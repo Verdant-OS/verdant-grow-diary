@@ -11,7 +11,7 @@ const opts = [
   { label: "Training", icon: Scissors, to: "/app/diary?new=training" },
   { label: "Photo", icon: Camera, to: "/app/photos?upload=1" },
   { label: "Environment", icon: Activity, to: "/app/sensors?new=1" },
-  { label: "Diagnosis", icon: Stethoscope, to: "/app/ask?diag=1" },
+  { label: "Diagnosis", icon: Stethoscope, to: "/app/diagnosis" },
   { label: "Harvest", icon: Sprout, to: "/app/diary?new=harvest" },
 ];
 

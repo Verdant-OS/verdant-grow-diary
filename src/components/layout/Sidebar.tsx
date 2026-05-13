@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, Sprout, BookOpen, Calendar, Image, Bot, BarChart3, Activity, Users, Settings, Leaf } from "lucide-react";
+import { LayoutDashboard, Sprout, BookOpen, Calendar, Image, Bot, Stethoscope, BarChart3, Activity, Users, Settings, Leaf } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
@@ -9,6 +9,7 @@ const items = [
   { to: "/app/calendar", icon: Calendar, label: "Calendar" },
   { to: "/app/photos", icon: Image, label: "Photos" },
   { to: "/app/ask", icon: Bot, label: "Ask My Grow" },
+  { to: "/app/diagnosis", icon: Stethoscope, label: "Diagnosis" },
   { to: "/app/reports", icon: BarChart3, label: "Reports" },
   { to: "/app/sensors", icon: Activity, label: "Sensors" },
   { to: "/app/customer", icon: Users, label: "Customer Mode" },

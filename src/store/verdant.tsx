@@ -63,6 +63,7 @@ export interface WateringEvent {
   runoffAmount?: number; runoffPh?: number; runoffEc?: number;
   soilMoistureBefore?: number; soilMoistureAfter?: number;
   nutrientsAdded?: boolean; notes?: string;
+  photoIds?: string[]; snapshotId?: string;
 }
 
 export interface FeedingEvent {
@@ -71,6 +72,7 @@ export interface FeedingEvent {
   totalVolume?: number; startEc?: number; finalEc?: number;
   phAfterMix?: number; runoffEc?: number; runoffPh?: number;
   response?: string;
+  photoIds?: string[]; snapshotId?: string;
 }
 
 export type TrainingType = "topping" | "defoliation" | "LST" | "HST" | "pruning" | "leaf-tucking" | "transplant";
@@ -79,18 +81,23 @@ export interface TrainingEvent {
   trainingType: TrainingType; areas?: string;
   stress?: "low" | "med" | "high";
   recoveryNotes?: string; followup24?: string; followup72?: string;
+  photoIds?: string[]; snapshotId?: string;
 }
 
 export interface Photo {
   id: string; plantId: string; timestamp: string;
   stage?: Stage; angle?: string; notes?: string;
+  symptoms?: string;
   diagnosisId?: string;
+  diaryEntryId?: string;
   dataUrl: string;
 }
 
 export interface Diagnosis {
   id: string; plantId: string; timestamp: string;
   photoIds: string[]; context: Record<string, string>;
+  symptoms?: string;
+  snapshotId?: string;
   result?: {
     likelyIssue: string; confidence: "low" | "medium" | "high";
     visualClues: string[]; possibleCauses: string[];
@@ -108,6 +115,7 @@ export interface Harvest {
   aroma?: string; density?: string; bagAppeal?: number;
   smokeQuality?: string; mistakes?: string;
   growAgainScore?: number; finalNotes?: string;
+  photoIds?: string[]; snapshotId?: string;
 }
 
 export interface CalendarEvent {

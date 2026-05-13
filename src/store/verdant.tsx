@@ -162,6 +162,7 @@ interface Ctx extends State {
   addFeeding: (f: Omit<FeedingEvent, "id">) => void;
   addTraining: (t: Omit<TrainingEvent, "id">) => void;
   addPhoto: (p: Omit<Photo, "id">) => Photo;
+  logPhoto: (p: Omit<Photo, "id" | "diaryEntryId">, opts?: { snapshotId?: string; note?: string }) => { photo: Photo; diaryEntry: DiaryEntry };
   addDiagnosis: (d: Omit<Diagnosis, "id">) => Diagnosis;
   addHarvest: (h: Omit<Harvest, "id">) => void;
   addSnapshot: (s: Omit<SensorSnapshot, "id" | "warnings" | "confidence">) => SensorSnapshot;

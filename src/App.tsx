@@ -18,6 +18,7 @@ import AskMyGrow from "./pages/app/AskMyGrow";
 import Reports from "./pages/app/Reports";
 import Sensors from "./pages/app/Sensors";
 import CustomerHub from "./pages/app/CustomerHub";
+import Diagnosis from "./pages/app/Diagnosis";
 import SMSOptIns from "./pages/app/SMSOptIns";
 import Settings from "./pages/app/Settings";
 
@@ -44,6 +45,7 @@ const App = () => (
               <Route path="calendar" element={<CalendarPage />} />
               <Route path="photos" element={<Photos />} />
               <Route path="ask" element={<AskMyGrow />} />
+              <Route path="diagnosis" element={<Diagnosis />} />
               <Route path="reports" element={<Reports />} />
               <Route path="sensors" element={<Sensors />} />
               <Route path="customer" element={<CustomerHub />} />

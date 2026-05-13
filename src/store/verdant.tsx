@@ -281,42 +281,81 @@ export function VerdantProvider({ children }: { children: ReactNode }) {
     },
     addWatering: (w) => {
       const id = uid();
-      setState(s => ({ ...s, watering: [{ id, ...w }, ...s.watering],
-        diary: [{ id: uid(), plantId: w.plantId, timestamp: w.timestamp, type: "watering",
-          note: `Watered ${w.amount ?? "?"} ${w.runoffAmount ? `· runoff ${w.runoffAmount}` : ""}`,
-          photoIds: [], refId: id }, ...s.diary] }));
+      setState(s => {
+        const snapshotId = w.snapshotId ?? s.snapshots[0]?.id;
+        const photoIds = w.photoIds ?? [];
+        return { ...s, watering: [{ id, ...w, snapshotId, photoIds }, ...s.watering],
+          diary: [{ id: uid(), plantId: w.plantId, timestamp: w.timestamp, type: "watering",
+            note: `Watered ${w.amount ?? "?"} ${w.runoffAmount ? `· runoff ${w.runoffAmount}` : ""}`,
+            photoIds, snapshotId, refId: id }, ...s.diary] };
+      });
     },
     addFeeding: (f) => {
       const id = uid();
-      setState(s => ({ ...s, feeding: [{ id, ...f }, ...s.feeding],
-        diary: [{ id: uid(), plantId: f.plantId, timestamp: f.timestamp, type: "feeding",
-          note: `Fed ${f.brand ?? ""} EC ${f.finalEc ?? "?"} pH ${f.phAfterMix ?? "?"}`,
-          photoIds: [], refId: id }, ...s.diary] }));
+      setState(s => {
+        const snapshotId = f.snapshotId ?? s.snapshots[0]?.id;
+        const photoIds = f.photoIds ?? [];
+        return { ...s, feeding: [{ id, ...f, snapshotId, photoIds }, ...s.feeding],
+          diary: [{ id: uid(), plantId: f.plantId, timestamp: f.timestamp, type: "feeding",
+            note: `Fed ${f.brand ?? ""} EC ${f.finalEc ?? "?"} pH ${f.phAfterMix ?? "?"}`,
+            photoIds, snapshotId, refId: id }, ...s.diary] };
+      });
     },
     addTraining: (t) => {
       const id = uid();
-      setState(s => ({ ...s, training: [{ id, ...t }, ...s.training],
-        diary: [{ id: uid(), plantId: t.plantId, timestamp: t.timestamp, type: "training",
-          note: `${t.trainingType} · ${t.areas ?? ""}`, photoIds: [], refId: id }, ...s.diary] }));
+      setState(s => {
+        const snapshotId = t.snapshotId ?? s.snapshots[0]?.id;
+        const photoIds = t.photoIds ?? [];
+        return { ...s, training: [{ id, ...t, snapshotId, photoIds }, ...s.training],
+          diary: [{ id: uid(), plantId: t.plantId, timestamp: t.timestamp, type: "training",
+            note: `${t.trainingType} · ${t.areas ?? ""}`, photoIds, snapshotId, refId: id }, ...s.diary] };
+      });
     },
     addPhoto: (p) => {
       const photo: Photo = { id: uid(), ...p };
       setState(s => ({ ...s, photos: [photo, ...s.photos] }));
       return photo;
     },
+    logPhoto: (p, opts) => {
+      // Adds photo AND a linked diary entry of type "photo"
+      const photoId = uid();
+      const diaryId = uid();
+      let result: { photo: Photo; diaryEntry: DiaryEntry } | null = null;
+      setState(s => {
+        const snapshotId = opts?.snapshotId ?? s.snapshots[0]?.id;
+        const photo: Photo = { id: photoId, ...p, diaryEntryId: diaryId };
+        const diaryEntry: DiaryEntry = {
+          id: diaryId, plantId: p.plantId, timestamp: p.timestamp, type: "photo",
+          stage: p.stage, note: opts?.note || `Photo · ${p.angle || "captured"}`,
+          symptoms: p.symptoms, photoIds: [photoId], snapshotId, refId: photoId,
+        };
+        result = { photo, diaryEntry };
+        return { ...s, photos: [photo, ...s.photos], diary: [diaryEntry, ...s.diary] };
+      });
+      return result!;
+    },
     addDiagnosis: (d) => {
       const diag: Diagnosis = { id: uid(), ...d };
-      setState(s => ({ ...s, diagnoses: [diag, ...s.diagnoses],
-        diary: [{ id: uid(), plantId: d.plantId, timestamp: d.timestamp, type: "diagnosis",
-          note: d.result?.likelyIssue ?? "Diagnosis requested (pending AI provider)",
-          photoIds: d.photoIds, refId: diag.id }, ...s.diary] }));
+      setState(s => {
+        const snapshotId = d.snapshotId ?? s.snapshots[0]?.id;
+        const merged = { ...diag, snapshotId };
+        return { ...s, diagnoses: [merged, ...s.diagnoses],
+          diary: [{ id: uid(), plantId: d.plantId, timestamp: d.timestamp, type: "diagnosis",
+            note: d.result?.likelyIssue ?? "Diagnosis requested · AI provider not connected",
+            symptoms: d.symptoms,
+            photoIds: d.photoIds, snapshotId, refId: diag.id }, ...s.diary] };
+      });
       return diag;
     },
     addHarvest: (h) => {
       const id = uid();
-      setState(s => ({ ...s, harvests: [{ id, ...h }, ...s.harvests],
-        diary: [{ id: uid(), plantId: h.plantId, timestamp: h.date, type: "harvest",
-          note: `Harvest · wet ${h.wetWeight ?? "?"}g`, photoIds: [], refId: id }, ...s.diary] }));
+      setState(s => {
+        const snapshotId = h.snapshotId ?? s.snapshots[0]?.id;
+        const photoIds = h.photoIds ?? [];
+        return { ...s, harvests: [{ id, ...h, snapshotId, photoIds }, ...s.harvests],
+          diary: [{ id: uid(), plantId: h.plantId, timestamp: h.date, type: "harvest",
+            note: `Harvest · wet ${h.wetWeight ?? "?"}g`, photoIds, snapshotId, refId: id }, ...s.diary] };
+      });
     },
     addSnapshot: (raw) => {
       const v = validateSnapshot(raw);

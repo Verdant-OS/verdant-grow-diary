@@ -87,7 +87,7 @@ export default function Diary() {
             return (
               <div key={d.id} className="relative mb-4">
                 <span className="absolute -left-[18px] top-3 h-3 w-3 rounded-full bg-primary ring-4 ring-background" />
-                <div className="glass rounded-xl p-4">
+                <Link to={`/app/diary/${d.id}`} className="block glass rounded-xl p-4 hover:border-primary/40 transition-colors">
                   <div className="flex flex-wrap items-center gap-2 mb-2">
                     <Badge variant="outline" className={"capitalize " + typeColor[d.type]}>{d.type}</Badge>
                     {plant && <Link to={`/app/plants/${plant.id}`}><Badge variant="secondary" className="hover:bg-secondary/80">{plant.name}</Badge></Link>}

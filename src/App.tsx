@@ -12,6 +12,7 @@ import Dashboard from "./pages/app/Dashboard";
 import Plants from "./pages/app/Plants";
 import PlantDetail from "./pages/app/PlantDetail";
 import Diary from "./pages/app/Diary";
+import DiaryEntryDetail from "./pages/app/DiaryEntryDetail";
 import CalendarPage from "./pages/app/CalendarPage";
 import Photos from "./pages/app/Photos";
 import AskMyGrow from "./pages/app/AskMyGrow";
@@ -42,6 +43,7 @@ const App = () => (
               <Route path="plants" element={<Plants />} />
               <Route path="plants/:id" element={<PlantDetail />} />
               <Route path="diary" element={<Diary />} />
+              <Route path="diary/:id" element={<DiaryEntryDetail />} />
               <Route path="calendar" element={<CalendarPage />} />
               <Route path="photos" element={<Photos />} />
               <Route path="ask" element={<AskMyGrow />} />

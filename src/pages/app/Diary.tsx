@@ -90,7 +90,7 @@ export default function Diary() {
                 <Link to={`/app/diary/${d.id}`} className="block glass rounded-xl p-4 hover:border-primary/40 transition-colors">
                   <div className="flex flex-wrap items-center gap-2 mb-2">
                     <Badge variant="outline" className={"capitalize " + typeColor[d.type]}>{d.type}</Badge>
-                    {plant && <Link to={`/app/plants/${plant.id}`}><Badge variant="secondary" className="hover:bg-secondary/80">{plant.name}</Badge></Link>}
+                    {plant && <Badge variant="secondary">{plant.name}</Badge>}
                     <span className="text-xs text-muted-foreground">{format(new Date(d.timestamp), "MMM d, yyyy · HH:mm")}</span>
                     {snap && (
                       <span className="ml-auto inline-flex items-center gap-1.5">
@@ -116,8 +116,8 @@ export default function Diary() {
                       {snap.tempF ? `${snap.tempF}°F · ` : ""}{snap.humidity ? `${snap.humidity}% RH · ` : ""}{snap.vpd ? `VPD ${snap.vpd}` : ""}
                     </div>
                   )}
-                  {linkedTo && <div className="mt-2 text-[11px] text-muted-foreground">Linked from {linkedTo}.</div>}
-                </div>
+                  {linkedTo && <div className="mt-2 text-[11px] text-muted-foreground">Linked from {linkedTo} · click to open</div>}
+                </Link>
               </div>
             );
           })}

@@ -80,41 +80,79 @@ export default function Rewards() {
       {/* Tier 2 harvest gate */}
       {level >= 8 && level < 21 && (
         <section className="glass rounded-2xl p-4 mb-5 border border-primary/30">
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-3 mb-4">
             <div className="h-10 w-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
               <Scissors className="h-5 w-5 text-primary" />
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="font-display font-semibold">Tier 2 · Vegetative gate</h2>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Tier 2 · Vegetative gate</div>
+              <h2 className="font-display font-semibold leading-tight">Currently capped at Lv {levelCap}</h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Levels 11–20 unlock as you document harvests. You're capped at <span className="text-foreground font-semibold">Lv {levelCap}</span> until your next harvest.
-              </p>
-              <div className="grid grid-cols-3 gap-2 mt-3">
-                {[
-                  { req: 1, max: "Lv 14" },
-                  { req: 2, max: "Lv 17" },
-                  { req: 3, max: "Lv 20" },
-                ].map((g) => {
-                  const met = harvestCount >= g.req;
-                  return (
-                    <div key={g.req} className={`rounded-xl border p-2 text-center ${met ? "border-primary/60 bg-primary/10" : "border-border/40 opacity-70"}`}>
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{g.req} harvest{g.req > 1 ? "s" : ""}</div>
-                      <div className="text-sm font-semibold tabular-nums">{g.max}</div>
-                    </div>
-                  );
-                })}
-              </div>
-              <p className="text-[11px] text-muted-foreground mt-2 tabular-nums">
-                Logged harvests: <span className="text-foreground font-semibold">{harvestCount}</span>
-                {(() => {
-                  const g = nextHarvestGate(harvestCount);
-                  return g
-                    ? <> · log <span className="text-foreground font-semibold">{g.needed}</span> more to unlock Lv {g.cap}.</>
-                    : <> · all Tier 2 gates cleared 🎉</>;
-                })()}
+                Levels 11–20 unlock as you document harvests.
               </p>
             </div>
           </div>
+
+          {/* Big "next gate" callout */}
+          {(() => {
+            const g = nextHarvestGate(harvestCount);
+            if (!g) {
+              return (
+                <div className="rounded-xl border border-primary/50 bg-primary/10 p-3 text-center">
+                  <div className="text-sm font-display font-semibold text-primary">All Tier 2 gates cleared 🎉</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">Keep stacking NUGs toward Lv 20.</div>
+                </div>
+              );
+            }
+            return (
+              <div className="rounded-xl border border-primary/40 bg-primary/5 p-3 flex items-center gap-3">
+                <div className="text-3xl font-display font-bold text-primary tabular-nums leading-none">{g.needed}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold leading-tight">
+                    more harvest{g.needed > 1 ? "s" : ""} to reach <span className="tabular-nums">Lv {g.cap}</span>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5 tabular-nums">
+                    {harvestCount} of {g.needed + harvestCount} harvest{g.needed + harvestCount > 1 ? "s" : ""} logged · log one from the Grows tab
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Gate ladder */}
+          <ol className="grid grid-cols-3 gap-2 mt-3" aria-label="Tier 2 harvest gates">
+            {[
+              { req: 1, max: 14 },
+              { req: 2, max: 17 },
+              { req: 3, max: 20 },
+            ].map((gate) => {
+              const met = harvestCount >= gate.req;
+              const isCurrent = !met && nextHarvestGate(harvestCount)?.cap === gate.max;
+              return (
+                <li
+                  key={gate.req}
+                  aria-current={isCurrent ? "step" : undefined}
+                  className={`rounded-xl border p-2 text-center transition ${
+                    met
+                      ? "border-primary/60 bg-primary/10"
+                      : isCurrent
+                      ? "border-primary bg-primary/5 ring-2 ring-primary/40"
+                      : "border-border/40 opacity-60"
+                  }`}
+                >
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center justify-center gap-1">
+                    {met && <Check className="h-3 w-3 text-primary" />}
+                    {isCurrent && <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />}
+                    {gate.req} harvest{gate.req > 1 ? "s" : ""}
+                  </div>
+                  <div className="text-sm font-semibold tabular-nums">Lv {gate.max}</div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">
+                    {met ? "unlocked" : isCurrent ? "next" : "locked"}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
         </section>
       )}
 

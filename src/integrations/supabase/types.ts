@@ -97,6 +97,42 @@ export type Database = {
         }
         Relationships: []
       }
+      harvests: {
+        Row: {
+          created_at: string
+          grow_id: string
+          grow_type: string
+          harvested_at: string
+          id: string
+          medium: string | null
+          notes: string | null
+          user_id: string
+          yield_grams: number | null
+        }
+        Insert: {
+          created_at?: string
+          grow_id: string
+          grow_type: string
+          harvested_at?: string
+          id?: string
+          medium?: string | null
+          notes?: string | null
+          user_id: string
+          yield_grams?: number | null
+        }
+        Update: {
+          created_at?: string
+          grow_id?: string
+          grow_type?: string
+          harvested_at?: string
+          id?: string
+          medium?: string | null
+          notes?: string | null
+          user_id?: string
+          yield_grams?: number | null
+        }
+        Relationships: []
+      }
       nug_events: {
         Row: {
           amount: number
@@ -220,6 +256,7 @@ export type Database = {
           tier: string
         }[]
       }
+      max_level_for_user: { Args: { _user_id: string }; Returns: number }
     }
     Enums: {
       [_ in never]: never

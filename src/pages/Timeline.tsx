@@ -4,12 +4,13 @@ import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
 import { STAGES, stageLabel } from "@/lib/grow";
 import { format, formatDistanceToNow } from "date-fns";
-import { Sprout, Image as ImageIcon, Loader2, Camera, FileText, FlaskConical, Check, Pencil } from "lucide-react";
+import { Sprout, Image as ImageIcon, Loader2, Camera, FileText, FlaskConical, Check, Pencil, Leaf, Gauge, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import QuestChecklist from "@/components/QuestChecklist";
 import EntryEditDialog from "@/components/EntryEditDialog";
 import { cn } from "@/lib/utils";
+import { getEventType } from "@/lib/diary";
 
 interface Entry {
   id: string; note: string; photo_url: string | null; stage: string | null;

@@ -48,11 +48,10 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
       const path = `${user.id}/${activeGrowId}/${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage.from("diary-photos").upload(path, photoFile, { contentType: photoFile.type });
       if (upErr) throw upErr;
-      const { data: pub } = supabase.storage.from("diary-photos").getPublicUrl(path);
 
       const cleanDetails = Object.fromEntries(Object.entries(details).filter(([, v]) => v && v.toString().trim()));
       const { error: insErr } = await supabase.from("diary_entries").insert({
-        user_id: user.id, grow_id: activeGrowId, photo_url: pub.publicUrl,
+        user_id: user.id, grow_id: activeGrowId, photo_url: path,
         note: note.trim(), stage, details: cleanDetails,
       });
       if (insErr) throw insErr;

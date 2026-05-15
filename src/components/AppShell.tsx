@@ -1,75 +1,88 @@
 import { useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { Home, Sprout, Sparkles, Plus, LogOut, Leaf, Trophy } from "lucide-react";
+import { Outlet, useNavigate } from "react-router-dom";
+import { Bell, LogOut, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/store/auth";
-import { useGrows } from "@/store/grows";
+import { useAlerts } from "@/hooks/useMockData";
+import AppSidebar from "./AppSidebar";
+import MobileNav from "./MobileNav";
 import QuickLog from "./QuickLog";
 import NugBadge from "./NugBadge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function AppShell() {
   const { user, loading, signOut } = useAuth();
-  const { grows, activeGrowId, setActiveGrowId } = useGrows();
+  const { data: alerts } = useAlerts();
   const nav = useNavigate();
   const [openLog, setOpenLog] = useState(false);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
   if (!user) { nav("/auth", { replace: true }); return null; }
 
-  const navItems = [
-    { to: "/", label: "Timeline", icon: Home, end: true },
-    { to: "/grows", label: "Grows", icon: Sprout, end: false },
-    { to: "/coach", label: "AI Coach", icon: Sparkles, end: false },
-    { to: "/rewards", label: "Rewards", icon: Trophy, end: false },
-  ];
+  const unread = (alerts || []).filter((a) => !a.acknowledged).length;
 
   return (
-    <div className="min-h-screen pb-24">
-      {/* Top bar */}
-      <header className="sticky top-0 z-30 backdrop-blur-xl bg-background/70 border-b border-border/40">
-        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg gradient-leaf flex items-center justify-center"><Leaf className="h-4 w-4 text-primary-foreground" /></div>
-            <span className="font-display font-semibold">Verdant</span>
-          </div>
-          {grows.length > 0 && (
-            <Select value={activeGrowId ?? ""} onValueChange={setActiveGrowId}>
-              <SelectTrigger className="ml-auto h-9 w-36 text-sm"><SelectValue placeholder="Pick grow" /></SelectTrigger>
-              <SelectContent>{grows.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}</SelectContent>
-            </Select>
-          )}
-          <div className={grows.length === 0 ? "ml-auto flex items-center gap-2" : "flex items-center gap-2"}>
-            <NugBadge />
-            <Button variant="ghost" size="icon" onClick={() => signOut().then(() => nav("/auth"))}>
-              <LogOut className="h-4 w-4" />
-            </Button>
-          </div>
+    <SidebarProvider defaultOpen>
+      <div className="min-h-screen flex w-full">
+        {/* Desktop sidebar */}
+        <div className="hidden md:block">
+          <AppSidebar />
         </div>
-      </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-5"><Outlet /></main>
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Top bar */}
+          <header className="sticky top-0 z-30 backdrop-blur-xl bg-background/70 border-b border-border/40">
+            <div className="h-14 px-3 md:px-5 flex items-center gap-3">
+              <div className="hidden md:block">
+                <SidebarTrigger />
+              </div>
+              <div className="md:hidden font-display font-semibold flex items-center gap-2">
+                <span className="h-7 w-7 rounded-lg gradient-leaf inline-flex items-center justify-center">
+                  <span className="text-primary-foreground font-bold text-sm">V</span>
+                </span>
+                Verdant
+              </div>
 
-      {/* Floating + button */}
-      <button onClick={() => setOpenLog(true)} aria-label="Quick log"
-        className="fixed z-40 bottom-24 right-1/2 translate-x-1/2 sm:translate-x-0 sm:right-8 h-16 w-16 rounded-full gradient-leaf shadow-elevated flex items-center justify-center text-primary-foreground hover:scale-105 transition active:scale-95 glow-accent">
-        <Plus className="h-7 w-7" />
-      </button>
+              <div className="ml-auto flex items-center gap-2">
+                <button className="hidden md:inline-flex items-center gap-2 px-3 h-9 rounded-lg border border-border/50 bg-secondary/30 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition">
+                  <Search className="h-4 w-4" /><span className="hidden lg:inline">Search…</span>
+                  <kbd className="hidden lg:inline ml-2 text-[10px] px-1.5 py-0.5 rounded bg-background/60 border border-border/40">⌘K</kbd>
+                </button>
+                <NugBadge />
+                <Button variant="outline" size="sm" onClick={() => setOpenLog(true)} className="hidden md:inline-flex">
+                  <Plus className="h-4 w-4" /> Quick log
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => nav("/alerts")} aria-label="Alerts" className="relative">
+                  <Bell className="h-4 w-4" />
+                  {unread > 0 && (
+                    <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-background" />
+                  )}
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => signOut().then(() => nav("/auth"))} aria-label="Sign out">
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </header>
 
-      {/* Bottom nav */}
-      <nav className="fixed bottom-0 inset-x-0 z-30 backdrop-blur-xl bg-background/85 border-t border-border/40">
-        <div className="max-w-2xl mx-auto grid grid-cols-4 h-16">
-          {navItems.map((n) => (
-            <NavLink key={n.to} to={n.to} end={n.end}
-              className={({ isActive }) =>
-                `flex flex-col items-center justify-center gap-0.5 text-xs transition ${isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}>
-              <n.icon className="h-5 w-5" />{n.label}
-            </NavLink>
-          ))}
+          <main className="flex-1 px-4 md:px-6 lg:px-8 py-5 pb-28 md:pb-8 max-w-[1400px] w-full mx-auto">
+            <Outlet />
+          </main>
         </div>
-      </nav>
 
-      <QuickLog open={openLog} onOpenChange={setOpenLog} onCreated={() => window.dispatchEvent(new Event("verdant:entry-created"))} />
-    </div>
+        {/* Mobile floating + */}
+        <button
+          onClick={() => setOpenLog(true)}
+          aria-label="Quick log"
+          className="md:hidden fixed z-40 bottom-20 right-4 h-14 w-14 rounded-full gradient-leaf shadow-elevated flex items-center justify-center text-primary-foreground hover:scale-105 transition active:scale-95 glow-accent"
+        >
+          <Plus className="h-6 w-6" />
+        </button>
+
+        <MobileNav />
+
+        <QuickLog open={openLog} onOpenChange={setOpenLog} onCreated={() => window.dispatchEvent(new Event("verdant:entry-created"))} />
+      </div>
+    </SidebarProvider>
   );
 }

@@ -1,6 +1,14 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@2";
 
+interface LikelyFix {
+  resource: "table" | "storage";
+  target: string;
+  operation: "SELECT" | "INSERT" | "UPDATE" | "DELETE";
+  expectedBehavior: "deny" | "allow";
+  hint: string;
+}
+
 interface Check {
   name: string;
   passed: boolean;
@@ -17,6 +25,7 @@ interface Check {
     name?: string;
   };
   dataSnapshot?: unknown;
+  likelyFix?: LikelyFix;
 }
 
 Deno.serve(async (req) => {

@@ -16,7 +16,7 @@ interface NugEvent { id: string; kind: string; amount: number; created_at: strin
 
 export default function Rewards() {
   const { user } = useAuth();
-  const { profile, unlocks, completedQuests, award, refresh } = useNugs();
+  const { profile, unlocks, completedQuests, harvestCount, levelCap, award, refresh } = useNugs();
   const [events, setEvents] = useState<NugEvent[]>([]);
   const [name, setName] = useState("");
   const [savingName, setSavingName] = useState(false);

@@ -308,3 +308,51 @@ function json(b: unknown, status = 200) {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
+
+function inferLikelyFix(c: Check): LikelyFix | undefined {
+  const n = c.name;
+  // Table policies
+  const tableMatch = n.match(/^(diary_entries|grows):\s+(?:cross-user\s+)?(SELECT|INSERT|UPDATE|DELETE)/i);
+  if (tableMatch) {
+    const target = tableMatch[1];
+    const op = tableMatch[2].toUpperCase() as LikelyFix["operation"];
+    const expectedBehavior: LikelyFix["expectedBehavior"] = "deny";
+    const using = `auth.uid() = user_id`;
+    const clause = op === "INSERT" ? `WITH CHECK (${using})` : `USING (${using})`;
+    return {
+      resource: "table",
+      target: `public.${target}`,
+      operation: op,
+      expectedBehavior,
+      hint: `Cross-user ${op} should be denied. Verify RLS is ENABLED on public.${target} and the ${op} policy uses ${clause}. If missing, recreate it. Likely cause: policy missing, too permissive (e.g. USING (true)), or RLS disabled.`,
+    };
+  }
+  if (/owner row intact/i.test(n)) {
+    return {
+      resource: "table",
+      target: "public.diary_entries",
+      operation: "SELECT",
+      expectedBehavior: "allow",
+      hint: `Owner could not read their own row after cross-user attempts — check that an UPDATE/DELETE policy didn't actually mutate the row, and that the SELECT policy with USING (auth.uid() = user_id) is intact.`,
+    };
+  }
+  // Storage policies on storage.objects for bucket diary-photos
+  if (/^storage:/i.test(n)) {
+    const expectedBehavior: LikelyFix["expectedBehavior"] = /owner can/i.test(n) ? "allow" : "deny";
+    let op: LikelyFix["operation"] = "SELECT";
+    if (/upload/i.test(n)) op = "INSERT";
+    else if (/remove/i.test(n)) op = "DELETE";
+    else if (/download|createSignedUrl/i.test(n)) op = "SELECT";
+    const folderCheck = `bucket_id = 'diary-photos' AND auth.uid()::text = (storage.foldername(name))[1]`;
+    return {
+      resource: "storage",
+      target: "storage.objects (bucket: diary-photos)",
+      operation: op,
+      expectedBehavior,
+      hint: expectedBehavior === "deny"
+        ? `Cross-user ${op} on diary-photos should be denied. Confirm bucket is private and the ${op} policy uses ${folderCheck}. If a public SELECT policy exists, drop it.`
+        : `Owner ${op} on own folder should succeed. Confirm a ${op} policy on storage.objects exists with ${folderCheck}.`,
+    };
+  }
+  return undefined;
+}

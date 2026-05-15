@@ -26,9 +26,18 @@ interface Ctx {
   profile: Profile | null;
   unlocks: Set<string>;
   completedQuests: Set<string>;
+  harvestCount: number;
+  levelCap: number;
   loading: boolean;
   award: (kind: string, amount: number, opts?: { questKey?: string; meta?: Record<string, unknown>; silent?: boolean }) => Promise<AwardResult | null>;
   refresh: () => Promise<void>;
+}
+
+function capForHarvests(h: number): number {
+  if (h >= 3) return 20;
+  if (h >= 2) return 17;
+  if (h >= 1) return 14;
+  return 10;
 }
 
 const NugsCtx = createContext<Ctx>({} as Ctx);

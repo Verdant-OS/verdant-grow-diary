@@ -275,6 +275,9 @@ Deno.serve(async (req) => {
       await admin.auth.admin.deleteUser(userB.id).catch(() => {});
     }
 
+    // Annotate each check with a best-effort fix hint
+    for (const c of checks) c.likelyFix = inferLikelyFix(c);
+
     const failed = checks.filter((c) => !c.passed);
     const totalDurationMs = Math.round(performance.now() - overallStart);
     return json({
@@ -282,6 +285,7 @@ Deno.serve(async (req) => {
       total: checks.length,
       failedCount: failed.length,
       durationMs: totalDurationMs,
+      topFixes: failed.map((c) => c.likelyFix).filter(Boolean),
       checks,
     }, failed.length === 0 ? 200 : 500);
   } catch (e) {

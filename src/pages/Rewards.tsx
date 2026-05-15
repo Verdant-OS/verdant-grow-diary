@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Sparkles, Lock, Trophy, Check } from "lucide-react";
+import { Sparkles, Lock, Trophy, Check, Scissors } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { useNugs } from "@/store/nugs";
@@ -16,7 +16,7 @@ interface NugEvent { id: string; kind: string; amount: number; created_at: strin
 
 export default function Rewards() {
   const { user } = useAuth();
-  const { profile, unlocks, completedQuests, award, refresh } = useNugs();
+  const { profile, unlocks, completedQuests, harvestCount, levelCap, award, refresh } = useNugs();
   const [events, setEvents] = useState<NugEvent[]>([]);
   const [name, setName] = useState("");
   const [savingName, setSavingName] = useState(false);
@@ -76,6 +76,41 @@ export default function Rewards() {
           <span>{next.toLocaleString()}</span>
         </div>
       </section>
+
+      {/* Tier 2 harvest gate */}
+      {level >= 8 && level < 21 && (
+        <section className="glass rounded-2xl p-4 mb-5 border border-primary/30">
+          <div className="flex items-start gap-3">
+            <div className="h-10 w-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+              <Scissors className="h-5 w-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="font-display font-semibold">Tier 2 · Vegetative gate</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Levels 11–20 unlock as you document harvests. You're capped at <span className="text-foreground font-semibold">Lv {levelCap}</span> until your next harvest.
+              </p>
+              <div className="grid grid-cols-3 gap-2 mt-3">
+                {[
+                  { req: 1, max: "Lv 14" },
+                  { req: 2, max: "Lv 17" },
+                  { req: 3, max: "Lv 20" },
+                ].map((g) => {
+                  const met = harvestCount >= g.req;
+                  return (
+                    <div key={g.req} className={`rounded-xl border p-2 text-center ${met ? "border-primary/60 bg-primary/10" : "border-border/40 opacity-70"}`}>
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{g.req} harvest{g.req > 1 ? "s" : ""}</div>
+                      <div className="text-sm font-semibold tabular-nums">{g.max}</div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-2 tabular-nums">
+                Logged harvests: <span className="text-foreground font-semibold">{harvestCount}</span> · log a harvest from the Grows tab.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
 
       <QuestChecklist />
 

@@ -94,8 +94,9 @@ export function NugsProvider({ children }: { children: ReactNode }) {
     return res;
   }, [user, refresh]);
 
+  const levelCap = capForHarvests(harvestCount);
   return (
-    <NugsCtx.Provider value={{ profile, unlocks, completedQuests, loading, award, refresh }}>
+    <NugsCtx.Provider value={{ profile, unlocks, completedQuests, harvestCount, levelCap, loading, award, refresh }}>
       {children}
     </NugsCtx.Provider>
   );

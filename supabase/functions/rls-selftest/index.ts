@@ -1,10 +1,28 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@2";
 
-interface Check { name: string; passed: boolean; detail?: string }
+interface Check {
+  name: string;
+  passed: boolean;
+  durationMs: number;
+  detail?: string;
+  status?: number;
+  rowCount?: number;
+  affectedRows?: number;
+  error?: {
+    message?: string;
+    code?: string;
+    details?: string;
+    hint?: string;
+    name?: string;
+  };
+  dataSnapshot?: unknown;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const overallStart = performance.now();
+
   try {
     const expected = Deno.env.get("RLS_TEST_SECRET");
     const provided = req.headers.get("x-rls-test-secret");
@@ -35,8 +53,37 @@ Deno.serve(async (req) => {
     };
 
     const checks: Check[] = [];
-    const record = (name: string, passed: boolean, detail?: string) => {
-      checks.push({ name, passed, detail });
+
+    const runCheck = async (
+      name: string,
+      fn: () => Promise<{
+        passed: boolean;
+        detail?: string;
+        status?: number;
+        rowCount?: number;
+        affectedRows?: number;
+        error?: Check["error"];
+        dataSnapshot?: unknown;
+      }>,
+    ) => {
+      const start = performance.now();
+      try {
+        const result = await fn();
+        checks.push({
+          name,
+          passed: result.passed,
+          durationMs: Math.round(performance.now() - start),
+          ...result,
+        });
+      } catch (e) {
+        checks.push({
+          name,
+          passed: false,
+          durationMs: Math.round(performance.now() - start),
+          detail: `Exception: ${e instanceof Error ? e.message : String(e)}`,
+          error: { message: e instanceof Error ? e.message : String(e) },
+        });
+      }
     };
 
     try {
@@ -52,8 +99,14 @@ Deno.serve(async (req) => {
       if (growErr || !grow) throw new Error("seed grow failed: " + growErr?.message);
 
       const photoPath = `${userA.id}/${grow.id}/${stamp}.txt`;
-      const upA = await clientA.storage.from("diary-photos").upload(photoPath, new Blob(["secret-A"], { type: "text/plain" }));
-      record("storage: owner can upload to own folder", !upA.error, upA.error?.message);
+      await runCheck("storage: owner can upload to own folder", async () => {
+        const upA = await clientA.storage.from("diary-photos").upload(photoPath, new Blob(["secret-A"], { type: "text/plain" }));
+        return {
+          passed: !upA.error,
+          detail: upA.error ? upA.error.message : "uploaded successfully",
+          error: upA.error ? { message: upA.error.message, name: (upA.error as any).name } : undefined,
+        };
+      });
 
       const { data: entry, error: entryErr } = await clientA.from("diary_entries").insert({
         user_id: userA.id, grow_id: grow.id, note: "private note A", photo_url: photoPath,
@@ -62,64 +115,157 @@ Deno.serve(async (req) => {
 
       // --- Cross-user attempts as user B ---
 
-      // SELECT diary_entries: should return nothing for A's row
-      const sel = await clientB.from("diary_entries").select("*").eq("id", entry.id);
-      record("diary_entries: cross-user SELECT returns no rows", (sel.data?.length ?? 0) === 0,
-        sel.error ? sel.error.message : `rows=${sel.data?.length}`);
-
-      // SELECT grows: should return nothing for A's row
-      const selG = await clientB.from("grows").select("*").eq("id", grow.id);
-      record("grows: cross-user SELECT returns no rows", (selG.data?.length ?? 0) === 0,
-        selG.error ? selG.error.message : `rows=${selG.data?.length}`);
-
-      // INSERT spoofing user A's id: must fail with-check
-      const insSpoof = await clientB.from("diary_entries").insert({
-        user_id: userA.id, grow_id: grow.id, note: "spoof",
+      await runCheck("diary_entries: cross-user SELECT returns no rows", async () => {
+        const sel = await clientB.from("diary_entries").select("*", { count: "exact" }).eq("id", entry.id);
+        const rowCount = sel.count ?? sel.data?.length ?? 0;
+        return {
+          passed: rowCount === 0,
+          detail: sel.error ? sel.error.message : `rows=${rowCount}`,
+          rowCount,
+          error: sel.error ? {
+            message: sel.error.message,
+            code: sel.error.code,
+            details: (sel.error as any).details,
+            hint: (sel.error as any).hint,
+          } : undefined,
+          dataSnapshot: sel.data,
+        };
       });
-      record("diary_entries: cross-user INSERT spoofing user_id is denied", !!insSpoof.error,
-        insSpoof.error?.message ?? "no error returned");
 
-      // UPDATE A's row as B: must affect 0 rows
-      const upd = await clientB.from("diary_entries").update({ note: "hacked" }).eq("id", entry.id).select();
-      record("diary_entries: cross-user UPDATE affects 0 rows", (upd.data?.length ?? 0) === 0,
-        upd.error ? upd.error.message : `affected=${upd.data?.length}`);
+      await runCheck("grows: cross-user SELECT returns no rows", async () => {
+        const sel = await clientB.from("grows").select("*", { count: "exact" }).eq("id", grow.id);
+        const rowCount = sel.count ?? sel.data?.length ?? 0;
+        return {
+          passed: rowCount === 0,
+          detail: sel.error ? sel.error.message : `rows=${rowCount}`,
+          rowCount,
+          error: sel.error ? {
+            message: sel.error.message,
+            code: sel.error.code,
+            details: (sel.error as any).details,
+            hint: (sel.error as any).hint,
+          } : undefined,
+          dataSnapshot: sel.data,
+        };
+      });
 
-      // DELETE A's row as B: must affect 0 rows
-      const del = await clientB.from("diary_entries").delete().eq("id", entry.id).select();
-      record("diary_entries: cross-user DELETE affects 0 rows", (del.data?.length ?? 0) === 0,
-        del.error ? del.error.message : `affected=${del.data?.length}`);
+      await runCheck("diary_entries: cross-user INSERT spoofing user_id is denied", async () => {
+        const ins = await clientB.from("diary_entries").insert({
+          user_id: userA.id, grow_id: grow.id, note: "spoof",
+        });
+        return {
+          passed: !!ins.error,
+          detail: ins.error ? ins.error.message : "no error returned",
+          error: ins.error ? {
+            message: ins.error.message,
+            code: ins.error.code,
+            details: (ins.error as any).details,
+            hint: (ins.error as any).hint,
+          } : undefined,
+        };
+      });
 
-      // Confirm A's row still intact via A
-      const verify = await clientA.from("diary_entries").select("note").eq("id", entry.id).single();
-      record("diary_entries: owner row intact after cross-user attempts",
-        !verify.error && verify.data?.note === "private note A",
-        verify.error?.message ?? `note=${verify.data?.note}`);
+      await runCheck("diary_entries: cross-user UPDATE affects 0 rows", async () => {
+        const upd = await clientB.from("diary_entries").update({ note: "hacked" }).eq("id", entry.id).select();
+        const affectedRows = upd.data?.length ?? 0;
+        return {
+          passed: affectedRows === 0,
+          detail: upd.error ? upd.error.message : `affected=${affectedRows}`,
+          affectedRows,
+          error: upd.error ? {
+            message: upd.error.message,
+            code: upd.error.code,
+            details: (upd.error as any).details,
+            hint: (upd.error as any).hint,
+          } : undefined,
+          dataSnapshot: upd.data,
+        };
+      });
 
-      // STORAGE: B downloads A's private photo via signed URL attempt: must fail
-      const signB = await clientB.storage.from("diary-photos").createSignedUrl(photoPath, 60);
-      record("storage: cross-user createSignedUrl is denied", !!signB.error,
-        signB.error?.message ?? "signed url created");
+      await runCheck("diary_entries: cross-user DELETE affects 0 rows", async () => {
+        const del = await clientB.from("diary_entries").delete().eq("id", entry.id).select();
+        const affectedRows = del.data?.length ?? 0;
+        return {
+          passed: affectedRows === 0,
+          detail: del.error ? del.error.message : `affected=${affectedRows}`,
+          affectedRows,
+          error: del.error ? {
+            message: del.error.message,
+            code: del.error.code,
+            details: (del.error as any).details,
+            hint: (del.error as any).hint,
+          } : undefined,
+          dataSnapshot: del.data,
+        };
+      });
 
-      // STORAGE: B downloads via .download(): must fail
-      const dlB = await clientB.storage.from("diary-photos").download(photoPath);
-      record("storage: cross-user download is denied", !!dlB.error,
-        dlB.error?.message ?? "downloaded bytes");
+      await runCheck("diary_entries: owner row intact after cross-user attempts", async () => {
+        const verify = await clientA.from("diary_entries").select("note").eq("id", entry.id).single();
+        return {
+          passed: !verify.error && verify.data?.note === "private note A",
+          detail: verify.error ? verify.error.message : `note=${verify.data?.note}`,
+          error: verify.error ? {
+            message: verify.error.message,
+            code: verify.error.code,
+            details: (verify.error as any).details,
+            hint: (verify.error as any).hint,
+          } : undefined,
+          dataSnapshot: verify.data,
+        };
+      });
 
-      // STORAGE: B uploads into A's folder: must fail
-      const upB = await clientB.storage.from("diary-photos").upload(`${userA.id}/${grow.id}/intruder.txt`,
-        new Blob(["x"], { type: "text/plain" }));
-      record("storage: cross-user upload into other folder is denied", !!upB.error,
-        upB.error?.message ?? "uploaded");
+      await runCheck("storage: cross-user createSignedUrl is denied", async () => {
+        const signB = await clientB.storage.from("diary-photos").createSignedUrl(photoPath, 60);
+        return {
+          passed: !!signB.error,
+          detail: signB.error ? signB.error.message : "signed url created",
+          error: signB.error ? { message: signB.error.message, name: (signB.error as any).name } : undefined,
+          dataSnapshot: signB.data,
+        };
+      });
 
-      // STORAGE: B deletes A's file: must report not removed
-      const rmB = await clientB.storage.from("diary-photos").remove([photoPath]);
-      const rmBlocked = !!rmB.error || (Array.isArray(rmB.data) && rmB.data.length === 0);
-      record("storage: cross-user remove is denied", rmBlocked,
-        rmB.error?.message ?? `removed=${rmB.data?.length ?? 0}`);
+      await runCheck("storage: cross-user download is denied", async () => {
+        const dlB = await clientB.storage.from("diary-photos").download(photoPath);
+        return {
+          passed: !!dlB.error,
+          detail: dlB.error ? dlB.error.message : "downloaded bytes",
+          error: dlB.error ? { message: dlB.error.message, name: (dlB.error as any).name } : undefined,
+          dataSnapshot: dlB.data ? "<Blob>" : undefined,
+        };
+      });
 
-      // Owner can still download own file
-      const dlA = await clientA.storage.from("diary-photos").download(photoPath);
-      record("storage: owner can download own file", !dlA.error, dlA.error?.message);
+      await runCheck("storage: cross-user upload into other folder is denied", async () => {
+        const upB = await clientB.storage.from("diary-photos").upload(
+          `${userA.id}/${grow.id}/intruder.txt`,
+          new Blob(["x"], { type: "text/plain" }),
+        );
+        return {
+          passed: !!upB.error,
+          detail: upB.error ? upB.error.message : "uploaded",
+          error: upB.error ? { message: upB.error.message, name: (upB.error as any).name } : undefined,
+        };
+      });
+
+      await runCheck("storage: cross-user remove is denied", async () => {
+        const rmB = await clientB.storage.from("diary-photos").remove([photoPath]);
+        const rmBlocked = !!rmB.error || (Array.isArray(rmB.data) && rmB.data.length === 0);
+        return {
+          passed: rmBlocked,
+          detail: rmB.error ? rmB.error.message : `removed=${rmB.data?.length ?? 0}`,
+          error: rmB.error ? { message: rmB.error.message, name: (rmB.error as any).name } : undefined,
+          dataSnapshot: rmB.data,
+        };
+      });
+
+      await runCheck("storage: owner can download own file", async () => {
+        const dlA = await clientA.storage.from("diary-photos").download(photoPath);
+        return {
+          passed: !dlA.error,
+          detail: dlA.error ? dlA.error.message : "downloaded successfully",
+          error: dlA.error ? { message: dlA.error.message, name: (dlA.error as any).name } : undefined,
+          dataSnapshot: dlA.data ? "<Blob>" : undefined,
+        };
+      });
     } finally {
       // Cleanup with service role
       await admin.from("diary_entries").delete().eq("user_id", userA.id);
@@ -130,10 +276,12 @@ Deno.serve(async (req) => {
     }
 
     const failed = checks.filter((c) => !c.passed);
+    const totalDurationMs = Math.round(performance.now() - overallStart);
     return json({
       passed: failed.length === 0,
       total: checks.length,
       failedCount: failed.length,
+      durationMs: totalDurationMs,
       checks,
     }, failed.length === 0 ? 200 : 500);
   } catch (e) {

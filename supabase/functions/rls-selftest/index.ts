@@ -275,6 +275,22 @@ Deno.serve(async (req) => {
           dataSnapshot: dlA.data ? "<Blob>" : undefined,
         };
       });
+
+      // QuickLog parity: owner must be able to insert a diary_entry with photo_url = null
+      await runCheck("diary_entries: owner INSERT with photo_url=null succeeds", async () => {
+        const ins = await clientA.from("diary_entries").insert({
+          user_id: userA.id, grow_id: grow.id, note: "text-only entry", photo_url: null,
+        }).select().single();
+        return {
+          passed: !ins.error && !!ins.data && ins.data.photo_url === null,
+          detail: ins.error ? ins.error.message : `inserted id=${ins.data?.id} photo_url=${ins.data?.photo_url}`,
+          error: ins.error ? {
+            message: ins.error.message, code: ins.error.code,
+            details: (ins.error as any).details, hint: (ins.error as any).hint,
+          } : undefined,
+          dataSnapshot: ins.data,
+        };
+      });
     } finally {
       // Cleanup with service role
       await admin.from("diary_entries").delete().eq("user_id", userA.id);

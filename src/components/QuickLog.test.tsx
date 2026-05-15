@@ -140,4 +140,23 @@ describe("QuickLog photo Remove button", () => {
     // Preview is preserved so the user can retry without re-picking the file
     expect(dialog.querySelector("img")).toBeTruthy();
   });
+
+  it("blocks submit with no photo and empty note, showing the validation toast", async () => {
+    const onOpenChange = vi.fn();
+    const onCreated = vi.fn();
+    render(<QuickLog open={true} onOpenChange={onOpenChange} onCreated={onCreated} />);
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.querySelector("img")).toBeNull();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /save entry/i }));
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith("Add a quick note"));
+
+    expect(uploadMock).not.toHaveBeenCalled();
+    expect(insertMock).not.toHaveBeenCalled();
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(onCreated).not.toHaveBeenCalled();
+  });
 });

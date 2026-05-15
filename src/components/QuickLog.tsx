@@ -98,16 +98,27 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
         <DialogHeader><DialogTitle className="font-display flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" />Quick Log</DialogTitle></DialogHeader>
         <form onSubmit={submit} className="grid gap-4">
           {/* Photo */}
-          <button type="button" onClick={() => fileRef.current?.click()}
-            className="relative aspect-square w-full rounded-xl border-2 border-dashed border-border/60 overflow-hidden bg-secondary/40 hover:border-primary/60 transition">
-            {preview ? <img src={preview} className="h-full w-full object-cover" alt="" /> : (
-              <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
-                <Camera className="h-10 w-10" /><span className="text-sm">Tap to add photo (optional)</span>
-              </div>
+          <div className="relative aspect-square w-full rounded-xl border-2 border-dashed border-border/60 overflow-hidden bg-secondary/40 hover:border-primary/60 transition">
+            <button type="button" onClick={() => fileRef.current?.click()} className="absolute inset-0 h-full w-full">
+              {preview ? <img src={preview} className="h-full w-full object-cover" alt="" /> : (
+                <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
+                  <Camera className="h-10 w-10" /><span className="text-sm">Tap to add photo (optional)</span>
+                </div>
+              )}
+            </button>
+            {preview && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleFile(null); if (fileRef.current) fileRef.current.value = ""; }}
+                aria-label="Remove photo"
+                className="absolute top-2 right-2 z-10 rounded-full bg-background/80 backdrop-blur px-2 py-1 text-xs font-medium border border-border/60 hover:bg-background"
+              >
+                Remove
+              </button>
             )}
             <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden"
               onChange={(e) => handleFile(e.target.files?.[0] ?? null)} />
-          </button>
+          </div>
 
           {/* Grow + stage */}
           <div className="grid grid-cols-2 gap-2">

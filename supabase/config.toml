@@ -1,1 +1,4 @@
 project_id = "knkwiiywfkbqznbxwqfh"
+
+[functions.rls-selftest]
+verify_jwt = false

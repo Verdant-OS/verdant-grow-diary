@@ -8,6 +8,16 @@ import { GrowsProvider } from "@/store/grows";
 import { NugsProvider } from "@/store/nugs";
 import AppShell from "@/components/AppShell";
 import Auth from "./pages/Auth";
+import Dashboard from "./pages/Dashboard";
+import Tents from "./pages/Tents";
+import TentDetail from "./pages/TentDetail";
+import Plants from "./pages/Plants";
+import PlantDetail from "./pages/PlantDetail";
+import Sensors from "./pages/Sensors";
+import Tasks from "./pages/Tasks";
+import Cameras from "./pages/Cameras";
+import Alerts from "./pages/Alerts";
+import Settings from "./pages/Settings";
 import Timeline from "./pages/Timeline";
 import Grows from "./pages/Grows";
 import Coach from "./pages/Coach";
@@ -28,10 +38,20 @@ const App = () => (
               <Routes>
                 <Route path="/auth" element={<Auth />} />
                 <Route element={<AppShell />}>
-                  <Route path="/" element={<Timeline />} />
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/tents" element={<Tents />} />
+                  <Route path="/tents/:id" element={<TentDetail />} />
+                  <Route path="/plants" element={<Plants />} />
+                  <Route path="/plants/:id" element={<PlantDetail />} />
+                  <Route path="/sensors" element={<Sensors />} />
+                  <Route path="/logs" element={<Timeline />} />
+                  <Route path="/tasks" element={<Tasks />} />
+                  <Route path="/cameras" element={<Cameras />} />
+                  <Route path="/alerts" element={<Alerts />} />
+                  <Route path="/doctor" element={<Coach />} />
                   <Route path="/grows" element={<Grows />} />
-                  <Route path="/coach" element={<Coach />} />
                   <Route path="/rewards" element={<Rewards />} />
+                  <Route path="/settings" element={<Settings />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>

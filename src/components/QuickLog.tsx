@@ -82,7 +82,7 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
             className="relative aspect-square w-full rounded-xl border-2 border-dashed border-border/60 overflow-hidden bg-secondary/40 hover:border-primary/60 transition">
             {preview ? <img src={preview} className="h-full w-full object-cover" alt="" /> : (
               <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
-                <Camera className="h-10 w-10" /><span className="text-sm">Tap to add photo</span>
+                <Camera className="h-10 w-10" /><span className="text-sm">Tap to add photo (optional)</span>
               </div>
             )}
             <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden"

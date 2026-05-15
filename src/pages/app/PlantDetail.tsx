@@ -129,14 +129,15 @@ export default function PlantDetail() {
           {diary.length === 0 ? <Empty kind="diary" /> : (
             <div className="space-y-2">
               {diary.map(d => (
-                <div key={d.id} className="glass rounded-xl p-3 text-sm">
+                <Link key={d.id} to={`/app/diary/${d.id}`} className="block glass rounded-xl p-3 text-sm hover:border-primary/40 transition">
                   <div className="flex items-center gap-2 mb-1">
                     <Badge variant="outline" className="capitalize">{d.type}</Badge>
                     <span className="text-xs text-muted-foreground">{format(new Date(d.timestamp), "PPp")}</span>
+                    <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
                   </div>
                   {d.note}
                   {(d.photoIds?.length ?? 0) > 0 && <div className="mt-2 text-xs text-muted-foreground">{d.photoIds.length} photo(s) attached</div>}
-                </div>
+                </Link>
               ))}
             </div>
           )}
@@ -150,6 +151,7 @@ export default function PlantDetail() {
                   <div className="flex items-center gap-2 mb-1">
                     <Droplets className="h-4 w-4 text-info" />
                     <span className="text-xs text-muted-foreground">{format(new Date(w.timestamp), "PPp")}</span>
+                    <DiaryLink refId={w.id} type="watering" />
                   </div>
                   <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-xs font-mono">
                     <Cell l="Amt" v={w.amount} /><Cell l="pH in" v={w.ph} /><Cell l="EC in" v={w.ec} />
@@ -170,6 +172,7 @@ export default function PlantDetail() {
                   <div className="flex items-center gap-2 mb-1">
                     <FlaskConical className="h-4 w-4 text-primary" />
                     <span className="text-xs text-muted-foreground">{format(new Date(f.timestamp), "PPp")}</span>
+                    <DiaryLink refId={f.id} type="feeding" />
                   </div>
                   <div>{f.brand || "—"} · EC {f.finalEc ?? "?"} · pH {f.phAfterMix ?? "?"}</div>
                   {f.response && <div className="text-xs text-muted-foreground mt-1">{f.response}</div>}
@@ -187,6 +190,7 @@ export default function PlantDetail() {
                   <div className="flex items-center gap-2 mb-1">
                     <Scissors className="h-4 w-4 text-warning" />
                     <span className="text-xs text-muted-foreground">{format(new Date(t.timestamp), "PPp")}</span>
+                    <DiaryLink refId={t.id} type="training" />
                   </div>
                   <div className="capitalize">{t.trainingType} · {t.areas || "—"}</div>
                   {t.recoveryNotes && <div className="text-xs text-muted-foreground mt-1">{t.recoveryNotes}</div>}
@@ -200,20 +204,20 @@ export default function PlantDetail() {
           {photos.length === 0 ? <Empty kind="photos" link="/app/photos?upload=1" /> : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
               {photos.map(ph => (
-                <Link key={ph.id} to="/app/photos" className="glass rounded-lg overflow-hidden">
+                <button key={ph.id} type="button" onClick={() => setViewPhoto(ph)} className="glass rounded-lg overflow-hidden text-left">
                   <img src={ph.dataUrl} className="w-full aspect-square object-cover" alt="" />
                   <div className="p-2 text-xs flex justify-between">
                     <span>{ph.angle}</span>
                     <span className="text-muted-foreground">{format(new Date(ph.timestamp), "MMM d")}</span>
                   </div>
-                </Link>
+                </button>
               ))}
             </div>
           )}
         </TabsContent>
 
         <TabsContent value="snapshots" className="mt-4">
-          {snaps.length === 0 ? <Empty kind="snapshots" link="/app/sensors?new=1" /> : (
+          {snaps.length === 0 ? <Empty kind="snapshots" link={`/app/sensors?plant=${p.id}`} /> : (
             <div className="space-y-2">
               {snaps.map(s => (
                 <div key={s.id} className="glass rounded-xl p-3 text-sm">
@@ -221,6 +225,7 @@ export default function PlantDetail() {
                     <Activity className="h-4 w-4 text-success" />
                     <SourceBadge source={s.source} /><ConfidenceBadge c={s.confidence} />
                     <span className="text-xs text-muted-foreground ml-auto">{format(new Date(s.timestamp), "PPp")}</span>
+                    <DiaryLink refId={s.id} type="environment" />
                   </div>
                   <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-xs font-mono">
                     <Cell l="Temp" v={s.tempF && s.tempF + "°F"} />
@@ -244,7 +249,10 @@ export default function PlantDetail() {
                   <div className="flex items-center gap-2 mb-1">
                     <Stethoscope className="h-4 w-4 text-destructive" />
                     <span className="text-xs text-muted-foreground">{format(new Date(d.timestamp), "PPp")}</span>
-                    {d.placeholder && <Badge variant="outline" className="text-[10px]">awaiting AI</Badge>}
+                    {d.placeholder && (
+                      <Link to="/app/settings" className="text-[10px] underline text-muted-foreground">Connect AI</Link>
+                    )}
+                    <DiaryLink refId={d.id} type="diagnosis" />
                   </div>
                   <div>{d.result?.likelyIssue || "Diagnosis request saved · AI provider not connected"}</div>
                   {d.symptoms && <div className="text-xs text-muted-foreground mt-1">Symptoms: {d.symptoms}</div>}
@@ -263,6 +271,7 @@ export default function PlantDetail() {
                   <div className="flex items-center gap-2 mb-1">
                     <Award className="h-4 w-4 text-leaf" />
                     <span className="text-xs text-muted-foreground">{format(new Date(h.date), "PP")}</span>
+                    <DiaryLink refId={h.id} type="harvest" />
                   </div>
                   Wet {h.wetWeight ?? "?"}g · Dry {h.dryWeight ?? "?"}g · Score {h.growAgainScore ?? "—"}/10
                   {h.finalNotes && <div className="text-xs text-muted-foreground mt-1">{h.finalNotes}</div>}
@@ -272,6 +281,28 @@ export default function PlantDetail() {
           )}
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!viewPhoto} onOpenChange={(o) => !o && setViewPhoto(null)}>
+        <DialogContent className="glass max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="font-display">Photo detail</DialogTitle></DialogHeader>
+          {viewPhoto && (
+            <>
+              <img src={viewPhoto.dataUrl} alt="" className="w-full max-h-96 object-contain rounded-lg" />
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div><div className="text-xs text-muted-foreground">Date</div>{format(new Date(viewPhoto.timestamp), "PPp")}</div>
+                {viewPhoto.angle && <div><div className="text-xs text-muted-foreground">Angle</div>{viewPhoto.angle}</div>}
+                {viewPhoto.symptoms && <div className="col-span-2"><div className="text-xs text-muted-foreground">Symptoms</div>{viewPhoto.symptoms}</div>}
+                {viewPhoto.notes && <div className="col-span-2"><div className="text-xs text-muted-foreground">Notes</div>{viewPhoto.notes}</div>}
+              </div>
+              {viewPhoto.diaryEntryId && (
+                <Button asChild variant="outline" className="gap-1.5">
+                  <Link to={`/app/diary/${viewPhoto.diaryEntryId}`}><BookOpen className="h-4 w-4" />Open linked diary entry</Link>
+                </Button>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

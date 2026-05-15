@@ -119,7 +119,7 @@ export default function Rewards() {
           <ul className="grid gap-1.5">
             {events.map((e) => (
               <li key={e.id} className="flex items-center justify-between text-sm py-1">
-                <span className="truncate capitalize">{e.kind.replaceAll("_", " ")}</span>
+                <span className="truncate capitalize">{e.kind.replace(/_/g, " ")}</span>
                 <span className="flex items-center gap-3 shrink-0">
                   <span className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(e.created_at), { addSuffix: true })}</span>
                   <span className="text-primary font-semibold tabular-nums">+{e.amount}</span>

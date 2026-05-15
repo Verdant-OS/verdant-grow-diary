@@ -42,21 +42,37 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
     if (!user || !activeGrowId) { toast.error("Pick a grow first"); return; }
     if (!note.trim()) { toast.error("Add a quick note"); return; }
     setBusy(true);
+    let uploadedPath: string | null = null;
     try {
-      let photoPath: string | null = null;
       if (photoFile) {
-        const ext = photoFile.name.split(".").pop() || "jpg";
-        photoPath = `${user.id}/${activeGrowId}/${Date.now()}.${ext}`;
-        const { error: upErr } = await supabase.storage.from("diary-photos").upload(photoPath, photoFile, { contentType: photoFile.type });
-        if (upErr) throw upErr;
+        const ext = (photoFile.name.split(".").pop() || "jpg").toLowerCase();
+        const path = `${user.id}/${activeGrowId}/${Date.now()}.${ext}`;
+        const { error: upErr } = await supabase.storage
+          .from("diary-photos")
+          .upload(path, photoFile, { contentType: photoFile.type, upsert: false });
+        if (upErr) {
+          // Surface the exact storage error and stop — keep form state intact for retry.
+          toast.error(`Photo upload failed: ${upErr.message}`);
+          console.error("[QuickLog] storage upload error", upErr);
+          return;
+        }
+        uploadedPath = path;
       }
 
       const cleanDetails = Object.fromEntries(Object.entries(details).filter(([, v]) => v && v.toString().trim()));
       const { error: insErr } = await supabase.from("diary_entries").insert({
-        user_id: user.id, grow_id: activeGrowId, photo_url: photoPath,
+        user_id: user.id, grow_id: activeGrowId, photo_url: uploadedPath,
         note: note.trim(), stage, details: cleanDetails,
       });
-      if (insErr) throw insErr;
+      if (insErr) {
+        // Roll back the orphaned upload so retries don't accumulate dead files.
+        if (uploadedPath) {
+          await supabase.storage.from("diary-photos").remove([uploadedPath]).catch(() => {});
+        }
+        toast.error(`Couldn't save entry: ${insErr.message}`);
+        console.error("[QuickLog] insert error", insErr);
+        return;
+      }
 
       // If stage changed, update grow
       if (activeGrow && stage !== activeGrow.stage) {
@@ -68,7 +84,11 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
       onOpenChange(false);
       onCreated?.();
     } catch (err: any) {
-      toast.error(err.message || "Failed to save");
+      if (uploadedPath) {
+        await supabase.storage.from("diary-photos").remove([uploadedPath]).catch(() => {});
+      }
+      toast.error(err?.message || "Failed to save");
+      console.error("[QuickLog] unexpected error", err);
     } finally { setBusy(false); }
   }
 

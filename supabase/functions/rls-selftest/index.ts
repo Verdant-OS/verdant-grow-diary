@@ -289,12 +289,14 @@ Deno.serve(async (req) => {
 
     const failed = checks.filter((c) => !c.passed);
     const totalDurationMs = Math.round(performance.now() - overallStart);
+    const policyMap = buildPolicyMap(failed);
     return json({
       passed: failed.length === 0,
       total: checks.length,
       failedCount: failed.length,
       durationMs: totalDurationMs,
       topFixes: failed.map((c) => c.likelyFix).filter(Boolean),
+      policyMap,
       checks,
     }, failed.length === 0 ? 200 : 500);
   } catch (e) {

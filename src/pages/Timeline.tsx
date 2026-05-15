@@ -54,6 +54,7 @@ export default function Timeline() {
 
   return (
     <div>
+      <QuestChecklist />
       {activeGrow && (
         <div className="mb-5">
           <h1 className="text-2xl font-display font-bold">{activeGrow.name}</h1>

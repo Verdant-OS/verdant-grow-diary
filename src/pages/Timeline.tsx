@@ -25,7 +25,14 @@ export default function Timeline() {
     const { data } = await supabase.from("diary_entries")
       .select("id,note,photo_url,stage,details,entry_at")
       .eq("grow_id", activeGrowId).order("entry_at", { ascending: false }).limit(100);
-    setEntries((data as Entry[]) || []);
+    const rows = (data as Entry[]) || [];
+    const paths = rows.map((r) => r.photo_url).filter((p): p is string => !!p && !p.startsWith("http"));
+    if (paths.length) {
+      const { data: signed } = await supabase.storage.from("diary-photos").createSignedUrls(paths, 3600);
+      const map = new Map((signed || []).map((s) => [s.path as string, s.signedUrl]));
+      rows.forEach((r) => { if (r.photo_url && map.has(r.photo_url)) r.photo_url = map.get(r.photo_url)!; });
+    }
+    setEntries(rows);
     setLoading(false);
   }
 

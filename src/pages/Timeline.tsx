@@ -33,6 +33,7 @@ export default function Timeline() {
   const [loading, setLoading] = useState(true);
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   async function load() {
     if (!user || !activeGrowId) { setEntries([]); setLoading(false); return; }

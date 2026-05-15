@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,12 +6,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Camera, Loader2, Sparkles } from "lucide-react";
+import { Camera, Loader2, Sparkles, Gauge } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
 import { useNugs } from "@/store/nugs";
 import { STAGES } from "@/lib/grow";
+import { EVENT_TYPES, snapshotForTent } from "@/lib/diary";
+import { plants as mockPlants } from "@/mock";
 import { toast } from "sonner";
 
 interface Props { open: boolean; onOpenChange: (v: boolean) => void; onCreated?: () => void; }
@@ -24,10 +26,19 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
   const [preview, setPreview] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [stage, setStage] = useState(activeGrow?.stage || "veg");
+  const [eventType, setEventType] = useState<string>("observation");
+  const [plantId, setPlantId] = useState<string>("");
+  const [snapshot, setSnapshot] = useState(false);
+  const [remindAt, setRemindAt] = useState<string>("");
   const [showMore, setShowMore] = useState(false);
   const [details, setDetails] = useState({ ph: "", ec: "", runoff: "", nutrients: "", training: "", watering: "" });
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Auto-pick a sensible event type when adding a photo
+  useEffect(() => { if (photoFile && eventType === "observation") setEventType("photo"); }, [photoFile]);
+
+  const selectedPlant = useMemo(() => mockPlants.find((p) => p.id === plantId) ?? null, [plantId]);
 
   function handleFile(f: File | null) {
     setPhotoFile(f);
@@ -36,6 +47,7 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
 
   function reset() {
     setPhotoFile(null); setPreview(null); setNote(""); setShowMore(false);
+    setEventType("observation"); setPlantId(""); setSnapshot(false); setRemindAt("");
     setDetails({ ph: "", ec: "", runoff: "", nutrients: "", training: "", watering: "" });
   }
 
@@ -53,7 +65,6 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
           .from("diary-photos")
           .upload(path, photoFile, { contentType: photoFile.type, upsert: false });
         if (upErr) {
-          // Surface the exact storage error and stop — keep form state intact for retry.
           toast.error(`Photo upload failed: ${upErr.message}`);
           console.error("[QuickLog] storage upload error", upErr);
           return;
@@ -61,13 +72,26 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
         uploadedPath = path;
       }
 
-      const cleanDetails = Object.fromEntries(Object.entries(details).filter(([, v]) => v && v.toString().trim()));
+      const cleanDetails: Record<string, any> = Object.fromEntries(
+        Object.entries(details).filter(([, v]) => v && v.toString().trim()),
+      );
+      cleanDetails.event_type = eventType;
+      if (selectedPlant) {
+        cleanDetails.plant_id = selectedPlant.id;
+        cleanDetails.plant_name = selectedPlant.name;
+        cleanDetails.tent_id = selectedPlant.tentId;
+      }
+      if (snapshot && selectedPlant) {
+        const snap = snapshotForTent(selectedPlant.tentId);
+        if (snap) cleanDetails.sensor = snap;
+      }
+      if (eventType === "reminder" && remindAt) cleanDetails.remind_at = remindAt;
+
       const { error: insErr } = await supabase.from("diary_entries").insert({
         user_id: user.id, grow_id: activeGrowId, photo_url: uploadedPath,
         note: note.trim(), stage, details: cleanDetails,
       });
       if (insErr) {
-        // Roll back the orphaned upload so retries don't accumulate dead files.
         if (uploadedPath) {
           await supabase.storage.from("diary-photos").remove([uploadedPath]).catch(() => {});
         }
@@ -76,7 +100,6 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
         return;
       }
 
-      // If stage changed, update grow
       if (activeGrow && stage !== activeGrow.stage) {
         await supabase.from("grows").update({ stage }).eq("id", activeGrowId);
       }
@@ -85,7 +108,7 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
       reset();
       onOpenChange(false);
       onCreated?.();
-      // Award NUGs: first-entry one-shot, then daily-log + photo bonus
+      window.dispatchEvent(new CustomEvent("verdant:entry-created"));
       if (!completedQuests.has("onboarding_first_entry")) {
         await award("onboarding_first_entry", 150, { questKey: "onboarding_first_entry" });
       } else {
@@ -129,13 +152,19 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
               onChange={(e) => handleFile(e.target.files?.[0] ?? null)} />
           </div>
 
-          {/* Grow + stage */}
+          {/* Event type + Stage */}
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <Label className="text-xs">Grow</Label>
-              <Select value={activeGrowId ?? ""} onValueChange={setActiveGrowId}>
-                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                <SelectContent>{grows.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}</SelectContent>
+              <Label className="text-xs">Event</Label>
+              <Select value={eventType} onValueChange={setEventType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {EVENT_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      <span className="inline-flex items-center gap-2"><t.icon className="h-3.5 w-3.5" />{t.label}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div>
@@ -147,10 +176,48 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
             </div>
           </div>
 
+          {/* Grow + Plant */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="text-xs">Grow</Label>
+              <Select value={activeGrowId ?? ""} onValueChange={setActiveGrowId}>
+                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectContent>{grows.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Plant (optional)</Label>
+              <Select value={plantId || "__none"} onValueChange={(v) => setPlantId(v === "__none" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">No specific plant</SelectItem>
+                  {mockPlants.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name} · {p.strain}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <div>
             <Label>What's happening?</Label>
             <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Watered, looking healthy, slight yellowing on a fan leaf…" rows={3} />
           </div>
+
+          {eventType === "reminder" && (
+            <div>
+              <Label className="text-xs">Remind me at</Label>
+              <Input type="datetime-local" value={remindAt} onChange={(e) => setRemindAt(e.target.value)} />
+            </div>
+          )}
+
+          <label className={`flex items-center justify-between gap-2 rounded-lg border p-3 ${selectedPlant ? "border-border/60" : "border-border/40 opacity-60"}`}>
+            <span className="text-sm flex items-center gap-2"><Gauge className="h-4 w-4 text-primary" />Attach sensor snapshot</span>
+            <Switch checked={snapshot && !!selectedPlant} onCheckedChange={setSnapshot} disabled={!selectedPlant} />
+          </label>
+          {snapshot && !selectedPlant && (
+            <p className="text-[11px] text-muted-foreground -mt-2">Pick a plant to capture its tent's latest readings.</p>
+          )}
 
           <label className="flex items-center justify-between gap-2 rounded-lg border border-border/60 p-3">
             <span className="text-sm">Add more details</span>

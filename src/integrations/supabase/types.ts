@@ -97,12 +97,129 @@ export type Database = {
         }
         Relationships: []
       }
+      nug_events: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          kind: string
+          meta: Json
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          kind: string
+          meta?: Json
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          kind?: string
+          meta?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          current_badge: string | null
+          display_name: string | null
+          level: number
+          nugs_total: number
+          tier: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_badge?: string | null
+          display_name?: string | null
+          level?: number
+          nugs_total?: number
+          tier?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_badge?: string | null
+          display_name?: string | null
+          level?: number
+          nugs_total?: number
+          tier?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      unlocks: {
+        Row: {
+          id: string
+          key: string
+          unlocked_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          key: string
+          unlocked_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          key?: string
+          unlocked_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_quests: {
+        Row: {
+          completed_at: string
+          id: string
+          quest_key: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string
+          id?: string
+          quest_key: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string
+          id?: string
+          quest_key?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      award_nugs: {
+        Args: {
+          _amount: number
+          _kind: string
+          _meta?: Json
+          _quest_key?: string
+        }
+        Returns: Json
+      }
+      compute_level: {
+        Args: { total: number }
+        Returns: {
+          level: number
+          tier: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

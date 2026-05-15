@@ -1,99 +1,75 @@
-# Verdant MVP Integrity Pass 2
 
-**Goal:** Make Calendar, Reports, Ask My Grow, plant detail tabs, and diary relationships feel real — not decorative. No redesign, no new product surfaces, no payments/SMS/device control/marketplace/community/packet sniffing.
+# NUGs Gamification System
 
----
+A point + leveling system that rewards onboarding, daily logging, and harvest milestones. Built in phased increments so we can ship value early.
 
-## 1. Calendar integrity (`src/pages/app/CalendarPage.tsx`)
+## What gets built
 
-**Problems today**
-- Day cells render events but are not clickable.
-- Calendar shows diary entries inline but provides no way to open them.
-- `addEvent` (when fired from "mark complete" flows) does not create a paired diary entry.
+### 1. Backend (Lovable Cloud)
 
-**Fixes**
-- Wrap each day cell in a `Popover` trigger. Popover content lists that day's diary entries + events with:
-  - Type badge using the same `colors` map (single source of truth — extract to `src/lib/eventColors.ts`).
-  - Plant name (link to `/app/plants/:plantId`).
-  - For diary entries: link to `/app/diary/:id`.
-  - For events: link to `/app/diary/:sourceId` when present, else show inline detail.
-- In `store/verdant.tsx`, update `addEvent` so that when an event is marked completed it calls `logEvent` (new helper) which creates a matching `DiaryEntry` with `refId = event.id` and stamps `event.diaryEntryId` back. Bidirectional link.
-- Today cell: keep ring, add "Today" pill so it reads at a glance on mobile.
+New tables (all RLS-protected, scoped to `auth.uid()`):
 
-## 2. Reports integrity (`src/pages/app/Reports.tsx`)
+- **`profiles`** — `user_id`, `display_name`, `nugs_total` (int), `level` (int), `tier` (text), `current_badge` (text), auto-created on signup via trigger.
+- **`nug_events`** — append-only ledger: `user_id`, `kind` (e.g. `onboarding_profile`, `daily_log`, `photo_added`, `harvest_logged`, `coach_session`), `amount`, `meta` (jsonb), `created_at`. Unique constraints prevent double-claiming one-shot quests.
+- **`harvests`** — `user_id`, `grow_id`, `harvested_at`, `grow_type`, `medium`, `yield_grams`, `notes`. Counts toward tier gates.
+- **`unlocks`** — `user_id`, `key` (e.g. `strain_library`, `vpd_tracker`, `hall_of_growers`), `unlocked_at`. Idempotent.
+- **`user_quests`** — tracks one-shot onboarding quest completion.
 
-**Problems today**
-- Stats counts are real, but chart silently uses `v.snapshots` filtered by plant — when none exist, the chart block is hidden with no message.
-- Risk list misses several mediums and never references diagnoses or training.
-- Nothing labels demo seed data vs. real user data.
+Database function `award_nugs(kind, amount, meta)` runs in a transaction:
+1. Inserts the event (respecting unique-once constraints).
+2. Recomputes `nugs_total` and re-derives `level` + `tier` from the curve.
+3. Inserts any newly earned `unlocks`.
+Returns `{ awarded, new_total, new_level, unlocked: [] }`.
 
-**Fixes**
-- For each plant, compute weekly buckets (last 4 weeks) for: waterings, feedings, training events, photos, diagnoses, snapshots, harvest yield (if logged).
-- Replace the single Recharts line block with two: env trend (temp/RH/VPD) and activity bars (water/feed/train counts/week). When data length < 2 show `EmptyState` with one CTA: "Capture snapshot" / "Log watering".
-- Expand `risks[]` rules:
-  - soil: warn if waterings/week > 4
-  - coco: warn if no feeding in last 3 days
-  - peat: warn if no runoff EC logged in last week
-  - hydro: warn if no res EC/pH snapshot in last 48h
-  - autoflower: warn if heavy training event in last 7 days
-- Add `SourceBadge` (`demo` vs `manual`) to each plant header based on `plant.source`.
+### 2. Level curve & unlock map (constants in `src/lib/leveling.ts`)
 
-## 3. Ask My Grow (`src/pages/app/AskMyGrow.tsx`)
+```text
+Tier 1 Seedling    L1=500, ×1.3 → L10≈5,000
+Tier 2 Vegetative  L11=7,500 (1 harvest)  → L20≈30,000 (3 harvests)
+Tier 3 Flowering   L21=45,000 (3 harvests) → L30≈110,000 (5 harvests, 2 types)
+Tier 4 Fruiting    L31=160,000 (5h, 2 mediums) → L40≈360,000 (7h, 3 types)
+Tier 5 Harvest Master L41=500,000 → L50≈1,200,000 (10h, 4 types)
+```
 
-**Problems today**
-- Context preview only assembles diary + latest snapshot even when user toggles watering/feeding/training/photos/harvest.
-- "MVP placeholder response" label is good; keep it but make the data bundle complete.
+Unlocks: L5 grow badge + strain library, L10 reminders + 2nd grow, L15 VPD/light tools, L20 strain discount, L25 breeding/phenotype, L30 premium guides + priority coach, L35 mentor badge, L40 limited strains + advisory, L45 Hall of Growers, L50 Legendary Cultivator.
 
-**Fixes**
-- Build `assembleContext(plantId, selectedCtx)` in `src/lib/askContext.ts` that returns a typed bundle pulling last N records per selected category:
-  - diary (5), watering (5), feeding (5), training (5), photos (3 — id + caption only), snapshots (3), diagnosis (3), harvest (all).
-- Render the bundle as a collapsible JSON/structured preview (not just a string), grouped by category, so the user can verify what would be sent.
-- Banner at top: "Shell mode — no AI provider connected. Connect in Settings → AI." Link to `/app/settings`.
-- Remove the canned suggested-question that implies certainty ("Is this autoflower stressed?") — replace with neutral framing: "What context should I review for this autoflower?"
+### 3. Earning rules
 
-## 4. Relationship validation
+- **Onboarding (one-shot, totals 500):** profile complete 100, first grow 150, first diary entry 150, first AI coach 100.
+- **Recurring:** daily log 25 (once/day), photo on entry +15, weekly streak bonus 50, AI coach session 20 (max 3/day), harvest logged 500 + bonuses for yield/cure/medium diversity.
 
-**Store changes (`src/store/verdant.tsx`)**
-- Add `resolveRef(entry: DiaryEntry)` helper returning the typed source record (`{ kind, record }`) by inspecting `entry.type` + `entry.refId`. Centralizes lookup.
-- Add `validateRelationships()` dev helper that scans:
-  - diary entries with `refId` pointing to nothing
-  - watering/feeding/training/diagnosis/harvest records missing a back-link diary entry
-  - photos without `diaryEntryId`
-  - snapshots referenced by diary entries that no longer exist
-  Returns a list of `{ kind, id, issue }`.
+### 4. Frontend
 
-**UI changes**
-- `PlantDetail.tsx`: each tab (Watering, Feeding, Training, Photos, Snapshots, Diagnosis, Harvest) row gets a "View diary entry" link when a back-link exists, "Link to diary" action when missing (creates one via existing log helpers).
-- Diary card "Linked from" chip: replace static badge with a `Link` resolved via `resolveRef` to `/app/plants/:plantId?tab=...#refId`.
-- Photo modal: replace `/app/diary` link with `/app/diary/:photo.diaryEntryId`.
+- **`useNugs()` hook** — reads profile, exposes `award(kind, meta)`, subscribes to realtime profile updates.
+- **Header NUG badge** — replaces nothing, sits in top bar: nug count + level chip, opens Rewards modal.
+- **Rewards page** (`/rewards`, new bottom-nav tab with trophy icon) — shows:
+  - Current tier card with level progress bar to next level.
+  - Onboarding quest checklist (tap quest → routes to relevant page).
+  - Tier roadmap: 5 expandable cards listing every level + unlock + requirements + lock state.
+  - Recent NUG activity feed.
+- **Spotlight tour** — first-login coach-marks point to: header grow picker → + button → Coach tab → Rewards. Skippable; completing each step awards its quest.
+- **Award triggers** — call `award()` from existing flows: profile save, grow create, QuickLog success, Coach reply, harvest creation.
+- **Level-up celebration** — confetti + toast when `new_level > old_level`, modal listing newly unlocked items.
+- **Unlock gating** — strain library, VPD tools, second grow, etc. read from `unlocks` table; locked features show a "Reach Lv X to unlock" state.
 
-## 5. MVP QA checklist page
+### 5. Harvest flow
 
-**New route:** `/app/qa` (operator-only, hidden from sidebar by default; reachable from Settings → "MVP QA Checklist").
+New "Mark harvested" action on a grow → opens harvest dialog (date, grow_type, medium, yield, cure notes) → inserts into `harvests`, awards NUGs, recomputes tier gates.
 
-**File:** `src/pages/app/QAChecklist.tsx`
+## Phasing
 
-**Contents (rendered as a static checklist + live signals)**
-- Passed flows: list each verified flow with a green check (Diary↔Photos, Diary↔Snapshots, Diagnosis save, Plant tabs render real data, Diary detail route, Calendar shows entries).
-- Failed flows: read from `validateRelationships()` and render any current breakages.
-- Missing relationships: live count of orphaned refs.
-- Next 10 fixes: static list mirroring the prioritized backlog (snapshot→diary entry, calendar click-through, NewSnap plantId prefill, inline snapshot in NewEntry, photo→diary deep link, in-place PhotoView in plant detail, diary "linked from" deep link, day grouping + jump-to-today, diagnosis CTA to AI settings, `resolveRef` rollout).
+This is large. I'd ship it in 4 PRs so each is reviewable and the app stays working:
 
-No styling overhaul — reuse `glass`, `PageHeader`, `EmptyState`, badges already in the system.
+1. **Foundation:** profiles, nug_events, unlocks, `award_nugs`, `useNugs`, header badge, onboarding quest awards + checklist on Timeline.
+2. **Rewards page + tour:** full `/rewards` page, spotlight tour, level-up modal, recurring daily-log/photo/coach awards.
+3. **Harvests:** harvests table, harvest dialog, Tier 2–3 gating, unlock gating for strain library / VPD placeholder pages.
+4. **Endgame:** Tier 4–5, Hall of Growers leaderboard view, Legendary badge surfaces, mentor flag.
 
----
+## Open questions before I start
 
-## Out of scope (explicit)
-Payments, real SMS sending, live device control, marketplace, public community, Spider Farmer packet sniffing, redesign, new navigation entries beyond `/app/qa` (linked from Settings only).
+1. **Phasing:** ship Phase 1 first (recommended) or build the whole thing in one go?
+2. **Tour style:** Coinbase-style spotlight overlay (recommended), or just a checklist card?
+3. **Leaderboard privacy:** Hall of Growers shows display names + nug totals to all signed-in users — OK or opt-in?
+4. **Unlocked features that don't exist yet** (strain library, VPD calculator, breeding DB): build placeholder "Coming soon — unlocked!" pages now, or stub the unlock and leave the feature for later?
 
-## Acceptance
-- Click any calendar day → see its diary + events; click an event → opens `/app/diary/:id` or plant detail.
-- Reports show real activity bars + env trend, with empty states + medium-aware risks.
-- Ask My Grow shows a structured, complete context bundle for every selected category and never implies real AI is answering.
-- Every plant detail tab row links to its diary entry; every diary card "Linked from" chip deep-links back.
-- `/app/qa` renders live pass/fail counts driven by `validateRelationships()`.
-
-## Technical notes
-- Extract event color map to `src/lib/eventColors.ts`; import in `CalendarPage`, `Diary`, `DiaryEntryDetail`.
-- `resolveRef` and `validateRelationships` live in `src/store/verdant.tsx` next to existing selectors.
-- No schema migrations — all fields (`refId`, `diaryEntryId`, `sourceId`, `snapshotId`, `photoIds`) already exist on the types.
+Confirm answers (or just say "go phase 1, spotlight, public leaderboard, placeholders") and I'll start building.

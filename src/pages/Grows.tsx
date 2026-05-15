@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
+import { useNugs } from "@/store/nugs";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,7 @@ import { toast } from "sonner";
 
 export default function Grows() {
   const { user } = useAuth();
+  const { award } = useNugs();
   const { grows, activeGrowId, setActiveGrowId, refresh, loading } = useGrows();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", grow_type: "tent", stage: "seedling", notes: "" });
@@ -35,6 +37,7 @@ export default function Grows() {
     if (data) setActiveGrowId(data.id);
     setOpen(false);
     setForm({ name: "", grow_type: "tent", stage: "seedling", notes: "" });
+    award("onboarding_first_grow", 150, { questKey: "onboarding_first_grow", meta: { grow_id: data?.id } });
   }
 
   async function archive(id: string) {

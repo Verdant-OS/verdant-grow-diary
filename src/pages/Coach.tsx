@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
+import { useNugs } from "@/store/nugs";
 import { supabase } from "@/integrations/supabase/client";
 import { Sparkles, Camera, Loader2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
@@ -11,6 +12,7 @@ type Mode = "diagnose" | "next_steps";
 
 export default function Coach() {
   const { user } = useAuth();
+  const { award, completedQuests } = useNugs();
   const { activeGrow, activeGrowId } = useGrows();
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -39,6 +41,11 @@ export default function Coach() {
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
       setReply((data as any).reply);
+      if (!completedQuests.has("onboarding_first_coach")) {
+        await award("onboarding_first_coach", 100, { questKey: "onboarding_first_coach" });
+      } else {
+        await award("coach_session", 20, { silent: true });
+      }
     } catch (e: any) {
       toast.error(e.message || "Coach failed");
     } finally { setBusy(false); }

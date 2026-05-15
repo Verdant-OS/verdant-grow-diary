@@ -7,7 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { LEVEL_THRESHOLDS, TIER_LABEL, UNLOCK_LABELS, progressToNext, tierForLevel, ONBOARDING_QUESTS } from "@/lib/leveling";
+import { LEVEL_THRESHOLDS, TIER_LABEL, UNLOCK_LABELS, progressToNext, tierForLevel, ONBOARDING_QUESTS, nextHarvestGate } from "@/lib/leveling";
 import QuestChecklist from "@/components/QuestChecklist";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";

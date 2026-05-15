@@ -79,6 +79,9 @@ export default function Grows() {
                     {growTypeLabel(g.grow_type)} · {stageLabel(g.stage)} · started {format(new Date(g.started_at), "MMM d")}
                   </div>
                 </button>
+                <Button size="sm" variant="outline" className="gap-1" onClick={() => setHarvestFor({ id: g.id, grow_type: g.grow_type })}>
+                  <Scissors className="h-3.5 w-3.5" />Harvest
+                </Button>
                 {g.id === activeGrowId ? (
                   <Check className="h-4 w-4 text-primary" />
                 ) : (

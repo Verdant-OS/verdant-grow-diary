@@ -119,6 +119,30 @@ export default function Rewards() {
             );
           })()}
 
+          {/* Tier 2 progress bar (0 → 3 harvests) */}
+          <div className="mt-4" aria-label="Tier 2 harvest progress">
+            <div className="relative h-2 rounded-full bg-muted/40 overflow-hidden">
+              <div
+                className="absolute inset-y-0 left-0 gradient-leaf transition-[width] duration-500"
+                style={{ width: `${Math.min(100, (Math.min(harvestCount, 3) / 3) * 100)}%` }}
+              />
+              {[1, 2].map((i) => (
+                <span
+                  key={i}
+                  className="absolute top-0 bottom-0 w-px bg-background/80"
+                  style={{ left: `${(i / 3) * 100}%` }}
+                  aria-hidden
+                />
+              ))}
+            </div>
+            <div className="flex justify-between text-[10px] text-muted-foreground mt-1 tabular-nums">
+              <span>0</span>
+              <span>1</span>
+              <span>2</span>
+              <span>3 harvests</span>
+            </div>
+          </div>
+
           {/* Gate ladder */}
           <ol className="grid grid-cols-3 gap-2 mt-3" aria-label="Tier 2 harvest gates">
             {[

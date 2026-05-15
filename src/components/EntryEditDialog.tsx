@@ -29,9 +29,25 @@ interface Props {
 
 const SUGGESTED_KEYS = ["ph", "ec", "runoff", "watering", "nutrients", "training"];
 
+const EVENT_TYPES = [
+  { value: "observation", label: "Observation" },
+  { value: "watering", label: "Watering" },
+  { value: "feeding", label: "Feeding" },
+  { value: "training", label: "Training" },
+  { value: "defoliation", label: "Defoliation" },
+  { value: "transplant", label: "Transplant" },
+  { value: "measurement", label: "Measurement" },
+  { value: "photo", label: "Photo" },
+  { value: "diagnosis", label: "Diagnosis" },
+  { value: "pest_disease", label: "Pest / Disease" },
+  { value: "harvest", label: "Harvest" },
+  { value: "other", label: "Other" },
+];
+
 export default function EntryEditDialog({ entry, open, onOpenChange, onSaved, onDeleted }: Props) {
   const [note, setNote] = useState("");
   const [stage, setStage] = useState<string>("veg");
+  const [eventType, setEventType] = useState<string>("observation");
   const [rows, setRows] = useState<{ key: string; value: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -40,8 +56,15 @@ export default function EntryEditDialog({ entry, open, onOpenChange, onSaved, on
     if (!entry) return;
     setNote(entry.note || "");
     setStage(entry.stage || "veg");
+    const d = entry.details || {};
+    const inferred = typeof d.event_type === "string" && d.event_type
+      ? d.event_type
+      : entry.photo_url ? "photo" : "observation";
+    setEventType(inferred);
     setRows(
-      Object.entries(entry.details || {}).map(([key, value]) => ({ key, value: String(value ?? "") })),
+      Object.entries(d)
+        .filter(([k]) => k !== "event_type")
+        .map(([key, value]) => ({ key, value: String(value ?? "") })),
     );
   }, [entry]);
 
@@ -60,10 +83,11 @@ export default function EntryEditDialog({ entry, open, onOpenChange, onSaved, on
     if (!note.trim()) { toast.error("Note can't be empty"); return; }
     setBusy(true);
     const details: Record<string, string> = {};
+    if (eventType) details.event_type = eventType;
     for (const r of rows) {
       const k = r.key.trim();
       const v = r.value.trim();
-      if (k && v) details[k] = v;
+      if (k && k !== "event_type" && v) details[k] = v;
     }
     const patch = { note: note.trim(), stage, details };
     const { error } = await supabase.from("diary_entries").update(patch).eq("id", entry.id);
@@ -97,14 +121,25 @@ export default function EntryEditDialog({ entry, open, onOpenChange, onSaved, on
         </DialogHeader>
 
         <div className="grid gap-4">
-          <div>
-            <Label className="text-xs">Stage</Label>
-            <Select value={stage} onValueChange={setStage}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {STAGES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="text-xs">Stage</Label>
+              <Select value={stage} onValueChange={setStage}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {STAGES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Event type</Label>
+              <Select value={eventType} onValueChange={setEventType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {EVENT_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div>

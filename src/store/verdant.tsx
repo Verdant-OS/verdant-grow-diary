@@ -361,10 +361,40 @@ export function VerdantProvider({ children }: { children: ReactNode }) {
     addSnapshot: (raw) => {
       const v = validateSnapshot(raw);
       const snap: SensorSnapshot = { id: uid(), ...raw, ...v };
-      setState(s => ({ ...s, snapshots: [snap, ...s.snapshots] }));
+      setState(s => {
+        const next: State = { ...s, snapshots: [snap, ...s.snapshots] };
+        if (raw.plantId) {
+          const noteParts = [
+            raw.tempF !== undefined ? `${raw.tempF}°F` : null,
+            raw.humidity !== undefined ? `${raw.humidity}% RH` : null,
+            raw.vpd !== undefined ? `VPD ${raw.vpd}` : null,
+          ].filter(Boolean);
+          next.diary = [{
+            id: uid(), plantId: raw.plantId, timestamp: raw.timestamp,
+            type: "environment", note: `Snapshot · ${noteParts.join(" · ") || "captured"}`,
+            photoIds: [], snapshotId: snap.id, refId: snap.id,
+          }, ...s.diary];
+        }
+        return next;
+      });
       return snap;
     },
-    addEvent: (e) => setState(s => ({ ...s, events: [{ id: uid(), ...e }, ...s.events] })),
+    addEvent: (e) => {
+      const id = uid();
+      setState(s => {
+        const ev: CalendarEvent = { id, ...e };
+        const next: State = { ...s, events: [ev, ...s.events] };
+        // If event has plantId, also create a paired diary entry of matching type for round-trip
+        if (e.plantId) {
+          const diaryId = uid();
+          next.diary = [{
+            id: diaryId, plantId: e.plantId, timestamp: e.date,
+            type: e.type, note: e.title, photoIds: [], refId: e.sourceId || id,
+          }, ...s.diary];
+        }
+        return next;
+      });
+    },
     addOptIn: (o) => setState(s => ({ ...s, optIns: [{ id: uid(), createdAt: new Date().toISOString(), ...o }, ...s.optIns] })),
     addQueueItem: (q) => setState(s => ({ ...s, queue: [{ id: uid(), createdAt: new Date().toISOString(), status: "pending", ...q }, ...s.queue] })),
     updateQueueItem: (id, patch) => setState(s => ({ ...s, queue: s.queue.map(q => q.id === id ? { ...q, ...patch } : q) })),

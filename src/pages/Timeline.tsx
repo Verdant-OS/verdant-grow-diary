@@ -4,10 +4,11 @@ import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
 import { STAGES, stageLabel } from "@/lib/grow";
 import { format, formatDistanceToNow } from "date-fns";
-import { Sprout, Image as ImageIcon, Loader2, Camera, FileText, FlaskConical, Check } from "lucide-react";
+import { Sprout, Image as ImageIcon, Loader2, Camera, FileText, FlaskConical, Check, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import QuestChecklist from "@/components/QuestChecklist";
+import EntryEditDialog from "@/components/EntryEditDialog";
 import { cn } from "@/lib/utils";
 
 interface Entry {
@@ -32,6 +33,7 @@ export default function Timeline() {
   const [loading, setLoading] = useState(true);
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   async function load() {
     if (!user || !activeGrowId) { setEntries([]); setLoading(false); return; }
@@ -193,6 +195,14 @@ export default function Timeline() {
                           <span className="inline-flex items-center gap-1 text-primary"><Sprout className="h-3 w-3" />{stageLabel(e.stage)}</span>
                           <span>·</span>
                           <span title={format(new Date(e.entry_at), "PPpp")}>{formatDistanceToNow(new Date(e.entry_at), { addSuffix: true })}</span>
+                          <button
+                            type="button"
+                            onClick={() => setEditingId(e.id)}
+                            aria-label="Edit entry"
+                            className="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition"
+                          >
+                            <Pencil className="h-3 w-3" />Edit
+                          </button>
                         </div>
                         <p className="text-sm whitespace-pre-wrap">{e.note}</p>
                         {e.details && Object.keys(e.details).length > 0 && (
@@ -212,6 +222,14 @@ export default function Timeline() {
             ))}
           </div>
         )}
+
+      <EntryEditDialog
+        entry={entries.find((e) => e.id === editingId) || null}
+        open={!!editingId}
+        onOpenChange={(o) => { if (!o) setEditingId(null); }}
+        onSaved={(patch) => setEntries((rows) => rows.map((r) => r.id === patch.id ? { ...r, ...patch } as Entry : r))}
+        onDeleted={(id) => setEntries((rows) => rows.filter((r) => r.id !== id))}
+      />
     </div>
   );
 }

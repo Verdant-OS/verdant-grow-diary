@@ -121,14 +121,25 @@ export default function EntryEditDialog({ entry, open, onOpenChange, onSaved, on
         </DialogHeader>
 
         <div className="grid gap-4">
-          <div>
-            <Label className="text-xs">Stage</Label>
-            <Select value={stage} onValueChange={setStage}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {STAGES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="text-xs">Stage</Label>
+              <Select value={stage} onValueChange={setStage}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {STAGES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Event type</Label>
+              <Select value={eventType} onValueChange={setEventType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {EVENT_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div>

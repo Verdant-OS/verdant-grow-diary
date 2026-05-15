@@ -116,6 +116,16 @@ export default function Grows() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {harvestFor && (
+        <HarvestDialog
+          open={!!harvestFor}
+          onOpenChange={(v) => !v && setHarvestFor(null)}
+          growId={harvestFor.id}
+          defaultGrowType={harvestFor.grow_type}
+          onLogged={() => { setHarvestFor(null); refresh(); }}
+        />
+      )}
     </div>
   );
 }

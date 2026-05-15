@@ -289,12 +289,14 @@ Deno.serve(async (req) => {
 
     const failed = checks.filter((c) => !c.passed);
     const totalDurationMs = Math.round(performance.now() - overallStart);
+    const policyMap = buildPolicyMap(failed);
     return json({
       passed: failed.length === 0,
       total: checks.length,
       failedCount: failed.length,
       durationMs: totalDurationMs,
       topFixes: failed.map((c) => c.likelyFix).filter(Boolean),
+      policyMap,
       checks,
     }, failed.length === 0 ? 200 : 500);
   } catch (e) {
@@ -355,4 +357,113 @@ function inferLikelyFix(c: Check): LikelyFix | undefined {
     };
   }
   return undefined;
+}
+
+interface PolicyMapEntry {
+  priority: number; // 1 = fix first
+  resource: "table" | "storage";
+  target: string;
+  operation: "SELECT" | "INSERT" | "UPDATE" | "DELETE";
+  expectedBehavior: "deny" | "allow";
+  failingChecks: string[];
+  policyName: string;
+  diagnosis: string;
+  sqlFix: string;
+}
+
+function buildPolicyMap(failed: Check[]): PolicyMapEntry[] {
+  // Group failures by (resource, target, operation, expectedBehavior)
+  const groups = new Map<string, { fix: LikelyFix; checks: Check[] }>();
+  for (const c of failed) {
+    if (!c.likelyFix) continue;
+    const f = c.likelyFix;
+    const key = `${f.resource}|${f.target}|${f.operation}|${f.expectedBehavior}`;
+    const g = groups.get(key);
+    if (g) g.checks.push(c);
+    else groups.set(key, { fix: f, checks: [c] });
+  }
+
+  // Priority weighting:
+  //  - deny failures (data leak / write bypass) first
+  //  - within deny: write ops (INSERT/UPDATE/DELETE) before SELECT
+  //  - allow failures (owner blocked from own data) after deny
+  const opWeight: Record<string, number> = { DELETE: 0, UPDATE: 1, INSERT: 2, SELECT: 3 };
+  const entries: PolicyMapEntry[] = [];
+
+  for (const { fix, checks } of groups.values()) {
+    entries.push({
+      priority: 0, // assigned after sort
+      resource: fix.resource,
+      target: fix.target,
+      operation: fix.operation,
+      expectedBehavior: fix.expectedBehavior,
+      failingChecks: checks.map((c) => c.name),
+      policyName: suggestPolicyName(fix),
+      diagnosis: diagnoseGroup(fix, checks),
+      sqlFix: buildSqlFix(fix),
+    });
+  }
+
+  entries.sort((a, b) => {
+    const aDeny = a.expectedBehavior === "deny" ? 0 : 1;
+    const bDeny = b.expectedBehavior === "deny" ? 0 : 1;
+    if (aDeny !== bDeny) return aDeny - bDeny;
+    return (opWeight[a.operation] ?? 9) - (opWeight[b.operation] ?? 9);
+  });
+  entries.forEach((e, i) => (e.priority = i + 1));
+  return entries;
+}
+
+function suggestPolicyName(f: LikelyFix): string {
+  if (f.resource === "table") {
+    const table = f.target.replace(/^public\./, "");
+    const verb = { SELECT: "view", INSERT: "insert", UPDATE: "update", DELETE: "delete" }[f.operation];
+    return `Users ${verb} own ${table}`;
+  }
+  const verb = { SELECT: "read", INSERT: "upload", UPDATE: "update", DELETE: "delete" }[f.operation];
+  return `Users ${verb} own diary-photos`;
+}
+
+function diagnoseGroup(f: LikelyFix, checks: Check[]): string {
+  const errs = checks.map((c) => c.error?.message).filter(Boolean) as string[];
+  const sample = errs[0] ? ` Sample error: "${errs[0]}".` : "";
+  if (f.expectedBehavior === "deny") {
+    return `${checks.length} cross-user ${f.operation} attempt(s) on ${f.target} were NOT blocked.${sample} Most likely: the ${f.operation} policy is missing, uses USING (true), targets the wrong column, or RLS is disabled on the table.`;
+  }
+  return `Owner ${f.operation} on ${f.target} failed when it should succeed.${sample} Most likely: the ${f.operation} policy is missing, the USING clause references the wrong column, or a prior failing policy mutated/destroyed the row.`;
+}
+
+function buildSqlFix(f: LikelyFix): string {
+  if (f.resource === "table") {
+    const table = f.target;
+    const policy = suggestPolicyName(f);
+    const using = `auth.uid() = user_id`;
+    if (f.operation === "INSERT") {
+      return [
+        `ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY;`,
+        `DROP POLICY IF EXISTS "${policy}" ON ${table};`,
+        `CREATE POLICY "${policy}" ON ${table} FOR INSERT TO authenticated WITH CHECK (${using});`,
+      ].join("\n");
+    }
+    return [
+      `ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY;`,
+      `DROP POLICY IF EXISTS "${policy}" ON ${table};`,
+      `CREATE POLICY "${policy}" ON ${table} FOR ${f.operation} TO authenticated USING (${using});`,
+    ].join("\n");
+  }
+  // storage.objects
+  const policy = suggestPolicyName(f);
+  const folder = `bucket_id = 'diary-photos' AND auth.uid()::text = (storage.foldername(name))[1]`;
+  if (f.operation === "INSERT") {
+    return [
+      `DROP POLICY IF EXISTS "${policy}" ON storage.objects;`,
+      `CREATE POLICY "${policy}" ON storage.objects FOR INSERT TO authenticated WITH CHECK (${folder});`,
+    ].join("\n");
+  }
+  return [
+    `-- Ensure bucket is private:`,
+    `UPDATE storage.buckets SET public = false WHERE id = 'diary-photos';`,
+    `DROP POLICY IF EXISTS "${policy}" ON storage.objects;`,
+    `CREATE POLICY "${policy}" ON storage.objects FOR ${f.operation} TO authenticated USING (${folder});`,
+  ].join("\n");
 }

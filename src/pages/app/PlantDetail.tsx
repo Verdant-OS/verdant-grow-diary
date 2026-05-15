@@ -1,10 +1,12 @@
+import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { useVerdant, dayOfPlant, weekOfPlant } from "@/store/verdant";
+import { useVerdant, dayOfPlant, weekOfPlant, EventType, Photo } from "@/store/verdant";
 import { PageHeader, EmptyState } from "@/components/ui-bits";
-import { Sprout, ChevronLeft, BookOpen, Droplets, FlaskConical, Scissors, Image as ImageIcon, Activity, Award, Stethoscope, AlertTriangle } from "lucide-react";
+import { Sprout, ChevronLeft, BookOpen, Droplets, FlaskConical, Scissors, Image as ImageIcon, Activity, Award, Stethoscope, AlertTriangle, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { SourceBadge, ConfidenceBadge } from "@/components/SourceBadge";
 

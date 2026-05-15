@@ -291,8 +291,116 @@ Deno.serve(async (req) => {
           dataSnapshot: ins.data,
         };
       });
+
+      // ─────────────────────────────────────────────────────────────────────
+      // Reward-table RLS: cross-user INSERT/UPDATE must be blocked.
+      // Tables: profiles, nug_events, unlocks, user_quests, harvests
+      // ─────────────────────────────────────────────────────────────────────
+
+      // Seed harvest as user A so we have an existing reward row to attack.
+      const { data: harvestA, error: harvestErr } = await clientA.from("harvests").insert({
+        user_id: userA.id, grow_id: grow.id, grow_type: "tent", medium: "soil", yield_grams: 100,
+      }).select().single();
+      if (harvestErr || !harvestA) throw new Error("seed harvest failed: " + harvestErr?.message);
+
+      // profiles are auto-created by handle_new_user trigger; just attack them.
+      await runCheck("profiles: cross-user UPDATE affects 0 rows", async () => {
+        const upd = await clientB.from("profiles").update({ display_name: "pwned", nugs_total: 999999 })
+          .eq("user_id", userA.id).select();
+        const affectedRows = upd.data?.length ?? 0;
+        return {
+          passed: affectedRows === 0,
+          detail: upd.error ? upd.error.message : `affected=${affectedRows}`,
+          affectedRows,
+          error: upd.error ? { message: upd.error.message, code: upd.error.code } : undefined,
+          dataSnapshot: upd.data,
+        };
+      });
+
+      await runCheck("profiles: cross-user INSERT spoofing user_id is denied", async () => {
+        const ins = await clientB.from("profiles").insert({
+          user_id: userA.id, display_name: "spoof", nugs_total: 999999,
+        });
+        return {
+          passed: !!ins.error,
+          detail: ins.error ? ins.error.message : "no error returned",
+          error: ins.error ? { message: ins.error.message, code: ins.error.code } : undefined,
+        };
+      });
+
+      await runCheck("nug_events: cross-user INSERT spoofing user_id is denied", async () => {
+        const ins = await clientB.from("nug_events").insert({
+          user_id: userA.id, kind: "spoof", amount: 99999,
+        });
+        return {
+          passed: !!ins.error,
+          detail: ins.error ? ins.error.message : "no error returned",
+          error: ins.error ? { message: ins.error.message, code: ins.error.code } : undefined,
+        };
+      });
+
+      await runCheck("unlocks: cross-user INSERT spoofing user_id is denied", async () => {
+        const ins = await clientB.from("unlocks").insert({
+          user_id: userA.id, key: "legendary_cultivator",
+        });
+        return {
+          passed: !!ins.error,
+          detail: ins.error ? ins.error.message : "no error returned",
+          error: ins.error ? { message: ins.error.message, code: ins.error.code } : undefined,
+        };
+      });
+
+      await runCheck("user_quests: cross-user INSERT spoofing user_id is denied", async () => {
+        const ins = await clientB.from("user_quests").insert({
+          user_id: userA.id, quest_key: "onboarding_profile",
+        });
+        return {
+          passed: !!ins.error,
+          detail: ins.error ? ins.error.message : "no error returned",
+          error: ins.error ? { message: ins.error.message, code: ins.error.code } : undefined,
+        };
+      });
+
+      await runCheck("harvests: cross-user INSERT spoofing user_id is denied", async () => {
+        const ins = await clientB.from("harvests").insert({
+          user_id: userA.id, grow_id: grow.id, grow_type: "tent", medium: "soil",
+        });
+        return {
+          passed: !!ins.error,
+          detail: ins.error ? ins.error.message : "no error returned",
+          error: ins.error ? { message: ins.error.message, code: ins.error.code } : undefined,
+        };
+      });
+
+      await runCheck("harvests: cross-user UPDATE affects 0 rows", async () => {
+        const upd = await clientB.from("harvests").update({ yield_grams: 1, notes: "hacked" })
+          .eq("id", harvestA.id).select();
+        const affectedRows = upd.data?.length ?? 0;
+        return {
+          passed: affectedRows === 0,
+          detail: upd.error ? upd.error.message : `affected=${affectedRows}`,
+          affectedRows,
+          error: upd.error ? { message: upd.error.message, code: upd.error.code } : undefined,
+          dataSnapshot: upd.data,
+        };
+      });
+
+      await runCheck("profiles: owner row untouched after cross-user attempts", async () => {
+        const verify = await clientA.from("profiles").select("display_name,nugs_total").eq("user_id", userA.id).single();
+        return {
+          passed: !verify.error && verify.data?.display_name !== "pwned" && (verify.data?.nugs_total ?? 0) < 999999,
+          detail: verify.error ? verify.error.message : `name=${verify.data?.display_name} nugs=${verify.data?.nugs_total}`,
+          dataSnapshot: verify.data,
+        };
+      });
     } finally {
       // Cleanup with service role
+      await admin.from("nug_events").delete().eq("user_id", userA.id);
+      await admin.from("unlocks").delete().eq("user_id", userA.id);
+      await admin.from("user_quests").delete().eq("user_id", userA.id);
+      await admin.from("harvests").delete().eq("user_id", userA.id);
+      await admin.from("profiles").delete().eq("user_id", userA.id);
+      await admin.from("profiles").delete().eq("user_id", userB.id);
       await admin.from("diary_entries").delete().eq("user_id", userA.id);
       await admin.from("grows").delete().eq("user_id", userA.id);
       await admin.storage.from("diary-photos").remove([`${userA.id}/`]).catch(() => {});

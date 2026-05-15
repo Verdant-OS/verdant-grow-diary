@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.max_level_for_user(uuid) FROM authenticated;

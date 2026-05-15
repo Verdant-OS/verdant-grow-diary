@@ -110,6 +110,8 @@ describe("QuickLog photo Remove button", () => {
 
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
     expect(onCreated).toHaveBeenCalled();
+    expect(toastSuccess).toHaveBeenCalledWith("Logged 🌱");
+    expect(toastError).not.toHaveBeenCalled();
   });
 
   it("shows the storage error and does not insert when upload fails", async () => {

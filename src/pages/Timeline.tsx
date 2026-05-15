@@ -222,6 +222,14 @@ export default function Timeline() {
             ))}
           </div>
         )}
+
+      <EntryEditDialog
+        entry={entries.find((e) => e.id === editingId) || null}
+        open={!!editingId}
+        onOpenChange={(o) => { if (!o) setEditingId(null); }}
+        onSaved={(patch) => setEntries((rows) => rows.map((r) => r.id === patch.id ? { ...r, ...patch } as Entry : r))}
+        onDeleted={(id) => setEntries((rows) => rows.filter((r) => r.id !== id))}
+      />
     </div>
   );
 }

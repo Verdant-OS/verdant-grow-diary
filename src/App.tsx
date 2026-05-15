@@ -33,7 +33,6 @@ const App = () => (
             </Routes>
           </GrowsProvider>
         </AuthProvider>
-      </Routes>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

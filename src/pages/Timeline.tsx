@@ -195,6 +195,14 @@ export default function Timeline() {
                           <span className="inline-flex items-center gap-1 text-primary"><Sprout className="h-3 w-3" />{stageLabel(e.stage)}</span>
                           <span>·</span>
                           <span title={format(new Date(e.entry_at), "PPpp")}>{formatDistanceToNow(new Date(e.entry_at), { addSuffix: true })}</span>
+                          <button
+                            type="button"
+                            onClick={() => setEditingId(e.id)}
+                            aria-label="Edit entry"
+                            className="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition"
+                          >
+                            <Pencil className="h-3 w-3" />Edit
+                          </button>
                         </div>
                         <p className="text-sm whitespace-pre-wrap">{e.note}</p>
                         {e.details && Object.keys(e.details).length > 0 && (

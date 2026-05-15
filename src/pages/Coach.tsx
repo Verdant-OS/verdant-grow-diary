@@ -29,7 +29,9 @@ export default function Coach() {
         const path = `${user.id}/coach/${Date.now()}.${ext}`;
         const { error } = await supabase.storage.from("diary-photos").upload(path, photoFile, { contentType: photoFile.type });
         if (error) throw error;
-        photoUrl = supabase.storage.from("diary-photos").getPublicUrl(path).data.publicUrl;
+        const { data: signed, error: sErr } = await supabase.storage.from("diary-photos").createSignedUrl(path, 600);
+        if (sErr) throw sErr;
+        photoUrl = signed.signedUrl;
       }
       const { data, error } = await supabase.functions.invoke("ai-coach", {
         body: { mode, growId: activeGrowId, photoUrl, question: question.trim() || undefined },

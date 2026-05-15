@@ -95,7 +95,8 @@ export default function Rewards() {
 
           {/* Big "next gate" callout */}
           {(() => {
-            const g = nextHarvestGate(harvestCount);
+            const count = harvestCount ?? 0;
+            const g = nextHarvestGate(count);
             if (!g) {
               return (
                 <div className="rounded-xl border border-primary/50 bg-primary/10 p-3 text-center">
@@ -109,10 +110,10 @@ export default function Rewards() {
                 <div className="text-3xl font-display font-bold text-primary tabular-nums leading-none">{g.needed}</div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold leading-tight">
-                    more harvest{g.needed > 1 ? "s" : ""} to reach <span className="tabular-nums">Lv {g.cap}</span>
+                    more harvest{g.needed === 1 ? "" : "s"} to reach <span className="tabular-nums">Lv {g.cap}</span>
                   </div>
                   <div className="text-[11px] text-muted-foreground mt-0.5 tabular-nums">
-                    {harvestCount} of {g.needed + harvestCount} harvest{g.needed + harvestCount > 1 ? "s" : ""} logged · log one from the Grows tab
+                    {count} of {g.needed + count} harvest{g.needed + count === 1 ? "" : "s"} logged · log one from the Grows tab
                   </div>
                 </div>
               </div>
@@ -124,7 +125,7 @@ export default function Rewards() {
             <div className="relative h-2 rounded-full bg-muted/40 overflow-hidden">
               <div
                 className="absolute inset-y-0 left-0 gradient-leaf transition-[width] duration-500"
-                style={{ width: `${Math.min(100, (Math.min(harvestCount, 3) / 3) * 100)}%` }}
+                style={{ width: `${Math.min(100, (Math.min(harvestCount ?? 0, 3) / 3) * 100)}%` }}
               />
               {[1, 2].map((i) => (
                 <span
@@ -142,11 +143,12 @@ export default function Rewards() {
               <span>3 harvests</span>
             </div>
             {(() => {
-              const g = nextHarvestGate(harvestCount);
+              const count = harvestCount ?? 0;
+              const g = nextHarvestGate(count);
               if (!g) return null;
               return (
                 <div className="text-center text-[11px] text-muted-foreground mt-1 tabular-nums">
-                  <span className="font-semibold text-primary">{g.needed}</span> harvest{g.needed > 1 ? "s" : ""} remaining to unlock Lv {g.cap}
+                  <span className="font-semibold text-primary">{g.needed}</span> harvest{g.needed === 1 ? "" : "s"} remaining to unlock Lv {g.cap}
                 </div>
               );
             })()}
@@ -159,8 +161,9 @@ export default function Rewards() {
               { req: 2, max: 17 },
               { req: 3, max: 20 },
             ].map((gate) => {
-              const met = harvestCount >= gate.req;
-              const isCurrent = !met && nextHarvestGate(harvestCount)?.cap === gate.max;
+              const count = harvestCount ?? 0;
+              const met = count >= gate.req;
+              const isCurrent = !met && nextHarvestGate(count)?.cap === gate.max;
               return (
                 <li
                   key={gate.req}

@@ -14,7 +14,89 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      diary_entries: {
+        Row: {
+          created_at: string
+          details: Json
+          entry_at: string
+          grow_id: string
+          id: string
+          note: string
+          photo_url: string | null
+          stage: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json
+          entry_at?: string
+          grow_id: string
+          id?: string
+          note: string
+          photo_url?: string | null
+          stage?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json
+          entry_at?: string
+          grow_id?: string
+          id?: string
+          note?: string
+          photo_url?: string | null
+          stage?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "diary_entries_grow_id_fkey"
+            columns: ["grow_id"]
+            isOneToOne: false
+            referencedRelation: "grows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      grows: {
+        Row: {
+          created_at: string
+          grow_type: string
+          id: string
+          is_archived: boolean
+          name: string
+          notes: string | null
+          stage: string
+          started_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          grow_type?: string
+          id?: string
+          is_archived?: boolean
+          name: string
+          notes?: string | null
+          stage?: string
+          started_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          grow_type?: string
+          id?: string
+          is_archived?: boolean
+          name?: string
+          notes?: string | null
+          stage?: string
+          started_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

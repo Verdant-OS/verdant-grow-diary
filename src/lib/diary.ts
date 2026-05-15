@@ -42,10 +42,9 @@ export interface SensorSnapshot {
   temp?: number; rh?: number; vpd?: number; co2?: number; soil?: number; ts?: string;
 }
 
+import { sensorReadings } from "@/mock";
+
 export function snapshotForTent(tentId: string): SensorSnapshot | null {
-  // Lazy import to avoid cycles in non-mock contexts.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { sensorReadings } = require("@/mock") as typeof import("@/mock");
   const rows = sensorReadings.filter((r) => r.tentId === tentId);
   if (!rows.length) return null;
   const last = rows[rows.length - 1];

@@ -421,3 +421,48 @@ export function dayOfPlant(p: Plant) {
 }
 export function weekOfPlant(p: Plant) { return Math.ceil(dayOfPlant(p) / 7); }
 export function plantById(plants: Plant[], id?: string) { return plants.find(p => p.id === id); }
+
+export type RefKind = "watering" | "feeding" | "training" | "photo" | "diagnosis" | "harvest" | "snapshot";
+
+export interface ResolvedRef { kind: RefKind; record: any; tab: string; }
+
+export function resolveRef(entry: DiaryEntry, state: Pick<State, "watering" | "feeding" | "training" | "photos" | "diagnoses" | "harvests" | "snapshots">): ResolvedRef | null {
+  if (!entry.refId) return null;
+  const map: Array<[EventType, RefKind, any[], string]> = [
+    ["watering", "watering", state.watering, "watering"],
+    ["feeding", "feeding", state.feeding, "feeding"],
+    ["training", "training", state.training, "training"],
+    ["photo", "photo", state.photos, "photos"],
+    ["diagnosis", "diagnosis", state.diagnoses, "diagnosis"],
+    ["harvest", "harvest", state.harvests, "harvest"],
+    ["environment", "snapshot", state.snapshots, "snapshots"],
+  ];
+  for (const [type, kind, arr, tab] of map) {
+    if (entry.type === type) {
+      const rec = arr.find((r: any) => r.id === entry.refId);
+      if (rec) return { kind, record: rec, tab };
+    }
+  }
+  return null;
+}
+
+export interface RelationshipIssue { kind: string; id: string; issue: string; }
+
+export function validateRelationships(state: Pick<State, "diary" | "watering" | "feeding" | "training" | "photos" | "diagnoses" | "harvests" | "snapshots">): RelationshipIssue[] {
+  const issues: RelationshipIssue[] = [];
+  for (const d of state.diary) {
+    if (d.refId && !resolveRef(d, state)) issues.push({ kind: "diary", id: d.id, issue: `refId ${d.refId} not found for type ${d.type}` });
+    if (d.snapshotId && !state.snapshots.find(s => s.id === d.snapshotId)) issues.push({ kind: "diary", id: d.id, issue: `snapshotId ${d.snapshotId} missing` });
+    for (const pid of d.photoIds || []) {
+      if (!state.photos.find(p => p.id === pid)) issues.push({ kind: "diary", id: d.id, issue: `photo ${pid} missing` });
+    }
+  }
+  const hasBacklink = (refId: string, type: EventType) => state.diary.some(d => d.refId === refId && d.type === type);
+  for (const w of state.watering) if (!hasBacklink(w.id, "watering")) issues.push({ kind: "watering", id: w.id, issue: "no diary back-link" });
+  for (const f of state.feeding) if (!hasBacklink(f.id, "feeding")) issues.push({ kind: "feeding", id: f.id, issue: "no diary back-link" });
+  for (const t of state.training) if (!hasBacklink(t.id, "training")) issues.push({ kind: "training", id: t.id, issue: "no diary back-link" });
+  for (const dx of state.diagnoses) if (!hasBacklink(dx.id, "diagnosis")) issues.push({ kind: "diagnosis", id: dx.id, issue: "no diary back-link" });
+  for (const h of state.harvests) if (!hasBacklink(h.id, "harvest")) issues.push({ kind: "harvest", id: h.id, issue: "no diary back-link" });
+  for (const p of state.photos) if (!p.diaryEntryId) issues.push({ kind: "photo", id: p.id, issue: "no diaryEntryId" });
+  return issues;
+}

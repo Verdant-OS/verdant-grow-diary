@@ -142,11 +142,12 @@ export default function Rewards() {
               <span>3 harvests</span>
             </div>
             {(() => {
-              const g = nextHarvestGate(harvestCount);
+              const count = harvestCount ?? 0;
+              const g = nextHarvestGate(count);
               if (!g) return null;
               return (
                 <div className="text-center text-[11px] text-muted-foreground mt-1 tabular-nums">
-                  <span className="font-semibold text-primary">{g.needed}</span> harvest{g.needed > 1 ? "s" : ""} remaining to unlock Lv {g.cap}
+                  <span className="font-semibold text-primary">{g.needed}</span> harvest{g.needed === 1 ? "" : "s"} remaining to unlock Lv {g.cap}
                 </div>
               );
             })()}

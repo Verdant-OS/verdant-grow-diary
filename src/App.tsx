@@ -5,11 +5,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/store/auth";
 import { GrowsProvider } from "@/store/grows";
+import { NugsProvider } from "@/store/nugs";
 import AppShell from "@/components/AppShell";
 import Auth from "./pages/Auth";
 import Timeline from "./pages/Timeline";
 import Grows from "./pages/Grows";
 import Coach from "./pages/Coach";
+import Rewards from "./pages/Rewards";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,15 +24,18 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <GrowsProvider>
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route element={<AppShell />}>
-                <Route path="/" element={<Timeline />} />
-                <Route path="/grows" element={<Grows />} />
-                <Route path="/coach" element={<Coach />} />
-              </Route>
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <NugsProvider>
+              <Routes>
+                <Route path="/auth" element={<Auth />} />
+                <Route element={<AppShell />}>
+                  <Route path="/" element={<Timeline />} />
+                  <Route path="/grows" element={<Grows />} />
+                  <Route path="/coach" element={<Coach />} />
+                  <Route path="/rewards" element={<Rewards />} />
+                </Route>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </NugsProvider>
           </GrowsProvider>
         </AuthProvider>
       </BrowserRouter>

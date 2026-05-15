@@ -10,6 +10,7 @@ import { Camera, Loader2, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
+import { useNugs } from "@/store/nugs";
 import { STAGES } from "@/lib/grow";
 import { toast } from "sonner";
 
@@ -18,6 +19,7 @@ interface Props { open: boolean; onOpenChange: (v: boolean) => void; onCreated?:
 export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
   const { user } = useAuth();
   const { grows, activeGrow, activeGrowId, setActiveGrowId } = useGrows();
+  const { award, completedQuests } = useNugs();
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [note, setNote] = useState("");
@@ -83,6 +85,13 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
       reset();
       onOpenChange(false);
       onCreated?.();
+      // Award NUGs: first-entry one-shot, then daily-log + photo bonus
+      if (!completedQuests.has("onboarding_first_entry")) {
+        await award("onboarding_first_entry", 150, { questKey: "onboarding_first_entry" });
+      } else {
+        await award("daily_log", 25, { silent: true });
+      }
+      if (uploadedPath) await award("photo_added", 15, { silent: true });
     } catch (err: any) {
       if (uploadedPath) {
         await supabase.storage.from("diary-photos").remove([uploadedPath]).catch(() => {});

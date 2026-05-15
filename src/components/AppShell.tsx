@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { Home, Sprout, Sparkles, Plus, LogOut, Leaf } from "lucide-react";
+import { Home, Sprout, Sparkles, Plus, LogOut, Leaf, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
 import QuickLog from "./QuickLog";
+import NugBadge from "./NugBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function AppShell() {
@@ -20,6 +21,7 @@ export default function AppShell() {
     { to: "/", label: "Timeline", icon: Home, end: true },
     { to: "/grows", label: "Grows", icon: Sprout, end: false },
     { to: "/coach", label: "AI Coach", icon: Sparkles, end: false },
+    { to: "/rewards", label: "Rewards", icon: Trophy, end: false },
   ];
 
   return (
@@ -33,13 +35,16 @@ export default function AppShell() {
           </div>
           {grows.length > 0 && (
             <Select value={activeGrowId ?? ""} onValueChange={setActiveGrowId}>
-              <SelectTrigger className="ml-auto h-9 w-44 text-sm"><SelectValue placeholder="Pick grow" /></SelectTrigger>
+              <SelectTrigger className="ml-auto h-9 w-36 text-sm"><SelectValue placeholder="Pick grow" /></SelectTrigger>
               <SelectContent>{grows.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}</SelectContent>
             </Select>
           )}
-          <Button variant="ghost" size="icon" onClick={() => signOut().then(() => nav("/auth"))} className={grows.length === 0 ? "ml-auto" : ""}>
-            <LogOut className="h-4 w-4" />
-          </Button>
+          <div className={grows.length === 0 ? "ml-auto flex items-center gap-2" : "flex items-center gap-2"}>
+            <NugBadge />
+            <Button variant="ghost" size="icon" onClick={() => signOut().then(() => nav("/auth"))}>
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -53,7 +58,7 @@ export default function AppShell() {
 
       {/* Bottom nav */}
       <nav className="fixed bottom-0 inset-x-0 z-30 backdrop-blur-xl bg-background/85 border-t border-border/40">
-        <div className="max-w-2xl mx-auto grid grid-cols-3 h-16">
+        <div className="max-w-2xl mx-auto grid grid-cols-4 h-16">
           {navItems.map((n) => (
             <NavLink key={n.to} to={n.to} end={n.end}
               className={({ isActive }) =>

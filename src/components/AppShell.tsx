@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { Home, Sprout, Sparkles, Plus, LogOut, Leaf } from "lucide-react";
+import { Home, Sprout, Sparkles, Plus, LogOut, Leaf, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
 import QuickLog from "./QuickLog";
+import NugBadge from "./NugBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function AppShell() {
@@ -20,6 +21,7 @@ export default function AppShell() {
     { to: "/", label: "Timeline", icon: Home, end: true },
     { to: "/grows", label: "Grows", icon: Sprout, end: false },
     { to: "/coach", label: "AI Coach", icon: Sparkles, end: false },
+    { to: "/rewards", label: "Rewards", icon: Trophy, end: false },
   ];
 
   return (

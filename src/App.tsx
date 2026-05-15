@@ -22,6 +22,7 @@ import CustomerHub from "./pages/app/CustomerHub";
 import Diagnosis from "./pages/app/Diagnosis";
 import SMSOptIns from "./pages/app/SMSOptIns";
 import Settings from "./pages/app/Settings";
+import QAChecklist from "./pages/app/QAChecklist";
 
 import CustomerLayout from "./pages/customer/CustomerLayout";
 import CustomerHome from "./pages/customer/CustomerHome";
@@ -53,6 +54,7 @@ const App = () => (
               <Route path="customer" element={<CustomerHub />} />
               <Route path="customer/sms" element={<SMSOptIns />} />
               <Route path="settings" element={<Settings />} />
+              <Route path="qa" element={<QAChecklist />} />
             </Route>
             <Route path="/grow" element={<CustomerLayout />}>
               <Route index element={<CustomerHome />} />

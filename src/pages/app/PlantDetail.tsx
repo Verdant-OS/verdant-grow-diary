@@ -21,6 +21,7 @@ export default function PlantDetail() {
   const { id } = useParams();
   const v = useVerdant();
   const p = v.plants.find(x => x.id === id);
+  const [viewPhoto, setViewPhoto] = useState<Photo | null>(null);
   if (!p) return <div>Plant not found. <Link to="/app/plants" className="text-primary">Back</Link></div>;
 
   const isDemo = p.id.startsWith("demo-");
@@ -32,6 +33,17 @@ export default function PlantDetail() {
   const harvests = v.harvests.filter(d => d.plantId === p.id);
   const diagnoses = v.diagnoses.filter(d => d.plantId === p.id);
   const snaps = v.snapshots.filter(d => !d.plantId || d.plantId === p.id);
+
+  const diaryFor = (refId: string, type: EventType) => diary.find(d => d.refId === refId && d.type === type);
+  const DiaryLink = ({ refId, type }: { refId: string; type: EventType }) => {
+    const d = diaryFor(refId, type);
+    if (!d) return null;
+    return (
+      <Link to={`/app/diary/${d.id}`} className="ml-auto inline-flex items-center gap-1 text-[11px] text-primary hover:underline">
+        <ExternalLink className="h-3 w-3" />Diary
+      </Link>
+    );
+  };
 
   const auto = p.seedType === "autoflower";
   const warnings: string[] = [];

@@ -7,7 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { LEVEL_THRESHOLDS, TIER_LABEL, UNLOCK_LABELS, progressToNext, tierForLevel, ONBOARDING_QUESTS } from "@/lib/leveling";
+import { LEVEL_THRESHOLDS, TIER_LABEL, UNLOCK_LABELS, progressToNext, tierForLevel, ONBOARDING_QUESTS, nextHarvestGate } from "@/lib/leveling";
 import QuestChecklist from "@/components/QuestChecklist";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
@@ -105,7 +105,13 @@ export default function Rewards() {
                 })}
               </div>
               <p className="text-[11px] text-muted-foreground mt-2 tabular-nums">
-                Logged harvests: <span className="text-foreground font-semibold">{harvestCount}</span> · log a harvest from the Grows tab.
+                Logged harvests: <span className="text-foreground font-semibold">{harvestCount}</span>
+                {(() => {
+                  const g = nextHarvestGate(harvestCount);
+                  return g
+                    ? <> · log <span className="text-foreground font-semibold">{g.needed}</span> more to unlock Lv {g.cap}.</>
+                    : <> · all Tier 2 gates cleared 🎉</>;
+                })()}
               </p>
             </div>
           </div>

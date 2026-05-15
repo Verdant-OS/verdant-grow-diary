@@ -47,21 +47,24 @@ export function NugsProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [unlocks, setUnlocks] = useState<Set<string>>(new Set());
   const [completedQuests, setCompletedQuests] = useState<Set<string>>(new Set());
+  const [harvestCount, setHarvestCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    if (!user) { setProfile(null); setUnlocks(new Set()); setCompletedQuests(new Set()); setLoading(false); return; }
+    if (!user) { setProfile(null); setUnlocks(new Set()); setCompletedQuests(new Set()); setHarvestCount(0); setLoading(false); return; }
     setLoading(true);
-    const [p, u, q] = await Promise.all([
+    const [p, u, q, h] = await Promise.all([
       (supabase as any).from("profiles").select("*").eq("user_id", user.id).maybeSingle(),
       (supabase as any).from("unlocks").select("key").eq("user_id", user.id),
       (supabase as any).from("user_quests").select("quest_key").eq("user_id", user.id),
+      (supabase as any).from("harvests").select("id", { count: "exact", head: true }).eq("user_id", user.id),
     ]);
     if (p.data) {
       setProfile({ ...p.data, tier: tierForLevel(p.data.level ?? 0) });
     }
     setUnlocks(new Set((u.data || []).map((r: any) => r.key)));
     setCompletedQuests(new Set((q.data || []).map((r: any) => r.quest_key)));
+    setHarvestCount(h.count ?? 0);
     setLoading(false);
   }, [user]);
 

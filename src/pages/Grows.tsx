@@ -20,6 +20,7 @@ export default function Grows() {
   const { award } = useNugs();
   const { grows, activeGrowId, setActiveGrowId, refresh, loading } = useGrows();
   const [open, setOpen] = useState(false);
+  const [harvestFor, setHarvestFor] = useState<{ id: string; grow_type: string } | null>(null);
   const [form, setForm] = useState({ name: "", grow_type: "tent", stage: "seedling", notes: "" });
   const [busy, setBusy] = useState(false);
 

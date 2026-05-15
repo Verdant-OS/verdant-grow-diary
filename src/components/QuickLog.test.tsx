@@ -159,4 +159,35 @@ describe("QuickLog photo Remove button", () => {
     expect(onOpenChange).not.toHaveBeenCalled();
     expect(onCreated).not.toHaveBeenCalled();
   });
+
+  it("submits with a note and no photo, logging without uploading", async () => {
+    insertMock.mockResolvedValue({ error: null });
+
+    const onOpenChange = vi.fn();
+    const onCreated = vi.fn();
+    render(<QuickLog open={true} onOpenChange={onOpenChange} onCreated={onCreated} />);
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.querySelector("img")).toBeNull();
+
+    const note = dialog.querySelector("textarea") as HTMLTextAreaElement;
+    fireEvent.change(note, { target: { value: "Topped plant" } });
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /save entry/i }));
+
+    await waitFor(() => expect(insertMock).toHaveBeenCalledTimes(1));
+    expect(insertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: "user-1",
+        grow_id: "grow-1",
+        note: "Topped plant",
+        photo_url: null,
+      }),
+    );
+    expect(uploadMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(onCreated).toHaveBeenCalled();
+    expect(toastSuccess).toHaveBeenCalledWith("Logged 🌱");
+    expect(toastError).not.toHaveBeenCalled();
+  });
 });

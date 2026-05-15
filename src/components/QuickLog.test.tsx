@@ -25,11 +25,15 @@ vi.mock("@/store/grows", () => ({
   }),
 }));
 
-vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+const toastError = vi.fn();
+const toastSuccess = vi.fn();
+vi.mock("sonner", () => ({ toast: { error: (...a: any[]) => toastError(...a), success: (...a: any[]) => toastSuccess(...a) } }));
 
 beforeEach(() => {
   insertMock.mockReset();
   uploadMock.mockReset();
+  toastError.mockReset();
+  toastSuccess.mockReset();
   // Stub object URL APIs used by preview
   (URL as any).createObjectURL = vi.fn(() => "blob:mock");
   (URL as any).revokeObjectURL = vi.fn();
@@ -106,5 +110,32 @@ describe("QuickLog photo Remove button", () => {
 
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
     expect(onCreated).toHaveBeenCalled();
+  });
+
+  it("shows the storage error and does not insert when upload fails", async () => {
+    uploadMock.mockResolvedValue({ error: { message: "bucket not found" } });
+
+    const onOpenChange = vi.fn();
+    const onCreated = vi.fn();
+    render(<QuickLog open={true} onOpenChange={onOpenChange} onCreated={onCreated} />);
+
+    const dialog = screen.getByRole("dialog");
+    const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(fileInput, { target: { files: [new File(["x"], "leaf.jpg", { type: "image/jpeg" })] } });
+    fireEvent.change(dialog.querySelector("textarea") as HTMLTextAreaElement, { target: { value: "Note" } });
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /save entry/i }));
+
+    await waitFor(() => expect(uploadMock).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith("Photo upload failed: bucket not found"),
+    );
+
+    expect(insertMock).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(onCreated).not.toHaveBeenCalled();
+    expect(toastSuccess).not.toHaveBeenCalled();
+    // Preview is preserved so the user can retry without re-picking the file
+    expect(dialog.querySelector("img")).toBeTruthy();
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import QuickLog from "./QuickLog";
 
 const insertMock = vi.fn();
@@ -67,5 +67,44 @@ describe("QuickLog photo Remove button", () => {
     expect(uploadMock).not.toHaveBeenCalled();
     expect(insertMock).not.toHaveBeenCalled();
     expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it("uploads the selected photo and inserts the entry with the uploaded path as photo_url", async () => {
+    uploadMock.mockResolvedValue({ error: null });
+    insertMock.mockResolvedValue({ error: null });
+
+    const onOpenChange = vi.fn();
+    const onCreated = vi.fn();
+    render(<QuickLog open={true} onOpenChange={onOpenChange} onCreated={onCreated} />);
+
+    const dialog = screen.getByRole("dialog");
+    const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["x"], "leaf.jpg", { type: "image/jpeg" });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    const note = dialog.querySelector("textarea") as HTMLTextAreaElement;
+    fireEvent.change(note, { target: { value: "Watered today" } });
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /save entry/i }));
+
+    await waitFor(() => expect(uploadMock).toHaveBeenCalledTimes(1));
+
+    // upload(path, file, opts)
+    const [uploadedPath, uploadedFile, uploadOpts] = uploadMock.mock.calls[0];
+    expect(uploadedFile).toBe(file);
+    expect(uploadOpts).toMatchObject({ contentType: "image/jpeg", upsert: false });
+    expect(uploadedPath).toMatch(/^user-1\/grow-1\/\d+\.jpg$/);
+
+    await waitFor(() => expect(insertMock).toHaveBeenCalledTimes(1));
+    const insertArg = insertMock.mock.calls[0][0];
+    expect(insertArg.photo_url).toBe(uploadedPath);
+    expect(insertArg).toMatchObject({
+      user_id: "user-1",
+      grow_id: "grow-1",
+      note: "Watered today",
+    });
+
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(onCreated).toHaveBeenCalled();
   });
 });

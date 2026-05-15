@@ -141,6 +141,15 @@ export default function Rewards() {
               <span>2</span>
               <span>3 harvests</span>
             </div>
+            {(() => {
+              const g = nextHarvestGate(harvestCount);
+              if (!g) return null;
+              return (
+                <div className="text-center text-[11px] text-muted-foreground mt-1 tabular-nums">
+                  <span className="font-semibold text-primary">{g.needed}</span> harvest{g.needed > 1 ? "s" : ""} remaining to unlock Lv {g.cap}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Gate ladder */}

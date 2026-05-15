@@ -157,7 +157,7 @@ function PhotoView({ photo, onClose }: { photo: Photo | null; onClose: () => voi
           {photo.notes && <div className="col-span-2"><div className="text-xs text-muted-foreground">Notes</div>{photo.notes}</div>}
         </div>
         {diary && (
-          <Button asChild variant="outline" className="gap-1.5"><Link to="/app/diary"><BookOpen className="h-4 w-4" />Linked diary entry</Link></Button>
+          <Button asChild variant="outline" className="gap-1.5"><Link to={`/app/diary/${diary.id}`}><BookOpen className="h-4 w-4" />Open linked diary entry</Link></Button>
         )}
       </DialogContent>
     </Dialog>

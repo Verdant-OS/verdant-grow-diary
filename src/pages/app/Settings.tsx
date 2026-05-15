@@ -1,10 +1,11 @@
 import { useVerdant, SafetyMode } from "@/store/verdant";
 import { PageHeader } from "@/components/ui-bits";
-import { Settings as SettingsIcon, Download, RotateCcw, ShieldCheck, Crown } from "lucide-react";
+import { Settings as SettingsIcon, Download, RotateCcw, ShieldCheck, Crown, ClipboardCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Link } from "react-router-dom";
 
 const tiers = [
   { name: "Free", price: "$0", features: ["Up to 3 plants", "Diary, watering, feeding", "Manual snapshots"] },
@@ -26,7 +27,8 @@ export default function Settings() {
 
   return (
     <>
-      <PageHeader title="Settings" subtitle="Safety, export, and SaaS tier blueprint" icon={SettingsIcon} />
+      <PageHeader title="Settings" subtitle="Safety, export, and SaaS tier blueprint" icon={SettingsIcon}
+        actions={<Button asChild variant="outline" className="gap-1.5"><Link to="/app/qa"><ClipboardCheck className="h-4 w-4" />MVP QA Checklist</Link></Button>} />
 
       <div className="grid lg:grid-cols-2 gap-4">
         <div className="glass rounded-xl p-5">

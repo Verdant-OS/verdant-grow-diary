@@ -192,29 +192,66 @@ export default function Timeline() {
                         </div>
                       )}
                       <div className="p-4">
-                        <div className="flex items-center gap-2 mb-1.5 text-xs text-muted-foreground">
-                          <span className="inline-flex items-center gap-1 text-primary"><Sprout className="h-3 w-3" />{stageLabel(e.stage)}</span>
-                          <span>·</span>
-                          <span title={format(new Date(e.entry_at), "PPpp")}>{formatDistanceToNow(new Date(e.entry_at), { addSuffix: true })}</span>
-                          <button
-                            type="button"
-                            onClick={() => setEditingId(e.id)}
-                            aria-label="Edit entry"
-                            className="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition"
-                          >
-                            <Pencil className="h-3 w-3" />Edit
-                          </button>
-                        </div>
-                        <p className="text-sm whitespace-pre-wrap">{e.note}</p>
-                        {e.details && Object.keys(e.details).length > 0 && (
-                          <div className="mt-2 flex flex-wrap gap-1.5">
-                            {Object.entries(e.details).map(([k, v]) => (
-                              <span key={k} className="text-[11px] px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40 capitalize">
-                                {k}: {String(v)}
-                              </span>
-                            ))}
-                          </div>
-                        )}
+                        {(() => {
+                          const et = getEventType(e.details?.event_type);
+                          const Icon = et.icon;
+                          const plantName = e.details?.plant_name as string | undefined;
+                          const sensor = e.details?.sensor as { temp?: number; rh?: number; vpd?: number; co2?: number; soil?: number } | undefined;
+                          const remindAt = e.details?.remind_at as string | undefined;
+                          const HIDDEN = ["event_type","plant_id","plant_name","tent_id","sensor","remind_at"];
+                          const extra = Object.entries(e.details || {}).filter(([k]) => !HIDDEN.includes(k));
+                          return (
+                            <>
+                              <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground flex-wrap">
+                                <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] font-medium", et.tone)}>
+                                  <Icon className="h-3 w-3" />{et.label}
+                                </span>
+                                <span className="inline-flex items-center gap-1 text-primary"><Sprout className="h-3 w-3" />{stageLabel(e.stage)}</span>
+                                {plantName && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40 text-[11px]">
+                                    <Leaf className="h-3 w-3" />{plantName}
+                                  </span>
+                                )}
+                                <span title={format(new Date(e.entry_at), "PPpp")}>{formatDistanceToNow(new Date(e.entry_at), { addSuffix: true })}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingId(e.id)}
+                                  aria-label="Edit entry"
+                                  className="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition"
+                                >
+                                  <Pencil className="h-3 w-3" />Edit
+                                </button>
+                              </div>
+                              <p className="text-sm whitespace-pre-wrap">{e.note}</p>
+                              {remindAt && (
+                                <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] px-2 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-yellow-300">
+                                  <Bell className="h-3 w-3" />Remind {format(new Date(remindAt), "PPp")}
+                                </div>
+                              )}
+                              {sensor && (
+                                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                  <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
+                                    <Gauge className="h-3 w-3" />Snapshot
+                                  </span>
+                                  {sensor.temp != null && <SnapChip>{sensor.temp}°C</SnapChip>}
+                                  {sensor.rh != null && <SnapChip>{sensor.rh}% RH</SnapChip>}
+                                  {sensor.vpd != null && <SnapChip>VPD {sensor.vpd}</SnapChip>}
+                                  {sensor.co2 != null && <SnapChip>CO₂ {sensor.co2}</SnapChip>}
+                                  {sensor.soil != null && <SnapChip>Soil {sensor.soil}%</SnapChip>}
+                                </div>
+                              )}
+                              {extra.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                  {extra.map(([k, v]) => (
+                                    <span key={k} className="text-[11px] px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40 capitalize">
+                                      {k}: {String(v)}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     </li>
                   ))}

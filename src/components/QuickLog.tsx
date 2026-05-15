@@ -40,18 +40,20 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!user || !activeGrowId) { toast.error("Pick a grow first"); return; }
-    if (!photoFile) { toast.error("Photo required"); return; }
     if (!note.trim()) { toast.error("Add a quick note"); return; }
     setBusy(true);
     try {
-      const ext = photoFile.name.split(".").pop() || "jpg";
-      const path = `${user.id}/${activeGrowId}/${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("diary-photos").upload(path, photoFile, { contentType: photoFile.type });
-      if (upErr) throw upErr;
+      let photoPath: string | null = null;
+      if (photoFile) {
+        const ext = photoFile.name.split(".").pop() || "jpg";
+        photoPath = `${user.id}/${activeGrowId}/${Date.now()}.${ext}`;
+        const { error: upErr } = await supabase.storage.from("diary-photos").upload(photoPath, photoFile, { contentType: photoFile.type });
+        if (upErr) throw upErr;
+      }
 
       const cleanDetails = Object.fromEntries(Object.entries(details).filter(([, v]) => v && v.toString().trim()));
       const { error: insErr } = await supabase.from("diary_entries").insert({
-        user_id: user.id, grow_id: activeGrowId, photo_url: path,
+        user_id: user.id, grow_id: activeGrowId, photo_url: photoPath,
         note: note.trim(), stage, details: cleanDetails,
       });
       if (insErr) throw insErr;
@@ -80,7 +82,7 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
             className="relative aspect-square w-full rounded-xl border-2 border-dashed border-border/60 overflow-hidden bg-secondary/40 hover:border-primary/60 transition">
             {preview ? <img src={preview} className="h-full w-full object-cover" alt="" /> : (
               <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
-                <Camera className="h-10 w-10" /><span className="text-sm">Tap to add photo</span>
+                <Camera className="h-10 w-10" /><span className="text-sm">Tap to add photo (optional)</span>
               </div>
             )}
             <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden"

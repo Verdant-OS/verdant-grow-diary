@@ -105,7 +105,13 @@ export default function Rewards() {
                 })}
               </div>
               <p className="text-[11px] text-muted-foreground mt-2 tabular-nums">
-                Logged harvests: <span className="text-foreground font-semibold">{harvestCount}</span> · log a harvest from the Grows tab.
+                Logged harvests: <span className="text-foreground font-semibold">{harvestCount}</span>
+                {(() => {
+                  const g = nextHarvestGate(harvestCount);
+                  return g
+                    ? <> · log <span className="text-foreground font-semibold">{g.needed}</span> more to unlock Lv {g.cap}.</>
+                    : <> · all Tier 2 gates cleared 🎉</>;
+                })()}
               </p>
             </div>
           </div>

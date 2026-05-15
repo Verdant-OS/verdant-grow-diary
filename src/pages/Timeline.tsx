@@ -304,3 +304,7 @@ function Empty({ title, desc, cta }: { title: string; desc: string; cta?: React.
     </div>
   );
 }
+
+function SnapChip({ children }: { children: React.ReactNode }) {
+  return <span className="text-[11px] px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40">{children}</span>;
+}

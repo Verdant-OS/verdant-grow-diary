@@ -49,6 +49,22 @@ export const ONBOARDING_QUESTS: Quest[] = [
   { key: "onboarding_first_coach", title: "Ask the AI Coach", amount: 100, href: "/coach", description: "Get a quick diagnosis or next steps." },
 ];
 
+// Tier 2 harvest gates — each tier of harvests raises the level cap.
+export const HARVEST_GATES: { req: number; cap: number }[] = [
+  { req: 0, cap: 10 },
+  { req: 1, cap: 14 },
+  { req: 2, cap: 17 },
+  { req: 3, cap: 20 },
+];
+
+/** Next gate the user hasn't reached yet, or null if all are met. */
+export function nextHarvestGate(harvestCount: number): { needed: number; cap: number } | null {
+  for (const g of HARVEST_GATES) {
+    if (harvestCount < g.req) return { needed: g.req - harvestCount, cap: g.cap };
+  }
+  return null;
+}
+
 export const UNLOCK_LABELS: Record<string, { label: string; level: number }> = {
   grow_badge: { label: "Grow badge", level: 5 },
   strain_library: { label: "Strain library", level: 5 },

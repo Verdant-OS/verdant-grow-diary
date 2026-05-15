@@ -31,10 +31,8 @@ beforeEach(() => {
   insertMock.mockReset();
   uploadMock.mockReset();
   // Stub object URL APIs used by preview
-  // @ts-expect-error jsdom
-  URL.createObjectURL = vi.fn(() => "blob:mock");
-  // @ts-expect-error jsdom
-  URL.revokeObjectURL = vi.fn();
+  (URL as any).createObjectURL = vi.fn(() => "blob:mock");
+  (URL as any).revokeObjectURL = vi.fn();
 });
 
 describe("QuickLog photo Remove button", () => {

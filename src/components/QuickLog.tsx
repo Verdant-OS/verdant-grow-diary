@@ -36,6 +36,7 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Auto-pick a sensible event type when adding a photo
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (photoFile && eventType === "observation") setEventType("photo"); }, [photoFile]);
 
   const selectedPlant = useMemo(() => mockPlants.find((p) => p.id === plantId) ?? null, [plantId]);

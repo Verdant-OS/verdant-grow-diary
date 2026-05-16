@@ -53,6 +53,7 @@ export default function Timeline() {
     setLoading(false);
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [activeGrowId, user]);
   useEffect(() => {
     const h = () => load();

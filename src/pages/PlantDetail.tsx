@@ -4,7 +4,8 @@ import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
 import EmptyState from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
-import { usePlant, useTent } from "@/hooks/useMockData";
+import { useTent } from "@/hooks/useMockData";
+import { useGrowPlant } from "@/hooks/useGrowData";
 import { format, formatDistanceToNow } from "date-fns";
 
 export default function PlantDetail() {

@@ -39,15 +39,16 @@ export default function Coach() {
         body: { mode, growId: activeGrowId, photoUrl, question: question.trim() || undefined },
       });
       if (error) throw error;
-      if ((data as any)?.error) throw new Error((data as any).error);
-      setReply((data as any).reply);
+      const d = data as { error?: string; reply?: string } | null;
+      if (d?.error) throw new Error(d.error);
+      setReply(d?.reply ?? "");
       if (!completedQuests.has("onboarding_first_coach")) {
         await award("onboarding_first_coach", 100, { questKey: "onboarding_first_coach" });
       } else {
         await award("coach_session", 20, { silent: true });
       }
-    } catch (e: any) {
-      toast.error(e.message || "Coach failed");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Coach failed");
     } finally { setBusy(false); }
   }
 

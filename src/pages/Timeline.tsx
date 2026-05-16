@@ -14,7 +14,7 @@ import { getEventType } from "@/lib/diary";
 
 interface Entry {
   id: string; note: string; photo_url: string | null; stage: string | null;
-  details: Record<string, any>; entry_at: string;
+  details: Record<string, unknown>; entry_at: string;
 }
 
 type EventFilter = "all" | "photo" | "note" | "measurement";
@@ -293,7 +293,7 @@ function FilterChip({ active, onClick, label, count, icon, disabled }: { active:
   );
 }
 
-function Center({ children }: any) { return <div className="py-20 flex justify-center text-muted-foreground">{children}</div>; }
+function Center({ children }: { children: React.ReactNode }) { return <div className="py-20 flex justify-center text-muted-foreground">{children}</div>; }
 function Empty({ title, desc, cta }: { title: string; desc: string; cta?: React.ReactNode }) {
   return (
     <div className="py-16 text-center">

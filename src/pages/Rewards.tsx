@@ -12,7 +12,7 @@ import QuestChecklist from "@/components/QuestChecklist";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 
-interface NugEvent { id: string; kind: string; amount: number; created_at: string; meta: any; }
+interface NugEvent { id: string; kind: string; amount: number; created_at: string; meta: Record<string, unknown> | null; }
 
 export default function Rewards() {
   const { user } = useAuth();
@@ -25,9 +25,9 @@ export default function Rewards() {
 
   useEffect(() => {
     if (!user) return;
-    (supabase as any).from("nug_events").select("id,kind,amount,created_at,meta")
+    supabase.from("nug_events").select("id,kind,amount,created_at,meta")
       .eq("user_id", user.id).order("created_at", { ascending: false }).limit(20)
-      .then(({ data }: any) => setEvents(data || []));
+      .then(({ data }) => setEvents((data as NugEvent[] | null) ?? []));
   }, [user, profile?.nugs_total]);
 
   const total = profile?.nugs_total ?? 0;
@@ -39,7 +39,7 @@ export default function Rewards() {
     e.preventDefault();
     if (!user || !name.trim()) return;
     setSavingName(true);
-    const { error } = await (supabase as any).from("profiles").update({ display_name: name.trim() }).eq("user_id", user.id);
+    const { error } = await supabase.from("profiles").update({ display_name: name.trim() }).eq("user_id", user.id);
     if (error) { toast.error(error.message); setSavingName(false); return; }
     if (!completedQuests.has("onboarding_profile")) {
       await award("onboarding_profile", 100, { questKey: "onboarding_profile" });

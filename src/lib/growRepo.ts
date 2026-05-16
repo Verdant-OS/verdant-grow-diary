@@ -4,7 +4,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert } from "@/integrations/supabase/types";
 import type { Tent, Plant, SensorReading } from "@/mock";
-import { mapTentRow, mapPlantRow, mapSensorReadingRow } from "./growAdapters";
+import { mapTentRow, mapPlantRow, groupSensorReadingRows } from "./growAdapters";
 
 function fail(scope: string, error: { message?: string } | null): never {
   throw new Error(`growRepo.${scope}: ${error?.message ?? "unknown error"}`);
@@ -47,7 +47,7 @@ export async function fetchSensorReadings(tentId?: string): Promise<SensorReadin
   if (tentId) q = q.eq("tent_id", tentId);
   const { data, error } = await q.order("ts", { ascending: false }).limit(2000);
   if (error) fail("fetchSensorReadings", error);
-  return (data ?? []).map(mapSensorReadingRow);
+  return groupSensorReadingRows(data ?? []);
 }
 
 export async function insertSensorReading(

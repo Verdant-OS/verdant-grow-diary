@@ -49,8 +49,9 @@ export function mapPlantRow(row: PlantRow): Plant {
 }
 
 /**
- * Maps the per-metric sensor_readings rows for a single timestamp into the
- * legacy mock-shaped SensorReading. Values default to 0 when not present.
+ * Maps a single per-metric sensor_readings row into the legacy mock-shaped
+ * SensorReading. Missing metrics default to 0. Prefer `groupSensorReadingRows`
+ * for fetch results — a single row alone reports only one metric.
  */
 export function mapSensorReadingRow(row: SensorRow): SensorReading {
   const reading: SensorReading = {
@@ -62,14 +63,38 @@ export function mapSensorReadingRow(row: SensorRow): SensorReading {
     co2: 0,
     soil: 0,
   };
-  const v = Number(row.value);
-  if (!Number.isFinite(v)) return reading;
-  switch (row.metric) {
+  applyMetric(reading, row.metric, row.value);
+  return reading;
+}
+
+function applyMetric(reading: SensorReading, metric: string, rawValue: number | string | null): void {
+  const v = Number(rawValue);
+  if (!Number.isFinite(v)) return;
+  switch (metric) {
     case "temperature_c": reading.temp = v; break;
     case "humidity_pct": reading.rh = v; break;
     case "vpd_kpa": reading.vpd = v; break;
     case "co2_ppm": reading.co2 = v; break;
     case "soil_moisture_pct": reading.soil = v; break;
   }
-  return reading;
+}
+
+/**
+ * Groups long-form sensor_readings rows by (tent_id, ts) into the legacy
+ * mock-shaped SensorReading objects. Missing metrics default to 0. Sorted by
+ * ts descending (newest first); rows with the same ts keep insertion order
+ * across distinct tents.
+ */
+export function groupSensorReadingRows(rows: SensorRow[]): SensorReading[] {
+  const byKey = new Map<string, SensorReading>();
+  for (const row of rows) {
+    const key = `${row.tent_id}|${row.ts}`;
+    let reading = byKey.get(key);
+    if (!reading) {
+      reading = { ts: row.ts, tentId: row.tent_id, temp: 0, rh: 0, vpd: 0, co2: 0, soil: 0 };
+      byKey.set(key, reading);
+    }
+    applyMetric(reading, row.metric, row.value);
+  }
+  return Array.from(byKey.values()).sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0));
 }

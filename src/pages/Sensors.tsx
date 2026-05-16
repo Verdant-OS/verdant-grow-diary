@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Activity } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import SensorChart from "@/components/SensorChart";
-import { useSensorReadings, useTents } from "@/hooks/useMockData";
+import { useTents } from "@/hooks/useMockData";
+import { useGrowSensorReadings } from "@/hooks/useGrowData";
 import { cn } from "@/lib/utils";
 
 const METRICS = [
@@ -15,7 +16,7 @@ const METRICS = [
 
 export default function Sensors() {
   const { data: tents = [] } = useTents();
-  const { data: readings = [] } = useSensorReadings();
+  const { data: readings = [] } = useGrowSensorReadings();
   const [tentId, setTentId] = useState<string>(tents[0]?.id ?? "t1");
   const filtered = readings.filter((r) => r.tentId === tentId);
 

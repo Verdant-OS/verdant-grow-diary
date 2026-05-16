@@ -15,7 +15,7 @@ interface Entry {
   note: string;
   photo_url: string | null;
   stage: string | null;
-  details: Record<string, any>;
+  details: Record<string, unknown>;
   entry_at: string;
 }
 

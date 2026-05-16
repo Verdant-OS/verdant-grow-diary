@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 
-interface NavItem { to: string; label: string; icon: any; end?: boolean }
+interface NavItem { to: string; label: string; icon: LucideIcon; end?: boolean }
 
 const groups: { label: string; items: NavItem[] }[] = [
   { label: "Overview", items: [{ to: "/", label: "Dashboard", icon: LayoutDashboard, end: true }] },

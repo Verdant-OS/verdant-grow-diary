@@ -27,7 +27,7 @@ vi.mock("@/store/grows", () => ({
 
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
-vi.mock("sonner", () => ({ toast: { error: (...a: any[]) => toastError(...a), success: (...a: any[]) => toastSuccess(...a) } }));
+vi.mock("sonner", () => ({ toast: { error: (...a: unknown[]) => toastError(...a), success: (...a: unknown[]) => toastSuccess(...a) } }));
 
 beforeEach(() => {
   insertMock.mockReset();
@@ -35,8 +35,8 @@ beforeEach(() => {
   toastError.mockReset();
   toastSuccess.mockReset();
   // Stub object URL APIs used by preview
-  (URL as any).createObjectURL = vi.fn(() => "blob:mock");
-  (URL as any).revokeObjectURL = vi.fn();
+  (URL as unknown as { createObjectURL: () => string }).createObjectURL = vi.fn(() => "blob:mock");
+  (URL as unknown as { revokeObjectURL: () => void }).revokeObjectURL = vi.fn();
 });
 
 describe("QuickLog photo Remove button", () => {

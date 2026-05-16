@@ -72,7 +72,7 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
         uploadedPath = path;
       }
 
-      const cleanDetails: Record<string, any> = Object.fromEntries(
+      const cleanDetails: Record<string, unknown> = Object.fromEntries(
         Object.entries(details).filter(([, v]) => v && v.toString().trim()),
       );
       cleanDetails.event_type = eventType;
@@ -115,11 +115,11 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
         await award("daily_log", 25, { silent: true });
       }
       if (uploadedPath) await award("photo_added", 15, { silent: true });
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (uploadedPath) {
         await supabase.storage.from("diary-photos").remove([uploadedPath]).catch(() => {});
       }
-      toast.error(err?.message || "Failed to save");
+      toast.error(err instanceof Error ? err.message : "Failed to save");
       console.error("[QuickLog] unexpected error", err);
     } finally { setBusy(false); }
   }

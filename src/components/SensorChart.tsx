@@ -20,8 +20,8 @@ const meta = {
 export default function SensorChart({ data, metric, height = 220, variant = "area" }: Props) {
   const m = meta[metric];
   const chartData = data.map((r) => ({ ts: r.ts, value: r[metric] }));
-  const Comp: any = variant === "area" ? AreaChart : LineChart;
-  const Series: any = variant === "area" ? Area : Line;
+  const Comp = (variant === "area" ? AreaChart : LineChart) as React.ComponentType<React.ComponentProps<typeof AreaChart>>;
+  const Series = (variant === "area" ? Area : Line) as React.ComponentType<React.ComponentProps<typeof Area>>;
   const id = `grad-${metric}`;
   return (
     <ResponsiveContainer width="100%" height={height}>

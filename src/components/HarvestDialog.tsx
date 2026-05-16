@@ -46,7 +46,7 @@ export default function HarvestDialog({ open, onOpenChange, growId, defaultGrowT
     if (!user) return;
     setBusy(true);
     const yieldNum = form.yield_grams ? Number(form.yield_grams) : null;
-    const { error } = await (supabase as any).from("harvests").insert({
+    const { error } = await supabase.from("harvests").insert({
       user_id: user.id,
       grow_id: growId,
       grow_type: form.grow_type,
@@ -58,7 +58,7 @@ export default function HarvestDialog({ open, onOpenChange, growId, defaultGrowT
     if (error) { toast.error(error.message); setBusy(false); return; }
 
     // Mark grow as harvest stage
-    await (supabase as any).from("grows").update({ stage: "harvest" }).eq("id", growId);
+    await supabase.from("grows").update({ stage: "harvest" }).eq("id", growId);
 
     // Base 500 + up to 1000 yield bonus (1 NUG per gram)
     const yieldBonus = yieldNum ? Math.min(1000, Math.round(yieldNum)) : 0;

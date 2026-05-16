@@ -5,10 +5,11 @@ import StageBadge from "@/components/StageBadge";
 import MetricChip from "@/components/MetricChip";
 import EmptyState from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
-import { useTents, useSensorReadings, usePlants } from "@/hooks/useMockData";
+import { useSensorReadings, usePlants } from "@/hooks/useMockData";
+import { useGrowTents } from "@/hooks/useGrowData";
 
 export default function Tents() {
-  const { data: tents = [], isLoading } = useTents();
+  const { data: tents = [], isLoading } = useGrowTents();
   const { data: readings = [] } = useSensorReadings();
   const { data: plants = [] } = usePlants();
 

@@ -6,11 +6,12 @@ import SensorChart from "@/components/SensorChart";
 import EmptyState from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Box, Lightbulb } from "lucide-react";
-import { useTent, usePlants, useSensorReadings, useCameras } from "@/hooks/useMockData";
+import { usePlants, useSensorReadings, useCameras } from "@/hooks/useMockData";
+import { useGrowTent } from "@/hooks/useGrowData";
 
 export default function TentDetail() {
   const { id } = useParams();
-  const { data: tent, isLoading } = useTent(id);
+  const { data: tent, isLoading } = useGrowTent(id);
   const { data: plants = [] } = usePlants(id);
   const { data: readings = [] } = useSensorReadings(id);
   const { data: cameras = [] } = useCameras();

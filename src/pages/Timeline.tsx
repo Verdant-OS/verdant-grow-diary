@@ -193,7 +193,7 @@ export default function Timeline() {
                       )}
                       <div className="p-4">
                         {(() => {
-                          const et = getEventType(e.details?.event_type);
+                          const et = getEventType((e.details?.event_type as string | undefined) ?? null);
                           const Icon = et.icon;
                           const plantName = e.details?.plant_name as string | undefined;
                           const sensor = e.details?.sensor as { temp?: number; rh?: number; vpd?: number; co2?: number; soil?: number } | undefined;

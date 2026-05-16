@@ -75,11 +75,11 @@ export function NugsProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase.rpc("award_nugs", {
       _kind: kind,
       _amount: amount,
-      _meta: opts.meta ?? {},
+      _meta: (opts.meta ?? {}) as Record<string, never>,
       _quest_key: opts.questKey ?? null,
     });
     if (error) { console.error("[award_nugs]", error); return null; }
-    const res = data as AwardResult;
+    const res = data as unknown as AwardResult;
 
     if (!res?.duplicate && (res?.awarded ?? 0) > 0 && !opts.silent) {
       toast.success(`+${res.awarded} NUGs 🌱`);

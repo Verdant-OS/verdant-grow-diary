@@ -96,8 +96,12 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": [
+      "prettier --write",
       "eslint --fix",
-      "tsc -p tsconfig.app.json --noEmit --skipLibCheck"
+      "bash -c 'tsc -p tsconfig.app.json --noEmit --skipLibCheck'"
+    ],
+    "*.{js,jsx,mjs,cjs,json,css,md,html,yml,yaml}": [
+      "prettier --write"
     ]
   }
 }

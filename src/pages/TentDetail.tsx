@@ -11,7 +11,7 @@ import { useGrowTent } from "@/hooks/useGrowData";
 
 export default function TentDetail() {
   const { id } = useParams();
-  const { data: tent, isLoading } = useTent(id);
+  const { data: tent, isLoading } = useGrowTent(id);
   const { data: plants = [] } = usePlants(id);
   const { data: readings = [] } = useSensorReadings(id);
   const { data: cameras = [] } = useCameras();

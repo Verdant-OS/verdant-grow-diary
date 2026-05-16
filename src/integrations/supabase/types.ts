@@ -160,6 +160,57 @@ export type Database = {
         }
         Relationships: []
       }
+      plants: {
+        Row: {
+          created_at: string
+          health: string
+          id: string
+          is_archived: boolean
+          last_note: string | null
+          name: string
+          photo_url: string | null
+          schema_version: number
+          stage: string
+          started_at: string
+          strain: string | null
+          tent_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          health?: string
+          id?: string
+          is_archived?: boolean
+          last_note?: string | null
+          name: string
+          photo_url?: string | null
+          schema_version?: number
+          stage?: string
+          started_at?: string
+          strain?: string | null
+          tent_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          health?: string
+          id?: string
+          is_archived?: boolean
+          last_note?: string | null
+          name?: string
+          photo_url?: string | null
+          schema_version?: number
+          stage?: string
+          started_at?: string
+          strain?: string | null
+          tent_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -188,6 +239,90 @@ export type Database = {
           level?: number
           nugs_total?: number
           tier?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      sensor_readings: {
+        Row: {
+          created_at: string
+          id: string
+          metric: string
+          quality: string
+          source: string
+          tent_id: string
+          ts: string
+          user_id: string
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metric: string
+          quality?: string
+          source?: string
+          tent_id: string
+          ts?: string
+          user_id: string
+          value: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metric?: string
+          quality?: string
+          source?: string
+          tent_id?: string
+          ts?: string
+          user_id?: string
+          value?: number
+        }
+        Relationships: []
+      }
+      tents: {
+        Row: {
+          brand: string | null
+          created_at: string
+          id: string
+          is_archived: boolean
+          light_on: boolean
+          light_schedule: string | null
+          light_wattage: number | null
+          name: string
+          schema_version: number
+          size: string | null
+          stage: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          brand?: string | null
+          created_at?: string
+          id?: string
+          is_archived?: boolean
+          light_on?: boolean
+          light_schedule?: string | null
+          light_wattage?: number | null
+          name: string
+          schema_version?: number
+          size?: string | null
+          stage?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          brand?: string | null
+          created_at?: string
+          id?: string
+          is_archived?: boolean
+          light_on?: boolean
+          light_schedule?: string | null
+          light_wattage?: number | null
+          name?: string
+          schema_version?: number
+          size?: string | null
+          stage?: string
           updated_at?: string
           user_id?: string
         }

@@ -1,0 +1,9 @@
+bun.lockb
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+dist
+build
+node_modules
+.husky
+src/integrations/supabase/types.ts

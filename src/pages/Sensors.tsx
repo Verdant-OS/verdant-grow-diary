@@ -2,8 +2,7 @@ import { useState } from "react";
 import { Activity } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import SensorChart from "@/components/SensorChart";
-import { useTents } from "@/hooks/useMockData";
-import { useGrowSensorReadings } from "@/hooks/useGrowData";
+import { useGrowTents, useGrowSensorReadings } from "@/hooks/useGrowData";
 import { cn } from "@/lib/utils";
 
 const METRICS = [

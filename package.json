@@ -9,6 +9,8 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -85,6 +87,7 @@
     "lint-staged": "^17.0.5",
     "lovable-tagger": "^1.1.13",
     "postcss": "^8.5.6",
+    "prettier": "^3.8.3",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",
@@ -93,8 +96,12 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": [
+      "prettier --write",
       "eslint --fix",
-      "tsc -p tsconfig.app.json --noEmit --skipLibCheck"
+      "bash -c 'tsc -p tsconfig.app.json --noEmit --skipLibCheck'"
+    ],
+    "*.{js,jsx,mjs,cjs,json,css,md,html,yml,yaml}": [
+      "prettier --write"
     ]
   }
 }

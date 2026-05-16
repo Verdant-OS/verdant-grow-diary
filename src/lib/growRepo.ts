@@ -47,7 +47,7 @@ export async function fetchSensorReadings(tentId?: string): Promise<SensorReadin
   if (tentId) q = q.eq("tent_id", tentId);
   const { data, error } = await q.order("ts", { ascending: false }).limit(2000);
   if (error) fail("fetchSensorReadings", error);
-  return (data ?? []).map(mapSensorReadingRow);
+  return groupSensorReadingRows(data ?? []);
 }
 
 export async function insertSensorReading(

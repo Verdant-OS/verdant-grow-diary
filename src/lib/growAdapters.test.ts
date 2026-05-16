@@ -111,6 +111,57 @@ describe("mapSensorReadingRow", () => {
   });
 });
 
+describe("groupSensorReadingRows", () => {
+  const base = { id: "r", user_id: "u", quality: "ok", source: "manual", created_at: "x" };
+  const row = (tent_id: string, ts: string, metric: string, value: number, id = `${tent_id}-${ts}-${metric}`) =>
+    ({ ...base, id, tent_id, ts, metric, value }) as any;
+
+  it("merges five metrics at the same ts/tent into one reading", () => {
+    const ts = "2026-05-01T12:00:00Z";
+    const out = groupSensorReadingRows([
+      row("t1", ts, "temperature_c", 24),
+      row("t1", ts, "humidity_pct", 55),
+      row("t1", ts, "vpd_kpa", 1.2),
+      row("t1", ts, "co2_ppm", 800),
+      row("t1", ts, "soil_moisture_pct", 40),
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toEqual({ ts, tentId: "t1", temp: 24, rh: 55, vpd: 1.2, co2: 800, soil: 40 });
+  });
+
+  it("produces two readings for two timestamps, newest first", () => {
+    const older = "2026-05-01T10:00:00Z";
+    const newer = "2026-05-01T12:00:00Z";
+    const out = groupSensorReadingRows([
+      row("t1", older, "temperature_c", 20),
+      row("t1", newer, "temperature_c", 25),
+    ]);
+    expect(out).toHaveLength(2);
+    expect(out[0].ts).toBe(newer);
+    expect(out[1].ts).toBe(older);
+  });
+
+  it("does not crash on sparse metrics; missing default to 0", () => {
+    const out = groupSensorReadingRows([row("t1", "2026-05-01T12:00:00Z", "temperature_c", 22)]);
+    expect(out[0]).toMatchObject({ temp: 22, rh: 0, vpd: 0, co2: 0, soil: 0 });
+  });
+
+  it("does not merge rows from different tents at the same ts", () => {
+    const ts = "2026-05-01T12:00:00Z";
+    const out = groupSensorReadingRows([
+      row("t1", ts, "temperature_c", 22),
+      row("t2", ts, "temperature_c", 28),
+    ]);
+    expect(out).toHaveLength(2);
+    const tents = out.map((r) => r.tentId).sort();
+    expect(tents).toEqual(["t1", "t2"]);
+  });
+
+  it("returns [] for empty input", () => {
+    expect(groupSensorReadingRows([])).toEqual([]);
+  });
+});
+
 describe("mock data immutability", () => {
   it("adapters do not mutate exported mock arrays", () => {
     const tentsSnap = JSON.stringify(tents);

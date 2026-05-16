@@ -4,11 +4,12 @@ import { useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
 import EmptyState from "@/components/EmptyState";
-import { useTents, usePlants } from "@/hooks/useMockData";
+import { useTents } from "@/hooks/useMockData";
+import { useGrowPlants } from "@/hooks/useGrowData";
 import { cn } from "@/lib/utils";
 
 export default function Plants() {
-  const { data: plants = [] } = usePlants();
+  const { data: plants = [] } = useGrowPlants();
   const { data: tents = [] } = useTents();
   const [tentFilter, setTentFilter] = useState<string>("all");
   const filtered = tentFilter === "all" ? plants : plants.filter((p) => p.tentId === tentFilter);

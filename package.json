@@ -8,9 +8,11 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepare": "husky"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

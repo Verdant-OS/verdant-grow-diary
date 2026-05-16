@@ -4,12 +4,13 @@ import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
 import EmptyState from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
-import { usePlant, useTent } from "@/hooks/useMockData";
+import { useTent } from "@/hooks/useMockData";
+import { useGrowPlant } from "@/hooks/useGrowData";
 import { format, formatDistanceToNow } from "date-fns";
 
 export default function PlantDetail() {
   const { id } = useParams();
-  const { data: plant, isLoading } = usePlant(id);
+  const { data: plant, isLoading } = useGrowPlant(id);
   const { data: tent } = useTent(plant?.tentId);
   if (isLoading) return <div className="glass rounded-2xl h-64 animate-pulse" />;
   if (!plant) return <EmptyState icon={<Sprout className="h-6 w-6" />} title="Plant not found" action={<Button asChild variant="outline"><Link to="/plants"><ArrowLeft className="h-4 w-4" /> Back</Link></Button>} />;

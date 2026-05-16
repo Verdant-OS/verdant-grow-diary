@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mapTentRow, mapPlantRow, mapSensorReadingRow } from "./growAdapters";
+import { mapTentRow, mapPlantRow, mapSensorReadingRow, groupSensorReadingRows } from "./growAdapters";
 import { tents, plants, sensorReadings } from "@/mock";
 
 const tentRow = {

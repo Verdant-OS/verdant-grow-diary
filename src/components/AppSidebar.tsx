@@ -2,6 +2,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Box, Sprout, Camera, Activity, NotebookText,
   ListChecks, Bell, Stethoscope, Trophy, Settings, Leaf,
+  type LucideIcon,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -9,7 +10,7 @@ import {
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 
-interface NavItem { to: string; label: string; icon: any; end?: boolean }
+interface NavItem { to: string; label: string; icon: LucideIcon; end?: boolean }
 
 const groups: { label: string; items: NavItem[] }[] = [
   { label: "Overview", items: [{ to: "/", label: "Dashboard", icon: LayoutDashboard, end: true }] },

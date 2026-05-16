@@ -54,16 +54,16 @@ export function NugsProvider({ children }: { children: ReactNode }) {
     if (!user) { setProfile(null); setUnlocks(new Set()); setCompletedQuests(new Set()); setHarvestCount(0); setLoading(false); return; }
     setLoading(true);
     const [p, u, q, h] = await Promise.all([
-      (supabase as any).from("profiles").select("*").eq("user_id", user.id).maybeSingle(),
-      (supabase as any).from("unlocks").select("key").eq("user_id", user.id),
-      (supabase as any).from("user_quests").select("quest_key").eq("user_id", user.id),
-      (supabase as any).from("harvests").select("id", { count: "exact", head: true }).eq("user_id", user.id),
+      supabase.from("profiles").select("*").eq("user_id", user.id).maybeSingle(),
+      supabase.from("unlocks").select("key").eq("user_id", user.id),
+      supabase.from("user_quests").select("quest_key").eq("user_id", user.id),
+      supabase.from("harvests").select("id", { count: "exact", head: true }).eq("user_id", user.id),
     ]);
     if (p.data) {
       setProfile({ ...p.data, tier: tierForLevel(p.data.level ?? 0) });
     }
-    setUnlocks(new Set((u.data || []).map((r: any) => r.key)));
-    setCompletedQuests(new Set((q.data || []).map((r: any) => r.quest_key)));
+    setUnlocks(new Set((u.data || []).map((r) => r.key)));
+    setCompletedQuests(new Set((q.data || []).map((r) => r.quest_key)));
     setHarvestCount(h.count ?? 0);
     setLoading(false);
   }, [user]);
@@ -72,14 +72,14 @@ export function NugsProvider({ children }: { children: ReactNode }) {
 
   const award = useCallback<Ctx["award"]>(async (kind, amount, opts = {}) => {
     if (!user) return null;
-    const { data, error } = await (supabase as any).rpc("award_nugs", {
+    const { data, error } = await supabase.rpc("award_nugs", {
       _kind: kind,
       _amount: amount,
-      _meta: opts.meta ?? {},
+      _meta: (opts.meta ?? {}) as Record<string, never>,
       _quest_key: opts.questKey ?? null,
     });
     if (error) { console.error("[award_nugs]", error); return null; }
-    const res = data as AwardResult;
+    const res = data as unknown as AwardResult;
 
     if (!res?.duplicate && (res?.awarded ?? 0) > 0 && !opts.silent) {
       toast.success(`+${res.awarded} NUGs 🌱`);

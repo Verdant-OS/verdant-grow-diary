@@ -17,11 +17,14 @@ export interface EnvOverrides {
   VITE_SUPABASE_PROJECT_ID?: string;
 }
 
-function buildChecks(env: EnvOverrides): EnvCheck[] {
+function buildChecks(env: EnvOverrides, shadowAll: boolean): EnvCheck[] {
+  const get = (k: keyof EnvOverrides): string | undefined =>
+    shadowAll ? env[k] : (env[k] ?? import.meta.env[k]);
+
   return [
     {
       name: "VITE_SUPABASE_URL",
-      value: env.VITE_SUPABASE_URL ?? import.meta.env.VITE_SUPABASE_URL,
+      value: get("VITE_SUPABASE_URL"),
       required: true,
       validate: (val) =>
         val.startsWith("https://") && val.includes(".supabase.co"),
@@ -29,14 +32,14 @@ function buildChecks(env: EnvOverrides): EnvCheck[] {
     },
     {
       name: "VITE_SUPABASE_PUBLISHABLE_KEY",
-      value: env.VITE_SUPABASE_PUBLISHABLE_KEY ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      value: get("VITE_SUPABASE_PUBLISHABLE_KEY"),
       required: true,
       validate: (val) => val.startsWith("eyJ") && val.length > 50,
       hint: "Must be a valid JWT-style publishable key (starts with eyJ...)",
     },
     {
       name: "VITE_SUPABASE_PROJECT_ID",
-      value: env.VITE_SUPABASE_PROJECT_ID ?? import.meta.env.VITE_SUPABASE_PROJECT_ID,
+      value: get("VITE_SUPABASE_PROJECT_ID"),
       required: false,
       validate: (val) => /^[a-z]{20}$/.test(val),
       hint: "Must be a 20-character Supabase project reference ID",
@@ -52,7 +55,7 @@ export function verifySupabaseEnv(overrides?: EnvOverrides): {
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  for (const c of buildChecks(overrides ?? {})) {
+  for (const c of buildChecks(overrides ?? {}, overrides !== undefined)) {
     if (!c.value || c.value.trim() === "") {
       if (c.required) {
         errors.push(

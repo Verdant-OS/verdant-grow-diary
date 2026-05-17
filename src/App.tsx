@@ -22,6 +22,7 @@ import Timeline from "./pages/Timeline";
 import Grows from "./pages/Grows";
 import Coach from "./pages/Coach";
 import Rewards from "./pages/Rewards";
+import Diagnostics from "./pages/Diagnostics";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -52,6 +53,7 @@ const App = () => (
                   <Route path="/grows" element={<Grows />} />
                   <Route path="/rewards" element={<Rewards />} />
                   <Route path="/settings" element={<Settings />} />
+                  <Route path="/diagnostics" element={<Diagnostics />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>

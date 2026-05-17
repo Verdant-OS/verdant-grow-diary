@@ -1,11 +1,9 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./auth";
+import type { GrowRow } from "@/lib/db";
 
-export interface Grow {
-  id: string; user_id: string; name: string; grow_type: string; stage: string;
-  started_at: string; notes: string | null; is_archived: boolean;
-}
+export type Grow = GrowRow;
 
 interface Ctx {
   grows: Grow[];
@@ -32,8 +30,18 @@ export function GrowsProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     if (!user) { setGrows([]); setLoading(false); return; }
     setLoading(true);
-    const { data } = await supabase.from("grows").select("*").eq("is_archived", false).order("created_at", { ascending: false });
-    setGrows((data as Grow[]) || []);
+    const { data, error } = await supabase
+      .from("grows")
+      .select("*")
+      .eq("is_archived", false)
+      .order("created_at", { ascending: false });
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error("GrowsProvider.refresh error:", error.message);
+      setGrows([]);
+    } else {
+      setGrows(data ?? []);
+    }
     setLoading(false);
   }, [user]);
 

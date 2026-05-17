@@ -2,7 +2,7 @@
 // Boring, predictable: each fn returns mapped domain objects or throws.
 // Not wired into UI yet; safe to import alongside mock data.
 import { supabase } from "@/integrations/supabase/client";
-import type { TablesInsert } from "@/integrations/supabase/types";
+import type { SensorReadingInsert } from "@/lib/db";
 import type { Tent, Plant, SensorReading } from "@/mock";
 import { mapTentRow, mapPlantRow, groupSensorReadingRows } from "./growAdapters";
 
@@ -51,7 +51,7 @@ export async function fetchSensorReadings(tentId?: string): Promise<SensorReadin
 }
 
 export async function insertSensorReading(
-  row: TablesInsert<"sensor_readings">,
+  row: SensorReadingInsert,
 ): Promise<void> {
   const { error } = await supabase.from("sensor_readings").insert(row);
   if (error) fail("insertSensorReading", error);

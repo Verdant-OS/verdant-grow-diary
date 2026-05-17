@@ -14,7 +14,20 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prepare": "husky"
+    "prepare": "husky",
+    "sb:login": "supabase login",
+    "sb:init": "supabase init",
+    "sb:link": "supabase link --project-ref knkwiiywfkbqznbxwqfh",
+    "sb:status": "supabase status",
+    "sb:pull": "supabase db pull",
+    "sb:push": "supabase db push",
+    "sb:diff": "supabase db diff --linked",
+    "sb:migration:new": "supabase migration new",
+    "sb:types": "supabase gen types typescript --project-id knkwiiywfkbqznbxwqfh > src/integrations/supabase/types.ts",
+    "sb:types:local": "supabase gen types typescript --local > src/integrations/supabase/types.ts",
+    "sb:functions:serve": "supabase functions serve --env-file .env.local",
+    "sb:functions:deploy": "supabase functions deploy",
+    "sb:verify": "tsx scripts/verify-seed.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

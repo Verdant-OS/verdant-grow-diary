@@ -230,7 +230,7 @@ export async function moderatePlantAsOperator(
 }
 
 /* ---------- Role assignment (operator only) ---------- */
-export function assignRoleAsOperator(
+export async function assignRoleAsOperator(
   caller: Caller,
   row: UserRoleInsert,
 ): Promise<UserRoleRow> {

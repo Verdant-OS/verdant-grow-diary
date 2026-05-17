@@ -1,11 +1,7 @@
 // Pure adapter functions: Supabase row -> app domain shape (matches @/mock types).
 // No side effects. No I/O. Safe to unit-test in isolation.
-import type { Tables } from "@/integrations/supabase/types";
+import type { TentRow, PlantRow, SensorReadingRow } from "@/lib/db";
 import type { Tent, Plant, SensorReading, Stage } from "@/mock";
-
-type TentRow = Tables<"tents">;
-type PlantRow = Tables<"plants">;
-type SensorRow = Tables<"sensor_readings">;
 
 const VALID_STAGES: readonly Stage[] = ["seedling", "veg", "flower", "flush", "harvest", "cure"];
 const VALID_HEALTH = ["healthy", "watch", "issue"] as const;
@@ -53,7 +49,7 @@ export function mapPlantRow(row: PlantRow): Plant {
  * SensorReading. Missing metrics default to 0. Prefer `groupSensorReadingRows`
  * for fetch results — a single row alone reports only one metric.
  */
-export function mapSensorReadingRow(row: SensorRow): SensorReading {
+export function mapSensorReadingRow(row: SensorReadingRow): SensorReading {
   const reading: SensorReading = {
     ts: row.ts,
     tentId: row.tent_id,
@@ -85,7 +81,7 @@ function applyMetric(reading: SensorReading, metric: string, rawValue: number | 
  * ts descending (newest first); rows with the same ts keep insertion order
  * across distinct tents.
  */
-export function groupSensorReadingRows(rows: SensorRow[]): SensorReading[] {
+export function groupSensorReadingRows(rows: SensorReadingRow[]): SensorReading[] {
   const byKey = new Map<string, SensorReading>();
   for (const row of rows) {
     const key = `${row.tent_id}|${row.ts}`;

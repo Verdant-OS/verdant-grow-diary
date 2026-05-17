@@ -5,6 +5,7 @@ const validEnv = {
   VITE_SUPABASE_URL: "https://abc123def456ghi789jk.supabase.co",
   VITE_SUPABASE_PUBLISHABLE_KEY:
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.test.test.test",
+  VITE_SUPABASE_PROJECT_ID: "knkwiiywfkbqznbxwqfh",
 } as const;
 
 describe("verifySupabaseEnv", () => {

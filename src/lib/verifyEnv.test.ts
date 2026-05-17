@@ -16,7 +16,10 @@ describe("verifySupabaseEnv", () => {
   });
 
   it("warns about missing optional project id", () => {
-    const result = verifySupabaseEnv(validEnv);
+    const result = verifySupabaseEnv({
+      ...validEnv,
+      VITE_SUPABASE_PROJECT_ID: undefined,
+    });
     expect(result.warnings.some((w) => w.includes("PROJECT_ID"))).toBe(true);
   });
 

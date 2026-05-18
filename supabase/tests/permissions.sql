@@ -15,7 +15,8 @@ DECLARE
     "award_nugs":                     {"anon": false, "authenticated": true},
     "max_level_for_user":             {"anon": false, "authenticated": false},
     "handle_new_user":                {"anon": false, "authenticated": false},
-    "recompute_level_after_harvest":  {"anon": false, "authenticated": false}
+    "recompute_level_after_harvest":  {"anon": false, "authenticated": false},
+    "has_role":                       {"anon": false, "authenticated": true}
   }'::jsonb;
   fn TEXT; role_name TEXT; want BOOLEAN; got BOOLEAN;
 BEGIN

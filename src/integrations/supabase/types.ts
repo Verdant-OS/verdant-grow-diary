@@ -712,6 +712,23 @@ export type Database = {
           tier: string
         }[]
       }
+      create_watering_event: {
+        Args: {
+          _ec_ms_cm?: number
+          _grow_id: string
+          _note?: string
+          _occurred_at?: string
+          _ph?: number
+          _plant_id?: string
+          _runoff_ec?: number
+          _runoff_ml?: number
+          _runoff_ph?: number
+          _tent_id?: string
+          _volume_ml: number
+          _water_temp_c?: number
+        }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

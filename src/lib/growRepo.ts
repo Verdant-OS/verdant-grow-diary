@@ -10,6 +10,14 @@ function fail(scope: string, error: { message?: string } | null): never {
   throw new Error(`growRepo.${scope}: ${error?.message ?? "unknown error"}`);
 }
 
+// Guard against legacy/mock string ids (e.g. "t1", "p1") which would cause
+// Postgres uuid columns to 400. When a non-UUID is passed, repo callers
+// short-circuit and let the useGrowData fallback layer serve mock data.
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isUuid = (v: string | undefined | null): v is string =>
+  !!v && UUID_RE.test(v);
+
 export async function fetchTents(): Promise<Tent[]> {
   const { data, error } = await supabase
     .from("tents")

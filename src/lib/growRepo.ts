@@ -29,13 +29,16 @@ export async function fetchTents(): Promise<Tent[]> {
 }
 
 export async function fetchTent(id: string): Promise<Tent | null> {
-  if (!id) return null;
+  if (!isUuid(id)) return null;
   const { data, error } = await supabase.from("tents").select("*").eq("id", id).maybeSingle();
   if (error) fail("fetchTent", error);
   return data ? mapTentRow(data) : null;
 }
 
 export async function fetchPlants(tentId?: string): Promise<Plant[]> {
+  // Non-UUID tentId (e.g. mock "t1") would 400 against a uuid column.
+  // Return empty so the hook falls back to mock-filtered plants.
+  if (tentId !== undefined && !isUuid(tentId)) return [];
   let q = supabase.from("plants").select("*").eq("is_archived", false);
   if (tentId) q = q.eq("tent_id", tentId);
   const { data, error } = await q.order("created_at", { ascending: false });
@@ -44,13 +47,14 @@ export async function fetchPlants(tentId?: string): Promise<Plant[]> {
 }
 
 export async function fetchPlant(id: string): Promise<Plant | null> {
-  if (!id) return null;
+  if (!isUuid(id)) return null;
   const { data, error } = await supabase.from("plants").select("*").eq("id", id).maybeSingle();
   if (error) fail("fetchPlant", error);
   return data ? mapPlantRow(data) : null;
 }
 
 export async function fetchSensorReadings(tentId?: string): Promise<SensorReading[]> {
+  if (tentId !== undefined && !isUuid(tentId)) return [];
   let q = supabase.from("sensor_readings").select("*");
   if (tentId) q = q.eq("tent_id", tentId);
   const { data, error } = await q.order("ts", { ascending: false }).limit(2000);

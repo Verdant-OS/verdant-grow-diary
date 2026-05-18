@@ -58,6 +58,145 @@ export type Database = {
           },
         ]
       }
+      environment_events: {
+        Row: {
+          co2_ppm: number | null
+          created_at: string
+          event_id: string
+          humidity_pct: number | null
+          light_hours: number | null
+          light_on: boolean | null
+          temperature_c: number | null
+          user_id: string
+          vpd_kpa: number | null
+        }
+        Insert: {
+          co2_ppm?: number | null
+          created_at?: string
+          event_id: string
+          humidity_pct?: number | null
+          light_hours?: number | null
+          light_on?: boolean | null
+          temperature_c?: number | null
+          user_id: string
+          vpd_kpa?: number | null
+        }
+        Update: {
+          co2_ppm?: number | null
+          created_at?: string
+          event_id?: string
+          humidity_pct?: number | null
+          light_hours?: number | null
+          light_on?: boolean | null
+          temperature_c?: number | null
+          user_id?: string
+          vpd_kpa?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "environment_events_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "grow_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feeding_events: {
+        Row: {
+          created_at: string
+          ec_ms_cm: number | null
+          event_id: string
+          nutrient_brand: string | null
+          ph: number | null
+          recipe: Json
+          schedule_week: number | null
+          user_id: string
+          volume_ml: number | null
+        }
+        Insert: {
+          created_at?: string
+          ec_ms_cm?: number | null
+          event_id: string
+          nutrient_brand?: string | null
+          ph?: number | null
+          recipe?: Json
+          schedule_week?: number | null
+          user_id: string
+          volume_ml?: number | null
+        }
+        Update: {
+          created_at?: string
+          ec_ms_cm?: number | null
+          event_id?: string
+          nutrient_brand?: string | null
+          ph?: number | null
+          recipe?: Json
+          schedule_week?: number | null
+          user_id?: string
+          volume_ml?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feeding_events_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "grow_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      grow_events: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          event_type: string
+          grow_id: string
+          id: string
+          is_deleted: boolean
+          note: string | null
+          occurred_at: string
+          plant_id: string | null
+          schema_version: number
+          source: string
+          tent_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          event_type: string
+          grow_id: string
+          id?: string
+          is_deleted?: boolean
+          note?: string | null
+          occurred_at?: string
+          plant_id?: string | null
+          schema_version?: number
+          source?: string
+          tent_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          event_type?: string
+          grow_id?: string
+          id?: string
+          is_deleted?: boolean
+          note?: string | null
+          occurred_at?: string
+          plant_id?: string | null
+          schema_version?: number
+          source?: string
+          tent_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       grows: {
         Row: {
           created_at: string
@@ -159,6 +298,85 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      observation_events: {
+        Row: {
+          affected_area: string | null
+          created_at: string
+          details: Json
+          event_id: string
+          severity: string | null
+          symptom_type: string[]
+          user_id: string
+        }
+        Insert: {
+          affected_area?: string | null
+          created_at?: string
+          details?: Json
+          event_id: string
+          severity?: string | null
+          symptom_type?: string[]
+          user_id: string
+        }
+        Update: {
+          affected_area?: string | null
+          created_at?: string
+          details?: Json
+          event_id?: string
+          severity?: string | null
+          symptom_type?: string[]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "observation_events_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "grow_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      photo_events: {
+        Row: {
+          caption: string | null
+          created_at: string
+          event_id: string
+          height_px: number | null
+          photo_url: string
+          taken_at: string | null
+          user_id: string
+          width_px: number | null
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          event_id: string
+          height_px?: number | null
+          photo_url: string
+          taken_at?: string | null
+          user_id: string
+          width_px?: number | null
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          event_id?: string
+          height_px?: number | null
+          photo_url?: string
+          taken_at?: string | null
+          user_id?: string
+          width_px?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "photo_events_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "grow_events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       plants: {
         Row: {
@@ -328,6 +546,41 @@ export type Database = {
         }
         Relationships: []
       }
+      training_events: {
+        Row: {
+          affected_nodes: number | null
+          created_at: string
+          event_id: string
+          intensity: string | null
+          technique: string
+          user_id: string
+        }
+        Insert: {
+          affected_nodes?: number | null
+          created_at?: string
+          event_id: string
+          intensity?: string | null
+          technique: string
+          user_id: string
+        }
+        Update: {
+          affected_nodes?: number | null
+          created_at?: string
+          event_id?: string
+          intensity?: string | null
+          technique?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_events_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "grow_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       unlocks: {
         Row: {
           id: string
@@ -390,6 +643,53 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      watering_events: {
+        Row: {
+          created_at: string
+          ec_ms_cm: number | null
+          event_id: string
+          ph: number | null
+          runoff_ec: number | null
+          runoff_ml: number | null
+          runoff_ph: number | null
+          user_id: string
+          volume_ml: number | null
+          water_temp_c: number | null
+        }
+        Insert: {
+          created_at?: string
+          ec_ms_cm?: number | null
+          event_id: string
+          ph?: number | null
+          runoff_ec?: number | null
+          runoff_ml?: number | null
+          runoff_ph?: number | null
+          user_id: string
+          volume_ml?: number | null
+          water_temp_c?: number | null
+        }
+        Update: {
+          created_at?: string
+          ec_ms_cm?: number | null
+          event_id?: string
+          ph?: number | null
+          runoff_ec?: number | null
+          runoff_ml?: number | null
+          runoff_ph?: number | null
+          user_id?: string
+          volume_ml?: number | null
+          water_temp_c?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "watering_events_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "grow_events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

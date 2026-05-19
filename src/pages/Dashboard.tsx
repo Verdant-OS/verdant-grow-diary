@@ -1,24 +1,62 @@
 import { Link } from "react-router-dom";
 import { Activity, AlertTriangle, Box, Sprout, ListChecks, Sparkles, ArrowRight } from "lucide-react";
-import type { Stage } from "@/mock";
+import type { Stage, SensorReading } from "@/mock";
 import PageHeader from "@/components/PageHeader";
 import KpiCard from "@/components/KpiCard";
 import MetricChip from "@/components/MetricChip";
 import SeverityBadge from "@/components/SeverityBadge";
 import StageBadge from "@/components/StageBadge";
 import SensorChart from "@/components/SensorChart";
-import { useAlerts, useSensorReadings, useTasks, useAIInsights } from "@/hooks/useMockData";
+import { useAlerts, useTasks, useAIInsights } from "@/hooks/useMockData";
 import { usePlants } from "@/hooks/use-plants";
 import { useTents } from "@/hooks/use-tents";
+import { useSensorReadings } from "@/hooks/use-sensor-readings";
+import type { SensorReadingRow } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
+
+type DashReading = {
+  ts: string;
+  tentId: string;
+  temp: number | null;
+  rh: number | null;
+  vpd: number | null;
+  co2: number | null;
+  soil: number | null;
+};
+
+const METRIC_KEY: Record<string, keyof Omit<DashReading, "ts" | "tentId">> = {
+  temperature_c: "temp",
+  humidity_pct: "rh",
+  vpd_kpa: "vpd",
+  co2_ppm: "co2",
+  soil_moisture_pct: "soil",
+};
+
+function groupReadings(rows: SensorReadingRow[]): DashReading[] {
+  const byKey = new Map<string, DashReading>();
+  for (const row of rows) {
+    const key = `${row.tent_id}|${row.ts}`;
+    let r = byKey.get(key);
+    if (!r) {
+      r = { ts: row.ts, tentId: row.tent_id, temp: null, rh: null, vpd: null, co2: null, soil: null };
+      byKey.set(key, r);
+    }
+    const k = METRIC_KEY[row.metric];
+    const v = Number(row.value);
+    if (k && Number.isFinite(v)) r[k] = v;
+  }
+  // Ascending by ts for chart readability
+  return Array.from(byKey.values()).sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0));
+}
 
 export default function Dashboard() {
   const { data: tents = [] } = useTents();
   const { data: plants = [] } = usePlants();
   const { data: tasks = [] } = useTasks();
   const { data: alerts = [] } = useAlerts();
-  const { data: readings = [] } = useSensorReadings();
+  const { data: rawReadings = [] } = useSensorReadings();
+  const readings = groupReadings(rawReadings);
   const { data: insights = [] } = useAIInsights();
 
   const dueToday = tasks.filter((t) => t.status === "today").length;

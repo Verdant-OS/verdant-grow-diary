@@ -13,7 +13,7 @@ import { useGrows } from "@/store/grows";
 
 import { STAGES } from "@/lib/grow";
 import { EVENT_TYPES, snapshotForTent } from "@/lib/diary";
-import { plants as mockPlants } from "@/mock";
+import { usePlants } from "@/hooks/use-plants";
 import { toast } from "sonner";
 
 interface Props { open: boolean; onOpenChange: (v: boolean) => void; onCreated?: () => void; }
@@ -21,6 +21,7 @@ interface Props { open: boolean; onOpenChange: (v: boolean) => void; onCreated?:
 export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
   const { user } = useAuth();
   const { grows, activeGrow, activeGrowId, setActiveGrowId } = useGrows();
+  const { data: plants = [] } = usePlants();
   
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -39,7 +40,7 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (photoFile && eventType === "observation") setEventType("photo"); }, [photoFile]);
 
-  const selectedPlant = useMemo(() => mockPlants.find((p) => p.id === plantId) ?? null, [plantId]);
+  const selectedPlant = useMemo(() => plants.find((p) => p.id === plantId) ?? null, [plantId, plants]);
 
   function handleFile(f: File | null) {
     setPhotoFile(f);
@@ -80,10 +81,10 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
       if (selectedPlant) {
         cleanDetails.plant_id = selectedPlant.id;
         cleanDetails.plant_name = selectedPlant.name;
-        cleanDetails.tent_id = selectedPlant.tentId;
+        if (selectedPlant.tent_id) cleanDetails.tent_id = selectedPlant.tent_id;
       }
-      if (snapshot && selectedPlant) {
-        const snap = snapshotForTent(selectedPlant.tentId);
+      if (snapshot && selectedPlant?.tent_id) {
+        const snap = snapshotForTent(selectedPlant.tent_id);
         if (snap) cleanDetails.sensor = snap;
       }
       if (eventType === "reminder" && remindAt) cleanDetails.remind_at = remindAt;
@@ -186,8 +187,8 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
                 <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none">No specific plant</SelectItem>
-                  {mockPlants.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.name} · {p.strain}</SelectItem>
+                  {plants.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}{p.strain ? ` · ${p.strain}` : ""}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

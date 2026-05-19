@@ -23,7 +23,9 @@ export type Database = {
           id: string
           note: string
           photo_url: string | null
+          plant_id: string | null
           stage: string | null
+          tent_id: string | null
           user_id: string
         }
         Insert: {
@@ -34,7 +36,9 @@ export type Database = {
           id?: string
           note: string
           photo_url?: string | null
+          plant_id?: string | null
           stage?: string | null
+          tent_id?: string | null
           user_id: string
         }
         Update: {
@@ -45,7 +49,9 @@ export type Database = {
           id?: string
           note?: string
           photo_url?: string | null
+          plant_id?: string | null
           stage?: string | null
+          tent_id?: string | null
           user_id?: string
         }
         Relationships: [

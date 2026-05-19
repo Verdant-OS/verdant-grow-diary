@@ -6,7 +6,9 @@ import MetricChip from "@/components/MetricChip";
 import SeverityBadge from "@/components/SeverityBadge";
 import StageBadge from "@/components/StageBadge";
 import SensorChart from "@/components/SensorChart";
-import { useAlerts, usePlants, useSensorReadings, useTasks, useTents, useAIInsights } from "@/hooks/useMockData";
+import { useAlerts, useSensorReadings, useTasks, useAIInsights } from "@/hooks/useMockData";
+import { usePlants } from "@/hooks/use-plants";
+import { useTents } from "@/hooks/use-tents";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 

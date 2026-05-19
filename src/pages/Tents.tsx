@@ -19,7 +19,7 @@ export default function Tents() {
         title="Tents"
         description="Every grow space, environment, and lighting status."
         icon={<Box className="h-5 w-5" />}
-        actions={<Button className="gradient-leaf text-primary-foreground"><Plus className="h-4 w-4" /> New tent</Button>}
+        actions={<CreateTentDialog />}
       />
 
       {isLoading ? (

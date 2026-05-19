@@ -12,8 +12,10 @@ import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
 
 import { STAGES } from "@/lib/grow";
-import { EVENT_TYPES, snapshotForTent } from "@/lib/diary";
+import { EVENT_TYPES } from "@/lib/diary";
 import { usePlants } from "@/hooks/use-plants";
+import { groupSensorReadingRows } from "@/lib/growAdapters";
+import type { SensorReadingRow } from "@/lib/db";
 import { toast } from "sonner";
 
 interface Props { open: boolean; onOpenChange: (v: boolean) => void; onCreated?: () => void; }

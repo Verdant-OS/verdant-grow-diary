@@ -7,7 +7,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import { Sprout, Image as ImageIcon, Loader2, Camera, FileText, FlaskConical, Check, Pencil, Leaf, Gauge, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import QuestChecklist from "@/components/QuestChecklist";
+
 import EntryEditDialog from "@/components/EntryEditDialog";
 import { cn } from "@/lib/utils";
 import { getEventType } from "@/lib/diary";
@@ -104,7 +104,7 @@ export default function Timeline() {
 
   return (
     <div>
-      <QuestChecklist />
+      
       {activeGrow && (
         <div className="mb-5">
           <h1 className="text-2xl font-display font-bold">{activeGrow.name}</h1>

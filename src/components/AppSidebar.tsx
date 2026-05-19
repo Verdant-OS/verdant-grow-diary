@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Box, Sprout, Camera, Activity, NotebookText,
-  ListChecks, Bell, Stethoscope, Trophy, Settings, Leaf,
+  ListChecks, Bell, Stethoscope, Settings, Leaf,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -30,7 +30,6 @@ const groups: { label: string; items: NavItem[] }[] = [
   { label: "Intelligence", items: [
     { to: "/doctor", label: "AI Grow Doctor", icon: Stethoscope },
     { to: "/grows", label: "Grows", icon: Sprout },
-    { to: "/rewards", label: "Rewards", icon: Trophy },
   ]},
   { label: "Account", items: [{ to: "/settings", label: "Settings", icon: Settings }] },
 ];

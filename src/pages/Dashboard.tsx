@@ -1,12 +1,15 @@
 import { Link } from "react-router-dom";
 import { Activity, AlertTriangle, Box, Sprout, ListChecks, Sparkles, ArrowRight } from "lucide-react";
+import type { Stage } from "@/mock";
 import PageHeader from "@/components/PageHeader";
 import KpiCard from "@/components/KpiCard";
 import MetricChip from "@/components/MetricChip";
 import SeverityBadge from "@/components/SeverityBadge";
 import StageBadge from "@/components/StageBadge";
 import SensorChart from "@/components/SensorChart";
-import { useAlerts, usePlants, useSensorReadings, useTasks, useTents, useAIInsights } from "@/hooks/useMockData";
+import { useAlerts, useSensorReadings, useTasks, useAIInsights } from "@/hooks/useMockData";
+import { usePlants } from "@/hooks/use-plants";
+import { useTents } from "@/hooks/use-tents";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 
@@ -39,7 +42,7 @@ export default function Dashboard() {
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        <KpiCard label="Active tents" value={tents.length} icon={<Box className="h-3.5 w-3.5" />} hint={`${tents.reduce((s, t) => s + t.alertCount, 0)} need attention`} />
+        <KpiCard label="Active tents" value={tents.length} icon={<Box className="h-3.5 w-3.5" />} />
         <KpiCard label="Plants" value={plants.length} icon={<Sprout className="h-3.5 w-3.5" />} hint={`${plants.filter((p) => p.health === "healthy").length} healthy`} accent="success" />
         <KpiCard label="Open alerts" value={openAlerts} icon={<AlertTriangle className="h-3.5 w-3.5" />} accent={openAlerts > 0 ? "destructive" : "success"} />
         <KpiCard label="Due today" value={dueToday} icon={<ListChecks className="h-3.5 w-3.5" />} accent={dueToday > 0 ? "warning" : "success"} />
@@ -65,9 +68,9 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-sm">{tent.name}</span>
-                    <StageBadge stage={tent.stage} />
+                    <StageBadge stage={tent.stage as Stage} />
                   </div>
-                  {tent.alertCount > 0 && <span className="text-[11px] text-destructive">● {tent.alertCount}</span>}
+                  { /* alertCount removed — not available in Supabase schema */ }
                 </div>
                 {last && (
                   <div className="flex flex-wrap gap-1.5">

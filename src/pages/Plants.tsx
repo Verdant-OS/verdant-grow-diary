@@ -4,6 +4,7 @@ import { useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
 import EmptyState from "@/components/EmptyState";
+import CreatePlantDialog from "@/components/CreatePlantDialog";
 import { useTents } from "@/hooks/useMockData";
 import { useGrowPlants } from "@/hooks/useGrowData";
 import { cn } from "@/lib/utils";
@@ -16,7 +17,7 @@ export default function Plants() {
 
   return (
     <div>
-      <PageHeader title="Plants" description="Every plant across every tent." icon={<Sprout className="h-5 w-5" />} />
+      <PageHeader title="Plants" description="Every plant across every tent." icon={<Sprout className="h-5 w-5" />} actions={<CreatePlantDialog />} />
       <div className="flex items-center gap-1.5 mb-4 flex-wrap">
         <Filter className="h-3.5 w-3.5 text-muted-foreground mr-1" />
         {[{ id: "all", name: "All tents" }, ...tents.map((t) => ({ id: t.id, name: t.name }))].map((t) => (

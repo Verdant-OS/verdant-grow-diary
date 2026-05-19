@@ -1,10 +1,10 @@
 import { Link } from "react-router-dom";
-import { Box, Lightbulb, Plus } from "lucide-react";
+import { Box, Lightbulb } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
 import MetricChip from "@/components/MetricChip";
 import EmptyState from "@/components/EmptyState";
-import { Button } from "@/components/ui/button";
+import CreateTentDialog from "@/components/CreateTentDialog";
 import { useSensorReadings, usePlants } from "@/hooks/useMockData";
 import { useGrowTents } from "@/hooks/useGrowData";
 
@@ -19,7 +19,7 @@ export default function Tents() {
         title="Tents"
         description="Every grow space, environment, and lighting status."
         icon={<Box className="h-5 w-5" />}
-        actions={<Button className="gradient-leaf text-primary-foreground"><Plus className="h-4 w-4" /> New tent</Button>}
+        actions={<CreateTentDialog />}
       />
 
       {isLoading ? (

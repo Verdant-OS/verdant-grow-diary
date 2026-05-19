@@ -15,6 +15,7 @@ import { getEventType } from "@/lib/diary";
 interface Entry {
   id: string; note: string; photo_url: string | null; stage: string | null;
   details: Record<string, unknown>; entry_at: string;
+  plant_id: string | null; tent_id: string | null;
 }
 
 type EventFilter = "all" | "photo" | "note" | "measurement";
@@ -40,7 +41,7 @@ export default function Timeline() {
     if (!user || !activeGrowId) { setEntries([]); setLoading(false); return; }
     setLoading(true);
     const { data } = await supabase.from("diary_entries")
-      .select("id,note,photo_url,stage,details,entry_at")
+      .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
       .eq("grow_id", activeGrowId).order("entry_at", { ascending: false }).limit(100);
     const rows = (data as Entry[]) || [];
     const paths = rows.map((r) => r.photo_url).filter((p): p is string => !!p && !p.startsWith("http"));

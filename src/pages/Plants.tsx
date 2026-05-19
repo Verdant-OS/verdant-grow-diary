@@ -4,6 +4,7 @@ import { useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
 import EmptyState from "@/components/EmptyState";
+import CreatePlantDialog from "@/components/CreatePlantDialog";
 import { useTents } from "@/hooks/useMockData";
 import { useGrowPlants } from "@/hooks/useGrowData";
 import { cn } from "@/lib/utils";

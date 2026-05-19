@@ -8,7 +8,7 @@ import { useAlerts } from "@/hooks/useMockData";
 import AppSidebar from "./AppSidebar";
 import MobileNav from "./MobileNav";
 import QuickLog from "./QuickLog";
-import NugBadge from "./NugBadge";
+
 
 export default function AppShell() {
   const { user, loading, signOut } = useAuth();
@@ -48,7 +48,7 @@ export default function AppShell() {
                   <Search className="h-4 w-4" /><span className="hidden lg:inline">Search…</span>
                   <kbd className="hidden lg:inline ml-2 text-[10px] px-1.5 py-0.5 rounded bg-background/60 border border-border/40">⌘K</kbd>
                 </button>
-                <NugBadge />
+                
                 <Button variant="outline" size="sm" onClick={() => setOpenLog(true)} className="hidden md:inline-flex">
                   <Plus className="h-4 w-4" /> Quick log
                 </Button>

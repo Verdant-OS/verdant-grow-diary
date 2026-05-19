@@ -5,7 +5,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/store/auth";
 import { GrowsProvider } from "@/store/grows";
-import { NugsProvider } from "@/store/nugs";
 import AppShell from "@/components/AppShell";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -21,7 +20,6 @@ import Settings from "./pages/Settings";
 import Timeline from "./pages/Timeline";
 import Grows from "./pages/Grows";
 import Coach from "./pages/Coach";
-import Rewards from "./pages/Rewards";
 import Diagnostics from "./pages/Diagnostics";
 import NotFound from "./pages/NotFound";
 
@@ -35,29 +33,26 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <GrowsProvider>
-            <NugsProvider>
-              <Routes>
-                <Route path="/auth" element={<Auth />} />
-                <Route element={<AppShell />}>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/tents" element={<Tents />} />
-                  <Route path="/tents/:id" element={<TentDetail />} />
-                  <Route path="/plants" element={<Plants />} />
-                  <Route path="/plants/:id" element={<PlantDetail />} />
-                  <Route path="/sensors" element={<Sensors />} />
-                  <Route path="/logs" element={<Timeline />} />
-                  <Route path="/tasks" element={<Tasks />} />
-                  <Route path="/cameras" element={<Cameras />} />
-                  <Route path="/alerts" element={<Alerts />} />
-                  <Route path="/doctor" element={<Coach />} />
-                  <Route path="/grows" element={<Grows />} />
-                  <Route path="/rewards" element={<Rewards />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/diagnostics" element={<Diagnostics />} />
-                </Route>
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </NugsProvider>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route element={<AppShell />}>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/tents" element={<Tents />} />
+                <Route path="/tents/:id" element={<TentDetail />} />
+                <Route path="/plants" element={<Plants />} />
+                <Route path="/plants/:id" element={<PlantDetail />} />
+                <Route path="/sensors" element={<Sensors />} />
+                <Route path="/logs" element={<Timeline />} />
+                <Route path="/tasks" element={<Tasks />} />
+                <Route path="/cameras" element={<Cameras />} />
+                <Route path="/alerts" element={<Alerts />} />
+                <Route path="/doctor" element={<Coach />} />
+                <Route path="/grows" element={<Grows />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/diagnostics" element={<Diagnostics />} />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
           </GrowsProvider>
         </AuthProvider>
       </BrowserRouter>

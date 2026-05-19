@@ -95,7 +95,7 @@ export default function Dashboard() {
             </div>
             <Button asChild size="sm" variant="ghost"><Link to="/sensors">Sensor data <ArrowRight className="h-3 w-3" /></Link></Button>
           </div>
-          <SensorChart data={readings.filter((r) => r.tentId === "t1")} metric="temp" height={200} />
+          <SensorChart data={readings.filter((r) => r.tentId === (tents[0]?.id ?? "")) as unknown as SensorReading[]} metric="temp" height={200} />
         </div>
 
         <div className="glass rounded-2xl p-4">
@@ -112,9 +112,9 @@ export default function Dashboard() {
                 </div>
                 {last && (
                   <div className="flex flex-wrap gap-1.5">
-                    <MetricChip label="T" value={last.temp} unit="°C" status={last.temp > 28 || last.temp < 19 ? "warn" : "ok"} />
-                    <MetricChip label="RH" value={last.rh} unit="%" status={last.rh > 65 || last.rh < 35 ? "warn" : "ok"} />
-                    <MetricChip label="VPD" value={last.vpd} unit=" kPa" status={last.vpd > 1.6 || last.vpd < 0.6 ? "warn" : "ok"} />
+                    <MetricChip label="T" value={last.temp ?? "—"} unit="°C" status={last.temp != null && (last.temp > 28 || last.temp < 19) ? "warn" : "ok"} />
+                    <MetricChip label="RH" value={last.rh ?? "—"} unit="%" status={last.rh != null && (last.rh > 65 || last.rh < 35) ? "warn" : "ok"} />
+                    <MetricChip label="VPD" value={last.vpd ?? "—"} unit=" kPa" status={last.vpd != null && (last.vpd > 1.6 || last.vpd < 0.6) ? "warn" : "ok"} />
                   </div>
                 )}
               </Link>

@@ -92,6 +92,8 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
       const { error: insErr } = await supabase.from("diary_entries").insert({
         user_id: user.id, grow_id: activeGrowId, photo_url: uploadedPath,
         note: note.trim(), stage, details: cleanDetails as Record<string, never>,
+        plant_id: selectedPlant?.id ?? null,
+        tent_id: selectedPlant?.tent_id ?? null,
       });
       if (insErr) {
         if (uploadedPath) {

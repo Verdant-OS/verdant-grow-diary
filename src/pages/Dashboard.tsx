@@ -68,9 +68,9 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-sm">{tent.name}</span>
-                    <StageBadge stage={tent.stage} />
+                    <StageBadge stage={tent.stage as Stage} />
                   </div>
-                  {tent.alertCount > 0 && <span className="text-[11px] text-destructive">● {tent.alertCount}</span>}
+                  { /* alertCount removed — not available in Supabase schema */ }
                 </div>
                 {last && (
                   <div className="flex flex-wrap gap-1.5">

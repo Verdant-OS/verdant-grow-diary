@@ -97,19 +97,24 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
         } else if (!readingRows || readingRows.length === 0) {
           toast.message("No recent sensor readings for this tent");
         } else {
-          const grouped = groupSensorReadingRows(readingRows as SensorReadingRow[]);
-          const latest = grouped[0];
-          if (latest) {
-            cleanDetails.sensor_snapshot = {
-              ts: latest.ts,
-              tent_id: latest.tentId,
-              temp: latest.temp,
-              rh: latest.rh,
-              vpd: latest.vpd,
-              co2: latest.co2,
-              soil: latest.soil,
-            };
-          }
+          const latestTs = readingRows[0].ts;
+          const latestRows = (readingRows as SensorReadingRow[]).filter((r) => r.ts === latestTs);
+          const availableMetrics = latestRows.map((r) => r.metric);
+          const getValue = (metric: string): number | null => {
+            const row = latestRows.find((r) => r.metric === metric);
+            const v = row ? Number(row.value) : NaN;
+            return Number.isFinite(v) ? v : null;
+          };
+          cleanDetails.sensor_snapshot = {
+            ts: latestTs,
+            tent_id: selectedPlant.tent_id,
+            temp: getValue("temperature_c"),
+            rh: getValue("humidity_pct"),
+            vpd: getValue("vpd_kpa"),
+            co2: getValue("co2_ppm"),
+            soil: getValue("soil_moisture_pct"),
+            available_metrics: availableMetrics,
+          };
         }
       }
       if (eventType === "reminder" && remindAt) cleanDetails.remind_at = remindAt;

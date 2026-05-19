@@ -12,8 +12,10 @@ import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
 
 import { STAGES } from "@/lib/grow";
-import { EVENT_TYPES, snapshotForTent } from "@/lib/diary";
+import { EVENT_TYPES } from "@/lib/diary";
 import { usePlants } from "@/hooks/use-plants";
+import { groupSensorReadingRows } from "@/lib/growAdapters";
+import type { SensorReadingRow } from "@/lib/db";
 import { toast } from "sonner";
 
 interface Props { open: boolean; onOpenChange: (v: boolean) => void; onCreated?: () => void; }
@@ -84,8 +86,32 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
         if (selectedPlant.tent_id) cleanDetails.tent_id = selectedPlant.tent_id;
       }
       if (snapshot && selectedPlant?.tent_id) {
-        const snap = snapshotForTent(selectedPlant.tent_id);
-        if (snap) cleanDetails.sensor = snap;
+        const { data: readingRows, error: readErr } = await supabase
+          .from("sensor_readings")
+          .select("*")
+          .eq("tent_id", selectedPlant.tent_id)
+          .order("ts", { ascending: false })
+          .limit(50);
+        if (readErr) {
+          console.warn("[QuickLog] sensor snapshot fetch failed", readErr);
+          toast.message("No sensor snapshot attached", { description: readErr.message });
+        } else if (!readingRows || readingRows.length === 0) {
+          toast.message("No recent sensor readings for this tent");
+        } else {
+          const grouped = groupSensorReadingRows(readingRows as SensorReadingRow[]);
+          const latest = grouped[0];
+          if (latest) {
+            cleanDetails.sensor_snapshot = {
+              ts: latest.ts,
+              tent_id: latest.tentId,
+              temp: latest.temp,
+              rh: latest.rh,
+              vpd: latest.vpd,
+              co2: latest.co2,
+              soil: latest.soil,
+            };
+          }
+        }
       }
       if (eventType === "reminder" && remindAt) cleanDetails.remind_at = remindAt;
 

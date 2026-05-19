@@ -36,7 +36,6 @@ export function GrowsProvider({ children }: { children: ReactNode }) {
       .eq("is_archived", false)
       .order("created_at", { ascending: false });
     if (error) {
-      // eslint-disable-next-line no-console
       console.error("GrowsProvider.refresh error:", error.message);
       setGrows([]);
     } else {

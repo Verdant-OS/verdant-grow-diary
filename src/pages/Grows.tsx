@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
-import { useNugs } from "@/store/nugs";
+
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,18 +9,15 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Sprout, Check, Trash2, Loader2, Scissors } from "lucide-react";
+import { Plus, Sprout, Check, Trash2, Loader2 } from "lucide-react";
 import { GROW_TYPES, STAGES, growTypeLabel, stageLabel } from "@/lib/grow";
-import HarvestDialog from "@/components/HarvestDialog";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
 export default function Grows() {
   const { user } = useAuth();
-  const { award } = useNugs();
   const { grows, activeGrowId, setActiveGrowId, refresh, loading } = useGrows();
   const [open, setOpen] = useState(false);
-  const [harvestFor, setHarvestFor] = useState<{ id: string; grow_type: string } | null>(null);
   const [form, setForm] = useState({ name: "", grow_type: "tent", stage: "seedling", notes: "" });
   const [busy, setBusy] = useState(false);
 
@@ -39,7 +36,6 @@ export default function Grows() {
     if (data) setActiveGrowId(data.id);
     setOpen(false);
     setForm({ name: "", grow_type: "tent", stage: "seedling", notes: "" });
-    award("onboarding_first_grow", 150, { questKey: "onboarding_first_grow", meta: { grow_id: data?.id } });
   }
 
   async function archive(id: string) {
@@ -79,9 +75,6 @@ export default function Grows() {
                     {growTypeLabel(g.grow_type)} · {stageLabel(g.stage)} · started {format(new Date(g.started_at), "MMM d")}
                   </div>
                 </button>
-                <Button size="sm" variant="outline" className="gap-1" onClick={() => setHarvestFor({ id: g.id, grow_type: g.grow_type })}>
-                  <Scissors className="h-3.5 w-3.5" />Harvest
-                </Button>
                 {g.id === activeGrowId ? (
                   <Check className="h-4 w-4 text-primary" />
                 ) : (
@@ -117,15 +110,6 @@ export default function Grows() {
         </DialogContent>
       </Dialog>
 
-      {harvestFor && (
-        <HarvestDialog
-          open={!!harvestFor}
-          onOpenChange={(v) => !v && setHarvestFor(null)}
-          growId={harvestFor.id}
-          defaultGrowType={harvestFor.grow_type}
-          onLogged={() => { setHarvestFor(null); refresh(); }}
-        />
-      )}
     </div>
   );
 }

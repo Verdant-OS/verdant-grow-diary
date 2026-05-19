@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Activity, AlertTriangle, Box, Sprout, ListChecks, Sparkles, ArrowRight } from "lucide-react";
+import type { Stage } from "@/mock";
 import PageHeader from "@/components/PageHeader";
 import KpiCard from "@/components/KpiCard";
 import MetricChip from "@/components/MetricChip";

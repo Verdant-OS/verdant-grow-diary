@@ -91,6 +91,10 @@ const RISK_RANK: Record<ActionRow["risk_level"], number> = {
 export default function ActionQueue() {
   const { user } = useAuth();
   const { activeGrowId, activeGrow } = useGrows();
+  const [searchParams] = useSearchParams();
+  const urlGrowId = searchParams.get("growId");
+  // URL growId takes precedence over active grow. RLS still enforces ownership.
+  const effectiveGrowId = urlGrowId ?? activeGrowId;
   const [rows, setRows] = useState<ActionRow[]>([]);
   const [events, setEvents] = useState<Record<string, EventRow[]>>({});
   const [loading, setLoading] = useState(true);

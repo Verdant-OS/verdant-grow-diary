@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Loader2, Check, X, FlaskConical, ListChecks, History } from "lucide-react";
+import { Loader2, Check, X, FlaskConical, ListChecks, History, CheckCircle2, Ban } from "lucide-react";
 import { toast } from "sonner";
 
 type Status =
@@ -41,7 +41,7 @@ type EventType =
   | "cancelled"
   | "note";
 
-type StatusFilter = "all" | "pending" | "simulated" | "approved" | "rejected";
+type StatusFilter = "all" | "pending" | "simulated" | "approved" | "rejected" | "completed" | "cancelled";
 type RiskFilter = "all" | "low" | "medium" | "high" | "critical";
 type SortOrder = "newest" | "oldest" | "risk";
 
@@ -96,7 +96,7 @@ export default function ActionQueue() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [noteDialog, setNoteDialog] = useState<
-    { row: ActionRow; kind: "approve" | "reject" | "simulate" } | null
+    { row: ActionRow; kind: "approve" | "reject" | "simulate" | "complete" | "cancel" } | null
   >(null);
   const [noteDraft, setNoteDraft] = useState("");
 
@@ -188,7 +188,14 @@ export default function ActionQueue() {
     await load();
   }
 
-  function openNoteDialog(row: ActionRow, kind: "approve" | "reject" | "simulate") {
+  function openNoteDialog(
+    row: ActionRow,
+    kind: "approve" | "reject" | "simulate" | "complete" | "cancel",
+  ) {
+    // SECURITY: terminal states cannot be transitioned again.
+    if (row.status === "completed" || row.status === "rejected" || row.status === "cancelled") {
+      return;
+    }
     setNoteDraft("");
     setNoteDialog({ row, kind });
   }
@@ -219,6 +226,19 @@ export default function ActionQueue() {
         "rejected",
         note,
       );
+    } else if (kind === "complete") {
+      // SECURITY: "completed" means the grower manually handled the action outside Verdant.
+      // No equipment command is sent.
+      await transition(
+        row,
+        { status: "completed", completed_at: new Date().toISOString() },
+        "completed",
+        "completed",
+        note,
+      );
+    } else if (kind === "cancel") {
+      // SECURITY: "cancelled" means the grower decided not to proceed. No equipment command is sent.
+      await transition(row, { status: "cancelled" }, "cancelled", "cancelled", note);
     } else {
       // Simulation NEVER sends device commands. Status + audit only.
       toast.message("Simulated (no device command sent)", {
@@ -243,6 +263,16 @@ export default function ActionQueue() {
   function simulate(row: ActionRow) {
     return openNoteDialog(row, "simulate");
   }
+  function complete(row: ActionRow) {
+    return openNoteDialog(row, "complete");
+  }
+  function cancelAction(row: ActionRow) {
+    return openNoteDialog(row, "cancel");
+  }
+
+  const canComplete = (s: Status) => s === "approved" || s === "simulated";
+  const canCancel = (s: Status) =>
+    s === "pending_approval" || s === "approved" || s === "simulated";
 
   const DIALOG_META = {
     approve: {
@@ -266,6 +296,22 @@ export default function ActionQueue() {
       label: "Simulation note",
       placeholder: "Optional — what did you simulate?",
       confirmLabel: "Simulate",
+    },
+    complete: {
+      title: "Mark Action Complete",
+      description:
+        "Marks this action as manually completed outside Verdant. No equipment command is sent.",
+      label: "Completion note",
+      placeholder: "Optional — what did you do?",
+      confirmLabel: "Mark Complete",
+    },
+    cancel: {
+      title: "Cancel Action",
+      description:
+        "Cancels this action. The grower decided not to proceed. No equipment command is sent.",
+      label: "Cancellation reason",
+      placeholder: "Optional — why are you cancelling?",
+      confirmLabel: "Cancel Action",
     },
   } as const;
   const meta = noteDialog ? DIALOG_META[noteDialog.kind] : null;
@@ -330,6 +376,8 @@ export default function ActionQueue() {
             <SelectItem value="simulated">Simulated</SelectItem>
             <SelectItem value="approved">Approved</SelectItem>
             <SelectItem value="rejected">Rejected</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="cancelled">Cancelled</SelectItem>
           </SelectContent>
         </Select>
 
@@ -389,7 +437,7 @@ export default function ActionQueue() {
                     <p className="text-xs text-muted-foreground mt-1">{row.reason}</p>
                   </div>
                 </div>
-                <div className="flex gap-2 mt-3">
+                <div className="flex flex-wrap gap-2 mt-3">
                   <Button size="sm" disabled={busyId === row.id} onClick={() => approve(row)} className="gradient-leaf text-primary-foreground">
                     <Check className="h-4 w-4" /> Approve
                   </Button>
@@ -399,6 +447,11 @@ export default function ActionQueue() {
                   <Button size="sm" variant="ghost" disabled={busyId === row.id} onClick={() => reject(row)}>
                     <X className="h-4 w-4" /> Reject
                   </Button>
+                  {canCancel(row.status) && (
+                    <Button size="sm" variant="ghost" disabled={busyId === row.id} onClick={() => cancelAction(row)}>
+                      <Ban className="h-4 w-4" /> Cancel
+                    </Button>
+                  )}
                 </div>
                 <EventHistory items={events[row.id]} />
               </li>
@@ -419,13 +472,23 @@ export default function ActionQueue() {
           <ul className="space-y-2 text-sm">
             {reviewed.slice(0, 50).map((row) => (
               <li key={row.id} className="rounded-lg border border-border/40 bg-secondary/20 p-2">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <Badge variant="outline" className="text-[10px] uppercase">{row.status}</Badge>
                   <Badge variant="outline" className={`text-[10px] uppercase ${RISK_VARIANT[row.risk_level]}`}>
                     {row.risk_level}
                   </Badge>
                   <span className="truncate flex-1">{row.suggested_change}</span>
                   <span className="text-xs text-muted-foreground">{row.action_type}</span>
+                  {canComplete(row.status) && (
+                    <Button size="sm" variant="secondary" disabled={busyId === row.id} onClick={() => complete(row)}>
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Mark Complete
+                    </Button>
+                  )}
+                  {canCancel(row.status) && (
+                    <Button size="sm" variant="ghost" disabled={busyId === row.id} onClick={() => cancelAction(row)}>
+                      <Ban className="h-3.5 w-3.5" /> Cancel
+                    </Button>
+                  )}
                 </div>
                 <EventHistory items={events[row.id]} />
               </li>

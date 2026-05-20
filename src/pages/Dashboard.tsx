@@ -16,6 +16,12 @@ import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useDashboardScopedData } from "@/hooks/useDashboardScopedData";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { useEnvironmentTrends } from "@/hooks/useEnvironmentTrends";
+import { useGrowTargets } from "@/hooks/useGrowTargets";
+import {
+  compareSnapshotToTargets,
+  STATUS_HEADLINE as TARGET_STATUS_HEADLINE,
+} from "@/lib/environmentTargetComparison";
+
 
 import {
   SOURCE_LABEL,

@@ -10,13 +10,12 @@ import { useGrowPlants } from "@/hooks/useGrowData";
 import { cn } from "@/lib/utils";
 
 export default function Plants() {
-  const { data: plants = [] } = useGrowPlants();
-  const { data: tents = [] } = useTents();
-  const [tentFilter, setTentFilter] = useState<string>("all");
   const [searchParams] = useSearchParams();
   const growId = searchParams.get("growId");
-  const growScoped = growId ? plants.filter((p) => p.growId === growId) : plants;
-  const filtered = tentFilter === "all" ? growScoped : growScoped.filter((p) => p.tentId === tentFilter);
+  const { data: plants = [] } = useGrowPlants(undefined, growId ?? undefined);
+  const { data: tents = [] } = useTents();
+  const [tentFilter, setTentFilter] = useState<string>("all");
+  const filtered = tentFilter === "all" ? plants : plants.filter((p) => p.tentId === tentFilter);
 
   return (
     <div>

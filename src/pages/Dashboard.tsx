@@ -13,10 +13,13 @@ import { useAlerts, useTasks, useAIInsights } from "@/hooks/useMockData";
 import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
+import { useDashboardScopedData } from "@/hooks/useDashboardScopedData";
 import type { SensorReadingRow } from "@/lib/db";
 import { Button } from "@/components/ui/button";
-import { dashboardPath } from "@/lib/routes";
+import { Badge } from "@/components/ui/badge";
+import { actionDetailPath, actionsPath, dashboardPath, logsPath } from "@/lib/routes";
 import { formatDistanceToNow } from "date-fns";
+
 
 type DashReading = {
   ts: string;

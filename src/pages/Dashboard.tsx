@@ -13,10 +13,13 @@ import { useAlerts, useTasks, useAIInsights } from "@/hooks/useMockData";
 import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
+import { useDashboardScopedData } from "@/hooks/useDashboardScopedData";
 import type { SensorReadingRow } from "@/lib/db";
 import { Button } from "@/components/ui/button";
-import { dashboardPath } from "@/lib/routes";
+import { Badge } from "@/components/ui/badge";
+import { actionDetailPath, actionsPath, dashboardPath, logsPath } from "@/lib/routes";
 import { formatDistanceToNow } from "date-fns";
+
 
 type DashReading = {
   ts: string;
@@ -65,6 +68,8 @@ export default function Dashboard() {
   const { data: rawReadings = [] } = useSensorReadings();
   const readings = groupReadings(rawReadings);
   const { data: insights = [] } = useAIInsights();
+  const { recent, pending } = useDashboardScopedData(scopedGrowId ?? null);
+
 
   const dueToday = tasks.filter((t) => t.status === "today").length;
   const openAlerts = alerts.filter((a) => !a.acknowledged).length;
@@ -185,6 +190,136 @@ export default function Dashboard() {
           </ul>
         </div>
       </div>
+      {scopedGrowId ? (
+        <div className="grid lg:grid-cols-2 gap-4 mt-4">
+          <section
+            className="glass rounded-2xl p-4"
+            aria-label="Recent activity"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-display font-semibold">Recent Activity</h2>
+              <Link
+                to={logsPath(scopedGrowId)}
+                className="text-xs text-primary hover:underline"
+              >
+                View full Timeline →
+              </Link>
+            </div>
+            {recent.status === "loading" || recent.status === "idle" ? (
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            ) : recent.status === "unavailable" ? (
+              <p className="text-sm text-muted-foreground">
+                Recent activity unavailable.
+              </p>
+            ) : recent.items.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No recent activity yet.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {recent.items.map((item) => (
+                  <li
+                    key={item.id}
+                    className="rounded-lg border border-border/40 bg-secondary/20 p-2 text-sm"
+                  >
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="outline" className="text-[10px] uppercase">
+                        {item.kind === "diary"
+                          ? "Diary Entry"
+                          : "Action Queue Event"}
+                      </Badge>
+                      <span className="text-xs truncate">{item.title}</span>
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(item.ts), {
+                          addSuffix: true,
+                        })}
+                      </span>
+                    </div>
+                    {item.detail && (
+                      <p className="text-xs mt-1 italic text-muted-foreground">
+                        {item.detail}
+                      </p>
+                    )}
+                    {item.href && (
+                      <Link
+                        to={item.href}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        View details →
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section
+            className="glass rounded-2xl p-4"
+            aria-label="Pending actions"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-display font-semibold">Pending Actions</h2>
+              <Link
+                to={actionsPath(scopedGrowId)}
+                className="text-xs text-primary hover:underline"
+              >
+                View all actions →
+              </Link>
+            </div>
+            {pending.status === "loading" || pending.status === "idle" ? (
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            ) : pending.status === "unavailable" ? (
+              <p className="text-sm text-muted-foreground">
+                Pending actions unavailable.
+              </p>
+            ) : pending.items.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No pending actions.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {pending.items.map((a) => (
+                  <li
+                    key={a.id}
+                    className="rounded-lg border border-border/40 bg-secondary/20 p-2 text-sm"
+                  >
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="outline" className="text-[10px] uppercase">
+                        {a.risk_level} risk
+                      </Badge>
+                      <span className="text-xs font-medium truncate">
+                        {a.suggested_change}
+                      </span>
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(a.created_at), {
+                          addSuffix: true,
+                        })}
+                      </span>
+                    </div>
+                    {a.reason && (
+                      <p className="text-xs mt-1 italic text-muted-foreground">
+                        {a.reason}
+                      </p>
+                    )}
+                    <Link
+                      to={actionDetailPath(a.id)}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      View action →
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground mt-4">
+          Select a grow to see scoped activity.
+        </p>
+      )}
     </div>
   );
 }
+

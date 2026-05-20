@@ -39,7 +39,7 @@ describe("GrowDetail", () => {
   });
 
   it("renders hub links to Timeline, Plants, Tents, Action Queue", () => {
-    expect(PAGE).toMatch(/to="\/logs"/);
+    expect(PAGE).toMatch(/\/timeline\?growId=/);
     expect(PAGE).toMatch(/to="\/plants"/);
     expect(PAGE).toMatch(/to="\/tents"/);
     expect(PAGE).toMatch(/to="\/actions"/);

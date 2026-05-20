@@ -103,7 +103,10 @@ export function useLatestSensorSnapshot(
     } catch {
       setState({ status: "unavailable", snapshot: EMPTY_SNAPSHOT });
     }
-  }, [user, growId, tentKey, tentIds]);
+    // tentKey ensures we re-fetch when the underlying tent ids change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, growId, tentKey]);
+
 
   useEffect(() => {
     load();

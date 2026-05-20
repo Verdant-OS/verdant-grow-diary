@@ -295,3 +295,35 @@ export default function Alerts() {
     </div>
   );
 }
+
+/**
+ * Read-only per-alert audit history. Reads `alert_events` via RLS-protected
+ * select. Renders nothing if there are no events or the table is unavailable.
+ */
+function AlertHistory({ alertId }: { alertId: string }) {
+  const { status, events } = useAlertEvents(alertId);
+  if (status !== "ok" || events.length === 0) return null;
+  return (
+    <details className="mt-1">
+      <summary className="text-[11px] text-muted-foreground cursor-pointer select-none">
+        History ({events.length})
+      </summary>
+      <ol className="mt-1 space-y-1 pl-3 border-l border-border/40">
+        {events.slice(0, 8).map((e) => (
+          <li key={e.id} className="text-[11px] text-muted-foreground">
+            <span className="font-medium">{e.event_type}</span>
+            {e.previous_status && e.new_status ? (
+              <span>
+                {" "}
+                — {e.previous_status} → {e.new_status}
+              </span>
+            ) : null}{" "}
+            <span className="opacity-70">
+              {formatDistanceToNow(new Date(e.created_at), { addSuffix: true })}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </details>
+  );
+}

@@ -119,8 +119,11 @@ describe("Page wiring — GrowBreadcrumbs usage", () => {
   });
 
   it("safe surface preserved on all pages", () => {
+    // Match invocation forms only — safety comments like "No ai-coach call"
+    // must not trip this check.
+    const AI_COACH_CALL = /["'`]ai-coach["'`]|functions\/ai-coach|ai_coach/;
     for (const [, src] of Object.entries(PAGES)) {
-      expect(src).not.toMatch(/ai-coach|ai_coach/);
+      expect(src).not.toMatch(AI_COACH_CALL);
       expect(src).not.toMatch(
         /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b|service_role/i,
       );

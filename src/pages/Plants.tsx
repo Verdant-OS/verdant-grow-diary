@@ -5,6 +5,7 @@ import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
 import EmptyState from "@/components/EmptyState";
 import CreatePlantDialog from "@/components/CreatePlantDialog";
+import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import { useTents } from "@/hooks/useMockData";
 import { useGrowPlants } from "@/hooks/useGrowData";
 import { useGrows } from "@/store/grows";

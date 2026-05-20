@@ -467,15 +467,25 @@ export default function Dashboard() {
                       plant-health diagnosis.
                     </p>
                   </div>
-                  <Link
-                    to={logsPath(scopedGrowId)}
-                    className="text-xs text-primary hover:underline"
-                  >
-                    Inspect history →
-                  </Link>
+                  <div className="flex items-center gap-3">
+                    <Link
+                      to={logsPath(scopedGrowId)}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Inspect history →
+                    </Link>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setTargetsEditorOpen(true)}
+                    >
+                      Edit targets
+                    </Button>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap mb-2">
                   <Badge variant="outline" className={`text-[10px] uppercase ${tone}`}>
+
                     {result.headline}
                   </Badge>
                   {result.status === "missing_targets" && (

@@ -465,7 +465,7 @@ export default function ActionQueue() {
                     </Button>
                   )}
                   <Link
-                    to={`/actions/${row.id}`}
+                    to={actionDetailPath(row.id)}
                     className="text-xs text-primary hover:underline"
                   >
                     View Details

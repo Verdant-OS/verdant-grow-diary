@@ -437,7 +437,7 @@ export default function ActionQueue() {
                     <p className="text-xs text-muted-foreground mt-1">{row.reason}</p>
                   </div>
                 </div>
-                <div className="flex gap-2 mt-3">
+                <div className="flex flex-wrap gap-2 mt-3">
                   <Button size="sm" disabled={busyId === row.id} onClick={() => approve(row)} className="gradient-leaf text-primary-foreground">
                     <Check className="h-4 w-4" /> Approve
                   </Button>
@@ -447,6 +447,11 @@ export default function ActionQueue() {
                   <Button size="sm" variant="ghost" disabled={busyId === row.id} onClick={() => reject(row)}>
                     <X className="h-4 w-4" /> Reject
                   </Button>
+                  {canCancel(row.status) && (
+                    <Button size="sm" variant="ghost" disabled={busyId === row.id} onClick={() => cancelAction(row)}>
+                      <Ban className="h-4 w-4" /> Cancel
+                    </Button>
+                  )}
                 </div>
                 <EventHistory items={events[row.id]} />
               </li>

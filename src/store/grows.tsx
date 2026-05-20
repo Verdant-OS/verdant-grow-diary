@@ -12,6 +12,7 @@ interface Ctx {
   activeGrow: Grow | null;
   refresh: () => Promise<void>;
   loading: boolean;
+  error: string | null;
 }
 const GrowsCtx = createContext<Ctx>({} as Ctx);
 
@@ -20,6 +21,7 @@ export function GrowsProvider({ children }: { children: ReactNode }) {
   const [grows, setGrows] = useState<Grow[]>([]);
   const [activeGrowId, _setActive] = useState<string | null>(() => localStorage.getItem("verdant.activeGrow"));
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const setActiveGrowId = (id: string | null) => {
     _setActive(id);
@@ -28,21 +30,24 @@ export function GrowsProvider({ children }: { children: ReactNode }) {
   };
 
   const refresh = useCallback(async () => {
-    if (!user) { setGrows([]); setLoading(false); return; }
+    if (!user) { setGrows([]); setLoading(false); setError(null); return; }
     setLoading(true);
-    const { data, error } = await supabase
+    const { data, error: qErr } = await supabase
       .from("grows")
       .select("*")
       .eq("is_archived", false)
       .order("created_at", { ascending: false });
-    if (error) {
-      console.error("GrowsProvider.refresh error:", error.message);
+    if (qErr) {
+      console.error("GrowsProvider.refresh error:", qErr.message);
       setGrows([]);
+      setError(qErr.message);
     } else {
       setGrows(data ?? []);
+      setError(null);
     }
     setLoading(false);
   }, [user]);
+
 
   useEffect(() => { refresh(); }, [refresh]);
 

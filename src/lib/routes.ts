@@ -21,6 +21,7 @@ export const plantsPath = (growId?: string | null): string => withGrowId("/plant
 export const tentsPath = (growId?: string | null): string => withGrowId("/tents", growId);
 export const actionsPath = (growId?: string | null): string => withGrowId("/actions", growId);
 export const dashboardPath = (growId?: string | null): string => withGrowId("/dashboard", growId);
+export const alertsPath = (growId?: string | null): string => withGrowId("/alerts", growId);
 
 export const actionDetailPath = (actionId: string): string =>
   `/actions/${encodeURIComponent(actionId)}`;

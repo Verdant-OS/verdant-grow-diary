@@ -150,6 +150,88 @@ export type Database = {
           },
         ]
       }
+      alerts: {
+        Row: {
+          acknowledged_at: string | null
+          created_at: string
+          first_seen_at: string
+          grow_id: string
+          id: string
+          last_seen_at: string
+          metric: string | null
+          plant_id: string | null
+          reason: string
+          resolved_at: string | null
+          severity: string
+          source: string
+          status: string
+          tent_id: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          created_at?: string
+          first_seen_at?: string
+          grow_id: string
+          id?: string
+          last_seen_at?: string
+          metric?: string | null
+          plant_id?: string | null
+          reason: string
+          resolved_at?: string | null
+          severity: string
+          source?: string
+          status?: string
+          tent_id?: string | null
+          title: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          created_at?: string
+          first_seen_at?: string
+          grow_id?: string
+          id?: string
+          last_seen_at?: string
+          metric?: string | null
+          plant_id?: string | null
+          reason?: string
+          resolved_at?: string | null
+          severity?: string
+          source?: string
+          status?: string
+          tent_id?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alerts_grow_id_fkey"
+            columns: ["grow_id"]
+            isOneToOne: false
+            referencedRelation: "grows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alerts_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alerts_tent_id_fkey"
+            columns: ["tent_id"]
+            isOneToOne: false
+            referencedRelation: "tents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       diary_entries: {
         Row: {
           created_at: string

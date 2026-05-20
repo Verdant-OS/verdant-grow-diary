@@ -26,7 +26,10 @@ import {
 import {
   buildEnvironmentAlerts,
   EMPTY_ALERTS_MESSAGE,
+  type EnvironmentAlert,
 } from "@/lib/environmentAlerts";
+import { saveAlert } from "@/lib/alerts";
+import { toast } from "sonner";
 
 
 import {
@@ -610,6 +613,35 @@ export default function Dashboard() {
                           <p className="text-xs text-muted-foreground">
                             {a.reason}
                           </p>
+                          {scopedGrowId && (
+                            <div className="mt-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={async () => {
+                                  try {
+                                    await saveAlert({
+                                      grow_id: scopedGrowId,
+                                      severity: a.severity,
+                                      title: a.title,
+                                      reason: a.reason,
+                                      metric:
+                                        typeof a.metric === "string"
+                                          ? a.metric
+                                          : null,
+                                    });
+                                    toast.success("Alert saved");
+                                  } catch (err) {
+                                    toast.error(
+                                      `Failed to save alert: ${(err as Error).message}`,
+                                    );
+                                  }
+                                }}
+                              >
+                                Save alert
+                              </Button>
+                            </div>
+                          )}
                         </li>
                       );
                     })}

@@ -19,6 +19,8 @@ import Alerts from "./pages/Alerts";
 import Settings from "./pages/Settings";
 import Timeline from "./pages/Timeline";
 import Grows from "./pages/Grows";
+import GrowDetail from "./pages/GrowDetail";
+
 import Coach from "./pages/Coach";
 import Diagnostics from "./pages/Diagnostics";
 import ActionQueue from "./pages/ActionQueue";
@@ -54,6 +56,8 @@ const App = () => (
                 <Route path="/actions/:actionId" element={<ActionDetail />} />
                 <Route path="/grow-lineage" element={<GrowLineageRepair />} />
                 <Route path="/grows" element={<Grows />} />
+                <Route path="/grows/:growId" element={<GrowDetail />} />
+
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/diagnostics" element={<Diagnostics />} />
               </Route>

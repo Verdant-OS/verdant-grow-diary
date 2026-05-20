@@ -276,7 +276,7 @@ export default function ActionDetail() {
         <p className="text-sm text-muted-foreground mt-1">{row.reason}</p>
 
         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-          <IdField label="Grow" id={row.grow_id} to={null} />
+          <IdField label="Grow" id={row.grow_id} to={`/grows/${row.grow_id}`} />
           {row.tent_id && <IdField label="Tent" id={row.tent_id} to={`/tents/${row.tent_id}`} />}
           {row.plant_id && <IdField label="Plant" id={row.plant_id} to={`/plants/${row.plant_id}`} />}
           <Field label="Created" value={new Date(row.created_at).toLocaleString()} />

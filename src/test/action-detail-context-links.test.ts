@@ -25,10 +25,11 @@ describe("ActionDetail — quick context links", () => {
     expect(DETAIL).toMatch(/row\.plant_id\s*&&\s*<IdField[^>]*to=\{`\/plants\/\$\{row\.plant_id\}`\}/);
   });
 
-  it("renders Grow as read-only text (no grow detail route exists)", () => {
-    expect(DETAIL).toMatch(/<IdField\s+label="Grow"\s+id=\{row\.grow_id\}\s+to=\{null\}/);
-    expect(APP).not.toMatch(/path="\/grows\/:/);
+  it("links Grow ID to /grows/:growId now that the route exists", () => {
+    expect(DETAIL).toMatch(/<IdField\s+label="Grow"\s+id=\{row\.grow_id\}\s+to=\{`\/grows\/\$\{row\.grow_id\}`\}/);
+    expect(APP).toMatch(/path="\/grows\/:growId"/);
   });
+
 
   it("IdField renders a Link only when 'to' is provided, plain span otherwise", () => {
     expect(DETAIL).toMatch(/function IdField[\s\S]*?to \? \(\s*<Link[\s\S]*?\) : \(\s*<span>/);

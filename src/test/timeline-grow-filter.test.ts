@@ -61,7 +61,7 @@ describe("Timeline route", () => {
 });
 
 describe("GrowDetail — links to /logs?growId=", () => {
-  it("hub card link uses growId", () => {
-    expect(GROW_DETAIL).toMatch(/to=\{`\/logs\?growId=\$\{growId\}`\}/);
+  it("hub card link uses logsPath(growId)", () => {
+    expect(GROW_DETAIL).toMatch(/to=\{logsPath\(growId\)\}/);
   });
 });

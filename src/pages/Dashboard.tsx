@@ -400,7 +400,9 @@ export default function Dashboard() {
             )}
           </section>
         </div>
+        </>
       ) : (
+
         <p className="text-sm text-muted-foreground mt-4">
           Select a grow to see scoped activity.
         </p>

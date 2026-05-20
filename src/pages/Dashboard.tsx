@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
+
 import { Activity, AlertTriangle, Box, Sprout, ListChecks, Sparkles, ArrowRight } from "lucide-react";
 import type { Stage, SensorReading } from "@/mock";
 import PageHeader from "@/components/PageHeader";
@@ -33,6 +35,8 @@ import { evaluateSensorQuality } from "@/lib/sensorQuality";
 
 import type { SensorReadingRow } from "@/lib/db";
 import { Button } from "@/components/ui/button";
+import GrowTargetsEditor from "@/components/GrowTargetsEditor";
+
 import { Badge } from "@/components/ui/badge";
 import { actionDetailPath, actionsPath, dashboardPath, logsPath } from "@/lib/routes";
 import { formatDistanceToNow } from "date-fns";
@@ -95,6 +99,8 @@ export default function Dashboard() {
     tents.map((t) => t.id),
   );
   const targetsState = useGrowTargets(scopedGrowId ?? null);
+  const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);
+
 
 
 
@@ -461,15 +467,25 @@ export default function Dashboard() {
                       plant-health diagnosis.
                     </p>
                   </div>
-                  <Link
-                    to={logsPath(scopedGrowId)}
-                    className="text-xs text-primary hover:underline"
-                  >
-                    Inspect history →
-                  </Link>
+                  <div className="flex items-center gap-3">
+                    <Link
+                      to={logsPath(scopedGrowId)}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Inspect history →
+                    </Link>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setTargetsEditorOpen(true)}
+                    >
+                      Edit targets
+                    </Button>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap mb-2">
                   <Badge variant="outline" className={`text-[10px] uppercase ${tone}`}>
+
                     {result.headline}
                   </Badge>
                   {result.status === "missing_targets" && (
@@ -526,7 +542,20 @@ export default function Dashboard() {
             );
           })()}
         </section>
+        {scopedGrowId && (
+          <GrowTargetsEditor
+            open={targetsEditorOpen}
+            onOpenChange={setTargetsEditorOpen}
+            growId={scopedGrowId}
+            growName={scopedGrowName ?? undefined}
+            onSaved={() => {
+              targetsState.reload();
+            }}
+
+          />
+        )}
         <div className="grid lg:grid-cols-2 gap-4 mt-4">
+
 
 
 

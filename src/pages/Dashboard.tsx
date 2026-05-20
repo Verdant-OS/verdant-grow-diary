@@ -79,12 +79,27 @@ export default function Dashboard() {
 
   return (
     <div>
+      <GrowBreadcrumbs
+        growId={urlGrowId}
+        growName={scopedGrowName}
+        current="Dashboard"
+        section="dashboard"
+      />
       <PageHeader
         title="Dashboard"
         description="Live status across every tent, plant, and sensor."
         icon={<Sparkles className="h-5 w-5" />}
         actions={<Button asChild className="gradient-leaf text-primary-foreground"><Link to="/tents">Open tents</Link></Button>}
       />
+      {urlGrowId && (
+        <ScopedGrowBanner
+          growId={urlGrowId}
+          growName={scopedGrowName}
+          label="dashboard"
+          clearHref={dashboardPath()}
+          backHref={backHref}
+        />
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <KpiCard label="Active tents" value={tents.length} icon={<Box className="h-3.5 w-3.5" />} />

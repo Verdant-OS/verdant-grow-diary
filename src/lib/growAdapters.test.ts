@@ -48,6 +48,7 @@ describe("mapTentRow", () => {
       stage: "flower",
       light: { on: true, schedule: "12/12", wattage: 450 },
       alertCount: 0,
+      growId: null,
     });
   });
   it("applies safe defaults for nullable fields", () => {
@@ -73,6 +74,7 @@ describe("mapPlantRow", () => {
       health: "watch",
       photo: "https://example.com/p.jpg",
       lastNote: "Trichomes cloudy",
+      growId: null,
     });
   });
   it("defaults null tent_id, strain, photo, note, and invalid health", () => {

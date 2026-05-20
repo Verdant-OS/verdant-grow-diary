@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Box, Lightbulb } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
@@ -9,9 +9,12 @@ import { useSensorReadings, usePlants } from "@/hooks/useMockData";
 import { useGrowTents } from "@/hooks/useGrowData";
 
 export default function Tents() {
-  const { data: tents = [], isLoading } = useGrowTents();
+  const { data: allTents = [], isLoading } = useGrowTents();
   const { data: readings = [] } = useSensorReadings();
   const { data: plants = [] } = usePlants();
+  const [searchParams] = useSearchParams();
+  const growId = searchParams.get("growId");
+  const tents = growId ? allTents.filter((t) => t.growId === growId) : allTents;
 
   return (
     <div>
@@ -21,6 +24,14 @@ export default function Tents() {
         icon={<Box className="h-5 w-5" />}
         actions={<CreateTentDialog />}
       />
+
+      {growId && (
+        <div className="glass rounded-2xl px-4 py-2 mb-4 flex items-center justify-between text-xs" aria-label="Grow filter banner">
+          <span className="text-muted-foreground">Showing tents for this grow</span>
+          <Link to="/tents" className="text-primary hover:underline">Clear grow filter</Link>
+        </div>
+      )}
+
 
       {isLoading ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">

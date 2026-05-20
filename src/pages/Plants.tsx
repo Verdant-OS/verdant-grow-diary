@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Sprout, Filter } from "lucide-react";
 import { useState } from "react";
 import PageHeader from "@/components/PageHeader";
@@ -13,11 +13,20 @@ export default function Plants() {
   const { data: plants = [] } = useGrowPlants();
   const { data: tents = [] } = useTents();
   const [tentFilter, setTentFilter] = useState<string>("all");
-  const filtered = tentFilter === "all" ? plants : plants.filter((p) => p.tentId === tentFilter);
+  const [searchParams] = useSearchParams();
+  const growId = searchParams.get("growId");
+  const growScoped = growId ? plants.filter((p) => p.growId === growId) : plants;
+  const filtered = tentFilter === "all" ? growScoped : growScoped.filter((p) => p.tentId === tentFilter);
 
   return (
     <div>
       <PageHeader title="Plants" description="Every plant across every tent." icon={<Sprout className="h-5 w-5" />} actions={<CreatePlantDialog />} />
+      {growId && (
+        <div className="glass rounded-2xl px-4 py-2 mb-4 flex items-center justify-between text-xs" aria-label="Grow filter banner">
+          <span className="text-muted-foreground">Showing plants for this grow</span>
+          <Link to="/plants" className="text-primary hover:underline">Clear grow filter</Link>
+        </div>
+      )}
       <div className="flex items-center gap-1.5 mb-4 flex-wrap">
         <Filter className="h-3.5 w-3.5 text-muted-foreground mr-1" />
         {[{ id: "all", name: "All tents" }, ...tents.map((t) => ({ id: t.id, name: t.name }))].map((t) => (

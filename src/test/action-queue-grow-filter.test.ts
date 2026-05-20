@@ -33,10 +33,10 @@ describe("ActionQueue — URL growId filter", () => {
     expect(PAGE).toMatch(/\.eq\(\s*["']grow_id["']\s*,\s*effectiveGrowId\s*\)/);
   });
 
-  it("renders the grow filter banner and Clear grow filter link", () => {
-    expect(PAGE).toMatch(/Showing actions for this grow/);
-    expect(PAGE).toMatch(/Clear grow filter/);
-    expect(PAGE).toMatch(/to=\s*["']\/actions["']/);
+  it("renders the grow filter banner and Clear grow filter link via ScopedGrowBanner", () => {
+    expect(PAGE).toMatch(/ScopedGrowBanner/);
+    expect(PAGE).toMatch(/label=\s*["']actions["']/);
+    expect(PAGE).toMatch(/clearHref=\s*["']\/actions["']/);
   });
 
   it("keeps status, risk, and sort filters", () => {

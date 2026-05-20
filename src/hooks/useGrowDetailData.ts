@@ -44,6 +44,9 @@ export interface GrowCounts {
   actionsPending: CountValue;
   actionsTotal: CountValue;
   auditEvents: CountValue;
+  alertsOpen: CountValue;
+  alertsCritical: CountValue;
+  alertsWarning: CountValue;
 }
 
 export const EMPTY_COUNTS: GrowCounts = {
@@ -53,6 +56,9 @@ export const EMPTY_COUNTS: GrowCounts = {
   actionsPending: 0,
   actionsTotal: 0,
   auditEvents: 0,
+  alertsOpen: 0,
+  alertsCritical: 0,
+  alertsWarning: 0,
 };
 
 export type RecentState =

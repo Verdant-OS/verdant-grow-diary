@@ -433,6 +433,43 @@ export default function ActionQueue() {
           </ul>
         )}
       </section>
+
+      <Dialog
+        open={noteDialog !== null}
+        onOpenChange={(open) => {
+          if (!open) cancelNoteDialog();
+        }}
+      >
+        <DialogContent>
+          {meta && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{meta.title}</DialogTitle>
+                <DialogDescription>{meta.description}</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2">
+                <Label htmlFor="action-note">{meta.label}</Label>
+                <Textarea
+                  id="action-note"
+                  value={noteDraft}
+                  onChange={(e) => setNoteDraft(e.target.value)}
+                  placeholder={meta.placeholder}
+                  rows={4}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leave blank to confirm without a note. Notes are stored in the audit history and cannot be edited.
+                </p>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={cancelNoteDialog}>
+                  Cancel
+                </Button>
+                <Button onClick={confirmNoteDialog}>{meta.confirmLabel}</Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

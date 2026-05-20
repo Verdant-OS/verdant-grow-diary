@@ -16,6 +16,7 @@ import Sensors from "./pages/Sensors";
 import Tasks from "./pages/Tasks";
 import Cameras from "./pages/Cameras";
 import Alerts from "./pages/Alerts";
+import AlertDetail from "./pages/AlertDetail";
 import Settings from "./pages/Settings";
 import Timeline from "./pages/Timeline";
 import Grows from "./pages/Grows";

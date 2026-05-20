@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
@@ -91,6 +91,10 @@ const RISK_RANK: Record<ActionRow["risk_level"], number> = {
 export default function ActionQueue() {
   const { user } = useAuth();
   const { activeGrowId, activeGrow } = useGrows();
+  const [searchParams] = useSearchParams();
+  const urlGrowId = searchParams.get("growId");
+  // URL growId takes precedence over active grow. RLS still enforces ownership.
+  const effectiveGrowId = urlGrowId ?? activeGrowId;
   const [rows, setRows] = useState<ActionRow[]>([]);
   const [events, setEvents] = useState<Record<string, EventRow[]>>({});
   const [loading, setLoading] = useState(true);
@@ -114,7 +118,7 @@ export default function ActionQueue() {
       )
       .order("created_at", { ascending: false })
       .limit(100);
-    const { data, error } = activeGrowId ? await q.eq("grow_id", activeGrowId) : await q;
+    const { data, error } = effectiveGrowId ? await q.eq("grow_id", effectiveGrowId) : await q;
     if (error) toast.error(error.message);
     const list = (data ?? []) as ActionRow[];
     setRows(list);
@@ -135,7 +139,7 @@ export default function ActionQueue() {
       setEvents({});
     }
     setLoading(false);
-  }, [user, activeGrowId]);
+  }, [user, effectiveGrowId]);
 
   useEffect(() => {
     load();
@@ -313,6 +317,18 @@ export default function ActionQueue() {
           {activeGrow ? <>Showing actions for <span className="text-foreground">{activeGrow.name}</span>.</> : "Showing all grows."}
         </p>
       </div>
+
+      {urlGrowId && (
+        <div
+          className="glass rounded-2xl p-3 mb-4 flex items-center justify-between gap-3 text-sm"
+          aria-label="Grow filter banner"
+        >
+          <span>Showing actions for this grow</span>
+          <Link to="/actions" className="text-primary hover:underline">
+            Clear grow filter
+          </Link>
+        </div>
+      )}
 
       <div
         className="glass rounded-2xl p-3 mb-4 flex flex-wrap gap-2"

@@ -22,7 +22,7 @@ import {
  * No writes. No ai-coach call. No device-control surface.
  */
 export default function GrowDetail() {
-  const { grow, loading, notFound, counts, recent, status } = useGrowDetailData();
+  const { grow, growId, loading, notFound, counts, recent, status } = useGrowDetailData();
 
   if (loading) {
     return (
@@ -99,7 +99,7 @@ export default function GrowDetail() {
           countLabel="tents"
         />
         <HubLink
-          to="/actions"
+          to={`/actions?growId=${growId}`}
           icon={<ListChecks className="h-4 w-4" />}
           title="Action Queue"
           description={`${formatCount(counts.actionsPending)} pending · ${formatCount(counts.auditEvents)} audit events`}

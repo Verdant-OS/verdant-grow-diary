@@ -41,6 +41,10 @@ export type TransitionKind =
   | "complete"
   | "cancel";
 
+/**
+ * Terminal statuses: no further transitions are allowed from these. The UI
+ * must render zero transition buttons and the helpers below all return false.
+ */
 export const TERMINAL_STATUSES: readonly ActionStatus[] = [
   "completed",
   "rejected",
@@ -51,7 +55,14 @@ export function isTerminalStatus(s: ActionStatus): boolean {
   return TERMINAL_STATUSES.includes(s);
 }
 
-/** Allowed transition source-status rules — single source of truth. */
+/**
+ * Allowed transition source-status rules — single source of truth.
+ *   pending_approval -> simulate / approve / reject / cancel
+ *   simulated        -> approve / complete / cancel
+ *   approved         -> complete / cancel
+ *   rejected | completed | cancelled -> none (terminal)
+ * Approve records grower intent only; it never executes equipment.
+ */
 export const canApprove = (s: ActionStatus): boolean =>
   s === "pending_approval" || s === "simulated";
 export const canSimulate = (s: ActionStatus): boolean => s === "pending_approval";
@@ -61,7 +72,12 @@ export const canComplete = (s: ActionStatus): boolean =>
 export const canCancel = (s: ActionStatus): boolean =>
   s === "pending_approval" || s === "approved" || s === "simulated";
 
+/**
+ * Returns the ordered list of transitions allowed from a given status. Used by
+ * the UI to render exactly the right set of buttons. Terminal -> [].
+ */
 export function allowedTransitions(s: ActionStatus): TransitionKind[] {
+
   if (isTerminalStatus(s)) return [];
   const out: TransitionKind[] = [];
   if (canApprove(s)) out.push("approve");

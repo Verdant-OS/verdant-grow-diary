@@ -18,9 +18,11 @@ import {
 
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useAlertsList } from "@/hooks/useAlertsList";
+import { useAlertEvents } from "@/hooks/useAlertEvents";
 import {
   acknowledgeAlert,
   dismissAlert,
+  logAlertEvent,
   resolveAlert,
   type AlertSeverityRow,
   type AlertStatusRow,

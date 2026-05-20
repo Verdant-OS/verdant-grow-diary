@@ -7,10 +7,14 @@ import EmptyState from "@/components/EmptyState";
 import CreateTentDialog from "@/components/CreateTentDialog";
 import { useSensorReadings, usePlants } from "@/hooks/useMockData";
 import { useGrowTents } from "@/hooks/useGrowData";
+import { useGrows } from "@/store/grows";
 
 export default function Tents() {
   const [searchParams] = useSearchParams();
   const growId = searchParams.get("growId");
+  const { grows } = useGrows();
+  // Only trust the URL growId when it maps to a grow loaded under RLS for this user.
+  const validGrowId = growId && grows.some((g) => g.id === growId) ? growId : undefined;
   const { data: tents = [], isLoading } = useGrowTents(growId ?? undefined);
   const { data: readings = [] } = useSensorReadings();
   const { data: plants = [] } = usePlants();
@@ -21,7 +25,7 @@ export default function Tents() {
         title="Tents"
         description="Every grow space, environment, and lighting status."
         icon={<Box className="h-5 w-5" />}
-        actions={<CreateTentDialog />}
+        actions={<CreateTentDialog defaultGrowId={validGrowId} />}
       />
 
       {growId && (

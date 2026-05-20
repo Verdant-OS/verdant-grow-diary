@@ -75,7 +75,7 @@ export default function GrowDetail() {
 
       <section className="grid grid-cols-1 sm:grid-cols-2 gap-3" aria-label="Grow hub links">
         <HubLink
-          to="/logs"
+          to={`/timeline?growId=${growId}`}
           icon={<ClipboardList className="h-4 w-4" />}
           title="Timeline"
           description="All events for your grows."

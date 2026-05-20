@@ -97,8 +97,14 @@ export interface ActionRowPatch {
 
 /**
  * Build the action_queue UPDATE payload for a transition.
- * No device fields are ever written.
+ *  - approve   -> status=approved, approved_at=now (approval only; no device exec)
+ *  - reject    -> status=rejected, rejected_at=now
+ *  - complete  -> status=completed, completed_at=now (grower handled manually)
+ *  - cancel    -> status=cancelled
+ *  - simulate  -> status=simulated
+ * No device-control fields are ever written here.
  */
+
 export function buildTransitionPatch(
   kind: TransitionKind,
   now: Date = new Date(),

@@ -33,7 +33,7 @@ describe("Plants/Tents — preselect grow on create", () => {
   });
 
   it("CreatePlantDialog accepts defaultGrowId and writes grow_id on insert", () => {
-    expect(CREATE_PLANT).toMatch(/defaultGrowId\?\:\s*string/);
+    expect(CREATE_PLANT).toMatch(/defaultGrowId\?\s*\:\s*string/);
     expect(CREATE_PLANT).toMatch(/if\s*\(defaultGrowId\)\s*payload\.grow_id\s*=\s*defaultGrowId/);
   });
 
@@ -42,7 +42,7 @@ describe("Plants/Tents — preselect grow on create", () => {
   });
 
   it("CreateTentDialog accepts defaultGrowId and writes grow_id on insert", () => {
-    expect(CREATE_TENT).toMatch(/defaultGrowId\?\:\s*string/);
+    expect(CREATE_TENT).toMatch(/defaultGrowId\?\s*\:\s*string/);
     expect(CREATE_TENT).toMatch(/if\s*\(defaultGrowId\)\s*payload\.grow_id\s*=\s*defaultGrowId/);
   });
 

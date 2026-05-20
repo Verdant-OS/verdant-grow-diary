@@ -62,3 +62,17 @@ describe("Adapters expose growId", () => {
     expect(ADAPTERS).toMatch(/mapPlantRow[\s\S]*?growId:/);
   });
 });
+
+import { readFileSync as _rfs } from "node:fs";
+const REPO = _rfs(resolve(ROOT, "src/lib/growRepo.ts"), "utf8");
+
+describe("growRepo — query-level grow filtering", () => {
+  it("fetchTents adds .eq('grow_id', growId) when growId provided", () => {
+    expect(REPO).toMatch(/fetchTents\(growId\?:\s*string\)/);
+    expect(REPO).toMatch(/if\s*\(\s*growId\s*\)\s*q\s*=\s*q\.eq\(\s*["']grow_id["']\s*,\s*growId\s*\)/);
+  });
+  it("fetchPlants adds .eq('grow_id', growId) when growId provided", () => {
+    expect(REPO).toMatch(/fetchPlants\(tentId\?:\s*string,\s*growId\?:\s*string\)/);
+    expect(REPO).toMatch(/if\s*\(\s*growId\s*\)\s*q\s*=\s*q\.eq\(\s*["']grow_id["']\s*,\s*growId\s*\)/);
+  });
+});

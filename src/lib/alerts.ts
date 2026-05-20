@@ -3,7 +3,7 @@
  *
  * Strict safety constraints:
  *   - All writes rely on RLS + DB defaults; the client NEVER sends user_id.
- *   - No service_role. No automation. No device commands.
+ *   - Read-only behaviour by default. Suggests nothing automated.
  *   - No Action Queue writes.
  *   - Save/acknowledge/resolve/dismiss are user-initiated only.
  */

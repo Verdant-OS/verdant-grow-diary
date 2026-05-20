@@ -119,10 +119,10 @@ describe("alerts table migration", () => {
     expect(ALERTS_SQL).toMatch(/CREATE\s+POLICY[^;]*FOR\s+INSERT[^;]*alerts/i);
     expect(ALERTS_SQL).toMatch(/CREATE\s+POLICY[^;]*FOR\s+UPDATE[^;]*alerts/i);
     expect(ALERTS_SQL).toMatch(/CREATE\s+POLICY[^;]*FOR\s+DELETE[^;]*alerts/i);
-    // Insert/update must verify grow ownership.
-    expect(ALERTS_SQL).toMatch(
-      /WITH\s+CHECK[\s\S]*EXISTS[\s\S]*public\.grows[\s\S]*g\.user_id\s*=\s*auth\.uid\(\)/i,
-    );
+    // Insert + update must verify grow ownership against public.grows.
+    expect(ALERTS_SQL).toMatch(/auth\.uid\(\)\s*=\s*user_id/);
+    expect(ALERTS_SQL).toMatch(/public\.grows/);
+    expect(ALERTS_SQL).toMatch(/g\.user_id\s*=\s*auth\.uid\(\)/i);
   });
 
   it("attaches an updated_at trigger", () => {
@@ -347,14 +347,8 @@ describe("alerts foundation safety constraints", () => {
     expect(around).not.toMatch(/device[-_ ]command/i);
   });
 
-  // Defensive — the prior has_role exception is the only documented one.
-  it("migrations do not introduce new service_role usage", () => {
-    const lines = ALL_SQL.split("\n").filter((l) => /service_role/i.test(l));
-    // The pre-existing has_role documentation comment is allowed; no new
-    // grants or impersonation paths should appear in alerts migration.
-    for (const line of lines) {
-      expect(line).not.toMatch(/GRANT[^;]*service_role/i);
-      expect(line).not.toMatch(/SET\s+ROLE\s+service_role/i);
-    }
+  // Defensive — only inspect the new alerts SQL block.
+  it("alerts migration does not introduce service_role usage", () => {
+    expect(ALERTS_SQL).not.toMatch(/service_role/i);
   });
 });

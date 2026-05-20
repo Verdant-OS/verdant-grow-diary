@@ -118,7 +118,7 @@ export default function ActionQueue() {
       )
       .order("created_at", { ascending: false })
       .limit(100);
-    const { data, error } = activeGrowId ? await q.eq("grow_id", activeGrowId) : await q;
+    const { data, error } = effectiveGrowId ? await q.eq("grow_id", effectiveGrowId) : await q;
     if (error) toast.error(error.message);
     const list = (data ?? []) as ActionRow[];
     setRows(list);
@@ -139,7 +139,7 @@ export default function ActionQueue() {
       setEvents({});
     }
     setLoading(false);
-  }, [user, activeGrowId]);
+  }, [user, effectiveGrowId]);
 
   useEffect(() => {
     load();

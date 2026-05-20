@@ -31,11 +31,11 @@ describe("Logs — grow filter (/logs?growId=…)", () => {
     expect(TIMELINE).toMatch(/label=\{scopeLabel\}/);
     expect(TIMELINE).toMatch(/scopeLabel\s*=\s*isLogsRoute\s*\?\s*["']logs["']/);
     expect(TIMELINE).toMatch(/clearHref=\{clearTo\}/);
-    expect(TIMELINE).toMatch(/clearTo\s*=\s*isLogsRoute\s*\?\s*["']\/logs["']/);
+    expect(TIMELINE).toMatch(/clearTo\s*=\s*isLogsRoute\s*\?\s*logsPath\(\)\s*:\s*timelinePath\(\)/);
   });
 
-  it("GrowDetail links to /logs?growId=<growId>", () => {
-    expect(GROW_DETAIL).toMatch(/\/logs\?growId=\$\{growId\}/);
+  it("GrowDetail links to /logs?growId=<growId> via logsPath(growId)", () => {
+    expect(GROW_DETAIL).toMatch(/logsPath\(growId\)/);
   });
 
   it("does not introduce ai-coach, device-control, or service_role surface", () => {

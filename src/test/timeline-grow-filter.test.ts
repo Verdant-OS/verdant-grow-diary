@@ -35,7 +35,7 @@ describe("Timeline — grow filter", () => {
 
   it("renders banner and clear-filter link when growId is present", () => {
     expect(TIMELINE).toMatch(/urlGrowId\s*&&/);
-    expect(TIMELINE).toMatch(/Showing timeline for this grow/);
+    expect(TIMELINE).toMatch(/Showing \{scopeLabel\} for this grow/);
     expect(TIMELINE).toMatch(/Clear grow filter/);
     expect(TIMELINE).toMatch(/to=\{clearTo\}/);
   });

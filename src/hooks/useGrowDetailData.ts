@@ -8,7 +8,7 @@
  *  - grow status (pending action risk + last diary timestamp)
  *
  * Read-only: no .insert/.update/.delete/.upsert/.rpc. No ai-coach call.
- * No device-control surface. No service_role. RLS enforces ownership.
+ * No device-control surface. No elevated keys. RLS enforces ownership.
  */
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";

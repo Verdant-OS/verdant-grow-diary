@@ -33,7 +33,7 @@ export default function Tents() {
           growId={urlGrowId}
           growName={scopedGrowName}
           label="tents"
-          clearHref="/tents"
+          clearHref={tentsPath()}
           backHref={backHref}
         />
       )}

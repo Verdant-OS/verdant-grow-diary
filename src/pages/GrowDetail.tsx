@@ -28,12 +28,33 @@ interface GrowRow {
  * Read-only grow detail hub. No writes. Authenticated client only (RLS enforces
  * auth.uid() = user_id). No device-control surface introduced.
  */
+type CountValue = number | "unavailable";
+
+interface GrowCounts {
+  plants: CountValue;
+  tents: CountValue;
+  diary: CountValue;
+  actionsPending: CountValue;
+  actionsTotal: CountValue;
+  auditEvents: CountValue;
+}
+
+const EMPTY_COUNTS: GrowCounts = {
+  plants: 0,
+  tents: 0,
+  diary: 0,
+  actionsPending: 0,
+  actionsTotal: 0,
+  auditEvents: 0,
+};
+
 export default function GrowDetail() {
   const { growId } = useParams<{ growId: string }>();
   const { user } = useAuth();
   const [grow, setGrow] = useState<GrowRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [counts, setCounts] = useState<GrowCounts>(EMPTY_COUNTS);
 
   const load = useCallback(async () => {
     if (!user || !growId) return;
@@ -51,12 +72,41 @@ export default function GrowDetail() {
       return;
     }
     setGrow(data as GrowRow);
+
+    // Read-only count queries. Any failure degrades to "unavailable" — never crashes.
+    async function countFrom(
+      table: "plants" | "tents" | "diary_entries" | "action_queue" | "action_queue_events",
+      extra?: (q: ReturnType<typeof supabase.from> extends infer _T ? ReturnType<typeof supabase.from> : never) => unknown,
+    ): Promise<CountValue> {
+      try {
+        let q = supabase.from(table).select("id", { count: "exact", head: true }).eq("grow_id", growId!);
+        if (extra) q = extra(q) as typeof q;
+        const { count, error: cErr } = await q;
+        if (cErr) return "unavailable";
+        return count ?? 0;
+      } catch {
+        return "unavailable";
+      }
+    }
+
+    const [plants, tents, diary, actionsPending, actionsTotal, auditEvents] = await Promise.all([
+      countFrom("plants"),
+      countFrom("tents"),
+      countFrom("diary_entries"),
+      countFrom("action_queue", (q) => (q as ReturnType<typeof supabase.from>).eq("status", "pending_approval")),
+      countFrom("action_queue"),
+      countFrom("action_queue_events"),
+    ]);
+    setCounts({ plants, tents, diary, actionsPending, actionsTotal, auditEvents });
+
     setLoading(false);
   }, [user, growId]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+
 
   if (loading) {
     return (
@@ -106,11 +156,40 @@ export default function GrowDetail() {
       </header>
 
       <section className="grid grid-cols-1 sm:grid-cols-2 gap-3" aria-label="Grow hub links">
-        <HubLink to="/logs" icon={<ClipboardList className="h-4 w-4" />} title="Timeline" description="All events for your grows." />
-        <HubLink to="/plants" icon={<Leaf className="h-4 w-4" />} title="Plants" description="Manage plants in this grow." />
-        <HubLink to="/tents" icon={<TentIcon className="h-4 w-4" />} title="Tents" description="Tents linked to this grow." />
-        <HubLink to="/actions" icon={<ListChecks className="h-4 w-4" />} title="Action Queue" description="Approve, simulate, or close actions." />
+        <HubLink
+          to="/logs"
+          icon={<ClipboardList className="h-4 w-4" />}
+          title="Timeline"
+          description="All events for your grows."
+          count={counts.diary}
+          countLabel="diary entries"
+        />
+        <HubLink
+          to="/plants"
+          icon={<Leaf className="h-4 w-4" />}
+          title="Plants"
+          description="Manage plants in this grow."
+          count={counts.plants}
+          countLabel="plants"
+        />
+        <HubLink
+          to="/tents"
+          icon={<TentIcon className="h-4 w-4" />}
+          title="Tents"
+          description="Tents linked to this grow."
+          count={counts.tents}
+          countLabel="tents"
+        />
+        <HubLink
+          to="/actions"
+          icon={<ListChecks className="h-4 w-4" />}
+          title="Action Queue"
+          description={`${formatCount(counts.actionsPending)} pending · ${formatCount(counts.auditEvents)} audit events`}
+          count={counts.actionsTotal}
+          countLabel="actions"
+        />
       </section>
+
     </div>
   );
 }
@@ -135,7 +214,25 @@ function Field({ label, value, mono }: { label: string; value: string; mono?: bo
   );
 }
 
-function HubLink({ to, icon, title, description }: { to: string; icon: React.ReactNode; title: string; description: string }) {
+function formatCount(c: CountValue): string {
+  return c === "unavailable" ? "Unavailable" : String(c);
+}
+
+function HubLink({
+  to,
+  icon,
+  title,
+  description,
+  count,
+  countLabel,
+}: {
+  to: string;
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  count: CountValue;
+  countLabel: string;
+}) {
   return (
     <Link
       to={to}
@@ -144,8 +241,12 @@ function HubLink({ to, icon, title, description }: { to: string; icon: React.Rea
       <div className="flex items-center gap-2 mb-1 text-sm font-semibold">
         {icon}
         {title}
+        <span className="ml-auto text-xs font-normal text-muted-foreground">
+          <span data-testid={`count-${countLabel.replace(/\s+/g, "-")}`}>{formatCount(count)}</span> {countLabel}
+        </span>
       </div>
       <p className="text-xs text-muted-foreground">{description}</p>
     </Link>
   );
 }
+

@@ -14,6 +14,91 @@ export type Database = {
   }
   public: {
     Tables: {
+      action_queue: {
+        Row: {
+          action_type: string
+          approved_at: string | null
+          completed_at: string | null
+          created_at: string
+          grow_id: string
+          id: string
+          plant_id: string | null
+          reason: string
+          rejected_at: string | null
+          risk_level: string
+          source: string
+          status: string
+          suggested_change: string
+          target_device: string | null
+          target_metric: string | null
+          tent_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          approved_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          grow_id: string
+          id?: string
+          plant_id?: string | null
+          reason: string
+          rejected_at?: string | null
+          risk_level?: string
+          source?: string
+          status?: string
+          suggested_change: string
+          target_device?: string | null
+          target_metric?: string | null
+          tent_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          action_type?: string
+          approved_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          grow_id?: string
+          id?: string
+          plant_id?: string | null
+          reason?: string
+          rejected_at?: string | null
+          risk_level?: string
+          source?: string
+          status?: string
+          suggested_change?: string
+          target_device?: string | null
+          target_metric?: string | null
+          tent_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "action_queue_grow_id_fkey"
+            columns: ["grow_id"]
+            isOneToOne: false
+            referencedRelation: "grows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "action_queue_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "action_queue_tent_id_fkey"
+            columns: ["tent_id"]
+            isOneToOne: false
+            referencedRelation: "tents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       diary_entries: {
         Row: {
           created_at: string

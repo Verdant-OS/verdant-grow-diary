@@ -1,5 +1,6 @@
 import { useSearchParams } from "react-router-dom";
 import { useGrows } from "@/store/grows";
+import { growDetailPath } from "@/lib/routes";
 import type { Grow } from "@/store/grows";
 
 /**
@@ -32,7 +33,7 @@ export function useScopedGrow(): {
     scopedGrow,
     scopedGrowName: scopedGrow?.name ?? null,
     isValidScopedGrow: !!urlGrowId && !!scopedGrow,
-    backHref: scopedGrow ? `/grows/${scopedGrow.id}` : undefined,
+    backHref: scopedGrow ? growDetailPath(scopedGrow.id) : undefined,
   };
 }
 

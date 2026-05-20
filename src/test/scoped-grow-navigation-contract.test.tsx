@@ -41,17 +41,17 @@ const SCOPED_PAGES: Array<[string, string]> = [
 ];
 
 describe("scoped-grow navigation contract — GrowDetail outbound links", () => {
-  it("links to /logs?growId=<growId>", () => {
-    expect(GROW_DETAIL).toMatch(/to=\{`\/logs\?growId=\$\{growId\}`\}/);
+  it("links to /logs?growId=<growId> via logsPath(growId)", () => {
+    expect(GROW_DETAIL).toMatch(/to=\{logsPath\(growId\)\}/);
   });
-  it("links to /plants?growId=<growId>", () => {
-    expect(GROW_DETAIL).toMatch(/to=\{`\/plants\?growId=\$\{growId\}`\}/);
+  it("links to /plants?growId=<growId> via plantsPath(growId)", () => {
+    expect(GROW_DETAIL).toMatch(/to=\{plantsPath\(growId\)\}/);
   });
-  it("links to /tents?growId=<growId>", () => {
-    expect(GROW_DETAIL).toMatch(/to=\{`\/tents\?growId=\$\{growId\}`\}/);
+  it("links to /tents?growId=<growId> via tentsPath(growId)", () => {
+    expect(GROW_DETAIL).toMatch(/to=\{tentsPath\(growId\)\}/);
   });
-  it("links to /actions?growId=<growId>", () => {
-    expect(GROW_DETAIL).toMatch(/to=\{`\/actions\?growId=\$\{growId\}`\}/);
+  it("links to /actions?growId=<growId> via actionsPath(growId)", () => {
+    expect(GROW_DETAIL).toMatch(/to=\{actionsPath\(growId\)\}/);
   });
 });
 
@@ -67,18 +67,18 @@ describe("scoped-grow navigation contract — scoped pages consume shared primit
 });
 
 describe("scoped-grow navigation contract — clear-filter targets", () => {
-  it("Plants clears to /plants", () => {
-    expect(PLANTS).toMatch(/clearHref=\s*["']\/plants["']/);
+  it("Plants clears to /plants via plantsPath()", () => {
+    expect(PLANTS).toMatch(/clearHref=\{plantsPath\(\)\}/);
   });
-  it("Tents clears to /tents", () => {
-    expect(TENTS).toMatch(/clearHref=\s*["']\/tents["']/);
+  it("Tents clears to /tents via tentsPath()", () => {
+    expect(TENTS).toMatch(/clearHref=\{tentsPath\(\)\}/);
   });
-  it("Timeline/Logs clears to /timeline and /logs respectively", () => {
-    expect(TIMELINE).toMatch(/clearTo\s*=\s*isLogsRoute\s*\?\s*["']\/logs["']\s*:\s*["']\/timeline["']/);
+  it("Timeline/Logs clears via logsPath()/timelinePath() based on route", () => {
+    expect(TIMELINE).toMatch(/clearTo\s*=\s*isLogsRoute\s*\?\s*logsPath\(\)\s*:\s*timelinePath\(\)/);
     expect(TIMELINE).toMatch(/clearHref=\{clearTo\}/);
   });
-  it("ActionQueue clears to /actions", () => {
-    expect(ACTIONQ).toMatch(/clearHref=\s*["']\/actions["']/);
+  it("ActionQueue clears to /actions via actionsPath()", () => {
+    expect(ACTIONQ).toMatch(/clearHref=\{actionsPath\(\)\}/);
   });
 });
 

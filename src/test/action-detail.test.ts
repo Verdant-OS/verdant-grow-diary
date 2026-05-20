@@ -38,8 +38,8 @@ describe("Action Queue detail view", () => {
     expect(DETAIL).toMatch(/do not have access/);
   });
 
-  it("has a Back to Action Queue link to /actions", () => {
-    expect(DETAIL).toMatch(/to="\/actions"/);
+  it("has a Back to Action Queue link to /actions via actionsPath()", () => {
+    expect(DETAIL).toMatch(/to=\{actionsPath\(\)\}/);
     expect(DETAIL).toMatch(/Back to Action Queue/);
   });
 

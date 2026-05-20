@@ -11,6 +11,7 @@ import { Link, useLocation } from "react-router-dom";
 import EntryEditDialog from "@/components/EntryEditDialog";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
+import { actionDetailPath, logsPath, timelinePath } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { getEventType } from "@/lib/diary";
 
@@ -55,7 +56,7 @@ export default function Timeline() {
   const activeGrowId = urlGrowId ?? storeGrowId;
   const isLogsRoute = pathname.startsWith("/logs");
   const scopeLabel = isLogsRoute ? "logs" : "timeline";
-  const clearTo = isLogsRoute ? "/logs" : "/timeline";
+  const clearTo = isLogsRoute ? logsPath() : timelinePath();
 
   // Preselect grow context for new log creation when URL pins a growId.
   // Only sync when the URL growId is a valid, RLS-authorized grow for this user.
@@ -425,7 +426,7 @@ function ActionQueueEventsSection({ events }: { events: ActionQueueEvent[] }) {
               </span>
               {e.action_queue_id && (
                 <Link
-                  to={`/actions/${e.action_queue_id}`}
+                  to={actionDetailPath(e.action_queue_id)}
                   className="text-[11px] text-primary hover:underline"
                 >
                   View Details

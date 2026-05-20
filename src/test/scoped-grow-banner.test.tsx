@@ -102,22 +102,22 @@ describe("ScopedGrowBanner — component", () => {
 });
 
 describe("Page wiring — ScopedGrowBanner usage", () => {
-  it("Plants uses ScopedGrowBanner with label='plants' and clearHref='/plants'", () => {
+  it("Plants uses ScopedGrowBanner with label='plants' and plantsPath() clearHref", () => {
     expect(PLANTS).toMatch(/import\s+ScopedGrowBanner/);
-    expect(PLANTS).toMatch(/<ScopedGrowBanner[\s\S]*?label=\s*["']plants["'][\s\S]*?clearHref=\s*["']\/plants["']/);
+    expect(PLANTS).toMatch(/<ScopedGrowBanner[\s\S]*?label=\s*["']plants["'][\s\S]*?clearHref=\{plantsPath\(\)\}/);
     expect(PLANTS).toMatch(/backHref=\{backHref\}/);
   });
-  it("Tents uses ScopedGrowBanner with label='tents' and clearHref='/tents'", () => {
+  it("Tents uses ScopedGrowBanner with label='tents' and tentsPath() clearHref", () => {
     expect(TENTS).toMatch(/import\s+ScopedGrowBanner/);
-    expect(TENTS).toMatch(/<ScopedGrowBanner[\s\S]*?label=\s*["']tents["'][\s\S]*?clearHref=\s*["']\/tents["']/);
+    expect(TENTS).toMatch(/<ScopedGrowBanner[\s\S]*?label=\s*["']tents["'][\s\S]*?clearHref=\{tentsPath\(\)\}/);
   });
   it("Timeline uses ScopedGrowBanner with dynamic scopeLabel + clearTo", () => {
     expect(TIMELINE).toMatch(/import\s+ScopedGrowBanner/);
     expect(TIMELINE).toMatch(/<ScopedGrowBanner[\s\S]*?label=\{scopeLabel\}[\s\S]*?clearHref=\{clearTo\}/);
   });
-  it("ActionQueue uses ScopedGrowBanner with label='actions' and clearHref='/actions'", () => {
+  it("ActionQueue uses ScopedGrowBanner with label='actions' and actionsPath() clearHref", () => {
     expect(ACTIONQ).toMatch(/import\s+ScopedGrowBanner/);
-    expect(ACTIONQ).toMatch(/<ScopedGrowBanner[\s\S]*?label=\s*["']actions["'][\s\S]*?clearHref=\s*["']\/actions["']/);
+    expect(ACTIONQ).toMatch(/<ScopedGrowBanner[\s\S]*?label=\s*["']actions["'][\s\S]*?clearHref=\{actionsPath\(\)\}/);
   });
 
   it("pages consume the shared useScopedGrow hook", () => {

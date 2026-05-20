@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Loader2, Check, X, FlaskConical, ListChecks, History, CheckCircle2, Ban } from "lucide-react";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
+import { actionDetailPath, actionsPath } from "@/lib/routes";
 import { toast } from "sonner";
 import {
   type ActionStatus,
@@ -325,7 +326,7 @@ export default function ActionQueue() {
           growId={urlGrowId}
           growName={scopedGrowName}
           label="actions"
-          clearHref="/actions"
+          clearHref={actionsPath()}
           backHref={backHref}
         />
       )}
@@ -421,7 +422,7 @@ export default function ActionQueue() {
                     </Button>
                   )}
                   <Link
-                    to={`/actions/${row.id}`}
+                    to={actionDetailPath(row.id)}
                     className="ml-auto text-xs text-primary hover:underline self-center"
                   >
                     View Details
@@ -464,7 +465,7 @@ export default function ActionQueue() {
                     </Button>
                   )}
                   <Link
-                    to={`/actions/${row.id}`}
+                    to={actionDetailPath(row.id)}
                     className="text-xs text-primary hover:underline"
                   >
                     View Details

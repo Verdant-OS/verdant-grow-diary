@@ -26,7 +26,7 @@ describe("ActionDetail — quick context links", () => {
   });
 
   it("links Grow ID to /grows/:growId now that the route exists", () => {
-    expect(DETAIL).toMatch(/<IdField\s+label="Grow"\s+id=\{row\.grow_id\}\s+to=\{`\/grows\/\$\{row\.grow_id\}`\}/);
+    expect(DETAIL).toMatch(/<IdField\s+label="Grow"\s+id=\{row\.grow_id\}\s+to=\{growDetailPath\(row\.grow_id\)\}/);
     expect(APP).toMatch(/path="\/grows\/:growId"/);
   });
 
@@ -35,8 +35,8 @@ describe("ActionDetail — quick context links", () => {
     expect(DETAIL).toMatch(/function IdField[\s\S]*?to \? \(\s*<Link[\s\S]*?\) : \(\s*<span>/);
   });
 
-  it("Back to Action Queue link is preserved", () => {
-    expect(DETAIL).toMatch(/to="\/actions"/);
+  it("Back to Action Queue link is preserved via actionsPath()", () => {
+    expect(DETAIL).toMatch(/to=\{actionsPath\(\)\}/);
     expect(DETAIL).toMatch(/Back to Action Queue/);
   });
 

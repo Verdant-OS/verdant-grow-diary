@@ -22,7 +22,7 @@ describe("Plants — grow filter", () => {
   it("renders banner and clear link via ScopedGrowBanner", () => {
     expect(PLANTS).toMatch(/ScopedGrowBanner/);
     expect(PLANTS).toMatch(/label=\s*["']plants["']/);
-    expect(PLANTS).toMatch(/clearHref=\s*["']\/plants["']/);
+    expect(PLANTS).toMatch(/clearHref=\{plantsPath\(\)\}/);
   });
   it("no ai-coach / device-control / service_role", () => {
     expect(PLANTS).not.toMatch(/ai-coach|ai_coach/);
@@ -41,7 +41,7 @@ describe("Tents — grow filter", () => {
   it("renders banner and clear link via ScopedGrowBanner", () => {
     expect(TENTS).toMatch(/ScopedGrowBanner/);
     expect(TENTS).toMatch(/label=\s*["']tents["']/);
-    expect(TENTS).toMatch(/clearHref=\s*["']\/tents["']/);
+    expect(TENTS).toMatch(/clearHref=\{tentsPath\(\)\}/);
   });
   it("no ai-coach / device-control / service_role", () => {
     expect(TENTS).not.toMatch(/ai-coach|ai_coach/);
@@ -50,9 +50,9 @@ describe("Tents — grow filter", () => {
 });
 
 describe("GrowDetail — scoped hub links", () => {
-  it("links to /plants and /tents with growId", () => {
-    expect(GROW_DETAIL).toMatch(/\/plants\?growId=\$\{growId\}/);
-    expect(GROW_DETAIL).toMatch(/\/tents\?growId=\$\{growId\}/);
+  it("links to /plants and /tents with growId via helpers", () => {
+    expect(GROW_DETAIL).toMatch(/plantsPath\(growId\)/);
+    expect(GROW_DETAIL).toMatch(/tentsPath\(growId\)/);
   });
 });
 

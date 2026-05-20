@@ -15,6 +15,7 @@ import {
   type StatusLevel,
   formatCount,
 } from "@/lib/growStatus";
+import { actionsPath, logsPath, plantsPath, tentsPath } from "@/lib/routes";
 
 /**
  * Read-only grow detail hub. Presentational only — all data loading +
@@ -75,7 +76,7 @@ export default function GrowDetail() {
 
       <section className="grid grid-cols-1 sm:grid-cols-2 gap-3" aria-label="Grow hub links">
         <HubLink
-          to={`/logs?growId=${growId}`}
+          to={logsPath(growId)}
           icon={<ClipboardList className="h-4 w-4" />}
           title="Timeline"
           description="All events for your grows."
@@ -83,7 +84,7 @@ export default function GrowDetail() {
           countLabel="diary entries"
         />
         <HubLink
-          to={`/plants?growId=${growId}`}
+          to={plantsPath(growId)}
           icon={<Leaf className="h-4 w-4" />}
           title="Plants"
           description="Manage plants in this grow."
@@ -91,7 +92,7 @@ export default function GrowDetail() {
           countLabel="plants"
         />
         <HubLink
-          to={`/tents?growId=${growId}`}
+          to={tentsPath(growId)}
           icon={<TentIcon className="h-4 w-4" />}
           title="Tents"
           description="Tents linked to this grow."
@@ -99,7 +100,7 @@ export default function GrowDetail() {
           countLabel="tents"
         />
         <HubLink
-          to={`/actions?growId=${growId}`}
+          to={actionsPath(growId)}
           icon={<ListChecks className="h-4 w-4" />}
           title="Action Queue"
           description={`${formatCount(counts.actionsPending)} pending · ${formatCount(counts.auditEvents)} audit events`}
@@ -113,7 +114,7 @@ export default function GrowDetail() {
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Recent Activity
           </h2>
-          <Link to={`/logs?growId=${growId}`} className="text-xs text-primary hover:underline">
+          <Link to={logsPath(growId)} className="text-xs text-primary hover:underline">
             View full Timeline →
           </Link>
         </div>
@@ -265,11 +266,11 @@ function GrowStatusCard({ status, growId }: { status: GrowStatus; growId: string
       </dl>
       <div className="flex gap-3 mt-3 text-xs">
         {pendingNum > 0 && (
-          <Link to={`/actions?growId=${growId}`} className="text-primary hover:underline">
+          <Link to={actionsPath(growId)} className="text-primary hover:underline">
             Review pending actions →
           </Link>
         )}
-        <Link to={`/logs?growId=${growId}`} className="text-primary hover:underline">
+        <Link to={logsPath(growId)} className="text-primary hover:underline">
           View Timeline →
         </Link>
       </div>

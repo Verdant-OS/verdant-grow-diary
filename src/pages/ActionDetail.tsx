@@ -42,6 +42,7 @@ import {
   nextStatusFor,
   normalizeNote,
 } from "@/lib/actionQueueTransitions";
+import { actionsPath, growDetailPath } from "@/lib/routes";
 
 type Status = ActionStatus;
 type EventType = ActionEventType;
@@ -276,7 +277,7 @@ export default function ActionDetail() {
         <p className="text-sm text-muted-foreground mt-1">{row.reason}</p>
 
         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-          <IdField label="Grow" id={row.grow_id} to={`/grows/${row.grow_id}`} />
+          <IdField label="Grow" id={row.grow_id} to={growDetailPath(row.grow_id)} />
           {row.tent_id && <IdField label="Tent" id={row.tent_id} to={`/tents/${row.tent_id}`} />}
           {row.plant_id && <IdField label="Plant" id={row.plant_id} to={`/plants/${row.plant_id}`} />}
           <Field label="Created" value={new Date(row.created_at).toLocaleString()} />
@@ -380,7 +381,7 @@ export default function ActionDetail() {
 function BackLink() {
   return (
     <Link
-      to="/actions"
+      to={actionsPath()}
       className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3"
     >
       <ArrowLeft className="h-4 w-4" /> Back to Action Queue

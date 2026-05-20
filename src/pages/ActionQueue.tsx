@@ -41,7 +41,7 @@ type EventType =
   | "cancelled"
   | "note";
 
-type StatusFilter = "all" | "pending" | "simulated" | "approved" | "rejected";
+type StatusFilter = "all" | "pending" | "simulated" | "approved" | "rejected" | "completed" | "cancelled";
 type RiskFilter = "all" | "low" | "medium" | "high" | "critical";
 type SortOrder = "newest" | "oldest" | "risk";
 

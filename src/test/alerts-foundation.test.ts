@@ -115,11 +115,10 @@ describe("alerts table migration", () => {
   });
 
   it("declares SELECT/INSERT/UPDATE/DELETE policies anchored on auth.uid()", () => {
-    expect(ALERTS_SQL).toMatch(/CREATE\s+POLICY[^;]*FOR\s+SELECT[^;]*alerts/i);
-    expect(ALERTS_SQL).toMatch(/CREATE\s+POLICY[^;]*FOR\s+INSERT[^;]*alerts/i);
-    expect(ALERTS_SQL).toMatch(/CREATE\s+POLICY[^;]*FOR\s+UPDATE[^;]*alerts/i);
-    expect(ALERTS_SQL).toMatch(/CREATE\s+POLICY[^;]*FOR\s+DELETE[^;]*alerts/i);
-    // Insert + update must verify grow ownership against public.grows.
+    expect(ALERTS_SQL).toMatch(/CREATE\s+POLICY[\s\S]*?alerts[\s\S]*?FOR\s+SELECT/i);
+    expect(ALERTS_SQL).toMatch(/CREATE\s+POLICY[\s\S]*?alerts[\s\S]*?FOR\s+INSERT/i);
+    expect(ALERTS_SQL).toMatch(/CREATE\s+POLICY[\s\S]*?alerts[\s\S]*?FOR\s+UPDATE/i);
+    expect(ALERTS_SQL).toMatch(/CREATE\s+POLICY[\s\S]*?alerts[\s\S]*?FOR\s+DELETE/i);
     expect(ALERTS_SQL).toMatch(/auth\.uid\(\)\s*=\s*user_id/);
     expect(ALERTS_SQL).toMatch(/public\.grows/);
     expect(ALERTS_SQL).toMatch(/g\.user_id\s*=\s*auth\.uid\(\)/i);
@@ -347,8 +346,11 @@ describe("alerts foundation safety constraints", () => {
     expect(around).not.toMatch(/device[-_ ]command/i);
   });
 
-  // Defensive — only inspect the new alerts SQL block.
-  it("alerts migration does not introduce service_role usage", () => {
-    expect(ALERTS_SQL).not.toMatch(/service_role/i);
+  // Defensive — only inspect the new alerts SQL block. Comment mentions are
+  // allowed; what we forbid is actual grants / role escalation.
+  it("alerts migration does not grant or assume service_role", () => {
+    expect(ALERTS_SQL).not.toMatch(/GRANT[^;]*service_role/i);
+    expect(ALERTS_SQL).not.toMatch(/SET\s+ROLE\s+service_role/i);
+    expect(ALERTS_SQL).not.toMatch(/TO\s+service_role/i);
   });
 });

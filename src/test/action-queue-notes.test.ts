@@ -99,8 +99,9 @@ describe("ActionQueue — dialog wiring", () => {
 describe("ActionQueue — safety", () => {
   it("no UPDATE policy exists for action_queue_events in any migration", () => {
     expect(MIG).not.toMatch(
-      /CREATE\s+POLICY[\s\S]*?ON\s+public\.action_queue_events[\s\S]*?FOR\s+UPDATE/i,
+      /CREATE\s+POLICY[^;]*?ON\s+public\.action_queue_events[^;]*?FOR\s+UPDATE/i,
     );
+
   });
 
   it("no device-control surface introduced", () => {

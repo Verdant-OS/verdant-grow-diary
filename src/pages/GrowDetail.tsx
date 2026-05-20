@@ -22,7 +22,7 @@ import {
  * No writes. No ai-coach call. No device-control surface.
  */
 export default function GrowDetail() {
-  const { grow, loading, notFound, counts, recent, status } = useGrowDetailData();
+  const { grow, growId, loading, notFound, counts, recent, status } = useGrowDetailData();
 
   if (loading) {
     return (

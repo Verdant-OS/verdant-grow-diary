@@ -10,6 +10,7 @@ import { Link, useSearchParams, useLocation } from "react-router-dom";
 
 import EntryEditDialog from "@/components/EntryEditDialog";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
+import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { cn } from "@/lib/utils";
 import { getEventType } from "@/lib/diary";
 

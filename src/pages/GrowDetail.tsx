@@ -86,6 +86,13 @@ export default function GrowDetail() {
   const [notFound, setNotFound] = useState(false);
   const [counts, setCounts] = useState<GrowCounts>(EMPTY_COUNTS);
   const [recent, setRecent] = useState<RecentState>({ status: "loading" });
+  const [status, setStatus] = useState<GrowStatus>({
+    level: "good",
+    reason: "Loading…",
+    pending: 0,
+    highestRisk: "none",
+    lastDiaryAt: null,
+  });
 
 
 

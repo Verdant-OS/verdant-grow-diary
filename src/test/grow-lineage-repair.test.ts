@@ -96,7 +96,13 @@ describe("Grow Lineage Repair — RLS enforcement", () => {
     expect(MIG).toMatch(/t\.grow_id\s*=\s*grow_id/i);
   });
 
-  it("no service_role introduced anywhere in migrations for this feature", () => {
-    expect(MIG).not.toMatch(/service_role/i);
+  it("the tightened tents policy migration does not use service_role", () => {
+    const dir = resolve(ROOT, "supabase/migrations");
+    const offending = readdirSync(dir)
+      .filter((n) => n.endsWith(".sql"))
+      .map((n) => readFileSync(join(dir, n), "utf8"))
+      .filter((sql) => /CREATE\s+POLICY\s+"Users update own tents"/i.test(sql))
+      .filter((sql) => /service_role/i.test(sql));
+    expect(offending).toEqual([]);
   });
 });

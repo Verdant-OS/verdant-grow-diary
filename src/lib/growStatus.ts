@@ -113,9 +113,19 @@ export function deriveStatus({
   return { level, reason };
 }
 
-/** Sort recent items newest-first by ts. Stable: returns a new array. */
+/**
+ * Sort recent items newest-first by ts, with deterministic tie-breakers:
+ *   1. ts descending (newest first)
+ *   2. kind alphabetical (action_event < alert_event < diary)
+ *   3. id ascending
+ *
+ * Stable: returns a new array; does not mutate input.
+ */
 export function mergeRecent(items: RecentItem[]): RecentItem[] {
-  return [...items].sort(
-    (a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime(),
-  );
+  return [...items].sort((a, b) => {
+    const dt = new Date(b.ts).getTime() - new Date(a.ts).getTime();
+    if (dt !== 0) return dt;
+    if (a.kind !== b.kind) return a.kind < b.kind ? -1 : 1;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
 }

@@ -24,12 +24,24 @@ export default function Plants() {
   return (
     <div>
       <PageHeader title="Plants" description="Every plant across every tent." icon={<Sprout className="h-5 w-5" />} actions={<CreatePlantDialog defaultGrowId={validGrowId} />} />
-      {growId && (
-        <div className="glass rounded-2xl px-4 py-2 mb-4 flex items-center justify-between text-xs" aria-label="Grow filter banner">
-          <span className="text-muted-foreground">Showing plants for this grow</span>
-          <Link to="/plants" className="text-primary hover:underline">Clear grow filter</Link>
-        </div>
-      )}
+      {growId && (() => {
+        const scopedGrow = grows.find((g) => g.id === growId) ?? null;
+        return (
+          <div className="glass rounded-2xl px-4 py-2 mb-4 flex items-center justify-between text-xs gap-2 flex-wrap" aria-label="Grow filter banner">
+            {scopedGrow ? (
+              <span className="text-muted-foreground">Showing plants for <span className="text-foreground font-medium">{scopedGrow.name}</span></span>
+            ) : (
+              <span className="text-muted-foreground">Showing plants for this grow</span>
+            )}
+            <span className="flex items-center gap-3">
+              {scopedGrow && (
+                <Link to={`/grows/${scopedGrow.id}`} className="text-primary hover:underline">Back to Grow</Link>
+              )}
+              <Link to="/plants" className="text-primary hover:underline">Clear grow filter</Link>
+            </span>
+          </div>
+        );
+      })()}
       <div className="flex items-center gap-1.5 mb-4 flex-wrap">
         <Filter className="h-3.5 w-3.5 text-muted-foreground mr-1" />
         {[{ id: "all", name: "All tents" }, ...tents.map((t) => ({ id: t.id, name: t.name }))].map((t) => (

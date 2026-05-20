@@ -1,7 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
-import { Link, useParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/store/auth";
+import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft,
@@ -11,276 +8,21 @@ import {
   Tent as TentIcon,
   ListChecks,
 } from "lucide-react";
-
-interface GrowRow {
-  id: string;
-  name: string;
-  stage: string;
-  grow_type: string;
-  is_archived: boolean;
-  started_at: string;
-  created_at: string;
-  updated_at: string;
-  notes: string | null;
-}
+import { useGrowDetailData } from "@/hooks/useGrowDetailData";
+import {
+  type CountValue,
+  type GrowStatus,
+  type StatusLevel,
+  formatCount,
+} from "@/lib/growStatus";
 
 /**
- * Read-only grow detail hub. No writes. Authenticated client only (RLS enforces
- * auth.uid() = user_id). No device-control surface introduced.
+ * Read-only grow detail hub. Presentational only — all data loading +
+ * derivation live in @/hooks/useGrowDetailData and @/lib/growStatus.
+ * No writes. No ai-coach call. No device-control surface.
  */
-type CountValue = number | "unavailable";
-
-interface GrowCounts {
-  plants: CountValue;
-  tents: CountValue;
-  diary: CountValue;
-  actionsPending: CountValue;
-  actionsTotal: CountValue;
-  auditEvents: CountValue;
-}
-
-const EMPTY_COUNTS: GrowCounts = {
-  plants: 0,
-  tents: 0,
-  diary: 0,
-  actionsPending: 0,
-  actionsTotal: 0,
-  auditEvents: 0,
-};
-
-interface RecentItem {
-  id: string;
-  kind: "diary" | "action_event";
-  ts: string;
-  title: string;
-  detail?: string | null;
-  href?: string;
-}
-
-type RecentState =
-  | { status: "loading" }
-  | { status: "ok"; items: RecentItem[] }
-  | { status: "unavailable" };
-
-/**
- * Grow Status summary — derived strictly from existing read-only data
- * (pending action counts, pending risk levels, latest diary timestamp).
- * NOT an AI diagnosis. No ai-coach call. No writes. No device control.
- */
-type StatusLevel = "good" | "watch" | "needs_review" | "unavailable";
-
-interface GrowStatus {
-  level: StatusLevel;
-  reason: string;
-  pending: CountValue;
-  highestRisk: "low" | "medium" | "high" | "critical" | "none" | "unknown";
-  lastDiaryAt: string | null;
-}
-
-
 export default function GrowDetail() {
-  const { growId } = useParams<{ growId: string }>();
-  const { user } = useAuth();
-  const [grow, setGrow] = useState<GrowRow | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
-  const [counts, setCounts] = useState<GrowCounts>(EMPTY_COUNTS);
-  const [recent, setRecent] = useState<RecentState>({ status: "loading" });
-  const [status, setStatus] = useState<GrowStatus>({
-    level: "good",
-    reason: "Loading…",
-    pending: 0,
-    highestRisk: "none",
-    lastDiaryAt: null,
-  });
-
-
-
-  const load = useCallback(async () => {
-    if (!user || !growId) return;
-    setLoading(true);
-    setNotFound(false);
-    const { data, error } = await supabase
-      .from("grows")
-      .select("id,name,stage,grow_type,is_archived,started_at,created_at,updated_at,notes")
-      .eq("id", growId)
-      .maybeSingle();
-    if (error || !data) {
-      setGrow(null);
-      setNotFound(true);
-      setLoading(false);
-      return;
-    }
-    setGrow(data as GrowRow);
-
-    // Read-only count queries. Any failure degrades to "unavailable" — never crashes.
-    async function countFrom(
-      table: "plants" | "tents" | "diary_entries" | "action_queue" | "action_queue_events",
-      extra?: (q: ReturnType<typeof supabase.from> extends infer _T ? ReturnType<typeof supabase.from> : never) => unknown,
-    ): Promise<CountValue> {
-      try {
-        let q = supabase.from(table).select("id", { count: "exact", head: true }).eq("grow_id", growId!);
-        if (extra) q = extra(q) as typeof q;
-        const { count, error: cErr } = await q;
-        if (cErr) return "unavailable";
-        return count ?? 0;
-      } catch {
-        return "unavailable";
-      }
-    }
-
-    const [plants, tents, diary, actionsPending, actionsTotal, auditEvents] = await Promise.all([
-      countFrom("plants"),
-      countFrom("tents"),
-      countFrom("diary_entries"),
-      countFrom("action_queue", (q) => (q as ReturnType<typeof supabase.from>).eq("status", "pending_approval")),
-      countFrom("action_queue"),
-      countFrom("action_queue_events"),
-    ]);
-    setCounts({ plants, tents, diary, actionsPending, actionsTotal, auditEvents });
-
-    // Recent activity: latest 5 diary entries + latest 5 action_queue_events,
-    // merged newest-first. Read-only; failure degrades to "unavailable".
-    try {
-      const [diaryRes, eventsRes] = await Promise.all([
-        supabase
-          .from("diary_entries")
-          .select("id,entry_at,stage,note")
-          .eq("grow_id", growId)
-          .order("entry_at", { ascending: false })
-          .limit(5),
-        supabase
-          .from("action_queue_events")
-          .select("id,action_queue_id,event_type,previous_status,new_status,note,created_at")
-          .eq("grow_id", growId)
-          .order("created_at", { ascending: false })
-          .limit(5),
-      ]);
-
-      if (diaryRes.error || eventsRes.error) {
-        setRecent({ status: "unavailable" });
-      } else {
-        const diaryItems: RecentItem[] = (diaryRes.data ?? []).map((d) => ({
-          id: `diary-${d.id}`,
-          kind: "diary",
-          ts: d.entry_at,
-          title: d.stage ? `Diary entry (${d.stage})` : "Diary entry",
-          detail: d.note,
-        }));
-
-        // Resolve parent action_queue rows for suggested_change/reason context.
-        const actionIds = Array.from(
-          new Set((eventsRes.data ?? []).map((e) => e.action_queue_id).filter(Boolean)),
-        );
-        let parents: Record<string, { suggested_change: string; reason: string }> = {};
-        if (actionIds.length > 0) {
-          const { data: pRows } = await supabase
-            .from("action_queue")
-            .select("id,suggested_change,reason")
-            .in("id", actionIds);
-          parents = Object.fromEntries(
-            (pRows ?? []).map((p) => [p.id, { suggested_change: p.suggested_change, reason: p.reason }]),
-          );
-        }
-
-        const eventItems: RecentItem[] = (eventsRes.data ?? []).map((e) => {
-          const parent = parents[e.action_queue_id];
-          return {
-            id: `event-${e.id}`,
-            kind: "action_event",
-            ts: e.created_at,
-            title: `${e.event_type}${parent ? `: ${parent.suggested_change}` : ""}`,
-            detail: e.note ?? parent?.reason ?? null,
-            href: `/actions/${e.action_queue_id}`,
-          };
-        });
-
-        const merged = [...diaryItems, ...eventItems].sort(
-          (a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime(),
-        );
-        setRecent({ status: "ok", items: merged });
-      }
-    } catch {
-      setRecent({ status: "unavailable" });
-    }
-
-    // Grow Status — derived from existing read-only data only.
-    // NOT AI diagnosis. No ai-coach call. No device control.
-    try {
-      let highestRisk: GrowStatus["highestRisk"] = "none";
-      const { data: riskRows, error: riskErr } = await supabase
-        .from("action_queue")
-        .select("risk_level")
-        .eq("grow_id", growId)
-        .eq("status", "pending_approval")
-        .limit(50);
-      if (riskErr) {
-        highestRisk = "unknown";
-      } else {
-        const order = { critical: 4, high: 3, medium: 2, low: 1 } as const;
-        let top = 0;
-        for (const r of riskRows ?? []) {
-          const v = order[(r.risk_level ?? "low") as keyof typeof order] ?? 0;
-          if (v > top) top = v;
-        }
-        highestRisk = top === 4 ? "critical" : top === 3 ? "high" : top === 2 ? "medium" : top === 1 ? "low" : "none";
-      }
-
-      const { data: lastDiaryRows, error: lastDiaryErr } = await supabase
-        .from("diary_entries")
-        .select("entry_at")
-        .eq("grow_id", growId)
-        .order("entry_at", { ascending: false })
-        .limit(1);
-      const lastDiaryAt = lastDiaryErr ? null : (lastDiaryRows?.[0]?.entry_at ?? null);
-
-      const pending = actionsPending;
-      const countsUnavailable = pending === "unavailable";
-      const ageDays = lastDiaryAt ? (Date.now() - new Date(lastDiaryAt).getTime()) / 86400000 : null;
-
-      let level: StatusLevel;
-      let reason: string;
-      if (countsUnavailable && highestRisk === "unknown") {
-        level = "unavailable";
-        reason = "Status unavailable";
-      } else if (highestRisk === "critical" || highestRisk === "high") {
-        level = "needs_review";
-        reason = `Pending action at ${highestRisk} risk needs review`;
-      } else if (typeof pending === "number" && pending > 0) {
-        level = "watch";
-        reason = `${pending} pending action${pending === 1 ? "" : "s"} awaiting approval`;
-      } else if (ageDays === null) {
-        level = "watch";
-        reason = "No diary entries yet";
-      } else if (ageDays > 7) {
-        level = "watch";
-        reason = `Last diary entry ${Math.floor(ageDays)} days ago`;
-      } else {
-        level = "good";
-        reason = "No pending actions, recent diary activity";
-      }
-
-      setStatus({ level, reason, pending, highestRisk, lastDiaryAt });
-    } catch {
-      setStatus({
-        level: "unavailable",
-        reason: "Status unavailable",
-        pending: "unavailable",
-        highestRisk: "unknown",
-        lastDiaryAt: null,
-      });
-    }
-
-    setLoading(false);
-  }, [user, growId]);
-
-
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-
+  const { grow, loading, notFound, counts, recent, status } = useGrowDetailData();
 
   if (loading) {
     return (
@@ -330,8 +72,6 @@ export default function GrowDetail() {
       </header>
 
       <GrowStatusCard status={status} />
-
-
 
       <section className="grid grid-cols-1 sm:grid-cols-2 gap-3" aria-label="Grow hub links">
         <HubLink
@@ -412,9 +152,7 @@ export default function GrowDetail() {
           </ul>
         )}
       </section>
-
     </div>
-
   );
 }
 
@@ -436,10 +174,6 @@ function Field({ label, value, mono }: { label: string; value: string; mono?: bo
       <dd className={mono ? "font-mono text-[11px] break-all" : ""}>{value}</dd>
     </div>
   );
-}
-
-function formatCount(c: CountValue): string {
-  return c === "unavailable" ? "Unavailable" : String(c);
 }
 
 function HubLink({
@@ -475,7 +209,8 @@ function HubLink({
 }
 
 /**
- * Read-only status card. Derived from existing data; NOT an AI diagnosis.
+ * Read-only status card. Status is derived in @/lib/growStatus.deriveStatus;
+ * this component only renders. NOT an AI diagnosis.
  */
 function GrowStatusCard({ status }: { status: GrowStatus }) {
   const labelMap: Record<StatusLevel, string> = {
@@ -541,5 +276,3 @@ function GrowStatusCard({ status }: { status: GrowStatus }) {
     </section>
   );
 }
-
-

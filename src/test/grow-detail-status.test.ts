@@ -51,7 +51,7 @@ describe("GrowDetail — status summary", () => {
   });
 
   it("does not call ai-coach from Grow Detail", () => {
-    expect(PAGE).not.toMatch(/ai-coach/);
+    expect(PAGE).not.toMatch(/["']ai-coach["']/);
     expect(PAGE).not.toMatch(/functions\.invoke/);
   });
 

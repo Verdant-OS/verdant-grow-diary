@@ -44,7 +44,10 @@ function entryKinds(e: Entry): EventFilter[] {
 
 export default function Timeline() {
   const { user } = useAuth();
-  const { activeGrow, activeGrowId, grows, loading: growsLoading } = useGrows();
+  const { activeGrow, activeGrowId: storeGrowId, grows, loading: growsLoading } = useGrows();
+  const [searchParams] = useSearchParams();
+  const urlGrowId = searchParams.get("growId");
+  const activeGrowId = urlGrowId ?? storeGrowId;
   const [entries, setEntries] = useState<Entry[]>([]);
   const [actionEvents, setActionEvents] = useState<ActionQueueEvent[]>([]);
   const [loading, setLoading] = useState(true);

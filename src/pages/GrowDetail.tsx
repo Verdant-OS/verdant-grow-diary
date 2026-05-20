@@ -204,8 +204,76 @@ export default function GrowDetail() {
       setRecent({ status: "unavailable" });
     }
 
+    // Grow Status — derived from existing read-only data only.
+    // NOT AI diagnosis. No ai-coach call. No device control.
+    try {
+      let highestRisk: GrowStatus["highestRisk"] = "none";
+      const { data: riskRows, error: riskErr } = await supabase
+        .from("action_queue")
+        .select("risk_level")
+        .eq("grow_id", growId)
+        .eq("status", "pending_approval")
+        .limit(50);
+      if (riskErr) {
+        highestRisk = "unknown";
+      } else {
+        const order = { critical: 4, high: 3, medium: 2, low: 1 } as const;
+        let top = 0;
+        for (const r of riskRows ?? []) {
+          const v = order[(r.risk_level ?? "low") as keyof typeof order] ?? 0;
+          if (v > top) top = v;
+        }
+        highestRisk = top === 4 ? "critical" : top === 3 ? "high" : top === 2 ? "medium" : top === 1 ? "low" : "none";
+      }
+
+      const { data: lastDiaryRows, error: lastDiaryErr } = await supabase
+        .from("diary_entries")
+        .select("entry_at")
+        .eq("grow_id", growId)
+        .order("entry_at", { ascending: false })
+        .limit(1);
+      const lastDiaryAt = lastDiaryErr ? null : (lastDiaryRows?.[0]?.entry_at ?? null);
+
+      const pending = actionsPending;
+      const countsUnavailable = pending === "unavailable";
+      const ageDays = lastDiaryAt ? (Date.now() - new Date(lastDiaryAt).getTime()) / 86400000 : null;
+
+      let level: StatusLevel;
+      let reason: string;
+      if (countsUnavailable && highestRisk === "unknown") {
+        level = "unavailable";
+        reason = "Status unavailable";
+      } else if (highestRisk === "critical" || highestRisk === "high") {
+        level = "needs_review";
+        reason = `Pending action at ${highestRisk} risk needs review`;
+      } else if (typeof pending === "number" && pending > 0) {
+        level = "watch";
+        reason = `${pending} pending action${pending === 1 ? "" : "s"} awaiting approval`;
+      } else if (ageDays === null) {
+        level = "watch";
+        reason = "No diary entries yet";
+      } else if (ageDays > 7) {
+        level = "watch";
+        reason = `Last diary entry ${Math.floor(ageDays)} days ago`;
+      } else {
+        level = "good";
+        reason = "No pending actions, recent diary activity";
+      }
+
+      setStatus({ level, reason, pending, highestRisk, lastDiaryAt });
+    } catch {
+      setStatus({
+        level: "unavailable",
+        reason: "Status unavailable",
+        pending: "unavailable",
+        highestRisk: "unknown",
+        lastDiaryAt: null,
+      });
+    }
+
     setLoading(false);
   }, [user, growId]);
+
 
 
   useEffect(() => {

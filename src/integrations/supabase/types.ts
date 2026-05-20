@@ -472,6 +472,7 @@ export type Database = {
       plants: {
         Row: {
           created_at: string
+          grow_id: string | null
           health: string
           id: string
           is_archived: boolean
@@ -488,6 +489,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          grow_id?: string | null
           health?: string
           id?: string
           is_archived?: boolean
@@ -504,6 +506,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          grow_id?: string | null
           health?: string
           id?: string
           is_archived?: boolean
@@ -518,7 +521,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "plants_grow_id_fkey"
+            columns: ["grow_id"]
+            isOneToOne: false
+            referencedRelation: "grows"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -593,6 +604,7 @@ export type Database = {
         Row: {
           brand: string | null
           created_at: string
+          grow_id: string | null
           id: string
           is_archived: boolean
           light_on: boolean
@@ -608,6 +620,7 @@ export type Database = {
         Insert: {
           brand?: string | null
           created_at?: string
+          grow_id?: string | null
           id?: string
           is_archived?: boolean
           light_on?: boolean
@@ -623,6 +636,7 @@ export type Database = {
         Update: {
           brand?: string | null
           created_at?: string
+          grow_id?: string | null
           id?: string
           is_archived?: boolean
           light_on?: boolean
@@ -635,7 +649,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tents_grow_id_fkey"
+            columns: ["grow_id"]
+            isOneToOne: false
+            referencedRelation: "grows"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       training_events: {
         Row: {

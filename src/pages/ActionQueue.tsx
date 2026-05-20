@@ -92,8 +92,7 @@ const RISK_RANK: Record<ActionRow["risk_level"], number> = {
 
 export default function ActionQueue() {
   const { user } = useAuth();
-  const { activeGrowId, activeGrow, grows } = useGrows();
-  const [searchParams] = useSearchParams();
+  const { activeGrowId, activeGrow } = useGrows();
   // Shared URL `?growId=` resolution against RLS-loaded grows. urlGrowId precedence
   // over activeGrowId is preserved exactly as before.
   const { urlGrowId, scopedGrowName, backHref } = useScopedGrow();

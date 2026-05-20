@@ -130,6 +130,7 @@ const DIALOG_META: Record<Kind, { title: string; description: string; label: str
 export default function ActionDetail() {
   const { actionId } = useParams<{ actionId: string }>();
   const { user } = useAuth();
+  const { grows } = useGrows();
   const [row, setRow] = useState<ActionRow | null>(null);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);

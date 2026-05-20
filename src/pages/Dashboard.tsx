@@ -20,6 +20,8 @@ import {
   formatValue,
   isStale,
 } from "@/lib/sensorSnapshot";
+import { evaluateSensorQuality } from "@/lib/sensorQuality";
+
 
 import type { SensorReadingRow } from "@/lib/db";
 import { Button } from "@/components/ui/button";

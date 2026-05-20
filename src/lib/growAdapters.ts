@@ -27,6 +27,7 @@ export function mapTentRow(row: TentRow): Tent {
       wattage: row.light_wattage ?? 0,
     },
     alertCount: 0, // alerts are out of scope for Phase 1; default to 0.
+    growId: (row as { grow_id?: string | null }).grow_id ?? null,
   };
 }
 

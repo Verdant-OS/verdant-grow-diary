@@ -62,6 +62,21 @@ type RecentState =
   | { status: "ok"; items: RecentItem[] }
   | { status: "unavailable" };
 
+/**
+ * Grow Status summary — derived strictly from existing read-only data
+ * (pending action counts, pending risk levels, latest diary timestamp).
+ * NOT an AI diagnosis. No ai-coach call. No writes. No device control.
+ */
+type StatusLevel = "good" | "watch" | "needs_review" | "unavailable";
+
+interface GrowStatus {
+  level: StatusLevel;
+  reason: string;
+  pending: CountValue;
+  highestRisk: "low" | "medium" | "high" | "critical" | "none" | "unknown";
+  lastDiaryAt: string | null;
+}
+
 
 export default function GrowDetail() {
   const { growId } = useParams<{ growId: string }>();
@@ -71,6 +86,13 @@ export default function GrowDetail() {
   const [notFound, setNotFound] = useState(false);
   const [counts, setCounts] = useState<GrowCounts>(EMPTY_COUNTS);
   const [recent, setRecent] = useState<RecentState>({ status: "loading" });
+  const [status, setStatus] = useState<GrowStatus>({
+    level: "good",
+    reason: "Loading…",
+    pending: 0,
+    highestRisk: "none",
+    lastDiaryAt: null,
+  });
 
 
 
@@ -182,8 +204,76 @@ export default function GrowDetail() {
       setRecent({ status: "unavailable" });
     }
 
+    // Grow Status — derived from existing read-only data only.
+    // NOT AI diagnosis. No ai-coach call. No device control.
+    try {
+      let highestRisk: GrowStatus["highestRisk"] = "none";
+      const { data: riskRows, error: riskErr } = await supabase
+        .from("action_queue")
+        .select("risk_level")
+        .eq("grow_id", growId)
+        .eq("status", "pending_approval")
+        .limit(50);
+      if (riskErr) {
+        highestRisk = "unknown";
+      } else {
+        const order = { critical: 4, high: 3, medium: 2, low: 1 } as const;
+        let top = 0;
+        for (const r of riskRows ?? []) {
+          const v = order[(r.risk_level ?? "low") as keyof typeof order] ?? 0;
+          if (v > top) top = v;
+        }
+        highestRisk = top === 4 ? "critical" : top === 3 ? "high" : top === 2 ? "medium" : top === 1 ? "low" : "none";
+      }
+
+      const { data: lastDiaryRows, error: lastDiaryErr } = await supabase
+        .from("diary_entries")
+        .select("entry_at")
+        .eq("grow_id", growId)
+        .order("entry_at", { ascending: false })
+        .limit(1);
+      const lastDiaryAt = lastDiaryErr ? null : (lastDiaryRows?.[0]?.entry_at ?? null);
+
+      const pending = actionsPending;
+      const countsUnavailable = pending === "unavailable";
+      const ageDays = lastDiaryAt ? (Date.now() - new Date(lastDiaryAt).getTime()) / 86400000 : null;
+
+      let level: StatusLevel;
+      let reason: string;
+      if (countsUnavailable && highestRisk === "unknown") {
+        level = "unavailable";
+        reason = "Status unavailable";
+      } else if (highestRisk === "critical" || highestRisk === "high") {
+        level = "needs_review";
+        reason = `Pending action at ${highestRisk} risk needs review`;
+      } else if (typeof pending === "number" && pending > 0) {
+        level = "watch";
+        reason = `${pending} pending action${pending === 1 ? "" : "s"} awaiting approval`;
+      } else if (ageDays === null) {
+        level = "watch";
+        reason = "No diary entries yet";
+      } else if (ageDays > 7) {
+        level = "watch";
+        reason = `Last diary entry ${Math.floor(ageDays)} days ago`;
+      } else {
+        level = "good";
+        reason = "No pending actions, recent diary activity";
+      }
+
+      setStatus({ level, reason, pending, highestRisk, lastDiaryAt });
+    } catch {
+      setStatus({
+        level: "unavailable",
+        reason: "Status unavailable",
+        pending: "unavailable",
+        highestRisk: "unknown",
+        lastDiaryAt: null,
+      });
+    }
+
     setLoading(false);
   }, [user, growId]);
+
 
 
   useEffect(() => {
@@ -238,6 +328,10 @@ export default function GrowDetail() {
           <Field label="Grow ID" value={grow.id} mono />
         </dl>
       </header>
+
+      <GrowStatusCard status={status} />
+
+
 
       <section className="grid grid-cols-1 sm:grid-cols-2 gap-3" aria-label="Grow hub links">
         <HubLink
@@ -379,4 +473,73 @@ function HubLink({
     </Link>
   );
 }
+
+/**
+ * Read-only status card. Derived from existing data; NOT an AI diagnosis.
+ */
+function GrowStatusCard({ status }: { status: GrowStatus }) {
+  const labelMap: Record<StatusLevel, string> = {
+    good: "Good",
+    watch: "Watch",
+    needs_review: "Needs Review",
+    unavailable: "Status unavailable",
+  };
+  const toneMap: Record<StatusLevel, string> = {
+    good: "bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30",
+    watch: "bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))] border-[hsl(var(--warning))]/30",
+    needs_review: "bg-destructive/15 text-destructive border-destructive/30",
+    unavailable: "bg-muted text-muted-foreground border-border/40",
+  };
+  const pendingNum = typeof status.pending === "number" ? status.pending : 0;
+  return (
+    <section
+      className="glass rounded-2xl p-4 mb-4"
+      aria-label="Grow status summary"
+      data-testid="grow-status-card"
+    >
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          Grow Status
+        </h2>
+        <span
+          className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${toneMap[status.level]}`}
+          data-testid="grow-status-level"
+        >
+          {labelMap[status.level]}
+        </span>
+      </div>
+      <p className="text-sm">{status.reason}</p>
+      <p className="text-[11px] text-muted-foreground mt-1">
+        Derived from your data — not an AI diagnosis.
+      </p>
+      <dl className="grid grid-cols-3 gap-2 mt-3 text-xs">
+        <div>
+          <dt className="text-muted-foreground uppercase tracking-wider text-[10px]">Pending</dt>
+          <dd>{formatCount(status.pending)}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground uppercase tracking-wider text-[10px]">Top risk</dt>
+          <dd className="capitalize">{status.highestRisk}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground uppercase tracking-wider text-[10px]">Last diary</dt>
+          <dd>
+            {status.lastDiaryAt ? new Date(status.lastDiaryAt).toLocaleDateString() : "—"}
+          </dd>
+        </div>
+      </dl>
+      <div className="flex gap-3 mt-3 text-xs">
+        {pendingNum > 0 && (
+          <Link to="/actions" className="text-primary hover:underline">
+            Review pending actions →
+          </Link>
+        )}
+        <Link to="/logs" className="text-primary hover:underline">
+          View Timeline →
+        </Link>
+      </div>
+    </section>
+  );
+}
+
 

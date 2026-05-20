@@ -273,6 +273,7 @@ export default function ActionDetail() {
         growName={growName}
         current="Action Detail"
         actionId={row.id}
+        section="action-detail"
       />
       <BackLink />
 

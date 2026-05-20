@@ -156,6 +156,7 @@ export default function Timeline() {
         growId={urlGrowId}
         growName={scopedGrowName}
         current={isLogsRoute ? "Logs" : "Timeline"}
+        section={isLogsRoute ? "logs" : "timeline"}
       />
       
       

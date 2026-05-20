@@ -310,7 +310,7 @@ export default function ActionQueue() {
 
   return (
     <div>
-      <GrowBreadcrumbs growId={urlGrowId} growName={scopedGrowName} current="Action Queue" />
+      <GrowBreadcrumbs growId={urlGrowId} growName={scopedGrowName} current="Action Queue" section="actions" />
       <div className="mb-5">
         <h1 className="text-2xl font-display font-bold flex items-center gap-2">
           <ListChecks className="h-5 w-5 text-primary" />

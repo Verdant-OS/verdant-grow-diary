@@ -50,7 +50,7 @@ export default function GrowDetail() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <GrowBreadcrumbs growId={grow.id} growName={grow.name} current={grow.name} />
+      <GrowBreadcrumbs growId={grow.id} growName={grow.name} current={grow.name} section="grow-detail" />
       <BackLink />
 
 

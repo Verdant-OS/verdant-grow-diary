@@ -99,6 +99,8 @@ export default function Dashboard() {
     tents.map((t) => t.id),
   );
   const targetsState = useGrowTargets(scopedGrowId ?? null);
+  const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);
+
 
 
 

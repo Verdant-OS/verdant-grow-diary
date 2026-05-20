@@ -15,6 +15,8 @@ import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useDashboardScopedData } from "@/hooks/useDashboardScopedData";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
+import { useEnvironmentTrends } from "@/hooks/useEnvironmentTrends";
+
 import {
   SOURCE_LABEL,
   formatValue,

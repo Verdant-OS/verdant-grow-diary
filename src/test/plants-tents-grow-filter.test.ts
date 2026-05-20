@@ -16,8 +16,8 @@ describe("Plants — grow filter", () => {
     expect(PLANTS).toMatch(/useSearchParams/);
     expect(PLANTS).toMatch(/searchParams\.get\(\s*["']growId["']\s*\)/);
   });
-  it("filters plants by growId when present", () => {
-    expect(PLANTS).toMatch(/plants\.filter\(\([^)]*\)\s*=>\s*[^)]*\.growId\s*===\s*growId\)/);
+  it("passes growId to the data hook (query-level filtering)", () => {
+    expect(PLANTS).toMatch(/useGrowPlants\([^)]*growId[^)]*\)/);
   });
   it("renders banner and clear link", () => {
     expect(PLANTS).toMatch(/Showing plants for this grow/);

@@ -20,6 +20,7 @@ export const timelinePath = (growId?: string | null): string => withGrowId("/tim
 export const plantsPath = (growId?: string | null): string => withGrowId("/plants", growId);
 export const tentsPath = (growId?: string | null): string => withGrowId("/tents", growId);
 export const actionsPath = (growId?: string | null): string => withGrowId("/actions", growId);
+export const dashboardPath = (growId?: string | null): string => withGrowId("/dashboard", growId);
 
 export const actionDetailPath = (actionId: string): string =>
   `/actions/${encodeURIComponent(actionId)}`;

@@ -174,14 +174,16 @@ export default function ActionDetail() {
     new_status: Status,
     note?: string,
   ): Promise<boolean> {
-    const { error } = await supabase.from("action_queue_events").insert({
-      action_queue_id: current.id,
-      grow_id: current.grow_id,
-      event_type,
-      previous_status: current.status,
-      new_status,
-      note: note ?? null,
-    });
+    const { error } = await supabase.from("action_queue_events").insert(
+      buildAuditEventPayload({
+        action_queue_id: current.id,
+        grow_id: current.grow_id,
+        event_type,
+        previous_status: current.status,
+        new_status,
+        note,
+      }),
+    );
     if (error) {
       toast.warning("Status updated, but audit log failed", { description: error.message });
       return false;
@@ -219,25 +221,18 @@ export default function ActionDetail() {
 
   async function confirmDialog() {
     if (!row || !dialog) return;
-    const trimmed = noteDraft.trim();
-    const note = trimmed.length ? trimmed : undefined;
+    const note = normalizeNote(noteDraft);
     const kind = dialog;
     setDialog(null);
     setNoteDraft("");
 
-    if (kind === "approve") {
-      await transition(row, { status: "approved", approved_at: new Date().toISOString() }, "approved", "approved", note);
-    } else if (kind === "reject") {
-      await transition(row, { status: "rejected", rejected_at: new Date().toISOString() }, "rejected", "rejected", note);
-    } else if (kind === "complete") {
-      await transition(row, { status: "completed", completed_at: new Date().toISOString() }, "completed", "completed", note);
-    } else if (kind === "cancel") {
-      await transition(row, { status: "cancelled" }, "cancelled", "cancelled", note);
-    } else {
+    if (kind === "simulate") {
       toast.message("Simulated (no device command sent)");
-      await transition(row, { status: "simulated" }, "simulated", "simulated", note);
     }
+    const patch = buildTransitionPatch(kind);
+    await transition(row, patch, eventTypeFor(kind), nextStatusFor(kind), note);
   }
+
 
   function cancelDialog() {
     setDialog(null);

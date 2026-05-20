@@ -68,6 +68,8 @@ export default function Dashboard() {
   const { data: rawReadings = [] } = useSensorReadings();
   const readings = groupReadings(rawReadings);
   const { data: insights = [] } = useAIInsights();
+  const { recent, pending } = useDashboardScopedData(scopedGrowId ?? null);
+
 
   const dueToday = tasks.filter((t) => t.status === "today").length;
   const openAlerts = alerts.filter((a) => !a.acknowledged).length;

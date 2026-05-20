@@ -9,6 +9,7 @@ import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import { useSensorReadings, usePlants } from "@/hooks/useMockData";
 import { useGrowTents } from "@/hooks/useGrowData";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
+import { tentsPath } from "@/lib/routes";
 
 export default function Tents() {
   // Shared URL `?growId=` resolution against RLS-loaded grows.

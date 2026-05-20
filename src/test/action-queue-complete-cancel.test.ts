@@ -9,28 +9,28 @@ describe("Action Queue complete/cancel transitions", () => {
     expect(src).toMatch(/"approve" \| "reject" \| "simulate" \| "complete" \| "cancel"/);
   });
 
-  it("blocks transitions on terminal statuses", () => {
-    expect(src).toMatch(/row\.status === "completed" \|\| row\.status === "rejected" \|\| row\.status === "cancelled"/);
+  it("blocks transitions on terminal statuses via shared isTerminalStatus", () => {
+    expect(src).toMatch(/isTerminalStatus\(row\.status\)/);
   });
 
-  it("complete branch sets status completed + completed_at and writes audit", () => {
-    expect(src).toMatch(/status: "completed", completed_at:/);
-    expect(src).toMatch(/"completed",\s*"completed",\s*note/);
+  it("complete branch builds patch with status completed + completed_at via shared helper", () => {
+    expect(src).toMatch(/buildTransitionPatch\(kind\)/);
+    expect(src).toMatch(/from "@\/lib\/actionQueueTransitions"/);
   });
 
-  it("cancel branch sets status cancelled and writes audit", () => {
-    expect(src).toMatch(/\{ status: "cancelled" \}/);
-    expect(src).toMatch(/"cancelled",\s*"cancelled",\s*note/);
+  it("cancel transition uses shared eventTypeFor/nextStatusFor", () => {
+    expect(src).toMatch(/eventTypeFor\(kind\)/);
+    expect(src).toMatch(/nextStatusFor\(kind\)/);
   });
 
-  it("Mark Complete is gated to approved/simulated rows", () => {
-    expect(src).toMatch(/canComplete = \(s: Status\) => s === "approved" \|\| s === "simulated"/);
+  it("Mark Complete is gated via shared canComplete", () => {
+    expect(src).toMatch(/import \{[\s\S]*?canComplete[\s\S]*?\} from "@\/lib\/actionQueueTransitions"/);
     expect(src).toMatch(/canComplete\(row\.status\) && \(/);
     expect(src).toMatch(/Mark Complete/);
   });
 
-  it("Cancel is gated to pending/simulated/approved rows", () => {
-    expect(src).toMatch(/canCancel = \(s: Status\) =>[\s\S]*?"pending_approval"[\s\S]*?"approved"[\s\S]*?"simulated"/);
+  it("Cancel is gated via shared canCancel", () => {
+    expect(src).toMatch(/import \{[\s\S]*?canCancel[\s\S]*?\} from "@\/lib\/actionQueueTransitions"/);
     expect(src).toMatch(/canCancel\(row\.status\) && \(/);
   });
 

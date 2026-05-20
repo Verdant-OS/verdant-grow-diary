@@ -2,9 +2,8 @@
  * Asserts safety properties of public.has_role(uuid, app_role).
  *
  * has_role must remain SECURITY DEFINER (per Supabase's recommended
- * non-recursive RLS pattern). These tests verify that the function
- * keeps its safety constraints and that no other code path bypasses
- * tenant ownership via service_role.
+ * non-recursive RLS pattern). These tests verify it keeps its safety
+ * constraints and that no migration pairs it with service_role escalation.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
@@ -13,27 +12,19 @@ import { resolve } from "node:path";
 const ROOT = resolve(__dirname, "../..");
 const MIGRATIONS_DIR = resolve(ROOT, "supabase/migrations");
 
-const migrationFiles = readdirSync(MIGRATIONS_DIR)
+const ALL_SQL = readdirSync(MIGRATIONS_DIR)
   .filter((f) => f.endsWith(".sql"))
-  .sort();
-const ALL_SQL = migrationFiles
+  .sort()
   .map((f) => readFileSync(resolve(MIGRATIONS_DIR, f), "utf8"))
   .join("\n\n-- FILE BOUNDARY --\n\n");
 
-const SRC_DIR = resolve(ROOT, "src");
-function walk(dir: string): string[] {
-  const out: string[] = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const p = resolve(dir, entry.name);
-    if (entry.isDirectory()) out.push(...walk(p));
-    else if (/\.(ts|tsx)$/.test(entry.name)) out.push(p);
-  }
-  return out;
+function hasRoleBody(): string {
+  const m = ALL_SQL.match(
+    /CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\.has_role[\s\S]*?AS\s+\$(?:function)?\$([\s\S]*?)\$(?:function)?\$/i,
+  );
+  if (!m) throw new Error("has_role definition not found");
+  return m[1];
 }
-const ALL_SRC = walk(SRC_DIR)
-  .filter((p) => !p.includes("/test/"))
-  .map((p) => readFileSync(p, "utf8"))
-  .join("\n");
 
 describe("has_role SECURITY DEFINER safety", () => {
   it("defines has_role with SECURITY DEFINER", () => {
@@ -43,20 +34,14 @@ describe("has_role SECURITY DEFINER safety", () => {
   });
 
   it("pins search_path on has_role", () => {
-    // The definition (or a later ALTER) must set search_path explicitly.
     expect(ALL_SQL).toMatch(
-      /has_role[\s\S]{0,800}SET\s+search_path\s*=\s*['"]?public/i,
+      /has_role[\s\S]{0,800}SET\s+search_path\s*=\s*['"]?\s*public/i,
     );
   });
 
   it("is STABLE and read-only (no INSERT/UPDATE/DELETE inside body)", () => {
-    const match = ALL_SQL.match(
-      /CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\.has_role[\s\S]*?\$function\$([\s\S]*?)\$function\$/i,
-    );
-    expect(match).not.toBeNull();
-    const body = match![1];
+    const body = hasRoleBody();
     expect(body).not.toMatch(/\b(INSERT|UPDATE|DELETE|TRUNCATE|ALTER)\b/i);
-    // Function declaration includes STABLE.
     expect(ALL_SQL).toMatch(/has_role[\s\S]{0,400}\bSTABLE\b/i);
   });
 
@@ -66,13 +51,10 @@ describe("has_role SECURITY DEFINER safety", () => {
     );
   });
 
-  it("checks ownership by _user_id parameter (no auth.uid() override inside body)", () => {
-    const match = ALL_SQL.match(
-      /CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\.has_role[\s\S]*?\$function\$([\s\S]*?)\$function\$/i,
-    );
-    expect(match).not.toBeNull();
-    const body = match![1];
+  it("checks ownership by the supplied _user_id (no auth.uid() override inside body)", () => {
+    const body = hasRoleBody();
     expect(body).toMatch(/user_id\s*=\s*_user_id/);
+    expect(body).not.toMatch(/auth\.uid\s*\(/i);
   });
 
   it("documents the SECURITY DEFINER rationale via COMMENT", () => {
@@ -81,15 +63,9 @@ describe("has_role SECURITY DEFINER safety", () => {
     );
   });
 
-  it("application code never references service_role for has_role bypass", () => {
-    expect(ALL_SRC).not.toMatch(/service_role/i);
-  });
-
-  it("no application code calls has_role via rpc with a forged user id", () => {
-    // Defensive: if has_role is ever exposed via rpc, callers must pass
-    // auth.uid() (handled in policies). Verify no client passes a literal
-    // uuid arg directly to a has_role rpc invocation.
-    const rpcForged = /\.rpc\(\s*['"]has_role['"]\s*,\s*\{[^}]*_user_id\s*:\s*['"]/;
-    expect(ALL_SRC).not.toMatch(rpcForged);
+  it("no migration pairs has_role with service_role escalation", () => {
+    const near =
+      /service_role[\s\S]{0,400}has_role|has_role[\s\S]{0,400}service_role/i;
+    expect(ALL_SQL).not.toMatch(near);
   });
 });

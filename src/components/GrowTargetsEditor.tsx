@@ -139,17 +139,19 @@ export default function GrowTargetsEditor({
       return;
     }
     setSaving(true);
-    const payload: Record<string, number | string | null> = {
+    const payload = {
       grow_id: growId,
       user_id: user.id,
-    };
+    } as Record<string, unknown>;
     for (const f of FIELDS) {
       payload[`${f.key}_min`] = parseField(form[`${f.key}_min`]);
       payload[`${f.key}_max`] = parseField(form[`${f.key}_max`]);
     }
     const { error } = await supabase
       .from("grow_targets")
-      .upsert(payload, { onConflict: "grow_id" });
+      // upsert with onConflict on the unique grow_id constraint
+      .upsert(payload as never, { onConflict: "grow_id" });
+
     setSaving(false);
     if (error) {
       toast({ title: "Could not save targets", description: error.message });

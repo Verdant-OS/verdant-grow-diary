@@ -76,6 +76,11 @@ export default function Dashboard() {
   const readings = groupReadings(rawReadings);
   const { data: insights = [] } = useAIInsights();
   const { recent, pending } = useDashboardScopedData(scopedGrowId ?? null);
+  const sensorState = useLatestSensorSnapshot(
+    scopedGrowId ?? null,
+    tents.map((t) => t.id),
+  );
+
 
 
   const dueToday = tasks.filter((t) => t.status === "today").length;

@@ -25,3 +25,6 @@ export const alertsPath = (growId?: string | null): string => withGrowId("/alert
 
 export const actionDetailPath = (actionId: string): string =>
   `/actions/${encodeURIComponent(actionId)}`;
+
+export const alertDetailPath = (alertId: string): string =>
+  `/alerts/${encodeURIComponent(alertId)}`;

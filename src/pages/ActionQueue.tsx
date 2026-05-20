@@ -90,7 +90,7 @@ const RISK_RANK: Record<ActionRow["risk_level"], number> = {
 
 export default function ActionQueue() {
   const { user } = useAuth();
-  const { activeGrowId, activeGrow } = useGrows();
+  const { activeGrowId, activeGrow, grows } = useGrows();
   const [searchParams] = useSearchParams();
   const urlGrowId = searchParams.get("growId");
   // URL growId takes precedence over active grow. RLS still enforces ownership.
@@ -318,17 +318,31 @@ export default function ActionQueue() {
         </p>
       </div>
 
-      {urlGrowId && (
-        <div
-          className="glass rounded-2xl p-3 mb-4 flex items-center justify-between gap-3 text-sm"
-          aria-label="Grow filter banner"
-        >
-          <span>Showing actions for this grow</span>
-          <Link to="/actions" className="text-primary hover:underline">
-            Clear grow filter
-          </Link>
-        </div>
-      )}
+      {urlGrowId && (() => {
+        const scopedGrow = grows.find((g) => g.id === urlGrowId) ?? null;
+        return (
+          <div
+            className="glass rounded-2xl p-3 mb-4 flex items-center justify-between gap-3 text-sm flex-wrap"
+            aria-label="Grow filter banner"
+          >
+            {scopedGrow ? (
+              <span>Showing actions for <span className="font-medium">{scopedGrow.name}</span></span>
+            ) : (
+              <span>Showing actions for this grow</span>
+            )}
+            <span className="flex items-center gap-3">
+              {scopedGrow && (
+                <Link to={`/grows/${scopedGrow.id}`} className="text-primary hover:underline">
+                  Back to Grow
+                </Link>
+              )}
+              <Link to="/actions" className="text-primary hover:underline">
+                Clear grow filter
+              </Link>
+            </span>
+          </div>
+        );
+      })()}
 
       <div
         className="glass rounded-2xl p-3 mb-4 flex flex-wrap gap-2"

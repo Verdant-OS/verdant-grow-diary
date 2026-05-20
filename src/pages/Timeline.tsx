@@ -185,12 +185,24 @@ export default function Timeline() {
         </div>
       )}
 
-      {urlGrowId && (
-        <div className="glass rounded-2xl px-4 py-2 mb-4 flex items-center justify-between text-xs" aria-label="Grow filter banner">
-          <span className="text-muted-foreground">Showing {scopeLabel} for this grow</span>
-          <Link to={clearTo} className="text-primary hover:underline">Clear grow filter</Link>
-        </div>
-      )}
+      {urlGrowId && (() => {
+        const scopedGrow = grows.find((g) => g.id === urlGrowId) ?? null;
+        return (
+          <div className="glass rounded-2xl px-4 py-2 mb-4 flex items-center justify-between text-xs gap-2 flex-wrap" aria-label="Grow filter banner">
+            {scopedGrow ? (
+              <span className="text-muted-foreground">Showing {scopeLabel} for <span className="text-foreground font-medium">{scopedGrow.name}</span></span>
+            ) : (
+              <span className="text-muted-foreground">Showing {scopeLabel} for this grow</span>
+            )}
+            <span className="flex items-center gap-3">
+              {scopedGrow && (
+                <Link to={`/grows/${scopedGrow.id}`} className="text-primary hover:underline">Back to Grow</Link>
+              )}
+              <Link to={clearTo} className="text-primary hover:underline">Clear grow filter</Link>
+            </span>
+          </div>
+        );
+      })()}
 
       {/* Filters */}
       <div className="space-y-2 mb-4">

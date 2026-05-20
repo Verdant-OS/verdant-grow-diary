@@ -326,7 +326,7 @@ export default function ActionQueue() {
           growId={urlGrowId}
           growName={scopedGrowName}
           label="actions"
-          clearHref="/actions"
+          clearHref={actionsPath()}
           backHref={backHref}
         />
       )}

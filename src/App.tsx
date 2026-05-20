@@ -51,6 +51,7 @@ const App = () => (
                 <Route path="/alerts" element={<Alerts />} />
                 <Route path="/doctor" element={<Coach />} />
                 <Route path="/actions" element={<ActionQueue />} />
+                <Route path="/actions/:actionId" element={<ActionDetail />} />
                 <Route path="/grow-lineage" element={<GrowLineageRepair />} />
                 <Route path="/grows" element={<Grows />} />
                 <Route path="/settings" element={<Settings />} />

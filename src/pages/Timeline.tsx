@@ -393,6 +393,14 @@ function ActionQueueEventsSection({ events }: { events: ActionQueueEvent[] }) {
               >
                 {formatDistanceToNow(new Date(e.created_at), { addSuffix: true })}
               </span>
+              {e.action_queue_id && (
+                <Link
+                  to={`/actions/${e.action_queue_id}`}
+                  className="text-[11px] text-primary hover:underline"
+                >
+                  View Details
+                </Link>
+              )}
             </div>
             {e.action?.suggested_change && (
               <p className="text-sm mt-2">{e.action.suggested_change}</p>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
@@ -452,6 +453,12 @@ export default function ActionQueue() {
                       <Ban className="h-4 w-4" /> Cancel
                     </Button>
                   )}
+                  <Link
+                    to={`/actions/${row.id}`}
+                    className="ml-auto text-xs text-primary hover:underline self-center"
+                  >
+                    View Details
+                  </Link>
                 </div>
                 <EventHistory items={events[row.id]} />
               </li>
@@ -489,6 +496,12 @@ export default function ActionQueue() {
                       <Ban className="h-3.5 w-3.5" /> Cancel
                     </Button>
                   )}
+                  <Link
+                    to={`/actions/${row.id}`}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    View Details
+                  </Link>
                 </div>
                 <EventHistory items={events[row.id]} />
               </li>

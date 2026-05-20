@@ -134,3 +134,78 @@ export async function listAlerts(query: AlertsQuery = {}): Promise<AlertRow[]> {
   if (error) throw error;
   return (data ?? []) as unknown as AlertRow[];
 }
+
+// ---------------------------------------------------------------------------
+// Alert events — immutable audit trail (append-only)
+// ---------------------------------------------------------------------------
+
+export type AlertEventType =
+  | "created"
+  | "acknowledged"
+  | "resolved"
+  | "dismissed"
+  | "reopened";
+
+export interface AlertEventRow {
+  id: string;
+  user_id: string;
+  alert_id: string;
+  grow_id: string;
+  event_type: AlertEventType;
+  previous_status: AlertStatusRow | null;
+  new_status: AlertStatusRow | null;
+  note: string | null;
+  created_at: string;
+}
+
+export interface LogAlertEventInput {
+  alert_id: string;
+  grow_id: string;
+  event_type: AlertEventType;
+  previous_status?: AlertStatusRow | null;
+  new_status?: AlertStatusRow | null;
+  note?: string | null;
+}
+
+function alertEventsTable() {
+  return (supabase as unknown as {
+    from: (t: string) => ReturnType<typeof supabase.from>;
+  }).from("alert_events");
+}
+
+/**
+ * Append an immutable audit row. user_id is intentionally omitted; the DB
+ * default (auth.uid()) plus RLS enforce ownership. Never updates or deletes.
+ */
+export async function logAlertEvent(
+  input: LogAlertEventInput,
+): Promise<AlertEventRow> {
+  const payload = {
+    alert_id: input.alert_id,
+    grow_id: input.grow_id,
+    event_type: input.event_type,
+    previous_status: input.previous_status ?? null,
+    new_status: input.new_status ?? null,
+    note: input.note ?? null,
+  };
+  const { data, error } = await alertEventsTable()
+    .insert(payload)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as unknown as AlertEventRow;
+}
+
+/** Read recent audit events for an alert (newest first). RLS enforces ownership. */
+export async function listAlertEvents(
+  alertId: string,
+  limit = 20,
+): Promise<AlertEventRow[]> {
+  const { data, error } = await alertEventsTable()
+    .select("*")
+    .eq("alert_id", alertId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []) as unknown as AlertEventRow[];
+}

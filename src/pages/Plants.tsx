@@ -9,6 +9,7 @@ import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import { useTents } from "@/hooks/useMockData";
 import { useGrowPlants } from "@/hooks/useGrowData";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
+import { plantsPath } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
 export default function Plants() {

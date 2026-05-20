@@ -47,7 +47,7 @@ function entryKinds(e: Entry): EventFilter[] {
 export default function Timeline() {
   const { user } = useAuth();
   const { activeGrow, activeGrowId: storeGrowId, grows, loading: growsLoading, setActiveGrowId } = useGrows();
-  const [searchParams] = useSearchParams();
+  
   const { pathname } = useLocation();
   // Shared URL `?growId=` resolution. urlGrowId is preserved as the source of truth
   // for filter precedence; scopedGrowName/backHref come from the same hook.

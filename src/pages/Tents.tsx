@@ -9,12 +9,11 @@ import { useSensorReadings, usePlants } from "@/hooks/useMockData";
 import { useGrowTents } from "@/hooks/useGrowData";
 
 export default function Tents() {
-  const { data: allTents = [], isLoading } = useGrowTents();
-  const { data: readings = [] } = useSensorReadings();
-  const { data: plants = [] } = usePlants();
   const [searchParams] = useSearchParams();
   const growId = searchParams.get("growId");
-  const tents = growId ? allTents.filter((t) => t.growId === growId) : allTents;
+  const { data: tents = [], isLoading } = useGrowTents(growId ?? undefined);
+  const { data: readings = [] } = useSensorReadings();
+  const { data: plants = [] } = usePlants();
 
   return (
     <div>

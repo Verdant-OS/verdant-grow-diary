@@ -16,8 +16,8 @@ describe("Plants — grow filter", () => {
     expect(PLANTS).toMatch(/useSearchParams/);
     expect(PLANTS).toMatch(/searchParams\.get\(\s*["']growId["']\s*\)/);
   });
-  it("filters plants by growId when present", () => {
-    expect(PLANTS).toMatch(/plants\.filter\(\([^)]*\)\s*=>\s*[^)]*\.growId\s*===\s*growId\)/);
+  it("passes growId to the data hook (query-level filtering)", () => {
+    expect(PLANTS).toMatch(/useGrowPlants\([^)]*growId[^)]*\)/);
   });
   it("renders banner and clear link", () => {
     expect(PLANTS).toMatch(/Showing plants for this grow/);
@@ -35,8 +35,8 @@ describe("Tents — grow filter", () => {
     expect(TENTS).toMatch(/useSearchParams/);
     expect(TENTS).toMatch(/searchParams\.get\(\s*["']growId["']\s*\)/);
   });
-  it("filters tents by growId when present", () => {
-    expect(TENTS).toMatch(/allTents\.filter\(\([^)]*\)\s*=>\s*[^)]*\.growId\s*===\s*growId\)/);
+  it("passes growId to the data hook (query-level filtering)", () => {
+    expect(TENTS).toMatch(/useGrowTents\([^)]*growId[^)]*\)/);
   });
   it("renders banner and clear link", () => {
     expect(TENTS).toMatch(/Showing tents for this grow/);
@@ -60,5 +60,19 @@ describe("Adapters expose growId", () => {
   it("mapTentRow and mapPlantRow include growId", () => {
     expect(ADAPTERS).toMatch(/mapTentRow[\s\S]*?growId:/);
     expect(ADAPTERS).toMatch(/mapPlantRow[\s\S]*?growId:/);
+  });
+});
+
+import { readFileSync as _rfs } from "node:fs";
+const REPO = _rfs(resolve(ROOT, "src/lib/growRepo.ts"), "utf8");
+
+describe("growRepo — query-level grow filtering", () => {
+  it("fetchTents adds .eq('grow_id', growId) when growId provided", () => {
+    expect(REPO).toMatch(/fetchTents\(growId\?:\s*string\)/);
+    expect(REPO).toMatch(/if\s*\(\s*growId\s*\)\s*q\s*=\s*q\.eq\(\s*["']grow_id["']\s*,\s*growId\s*\)/);
+  });
+  it("fetchPlants adds .eq('grow_id', growId) when growId provided", () => {
+    expect(REPO).toMatch(/fetchPlants\(tentId\?:\s*string,\s*growId\?:\s*string\)/);
+    expect(REPO).toMatch(/if\s*\(\s*growId\s*\)\s*q\s*=\s*q\.eq\(\s*["']grow_id["']\s*,\s*growId\s*\)/);
   });
 });

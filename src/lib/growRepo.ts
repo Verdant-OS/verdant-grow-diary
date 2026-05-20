@@ -18,12 +18,14 @@ const UUID_RE =
 const isUuid = (v: string | undefined | null): v is string =>
   !!v && UUID_RE.test(v);
 
-export async function fetchTents(): Promise<Tent[]> {
-  const { data, error } = await supabase
+export async function fetchTents(growId?: string): Promise<Tent[]> {
+  if (growId !== undefined && !isUuid(growId)) return [];
+  let q = supabase
     .from("tents")
     .select("*")
-    .eq("is_archived", false)
-    .order("created_at", { ascending: false });
+    .eq("is_archived", false);
+  if (growId) q = q.eq("grow_id", growId);
+  const { data, error } = await q.order("created_at", { ascending: false });
   if (error) fail("fetchTents", error);
   return (data ?? []).map(mapTentRow);
 }
@@ -35,12 +37,14 @@ export async function fetchTent(id: string): Promise<Tent | null> {
   return data ? mapTentRow(data) : null;
 }
 
-export async function fetchPlants(tentId?: string): Promise<Plant[]> {
+export async function fetchPlants(tentId?: string, growId?: string): Promise<Plant[]> {
   // Non-UUID tentId (e.g. mock "t1") would 400 against a uuid column.
   // Return empty so the hook falls back to mock-filtered plants.
   if (tentId !== undefined && !isUuid(tentId)) return [];
+  if (growId !== undefined && !isUuid(growId)) return [];
   let q = supabase.from("plants").select("*").eq("is_archived", false);
   if (tentId) q = q.eq("tent_id", tentId);
+  if (growId) q = q.eq("grow_id", growId);
   const { data, error } = await q.order("created_at", { ascending: false });
   if (error) fail("fetchPlants", error);
   return (data ?? []).map(mapPlantRow);

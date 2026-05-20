@@ -237,7 +237,12 @@ export default function Alerts() {
                         >
                           {a.status}
                         </Badge>
-                        <span className="text-sm font-medium">{a.title}</span>
+                        <Link
+                          to={alertDetailPath(a.id)}
+                          className="text-sm font-medium hover:underline"
+                        >
+                          {a.title}
+                        </Link>
                         <span className="ml-auto text-[11px] text-muted-foreground">
                           {formatDistanceToNow(new Date(a.first_seen_at), {
                             addSuffix: true,

@@ -50,9 +50,9 @@ describe("Tents — grow filter", () => {
 });
 
 describe("GrowDetail — scoped hub links", () => {
-  it("links to /plants and /tents with growId", () => {
-    expect(GROW_DETAIL).toMatch(/\/plants\?growId=\$\{growId\}/);
-    expect(GROW_DETAIL).toMatch(/\/tents\?growId=\$\{growId\}/);
+  it("links to /plants and /tents with growId via helpers", () => {
+    expect(GROW_DETAIL).toMatch(/plantsPath\(growId\)/);
+    expect(GROW_DETAIL).toMatch(/tentsPath\(growId\)/);
   });
 });
 

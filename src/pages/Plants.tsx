@@ -6,6 +6,7 @@ import StageBadge from "@/components/StageBadge";
 import EmptyState from "@/components/EmptyState";
 import CreatePlantDialog from "@/components/CreatePlantDialog";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
+import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { useTents } from "@/hooks/useMockData";
 import { useGrowPlants } from "@/hooks/useGrowData";
 import { useScopedGrow } from "@/hooks/useScopedGrow";

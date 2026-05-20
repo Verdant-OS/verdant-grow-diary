@@ -26,24 +26,27 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-type Status =
-  | "pending_approval"
-  | "approved"
-  | "rejected"
-  | "simulated"
-  | "completed"
-  | "cancelled";
+import {
+  type ActionStatus,
+  type ActionEventType,
+  type TransitionKind,
+  isTerminalStatus,
+  canApprove,
+  canSimulate,
+  canReject,
+  canComplete,
+  canCancel,
+  buildTransitionPatch,
+  
+  eventTypeFor,
+  nextStatusFor,
+  normalizeNote,
+} from "@/lib/actionQueueTransitions";
 
-type EventType =
-  | "created"
-  | "simulated"
-  | "approved"
-  | "rejected"
-  | "completed"
-  | "cancelled"
-  | "note";
-
-type Kind = "approve" | "reject" | "simulate" | "complete" | "cancel";
+type Status = ActionStatus;
+type EventType = ActionEventType;
+type Kind = TransitionKind;
+const isTerminal = isTerminalStatus;
 
 interface ActionRow {
   id: string;
@@ -120,14 +123,6 @@ const DIALOG_META: Record<Kind, { title: string; description: string; label: str
   },
 };
 
-const canApprove = (s: Status) => s === "pending_approval" || s === "simulated";
-const canSimulate = (s: Status) => s === "pending_approval";
-const canReject = (s: Status) => s === "pending_approval";
-const canComplete = (s: Status) => s === "approved" || s === "simulated";
-const canCancel = (s: Status) =>
-  s === "pending_approval" || s === "approved" || s === "simulated";
-const isTerminal = (s: Status) =>
-  s === "completed" || s === "rejected" || s === "cancelled";
 
 export default function ActionDetail() {
   const { actionId } = useParams<{ actionId: string }>();
@@ -224,25 +219,18 @@ export default function ActionDetail() {
 
   async function confirmDialog() {
     if (!row || !dialog) return;
-    const trimmed = noteDraft.trim();
-    const note = trimmed.length ? trimmed : undefined;
+    const note = normalizeNote(noteDraft);
     const kind = dialog;
     setDialog(null);
     setNoteDraft("");
 
-    if (kind === "approve") {
-      await transition(row, { status: "approved", approved_at: new Date().toISOString() }, "approved", "approved", note);
-    } else if (kind === "reject") {
-      await transition(row, { status: "rejected", rejected_at: new Date().toISOString() }, "rejected", "rejected", note);
-    } else if (kind === "complete") {
-      await transition(row, { status: "completed", completed_at: new Date().toISOString() }, "completed", "completed", note);
-    } else if (kind === "cancel") {
-      await transition(row, { status: "cancelled" }, "cancelled", "cancelled", note);
-    } else {
+    if (kind === "simulate") {
       toast.message("Simulated (no device command sent)");
-      await transition(row, { status: "simulated" }, "simulated", "simulated", note);
     }
+    const patch = buildTransitionPatch(kind);
+    await transition(row, patch, eventTypeFor(kind), nextStatusFor(kind), note);
   }
+
 
   function cancelDialog() {
     setDialog(null);

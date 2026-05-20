@@ -108,9 +108,9 @@ describe("ActionQueue page — audit wiring", () => {
     expect(PAGE).toMatch(/function\s+simulate[\s\S]*?openNoteDialog\(/);
     expect(PAGE).toMatch(/function\s+confirmNoteDialog[\s\S]*?transition\(/);
     // each transition call passes an event_type AND new_status that match
-    expect(PAGE).toMatch(/transition\([\s\S]*?["']approved["'][\s\S]*?["']approved["']/);
-    expect(PAGE).toMatch(/transition\([\s\S]*?["']rejected["'][\s\S]*?["']rejected["']/);
-    expect(PAGE).toMatch(/transition\([\s\S]*?["']simulated["'][\s\S]*?["']simulated["']/);
+    expect(PAGE).toMatch(/transition\(row,\s*patch,\s*eventTypeFor\(kind\),\s*nextStatusFor\(kind\),\s*note\)/);
+    expect(PAGE).toMatch(/buildTransitionPatch\(kind\)/);
+    expect(PAGE).toMatch(/from "@\/lib\/actionQueueTransitions"/);
   });
 
   it("simulate explicitly states no device command is sent", () => {

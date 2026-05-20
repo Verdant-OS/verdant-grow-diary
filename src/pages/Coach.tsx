@@ -51,16 +51,20 @@ export default function Coach() {
     const risk: "low" | "medium" | "high" | "critical" =
       analysis.risk_level === "unknown" ? "low" : analysis.risk_level;
     setQueuingIdx(idx);
-    const { error } = await supabase.from("action_queue").insert({
-      grow_id: activeGrowId,
-      action_type: "advisory",
-      target_metric: "general",
-      suggested_change: recommendation,
-      reason: analysis.likely_issue || analysis.summary || "AI Coach recommendation",
-      risk_level: risk,
-      source: "ai_coach",
-      status: "pending_approval",
-    });
+    const { data: inserted, error } = await supabase
+      .from("action_queue")
+      .insert({
+        grow_id: activeGrowId,
+        action_type: "advisory",
+        target_metric: "general",
+        suggested_change: recommendation,
+        reason: analysis.likely_issue || analysis.summary || "AI Coach recommendation",
+        risk_level: risk,
+        source: "ai_coach",
+        status: "pending_approval",
+      })
+      .select("id,grow_id")
+      .single();
     setQueuingIdx(null);
     if (error) {
       const msg = (error.message || "").toLowerCase();
@@ -75,6 +79,24 @@ export default function Coach() {
       return;
     }
     setQueuedIdx((s) => new Set(s).add(idx));
+
+    // SECURITY: audit-only insert. No device commands. user_id omitted (DB default auth.uid()).
+    if (inserted?.id) {
+      const { error: auditError } = await supabase.from("action_queue_events").insert({
+        action_queue_id: inserted.id,
+        grow_id: inserted.grow_id ?? activeGrowId,
+        event_type: "created",
+        previous_status: null,
+        new_status: "pending_approval",
+        note: "Created from AI Coach recommendation",
+      });
+      if (auditError) {
+        toast.warning("Action queued, but audit log failed.", {
+          description: auditError.message,
+        });
+        return;
+      }
+    }
     toast.success("Action queued for approval.");
   }
 

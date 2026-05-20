@@ -70,6 +70,9 @@ export default function GrowDetail() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [counts, setCounts] = useState<GrowCounts>(EMPTY_COUNTS);
+  const [recent, setRecent] = useState<RecentState>({ status: "loading" });
+
+
 
   const load = useCallback(async () => {
     if (!user || !growId) return;

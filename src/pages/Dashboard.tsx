@@ -45,7 +45,7 @@ import { Button } from "@/components/ui/button";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
 
 import { Badge } from "@/components/ui/badge";
-import { actionDetailPath, actionsPath, dashboardPath, logsPath } from "@/lib/routes";
+import { actionDetailPath, actionsPath, alertDetailPath, dashboardPath, logsPath } from "@/lib/routes";
 import { formatDistanceToNow } from "date-fns";
 
 

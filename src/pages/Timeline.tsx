@@ -186,18 +186,15 @@ export default function Timeline() {
         </div>
       )}
 
-      {urlGrowId && (() => {
-        const scopedGrow = grows.find((g) => g.id === urlGrowId) ?? null;
-        return (
-          <ScopedGrowBanner
-            growId={urlGrowId}
-            growName={scopedGrow?.name ?? null}
-            label={scopeLabel}
-            clearHref={clearTo}
-            backHref={scopedGrow ? `/grows/${scopedGrow.id}` : undefined}
-          />
-        );
-      })()}
+      {urlGrowId && (
+        <ScopedGrowBanner
+          growId={urlGrowId}
+          growName={scopedGrowName}
+          label={scopeLabel}
+          clearHref={clearTo}
+          backHref={backHref}
+        />
+      )}
 
       {/* Filters */}
       <div className="space-y-2 mb-4">

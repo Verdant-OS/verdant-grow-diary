@@ -21,7 +21,7 @@ export interface GrowStatus {
 
 export interface RecentItem {
   id: string;
-  kind: "diary" | "action_event";
+  kind: "diary" | "action_event" | "alert_event";
   ts: string;
   title: string;
   detail?: string | null;

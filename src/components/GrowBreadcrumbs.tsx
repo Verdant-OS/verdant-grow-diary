@@ -127,6 +127,8 @@ export function buildSwitcherTarget(
       return actionsPath(newGrowId);
     case "grow-detail":
       return growDetailPath(newGrowId);
+    case "dashboard":
+      return dashboardPath(newGrowId);
   }
 }
 

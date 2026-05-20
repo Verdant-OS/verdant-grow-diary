@@ -212,7 +212,7 @@ function HubLink({
  * Read-only status card. Status is derived in @/lib/growStatus.deriveStatus;
  * this component only renders. NOT an AI diagnosis.
  */
-function GrowStatusCard({ status }: { status: GrowStatus }) {
+function GrowStatusCard({ status, growId }: { status: GrowStatus; growId: string }) {
   const labelMap: Record<StatusLevel, string> = {
     good: "Good",
     watch: "Watch",

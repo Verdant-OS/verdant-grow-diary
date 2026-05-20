@@ -7,6 +7,7 @@ import {
   Leaf,
   Tent as TentIcon,
   ListChecks,
+  Sparkles,
 } from "lucide-react";
 import { useGrowDetailData } from "@/hooks/useGrowDetailData";
 import {
@@ -15,7 +16,7 @@ import {
   type StatusLevel,
   formatCount,
 } from "@/lib/growStatus";
-import { actionsPath, logsPath, plantsPath, tentsPath } from "@/lib/routes";
+import { actionsPath, dashboardPath, logsPath, plantsPath, tentsPath } from "@/lib/routes";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 
 /**

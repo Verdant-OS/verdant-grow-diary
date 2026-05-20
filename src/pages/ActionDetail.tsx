@@ -396,3 +396,19 @@ function Field({ label, value, mono }: { label: string; value: string; mono?: bo
     </div>
   );
 }
+
+function IdField({ label, id, to }: { label: string; id: string; to: string | null }) {
+  return (
+    <div>
+      <dt className="text-muted-foreground uppercase tracking-wider text-[10px]">{label}</dt>
+      <dd className="font-mono text-[11px] break-all">
+        {to ? (
+          <Link to={to} className="text-primary hover:underline">{id}</Link>
+        ) : (
+          <span>{id}</span>
+        )}
+      </dd>
+    </div>
+  );
+}
+

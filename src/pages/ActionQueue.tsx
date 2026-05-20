@@ -23,6 +23,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Loader2, Check, X, FlaskConical, ListChecks, History, CheckCircle2, Ban } from "lucide-react";
+import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import { toast } from "sonner";
 import {
   type ActionStatus,

@@ -62,6 +62,21 @@ type RecentState =
   | { status: "ok"; items: RecentItem[] }
   | { status: "unavailable" };
 
+/**
+ * Grow Status summary — derived strictly from existing read-only data
+ * (pending action counts, pending risk levels, latest diary timestamp).
+ * NOT an AI diagnosis. No ai-coach call. No writes. No device control.
+ */
+type StatusLevel = "good" | "watch" | "needs_review" | "unavailable";
+
+interface GrowStatus {
+  level: StatusLevel;
+  reason: string;
+  pending: CountValue;
+  highestRisk: "low" | "medium" | "high" | "critical" | "none" | "unknown";
+  lastDiaryAt: string | null;
+}
+
 
 export default function GrowDetail() {
   const { growId } = useParams<{ growId: string }>();

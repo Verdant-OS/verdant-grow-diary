@@ -31,12 +31,12 @@ describe("Plants — grow filter", () => {
 });
 
 describe("Tents — grow filter", () => {
-  it("reads growId from URL", () => {
-    expect(TENTS).toMatch(/useSearchParams/);
-    expect(TENTS).toMatch(/searchParams\.get\(\s*["']growId["']\s*\)/);
+  it("reads growId via shared useScopedGrow hook", () => {
+    expect(TENTS).toMatch(/useScopedGrow\(\)/);
+    expect(TENTS).toMatch(/const\s*\{[^}]*urlGrowId[^}]*\}\s*=\s*useScopedGrow\(\)/);
   });
   it("passes growId to the data hook (query-level filtering)", () => {
-    expect(TENTS).toMatch(/useGrowTents\([^)]*growId[^)]*\)/);
+    expect(TENTS).toMatch(/useGrowTents\([^)]*urlGrowId[^)]*\)/);
   });
   it("renders banner and clear link via ScopedGrowBanner", () => {
     expect(TENTS).toMatch(/ScopedGrowBanner/);

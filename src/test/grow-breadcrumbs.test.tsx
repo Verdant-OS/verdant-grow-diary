@@ -13,12 +13,22 @@
  *     render <GrowBreadcrumbs />.
  *   - No ai-coach / device-command / service_role surface introduced.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
-import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
+import GrowBreadcrumbs, { buildSwitcherTarget } from "@/components/GrowBreadcrumbs";
+
+vi.mock("@/store/grows", () => ({
+  useGrows: () => ({
+    grows: [
+      { id: "g1", name: "Blue Dream" },
+      { id: "g2", name: "OG Kush" },
+      { id: "g3", name: "White Widow" },
+    ],
+  }),
+}));
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");

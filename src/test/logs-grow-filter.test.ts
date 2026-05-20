@@ -26,10 +26,11 @@ describe("Logs — grow filter (/logs?growId=…)", () => {
     );
   });
 
-  it("route-aware banner: 'Showing {scope} for this grow' and Clear link", () => {
-    expect(TIMELINE).toMatch(/Showing\s+\{scopeLabel\}\s+for this grow/);
+  it("route-aware banner uses ScopedGrowBanner with scopeLabel + clearTo", () => {
+    expect(TIMELINE).toMatch(/ScopedGrowBanner/);
+    expect(TIMELINE).toMatch(/label=\{scopeLabel\}/);
     expect(TIMELINE).toMatch(/scopeLabel\s*=\s*isLogsRoute\s*\?\s*["']logs["']/);
-    expect(TIMELINE).toMatch(/Clear grow filter/);
+    expect(TIMELINE).toMatch(/clearHref=\{clearTo\}/);
     expect(TIMELINE).toMatch(/clearTo\s*=\s*isLogsRoute\s*\?\s*["']\/logs["']/);
   });
 

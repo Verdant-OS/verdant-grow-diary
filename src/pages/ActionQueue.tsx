@@ -318,6 +318,18 @@ export default function ActionQueue() {
         </p>
       </div>
 
+      {urlGrowId && (
+        <div
+          className="glass rounded-2xl p-3 mb-4 flex items-center justify-between gap-3 text-sm"
+          aria-label="Grow filter banner"
+        >
+          <span>Showing actions for this grow</span>
+          <Link to="/actions" className="text-primary hover:underline">
+            Clear grow filter
+          </Link>
+        </div>
+      )}
+
       <div
         className="glass rounded-2xl p-3 mb-4 flex flex-wrap gap-2"
         aria-label="Action queue filters"

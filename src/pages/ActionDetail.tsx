@@ -37,7 +37,7 @@ import {
   canComplete,
   canCancel,
   buildTransitionPatch,
-  buildAuditEventPayload,
+  
   eventTypeFor,
   nextStatusFor,
   normalizeNote,

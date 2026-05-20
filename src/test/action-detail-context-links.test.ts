@@ -26,7 +26,7 @@ describe("ActionDetail — quick context links", () => {
   });
 
   it("links Grow ID to /grows/:growId now that the route exists", () => {
-    expect(DETAIL).toMatch(/<IdField\s+label="Grow"\s+id=\{row\.grow_id\}\s+to=\{`\/grows\/\$\{row\.grow_id\}`\}/);
+    expect(DETAIL).toMatch(/<IdField\s+label="Grow"\s+id=\{row\.grow_id\}\s+to=\{growDetailPath\(row\.grow_id\)\}/);
     expect(APP).toMatch(/path="\/grows\/:growId"/);
   });
 

@@ -1,4 +1,4 @@
-import { Link, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Box, Lightbulb } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
@@ -8,15 +8,13 @@ import CreateTentDialog from "@/components/CreateTentDialog";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import { useSensorReadings, usePlants } from "@/hooks/useMockData";
 import { useGrowTents } from "@/hooks/useGrowData";
-import { useGrows } from "@/store/grows";
+import { useScopedGrow } from "@/hooks/useScopedGrow";
 
 export default function Tents() {
-  const [searchParams] = useSearchParams();
-  const growId = searchParams.get("growId");
-  const { grows } = useGrows();
-  // Only trust the URL growId when it maps to a grow loaded under RLS for this user.
-  const validGrowId = growId && grows.some((g) => g.id === growId) ? growId : undefined;
-  const { data: tents = [], isLoading } = useGrowTents(growId ?? undefined);
+  // Shared URL `?growId=` resolution against RLS-loaded grows.
+  const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
+  const validGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
+  const { data: tents = [], isLoading } = useGrowTents(urlGrowId ?? undefined);
   const { data: readings = [] } = useSensorReadings();
   const { data: plants = [] } = usePlants();
 
@@ -29,18 +27,16 @@ export default function Tents() {
         actions={<CreateTentDialog defaultGrowId={validGrowId} />}
       />
 
-      {growId && (() => {
-        const scopedGrow = grows.find((g) => g.id === growId) ?? null;
-        return (
-          <ScopedGrowBanner
-            growId={growId}
-            growName={scopedGrow?.name ?? null}
-            label="tents"
-            clearHref="/tents"
-            backHref={scopedGrow ? `/grows/${scopedGrow.id}` : undefined}
-          />
-        );
-      })()}
+      {urlGrowId && (
+        <ScopedGrowBanner
+          growId={urlGrowId}
+          growName={scopedGrowName}
+          label="tents"
+          clearHref="/tents"
+          backHref={backHref}
+        />
+      )}
+
 
 
       {isLoading ? (

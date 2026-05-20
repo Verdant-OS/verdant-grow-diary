@@ -1,11 +1,12 @@
 import { useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
 
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles, Camera, Loader2, Wand2 } from "lucide-react";
+import { Sparkles, Camera, Loader2, Wand2, ListChecks, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 type Mode = "diagnose" | "next_steps";
@@ -40,6 +41,42 @@ export default function Coach() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<CoachResponse | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [queuedIdx, setQueuedIdx] = useState<Set<number>>(new Set());
+  const [queuingIdx, setQueuingIdx] = useState<number | null>(null);
+
+  // SECURITY: never send user_id from the client. DB default (auth.uid()) wins.
+  // status always defaults to pending_approval. No device-control fields.
+  async function addToQueue(idx: number, recommendation: string) {
+    if (!user || !activeGrowId || !analysis) return;
+    const risk: "low" | "medium" | "high" | "critical" =
+      analysis.risk_level === "unknown" ? "low" : analysis.risk_level;
+    setQueuingIdx(idx);
+    const { error } = await supabase.from("action_queue").insert({
+      grow_id: activeGrowId,
+      action_type: "advisory",
+      target_metric: "general",
+      suggested_change: recommendation,
+      reason: analysis.likely_issue || analysis.summary || "AI Coach recommendation",
+      risk_level: risk,
+      source: "ai_coach",
+      status: "pending_approval",
+    });
+    setQueuingIdx(null);
+    if (error) {
+      const msg = (error.message || "").toLowerCase();
+      if (error.code === "42501" || msg.includes("row-level security") || msg.includes("violates")) {
+        toast.error(
+          "This action cannot be queued until the plant/tent is assigned to this grow.",
+          { description: "Open Lineage Repair to assign tents to this grow." },
+        );
+        return;
+      }
+      toast.error(error.message);
+      return;
+    }
+    setQueuedIdx((s) => new Set(s).add(idx));
+    toast.success("Action queued for approval.");
+  }
 
   async function ask(mode: Mode) {
     if (!user) return;
@@ -122,7 +159,45 @@ export default function Coach() {
           )}
           <Section title="Evidence" items={analysis.evidence} />
           <Section title="Possible causes" items={analysis.possible_causes} />
-          <Section title="Recommended actions" items={analysis.recommended_actions} />
+          <div>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
+              Recommended actions
+            </p>
+            <ul className="space-y-1.5">
+              {analysis.recommended_actions.map((it, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <span className="flex-1">• {it}</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 shrink-0"
+                    disabled={
+                      !activeGrowId || queuingIdx === i || queuedIdx.has(i)
+                    }
+                    onClick={() => addToQueue(i, it)}
+                  >
+                    {queuingIdx === i ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : queuedIdx.has(i) ? (
+                      "Queued"
+                    ) : (
+                      <>
+                        <Plus className="h-3 w-3" />
+                        Add to Action Queue
+                      </>
+                    )}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-2">
+              <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs">
+                <Link to="/actions">
+                  <ListChecks className="h-3 w-3" /> Open Action Queue
+                </Link>
+              </Button>
+            </div>
+          </div>
           <Section title="Do NOT do" items={analysis.do_not_do} />
           <div className="text-xs space-y-1 pt-2 border-t border-border/40">
             <p><span className="text-muted-foreground">Next 24h:</span> {analysis.follow_up_24h}</p>

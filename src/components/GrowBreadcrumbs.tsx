@@ -19,7 +19,8 @@ export type GrowBreadcrumbsSection =
   | "actions"
   | "grow-detail"
   | "action-detail"
-  | "dashboard";
+  | "dashboard"
+  | "alerts";
 
 export interface GrowBreadcrumbsProps {
   growId?: string | null;

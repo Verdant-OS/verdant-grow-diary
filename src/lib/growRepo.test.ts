@@ -15,8 +15,10 @@ function reset() {
   calls.single = false;
 }
 
-function builder() {
-  const b: Record<string, unknown> = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function builder(): any {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const b: any = {
     select: () => b,
     eq: (col: string, val: unknown) => { calls.filters.push([col, val]); return b; },
     order: (col: string) => { calls.ordered = col; return b; },

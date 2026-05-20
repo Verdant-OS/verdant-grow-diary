@@ -319,18 +319,15 @@ export default function ActionQueue() {
         </p>
       </div>
 
-      {urlGrowId && (() => {
-        const scopedGrow = grows.find((g) => g.id === urlGrowId) ?? null;
-        return (
-          <ScopedGrowBanner
-            growId={urlGrowId}
-            growName={scopedGrow?.name ?? null}
-            label="actions"
-            clearHref="/actions"
-            backHref={scopedGrow ? `/grows/${scopedGrow.id}` : undefined}
-          />
-        );
-      })()}
+      {urlGrowId && (
+        <ScopedGrowBanner
+          growId={urlGrowId}
+          growName={scopedGrowName}
+          label="actions"
+          clearHref="/actions"
+          backHref={backHref}
+        />
+      )}
 
       <div
         className="glass rounded-2xl p-3 mb-4 flex flex-wrap gap-2"

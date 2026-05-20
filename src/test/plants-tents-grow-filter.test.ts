@@ -35,8 +35,8 @@ describe("Tents — grow filter", () => {
     expect(TENTS).toMatch(/useSearchParams/);
     expect(TENTS).toMatch(/searchParams\.get\(\s*["']growId["']\s*\)/);
   });
-  it("filters tents by growId when present", () => {
-    expect(TENTS).toMatch(/allTents\.filter\(\([^)]*\)\s*=>\s*[^)]*\.growId\s*===\s*growId\)/);
+  it("passes growId to the data hook (query-level filtering)", () => {
+    expect(TENTS).toMatch(/useGrowTents\([^)]*growId[^)]*\)/);
   });
   it("renders banner and clear link", () => {
     expect(TENTS).toMatch(/Showing tents for this grow/);

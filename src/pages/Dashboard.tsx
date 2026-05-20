@@ -542,7 +542,21 @@ export default function Dashboard() {
             );
           })()}
         </section>
+        {scopedGrowId && (
+          <GrowTargetsEditor
+            open={targetsEditorOpen}
+            onOpenChange={setTargetsEditorOpen}
+            growId={scopedGrowId}
+            growName={scopedGrowName ?? undefined}
+            onSaved={() => {
+              // Reload by toggling the URL? Simpler: force a soft refresh
+              // by replacing the current location with the same path.
+              window.location.assign(window.location.pathname + window.location.search);
+            }}
+          />
+        )}
         <div className="grid lg:grid-cols-2 gap-4 mt-4">
+
 
 
 

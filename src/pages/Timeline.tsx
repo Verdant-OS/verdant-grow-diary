@@ -6,10 +6,11 @@ import { STAGES, stageLabel } from "@/lib/grow";
 import { format, formatDistanceToNow } from "date-fns";
 import { Sprout, Image as ImageIcon, Loader2, Camera, FileText, FlaskConical, Check, Pencil, Leaf, Gauge, Bell, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link, useSearchParams, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import EntryEditDialog from "@/components/EntryEditDialog";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
+import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { cn } from "@/lib/utils";
 import { getEventType } from "@/lib/diary";
 
@@ -46,9 +47,11 @@ function entryKinds(e: Entry): EventFilter[] {
 export default function Timeline() {
   const { user } = useAuth();
   const { activeGrow, activeGrowId: storeGrowId, grows, loading: growsLoading, setActiveGrowId } = useGrows();
-  const [searchParams] = useSearchParams();
+  
   const { pathname } = useLocation();
-  const urlGrowId = searchParams.get("growId");
+  // Shared URL `?growId=` resolution. urlGrowId is preserved as the source of truth
+  // for filter precedence; scopedGrowName/backHref come from the same hook.
+  const { urlGrowId, scopedGrowName, backHref } = useScopedGrow();
   const activeGrowId = urlGrowId ?? storeGrowId;
   const isLogsRoute = pathname.startsWith("/logs");
   const scopeLabel = isLogsRoute ? "logs" : "timeline";
@@ -186,18 +189,15 @@ export default function Timeline() {
         </div>
       )}
 
-      {urlGrowId && (() => {
-        const scopedGrow = grows.find((g) => g.id === urlGrowId) ?? null;
-        return (
-          <ScopedGrowBanner
-            growId={urlGrowId}
-            growName={scopedGrow?.name ?? null}
-            label={scopeLabel}
-            clearHref={clearTo}
-            backHref={scopedGrow ? `/grows/${scopedGrow.id}` : undefined}
-          />
-        );
-      })()}
+      {urlGrowId && (
+        <ScopedGrowBanner
+          growId={urlGrowId}
+          growName={scopedGrowName}
+          label={scopeLabel}
+          clearHref={clearTo}
+          backHref={backHref}
+        />
+      )}
 
       {/* Filters */}
       <div className="space-y-2 mb-4">

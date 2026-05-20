@@ -11,13 +11,13 @@ const GROW_DETAIL = readFileSync(resolve(ROOT, "src/pages/GrowDetail.tsx"), "utf
 const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
 
 describe("Timeline — grow filter", () => {
-  it("imports useSearchParams from react-router-dom", () => {
-    expect(TIMELINE).toMatch(/useSearchParams/);
-    expect(TIMELINE).toMatch(/from\s+["']react-router-dom["']/);
+  it("resolves URL growId via the shared useScopedGrow hook", () => {
+    expect(TIMELINE).toMatch(/useScopedGrow/);
+    expect(TIMELINE).toMatch(/from\s+["']@\/hooks\/useScopedGrow["']/);
   });
 
-  it("reads growId from URL search params", () => {
-    expect(TIMELINE).toMatch(/searchParams\.get\(\s*["']growId["']\s*\)/);
+  it("reads growId from URL via useScopedGrow", () => {
+    expect(TIMELINE).toMatch(/const\s*\{[^}]*urlGrowId[^}]*\}\s*=\s*useScopedGrow\(\)/);
   });
 
   it("falls back to store grow id when URL param absent", () => {

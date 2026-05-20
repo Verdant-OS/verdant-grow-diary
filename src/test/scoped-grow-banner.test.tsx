@@ -105,7 +105,7 @@ describe("Page wiring — ScopedGrowBanner usage", () => {
   it("Plants uses ScopedGrowBanner with label='plants' and clearHref='/plants'", () => {
     expect(PLANTS).toMatch(/import\s+ScopedGrowBanner/);
     expect(PLANTS).toMatch(/<ScopedGrowBanner[\s\S]*?label=\s*["']plants["'][\s\S]*?clearHref=\s*["']\/plants["']/);
-    expect(PLANTS).toMatch(/backHref=\{scopedGrow\s*\?\s*`\/grows\/\$\{scopedGrow\.id\}`/);
+    expect(PLANTS).toMatch(/backHref=\{backHref\}/);
   });
   it("Tents uses ScopedGrowBanner with label='tents' and clearHref='/tents'", () => {
     expect(TENTS).toMatch(/import\s+ScopedGrowBanner/);
@@ -118,6 +118,12 @@ describe("Page wiring — ScopedGrowBanner usage", () => {
   it("ActionQueue uses ScopedGrowBanner with label='actions' and clearHref='/actions'", () => {
     expect(ACTIONQ).toMatch(/import\s+ScopedGrowBanner/);
     expect(ACTIONQ).toMatch(/<ScopedGrowBanner[\s\S]*?label=\s*["']actions["'][\s\S]*?clearHref=\s*["']\/actions["']/);
+  });
+
+  it("pages consume the shared useScopedGrow hook", () => {
+    for (const src of [PLANTS, TENTS, TIMELINE, ACTIONQ]) {
+      expect(src).toMatch(/useScopedGrow/);
+    }
   });
 
   it("pages no longer contain inline banner duplication", () => {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
@@ -24,6 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Loader2, Check, X, FlaskConical, ListChecks, History, CheckCircle2, Ban } from "lucide-react";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
+import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { toast } from "sonner";
 import {
   type ActionStatus,
@@ -91,10 +92,10 @@ const RISK_RANK: Record<ActionRow["risk_level"], number> = {
 
 export default function ActionQueue() {
   const { user } = useAuth();
-  const { activeGrowId, activeGrow, grows } = useGrows();
-  const [searchParams] = useSearchParams();
-  const urlGrowId = searchParams.get("growId");
-  // URL growId takes precedence over active grow. RLS still enforces ownership.
+  const { activeGrowId, activeGrow } = useGrows();
+  // Shared URL `?growId=` resolution against RLS-loaded grows. urlGrowId precedence
+  // over activeGrowId is preserved exactly as before.
+  const { urlGrowId, scopedGrowName, backHref } = useScopedGrow();
   const effectiveGrowId = urlGrowId ?? activeGrowId;
   const [rows, setRows] = useState<ActionRow[]>([]);
   const [events, setEvents] = useState<Record<string, EventRow[]>>({});
@@ -319,18 +320,15 @@ export default function ActionQueue() {
         </p>
       </div>
 
-      {urlGrowId && (() => {
-        const scopedGrow = grows.find((g) => g.id === urlGrowId) ?? null;
-        return (
-          <ScopedGrowBanner
-            growId={urlGrowId}
-            growName={scopedGrow?.name ?? null}
-            label="actions"
-            clearHref="/actions"
-            backHref={scopedGrow ? `/grows/${scopedGrow.id}` : undefined}
-          />
-        );
-      })()}
+      {urlGrowId && (
+        <ScopedGrowBanner
+          growId={urlGrowId}
+          growName={scopedGrowName}
+          label="actions"
+          clearHref="/actions"
+          backHref={backHref}
+        />
+      )}
 
       <div
         className="glass rounded-2xl p-3 mb-4 flex flex-wrap gap-2"

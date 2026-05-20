@@ -1,4 +1,4 @@
-import { Link, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Sprout, Filter } from "lucide-react";
 import { useState } from "react";
 import PageHeader from "@/components/PageHeader";
@@ -8,16 +8,14 @@ import CreatePlantDialog from "@/components/CreatePlantDialog";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import { useTents } from "@/hooks/useMockData";
 import { useGrowPlants } from "@/hooks/useGrowData";
-import { useGrows } from "@/store/grows";
+import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { cn } from "@/lib/utils";
 
 export default function Plants() {
-  const [searchParams] = useSearchParams();
-  const growId = searchParams.get("growId");
-  const { grows } = useGrows();
-  // Only trust the URL growId when it maps to a grow loaded under RLS for this user.
-  const validGrowId = growId && grows.some((g) => g.id === growId) ? growId : undefined;
-  const { data: plants = [] } = useGrowPlants(undefined, growId ?? undefined);
+  // Shared URL `?growId=` resolution against RLS-loaded grows.
+  const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
+  const validGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
+  const { data: plants = [] } = useGrowPlants(undefined, urlGrowId ?? undefined);
   const { data: tents = [] } = useTents();
   const [tentFilter, setTentFilter] = useState<string>("all");
   const filtered = tentFilter === "all" ? plants : plants.filter((p) => p.tentId === tentFilter);
@@ -25,18 +23,15 @@ export default function Plants() {
   return (
     <div>
       <PageHeader title="Plants" description="Every plant across every tent." icon={<Sprout className="h-5 w-5" />} actions={<CreatePlantDialog defaultGrowId={validGrowId} />} />
-      {growId && (() => {
-        const scopedGrow = grows.find((g) => g.id === growId) ?? null;
-        return (
-          <ScopedGrowBanner
-            growId={growId}
-            growName={scopedGrow?.name ?? null}
-            label="plants"
-            clearHref="/plants"
-            backHref={scopedGrow ? `/grows/${scopedGrow.id}` : undefined}
-          />
-        );
-      })()}
+      {urlGrowId && (
+        <ScopedGrowBanner
+          growId={urlGrowId}
+          growName={scopedGrowName}
+          label="plants"
+          clearHref="/plants"
+          backHref={backHref}
+        />
+      )}
       <div className="flex items-center gap-1.5 mb-4 flex-wrap">
         <Filter className="h-3.5 w-3.5 text-muted-foreground mr-1" />
         {[{ id: "all", name: "All tents" }, ...tents.map((t) => ({ id: t.id, name: t.name }))].map((t) => (

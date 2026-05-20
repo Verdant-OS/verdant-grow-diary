@@ -14,18 +14,18 @@ const CREATE_PLANT = readFileSync(resolve(ROOT, "src/components/CreatePlantDialo
 const CREATE_TENT = readFileSync(resolve(ROOT, "src/components/CreateTentDialog.tsx"), "utf8");
 
 describe("Plants/Tents — preselect grow on create", () => {
-  it("Plants validates URL growId against the user's RLS-loaded grows", () => {
-    expect(PLANTS).toMatch(/useGrows\(\)/);
-    expect(PLANTS).toMatch(/validGrowId\s*=\s*growId\s*&&\s*grows\.some\(\(g\)\s*=>\s*g\.id\s*===\s*growId\)/);
+  it("Plants validates URL growId against the user's RLS-loaded grows via useScopedGrow", () => {
+    expect(PLANTS).toMatch(/useScopedGrow\(\)/);
+    expect(PLANTS).toMatch(/validGrowId\s*=\s*isValidScopedGrow\s*\?\s*urlGrowId\s*\?\?\s*undefined\s*:\s*undefined/);
   });
 
   it("Plants passes validGrowId into CreatePlantDialog", () => {
     expect(PLANTS).toMatch(/<CreatePlantDialog\s+defaultGrowId=\{validGrowId\}\s*\/>/);
   });
 
-  it("Tents validates URL growId against the user's RLS-loaded grows", () => {
-    expect(TENTS).toMatch(/useGrows\(\)/);
-    expect(TENTS).toMatch(/validGrowId\s*=\s*growId\s*&&\s*grows\.some\(\(g\)\s*=>\s*g\.id\s*===\s*growId\)/);
+  it("Tents validates URL growId against the user's RLS-loaded grows via useScopedGrow", () => {
+    expect(TENTS).toMatch(/useScopedGrow\(\)/);
+    expect(TENTS).toMatch(/validGrowId\s*=\s*isValidScopedGrow\s*\?\s*urlGrowId\s*\?\?\s*undefined\s*:\s*undefined/);
   });
 
   it("Tents passes validGrowId into CreateTentDialog", () => {

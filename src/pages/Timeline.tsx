@@ -426,7 +426,7 @@ function ActionQueueEventsSection({ events }: { events: ActionQueueEvent[] }) {
               </span>
               {e.action_queue_id && (
                 <Link
-                  to={`/actions/${e.action_queue_id}`}
+                  to={actionDetailPath(e.action_queue_id)}
                   className="text-[11px] text-primary hover:underline"
                 >
                   View Details

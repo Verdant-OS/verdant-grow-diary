@@ -44,7 +44,7 @@ function entryKinds(e: Entry): EventFilter[] {
 
 export default function Timeline() {
   const { user } = useAuth();
-  const { activeGrow, activeGrowId: storeGrowId, grows, loading: growsLoading } = useGrows();
+  const { activeGrow, activeGrowId: storeGrowId, grows, loading: growsLoading, setActiveGrowId } = useGrows();
   const [searchParams] = useSearchParams();
   const { pathname } = useLocation();
   const urlGrowId = searchParams.get("growId");
@@ -52,6 +52,15 @@ export default function Timeline() {
   const isLogsRoute = pathname.startsWith("/logs");
   const scopeLabel = isLogsRoute ? "logs" : "timeline";
   const clearTo = isLogsRoute ? "/logs" : "/timeline";
+
+  // Preselect grow context for new log creation when URL pins a growId.
+  // Only sync when the URL growId is a valid, RLS-authorized grow for this user.
+  // Edit flows are unaffected (EntryEditDialog operates on the entry's own grow_id).
+  useEffect(() => {
+    if (!urlGrowId) return;
+    if (!grows.some((g) => g.id === urlGrowId)) return;
+    if (urlGrowId !== storeGrowId) setActiveGrowId(urlGrowId);
+  }, [urlGrowId, grows, storeGrowId, setActiveGrowId]);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [actionEvents, setActionEvents] = useState<ActionQueueEvent[]>([]);
   const [loading, setLoading] = useState(true);

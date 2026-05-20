@@ -45,11 +45,16 @@ async function withFallback<T>(
 const isArrEmpty = <T,>(v: T[]) => v.length === 0;
 const never = <T,>(_v: T) => false;
 
-export function useGrowTents(): UseQueryResult<Tent[]> {
+export function useGrowTents(growId?: string): UseQueryResult<Tent[]> {
   return useQuery({
-    queryKey: ["grow", "tents"],
+    queryKey: ["grow", "tents", growId ?? "all"],
     queryFn: () =>
-      withFallback("tents", fetchTents, () => tents, isArrEmpty),
+      withFallback(
+        "tents",
+        () => fetchTents(growId),
+        () => (growId ? tents.filter((t) => t.growId === growId) : tents),
+        isArrEmpty,
+      ),
   });
 }
 
@@ -67,14 +72,19 @@ export function useGrowTent(id?: string): UseQueryResult<Tent | null> {
   });
 }
 
-export function useGrowPlants(tentId?: string): UseQueryResult<Plant[]> {
+export function useGrowPlants(tentId?: string, growId?: string): UseQueryResult<Plant[]> {
   return useQuery({
-    queryKey: ["grow", "plants", tentId ?? "all"],
+    queryKey: ["grow", "plants", tentId ?? "all", growId ?? "all"],
     queryFn: () =>
       withFallback(
         "plants",
-        () => fetchPlants(tentId),
-        () => (tentId ? plants.filter((p) => p.tentId === tentId) : plants),
+        () => fetchPlants(tentId, growId),
+        () => {
+          let list = plants;
+          if (tentId) list = list.filter((p) => p.tentId === tentId);
+          if (growId) list = list.filter((p) => p.growId === growId);
+          return list;
+        },
         isArrEmpty,
       ),
   });

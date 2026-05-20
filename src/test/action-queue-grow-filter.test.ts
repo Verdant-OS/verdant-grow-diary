@@ -36,7 +36,7 @@ describe("ActionQueue — URL growId filter", () => {
   it("renders the grow filter banner and Clear grow filter link via ScopedGrowBanner", () => {
     expect(PAGE).toMatch(/ScopedGrowBanner/);
     expect(PAGE).toMatch(/label=\s*["']actions["']/);
-    expect(PAGE).toMatch(/clearHref=\s*["']\/actions["']/);
+    expect(PAGE).toMatch(/clearHref=\{actionsPath\(\)\}/);
   });
 
   it("keeps status, risk, and sort filters", () => {

@@ -66,7 +66,7 @@ function readAll(): string {
 }
 const ALL_PROD_CODE = readAll();
 
-// Find any migration introducing an action_queue table (future-proofing).
+// Find the migration that introduces the action_queue TABLE (for table-shape checks).
 function findActionQueueMigration(): string | null {
   const migDir = resolve(ROOT, "supabase/migrations");
   for (const name of readdirSync(migDir)) {
@@ -75,6 +75,19 @@ function findActionQueueMigration(): string | null {
     if (/create\s+table[^;]*\baction_queue\b/i.test(sql)) return sql;
   }
   return null;
+}
+
+// Concatenate EVERY migration that touches action_queue — needed because later
+// migrations may DROP + recreate policies to tighten checks.
+function readAllActionQueueMigrations(): string {
+  const migDir = resolve(ROOT, "supabase/migrations");
+  const chunks: string[] = [];
+  for (const name of readdirSync(migDir).sort()) {
+    if (!name.endsWith(".sql")) continue;
+    const sql = readFileSync(join(migDir, name), "utf8");
+    if (/\baction_queue\b/i.test(sql)) chunks.push(sql);
+  }
+  return chunks.join("\n\n");
 }
 const ACTION_QUEUE_SQL = findActionQueueMigration();
 const HAS_ACTION_QUEUE_TABLE = /action_queue/i.test(TYPES_SRC) || !!ACTION_QUEUE_SQL;

@@ -90,6 +90,7 @@ function readAllActionQueueMigrations(): string {
   return chunks.join("\n\n");
 }
 const ACTION_QUEUE_SQL = findActionQueueMigration();
+const ALL_ACTION_QUEUE_SQL = readAllActionQueueMigrations();
 const HAS_ACTION_QUEUE_TABLE = /action_queue/i.test(TYPES_SRC) || !!ACTION_QUEUE_SQL;
 
 // Strip JS/TS comments for source-shape checks on ai-coach.

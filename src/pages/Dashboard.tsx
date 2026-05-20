@@ -14,6 +14,13 @@ import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useDashboardScopedData } from "@/hooks/useDashboardScopedData";
+import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
+import {
+  SOURCE_LABEL,
+  formatValue,
+  isStale,
+} from "@/lib/sensorSnapshot";
+
 import type { SensorReadingRow } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

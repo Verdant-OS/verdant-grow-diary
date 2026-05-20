@@ -24,6 +24,7 @@ export default function Plants() {
 
   return (
     <div>
+      <GrowBreadcrumbs growId={urlGrowId} growName={scopedGrowName} current="Plants" />
       <PageHeader title="Plants" description="Every plant across every tent." icon={<Sprout className="h-5 w-5" />} actions={<CreatePlantDialog defaultGrowId={validGrowId} />} />
       {urlGrowId && (
         <ScopedGrowBanner

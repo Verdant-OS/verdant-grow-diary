@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Link, useSearchParams, useLocation } from "react-router-dom";
 
 import EntryEditDialog from "@/components/EntryEditDialog";
+import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import { cn } from "@/lib/utils";
 import { getEventType } from "@/lib/diary";
 

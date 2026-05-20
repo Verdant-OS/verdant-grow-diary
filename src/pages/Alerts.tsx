@@ -18,9 +18,11 @@ import {
 
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useAlertsList } from "@/hooks/useAlertsList";
+import { useAlertEvents } from "@/hooks/useAlertEvents";
 import {
   acknowledgeAlert,
   dismissAlert,
+  logAlertEvent,
   resolveAlert,
   type AlertSeverityRow,
   type AlertStatusRow,
@@ -84,33 +86,52 @@ export default function Alerts() {
     };
   }, [alerts]);
 
-  const handleAcknowledge = async (id: string) => {
+  /**
+   * Status-change handler:
+   *   1. Update alert status (single write).
+   *   2. On success, append an immutable audit event.
+   *   3. If only the audit log fails, show a warning toast — the user-visible
+   *      status change is still accepted, but the missing audit row is surfaced.
+   */
+  const runStatusChange = async (
+    id: string,
+    grow_id: string,
+    previous_status: AlertStatusRow,
+    event_type: "acknowledged" | "resolved" | "dismissed",
+    op: () => Promise<{ status: AlertStatusRow }>,
+    label: string,
+  ) => {
+    let newStatus: AlertStatusRow | null = null;
     try {
-      await acknowledgeAlert(id);
-      toast.success("Alert acknowledged");
-      reload();
+      const updated = await op();
+      newStatus = updated.status ?? event_type;
     } catch (e) {
-      toast.error(`Failed to acknowledge: ${(e as Error).message}`);
+      toast.error(`Failed to ${label}: ${(e as Error).message}`);
+      return;
     }
-  };
-  const handleResolve = async (id: string) => {
     try {
-      await resolveAlert(id);
-      toast.success("Alert resolved");
-      reload();
-    } catch (e) {
-      toast.error(`Failed to resolve: ${(e as Error).message}`);
+      await logAlertEvent({
+        alert_id: id,
+        grow_id,
+        event_type,
+        previous_status,
+        new_status: newStatus,
+      });
+      toast.success(`Alert ${label}d`);
+    } catch (logErr) {
+      toast.warning(
+        `Alert ${label}d, but audit log failed: ${(logErr as Error).message}`,
+      );
     }
+    reload();
   };
-  const handleDismiss = async (id: string) => {
-    try {
-      await dismissAlert(id);
-      toast.success("Alert dismissed");
-      reload();
-    } catch (e) {
-      toast.error(`Failed to dismiss: ${(e as Error).message}`);
-    }
-  };
+
+  const handleAcknowledge = (id: string, grow_id: string, prev: AlertStatusRow) =>
+    runStatusChange(id, grow_id, prev, "acknowledged", () => acknowledgeAlert(id), "acknowledge");
+  const handleResolve = (id: string, grow_id: string, prev: AlertStatusRow) =>
+    runStatusChange(id, grow_id, prev, "resolved", () => resolveAlert(id), "resolve");
+  const handleDismiss = (id: string, grow_id: string, prev: AlertStatusRow) =>
+    runStatusChange(id, grow_id, prev, "dismissed", () => dismissAlert(id), "dismiss");
 
   return (
     <div>
@@ -231,7 +252,9 @@ export default function Alerts() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleAcknowledge(a.id)}
+                              onClick={() =>
+                                handleAcknowledge(a.id, a.grow_id, a.status)
+                              }
                             >
                               Acknowledge
                             </Button>
@@ -240,7 +263,9 @@ export default function Alerts() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleResolve(a.id)}
+                            onClick={() =>
+                              handleResolve(a.id, a.grow_id, a.status)
+                            }
                           >
                             Resolve
                           </Button>
@@ -250,12 +275,15 @@ export default function Alerts() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => handleDismiss(a.id)}
+                              onClick={() =>
+                                handleDismiss(a.id, a.grow_id, a.status)
+                              }
                             >
                               Dismiss
                             </Button>
                           )}
                       </div>
+                      <AlertHistory alertId={a.id} />
                     </li>
                   ))}
                 </ul>
@@ -265,5 +293,37 @@ export default function Alerts() {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Read-only per-alert audit history. Reads `alert_events` via RLS-protected
+ * select. Renders nothing if there are no events or the table is unavailable.
+ */
+function AlertHistory({ alertId }: { alertId: string }) {
+  const { status, events } = useAlertEvents(alertId);
+  if (status !== "ok" || events.length === 0) return null;
+  return (
+    <details className="mt-1">
+      <summary className="text-[11px] text-muted-foreground cursor-pointer select-none">
+        History ({events.length})
+      </summary>
+      <ol className="mt-1 space-y-1 pl-3 border-l border-border/40">
+        {events.slice(0, 8).map((e) => (
+          <li key={e.id} className="text-[11px] text-muted-foreground">
+            <span className="font-medium">{e.event_type}</span>
+            {e.previous_status && e.new_status ? (
+              <span>
+                {" "}
+                — {e.previous_status} → {e.new_status}
+              </span>
+            ) : null}{" "}
+            <span className="opacity-70">
+              {formatDistanceToNow(new Date(e.created_at), { addSuffix: true })}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </details>
   );
 }

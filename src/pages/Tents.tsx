@@ -5,6 +5,7 @@ import StageBadge from "@/components/StageBadge";
 import MetricChip from "@/components/MetricChip";
 import EmptyState from "@/components/EmptyState";
 import CreateTentDialog from "@/components/CreateTentDialog";
+import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import { useSensorReadings, usePlants } from "@/hooks/useMockData";
 import { useGrowTents } from "@/hooks/useGrowData";
 import { useGrows } from "@/store/grows";
@@ -31,19 +32,13 @@ export default function Tents() {
       {growId && (() => {
         const scopedGrow = grows.find((g) => g.id === growId) ?? null;
         return (
-          <div className="glass rounded-2xl px-4 py-2 mb-4 flex items-center justify-between text-xs gap-2 flex-wrap" aria-label="Grow filter banner">
-            {scopedGrow ? (
-              <span className="text-muted-foreground">Showing tents for <span className="text-foreground font-medium">{scopedGrow.name}</span></span>
-            ) : (
-              <span className="text-muted-foreground">Showing tents for this grow</span>
-            )}
-            <span className="flex items-center gap-3">
-              {scopedGrow && (
-                <Link to={`/grows/${scopedGrow.id}`} className="text-primary hover:underline">Back to Grow</Link>
-              )}
-              <Link to="/tents" className="text-primary hover:underline">Clear grow filter</Link>
-            </span>
-          </div>
+          <ScopedGrowBanner
+            growId={growId}
+            growName={scopedGrow?.name ?? null}
+            label="tents"
+            clearHref="/tents"
+            backHref={scopedGrow ? `/grows/${scopedGrow.id}` : undefined}
+          />
         );
       })()}
 

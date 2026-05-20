@@ -5,6 +5,7 @@ import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
 import EmptyState from "@/components/EmptyState";
 import CreatePlantDialog from "@/components/CreatePlantDialog";
+import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import { useTents } from "@/hooks/useMockData";
 import { useGrowPlants } from "@/hooks/useGrowData";
 import { useGrows } from "@/store/grows";
@@ -27,19 +28,13 @@ export default function Plants() {
       {growId && (() => {
         const scopedGrow = grows.find((g) => g.id === growId) ?? null;
         return (
-          <div className="glass rounded-2xl px-4 py-2 mb-4 flex items-center justify-between text-xs gap-2 flex-wrap" aria-label="Grow filter banner">
-            {scopedGrow ? (
-              <span className="text-muted-foreground">Showing plants for <span className="text-foreground font-medium">{scopedGrow.name}</span></span>
-            ) : (
-              <span className="text-muted-foreground">Showing plants for this grow</span>
-            )}
-            <span className="flex items-center gap-3">
-              {scopedGrow && (
-                <Link to={`/grows/${scopedGrow.id}`} className="text-primary hover:underline">Back to Grow</Link>
-              )}
-              <Link to="/plants" className="text-primary hover:underline">Clear grow filter</Link>
-            </span>
-          </div>
+          <ScopedGrowBanner
+            growId={growId}
+            growName={scopedGrow?.name ?? null}
+            label="plants"
+            clearHref="/plants"
+            backHref={scopedGrow ? `/grows/${scopedGrow.id}` : undefined}
+          />
         );
       })()}
       <div className="flex items-center gap-1.5 mb-4 flex-wrap">

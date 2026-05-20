@@ -28,12 +28,33 @@ interface GrowRow {
  * Read-only grow detail hub. No writes. Authenticated client only (RLS enforces
  * auth.uid() = user_id). No device-control surface introduced.
  */
+type CountValue = number | "unavailable";
+
+interface GrowCounts {
+  plants: CountValue;
+  tents: CountValue;
+  diary: CountValue;
+  actionsPending: CountValue;
+  actionsTotal: CountValue;
+  auditEvents: CountValue;
+}
+
+const EMPTY_COUNTS: GrowCounts = {
+  plants: 0,
+  tents: 0,
+  diary: 0,
+  actionsPending: 0,
+  actionsTotal: 0,
+  auditEvents: 0,
+};
+
 export default function GrowDetail() {
   const { growId } = useParams<{ growId: string }>();
   const { user } = useAuth();
   const [grow, setGrow] = useState<GrowRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [counts, setCounts] = useState<GrowCounts>(EMPTY_COUNTS);
 
   const load = useCallback(async () => {
     if (!user || !growId) return;
@@ -51,12 +72,41 @@ export default function GrowDetail() {
       return;
     }
     setGrow(data as GrowRow);
+
+    // Read-only count queries. Any failure degrades to "unavailable" — never crashes.
+    async function countFrom(
+      table: "plants" | "tents" | "diary_entries" | "action_queue" | "action_queue_events",
+      extra?: (q: ReturnType<typeof supabase.from> extends infer _T ? ReturnType<typeof supabase.from> : never) => unknown,
+    ): Promise<CountValue> {
+      try {
+        let q = supabase.from(table).select("id", { count: "exact", head: true }).eq("grow_id", growId!);
+        if (extra) q = extra(q) as typeof q;
+        const { count, error: cErr } = await q;
+        if (cErr) return "unavailable";
+        return count ?? 0;
+      } catch {
+        return "unavailable";
+      }
+    }
+
+    const [plants, tents, diary, actionsPending, actionsTotal, auditEvents] = await Promise.all([
+      countFrom("plants"),
+      countFrom("tents"),
+      countFrom("diary_entries"),
+      countFrom("action_queue", (q) => (q as ReturnType<typeof supabase.from>).eq("status", "pending_approval")),
+      countFrom("action_queue"),
+      countFrom("action_queue_events"),
+    ]);
+    setCounts({ plants, tents, diary, actionsPending, actionsTotal, auditEvents });
+
     setLoading(false);
   }, [user, growId]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+
 
   if (loading) {
     return (

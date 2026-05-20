@@ -123,14 +123,6 @@ const DIALOG_META: Record<Kind, { title: string; description: string; label: str
   },
 };
 
-const canApprove = (s: Status) => s === "pending_approval" || s === "simulated";
-const canSimulate = (s: Status) => s === "pending_approval";
-const canReject = (s: Status) => s === "pending_approval";
-const canComplete = (s: Status) => s === "approved" || s === "simulated";
-const canCancel = (s: Status) =>
-  s === "pending_approval" || s === "approved" || s === "simulated";
-const isTerminal = (s: Status) =>
-  s === "completed" || s === "rejected" || s === "cancelled";
 
 export default function ActionDetail() {
   const { actionId } = useParams<{ actionId: string }>();

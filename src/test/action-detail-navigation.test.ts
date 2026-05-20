@@ -12,8 +12,8 @@ describe("Action Queue → Detail navigation", () => {
     expect(ACTION_QUEUE).toMatch(/import \{[^}]*\bLink\b[^}]*\} from "react-router-dom"/);
   });
 
-  it("ActionQueue cards link to /actions/${row.id}", () => {
-    const matches = ACTION_QUEUE.match(/to=\{`\/actions\/\$\{row\.id\}`\}/g);
+  it("ActionQueue cards link to actionDetailPath(row.id)", () => {
+    const matches = ACTION_QUEUE.match(/to=\{actionDetailPath\(row\.id\)\}/g);
     expect(matches?.length ?? 0).toBeGreaterThanOrEqual(2);
     expect(ACTION_QUEUE).toMatch(/View Details/);
   });
@@ -26,14 +26,14 @@ describe("Action Queue → Detail navigation", () => {
     expect(ACTION_QUEUE).toMatch(/onClick=\{\(\) => cancelAction\(row\)\}/);
   });
 
-  it("Timeline action events link to /actions/${e.action_queue_id} when present", () => {
+  it("Timeline action events link to actionDetailPath(e.action_queue_id) when present", () => {
     expect(TIMELINE).toMatch(/e\.action_queue_id && \(/);
-    expect(TIMELINE).toMatch(/to=\{`\/actions\/\$\{e\.action_queue_id\}`\}/);
+    expect(TIMELINE).toMatch(/to=\{actionDetailPath\(e\.action_queue_id\)\}/);
     expect(TIMELINE).toMatch(/View Details/);
   });
 
-  it("Detail Back link still returns to /actions", () => {
-    expect(DETAIL).toMatch(/to="\/actions"/);
+  it("Detail Back link still returns to /actions via actionsPath()", () => {
+    expect(DETAIL).toMatch(/to=\{actionsPath\(\)\}/);
     expect(DETAIL).toMatch(/Back to Action Queue/);
   });
 

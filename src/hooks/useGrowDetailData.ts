@@ -119,7 +119,8 @@ export function useGrowDetailData(): UseGrowDetailData {
         | "tents"
         | "diary_entries"
         | "action_queue"
-        | "action_queue_events",
+        | "action_queue_events"
+        | "alerts",
       extra?: (
         q: ReturnType<typeof supabase.from> extends infer _T
           ? ReturnType<typeof supabase.from>
@@ -140,20 +141,42 @@ export function useGrowDetailData(): UseGrowDetailData {
       }
     }
 
-    const [plants, tents, diary, actionsPending, actionsTotal, auditEvents] =
-      await Promise.all([
-        countFrom("plants"),
-        countFrom("tents"),
-        countFrom("diary_entries"),
-        countFrom("action_queue", (q) =>
-          (q as ReturnType<typeof supabase.from>).eq(
-            "status",
-            "pending_approval",
-          ),
+    const [
+      plants,
+      tents,
+      diary,
+      actionsPending,
+      actionsTotal,
+      auditEvents,
+      alertsOpen,
+      alertsCritical,
+      alertsWarning,
+    ] = await Promise.all([
+      countFrom("plants"),
+      countFrom("tents"),
+      countFrom("diary_entries"),
+      countFrom("action_queue", (q) =>
+        (q as ReturnType<typeof supabase.from>).eq(
+          "status",
+          "pending_approval",
         ),
-        countFrom("action_queue"),
-        countFrom("action_queue_events"),
-      ]);
+      ),
+      countFrom("action_queue"),
+      countFrom("action_queue_events"),
+      countFrom("alerts", (q) =>
+        (q as ReturnType<typeof supabase.from>).eq("status", "open"),
+      ),
+      countFrom("alerts", (q) =>
+        (q as ReturnType<typeof supabase.from>)
+          .eq("status", "open")
+          .eq("severity", "critical"),
+      ),
+      countFrom("alerts", (q) =>
+        (q as ReturnType<typeof supabase.from>)
+          .eq("status", "open")
+          .eq("severity", "warning"),
+      ),
+    ]);
     setCounts({
       plants,
       tents,
@@ -161,6 +184,9 @@ export function useGrowDetailData(): UseGrowDetailData {
       actionsPending,
       actionsTotal,
       auditEvents,
+      alertsOpen,
+      alertsCritical,
+      alertsWarning,
     });
 
     // Recent activity: latest 5 diary + latest 5 action_queue_events.

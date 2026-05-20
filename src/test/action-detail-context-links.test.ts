@@ -35,8 +35,8 @@ describe("ActionDetail — quick context links", () => {
     expect(DETAIL).toMatch(/function IdField[\s\S]*?to \? \(\s*<Link[\s\S]*?\) : \(\s*<span>/);
   });
 
-  it("Back to Action Queue link is preserved", () => {
-    expect(DETAIL).toMatch(/to="\/actions"/);
+  it("Back to Action Queue link is preserved via actionsPath()", () => {
+    expect(DETAIL).toMatch(/to=\{actionsPath\(\)\}/);
     expect(DETAIL).toMatch(/Back to Action Queue/);
   });
 

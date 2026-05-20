@@ -203,7 +203,81 @@ export default function Dashboard() {
         </div>
       </div>
       {scopedGrowId ? (
+        <>
+        <section
+          className="glass rounded-2xl p-4 mt-4"
+          aria-label="Latest environment"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="font-display font-semibold">Latest Environment</h2>
+              <p className="text-xs text-muted-foreground">
+                Most recent reading for this grow. Not live device control.
+              </p>
+            </div>
+            <Link
+              to={logsPath(scopedGrowId)}
+              className="text-xs text-primary hover:underline"
+            >
+              Open Timeline →
+            </Link>
+          </div>
+          {sensorState.status === "loading" || sensorState.status === "idle" ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : sensorState.status === "unavailable" ? (
+            <p className="text-sm text-muted-foreground">
+              Sensor data unavailable.
+            </p>
+          ) : sensorState.snapshot.source === "unavailable" ? (
+            <p className="text-sm text-muted-foreground">No sensor data yet.</p>
+          ) : (
+            <div>
+              <div className="flex items-center gap-2 flex-wrap mb-2">
+                <Badge variant="outline" className="text-[10px] uppercase">
+                  {SOURCE_LABEL[sensorState.snapshot.source]}
+                </Badge>
+                {sensorState.snapshot.ts && (
+                  <span className="text-xs text-muted-foreground">
+                    {formatDistanceToNow(new Date(sensorState.snapshot.ts), {
+                      addSuffix: true,
+                    })}
+                  </span>
+                )}
+                {isStale(sensorState.snapshot.ts) && (
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] uppercase border-amber-500 text-amber-600"
+                  >
+                    Stale reading
+                  </Badge>
+                )}
+              </div>
+              <dl className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
+                {[
+                  { label: "Temperature", value: formatValue(sensorState.snapshot.temp, "°C") },
+                  { label: "Humidity", value: formatValue(sensorState.snapshot.rh, "%") },
+                  { label: "VPD", value: formatValue(sensorState.snapshot.vpd, " kPa", 2) },
+                  { label: "Soil water", value: formatValue(sensorState.snapshot.soil, "%") },
+                  { label: "Soil EC", value: formatValue(sensorState.snapshot.soil_ec, " mS/cm", 2) },
+                  { label: "Soil temp", value: formatValue(sensorState.snapshot.soil_temp, "°C") },
+                  { label: "PPFD", value: formatValue(sensorState.snapshot.ppfd, " µmol", 0) },
+                ].map((m) => (
+                  <div
+                    key={m.label}
+                    className="rounded-lg border border-border/40 bg-secondary/20 p-2"
+                  >
+                    <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      {m.label}
+                    </dt>
+                    <dd className="text-sm font-medium">{m.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          )}
+        </section>
         <div className="grid lg:grid-cols-2 gap-4 mt-4">
+
           <section
             className="glass rounded-2xl p-4"
             aria-label="Recent activity"

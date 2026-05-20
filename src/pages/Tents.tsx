@@ -25,6 +25,14 @@ export default function Tents() {
         actions={<CreateTentDialog />}
       />
 
+      {growId && (
+        <div className="glass rounded-2xl px-4 py-2 mb-4 flex items-center justify-between text-xs" aria-label="Grow filter banner">
+          <span className="text-muted-foreground">Showing tents for this grow</span>
+          <Link to="/tents" className="text-primary hover:underline">Clear grow filter</Link>
+        </div>
+      )}
+
+
       {isLoading ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[0, 1, 2].map((i) => <div key={i} className="glass rounded-2xl h-48 animate-pulse" />)}

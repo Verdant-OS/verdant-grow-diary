@@ -106,9 +106,7 @@ export default function ActionQueue() {
   }, [load]);
 
   // SECURITY: never sends device commands. Inserts an audit row ONLY.
-  // user_id is left to DB default auth.uid(). No service_role.
-  async function logEvent(
-    row: ActionRow,
+  // user_id is left to DB default auth.uid(). No privileged backend role.
     event_type: EventType,
     new_status: Status,
     note?: string,
@@ -153,7 +151,7 @@ export default function ActionQueue() {
 
   function approve(row: ActionRow) {
     // SECURITY: "approved" means approved for future manual/controlled execution.
-    // NO device command is sent. No MQTT / Home Assistant / Pi bridge / webhook.
+    // NO equipment command is sent from this app.
     return transition(
       row,
       { status: "approved", approved_at: new Date().toISOString() },

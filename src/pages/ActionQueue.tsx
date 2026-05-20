@@ -96,7 +96,7 @@ export default function ActionQueue() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [noteDialog, setNoteDialog] = useState<
-    { row: ActionRow; kind: "approve" | "reject" | "simulate" } | null
+    { row: ActionRow; kind: "approve" | "reject" | "simulate" | "complete" | "cancel" } | null
   >(null);
   const [noteDraft, setNoteDraft] = useState("");
 

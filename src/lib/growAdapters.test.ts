@@ -74,6 +74,7 @@ describe("mapPlantRow", () => {
       health: "watch",
       photo: "https://example.com/p.jpg",
       lastNote: "Trichomes cloudy",
+      growId: null,
     });
   });
   it("defaults null tent_id, strain, photo, note, and invalid health", () => {

@@ -23,6 +23,10 @@ import {
   compareSnapshotToTargets,
   STATUS_HEADLINE as TARGET_STATUS_HEADLINE,
 } from "@/lib/environmentTargetComparison";
+import {
+  buildEnvironmentAlerts,
+  EMPTY_ALERTS_MESSAGE,
+} from "@/lib/environmentAlerts";
 
 
 import {
@@ -536,6 +540,79 @@ export default function Dashboard() {
                     {result.reasons.map((r) => (
                       <li key={r}>{r}</li>
                     ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })()}
+        </section>
+        <section
+          className="glass rounded-2xl p-4 mt-4"
+          aria-label="Environment Alerts"
+        >
+          {(() => {
+            const snap =
+              sensorState.status === "ok" ? sensorState.snapshot : null;
+            const quality = evaluateSensorQuality(snap);
+            const targetsCmp = compareSnapshotToTargets(
+              snap,
+              targetsState.status === "ok" ? targetsState.targets : null,
+            );
+            const alerts = buildEnvironmentAlerts({
+              snapshot: snap,
+              quality,
+              targets: targetsCmp,
+            });
+            return (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <h2 className="font-display font-semibold">
+                      Environment Alerts
+                    </h2>
+                    <p className="text-xs text-muted-foreground">
+                      Read-only summary of data quality and target status. Not a
+                      plant-health diagnosis. Not device control.
+                    </p>
+                  </div>
+                </div>
+                {alerts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    {EMPTY_ALERTS_MESSAGE}
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {alerts.map((a) => {
+                      const tone =
+                        a.severity === "critical"
+                          ? "border-destructive text-destructive"
+                          : a.severity === "warning"
+                            ? "border-amber-500 text-amber-600"
+                            : a.severity === "watch"
+                              ? "border-amber-400 text-amber-500"
+                              : "border-muted-foreground text-muted-foreground";
+                      return (
+                        <li
+                          key={a.id}
+                          className="rounded-lg border border-border/40 bg-secondary/20 p-2 text-sm"
+                        >
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] uppercase ${tone}`}
+                            >
+                              {a.severity}
+                            </Badge>
+                            <span className="font-medium text-sm">
+                              {a.title}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {a.reason}
+                          </p>
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </div>

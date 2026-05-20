@@ -341,3 +341,71 @@ function Empty({ title, desc, cta }: { title: string; desc: string; cta?: React.
 function SnapChip({ children }: { children: React.ReactNode }) {
   return <span className="text-[11px] px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40">{children}</span>;
 }
+
+const ACTION_EVENT_TONE: Record<ActionEventType, string> = {
+  created:   "bg-secondary/60 border-border/50 text-foreground",
+  simulated: "bg-blue-500/10 border-blue-500/30 text-blue-300",
+  approved:  "bg-emerald-500/10 border-emerald-500/30 text-emerald-300",
+  rejected:  "bg-red-500/10 border-red-500/30 text-red-300",
+  completed: "bg-primary/10 border-primary/30 text-primary",
+  cancelled: "bg-muted/40 border-border/50 text-muted-foreground",
+  note:      "bg-amber-500/10 border-amber-500/30 text-amber-300",
+};
+
+function ActionQueueEventsSection({ events }: { events: ActionQueueEvent[] }) {
+  if (!events?.length) return null;
+  // Defensive: sort newest-first regardless of fetch order.
+  const sorted = [...events].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
+  return (
+    <section className="glass rounded-2xl p-4 mb-4" aria-label="Action Queue events">
+      <div className="flex items-center gap-2 mb-3">
+        <ListChecks className="h-3.5 w-3.5 text-primary" />
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Action Queue events
+        </h2>
+        <span className="text-[11px] text-muted-foreground">
+          {sorted.length} {sorted.length === 1 ? "event" : "events"} · read-only
+        </span>
+      </div>
+      <ul className="space-y-2">
+        {sorted.map((e) => (
+          <li
+            key={e.id}
+            className="rounded-xl border border-border/50 bg-secondary/30 p-3"
+          >
+            <div className="flex items-center gap-2 flex-wrap text-xs">
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] font-medium uppercase",
+                  ACTION_EVENT_TONE[e.event_type] ?? ACTION_EVENT_TONE.created,
+                )}
+              >
+                {e.event_type}
+              </span>
+              <span className="text-muted-foreground">
+                {e.previous_status ?? "—"} → {e.new_status ?? "—"}
+              </span>
+              <span
+                className="ml-auto text-muted-foreground"
+                title={format(new Date(e.created_at), "PPpp")}
+              >
+                {formatDistanceToNow(new Date(e.created_at), { addSuffix: true })}
+              </span>
+            </div>
+            {e.action?.suggested_change && (
+              <p className="text-sm mt-2">{e.action.suggested_change}</p>
+            )}
+            {e.action?.reason && (
+              <p className="text-xs text-muted-foreground mt-1">{e.action.reason}</p>
+            )}
+            {e.note && (
+              <p className="text-xs italic text-muted-foreground mt-2">· {e.note}</p>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}

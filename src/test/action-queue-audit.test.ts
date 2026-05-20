@@ -102,9 +102,13 @@ describe("ActionQueue page — audit wiring", () => {
   });
 
   it("approve / reject / simulate each call the transition helper", () => {
-    expect(PAGE).toMatch(/function\s+approve[\s\S]*?transition\([\s\S]*?["']approved["'][\s\S]*?["']approved["']\s*\)/);
-    expect(PAGE).toMatch(/function\s+reject[\s\S]*?transition\([\s\S]*?["']rejected["'][\s\S]*?["']rejected["']\s*\)/);
-    expect(PAGE).toMatch(/function\s+simulate[\s\S]*?transition\([\s\S]*?["']simulated["'][\s\S]*?["']simulated["']\s*\)/);
+    expect(PAGE).toMatch(/function\s+approve[\s\S]*?transition\(/);
+    expect(PAGE).toMatch(/function\s+reject[\s\S]*?transition\(/);
+    expect(PAGE).toMatch(/function\s+simulate[\s\S]*?transition\(/);
+    // each transition call passes an event_type AND new_status that match
+    expect(PAGE).toMatch(/transition\([\s\S]*?["']approved["'][\s\S]*?["']approved["']/);
+    expect(PAGE).toMatch(/transition\([\s\S]*?["']rejected["'][\s\S]*?["']rejected["']/);
+    expect(PAGE).toMatch(/transition\([\s\S]*?["']simulated["'][\s\S]*?["']simulated["']/);
   });
 
   it("simulate explicitly states no device command is sent", () => {

@@ -14,6 +14,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
+import { alertDetailPath } from "@/lib/routes";
 import {
   type CountValue,
   type GrowStatus,

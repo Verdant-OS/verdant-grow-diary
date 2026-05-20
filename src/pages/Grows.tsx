@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
 
@@ -9,14 +10,15 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Sprout, Check, Trash2, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Sprout, Check, Trash2, Loader2, AlertCircle } from "lucide-react";
 import { GROW_TYPES, STAGES, growTypeLabel, stageLabel } from "@/lib/grow";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
 export default function Grows() {
   const { user } = useAuth();
-  const { grows, activeGrowId, setActiveGrowId, refresh, loading } = useGrows();
+  const { grows, activeGrowId, setActiveGrowId, refresh, loading, error } = useGrows();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", grow_type: "tent", stage: "seedling", notes: "" });
   const [busy, setBusy] = useState(false);

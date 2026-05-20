@@ -620,7 +620,7 @@ export default function Dashboard() {
                                 variant="outline"
                                 onClick={async () => {
                                   try {
-                                    await saveAlert({
+                                    const saved = await saveAlert({
                                       grow_id: scopedGrowId,
                                       severity: a.severity,
                                       title: a.title,
@@ -630,7 +630,19 @@ export default function Dashboard() {
                                           ? a.metric
                                           : null,
                                     });
-                                    toast.success("Alert saved");
+                                    try {
+                                      await logAlertEvent({
+                                        alert_id: saved.id,
+                                        grow_id: scopedGrowId,
+                                        event_type: "created",
+                                        new_status: "open",
+                                      });
+                                      toast.success("Alert saved");
+                                    } catch (logErr) {
+                                      toast.warning(
+                                        `Alert saved, but audit log failed: ${(logErr as Error).message}`,
+                                      );
+                                    }
                                   } catch (err) {
                                     toast.error(
                                       `Failed to save alert: ${(err as Error).message}`,

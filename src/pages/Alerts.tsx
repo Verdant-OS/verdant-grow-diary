@@ -252,7 +252,9 @@ export default function Alerts() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleAcknowledge(a.id)}
+                              onClick={() =>
+                                handleAcknowledge(a.id, a.grow_id, a.status)
+                              }
                             >
                               Acknowledge
                             </Button>
@@ -261,7 +263,9 @@ export default function Alerts() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleResolve(a.id)}
+                            onClick={() =>
+                              handleResolve(a.id, a.grow_id, a.status)
+                            }
                           >
                             Resolve
                           </Button>
@@ -271,12 +275,15 @@ export default function Alerts() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => handleDismiss(a.id)}
+                              onClick={() =>
+                                handleDismiss(a.id, a.grow_id, a.status)
+                              }
                             >
                               Dismiss
                             </Button>
                           )}
                       </div>
+                      <AlertHistory alertId={a.id} />
                     </li>
                   ))}
                 </ul>

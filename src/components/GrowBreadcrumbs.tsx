@@ -3,6 +3,7 @@ import { ChevronRight } from "lucide-react";
 import { useGrows } from "@/store/grows";
 import {
   actionsPath,
+  alertsPath,
   dashboardPath,
   growDetailPath,
   logsPath,
@@ -130,6 +131,8 @@ export function buildSwitcherTarget(
       return growDetailPath(newGrowId);
     case "dashboard":
       return dashboardPath(newGrowId);
+    case "alerts":
+      return alertsPath(newGrowId);
   }
 }
 

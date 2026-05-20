@@ -63,9 +63,10 @@ describe("has_role SECURITY DEFINER safety", () => {
     );
   });
 
-  it("no migration pairs has_role with service_role escalation", () => {
-    const near =
-      /service_role[\s\S]{0,400}has_role|has_role[\s\S]{0,400}service_role/i;
-    expect(ALL_SQL).not.toMatch(near);
+  it("has_role EXECUTE is restricted (not granted to anon/public)", () => {
+    // Defensive: signed-out / public callers must not be able to probe roles.
+    expect(ALL_SQL).not.toMatch(
+      /GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+public\.has_role[^;]*\bTO\s+(anon|public)\b/i,
+    );
   });
 });

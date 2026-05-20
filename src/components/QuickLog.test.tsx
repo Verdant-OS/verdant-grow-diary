@@ -1,6 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement } from "react";
 import QuickLog from "./QuickLog";
+
+function renderWithClient(ui: ReactElement) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
 
 const insertMock = vi.fn();
 const uploadMock = vi.fn();
@@ -42,7 +51,7 @@ beforeEach(() => {
 describe("QuickLog photo Remove button", () => {
   it("clears the preview and does not submit the form", () => {
     const onOpenChange = vi.fn();
-    render(<QuickLog open={true} onOpenChange={onOpenChange} />);
+    renderWithClient(<QuickLog open={true} onOpenChange={onOpenChange} />);
 
     const dialog = screen.getByRole("dialog");
     // File input is hidden; grab it via the dialog
@@ -79,7 +88,7 @@ describe("QuickLog photo Remove button", () => {
 
     const onOpenChange = vi.fn();
     const onCreated = vi.fn();
-    render(<QuickLog open={true} onOpenChange={onOpenChange} onCreated={onCreated} />);
+    renderWithClient(<QuickLog open={true} onOpenChange={onOpenChange} onCreated={onCreated} />);
 
     const dialog = screen.getByRole("dialog");
     const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
@@ -119,7 +128,7 @@ describe("QuickLog photo Remove button", () => {
 
     const onOpenChange = vi.fn();
     const onCreated = vi.fn();
-    render(<QuickLog open={true} onOpenChange={onOpenChange} onCreated={onCreated} />);
+    renderWithClient(<QuickLog open={true} onOpenChange={onOpenChange} onCreated={onCreated} />);
 
     const dialog = screen.getByRole("dialog");
     const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
@@ -144,7 +153,7 @@ describe("QuickLog photo Remove button", () => {
   it("blocks submit with no photo and empty note, showing the validation toast", async () => {
     const onOpenChange = vi.fn();
     const onCreated = vi.fn();
-    render(<QuickLog open={true} onOpenChange={onOpenChange} onCreated={onCreated} />);
+    renderWithClient(<QuickLog open={true} onOpenChange={onOpenChange} onCreated={onCreated} />);
 
     const dialog = screen.getByRole("dialog");
     expect(dialog.querySelector("img")).toBeNull();
@@ -165,7 +174,7 @@ describe("QuickLog photo Remove button", () => {
 
     const onOpenChange = vi.fn();
     const onCreated = vi.fn();
-    render(<QuickLog open={true} onOpenChange={onOpenChange} onCreated={onCreated} />);
+    renderWithClient(<QuickLog open={true} onOpenChange={onOpenChange} onCreated={onCreated} />);
 
     const dialog = screen.getByRole("dialog");
     expect(dialog.querySelector("img")).toBeNull();

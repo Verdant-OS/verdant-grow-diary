@@ -549,10 +549,9 @@ export default function Dashboard() {
             growId={scopedGrowId}
             growName={scopedGrowName ?? undefined}
             onSaved={() => {
-              // Reload by toggling the URL? Simpler: force a soft refresh
-              // by replacing the current location with the same path.
-              window.location.assign(window.location.pathname + window.location.search);
+              targetsState.reload();
             }}
+
           />
         )}
         <div className="grid lg:grid-cols-2 gap-4 mt-4">

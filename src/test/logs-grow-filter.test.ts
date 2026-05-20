@@ -16,8 +16,8 @@ describe("Logs — grow filter (/logs?growId=…)", () => {
     expect(APP).toMatch(/path=\s*["']\/logs["']\s*element=\{<Timeline/);
   });
 
-  it("reads growId from URL search params", () => {
-    expect(TIMELINE).toMatch(/searchParams\.get\(\s*["']growId["']\s*\)/);
+  it("reads growId via shared useScopedGrow hook", () => {
+    expect(TIMELINE).toMatch(/useScopedGrow\(\)/);
   });
 
   it("scopes diary_entries query by grow_id at the query layer", () => {

@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 
 export default function Plants() {
   // Shared URL `?growId=` resolution against RLS-loaded grows.
-  const { urlGrowId, scopedGrow, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
+  const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
   const validGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
   const { data: plants = [] } = useGrowPlants(undefined, urlGrowId ?? undefined);
   const { data: tents = [] } = useTents();

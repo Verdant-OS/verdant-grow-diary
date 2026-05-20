@@ -152,6 +152,12 @@ export default function Timeline() {
 
   return (
     <div>
+      <GrowBreadcrumbs
+        growId={urlGrowId}
+        growName={scopedGrowName}
+        current={isLogsRoute ? "Logs" : "Timeline"}
+      />
+      
       
       {activeGrow && (
         <div className="mb-5">

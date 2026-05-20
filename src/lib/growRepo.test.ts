@@ -16,7 +16,7 @@ function reset() {
 }
 
 function builder() {
-  const b: any = {
+  const b: Record<string, unknown> = {
     select: () => b,
     eq: (col: string, val: unknown) => { calls.filters.push([col, val]); return b; },
     order: (col: string) => { calls.ordered = col; return b; },

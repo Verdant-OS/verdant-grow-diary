@@ -22,6 +22,7 @@ export default function Tents() {
 
   return (
     <div>
+      <GrowBreadcrumbs growId={urlGrowId} growName={scopedGrowName} current="Tents" />
       <PageHeader
         title="Tents"
         description="Every grow space, environment, and lighting status."

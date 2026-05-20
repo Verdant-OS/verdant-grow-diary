@@ -48,6 +48,21 @@ const EMPTY_COUNTS: GrowCounts = {
   auditEvents: 0,
 };
 
+interface RecentItem {
+  id: string;
+  kind: "diary" | "action_event";
+  ts: string;
+  title: string;
+  detail?: string | null;
+  href?: string;
+}
+
+type RecentState =
+  | { status: "loading" }
+  | { status: "ok"; items: RecentItem[] }
+  | { status: "unavailable" };
+
+
 export default function GrowDetail() {
   const { growId } = useParams<{ growId: string }>();
   const { user } = useAuth();

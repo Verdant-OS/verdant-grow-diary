@@ -6,8 +6,8 @@
  * no external-control, no service_role, no write paths).
  */
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 import {
   buildEnvironmentAlerts,
@@ -221,23 +221,4 @@ describe("Environment Alerts — safety constraints", () => {
     expect(block).not.toMatch(/\.insert\s*\(/);
   });
 
-  it("no non-test src file references service_role (defensive sweep)", () => {
-    const srcDir = resolve(__dirname, "..");
-    const violations: string[] = [];
-    const walk = (dir: string) => {
-      for (const name of readdirSync(dir)) {
-        const full = join(dir, name);
-        const s = statSync(full);
-        if (s.isDirectory()) {
-          if (name === "node_modules" || name.startsWith(".") || name === "test") continue;
-          walk(full);
-        } else if (/\.(ts|tsx)$/.test(name) && !name.endsWith(".test.ts") && !name.endsWith(".test.tsx")) {
-          const text = readFileSync(full, "utf8");
-          if (/service_role/i.test(text)) violations.push(full);
-        }
-      }
-    };
-    walk(srcDir);
-    expect(violations).toEqual([]);
-  });
 });

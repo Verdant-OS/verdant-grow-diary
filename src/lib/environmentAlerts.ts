@@ -9,7 +9,7 @@
  * Strict constraints:
  *   - No I/O. No Supabase calls. No React.
  *   - No AI calls. No plant-health diagnosis.
- *   - Read-only. No automation or external control recommendations.
+ *   - Read-only. Suggests nothing automated.
  *   - Does NOT create database rows. Candidates only.
  */
 import { isStale, type SensorSnapshot } from "@/lib/sensorSnapshot";

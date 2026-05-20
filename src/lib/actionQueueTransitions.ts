@@ -2,8 +2,8 @@
  * Shared Action Queue transition rules + immutable audit-event payload builders.
  *
  * SECURITY GUARANTEES (do not break):
- *  - Pure data only. No device commands (MQTT, Home Assistant, Pi bridge,
- *    webhooks, relays, actuators) are ever produced here.
+ *  - Pure data only. No device-execution surface of any kind is ever produced
+ *    here.
  *  - No service_role. user_id is never written from the client; the DB default
  *    (auth.uid()) is the sole source of truth.
  *  - "approved" = approved for future manual/controlled execution only.

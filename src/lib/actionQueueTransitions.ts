@@ -1,14 +1,21 @@
 /**
  * Shared Action Queue transition rules + immutable audit-event payload builders.
  *
+ * SCOPE:
+ *  - Suggest-only workflow. Equipment / device execution (MQTT, Home Assistant,
+ *    Pi bridge, webhooks, relays, actuators) is intentionally OUT OF SCOPE and
+ *    must never be added here. "approve" records grower intent only; it does
+ *    NOT execute any equipment command. "complete" means the grower handled
+ *    the action manually outside Verdant.
+ *
  * SECURITY GUARANTEES (do not break):
  *  - Pure data only. No device-execution surface of any kind is ever produced
  *    here.
  *  - No service_role. user_id is never written from the client; the DB default
  *    (auth.uid()) is the sole source of truth.
- *  - "approved" = approved for future manual/controlled execution only.
  *  - Terminal statuses (completed, rejected, cancelled) cannot be transitioned.
  */
+
 
 export type ActionStatus =
   | "pending_approval"

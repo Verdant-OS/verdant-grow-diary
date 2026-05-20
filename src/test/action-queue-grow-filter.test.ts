@@ -59,7 +59,7 @@ describe("ActionQueue — URL growId filter", () => {
 });
 
 describe("GrowDetail — Action Queue hub link", () => {
-  it("links Action Queue card to /actions?growId=<growId>", () => {
-    expect(GROW).toMatch(/\/actions\?growId=\$\{growId\}/);
+  it("links Action Queue card via actionsPath(growId)", () => {
+    expect(GROW).toMatch(/actionsPath\(growId\)/);
   });
 });

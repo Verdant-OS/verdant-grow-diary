@@ -140,7 +140,11 @@ describe("scoped-grow navigation contract — create defaults remain grow-aware"
 describe("scoped-grow navigation contract — safe surface", () => {
   const SAFE = [GROW_DETAIL, PLANTS, TENTS, TIMELINE, ACTIONQ, HOOK_SRC, BANNER_SRC];
   it("no ai-coach call introduced", () => {
-    for (const src of SAFE) expect(src).not.toMatch(/ai-coach|ai_coach/);
+    // Match invocation forms only ("ai-coach" string literal, edge-fn path,
+    // or snake_case identifier) — not safety comments that say
+    // "No ai-coach call".
+    const AI_COACH_CALL = /["'`]ai-coach["'`]|functions\/ai-coach|ai_coach/;
+    for (const src of SAFE) expect(src).not.toMatch(AI_COACH_CALL);
   });
   it("no device-control strings introduced", () => {
     for (const src of SAFE) {

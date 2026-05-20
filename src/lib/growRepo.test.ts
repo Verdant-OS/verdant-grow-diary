@@ -116,13 +116,13 @@ describe("fetchSensorReadings", () => {
 describe("insertSensorReading", () => {
   it("forwards the row payload", async () => {
     nextResult = { data: null, error: null };
-    await insertSensorReading({ user_id: "u", tent_id: TENT_UUID, metric: "temperature_c", value: 22 } as any);
+    await insertSensorReading({ user_id: "u", tent_id: TENT_UUID, metric: "temperature_c", value: 22 } as never);
     expect(calls.table).toBe("sensor_readings");
     expect(calls.inserted).toMatchObject({ metric: "temperature_c", value: 22 });
   });
   it("throws on error", async () => {
     nextResult = { data: null, error: { message: "denied" } };
-    await expect(insertSensorReading({ user_id: "u", tent_id: TENT_UUID, metric: "temperature_c", value: 1 } as any))
+    await expect(insertSensorReading({ user_id: "u", tent_id: TENT_UUID, metric: "temperature_c", value: 1 } as never))
       .rejects.toThrow(/insertSensorReading.*denied/);
   });
 });

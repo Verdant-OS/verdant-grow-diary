@@ -41,7 +41,7 @@ describe("Tents — grow filter", () => {
   it("renders banner and clear link via ScopedGrowBanner", () => {
     expect(TENTS).toMatch(/ScopedGrowBanner/);
     expect(TENTS).toMatch(/label=\s*["']tents["']/);
-    expect(TENTS).toMatch(/clearHref=\s*["']\/tents["']/);
+    expect(TENTS).toMatch(/clearHref=\{tentsPath\(\)\}/);
   });
   it("no ai-coach / device-control / service_role", () => {
     expect(TENTS).not.toMatch(/ai-coach|ai_coach/);

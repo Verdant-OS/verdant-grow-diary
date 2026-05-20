@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Box, Lightbulb } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
@@ -9,7 +9,7 @@ import { useSensorReadings, usePlants } from "@/hooks/useMockData";
 import { useGrowTents } from "@/hooks/useGrowData";
 
 export default function Tents() {
-  const { data: tents = [], isLoading } = useGrowTents();
+  const { data: tents: allTents = [], isLoading } = useGrowTents();
   const { data: readings = [] } = useSensorReadings();
   const { data: plants = [] } = usePlants();
 

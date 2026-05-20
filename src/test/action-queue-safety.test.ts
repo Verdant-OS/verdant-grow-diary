@@ -1,0 +1,210 @@
+/**
+ * Action Queue safety regression tests for Verdant.
+ *
+ * Verdant currently has NO action_queue table and NO device-control surface.
+ * AI Coach is suggest-only by construction: it returns structured JSON to the
+ * user and never writes side effects, never opens MQTT / Home Assistant /
+ * Pi-bridge / webhook sockets, and the schema has no table that could be used
+ * to drive equipment.
+ *
+ * These tests lock that posture in TWO ways:
+ *
+ *   A. CURRENT-STATE assertions — fail loudly if any device-control code is
+ *      introduced into the repo (ai-coach edge function or anywhere in src/
+ *      / supabase/functions/).
+ *
+ *   B. FUTURE-PROOF assertions — if/when a migration introduces the
+ *      `action_queue` table, it MUST satisfy the safety contract:
+ *        - default status = 'pending_approval'
+ *        - required columns: user_id, grow_id, action_type, target,
+ *          reason, risk_level, status, created_at
+ *        - RLS enabled with user-scoped policies
+ *        - no service-role bypass on writes
+ *      Until that migration exists those assertions are gated behind a
+ *      detection step and reported as "n/a (table not yet introduced)".
+ *
+ * Do NOT relax these tests without a security review.
+ */
+
+import { describe, it, expect } from "vitest";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { resolve, join } from "node:path";
+
+const ROOT = resolve(__dirname, "../..");
+const AI_COACH_SRC = readFileSync(
+  resolve(ROOT, "supabase/functions/ai-coach/index.ts"),
+  "utf8",
+);
+const TYPES_SRC = readFileSync(
+  resolve(ROOT, "src/integrations/supabase/types.ts"),
+  "utf8",
+);
+
+// Recursively collect text files under a directory, excluding test files and
+// this file (so we don't false-positive on our own regex strings).
+function walk(dir: string, acc: string[] = []): string[] {
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name);
+    const s = statSync(p);
+    if (s.isDirectory()) {
+      if (name === "node_modules" || name === "dist" || name === ".git") continue;
+      walk(p, acc);
+    } else if (/\.(ts|tsx|js|jsx|sql|toml)$/.test(name)) {
+      acc.push(p);
+    }
+  }
+  return acc;
+}
+
+const SCAN_PATHS = [
+  ...walk(resolve(ROOT, "src")),
+  ...walk(resolve(ROOT, "supabase/functions")),
+].filter((p) => !p.includes("/test/") && !p.endsWith(".test.ts") && !p.endsWith(".test.tsx"));
+
+function readAll(): string {
+  return SCAN_PATHS.map((p) => readFileSync(p, "utf8")).join("\n\n//FILE\n\n");
+}
+const ALL_PROD_CODE = readAll();
+
+// Find any migration introducing an action_queue table (future-proofing).
+function findActionQueueMigration(): string | null {
+  const migDir = resolve(ROOT, "supabase/migrations");
+  for (const name of readdirSync(migDir)) {
+    if (!name.endsWith(".sql")) continue;
+    const sql = readFileSync(join(migDir, name), "utf8");
+    if (/create\s+table[^;]*\baction_queue\b/i.test(sql)) return sql;
+  }
+  return null;
+}
+const ACTION_QUEUE_SQL = findActionQueueMigration();
+const HAS_ACTION_QUEUE_TABLE = /action_queue/i.test(TYPES_SRC) || !!ACTION_QUEUE_SQL;
+
+// Strip JS/TS comments for source-shape checks on ai-coach.
+const AI_COACH_CODE = AI_COACH_SRC
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+describe("Action Queue safety — current posture (suggest-only by construction)", () => {
+  it("1. ai-coach performs NO writes (no .insert / .upsert / .update / .delete / .rpc)", () => {
+    // Strong invariant: the AI Coach must be read-only on the database.
+    expect(AI_COACH_CODE).not.toMatch(/\.insert\s*\(/);
+    expect(AI_COACH_CODE).not.toMatch(/\.upsert\s*\(/);
+    expect(AI_COACH_CODE).not.toMatch(/\.update\s*\(/);
+    expect(AI_COACH_CODE).not.toMatch(/\.delete\s*\(/);
+    expect(AI_COACH_CODE).not.toMatch(/\.rpc\s*\(/);
+    // And specifically never writes to action_queue (even once the table exists).
+    expect(AI_COACH_CODE).not.toMatch(/action_queue/i);
+  });
+
+  it("2. no AI / coach code reaches MQTT, Home Assistant, Pi bridge, webhooks, or device endpoints", () => {
+    const banned: Array<{ name: string; re: RegExp }> = [
+      { name: "MQTT", re: /\bmqtt:\/\//i },
+      { name: "MQTT client", re: /\bmqtt\.connect\b/i },
+      { name: "Home Assistant", re: /home[\s_-]?assistant/i },
+      { name: "Pi bridge HTTP", re: /pi[\s_-]?bridge\.(?:local|lan|home|io|net|com)/i },
+      { name: "webhook URL var", re: /\bWEBHOOK_URL\b/ },
+      { name: "device_command", re: /device_command/i },
+      { name: "actuator call", re: /\bactuator\.(send|trigger|run|fire)/i },
+      { name: "relay control", re: /\brelay\.(on|off|toggle)/i },
+      { name: "command bus", re: /command_bus/i },
+    ];
+    for (const { name, re } of banned) {
+      expect(ALL_PROD_CODE, `must not contain device-control surface: ${name}`).not.toMatch(re);
+    }
+    // pi_bridge appears ONLY as a sensor_readings.source enum value (read-side
+    // ingest tag), never as an outbound device controller — assert it's not
+    // referenced from any fetch/url/MQTT call.
+    const piContexts = [...ALL_PROD_CODE.matchAll(/pi[_-]bridge/gi)];
+    for (const m of piContexts) {
+      const ctx = ALL_PROD_CODE.slice(Math.max(0, m.index! - 60), m.index! + 60);
+      expect(ctx, `pi_bridge reference must not be a control call: ${ctx}`).not.toMatch(
+        /fetch|http|mqtt|publish|post|send|trigger/i,
+      );
+    }
+  });
+
+  it("10. no simulation/auto-execute path exists that could push commands to real devices", () => {
+    // No "auto execute / autopilot" code paths in production.
+    for (const re of [
+      /\bautopilot\b/i,
+      /\bauto[-_ ]?execute\b/i,
+      /\bauto[-_ ]?apply\b/i,
+      /\bexecute_action\b/i,
+      /\bdispatch_command\b/i,
+    ]) {
+      expect(ALL_PROD_CODE).not.toMatch(re);
+    }
+  });
+});
+
+describe("Action Queue safety — future-proof contract (active only when action_queue ships)", () => {
+  it(`detects whether action_queue table exists (currently: ${HAS_ACTION_QUEUE_TABLE ? "YES" : "no — gated tests are pending"})`, () => {
+    // This is informational; the gated tests below assert the contract IF the
+    // table is introduced. Today we expect it NOT to exist.
+    expect(typeof HAS_ACTION_QUEUE_TABLE).toBe("boolean");
+  });
+
+  (HAS_ACTION_QUEUE_TABLE ? it : it.skip)(
+    "3. action_queue.status defaults to 'pending_approval' (or equivalent approval-required state)",
+    () => {
+      const sql = ACTION_QUEUE_SQL ?? "";
+      expect(sql).toMatch(/status[\s\S]{0,80}default\s+['"](pending_approval|awaiting_approval|proposed|suggested)['"]/i);
+    },
+  );
+
+  (HAS_ACTION_QUEUE_TABLE ? it : it.skip)(
+    "4. action_queue includes user_id, grow_id, action_type, target, reason, risk_level, status, created_at",
+    () => {
+      const sql = ACTION_QUEUE_SQL ?? "";
+      for (const col of [
+        "user_id",
+        "grow_id",
+        "action_type",
+        "reason",
+        "risk_level",
+        "status",
+        "created_at",
+      ]) {
+        expect(sql, `action_queue missing required column: ${col}`).toMatch(
+          new RegExp(`\\b${col}\\b`, "i"),
+        );
+      }
+      // target_device OR target_metric must exist.
+      expect(sql).toMatch(/target_(device|metric)/i);
+    },
+  );
+
+  (HAS_ACTION_QUEUE_TABLE ? it : it.skip)(
+    "5+6+7. action_queue enforces RLS with auth.uid() = user_id (user-scoped writes; client user_id not trusted)",
+    () => {
+      const sql = ACTION_QUEUE_SQL ?? "";
+      expect(sql).toMatch(/alter\s+table[\s\S]*action_queue[\s\S]*enable\s+row\s+level\s+security/i);
+      expect(sql).toMatch(/create\s+policy[\s\S]*action_queue[\s\S]*auth\.uid\(\)\s*=\s*user_id/i);
+      // No service_role bypass policy.
+      expect(sql).not.toMatch(/service_role/i);
+    },
+  );
+
+  (HAS_ACTION_QUEUE_TABLE ? it : it.skip)(
+    "8. action_queue grow ownership is enforced (FK to grows or trigger/policy referencing grows.user_id)",
+    () => {
+      const sql = ACTION_QUEUE_SQL ?? "";
+      // Either a FK to grows(id) plus the RLS-on-user_id above, or an explicit
+      // grow-ownership check.
+      const hasGrowFk = /grow_id[\s\S]{0,200}references\s+(public\.)?grows\s*\(\s*id\s*\)/i.test(sql);
+      const hasGrowOwnershipCheck = /grows[\s\S]{0,200}user_id[\s\S]{0,40}auth\.uid\(\)/i.test(sql);
+      expect(hasGrowFk || hasGrowOwnershipCheck).toBe(true);
+    },
+  );
+
+  (HAS_ACTION_QUEUE_TABLE ? it : it.skip)(
+    "9. approved actions are separated from suggested (status enum / approved_at column / approvals table)",
+    () => {
+      const sql = ACTION_QUEUE_SQL ?? "";
+      const hasStatusEnum = /status[\s\S]{0,200}(approved|executed|rejected|pending_approval)/i.test(sql);
+      const hasApprovedAt = /\bapproved_at\b/i.test(sql);
+      const hasApprovalsTable = /create\s+table[^;]*\baction_approvals?\b/i.test(sql);
+      expect(hasStatusEnum || hasApprovedAt || hasApprovalsTable).toBe(true);
+    },
+  );
+});

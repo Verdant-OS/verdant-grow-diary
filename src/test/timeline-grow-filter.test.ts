@@ -33,11 +33,11 @@ describe("Timeline — grow filter", () => {
     );
   });
 
-  it("renders banner and clear-filter link when growId is present", () => {
+  it("renders banner and clear-filter link when growId is present via ScopedGrowBanner", () => {
     expect(TIMELINE).toMatch(/urlGrowId\s*&&/);
-    expect(TIMELINE).toMatch(/Showing \{scopeLabel\} for this grow/);
-    expect(TIMELINE).toMatch(/Clear grow filter/);
-    expect(TIMELINE).toMatch(/to=\{clearTo\}/);
+    expect(TIMELINE).toMatch(/ScopedGrowBanner/);
+    expect(TIMELINE).toMatch(/label=\{scopeLabel\}/);
+    expect(TIMELINE).toMatch(/clearHref=\{clearTo\}/);
   });
 
   it("preserves newest-first ordering", () => {

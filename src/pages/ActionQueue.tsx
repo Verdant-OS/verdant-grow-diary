@@ -24,6 +24,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Loader2, Check, X, FlaskConical, ListChecks, History, CheckCircle2, Ban } from "lucide-react";
 import { toast } from "sonner";
+import {
+  type ActionStatus,
+  type ActionEventType,
+  type TransitionKind,
+  isTerminalStatus,
+  canComplete,
+  canCancel,
+  buildTransitionPatch,
+  buildAuditEventPayload,
+  eventTypeFor,
+  nextStatusFor,
+  normalizeNote,
+} from "@/lib/actionQueueTransitions";
 
 type Status =
   | "pending_approval"

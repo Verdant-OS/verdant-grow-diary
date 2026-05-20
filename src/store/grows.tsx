@@ -60,7 +60,7 @@ export function GrowsProvider({ children }: { children: ReactNode }) {
   const activeGrow = grows.find((g) => g.id === activeGrowId) ?? null;
 
   return (
-    <GrowsCtx.Provider value={{ grows, activeGrowId, setActiveGrowId, activeGrow, refresh, loading }}>
+    <GrowsCtx.Provider value={{ grows, activeGrowId, setActiveGrowId, activeGrow, refresh, loading, error }}>
       {children}
     </GrowsCtx.Provider>
   );

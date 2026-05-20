@@ -6,10 +6,7 @@ identify the finding, justify the exception, list the safety controls that
 contain its blast radius, and reference the regression tests that prove those
 controls remain in place.
 
-> **Note:** New `SECURITY DEFINER` functions require explicit review and
-> dedicated tests before being added. This registry does **not** authorize
-> adding more `SECURITY DEFINER` helpers as a general pattern — each one must
-> be justified, scoped, and tested individually.
+**Note:** New SECURITY DEFINER functions require explicit review and dedicated tests before being added. This registry does **not** authorize adding more SECURITY DEFINER helpers as a general pattern — each one must be justified, scoped, and tested individually.
 
 ---
 

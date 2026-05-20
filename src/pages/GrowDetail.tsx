@@ -156,11 +156,40 @@ export default function GrowDetail() {
       </header>
 
       <section className="grid grid-cols-1 sm:grid-cols-2 gap-3" aria-label="Grow hub links">
-        <HubLink to="/logs" icon={<ClipboardList className="h-4 w-4" />} title="Timeline" description="All events for your grows." />
-        <HubLink to="/plants" icon={<Leaf className="h-4 w-4" />} title="Plants" description="Manage plants in this grow." />
-        <HubLink to="/tents" icon={<TentIcon className="h-4 w-4" />} title="Tents" description="Tents linked to this grow." />
-        <HubLink to="/actions" icon={<ListChecks className="h-4 w-4" />} title="Action Queue" description="Approve, simulate, or close actions." />
+        <HubLink
+          to="/logs"
+          icon={<ClipboardList className="h-4 w-4" />}
+          title="Timeline"
+          description="All events for your grows."
+          count={counts.diary}
+          countLabel="diary entries"
+        />
+        <HubLink
+          to="/plants"
+          icon={<Leaf className="h-4 w-4" />}
+          title="Plants"
+          description="Manage plants in this grow."
+          count={counts.plants}
+          countLabel="plants"
+        />
+        <HubLink
+          to="/tents"
+          icon={<TentIcon className="h-4 w-4" />}
+          title="Tents"
+          description="Tents linked to this grow."
+          count={counts.tents}
+          countLabel="tents"
+        />
+        <HubLink
+          to="/actions"
+          icon={<ListChecks className="h-4 w-4" />}
+          title="Action Queue"
+          description={`${formatCount(counts.actionsPending)} pending · ${formatCount(counts.auditEvents)} audit events`}
+          count={counts.actionsTotal}
+          countLabel="actions"
+        />
       </section>
+
     </div>
   );
 }

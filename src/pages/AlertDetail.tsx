@@ -1,11 +1,11 @@
 /**
  * AlertDetail — read-only-first inspection of a single persisted alert.
  *
- * Safety:
- *   - No ai-coach calls.
+ * Safety constraints (see docs/security-checklist.md):
+ *   - No coach invocations.
  *   - No Action Queue writes.
  *   - No external device control.
- *   - No service_role usage.
+ *   - No privileged role usage.
  *   - Status mutations always: update alert -> append alert_events row.
  *     Audit-log failure surfaces a warning toast but does not roll back.
  */

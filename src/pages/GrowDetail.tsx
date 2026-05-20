@@ -265,11 +265,11 @@ function GrowStatusCard({ status, growId }: { status: GrowStatus; growId: string
       </dl>
       <div className="flex gap-3 mt-3 text-xs">
         {pendingNum > 0 && (
-          <Link to="/actions" className="text-primary hover:underline">
+          <Link to={`/actions?growId=${growId}`} className="text-primary hover:underline">
             Review pending actions →
           </Link>
         )}
-        <Link to="/logs" className="text-primary hover:underline">
+        <Link to={`/timeline?growId=${growId}`} className="text-primary hover:underline">
           View Timeline →
         </Link>
       </div>

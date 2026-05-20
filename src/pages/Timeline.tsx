@@ -49,7 +49,9 @@ export default function Timeline() {
   const { activeGrow, activeGrowId: storeGrowId, grows, loading: growsLoading, setActiveGrowId } = useGrows();
   const [searchParams] = useSearchParams();
   const { pathname } = useLocation();
-  const urlGrowId = searchParams.get("growId");
+  // Shared URL `?growId=` resolution. urlGrowId is preserved as the source of truth
+  // for filter precedence; scopedGrowName/backHref come from the same hook.
+  const { urlGrowId, scopedGrowName, backHref } = useScopedGrow();
   const activeGrowId = urlGrowId ?? storeGrowId;
   const isLogsRoute = pathname.startsWith("/logs");
   const scopeLabel = isLogsRoute ? "logs" : "timeline";

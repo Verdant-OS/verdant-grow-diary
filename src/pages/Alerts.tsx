@@ -86,33 +86,52 @@ export default function Alerts() {
     };
   }, [alerts]);
 
-  const handleAcknowledge = async (id: string) => {
+  /**
+   * Status-change handler:
+   *   1. Update alert status (single write).
+   *   2. On success, append an immutable audit event.
+   *   3. If only the audit log fails, show a warning toast — the user-visible
+   *      status change is still accepted, but the missing audit row is surfaced.
+   */
+  const runStatusChange = async (
+    id: string,
+    grow_id: string,
+    previous_status: AlertStatusRow,
+    event_type: "acknowledged" | "resolved" | "dismissed",
+    op: () => Promise<{ status: AlertStatusRow }>,
+    label: string,
+  ) => {
+    let newStatus: AlertStatusRow | null = null;
     try {
-      await acknowledgeAlert(id);
-      toast.success("Alert acknowledged");
-      reload();
+      const updated = await op();
+      newStatus = updated.status ?? event_type;
     } catch (e) {
-      toast.error(`Failed to acknowledge: ${(e as Error).message}`);
+      toast.error(`Failed to ${label}: ${(e as Error).message}`);
+      return;
     }
-  };
-  const handleResolve = async (id: string) => {
     try {
-      await resolveAlert(id);
-      toast.success("Alert resolved");
-      reload();
-    } catch (e) {
-      toast.error(`Failed to resolve: ${(e as Error).message}`);
+      await logAlertEvent({
+        alert_id: id,
+        grow_id,
+        event_type,
+        previous_status,
+        new_status: newStatus,
+      });
+      toast.success(`Alert ${label}d`);
+    } catch (logErr) {
+      toast.warning(
+        `Alert ${label}d, but audit log failed: ${(logErr as Error).message}`,
+      );
     }
+    reload();
   };
-  const handleDismiss = async (id: string) => {
-    try {
-      await dismissAlert(id);
-      toast.success("Alert dismissed");
-      reload();
-    } catch (e) {
-      toast.error(`Failed to dismiss: ${(e as Error).message}`);
-    }
-  };
+
+  const handleAcknowledge = (id: string, grow_id: string, prev: AlertStatusRow) =>
+    runStatusChange(id, grow_id, prev, "acknowledged", () => acknowledgeAlert(id), "acknowledge");
+  const handleResolve = (id: string, grow_id: string, prev: AlertStatusRow) =>
+    runStatusChange(id, grow_id, prev, "resolved", () => resolveAlert(id), "resolve");
+  const handleDismiss = (id: string, grow_id: string, prev: AlertStatusRow) =>
+    runStatusChange(id, grow_id, prev, "dismissed", () => dismissAlert(id), "dismiss");
 
   return (
     <div>

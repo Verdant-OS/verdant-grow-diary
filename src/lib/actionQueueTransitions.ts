@@ -1,14 +1,21 @@
 /**
  * Shared Action Queue transition rules + immutable audit-event payload builders.
  *
+ * SCOPE:
+ *  - Suggest-only workflow. Equipment / device execution surfaces of any kind
+ *    are intentionally OUT OF SCOPE and must never be added here. "approve"
+ *    records grower intent only; it does NOT execute any equipment command.
+ *    "complete" means the grower handled the action manually outside Verdant.
+
+ *
  * SECURITY GUARANTEES (do not break):
  *  - Pure data only. No device-execution surface of any kind is ever produced
  *    here.
  *  - No service_role. user_id is never written from the client; the DB default
  *    (auth.uid()) is the sole source of truth.
- *  - "approved" = approved for future manual/controlled execution only.
  *  - Terminal statuses (completed, rejected, cancelled) cannot be transitioned.
  */
+
 
 export type ActionStatus =
   | "pending_approval"
@@ -34,6 +41,10 @@ export type TransitionKind =
   | "complete"
   | "cancel";
 
+/**
+ * Terminal statuses: no further transitions are allowed from these. The UI
+ * must render zero transition buttons and the helpers below all return false.
+ */
 export const TERMINAL_STATUSES: readonly ActionStatus[] = [
   "completed",
   "rejected",
@@ -44,7 +55,14 @@ export function isTerminalStatus(s: ActionStatus): boolean {
   return TERMINAL_STATUSES.includes(s);
 }
 
-/** Allowed transition source-status rules — single source of truth. */
+/**
+ * Allowed transition source-status rules — single source of truth.
+ *   pending_approval -> simulate / approve / reject / cancel
+ *   simulated        -> approve / complete / cancel
+ *   approved         -> complete / cancel
+ *   rejected | completed | cancelled -> none (terminal)
+ * Approve records grower intent only; it never executes equipment.
+ */
 export const canApprove = (s: ActionStatus): boolean =>
   s === "pending_approval" || s === "simulated";
 export const canSimulate = (s: ActionStatus): boolean => s === "pending_approval";
@@ -54,7 +72,12 @@ export const canComplete = (s: ActionStatus): boolean =>
 export const canCancel = (s: ActionStatus): boolean =>
   s === "pending_approval" || s === "approved" || s === "simulated";
 
+/**
+ * Returns the ordered list of transitions allowed from a given status. Used by
+ * the UI to render exactly the right set of buttons. Terminal -> [].
+ */
 export function allowedTransitions(s: ActionStatus): TransitionKind[] {
+
   if (isTerminalStatus(s)) return [];
   const out: TransitionKind[] = [];
   if (canApprove(s)) out.push("approve");
@@ -74,8 +97,14 @@ export interface ActionRowPatch {
 
 /**
  * Build the action_queue UPDATE payload for a transition.
- * No device fields are ever written.
+ *  - approve   -> status=approved, approved_at=now (approval only; no device exec)
+ *  - reject    -> status=rejected, rejected_at=now
+ *  - complete  -> status=completed, completed_at=now (grower handled manually)
+ *  - cancel    -> status=cancelled
+ *  - simulate  -> status=simulated
+ * No device-control fields are ever written here.
  */
+
 export function buildTransitionPatch(
   kind: TransitionKind,
   now: Date = new Date(),
@@ -124,8 +153,11 @@ export interface AuditEventPayload {
 
 /**
  * Build the immutable action_queue_events INSERT payload.
+ * Audit rows are append-only — no UPDATE/DELETE policy exists for this table.
  * SECURITY: user_id is intentionally omitted — DB default auth.uid() wins.
+ * Never include device-control fields.
  */
+
 export function buildAuditEventPayload(args: {
   action_queue_id: string;
   grow_id: string;
@@ -144,7 +176,13 @@ export function buildAuditEventPayload(args: {
   };
 }
 
-/** Normalize a free-text note: trim, treat empty as undefined. */
+/**
+ * Normalize a free-text note from a dialog/textarea:
+ *  - null/undefined/"" -> undefined (caller writes null into audit row)
+ *  - whitespace-only   -> undefined
+ *  - otherwise         -> trimmed string
+ */
+
 export function normalizeNote(raw: string | null | undefined): string | undefined {
   if (!raw) return undefined;
   const trimmed = raw.trim();

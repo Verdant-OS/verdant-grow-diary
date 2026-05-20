@@ -26,24 +26,27 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-type Status =
-  | "pending_approval"
-  | "approved"
-  | "rejected"
-  | "simulated"
-  | "completed"
-  | "cancelled";
+import {
+  type ActionStatus,
+  type ActionEventType,
+  type TransitionKind,
+  isTerminalStatus,
+  canApprove,
+  canSimulate,
+  canReject,
+  canComplete,
+  canCancel,
+  buildTransitionPatch,
+  buildAuditEventPayload,
+  eventTypeFor,
+  nextStatusFor,
+  normalizeNote,
+} from "@/lib/actionQueueTransitions";
 
-type EventType =
-  | "created"
-  | "simulated"
-  | "approved"
-  | "rejected"
-  | "completed"
-  | "cancelled"
-  | "note";
-
-type Kind = "approve" | "reject" | "simulate" | "complete" | "cancel";
+type Status = ActionStatus;
+type EventType = ActionEventType;
+type Kind = TransitionKind;
+const isTerminal = isTerminalStatus;
 
 interface ActionRow {
   id: string;

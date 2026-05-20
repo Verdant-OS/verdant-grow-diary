@@ -13,12 +13,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import type { GrowTargets, MetricKey } from "@/lib/environmentTargetComparison";
 
-export type TargetsState = (
+type InnerState =
   | { status: "idle"; targets: GrowTargets | null }
   | { status: "loading"; targets: GrowTargets | null }
   | { status: "ok"; targets: GrowTargets | null }
-  | { status: "unavailable"; targets: GrowTargets | null }
-) & { reload: () => void };
+  | { status: "unavailable"; targets: GrowTargets | null };
+
+export type TargetsState = InnerState & { reload: () => void };
+
 
 
 const COLUMN_TO_METRIC: Record<string, MetricKey> = {

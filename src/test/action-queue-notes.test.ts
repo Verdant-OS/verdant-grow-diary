@@ -82,7 +82,8 @@ describe("ActionQueue — dialog wiring", () => {
     expect(PAGE).toMatch(/buildTransitionPatch\(kind\)/);
     expect(PAGE).toMatch(/transition\(row,\s*patch,\s*eventTypeFor\(kind\),\s*nextStatusFor\(kind\),\s*note\)/);
   });
-  });
+
+
 
   it("note is written into action_queue_events.note", () => {
     expect(PAGE).toMatch(

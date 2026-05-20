@@ -33,7 +33,7 @@ export function useScopedGrow(): {
     scopedGrow,
     scopedGrowName: scopedGrow?.name ?? null,
     isValidScopedGrow: !!urlGrowId && !!scopedGrow,
-    backHref: scopedGrow ? `/grows/${scopedGrow.id}` : undefined,
+    backHref: scopedGrow ? growDetailPath(scopedGrow.id) : undefined,
   };
 }
 

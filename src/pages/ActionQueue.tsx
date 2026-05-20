@@ -107,6 +107,8 @@ export default function ActionQueue() {
 
   // SECURITY: never sends device commands. Inserts an audit row ONLY.
   // user_id is left to DB default auth.uid(). No privileged backend role.
+  async function logEvent(
+    row: ActionRow,
     event_type: EventType,
     new_status: Status,
     note?: string,

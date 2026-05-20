@@ -95,6 +95,10 @@ export default function ActionQueue() {
   const [events, setEvents] = useState<Record<string, EventRow[]>>({});
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [noteDialog, setNoteDialog] = useState<
+    { row: ActionRow; kind: "approve" | "reject" | "simulate" } | null
+  >(null);
+  const [noteDraft, setNoteDraft] = useState("");
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");

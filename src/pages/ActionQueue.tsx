@@ -149,14 +149,16 @@ export default function ActionQueue() {
     new_status: Status,
     note?: string,
   ): Promise<boolean> {
-    const { error } = await supabase.from("action_queue_events").insert({
-      action_queue_id: row.id,
-      grow_id: row.grow_id,
-      event_type,
-      previous_status: row.status,
-      new_status,
-      note: note ?? null,
-    });
+    const { error } = await supabase.from("action_queue_events").insert(
+      buildAuditEventPayload({
+        action_queue_id: row.id,
+        grow_id: row.grow_id,
+        event_type,
+        previous_status: row.status,
+        new_status,
+        note,
+      }),
+    );
     if (error) {
       toast.warning("Status updated, but audit log failed", {
         description: error.message,
@@ -188,14 +190,9 @@ export default function ActionQueue() {
     await load();
   }
 
-  function openNoteDialog(
-    row: ActionRow,
-    kind: "approve" | "reject" | "simulate" | "complete" | "cancel",
-  ) {
+  function openNoteDialog(row: ActionRow, kind: TransitionKind) {
     // SECURITY: terminal states cannot be transitioned again.
-    if (row.status === "completed" || row.status === "rejected" || row.status === "cancelled") {
-      return;
-    }
+    if (isTerminalStatus(row.status)) return;
     setNoteDraft("");
     setNoteDialog({ row, kind });
   }
@@ -204,48 +201,18 @@ export default function ActionQueue() {
   async function confirmNoteDialog() {
     if (!noteDialog) return;
     const { row, kind } = noteDialog;
-    const trimmed = noteDraft.trim();
-    const note = trimmed.length ? trimmed : undefined;
+    const note = normalizeNote(noteDraft);
     setNoteDialog(null);
     setNoteDraft("");
 
-    if (kind === "approve") {
-      // SECURITY: "approved" means approved for future manual/controlled execution.
-      await transition(
-        row,
-        { status: "approved", approved_at: new Date().toISOString() },
-        "approved",
-        "approved",
-        note,
-      );
-    } else if (kind === "reject") {
-      await transition(
-        row,
-        { status: "rejected", rejected_at: new Date().toISOString() },
-        "rejected",
-        "rejected",
-        note,
-      );
-    } else if (kind === "complete") {
-      // SECURITY: "completed" means the grower manually handled the action outside Verdant.
-      // No equipment command is sent.
-      await transition(
-        row,
-        { status: "completed", completed_at: new Date().toISOString() },
-        "completed",
-        "completed",
-        note,
-      );
-    } else if (kind === "cancel") {
-      // SECURITY: "cancelled" means the grower decided not to proceed. No equipment command is sent.
-      await transition(row, { status: "cancelled" }, "cancelled", "cancelled", note);
-    } else {
+    if (kind === "simulate") {
       // Simulation NEVER sends device commands. Status + audit only.
       toast.message("Simulated (no device command sent)", {
         description: `${row.action_type} → ${row.target_metric ?? row.target_device}`,
       });
-      await transition(row, { status: "simulated" }, "simulated", "simulated", note);
     }
+    const patch = buildTransitionPatch(kind);
+    await transition(row, patch, eventTypeFor(kind), nextStatusFor(kind), note);
   }
 
   function cancelNoteDialog() {
@@ -254,25 +221,12 @@ export default function ActionQueue() {
     setNoteDraft("");
   }
 
-  function approve(row: ActionRow) {
-    return openNoteDialog(row, "approve");
-  }
-  function reject(row: ActionRow) {
-    return openNoteDialog(row, "reject");
-  }
-  function simulate(row: ActionRow) {
-    return openNoteDialog(row, "simulate");
-  }
-  function complete(row: ActionRow) {
-    return openNoteDialog(row, "complete");
-  }
-  function cancelAction(row: ActionRow) {
-    return openNoteDialog(row, "cancel");
-  }
+  function approve(row: ActionRow) { return openNoteDialog(row, "approve"); }
+  function reject(row: ActionRow) { return openNoteDialog(row, "reject"); }
+  function simulate(row: ActionRow) { return openNoteDialog(row, "simulate"); }
+  function complete(row: ActionRow) { return openNoteDialog(row, "complete"); }
+  function cancelAction(row: ActionRow) { return openNoteDialog(row, "cancel"); }
 
-  const canComplete = (s: Status) => s === "approved" || s === "simulated";
-  const canCancel = (s: Status) =>
-    s === "pending_approval" || s === "approved" || s === "simulated";
 
   const DIALOG_META = {
     approve: {

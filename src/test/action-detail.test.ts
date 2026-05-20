@@ -43,18 +43,15 @@ describe("Action Queue detail view", () => {
     expect(DETAIL).toMatch(/Back to Action Queue/);
   });
 
-  it("guards transitions on terminal statuses (no buttons rendered)", () => {
-    expect(DETAIL).toMatch(/isTerminal = \(s: Status\) =>[\s\S]{0,200}"completed"[\s\S]{0,80}"rejected"[\s\S]{0,80}"cancelled"/);
+  it("guards transitions on terminal statuses via shared helper", () => {
+    expect(DETAIL).toMatch(/from "@\/lib\/actionQueueTransitions"/);
+    expect(DETAIL).toMatch(/isTerminalStatus/);
     expect(DETAIL).toMatch(/!isTerminal\(row\.status\) && \(/);
     expect(DETAIL).toMatch(/if \(!row \|\| isTerminal\(row\.status\)\) return;/);
   });
 
-  it("gates each transition to the allowed source statuses", () => {
-    expect(DETAIL).toMatch(/canApprove = \(s: Status\) => s === "pending_approval" \|\| s === "simulated"/);
-    expect(DETAIL).toMatch(/canSimulate = \(s: Status\) => s === "pending_approval"/);
-    expect(DETAIL).toMatch(/canReject = \(s: Status\) => s === "pending_approval"/);
-    expect(DETAIL).toMatch(/canComplete = \(s: Status\) => s === "approved" \|\| s === "simulated"/);
-    expect(DETAIL).toMatch(/canCancel = \(s: Status\) =>[\s\S]*?"pending_approval"[\s\S]*?"approved"[\s\S]*?"simulated"/);
+  it("imports the shared transition guards (canApprove/canSimulate/canReject/canComplete/canCancel)", () => {
+    expect(DETAIL).toMatch(/import \{[\s\S]*?canApprove[\s\S]*?canSimulate[\s\S]*?canReject[\s\S]*?canComplete[\s\S]*?canCancel[\s\S]*?\} from "@\/lib\/actionQueueTransitions"/);
   });
 
   it("does not allow editing audit events (no update on action_queue_events)", () => {

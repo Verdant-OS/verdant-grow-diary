@@ -472,13 +472,23 @@ export default function ActionQueue() {
           <ul className="space-y-2 text-sm">
             {reviewed.slice(0, 50).map((row) => (
               <li key={row.id} className="rounded-lg border border-border/40 bg-secondary/20 p-2">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <Badge variant="outline" className="text-[10px] uppercase">{row.status}</Badge>
                   <Badge variant="outline" className={`text-[10px] uppercase ${RISK_VARIANT[row.risk_level]}`}>
                     {row.risk_level}
                   </Badge>
                   <span className="truncate flex-1">{row.suggested_change}</span>
                   <span className="text-xs text-muted-foreground">{row.action_type}</span>
+                  {canComplete(row.status) && (
+                    <Button size="sm" variant="secondary" disabled={busyId === row.id} onClick={() => complete(row)}>
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Mark Complete
+                    </Button>
+                  )}
+                  {canCancel(row.status) && (
+                    <Button size="sm" variant="ghost" disabled={busyId === row.id} onClick={() => cancelAction(row)}>
+                      <Ban className="h-3.5 w-3.5" /> Cancel
+                    </Button>
+                  )}
                 </div>
                 <EventHistory items={events[row.id]} />
               </li>

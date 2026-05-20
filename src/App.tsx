@@ -22,6 +22,7 @@ import Grows from "./pages/Grows";
 import Coach from "./pages/Coach";
 import Diagnostics from "./pages/Diagnostics";
 import ActionQueue from "./pages/ActionQueue";
+import GrowLineageRepair from "./pages/GrowLineageRepair";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -49,6 +50,7 @@ const App = () => (
                 <Route path="/alerts" element={<Alerts />} />
                 <Route path="/doctor" element={<Coach />} />
                 <Route path="/actions" element={<ActionQueue />} />
+                <Route path="/grow-lineage" element={<GrowLineageRepair />} />
                 <Route path="/grows" element={<Grows />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/diagnostics" element={<Diagnostics />} />

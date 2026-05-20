@@ -381,7 +381,7 @@ export default function ActionDetail() {
 function BackLink() {
   return (
     <Link
-      to="/actions"
+      to={actionsPath()}
       className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3"
     >
       <ArrowLeft className="h-4 w-4" /> Back to Action Queue

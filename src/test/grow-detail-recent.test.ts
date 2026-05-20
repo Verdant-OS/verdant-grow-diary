@@ -16,7 +16,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const ROOT = resolve(__dirname, "../..");
-const PAGE = readFileSync(resolve(ROOT, "src/pages/GrowDetail.tsx"), "utf8");
+const PAGE = readFileSync(resolve(ROOT, "src/pages/GrowDetail.tsx"), "utf8") + "\n" + readFileSync(resolve(ROOT, "src/hooks/useGrowDetailData.ts"), "utf8") + "\n" + readFileSync(resolve(ROOT, "src/lib/growStatus.ts"), "utf8");
 
 describe("GrowDetail — recent activity", () => {
   it("fetches latest 5 diary_entries by grow_id, entry_at desc", () => {

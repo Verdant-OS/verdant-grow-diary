@@ -15,7 +15,7 @@ import { resolve } from "node:path";
 
 const ROOT = resolve(__dirname, "../..");
 const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
-const PAGE = readFileSync(resolve(ROOT, "src/pages/GrowDetail.tsx"), "utf8");
+const PAGE = readFileSync(resolve(ROOT, "src/pages/GrowDetail.tsx"), "utf8") + "\n" + readFileSync(resolve(ROOT, "src/hooks/useGrowDetailData.ts"), "utf8") + "\n" + readFileSync(resolve(ROOT, "src/lib/growStatus.ts"), "utf8");
 
 describe("GrowDetail", () => {
   it("registers /grows/:growId route in App.tsx", () => {

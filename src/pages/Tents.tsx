@@ -5,6 +5,7 @@ import StageBadge from "@/components/StageBadge";
 import MetricChip from "@/components/MetricChip";
 import EmptyState from "@/components/EmptyState";
 import CreateTentDialog from "@/components/CreateTentDialog";
+import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import { useSensorReadings, usePlants } from "@/hooks/useMockData";
 import { useGrowTents } from "@/hooks/useGrowData";
 import { useGrows } from "@/store/grows";

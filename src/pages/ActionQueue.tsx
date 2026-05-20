@@ -453,6 +453,12 @@ export default function ActionQueue() {
                       <Ban className="h-4 w-4" /> Cancel
                     </Button>
                   )}
+                  <Link
+                    to={`/actions/${row.id}`}
+                    className="ml-auto text-xs text-primary hover:underline self-center"
+                  >
+                    View Details
+                  </Link>
                 </div>
                 <EventHistory items={events[row.id]} />
               </li>

@@ -15,6 +15,7 @@ import {
   type StatusLevel,
   formatCount,
 } from "@/lib/growStatus";
+import { actionsPath, logsPath, plantsPath, tentsPath } from "@/lib/routes";
 
 /**
  * Read-only grow detail hub. Presentational only — all data loading +

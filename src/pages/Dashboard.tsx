@@ -84,6 +84,11 @@ export default function Dashboard() {
     scopedGrowId ?? null,
     tents.map((t) => t.id),
   );
+  const trendsState = useEnvironmentTrends(
+    scopedGrowId ?? null,
+    tents.map((t) => t.id),
+  );
+
 
 
 

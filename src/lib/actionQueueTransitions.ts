@@ -176,7 +176,13 @@ export function buildAuditEventPayload(args: {
   };
 }
 
-/** Normalize a free-text note: trim, treat empty as undefined. */
+/**
+ * Normalize a free-text note from a dialog/textarea:
+ *  - null/undefined/"" -> undefined (caller writes null into audit row)
+ *  - whitespace-only   -> undefined
+ *  - otherwise         -> trimmed string
+ */
+
 export function normalizeNote(raw: string | null | undefined): string | undefined {
   if (!raw) return undefined;
   const trimmed = raw.trim();

@@ -117,8 +117,74 @@ export default function GrowDetail() {
     ]);
     setCounts({ plants, tents, diary, actionsPending, actionsTotal, auditEvents });
 
+    // Recent activity: latest 5 diary entries + latest 5 action_queue_events,
+    // merged newest-first. Read-only; failure degrades to "unavailable".
+    try {
+      const [diaryRes, eventsRes] = await Promise.all([
+        supabase
+          .from("diary_entries")
+          .select("id,entry_at,stage,note")
+          .eq("grow_id", growId)
+          .order("entry_at", { ascending: false })
+          .limit(5),
+        supabase
+          .from("action_queue_events")
+          .select("id,action_queue_id,event_type,previous_status,new_status,note,created_at")
+          .eq("grow_id", growId)
+          .order("created_at", { ascending: false })
+          .limit(5),
+      ]);
+
+      if (diaryRes.error || eventsRes.error) {
+        setRecent({ status: "unavailable" });
+      } else {
+        const diaryItems: RecentItem[] = (diaryRes.data ?? []).map((d) => ({
+          id: `diary-${d.id}`,
+          kind: "diary",
+          ts: d.entry_at,
+          title: d.stage ? `Diary entry (${d.stage})` : "Diary entry",
+          detail: d.note,
+        }));
+
+        // Resolve parent action_queue rows for suggested_change/reason context.
+        const actionIds = Array.from(
+          new Set((eventsRes.data ?? []).map((e) => e.action_queue_id).filter(Boolean)),
+        );
+        let parents: Record<string, { suggested_change: string; reason: string }> = {};
+        if (actionIds.length > 0) {
+          const { data: pRows } = await supabase
+            .from("action_queue")
+            .select("id,suggested_change,reason")
+            .in("id", actionIds);
+          parents = Object.fromEntries(
+            (pRows ?? []).map((p) => [p.id, { suggested_change: p.suggested_change, reason: p.reason }]),
+          );
+        }
+
+        const eventItems: RecentItem[] = (eventsRes.data ?? []).map((e) => {
+          const parent = parents[e.action_queue_id];
+          return {
+            id: `event-${e.id}`,
+            kind: "action_event",
+            ts: e.created_at,
+            title: `${e.event_type}${parent ? `: ${parent.suggested_change}` : ""}`,
+            detail: e.note ?? parent?.reason ?? null,
+            href: `/actions/${e.action_queue_id}`,
+          };
+        });
+
+        const merged = [...diaryItems, ...eventItems].sort(
+          (a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime(),
+        );
+        setRecent({ status: "ok", items: merged });
+      }
+    } catch {
+      setRecent({ status: "unavailable" });
+    }
+
     setLoading(false);
   }, [user, growId]);
+
 
   useEffect(() => {
     load();

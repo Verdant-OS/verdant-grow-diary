@@ -278,7 +278,65 @@ export default function Dashboard() {
             </div>
           )}
         </section>
+        {sensorState.status === "ok" && (
+          <section
+            className="glass rounded-2xl p-4 mt-4"
+            aria-label="Sensor Data Quality"
+          >
+            {(() => {
+              const q = evaluateSensorQuality(sensorState.snapshot);
+              const tone =
+                q.quality === "good"
+                  ? "border-emerald-500 text-emerald-600"
+                  : q.quality === "watch"
+                    ? "border-amber-500 text-amber-600"
+                    : "border-muted-foreground text-muted-foreground";
+              return (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <h2 className="font-display font-semibold">
+                        Sensor Data Quality
+                      </h2>
+                      <p className="text-xs text-muted-foreground">
+                        Heuristic check of the latest snapshot. Not a plant-health
+                        diagnosis.
+                      </p>
+                    </div>
+                    <Link
+                      to={logsPath(scopedGrowId)}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Inspect history →
+                    </Link>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap mb-2">
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] uppercase ${tone}`}
+                    >
+                      {q.headline}
+                    </Badge>
+                    {q.suspiciousFields.length > 0 && (
+                      <span className="text-xs text-muted-foreground">
+                        Suspicious: {q.suspiciousFields.join(", ")}
+                      </span>
+                    )}
+                  </div>
+                  {q.reasons.length > 0 && (
+                    <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-0.5">
+                      {q.reasons.map((r) => (
+                        <li key={r}>{r}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })()}
+          </section>
+        )}
         <div className="grid lg:grid-cols-2 gap-4 mt-4">
+
 
           <section
             className="glass rounded-2xl p-4"

@@ -28,7 +28,7 @@ import {
   EMPTY_ALERTS_MESSAGE,
   type EnvironmentAlert,
 } from "@/lib/environmentAlerts";
-import { saveAlert } from "@/lib/alerts";
+import { saveAlert, logAlertEvent } from "@/lib/alerts";
 import { toast } from "sonner";
 
 

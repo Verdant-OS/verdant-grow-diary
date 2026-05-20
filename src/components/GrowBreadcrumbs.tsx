@@ -3,6 +3,7 @@ import { ChevronRight } from "lucide-react";
 import { useGrows } from "@/store/grows";
 import {
   actionsPath,
+  dashboardPath,
   growDetailPath,
   logsPath,
   plantsPath,

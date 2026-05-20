@@ -265,9 +265,17 @@ export default function ActionDetail() {
     );
   }
 
+  const growName = grows.find((g) => g.id === row.grow_id)?.name ?? null;
   return (
     <div className="max-w-3xl mx-auto">
+      <GrowBreadcrumbs
+        growId={row.grow_id}
+        growName={growName}
+        current="Action Detail"
+        actionId={row.id}
+      />
       <BackLink />
+
 
       <header className="glass rounded-2xl p-4 mb-4">
         <div className="flex items-center gap-2 flex-wrap mb-2">

@@ -42,6 +42,7 @@ export function mapPlantRow(row: PlantRow): Plant {
     health: coerceHealth(row.health),
     photo: row.photo_url ?? "",
     lastNote: row.last_note ?? "",
+    growId: (row as { grow_id?: string | null }).grow_id ?? null,
   };
 }
 

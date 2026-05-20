@@ -29,7 +29,7 @@ export default function Plants() {
           growId={urlGrowId}
           growName={scopedGrowName}
           label="plants"
-          clearHref="/plants"
+          clearHref={plantsPath()}
           backHref={backHref}
         />
       )}

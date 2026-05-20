@@ -4,7 +4,7 @@ import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
 import { STAGES, stageLabel } from "@/lib/grow";
 import { format, formatDistanceToNow } from "date-fns";
-import { Sprout, Image as ImageIcon, Loader2, Camera, FileText, FlaskConical, Check, Pencil, Leaf, Gauge, Bell } from "lucide-react";
+import { Sprout, Image as ImageIcon, Loader2, Camera, FileText, FlaskConical, Check, Pencil, Leaf, Gauge, Bell, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 
@@ -16,6 +16,20 @@ interface Entry {
   id: string; note: string; photo_url: string | null; stage: string | null;
   details: Record<string, unknown>; entry_at: string;
   plant_id: string | null; tent_id: string | null;
+}
+
+type ActionEventType =
+  | "created" | "simulated" | "approved" | "rejected" | "completed" | "cancelled" | "note";
+
+interface ActionQueueEvent {
+  id: string;
+  action_queue_id: string;
+  event_type: ActionEventType;
+  previous_status: string | null;
+  new_status: string | null;
+  note: string | null;
+  created_at: string;
+  action?: { suggested_change: string | null; reason: string | null } | null;
 }
 
 type EventFilter = "all" | "photo" | "note" | "measurement";

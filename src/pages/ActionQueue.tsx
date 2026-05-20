@@ -422,7 +422,7 @@ export default function ActionQueue() {
                     </Button>
                   )}
                   <Link
-                    to={`/actions/${row.id}`}
+                    to={actionDetailPath(row.id)}
                     className="ml-auto text-xs text-primary hover:underline self-center"
                   >
                     View Details

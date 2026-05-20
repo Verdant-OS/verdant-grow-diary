@@ -222,3 +222,100 @@ describe("Action Queue safety — future-proof contract (active only when action
     },
   );
 });
+
+describe("Action Queue safety — tightened plant/tent ownership (active once policies tighten)", () => {
+  // Pull out just the latest CREATE POLICY ... FOR INSERT / UPDATE blocks on action_queue
+  // from across all migrations. The last one wins (later DROP + recreate).
+  function lastPolicyBlock(cmd: "INSERT" | "UPDATE"): string {
+    const re = new RegExp(
+      `CREATE\\s+POLICY[^;]*?ON\\s+public\\.action_queue[\\s\\S]*?FOR\\s+${cmd}[\\s\\S]*?;`,
+      "gi",
+    );
+    const matches = [...ALL_ACTION_QUEUE_SQL.matchAll(re)];
+    return matches.length ? matches[matches.length - 1][0] : "";
+  }
+  const INSERT_POLICY = lastPolicyBlock("INSERT");
+  const UPDATE_POLICY = lastPolicyBlock("UPDATE");
+
+  const hasTightening =
+    /plant_id\s+IS\s+NULL\s+OR\s+EXISTS/i.test(INSERT_POLICY) &&
+    /tent_id\s+IS\s+NULL\s+OR\s+EXISTS/i.test(INSERT_POLICY);
+
+  it(`detects tightened plant/tent ownership policy: ${hasTightening ? "YES" : "no"}`, () => {
+    expect(typeof hasTightening).toBe("boolean");
+  });
+
+  (hasTightening ? it : it.skip)(
+    "INSERT WITH CHECK enforces user_id = auth.uid()",
+    () => {
+      expect(INSERT_POLICY).toMatch(/WITH\s+CHECK\s*\([\s\S]*auth\.uid\(\)\s*=\s*user_id/i);
+    },
+  );
+
+  (hasTightening ? it : it.skip)(
+    "INSERT WITH CHECK enforces grow_id ownership via grows.user_id = auth.uid()",
+    () => {
+      expect(INSERT_POLICY).toMatch(
+        /EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.grows[\s\S]*?id\s*=\s*grow_id[\s\S]*?user_id\s*=\s*auth\.uid\(\)/i,
+      );
+    },
+  );
+
+  (hasTightening ? it : it.skip)(
+    "INSERT WITH CHECK enforces plant_id ownership when plant_id is not null",
+    () => {
+      expect(INSERT_POLICY).toMatch(
+        /plant_id\s+IS\s+NULL\s+OR\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.plants[\s\S]*?id\s*=\s*plant_id[\s\S]*?user_id\s*=\s*auth\.uid\(\)/i,
+      );
+    },
+  );
+
+  (hasTightening ? it : it.skip)(
+    "INSERT WITH CHECK enforces tent_id ownership when tent_id is not null",
+    () => {
+      expect(INSERT_POLICY).toMatch(
+        /tent_id\s+IS\s+NULL\s+OR\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.tents[\s\S]*?id\s*=\s*tent_id[\s\S]*?user_id\s*=\s*auth\.uid\(\)/i,
+      );
+    },
+  );
+
+  (hasTightening ? it : it.skip)(
+    "INSERT WITH CHECK enforces plant-in-tent consistency when both are set",
+    () => {
+      // plant.tent_id must match the action's tent_id.
+      expect(INSERT_POLICY).toMatch(
+        /plant_id\s+IS\s+NULL\s+OR\s+tent_id\s+IS\s+NULL\s+OR\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.plants[\s\S]*?id\s*=\s*plant_id[\s\S]*?tent_id\s*=\s*tent_id/i,
+      );
+    },
+  );
+
+  (hasTightening ? it : it.skip)(
+    "UPDATE WITH CHECK mirrors the same plant/tent/grow ownership guards",
+    () => {
+      expect(UPDATE_POLICY).toMatch(/WITH\s+CHECK\s*\([\s\S]*auth\.uid\(\)\s*=\s*user_id/i);
+      expect(UPDATE_POLICY).toMatch(/plant_id\s+IS\s+NULL\s+OR\s+EXISTS/i);
+      expect(UPDATE_POLICY).toMatch(/tent_id\s+IS\s+NULL\s+OR\s+EXISTS/i);
+      expect(UPDATE_POLICY).toMatch(
+        /EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.grows[\s\S]*?id\s*=\s*grow_id[\s\S]*?user_id\s*=\s*auth\.uid\(\)/i,
+      );
+    },
+  );
+
+  (hasTightening ? it : it.skip)(
+    "client-provided user_id cannot bypass auth.uid() (default = auth.uid() AND WITH CHECK auth.uid() = user_id)",
+    () => {
+      // Table default: user_id DEFAULT auth.uid(). Combined with WITH CHECK
+      // auth.uid() = user_id, a spoofed client user_id cannot land in the row.
+      expect(ALL_ACTION_QUEUE_SQL).toMatch(/user_id[\s\S]{0,80}DEFAULT\s+auth\.uid\(\)/i);
+      expect(INSERT_POLICY).toMatch(/auth\.uid\(\)\s*=\s*user_id/i);
+      expect(UPDATE_POLICY).toMatch(/auth\.uid\(\)\s*=\s*user_id/i);
+    },
+  );
+
+  (hasTightening ? it : it.skip)(
+    "no service_role bypass introduced by tightening migrations",
+    () => {
+      expect(ALL_ACTION_QUEUE_SQL).not.toMatch(/service_role/i);
+    },
+  );
+});

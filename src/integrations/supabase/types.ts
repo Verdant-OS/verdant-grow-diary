@@ -99,6 +99,57 @@ export type Database = {
           },
         ]
       }
+      action_queue_events: {
+        Row: {
+          action_queue_id: string
+          created_at: string
+          event_type: string
+          grow_id: string
+          id: string
+          new_status: string | null
+          note: string | null
+          previous_status: string | null
+          user_id: string
+        }
+        Insert: {
+          action_queue_id: string
+          created_at?: string
+          event_type: string
+          grow_id: string
+          id?: string
+          new_status?: string | null
+          note?: string | null
+          previous_status?: string | null
+          user_id?: string
+        }
+        Update: {
+          action_queue_id?: string
+          created_at?: string
+          event_type?: string
+          grow_id?: string
+          id?: string
+          new_status?: string | null
+          note?: string | null
+          previous_status?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "action_queue_events_action_queue_id_fkey"
+            columns: ["action_queue_id"]
+            isOneToOne: false
+            referencedRelation: "action_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "action_queue_events_grow_id_fkey"
+            columns: ["grow_id"]
+            isOneToOne: false
+            referencedRelation: "grows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       diary_entries: {
         Row: {
           created_at: string

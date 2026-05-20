@@ -16,6 +16,7 @@ import {
   formatCount,
 } from "@/lib/growStatus";
 import { actionsPath, logsPath, plantsPath, tentsPath } from "@/lib/routes";
+import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 
 /**
  * Read-only grow detail hub. Presentational only — all data loading +
@@ -49,7 +50,9 @@ export default function GrowDetail() {
 
   return (
     <div className="max-w-3xl mx-auto">
+      <GrowBreadcrumbs growId={grow.id} growName={grow.name} current={grow.name} />
       <BackLink />
+
 
       <header className="glass rounded-2xl p-4 mb-4">
         <div className="flex items-center gap-2 flex-wrap mb-2">

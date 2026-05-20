@@ -10,6 +10,7 @@ import { Link, useLocation } from "react-router-dom";
 
 import EntryEditDialog from "@/components/EntryEditDialog";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
+import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { actionDetailPath, logsPath, timelinePath } from "@/lib/routes";
 import { cn } from "@/lib/utils";
@@ -151,6 +152,12 @@ export default function Timeline() {
 
   return (
     <div>
+      <GrowBreadcrumbs
+        growId={urlGrowId}
+        growName={scopedGrowName}
+        current={isLogsRoute ? "Logs" : "Timeline"}
+      />
+      
       
       {activeGrow && (
         <div className="mb-5">

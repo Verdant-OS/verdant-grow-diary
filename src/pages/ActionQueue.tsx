@@ -24,6 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Loader2, Check, X, FlaskConical, ListChecks, History, CheckCircle2, Ban } from "lucide-react";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
+import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { actionDetailPath, actionsPath } from "@/lib/routes";
 import { toast } from "sonner";
@@ -309,6 +310,7 @@ export default function ActionQueue() {
 
   return (
     <div>
+      <GrowBreadcrumbs growId={urlGrowId} growName={scopedGrowName} current="Action Queue" />
       <div className="mb-5">
         <h1 className="text-2xl font-display font-bold flex items-center gap-2">
           <ListChecks className="h-5 w-5 text-primary" />

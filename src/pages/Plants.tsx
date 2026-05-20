@@ -6,6 +6,7 @@ import StageBadge from "@/components/StageBadge";
 import EmptyState from "@/components/EmptyState";
 import CreatePlantDialog from "@/components/CreatePlantDialog";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
+import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { useTents } from "@/hooks/useMockData";
 import { useGrowPlants } from "@/hooks/useGrowData";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
@@ -23,6 +24,7 @@ export default function Plants() {
 
   return (
     <div>
+      <GrowBreadcrumbs growId={urlGrowId} growName={scopedGrowName} current="Plants" />
       <PageHeader title="Plants" description="Every plant across every tent." icon={<Sprout className="h-5 w-5" />} actions={<CreatePlantDialog defaultGrowId={validGrowId} />} />
       {urlGrowId && (
         <ScopedGrowBanner

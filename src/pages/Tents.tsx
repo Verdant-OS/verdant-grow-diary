@@ -6,6 +6,7 @@ import MetricChip from "@/components/MetricChip";
 import EmptyState from "@/components/EmptyState";
 import CreateTentDialog from "@/components/CreateTentDialog";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
+import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { useSensorReadings, usePlants } from "@/hooks/useMockData";
 import { useGrowTents } from "@/hooks/useGrowData";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
@@ -21,6 +22,7 @@ export default function Tents() {
 
   return (
     <div>
+      <GrowBreadcrumbs growId={urlGrowId} growName={scopedGrowName} current="Tents" />
       <PageHeader
         title="Tents"
         description="Every grow space, environment, and lighting status."

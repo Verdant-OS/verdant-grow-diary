@@ -43,6 +43,8 @@ import {
   normalizeNote,
 } from "@/lib/actionQueueTransitions";
 import { actionsPath, growDetailPath } from "@/lib/routes";
+import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
+import { useGrows } from "@/store/grows";
 
 type Status = ActionStatus;
 type EventType = ActionEventType;
@@ -128,6 +130,7 @@ const DIALOG_META: Record<Kind, { title: string; description: string; label: str
 export default function ActionDetail() {
   const { actionId } = useParams<{ actionId: string }>();
   const { user } = useAuth();
+  const { grows } = useGrows();
   const [row, setRow] = useState<ActionRow | null>(null);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -262,9 +265,17 @@ export default function ActionDetail() {
     );
   }
 
+  const growName = grows.find((g) => g.id === row.grow_id)?.name ?? null;
   return (
     <div className="max-w-3xl mx-auto">
+      <GrowBreadcrumbs
+        growId={row.grow_id}
+        growName={growName}
+        current="Action Detail"
+        actionId={row.id}
+      />
       <BackLink />
+
 
       <header className="glass rounded-2xl p-4 mb-4">
         <div className="flex items-center gap-2 flex-wrap mb-2">

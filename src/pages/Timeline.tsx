@@ -178,8 +178,8 @@ export default function Timeline() {
 
       {urlGrowId && (
         <div className="glass rounded-2xl px-4 py-2 mb-4 flex items-center justify-between text-xs" aria-label="Grow filter banner">
-          <span className="text-muted-foreground">Showing timeline for this grow</span>
-          <Link to="/timeline" className="text-primary hover:underline">Clear grow filter</Link>
+          <span className="text-muted-foreground">Showing {scopeLabel} for this grow</span>
+          <Link to={clearTo} className="text-primary hover:underline">Clear grow filter</Link>
         </div>
       )}
 

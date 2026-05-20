@@ -48,6 +48,21 @@ const EMPTY_COUNTS: GrowCounts = {
   auditEvents: 0,
 };
 
+interface RecentItem {
+  id: string;
+  kind: "diary" | "action_event";
+  ts: string;
+  title: string;
+  detail?: string | null;
+  href?: string;
+}
+
+type RecentState =
+  | { status: "loading" }
+  | { status: "ok"; items: RecentItem[] }
+  | { status: "unavailable" };
+
+
 export default function GrowDetail() {
   const { growId } = useParams<{ growId: string }>();
   const { user } = useAuth();
@@ -55,6 +70,9 @@ export default function GrowDetail() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [counts, setCounts] = useState<GrowCounts>(EMPTY_COUNTS);
+  const [recent, setRecent] = useState<RecentState>({ status: "loading" });
+
+
 
   const load = useCallback(async () => {
     if (!user || !growId) return;
@@ -99,8 +117,74 @@ export default function GrowDetail() {
     ]);
     setCounts({ plants, tents, diary, actionsPending, actionsTotal, auditEvents });
 
+    // Recent activity: latest 5 diary entries + latest 5 action_queue_events,
+    // merged newest-first. Read-only; failure degrades to "unavailable".
+    try {
+      const [diaryRes, eventsRes] = await Promise.all([
+        supabase
+          .from("diary_entries")
+          .select("id,entry_at,stage,note")
+          .eq("grow_id", growId)
+          .order("entry_at", { ascending: false })
+          .limit(5),
+        supabase
+          .from("action_queue_events")
+          .select("id,action_queue_id,event_type,previous_status,new_status,note,created_at")
+          .eq("grow_id", growId)
+          .order("created_at", { ascending: false })
+          .limit(5),
+      ]);
+
+      if (diaryRes.error || eventsRes.error) {
+        setRecent({ status: "unavailable" });
+      } else {
+        const diaryItems: RecentItem[] = (diaryRes.data ?? []).map((d) => ({
+          id: `diary-${d.id}`,
+          kind: "diary",
+          ts: d.entry_at,
+          title: d.stage ? `Diary entry (${d.stage})` : "Diary entry",
+          detail: d.note,
+        }));
+
+        // Resolve parent action_queue rows for suggested_change/reason context.
+        const actionIds = Array.from(
+          new Set((eventsRes.data ?? []).map((e) => e.action_queue_id).filter(Boolean)),
+        );
+        let parents: Record<string, { suggested_change: string; reason: string }> = {};
+        if (actionIds.length > 0) {
+          const { data: pRows } = await supabase
+            .from("action_queue")
+            .select("id,suggested_change,reason")
+            .in("id", actionIds);
+          parents = Object.fromEntries(
+            (pRows ?? []).map((p) => [p.id, { suggested_change: p.suggested_change, reason: p.reason }]),
+          );
+        }
+
+        const eventItems: RecentItem[] = (eventsRes.data ?? []).map((e) => {
+          const parent = parents[e.action_queue_id];
+          return {
+            id: `event-${e.id}`,
+            kind: "action_event",
+            ts: e.created_at,
+            title: `${e.event_type}${parent ? `: ${parent.suggested_change}` : ""}`,
+            detail: e.note ?? parent?.reason ?? null,
+            href: `/actions/${e.action_queue_id}`,
+          };
+        });
+
+        const merged = [...diaryItems, ...eventItems].sort(
+          (a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime(),
+        );
+        setRecent({ status: "ok", items: merged });
+      }
+    } catch {
+      setRecent({ status: "unavailable" });
+    }
+
     setLoading(false);
   }, [user, growId]);
+
 
   useEffect(() => {
     load();
@@ -190,7 +274,53 @@ export default function GrowDetail() {
         />
       </section>
 
+      <section className="glass rounded-2xl p-4 mt-4" aria-label="Recent activity">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Recent Activity
+          </h2>
+          <Link to="/logs" className="text-xs text-primary hover:underline">
+            View full Timeline →
+          </Link>
+        </div>
+        {recent.status === "loading" ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : recent.status === "unavailable" ? (
+          <p className="text-sm text-muted-foreground">Recent activity unavailable.</p>
+        ) : recent.items.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No recent activity yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {recent.items.map((item) => (
+              <li
+                key={item.id}
+                className="rounded-lg border border-border/40 bg-secondary/20 p-2 text-sm"
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className="text-[10px] uppercase">
+                    {item.kind === "diary" ? "Diary Entry" : "Action Queue Event"}
+                  </Badge>
+                  <span className="text-xs truncate">{item.title}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {new Date(item.ts).toLocaleString()}
+                  </span>
+                </div>
+                {item.detail && (
+                  <p className="text-xs mt-1 italic text-muted-foreground">{item.detail}</p>
+                )}
+                {item.href && (
+                  <Link to={item.href} className="text-xs text-primary hover:underline">
+                    View details →
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
     </div>
+
   );
 }
 

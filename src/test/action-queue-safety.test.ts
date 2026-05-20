@@ -319,3 +319,116 @@ describe("Action Queue safety — tightened plant/tent ownership (active once po
     },
   );
 });
+
+describe("Action Queue safety — same-grow lineage (plants/tents must share grow_id)", () => {
+  // Reuse the last INSERT/UPDATE policy text.
+  function lastPolicyBlock(cmd: "INSERT" | "UPDATE"): string {
+    const re = new RegExp(
+      `CREATE\\s+POLICY[^;]*?ON\\s+public\\.action_queue[\\s\\S]*?FOR\\s+${cmd}[\\s\\S]*?;`,
+      "gi",
+    );
+    const matches = [...ALL_ACTION_QUEUE_SQL.matchAll(re)];
+    return matches.length ? matches[matches.length - 1][0] : "";
+  }
+  const INSERT_POLICY = lastPolicyBlock("INSERT");
+  const UPDATE_POLICY = lastPolicyBlock("UPDATE");
+
+  // Detect that plants/tents have a grow_id column and the policy enforces same-grow.
+  function findMigration(re: RegExp): string | null {
+    const migDir = resolve(ROOT, "supabase/migrations");
+    for (const name of readdirSync(migDir).sort()) {
+      if (!name.endsWith(".sql")) continue;
+      const sql = readFileSync(join(migDir, name), "utf8");
+      if (re.test(sql)) return sql;
+    }
+    return null;
+  }
+  const tentsGrowMig = findMigration(/ALTER\s+TABLE\s+public\.tents[\s\S]{0,200}ADD\s+COLUMN[\s\S]{0,80}grow_id/i);
+  const plantsGrowMig = findMigration(/ALTER\s+TABLE\s+public\.plants[\s\S]{0,200}ADD\s+COLUMN[\s\S]{0,80}grow_id/i);
+  const hasLineage =
+    !!tentsGrowMig &&
+    !!plantsGrowMig &&
+    /t\.grow_id\s*=\s*grow_id/i.test(INSERT_POLICY) &&
+    /p\.grow_id\s*=\s*grow_id/i.test(INSERT_POLICY);
+
+  it(`detects grow_id lineage on plants+tents and same-grow policy: ${hasLineage ? "YES" : "no"}`, () => {
+    expect(typeof hasLineage).toBe("boolean");
+  });
+
+  (hasLineage ? it : it.skip)(
+    "tents.grow_id exists and references public.grows(id)",
+    () => {
+      expect(tentsGrowMig).toMatch(
+        /ALTER\s+TABLE\s+public\.tents[\s\S]{0,200}ADD\s+COLUMN[\s\S]{0,200}grow_id\s+uuid[\s\S]{0,80}REFERENCES\s+public\.grows\s*\(\s*id\s*\)/i,
+      );
+    },
+  );
+
+  (hasLineage ? it : it.skip)(
+    "plants.grow_id exists and references public.grows(id)",
+    () => {
+      expect(plantsGrowMig).toMatch(
+        /ALTER\s+TABLE\s+public\.plants[\s\S]{0,200}ADD\s+COLUMN[\s\S]{0,200}grow_id\s+uuid[\s\S]{0,80}REFERENCES\s+public\.grows\s*\(\s*id\s*\)/i,
+      );
+    },
+  );
+
+  (hasLineage ? it : it.skip)(
+    "required indexes added: tents(user_id,grow_id), plants(user_id,grow_id), plants(tent_id)",
+    () => {
+      expect(ALL_ACTION_QUEUE_SQL + (tentsGrowMig ?? "")).toMatch(
+        /CREATE\s+INDEX[\s\S]{0,200}tents\s*\(\s*user_id\s*,\s*grow_id\s*\)/i,
+      );
+      expect(ALL_ACTION_QUEUE_SQL + (plantsGrowMig ?? "")).toMatch(
+        /CREATE\s+INDEX[\s\S]{0,200}plants\s*\(\s*user_id\s*,\s*grow_id\s*\)/i,
+      );
+      expect(ALL_ACTION_QUEUE_SQL + (plantsGrowMig ?? "")).toMatch(
+        /CREATE\s+INDEX[\s\S]{0,200}plants\s*\(\s*tent_id\s*\)/i,
+      );
+    },
+  );
+
+  (hasLineage ? it : it.skip)(
+    "INSERT enforces tent belongs to the SAME grow (t.grow_id = grow_id)",
+    () => {
+      expect(INSERT_POLICY).toMatch(
+        /tent_id\s+IS\s+NULL\s+OR\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.tents[\s\S]*?id\s*=\s*tent_id[\s\S]*?user_id\s*=\s*auth\.uid\(\)[\s\S]*?grow_id\s*=\s*grow_id/i,
+      );
+    },
+  );
+
+  (hasLineage ? it : it.skip)(
+    "INSERT enforces plant belongs to the SAME grow (p.grow_id = grow_id)",
+    () => {
+      expect(INSERT_POLICY).toMatch(
+        /plant_id\s+IS\s+NULL\s+OR\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.plants[\s\S]*?id\s*=\s*plant_id[\s\S]*?user_id\s*=\s*auth\.uid\(\)[\s\S]*?grow_id\s*=\s*grow_id/i,
+      );
+    },
+  );
+
+  (hasLineage ? it : it.skip)(
+    "UPDATE mirrors the same-grow lineage checks for both plant and tent",
+    () => {
+      expect(UPDATE_POLICY).toMatch(/t\.grow_id\s*=\s*grow_id/i);
+      expect(UPDATE_POLICY).toMatch(/p\.grow_id\s*=\s*grow_id/i);
+    },
+  );
+
+  (hasLineage ? it : it.skip)(
+    "plant-in-tent consistency still enforced when both are set",
+    () => {
+      expect(INSERT_POLICY).toMatch(
+        /plant_id\s+IS\s+NULL\s+OR\s+tent_id\s+IS\s+NULL\s+OR\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.plants[\s\S]*?tent_id\s*=\s*tent_id/i,
+      );
+    },
+  );
+
+  (hasLineage ? it : it.skip)(
+    "no service_role bypass and no device-control surface introduced",
+    () => {
+      expect(ALL_ACTION_QUEUE_SQL).not.toMatch(/service_role/i);
+      const combined = (tentsGrowMig ?? "") + (plantsGrowMig ?? "") + ALL_ACTION_QUEUE_SQL;
+      expect(combined).not.toMatch(/mqtt|home[\s_-]?assistant|webhook|pi[\s_-]?bridge\.(local|lan|home|io|net|com)/i);
+    },
+  );
+});

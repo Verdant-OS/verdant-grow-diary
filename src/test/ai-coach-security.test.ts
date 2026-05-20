@@ -66,18 +66,19 @@ describe("ai-coach edge function — security shape", () => {
   });
 
   it("derives plant/tent IDs only from RLS-filtered diary_entries rows", () => {
-    // plantIds and tentIds must come from entries.map(... .plant_id / .tent_id)
-    expect(CODE).toMatch(/entries\.map\([^)]*\.plant_id/);
-    expect(CODE).toMatch(/entries\.map\([^)]*\.tent_id/);
+    // plantIds and tentIds must come from entries.map(...).<something> on the .plant_id / .tent_id field of an entry row.
+    expect(CODE).toMatch(/entries\.map\([\s\S]*?\.plant_id/);
+    expect(CODE).toMatch(/entries\.map\([\s\S]*?\.tent_id/);
   });
 
   it("queries grows / diary_entries / plants / tents only via the user-scoped supabase client", () => {
     for (const table of ["grows", "diary_entries", "plants", "tents"]) {
       const re = new RegExp(`\\.from\\(\\s*["']${table}["']\\s*\\)`, "g");
       const matches = CODE.match(re) ?? [];
-      expect(matches.length, `expected at least one supabase.from("${table}") call`).toBeGreaterThan(0);
+      expect(matches.length, `expected at least one .from("${table}") call`).toBeGreaterThan(0);
       // Every .from("<table>") occurrence must be on the `supabase` (anon, auth-forwarded) client.
-      const prefixed = CODE.match(new RegExp(`supabase\\.from\\(\\s*["']${table}["']\\s*\\)`, "g")) ?? [];
+      // Allow whitespace/newlines between `supabase` and `.from(...)` (chained on next line).
+      const prefixed = CODE.match(new RegExp(`supabase\\s*\\.from\\(\\s*["']${table}["']\\s*\\)`, "g")) ?? [];
       expect(prefixed.length, `every .from("${table}") must be on the user-scoped supabase client`).toBe(matches.length);
     }
   });

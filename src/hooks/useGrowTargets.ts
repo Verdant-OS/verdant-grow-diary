@@ -58,7 +58,7 @@ export function useGrowTargets(
   growId: string | null | undefined,
 ): TargetsState {
   const { user } = useAuth();
-  const [state, setState] = useState<TargetsState>({
+  const [state, setState] = useState<InnerState>({
     status: "idle",
     targets: null,
   });
@@ -92,7 +92,8 @@ export function useGrowTargets(
     load();
   }, [load]);
 
-  return state;
+  return { ...state, reload: load };
+
 }
 
 export default useGrowTargets;

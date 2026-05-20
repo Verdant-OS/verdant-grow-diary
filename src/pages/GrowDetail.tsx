@@ -274,7 +274,53 @@ export default function GrowDetail() {
         />
       </section>
 
+      <section className="glass rounded-2xl p-4 mt-4" aria-label="Recent activity">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Recent Activity
+          </h2>
+          <Link to="/logs" className="text-xs text-primary hover:underline">
+            View full Timeline →
+          </Link>
+        </div>
+        {recent.status === "loading" ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : recent.status === "unavailable" ? (
+          <p className="text-sm text-muted-foreground">Recent activity unavailable.</p>
+        ) : recent.items.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No recent activity yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {recent.items.map((item) => (
+              <li
+                key={item.id}
+                className="rounded-lg border border-border/40 bg-secondary/20 p-2 text-sm"
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className="text-[10px] uppercase">
+                    {item.kind === "diary" ? "Diary Entry" : "Action Queue Event"}
+                  </Badge>
+                  <span className="text-xs truncate">{item.title}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {new Date(item.ts).toLocaleString()}
+                  </span>
+                </div>
+                {item.detail && (
+                  <p className="text-xs mt-1 italic text-muted-foreground">{item.detail}</p>
+                )}
+                {item.href && (
+                  <Link to={item.href} className="text-xs text-primary hover:underline">
+                    View details →
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
     </div>
+
   );
 }
 

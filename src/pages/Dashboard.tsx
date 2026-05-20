@@ -7,12 +7,15 @@ import MetricChip from "@/components/MetricChip";
 import SeverityBadge from "@/components/SeverityBadge";
 import StageBadge from "@/components/StageBadge";
 import SensorChart from "@/components/SensorChart";
+import ScopedGrowBanner from "@/components/ScopedGrowBanner";
+import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { useAlerts, useTasks, useAIInsights } from "@/hooks/useMockData";
-import { usePlants } from "@/hooks/use-plants";
-import { useTents } from "@/hooks/use-tents";
+import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
+import { useScopedGrow } from "@/hooks/useScopedGrow";
 import type { SensorReadingRow } from "@/lib/db";
 import { Button } from "@/components/ui/button";
+import { dashboardPath } from "@/lib/routes";
 import { formatDistanceToNow } from "date-fns";
 
 type DashReading = {

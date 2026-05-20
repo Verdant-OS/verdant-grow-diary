@@ -339,6 +339,83 @@ export type Database = {
         }
         Relationships: []
       }
+      grow_targets: {
+        Row: {
+          created_at: string
+          grow_id: string
+          id: string
+          notes: string | null
+          ppfd_max: number | null
+          ppfd_min: number | null
+          rh_max: number | null
+          rh_min: number | null
+          soil_ec_max: number | null
+          soil_ec_min: number | null
+          soil_temp_max: number | null
+          soil_temp_min: number | null
+          soil_wc_max: number | null
+          soil_wc_min: number | null
+          temp_max: number | null
+          temp_min: number | null
+          updated_at: string
+          user_id: string
+          vpd_max: number | null
+          vpd_min: number | null
+        }
+        Insert: {
+          created_at?: string
+          grow_id: string
+          id?: string
+          notes?: string | null
+          ppfd_max?: number | null
+          ppfd_min?: number | null
+          rh_max?: number | null
+          rh_min?: number | null
+          soil_ec_max?: number | null
+          soil_ec_min?: number | null
+          soil_temp_max?: number | null
+          soil_temp_min?: number | null
+          soil_wc_max?: number | null
+          soil_wc_min?: number | null
+          temp_max?: number | null
+          temp_min?: number | null
+          updated_at?: string
+          user_id?: string
+          vpd_max?: number | null
+          vpd_min?: number | null
+        }
+        Update: {
+          created_at?: string
+          grow_id?: string
+          id?: string
+          notes?: string | null
+          ppfd_max?: number | null
+          ppfd_min?: number | null
+          rh_max?: number | null
+          rh_min?: number | null
+          soil_ec_max?: number | null
+          soil_ec_min?: number | null
+          soil_temp_max?: number | null
+          soil_temp_min?: number | null
+          soil_wc_max?: number | null
+          soil_wc_min?: number | null
+          temp_max?: number | null
+          temp_min?: number | null
+          updated_at?: string
+          user_id?: string
+          vpd_max?: number | null
+          vpd_min?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grow_targets_grow_id_fkey"
+            columns: ["grow_id"]
+            isOneToOne: true
+            referencedRelation: "grows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       grows: {
         Row: {
           created_at: string

@@ -7,11 +7,15 @@ import EmptyState from "@/components/EmptyState";
 import CreatePlantDialog from "@/components/CreatePlantDialog";
 import { useTents } from "@/hooks/useMockData";
 import { useGrowPlants } from "@/hooks/useGrowData";
+import { useGrows } from "@/store/grows";
 import { cn } from "@/lib/utils";
 
 export default function Plants() {
   const [searchParams] = useSearchParams();
   const growId = searchParams.get("growId");
+  const { grows } = useGrows();
+  // Only trust the URL growId when it maps to a grow loaded under RLS for this user.
+  const validGrowId = growId && grows.some((g) => g.id === growId) ? growId : undefined;
   const { data: plants = [] } = useGrowPlants(undefined, growId ?? undefined);
   const { data: tents = [] } = useTents();
   const [tentFilter, setTentFilter] = useState<string>("all");
@@ -19,7 +23,7 @@ export default function Plants() {
 
   return (
     <div>
-      <PageHeader title="Plants" description="Every plant across every tent." icon={<Sprout className="h-5 w-5" />} actions={<CreatePlantDialog />} />
+      <PageHeader title="Plants" description="Every plant across every tent." icon={<Sprout className="h-5 w-5" />} actions={<CreatePlantDialog defaultGrowId={validGrowId} />} />
       {growId && (
         <div className="glass rounded-2xl px-4 py-2 mb-4 flex items-center justify-between text-xs" aria-label="Grow filter banner">
           <span className="text-muted-foreground">Showing plants for this grow</span>

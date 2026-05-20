@@ -4,7 +4,7 @@ import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
 import { STAGES, stageLabel } from "@/lib/grow";
 import { format, formatDistanceToNow } from "date-fns";
-import { Sprout, Image as ImageIcon, Loader2, Camera, FileText, FlaskConical, Check, Pencil, Leaf, Gauge, Bell } from "lucide-react";
+import { Sprout, Image as ImageIcon, Loader2, Camera, FileText, FlaskConical, Check, Pencil, Leaf, Gauge, Bell, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 
@@ -16,6 +16,20 @@ interface Entry {
   id: string; note: string; photo_url: string | null; stage: string | null;
   details: Record<string, unknown>; entry_at: string;
   plant_id: string | null; tent_id: string | null;
+}
+
+type ActionEventType =
+  | "created" | "simulated" | "approved" | "rejected" | "completed" | "cancelled" | "note";
+
+interface ActionQueueEvent {
+  id: string;
+  action_queue_id: string;
+  event_type: ActionEventType;
+  previous_status: string | null;
+  new_status: string | null;
+  note: string | null;
+  created_at: string;
+  action?: { suggested_change: string | null; reason: string | null } | null;
 }
 
 type EventFilter = "all" | "photo" | "note" | "measurement";
@@ -32,13 +46,14 @@ export default function Timeline() {
   const { user } = useAuth();
   const { activeGrow, activeGrowId, grows, loading: growsLoading } = useGrows();
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [actionEvents, setActionEvents] = useState<ActionQueueEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
   const [editingId, setEditingId] = useState<string | null>(null);
 
   async function load() {
-    if (!user || !activeGrowId) { setEntries([]); setLoading(false); return; }
+    if (!user || !activeGrowId) { setEntries([]); setActionEvents([]); setLoading(false); return; }
     setLoading(true);
     const { data } = await supabase.from("diary_entries")
       .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
@@ -51,6 +66,16 @@ export default function Timeline() {
       rows.forEach((r) => { if (r.photo_url && map.has(r.photo_url)) r.photo_url = map.get(r.photo_url)!; });
     }
     setEntries(rows);
+
+    // Action Queue events for this grow (read-only audit trail).
+    // RLS ensures only the owner sees their events.
+    const { data: aqe } = await supabase.from("action_queue_events")
+      .select("id,action_queue_id,event_type,previous_status,new_status,note,created_at,action:action_queue(suggested_change,reason)")
+      .eq("grow_id", activeGrowId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    setActionEvents((aqe as unknown as ActionQueueEvent[]) || []);
+
     setLoading(false);
   }
 
@@ -166,6 +191,12 @@ export default function Timeline() {
           <FilterChip active={eventFilter === "measurement"} onClick={() => setEventFilter("measurement")} label="Measurements" icon={<FlaskConical className="h-3 w-3" />} count={eventCounts.measurement} />
         </div>
       </div>
+
+      <ActionQueueEventsSection events={actionEvents} />
+
+
+
+
 
       {loading ? <Center><Loader2 className="h-5 w-5 animate-spin" /></Center>
         : entries.length === 0 ? (
@@ -309,4 +340,72 @@ function Empty({ title, desc, cta }: { title: string; desc: string; cta?: React.
 
 function SnapChip({ children }: { children: React.ReactNode }) {
   return <span className="text-[11px] px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40">{children}</span>;
+}
+
+const ACTION_EVENT_TONE: Record<ActionEventType, string> = {
+  created:   "bg-secondary/60 border-border/50 text-foreground",
+  simulated: "bg-blue-500/10 border-blue-500/30 text-blue-300",
+  approved:  "bg-emerald-500/10 border-emerald-500/30 text-emerald-300",
+  rejected:  "bg-red-500/10 border-red-500/30 text-red-300",
+  completed: "bg-primary/10 border-primary/30 text-primary",
+  cancelled: "bg-muted/40 border-border/50 text-muted-foreground",
+  note:      "bg-amber-500/10 border-amber-500/30 text-amber-300",
+};
+
+function ActionQueueEventsSection({ events }: { events: ActionQueueEvent[] }) {
+  if (!events?.length) return null;
+  // Defensive: sort newest-first regardless of fetch order.
+  const sorted = [...events].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
+  return (
+    <section className="glass rounded-2xl p-4 mb-4" aria-label="Action Queue events">
+      <div className="flex items-center gap-2 mb-3">
+        <ListChecks className="h-3.5 w-3.5 text-primary" />
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Action Queue events
+        </h2>
+        <span className="text-[11px] text-muted-foreground">
+          {sorted.length} {sorted.length === 1 ? "event" : "events"} · read-only
+        </span>
+      </div>
+      <ul className="space-y-2">
+        {sorted.map((e) => (
+          <li
+            key={e.id}
+            className="rounded-xl border border-border/50 bg-secondary/30 p-3"
+          >
+            <div className="flex items-center gap-2 flex-wrap text-xs">
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] font-medium uppercase",
+                  ACTION_EVENT_TONE[e.event_type] ?? ACTION_EVENT_TONE.created,
+                )}
+              >
+                {e.event_type}
+              </span>
+              <span className="text-muted-foreground">
+                {e.previous_status ?? "—"} → {e.new_status ?? "—"}
+              </span>
+              <span
+                className="ml-auto text-muted-foreground"
+                title={format(new Date(e.created_at), "PPpp")}
+              >
+                {formatDistanceToNow(new Date(e.created_at), { addSuffix: true })}
+              </span>
+            </div>
+            {e.action?.suggested_change && (
+              <p className="text-sm mt-2">{e.action.suggested_change}</p>
+            )}
+            {e.action?.reason && (
+              <p className="text-xs text-muted-foreground mt-1">{e.action.reason}</p>
+            )}
+            {e.note && (
+              <p className="text-xs italic text-muted-foreground mt-2">· {e.note}</p>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }

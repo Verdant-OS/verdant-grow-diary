@@ -93,8 +93,9 @@ export default function ActionQueue() {
   const { user } = useAuth();
   const { activeGrowId, activeGrow, grows } = useGrows();
   const [searchParams] = useSearchParams();
-  const urlGrowId = searchParams.get("growId");
-  // URL growId takes precedence over active grow. RLS still enforces ownership.
+  // Shared URL `?growId=` resolution against RLS-loaded grows. urlGrowId precedence
+  // over activeGrowId is preserved exactly as before.
+  const { urlGrowId, scopedGrowName, backHref } = useScopedGrow();
   const effectiveGrowId = urlGrowId ?? activeGrowId;
   const [rows, setRows] = useState<ActionRow[]>([]);
   const [events, setEvents] = useState<Record<string, EventRow[]>>({});

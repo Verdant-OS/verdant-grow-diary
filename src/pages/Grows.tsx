@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
 
@@ -9,14 +10,15 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Sprout, Check, Trash2, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Sprout, Check, Trash2, Loader2, AlertCircle } from "lucide-react";
 import { GROW_TYPES, STAGES, growTypeLabel, stageLabel } from "@/lib/grow";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
 export default function Grows() {
   const { user } = useAuth();
-  const { grows, activeGrowId, setActiveGrowId, refresh, loading } = useGrows();
+  const { grows, activeGrowId, setActiveGrowId, refresh, loading, error } = useGrows();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", grow_type: "tent", stage: "seedling", notes: "" });
   const [busy, setBusy] = useState(false);
@@ -54,36 +56,91 @@ export default function Grows() {
         </Button>
       </div>
 
-      {loading ? <div className="py-16 text-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin mx-auto" /></div>
-        : grows.length === 0 ? (
-          <div className="py-16 text-center">
-            <div className="mx-auto h-16 w-16 rounded-2xl glass flex items-center justify-center mb-4"><Sprout className="h-7 w-7 text-primary" /></div>
-            <h2 className="font-display text-lg font-semibold">No grows yet</h2>
-            <p className="text-sm text-muted-foreground mt-1 mb-4">Create your first grow to start logging.</p>
-            <Button onClick={() => setOpen(true)} className="gradient-leaf text-primary-foreground">Create grow</Button>
+      {loading ? (
+        <div className="py-16 text-center text-muted-foreground" data-testid="grows-loading">
+          <Loader2 className="h-5 w-5 animate-spin mx-auto" />
+        </div>
+      ) : error ? (
+        <div
+          className="glass rounded-2xl p-6 text-center"
+          role="alert"
+          data-testid="grows-error"
+        >
+          <AlertCircle className="h-5 w-5 text-destructive mx-auto mb-2" />
+          <p className="font-semibold">Unable to load grows.</p>
+          <p className="text-xs text-muted-foreground mt-1">Please try again later.</p>
+        </div>
+      ) : grows.length === 0 ? (
+        <div className="py-16 text-center" data-testid="grows-empty">
+          <div className="mx-auto h-16 w-16 rounded-2xl glass flex items-center justify-center mb-4">
+            <Sprout className="h-7 w-7 text-primary" />
           </div>
-        ) : (
-          <ul className="space-y-3">
-            {grows.map((g) => (
-              <li key={g.id} className={`glass rounded-2xl p-4 flex items-center gap-3 ${g.id === activeGrowId ? "border-primary/60" : ""}`}>
-                <button onClick={() => setActiveGrowId(g.id)} className="flex-1 text-left">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold">{g.name}</span>
-                    {g.id === activeGrowId && <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/20 text-primary">active</span>}
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                    {growTypeLabel(g.grow_type)} · {stageLabel(g.stage)} · started {format(new Date(g.started_at), "MMM d")}
-                  </div>
-                </button>
-                {g.id === activeGrowId ? (
-                  <Check className="h-4 w-4 text-primary" />
-                ) : (
-                  <Button size="icon" variant="ghost" onClick={() => archive(g.id)}><Trash2 className="h-4 w-4" /></Button>
+          <h2 className="font-display text-lg font-semibold">No grows yet.</h2>
+          <p className="text-sm text-muted-foreground mt-1 mb-4">Create your first grow to start logging.</p>
+          <Button onClick={() => setOpen(true)} className="gradient-leaf text-primary-foreground">Create grow</Button>
+        </div>
+      ) : (
+        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="grows-list">
+          {grows.map((g) => (
+            <li
+              key={g.id}
+              className={`glass rounded-2xl p-0 overflow-hidden ${g.id === activeGrowId ? "border-primary/60" : ""}`}
+            >
+              <Link
+                to={`/grows/${g.id}`}
+                className="block p-4 hover:bg-secondary/20 transition-colors"
+                data-testid="grow-card-link"
+              >
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <span className="font-semibold">{g.name}</span>
+                  {g.id === activeGrowId && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/20 text-primary">active</span>
+                  )}
+                  {g.is_archived && (
+                    <Badge variant="outline" className="text-[10px]">archived</Badge>
+                  )}
+                  <Badge variant="outline" className="uppercase text-[10px]">{stageLabel(g.stage)}</Badge>
+                  <Badge variant="outline" className="text-[10px]">{growTypeLabel(g.grow_type)}</Badge>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Started {format(new Date(g.started_at), "MMM d, yyyy")}
+                  {g.updated_at && (
+                    <> · Updated {format(new Date(g.updated_at), "MMM d, yyyy")}</>
+                  )}
+                </div>
+                {g.notes && (
+                  <p className="text-xs mt-2 text-muted-foreground line-clamp-2">{g.notes}</p>
                 )}
-              </li>
-            ))}
-          </ul>
-        )}
+              </Link>
+              <div className="flex items-center justify-between px-4 pb-3 -mt-1">
+                {g.id === activeGrowId ? (
+                  <span className="inline-flex items-center text-[11px] text-primary gap-1">
+                    <Check className="h-3 w-3" /> active grow
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => setActiveGrowId(g.id)}
+                    className="text-[11px] text-muted-foreground hover:text-foreground"
+                  >
+                    Set active
+                  </button>
+                )}
+                {g.id !== activeGrowId && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => archive(g.id)}
+                    aria-label="Archive grow"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="glass max-w-md">

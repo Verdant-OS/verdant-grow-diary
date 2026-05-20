@@ -4,6 +4,13 @@ import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Loader2, Check, X, FlaskConical, ListChecks, History } from "lucide-react";
 import { toast } from "sonner";
 
@@ -23,6 +30,10 @@ type EventType =
   | "completed"
   | "cancelled"
   | "note";
+
+type StatusFilter = "all" | "pending" | "simulated" | "approved" | "rejected";
+type RiskFilter = "all" | "low" | "medium" | "high" | "critical";
+type SortOrder = "newest" | "oldest" | "risk";
 
 interface ActionRow {
   id: string;
@@ -60,6 +71,13 @@ const RISK_VARIANT: Record<ActionRow["risk_level"], string> = {
   critical: "bg-red-500/15 text-red-300 border-red-500/30",
 };
 
+const RISK_RANK: Record<ActionRow["risk_level"], number> = {
+  critical: 4,
+  high: 3,
+  medium: 2,
+  low: 1,
+};
+
 export default function ActionQueue() {
   const { user } = useAuth();
   const { activeGrowId, activeGrow } = useGrows();
@@ -67,6 +85,10 @@ export default function ActionQueue() {
   const [events, setEvents] = useState<Record<string, EventRow[]>>({});
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -177,8 +199,35 @@ export default function ActionQueue() {
     return transition(row, { status: "simulated" }, "simulated", "simulated");
   }
 
-  const pending = useMemo(() => rows.filter((r) => r.status === "pending_approval"), [rows]);
-  const reviewed = useMemo(() => rows.filter((r) => r.status !== "pending_approval"), [rows]);
+  const filtered = useMemo(() => {
+    const matchesStatus = (s: Status) => {
+      if (statusFilter === "all") return true;
+      if (statusFilter === "pending") return s === "pending_approval";
+      return s === statusFilter;
+    };
+    const list = rows
+      .filter((r) => matchesStatus(r.status))
+      .filter((r) => riskFilter === "all" || r.risk_level === riskFilter);
+    const sorted = [...list].sort((a, b) => {
+      if (sortOrder === "risk") return RISK_RANK[b.risk_level] - RISK_RANK[a.risk_level];
+      const ta = new Date(a.created_at).getTime();
+      const tb = new Date(b.created_at).getTime();
+      return sortOrder === "oldest" ? ta - tb : tb - ta;
+    });
+    return sorted;
+  }, [rows, statusFilter, riskFilter, sortOrder]);
+
+  const pending = useMemo(
+    () => filtered.filter((r) => r.status === "pending_approval"),
+    [filtered],
+  );
+  const reviewed = useMemo(
+    () => filtered.filter((r) => r.status !== "pending_approval"),
+    [filtered],
+  );
+
+  const filtersActive =
+    statusFilter !== "all" || riskFilter !== "all" || sortOrder !== "newest";
 
   return (
     <div>
@@ -194,16 +243,60 @@ export default function ActionQueue() {
         </p>
       </div>
 
-      <section className="glass rounded-2xl p-4 mb-4">
+      <div
+        className="glass rounded-2xl p-3 mb-4 flex flex-wrap gap-2"
+        aria-label="Action queue filters"
+      >
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+          <SelectTrigger className="h-9 w-[150px]" aria-label="Status filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="simulated">Simulated</SelectItem>
+            <SelectItem value="approved">Approved</SelectItem>
+            <SelectItem value="rejected">Rejected</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={riskFilter} onValueChange={(v) => setRiskFilter(v as RiskFilter)}>
+          <SelectTrigger className="h-9 w-[140px]" aria-label="Risk filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All risks</SelectItem>
+            <SelectItem value="low">Low</SelectItem>
+            <SelectItem value="medium">Medium</SelectItem>
+            <SelectItem value="high">High</SelectItem>
+            <SelectItem value="critical">Critical</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as SortOrder)}>
+          <SelectTrigger className="h-9 w-[170px]" aria-label="Sort order">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="newest">Newest first</SelectItem>
+            <SelectItem value="oldest">Oldest first</SelectItem>
+            <SelectItem value="risk">Highest risk first</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <section className="glass rounded-2xl p-4 mb-4" aria-label="Needs Review">
         <h2 className="text-sm font-semibold mb-3 uppercase tracking-wider text-muted-foreground">
-          Pending approval ({pending.length})
+          Needs Review ({pending.length})
         </h2>
         {loading ? (
           <div className="flex items-center justify-center py-8 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
           </div>
         ) : pending.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4">No pending suggestions.</p>
+          <p className="text-sm text-muted-foreground py-4">
+            {filtersActive ? "No actions match these filters." : "No pending actions."}
+          </p>
         ) : (
           <ul className="space-y-3">
             {pending.map((row) => (
@@ -241,16 +334,23 @@ export default function ActionQueue() {
         )}
       </section>
 
-      {reviewed.length > 0 && (
-        <section className="glass rounded-2xl p-4">
-          <h2 className="text-sm font-semibold mb-3 uppercase tracking-wider text-muted-foreground">
-            Recent ({reviewed.length})
-          </h2>
+      <section className="glass rounded-2xl p-4" aria-label="Already Reviewed">
+        <h2 className="text-sm font-semibold mb-3 uppercase tracking-wider text-muted-foreground">
+          Already Reviewed ({reviewed.length})
+        </h2>
+        {loading ? null : reviewed.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4">
+            {filtersActive ? "No actions match these filters." : "No reviewed actions."}
+          </p>
+        ) : (
           <ul className="space-y-2 text-sm">
-            {reviewed.slice(0, 20).map((row) => (
+            {reviewed.slice(0, 50).map((row) => (
               <li key={row.id} className="rounded-lg border border-border/40 bg-secondary/20 p-2">
                 <div className="flex items-center gap-3">
                   <Badge variant="outline" className="text-[10px] uppercase">{row.status}</Badge>
+                  <Badge variant="outline" className={`text-[10px] uppercase ${RISK_VARIANT[row.risk_level]}`}>
+                    {row.risk_level}
+                  </Badge>
                   <span className="truncate flex-1">{row.suggested_change}</span>
                   <span className="text-xs text-muted-foreground">{row.action_type}</span>
                 </div>
@@ -258,8 +358,8 @@ export default function ActionQueue() {
               </li>
             ))}
           </ul>
-        </section>
-      )}
+        )}
+      </section>
     </div>
   );
 }

@@ -22,6 +22,7 @@ import Grows from "./pages/Grows";
 import Coach from "./pages/Coach";
 import Diagnostics from "./pages/Diagnostics";
 import ActionQueue from "./pages/ActionQueue";
+import ActionDetail from "./pages/ActionDetail";
 import GrowLineageRepair from "./pages/GrowLineageRepair";
 import NotFound from "./pages/NotFound";
 

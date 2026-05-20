@@ -75,7 +75,7 @@ export default function GrowDetail() {
 
       <section className="grid grid-cols-1 sm:grid-cols-2 gap-3" aria-label="Grow hub links">
         <HubLink
-          to={`/timeline?growId=${growId}`}
+          to={`/logs?growId=${growId}`}
           icon={<ClipboardList className="h-4 w-4" />}
           title="Timeline"
           description="All events for your grows."
@@ -113,7 +113,7 @@ export default function GrowDetail() {
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Recent Activity
           </h2>
-          <Link to={`/timeline?growId=${growId}`} className="text-xs text-primary hover:underline">
+          <Link to={`/logs?growId=${growId}`} className="text-xs text-primary hover:underline">
             View full Timeline →
           </Link>
         </div>
@@ -269,7 +269,7 @@ function GrowStatusCard({ status, growId }: { status: GrowStatus; growId: string
             Review pending actions →
           </Link>
         )}
-        <Link to={`/timeline?growId=${growId}`} className="text-primary hover:underline">
+        <Link to={`/logs?growId=${growId}`} className="text-primary hover:underline">
           View Timeline →
         </Link>
       </div>

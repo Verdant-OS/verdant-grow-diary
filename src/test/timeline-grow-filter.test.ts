@@ -35,9 +35,9 @@ describe("Timeline — grow filter", () => {
 
   it("renders banner and clear-filter link when growId is present", () => {
     expect(TIMELINE).toMatch(/urlGrowId\s*&&/);
-    expect(TIMELINE).toMatch(/Showing timeline for this grow/);
+    expect(TIMELINE).toMatch(/Showing \{scopeLabel\} for this grow/);
     expect(TIMELINE).toMatch(/Clear grow filter/);
-    expect(TIMELINE).toMatch(/to=\s*["']\/timeline["']/);
+    expect(TIMELINE).toMatch(/to=\{clearTo\}/);
   });
 
   it("preserves newest-first ordering", () => {
@@ -60,8 +60,8 @@ describe("Timeline route", () => {
   });
 });
 
-describe("GrowDetail — links to /timeline?growId=", () => {
+describe("GrowDetail — links to /logs?growId=", () => {
   it("hub card link uses growId", () => {
-    expect(GROW_DETAIL).toMatch(/to=\{`\/timeline\?growId=\$\{growId\}`\}/);
+    expect(GROW_DETAIL).toMatch(/to=\{`\/logs\?growId=\$\{growId\}`\}/);
   });
 });

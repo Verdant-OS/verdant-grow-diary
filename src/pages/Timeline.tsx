@@ -46,13 +46,14 @@ export default function Timeline() {
   const { user } = useAuth();
   const { activeGrow, activeGrowId, grows, loading: growsLoading } = useGrows();
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [actionEvents, setActionEvents] = useState<ActionQueueEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
   const [editingId, setEditingId] = useState<string | null>(null);
 
   async function load() {
-    if (!user || !activeGrowId) { setEntries([]); setLoading(false); return; }
+    if (!user || !activeGrowId) { setEntries([]); setActionEvents([]); setLoading(false); return; }
     setLoading(true);
     const { data } = await supabase.from("diary_entries")
       .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
@@ -65,6 +66,16 @@ export default function Timeline() {
       rows.forEach((r) => { if (r.photo_url && map.has(r.photo_url)) r.photo_url = map.get(r.photo_url)!; });
     }
     setEntries(rows);
+
+    // Action Queue events for this grow (read-only audit trail).
+    // RLS ensures only the owner sees their events.
+    const { data: aqe } = await supabase.from("action_queue_events")
+      .select("id,action_queue_id,event_type,previous_status,new_status,note,created_at,action:action_queue(suggested_change,reason)")
+      .eq("grow_id", activeGrowId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    setActionEvents((aqe as unknown as ActionQueueEvent[]) || []);
+
     setLoading(false);
   }
 

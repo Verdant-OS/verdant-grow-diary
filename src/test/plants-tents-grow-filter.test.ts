@@ -22,7 +22,7 @@ describe("Plants — grow filter", () => {
   it("renders banner and clear link via ScopedGrowBanner", () => {
     expect(PLANTS).toMatch(/ScopedGrowBanner/);
     expect(PLANTS).toMatch(/label=\s*["']plants["']/);
-    expect(PLANTS).toMatch(/clearHref=\s*["']\/plants["']/);
+    expect(PLANTS).toMatch(/clearHref=\{plantsPath\(\)\}/);
   });
   it("no ai-coach / device-control / service_role", () => {
     expect(PLANTS).not.toMatch(/ai-coach|ai_coach/);

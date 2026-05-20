@@ -16,6 +16,7 @@ import Sensors from "./pages/Sensors";
 import Tasks from "./pages/Tasks";
 import Cameras from "./pages/Cameras";
 import Alerts from "./pages/Alerts";
+import AlertDetail from "./pages/AlertDetail";
 import Settings from "./pages/Settings";
 import Timeline from "./pages/Timeline";
 import Grows from "./pages/Grows";
@@ -52,6 +53,7 @@ const App = () => (
                 <Route path="/tasks" element={<Tasks />} />
                 <Route path="/cameras" element={<Cameras />} />
                 <Route path="/alerts" element={<Alerts />} />
+                <Route path="/alerts/:alertId" element={<AlertDetail />} />
                 <Route path="/doctor" element={<Coach />} />
                 <Route path="/actions" element={<ActionQueue />} />
                 <Route path="/actions/:actionId" element={<ActionDetail />} />

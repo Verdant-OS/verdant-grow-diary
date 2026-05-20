@@ -188,45 +188,89 @@ export default function ActionQueue() {
     await load();
   }
 
-  function promptNote(label: string): string | undefined {
-    if (typeof window === "undefined" || typeof window.prompt !== "function") {
-      return undefined;
+  function openNoteDialog(row: ActionRow, kind: "approve" | "reject" | "simulate") {
+    setNoteDraft("");
+    setNoteDialog({ row, kind });
+  }
+
+  // SECURITY: each branch only flips status + writes audit. No device commands.
+  async function confirmNoteDialog() {
+    if (!noteDialog) return;
+    const { row, kind } = noteDialog;
+    const trimmed = noteDraft.trim();
+    const note = trimmed.length ? trimmed : undefined;
+    setNoteDialog(null);
+    setNoteDraft("");
+
+    if (kind === "approve") {
+      // SECURITY: "approved" means approved for future manual/controlled execution.
+      await transition(
+        row,
+        { status: "approved", approved_at: new Date().toISOString() },
+        "approved",
+        "approved",
+        note,
+      );
+    } else if (kind === "reject") {
+      await transition(
+        row,
+        { status: "rejected", rejected_at: new Date().toISOString() },
+        "rejected",
+        "rejected",
+        note,
+      );
+    } else {
+      // Simulation NEVER sends device commands. Status + audit only.
+      toast.message("Simulated (no device command sent)", {
+        description: `${row.action_type} → ${row.target_metric ?? row.target_device}`,
+      });
+      await transition(row, { status: "simulated" }, "simulated", "simulated", note);
     }
-    const raw = window.prompt(label) ?? "";
-    const trimmed = raw.trim();
-    return trimmed.length ? trimmed : undefined;
+  }
+
+  function cancelNoteDialog() {
+    // No status change, no audit event written.
+    setNoteDialog(null);
+    setNoteDraft("");
   }
 
   function approve(row: ActionRow) {
-    // SECURITY: "approved" means approved for future manual/controlled execution.
-    // NO equipment command is sent from this app.
-    const note = promptNote("Optional approval note (why are you approving?)");
-    return transition(
-      row,
-      { status: "approved", approved_at: new Date().toISOString() },
-      "approved",
-      "approved",
-      note,
-    );
+    return openNoteDialog(row, "approve");
   }
   function reject(row: ActionRow) {
-    const note = promptNote("Optional rejection reason (why are you rejecting?)");
-    return transition(
-      row,
-      { status: "rejected", rejected_at: new Date().toISOString() },
-      "rejected",
-      "rejected",
-      note,
-    );
+    return openNoteDialog(row, "reject");
   }
   function simulate(row: ActionRow) {
-    // Simulation NEVER sends device commands. Status + audit only.
-    const note = promptNote("Optional simulation note");
-    toast.message("Simulated (no device command sent)", {
-      description: `${row.action_type} → ${row.target_metric ?? row.target_device}`,
-    });
-    return transition(row, { status: "simulated" }, "simulated", "simulated", note);
+    return openNoteDialog(row, "simulate");
   }
+
+  const DIALOG_META = {
+    approve: {
+      title: "Approve Action",
+      description:
+        "Approved actions are recorded for future manual or controlled execution. No equipment command is sent.",
+      label: "Approval note",
+      placeholder: "Optional — why are you approving?",
+      confirmLabel: "Approve",
+    },
+    reject: {
+      title: "Reject Action",
+      description: "Reject this suggestion. No equipment command is sent.",
+      label: "Rejection reason",
+      placeholder: "Optional — why are you rejecting?",
+      confirmLabel: "Reject",
+    },
+    simulate: {
+      title: "Simulate Action",
+      description: "Marks the action as simulated. No equipment command is sent.",
+      label: "Simulation note",
+      placeholder: "Optional — what did you simulate?",
+      confirmLabel: "Simulate",
+    },
+  } as const;
+  const meta = noteDialog ? DIALOG_META[noteDialog.kind] : null;
+
+
 
   const filtered = useMemo(() => {
     const matchesStatus = (s: Status) => {

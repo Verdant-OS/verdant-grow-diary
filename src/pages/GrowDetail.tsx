@@ -16,6 +16,7 @@ import {
   formatCount,
 } from "@/lib/growStatus";
 import { actionsPath, logsPath, plantsPath, tentsPath } from "@/lib/routes";
+import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 
 /**
  * Read-only grow detail hub. Presentational only — all data loading +

@@ -29,12 +29,19 @@ const HEALTH = [
 interface Props {
   trigger?: React.ReactNode;
   defaultTentId?: string;
+  defaultGrowId?: string;
 }
 
-export default function CreatePlantDialog({ trigger, defaultTentId }: Props) {
+export default function CreatePlantDialog({ trigger, defaultTentId, defaultGrowId }: Props) {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const { data: tents = [] } = useTents();
+  const { data: allTents = [] } = useTents();
+  // Scope tent options to the preselected grow when present.
+  const tents = defaultGrowId
+    ? (allTents as Array<{ id: string; name: string; grow_id: string | null }>).filter(
+        (t) => t.grow_id === defaultGrowId,
+      )
+    : allTents;
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
@@ -61,6 +68,8 @@ export default function CreatePlantDialog({ trigger, defaultTentId }: Props) {
       health: form.health,
     };
     if (form.tent_id && form.tent_id !== "none") payload.tent_id = form.tent_id;
+    // Preselect grow context when provided. RLS enforces ownership server-side.
+    if (defaultGrowId) payload.grow_id = defaultGrowId;
     if (form.started_at) payload.started_at = new Date(form.started_at).toISOString();
 
     const { error } = await supabase.from("plants").insert(payload as never);
@@ -71,6 +80,7 @@ export default function CreatePlantDialog({ trigger, defaultTentId }: Props) {
     }
     toast.success("Plant created");
     qc.invalidateQueries({ queryKey: ["plants"] });
+    qc.invalidateQueries({ queryKey: ["grow", "plants"] });
     setForm({ name: "", strain: "", tent_id: defaultTentId ?? "none", stage: "seedling", health: "healthy", started_at: "" });
     setOpen(false);
   }

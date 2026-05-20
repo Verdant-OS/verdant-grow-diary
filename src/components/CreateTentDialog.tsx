@@ -13,9 +13,10 @@ import { toast } from "sonner";
 
 interface Props {
   trigger?: React.ReactNode;
+  defaultGrowId?: string;
 }
 
-export default function CreateTentDialog({ trigger }: Props) {
+export default function CreateTentDialog({ trigger, defaultGrowId }: Props) {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -29,13 +30,16 @@ export default function CreateTentDialog({ trigger }: Props) {
       return;
     }
     setBusy(true);
-    const { error } = await supabase.from("tents").insert({
+    const payload: Record<string, unknown> = {
       user_id: user.id,
       name: form.name.trim(),
       size: form.size.trim() || null,
       brand: form.brand.trim() || null,
       stage: form.stage,
-    });
+    };
+    // Preselect grow context when provided. RLS enforces ownership server-side.
+    if (defaultGrowId) payload.grow_id = defaultGrowId;
+    const { error } = await supabase.from("tents").insert(payload as never);
     setBusy(false);
     if (error) {
       toast.error(error.message);
@@ -43,6 +47,7 @@ export default function CreateTentDialog({ trigger }: Props) {
     }
     toast.success("Tent created");
     qc.invalidateQueries({ queryKey: ["tents"] });
+    qc.invalidateQueries({ queryKey: ["grow", "tents"] });
     setForm({ name: "", size: "", brand: "", stage: "seedling" });
     setOpen(false);
   }

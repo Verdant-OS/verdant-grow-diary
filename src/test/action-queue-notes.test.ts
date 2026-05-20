@@ -74,14 +74,14 @@ describe("ActionQueue — dialog wiring", () => {
   });
 
   it("Confirm forwards a blank-trimmed note as undefined and otherwise as string", () => {
-    expect(PAGE).toMatch(/trimmed\.length\s*\?\s*trimmed\s*:\s*undefined/);
+    expect(PAGE).toMatch(/normalizeNote\(noteDraft\)/);
     expect(PAGE).toMatch(/function\s+confirmNoteDialog[\s\S]*?transition\(/);
   });
 
-  it("Confirm path drives transition() for each kind", () => {
-    expect(PAGE).toMatch(/transition\([\s\S]*?status:\s*["']approved["'][\s\S]*?["']approved["'][\s\S]*?["']approved["']/);
-    expect(PAGE).toMatch(/transition\([\s\S]*?status:\s*["']rejected["'][\s\S]*?["']rejected["'][\s\S]*?["']rejected["']/);
-    expect(PAGE).toMatch(/transition\([\s\S]*?status:\s*["']simulated["'][\s\S]*?["']simulated["'][\s\S]*?["']simulated["']/);
+  it("Confirm path drives transition() for each kind via shared helpers", () => {
+    expect(PAGE).toMatch(/buildTransitionPatch\(kind\)/);
+    expect(PAGE).toMatch(/transition\(row,\s*patch,\s*eventTypeFor\(kind\),\s*nextStatusFor\(kind\),\s*note\)/);
+  });
   });
 
   it("note is written into action_queue_events.note", () => {

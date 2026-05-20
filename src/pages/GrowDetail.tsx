@@ -83,7 +83,7 @@ export default function GrowDetail() {
           countLabel="diary entries"
         />
         <HubLink
-          to="/plants"
+          to={`/plants?growId=${growId}`}
           icon={<Leaf className="h-4 w-4" />}
           title="Plants"
           description="Manage plants in this grow."
@@ -91,7 +91,7 @@ export default function GrowDetail() {
           countLabel="plants"
         />
         <HubLink
-          to="/tents"
+          to={`/tents?growId=${growId}`}
           icon={<TentIcon className="h-4 w-4" />}
           title="Tents"
           description="Tents linked to this grow."

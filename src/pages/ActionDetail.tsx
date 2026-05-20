@@ -43,6 +43,8 @@ import {
   normalizeNote,
 } from "@/lib/actionQueueTransitions";
 import { actionsPath, growDetailPath } from "@/lib/routes";
+import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
+import { useGrows } from "@/store/grows";
 
 type Status = ActionStatus;
 type EventType = ActionEventType;

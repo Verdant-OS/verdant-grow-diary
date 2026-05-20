@@ -24,9 +24,9 @@ const GROW = readFileSync(
 );
 
 describe("ActionQueue — URL growId filter", () => {
-  it("reads growId from URL search params", () => {
-    expect(PAGE).toMatch(/useSearchParams/);
-    expect(PAGE).toMatch(/searchParams\.get\(\s*["']growId["']\s*\)/);
+  it("reads growId via shared useScopedGrow hook", () => {
+    expect(PAGE).toMatch(/useScopedGrow\(\)/);
+    expect(PAGE).toMatch(/const\s*\{[^}]*urlGrowId[^}]*\}\s*=\s*useScopedGrow\(\)/);
   });
 
   it("scopes the action_queue query by grow_id", () => {

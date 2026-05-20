@@ -150,6 +150,57 @@ export type Database = {
           },
         ]
       }
+      alert_events: {
+        Row: {
+          alert_id: string
+          created_at: string
+          event_type: string
+          grow_id: string
+          id: string
+          new_status: string | null
+          note: string | null
+          previous_status: string | null
+          user_id: string
+        }
+        Insert: {
+          alert_id: string
+          created_at?: string
+          event_type: string
+          grow_id: string
+          id?: string
+          new_status?: string | null
+          note?: string | null
+          previous_status?: string | null
+          user_id?: string
+        }
+        Update: {
+          alert_id?: string
+          created_at?: string
+          event_type?: string
+          grow_id?: string
+          id?: string
+          new_status?: string | null
+          note?: string | null
+          previous_status?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alert_events_alert_id_fkey"
+            columns: ["alert_id"]
+            isOneToOne: false
+            referencedRelation: "alerts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alert_events_grow_id_fkey"
+            columns: ["grow_id"]
+            isOneToOne: false
+            referencedRelation: "grows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       alerts: {
         Row: {
           acknowledged_at: string | null

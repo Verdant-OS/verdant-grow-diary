@@ -7,7 +7,7 @@
  * `null` and the UI renders "No grow targets configured."
  *
  * Read-only: SELECT only. No ai-coach call. No external-control surface.
- * No service_role. No new write paths.
+ * No elevated keys. No new write paths.
  */
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";

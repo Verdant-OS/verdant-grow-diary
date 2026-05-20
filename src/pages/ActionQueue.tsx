@@ -297,6 +297,22 @@ export default function ActionQueue() {
       placeholder: "Optional — what did you simulate?",
       confirmLabel: "Simulate",
     },
+    complete: {
+      title: "Mark Action Complete",
+      description:
+        "Marks this action as manually completed outside Verdant. No equipment command is sent.",
+      label: "Completion note",
+      placeholder: "Optional — what did you do?",
+      confirmLabel: "Mark Complete",
+    },
+    cancel: {
+      title: "Cancel Action",
+      description:
+        "Cancels this action. The grower decided not to proceed. No equipment command is sent.",
+      label: "Cancellation reason",
+      placeholder: "Optional — why are you cancelling?",
+      confirmLabel: "Cancel Action",
+    },
   } as const;
   const meta = noteDialog ? DIALOG_META[noteDialog.kind] : null;
 

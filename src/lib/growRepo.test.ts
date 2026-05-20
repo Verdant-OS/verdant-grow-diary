@@ -36,8 +36,11 @@ import { fetchTents, fetchTent, fetchPlants, fetchSensorReadings, insertSensorRe
 
 beforeEach(reset);
 
+const TENT_UUID = "11111111-1111-4111-8111-111111111111";
+const TENT_UUID_2 = "22222222-2222-4222-8222-222222222222";
+
 const tentRow = {
-  id: "t1", user_id: "u", name: "A", brand: null, size: null,
+  id: TENT_UUID, user_id: "u", name: "A", brand: null, size: null,
   stage: "veg", light_on: true, light_schedule: null, light_wattage: null,
   is_archived: false, schema_version: 1,
   created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z",
@@ -48,7 +51,7 @@ describe("fetchTents", () => {
     nextResult = { data: [tentRow], error: null };
     const r = await fetchTents();
     expect(r).toHaveLength(1);
-    expect(r[0].id).toBe("t1");
+    expect(r[0].id).toBe(TENT_UUID);
     expect(calls.table).toBe("tents");
     expect(calls.filters).toContainEqual(["is_archived", false]);
   });
@@ -73,7 +76,7 @@ describe("fetchTent", () => {
   });
   it("returns null when row missing", async () => {
     nextResult = { data: null, error: null };
-    expect(await fetchTent("t1")).toBeNull();
+    expect(await fetchTent(TENT_UUID)).toBeNull();
     expect(calls.single).toBe(true);
   });
 });
@@ -81,8 +84,8 @@ describe("fetchTent", () => {
 describe("fetchPlants", () => {
   it("filters by tentId when provided", async () => {
     nextResult = { data: [], error: null };
-    await fetchPlants("tent-9");
-    expect(calls.filters).toContainEqual(["tent_id", "tent-9"]);
+    await fetchPlants(TENT_UUID_2);
+    expect(calls.filters).toContainEqual(["tent_id", TENT_UUID_2]);
   });
   it("omits tent filter when not provided", async () => {
     nextResult = { data: [], error: null };
@@ -98,7 +101,7 @@ describe("fetchPlants", () => {
 describe("fetchSensorReadings", () => {
   it("applies limit and order", async () => {
     nextResult = { data: [], error: null };
-    await fetchSensorReadings("t1");
+    await fetchSensorReadings(TENT_UUID);
     expect(calls.ordered).toBe("ts");
     expect(calls.limited).toBe(2000);
   });
@@ -111,13 +114,13 @@ describe("fetchSensorReadings", () => {
 describe("insertSensorReading", () => {
   it("forwards the row payload", async () => {
     nextResult = { data: null, error: null };
-    await insertSensorReading({ user_id: "u", tent_id: "t1", metric: "temperature_c", value: 22 } as any);
+    await insertSensorReading({ user_id: "u", tent_id: TENT_UUID, metric: "temperature_c", value: 22 } as any);
     expect(calls.table).toBe("sensor_readings");
     expect(calls.inserted).toMatchObject({ metric: "temperature_c", value: 22 });
   });
   it("throws on error", async () => {
     nextResult = { data: null, error: { message: "denied" } };
-    await expect(insertSensorReading({ user_id: "u", tent_id: "t1", metric: "temperature_c", value: 1 } as any))
+    await expect(insertSensorReading({ user_id: "u", tent_id: TENT_UUID, metric: "temperature_c", value: 1 } as any))
       .rejects.toThrow(/insertSensorReading.*denied/);
   });
 });

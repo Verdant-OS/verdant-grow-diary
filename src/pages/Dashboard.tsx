@@ -433,7 +433,101 @@ export default function Dashboard() {
             </div>
           )}
         </section>
+        <section
+          className="glass rounded-2xl p-4 mt-4"
+          aria-label="Target Comparison"
+        >
+          {(() => {
+            const snap =
+              sensorState.status === "ok" ? sensorState.snapshot : null;
+            const targets =
+              targetsState.status === "ok" ? targetsState.targets : null;
+            const result = compareSnapshotToTargets(snap, targets);
+            const tone =
+              result.status === "in_range"
+                ? "border-emerald-500 text-emerald-600"
+                : result.status === "out_of_range"
+                  ? "border-amber-500 text-amber-600"
+                  : "border-muted-foreground text-muted-foreground";
+            return (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <h2 className="font-display font-semibold">
+                      Target Comparison
+                    </h2>
+                    <p className="text-xs text-muted-foreground">
+                      Latest snapshot vs configured grow targets. Not a
+                      plant-health diagnosis.
+                    </p>
+                  </div>
+                  <Link
+                    to={logsPath(scopedGrowId)}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Inspect history →
+                  </Link>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap mb-2">
+                  <Badge variant="outline" className={`text-[10px] uppercase ${tone}`}>
+                    {result.headline}
+                  </Badge>
+                  {result.status === "missing_targets" && (
+                    <span className="text-xs text-muted-foreground">
+                      No grow targets configured.
+                    </span>
+                  )}
+                </div>
+                {result.metrics.length > 0 && (
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                    {result.metrics.map((m) => {
+                      const valueText =
+                        m.value === null ? "Unknown" : String(m.value);
+                      const rangeText =
+                        m.min === null && m.max === null
+                          ? "No target set"
+                          : `${m.min ?? "—"} – ${m.max ?? "—"}`;
+                      const stateTone =
+                        m.state === "low" || m.state === "high"
+                          ? "text-amber-600"
+                          : m.state === "in_range"
+                            ? "text-emerald-600"
+                            : "text-muted-foreground";
+                      return (
+                        <div
+                          key={m.metric}
+                          className="rounded-lg border border-border/40 bg-secondary/20 p-2"
+                        >
+                          <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                            {m.label}
+                          </dt>
+                          <dd className="text-sm font-medium">
+                            {valueText}{" "}
+                            <span className={`text-xs ${stateTone}`}>
+                              ({m.state.replace("_", " ")})
+                            </span>
+                          </dd>
+                          <dd className="text-[11px] text-muted-foreground">
+                            target {rangeText}
+                          </dd>
+                        </div>
+                      );
+                    })}
+                  </dl>
+                )}
+                {result.reasons.length > 0 && (
+                  <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-0.5 mt-2">
+                    {result.reasons.map((r) => (
+                      <li key={r}>{r}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })()}
+        </section>
         <div className="grid lg:grid-cols-2 gap-4 mt-4">
+
 
 
 

@@ -321,26 +321,13 @@ export default function ActionQueue() {
       {urlGrowId && (() => {
         const scopedGrow = grows.find((g) => g.id === urlGrowId) ?? null;
         return (
-          <div
-            className="glass rounded-2xl p-3 mb-4 flex items-center justify-between gap-3 text-sm flex-wrap"
-            aria-label="Grow filter banner"
-          >
-            {scopedGrow ? (
-              <span>Showing actions for <span className="font-medium">{scopedGrow.name}</span></span>
-            ) : (
-              <span>Showing actions for this grow</span>
-            )}
-            <span className="flex items-center gap-3">
-              {scopedGrow && (
-                <Link to={`/grows/${scopedGrow.id}`} className="text-primary hover:underline">
-                  Back to Grow
-                </Link>
-              )}
-              <Link to="/actions" className="text-primary hover:underline">
-                Clear grow filter
-              </Link>
-            </span>
-          </div>
+          <ScopedGrowBanner
+            growId={urlGrowId}
+            growName={scopedGrow?.name ?? null}
+            label="actions"
+            clearHref="/actions"
+            backHref={scopedGrow ? `/grows/${scopedGrow.id}` : undefined}
+          />
         );
       })()}
 

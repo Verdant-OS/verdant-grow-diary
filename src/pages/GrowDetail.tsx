@@ -111,6 +111,14 @@ export default function GrowDetail() {
           count={counts.actionsTotal}
           countLabel="actions"
         />
+        <HubLink
+          to={dashboardPath(growId)}
+          icon={<Sparkles className="h-4 w-4" />}
+          title="Dashboard"
+          description="Open the live dashboard scoped to this grow."
+          count="unavailable"
+          countLabel="dashboard"
+        />
       </section>
 
       <section className="glass rounded-2xl p-4 mt-4" aria-label="Recent activity">

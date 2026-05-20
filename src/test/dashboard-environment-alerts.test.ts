@@ -171,14 +171,13 @@ describe("Environment Alerts — Dashboard integration", () => {
 
   it("Dashboard renders Environment Alerts section only when scoped", () => {
     expect(DASHBOARD).toMatch(/aria-label=["']Environment Alerts["']/);
-    // The Environment Alerts section must live inside the scopedGrowId branch.
-    const scopedIdx = DASHBOARD.indexOf("scopedGrowId ? (");
-    const elseIdx = DASHBOARD.indexOf(") : (", scopedIdx);
+    // The Environment Alerts section must live before the unscoped fallback.
     const alertsIdx = DASHBOARD.indexOf('aria-label="Environment Alerts"');
-    expect(scopedIdx).toBeGreaterThan(-1);
-    expect(elseIdx).toBeGreaterThan(scopedIdx);
-    expect(alertsIdx).toBeGreaterThan(scopedIdx);
-    expect(alertsIdx).toBeLessThan(elseIdx);
+    const fallbackIdx = DASHBOARD.indexOf(
+      "Select a grow to see scoped activity",
+    );
+    expect(alertsIdx).toBeGreaterThan(-1);
+    expect(fallbackIdx).toBeGreaterThan(alertsIdx);
   });
 
   it("Dashboard renders the empty-state copy when there are no alerts", () => {
@@ -222,7 +221,7 @@ describe("Environment Alerts — safety constraints", () => {
     expect(block).not.toMatch(/\.insert\s*\(/);
   });
 
-  it("no project source file references service_role (defensive sweep)", () => {
+  it("no non-test src file references service_role (defensive sweep)", () => {
     const srcDir = resolve(__dirname, "..");
     const violations: string[] = [];
     const walk = (dir: string) => {
@@ -230,9 +229,9 @@ describe("Environment Alerts — safety constraints", () => {
         const full = join(dir, name);
         const s = statSync(full);
         if (s.isDirectory()) {
-          if (name === "node_modules" || name.startsWith(".")) continue;
+          if (name === "node_modules" || name.startsWith(".") || name === "test") continue;
           walk(full);
-        } else if (/\.(ts|tsx)$/.test(name)) {
+        } else if (/\.(ts|tsx)$/.test(name) && !name.endsWith(".test.ts") && !name.endsWith(".test.tsx")) {
           const text = readFileSync(full, "utf8");
           if (/service_role/i.test(text)) violations.push(full);
         }

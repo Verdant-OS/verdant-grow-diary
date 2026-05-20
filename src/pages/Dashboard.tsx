@@ -640,11 +640,7 @@ export default function Dashboard() {
                                       toast.success("Alert saved", {
                                         action: {
                                           label: "View",
-                                          onClick: () => {
-                                            window.location.assign(
-                                              alertDetailPath(saved.id),
-                                            );
-                                          },
+                                          onClick: () => window.location.assign(alertDetailPath(saved.id)),
                                         },
                                       });
                                     } catch (logErr) {

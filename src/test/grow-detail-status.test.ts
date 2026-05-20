@@ -42,8 +42,8 @@ describe("GrowDetail — status summary", () => {
   });
 
   it("links to Action Queue when pending > 0 and to Timeline", () => {
-    expect(PAGE).toMatch(/pendingNum > 0[\s\S]{0,200}to="\/actions"/);
-    expect(PAGE).toMatch(/to="\/logs"/);
+    expect(PAGE).toMatch(/pendingNum > 0[\s\S]{0,200}\/actions/);
+    expect(PAGE).toMatch(/\/timeline\?growId=/);
   });
 
   it("declares the summary is not an AI diagnosis", () => {

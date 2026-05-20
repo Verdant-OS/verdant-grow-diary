@@ -15,6 +15,8 @@ import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useDashboardScopedData } from "@/hooks/useDashboardScopedData";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
+import { useEnvironmentTrends } from "@/hooks/useEnvironmentTrends";
+
 import {
   SOURCE_LABEL,
   formatValue,
@@ -82,6 +84,11 @@ export default function Dashboard() {
     scopedGrowId ?? null,
     tents.map((t) => t.id),
   );
+  const trendsState = useEnvironmentTrends(
+    scopedGrowId ?? null,
+    tents.map((t) => t.id),
+  );
+
 
 
 
@@ -335,7 +342,91 @@ export default function Dashboard() {
             })()}
           </section>
         )}
+        <section
+          className="glass rounded-2xl p-4 mt-4"
+          aria-label="Environment Trends"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h2 className="font-display font-semibold">Environment Trends</h2>
+              <p className="text-xs text-muted-foreground">
+                Recent readings summary. Not a plant-health diagnosis.
+              </p>
+            </div>
+            <Link
+              to={logsPath(scopedGrowId)}
+              className="text-xs text-primary hover:underline"
+            >
+              Open Timeline →
+            </Link>
+          </div>
+          {trendsState.status === "loading" || trendsState.status === "idle" ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : trendsState.status === "unavailable" ? (
+            <p className="text-sm text-muted-foreground">
+              Trend data unavailable.
+            </p>
+          ) : trendsState.trends.status === "empty" ? (
+            <p className="text-sm text-muted-foreground">No trend data yet.</p>
+          ) : (
+            <div>
+              <div className="flex items-center gap-2 flex-wrap mb-2">
+                <Badge variant="outline" className="text-[10px] uppercase">
+                  {trendsState.trends.headline}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  {trendsState.trends.count} reading
+                  {trendsState.trends.count === 1 ? "" : "s"}
+                </span>
+                {trendsState.trends.latestTs && (
+                  <span className="text-xs text-muted-foreground">
+                    · latest{" "}
+                    {formatDistanceToNow(new Date(trendsState.trends.latestTs), {
+                      addSuffix: true,
+                    })}
+                  </span>
+                )}
+                <Badge variant="outline" className="text-[10px] uppercase">
+                  {SOURCE_LABEL[trendsState.trends.source]}
+                </Badge>
+              </div>
+              <dl className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+                {[
+                  {
+                    label: "Temperature",
+                    avg: formatValue(trendsState.trends.temp.avg, "°C"),
+                    range: `${formatValue(trendsState.trends.temp.min, "°C")} – ${formatValue(trendsState.trends.temp.max, "°C")}`,
+                  },
+                  {
+                    label: "Humidity",
+                    avg: formatValue(trendsState.trends.rh.avg, "%"),
+                    range: `${formatValue(trendsState.trends.rh.min, "%")} – ${formatValue(trendsState.trends.rh.max, "%")}`,
+                  },
+                  {
+                    label: "VPD",
+                    avg: formatValue(trendsState.trends.vpd.avg, " kPa", 2),
+                    range: `${formatValue(trendsState.trends.vpd.min, " kPa", 2)} – ${formatValue(trendsState.trends.vpd.max, " kPa", 2)}`,
+                  },
+                ].map((m) => (
+                  <div
+                    key={m.label}
+                    className="rounded-lg border border-border/40 bg-secondary/20 p-2"
+                  >
+                    <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      {m.label} · avg
+                    </dt>
+                    <dd className="text-sm font-medium">{m.avg}</dd>
+                    <dd className="text-[11px] text-muted-foreground">
+                      range {m.range}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          )}
+        </section>
         <div className="grid lg:grid-cols-2 gap-4 mt-4">
+
 
 
           <section

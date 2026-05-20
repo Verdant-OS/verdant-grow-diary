@@ -214,7 +214,25 @@ function Field({ label, value, mono }: { label: string; value: string; mono?: bo
   );
 }
 
-function HubLink({ to, icon, title, description }: { to: string; icon: React.ReactNode; title: string; description: string }) {
+function formatCount(c: CountValue): string {
+  return c === "unavailable" ? "Unavailable" : String(c);
+}
+
+function HubLink({
+  to,
+  icon,
+  title,
+  description,
+  count,
+  countLabel,
+}: {
+  to: string;
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  count: CountValue;
+  countLabel: string;
+}) {
   return (
     <Link
       to={to}
@@ -223,8 +241,12 @@ function HubLink({ to, icon, title, description }: { to: string; icon: React.Rea
       <div className="flex items-center gap-2 mb-1 text-sm font-semibold">
         {icon}
         {title}
+        <span className="ml-auto text-xs font-normal text-muted-foreground">
+          <span data-testid={`count-${countLabel.replace(/\s+/g, "-")}`}>{formatCount(count)}</span> {countLabel}
+        </span>
       </div>
       <p className="text-xs text-muted-foreground">{description}</p>
     </Link>
   );
 }
+

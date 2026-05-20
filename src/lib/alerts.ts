@@ -115,6 +115,35 @@ export async function dismissAlert(id: string): Promise<AlertRow> {
   return data as unknown as AlertRow;
 }
 
+/**
+ * Reopen a previously resolved or dismissed alert. Resets status to 'open'
+ * and clears acknowledged_at/resolved_at to satisfy the table CHECK
+ * constraints (those timestamps are only valid when status matches).
+ */
+export async function reopenAlert(id: string): Promise<AlertRow> {
+  const { data, error } = await alertsTable()
+    .update({
+      status: "open",
+      acknowledged_at: null,
+      resolved_at: null,
+    })
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as unknown as AlertRow;
+}
+
+/** Read a single alert by id. RLS enforces ownership. */
+export async function getAlertById(id: string): Promise<AlertRow | null> {
+  const { data, error } = await alertsTable()
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return (data ?? null) as AlertRow | null;
+}
+
 export interface AlertsQuery {
   growId?: string | null;
   status?: AlertStatusRow | "all";

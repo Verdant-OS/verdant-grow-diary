@@ -1,8 +1,8 @@
 /**
  * Pure helpers for the scoped Dashboard "Environment Trends" card.
  *
- * No I/O, no Supabase, no React. Computes simple aggregates over a list of
- * normalized environment samples. Strictly read-only. Not AI. Not diagnosis.
+ * normalized environment samples. Strictly read-only. Not AI. Not advisory.
+
  */
 
 import type { SnapshotSource } from "@/lib/sensorSnapshot";

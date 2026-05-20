@@ -71,11 +71,11 @@ export default function GrowDetail() {
         </dl>
       </header>
 
-      <GrowStatusCard status={status} />
+      <GrowStatusCard status={status} growId={growId} />
 
       <section className="grid grid-cols-1 sm:grid-cols-2 gap-3" aria-label="Grow hub links">
         <HubLink
-          to="/logs"
+          to={`/timeline?growId=${growId}`}
           icon={<ClipboardList className="h-4 w-4" />}
           title="Timeline"
           description="All events for your grows."
@@ -113,7 +113,7 @@ export default function GrowDetail() {
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Recent Activity
           </h2>
-          <Link to="/logs" className="text-xs text-primary hover:underline">
+          <Link to={`/timeline?growId=${growId}`} className="text-xs text-primary hover:underline">
             View full Timeline →
           </Link>
         </div>
@@ -212,7 +212,7 @@ function HubLink({
  * Read-only status card. Status is derived in @/lib/growStatus.deriveStatus;
  * this component only renders. NOT an AI diagnosis.
  */
-function GrowStatusCard({ status }: { status: GrowStatus }) {
+function GrowStatusCard({ status, growId }: { status: GrowStatus; growId: string }) {
   const labelMap: Record<StatusLevel, string> = {
     good: "Good",
     watch: "Watch",
@@ -265,11 +265,11 @@ function GrowStatusCard({ status }: { status: GrowStatus }) {
       </dl>
       <div className="flex gap-3 mt-3 text-xs">
         {pendingNum > 0 && (
-          <Link to="/actions" className="text-primary hover:underline">
+          <Link to={`/actions?growId=${growId}`} className="text-primary hover:underline">
             Review pending actions →
           </Link>
         )}
-        <Link to="/logs" className="text-primary hover:underline">
+        <Link to={`/timeline?growId=${growId}`} className="text-primary hover:underline">
           View Timeline →
         </Link>
       </div>

@@ -6,7 +6,7 @@ import { STAGES, stageLabel } from "@/lib/grow";
 import { format, formatDistanceToNow } from "date-fns";
 import { Sprout, Image as ImageIcon, Loader2, Camera, FileText, FlaskConical, Check, Pencil, Leaf, Gauge, Bell, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import EntryEditDialog from "@/components/EntryEditDialog";
 import { cn } from "@/lib/utils";
@@ -44,7 +44,10 @@ function entryKinds(e: Entry): EventFilter[] {
 
 export default function Timeline() {
   const { user } = useAuth();
-  const { activeGrow, activeGrowId, grows, loading: growsLoading } = useGrows();
+  const { activeGrow, activeGrowId: storeGrowId, grows, loading: growsLoading } = useGrows();
+  const [searchParams] = useSearchParams();
+  const urlGrowId = searchParams.get("growId");
+  const activeGrowId = urlGrowId ?? storeGrowId;
   const [entries, setEntries] = useState<Entry[]>([]);
   const [actionEvents, setActionEvents] = useState<ActionQueueEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -166,6 +169,13 @@ export default function Timeline() {
               );
             })}
           </ol>
+        </div>
+      )}
+
+      {urlGrowId && (
+        <div className="glass rounded-2xl px-4 py-2 mb-4 flex items-center justify-between text-xs" aria-label="Grow filter banner">
+          <span className="text-muted-foreground">Showing timeline for this grow</span>
+          <Link to="/timeline" className="text-primary hover:underline">Clear grow filter</Link>
         </div>
       )}
 

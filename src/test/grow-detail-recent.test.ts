@@ -45,7 +45,7 @@ describe("GrowDetail — recent activity", () => {
     expect(PAGE).toMatch(/aria-label="Recent activity"/);
     expect(PAGE).toMatch(/Recent Activity/);
     expect(PAGE).toMatch(/View full Timeline/);
-    expect(PAGE).toMatch(/to="\/logs"/);
+    expect(PAGE).toMatch(/\/timeline\?growId=/);
   });
 
   it("shows empty state when no activity", () => {

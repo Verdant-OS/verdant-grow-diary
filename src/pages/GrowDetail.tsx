@@ -113,7 +113,7 @@ export default function GrowDetail() {
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Recent Activity
           </h2>
-          <Link to="/logs" className="text-xs text-primary hover:underline">
+          <Link to={`/timeline?growId=${growId}`} className="text-xs text-primary hover:underline">
             View full Timeline →
           </Link>
         </div>

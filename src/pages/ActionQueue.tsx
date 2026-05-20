@@ -28,6 +28,9 @@ interface ActionRow {
   reason: string;
   risk_level: "low" | "medium" | "high" | "critical";
   status: Status;
+  approved_at: string | null;
+  rejected_at: string | null;
+  completed_at: string | null;
   created_at: string;
 }
 

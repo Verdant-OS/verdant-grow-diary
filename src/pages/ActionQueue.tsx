@@ -157,6 +157,7 @@ export default function ActionQueue() {
     next: Partial<ActionRow>,
     event_type: EventType,
     new_status: Status,
+    note?: string,
   ) {
     setBusyId(row.id);
     const { error } = await supabase
@@ -168,35 +169,49 @@ export default function ActionQueue() {
       toast.error(error.message);
       return;
     }
-    await logEvent(row, event_type, new_status);
+    await logEvent(row, event_type, new_status, note);
     setBusyId(null);
     await load();
+  }
+
+  function promptNote(label: string): string | undefined {
+    if (typeof window === "undefined" || typeof window.prompt !== "function") {
+      return undefined;
+    }
+    const raw = window.prompt(label) ?? "";
+    const trimmed = raw.trim();
+    return trimmed.length ? trimmed : undefined;
   }
 
   function approve(row: ActionRow) {
     // SECURITY: "approved" means approved for future manual/controlled execution.
     // NO equipment command is sent from this app.
+    const note = promptNote("Optional approval note (why are you approving?)");
     return transition(
       row,
       { status: "approved", approved_at: new Date().toISOString() },
       "approved",
       "approved",
+      note,
     );
   }
   function reject(row: ActionRow) {
+    const note = promptNote("Optional rejection reason (why are you rejecting?)");
     return transition(
       row,
       { status: "rejected", rejected_at: new Date().toISOString() },
       "rejected",
       "rejected",
+      note,
     );
   }
   function simulate(row: ActionRow) {
     // Simulation NEVER sends device commands. Status + audit only.
+    const note = promptNote("Optional simulation note");
     toast.message("Simulated (no device command sent)", {
       description: `${row.action_type} → ${row.target_metric ?? row.target_device}`,
     });
-    return transition(row, { status: "simulated" }, "simulated", "simulated");
+    return transition(row, { status: "simulated" }, "simulated", "simulated", note);
   }
 
   const filtered = useMemo(() => {

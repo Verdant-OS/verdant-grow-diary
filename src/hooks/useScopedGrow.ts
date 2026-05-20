@@ -1,5 +1,6 @@
 import { useSearchParams } from "react-router-dom";
 import { useGrows } from "@/store/grows";
+import { growDetailPath } from "@/lib/routes";
 import type { Grow } from "@/store/grows";
 
 /**

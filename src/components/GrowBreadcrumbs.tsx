@@ -3,6 +3,7 @@ import { ChevronRight } from "lucide-react";
 import { useGrows } from "@/store/grows";
 import {
   actionsPath,
+  dashboardPath,
   growDetailPath,
   logsPath,
   plantsPath,
@@ -17,7 +18,8 @@ export type GrowBreadcrumbsSection =
   | "tents"
   | "actions"
   | "grow-detail"
-  | "action-detail";
+  | "action-detail"
+  | "dashboard";
 
 export interface GrowBreadcrumbsProps {
   growId?: string | null;
@@ -125,6 +127,8 @@ export function buildSwitcherTarget(
       return actionsPath(newGrowId);
     case "grow-detail":
       return growDetailPath(newGrowId);
+    case "dashboard":
+      return dashboardPath(newGrowId);
   }
 }
 

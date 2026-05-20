@@ -7,6 +7,7 @@ import {
   Leaf,
   Tent as TentIcon,
   ListChecks,
+  Sparkles,
 } from "lucide-react";
 import { useGrowDetailData } from "@/hooks/useGrowDetailData";
 import {
@@ -15,7 +16,7 @@ import {
   type StatusLevel,
   formatCount,
 } from "@/lib/growStatus";
-import { actionsPath, logsPath, plantsPath, tentsPath } from "@/lib/routes";
+import { actionsPath, dashboardPath, logsPath, plantsPath, tentsPath } from "@/lib/routes";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 
 /**
@@ -109,6 +110,14 @@ export default function GrowDetail() {
           description={`${formatCount(counts.actionsPending)} pending · ${formatCount(counts.auditEvents)} audit events`}
           count={counts.actionsTotal}
           countLabel="actions"
+        />
+        <HubLink
+          to={dashboardPath(growId)}
+          icon={<Sparkles className="h-4 w-4" />}
+          title="Dashboard"
+          description="Open the live dashboard scoped to this grow."
+          count="unavailable"
+          countLabel="dashboard"
         />
       </section>
 

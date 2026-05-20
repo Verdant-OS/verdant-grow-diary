@@ -7,12 +7,15 @@ import MetricChip from "@/components/MetricChip";
 import SeverityBadge from "@/components/SeverityBadge";
 import StageBadge from "@/components/StageBadge";
 import SensorChart from "@/components/SensorChart";
+import ScopedGrowBanner from "@/components/ScopedGrowBanner";
+import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { useAlerts, useTasks, useAIInsights } from "@/hooks/useMockData";
-import { usePlants } from "@/hooks/use-plants";
-import { useTents } from "@/hooks/use-tents";
+import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
+import { useScopedGrow } from "@/hooks/useScopedGrow";
 import type { SensorReadingRow } from "@/lib/db";
 import { Button } from "@/components/ui/button";
+import { dashboardPath } from "@/lib/routes";
 import { formatDistanceToNow } from "date-fns";
 
 type DashReading = {
@@ -51,8 +54,12 @@ function groupReadings(rows: SensorReadingRow[]): DashReading[] {
 }
 
 export default function Dashboard() {
-  const { data: tents = [] } = useTents();
-  const { data: plants = [] } = usePlants();
+  // Shared URL `?growId=` resolution against RLS-loaded grows. When growId is
+  // absent or invalid, hooks fetch the user's full set (legacy behavior).
+  const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
+  const scopedGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
+  const { data: tents = [] } = useGrowTents(scopedGrowId);
+  const { data: plants = [] } = useGrowPlants(undefined, scopedGrowId);
   const { data: tasks = [] } = useTasks();
   const { data: alerts = [] } = useAlerts();
   const { data: rawReadings = [] } = useSensorReadings();
@@ -72,12 +79,27 @@ export default function Dashboard() {
 
   return (
     <div>
+      <GrowBreadcrumbs
+        growId={urlGrowId}
+        growName={scopedGrowName}
+        current="Dashboard"
+        section="dashboard"
+      />
       <PageHeader
         title="Dashboard"
         description="Live status across every tent, plant, and sensor."
         icon={<Sparkles className="h-5 w-5" />}
         actions={<Button asChild className="gradient-leaf text-primary-foreground"><Link to="/tents">Open tents</Link></Button>}
       />
+      {urlGrowId && (
+        <ScopedGrowBanner
+          growId={urlGrowId}
+          growName={scopedGrowName}
+          label="dashboard"
+          clearHref={dashboardPath()}
+          backHref={backHref}
+        />
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <KpiCard label="Active tents" value={tents.length} icon={<Box className="h-3.5 w-3.5" />} />

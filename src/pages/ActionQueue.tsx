@@ -11,6 +11,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Loader2, Check, X, FlaskConical, ListChecks, History } from "lucide-react";
 import { toast } from "sonner";
 
@@ -85,6 +95,10 @@ export default function ActionQueue() {
   const [events, setEvents] = useState<Record<string, EventRow[]>>({});
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [noteDialog, setNoteDialog] = useState<
+    { row: ActionRow; kind: "approve" | "reject" | "simulate" } | null
+  >(null);
+  const [noteDraft, setNoteDraft] = useState("");
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
@@ -174,45 +188,89 @@ export default function ActionQueue() {
     await load();
   }
 
-  function promptNote(label: string): string | undefined {
-    if (typeof window === "undefined" || typeof window.prompt !== "function") {
-      return undefined;
+  function openNoteDialog(row: ActionRow, kind: "approve" | "reject" | "simulate") {
+    setNoteDraft("");
+    setNoteDialog({ row, kind });
+  }
+
+  // SECURITY: each branch only flips status + writes audit. No device commands.
+  async function confirmNoteDialog() {
+    if (!noteDialog) return;
+    const { row, kind } = noteDialog;
+    const trimmed = noteDraft.trim();
+    const note = trimmed.length ? trimmed : undefined;
+    setNoteDialog(null);
+    setNoteDraft("");
+
+    if (kind === "approve") {
+      // SECURITY: "approved" means approved for future manual/controlled execution.
+      await transition(
+        row,
+        { status: "approved", approved_at: new Date().toISOString() },
+        "approved",
+        "approved",
+        note,
+      );
+    } else if (kind === "reject") {
+      await transition(
+        row,
+        { status: "rejected", rejected_at: new Date().toISOString() },
+        "rejected",
+        "rejected",
+        note,
+      );
+    } else {
+      // Simulation NEVER sends device commands. Status + audit only.
+      toast.message("Simulated (no device command sent)", {
+        description: `${row.action_type} → ${row.target_metric ?? row.target_device}`,
+      });
+      await transition(row, { status: "simulated" }, "simulated", "simulated", note);
     }
-    const raw = window.prompt(label) ?? "";
-    const trimmed = raw.trim();
-    return trimmed.length ? trimmed : undefined;
+  }
+
+  function cancelNoteDialog() {
+    // No status change, no audit event written.
+    setNoteDialog(null);
+    setNoteDraft("");
   }
 
   function approve(row: ActionRow) {
-    // SECURITY: "approved" means approved for future manual/controlled execution.
-    // NO equipment command is sent from this app.
-    const note = promptNote("Optional approval note (why are you approving?)");
-    return transition(
-      row,
-      { status: "approved", approved_at: new Date().toISOString() },
-      "approved",
-      "approved",
-      note,
-    );
+    return openNoteDialog(row, "approve");
   }
   function reject(row: ActionRow) {
-    const note = promptNote("Optional rejection reason (why are you rejecting?)");
-    return transition(
-      row,
-      { status: "rejected", rejected_at: new Date().toISOString() },
-      "rejected",
-      "rejected",
-      note,
-    );
+    return openNoteDialog(row, "reject");
   }
   function simulate(row: ActionRow) {
-    // Simulation NEVER sends device commands. Status + audit only.
-    const note = promptNote("Optional simulation note");
-    toast.message("Simulated (no device command sent)", {
-      description: `${row.action_type} → ${row.target_metric ?? row.target_device}`,
-    });
-    return transition(row, { status: "simulated" }, "simulated", "simulated", note);
+    return openNoteDialog(row, "simulate");
   }
+
+  const DIALOG_META = {
+    approve: {
+      title: "Approve Action",
+      description:
+        "Approved actions are recorded for future manual or controlled execution. No equipment command is sent.",
+      label: "Approval note",
+      placeholder: "Optional — why are you approving?",
+      confirmLabel: "Approve",
+    },
+    reject: {
+      title: "Reject Action",
+      description: "Reject this suggestion. No equipment command is sent.",
+      label: "Rejection reason",
+      placeholder: "Optional — why are you rejecting?",
+      confirmLabel: "Reject",
+    },
+    simulate: {
+      title: "Simulate Action",
+      description: "Marks the action as simulated. No equipment command is sent.",
+      label: "Simulation note",
+      placeholder: "Optional — what did you simulate?",
+      confirmLabel: "Simulate",
+    },
+  } as const;
+  const meta = noteDialog ? DIALOG_META[noteDialog.kind] : null;
+
+
 
   const filtered = useMemo(() => {
     const matchesStatus = (s: Status) => {
@@ -375,6 +433,43 @@ export default function ActionQueue() {
           </ul>
         )}
       </section>
+
+      <Dialog
+        open={noteDialog !== null}
+        onOpenChange={(open) => {
+          if (!open) cancelNoteDialog();
+        }}
+      >
+        <DialogContent>
+          {meta && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{meta.title}</DialogTitle>
+                <DialogDescription>{meta.description}</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2">
+                <Label htmlFor="action-note">{meta.label}</Label>
+                <Textarea
+                  id="action-note"
+                  value={noteDraft}
+                  onChange={(e) => setNoteDraft(e.target.value)}
+                  placeholder={meta.placeholder}
+                  rows={4}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leave blank to confirm without a note. Notes are stored in the audit history and cannot be edited.
+                </p>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={cancelNoteDialog}>
+                  Cancel
+                </Button>
+                <Button onClick={confirmNoteDialog}>{meta.confirmLabel}</Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

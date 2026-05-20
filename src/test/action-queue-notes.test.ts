@@ -1,13 +1,15 @@
 /**
- * Static tests for optional approve/simulate/reject notes on Action Queue.
+ * Static tests for the polished note Dialog on Action Queue transitions.
  *
  * Asserts:
- *  - Each of approve/reject/simulate calls a prompt helper for an optional note.
- *  - The note is forwarded through transition() into logEvent() and into the
- *    action_queue_events.note column.
- *  - History renders the note (existing behavior preserved).
- *  - action_queue_events remains immutable: no UPDATE policy exists anywhere
- *    in the migrations.
+ *  - Native window.prompt is no longer used.
+ *  - shadcn Dialog + Textarea power the note capture.
+ *  - Cancel writes no audit event (no transition() in cancel handler).
+ *  - Confirm forwards a trimmed note (or undefined if blank) into transition()
+ *    and ultimately into action_queue_events.note.
+ *  - Approve / Reject / Simulate each open the dialog.
+ *  - History still renders the note.
+ *  - action_queue_events remains immutable (no UPDATE policy added).
  *  - No device-control surface is introduced.
  */
 import { describe, it, expect } from "vitest";
@@ -27,70 +29,80 @@ function allMigrations(): string {
 }
 const MIG = allMigrations();
 
-describe("ActionQueue — optional notes on transitions", () => {
-  it("defines a prompt helper that returns undefined when empty", () => {
-    expect(PAGE).toMatch(/function\s+promptNote\s*\(/);
-    // empty/whitespace prompt collapses to undefined → no note stored
+describe("ActionQueue — note Dialog UX", () => {
+  it("no longer calls window.prompt", () => {
+    expect(PAGE).not.toMatch(/window\.prompt/);
+  });
+
+  it("imports Dialog primitives and Textarea from shadcn/ui", () => {
+    expect(PAGE).toMatch(/from\s+["']@\/components\/ui\/dialog["']/);
+    expect(PAGE).toMatch(/from\s+["']@\/components\/ui\/textarea["']/);
+    expect(PAGE).toMatch(/\bDialog\b/);
+    expect(PAGE).toMatch(/\bTextarea\b/);
+  });
+
+  it("renders all three dialog titles", () => {
+    expect(PAGE).toContain("Approve Action");
+    expect(PAGE).toContain("Reject Action");
+    expect(PAGE).toContain("Simulate Action");
+  });
+
+  it("renders all three note labels", () => {
+    expect(PAGE).toContain("Approval note");
+    expect(PAGE).toContain("Rejection reason");
+    expect(PAGE).toContain("Simulation note");
+  });
+
+  it("exposes Cancel and Confirm buttons", () => {
+    expect(PAGE).toMatch(/onClick=\{cancelNoteDialog\}[\s\S]{0,40}Cancel/);
+    expect(PAGE).toMatch(/onClick=\{confirmNoteDialog\}/);
+  });
+});
+
+describe("ActionQueue — dialog wiring", () => {
+  it("Approve / Reject / Simulate each open the dialog", () => {
+    expect(PAGE).toMatch(/function\s+approve[\s\S]{0,80}openNoteDialog\(\s*row\s*,\s*["']approve["']\s*\)/);
+    expect(PAGE).toMatch(/function\s+reject[\s\S]{0,80}openNoteDialog\(\s*row\s*,\s*["']reject["']\s*\)/);
+    expect(PAGE).toMatch(/function\s+simulate[\s\S]{0,80}openNoteDialog\(\s*row\s*,\s*["']simulate["']\s*\)/);
+  });
+
+  it("Cancel makes no status change and writes no audit event", () => {
+    const m = PAGE.match(/function\s+cancelNoteDialog\s*\(\s*\)\s*\{([\s\S]*?)\}\s*\n/);
+    expect(m).not.toBeNull();
+    expect(m![1]).not.toMatch(/transition\(/);
+    expect(m![1]).not.toMatch(/\.from\(\s*["']action_queue/);
+  });
+
+  it("Confirm forwards a blank-trimmed note as undefined and otherwise as string", () => {
     expect(PAGE).toMatch(/trimmed\.length\s*\?\s*trimmed\s*:\s*undefined/);
+    expect(PAGE).toMatch(/function\s+confirmNoteDialog[\s\S]*?transition\(/);
   });
 
-  it("approve prompts for an optional approval note and forwards it", () => {
-    expect(PAGE).toMatch(
-      /function\s+approve[\s\S]*?promptNote\([\s\S]*?approv[\s\S]*?transition\([\s\S]*?note\s*\)/i,
-    );
+  it("Confirm path drives transition() for each kind", () => {
+    expect(PAGE).toMatch(/transition\([\s\S]*?status:\s*["']approved["'][\s\S]*?["']approved["'][\s\S]*?["']approved["']/);
+    expect(PAGE).toMatch(/transition\([\s\S]*?status:\s*["']rejected["'][\s\S]*?["']rejected["'][\s\S]*?["']rejected["']/);
+    expect(PAGE).toMatch(/transition\([\s\S]*?status:\s*["']simulated["'][\s\S]*?["']simulated["'][\s\S]*?["']simulated["']/);
   });
 
-  it("reject prompts for an optional rejection reason and forwards it", () => {
-    expect(PAGE).toMatch(
-      /function\s+reject[\s\S]*?promptNote\([\s\S]*?reject[\s\S]*?transition\([\s\S]*?note\s*\)/i,
-    );
-  });
-
-  it("simulate prompts for an optional simulation note and forwards it", () => {
-    expect(PAGE).toMatch(
-      /function\s+simulate[\s\S]*?promptNote\([\s\S]*?simulat[\s\S]*?transition\([\s\S]*?note\s*\)/i,
-    );
-  });
-
-  it("transition() accepts a note arg and passes it to logEvent()", () => {
-    expect(PAGE).toMatch(
-      /function\s+transition\([\s\S]*?note\?:\s*string[\s\S]*?logEvent\([\s\S]*?,\s*note\s*\)/,
-    );
-  });
-
-  it("logEvent writes the note into the action_queue_events.note column", () => {
+  it("note is written into action_queue_events.note", () => {
     expect(PAGE).toMatch(
       /\.from\(\s*["']action_queue_events["']\s*\)\s*\.insert\(\s*\{[\s\S]*?note:\s*note\s*\?\?\s*null[\s\S]*?\}/,
     );
   });
 
-  it("history view renders the note", () => {
+  it("history view still renders the note", () => {
     expect(PAGE).toMatch(/e\.note/);
   });
 });
 
-describe("ActionQueue — transition/audit flow preserved", () => {
-  it("approve/reject/simulate still go through transition()", () => {
-    expect(PAGE).toMatch(/function\s+approve[\s\S]*?transition\(/);
-    expect(PAGE).toMatch(/function\s+reject[\s\S]*?transition\(/);
-    expect(PAGE).toMatch(/function\s+simulate[\s\S]*?transition\(/);
-  });
-
-  it("status semantics unchanged", () => {
-    expect(PAGE).toMatch(/transition\([\s\S]*?status:\s*["']approved["'][\s\S]*?["']approved["'][\s\S]*?["']approved["']/);
-    expect(PAGE).toMatch(/transition\([\s\S]*?status:\s*["']rejected["'][\s\S]*?["']rejected["'][\s\S]*?["']rejected["']/);
-    expect(PAGE).toMatch(/transition\([\s\S]*?status:\s*["']simulated["'][\s\S]*?["']simulated["'][\s\S]*?["']simulated["']/);
-  });
-});
-
-describe("action_queue_events — immutability", () => {
+describe("ActionQueue — safety", () => {
   it("no UPDATE policy exists for action_queue_events in any migration", () => {
     expect(MIG).not.toMatch(
       /CREATE\s+POLICY[\s\S]*?ON\s+public\.action_queue_events[\s\S]*?FOR\s+UPDATE/i,
     );
   });
 
-  it("no device-control surface introduced anywhere new", () => {
+  it("no device-control surface introduced", () => {
     expect(PAGE).not.toMatch(
       /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b|service_role/i,
     );

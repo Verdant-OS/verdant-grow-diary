@@ -65,10 +65,11 @@ describe("ActionQueue — grouping & empty states", () => {
 });
 
 describe("ActionQueue — transition/audit flow preserved", () => {
-  it("approve/reject/simulate still call transition()", () => {
-    expect(PAGE).toMatch(/function\s+approve[\s\S]*?transition\(/);
-    expect(PAGE).toMatch(/function\s+reject[\s\S]*?transition\(/);
-    expect(PAGE).toMatch(/function\s+simulate[\s\S]*?transition\(/);
+  it("approve/reject/simulate still flow through transition() via the note dialog", () => {
+    expect(PAGE).toMatch(/function\s+approve[\s\S]*?openNoteDialog\(/);
+    expect(PAGE).toMatch(/function\s+reject[\s\S]*?openNoteDialog\(/);
+    expect(PAGE).toMatch(/function\s+simulate[\s\S]*?openNoteDialog\(/);
+    expect(PAGE).toMatch(/function\s+confirmNoteDialog[\s\S]*?transition\(/);
   });
 
   it("transition() writes to action_queue_events", () => {

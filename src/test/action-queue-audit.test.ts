@@ -101,10 +101,12 @@ describe("ActionQueue page — audit wiring", () => {
     expect(m![1]).not.toMatch(/\buser_id\s*:/);
   });
 
-  it("approve / reject / simulate each call the transition helper", () => {
-    expect(PAGE).toMatch(/function\s+approve[\s\S]*?transition\(/);
-    expect(PAGE).toMatch(/function\s+reject[\s\S]*?transition\(/);
-    expect(PAGE).toMatch(/function\s+simulate[\s\S]*?transition\(/);
+  it("approve / reject / simulate each go through the transition helper (via dialog confirm)", () => {
+    // approve/reject/simulate open the note dialog; confirmNoteDialog calls transition()
+    expect(PAGE).toMatch(/function\s+approve[\s\S]*?openNoteDialog\(/);
+    expect(PAGE).toMatch(/function\s+reject[\s\S]*?openNoteDialog\(/);
+    expect(PAGE).toMatch(/function\s+simulate[\s\S]*?openNoteDialog\(/);
+    expect(PAGE).toMatch(/function\s+confirmNoteDialog[\s\S]*?transition\(/);
     // each transition call passes an event_type AND new_status that match
     expect(PAGE).toMatch(/transition\([\s\S]*?["']approved["'][\s\S]*?["']approved["']/);
     expect(PAGE).toMatch(/transition\([\s\S]*?["']rejected["'][\s\S]*?["']rejected["']/);

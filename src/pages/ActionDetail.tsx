@@ -174,16 +174,14 @@ export default function ActionDetail() {
     new_status: Status,
     note?: string,
   ): Promise<boolean> {
-    const { error } = await supabase.from("action_queue_events").insert(
-      buildAuditEventPayload({
-        action_queue_id: current.id,
-        grow_id: current.grow_id,
-        event_type,
-        previous_status: current.status,
-        new_status,
-        note,
-      }),
-    );
+    const { error } = await supabase.from("action_queue_events").insert({
+      action_queue_id: current.id,
+      grow_id: current.grow_id,
+      event_type,
+      previous_status: current.status,
+      new_status,
+      note: note ?? null,
+    });
     if (error) {
       toast.warning("Status updated, but audit log failed", { description: error.message });
       return false;

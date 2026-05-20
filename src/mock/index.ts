@@ -10,6 +10,7 @@ export interface Tent {
   stage: Stage;
   light: { on: boolean; schedule: string; wattage: number };
   alertCount: number;
+  growId?: string | null;
 }
 
 export interface Plant {
@@ -22,6 +23,7 @@ export interface Plant {
   health: "healthy" | "watch" | "issue";
   photo: string;
   lastNote: string;
+  growId?: string | null;
 }
 
 export interface SensorReading {

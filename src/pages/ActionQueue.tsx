@@ -188,7 +188,14 @@ export default function ActionQueue() {
     await load();
   }
 
-  function openNoteDialog(row: ActionRow, kind: "approve" | "reject" | "simulate") {
+  function openNoteDialog(
+    row: ActionRow,
+    kind: "approve" | "reject" | "simulate" | "complete" | "cancel",
+  ) {
+    // SECURITY: terminal states cannot be transitioned again.
+    if (row.status === "completed" || row.status === "rejected" || row.status === "cancelled") {
+      return;
+    }
     setNoteDraft("");
     setNoteDialog({ row, kind });
   }
@@ -219,6 +226,19 @@ export default function ActionQueue() {
         "rejected",
         note,
       );
+    } else if (kind === "complete") {
+      // SECURITY: "completed" means the grower manually handled the action outside Verdant.
+      // No equipment command is sent.
+      await transition(
+        row,
+        { status: "completed", completed_at: new Date().toISOString() },
+        "completed",
+        "completed",
+        note,
+      );
+    } else if (kind === "cancel") {
+      // SECURITY: "cancelled" means the grower decided not to proceed. No equipment command is sent.
+      await transition(row, { status: "cancelled" }, "cancelled", "cancelled", note);
     } else {
       // Simulation NEVER sends device commands. Status + audit only.
       toast.message("Simulated (no device command sent)", {
@@ -243,6 +263,16 @@ export default function ActionQueue() {
   function simulate(row: ActionRow) {
     return openNoteDialog(row, "simulate");
   }
+  function complete(row: ActionRow) {
+    return openNoteDialog(row, "complete");
+  }
+  function cancelAction(row: ActionRow) {
+    return openNoteDialog(row, "cancel");
+  }
+
+  const canComplete = (s: Status) => s === "approved" || s === "simulated";
+  const canCancel = (s: Status) =>
+    s === "pending_approval" || s === "approved" || s === "simulated";
 
   const DIALOG_META = {
     approve: {

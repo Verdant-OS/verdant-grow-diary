@@ -37,7 +37,7 @@ describe("Timeline — grow filter", () => {
     expect(TIMELINE).toMatch(/urlGrowId\s*&&/);
     expect(TIMELINE).toMatch(/Showing timeline for this grow/);
     expect(TIMELINE).toMatch(/Clear grow filter/);
-    expect(TIMELINE).toMatch(/to=\s*["']\/timeline["']/);
+    expect(TIMELINE).toMatch(/to=\{clearTo\}/);
   });
 
   it("preserves newest-first ordering", () => {

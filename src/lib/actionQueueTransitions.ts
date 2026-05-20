@@ -153,8 +153,11 @@ export interface AuditEventPayload {
 
 /**
  * Build the immutable action_queue_events INSERT payload.
+ * Audit rows are append-only — no UPDATE/DELETE policy exists for this table.
  * SECURITY: user_id is intentionally omitted — DB default auth.uid() wins.
+ * Never include device-control fields.
  */
+
 export function buildAuditEventPayload(args: {
   action_queue_id: string;
   grow_id: string;

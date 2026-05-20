@@ -9,7 +9,7 @@ const DETAIL = readFileSync(resolve(ROOT, "src/pages/ActionDetail.tsx"), "utf8")
 
 describe("Action Queue → Detail navigation", () => {
   it("ActionQueue imports Link from react-router-dom", () => {
-    expect(ACTION_QUEUE).toMatch(/import \{ Link \} from "react-router-dom"/);
+    expect(ACTION_QUEUE).toMatch(/import \{[^}]*\bLink\b[^}]*\} from "react-router-dom"/);
   });
 
   it("ActionQueue cards link to /actions/${row.id}", () => {

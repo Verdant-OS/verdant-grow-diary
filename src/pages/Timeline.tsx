@@ -56,7 +56,7 @@ export default function Timeline() {
   const activeGrowId = urlGrowId ?? storeGrowId;
   const isLogsRoute = pathname.startsWith("/logs");
   const scopeLabel = isLogsRoute ? "logs" : "timeline";
-  const clearTo = isLogsRoute ? "/logs" : "/timeline";
+  const clearTo = isLogsRoute ? logsPath() : timelinePath();
 
   // Preselect grow context for new log creation when URL pins a growId.
   // Only sync when the URL growId is a valid, RLS-authorized grow for this user.

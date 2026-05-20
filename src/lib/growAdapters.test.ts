@@ -48,6 +48,7 @@ describe("mapTentRow", () => {
       stage: "flower",
       light: { on: true, schedule: "12/12", wattage: 450 },
       alertCount: 0,
+      growId: null,
     });
   });
   it("applies safe defaults for nullable fields", () => {

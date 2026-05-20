@@ -19,10 +19,10 @@ describe("Plants — grow filter", () => {
   it("passes growId to the data hook (query-level filtering)", () => {
     expect(PLANTS).toMatch(/useGrowPlants\([^)]*growId[^)]*\)/);
   });
-  it("renders banner and clear link", () => {
-    expect(PLANTS).toMatch(/Showing plants for this grow/);
-    expect(PLANTS).toMatch(/to=\s*["']\/plants["']/);
-    expect(PLANTS).toMatch(/Clear grow filter/);
+  it("renders banner and clear link via ScopedGrowBanner", () => {
+    expect(PLANTS).toMatch(/ScopedGrowBanner/);
+    expect(PLANTS).toMatch(/label=\s*["']plants["']/);
+    expect(PLANTS).toMatch(/clearHref=\s*["']\/plants["']/);
   });
   it("no ai-coach / device-control / service_role", () => {
     expect(PLANTS).not.toMatch(/ai-coach|ai_coach/);

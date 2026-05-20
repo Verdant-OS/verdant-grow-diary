@@ -276,15 +276,16 @@ export default function ActionDetail() {
         <p className="text-sm text-muted-foreground mt-1">{row.reason}</p>
 
         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-          <Field label="Grow" value={row.grow_id} mono />
-          {row.tent_id && <Field label="Tent" value={row.tent_id} mono />}
-          {row.plant_id && <Field label="Plant" value={row.plant_id} mono />}
+          <IdField label="Grow" id={row.grow_id} to={null} />
+          {row.tent_id && <IdField label="Tent" id={row.tent_id} to={`/tents/${row.tent_id}`} />}
+          {row.plant_id && <IdField label="Plant" id={row.plant_id} to={`/plants/${row.plant_id}`} />}
           <Field label="Created" value={new Date(row.created_at).toLocaleString()} />
           <Field label="Updated" value={new Date(row.updated_at).toLocaleString()} />
           {row.completed_at && (
             <Field label="Completed" value={new Date(row.completed_at).toLocaleString()} />
           )}
         </dl>
+
 
         {!isTerminal(row.status) && (
           <div className="flex flex-wrap gap-2 mt-4">
@@ -395,3 +396,19 @@ function Field({ label, value, mono }: { label: string; value: string; mono?: bo
     </div>
   );
 }
+
+function IdField({ label, id, to }: { label: string; id: string; to: string | null }) {
+  return (
+    <div>
+      <dt className="text-muted-foreground uppercase tracking-wider text-[10px]">{label}</dt>
+      <dd className="font-mono text-[11px] break-all">
+        {to ? (
+          <Link to={to} className="text-primary hover:underline">{id}</Link>
+        ) : (
+          <span>{id}</span>
+        )}
+      </dd>
+    </div>
+  );
+}
+

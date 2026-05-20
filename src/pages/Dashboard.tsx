@@ -637,7 +637,16 @@ export default function Dashboard() {
                                         event_type: "created",
                                         new_status: "open",
                                       });
-                                      toast.success("Alert saved");
+                                      toast.success("Alert saved", {
+                                        action: {
+                                          label: "View",
+                                          onClick: () => {
+                                            window.location.assign(
+                                              alertDetailPath(saved.id),
+                                            );
+                                          },
+                                        },
+                                      });
                                     } catch (logErr) {
                                       toast.warning(
                                         `Alert saved, but audit log failed: ${(logErr as Error).message}`,

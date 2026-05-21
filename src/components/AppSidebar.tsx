@@ -45,9 +45,7 @@ export default function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border px-3 py-3">
         <div className="flex items-center gap-2.5">
-          <div className="h-9 w-9 rounded-xl gradient-leaf flex items-center justify-center glow-accent shrink-0">
-            <Leaf className="h-4.5 w-4.5 text-primary-foreground" />
-          </div>
+          <BrandLogo size="md" />
           {!collapsed && (
             <div className="leading-tight">
               <div className="font-display font-semibold text-sm">Verdant</div>

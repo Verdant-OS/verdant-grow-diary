@@ -38,6 +38,15 @@ const STATUSES: LeadStatus[] = [
   "spam",
 ];
 
+const STATUS_LABEL: Record<LeadStatus, string> = {
+  new: "New",
+  reviewed: "Reviewed",
+  contacted: "Contacted",
+  follow_up: "Follow-up",
+  closed: "Close",
+  spam: "Spam",
+};
+
 export interface LeadDetailDrawerProps {
   lead: LeadRow | null;
   open: boolean;

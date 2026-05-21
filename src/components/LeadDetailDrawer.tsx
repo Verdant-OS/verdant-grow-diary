@@ -29,6 +29,7 @@ import {
 } from "@/lib/leadEventRules";
 import { buildLeadDetailViewModel } from "@/lib/leadDetailViewModel";
 import LeadActivityTimeline from "@/components/LeadActivityTimeline";
+import LeadNextActionPanel from "@/components/LeadNextActionPanel";
 
 const STATUSES: LeadStatus[] = [
   "new",
@@ -258,6 +259,14 @@ function LeadDetailBody({
           Derived Timeline
         </h3>
         <LeadActivityTimeline lead={lead} />
+      </section>
+
+      {/* Next Action Advisor (read-only) */}
+      <section className="space-y-2" data-section="next-action">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Next Action
+        </h3>
+        <LeadNextActionPanel lead={lead} />
       </section>
     </div>
   );

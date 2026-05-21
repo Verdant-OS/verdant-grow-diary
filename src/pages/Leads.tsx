@@ -21,6 +21,9 @@ import { toast } from "sonner";
 import PageHeader from "@/components/PageHeader";
 import LeadDetailDrawer from "@/components/LeadDetailDrawer";
 import LeadAnalyticsPanel from "@/components/LeadAnalyticsPanel";
+import LeadSavedViewsMenu from "@/components/LeadSavedViewsMenu";
+import { useLeadSavedViews } from "@/hooks/useLeadSavedViews";
+import type { LeadSavedView } from "@/lib/leadSavedViewsRules";
 import {
   useLeadsList,
   type LeadRow,
@@ -102,9 +105,20 @@ export default function Leads() {
     status: status === "all" ? null : status,
   });
   const { createEvent, submitting: creatingEvent } = useCreateLeadEvent();
+  const savedViews = useLeadSavedViews();
   const [activityNonce, setActivityNonce] = useState<Record<string, number>>({});
   const bumpActivity = (leadId: string) =>
     setActivityNonce((m) => ({ ...m, [leadId]: (m[leadId] ?? 0) + 1 }));
+
+  function applySavedView(v: LeadSavedView) {
+    setSearch(v.search);
+    setQuickFilter(v.quickFilter);
+    setSortOption(v.sort);
+  }
+  function handleSaveCurrentView(name: string) {
+    savedViews.saveView({ name, search, quickFilter, sort: sortOption });
+  }
+
 
   const summary = useMemo(() => summarizeLeads(leads), [leads]);
 
@@ -238,6 +252,17 @@ export default function Leads() {
               </Button>
             ))}
           </div>
+
+          <div className="flex justify-end">
+            <LeadSavedViewsMenu
+              views={savedViews.views}
+              onApply={applySavedView}
+              onSave={handleSaveCurrentView}
+              onRename={savedViews.renameView}
+              onDelete={savedViews.deleteView}
+            />
+          </div>
+
 
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1">

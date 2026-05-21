@@ -226,7 +226,7 @@ describe("Leads Command Center contract", () => {
     it("pipeline health surfaces unknown source/type signals", () => {
       const warnings = evaluatePipelineHealth(leads, NOW);
       const cats = warnings.map((w) => w.id);
-      expect(cats).toEqual(expect.arrayContaining(["unknown_source"]));
+      expect(cats).toEqual(expect.arrayContaining(["high_unknown_source"]));
     });
 
     it("status summary still counts the unknown-status lead in total", () => {

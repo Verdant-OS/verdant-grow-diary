@@ -267,6 +267,7 @@ export default function Timeline() {
       </div>
 
       <ActionQueueEventsSection events={actionEvents} />
+      <AlertEventsSection events={alertEvents} />
 
 
 

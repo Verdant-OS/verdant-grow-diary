@@ -338,6 +338,10 @@ export function quickLogToTypedEventPayload(
     case "watering": {
       const vol = readVolumeMl(details);
       if (vol.error) return { ok: false, reason: vol.error, warnings };
+      // Watering must have a strictly positive volume — DB RPC requires it.
+      if (vol.value === undefined || vol.value <= 0) {
+        return { ok: false, reason: "volume:required-positive", warnings };
+      }
       const ph = checkPh(pick(details, "ph", "pH"), "ph");
       if (ph.error) return { ok: false, reason: ph.error, warnings };
       const ec = checkEc(pick(details, "ec", "EC"), "ec");
@@ -352,7 +356,7 @@ export function quickLogToTypedEventPayload(
       const runoffEc = checkEc(pick(details, "runoff_ec", "runoffEc"), "runoff_ec");
       if (runoffEc.error) return { ok: false, reason: runoffEc.error, warnings };
 
-      if (vol.value !== undefined) subtypePayload.volume_ml = vol.value;
+      subtypePayload.volume_ml = vol.value;
       if (ph.value !== undefined) subtypePayload.ph = ph.value;
       if (ec.value !== undefined) subtypePayload.ec_ms_cm = ec.value;
       if (runoffMl.value !== undefined) subtypePayload.runoff_ml = runoffMl.value;

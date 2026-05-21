@@ -3,23 +3,55 @@ import { ArrowLeft, Sprout } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
 import EmptyState from "@/components/EmptyState";
+import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
 import { Button } from "@/components/ui/button";
-import { useTent } from "@/hooks/useMockData";
-import { useGrowPlant } from "@/hooks/useGrowData";
+import { useGrowPlant, useGrowTent, getGrowDataMeta } from "@/hooks/useGrowData";
 import { format, formatDistanceToNow } from "date-fns";
 
 export default function PlantDetail() {
   const { id } = useParams();
   const { data: plant, isLoading } = useGrowPlant(id);
-  const { data: tent } = useTent(plant?.tentId);
+  const { data: tent } = useGrowTent(plant?.tentId);
+  const plantMeta = getGrowDataMeta(["grow", "plant", id ?? null]);
+  const tentMeta = getGrowDataMeta(["grow", "tent", plant?.tentId ?? null]);
+
   if (isLoading) return <div className="glass rounded-2xl h-64 animate-pulse" />;
-  if (!plant) return <EmptyState icon={<Sprout className="h-6 w-6" />} title="Plant not found" action={<Button asChild variant="outline"><Link to="/plants"><ArrowLeft className="h-4 w-4" /> Back</Link></Button>} />;
+  if (!plant) {
+    return (
+      <div>
+        <GrowDataSourceDisclosure
+          resource="plants"
+          hasAnyData={false}
+          metas={[plantMeta]}
+          testId="plant-detail-data-source-disclosure"
+        />
+        <EmptyState
+          icon={<Sprout className="h-6 w-6" />}
+          title="Plant not found"
+          description="This plant does not exist in your real grow data."
+          action={
+            <Button asChild variant="outline">
+              <Link to="/plants">
+                <ArrowLeft className="h-4 w-4" /> Back
+              </Link>
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
 
   const ageDays = Math.floor((Date.now() - new Date(plant.startedAt).getTime()) / 86400000);
   return (
     <div>
       <Button asChild variant="ghost" size="sm" className="mb-3"><Link to="/plants"><ArrowLeft className="h-4 w-4" /> Plants</Link></Button>
       <PageHeader title={plant.name} description={plant.strain} icon={<Sprout className="h-5 w-5" />} actions={<StageBadge stage={plant.stage} />} />
+      <GrowDataSourceDisclosure
+        resource="plant"
+        hasAnyData
+        metas={[plantMeta, tentMeta]}
+        testId="plant-detail-data-source-disclosure"
+      />
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="lg:col-span-1 glass rounded-2xl overflow-hidden">
           <div className="aspect-square bg-secondary/40"><img src={plant.photo} alt="" className="w-full h-full object-cover" /></div>

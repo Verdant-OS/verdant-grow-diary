@@ -77,6 +77,7 @@ describe("buildWateringHistory", () => {
     const notes = {
       ...validWatering,
       id: "n1",
+      entry_type: "note",
       details: {},
     };
     const rows = buildWateringHistory(normalize([notes]));
@@ -88,7 +89,6 @@ describe("buildWateringHistory", () => {
       ...validWatering,
       id: "bad1",
       details: {
-        event_type: "watering",
         watering_amount_ml: 0,
         ph: 99,
         ec: -1,

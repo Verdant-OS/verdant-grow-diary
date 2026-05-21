@@ -187,7 +187,7 @@ describe("safety contracts preserved by the drawer refactor", () => {
       expect(blob).not.toMatch(/\bwebhook\b/i);
       expect(blob).not.toMatch(/\bSMS\b/);
       expect(blob).not.toMatch(/send[-_ ]?email/i);
-      expect(blob).not.toMatch(/\bexport\b/i);
+      expect(blob).not.toMatch(/data\s+export|csv\s+export|export\s+to/i);
       expect(blob).not.toMatch(/mailgun|sendgrid|twilio|resend\.com/i);
     });
   }

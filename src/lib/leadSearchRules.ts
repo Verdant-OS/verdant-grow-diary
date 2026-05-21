@@ -49,11 +49,6 @@ export function searchLeads(leads: LeadRow[], query: string): LeadRow[] {
   );
 }
 
-function toTime(iso: string | null | undefined): number | null {
-  if (!iso) return null;
-  const t = new Date(iso).getTime();
-  return Number.isFinite(t) ? t : null;
-}
 
 // Stable, predictable status ordering: action-needed first, terminal last.
 const STATUS_ORDER: Record<string, number> = {

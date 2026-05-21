@@ -47,6 +47,8 @@ const App = () => (
             <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/welcome" element={<Landing />} />
+              <Route path="/hardware-integrations" element={<HardwareIntegrations />} />
+
               <Route element={<AppShell />}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/tents" element={<Tents />} />

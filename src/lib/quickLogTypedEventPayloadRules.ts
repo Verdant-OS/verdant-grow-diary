@@ -317,13 +317,12 @@ export function quickLogToTypedEventPayload(
   }
   const event_type = eventTypeRaw as TypedEventKind;
 
-  const occurred_at =
-    toIsoOrNull(draft.occurred_at) ?? new Date(0).toISOString();
-  if (draft.occurred_at != null && toIsoOrNull(draft.occurred_at) == null) {
+  const occurredIso = toIsoOrNull(draft.occurred_at);
+  if (draft.occurred_at != null && occurredIso == null) {
     warnings.push("occurred_at:invalid");
-  } else if (draft.occurred_at == null) {
-    warnings.push("occurred_at:missing");
   }
+  // When missing/invalid, leave null so DB default (now()) applies.
+  const occurred_at: string | null = occurredIso;
 
   const tent_id = toStringOrNull(draft.tent_id);
   const plant_id = toStringOrNull(draft.plant_id);

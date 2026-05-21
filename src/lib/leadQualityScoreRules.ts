@@ -10,6 +10,10 @@ import {
   recommendNextAction,
   type LeadNextActionPriority,
 } from "@/lib/leadNextActionRules";
+import {
+  KNOWN_LEAD_STATUSES as KNOWN_STATUSES,
+  isMeaningfulString as isMeaningful,
+} from "@/lib/leadFieldUtils";
 
 export type LeadQualityGrade = "A" | "B" | "C" | "D" | "F" | "Unknown";
 
@@ -23,20 +27,7 @@ export interface LeadQualityScore {
   sortWeight: number;
 }
 
-const KNOWN_STATUSES = new Set([
-  "new",
-  "reviewed",
-  "contacted",
-  "follow_up",
-  "closed",
-  "spam",
-]);
-
 const GENERIC_VALUES = new Set(["other", "unknown", "n/a", "na", "none"]);
-
-function isMeaningful(v: string | null | undefined): boolean {
-  return typeof v === "string" && v.trim().length > 0;
-}
 
 function isGeneric(v: string | null | undefined): boolean {
   if (!isMeaningful(v)) return false;

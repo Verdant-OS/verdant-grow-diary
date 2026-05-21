@@ -36,11 +36,8 @@ export default function AppShell() {
               <div className="hidden md:block">
                 <SidebarTrigger />
               </div>
-              <div className="md:hidden font-display font-semibold flex items-center gap-2">
-                <span className="h-7 w-7 rounded-lg gradient-leaf inline-flex items-center justify-center">
-                  <span className="text-primary-foreground font-bold text-sm">V</span>
-                </span>
-                Verdant
+              <div className="md:hidden">
+                <BrandLogo size="md" showText />
               </div>
 
               <div className="ml-auto flex items-center gap-2">

@@ -302,6 +302,7 @@ export default function Leads() {
                             }
                           }}
                         />
+                        <LeadActivity leadId={l.id} refreshKey={l.updated_at ?? l.created_at} />
                       </TableCell>
                     </TableRow>
                   ))}

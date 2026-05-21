@@ -67,6 +67,7 @@ export default function Leads() {
   const [leadType, setLeadType] = useState<string>("all");
   const [source, setSource] = useState<string>("all");
   const [status, setStatus] = useState<string>("all");
+  const [quickFilter, setQuickFilter] = useState<LeadQuickFilter>("all");
   const [search, setSearch] = useState("");
 
   const { loading, authorized, error, leads, updateLead } = useLeadsList({
@@ -75,16 +76,20 @@ export default function Leads() {
     status: status === "all" ? null : status,
   });
 
+  const summary = useMemo(() => summarizeLeads(leads), [leads]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return leads;
-    return leads.filter(
-      (l) =>
-        l.email.toLowerCase().includes(q) ||
-        (l.name ?? "").toLowerCase().includes(q) ||
-        (l.company ?? "").toLowerCase().includes(q),
-    );
-  }, [leads, search]);
+    const base = q
+      ? leads.filter(
+          (l) =>
+            l.email.toLowerCase().includes(q) ||
+            (l.name ?? "").toLowerCase().includes(q) ||
+            (l.company ?? "").toLowerCase().includes(q),
+        )
+      : leads;
+    return filterAndSortLeads(base, quickFilter);
+  }, [leads, search, quickFilter]);
 
   async function copyEmail(email: string) {
     try {

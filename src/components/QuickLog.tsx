@@ -15,6 +15,8 @@ import { STAGES } from "@/lib/grow";
 import { EVENT_TYPES } from "@/lib/diary";
 import { usePlants } from "@/hooks/use-plants";
 import type { SensorReadingRow } from "@/lib/db";
+import { evaluateQuickLogPreview } from "@/lib/quickLogPreviewRules";
+import { AlertTriangle, Info } from "lucide-react";
 import { toast } from "sonner";
 
 interface Props { open: boolean; onOpenChange: (v: boolean) => void; onCreated?: () => void; }

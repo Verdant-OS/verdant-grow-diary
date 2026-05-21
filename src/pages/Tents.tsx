@@ -42,6 +42,12 @@ export default function Tents() {
         />
       )}
 
+      <GrowDataSourceDisclosure
+        resource="tents"
+        hasAnyData={tents.length > 0}
+        metas={[tentsMeta]}
+        testId="tents-data-source-disclosure"
+      />
 
 
       {isLoading ? (

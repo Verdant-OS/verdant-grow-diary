@@ -77,7 +77,7 @@ describe("buildWateringHistory", () => {
     const notes = {
       ...validWatering,
       id: "n1",
-      details: { event_type: "note" },
+      details: {},
     };
     const rows = buildWateringHistory(normalize([notes]));
     expect(rows).toEqual([]);
@@ -109,7 +109,7 @@ describe("buildWateringHistory", () => {
     const e = {
       ...validWatering,
       id: "ph1",
-      details: { event_type: "watering", watering_amount_ml: 500, ph: 15 },
+      details: { watering_amount_ml: 500, ph: 15 },
     };
     const rows = buildWateringHistory(normalize([e]));
     expect(rows).toHaveLength(1);
@@ -120,7 +120,7 @@ describe("buildWateringHistory", () => {
     const e = {
       ...validWatering,
       id: "ec1",
-      details: { event_type: "watering", watering_amount_ml: 500, ec: -3 },
+      details: { watering_amount_ml: 500, ec: -3 },
     };
     const rows = buildWateringHistory(normalize([e]));
     expect(rows).toHaveLength(1);
@@ -131,7 +131,7 @@ describe("buildWateringHistory", () => {
     const e = {
       ...validWatering,
       id: "v1",
-      details: { event_type: "watering", watering_amount_ml: 0 },
+      details: { watering_amount_ml: 0 },
     };
     const rows = buildWateringHistory(normalize([e]));
     expect(rows).toHaveLength(1);

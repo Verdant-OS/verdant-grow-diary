@@ -418,7 +418,14 @@ export function quickLogToTypedEventPayload(
         }
         if (symptom_type == null) warnings.push("symptom_type:invalid");
       }
-      const severity = toStringOrNull(pick(details, "severity"));
+      const severityRaw = toStringOrNull(pick(details, "severity"));
+      let severity: string | null = null;
+      if (severityRaw != null) {
+        if (!OBSERVATION_SEVERITIES.has(severityRaw)) {
+          return { ok: false, reason: "severity:invalid", warnings };
+        }
+        severity = severityRaw;
+      }
       const affected_area = toStringOrNull(
         pick(details, "affected_area", "affectedArea"),
       );

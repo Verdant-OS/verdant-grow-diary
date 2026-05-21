@@ -106,9 +106,9 @@ export function writeWateringTypedEvent(
 
   const rpcArgs = mapWateringPayloadToCreateWateringEventArgs(adapted);
 
-  // Intentionally NOT calling supabase.rpc here. Wiring the actual call is
-  // a separate, gated change that requires the live RLS checklist to be
-  // signed off first.
+  // Intentionally NOT invoking the RPC here. Wiring the actual Supabase
+  // call is a separate, gated change that requires the live RLS checklist
+  // to be signed off first.
   return {
     ok: true,
     status: "would_write",

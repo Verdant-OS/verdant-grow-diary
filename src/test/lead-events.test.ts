@@ -129,6 +129,28 @@ describe("status-change trigger captures old_status and new_status", () => {
       /CREATE TRIGGER\s+leads_log_status_change[\s\S]*?AFTER UPDATE[\s\S]*?ON\s+public\.leads/i,
     );
   });
+
+  it("is hardened: latest definition is SECURITY DEFINER with locked search_path and fully qualified table refs", () => {
+    // Use the LAST occurrence so later migrations supersede earlier ones.
+    const matches = [
+      ...migrationContents.matchAll(
+        /FUNCTION\s+public\.log_lead_status_change[\s\S]*?\$\$;/gi,
+      ),
+    ];
+    expect(matches.length).toBeGreaterThan(0);
+    const fn = matches[matches.length - 1][0];
+    expect(fn).toMatch(/SECURITY DEFINER/i);
+    expect(fn).toMatch(/SET\s+search_path\s*=\s*public\s*,\s*auth/i);
+    // Disallow bare (unqualified) writes to lead_events / leads in the body.
+    expect(fn).not.toMatch(/INSERT\s+INTO\s+lead_events\b/i);
+    expect(fn).toMatch(/INSERT\s+INTO\s+public\.lead_events\b/i);
+  });
+
+  it("revokes EXECUTE on log_lead_status_change from PUBLIC/anon/authenticated", () => {
+    expect(migrationContents).toMatch(
+      /REVOKE\s+EXECUTE\s+ON\s+FUNCTION\s+public\.log_lead_status_change\(\)\s+FROM\s+PUBLIC\s*,\s*anon\s*,\s*authenticated/i,
+    );
+  });
 });
 
 describe("updateLead enforces immutable submission fields", () => {

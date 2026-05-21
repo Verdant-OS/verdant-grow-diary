@@ -113,12 +113,15 @@ describe("public Landing + form still safe", () => {
 });
 
 describe("leads migration policies stay locked", () => {
-  it("contains no FOR UPDATE or FOR DELETE policy on leads", () => {
+  it("contains no FOR DELETE policy on leads, and UPDATE is operator-gated", () => {
     const leadsPolicies =
       migrationContents.match(/CREATE POLICY[^;]*ON\s+public\.leads[^;]*;/gi) ?? [];
     for (const p of leadsPolicies) {
-      expect(p).not.toMatch(/FOR\s+UPDATE/i);
       expect(p).not.toMatch(/FOR\s+DELETE/i);
+      if (/FOR\s+UPDATE/i.test(p)) {
+        expect(p).toMatch(/has_role/);
+        expect(p).not.toMatch(/TO\s+anon/i);
+      }
     }
   });
 

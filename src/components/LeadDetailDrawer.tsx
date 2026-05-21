@@ -28,6 +28,7 @@ import {
   type InteractionEventType,
 } from "@/lib/leadEventRules";
 import { buildLeadDetailViewModel } from "@/lib/leadDetailViewModel";
+import LeadActivityTimeline from "@/components/LeadActivityTimeline";
 
 const STATUSES: LeadStatus[] = [
   "new",

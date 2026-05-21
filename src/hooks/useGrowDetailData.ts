@@ -14,6 +14,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
+import { alertDetailPath } from "@/lib/routes";
 import {
   type CountValue,
   type GrowStatus,
@@ -44,6 +45,9 @@ export interface GrowCounts {
   actionsPending: CountValue;
   actionsTotal: CountValue;
   auditEvents: CountValue;
+  alertsOpen: CountValue;
+  alertsCritical: CountValue;
+  alertsWarning: CountValue;
 }
 
 export const EMPTY_COUNTS: GrowCounts = {
@@ -53,6 +57,9 @@ export const EMPTY_COUNTS: GrowCounts = {
   actionsPending: 0,
   actionsTotal: 0,
   auditEvents: 0,
+  alertsOpen: 0,
+  alertsCritical: 0,
+  alertsWarning: 0,
 };
 
 export type RecentState =
@@ -113,7 +120,8 @@ export function useGrowDetailData(): UseGrowDetailData {
         | "tents"
         | "diary_entries"
         | "action_queue"
-        | "action_queue_events",
+        | "action_queue_events"
+        | "alerts",
       extra?: (
         q: ReturnType<typeof supabase.from> extends infer _T
           ? ReturnType<typeof supabase.from>
@@ -134,20 +142,42 @@ export function useGrowDetailData(): UseGrowDetailData {
       }
     }
 
-    const [plants, tents, diary, actionsPending, actionsTotal, auditEvents] =
-      await Promise.all([
-        countFrom("plants"),
-        countFrom("tents"),
-        countFrom("diary_entries"),
-        countFrom("action_queue", (q) =>
-          (q as ReturnType<typeof supabase.from>).eq(
-            "status",
-            "pending_approval",
-          ),
+    const [
+      plants,
+      tents,
+      diary,
+      actionsPending,
+      actionsTotal,
+      auditEvents,
+      alertsOpen,
+      alertsCritical,
+      alertsWarning,
+    ] = await Promise.all([
+      countFrom("plants"),
+      countFrom("tents"),
+      countFrom("diary_entries"),
+      countFrom("action_queue", (q) =>
+        (q as ReturnType<typeof supabase.from>).eq(
+          "status",
+          "pending_approval",
         ),
-        countFrom("action_queue"),
-        countFrom("action_queue_events"),
-      ]);
+      ),
+      countFrom("action_queue"),
+      countFrom("action_queue_events"),
+      countFrom("alerts", (q) =>
+        (q as ReturnType<typeof supabase.from>).eq("status", "open"),
+      ),
+      countFrom("alerts", (q) =>
+        (q as ReturnType<typeof supabase.from>)
+          .eq("status", "open")
+          .eq("severity", "critical"),
+      ),
+      countFrom("alerts", (q) =>
+        (q as ReturnType<typeof supabase.from>)
+          .eq("status", "open")
+          .eq("severity", "warning"),
+      ),
+    ]);
     setCounts({
       plants,
       tents,
@@ -155,11 +185,15 @@ export function useGrowDetailData(): UseGrowDetailData {
       actionsPending,
       actionsTotal,
       auditEvents,
+      alertsOpen,
+      alertsCritical,
+      alertsWarning,
     });
 
-    // Recent activity: latest 5 diary + latest 5 action_queue_events.
+    // Recent activity: latest 5 diary + latest 5 action_queue_events
+    // + latest 5 alert_events (read-only audit trail merge).
     try {
-      const [diaryRes, eventsRes] = await Promise.all([
+      const [diaryRes, eventsRes, alertEventsRes] = await Promise.all([
         supabase
           .from("diary_entries")
           .select("id,entry_at,stage,note")
@@ -174,9 +208,17 @@ export function useGrowDetailData(): UseGrowDetailData {
           .eq("grow_id", growId)
           .order("created_at", { ascending: false })
           .limit(5),
+        supabase
+          .from("alert_events")
+          .select(
+            "id,alert_id,event_type,previous_status,new_status,note,created_at",
+          )
+          .eq("grow_id", growId)
+          .order("created_at", { ascending: false })
+          .limit(5),
       ]);
 
-      if (diaryRes.error || eventsRes.error) {
+      if (diaryRes.error || eventsRes.error || alertEventsRes.error) {
         setRecent({ status: "unavailable" });
       } else {
         const diaryItems: RecentItem[] = (diaryRes.data ?? []).map((d) => ({
@@ -218,7 +260,55 @@ export function useGrowDetailData(): UseGrowDetailData {
           };
         });
 
-        setRecent({ status: "ok", items: mergeRecent([...diaryItems, ...eventItems]) });
+        // Resolve parent alerts for context (title/severity/metric).
+        const alertIds = Array.from(
+          new Set(
+            (alertEventsRes.data ?? [])
+              .map((e) => e.alert_id)
+              .filter(Boolean),
+          ),
+        );
+        let alertParents: Record<
+          string,
+          { title: string; severity: string; metric: string | null; status: string }
+        > = {};
+        if (alertIds.length > 0) {
+          const { data: aRows } = await supabase
+            .from("alerts")
+            .select("id,title,severity,metric,status")
+            .in("id", alertIds);
+          alertParents = Object.fromEntries(
+            (aRows ?? []).map((a) => [
+              a.id,
+              {
+                title: a.title as string,
+                severity: a.severity as string,
+                metric: (a.metric as string | null) ?? null,
+                status: a.status as string,
+              },
+            ]),
+          );
+        }
+
+        const alertItems: RecentItem[] = (alertEventsRes.data ?? []).map((e) => {
+          const parent = alertParents[e.alert_id];
+          return {
+            id: `alert-event-${e.id}`,
+            kind: "alert_event",
+            ts: e.created_at,
+            title: `${e.event_type}${parent ? `: ${parent.title}` : ""}`,
+            detail:
+              e.note ??
+              (parent?.metric ? `metric: ${parent.metric}` : null) ??
+              null,
+            href: alertDetailPath(e.alert_id),
+          };
+        });
+
+        setRecent({
+          status: "ok",
+          items: mergeRecent([...diaryItems, ...eventItems, ...alertItems]),
+        });
       }
     } catch {
       setRecent({ status: "unavailable" });

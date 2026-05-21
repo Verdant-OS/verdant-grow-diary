@@ -8,6 +8,7 @@ import {
   Tent as TentIcon,
   ListChecks,
   Sparkles,
+  Bell,
 } from "lucide-react";
 import { useGrowDetailData } from "@/hooks/useGrowDetailData";
 import {
@@ -16,7 +17,14 @@ import {
   type StatusLevel,
   formatCount,
 } from "@/lib/growStatus";
-import { actionsPath, dashboardPath, logsPath, plantsPath, tentsPath } from "@/lib/routes";
+import {
+  actionsPath,
+  alertsPath,
+  dashboardPath,
+  logsPath,
+  plantsPath,
+  tentsPath,
+} from "@/lib/routes";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 
 /**
@@ -112,6 +120,14 @@ export default function GrowDetail() {
           countLabel="actions"
         />
         <HubLink
+          to={alertsPath(growId)}
+          icon={<Bell className="h-4 w-4" />}
+          title="Alerts"
+          description={`${formatCount(counts.alertsCritical)} critical · ${formatCount(counts.alertsWarning)} warning`}
+          count={counts.alertsOpen}
+          countLabel="open alerts"
+        />
+        <HubLink
           to={dashboardPath(growId)}
           icon={<Sparkles className="h-4 w-4" />}
           title="Dashboard"
@@ -145,7 +161,11 @@ export default function GrowDetail() {
               >
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant="outline" className="text-[10px] uppercase">
-                    {item.kind === "diary" ? "Diary Entry" : "Action Queue Event"}
+                    {item.kind === "diary"
+                      ? "Diary Entry"
+                      : item.kind === "alert_event"
+                        ? "Alert Event"
+                        : "Action Queue Event"}
                   </Badge>
                   <span className="text-xs truncate">{item.title}</span>
                   <span className="ml-auto text-xs text-muted-foreground">

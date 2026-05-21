@@ -7,8 +7,8 @@ import EmptyState from "@/components/EmptyState";
 import CreatePlantDialog from "@/components/CreatePlantDialog";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
-import { useTents } from "@/hooks/useMockData";
-import { useGrowPlants } from "@/hooks/useGrowData";
+import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
+import { useGrowPlants, useGrowTents, getGrowDataMeta } from "@/hooks/useGrowData";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { plantsPath } from "@/lib/routes";
 import { cn } from "@/lib/utils";
@@ -18,7 +18,11 @@ export default function Plants() {
   const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
   const validGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
   const { data: plants = [] } = useGrowPlants(undefined, urlGrowId ?? undefined);
-  const { data: tents = [] } = useTents();
+  // Real tent records (Supabase-backed with documented mock fallback) drive
+  // filter labels so demo tents never masquerade as live filter chips.
+  const { data: tents = [] } = useGrowTents(urlGrowId ?? undefined);
+  const plantsMeta = getGrowDataMeta(["grow", "plants", "all", urlGrowId ?? "all"]);
+  const tentsMeta = getGrowDataMeta(["grow", "tents", urlGrowId ?? "all"]);
   const [tentFilter, setTentFilter] = useState<string>("all");
   const filtered = tentFilter === "all" ? plants : plants.filter((p) => p.tentId === tentFilter);
 

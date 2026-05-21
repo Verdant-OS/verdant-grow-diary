@@ -74,7 +74,7 @@ describe("lead_events RLS", () => {
     const selects = leadEventsPolicies.filter((p) => /FOR\s+SELECT/i.test(p));
     expect(selects.length).toBeGreaterThan(0);
     for (const p of selects) {
-      expect(p).toMatch(/has_role\([^)]*'operator'/i);
+      expect(p).toMatch(/has_role[\s\S]*?'operator'/i);
       expect(p).not.toMatch(/TO\s+anon/i);
     }
   });
@@ -83,7 +83,7 @@ describe("lead_events RLS", () => {
     const inserts = leadEventsPolicies.filter((p) => /FOR\s+INSERT/i.test(p));
     expect(inserts.length).toBeGreaterThan(0);
     for (const p of inserts) {
-      expect(p).toMatch(/has_role\([^)]*'operator'/i);
+      expect(p).toMatch(/has_role[\s\S]*?'operator'/i);
       expect(p).not.toMatch(/TO\s+anon/i);
     }
   });

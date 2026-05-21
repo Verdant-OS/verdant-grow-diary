@@ -384,6 +384,10 @@ export default function Timeline() {
                                   ))}
                                 </div>
                               )}
+                              {(() => {
+                                const ni = normalizedById.get(e.id);
+                                return ni ? <DiaryEntryBadges item={ni} /> : null;
+                              })()}
                             </>
                           );
                         })()}

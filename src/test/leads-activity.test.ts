@@ -20,7 +20,8 @@ const readSrc = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8")
 
 const RULES = readSrc("lib/leadActivityRules.ts");
 const COMPONENT = readSrc("components/LeadActivityTimeline.tsx");
-const DRAWER = readSrc("components/LeadDetailDrawer.tsx");
+import { readLeadDetailDrawerBundle } from "./_leadDrawerBundle";
+const DRAWER = readLeadDetailDrawerBundle();
 const PAGE = readSrc("pages/Leads.tsx");
 
 const baseLead: LeadRow = {

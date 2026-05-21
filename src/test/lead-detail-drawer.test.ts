@@ -23,7 +23,8 @@ const root = resolve(__dirname, "..", "..");
 const readSrc = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
 
 const PAGE = readSrc("pages/Leads.tsx");
-const DRAWER = readSrc("components/LeadDetailDrawer.tsx");
+import { readLeadDetailDrawerBundle } from "./_leadDrawerBundle";
+const DRAWER = readLeadDetailDrawerBundle();
 const HOOK = readSrc("hooks/useLeadsList.ts");
 const VIEW_MODEL = readSrc("lib/leadDetailViewModel.ts");
 

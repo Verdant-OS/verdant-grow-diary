@@ -5,7 +5,12 @@
  * Recommends a single next action for a lead based strictly on existing
  * LeadRow fields. Unknown/ambiguous data is never treated as healthy.
  */
-import type { LeadRow, LeadStatus } from "@/hooks/useLeadsList";
+import type { LeadRow } from "@/hooks/useLeadsList";
+import {
+  KNOWN_LEAD_STATUSES as KNOWN_STATUSES,
+  isMeaningfulString as isMeaningful,
+  parseLeadTime as parseTime,
+} from "@/lib/leadFieldUtils";
 
 export type LeadNextActionType =
   | "needs_first_contact"
@@ -28,27 +33,8 @@ export interface LeadNextAction {
   sortWeight: number;
 }
 
-const KNOWN_STATUSES: ReadonlySet<string> = new Set<LeadStatus>([
-  "new",
-  "reviewed",
-  "contacted",
-  "follow_up",
-  "closed",
-  "spam",
-]);
-
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
-
-function isMeaningful(v: string | null | undefined): boolean {
-  return typeof v === "string" && v.trim().length > 0;
-}
-
-function parseTime(iso: string | null | undefined): number | null {
-  if (!iso) return null;
-  const t = new Date(iso).getTime();
-  return Number.isFinite(t) ? t : null;
-}
 
 /**
  * Recommend the single next action for a lead.

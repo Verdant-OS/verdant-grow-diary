@@ -7,6 +7,7 @@
  */
 import type { LeadRow } from "@/hooks/useLeadsList";
 import { summarizeLeadStatuses } from "@/lib/leadStatusSummaryRules";
+import { isMeaningfulString as isMeaningful } from "@/lib/leadFieldUtils";
 
 export type LeadPipelineHealthSeverity = "info" | "watch" | "warning";
 
@@ -27,10 +28,6 @@ const SEVERITY_WEIGHT: Record<LeadPipelineHealthSeverity, number> = {
   watch: 2,
   info: 1,
 };
-
-function isMeaningful(v: string | null | undefined): boolean {
-  return typeof v === "string" && v.trim().length > 0;
-}
 
 function safePct(numerator: number, denominator: number): number {
   if (!denominator || denominator <= 0) return 0;

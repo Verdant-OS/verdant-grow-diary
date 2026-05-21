@@ -8,6 +8,7 @@
 import type { LeadRow } from "@/hooks/useLeadsList";
 import { summarizeLeadStatuses } from "@/lib/leadStatusSummaryRules";
 import { evaluatePipelineHealth } from "@/lib/leadPipelineHealthRules";
+import { isMeaningfulString as isMeaningful } from "@/lib/leadFieldUtils";
 
 export type LeadCommandCenterGuidanceState =
   | "empty"
@@ -37,9 +38,6 @@ const STATE_WEIGHT: Record<LeadCommandCenterGuidanceState, number> = {
   healthy: 1,
 };
 
-function isMeaningful(v: string | null | undefined): boolean {
-  return typeof v === "string" && v.trim().length > 0;
-}
 
 function safePct(num: number, den: number): number {
   if (!den || den <= 0) return 0;

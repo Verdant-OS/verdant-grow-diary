@@ -5,6 +5,7 @@
  * persistence. Derives a timeline strictly from existing LeadRow fields.
  */
 import type { LeadRow, LeadStatus } from "@/hooks/useLeadsList";
+import { isMeaningfulString as isMeaningful } from "@/lib/leadFieldUtils";
 
 export type LeadActivityEventType =
   | "lead_created"
@@ -34,9 +35,6 @@ function safeIso(value: string | null | undefined): string | null {
   return Number.isFinite(t) ? new Date(t).toISOString() : null;
 }
 
-function isMeaningful(value: string | null | undefined): boolean {
-  return typeof value === "string" && value.trim().length > 0;
-}
 
 function statusLabel(status: LeadStatus): string {
   switch (status) {

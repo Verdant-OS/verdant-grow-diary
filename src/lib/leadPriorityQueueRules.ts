@@ -12,6 +12,7 @@ import {
   type LeadNextActionPriority,
   type LeadNextActionType,
 } from "@/lib/leadNextActionRules";
+import { parseLeadTime } from "@/lib/leadFieldUtils";
 
 export interface LeadPriorityQueueItem {
   leadId: string;
@@ -51,9 +52,8 @@ function safeLabel(lead: LeadRow): string {
 }
 
 function safeCreatedTime(iso: string | null | undefined): number {
-  if (!iso) return Number.POSITIVE_INFINITY;
-  const t = new Date(iso).getTime();
-  return Number.isFinite(t) ? t : Number.POSITIVE_INFINITY;
+  const t = parseLeadTime(iso);
+  return t === null ? Number.POSITIVE_INFINITY : t;
 }
 
 /**

@@ -6,6 +6,10 @@
  * (no names, emails, notes, phones, messages).
  */
 import type { LeadRow } from "@/hooks/useLeadsList";
+import {
+  KNOWN_LEAD_STATUSES as KNOWN_STATUSES,
+  isMeaningfulString as isMeaningful,
+} from "@/lib/leadFieldUtils";
 
 export type LeadDataQualitySeverity = "info" | "watch" | "warning";
 
@@ -23,15 +27,6 @@ export interface LeadDataQualityFinding {
   sortWeight: number;
 }
 
-const KNOWN_STATUSES = new Set([
-  "new",
-  "reviewed",
-  "contacted",
-  "follow_up",
-  "closed",
-  "spam",
-]);
-
 const SEVERITY_WEIGHT: Record<LeadDataQualitySeverity, number> = {
   warning: 3,
   watch: 2,
@@ -39,10 +34,6 @@ const SEVERITY_WEIGHT: Record<LeadDataQualitySeverity, number> = {
 };
 
 const STALE_DAYS = 30;
-
-function isMeaningful(v: string | null | undefined): boolean {
-  return typeof v === "string" && v.trim().length > 0;
-}
 
 function safePct(num: number, den: number): number {
   if (!den || den <= 0) return 0;

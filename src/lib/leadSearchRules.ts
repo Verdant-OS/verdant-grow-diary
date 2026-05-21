@@ -4,6 +4,7 @@
  * UI-only / read-derived. No I/O, no Supabase, no side effects.
  */
 import type { LeadRow } from "@/hooks/useLeadsList";
+import { parseLeadTime as toTime } from "@/lib/leadFieldUtils";
 
 export type LeadSortOption =
   | "default"
@@ -48,11 +49,6 @@ export function searchLeads(leads: LeadRow[], query: string): LeadRow[] {
   );
 }
 
-function toTime(iso: string | null | undefined): number | null {
-  if (!iso) return null;
-  const t = new Date(iso).getTime();
-  return Number.isFinite(t) ? t : null;
-}
 
 // Stable, predictable status ordering: action-needed first, terminal last.
 const STATUS_ORDER: Record<string, number> = {

@@ -268,6 +268,7 @@ function LeadDetailBody({
           Next Action
         </h3>
         <LeadNextActionPanel lead={lead} />
+        <LeadQualityScoreBadge lead={lead} />
       </section>
     </div>
   );

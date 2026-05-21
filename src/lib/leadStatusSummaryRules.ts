@@ -8,6 +8,7 @@
 import type { LeadRow } from "@/hooks/useLeadsList";
 import { recommendNextAction } from "@/lib/leadNextActionRules";
 import { scoreLeadQuality } from "@/lib/leadQualityScoreRules";
+import { KNOWN_LEAD_STATUSES as KNOWN_STATUSES } from "@/lib/leadFieldUtils";
 
 export interface LeadStatusSummary {
   total: number;
@@ -23,15 +24,6 @@ export interface LeadStatusSummary {
   percentNeedingAction: number; // 0-100
   warnings: string[];
 }
-
-const KNOWN_STATUSES = new Set([
-  "new",
-  "reviewed",
-  "contacted",
-  "follow_up",
-  "closed",
-  "spam",
-]);
 
 function safePct(numerator: number, denominator: number): number {
   if (!denominator || denominator <= 0) return 0;

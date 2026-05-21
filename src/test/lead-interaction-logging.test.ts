@@ -175,7 +175,7 @@ describe("/leads UI exposes interaction logging", () => {
 
   it("renders a LogInteraction control with select + note + log button", () => {
     expect(PAGE).toMatch(/data-testid="log-interaction"/);
-    expect(PAGE).toMatch(/Log interaction/);
+    expect(PAGE).toMatch(/Log Interaction/i);
     expect(PAGE).toMatch(/placeholder="Optional note"/);
   });
 

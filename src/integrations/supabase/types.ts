@@ -624,6 +624,47 @@ export type Database = {
         }
         Relationships: []
       }
+      lead_events: {
+        Row: {
+          actor_user_id: string
+          created_at: string
+          event_type: string
+          id: string
+          lead_id: string
+          new_status: string | null
+          note: string | null
+          old_status: string | null
+        }
+        Insert: {
+          actor_user_id?: string
+          created_at?: string
+          event_type: string
+          id?: string
+          lead_id: string
+          new_status?: string | null
+          note?: string | null
+          old_status?: string | null
+        }
+        Update: {
+          actor_user_id?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          lead_id?: string
+          new_status?: string | null
+          note?: string | null
+          old_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_events_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           company: string | null

@@ -272,9 +272,23 @@ export default function Leads() {
                         {new Date(l.created_at).toLocaleString()}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={STATUS_VARIANT[l.status] ?? "secondary"}>
-                          {l.status}
-                        </Badge>
+                        <div className="flex flex-wrap items-center gap-1">
+                          <Badge variant={STATUS_VARIANT[l.status] ?? "secondary"}>
+                            {l.status}
+                          </Badge>
+                          {(() => {
+                            const b = followUpBadge(l);
+                            if (!b) return null;
+                            const map: Record<string, { variant: "destructive" | "default" | "secondary" | "outline"; label: string }> = {
+                              overdue: { variant: "destructive", label: "Overdue" },
+                              due_today: { variant: "default", label: "Due today" },
+                              upcoming: { variant: "secondary", label: "Upcoming" },
+                              no_follow_up: { variant: "outline", label: "No follow-up" },
+                            };
+                            const m = map[b];
+                            return <Badge variant={m.variant}>{m.label}</Badge>;
+                          })()}
+                        </div>
                       </TableCell>
                       <TableCell>{l.name ?? "—"}</TableCell>
                       <TableCell>

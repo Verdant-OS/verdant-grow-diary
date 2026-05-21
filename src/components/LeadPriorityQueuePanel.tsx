@@ -103,7 +103,9 @@ function QueueRow({
           </div>
         )}
       </div>
-      <Badge variant={PRIORITY_VARIANT[item.priority]}>{item.priority}</Badge>
+      <div className="flex shrink-0 items-center gap-1">
+        <Badge variant={PRIORITY_VARIANT[item.priority]}>{item.priority}</Badge>
+      </div>
     </div>
   );
   return (

@@ -30,6 +30,7 @@ import {
 import { buildLeadDetailViewModel } from "@/lib/leadDetailViewModel";
 import LeadActivityTimeline from "@/components/LeadActivityTimeline";
 import LeadNextActionPanel from "@/components/LeadNextActionPanel";
+import LeadQualityScoreBadge from "@/components/LeadQualityScoreBadge";
 
 const STATUSES: LeadStatus[] = [
   "new",
@@ -267,6 +268,7 @@ function LeadDetailBody({
           Next Action
         </h3>
         <LeadNextActionPanel lead={lead} />
+        <LeadQualityScoreBadge lead={lead} />
       </section>
     </div>
   );

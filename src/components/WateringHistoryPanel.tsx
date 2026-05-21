@@ -135,7 +135,20 @@ export default function WateringHistoryPanel({
   className,
 }: WateringHistoryPanelProps) {
   const rows = useMemo(() => {
-    const normalized = normalizeDiaryEntries({ rawEntries });
+    // Mirror Timeline's normalization convention: lift `details.event_type`
+    // to the top-level `entry_type` so the diary normalizer can classify
+    // the entry. We do not interpret any other `details` field here — that
+    // is the rules layer's job.
+    const lifted = (rawEntries ?? []).map((raw) => {
+      const r = (raw ?? {}) as Record<string, unknown>;
+      if (r.entry_type || r.entryType || r.event_type || r.eventType) return r;
+      const det = (r.details ?? null) as Record<string, unknown> | null;
+      const lifted = det && typeof det === "object" ? det.event_type : undefined;
+      return typeof lifted === "string" && lifted.length > 0
+        ? { ...r, entry_type: lifted }
+        : r;
+    });
+    const normalized = normalizeDiaryEntries({ rawEntries: lifted });
     const all = buildWateringHistory(normalized);
     return all.slice(0, Math.max(0, limit));
   }, [rawEntries, limit]);

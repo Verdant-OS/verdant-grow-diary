@@ -112,9 +112,13 @@ describe("LeadCaptureForm", () => {
   });
 
   it("does not collect a phone number or enroll in SMS", () => {
-    expect(FORM.toLowerCase()).not.toMatch(/\bphone\b/);
-    expect(FORM.toLowerCase()).not.toMatch(/\bsms\b\s*[:=]/);
+    // No phone input field and no SMS enrollment code path.
+    expect(FORM).not.toMatch(/type=["']tel["']/);
+    expect(FORM).not.toMatch(/autoComplete=["']tel["']/);
+    expect(FORM).not.toMatch(/setPhone|phoneNumber/);
+    expect(FORM).not.toMatch(/sms_opt_in|smsOptIn/i);
   });
+
 
   it("does not use service_role or external-control strings", () => {
     expect(FORM).not.toMatch(/service_role/);

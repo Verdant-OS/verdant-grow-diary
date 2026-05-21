@@ -27,6 +27,7 @@ import Diagnostics from "./pages/Diagnostics";
 import ActionQueue from "./pages/ActionQueue";
 import ActionDetail from "./pages/ActionDetail";
 import GrowLineageRepair from "./pages/GrowLineageRepair";
+import Landing from "./pages/Landing";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();

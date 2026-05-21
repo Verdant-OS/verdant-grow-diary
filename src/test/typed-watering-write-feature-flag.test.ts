@@ -44,10 +44,9 @@ describe("typed watering write — feature flag scaffold", () => {
       } as Parameters<typeof writeWateringTypedEvent>[0]["input"],
     });
     expect(out.ok).toBe(false);
-    if (!out.ok) {
-      expect(out.status).toBe("disabled");
-      expect(out.reason).toBe("feature_flag_off");
-    }
+    const fail = out as Extract<typeof out, { ok: false }>;
+    expect(fail.status).toBe("disabled");
+    expect((fail as { reason?: string }).reason).toBe("feature_flag_off");
   });
 
   it("helper short-circuit happens before any validation work", () => {

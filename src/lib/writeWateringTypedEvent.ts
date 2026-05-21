@@ -95,7 +95,7 @@ export function writeWateringTypedEvent(
   }
 
   const adapted = quickLogToTypedEventPayload(args.input);
-  if (!adapted.ok) {
+  if (adapted.ok !== true) {
     return {
       ok: false,
       status: "invalid_payload",

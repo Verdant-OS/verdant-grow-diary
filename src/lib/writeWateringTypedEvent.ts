@@ -15,7 +15,7 @@
  *   1. Validate the QuickLog input via `quickLogToTypedEventPayload`
  *   2. Refuse non-watering payloads via `getTypedEventWriteReadiness`
  *   3. Map the validated payload via `mapWateringPayloadToCreateWateringEventArgs`
- *   4. Call `supabase.rpc('create_watering_event', args)`
+ *   4. Invoke the create_watering_event RPC via the Supabase client
  *
  * Until then, all of those steps are inert. No `supabase` import is added
  * here on purpose — adding it later is a deliberate, reviewable step.

@@ -1,7 +1,17 @@
 import { ListChecks, Droplet, FlaskConical, Scissors, Sparkles, Eye, CheckCircle2, type LucideIcon } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
+import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
 import { useTasks, useTents } from "@/hooks/useMockData";
+import { type GrowDataSourceMeta } from "@/hooks/useGrowData";
 import { format } from "date-fns";
+
+// Tasks still rely on useMockData. Disclose as Demo so columns are never
+// mistaken for live scheduling output.
+const TASKS_MOCK_META: GrowDataSourceMeta = {
+  isDemoData: true,
+  dataSource: "mock",
+  sourceReason: "tasks:mock",
+};
 
 type Task = {
   id: string;

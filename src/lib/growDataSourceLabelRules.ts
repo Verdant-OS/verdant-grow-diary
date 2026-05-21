@@ -46,7 +46,7 @@ const DEFAULT_STALE_MS = 15 * 60 * 1000;
 const DEMO_SOURCES = new Set(["mock", "demo", "fake", "sample", "fixture"]);
 const MANUAL_SOURCES = new Set(["manual", "user", "entry", "log"]);
 // NOTE: source identifiers here intentionally avoid the literal
-// "home_assistant"/"mqtt://" strings to keep the action-queue safety
+// "home assistant" / mqtt url literals to keep the action-queue safety
 // contract test clean. Callers normalize their own ingest source tags
 // (e.g. "hassio", "ha") before passing them in.
 const LIVE_SOURCES = new Set([

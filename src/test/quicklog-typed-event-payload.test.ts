@@ -302,7 +302,7 @@ describe("quickLogToTypedEventPayload", () => {
     const r = quickLogToTypedEventPayload({
       ...baseDraft,
       event_type: "watering",
-      details: {},
+      details: { watering_amount_ml: 100 },
     });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -314,7 +314,7 @@ describe("quickLogToTypedEventPayload", () => {
       ...baseDraft,
       user_id: "user-1",
       event_type: "watering",
-      details: {},
+      details: { watering_amount_ml: 100 },
     });
     expect(r.ok).toBe(true);
     if (!r.ok) return;

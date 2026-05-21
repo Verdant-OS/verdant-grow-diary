@@ -12,6 +12,7 @@ import {
   type LeadNextActionPriority,
   type LeadNextActionType,
 } from "@/lib/leadNextActionRules";
+import { parseLeadTime } from "@/lib/leadFieldUtils";
 
 export interface LeadPriorityQueueItem {
   leadId: string;

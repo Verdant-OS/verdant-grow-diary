@@ -362,6 +362,8 @@ export default function Leads() {
             </div>
           )}
 
+          {!loading && <LeadStatusSummaryStrip leads={filtered} />}
+
           {!loading && (
             <LeadPriorityQueuePanel
               leads={filtered}

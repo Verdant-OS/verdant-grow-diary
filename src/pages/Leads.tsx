@@ -24,6 +24,7 @@ import LeadAnalyticsPanel from "@/components/LeadAnalyticsPanel";
 import LeadPriorityQueuePanel from "@/components/LeadPriorityQueuePanel";
 import LeadStatusSummaryStrip from "@/components/LeadStatusSummaryStrip";
 import LeadPipelineHealthPanel from "@/components/LeadPipelineHealthPanel";
+import LeadCommandCenterGuidance from "@/components/LeadCommandCenterGuidance";
 import LeadSavedViewsMenu from "@/components/LeadSavedViewsMenu";
 import { useLeadSavedViews } from "@/hooks/useLeadSavedViews";
 import type { LeadSavedView } from "@/lib/leadSavedViewsRules";
@@ -361,6 +362,20 @@ export default function Leads() {
             >
               Showing {filtered.length} of {leads.length} leads
             </div>
+          )}
+
+          {!loading && (
+            <LeadCommandCenterGuidance
+              leads={filtered}
+              hasActiveFilters={
+                leadType !== "all" ||
+                source !== "all" ||
+                status !== "all" ||
+                quickFilter !== "all" ||
+                search.trim().length > 0
+              }
+              totalUnfiltered={leads.length}
+            />
           )}
 
           {!loading && <LeadStatusSummaryStrip leads={filtered} />}

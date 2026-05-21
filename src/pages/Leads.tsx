@@ -91,6 +91,7 @@ export default function Leads() {
   const [status, setStatus] = useState<string>("all");
   const [quickFilter, setQuickFilter] = useState<LeadQuickFilter>("all");
   const [search, setSearch] = useState("");
+  const [sortOption, setSortOption] = useState<LeadSortOption>("default");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -107,17 +108,13 @@ export default function Leads() {
   const summary = useMemo(() => summarizeLeads(leads), [leads]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const base = q
-      ? leads.filter(
-          (l) =>
-            l.email.toLowerCase().includes(q) ||
-            (l.name ?? "").toLowerCase().includes(q) ||
-            (l.company ?? "").toLowerCase().includes(q),
-        )
-      : leads;
-    return filterAndSortLeads(base, quickFilter);
-  }, [leads, search, quickFilter]);
+    const searched = searchLeads(leads, search);
+    const filteredSorted = filterAndSortLeads(searched, quickFilter);
+    return sortOption === "default"
+      ? filteredSorted
+      : sortLeads(filteredSorted, sortOption);
+  }, [leads, search, quickFilter, sortOption]);
+
 
   const selectedLead = useMemo(
     () => leads.find((l) => l.id === selectedId) ?? null,

@@ -333,6 +333,7 @@ export default function Leads() {
             >
               Showing {filtered.length} of {leads.length} leads
             </div>
+          )}
 
           {!loading && (
             <LeadAnalyticsPanel
@@ -340,6 +341,8 @@ export default function Leads() {
               scopeLabel="current results"
             />
           )}
+
+
 
 
           {loading ? (

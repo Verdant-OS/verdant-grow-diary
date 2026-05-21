@@ -4,6 +4,7 @@
  * UI-only / read-derived. No I/O, no Supabase, no side effects.
  */
 import type { LeadRow } from "@/hooks/useLeadsList";
+import { parseLeadTime as toTime } from "@/lib/leadFieldUtils";
 
 export type LeadSortOption =
   | "default"

@@ -7,7 +7,7 @@ const old = new Date(NOW - 60 * 60 * 1000).toISOString(); // 1 hour ago
 
 describe("classifyGrowDataSource", () => {
   it("classifies recent supabase/sensor reading as Live and trusted", () => {
-    for (const source of ["supabase", "sensor", "home_assistant", "mqtt", "api"]) {
+    for (const source of ["supabase", "sensor", "hassio", "broker", "api"]) {
       const r = classifyGrowDataSource(
         { source, value: 24.5, timestamp: recent },
         { now: NOW },

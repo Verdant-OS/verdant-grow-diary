@@ -14,6 +14,7 @@ import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import DiaryEntryBadges from "@/components/DiaryEntryBadges";
 import WateringHistoryPanel from "@/components/WateringHistoryPanel";
 import FeedingHistoryPanel from "@/components/FeedingHistoryPanel";
+import PhotoHistoryPanel from "@/components/PhotoHistoryPanel";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { actionDetailPath, alertDetailPath, logsPath, timelinePath } from "@/lib/routes";
 import { cn } from "@/lib/utils";

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,6 +8,14 @@ import { useAuth } from "@/store/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { Sparkles, Camera, Loader2, Wand2, ListChecks, Plus } from "lucide-react";
 import { toast } from "sonner";
+import {
+  useGrowPlants,
+  useGrowSensorReadings,
+  getGrowDataMeta,
+} from "@/hooks/useGrowData";
+import { useDiaryEntries } from "@/hooks/use-diary-entries";
+import { evaluateAiContextSufficiency } from "@/lib/aiContextSufficiencyRules";
+import CoachContextSufficiencyPanel from "@/components/CoachContextSufficiencyPanel";
 
 type Mode = "diagnose" | "next_steps";
 

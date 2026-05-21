@@ -45,8 +45,8 @@ review.
       `/diagnostics` while signed out redirects to `/auth`.
 - [ ] RLS still enforces `auth.uid()` ownership on every user-owned
       table (verified via the existing test suite + Supabase linter).
-- [ ] AI Coach remains read-only and suggest-only. No new device-command
-      or external-control surface has shipped.
+- [ ] AI Coach remains read-only and suggest-only. No new actuator
+      surface or hardware-write path has shipped.
 - [ ] Action Queue still requires explicit user approval for every
       state transition.
 

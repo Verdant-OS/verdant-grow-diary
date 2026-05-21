@@ -88,13 +88,20 @@ export default function Timeline() {
   }, [urlGrowId, grows, storeGrowId, setActiveGrowId]);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [actionEvents, setActionEvents] = useState<ActionQueueEvent[]>([]);
+  const [alertEvents, setAlertEvents] = useState<AlertEventRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
   const [editingId, setEditingId] = useState<string | null>(null);
 
   async function load() {
-    if (!user || !activeGrowId) { setEntries([]); setActionEvents([]); setLoading(false); return; }
+    if (!user || !activeGrowId) {
+      setEntries([]);
+      setActionEvents([]);
+      setAlertEvents([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const { data } = await supabase.from("diary_entries")
       .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
@@ -116,6 +123,15 @@ export default function Timeline() {
       .order("created_at", { ascending: false })
       .limit(50);
     setActionEvents((aqe as unknown as ActionQueueEvent[]) || []);
+
+    // Alert events for this grow (read-only audit trail). Joins parent alert
+    // for title/severity/metric/status. RLS enforces owner-only visibility.
+    const { data: ale } = await supabase.from("alert_events")
+      .select("id,alert_id,event_type,previous_status,new_status,note,created_at,alert:alerts(title,severity,metric,status)")
+      .eq("grow_id", activeGrowId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    setAlertEvents((ale as unknown as AlertEventRow[]) || []);
 
     setLoading(false);
   }

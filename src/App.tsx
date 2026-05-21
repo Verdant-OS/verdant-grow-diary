@@ -28,8 +28,10 @@ import ActionQueue from "./pages/ActionQueue";
 import ActionDetail from "./pages/ActionDetail";
 import GrowLineageRepair from "./pages/GrowLineageRepair";
 import Landing from "./pages/Landing";
+import HardwareIntegrations from "./pages/HardwareIntegrations";
 import Leads from "./pages/Leads";
 import NotFound from "./pages/NotFound";
+
 
 
 const queryClient = new QueryClient();

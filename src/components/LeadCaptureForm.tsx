@@ -44,11 +44,23 @@ const leadSchema = z.object({
   message: z.string().trim().max(2000).optional().or(z.literal("")),
 });
 
-export default function LeadCaptureForm() {
+export interface LeadCaptureFormProps {
+  defaultLeadType?:
+    | "beta_user"
+    | "hardware_partner"
+    | "grower"
+    | "investor"
+    | "other";
+}
+
+export default function LeadCaptureForm({
+  defaultLeadType = "beta_user",
+}: LeadCaptureFormProps = {}) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [company, setCompany] = useState("");
-  const [leadType, setLeadType] = useState<string>("beta_user");
+  const [leadType, setLeadType] = useState<string>(defaultLeadType);
+
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);

@@ -27,6 +27,7 @@ import {
   type LeadStatus,
 } from "@/hooks/useLeadsList";
 import { useLeadEvents } from "@/hooks/useLeadEvents";
+import { useCreateLeadEvent } from "@/hooks/useCreateLeadEvent";
 import {
   QUICK_FILTERS,
   filterAndSortLeads,
@@ -34,6 +35,13 @@ import {
   summarizeLeads,
   type LeadQuickFilter,
 } from "@/lib/leadFollowupRules";
+import {
+  INTERACTION_OPTIONS,
+  describeFollowUpChange,
+  followUpDidChange,
+  labelForEventType,
+  type InteractionEventType,
+} from "@/lib/leadEventRules";
 
 const LEAD_TYPES = [
   "beta_user",

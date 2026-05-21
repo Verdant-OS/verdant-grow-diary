@@ -87,7 +87,7 @@ export function evaluatePipelineHealth(
       message: `${summary.needsFirstContact}/${total} leads (${pctNeedsFirstContact}%) are awaiting first contact.`,
       metricValue: pctNeedsFirstContact,
       recommendation:
-        "Reach out to the newest unc ontacted leads to clear the backlog.",
+        "Reach out to the newest uncontacted leads to clear the backlog.",
       sortWeight: 90 + Math.round(pctNeedsFirstContact),
     });
   }

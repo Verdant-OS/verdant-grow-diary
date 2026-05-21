@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,6 +8,14 @@ import { useAuth } from "@/store/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { Sparkles, Camera, Loader2, Wand2, ListChecks, Plus } from "lucide-react";
 import { toast } from "sonner";
+import {
+  useGrowPlants,
+  useGrowSensorReadings,
+  getGrowDataMeta,
+} from "@/hooks/useGrowData";
+import { useDiaryEntries } from "@/hooks/use-diary-entries";
+import { evaluateAiContextSufficiency } from "@/lib/aiContextSufficiencyRules";
+import CoachContextSufficiencyPanel from "@/components/CoachContextSufficiencyPanel";
 
 type Mode = "diagnose" | "next_steps";
 
@@ -43,6 +51,52 @@ export default function Coach() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [queuedIdx, setQueuedIdx] = useState<Set<number>>(new Set());
   const [queuingIdx, setQueuingIdx] = useState<number | null>(null);
+
+  // --- Real grow context for AI sufficiency evaluation (presenter only) ---
+  const { data: ctxPlants = [] } = useGrowPlants(undefined, activeGrowId ?? undefined);
+  const { data: ctxSensors = [] } = useGrowSensorReadings(undefined);
+  const { data: ctxDiary = [] } = useDiaryEntries();
+  const contextSufficiency = useMemo(() => {
+    const plantsMeta = getGrowDataMeta(["grow", "plants", "all", activeGrowId ?? "all"]);
+    const sensorsMeta = getGrowDataMeta(["grow", "sensors", "all"]);
+    const diaryWaterFeed = (ctxDiary as Array<{ entry_at?: string; entry_type?: string }>).filter(
+      (e) => {
+        const t = (e?.entry_type ?? "").toLowerCase();
+        return t.includes("water") || t.includes("feed");
+      },
+    );
+    return evaluateAiContextSufficiency({
+      activeGrow: activeGrowId ? { id: activeGrowId } : null,
+      plants: ctxPlants.map((p) => ({
+        id: p.id,
+        stage: p.stage ?? null,
+        strain: p.strain ?? null,
+        // Mock Plant type doesn't carry medium yet; treat as unknown so the
+        // rule helper can warn honestly without inventing values.
+        medium: (p as { medium?: string | null }).medium ?? null,
+      })),
+      recentDiaryEntries: (ctxDiary as Array<{ entry_at?: string; entry_type?: string }>).map(
+        (e) => ({ at: e.entry_at, type: e.entry_type }),
+      ),
+      recentWateringOrFeeding: diaryWaterFeed.map((e) => ({
+        at: e.entry_at,
+        type: e.entry_type,
+      })),
+      recentSensorReadings: ctxSensors.map((r) => ({
+        at: (r as { recordedAt?: string | number | Date; at?: string | number | Date }).recordedAt
+          ?? (r as { at?: string | number | Date }).at,
+        temp: r.temp,
+        rh: r.rh,
+        vpd: r.vpd,
+        ph: (r as { ph?: number }).ph,
+        ec: (r as { ec?: number }).ec,
+      })),
+      hasPhoto: !!photoFile,
+      sensorMeta: sensorsMeta,
+      contextMeta: plantsMeta,
+      questionKind: photoFile ? "visual-diagnosis" : "general",
+    });
+  }, [activeGrowId, ctxPlants, ctxSensors, ctxDiary, photoFile]);
 
   // SECURITY: never send user_id from the client. DB default (auth.uid()) wins.
   // status always defaults to pending_approval. No device-control fields.
@@ -142,6 +196,8 @@ export default function Coach() {
         </p>
       </div>
 
+      <CoachContextSufficiencyPanel result={contextSufficiency} className="mb-4" />
+
       <div className="glass rounded-2xl p-4 space-y-4">
         <button type="button" onClick={() => fileRef.current?.click()}
           className="relative aspect-video w-full rounded-xl border-2 border-dashed border-border/60 overflow-hidden bg-secondary/40 hover:border-primary/60 transition">
@@ -168,13 +224,28 @@ export default function Coach() {
 
       {analysis && (
         <div className="glass rounded-2xl p-4 mt-4 animate-fade-in space-y-3 text-sm">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Sparkles className="h-3 w-3 text-primary" />Coach
-            <span className="ml-auto uppercase tracking-wider">
-              conf: {analysis.confidence} · risk: {analysis.risk_level}
-              {result?.sparse && " · sparse data"}
-            </span>
-          </div>
+          {(() => {
+            const rank = { low: 0, medium: 1, high: 2 } as const;
+            const cappedConf =
+              rank[analysis.confidence] > rank[contextSufficiency.confidenceCeiling]
+                ? contextSufficiency.confidenceCeiling
+                : analysis.confidence;
+            const capped = cappedConf !== analysis.confidence;
+            return (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Sparkles className="h-3 w-3 text-primary" />Coach
+                <span
+                  className="ml-auto uppercase tracking-wider"
+                  data-testid="coach-displayed-confidence"
+                  data-capped={String(capped)}
+                >
+                  conf: {cappedConf} · risk: {analysis.risk_level}
+                  {capped && " · limited-context guidance"}
+                  {result?.sparse && " · sparse data"}
+                </span>
+              </div>
+            );
+          })()}
           <p className="font-medium">{analysis.summary}</p>
           {analysis.likely_issue && (
             <p className="text-xs"><span className="text-muted-foreground">Likely issue:</span> {analysis.likely_issue}</p>

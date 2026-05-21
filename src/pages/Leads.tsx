@@ -315,3 +315,35 @@ export default function Leads() {
     </div>
   );
 }
+
+function LeadActivity({ leadId, refreshKey }: { leadId: string; refreshKey: string }) {
+  // refreshKey lets the activity panel refetch when the lead row is updated.
+  const refreshNonce = useMemo(() => refreshKey.length + refreshKey.charCodeAt(0), [refreshKey]);
+  const { events, loading, error } = useLeadEvents(leadId, refreshNonce);
+  if (loading) {
+    return <p className="text-xs text-muted-foreground">Loading activity…</p>;
+  }
+  if (error) {
+    return <p className="text-xs text-destructive">Activity unavailable: {error}</p>;
+  }
+  if (events.length === 0) {
+    return <p className="text-xs text-muted-foreground">No activity yet.</p>;
+  }
+  return (
+    <ul className="space-y-1 text-xs text-muted-foreground" data-testid="lead-activity">
+      {events.map((ev) => (
+        <li key={ev.id} className="flex items-start gap-2">
+          <span className="tabular-nums">
+            {new Date(ev.created_at).toLocaleString()}
+          </span>
+          <span>
+            {ev.event_type === "status_change"
+              ? `${ev.old_status ?? "—"} → ${ev.new_status ?? "—"}`
+              : ev.event_type}
+            {ev.note ? ` · ${ev.note}` : ""}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}

@@ -58,6 +58,12 @@ export default function Tasks() {
   return (
     <div>
       <PageHeader title="Tasks" description="Watering, feeding, training, and inspection schedule." icon={<ListChecks className="h-5 w-5" />} />
+      <GrowDataSourceDisclosure
+        resource="tasks"
+        hasAnyData={tasks.length > 0}
+        metas={[TASKS_MOCK_META]}
+        testId="tasks-data-source-disclosure"
+      />
       <div className="grid md:grid-cols-3 gap-4">
         <Column title="Today" items={(tasks as Task[]).filter((t) => t.status === "today")} tents={tents as Tent[]} />
         <Column title="Upcoming" items={(tasks as Task[]).filter((t) => t.status === "upcoming")} tents={tents as Tent[]} />

@@ -39,6 +39,12 @@ export default function Plants() {
           backHref={backHref}
         />
       )}
+      <GrowDataSourceDisclosure
+        resource="plants"
+        hasAnyData={plants.length > 0}
+        metas={[plantsMeta, tentsMeta]}
+        testId="plants-data-source-disclosure"
+      />
       <div className="flex items-center gap-1.5 mb-4 flex-wrap">
         <Filter className="h-3.5 w-3.5 text-muted-foreground mr-1" />
         {[{ id: "all", name: "All tents" }, ...tents.map((t) => ({ id: t.id, name: t.name }))].map((t) => (

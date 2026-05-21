@@ -624,6 +624,42 @@ export type Database = {
         }
         Relationships: []
       }
+      leads: {
+        Row: {
+          company: string | null
+          created_at: string
+          email: string
+          id: string
+          lead_type: string
+          message: string | null
+          name: string | null
+          role: string | null
+          source: string
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          lead_type?: string
+          message?: string | null
+          name?: string | null
+          role?: string | null
+          source?: string
+        }
+        Update: {
+          company?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          lead_type?: string
+          message?: string | null
+          name?: string | null
+          role?: string | null
+          source?: string
+        }
+        Relationships: []
+      }
       nug_events: {
         Row: {
           amount: number

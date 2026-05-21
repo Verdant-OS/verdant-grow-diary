@@ -105,9 +105,20 @@ export default function Leads() {
     status: status === "all" ? null : status,
   });
   const { createEvent, submitting: creatingEvent } = useCreateLeadEvent();
+  const savedViews = useLeadSavedViews();
   const [activityNonce, setActivityNonce] = useState<Record<string, number>>({});
   const bumpActivity = (leadId: string) =>
     setActivityNonce((m) => ({ ...m, [leadId]: (m[leadId] ?? 0) + 1 }));
+
+  function applySavedView(v: LeadSavedView) {
+    setSearch(v.search);
+    setQuickFilter(v.quickFilter);
+    setSortOption(v.sort);
+  }
+  function handleSaveCurrentView(name: string) {
+    savedViews.saveView({ name, search, quickFilter, sort: sortOption });
+  }
+
 
   const summary = useMemo(() => summarizeLeads(leads), [leads]);
 

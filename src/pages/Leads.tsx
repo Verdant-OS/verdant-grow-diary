@@ -137,11 +137,25 @@ export default function Leads() {
   }
 
   async function saveFollowUp(l: LeadRow, iso: string) {
+    const next = iso || null;
+    const changed = followUpDidChange(l.follow_up_at, next);
     const { error: uErr } = await updateLead(l.id, {
-      follow_up_at: iso || null,
+      follow_up_at: next,
     });
-    if (uErr) toast.error(uErr);
-    else toast.success("Follow-up updated");
+    if (uErr) {
+      toast.error(uErr);
+      return;
+    }
+    if (changed) {
+      await createEvent({
+        leadId: l.id,
+        eventType: "follow_up_changed",
+        note: describeFollowUpChange(l.follow_up_at, next),
+      });
+      bumpActivity(l.id);
+    }
+    toast.success("Follow-up updated");
+    return;
   }
 
   return (

@@ -492,3 +492,97 @@ function ActionQueueEventsSection({ events }: { events: ActionQueueEvent[] }) {
     </section>
   );
 }
+
+const ALERT_SEVERITY_TONE: Record<string, string> = {
+  critical: "bg-destructive/10 border-destructive/40 text-destructive",
+  warning: "bg-amber-500/10 border-amber-500/30 text-amber-300",
+  watch: "bg-amber-400/10 border-amber-400/30 text-amber-300",
+  info: "bg-muted/40 border-border/50 text-muted-foreground",
+};
+
+const ALERT_EVENT_TONE: Record<AlertEventType, string> = {
+  created:      "bg-secondary/60 border-border/50 text-foreground",
+  acknowledged: "bg-amber-500/10 border-amber-500/30 text-amber-300",
+  resolved:     "bg-emerald-500/10 border-emerald-500/30 text-emerald-300",
+  dismissed:    "bg-muted/40 border-border/50 text-muted-foreground",
+  reopened:     "bg-primary/10 border-primary/30 text-primary",
+};
+
+function AlertEventsSection({ events }: { events: AlertEventRow[] }) {
+  if (!events?.length) return null;
+  // Defensive: sort newest-first regardless of fetch order.
+  const sorted = [...events].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
+  return (
+    <section className="glass rounded-2xl p-4 mb-4" aria-label="Alert events">
+      <div className="flex items-center gap-2 mb-3">
+        <Bell className="h-3.5 w-3.5 text-primary" />
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Alert events
+        </h2>
+        <span className="text-[11px] text-muted-foreground">
+          {sorted.length} {sorted.length === 1 ? "event" : "events"} · read-only
+        </span>
+      </div>
+      <ul className="space-y-2">
+        {sorted.map((e) => (
+          <li
+            key={e.id}
+            className="rounded-xl border border-border/50 bg-secondary/30 p-3"
+          >
+            <div className="flex items-center gap-2 flex-wrap text-xs">
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] font-medium uppercase",
+                  ALERT_EVENT_TONE[e.event_type] ?? ALERT_EVENT_TONE.created,
+                )}
+              >
+                {e.event_type}
+              </span>
+              {e.alert?.severity && (
+                <span
+                  className={cn(
+                    "inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-medium uppercase",
+                    ALERT_SEVERITY_TONE[e.alert.severity] ??
+                      ALERT_SEVERITY_TONE.info,
+                  )}
+                >
+                  {e.alert.severity}
+                </span>
+              )}
+              <span className="text-muted-foreground">
+                {e.previous_status ?? "—"} → {e.new_status ?? "—"}
+              </span>
+              <span
+                className="ml-auto text-muted-foreground"
+                title={format(new Date(e.created_at), "PPpp")}
+              >
+                {formatDistanceToNow(new Date(e.created_at), { addSuffix: true })}
+              </span>
+              {e.alert_id && (
+                <Link
+                  to={alertDetailPath(e.alert_id)}
+                  className="text-[11px] text-primary hover:underline"
+                >
+                  View Details
+                </Link>
+              )}
+            </div>
+            {e.alert?.title && (
+              <p className="text-sm mt-2">{e.alert.title}</p>
+            )}
+            {e.alert?.metric && (
+              <p className="text-xs text-muted-foreground mt-1">
+                metric: {e.alert.metric}
+              </p>
+            )}
+            {e.note && (
+              <p className="text-xs italic text-muted-foreground mt-2">· {e.note}</p>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}

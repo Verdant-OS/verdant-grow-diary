@@ -561,3 +561,86 @@ export function quickLogToTypedEventPayload(
     warnings,
   };
 }
+
+// ---------------------------------------------------------------------------
+// RPC boundary helpers (pure — no network)
+// ---------------------------------------------------------------------------
+
+export type TypedEventWriteReadiness = "rpc_available" | "rpc_missing";
+
+const RPC_READINESS: Record<TypedEventKind, TypedEventWriteReadiness> = {
+  watering: "rpc_available",
+  feeding: "rpc_missing",
+  photo: "rpc_missing",
+  observation: "rpc_missing",
+  training: "rpc_missing",
+  environment: "rpc_missing",
+};
+
+/**
+ * Report whether an atomic RPC currently exists for this event type.
+ * Callers MUST refuse to perform a typed write when this returns
+ * "rpc_missing" — the non-atomic two-step insert path is unsafe.
+ */
+export function getTypedEventWriteReadiness(
+  eventType: string,
+): TypedEventWriteReadiness {
+  if (!KNOWN_EVENT_TYPES.has(eventType as TypedEventKind)) {
+    return "rpc_missing";
+  }
+  return RPC_READINESS[eventType as TypedEventKind];
+}
+
+export interface CreateWateringEventArgs {
+  _grow_id: string;
+  _volume_ml: number;
+  _tent_id?: string;
+  _plant_id?: string;
+  _occurred_at?: string;
+  _note?: string;
+  _ph?: number;
+  _ec_ms_cm?: number;
+  _runoff_ml?: number;
+  _runoff_ph?: number;
+  _runoff_ec?: number;
+  _water_temp_c?: number;
+}
+
+/**
+ * Pure boundary mapper: adapter Success → create_watering_event RPC args.
+ * Does NOT call Supabase. Returns null if the result is not a watering
+ * payload or required args are missing.
+ */
+export function mapWateringPayloadToCreateWateringEventArgs(
+  result: TypedEventResult,
+): CreateWateringEventArgs | null {
+  if (!result.ok) return null;
+  if (result.subtype.kind !== "watering") return null;
+  const p = result.parent;
+  const s = result.subtype.payload as {
+    volume_ml?: number;
+    ph?: number;
+    ec_ms_cm?: number;
+    runoff_ml?: number;
+    runoff_ph?: number;
+    runoff_ec_ms_cm?: number;
+    water_temp_c?: number;
+  };
+  if (typeof s.volume_ml !== "number" || !(s.volume_ml > 0)) return null;
+
+  const args: CreateWateringEventArgs = {
+    _grow_id: p.grow_id,
+    _volume_ml: s.volume_ml,
+  };
+  if (p.tent_id) args._tent_id = p.tent_id;
+  if (p.plant_id) args._plant_id = p.plant_id;
+  if (p.occurred_at) args._occurred_at = p.occurred_at;
+  if (p.note) args._note = p.note;
+  if (s.ph !== undefined) args._ph = s.ph;
+  if (s.ec_ms_cm !== undefined) args._ec_ms_cm = s.ec_ms_cm;
+  if (s.runoff_ml !== undefined) args._runoff_ml = s.runoff_ml;
+  if (s.runoff_ph !== undefined) args._runoff_ph = s.runoff_ph;
+  if (s.runoff_ec_ms_cm !== undefined) args._runoff_ec = s.runoff_ec_ms_cm;
+  if (s.water_temp_c !== undefined) args._water_temp_c = s.water_temp_c;
+  return args;
+}

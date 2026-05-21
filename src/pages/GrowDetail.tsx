@@ -120,6 +120,14 @@ export default function GrowDetail() {
           countLabel="actions"
         />
         <HubLink
+          to={alertsPath(growId)}
+          icon={<Bell className="h-4 w-4" />}
+          title="Alerts"
+          description={`${formatCount(counts.alertsCritical)} critical · ${formatCount(counts.alertsWarning)} warning`}
+          count={counts.alertsOpen}
+          countLabel="open alerts"
+        />
+        <HubLink
           to={dashboardPath(growId)}
           icon={<Sparkles className="h-4 w-4" />}
           title="Dashboard"

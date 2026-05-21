@@ -28,7 +28,9 @@ import ActionQueue from "./pages/ActionQueue";
 import ActionDetail from "./pages/ActionDetail";
 import GrowLineageRepair from "./pages/GrowLineageRepair";
 import Landing from "./pages/Landing";
+import Leads from "./pages/Leads";
 import NotFound from "./pages/NotFound";
+
 
 const queryClient = new QueryClient();
 
@@ -65,7 +67,9 @@ const App = () => (
 
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/diagnostics" element={<Diagnostics />} />
+                <Route path="/leads" element={<Leads />} />
               </Route>
+
               <Route path="*" element={<NotFound />} />
             </Routes>
           </GrowsProvider>

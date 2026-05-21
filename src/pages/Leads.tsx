@@ -64,7 +64,7 @@ export default function Leads() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Leads Inbox" subtitle="Operator-only view of public lead submissions" />
+      <PageHeader title="Leads Inbox" description="Operator-only view of public lead submissions" />
 
       {!loading && !authorized && (
         <div className="rounded-xl border border-border/50 bg-card/40 p-6 text-center">

@@ -251,6 +251,14 @@ function LeadDetailBody({
         </h3>
         <LeadActivity leadId={lead.id} refreshNonce={activityNonce} />
       </section>
+
+      {/* Derived Activity Timeline (read-only) */}
+      <section className="space-y-2" data-section="activity-timeline">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Derived Timeline
+        </h3>
+        <LeadActivityTimeline lead={lead} />
+      </section>
     </div>
   );
 }

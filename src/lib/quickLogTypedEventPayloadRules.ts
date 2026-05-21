@@ -72,6 +72,30 @@ const KNOWN_EVENT_TYPES: ReadonlySet<TypedEventKind> = new Set([
   "environment",
 ]);
 
+export const OBSERVATION_SEVERITIES: ReadonlySet<string> = new Set([
+  "info",
+  "watch",
+  "warn",
+  "critical",
+]);
+
+export const TRAINING_TECHNIQUES: ReadonlySet<string> = new Set([
+  "lst",
+  "topping",
+  "fim",
+  "defoliation",
+  "supercropping",
+  "scrog",
+  "manifold",
+  "other",
+]);
+
+export const TRAINING_INTENSITIES: ReadonlySet<string> = new Set([
+  "light",
+  "medium",
+  "heavy",
+]);
+
 // ---------------------------------------------------------------------------
 // Coercion helpers (pure)
 // ---------------------------------------------------------------------------

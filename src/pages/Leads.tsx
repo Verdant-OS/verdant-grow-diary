@@ -21,6 +21,9 @@ import { toast } from "sonner";
 import PageHeader from "@/components/PageHeader";
 import LeadDetailDrawer from "@/components/LeadDetailDrawer";
 import LeadAnalyticsPanel from "@/components/LeadAnalyticsPanel";
+import LeadSavedViewsMenu from "@/components/LeadSavedViewsMenu";
+import { useLeadSavedViews } from "@/hooks/useLeadSavedViews";
+import type { LeadSavedView } from "@/lib/leadSavedViewsRules";
 import {
   useLeadsList,
   type LeadRow,

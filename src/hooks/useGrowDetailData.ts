@@ -190,9 +190,10 @@ export function useGrowDetailData(): UseGrowDetailData {
       alertsWarning,
     });
 
-    // Recent activity: latest 5 diary + latest 5 action_queue_events.
+    // Recent activity: latest 5 diary + latest 5 action_queue_events
+    // + latest 5 alert_events (read-only audit trail merge).
     try {
-      const [diaryRes, eventsRes] = await Promise.all([
+      const [diaryRes, eventsRes, alertEventsRes] = await Promise.all([
         supabase
           .from("diary_entries")
           .select("id,entry_at,stage,note")
@@ -207,9 +208,17 @@ export function useGrowDetailData(): UseGrowDetailData {
           .eq("grow_id", growId)
           .order("created_at", { ascending: false })
           .limit(5),
+        supabase
+          .from("alert_events")
+          .select(
+            "id,alert_id,event_type,previous_status,new_status,note,created_at",
+          )
+          .eq("grow_id", growId)
+          .order("created_at", { ascending: false })
+          .limit(5),
       ]);
 
-      if (diaryRes.error || eventsRes.error) {
+      if (diaryRes.error || eventsRes.error || alertEventsRes.error) {
         setRecent({ status: "unavailable" });
       } else {
         const diaryItems: RecentItem[] = (diaryRes.data ?? []).map((d) => ({
@@ -251,7 +260,55 @@ export function useGrowDetailData(): UseGrowDetailData {
           };
         });
 
-        setRecent({ status: "ok", items: mergeRecent([...diaryItems, ...eventItems]) });
+        // Resolve parent alerts for context (title/severity/metric).
+        const alertIds = Array.from(
+          new Set(
+            (alertEventsRes.data ?? [])
+              .map((e) => e.alert_id)
+              .filter(Boolean),
+          ),
+        );
+        let alertParents: Record<
+          string,
+          { title: string; severity: string; metric: string | null; status: string }
+        > = {};
+        if (alertIds.length > 0) {
+          const { data: aRows } = await supabase
+            .from("alerts")
+            .select("id,title,severity,metric,status")
+            .in("id", alertIds);
+          alertParents = Object.fromEntries(
+            (aRows ?? []).map((a) => [
+              a.id,
+              {
+                title: a.title as string,
+                severity: a.severity as string,
+                metric: (a.metric as string | null) ?? null,
+                status: a.status as string,
+              },
+            ]),
+          );
+        }
+
+        const alertItems: RecentItem[] = (alertEventsRes.data ?? []).map((e) => {
+          const parent = alertParents[e.alert_id];
+          return {
+            id: `alert-event-${e.id}`,
+            kind: "alert_event",
+            ts: e.created_at,
+            title: `${e.event_type}${parent ? `: ${parent.title}` : ""}`,
+            detail:
+              e.note ??
+              (parent?.metric ? `metric: ${parent.metric}` : null) ??
+              null,
+            href: alertDetailPath(e.alert_id),
+          };
+        });
+
+        setRecent({
+          status: "ok",
+          items: mergeRecent([...diaryItems, ...eventItems, ...alertItems]),
+        });
       }
     } catch {
       setRecent({ status: "unavailable" });

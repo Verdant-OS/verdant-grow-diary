@@ -52,6 +52,52 @@ export default function Coach() {
   const [queuedIdx, setQueuedIdx] = useState<Set<number>>(new Set());
   const [queuingIdx, setQueuingIdx] = useState<number | null>(null);
 
+  // --- Real grow context for AI sufficiency evaluation (presenter only) ---
+  const { data: ctxPlants = [] } = useGrowPlants(undefined, activeGrowId ?? undefined);
+  const { data: ctxSensors = [] } = useGrowSensorReadings(undefined);
+  const { data: ctxDiary = [] } = useDiaryEntries();
+  const contextSufficiency = useMemo(() => {
+    const plantsMeta = getGrowDataMeta(["grow", "plants", "all", activeGrowId ?? "all"]);
+    const sensorsMeta = getGrowDataMeta(["grow", "sensors", "all"]);
+    const diaryWaterFeed = (ctxDiary as Array<{ entry_at?: string; entry_type?: string }>).filter(
+      (e) => {
+        const t = (e?.entry_type ?? "").toLowerCase();
+        return t.includes("water") || t.includes("feed");
+      },
+    );
+    return evaluateAiContextSufficiency({
+      activeGrow: activeGrowId ? { id: activeGrowId } : null,
+      plants: ctxPlants.map((p) => ({
+        id: p.id,
+        stage: p.stage ?? null,
+        strain: p.strain ?? null,
+        // Mock Plant type doesn't carry medium yet; treat as unknown so the
+        // rule helper can warn honestly without inventing values.
+        medium: (p as { medium?: string | null }).medium ?? null,
+      })),
+      recentDiaryEntries: (ctxDiary as Array<{ entry_at?: string; entry_type?: string }>).map(
+        (e) => ({ at: e.entry_at, type: e.entry_type }),
+      ),
+      recentWateringOrFeeding: diaryWaterFeed.map((e) => ({
+        at: e.entry_at,
+        type: e.entry_type,
+      })),
+      recentSensorReadings: ctxSensors.map((r) => ({
+        at: (r as { recordedAt?: string | number | Date; at?: string | number | Date }).recordedAt
+          ?? (r as { at?: string | number | Date }).at,
+        temp: r.temp,
+        rh: r.rh,
+        vpd: r.vpd,
+        ph: (r as { ph?: number }).ph,
+        ec: (r as { ec?: number }).ec,
+      })),
+      hasPhoto: !!photoFile,
+      sensorMeta: sensorsMeta,
+      contextMeta: plantsMeta,
+      questionKind: photoFile ? "visual-diagnosis" : "general",
+    });
+  }, [activeGrowId, ctxPlants, ctxSensors, ctxDiary, photoFile]);
+
   // SECURITY: never send user_id from the client. DB default (auth.uid()) wins.
   // status always defaults to pending_approval. No device-control fields.
   async function addToQueue(idx: number, recommendation: string) {

@@ -124,9 +124,17 @@ export function useLeadsList(opts: UseLeadsListOptions = {}): UseLeadsListResult
         "contacted_at",
         "follow_up_at",
       ] as const;
-      const safePatch: Record<string, unknown> = {};
+      const safePatch: {
+        status?: LeadStatus;
+        operator_notes?: string | null;
+        contacted_at?: string | null;
+        follow_up_at?: string | null;
+      } = {};
       for (const k of ALLOWED) {
-        if (k in patch) safePatch[k] = (patch as Record<string, unknown>)[k];
+        if (k in patch) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (safePatch as any)[k] = (patch as any)[k];
+        }
       }
       const { data, error: uErr } = await supabase
         .from("leads")

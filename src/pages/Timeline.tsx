@@ -166,6 +166,31 @@ export default function Timeline() {
     });
   }, [entries, stageFilter, eventFilter]);
 
+  // Pure normalized timeline view-model. Drives per-entry tags/warnings and a
+  // future-proof empty/limited disclosure. Includes invalid entries so
+  // malformed diary rows still surface as "Limited data" instead of vanishing.
+  const normalizedById = useMemo(() => {
+    const items = buildGrowDiaryTimeline({
+      rawEntries: entries.map((e) => ({
+        id: e.id,
+        grow_id: activeGrowId ?? null,
+        plant_id: e.plant_id,
+        tent_id: e.tent_id,
+        stage: e.stage,
+        entry_at: e.entry_at,
+        entry_type:
+          (e.details && (e.details.event_type as string | undefined)) ?? "note",
+        note: e.note,
+        photo_url: e.photo_url,
+        details: e.details,
+      })),
+      filter: { includeInvalid: true },
+    });
+    const map = new Map<string, (typeof items)[number]>();
+    items.forEach((it) => map.set(it.id, it));
+    return map;
+  }, [entries, activeGrowId]);
+
   const groupedByStage = useMemo(() => {
     const groups: { stage: string; items: Entry[] }[] = [];
     filtered.forEach((e) => {

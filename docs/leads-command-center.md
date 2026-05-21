@@ -4,6 +4,30 @@ Read-only reference for the Leads page and its derived intelligence panels.
 Everything described here is implemented today; this document does **not**
 change runtime behavior.
 
+## Scope & Boundary (Important)
+
+**Leads is an internal admin / operator module.** It is intentionally
+**separate from the main Verdant Grow OS** grower-facing experience and
+exists to support business development, partner tracking, and outreach
+pipeline visibility — nothing else.
+
+- **Primary route:** `/admin/leads` (mounted in `src/App.tsx`).
+  `/leads` is retained as a back-compat alias only; new links should use
+  `/admin/leads`.
+- **Not surfaced in grower navigation.** `AppSidebar` and `MobileNav` do
+  **not** link to Leads. The link belongs only inside an Admin / Operator
+  section (to be added behind an admin role check when one exists).
+- **Must not be mixed with grower data.** Leads must never be associated,
+  joined, cross-referenced, or co-rendered with plants, grow diaries,
+  sensors, AI Grow Doctor, customer mode, public grow companion data, or
+  any other grower-facing entity. It reads `public.leads` and nothing else.
+- **Audience:** internal operators / BD only — not growers, not end
+  customers, not the public companion experience.
+- **Purpose:** business development, partner tracking, and outreach
+  pipeline visibility. Not a CRM for grower-customer relationships.
+
+
+
 ## Page Purpose
 
 `src/pages/Leads.tsx` is the operator console for inbound leads. It loads the

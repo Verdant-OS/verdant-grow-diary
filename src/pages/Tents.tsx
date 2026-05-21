@@ -7,8 +7,9 @@ import EmptyState from "@/components/EmptyState";
 import CreateTentDialog from "@/components/CreateTentDialog";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
+import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
 import { useSensorReadings, usePlants } from "@/hooks/useMockData";
-import { useGrowTents } from "@/hooks/useGrowData";
+import { useGrowTents, getGrowDataMeta } from "@/hooks/useGrowData";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { tentsPath } from "@/lib/routes";
 

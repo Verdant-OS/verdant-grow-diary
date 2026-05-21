@@ -172,8 +172,8 @@ describe("quickLogToTypedEventPayload", () => {
       event_type: "watering",
       details: {},
     });
-    if (r.ok) throw new Error("expected failure");
-    expect(r.reason).toBe("grow_id:missing");
+    expect(r.ok).toBe(false);
+    expect((r as { reason?: string }).reason).toBe("grow_id:missing");
   });
 
   it("fails on unknown event type", () => {
@@ -181,8 +181,8 @@ describe("quickLogToTypedEventPayload", () => {
       ...baseDraft,
       event_type: "teleport",
     });
-    if (r.ok) throw new Error("expected failure");
-    expect(r.reason).toBe("event_type:unknown");
+    expect(r.ok).toBe(false);
+    expect((r as { reason?: string }).reason).toBe("event_type:unknown");
   });
 
   it("fails on invalid pH", () => {
@@ -191,8 +191,8 @@ describe("quickLogToTypedEventPayload", () => {
       event_type: "watering",
       details: { ph: "banana" },
     });
-    if (r.ok) throw new Error("expected failure");
-    expect(r.reason).toBe("ph:invalid");
+    expect(r.ok).toBe(false);
+    expect((r as { reason?: string }).reason).toBe("ph:invalid");
   });
 
   it("fails on out-of-range pH (never silently coerces)", () => {
@@ -201,8 +201,8 @@ describe("quickLogToTypedEventPayload", () => {
       event_type: "watering",
       details: { ph: 99 },
     });
-    if (r.ok) throw new Error("expected failure");
-    expect(r.reason).toBe("ph:out-of-range");
+    expect(r.ok).toBe(false);
+    expect((r as { reason?: string }).reason).toBe("ph:out-of-range");
   });
 
   it("fails on invalid EC", () => {
@@ -211,8 +211,8 @@ describe("quickLogToTypedEventPayload", () => {
       event_type: "feeding",
       details: { ec: "x" },
     });
-    if (r.ok) throw new Error("expected failure");
-    expect(r.reason).toBe("ec:invalid");
+    expect(r.ok).toBe(false);
+    expect((r as { reason?: string }).reason).toBe("ec:invalid");
   });
 
   it("fails on invalid volume", () => {
@@ -221,8 +221,8 @@ describe("quickLogToTypedEventPayload", () => {
       event_type: "watering",
       details: { watering_amount_ml: "not-a-number" },
     });
-    if (r.ok) throw new Error("expected failure");
-    expect(r.reason).toBe("volume:invalid");
+    expect(r.ok).toBe(false);
+    expect((r as { reason?: string }).reason).toBe("volume:invalid");
   });
 
   it("fails on invalid humidity", () => {
@@ -231,8 +231,8 @@ describe("quickLogToTypedEventPayload", () => {
       event_type: "environment",
       details: { humidity_pct: 250 },
     });
-    if (r.ok) throw new Error("expected failure");
-    expect(r.reason).toBe("humidity_pct:out-of-range");
+    expect(r.ok).toBe(false);
+    expect((r as { reason?: string }).reason).toBe("humidity_pct:out-of-range");
   });
 
   it("fails on invalid light_hours", () => {
@@ -241,8 +241,8 @@ describe("quickLogToTypedEventPayload", () => {
       event_type: "environment",
       details: { light_hours: 99 },
     });
-    if (r.ok) throw new Error("expected failure");
-    expect(r.reason).toBe("light_hours:out-of-range");
+    expect(r.ok).toBe(false);
+    expect((r as { reason?: string }).reason).toBe("light_hours:out-of-range");
   });
 
   it("preserves unknown extras under extras key", () => {
@@ -274,9 +274,10 @@ describe("quickLogToTypedEventPayload", () => {
       event_type: "watering",
       details: { ph: secret, watering_amount_ml: secret },
     });
-    if (r.ok) throw new Error("expected failure");
-    expect(r.reason).not.toContain(secret);
-    for (const w of r.warnings) {
+    expect(r.ok).toBe(false);
+    const fail = r as { reason: string; warnings: string[] };
+    expect(fail.reason).not.toContain(secret);
+    for (const w of fail.warnings) {
       expect(w).not.toContain(secret);
     }
   });

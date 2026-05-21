@@ -28,8 +28,10 @@ import ActionQueue from "./pages/ActionQueue";
 import ActionDetail from "./pages/ActionDetail";
 import GrowLineageRepair from "./pages/GrowLineageRepair";
 import Landing from "./pages/Landing";
+import HardwareIntegrations from "./pages/HardwareIntegrations";
 import Leads from "./pages/Leads";
 import NotFound from "./pages/NotFound";
+
 
 
 const queryClient = new QueryClient();
@@ -45,6 +47,8 @@ const App = () => (
             <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/welcome" element={<Landing />} />
+              <Route path="/hardware-integrations" element={<HardwareIntegrations />} />
+
               <Route element={<AppShell />}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/tents" element={<Tents />} />

@@ -36,7 +36,9 @@ export interface TypedParentPayload {
   user_id?: string;
   event_type: TypedEventKind;
   source: "manual";
-  occurred_at: string;
+  /** ISO timestamp, or null when caller did not supply one — let the DB
+   * default (`now()`) apply rather than fabricating an epoch-0 row. */
+  occurred_at: string | null;
   note: string | null;
   schema_version: number;
 }

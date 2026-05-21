@@ -365,6 +365,8 @@ export default function Leads() {
 
           {!loading && <LeadStatusSummaryStrip leads={filtered} />}
 
+          {!loading && <LeadPipelineHealthPanel leads={filtered} />}
+
           {!loading && (
             <LeadPriorityQueuePanel
               leads={filtered}

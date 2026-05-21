@@ -31,6 +31,7 @@ import { buildLeadDetailViewModel } from "@/lib/leadDetailViewModel";
 import LeadActivityTimeline from "@/components/LeadActivityTimeline";
 import LeadNextActionPanel from "@/components/LeadNextActionPanel";
 import LeadQualityScoreBadge from "@/components/LeadQualityScoreBadge";
+import LeadDetailSnapshotCard from "@/components/LeadDetailSnapshotCard";
 
 const STATUSES: LeadStatus[] = [
   "new",

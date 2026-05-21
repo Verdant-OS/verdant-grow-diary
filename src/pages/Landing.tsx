@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/store/auth";
+import BrandLogo from "@/components/BrandLogo";
 
 /**
  * Public landing page for https://verdantgrowdiary.com.

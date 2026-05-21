@@ -66,7 +66,7 @@ export default function Coach() {
     const diaryAdapted = adaptDiaryForAiContext({
       rawDiaryEntries: ctxDiary as readonly unknown[],
     });
-    const liveSensors: Array<AiContextSensorReadingInputLocal> = ctxSensors.map((r) => ({
+    const liveSensors = ctxSensors.map((r) => ({
       at: (r as { recordedAt?: string | number | Date; at?: string | number | Date }).recordedAt
         ?? (r as { at?: string | number | Date }).at,
       temp: r.temp,

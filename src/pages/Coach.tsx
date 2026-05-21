@@ -224,13 +224,28 @@ export default function Coach() {
 
       {analysis && (
         <div className="glass rounded-2xl p-4 mt-4 animate-fade-in space-y-3 text-sm">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Sparkles className="h-3 w-3 text-primary" />Coach
-            <span className="ml-auto uppercase tracking-wider">
-              conf: {analysis.confidence} · risk: {analysis.risk_level}
-              {result?.sparse && " · sparse data"}
-            </span>
-          </div>
+          {(() => {
+            const rank = { low: 0, medium: 1, high: 2 } as const;
+            const cappedConf =
+              rank[analysis.confidence] > rank[contextSufficiency.confidenceCeiling]
+                ? contextSufficiency.confidenceCeiling
+                : analysis.confidence;
+            const capped = cappedConf !== analysis.confidence;
+            return (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Sparkles className="h-3 w-3 text-primary" />Coach
+                <span
+                  className="ml-auto uppercase tracking-wider"
+                  data-testid="coach-displayed-confidence"
+                  data-capped={String(capped)}
+                >
+                  conf: {cappedConf} · risk: {analysis.risk_level}
+                  {capped && " · limited-context guidance"}
+                  {result?.sparse && " · sparse data"}
+                </span>
+              </div>
+            );
+          })()}
           <p className="font-medium">{analysis.summary}</p>
           {analysis.likely_issue && (
             <p className="text-xs"><span className="text-muted-foreground">Likely issue:</span> {analysis.likely_issue}</p>

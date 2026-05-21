@@ -23,6 +23,7 @@ import LeadDetailDrawer from "@/components/LeadDetailDrawer";
 import LeadAnalyticsPanel from "@/components/LeadAnalyticsPanel";
 import LeadPriorityQueuePanel from "@/components/LeadPriorityQueuePanel";
 import LeadDataQualityAuditPanel from "@/components/LeadDataQualityAuditPanel";
+import LeadSourceInsightsPanel from "@/components/LeadSourceInsightsPanel";
 import LeadStatusSummaryStrip from "@/components/LeadStatusSummaryStrip";
 import LeadPipelineHealthPanel from "@/components/LeadPipelineHealthPanel";
 import LeadCommandCenterGuidance from "@/components/LeadCommandCenterGuidance";
@@ -448,6 +449,19 @@ export default function Leads() {
               <LeadDataQualityAuditPanel leads={filtered} />
             </LeadCommandCenterSection>
           )}
+
+          {!loading && (
+            <LeadCommandCenterSection
+              id="source_insights"
+              label="Source & Type Insights"
+              collapsed={lcc.isCollapsed("source_insights")}
+              onToggle={lcc.toggle}
+            >
+              <LeadSourceInsightsPanel leads={filtered} />
+            </LeadCommandCenterSection>
+          )}
+
+
 
 
           {!loading && (

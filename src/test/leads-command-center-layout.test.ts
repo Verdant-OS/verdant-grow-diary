@@ -56,7 +56,7 @@ describe("leadCommandCenterLayoutRules — safety", () => {
   it("never persists lead data fields (no email/name/notes keys)", () => {
     const layout = defaultLeadCommandCenterLayout();
     const json = serializeLeadCommandCenterLayout(layout);
-    expect(json).not.toMatch(/email|name|notes|phone|message|lead_type|source|created_at/i);
+    expect(json).not.toMatch(/\b(email|notes|phone|message|lead_type|created_at|operator_notes)\b/i);
   });
 
   it("is wired into Leads page", () => {

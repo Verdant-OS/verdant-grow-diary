@@ -149,6 +149,11 @@ export default function Dashboard() {
         />
       )}
 
+      <DashboardDataSourceDisclosure
+        scopedGrowId={scopedGrowId}
+        hasAnyData={tents.length > 0 || plants.length > 0}
+      />
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <KpiCard label="Active tents" value={tents.length} icon={<Box className="h-3.5 w-3.5" />} />
         <KpiCard label="Plants" value={plants.length} icon={<Sprout className="h-3.5 w-3.5" />} hint={`${plants.filter((p) => p.health === "healthy").length} healthy`} accent="success" />

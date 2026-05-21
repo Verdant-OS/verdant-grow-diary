@@ -27,6 +27,13 @@ import {
   type LeadStatus,
 } from "@/hooks/useLeadsList";
 import { useLeadEvents } from "@/hooks/useLeadEvents";
+import {
+  QUICK_FILTERS,
+  filterAndSortLeads,
+  followUpBadge,
+  summarizeLeads,
+  type LeadQuickFilter,
+} from "@/lib/leadFollowupRules";
 
 const LEAD_TYPES = [
   "beta_user",
@@ -60,6 +67,7 @@ export default function Leads() {
   const [leadType, setLeadType] = useState<string>("all");
   const [source, setSource] = useState<string>("all");
   const [status, setStatus] = useState<string>("all");
+  const [quickFilter, setQuickFilter] = useState<LeadQuickFilter>("all");
   const [search, setSearch] = useState("");
 
   const { loading, authorized, error, leads, updateLead } = useLeadsList({
@@ -68,16 +76,20 @@ export default function Leads() {
     status: status === "all" ? null : status,
   });
 
+  const summary = useMemo(() => summarizeLeads(leads), [leads]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return leads;
-    return leads.filter(
-      (l) =>
-        l.email.toLowerCase().includes(q) ||
-        (l.name ?? "").toLowerCase().includes(q) ||
-        (l.company ?? "").toLowerCase().includes(q),
-    );
-  }, [leads, search]);
+    const base = q
+      ? leads.filter(
+          (l) =>
+            l.email.toLowerCase().includes(q) ||
+            (l.name ?? "").toLowerCase().includes(q) ||
+            (l.company ?? "").toLowerCase().includes(q),
+        )
+      : leads;
+    return filterAndSortLeads(base, quickFilter);
+  }, [leads, search, quickFilter]);
 
   async function copyEmail(email: string) {
     try {
@@ -135,7 +147,44 @@ export default function Leads() {
 
       {authorized && (
         <>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {[
+              { label: "New leads", value: summary.new_leads },
+              { label: "Needs action", value: summary.needs_action },
+              { label: "Overdue follow-ups", value: summary.overdue },
+              { label: "Due today", value: summary.due_today },
+              { label: "Upcoming follow-ups", value: summary.upcoming },
+              { label: "Closed leads", value: summary.closed },
+            ].map((c) => (
+              <div
+                key={c.label}
+                className="rounded-xl border border-border/50 bg-card/40 p-3"
+              >
+                <div className="text-xs text-muted-foreground">{c.label}</div>
+                <div className="mt-1 font-display text-2xl font-semibold">
+                  {c.value}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Lead quick filters">
+            {QUICK_FILTERS.map((f) => (
+              <Button
+                key={f.id}
+                size="sm"
+                variant={quickFilter === f.id ? "default" : "outline"}
+                onClick={() => setQuickFilter(f.id)}
+                role="tab"
+                aria-selected={quickFilter === f.id}
+              >
+                {f.label}
+              </Button>
+            ))}
+          </div>
+
           <div className="flex flex-wrap items-end gap-3">
+
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Status</label>
               <Select value={status} onValueChange={setStatus}>
@@ -223,9 +272,23 @@ export default function Leads() {
                         {new Date(l.created_at).toLocaleString()}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={STATUS_VARIANT[l.status] ?? "secondary"}>
-                          {l.status}
-                        </Badge>
+                        <div className="flex flex-wrap items-center gap-1">
+                          <Badge variant={STATUS_VARIANT[l.status] ?? "secondary"}>
+                            {l.status}
+                          </Badge>
+                          {(() => {
+                            const b = followUpBadge(l);
+                            if (!b) return null;
+                            const map: Record<string, { variant: "destructive" | "default" | "secondary" | "outline"; label: string }> = {
+                              overdue: { variant: "destructive", label: "Overdue" },
+                              due_today: { variant: "default", label: "Due today" },
+                              upcoming: { variant: "secondary", label: "Upcoming" },
+                              no_follow_up: { variant: "outline", label: "No follow-up" },
+                            };
+                            const m = map[b];
+                            return <Badge variant={m.variant}>{m.label}</Badge>;
+                          })()}
+                        </div>
                       </TableCell>
                       <TableCell>{l.name ?? "—"}</TableCell>
                       <TableCell>

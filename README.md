@@ -17,6 +17,26 @@ without exposing private dashboard data.
 
 ---
 
+## Production deployment
+
+- **Primary domain:** https://verdantgrowdiary.com (apex + `www`).
+- **Public route:** `/welcome` only. Every other route requires auth and is
+  protected by Supabase RLS at the data layer.
+- **SSL:** TLS certificates are provisioned automatically by Lovable hosting
+  once DNS resolves. Confirm the lock icon and a valid certificate chain on
+  both `verdantgrowdiary.com` and `www.verdantgrowdiary.com` after each
+  domain or DNS change.
+- **DNS reminder:** Apex `A` record and `www` `A` record must both point at
+  the Lovable hosting IP. Remove stale records before cutover; SSL issuance
+  fails silently when conflicting records exist.
+- **Frontend vs backend:** Frontend changes ship when you click *Update* in
+  the publish dialog. Edge Functions and migrations deploy automatically on
+  merge.
+- **Rollback:** Use the Lovable version history to revert a published
+  frontend; database migrations roll back via a follow-up migration only.
+
+---
+
 ## Project overview
 
 - **Frontend:** React 18, Vite, TypeScript, Tailwind, shadcn/ui, Recharts,

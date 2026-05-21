@@ -1,19 +1,25 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/store/auth";
 
 /**
  * Public landing page for https://verdantgrowdiary.com.
  *
  * This page is intentionally read-only marketing copy. It does NOT:
- *  - read or render any authenticated dashboard data,
- *  - call Supabase with user-scoped queries,
- *  - expose private routes (/grows, /plants, /tents, /sensors, /alerts,
- *    /actions, /timeline, /doctor, /settings, /diagnostics, /cameras),
- *  - display any live metrics, sensor values, or AI Coach output.
+ *  - read or render any authenticated dashboard data (no grows, plants,
+ *    tents, sensors, alerts, or action_queue queries),
+ *  - call Supabase with user-scoped data queries,
+ *  - expose private dashboard internals,
+ *  - display any live metrics, sensor values, or AI Coach output,
+ *  - introduce any write path.
  *
- * The only outbound links go to /auth (sign in / sign up).
+ * It reads `useAuth()` only to decide whether to show an "Open dashboard"
+ * CTA for an already-signed-in visitor. The session state is supplied by
+ * the existing AuthProvider; no extra Supabase query is issued here.
  */
 export default function Landing() {
+  const { user } = useAuth();
+
   return (
     <main className="min-h-screen bg-background text-foreground">
       <header className="px-6 py-5 flex items-center justify-between max-w-6xl mx-auto">
@@ -23,9 +29,15 @@ export default function Landing() {
           </span>
           Verdant Grow Diary
         </div>
-        <Link to="/auth">
-          <Button variant="outline" size="sm">Sign in</Button>
-        </Link>
+        {user ? (
+          <Link to="/">
+            <Button variant="outline" size="sm">Open dashboard</Button>
+          </Link>
+        ) : (
+          <Link to="/auth">
+            <Button variant="outline" size="sm">Sign in</Button>
+          </Link>
+        )}
       </header>
 
       <section className="px-6 pt-16 pb-20 max-w-4xl mx-auto text-center">
@@ -40,15 +52,22 @@ export default function Landing() {
           logs, track plants and tents, and turn sensor data into safer
           insight — without handing control to a black box.
         </p>
-        <div className="mt-8 flex items-center justify-center gap-3">
-          <Link to="/auth">
-            <Button size="lg">Get started</Button>
-          </Link>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          {user ? (
+            <Link to="/">
+              <Button size="lg">Open dashboard</Button>
+            </Link>
+          ) : (
+            <Link to="/auth">
+              <Button size="lg">Sign in</Button>
+            </Link>
+          )}
           <a href="#features">
             <Button size="lg" variant="outline">Learn more</Button>
           </a>
         </div>
       </section>
+
 
       <section id="features" className="px-6 py-16 max-w-5xl mx-auto grid gap-6 md:grid-cols-2">
         <FeatureCard

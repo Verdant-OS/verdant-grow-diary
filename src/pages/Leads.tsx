@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import PageHeader from "@/components/PageHeader";
 import LeadDetailDrawer from "@/components/LeadDetailDrawer";
+import LeadAnalyticsPanel from "@/components/LeadAnalyticsPanel";
 import {
   useLeadsList,
   type LeadRow,
@@ -333,6 +334,16 @@ export default function Leads() {
               Showing {filtered.length} of {leads.length} leads
             </div>
           )}
+
+          {!loading && (
+            <LeadAnalyticsPanel
+              leads={filtered}
+              scopeLabel="current results"
+            />
+          )}
+
+
+
 
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading leads…</p>

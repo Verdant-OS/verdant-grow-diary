@@ -70,7 +70,7 @@ describe("Leads admin boundary — documentation", () => {
   it("declares the BD / partner / outreach purpose", () => {
     expect(DOC).toMatch(/business development/i);
     expect(DOC).toMatch(/partner tracking/i);
-    expect(DOC).toMatch(/outreach pipeline/i);
+    expect(DOC).toMatch(/outreach\s+pipeline/i);
   });
 
   it("names /admin/leads as the primary route and /leads as the alias", () => {

@@ -14,7 +14,8 @@ export type LeadCommandCenterSectionId =
   | "analytics"
   | "saved_views"
   | "data_quality"
-  | "source_insights";
+  | "source_insights"
+  | "executive_summary";
 
 export interface LeadCommandCenterSection {
   id: LeadCommandCenterSectionId;
@@ -31,6 +32,7 @@ export const LEAD_COMMAND_CENTER_LAYOUT_STORAGE_KEY =
   "verdant.leads.commandCenterLayout.v1";
 
 export const DEFAULT_SECTION_ORDER: readonly LeadCommandCenterSectionId[] = [
+  "executive_summary",
   "saved_views",
   "guidance",
   "status_summary",
@@ -50,6 +52,7 @@ const SECTION_LABELS: Record<LeadCommandCenterSectionId, string> = {
   saved_views: "Saved Views",
   data_quality: "Data Quality Audit",
   source_insights: "Source & Type Insights",
+  executive_summary: "Executive Summary",
 };
 
 const KNOWN_IDS = new Set<LeadCommandCenterSectionId>(DEFAULT_SECTION_ORDER);

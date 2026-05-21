@@ -56,8 +56,8 @@ describe("leadExecutiveSummaryRules — safety", () => {
 
   it("mounted on Leads page above guidance", () => {
     expect(PAGE).toMatch(/LeadExecutiveSummaryCard/);
-    const idxSummary = PAGE.indexOf("LeadExecutiveSummaryCard");
-    const idxGuidance = PAGE.indexOf("LeadCommandCenterGuidance");
+    const idxSummary = PAGE.indexOf("<LeadExecutiveSummaryCard");
+    const idxGuidance = PAGE.indexOf("<LeadCommandCenterGuidance");
     expect(idxSummary).toBeGreaterThan(-1);
     expect(idxGuidance).toBeGreaterThan(-1);
     expect(idxSummary).toBeLessThan(idxGuidance);
@@ -90,7 +90,7 @@ describe("buildLeadExecutiveSummary", () => {
     const leads: LeadRow[] = Array.from({ length: 6 }, (_, i) =>
       lead({
         id: `l${i}`,
-        status: i % 2 === 0 ? "contacted" : "closed",
+        status: "closed",
         contacted_at: "2026-05-08T00:00:00Z",
       }),
     );

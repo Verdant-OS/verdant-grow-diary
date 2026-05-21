@@ -1,5 +1,9 @@
 # Verdant Security Checklist
 
+Production deployment: https://verdantgrowdiary.com — only the `/welcome`
+landing route is public; all other routes require authentication.
+
+
 Use this checklist for every Verdant PR that touches data access, auth, AI,
 Action Queue, sensors, device control, or migrations. It complements
 [`docs/security-exceptions.md`](./security-exceptions.md), which tracks the

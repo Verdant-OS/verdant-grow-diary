@@ -10,6 +10,11 @@ The frontend is React + Vite + TypeScript + Tailwind + shadcn/ui. The backend
 is Supabase (Postgres + Auth + Edge Functions) exposed to the app as
 "Lovable Cloud".
 
+**Production:** https://verdantgrowdiary.com
+
+A public landing page at `/welcome` explains the product to visitors
+without exposing private dashboard data.
+
 ---
 
 ## Project overview

@@ -27,6 +27,7 @@ import Diagnostics from "./pages/Diagnostics";
 import ActionQueue from "./pages/ActionQueue";
 import ActionDetail from "./pages/ActionDetail";
 import GrowLineageRepair from "./pages/GrowLineageRepair";
+import Landing from "./pages/Landing";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -41,6 +42,7 @@ const App = () => (
           <GrowsProvider>
             <Routes>
               <Route path="/auth" element={<Auth />} />
+              <Route path="/welcome" element={<Landing />} />
               <Route element={<AppShell />}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/tents" element={<Tents />} />

@@ -34,6 +34,12 @@ without exposing private dashboard data.
   merge.
 - **Rollback:** Use the Lovable version history to revert a published
   frontend; database migrations roll back via a follow-up migration only.
+- **Crawlers:** [`public/robots.txt`](./public/robots.txt) advertises
+  [`public/sitemap.xml`](./public/sitemap.xml), which lists only the
+  public landing routes (`/` and `/welcome`).
+- **Launch checks:** Run through [`docs/launch-checklist.md`](./docs/launch-checklist.md)
+  before each public launch or post-DNS change.
+
 
 ---
 

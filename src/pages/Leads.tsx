@@ -23,6 +23,7 @@ import LeadDetailDrawer from "@/components/LeadDetailDrawer";
 import LeadAnalyticsPanel from "@/components/LeadAnalyticsPanel";
 import LeadPriorityQueuePanel from "@/components/LeadPriorityQueuePanel";
 import LeadStatusSummaryStrip from "@/components/LeadStatusSummaryStrip";
+import LeadPipelineHealthPanel from "@/components/LeadPipelineHealthPanel";
 import LeadSavedViewsMenu from "@/components/LeadSavedViewsMenu";
 import { useLeadSavedViews } from "@/hooks/useLeadSavedViews";
 import type { LeadSavedView } from "@/lib/leadSavedViewsRules";

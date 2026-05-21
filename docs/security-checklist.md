@@ -136,3 +136,21 @@ All 651+ existing tests must pass. New behavior must ship with new tests.
 - [`src/test/action-queue-safety.test.ts`](../src/test/action-queue-safety.test.ts)
 - [`src/test/action-queue-audit.test.ts`](../src/test/action-queue-audit.test.ts)
 - [`src/test/has-role-security-definer.test.ts`](../src/test/has-role-security-definer.test.ts)
+
+---
+
+## Public lead capture (`public.leads`)
+
+The landing page collects beta and hardware-partner interest into
+`public.leads`. This table follows a deliberate public-contact-form RLS
+pattern:
+
+- **INSERT** is allowed for `anon` and `authenticated` (lead submission).
+- **SELECT** is restricted to operators only (`has_role(auth.uid(), 'operator')`).
+- **UPDATE** and **DELETE** are not allowed from any client.
+- The public Landing page only inserts leads; it never selects them.
+- The operator-only `/leads` page reads `public.leads` and nothing else.
+
+This pattern is intentional **for this table only**. It is not a blanket
+exception — new public tables must justify any `WITH CHECK (true)` use
+case the same way and must not gain public SELECT.

@@ -172,8 +172,7 @@ describe("quickLogToTypedEventPayload", () => {
       event_type: "watering",
       details: {},
     });
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
+    if (r.ok) throw new Error("expected failure");
     expect(r.reason).toBe("grow_id:missing");
   });
 
@@ -182,8 +181,7 @@ describe("quickLogToTypedEventPayload", () => {
       ...baseDraft,
       event_type: "teleport",
     });
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
+    if (r.ok) throw new Error("expected failure");
     expect(r.reason).toBe("event_type:unknown");
   });
 
@@ -193,8 +191,7 @@ describe("quickLogToTypedEventPayload", () => {
       event_type: "watering",
       details: { ph: "banana" },
     });
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
+    if (r.ok) throw new Error("expected failure");
     expect(r.reason).toBe("ph:invalid");
   });
 
@@ -204,8 +201,7 @@ describe("quickLogToTypedEventPayload", () => {
       event_type: "watering",
       details: { ph: 99 },
     });
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
+    if (r.ok) throw new Error("expected failure");
     expect(r.reason).toBe("ph:out-of-range");
   });
 
@@ -215,8 +211,7 @@ describe("quickLogToTypedEventPayload", () => {
       event_type: "feeding",
       details: { ec: "x" },
     });
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
+    if (r.ok) throw new Error("expected failure");
     expect(r.reason).toBe("ec:invalid");
   });
 
@@ -226,8 +221,7 @@ describe("quickLogToTypedEventPayload", () => {
       event_type: "watering",
       details: { watering_amount_ml: "not-a-number" },
     });
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
+    if (r.ok) throw new Error("expected failure");
     expect(r.reason).toBe("volume:invalid");
   });
 
@@ -237,8 +231,7 @@ describe("quickLogToTypedEventPayload", () => {
       event_type: "environment",
       details: { humidity_pct: 250 },
     });
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
+    if (r.ok) throw new Error("expected failure");
     expect(r.reason).toBe("humidity_pct:out-of-range");
   });
 
@@ -248,8 +241,7 @@ describe("quickLogToTypedEventPayload", () => {
       event_type: "environment",
       details: { light_hours: 99 },
     });
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
+    if (r.ok) throw new Error("expected failure");
     expect(r.reason).toBe("light_hours:out-of-range");
   });
 
@@ -282,8 +274,7 @@ describe("quickLogToTypedEventPayload", () => {
       event_type: "watering",
       details: { ph: secret, watering_amount_ml: secret },
     });
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
+    if (r.ok) throw new Error("expected failure");
     expect(r.reason).not.toContain(secret);
     for (const w of r.warnings) {
       expect(w).not.toContain(secret);

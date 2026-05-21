@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/store/auth";
+import BrandLogo from "@/components/BrandLogo";
 
 /**
  * Public landing page for https://verdantgrowdiary.com.
@@ -23,12 +24,7 @@ export default function Landing() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <header className="px-6 py-5 flex items-center justify-between max-w-6xl mx-auto">
-        <div className="flex items-center gap-2 font-display font-semibold text-lg">
-          <span className="h-8 w-8 rounded-lg gradient-leaf inline-flex items-center justify-center">
-            <span className="text-primary-foreground font-bold">V</span>
-          </span>
-          Verdant Grow Diary
-        </div>
+        <BrandLogo size="md" showText />
         {user ? (
           <Link to="/">
             <Button variant="outline" size="sm">Open dashboard</Button>
@@ -40,7 +36,10 @@ export default function Landing() {
         )}
       </header>
 
-      <section className="px-6 pt-16 pb-20 max-w-4xl mx-auto text-center">
+      <section className="px-6 pt-12 pb-20 max-w-4xl mx-auto text-center">
+        <div className="flex justify-center mb-8">
+          <BrandLogo size="hero" />
+        </div>
         <h1 className="font-display text-4xl md:text-6xl font-bold tracking-tight">
           Verdant Grow Diary
         </h1>

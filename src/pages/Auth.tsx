@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Leaf } from "lucide-react";
 import { toast } from "sonner";
+import BrandLogo from "@/components/BrandLogo";
 
 export default function Auth() {
   const { user, loading } = useAuth();
@@ -37,10 +37,8 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6">
-      <div className="flex items-center gap-2 mb-8">
-        <div className="h-12 w-12 rounded-2xl gradient-leaf flex items-center justify-center">
-          <Leaf className="h-6 w-6 text-primary-foreground" />
-        </div>
+      <div className="flex items-center gap-3 mb-8">
+        <BrandLogo size="lg" />
         <div>
           <h1 className="text-3xl font-display font-bold">Verdant</h1>
           <p className="text-sm text-muted-foreground">Your simple grow diary</p>

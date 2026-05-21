@@ -199,7 +199,7 @@ describe("quickLogToTypedEventPayload", () => {
     const r = quickLogToTypedEventPayload({
       ...baseDraft,
       event_type: "watering",
-      details: { ph: 99 },
+      details: { watering_amount_ml: 100, ph: 99 },
     });
     expect(r.ok).toBe(false);
     expect((r as { reason?: string }).reason).toBe("ph:out-of-range");

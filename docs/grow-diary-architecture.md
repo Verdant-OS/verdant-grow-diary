@@ -11,7 +11,7 @@ decisions and is verified by `src/test/grow-diary-architecture-doc.test.ts`.
 
 - **QuickLog** is the primary entry point for grower-authored diary events.
 - QuickLog writes rows to the `diary_entries` table.
-- The `diary_entries.details` column is a flexible **jsonb** payload and
+- The `diary_entries.details` column is a flexible **jsonb** payload (the "details jsonb") and
   remains the current shape for all event-specific data
   (pH, EC/TDS, watering amount, runoff, notes, reminders, etc.).
 - Photo uploads attached to a diary entry are stored in the

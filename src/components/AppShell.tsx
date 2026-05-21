@@ -8,6 +8,7 @@ import { useAlerts } from "@/hooks/useMockData";
 import AppSidebar from "./AppSidebar";
 import MobileNav from "./MobileNav";
 import QuickLog from "./QuickLog";
+import BrandLogo from "./BrandLogo";
 
 
 export default function AppShell() {

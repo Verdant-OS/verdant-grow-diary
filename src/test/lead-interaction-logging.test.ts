@@ -36,7 +36,8 @@ const migrationContents = readdirSync(MIGRATIONS_DIR)
   .map((f) => readFileSync(resolve(MIGRATIONS_DIR, f), "utf8"))
   .join("\n\n");
 
-const PAGE = readSrc("pages/Leads.tsx");
+const DRAWER = readSrc("components/LeadDetailDrawer.tsx");
+const PAGE = readSrc("pages/Leads.tsx") + "\n" + DRAWER;
 const HOOK = readSrc("hooks/useLeadsList.ts");
 const CREATE_HOOK = readSrc("hooks/useCreateLeadEvent.ts");
 const RULES = readSrc("lib/leadEventRules.ts");

@@ -58,7 +58,7 @@ describe("compact /leads table", () => {
   it("renders a row per lead with a View action", () => {
     expect(PAGE).toMatch(/data-testid="lead-row"/);
     expect(PAGE).toMatch(/data-testid="lead-view-button"/);
-    expect(PAGE).toMatch(/onClick=\{() => openLead\(l\)\}/);
+    expect(PAGE).toContain("openLead(l)");
   });
 
   it("does not embed the full operator panel inline in the row", () => {

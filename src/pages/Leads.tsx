@@ -34,11 +34,18 @@ import {
   type LeadQuickFilter,
 } from "@/lib/leadFollowupRules";
 import {
+  SORT_OPTIONS,
+  searchLeads,
+  sortLeads,
+  type LeadSortOption,
+} from "@/lib/leadSearchRules";
+import {
   describeFollowUpChange,
   followUpDidChange,
   labelForEventType,
   type InteractionEventType,
 } from "@/lib/leadEventRules";
+
 
 const LEAD_TYPES = [
   "beta_user",

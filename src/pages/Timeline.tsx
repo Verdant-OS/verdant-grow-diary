@@ -307,6 +307,10 @@ export default function Timeline() {
         <FeedingHistoryPanel rawEntries={entries} limit={20} />
       </div>
 
+      <div className="mt-4">
+        <PhotoHistoryPanel rawEntries={entries} limit={24} />
+      </div>
+
 
 
 

@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import PageHeader from "@/components/PageHeader";
 import LeadDetailDrawer from "@/components/LeadDetailDrawer";
 import LeadAnalyticsPanel from "@/components/LeadAnalyticsPanel";
+import LeadPriorityQueuePanel from "@/components/LeadPriorityQueuePanel";
 import LeadSavedViewsMenu from "@/components/LeadSavedViewsMenu";
 import { useLeadSavedViews } from "@/hooks/useLeadSavedViews";
 import type { LeadSavedView } from "@/lib/leadSavedViewsRules";
@@ -358,6 +359,16 @@ export default function Leads() {
             >
               Showing {filtered.length} of {leads.length} leads
             </div>
+          )}
+
+          {!loading && (
+            <LeadPriorityQueuePanel
+              leads={filtered}
+              onSelectLead={(id) => {
+                const l = leads.find((x) => x.id === id);
+                if (l) openLead(l);
+              }}
+            />
           )}
 
           {!loading && (

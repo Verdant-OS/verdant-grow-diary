@@ -5,6 +5,7 @@
  * Operates on LeadRow shape from useLeadsList.
  */
 import type { LeadRow, LeadStatus } from "@/hooks/useLeadsList";
+import { parseLeadTime as toTime } from "@/lib/leadFieldUtils";
 
 export type LeadQuickFilter =
   | "all"
@@ -24,12 +25,6 @@ export type FollowUpBadge =
   | "no_follow_up";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-function toTime(iso: string | null | undefined): number | null {
-  if (!iso) return null;
-  const t = new Date(iso).getTime();
-  return Number.isFinite(t) ? t : null;
-}
 
 function startOfDay(t: number): number {
   const d = new Date(t);

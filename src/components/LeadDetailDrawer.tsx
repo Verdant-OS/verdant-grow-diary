@@ -31,6 +31,7 @@ import { buildLeadDetailViewModel } from "@/lib/leadDetailViewModel";
 import LeadActivityTimeline from "@/components/LeadActivityTimeline";
 import LeadNextActionPanel from "@/components/LeadNextActionPanel";
 import LeadQualityScoreBadge from "@/components/LeadQualityScoreBadge";
+import LeadDetailSnapshotCard from "@/components/LeadDetailSnapshotCard";
 
 const STATUSES: LeadStatus[] = [
   "new",
@@ -130,6 +131,9 @@ function LeadDetailBody({
         <SheetTitle className="font-display text-xl">{vm.title}</SheetTitle>
         <SheetDescription>{vm.subtitle}</SheetDescription>
       </SheetHeader>
+
+      {/* Composed snapshot (read-only) */}
+      <LeadDetailSnapshotCard lead={lead} />
 
       {/* Lead Summary */}
       <section className="space-y-2" data-section="summary">

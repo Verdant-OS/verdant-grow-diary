@@ -415,7 +415,7 @@ export default function Leads() {
                         />
                         <LeadActivity
                           leadId={l.id}
-                          refreshKey={`${l.updated_at ?? l.created_at}:${activityNonce[l.id] ?? 0}`}
+                          refreshNonce={activityNonce[l.id] ?? 0}
                         />
                       </TableCell>
                     </TableRow>

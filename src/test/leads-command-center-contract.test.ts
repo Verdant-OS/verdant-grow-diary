@@ -166,7 +166,7 @@ describe("Leads Command Center contract", () => {
 
     it("executive summary reports empty state", () => {
       const s = buildLeadExecutiveSummary(empty, NOW);
-      expect(s.state).toBe("empty");
+      expect(s.overallState).toBe("empty");
     });
 
     it("priority queue is empty array", () => {
@@ -225,7 +225,7 @@ describe("Leads Command Center contract", () => {
 
     it("pipeline health surfaces unknown source/type signals", () => {
       const warnings = evaluatePipelineHealth(leads, NOW);
-      const cats = warnings.map((w) => w.category);
+      const cats = warnings.map((w) => w.id);
       expect(cats).toEqual(expect.arrayContaining(["unknown_source"]));
     });
 
@@ -269,7 +269,7 @@ describe("Leads Command Center contract", () => {
         expect(match).toBeDefined();
         const snap = buildLeadDetailSnapshot(match!, NOW);
         expect(snap).toBeDefined();
-        expect(typeof snap.label).toBe("string");
+        expect(typeof snap.displayName).toBe("string");
       }
     });
 
@@ -323,7 +323,7 @@ describe("Leads Command Center contract", () => {
   describe("composition with executive summary", () => {
     it("executive summary state is one of the declared values for fixtures", () => {
       const s = buildLeadExecutiveSummary(fixtureLeads(), NOW);
-      expect(["healthy", "needs_attention", "risky"]).toContain(s.state);
+      expect(["healthy", "needs_attention", "risky"]).toContain(s.overallState);
     });
 
     it("healthy single-closed-lead pipeline does not flag risky", () => {
@@ -335,7 +335,7 @@ describe("Leads Command Center contract", () => {
         }),
       ];
       const s = buildLeadExecutiveSummary(single, NOW);
-      expect(s.state).not.toBe("risky");
+      expect(s.overallState).not.toBe("risky");
     });
   });
 });

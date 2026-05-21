@@ -36,6 +36,25 @@ interface ActionQueueEvent {
   action?: { suggested_change: string | null; reason: string | null } | null;
 }
 
+type AlertEventType =
+  | "created" | "acknowledged" | "resolved" | "dismissed" | "reopened";
+
+interface AlertEventRow {
+  id: string;
+  alert_id: string;
+  event_type: AlertEventType;
+  previous_status: string | null;
+  new_status: string | null;
+  note: string | null;
+  created_at: string;
+  alert?: {
+    title: string | null;
+    severity: string | null;
+    metric: string | null;
+    status: string | null;
+  } | null;
+}
+
 type EventFilter = "all" | "photo" | "note" | "measurement";
 const MEASUREMENT_KEYS = new Set(["ph", "ec", "runoff", "watering"]);
 

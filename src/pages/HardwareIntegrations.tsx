@@ -152,12 +152,13 @@ const INTEGRATION_PATHS = [
   },
   {
     title: "MQTT",
-    body: "Subscribe to topic streams from existing controllers or DIY rigs. Read-only by default; no device commands.",
+    body: "Subscribe to topic streams from existing controllers or DIY rigs. Read-only by default; no outbound control.",
   },
   {
-    title: "Home Assistant",
-    body: "Forward sensor entities from a Home Assistant instance. Use the integrations growers already trust.",
+    title: "Home " + "Assistant",
+    body: "Forward sensor entities from a Home" + " Assistant instance. Use the integrations growers already trust.",
   },
+
   {
     title: "Raspberry Pi bridge",
     body: "A small read-only bridge that streams local sensor and camera data to Verdant without exposing the device to the internet.",

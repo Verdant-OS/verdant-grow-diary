@@ -38,9 +38,6 @@ const STATE_WEIGHT: Record<LeadCommandCenterGuidanceState, number> = {
   healthy: 1,
 };
 
-function isMeaningful(v: string | null | undefined): boolean {
-  return typeof v === "string" && v.trim().length > 0;
-}
 
 function safePct(num: number, den: number): number {
   if (!den || den <= 0) return 0;

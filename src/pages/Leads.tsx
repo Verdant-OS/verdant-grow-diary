@@ -22,6 +22,7 @@ import PageHeader from "@/components/PageHeader";
 import LeadDetailDrawer from "@/components/LeadDetailDrawer";
 import LeadAnalyticsPanel from "@/components/LeadAnalyticsPanel";
 import LeadPriorityQueuePanel from "@/components/LeadPriorityQueuePanel";
+import LeadStatusSummaryStrip from "@/components/LeadStatusSummaryStrip";
 import LeadSavedViewsMenu from "@/components/LeadSavedViewsMenu";
 import { useLeadSavedViews } from "@/hooks/useLeadSavedViews";
 import type { LeadSavedView } from "@/lib/leadSavedViewsRules";
@@ -360,6 +361,8 @@ export default function Leads() {
               Showing {filtered.length} of {leads.length} leads
             </div>
           )}
+
+          {!loading && <LeadStatusSummaryStrip leads={filtered} />}
 
           {!loading && (
             <LeadPriorityQueuePanel

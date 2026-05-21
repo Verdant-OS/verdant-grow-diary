@@ -14,6 +14,7 @@ import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import DiaryEntryBadges from "@/components/DiaryEntryBadges";
 import WateringHistoryPanel from "@/components/WateringHistoryPanel";
 import FeedingHistoryPanel from "@/components/FeedingHistoryPanel";
+import PhotoHistoryPanel from "@/components/PhotoHistoryPanel";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { actionDetailPath, alertDetailPath, logsPath, timelinePath } from "@/lib/routes";
 import { cn } from "@/lib/utils";
@@ -304,6 +305,10 @@ export default function Timeline() {
 
       <div className="mt-4">
         <FeedingHistoryPanel rawEntries={entries} limit={20} />
+      </div>
+
+      <div className="mt-4">
+        <PhotoHistoryPanel rawEntries={entries} limit={24} />
       </div>
 
 

@@ -265,6 +265,47 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
             </div>
           )}
 
+          {(() => {
+            const preview = evaluateQuickLogPreview({
+              note,
+              eventType,
+              stage,
+              remindAt,
+              details,
+            });
+            if (preview.warnings.length === 0) return null;
+            return (
+              <div
+                data-testid="quicklog-preview"
+                data-has-issues={String(preview.hasIssues)}
+                className="rounded-lg border border-border/60 bg-secondary/30 p-3 space-y-1.5"
+              >
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Validation preview
+                </p>
+                <ul className="space-y-1">
+                  {preview.warnings.map((w) => {
+                    const Icon = w.severity === "warning" ? AlertTriangle : Info;
+                    const tone =
+                      w.severity === "warning"
+                        ? "text-amber-300"
+                        : "text-muted-foreground";
+                    return (
+                      <li
+                        key={w.code}
+                        data-testid={`quicklog-preview-${w.code}`}
+                        className={`flex items-start gap-1.5 text-[12px] ${tone}`}
+                      >
+                        <Icon className="h-3 w-3 mt-0.5 shrink-0" />
+                        <span>{w.message}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            );
+          })()}
+
           <Button type="submit" disabled={busy} className="gradient-leaf text-primary-foreground">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save entry"}
           </Button>

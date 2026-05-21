@@ -129,7 +129,7 @@ describe("mapWateringPayloadToCreateWateringEventArgs", () => {
     const args = mapWateringPayloadToCreateWateringEventArgs(r);
     expect(args?._runoff_ec).toBe(2.1);
     // adapter must not leak the long-form key into RPC args
-    expect((args as Record<string, unknown>)?.runoff_ec_ms_cm).toBeUndefined();
+    expect((args as unknown as Record<string, unknown>)?.runoff_ec_ms_cm).toBeUndefined();
   });
 
   it("returns null for non-watering results", () => {

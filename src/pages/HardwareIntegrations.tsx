@@ -30,13 +30,15 @@ export default function HardwareIntegrations() {
           A hardware-neutral Grow OS
         </h1>
         <p className="mt-6 text-base md:text-lg text-muted-foreground max-w-2xl mx-auto">
-          Verdant Grow Diary is a hardware-neutral Grow OS. It turns grow
-          logs, photos, environmental readings, alerts, and AI-assisted
-          insights into better cultivation decisions — without taking
-          control away from the grower. Read-only integrations are
-          valuable; Verdant does not need full device control to create
-          value. Grower stays in control. No blind automation.
+          Verdant Grow Diary is a hardware-neutral Grow OS.
         </p>
+        <p className="mt-4 text-base text-muted-foreground max-w-2xl mx-auto">
+          It turns grow logs, photos, environmental readings, alerts, and AI-assisted insights into better cultivation decisions — without taking control away from the grower.
+        </p>
+        <p className="mt-4 text-base text-muted-foreground max-w-2xl mx-auto">
+          Read-only integrations are valuable. Verdant does not need full device control to create value. Grower stays in control. No blind automation.
+        </p>
+
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <a href="#partner">
             <Button size="lg">Hardware partner? Contact Verdant</Button>

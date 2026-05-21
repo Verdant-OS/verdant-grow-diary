@@ -132,6 +132,9 @@ function LeadDetailBody({
         <SheetDescription>{vm.subtitle}</SheetDescription>
       </SheetHeader>
 
+      {/* Composed snapshot (read-only) */}
+      <LeadDetailSnapshotCard lead={lead} />
+
       {/* Lead Summary */}
       <section className="space-y-2" data-section="summary">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

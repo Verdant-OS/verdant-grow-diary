@@ -27,6 +27,7 @@ import {
   type LeadStatus,
 } from "@/hooks/useLeadsList";
 import { useLeadEvents } from "@/hooks/useLeadEvents";
+import { useCreateLeadEvent } from "@/hooks/useCreateLeadEvent";
 import {
   QUICK_FILTERS,
   filterAndSortLeads,
@@ -34,6 +35,13 @@ import {
   summarizeLeads,
   type LeadQuickFilter,
 } from "@/lib/leadFollowupRules";
+import {
+  INTERACTION_OPTIONS,
+  describeFollowUpChange,
+  followUpDidChange,
+  labelForEventType,
+  type InteractionEventType,
+} from "@/lib/leadEventRules";
 
 const LEAD_TYPES = [
   "beta_user",
@@ -75,6 +83,10 @@ export default function Leads() {
     source: source === "all" ? null : source,
     status: status === "all" ? null : status,
   });
+  const { createEvent, submitting: creatingEvent } = useCreateLeadEvent();
+  const [activityNonce, setActivityNonce] = useState<Record<string, number>>({});
+  const bumpActivity = (leadId: string) =>
+    setActivityNonce((m) => ({ ...m, [leadId]: (m[leadId] ?? 0) + 1 }));
 
   const summary = useMemo(() => summarizeLeads(leads), [leads]);
 
@@ -125,11 +137,43 @@ export default function Leads() {
   }
 
   async function saveFollowUp(l: LeadRow, iso: string) {
+    const next = iso || null;
+    const changed = followUpDidChange(l.follow_up_at, next);
     const { error: uErr } = await updateLead(l.id, {
-      follow_up_at: iso || null,
+      follow_up_at: next,
     });
-    if (uErr) toast.error(uErr);
-    else toast.success("Follow-up updated");
+    if (uErr) {
+      toast.error(uErr);
+      return;
+    }
+    if (changed) {
+      await createEvent({
+        leadId: l.id,
+        eventType: "follow_up_changed",
+        note: describeFollowUpChange(l.follow_up_at, next),
+      });
+      bumpActivity(l.id);
+    }
+    toast.success("Follow-up updated");
+    return;
+  }
+
+  async function logInteraction(
+    l: LeadRow,
+    eventType: InteractionEventType,
+    note: string,
+  ) {
+    const { error: cErr } = await createEvent({
+      leadId: l.id,
+      eventType,
+      note: note.trim() || null,
+    });
+    if (cErr) {
+      toast.error(cErr);
+      return;
+    }
+    bumpActivity(l.id);
+    toast.success(`${labelForEventType(eventType)} logged`);
   }
 
   return (
@@ -365,7 +409,14 @@ export default function Leads() {
                             }
                           }}
                         />
-                        <LeadActivity leadId={l.id} refreshKey={l.updated_at ?? l.created_at} />
+                        <LogInteraction
+                          disabled={creatingEvent}
+                          onSubmit={(t, n) => logInteraction(l, t, n)}
+                        />
+                        <LeadActivity
+                          leadId={l.id}
+                          refreshNonce={activityNonce[l.id] ?? 0}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -379,9 +430,7 @@ export default function Leads() {
   );
 }
 
-function LeadActivity({ leadId, refreshKey }: { leadId: string; refreshKey: string }) {
-  // refreshKey lets the activity panel refetch when the lead row is updated.
-  const refreshNonce = useMemo(() => refreshKey.length + refreshKey.charCodeAt(0), [refreshKey]);
+function LeadActivity({ leadId, refreshNonce }: { leadId: string; refreshNonce: number }) {
   const { events, loading, error } = useLeadEvents(leadId, refreshNonce);
   if (loading) {
     return <p className="text-xs text-muted-foreground">Loading activity…</p>;
@@ -394,19 +443,75 @@ function LeadActivity({ leadId, refreshKey }: { leadId: string; refreshKey: stri
   }
   return (
     <ul className="space-y-1 text-xs text-muted-foreground" data-testid="lead-activity">
-      {events.map((ev) => (
-        <li key={ev.id} className="flex items-start gap-2">
-          <span className="tabular-nums">
-            {new Date(ev.created_at).toLocaleString()}
-          </span>
-          <span>
-            {ev.event_type === "status_change"
-              ? `${ev.old_status ?? "—"} → ${ev.new_status ?? "—"}`
-              : ev.event_type}
-            {ev.note ? ` · ${ev.note}` : ""}
-          </span>
-        </li>
-      ))}
+      {events.map((ev) => {
+        const label = labelForEventType(ev.event_type);
+        const detail =
+          ev.event_type === "status_change"
+            ? `${ev.old_status ?? "—"} → ${ev.new_status ?? "—"}`
+            : null;
+        return (
+          <li key={ev.id} className="flex items-start gap-2" data-event-type={ev.event_type}>
+            <span className="tabular-nums">
+              {new Date(ev.created_at).toLocaleString()}
+            </span>
+            <span>
+              <span className="font-medium text-foreground">{label}</span>
+              {detail ? ` · ${detail}` : ""}
+              {ev.note ? ` · ${ev.note}` : ""}
+            </span>
+          </li>
+        );
+      })}
     </ul>
+  );
+}
+
+function LogInteraction({
+  disabled,
+  onSubmit,
+}: {
+  disabled?: boolean;
+  onSubmit: (type: InteractionEventType, note: string) => void | Promise<void>;
+}) {
+  const [type, setType] = useState<InteractionEventType>("call_logged");
+  const [note, setNote] = useState("");
+  return (
+    <div
+      className="space-y-1 rounded-md border border-border/50 bg-card/30 p-2"
+      data-testid="log-interaction"
+    >
+      <label className="text-xs text-muted-foreground">Log interaction</label>
+      <div className="flex flex-wrap gap-2">
+        <Select value={type} onValueChange={(v) => setType(v as InteractionEventType)}>
+          <SelectTrigger className="h-8 w-36">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {INTERACTION_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Input
+          className="h-8 flex-1 min-w-40"
+          placeholder="Optional note"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+        />
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={disabled}
+          onClick={async () => {
+            await onSubmit(type, note);
+            setNote("");
+          }}
+        >
+          Log
+        </Button>
+      </div>
+    </div>
   );
 }

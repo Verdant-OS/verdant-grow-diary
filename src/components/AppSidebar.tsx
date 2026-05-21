@@ -9,6 +9,7 @@ import {
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, useSidebar,
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
+import BrandLogo from "@/components/BrandLogo";
 
 interface NavItem { to: string; label: string; icon: LucideIcon; end?: boolean }
 

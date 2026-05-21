@@ -161,7 +161,11 @@ export default function GrowDetail() {
               >
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant="outline" className="text-[10px] uppercase">
-                    {item.kind === "diary" ? "Diary Entry" : "Action Queue Event"}
+                    {item.kind === "diary"
+                      ? "Diary Entry"
+                      : item.kind === "alert_event"
+                        ? "Alert Event"
+                        : "Action Queue Event"}
                   </Badge>
                   <span className="text-xs truncate">{item.title}</span>
                   <span className="ml-auto text-xs text-muted-foreground">

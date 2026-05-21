@@ -14,6 +14,10 @@ import {
   type LeadQualityScore,
 } from "@/lib/leadQualityScoreRules";
 import { buildLeadActivityTimeline } from "@/lib/leadActivityRules";
+import {
+  KNOWN_LEAD_STATUSES as KNOWN_STATUSES,
+  isMeaningfulString as isMeaningful,
+} from "@/lib/leadFieldUtils";
 
 export interface LeadDetailSnapshot {
   leadId: string;
@@ -33,19 +37,6 @@ export interface LeadDetailSnapshot {
   warnings: string[];
   /** Indicates the snapshot was built from an empty/invalid lead input. */
   isFallback: boolean;
-}
-
-const KNOWN_STATUSES = new Set([
-  "new",
-  "reviewed",
-  "contacted",
-  "follow_up",
-  "closed",
-  "spam",
-]);
-
-function isMeaningful(v: string | null | undefined): boolean {
-  return typeof v === "string" && v.trim().length > 0;
 }
 
 function safeName(lead: LeadRow): string {

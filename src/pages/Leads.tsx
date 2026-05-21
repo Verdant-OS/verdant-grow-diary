@@ -253,6 +253,17 @@ export default function Leads() {
             ))}
           </div>
 
+          <div className="flex justify-end">
+            <LeadSavedViewsMenu
+              views={savedViews.views}
+              onApply={applySavedView}
+              onSave={handleSaveCurrentView}
+              onRename={savedViews.renameView}
+              onDelete={savedViews.deleteView}
+            />
+          </div>
+
+
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Status</label>

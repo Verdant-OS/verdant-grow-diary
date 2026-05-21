@@ -403,7 +403,7 @@ export function quickLogToTypedEventPayload(
         toIsoOrNull(pick(details, "taken_at", "takenAt")) ?? occurred_at;
       subtypePayload.photo_url = photo_url;
       if (caption) subtypePayload.caption = caption;
-      subtypePayload.taken_at = taken_at;
+      if (taken_at) subtypePayload.taken_at = taken_at;
       break;
     }
     case "observation": {

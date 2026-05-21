@@ -2,7 +2,9 @@ import { useState } from "react";
 import { Activity } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import SensorChart from "@/components/SensorChart";
+import GrowDataSourceBadge from "@/components/GrowDataSourceBadge";
 import { useGrowTents, useGrowSensorReadings } from "@/hooks/useGrowData";
+import { classifyGrowDataSource } from "@/lib/growDataSourceLabelRules";
 import { cn } from "@/lib/utils";
 
 const METRICS = [
@@ -18,23 +20,44 @@ export default function Sensors() {
   const { data: readings = [] } = useGrowSensorReadings();
   const [tentId, setTentId] = useState<string>(tents[0]?.id ?? "t1");
   const filtered = readings.filter((r) => r.tentId === tentId);
+  const latest = filtered.length > 0 ? filtered[filtered.length - 1] : null;
+
+  // useGrowSensorReadings currently silently falls back to mock data
+  // (documented in docs/grow-os-architecture.md). Until that fallback is
+  // removed, we honestly label what is on screen as Demo data and surface
+  // Unavailable when the slice is empty.
+  const classification = classifyGrowDataSource(
+    latest
+      ? { source: "demo", value: latest.temp, timestamp: latest.ts }
+      : { source: null, value: null, timestamp: null },
+  );
 
   return (
     <div>
       <PageHeader title="Sensor Data" description="Environmental telemetry across tents." icon={<Activity className="h-5 w-5" />} />
-      <div className="flex flex-wrap gap-1.5 mb-4">
+      <div className="flex flex-wrap items-center gap-1.5 mb-4">
         {tents.map((t) => (
           <button key={t.id} onClick={() => setTentId(t.id)}
             className={cn("text-xs px-2.5 py-1 rounded-full border transition", tentId === t.id ? "bg-primary text-primary-foreground border-primary" : "bg-secondary/50 border-border/50 hover:bg-secondary")}>
             {t.name}
           </button>
         ))}
+        <GrowDataSourceBadge classification={classification} className="ml-2" />
       </div>
       <div className="grid lg:grid-cols-2 gap-4">
         {METRICS.map((m) => (
           <div key={m.key} className="glass rounded-2xl p-4">
-            <h3 className="font-display font-semibold mb-2">{m.label}</h3>
-            <SensorChart data={filtered} metric={m.key} height={200} />
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-display font-semibold">{m.label}</h3>
+              <GrowDataSourceBadge classification={classification} />
+            </div>
+            {classification.label === "Unavailable" ? (
+              <p className="text-xs text-muted-foreground py-6 text-center">
+                No reading available.
+              </p>
+            ) : (
+              <SensorChart data={filtered} metric={m.key} height={200} />
+            )}
           </div>
         ))}
       </div>

@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import PageHeader from "@/components/PageHeader";
 import LeadDetailDrawer from "@/components/LeadDetailDrawer";
+import LeadAnalyticsPanel from "@/components/LeadAnalyticsPanel";
 import {
   useLeadsList,
   type LeadRow,

@@ -36,10 +36,10 @@ const validWatering = {
   tent_id: "t1",
   stage: "veg",
   entry_at: "2025-05-10T12:00:00.000Z",
+  entry_type: "watering",
   note: "Watered evenly, slight runoff.",
   photo_url: null,
   details: {
-    event_type: "watering",
     watering_amount_ml: 500,
     ph: 6.3,
     ec: 1.4,

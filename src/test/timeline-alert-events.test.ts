@@ -209,25 +209,25 @@ describe("Grow Detail — scoped alert counts", () => {
 // ---------------------------------------------------------------------------
 describe("alert_events integration safety", () => {
   it("Timeline introduces no new write path for alert events", () => {
-    // Allowlist: only one .from('alert_events') and it is followed by .select.
-    const m = TIMELINE.match(/from\(["']alert_events["']\)\.(\w+)/);
+    const m = TIMELINE.match(/from\(["']alert_events["']\)\s*\.(\w+)/);
     expect(m?.[1]).toBe("select");
-    expect(TIMELINE).not.toMatch(/alert_events["']\)[^;]{0,200}\.insert\(/);
-    expect(TIMELINE).not.toMatch(/alert_events["']\)[^;]{0,200}\.update\(/);
-    expect(TIMELINE).not.toMatch(/alert_events["']\)[^;]{0,200}\.delete\(/);
+    expect(TIMELINE).not.toMatch(/alert_events["']\)[\s\S]{0,400}\.insert\(/);
+    expect(TIMELINE).not.toMatch(/alert_events["']\)[\s\S]{0,400}\.update\(/);
+    expect(TIMELINE).not.toMatch(/alert_events["']\)[\s\S]{0,400}\.delete\(/);
   });
 
   it("Grow Detail hook introduces no new write path for alert events", () => {
-    const m = HOOK.match(/from\(["']alert_events["']\)\.(\w+)/);
+    const m = HOOK.match(/from\(["']alert_events["']\)\s*\.(\w+)/);
     expect(m?.[1]).toBe("select");
-    expect(HOOK).not.toMatch(/alert_events["']\)[^;]{0,200}\.insert\(/);
-    expect(HOOK).not.toMatch(/alert_events["']\)[^;]{0,200}\.update\(/);
-    expect(HOOK).not.toMatch(/alert_events["']\)[^;]{0,200}\.delete\(/);
+    expect(HOOK).not.toMatch(/alert_events["']\)[\s\S]{0,400}\.insert\(/);
+    expect(HOOK).not.toMatch(/alert_events["']\)[\s\S]{0,400}\.update\(/);
+    expect(HOOK).not.toMatch(/alert_events["']\)[\s\S]{0,400}\.delete\(/);
   });
 
   it("no ai-coach call introduced in either file", () => {
-    expect(TIMELINE).not.toMatch(/ai-coach/i);
-    expect(HOOK).not.toMatch(/ai-coach/i);
+    // Doc-comments may mention the constraint; what we forbid is an actual call.
+    expect(TIMELINE).not.toMatch(/functions\.invoke\(\s*["']ai-coach["']/);
+    expect(HOOK).not.toMatch(/functions\.invoke\(\s*["']ai-coach["']/);
     expect(TIMELINE).not.toMatch(/functions\.invoke/);
     expect(HOOK).not.toMatch(/functions\.invoke/);
   });

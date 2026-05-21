@@ -29,6 +29,7 @@ import {
 } from "@/lib/leadEventRules";
 import { buildLeadDetailViewModel } from "@/lib/leadDetailViewModel";
 import LeadActivityTimeline from "@/components/LeadActivityTimeline";
+import LeadNextActionPanel from "@/components/LeadNextActionPanel";
 
 const STATUSES: LeadStatus[] = [
   "new",

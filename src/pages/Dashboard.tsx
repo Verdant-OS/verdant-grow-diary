@@ -11,6 +11,7 @@ import StageBadge from "@/components/StageBadge";
 import SensorChart from "@/components/SensorChart";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
+import DashboardDataSourceDisclosure from "@/components/DashboardDataSourceDisclosure";
 import { useAlerts, useTasks, useAIInsights } from "@/hooks/useMockData";
 import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";

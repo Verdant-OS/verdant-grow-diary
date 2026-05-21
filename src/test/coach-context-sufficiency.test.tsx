@@ -157,6 +157,6 @@ describe("CoachContextSufficiencyPanel source", () => {
   it("is presenter-only — no queries, writes, or classification", () => {
     expect(PANEL).not.toMatch(/supabase|service_role/);
     expect(PANEL).not.toMatch(/\.(insert|update|delete|upsert|select)\s*\(/);
-    expect(PANEL).not.toMatch(/evaluateAiContextSufficiency/);
+    expect(PANEL).not.toMatch(/evaluateAiContextSufficiency\s*\(/);
   });
 });

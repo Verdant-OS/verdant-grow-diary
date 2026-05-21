@@ -1,8 +1,6 @@
 import { useMemo, useState } from "react";
-import { Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -21,12 +19,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import PageHeader from "@/components/PageHeader";
+import LeadDetailDrawer from "@/components/LeadDetailDrawer";
 import {
   useLeadsList,
   type LeadRow,
   type LeadStatus,
 } from "@/hooks/useLeadsList";
-import { useLeadEvents } from "@/hooks/useLeadEvents";
 import { useCreateLeadEvent } from "@/hooks/useCreateLeadEvent";
 import {
   QUICK_FILTERS,
@@ -36,7 +34,6 @@ import {
   type LeadQuickFilter,
 } from "@/lib/leadFollowupRules";
 import {
-  INTERACTION_OPTIONS,
   describeFollowUpChange,
   followUpDidChange,
   labelForEventType,
@@ -71,12 +68,24 @@ const STATUS_VARIANT: Record<LeadStatus, "default" | "secondary" | "outline" | "
   spam: "destructive",
 };
 
+const FOLLOW_UP_BADGE_MAP: Record<
+  string,
+  { variant: "destructive" | "default" | "secondary" | "outline"; label: string }
+> = {
+  overdue: { variant: "destructive", label: "Overdue" },
+  due_today: { variant: "default", label: "Due today" },
+  upcoming: { variant: "secondary", label: "Upcoming" },
+  no_follow_up: { variant: "outline", label: "No follow-up" },
+};
+
 export default function Leads() {
   const [leadType, setLeadType] = useState<string>("all");
   const [source, setSource] = useState<string>("all");
   const [status, setStatus] = useState<string>("all");
   const [quickFilter, setQuickFilter] = useState<LeadQuickFilter>("all");
   const [search, setSearch] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const { loading, authorized, error, leads, updateLead } = useLeadsList({
     leadType: leadType === "all" ? null : leadType,
@@ -103,13 +112,14 @@ export default function Leads() {
     return filterAndSortLeads(base, quickFilter);
   }, [leads, search, quickFilter]);
 
-  async function copyEmail(email: string) {
-    try {
-      await navigator.clipboard.writeText(email);
-      toast.success("Email copied");
-    } catch {
-      toast.error("Could not copy");
-    }
+  const selectedLead = useMemo(
+    () => leads.find((l) => l.id === selectedId) ?? null,
+    [leads, selectedId],
+  );
+
+  function openLead(l: LeadRow) {
+    setSelectedId(l.id);
+    setDrawerOpen(true);
   }
 
   async function setLeadStatus(l: LeadRow, next: LeadStatus) {
@@ -139,9 +149,7 @@ export default function Leads() {
   async function saveFollowUp(l: LeadRow, iso: string) {
     const next = iso || null;
     const changed = followUpDidChange(l.follow_up_at, next);
-    const { error: uErr } = await updateLead(l.id, {
-      follow_up_at: next,
-    });
+    const { error: uErr } = await updateLead(l.id, { follow_up_at: next });
     if (uErr) {
       toast.error(uErr);
       return;
@@ -155,7 +163,6 @@ export default function Leads() {
       bumpActivity(l.id);
     }
     toast.success("Follow-up updated");
-    return;
   }
 
   async function logInteraction(
@@ -228,13 +235,10 @@ export default function Leads() {
           </div>
 
           <div className="flex flex-wrap items-end gap-3">
-
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Status</label>
               <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger className="w-44">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All statuses</SelectItem>
                   {STATUSES.map((s) => (
@@ -246,9 +250,7 @@ export default function Leads() {
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Lead type</label>
               <Select value={leadType} onValueChange={setLeadType}>
-                <SelectTrigger className="w-44">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All types</SelectItem>
                   {LEAD_TYPES.map((t) => (
@@ -260,9 +262,7 @@ export default function Leads() {
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Source</label>
               <Select value={source} onValueChange={setSource}>
-                <SelectTrigger className="w-44">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All sources</SelectItem>
                   {SOURCES.map((s) => (
@@ -294,224 +294,93 @@ export default function Leads() {
               <p className="text-sm text-muted-foreground">No leads match these filters.</p>
             </div>
           ) : (
-            <div className="rounded-xl border border-border/50 overflow-x-auto">
+            <div
+              className="rounded-xl border border-border/50 overflow-x-auto"
+              data-testid="leads-table"
+            >
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Received</TableHead>
+                    <TableHead>Lead</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Company</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Source</TableHead>
-                    <TableHead>Message</TableHead>
-                    <TableHead>Operator</TableHead>
+                    <TableHead>Follow-up</TableHead>
+                    <TableHead>Received</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map((l) => (
-                    <TableRow key={l.id}>
-                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                        {new Date(l.created_at).toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap items-center gap-1">
+                  {filtered.map((l) => {
+                    const b = followUpBadge(l);
+                    const fu = b ? FOLLOW_UP_BADGE_MAP[b] : null;
+                    const primary = l.name?.trim() || l.email;
+                    const secondary = l.company ?? l.email;
+                    return (
+                      <TableRow
+                        key={l.id}
+                        className="cursor-pointer"
+                        onClick={() => openLead(l)}
+                        data-testid="lead-row"
+                      >
+                        <TableCell className="space-y-0.5">
+                          <div className="font-medium">{primary}</div>
+                          <div className="text-xs text-muted-foreground">{secondary}</div>
+                        </TableCell>
+                        <TableCell>
                           <Badge variant={STATUS_VARIANT[l.status] ?? "secondary"}>
                             {l.status}
                           </Badge>
-                          {(() => {
-                            const b = followUpBadge(l);
-                            if (!b) return null;
-                            const map: Record<string, { variant: "destructive" | "default" | "secondary" | "outline"; label: string }> = {
-                              overdue: { variant: "destructive", label: "Overdue" },
-                              due_today: { variant: "default", label: "Due today" },
-                              upcoming: { variant: "secondary", label: "Upcoming" },
-                              no_follow_up: { variant: "outline", label: "No follow-up" },
-                            };
-                            const m = map[b];
-                            return <Badge variant={m.variant}>{m.label}</Badge>;
-                          })()}
-                        </div>
-                      </TableCell>
-                      <TableCell>{l.name ?? "—"}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <span>{l.email}</span>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7"
-                            onClick={() => copyEmail(l.email)}
-                            aria-label="Copy email"
-                          >
-                            <Copy className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                      <TableCell>{l.company ?? "—"}</TableCell>
-                      <TableCell><Badge variant="secondary">{l.lead_type}</Badge></TableCell>
-                      <TableCell><Badge variant="outline">{l.source}</Badge></TableCell>
-                      <TableCell className="max-w-sm whitespace-pre-wrap text-sm text-muted-foreground">
-                        {l.message ?? "—"}
-                      </TableCell>
-                      <TableCell className="min-w-72 space-y-2">
-                        <div className="flex flex-wrap gap-1">
-                          <Button size="sm" variant="outline" onClick={() => setLeadStatus(l, "reviewed")}>
-                            Reviewed
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => setLeadStatus(l, "contacted")}>
-                            Contacted
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => setLeadStatus(l, "follow_up")}>
-                            Follow-up
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => setLeadStatus(l, "closed")}>
-                            Close
-                          </Button>
-                          <Button size="sm" variant="destructive" onClick={() => setLeadStatus(l, "spam")}>
-                            Spam
-                          </Button>
-                        </div>
-                        {l.status === "follow_up" && (
-                          <div className="space-y-1">
-                            <label className="text-xs text-muted-foreground">
-                              Follow-up at
-                            </label>
-                            <Input
-                              type="datetime-local"
-                              defaultValue={
-                                l.follow_up_at
-                                  ? new Date(l.follow_up_at)
-                                      .toISOString()
-                                      .slice(0, 16)
-                                  : ""
-                              }
-                              onBlur={(e) => {
-                                const v = e.target.value;
-                                const iso = v ? new Date(v).toISOString() : "";
-                                if (
-                                  (iso || null) !== (l.follow_up_at ?? null)
-                                ) {
-                                  saveFollowUp(l, iso);
-                                }
-                              }}
-                            />
+                        </TableCell>
+                        <TableCell>
+                          {fu ? <Badge variant={fu.variant}>{fu.label}</Badge> : <span className="text-xs text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                          {new Date(l.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell
+                          className="text-right"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex justify-end gap-1">
+                            {l.status === "new" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setLeadStatus(l, "reviewed")}
+                              >
+                                Reviewed
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => openLead(l)}
+                              data-testid="lead-view-button"
+                            >
+                              View
+                            </Button>
                           </div>
-                        )}
-                        <Textarea
-                          rows={2}
-                          placeholder="Operator notes"
-                          defaultValue={l.operator_notes ?? ""}
-                          onBlur={(e) => {
-                            if ((e.target.value || "") !== (l.operator_notes ?? "")) {
-                              saveNotes(l, e.target.value);
-                            }
-                          }}
-                        />
-                        <LogInteraction
-                          disabled={creatingEvent}
-                          onSubmit={(t, n) => logInteraction(l, t, n)}
-                        />
-                        <LeadActivity
-                          leadId={l.id}
-                          refreshNonce={activityNonce[l.id] ?? 0}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
           )}
         </>
       )}
-    </div>
-  );
-}
 
-function LeadActivity({ leadId, refreshNonce }: { leadId: string; refreshNonce: number }) {
-  const { events, loading, error } = useLeadEvents(leadId, refreshNonce);
-  if (loading) {
-    return <p className="text-xs text-muted-foreground">Loading activity…</p>;
-  }
-  if (error) {
-    return <p className="text-xs text-destructive">Activity unavailable: {error}</p>;
-  }
-  if (events.length === 0) {
-    return <p className="text-xs text-muted-foreground">No activity yet.</p>;
-  }
-  return (
-    <ul className="space-y-1 text-xs text-muted-foreground" data-testid="lead-activity">
-      {events.map((ev) => {
-        const label = labelForEventType(ev.event_type);
-        const detail =
-          ev.event_type === "status_change"
-            ? `${ev.old_status ?? "—"} → ${ev.new_status ?? "—"}`
-            : null;
-        return (
-          <li key={ev.id} className="flex items-start gap-2" data-event-type={ev.event_type}>
-            <span className="tabular-nums">
-              {new Date(ev.created_at).toLocaleString()}
-            </span>
-            <span>
-              <span className="font-medium text-foreground">{label}</span>
-              {detail ? ` · ${detail}` : ""}
-              {ev.note ? ` · ${ev.note}` : ""}
-            </span>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-function LogInteraction({
-  disabled,
-  onSubmit,
-}: {
-  disabled?: boolean;
-  onSubmit: (type: InteractionEventType, note: string) => void | Promise<void>;
-}) {
-  const [type, setType] = useState<InteractionEventType>("call_logged");
-  const [note, setNote] = useState("");
-  return (
-    <div
-      className="space-y-1 rounded-md border border-border/50 bg-card/30 p-2"
-      data-testid="log-interaction"
-    >
-      <label className="text-xs text-muted-foreground">Log interaction</label>
-      <div className="flex flex-wrap gap-2">
-        <Select value={type} onValueChange={(v) => setType(v as InteractionEventType)}>
-          <SelectTrigger className="h-8 w-36">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {INTERACTION_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Input
-          className="h-8 flex-1 min-w-40"
-          placeholder="Optional note"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-        />
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={disabled}
-          onClick={async () => {
-            await onSubmit(type, note);
-            setNote("");
-          }}
-        >
-          Log
-        </Button>
-      </div>
+      <LeadDetailDrawer
+        lead={selectedLead}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        activityNonce={selectedLead ? activityNonce[selectedLead.id] ?? 0 : 0}
+        creatingEvent={creatingEvent}
+        onStatusChange={setLeadStatus}
+        onSaveNotes={saveNotes}
+        onSaveFollowUp={saveFollowUp}
+        onLogInteraction={logInteraction}
+      />
     </div>
   );
 }

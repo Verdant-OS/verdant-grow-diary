@@ -158,6 +158,24 @@ export default function Leads() {
     return;
   }
 
+  async function logInteraction(
+    l: LeadRow,
+    eventType: InteractionEventType,
+    note: string,
+  ) {
+    const { error: cErr } = await createEvent({
+      leadId: l.id,
+      eventType,
+      note: note.trim() || null,
+    });
+    if (cErr) {
+      toast.error(cErr);
+      return;
+    }
+    bumpActivity(l.id);
+    toast.success(`${labelForEventType(eventType)} logged`);
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader title="Leads Inbox" description="Operator-only view of public lead submissions" />

@@ -73,7 +73,7 @@ export default function Landing() {
         />
         <FeatureCard
           title="Approval-required Action Queue"
-          body="AI suggestions become queued actions that you explicitly approve, edit, or dismiss. No blind automation. No device commands ship without an explicit safety review."
+          body="AI suggestions become queued actions that you explicitly approve, edit, or dismiss. No blind automation — every meaningful change requires a human in the loop."
         />
       </section>
 

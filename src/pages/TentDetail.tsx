@@ -4,10 +4,20 @@ import StageBadge from "@/components/StageBadge";
 import MetricChip from "@/components/MetricChip";
 import SensorChart from "@/components/SensorChart";
 import EmptyState from "@/components/EmptyState";
+import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Box, Lightbulb } from "lucide-react";
 import { usePlants, useSensorReadings, useCameras } from "@/hooks/useMockData";
-import { useGrowTent } from "@/hooks/useGrowData";
+import { useGrowTent, getGrowDataMeta, type GrowDataSourceMeta } from "@/hooks/useGrowData";
+
+// Plants, sensor readings, and cameras inside this page still come from the
+// useMockData hooks (Phase 1 has not migrated them yet). Surface that as
+// explicit demo metadata so the disclosure honestly reports Mixed/Demo.
+const DEMO_SUBDATA_META: GrowDataSourceMeta = {
+  isDemoData: true,
+  dataSource: "mock",
+  sourceReason: "tent-detail:subdata-mock",
+};
 
 export default function TentDetail() {
   const { id } = useParams();
@@ -17,9 +27,33 @@ export default function TentDetail() {
   const { data: cameras = [] } = useCameras();
   const cam = cameras.find((c) => c.tentId === id);
   const last = readings.at(-1);
+  const tentMeta = getGrowDataMeta(["grow", "tent", id ?? null]);
 
   if (isLoading) return <div className="glass rounded-2xl h-64 animate-pulse" />;
-  if (!tent) return <EmptyState icon={<Box className="h-6 w-6" />} title="Tent not found" action={<Button asChild variant="outline"><Link to="/tents"><ArrowLeft className="h-4 w-4" /> Back</Link></Button>} />;
+  if (!tent) {
+    return (
+      <div>
+        <GrowDataSourceDisclosure
+          resource="tents"
+          hasAnyData={false}
+          metas={[tentMeta]}
+          testId="tent-detail-data-source-disclosure"
+        />
+        <EmptyState
+          icon={<Box className="h-6 w-6" />}
+          title="Tent not found"
+          description="This tent does not exist in your real grow data."
+          action={
+            <Button asChild variant="outline">
+              <Link to="/tents">
+                <ArrowLeft className="h-4 w-4" /> Back
+              </Link>
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -29,6 +63,13 @@ export default function TentDetail() {
         description={`${tent.brand} · ${tent.size}`}
         icon={<Box className="h-5 w-5" />}
         actions={<StageBadge stage={tent.stage} />}
+      />
+
+      <GrowDataSourceDisclosure
+        resource="tent"
+        hasAnyData
+        metas={[tentMeta, DEMO_SUBDATA_META]}
+        testId="tent-detail-data-source-disclosure"
       />
 
       <div className="flex flex-wrap gap-2 mb-5">

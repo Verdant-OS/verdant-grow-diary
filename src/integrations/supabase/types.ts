@@ -627,36 +627,51 @@ export type Database = {
       leads: {
         Row: {
           company: string | null
+          contacted_at: string | null
           created_at: string
           email: string
+          follow_up_at: string | null
           id: string
           lead_type: string
           message: string | null
           name: string | null
+          operator_notes: string | null
           role: string | null
           source: string
+          status: string
+          updated_at: string
         }
         Insert: {
           company?: string | null
+          contacted_at?: string | null
           created_at?: string
           email: string
+          follow_up_at?: string | null
           id?: string
           lead_type?: string
           message?: string | null
           name?: string | null
+          operator_notes?: string | null
           role?: string | null
           source?: string
+          status?: string
+          updated_at?: string
         }
         Update: {
           company?: string | null
+          contacted_at?: string | null
           created_at?: string
           email?: string
+          follow_up_at?: string | null
           id?: string
           lead_type?: string
           message?: string | null
           name?: string | null
+          operator_notes?: string | null
           role?: string | null
           source?: string
+          status?: string
+          updated_at?: string
         }
         Relationships: []
       }

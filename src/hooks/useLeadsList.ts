@@ -1,10 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveCaller, hasRole, type Caller } from "@/lib/permissions";
+
+export type LeadStatus =
+  | "new"
+  | "reviewed"
+  | "contacted"
+  | "follow_up"
+  | "closed"
+  | "spam";
 
 export interface LeadRow {
   id: string;
   created_at: string;
+  updated_at: string | null;
   name: string | null;
   email: string;
   company: string | null;
@@ -12,6 +21,10 @@ export interface LeadRow {
   lead_type: string;
   source: string;
   message: string | null;
+  status: LeadStatus;
+  operator_notes: string | null;
+  contacted_at: string | null;
+  follow_up_at: string | null;
 }
 
 export interface UseLeadsListResult {
@@ -20,20 +33,28 @@ export interface UseLeadsListResult {
   error: string | null;
   leads: LeadRow[];
   reload: () => void;
+  updateLead: (
+    id: string,
+    patch: Partial<
+      Pick<
+        LeadRow,
+        "status" | "operator_notes" | "contacted_at" | "follow_up_at"
+      >
+    >,
+  ) => Promise<{ error: string | null }>;
 }
 
 export interface UseLeadsListOptions {
   leadType?: string | null;
   source?: string | null;
+  status?: string | null;
 }
 
 /**
  * Operator-only lead inbox query.
  *
- * Reads only public.leads. RLS restricts SELECT to operators, so non-operator
- * callers will get an empty result. We also short-circuit on the client when
- * we can detect the caller is not an operator, to render a clear unauthorized
- * state instead of a misleading "no leads yet".
+ * Reads and updates only public.leads. RLS restricts SELECT/UPDATE to
+ * operators; non-operator callers see an unauthorized state.
  */
 export function useLeadsList(opts: UseLeadsListOptions = {}): UseLeadsListResult {
   const [loading, setLoading] = useState(true);
@@ -69,10 +90,13 @@ export function useLeadsList(opts: UseLeadsListOptions = {}): UseLeadsListResult
       }
       let q = supabase
         .from("leads")
-        .select("id, created_at, name, email, company, role, lead_type, source, message")
+        .select(
+          "id, created_at, updated_at, name, email, company, role, lead_type, source, message, status, operator_notes, contacted_at, follow_up_at",
+        )
         .order("created_at", { ascending: false });
       if (opts.leadType) q = q.eq("lead_type", opts.leadType);
       if (opts.source) q = q.eq("source", opts.source);
+      if (opts.status) q = q.eq("status", opts.status);
       const { data, error: qErr } = await q;
       if (cancelled) return;
       if (qErr) {
@@ -88,7 +112,28 @@ export function useLeadsList(opts: UseLeadsListOptions = {}): UseLeadsListResult
     return () => {
       cancelled = true;
     };
-  }, [opts.leadType, opts.source, nonce]);
+  }, [opts.leadType, opts.source, opts.status, nonce]);
+
+  const updateLead = useCallback<UseLeadsListResult["updateLead"]>(
+    async (id, patch) => {
+      const { data, error: uErr } = await supabase
+        .from("leads")
+        .update(patch)
+        .eq("id", id)
+        .select(
+          "id, created_at, updated_at, name, email, company, role, lead_type, source, message, status, operator_notes, contacted_at, follow_up_at",
+        )
+        .maybeSingle();
+      if (uErr) return { error: uErr.message };
+      if (data) {
+        setLeads((prev) =>
+          prev.map((l) => (l.id === id ? ({ ...l, ...(data as LeadRow) }) : l)),
+        );
+      }
+      return { error: null };
+    },
+    [],
+  );
 
   return {
     loading,
@@ -96,5 +141,6 @@ export function useLeadsList(opts: UseLeadsListOptions = {}): UseLeadsListResult
     error,
     leads,
     reload: () => setNonce((n) => n + 1),
+    updateLead,
   };
 }

@@ -83,6 +83,10 @@ export default function Leads() {
     source: source === "all" ? null : source,
     status: status === "all" ? null : status,
   });
+  const { createEvent, submitting: creatingEvent } = useCreateLeadEvent();
+  const [activityNonce, setActivityNonce] = useState<Record<string, number>>({});
+  const bumpActivity = (leadId: string) =>
+    setActivityNonce((m) => ({ ...m, [leadId]: (m[leadId] ?? 0) + 1 }));
 
   const summary = useMemo(() => summarizeLeads(leads), [leads]);
 

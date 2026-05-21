@@ -362,6 +362,16 @@ export default function Leads() {
           )}
 
           {!loading && (
+            <LeadPriorityQueuePanel
+              leads={filtered}
+              onSelectLead={(id) => {
+                const l = leads.find((x) => x.id === id);
+                if (l) openLead(l);
+              }}
+            />
+          )}
+
+          {!loading && (
             <LeadAnalyticsPanel
               leads={filtered}
               scopeLabel="current results"

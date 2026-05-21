@@ -171,12 +171,14 @@ describe("WateringHistoryPanel runtime safety", () => {
       .split("\n")
       .map((l) => l.trim())
       .filter(Boolean)
-      // Generated types, pure adapter, disabled helper, docs, and tests are allowed.
+      // Generated types, pure adapter, disabled helper, the flag's doc
+      // comment, docs, and tests are allowed.
       .filter((line) => {
         const path = line.split(":")[0];
         if (path === "src/integrations/supabase/types.ts") return false;
         if (path === "src/lib/quickLogTypedEventPayloadRules.ts") return false;
         if (path === "src/lib/writeWateringTypedEvent.ts") return false;
+        if (path === "src/lib/featureFlags.ts") return false;
         if (path.startsWith("src/test/")) return false;
         return true;
       });

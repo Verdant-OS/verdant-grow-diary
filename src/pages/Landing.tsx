@@ -2,6 +2,8 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/store/auth";
 import BrandLogo from "@/components/BrandLogo";
+import LeadCaptureForm from "@/components/LeadCaptureForm";
+
 
 /**
  * Public landing page for https://verdantgrowdiary.com.
@@ -105,6 +107,24 @@ export default function Landing() {
           The grower stays in control.
         </p>
       </section>
+
+      <section id="beta" className="px-6 py-16 max-w-3xl mx-auto">
+        <div className="text-center mb-8">
+          <h2 className="font-display text-2xl md:text-3xl font-semibold">
+            Join the Verdant beta
+          </h2>
+          <p className="mt-3 text-muted-foreground">
+            Hardware partner? Contact Verdant about read-only integrations.
+          </p>
+          <p className="mt-4 text-sm text-muted-foreground">
+            Verdant Grow Diary is currently in early build. Join the beta list
+            or reach out about read-only hardware integrations. Grower stays
+            in control. No blind automation.
+          </p>
+        </div>
+        <LeadCaptureForm />
+      </section>
+
 
       <footer className="px-6 py-10 border-t border-border/40 text-sm text-muted-foreground text-center">
         <p>

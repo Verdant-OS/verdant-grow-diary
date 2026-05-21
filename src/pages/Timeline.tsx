@@ -12,6 +12,7 @@ import EntryEditDialog from "@/components/EntryEditDialog";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import DiaryEntryBadges from "@/components/DiaryEntryBadges";
+import WateringHistoryPanel from "@/components/WateringHistoryPanel";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { actionDetailPath, alertDetailPath, logsPath, timelinePath } from "@/lib/routes";
 import { cn } from "@/lib/utils";
@@ -295,6 +296,10 @@ export default function Timeline() {
 
       <ActionQueueEventsSection events={actionEvents} />
       <AlertEventsSection events={alertEvents} />
+
+      <div className="mt-4">
+        <WateringHistoryPanel rawEntries={entries} limit={20} />
+      </div>
 
 
 

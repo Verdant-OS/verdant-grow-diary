@@ -115,7 +115,7 @@ describe("quickLogToTypedEventPayload", () => {
     expect(r.subtype.kind).toBe("observation");
     expect(r.subtype.payload).toEqual({
       symptom_type: ["yellowing", "spots"],
-      severity: "moderate",
+      severity: "warn",
       affected_area: "lower fan leaves",
       details: "spreading slowly",
     });
@@ -126,18 +126,18 @@ describe("quickLogToTypedEventPayload", () => {
       ...baseDraft,
       event_type: "training",
       details: {
-        technique: "LST",
+        technique: "lst",
         intensity: "light",
-        affected_nodes: ["n1", "n2"],
+        affected_nodes: 3,
       },
     });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.subtype.kind).toBe("training");
     expect(r.subtype.payload).toEqual({
-      technique: "LST",
+      technique: "lst",
       intensity: "light",
-      affected_nodes: ["n1", "n2"],
+      affected_nodes: 3,
     });
   });
 

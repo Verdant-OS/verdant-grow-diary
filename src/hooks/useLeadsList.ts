@@ -116,9 +116,21 @@ export function useLeadsList(opts: UseLeadsListOptions = {}): UseLeadsListResult
 
   const updateLead = useCallback<UseLeadsListResult["updateLead"]>(
     async (id, patch) => {
+      // Allow-list: original lead submission fields (name, email, company,
+      // role, lead_type, source, message) are immutable from the UI.
+      const ALLOWED = [
+        "status",
+        "operator_notes",
+        "contacted_at",
+        "follow_up_at",
+      ] as const;
+      const safePatch: Record<string, unknown> = {};
+      for (const k of ALLOWED) {
+        if (k in patch) safePatch[k] = (patch as Record<string, unknown>)[k];
+      }
       const { data, error: uErr } = await supabase
         .from("leads")
-        .update(patch)
+        .update(safePatch)
         .eq("id", id)
         .select(
           "id, created_at, updated_at, name, email, company, role, lead_type, source, message, status, operator_notes, contacted_at, follow_up_at",

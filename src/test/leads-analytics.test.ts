@@ -37,9 +37,11 @@ function lead(p: Partial<LeadRow> & { id: string }): LeadRow {
     email: p.email ?? `${p.id}@example.com`,
     company: p.company ?? null,
     role: p.role ?? null,
-    // Cast through unknown so tests can simulate missing/empty values.
-    lead_type: (p.lead_type ?? "beta_user") as unknown as string,
-    source: (p.source ?? "landing") as unknown as string,
+    // Preserve explicitly-passed null/empty so tests can simulate missing values.
+    lead_type: ("lead_type" in p
+      ? p.lead_type
+      : "beta_user") as unknown as string,
+    source: ("source" in p ? p.source : "landing") as unknown as string,
     message: p.message ?? null,
     status: p.status ?? "new",
     operator_notes: p.operator_notes ?? null,
@@ -47,6 +49,7 @@ function lead(p: Partial<LeadRow> & { id: string }): LeadRow {
     follow_up_at: p.follow_up_at ?? null,
   } as LeadRow;
 }
+
 
 const SAMPLE: LeadRow[] = [
   lead({ id: "1", source: "landing", lead_type: "beta_user", status: "new" }),

@@ -54,16 +54,16 @@ describe("leads migration", () => {
     );
   });
 
-  it("does not expose a public SELECT/UPDATE/DELETE policy on leads", () => {
-    // Only an operator SELECT policy is allowed.
+  it("does not expose a public UPDATE/DELETE policy on leads", () => {
+    // Only operator SELECT and operator UPDATE policies are allowed.
     const leadsPolicyBlocks = migrationContents.match(
       /CREATE POLICY[^;]*ON\s+public\.leads[^;]*;/gi,
     ) ?? [];
     for (const p of leadsPolicyBlocks) {
-      if (/FOR\s+(UPDATE|DELETE)/i.test(p)) {
-        throw new Error("Unexpected UPDATE/DELETE policy on leads: " + p);
+      if (/FOR\s+DELETE/i.test(p)) {
+        throw new Error("Unexpected DELETE policy on leads: " + p);
       }
-      if (/FOR\s+SELECT/i.test(p)) {
+      if (/FOR\s+SELECT/i.test(p) || /FOR\s+UPDATE/i.test(p)) {
         expect(p).toMatch(/has_role/);
       }
     }

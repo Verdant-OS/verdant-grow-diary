@@ -11,10 +11,12 @@ import { Link, useLocation } from "react-router-dom";
 import EntryEditDialog from "@/components/EntryEditDialog";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
+import DiaryEntryBadges from "@/components/DiaryEntryBadges";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { actionDetailPath, alertDetailPath, logsPath, timelinePath } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { getEventType } from "@/lib/diary";
+import { buildGrowDiaryTimeline } from "@/lib/growDiaryTimelineRules";
 
 interface Entry {
   id: string; note: string; photo_url: string | null; stage: string | null;
@@ -163,6 +165,31 @@ export default function Timeline() {
       return true;
     });
   }, [entries, stageFilter, eventFilter]);
+
+  // Pure normalized timeline view-model. Drives per-entry tags/warnings and a
+  // future-proof empty/limited disclosure. Includes invalid entries so
+  // malformed diary rows still surface as "Limited data" instead of vanishing.
+  const normalizedById = useMemo(() => {
+    const items = buildGrowDiaryTimeline({
+      rawEntries: entries.map((e) => ({
+        id: e.id,
+        grow_id: activeGrowId ?? null,
+        plant_id: e.plant_id,
+        tent_id: e.tent_id,
+        stage: e.stage,
+        entry_at: e.entry_at,
+        entry_type:
+          (e.details && (e.details.event_type as string | undefined)) ?? "note",
+        note: e.note,
+        photo_url: e.photo_url,
+        details: e.details,
+      })),
+      filter: { includeInvalid: true },
+    });
+    const map = new Map<string, (typeof items)[number]>();
+    items.forEach((it) => map.set(it.id, it));
+    return map;
+  }, [entries, activeGrowId]);
 
   const groupedByStage = useMemo(() => {
     const groups: { stage: string; items: Entry[] }[] = [];
@@ -357,6 +384,10 @@ export default function Timeline() {
                                   ))}
                                 </div>
                               )}
+                              {(() => {
+                                const ni = normalizedById.get(e.id);
+                                return ni ? <DiaryEntryBadges item={ni} /> : null;
+                              })()}
                             </>
                           );
                         })()}

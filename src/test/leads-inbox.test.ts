@@ -84,8 +84,7 @@ describe("Leads page", () => {
     expect(PAGE).toMatch(/!authorized/);
   });
 
-  it("does not perform updates or deletes on leads", () => {
-    expect(PAGE + HOOK).not.toMatch(/\.update\(/);
+  it("does not perform deletes on leads (updates are operator-only and allowed)", () => {
     expect(PAGE + HOOK).not.toMatch(/\.delete\(/);
   });
 

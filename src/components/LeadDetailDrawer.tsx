@@ -193,7 +193,7 @@ function LeadDetailBody({
               variant={s === "spam" ? "destructive" : s === lead.status ? "default" : "outline"}
               onClick={() => onStatusChange(lead, s)}
             >
-              {s.replace("_", " ")}
+              {STATUS_LABEL[s]}
             </Button>
           ))}
         </div>

@@ -439,22 +439,34 @@ export function quickLogToTypedEventPayload(
       break;
     }
     case "training": {
-      const technique = toStringOrNull(pick(details, "technique"));
-      if (!technique) {
+      const techniqueRaw = toStringOrNull(pick(details, "technique"));
+      if (!techniqueRaw) {
         return { ok: false, reason: "technique:missing", warnings };
       }
-      const intensity = toStringOrNull(pick(details, "intensity"));
-      const affectedRaw = pick(details, "affected_nodes", "affectedNodes");
-      let affected_nodes: string[] | null = null;
-      if (affectedRaw != null) {
-        if (Array.isArray(affectedRaw)) {
-          affected_nodes = toStringArray(affectedRaw);
+      if (!TRAINING_TECHNIQUES.has(techniqueRaw)) {
+        return { ok: false, reason: "technique:invalid", warnings };
+      }
+      const technique = techniqueRaw;
+      const intensityRaw = toStringOrNull(pick(details, "intensity"));
+      let intensity: string | null = null;
+      if (intensityRaw != null) {
+        if (!TRAINING_INTENSITIES.has(intensityRaw)) {
+          return { ok: false, reason: "intensity:invalid", warnings };
         }
-        if (affected_nodes == null) warnings.push("affected_nodes:invalid");
+        intensity = intensityRaw;
+      }
+      const affectedRaw = pick(details, "affected_nodes", "affectedNodes");
+      let affected_nodes: number | null = null;
+      if (affectedRaw != null) {
+        const n = toNumber(affectedRaw);
+        if (n == null || !Number.isInteger(n) || n < 0) {
+          return { ok: false, reason: "affected_nodes:invalid", warnings };
+        }
+        affected_nodes = n;
       }
       subtypePayload.technique = technique;
       if (intensity) subtypePayload.intensity = intensity;
-      if (affected_nodes) subtypePayload.affected_nodes = affected_nodes;
+      if (affected_nodes !== null) subtypePayload.affected_nodes = affected_nodes;
       break;
     }
     case "environment": {

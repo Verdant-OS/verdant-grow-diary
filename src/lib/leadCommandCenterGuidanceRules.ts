@@ -8,6 +8,7 @@
 import type { LeadRow } from "@/hooks/useLeadsList";
 import { summarizeLeadStatuses } from "@/lib/leadStatusSummaryRules";
 import { evaluatePipelineHealth } from "@/lib/leadPipelineHealthRules";
+import { isMeaningfulString as isMeaningful } from "@/lib/leadFieldUtils";
 
 export type LeadCommandCenterGuidanceState =
   | "empty"

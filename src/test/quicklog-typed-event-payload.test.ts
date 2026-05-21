@@ -105,7 +105,7 @@ describe("quickLogToTypedEventPayload", () => {
       event_type: "observation",
       details: {
         symptom_type: ["yellowing", "spots"],
-        severity: "moderate",
+        severity: "warn",
         affected_area: "lower fan leaves",
         details: "spreading slowly",
       },

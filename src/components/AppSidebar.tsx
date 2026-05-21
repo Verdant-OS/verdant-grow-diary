@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Box, Sprout, Camera, Activity, NotebookText,
-  ListChecks, Bell, Stethoscope, Settings, Leaf, ShieldCheck, Wrench,
+  ListChecks, Bell, Stethoscope, Settings, ShieldCheck, Wrench,
   type LucideIcon,
 } from "lucide-react";
 import {

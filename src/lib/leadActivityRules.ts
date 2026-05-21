@@ -5,6 +5,7 @@
  * persistence. Derives a timeline strictly from existing LeadRow fields.
  */
 import type { LeadRow, LeadStatus } from "@/hooks/useLeadsList";
+import { isMeaningfulString as isMeaningful } from "@/lib/leadFieldUtils";
 
 export type LeadActivityEventType =
   | "lead_created"

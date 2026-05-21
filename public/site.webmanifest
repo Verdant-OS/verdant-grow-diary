@@ -1,0 +1,18 @@
+{
+  "name": "Verdant Grow Diary",
+  "short_name": "Verdant",
+  "description": "Grow logs, sensor-aware insights, environment alerts, and cautious AI coaching for serious cultivators.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0d1a12",
+  "theme_color": "#0d1a12",
+  "icons": [
+    {
+      "src": "/brand/verdant-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

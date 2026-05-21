@@ -26,6 +26,10 @@ import LeadStatusSummaryStrip from "@/components/LeadStatusSummaryStrip";
 import LeadPipelineHealthPanel from "@/components/LeadPipelineHealthPanel";
 import LeadCommandCenterGuidance from "@/components/LeadCommandCenterGuidance";
 import LeadSavedViewsMenu from "@/components/LeadSavedViewsMenu";
+import {
+  LeadCommandCenterSection,
+  useLeadCommandCenterLayout,
+} from "@/components/LeadCommandCenterLayoutControls";
 import { useLeadSavedViews } from "@/hooks/useLeadSavedViews";
 import type { LeadSavedView } from "@/lib/leadSavedViewsRules";
 import {
@@ -113,6 +117,8 @@ export default function Leads() {
   const [activityNonce, setActivityNonce] = useState<Record<string, number>>({});
   const bumpActivity = (leadId: string) =>
     setActivityNonce((m) => ({ ...m, [leadId]: (m[leadId] ?? 0) + 1 }));
+
+  const lcc = useLeadCommandCenterLayout();
 
   function applySavedView(v: LeadSavedView) {
     setSearch(v.search);
@@ -257,15 +263,22 @@ export default function Leads() {
             ))}
           </div>
 
-          <div className="flex justify-end">
-            <LeadSavedViewsMenu
-              views={savedViews.views}
-              onApply={applySavedView}
-              onSave={handleSaveCurrentView}
-              onRename={savedViews.renameView}
-              onDelete={savedViews.deleteView}
-            />
-          </div>
+          <LeadCommandCenterSection
+            id="saved_views"
+            label="Saved Views"
+            collapsed={lcc.isCollapsed("saved_views")}
+            onToggle={lcc.toggle}
+          >
+            <div className="flex justify-end">
+              <LeadSavedViewsMenu
+                views={savedViews.views}
+                onApply={applySavedView}
+                onSave={handleSaveCurrentView}
+                onRename={savedViews.renameView}
+                onDelete={savedViews.deleteView}
+              />
+            </div>
+          </LeadCommandCenterSection>
 
 
           <div className="flex flex-wrap items-end gap-3">
@@ -365,38 +378,77 @@ export default function Leads() {
           )}
 
           {!loading && (
-            <LeadCommandCenterGuidance
-              leads={filtered}
-              hasActiveFilters={
-                leadType !== "all" ||
-                source !== "all" ||
-                status !== "all" ||
-                quickFilter !== "all" ||
-                search.trim().length > 0
-              }
-              totalUnfiltered={leads.length}
-            />
-          )}
-
-          {!loading && <LeadStatusSummaryStrip leads={filtered} />}
-
-          {!loading && <LeadPipelineHealthPanel leads={filtered} />}
-
-          {!loading && (
-            <LeadPriorityQueuePanel
-              leads={filtered}
-              onSelectLead={(id) => {
-                const l = leads.find((x) => x.id === id);
-                if (l) openLead(l);
-              }}
-            />
+            <LeadCommandCenterSection
+              id="guidance"
+              label="Operator Guidance"
+              collapsed={lcc.isCollapsed("guidance")}
+              onToggle={lcc.toggle}
+            >
+              <LeadCommandCenterGuidance
+                leads={filtered}
+                hasActiveFilters={
+                  leadType !== "all" ||
+                  source !== "all" ||
+                  status !== "all" ||
+                  quickFilter !== "all" ||
+                  search.trim().length > 0
+                }
+                totalUnfiltered={leads.length}
+              />
+            </LeadCommandCenterSection>
           )}
 
           {!loading && (
-            <LeadAnalyticsPanel
-              leads={filtered}
-              scopeLabel="current results"
-            />
+            <LeadCommandCenterSection
+              id="status_summary"
+              label="Status Summary"
+              collapsed={lcc.isCollapsed("status_summary")}
+              onToggle={lcc.toggle}
+            >
+              <LeadStatusSummaryStrip leads={filtered} />
+            </LeadCommandCenterSection>
+          )}
+
+          {!loading && (
+            <LeadCommandCenterSection
+              id="pipeline_health"
+              label="Pipeline Health"
+              collapsed={lcc.isCollapsed("pipeline_health")}
+              onToggle={lcc.toggle}
+            >
+              <LeadPipelineHealthPanel leads={filtered} />
+            </LeadCommandCenterSection>
+          )}
+
+          {!loading && (
+            <LeadCommandCenterSection
+              id="priority_queue"
+              label="Priority Queue"
+              collapsed={lcc.isCollapsed("priority_queue")}
+              onToggle={lcc.toggle}
+            >
+              <LeadPriorityQueuePanel
+                leads={filtered}
+                onSelectLead={(id) => {
+                  const l = leads.find((x) => x.id === id);
+                  if (l) openLead(l);
+                }}
+              />
+            </LeadCommandCenterSection>
+          )}
+
+          {!loading && (
+            <LeadCommandCenterSection
+              id="analytics"
+              label="Analytics"
+              collapsed={lcc.isCollapsed("analytics")}
+              onToggle={lcc.toggle}
+            >
+              <LeadAnalyticsPanel
+                leads={filtered}
+                scopeLabel="current results"
+              />
+            </LeadCommandCenterSection>
           )}
 
 

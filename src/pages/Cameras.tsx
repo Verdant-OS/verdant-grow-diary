@@ -1,7 +1,17 @@
 import { Camera as CamIcon, Wifi, WifiOff } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
+import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
 import { useCameras, useTents } from "@/hooks/useMockData";
+import { type GrowDataSourceMeta } from "@/hooks/useGrowData";
 import { formatDistanceToNow } from "date-fns";
+
+// Cameras still rely on useMockData. Surface that honestly as Demo so live
+// feed badges below cannot be mistaken for real hardware.
+const CAMERAS_MOCK_META: GrowDataSourceMeta = {
+  isDemoData: true,
+  dataSource: "mock",
+  sourceReason: "cameras:mock",
+};
 
 export default function Cameras() {
   const { data: cameras = [] } = useCameras();
@@ -9,6 +19,12 @@ export default function Cameras() {
   return (
     <div>
       <PageHeader title="Cameras" description="Live tiles and timelapse snapshots." icon={<CamIcon className="h-5 w-5" />} />
+      <GrowDataSourceDisclosure
+        resource="cameras"
+        hasAnyData={cameras.length > 0}
+        metas={[CAMERAS_MOCK_META]}
+        testId="cameras-data-source-disclosure"
+      />
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {cameras.map((c) => {
           const tent = tents.find((t) => t.id === c.tentId);

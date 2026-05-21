@@ -34,11 +34,18 @@ import {
   type LeadQuickFilter,
 } from "@/lib/leadFollowupRules";
 import {
+  SORT_OPTIONS,
+  searchLeads,
+  sortLeads,
+  type LeadSortOption,
+} from "@/lib/leadSearchRules";
+import {
   describeFollowUpChange,
   followUpDidChange,
   labelForEventType,
   type InteractionEventType,
 } from "@/lib/leadEventRules";
+
 
 const LEAD_TYPES = [
   "beta_user",
@@ -84,6 +91,7 @@ export default function Leads() {
   const [status, setStatus] = useState<string>("all");
   const [quickFilter, setQuickFilter] = useState<LeadQuickFilter>("all");
   const [search, setSearch] = useState("");
+  const [sortOption, setSortOption] = useState<LeadSortOption>("default");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -100,17 +108,13 @@ export default function Leads() {
   const summary = useMemo(() => summarizeLeads(leads), [leads]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const base = q
-      ? leads.filter(
-          (l) =>
-            l.email.toLowerCase().includes(q) ||
-            (l.name ?? "").toLowerCase().includes(q) ||
-            (l.company ?? "").toLowerCase().includes(q),
-        )
-      : leads;
-    return filterAndSortLeads(base, quickFilter);
-  }, [leads, search, quickFilter]);
+    const searched = searchLeads(leads, search);
+    const filteredSorted = filterAndSortLeads(searched, quickFilter);
+    return sortOption === "default"
+      ? filteredSorted
+      : sortLeads(filteredSorted, sortOption);
+  }, [leads, search, quickFilter, sortOption]);
+
 
   const selectedLead = useMemo(
     () => leads.find((l) => l.id === selectedId) ?? null,
@@ -273,11 +277,45 @@ export default function Leads() {
             </div>
             <div className="space-y-1 flex-1 min-w-48">
               <label className="text-xs text-muted-foreground">Search</label>
-              <Input
-                placeholder="email, name, company"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+              <div className="relative">
+                <Input
+                  placeholder="name, email, company, role, type, source, message, notes"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  data-testid="leads-search-input"
+                  className="pr-16"
+                />
+                {search && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setSearch("")}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-8 px-2"
+                    data-testid="leads-search-clear"
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Sort by</label>
+              <Select
+                value={sortOption}
+                onValueChange={(v) => setSortOption(v as LeadSortOption)}
+              >
+                <SelectTrigger className="w-52" data-testid="leads-sort-select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SORT_OPTIONS.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -287,12 +325,27 @@ export default function Leads() {
             </div>
           )}
 
+          {!loading && (
+            <div
+              className="text-xs text-muted-foreground"
+              data-testid="leads-result-count"
+            >
+              Showing {filtered.length} of {leads.length} leads
+            </div>
+          )}
+
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading leads…</p>
           ) : filtered.length === 0 ? (
-            <div className="rounded-xl border border-border/50 bg-card/40 p-8 text-center">
-              <p className="text-sm text-muted-foreground">No leads match these filters.</p>
+            <div
+              className="rounded-xl border border-border/50 bg-card/40 p-8 text-center"
+              data-testid="leads-empty-state"
+            >
+              <p className="text-sm text-muted-foreground">
+                No leads match this search/filter.
+              </p>
             </div>
+
           ) : (
             <div
               className="rounded-xl border border-border/50 overflow-x-auto"

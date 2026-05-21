@@ -27,6 +27,7 @@ import LeadSourceInsightsPanel from "@/components/LeadSourceInsightsPanel";
 import LeadStatusSummaryStrip from "@/components/LeadStatusSummaryStrip";
 import LeadPipelineHealthPanel from "@/components/LeadPipelineHealthPanel";
 import LeadCommandCenterGuidance from "@/components/LeadCommandCenterGuidance";
+import LeadExecutiveSummaryCard from "@/components/LeadExecutiveSummaryCard";
 import LeadSavedViewsMenu from "@/components/LeadSavedViewsMenu";
 import {
   LeadCommandCenterSection,
@@ -264,6 +265,17 @@ export default function Leads() {
               </Button>
             ))}
           </div>
+
+          {!loading && (
+            <LeadCommandCenterSection
+              id="executive_summary"
+              label="Executive Summary"
+              collapsed={lcc.isCollapsed("executive_summary")}
+              onToggle={lcc.toggle}
+            >
+              <LeadExecutiveSummaryCard leads={filtered} />
+            </LeadCommandCenterSection>
+          )}
 
           <LeadCommandCenterSection
             id="saved_views"

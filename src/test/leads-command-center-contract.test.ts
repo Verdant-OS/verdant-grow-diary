@@ -91,7 +91,7 @@ function fixtureLeads(): LeadRow[] {
     lead({
       id: "lost",
       name: "Lost One",
-      status: "lost" as unknown as LeadRow["status"],
+      status: "spam",
       created_at: new Date(NOW - 30 * DAY).toISOString(),
     }),
     // unknown source/type/status

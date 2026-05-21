@@ -22,6 +22,7 @@ import PageHeader from "@/components/PageHeader";
 import LeadDetailDrawer from "@/components/LeadDetailDrawer";
 import LeadAnalyticsPanel from "@/components/LeadAnalyticsPanel";
 import LeadPriorityQueuePanel from "@/components/LeadPriorityQueuePanel";
+import LeadDataQualityAuditPanel from "@/components/LeadDataQualityAuditPanel";
 import LeadStatusSummaryStrip from "@/components/LeadStatusSummaryStrip";
 import LeadPipelineHealthPanel from "@/components/LeadPipelineHealthPanel";
 import LeadCommandCenterGuidance from "@/components/LeadCommandCenterGuidance";
@@ -436,6 +437,18 @@ export default function Leads() {
               />
             </LeadCommandCenterSection>
           )}
+
+          {!loading && (
+            <LeadCommandCenterSection
+              id="data_quality"
+              label="Data Quality Audit"
+              collapsed={lcc.isCollapsed("data_quality")}
+              onToggle={lcc.toggle}
+            >
+              <LeadDataQualityAuditPanel leads={filtered} />
+            </LeadCommandCenterSection>
+          )}
+
 
           {!loading && (
             <LeadCommandCenterSection

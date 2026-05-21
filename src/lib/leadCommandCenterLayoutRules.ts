@@ -12,7 +12,8 @@ export type LeadCommandCenterSectionId =
   | "pipeline_health"
   | "priority_queue"
   | "analytics"
-  | "saved_views";
+  | "saved_views"
+  | "data_quality";
 
 export interface LeadCommandCenterSection {
   id: LeadCommandCenterSectionId;
@@ -34,6 +35,7 @@ export const DEFAULT_SECTION_ORDER: readonly LeadCommandCenterSectionId[] = [
   "status_summary",
   "pipeline_health",
   "priority_queue",
+  "data_quality",
   "analytics",
 ] as const;
 
@@ -44,6 +46,7 @@ const SECTION_LABELS: Record<LeadCommandCenterSectionId, string> = {
   priority_queue: "Priority Queue",
   analytics: "Analytics",
   saved_views: "Saved Views",
+  data_quality: "Data Quality Audit",
 };
 
 const KNOWN_IDS = new Set<LeadCommandCenterSectionId>(DEFAULT_SECTION_ORDER);

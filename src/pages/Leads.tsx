@@ -333,7 +333,14 @@ export default function Leads() {
             >
               Showing {filtered.length} of {leads.length} leads
             </div>
+
+          {!loading && (
+            <LeadAnalyticsPanel
+              leads={filtered}
+              scopeLabel="current results"
+            />
           )}
+
 
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading leads…</p>

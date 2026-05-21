@@ -36,7 +36,9 @@ export interface TypedParentPayload {
   user_id?: string;
   event_type: TypedEventKind;
   source: "manual";
-  occurred_at: string;
+  /** ISO timestamp, or null when caller did not supply one — let the DB
+   * default (`now()`) apply rather than fabricating an epoch-0 row. */
+  occurred_at: string | null;
   note: string | null;
   schema_version: number;
 }
@@ -68,6 +70,30 @@ const KNOWN_EVENT_TYPES: ReadonlySet<TypedEventKind> = new Set([
   "observation",
   "training",
   "environment",
+]);
+
+export const OBSERVATION_SEVERITIES: ReadonlySet<string> = new Set([
+  "info",
+  "watch",
+  "warn",
+  "critical",
+]);
+
+export const TRAINING_TECHNIQUES: ReadonlySet<string> = new Set([
+  "lst",
+  "topping",
+  "fim",
+  "defoliation",
+  "supercropping",
+  "scrog",
+  "manifold",
+  "other",
+]);
+
+export const TRAINING_INTENSITIES: ReadonlySet<string> = new Set([
+  "light",
+  "medium",
+  "heavy",
 ]);
 
 // ---------------------------------------------------------------------------
@@ -315,13 +341,12 @@ export function quickLogToTypedEventPayload(
   }
   const event_type = eventTypeRaw as TypedEventKind;
 
-  const occurred_at =
-    toIsoOrNull(draft.occurred_at) ?? new Date(0).toISOString();
-  if (draft.occurred_at != null && toIsoOrNull(draft.occurred_at) == null) {
+  const occurredIso = toIsoOrNull(draft.occurred_at);
+  if (draft.occurred_at != null && occurredIso == null) {
     warnings.push("occurred_at:invalid");
-  } else if (draft.occurred_at == null) {
-    warnings.push("occurred_at:missing");
   }
+  // When missing/invalid, leave null so DB default (now()) applies.
+  const occurred_at: string | null = occurredIso;
 
   const tent_id = toStringOrNull(draft.tent_id);
   const plant_id = toStringOrNull(draft.plant_id);
@@ -337,6 +362,10 @@ export function quickLogToTypedEventPayload(
     case "watering": {
       const vol = readVolumeMl(details);
       if (vol.error) return { ok: false, reason: vol.error, warnings };
+      // Watering must have a strictly positive volume — DB RPC requires it.
+      if (vol.value === undefined || vol.value <= 0) {
+        return { ok: false, reason: "volume:required-positive", warnings };
+      }
       const ph = checkPh(pick(details, "ph", "pH"), "ph");
       if (ph.error) return { ok: false, reason: ph.error, warnings };
       const ec = checkEc(pick(details, "ec", "EC"), "ec");
@@ -351,7 +380,7 @@ export function quickLogToTypedEventPayload(
       const runoffEc = checkEc(pick(details, "runoff_ec", "runoffEc"), "runoff_ec");
       if (runoffEc.error) return { ok: false, reason: runoffEc.error, warnings };
 
-      if (vol.value !== undefined) subtypePayload.volume_ml = vol.value;
+      subtypePayload.volume_ml = vol.value;
       if (ph.value !== undefined) subtypePayload.ph = ph.value;
       if (ec.value !== undefined) subtypePayload.ec_ms_cm = ec.value;
       if (runoffMl.value !== undefined) subtypePayload.runoff_ml = runoffMl.value;
@@ -398,7 +427,7 @@ export function quickLogToTypedEventPayload(
         toIsoOrNull(pick(details, "taken_at", "takenAt")) ?? occurred_at;
       subtypePayload.photo_url = photo_url;
       if (caption) subtypePayload.caption = caption;
-      subtypePayload.taken_at = taken_at;
+      if (taken_at) subtypePayload.taken_at = taken_at;
       break;
     }
     case "observation": {
@@ -413,7 +442,14 @@ export function quickLogToTypedEventPayload(
         }
         if (symptom_type == null) warnings.push("symptom_type:invalid");
       }
-      const severity = toStringOrNull(pick(details, "severity"));
+      const severityRaw = toStringOrNull(pick(details, "severity"));
+      let severity: string | null = null;
+      if (severityRaw != null) {
+        if (!OBSERVATION_SEVERITIES.has(severityRaw)) {
+          return { ok: false, reason: "severity:invalid", warnings };
+        }
+        severity = severityRaw;
+      }
       const affected_area = toStringOrNull(
         pick(details, "affected_area", "affectedArea"),
       );
@@ -427,22 +463,34 @@ export function quickLogToTypedEventPayload(
       break;
     }
     case "training": {
-      const technique = toStringOrNull(pick(details, "technique"));
-      if (!technique) {
+      const techniqueRaw = toStringOrNull(pick(details, "technique"));
+      if (!techniqueRaw) {
         return { ok: false, reason: "technique:missing", warnings };
       }
-      const intensity = toStringOrNull(pick(details, "intensity"));
-      const affectedRaw = pick(details, "affected_nodes", "affectedNodes");
-      let affected_nodes: string[] | null = null;
-      if (affectedRaw != null) {
-        if (Array.isArray(affectedRaw)) {
-          affected_nodes = toStringArray(affectedRaw);
+      if (!TRAINING_TECHNIQUES.has(techniqueRaw)) {
+        return { ok: false, reason: "technique:invalid", warnings };
+      }
+      const technique = techniqueRaw;
+      const intensityRaw = toStringOrNull(pick(details, "intensity"));
+      let intensity: string | null = null;
+      if (intensityRaw != null) {
+        if (!TRAINING_INTENSITIES.has(intensityRaw)) {
+          return { ok: false, reason: "intensity:invalid", warnings };
         }
-        if (affected_nodes == null) warnings.push("affected_nodes:invalid");
+        intensity = intensityRaw;
+      }
+      const affectedRaw = pick(details, "affected_nodes", "affectedNodes");
+      let affected_nodes: number | null = null;
+      if (affectedRaw != null) {
+        const n = toNumber(affectedRaw);
+        if (n == null || !Number.isInteger(n) || n < 0) {
+          return { ok: false, reason: "affected_nodes:invalid", warnings };
+        }
+        affected_nodes = n;
       }
       subtypePayload.technique = technique;
       if (intensity) subtypePayload.intensity = intensity;
-      if (affected_nodes) subtypePayload.affected_nodes = affected_nodes;
+      if (affected_nodes !== null) subtypePayload.affected_nodes = affected_nodes;
       break;
     }
     case "environment": {
@@ -512,4 +560,87 @@ export function quickLogToTypedEventPayload(
     subtype: { kind: event_type, payload: subtypePayload },
     warnings,
   };
+}
+
+// ---------------------------------------------------------------------------
+// RPC boundary helpers (pure — no network)
+// ---------------------------------------------------------------------------
+
+export type TypedEventWriteReadiness = "rpc_available" | "rpc_missing";
+
+const RPC_READINESS: Record<TypedEventKind, TypedEventWriteReadiness> = {
+  watering: "rpc_available",
+  feeding: "rpc_missing",
+  photo: "rpc_missing",
+  observation: "rpc_missing",
+  training: "rpc_missing",
+  environment: "rpc_missing",
+};
+
+/**
+ * Report whether an atomic RPC currently exists for this event type.
+ * Callers MUST refuse to perform a typed write when this returns
+ * "rpc_missing" — the non-atomic two-step insert path is unsafe.
+ */
+export function getTypedEventWriteReadiness(
+  eventType: string,
+): TypedEventWriteReadiness {
+  if (!KNOWN_EVENT_TYPES.has(eventType as TypedEventKind)) {
+    return "rpc_missing";
+  }
+  return RPC_READINESS[eventType as TypedEventKind];
+}
+
+export interface CreateWateringEventArgs {
+  _grow_id: string;
+  _volume_ml: number;
+  _tent_id?: string;
+  _plant_id?: string;
+  _occurred_at?: string;
+  _note?: string;
+  _ph?: number;
+  _ec_ms_cm?: number;
+  _runoff_ml?: number;
+  _runoff_ph?: number;
+  _runoff_ec?: number;
+  _water_temp_c?: number;
+}
+
+/**
+ * Pure boundary mapper: adapter Success → create_watering_event RPC args.
+ * Does NOT call Supabase. Returns null if the result is not a watering
+ * payload or required args are missing.
+ */
+export function mapWateringPayloadToCreateWateringEventArgs(
+  result: TypedEventResult,
+): CreateWateringEventArgs | null {
+  if (!result.ok) return null;
+  if (result.subtype.kind !== "watering") return null;
+  const p = result.parent;
+  const s = result.subtype.payload as {
+    volume_ml?: number;
+    ph?: number;
+    ec_ms_cm?: number;
+    runoff_ml?: number;
+    runoff_ph?: number;
+    runoff_ec_ms_cm?: number;
+    water_temp_c?: number;
+  };
+  if (typeof s.volume_ml !== "number" || !(s.volume_ml > 0)) return null;
+
+  const args: CreateWateringEventArgs = {
+    _grow_id: p.grow_id,
+    _volume_ml: s.volume_ml,
+  };
+  if (p.tent_id) args._tent_id = p.tent_id;
+  if (p.plant_id) args._plant_id = p.plant_id;
+  if (p.occurred_at) args._occurred_at = p.occurred_at;
+  if (p.note) args._note = p.note;
+  if (s.ph !== undefined) args._ph = s.ph;
+  if (s.ec_ms_cm !== undefined) args._ec_ms_cm = s.ec_ms_cm;
+  if (s.runoff_ml !== undefined) args._runoff_ml = s.runoff_ml;
+  if (s.runoff_ph !== undefined) args._runoff_ph = s.runoff_ph;
+  if (s.runoff_ec_ms_cm !== undefined) args._runoff_ec = s.runoff_ec_ms_cm;
+  if (s.water_temp_c !== undefined) args._water_temp_c = s.water_temp_c;
+  return args;
 }

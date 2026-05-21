@@ -105,7 +105,7 @@ describe("quickLogToTypedEventPayload", () => {
       event_type: "observation",
       details: {
         symptom_type: ["yellowing", "spots"],
-        severity: "moderate",
+        severity: "warn",
         affected_area: "lower fan leaves",
         details: "spreading slowly",
       },
@@ -115,7 +115,7 @@ describe("quickLogToTypedEventPayload", () => {
     expect(r.subtype.kind).toBe("observation");
     expect(r.subtype.payload).toEqual({
       symptom_type: ["yellowing", "spots"],
-      severity: "moderate",
+      severity: "warn",
       affected_area: "lower fan leaves",
       details: "spreading slowly",
     });
@@ -126,18 +126,18 @@ describe("quickLogToTypedEventPayload", () => {
       ...baseDraft,
       event_type: "training",
       details: {
-        technique: "LST",
+        technique: "lst",
         intensity: "light",
-        affected_nodes: ["n1", "n2"],
+        affected_nodes: 3,
       },
     });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.subtype.kind).toBe("training");
     expect(r.subtype.payload).toEqual({
-      technique: "LST",
+      technique: "lst",
       intensity: "light",
-      affected_nodes: ["n1", "n2"],
+      affected_nodes: 3,
     });
   });
 
@@ -189,7 +189,7 @@ describe("quickLogToTypedEventPayload", () => {
     const r = quickLogToTypedEventPayload({
       ...baseDraft,
       event_type: "watering",
-      details: { ph: "banana" },
+      details: { watering_amount_ml: 100, ph: "banana" },
     });
     expect(r.ok).toBe(false);
     expect((r as { reason?: string }).reason).toBe("ph:invalid");
@@ -199,7 +199,7 @@ describe("quickLogToTypedEventPayload", () => {
     const r = quickLogToTypedEventPayload({
       ...baseDraft,
       event_type: "watering",
-      details: { ph: 99 },
+      details: { watering_amount_ml: 100, ph: 99 },
     });
     expect(r.ok).toBe(false);
     expect((r as { reason?: string }).reason).toBe("ph:out-of-range");
@@ -302,7 +302,7 @@ describe("quickLogToTypedEventPayload", () => {
     const r = quickLogToTypedEventPayload({
       ...baseDraft,
       event_type: "watering",
-      details: {},
+      details: { watering_amount_ml: 100 },
     });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -314,7 +314,7 @@ describe("quickLogToTypedEventPayload", () => {
       ...baseDraft,
       user_id: "user-1",
       event_type: "watering",
-      details: {},
+      details: { watering_amount_ml: 100 },
     });
     expect(r.ok).toBe(true);
     if (!r.ok) return;

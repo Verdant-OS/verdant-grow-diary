@@ -19,7 +19,8 @@ import type { LeadRow } from "@/hooks/useLeadsList";
 const readSrc = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
 const RULES = readSrc("lib/leadDetailSnapshotRules.ts");
 const COMPONENT = readSrc("components/LeadDetailSnapshotCard.tsx");
-const DRAWER = readSrc("components/LeadDetailDrawer.tsx");
+import { readLeadDetailDrawerBundle } from "./_leadDrawerBundle";
+const DRAWER = readLeadDetailDrawerBundle();
 
 const NOW = new Date("2026-05-10T12:00:00Z").getTime();
 

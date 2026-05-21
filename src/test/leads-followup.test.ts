@@ -27,7 +27,8 @@ const migrationContents = readdirSync(MIGRATIONS_DIR)
   .map((f) => readFileSync(resolve(MIGRATIONS_DIR, f), "utf8"))
   .join("\n\n");
 
-const PAGE = readSrc("pages/Leads.tsx") + "\n" + readSrc("components/LeadDetailDrawer.tsx");
+import { readLeadDetailDrawerBundle } from "./_leadDrawerBundle";
+const PAGE = readSrc("pages/Leads.tsx") + "\n" + readLeadDetailDrawerBundle();
 const HOOK = readSrc("hooks/useLeadsList.ts");
 const FORM = readSrc("components/LeadCaptureForm.tsx");
 const LANDING = readSrc("pages/Landing.tsx");

@@ -130,9 +130,9 @@ describe("auditLeadDataQuality", () => {
 
   it("duplicate-looking leads via shared email", () => {
     const leads: LeadRow[] = [
-      lead({ id: "a", email: "dup@x.io" }),
-      lead({ id: "b", email: "DUP@x.io" }),
-      lead({ id: "c", email: "other@x.io" }),
+      lead({ id: "a", email: "dup@x.io", name: "Alpha", company: "C1" }),
+      lead({ id: "b", email: "DUP@x.io", name: "Beta", company: "C2" }),
+      lead({ id: "c", email: "other@x.io", name: "Gamma", company: "C3" }),
     ];
     const r = auditLeadDataQuality(leads, NOW);
     const f = r.find((x) => x.id === "duplicate_looking");

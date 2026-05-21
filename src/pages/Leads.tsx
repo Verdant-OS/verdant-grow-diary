@@ -409,7 +409,14 @@ export default function Leads() {
                             }
                           }}
                         />
-                        <LeadActivity leadId={l.id} refreshKey={l.updated_at ?? l.created_at} />
+                        <LogInteraction
+                          disabled={creatingEvent}
+                          onSubmit={(t, n) => logInteraction(l, t, n)}
+                        />
+                        <LeadActivity
+                          leadId={l.id}
+                          refreshKey={`${l.updated_at ?? l.created_at}:${activityNonce[l.id] ?? 0}`}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}

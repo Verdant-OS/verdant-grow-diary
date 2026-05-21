@@ -15,6 +15,7 @@ import {
 } from "@/hooks/useGrowData";
 import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import { evaluateAiContextSufficiency } from "@/lib/aiContextSufficiencyRules";
+import { adaptDiaryForAiContext } from "@/lib/coachContextAdapter";
 import CoachContextSufficiencyPanel from "@/components/CoachContextSufficiencyPanel";
 
 type Mode = "diagnose" | "next_steps";

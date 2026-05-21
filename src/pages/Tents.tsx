@@ -20,6 +20,7 @@ export default function Tents() {
   const { data: tents = [], isLoading } = useGrowTents(urlGrowId ?? undefined);
   const { data: readings = [] } = useSensorReadings();
   const { data: plants = [] } = usePlants();
+  const tentsMeta = getGrowDataMeta(["grow", "tents", urlGrowId ?? "all"]);
 
   return (
     <div>

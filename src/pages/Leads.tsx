@@ -27,6 +27,13 @@ import {
   type LeadStatus,
 } from "@/hooks/useLeadsList";
 import { useLeadEvents } from "@/hooks/useLeadEvents";
+import {
+  QUICK_FILTERS,
+  filterAndSortLeads,
+  followUpBadge,
+  summarizeLeads,
+  type LeadQuickFilter,
+} from "@/lib/leadFollowupRules";
 
 const LEAD_TYPES = [
   "beta_user",

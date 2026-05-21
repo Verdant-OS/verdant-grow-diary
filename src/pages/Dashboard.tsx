@@ -11,6 +11,7 @@ import StageBadge from "@/components/StageBadge";
 import SensorChart from "@/components/SensorChart";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
+import DashboardDataSourceDisclosure from "@/components/DashboardDataSourceDisclosure";
 import { useAlerts, useTasks, useAIInsights } from "@/hooks/useMockData";
 import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
@@ -147,6 +148,11 @@ export default function Dashboard() {
           backHref={backHref}
         />
       )}
+
+      <DashboardDataSourceDisclosure
+        scopedGrowId={scopedGrowId}
+        hasAnyData={tents.length > 0 || plants.length > 0}
+      />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <KpiCard label="Active tents" value={tents.length} icon={<Box className="h-3.5 w-3.5" />} />

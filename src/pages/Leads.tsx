@@ -26,6 +26,7 @@ import {
   type LeadRow,
   type LeadStatus,
 } from "@/hooks/useLeadsList";
+import { useLeadEvents } from "@/hooks/useLeadEvents";
 
 const LEAD_TYPES = [
   "beta_user",

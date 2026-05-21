@@ -15,6 +15,7 @@ import {
 } from "@/hooks/useGrowData";
 import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import { evaluateAiContextSufficiency } from "@/lib/aiContextSufficiencyRules";
+import { adaptDiaryForAiContext } from "@/lib/coachContextAdapter";
 import CoachContextSufficiencyPanel from "@/components/CoachContextSufficiencyPanel";
 
 type Mode = "diagnose" | "next_steps";
@@ -59,12 +60,21 @@ export default function Coach() {
   const contextSufficiency = useMemo(() => {
     const plantsMeta = getGrowDataMeta(["grow", "plants", "all", activeGrowId ?? "all"]);
     const sensorsMeta = getGrowDataMeta(["grow", "sensors", "all"]);
-    const diaryWaterFeed = (ctxDiary as Array<{ entry_at?: string; entry_type?: string }>).filter(
-      (e) => {
-        const t = (e?.entry_type ?? "").toLowerCase();
-        return t.includes("water") || t.includes("feed");
-      },
-    );
+    // Route raw diary rows through the normalization rules so malformed
+    // details degrade context safely and valid pH/EC/watering/photo signals
+    // can lift sufficiency where appropriate.
+    const diaryAdapted = adaptDiaryForAiContext({
+      rawDiaryEntries: ctxDiary as readonly unknown[],
+    });
+    const liveSensors = ctxSensors.map((r) => ({
+      at: (r as { recordedAt?: string | number | Date; at?: string | number | Date }).recordedAt
+        ?? (r as { at?: string | number | Date }).at,
+      temp: r.temp,
+      rh: r.rh,
+      vpd: r.vpd,
+      ph: (r as { ph?: number }).ph,
+      ec: (r as { ec?: number }).ec,
+    }));
     return evaluateAiContextSufficiency({
       activeGrow: activeGrowId ? { id: activeGrowId } : null,
       plants: ctxPlants.map((p) => ({
@@ -75,23 +85,10 @@ export default function Coach() {
         // rule helper can warn honestly without inventing values.
         medium: (p as { medium?: string | null }).medium ?? null,
       })),
-      recentDiaryEntries: (ctxDiary as Array<{ entry_at?: string; entry_type?: string }>).map(
-        (e) => ({ at: e.entry_at, type: e.entry_type }),
-      ),
-      recentWateringOrFeeding: diaryWaterFeed.map((e) => ({
-        at: e.entry_at,
-        type: e.entry_type,
-      })),
-      recentSensorReadings: ctxSensors.map((r) => ({
-        at: (r as { recordedAt?: string | number | Date; at?: string | number | Date }).recordedAt
-          ?? (r as { at?: string | number | Date }).at,
-        temp: r.temp,
-        rh: r.rh,
-        vpd: r.vpd,
-        ph: (r as { ph?: number }).ph,
-        ec: (r as { ec?: number }).ec,
-      })),
-      hasPhoto: !!photoFile,
+      recentDiaryEntries: diaryAdapted.recentDiaryEntries,
+      recentWateringOrFeeding: diaryAdapted.recentWateringOrFeeding,
+      recentSensorReadings: [...liveSensors, ...diaryAdapted.diaryDerivedSensors],
+      hasPhoto: !!photoFile || diaryAdapted.hasDiaryPhoto,
       sensorMeta: sensorsMeta,
       contextMeta: plantsMeta,
       questionKind: photoFile ? "visual-diagnosis" : "general",

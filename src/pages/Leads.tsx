@@ -147,7 +147,44 @@ export default function Leads() {
 
       {authorized && (
         <>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {[
+              { label: "New leads", value: summary.new_leads },
+              { label: "Needs action", value: summary.needs_action },
+              { label: "Overdue follow-ups", value: summary.overdue },
+              { label: "Due today", value: summary.due_today },
+              { label: "Upcoming follow-ups", value: summary.upcoming },
+              { label: "Closed leads", value: summary.closed },
+            ].map((c) => (
+              <div
+                key={c.label}
+                className="rounded-xl border border-border/50 bg-card/40 p-3"
+              >
+                <div className="text-xs text-muted-foreground">{c.label}</div>
+                <div className="mt-1 font-display text-2xl font-semibold">
+                  {c.value}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Lead quick filters">
+            {QUICK_FILTERS.map((f) => (
+              <Button
+                key={f.id}
+                size="sm"
+                variant={quickFilter === f.id ? "default" : "outline"}
+                onClick={() => setQuickFilter(f.id)}
+                role="tab"
+                aria-selected={quickFilter === f.id}
+              >
+                {f.label}
+              </Button>
+            ))}
+          </div>
+
           <div className="flex flex-wrap items-end gap-3">
+
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Status</label>
               <Select value={status} onValueChange={setStatus}>

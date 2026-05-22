@@ -7,7 +7,7 @@
  * STRICTLY READ-ONLY. NO WRITES. NO AUTOMATION. NO DEVICE CONTROL.
  *  - No .insert / .update / .delete / .upsert / .rpc anywhere on this page.
  *  - No Action Queue creation. Links only to existing detail pages.
- *  - No service_role. No device-command surface.
+ *  - No elevated keys. No executable equipment surface.
  *  - All business logic lives in src/lib/growRoomModeRules.ts.
  *
  * UI is mobile-first: large status cards, fast scan, clear warnings.

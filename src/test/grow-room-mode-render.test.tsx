@@ -6,12 +6,15 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
+const EMPTY_TENTS: never[] = [];
+const EMPTY_ALERTS: never[] = [];
+
 vi.mock("@/hooks/use-tents", () => ({
-  useTents: () => ({ data: [], isLoading: false, error: null }),
+  useTents: () => ({ data: EMPTY_TENTS, isLoading: false, error: null }),
 }));
 
 vi.mock("@/hooks/useAlertsList", () => ({
-  useAlertsList: () => ({ alerts: [], isLoading: false, error: null }),
+  useAlertsList: () => ({ alerts: EMPTY_ALERTS, isLoading: false, error: null }),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({

@@ -116,7 +116,9 @@ export default function ActionQueue() {
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
+
 
   const load = useCallback(async () => {
     if (!user) return;

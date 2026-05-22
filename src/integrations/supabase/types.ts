@@ -937,7 +937,7 @@ export type Database = {
           source?: string
           tent_id: string
           ts?: string
-          user_id: string
+          user_id?: string
           value: number
         }
         Update: {

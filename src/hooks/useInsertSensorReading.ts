@@ -19,7 +19,10 @@ const VALID_METRICS = [
 
 export function validateSensorReadingPayload(p: InsertSensorReadingPayload): void {
   if (!p) throw new Error("sensor reading payload required");
-  if (!p.user_id) throw new Error("user_id required");
+  // user_id is optional in client payloads: the DB default `auth.uid()` and
+  // RLS enforce ownership. When explicitly provided (legacy callers/tests),
+  // it must be a non-empty string.
+  if (p.user_id !== undefined && !p.user_id) throw new Error("user_id required");
   if (!p.tent_id) throw new Error("tent_id required");
   if (!(VALID_METRICS as readonly string[]).includes(p.metric)) {
     throw new Error(`invalid metric: ${p.metric}`);
@@ -41,6 +44,7 @@ export function useInsertSensorReading(): UseMutationResult<
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["grow", "sensors"] });
+      qc.invalidateQueries({ queryKey: ["sensor_readings"] });
     },
   });
 }

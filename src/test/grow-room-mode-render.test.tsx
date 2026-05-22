@@ -43,6 +43,6 @@ describe("GrowRoomMode page render smoke", () => {
         <GrowRoomMode />
       </MemoryRouter>,
     );
-    expect(screen.getByText(/grow.?room/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/grow.?room/i).length).toBeGreaterThan(0);
   });
 });

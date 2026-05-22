@@ -47,7 +47,9 @@ import {
   extractSourceAlertId,
   getActionQueueSourceLabel,
   isAlertDerived,
+  shouldWarnPendingActionHasClosedSourceAlert,
 } from "@/lib/actionQueueProvenanceRules";
+
 
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { useGrows } from "@/store/grows";
@@ -144,6 +146,11 @@ export default function ActionDetail() {
   const [busy, setBusy] = useState(false);
   const [dialog, setDialog] = useState<Kind | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
+  const [sourceAlertStatus, setSourceAlertStatus] = useState<string | null>(
+    null,
+  );
+
+
 
   const load = useCallback(async () => {
     if (!user || !actionId) return;
@@ -176,6 +183,38 @@ export default function ActionDetail() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Read-only source-alert fetch (stale-action warning only).
+  // Only runs when we have an alert-derived action with a parseable alert id.
+  useEffect(() => {
+    let cancelled = false;
+    setSourceAlertStatus(null);
+    if (!row) return;
+    if (!isAlertDerived(row)) return;
+    const sourceAlertId = extractSourceAlertId(row.reason);
+    if (!sourceAlertId) return;
+    (async () => {
+      const { data, error } = await supabase
+        .from("alerts")
+        .select("id,status")
+        .eq("id", sourceAlertId)
+        .maybeSingle();
+      if (cancelled || error || !data) return;
+      setSourceAlertStatus(
+        typeof data.status === "string" ? data.status : null,
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [row]);
+
+  const showStaleSourceAlertWarning =
+    shouldWarnPendingActionHasClosedSourceAlert(
+      row?.status,
+      sourceAlertStatus,
+    );
+
 
   // SECURITY: audit-only insert. No device commands. user_id omitted (DB default auth.uid()).
   async function logEvent(
@@ -341,7 +380,19 @@ export default function ActionDetail() {
                   <Link to={alertDetailPath(sourceAlertId)}>Open source alert</Link>
                 </Button>
               )}
+              {showStaleSourceAlertWarning && (
+                <div
+                  role="alert"
+                  aria-label="Stale source alert warning"
+                  data-testid="stale-source-alert-warning"
+                  className="mt-3 rounded-lg border border-amber-500/60 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300"
+                >
+                  The source alert is no longer open. Re-check current grow
+                  conditions before approving this action.
+                </div>
+              )}
             </div>
+
           );
         })()}
 

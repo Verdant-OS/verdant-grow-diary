@@ -76,6 +76,20 @@ function fmt(ts: string | null | undefined): string {
   }
 }
 
+interface RelatedActionRow {
+  id: string;
+  grow_id: string | null;
+  source: string | null;
+  reason: string | null;
+  status: string | null;
+  risk_level: string | null;
+  suggested_change: string | null;
+  action_type: string | null;
+  created_at: string | null;
+}
+
+
+
 export default function AlertDetail() {
   const { alertId } = useParams<{ alertId: string }>();
   const [status, setStatus] = useState<LoadStatus>("idle");

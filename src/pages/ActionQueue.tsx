@@ -41,13 +41,19 @@ import {
   nextStatusFor,
   normalizeNote,
 } from "@/lib/actionQueueTransitions";
+import {
+  getActionQueueSourceLabel,
+  isAlertDerived,
+} from "@/lib/actionQueueProvenanceRules";
 
 type Status = ActionStatus;
 type EventType = ActionEventType;
 
 type StatusFilter = "all" | "pending" | "simulated" | "approved" | "rejected" | "completed" | "cancelled";
 type RiskFilter = "all" | "low" | "medium" | "high" | "critical";
+type SourceFilter = "all" | "environment_alert" | "ai_coach" | "manual";
 type SortOrder = "newest" | "oldest" | "risk";
+
 
 interface ActionRow {
   id: string;

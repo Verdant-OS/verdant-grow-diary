@@ -3,13 +3,14 @@
  *
  * Safety constraints (see docs/security-checklist.md):
  *   - No coach invocations.
- *   - No external device control.
+ *   - No external control surface and no equipment execution.
  *   - No privileged role usage.
  *   - Status mutations always: update alert -> append alert_events row.
  *   - "Add to Action Queue" is user-initiated only, creates a
- *     suggested/pending_approval row, never executes an action.
+ *     suggested/pending_approval row, never runs anything.
  *     Mapping lives in src/lib/alertToActionQueueRules.ts (no JSX duplication).
  */
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Bell, History, ListChecks } from "lucide-react";

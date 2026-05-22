@@ -543,6 +543,77 @@ export default function AlertDetail() {
             )}
           </section>
 
+          <section
+            className="glass rounded-2xl p-4"
+            aria-label="Related Action Queue Items"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <ListChecks className="h-4 w-4 text-muted-foreground" />
+              <h2 className="font-display font-semibold text-sm">
+                Related Action Queue Items{" "}
+                <span className="text-xs text-muted-foreground">
+                  {relatedActions.length}
+                </span>
+              </h2>
+            </div>
+            {!relatedLoaded ? (
+              <p className="text-xs text-muted-foreground">Loading…</p>
+            ) : relatedActions.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No queue items have been created from this alert yet.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {relatedActions.map((a) => (
+                  <li
+                    key={a.id}
+                    className="rounded-lg border border-border/40 bg-secondary/20 p-2"
+                  >
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {a.status && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] uppercase"
+                        >
+                          {a.status}
+                        </Badge>
+                      )}
+                      {a.risk_level && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] uppercase"
+                        >
+                          {a.risk_level}
+                        </Badge>
+                      )}
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] uppercase border-primary text-primary"
+                      >
+                        {getActionQueueSourceLabel(a)}
+                      </Badge>
+                      <Link
+                        to={actionDetailPath(a.id)}
+                        className="ml-auto text-xs text-primary hover:underline"
+                      >
+                        Open
+                      </Link>
+                    </div>
+                    <p className="text-sm mt-1 break-words">
+                      {a.suggested_change ?? a.action_type ?? a.id}
+                    </p>
+                    {a.created_at && (
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        {formatDistanceToNow(new Date(a.created_at), {
+                          addSuffix: true,
+                        })}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
 
 
           <section className="glass rounded-2xl p-4" aria-label="Alert history">

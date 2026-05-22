@@ -45,8 +45,10 @@ import {
 } from "@/lib/alertToActionQueueRules";
 import {
   getActionQueueSourceLabel,
+  hasPendingActionsForClosedAlert,
   isActionDerivedFromAlert,
 } from "@/lib/actionQueueProvenanceRules";
+
 
 import { supabase } from "@/integrations/supabase/client";
 

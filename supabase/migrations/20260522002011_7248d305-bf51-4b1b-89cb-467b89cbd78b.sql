@@ -1,0 +1,1 @@
+ALTER TABLE public.sensor_readings ALTER COLUMN user_id SET DEFAULT auth.uid();

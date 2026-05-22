@@ -127,6 +127,12 @@ export default function Dashboard() {
   );
   const targetsState = useGrowTargets(scopedGrowId ?? null);
   const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);
+  // Real persisted alerts for this grow (open only). Read-only display so
+  // growers can see the loop close: manual reading → derived alert → persisted.
+  const persistedAlertsState = useAlertsList(
+    scopedGrowId ? { growId: scopedGrowId, status: "open" } : { status: "open" },
+  );
+  const persistedOpenCount = scopedGrowId ? persistedAlertsState.alerts.length : 0;
 
   // Persist derived Environment Alerts into public.alerts when (and only
   // when) they are backed by real, valid sensor readings. Idempotent and

@@ -41,13 +41,26 @@ import {
   nextStatusFor,
   normalizeNote,
 } from "@/lib/actionQueueTransitions";
+import {
+  ACTION_QUEUE_SOURCE_VALUES,
+  getActionQueueSourceLabel,
+  isAlertDerived,
+} from "@/lib/actionQueueProvenanceRules";
+
 
 type Status = ActionStatus;
 type EventType = ActionEventType;
 
 type StatusFilter = "all" | "pending" | "simulated" | "approved" | "rejected" | "completed" | "cancelled";
 type RiskFilter = "all" | "low" | "medium" | "high" | "critical";
+type SourceFilter =
+  | "all"
+  | typeof ACTION_QUEUE_SOURCE_VALUES.ENVIRONMENT_ALERT
+  | typeof ACTION_QUEUE_SOURCE_VALUES.AI_COACH
+  | typeof ACTION_QUEUE_SOURCE_VALUES.MANUAL;
+
 type SortOrder = "newest" | "oldest" | "risk";
+
 
 interface ActionRow {
   id: string;
@@ -110,7 +123,9 @@ export default function ActionQueue() {
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
+
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -286,7 +301,8 @@ export default function ActionQueue() {
     };
     const list = rows
       .filter((r) => matchesStatus(r.status))
-      .filter((r) => riskFilter === "all" || r.risk_level === riskFilter);
+      .filter((r) => riskFilter === "all" || r.risk_level === riskFilter)
+      .filter((r) => sourceFilter === "all" || (r.source ?? "") === sourceFilter);
     const sorted = [...list].sort((a, b) => {
       if (sortOrder === "risk") return RISK_RANK[b.risk_level] - RISK_RANK[a.risk_level];
       const ta = new Date(a.created_at).getTime();
@@ -294,7 +310,7 @@ export default function ActionQueue() {
       return sortOrder === "oldest" ? ta - tb : tb - ta;
     });
     return sorted;
-  }, [rows, statusFilter, riskFilter, sortOrder]);
+  }, [rows, statusFilter, riskFilter, sourceFilter, sortOrder]);
 
   const pending = useMemo(
     () => filtered.filter((r) => r.status === "pending_approval"),
@@ -306,7 +322,11 @@ export default function ActionQueue() {
   );
 
   const filtersActive =
-    statusFilter !== "all" || riskFilter !== "all" || sortOrder !== "newest";
+    statusFilter !== "all" ||
+    riskFilter !== "all" ||
+    sourceFilter !== "all" ||
+    sortOrder !== "newest";
+
 
   return (
     <div>
@@ -365,6 +385,21 @@ export default function ActionQueue() {
           </SelectContent>
         </Select>
 
+        <Select value={sourceFilter} onValueChange={(v) => setSourceFilter(v as SourceFilter)}>
+          <SelectTrigger className="h-9 w-[170px]" aria-label="Source filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All sources</SelectItem>
+            <SelectItem value={ACTION_QUEUE_SOURCE_VALUES.ENVIRONMENT_ALERT}>Environment Alerts</SelectItem>
+            <SelectItem value={ACTION_QUEUE_SOURCE_VALUES.AI_COACH}>AI Coach</SelectItem>
+            <SelectItem value={ACTION_QUEUE_SOURCE_VALUES.MANUAL}>Manual</SelectItem>
+
+          </SelectContent>
+        </Select>
+
+
+
         <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as SortOrder)}>
           <SelectTrigger className="h-9 w-[170px]" aria-label="Sort order">
             <SelectValue />
@@ -400,6 +435,15 @@ export default function ActionQueue() {
                       <Badge variant="outline" className={RISK_VARIANT[row.risk_level]}>
                         {row.risk_level}
                       </Badge>
+                      {isAlertDerived(row) && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] uppercase border-primary text-primary"
+                        >
+                          {getActionQueueSourceLabel(row)}
+                        </Badge>
+                      )}
+
                       <span className="text-xs text-muted-foreground">
                         {row.target_metric ?? row.target_device}
                       </span>
@@ -454,6 +498,15 @@ export default function ActionQueue() {
                   <Badge variant="outline" className={`text-[10px] uppercase ${RISK_VARIANT[row.risk_level]}`}>
                     {row.risk_level}
                   </Badge>
+                  {isAlertDerived(row) && (
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] uppercase border-primary text-primary"
+                    >
+                      {getActionQueueSourceLabel(row)}
+                    </Badge>
+                  )}
+
                   <span className="truncate flex-1">{row.suggested_change}</span>
                   <span className="text-xs text-muted-foreground">{row.action_type}</span>
                   {canComplete(row.status) && (

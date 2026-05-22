@@ -42,7 +42,13 @@ import {
   nextStatusFor,
   normalizeNote,
 } from "@/lib/actionQueueTransitions";
-import { actionsPath, growDetailPath } from "@/lib/routes";
+import { actionsPath, alertDetailPath, growDetailPath } from "@/lib/routes";
+import {
+  extractSourceAlertId,
+  getActionQueueSourceLabel,
+  isAlertDerived,
+} from "@/lib/actionQueueProvenanceRules";
+
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { useGrows } from "@/store/grows";
 
@@ -283,7 +289,9 @@ export default function ActionDetail() {
           <Badge variant="outline" className="uppercase text-[10px]">{row.status}</Badge>
           <Badge variant="outline" className={RISK_VARIANT[row.risk_level]}>{row.risk_level}</Badge>
           <span className="text-xs text-muted-foreground">{row.action_type}</span>
-          <span className="text-xs text-muted-foreground">· {row.source}</span>
+          <Badge variant="outline" className="text-[10px] uppercase">
+            {getActionQueueSourceLabel(row)}
+          </Badge>
         </div>
         <h1 className="text-xl font-display font-bold">{row.suggested_change}</h1>
         <p className="text-sm text-muted-foreground mt-1">{row.reason}</p>
@@ -298,6 +306,46 @@ export default function ActionDetail() {
             <Field label="Completed" value={new Date(row.completed_at).toLocaleString()} />
           )}
         </dl>
+
+        {isAlertDerived(row) && (() => {
+          const sourceAlertId = extractSourceAlertId(row.reason);
+          return (
+            <div
+              className="mt-4 rounded-lg border border-border/40 bg-secondary/20 p-3"
+              aria-label="Action source"
+            >
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                Source
+              </p>
+              <p className="text-sm font-medium mt-0.5">Environment Alert</p>
+              <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                {row.target_metric && (
+                  <div>
+                    <dt className="uppercase tracking-wider text-[10px]">Metric</dt>
+                    <dd className="text-foreground">{row.target_metric}</dd>
+                  </div>
+                )}
+                <div>
+                  <dt className="uppercase tracking-wider text-[10px]">Risk</dt>
+                  <dd className="text-foreground">{row.risk_level}</dd>
+                </div>
+                {sourceAlertId && (
+                  <div className="col-span-2">
+                    <dt className="uppercase tracking-wider text-[10px]">Alert ID</dt>
+                    <dd className="text-foreground font-mono truncate">{sourceAlertId}</dd>
+                  </div>
+                )}
+              </dl>
+              {sourceAlertId && (
+                <Button asChild size="sm" variant="outline" className="mt-3">
+                  <Link to={alertDetailPath(sourceAlertId)}>Open source alert</Link>
+                </Button>
+              )}
+            </div>
+          );
+        })()}
+
+
 
 
         {!isTerminal(row.status) && (

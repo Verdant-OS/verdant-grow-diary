@@ -47,7 +47,9 @@ import {
   extractSourceAlertId,
   getActionQueueSourceLabel,
   isAlertDerived,
+  shouldWarnPendingActionHasClosedSourceAlert,
 } from "@/lib/actionQueueProvenanceRules";
+
 
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { useGrows } from "@/store/grows";

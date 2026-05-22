@@ -380,7 +380,19 @@ export default function ActionDetail() {
                   <Link to={alertDetailPath(sourceAlertId)}>Open source alert</Link>
                 </Button>
               )}
+              {showStaleSourceAlertWarning && (
+                <div
+                  role="alert"
+                  aria-label="Stale source alert warning"
+                  data-testid="stale-source-alert-warning"
+                  className="mt-3 rounded-lg border border-amber-500/60 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300"
+                >
+                  The source alert is no longer open. Re-check current grow
+                  conditions before approving this action.
+                </div>
+              )}
             </div>
+
           );
         })()}
 

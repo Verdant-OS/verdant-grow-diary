@@ -168,6 +168,13 @@ export default function AlertDetail() {
   );
   const canQueue = !!draftResult && draftResult.ok && alert?.status === "open";
 
+  // Read-only stale-action warning: closed alert + still-pending related items.
+  const showStaleActionWarning = useMemo(
+    () => hasPendingActionsForClosedAlert(alert?.status, relatedActions),
+    [alert?.status, relatedActions],
+  );
+
+
   // Idempotency probe: look for an existing pending/approved action row that
   // already references this alert via its back-pointer token.
   useEffect(() => {

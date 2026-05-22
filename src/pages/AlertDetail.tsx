@@ -45,8 +45,10 @@ import {
 } from "@/lib/alertToActionQueueRules";
 import {
   getActionQueueSourceLabel,
+  hasPendingActionsForClosedAlert,
   isActionDerivedFromAlert,
 } from "@/lib/actionQueueProvenanceRules";
+
 
 import { supabase } from "@/integrations/supabase/client";
 
@@ -165,6 +167,13 @@ export default function AlertDetail() {
     [alert],
   );
   const canQueue = !!draftResult && draftResult.ok && alert?.status === "open";
+
+  // Read-only stale-action warning: closed alert + still-pending related items.
+  const showStaleActionWarning = useMemo(
+    () => hasPendingActionsForClosedAlert(alert?.status, relatedActions),
+    [alert?.status, relatedActions],
+  );
+
 
   // Idempotency probe: look for an existing pending/approved action row that
   // already references this alert via its back-pointer token.
@@ -556,6 +565,19 @@ export default function AlertDetail() {
                 </span>
               </h2>
             </div>
+            {showStaleActionWarning && (
+              <div
+                role="alert"
+                aria-label="Stale action warning"
+                data-testid="stale-action-warning"
+                className="mb-3 rounded-lg border border-amber-500/60 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300"
+              >
+                This alert is no longer open, but related actions are still
+                pending review. Confirm the current grow conditions before
+                approving.
+              </div>
+            )}
+
             {!relatedLoaded ? (
               <p className="text-xs text-muted-foreground">Loading…</p>
             ) : relatedActions.length === 0 ? (

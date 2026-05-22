@@ -92,3 +92,36 @@ export function isActionDerivedFromAlert(
   return extractSourceAlertId(action.reason) === alertId;
 }
 
+/** Alert statuses considered "closed" for stale-action warning purposes. */
+export const CLOSED_ALERT_STATUSES = ["resolved", "dismissed"] as const;
+export type ClosedAlertStatus = (typeof CLOSED_ALERT_STATUSES)[number];
+
+export function isClosedAlertStatus(
+  status: string | null | undefined,
+): status is ClosedAlertStatus {
+  return status === "resolved" || status === "dismissed";
+}
+
+/**
+ * Returns true when the alert is closed (resolved/dismissed) but at least one
+ * related action queue row is still `pending_approval`. Pure, null-safe, and
+ * deterministic — surfaces a read-only warning, never mutates anything.
+ */
+export function hasPendingActionsForClosedAlert(
+  alertStatus: string | null | undefined,
+  relatedActions:
+    | ReadonlyArray<{ status?: string | null } | null | undefined>
+    | null
+    | undefined,
+): boolean {
+  if (!isClosedAlertStatus(alertStatus)) return false;
+  if (!Array.isArray(relatedActions) || relatedActions.length === 0) {
+    return false;
+  }
+  for (const a of relatedActions) {
+    if (a && a.status === "pending_approval") return true;
+  }
+  return false;
+}
+
+

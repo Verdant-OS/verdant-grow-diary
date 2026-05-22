@@ -121,3 +121,20 @@ remain a deliberate grower decision.
 
 > Your hardware collects the data. Verdant turns it into plant memory, alert context, and approval-required decisions.
 
+## V0 contract test (stop-ship)
+
+`src/test/v0-operating-loop-contract.test.ts` is a **stop-ship test**. It
+locks the end-to-end V0 operating loop described above and guards every
+safety guarantee in this document.
+
+- It runs in CI on every pull request and push to `main` via
+  `.github/workflows/ci.yml`, both as a dedicated step and as part of
+  the full `bunx vitest run` suite.
+- A failure here blocks merge. Do not skip, mark `.skip`, or weaken its
+  assertions to make a PR green.
+- If a legitimate product change requires updating the contract, update
+  this document **and** the contract test in the same PR, and call it
+  out explicitly in the "V0 Operating Loop impact" section of the PR
+  template.
+
+

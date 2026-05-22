@@ -131,7 +131,7 @@ describe("Alert persistence gating from manual readings", () => {
       quality: "good",
     });
     expect(out.length).toBe(1);
-    expect(out[0].metric).toBe("humidity_pct");
+    expect(out[0].metric).toBe("rh");
   });
 
   it("dedupes against an already-open equivalent alert (idempotent)", () => {
@@ -144,7 +144,7 @@ describe("Alert persistence gating from manual readings", () => {
     ];
     expect(dedupeAgainstOpen([oorAlert], open)).toEqual([]);
     // Same rule key on both sides:
-    expect(derivedAlertKey(oorAlert)).toContain("humidity_pct");
+    expect(derivedAlertKey(oorAlert)).toContain("rh");
   });
 });
 

@@ -35,6 +35,7 @@ import {
 } from "@/lib/alerts";
 import { useAlertEvents } from "@/hooks/useAlertEvents";
 import {
+  actionDetailPath,
   alertsPath,
   growDetailPath,
 } from "@/lib/routes";
@@ -42,6 +43,11 @@ import {
   actionMatchesAlert,
   buildActionQueueDraftFromAlert,
 } from "@/lib/alertToActionQueueRules";
+import {
+  getActionQueueSourceLabel,
+  isActionDerivedFromAlert,
+} from "@/lib/actionQueueProvenanceRules";
+
 import { supabase } from "@/integrations/supabase/client";
 
 
@@ -70,6 +76,20 @@ function fmt(ts: string | null | undefined): string {
   }
 }
 
+interface RelatedActionRow {
+  id: string;
+  grow_id: string | null;
+  source: string | null;
+  reason: string | null;
+  status: string | null;
+  risk_level: string | null;
+  suggested_change: string | null;
+  action_type: string | null;
+  created_at: string | null;
+}
+
+
+
 export default function AlertDetail() {
   const { alertId } = useParams<{ alertId: string }>();
   const [status, setStatus] = useState<LoadStatus>("idle");
@@ -78,6 +98,9 @@ export default function AlertDetail() {
   const [eventsKey, setEventsKey] = useState(0);
   const [existingActionId, setExistingActionId] = useState<string | null>(null);
   const [queuing, setQueuing] = useState(false);
+  const [relatedActions, setRelatedActions] = useState<RelatedActionRow[]>([]);
+  const [relatedLoaded, setRelatedLoaded] = useState(false);
+
 
 
   const load = useCallback(async () => {
@@ -168,6 +191,48 @@ export default function AlertDetail() {
       cancelled = true;
     };
   }, [alert]);
+
+  // Read-only reverse provenance: list action_queue rows derived from this alert.
+  useEffect(() => {
+    let cancelled = false;
+    setRelatedActions([]);
+    setRelatedLoaded(false);
+    if (!alert || !alert.grow_id) return;
+    (async () => {
+      const { data, error: relErr } = await supabase
+        .from("action_queue")
+        .select(
+          "id,grow_id,source,reason,status,risk_level,suggested_change,action_type,created_at",
+        )
+        .eq("grow_id", alert.grow_id)
+        .eq("source", "environment_alert")
+        .like("reason", `%[alert:${alert.id}]%`)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (cancelled) return;
+      if (relErr) {
+        setRelatedLoaded(true);
+        return;
+      }
+      const rows = (data ?? []) as RelatedActionRow[];
+      // Deterministic filter via shared pure helper — no inline regex.
+      const matched = rows
+        .filter((r) => isActionDerivedFromAlert(r, alert.id))
+        .sort((a, b) => {
+          const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+          if (tb !== ta) return tb - ta;
+          return a.id.localeCompare(b.id);
+        });
+      setRelatedActions(matched);
+      setRelatedLoaded(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [alert]);
+
+
 
   async function addAlertToActionQueue() {
     if (!alert || !draftResult || !draftResult.ok || existingActionId) return;
@@ -478,6 +543,77 @@ export default function AlertDetail() {
             )}
           </section>
 
+          <section
+            className="glass rounded-2xl p-4"
+            aria-label="Related Action Queue Items"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <ListChecks className="h-4 w-4 text-muted-foreground" />
+              <h2 className="font-display font-semibold text-sm">
+                Related Action Queue Items{" "}
+                <span className="text-xs text-muted-foreground">
+                  {relatedActions.length}
+                </span>
+              </h2>
+            </div>
+            {!relatedLoaded ? (
+              <p className="text-xs text-muted-foreground">Loading…</p>
+            ) : relatedActions.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No queue items have been created from this alert yet.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {relatedActions.map((a) => (
+                  <li
+                    key={a.id}
+                    className="rounded-lg border border-border/40 bg-secondary/20 p-2"
+                  >
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {a.status && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] uppercase"
+                        >
+                          {a.status}
+                        </Badge>
+                      )}
+                      {a.risk_level && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] uppercase"
+                        >
+                          {a.risk_level}
+                        </Badge>
+                      )}
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] uppercase border-primary text-primary"
+                      >
+                        {getActionQueueSourceLabel(a)}
+                      </Badge>
+                      <Link
+                        to={actionDetailPath(a.id)}
+                        className="ml-auto text-xs text-primary hover:underline"
+                      >
+                        Open
+                      </Link>
+                    </div>
+                    <p className="text-sm mt-1 break-words">
+                      {a.suggested_change ?? a.action_type ?? a.id}
+                    </p>
+                    {a.created_at && (
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        {formatDistanceToNow(new Date(a.created_at), {
+                          addSuffix: true,
+                        })}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
 
 
           <section className="glass rounded-2xl p-4" aria-label="Alert history">

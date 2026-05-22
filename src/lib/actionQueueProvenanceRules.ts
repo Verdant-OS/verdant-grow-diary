@@ -74,3 +74,21 @@ export function isAlertDerived(
 ): boolean {
   return getActionQueueSourceKind(action) === "environment_alert";
 }
+
+/**
+ * Deterministic check: was `action` created from the alert with `alertId`?
+ * Requires the `environment_alert` source AND a matching `[alert:<id>]`
+ * back-pointer in the action's reason.
+ */
+export function isActionDerivedFromAlert(
+  action:
+    | (SourceLabelInput & { reason?: string | null })
+    | null
+    | undefined,
+  alertId: string | null | undefined,
+): boolean {
+  if (!action || typeof alertId !== "string" || !alertId) return false;
+  if (!isAlertDerived(action)) return false;
+  return extractSourceAlertId(action.reason) === alertId;
+}
+

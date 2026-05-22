@@ -13,7 +13,7 @@
  *   9. UI / Dashboard does not directly call supabase.from("alerts").insert.
  *  10. New persistence module is free of automation / device-control / service_role.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -259,7 +259,19 @@ function setupOk() {
 }
 
 describe("usePersistEnvironmentAlerts — hook behaviour", () => {
-  beforeEach(() => setupOk());
+  beforeEach(() => {
+    // Lock wall-clock to NOW so FRESH_TS stays fresh regardless of when CI runs.
+    // Use shouldAdvanceTime so testing-library's waitFor (which uses real
+    // setTimeout under the hood) still progresses.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+    setupOk();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
 
   it("does not write when snapshot is missing", async () => {
     renderHook(() =>

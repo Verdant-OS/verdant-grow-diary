@@ -137,7 +137,7 @@ describe("Alert persistence gating from manual readings", () => {
   it("dedupes against an already-open equivalent alert (idempotent)", () => {
     const open = [
       {
-        metric: "humidity_pct",
+        metric: "rh",
         source: "environment_alerts",
         reason: oorAlert.reason,
       },

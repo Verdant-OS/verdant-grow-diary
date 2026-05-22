@@ -259,7 +259,19 @@ function setupOk() {
 }
 
 describe("usePersistEnvironmentAlerts — hook behaviour", () => {
-  beforeEach(() => setupOk());
+  beforeEach(() => {
+    // Lock wall-clock to NOW so FRESH_TS stays fresh regardless of when CI runs.
+    // Use shouldAdvanceTime so testing-library's waitFor (which uses real
+    // setTimeout under the hood) still progresses.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+    setupOk();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
 
   it("does not write when snapshot is missing", async () => {
     renderHook(() =>

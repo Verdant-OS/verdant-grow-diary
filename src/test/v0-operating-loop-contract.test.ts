@@ -221,13 +221,16 @@ describe("V0 loop · action drafts are safe by construction", () => {
   });
 
   it("AlertDetail insert payload omits user_id", () => {
-    // Static check: the insert object passed in AlertDetail must not set user_id.
-    const insertIdx = ALERT_DETAIL.indexOf('.from("action_queue")');
+    // Static check: the action_queue insert object passed in AlertDetail must
+    // not set user_id (DB default auth.uid() owns it).
+    const insertIdx = ALERT_DETAIL.indexOf(".insert({");
     expect(insertIdx).toBeGreaterThan(-1);
-    const block = ALERT_DETAIL.slice(insertIdx, insertIdx + 1200);
-    expect(block).toMatch(/\.insert\(\{/);
-    expect(block).not.toMatch(/user_id\s*:/);
+    // Capture the immediate insert payload object.
+    const block = ALERT_DETAIL.slice(insertIdx, insertIdx + 800);
+    expect(block).toMatch(/grow_id\s*:/);
+    expect(block).not.toMatch(/\buser_id\s*:/);
   });
+
 });
 
 // ============================================================================

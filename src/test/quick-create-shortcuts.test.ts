@@ -114,12 +114,22 @@ describe("Quick creation shortcuts — V0 safety guardrails", () => {
   });
 
   it("CreatePlantDialog inserts into the plants table only", () => {
-    const inserts = CREATE_PLANT.match(/\.from\("[^"]+"\)\s*\.insert/g) ?? [];
-    expect(inserts).toEqual(['.from("plants").insert']);
+    const tables = Array.from(
+      CREATE_PLANT.matchAll(/\.from\("([^"]+)"\)[\s\S]{0,200}?\.insert\(/g),
+      (m) => m[1],
+    );
+    expect(new Set(tables)).toEqual(new Set(["plants"]));
+    expect(CREATE_PLANT).toContain('.from("plants")');
+    expect(CREATE_PLANT).toContain(".insert(payload as never)");
   });
 
   it("CreateTentDialog inserts into the tents table only", () => {
-    const inserts = CREATE_TENT.match(/\.from\("[^"]+"\)\s*\.insert/g) ?? [];
-    expect(inserts).toEqual(['.from("tents").insert']);
+    const tables = Array.from(
+      CREATE_TENT.matchAll(/\.from\("([^"]+)"\)[\s\S]{0,200}?\.insert\(/g),
+      (m) => m[1],
+    );
+    expect(new Set(tables)).toEqual(new Set(["tents"]));
+    expect(CREATE_TENT).toContain('.from("tents")');
+    expect(CREATE_TENT).toContain(".insert(payload as never)");
   });
 });

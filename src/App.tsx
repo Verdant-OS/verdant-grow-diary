@@ -27,6 +27,7 @@ import Diagnostics from "./pages/Diagnostics";
 import ActionQueue from "./pages/ActionQueue";
 import ActionDetail from "./pages/ActionDetail";
 import GrowLineageRepair from "./pages/GrowLineageRepair";
+import GrowRoomMode from "./pages/GrowRoomMode";
 import Landing from "./pages/Landing";
 import HardwareIntegrations from "./pages/HardwareIntegrations";
 import Leads from "./pages/Leads";

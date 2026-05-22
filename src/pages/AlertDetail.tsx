@@ -565,6 +565,19 @@ export default function AlertDetail() {
                 </span>
               </h2>
             </div>
+            {showStaleActionWarning && (
+              <div
+                role="alert"
+                aria-label="Stale action warning"
+                data-testid="stale-action-warning"
+                className="mb-3 rounded-lg border border-amber-500/60 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300"
+              >
+                This alert is no longer open, but related actions are still
+                pending review. Confirm the current grow conditions before
+                approving.
+              </div>
+            )}
+
             {!relatedLoaded ? (
               <p className="text-xs text-muted-foreground">Loading…</p>
             ) : relatedActions.length === 0 ? (

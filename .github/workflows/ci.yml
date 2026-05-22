@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      # Stop-ship: the V0 operating loop contract test must pass.
+      # See docs/v0-operating-loop-demo.md ("V0 contract test").
+      - name: V0 operating loop contract test
+        run: bunx vitest run src/test/v0-operating-loop-contract.test.ts
+
+      - name: Full test suite
+        run: bunx vitest run
+
+      - name: Build
+        run: bun run build

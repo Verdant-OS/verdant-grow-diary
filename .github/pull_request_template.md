@@ -33,6 +33,26 @@ Document any exceptions in [`docs/security-exceptions.md`](../docs/security-exce
 - [ ] Action Queue unchanged, or changes preserve user-approval-required semantics
 - [ ] Tests added/updated when behavior changes
 
+## V0 Operating Loop impact
+
+The V0 operating loop is Verdant's protected product spine — see
+[`docs/v0-operating-loop-demo.md`](../docs/v0-operating-loop-demo.md)
+and the stop-ship contract test
+`src/test/v0-operating-loop-contract.test.ts`.
+
+Confirm any change touching the loop is intentional and safety-reviewed:
+
+- [ ] Sensor readings (manual ingest, freshness, source) — unchanged or reviewed
+- [ ] Dashboard latest environment snapshot — unchanged or reviewed
+- [ ] Environment alerts (derivation rules) — unchanged or reviewed
+- [ ] Alert persistence (`alerts`, `alert_events`) — unchanged or reviewed
+- [ ] AlertDetail — unchanged or reviewed
+- [ ] ActionQueue — unchanged or reviewed
+- [ ] ActionDetail — unchanged or reviewed
+- [ ] Action Queue transitions (approve / reject / complete / cancel) — unchanged or reviewed
+- [ ] AI Coach → Action Queue handoff — unchanged or reviewed
+- [ ] `src/test/v0-operating-loop-contract.test.ts` still passes
+
 ## RLS / ownership impact
 
 <!-- New tables, new policies, changed policies, or ownership joins. Write "None" if not applicable. -->

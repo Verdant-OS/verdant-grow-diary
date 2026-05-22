@@ -15,7 +15,7 @@
  *     before the open-list query refreshes.
  *   - Never sends user_id from the client. Ownership is anchored on
  *     auth.uid() via DB defaults + RLS.
- *   - No service_role. No ai-coach call. No action_queue writes.
+ *   - No elevated keys. No AI calls. No Action Queue writes.
  *   - On audit-log failure the alert row remains; the failure is surfaced
  *     via the returned state, never silently retried into automation.
  */

@@ -6,7 +6,8 @@ import SensorChart from "@/components/SensorChart";
 import EmptyState from "@/components/EmptyState";
 import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Box, Lightbulb } from "lucide-react";
+import { ArrowLeft, Box, Lightbulb, Plus } from "lucide-react";
+import CreatePlantDialog from "@/components/CreatePlantDialog";
 import { usePlants, useSensorReadings, useCameras } from "@/hooks/useMockData";
 import { useGrowTent, getGrowDataMeta, type GrowDataSourceMeta } from "@/hooks/useGrowData";
 

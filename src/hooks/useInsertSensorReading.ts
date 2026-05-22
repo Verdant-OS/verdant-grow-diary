@@ -44,6 +44,7 @@ export function useInsertSensorReading(): UseMutationResult<
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["grow", "sensors"] });
+      qc.invalidateQueries({ queryKey: ["sensor_readings"] });
     },
   });
 }

@@ -119,5 +119,5 @@ remain a deliberate grower decision.
 
 ## Partner demo framing
 
-> Your hardware collects the data. Verdant turns it into plant memory,
-> alert context, and approval-required decisions.
+> Your hardware collects the data. Verdant turns it into plant memory, alert context, and approval-required decisions.
+

@@ -42,7 +42,13 @@ import {
   nextStatusFor,
   normalizeNote,
 } from "@/lib/actionQueueTransitions";
-import { actionsPath, growDetailPath } from "@/lib/routes";
+import { actionsPath, alertDetailPath, growDetailPath } from "@/lib/routes";
+import {
+  extractSourceAlertId,
+  getActionQueueSourceLabel,
+  isAlertDerived,
+} from "@/lib/actionQueueProvenanceRules";
+
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { useGrows } from "@/store/grows";
 

@@ -195,7 +195,7 @@ describe("Dashboard latest-snapshot consumption of manual readings", () => {
     const { isSnapshotPersistable } = await import("@/lib/environmentAlertPersistence");
     const ts = new Date().toISOString();
     const manualSnap = { source: "manual", ts, temp: 24, rh: 55, vpd: null, co2: null, soil: null, soil_ec: null, soil_temp: null, ppfd: null } as any;
-    expect(isSnapshotPersistable({ snapshot: manualSnap, quality: "ok" })).toBe(true);
-    expect(isSnapshotPersistable({ snapshot: manualSnap, quality: "ok", isDemoData: true })).toBe(false);
+    expect(isSnapshotPersistable({ snapshot: manualSnap, quality: "good" })).toBe(true);
+    expect(isSnapshotPersistable({ snapshot: manualSnap, quality: "good", isDemoData: true })).toBe(false);
   });
 });

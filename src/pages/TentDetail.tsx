@@ -6,7 +6,8 @@ import SensorChart from "@/components/SensorChart";
 import EmptyState from "@/components/EmptyState";
 import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Box, Lightbulb } from "lucide-react";
+import { ArrowLeft, Box, Lightbulb, Plus } from "lucide-react";
+import CreatePlantDialog from "@/components/CreatePlantDialog";
 import { usePlants, useSensorReadings, useCameras } from "@/hooks/useMockData";
 import { useGrowTent, getGrowDataMeta, type GrowDataSourceMeta } from "@/hooks/useGrowData";
 
@@ -99,18 +100,33 @@ export default function TentDetail() {
       </div>
 
       <div className="glass rounded-2xl p-4">
-        <h2 className="font-display font-semibold mb-3">Plants in this tent ({plants.length})</h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {plants.map((p) => (
-            <Link key={p.id} to={`/plants/${p.id}`} className="rounded-xl border border-border/40 overflow-hidden hover:border-primary/50 transition">
-              <div className="aspect-video bg-secondary/40"><img src={p.photo} alt="" className="w-full h-full object-cover" /></div>
-              <div className="p-3">
-                <div className="flex items-center justify-between"><span className="font-medium text-sm">{p.name}</span><StageBadge stage={p.stage} /></div>
-                <p className="text-xs text-muted-foreground mt-0.5">{p.strain}</p>
-              </div>
-            </Link>
-          ))}
+        <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+          <h2 className="font-display font-semibold">Plants in this tent ({plants.length})</h2>
+          <CreatePlantDialog
+            defaultTentId={id}
+            defaultGrowId={tent.growId ?? undefined}
+            trigger={
+              <Button size="sm" className="gradient-leaf text-primary-foreground gap-1">
+                <Plus className="h-4 w-4" /> Add Plant to This Tent
+              </Button>
+            }
+          />
         </div>
+        {plants.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No plants in this tent yet. Add Plant.</p>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {plants.map((p) => (
+              <Link key={p.id} to={`/plants/${p.id}`} className="rounded-xl border border-border/40 overflow-hidden hover:border-primary/50 transition">
+                <div className="aspect-video bg-secondary/40"><img src={p.photo} alt="" className="w-full h-full object-cover" /></div>
+                <div className="p-3">
+                  <div className="flex items-center justify-between"><span className="font-medium text-sm">{p.name}</span><StageBadge stage={p.stage} /></div>
+                  <p className="text-xs text-muted-foreground mt-0.5">{p.strain}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

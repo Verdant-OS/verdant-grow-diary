@@ -3,7 +3,7 @@
  *
  * Safety constraints (see docs/security-checklist.md):
  *   - No coach invocations.
- *   - No external control surface and no equipment execution.
+ *   - No outbound equipment surface and no execution paths.
  *   - No privileged role usage.
  *   - Status mutations always: update alert -> append alert_events row.
  *   - "Add to Action Queue" is user-initiated only, creates a

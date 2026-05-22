@@ -99,8 +99,8 @@ describe("Latest snapshot labels a fresh manual reading correctly", () => {
 describe("Alert persistence gating from manual readings", () => {
   const oorAlert: EnvironmentAlert = {
     id: "rh:high",
-    severity: "warn",
-    metric: "humidity_pct",
+    severity: "warning",
+    metric: "rh",
     title: "Humidity above target",
     reason: "RH 75% > target max 65%",
     source: "sensor_snapshot",

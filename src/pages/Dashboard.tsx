@@ -285,20 +285,62 @@ export default function Dashboard() {
           className="glass rounded-2xl p-4 mt-4"
           aria-label="Latest environment"
         >
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
             <div>
               <h2 className="font-display font-semibold">Latest Environment</h2>
               <p className="text-xs text-muted-foreground">
                 Most recent reading for this grow. Not live device control.
               </p>
             </div>
-            <Link
-              to={logsPath(scopedGrowId)}
-              className="text-xs text-primary hover:underline"
-            >
-              Open Timeline →
-            </Link>
+            <div className="flex items-center gap-2 flex-wrap">
+              {selectableTents.length > 1 && (
+                <Select
+                  value={tentSelection}
+                  onValueChange={(v) => setTentSelection(v as TentSelection)}
+                >
+                  <SelectTrigger
+                    className="h-7 text-xs w-[140px]"
+                    aria-label="Tent filter"
+                    data-testid="latest-env-tent-select"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All tents</SelectItem>
+                    {selectableTents.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Link
+                to={logsPath(scopedGrowId)}
+                className="text-xs text-primary hover:underline"
+              >
+                Open Timeline →
+              </Link>
+            </div>
           </div>
+          {persistedAlertsState.status === "ok" && (
+            <div
+              className="mb-3 text-xs text-muted-foreground"
+              data-testid="latest-env-persisted-count"
+            >
+              {persistedOpenCount > 0 ? (
+                <>
+                  <Link to="/alerts" className="text-primary hover:underline">
+                    {persistedOpenCount} persisted open alert
+                    {persistedOpenCount === 1 ? "" : "s"}
+                  </Link>{" "}
+                  for this grow.
+                </>
+              ) : (
+                "No persisted open alerts for this grow."
+              )}
+            </div>
+          )}
           {sensorState.status === "loading" || sensorState.status === "idle" ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : sensorState.status === "unavailable" ? (

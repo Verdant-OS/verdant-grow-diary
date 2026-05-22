@@ -166,7 +166,7 @@ describe("Dashboard — Latest Environment card wiring", () => {
     expect(DASHBOARD).toMatch(/formatValue/);
     expect(DASHBOARD).toMatch(/isStale/);
     expect(DASHBOARD).toMatch(
-      /useLatestSensorSnapshot\(\s*scopedGrowId\s*\?\?\s*null\s*,\s*tents\.map\(\(t\)\s*=>\s*t\.id\)/,
+      /useLatestSensorSnapshot\(\s*scopedGrowId\s*\?\?\s*null\s*,\s*selectedTentIds/,
     );
   });
 

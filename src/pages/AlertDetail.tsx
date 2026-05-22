@@ -3,15 +3,17 @@
  *
  * Safety constraints (see docs/security-checklist.md):
  *   - No coach invocations.
- *   - No Action Queue writes.
- *   - No external device control.
+ *   - No outbound equipment surface and no execution paths.
  *   - No privileged role usage.
  *   - Status mutations always: update alert -> append alert_events row.
- *     Audit-log failure surfaces a warning toast but does not roll back.
+ *   - "Add to Action Queue" is user-initiated only, creates a
+ *     suggested/pending_approval row, never runs anything.
+ *     Mapping lives in src/lib/alertToActionQueueRules.ts (no JSX duplication).
  */
-import { useCallback, useEffect, useState } from "react";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Bell, History } from "lucide-react";
+import { ArrowLeft, Bell, History, ListChecks } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 
@@ -36,6 +38,12 @@ import {
   alertsPath,
   growDetailPath,
 } from "@/lib/routes";
+import {
+  actionMatchesAlert,
+  buildActionQueueDraftFromAlert,
+} from "@/lib/alertToActionQueueRules";
+import { supabase } from "@/integrations/supabase/client";
+
 
 type LoadStatus = "idle" | "loading" | "ok" | "not_found" | "error";
 
@@ -68,6 +76,9 @@ export default function AlertDetail() {
   const [alert, setAlert] = useState<AlertRow | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [eventsKey, setEventsKey] = useState(0);
+  const [existingActionId, setExistingActionId] = useState<string | null>(null);
+  const [queuing, setQueuing] = useState(false);
+
 
   const load = useCallback(async () => {
     if (!alertId) return;
@@ -125,6 +136,102 @@ export default function AlertDetail() {
     }
     setEventsKey((k) => k + 1);
   };
+
+  const draftResult = useMemo(
+    () => (alert ? buildActionQueueDraftFromAlert(alert) : null),
+    [alert],
+  );
+  const canQueue = !!draftResult && draftResult.ok && alert?.status === "open";
+
+  // Idempotency probe: look for an existing pending/approved action row that
+  // already references this alert via its back-pointer token.
+  useEffect(() => {
+    let cancelled = false;
+    setExistingActionId(null);
+    if (!alert || !alert.grow_id) return;
+    (async () => {
+      const { data, error: probeErr } = await supabase
+        .from("action_queue")
+        .select("id,source,status,reason,grow_id")
+        .eq("grow_id", alert.grow_id)
+        .eq("source", "environment_alert")
+        .in("status", ["pending_approval", "approved"])
+        .like("reason", `%[alert:${alert.id}]%`)
+        .limit(1);
+      if (cancelled || probeErr) return;
+      const match = (data ?? []).find((r) =>
+        actionMatchesAlert(r as never, alert),
+      );
+      if (match) setExistingActionId(match.id);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [alert]);
+
+  async function addAlertToActionQueue() {
+    if (!alert || !draftResult || !draftResult.ok || existingActionId) return;
+    setQueuing(true);
+    const { draft } = draftResult;
+    // SECURITY: never send user_id from the client. DB default (auth.uid()) wins.
+    const { data: inserted, error: insErr } = await supabase
+      .from("action_queue")
+      .insert({
+        grow_id: draft.grow_id,
+        tent_id: draft.tent_id,
+        plant_id: draft.plant_id,
+        action_type: draft.action_type,
+        target_metric: draft.target_metric,
+        suggested_change: draft.suggested_change,
+        reason: draft.reason,
+        risk_level: draft.risk_level,
+        source: draft.source,
+        status: draft.status,
+      })
+      .select("id,grow_id")
+      .single();
+    if (insErr) {
+      setQueuing(false);
+      const msg = (insErr.message || "").toLowerCase();
+      if (
+        insErr.code === "42501" ||
+        msg.includes("row-level security") ||
+        msg.includes("violates")
+      ) {
+        toast.error(
+          "This action cannot be queued until the plant/tent is assigned to this grow.",
+          { description: "Open Lineage Repair to assign tents to this grow." },
+        );
+        return;
+      }
+      toast.error(insErr.message);
+      return;
+    }
+    if (inserted?.id) {
+      setExistingActionId(inserted.id);
+      const { error: auditError } = await supabase
+        .from("action_queue_events")
+        .insert({
+          action_queue_id: inserted.id,
+          grow_id: inserted.grow_id ?? draft.grow_id,
+          event_type: "created",
+          previous_status: null,
+          new_status: "pending_approval",
+          note: draft.audit_note,
+        });
+      if (auditError) {
+        setQueuing(false);
+        toast.warning("Action queued, but audit log failed.", {
+          description: auditError.message,
+        });
+        return;
+      }
+    }
+    setQueuing(false);
+    toast.success("Action queued for approval.");
+  }
+
+
 
   return (
     <div>
@@ -323,7 +430,55 @@ export default function AlertDetail() {
                 </Button>
               )}
             </div>
+
+            {alert.status === "open" && (
+              <div
+                className="mt-4 rounded-lg border border-border/40 bg-secondary/10 p-3"
+                aria-label="Action queue handoff"
+              >
+                <div className="flex items-start gap-2">
+                  <ListChecks className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                  <div className="flex-1">
+                    <p className="text-xs font-medium">Suggested action</p>
+                    {draftResult && draftResult.ok ? (
+                      <>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {draftResult.draft.suggested_change}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground/80 mt-1">
+                          Approval-required. No device commands will run.
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Not enough alert context to draft a safe action.
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {existingActionId ? (
+                        <Button asChild size="sm" variant="outline">
+                          <Link to={`/actions/${existingActionId}`}>
+                            Already in Action Queue
+                          </Link>
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={!canQueue || queuing}
+                          onClick={addAlertToActionQueue}
+                        >
+                          {queuing ? "Adding…" : "Add to Action Queue"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
+
+
 
           <section className="glass rounded-2xl p-4" aria-label="Alert history">
             <div className="flex items-center gap-2 mb-2">

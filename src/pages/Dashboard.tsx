@@ -31,6 +31,18 @@ import {
 } from "@/lib/environmentAlerts";
 import { saveAlert, logAlertEvent } from "@/lib/alerts";
 import { usePersistEnvironmentAlerts } from "@/hooks/usePersistEnvironmentAlerts";
+import { useAlertsList } from "@/hooks/useAlertsList";
+import {
+  resolveSelectedTentIds,
+  type TentSelection,
+} from "@/lib/dashboardLatestEnvironmentRules";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 
 

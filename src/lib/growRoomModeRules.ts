@@ -11,7 +11,7 @@
  *  - Never labels demo / manual / stale data as live.
  *  - Caller (UI) does the rendering only — no business logic in JSX.
  *
- * Pure: deterministic, no Date.now() (caller passes `now`).
+ * Pure: deterministic, no clock reads (caller passes `now`).
  */
 import type { SensorSnapshot, SnapshotSource } from "@/lib/sensorSnapshot";
 

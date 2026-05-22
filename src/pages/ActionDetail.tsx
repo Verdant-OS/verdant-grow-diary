@@ -184,6 +184,38 @@ export default function ActionDetail() {
     load();
   }, [load]);
 
+  // Read-only source-alert fetch (stale-action warning only).
+  // Only runs when we have an alert-derived action with a parseable alert id.
+  useEffect(() => {
+    let cancelled = false;
+    setSourceAlertStatus(null);
+    if (!row) return;
+    if (!isAlertDerived(row)) return;
+    const sourceAlertId = extractSourceAlertId(row.reason);
+    if (!sourceAlertId) return;
+    (async () => {
+      const { data, error } = await supabase
+        .from("alerts")
+        .select("id,status")
+        .eq("id", sourceAlertId)
+        .maybeSingle();
+      if (cancelled || error || !data) return;
+      setSourceAlertStatus(
+        typeof data.status === "string" ? data.status : null,
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [row]);
+
+  const showStaleSourceAlertWarning =
+    shouldWarnPendingActionHasClosedSourceAlert(
+      row?.status,
+      sourceAlertStatus,
+    );
+
+
   // SECURITY: audit-only insert. No device commands. user_id omitted (DB default auth.uid()).
   async function logEvent(
     current: ActionRow,

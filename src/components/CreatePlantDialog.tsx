@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
+import CreateTentDialog from "@/components/CreateTentDialog";
 
 const STAGES = [
   { value: "seedling", label: "Seedling" },

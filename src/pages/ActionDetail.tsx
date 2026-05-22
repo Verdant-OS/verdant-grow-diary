@@ -144,8 +144,11 @@ export default function ActionDetail() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [dialog, setDialog] = useState<Kind | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
+  const [sourceAlertStatus, setSourceAlertStatus] = useState<string | null>(
+    null,
+  );
+
 
   const load = useCallback(async () => {
     if (!user || !actionId) return;

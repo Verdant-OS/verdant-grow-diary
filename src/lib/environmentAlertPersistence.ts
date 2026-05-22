@@ -5,7 +5,7 @@
  * Strict constraints:
  *   - No I/O. No Supabase calls. No React. No timers.
  *   - No AI calls. No plant-health diagnosis. No device control.
- *   - No service_role usage.
+ *   - No elevated keys.
  *   - Read-only logic; just decides which alerts SHOULD be saved and
  *     produces deterministic idempotency keys. The hook layer performs
  *     the actual writes, scoped to `auth.uid()` via RLS + DB defaults.

@@ -13,7 +13,7 @@
  *   9. UI / Dashboard does not directly call supabase.from("alerts").insert.
  *  10. New persistence module is free of automation / device-control / service_role.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 

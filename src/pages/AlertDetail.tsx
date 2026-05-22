@@ -35,6 +35,7 @@ import {
 } from "@/lib/alerts";
 import { useAlertEvents } from "@/hooks/useAlertEvents";
 import {
+  actionDetailPath,
   alertsPath,
   growDetailPath,
 } from "@/lib/routes";
@@ -42,6 +43,11 @@ import {
   actionMatchesAlert,
   buildActionQueueDraftFromAlert,
 } from "@/lib/alertToActionQueueRules";
+import {
+  getActionQueueSourceLabel,
+  isActionDerivedFromAlert,
+} from "@/lib/actionQueueProvenanceRules";
+
 import { supabase } from "@/integrations/supabase/client";
 
 

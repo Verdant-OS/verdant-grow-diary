@@ -15,20 +15,12 @@ interface Props {
   trigger?: React.ReactNode;
   defaultGrowId?: string;
   onCreated?: (tent: { id: string; name: string }) => void;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
 }
 
-export default function CreateTentDialog({ trigger, defaultGrowId, onCreated, open: controlledOpen, onOpenChange }: Props) {
+export default function CreateTentDialog({ trigger, defaultGrowId, onCreated }: Props) {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const [internalOpen, setInternalOpen] = useState(false);
-  const isControlled = controlledOpen !== undefined;
-  const open = isControlled ? controlledOpen : internalOpen;
-  const setOpen = (next: boolean) => {
-    if (!isControlled) setInternalOpen(next);
-    onOpenChange?.(next);
-  };
+  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ name: "", size: "", brand: "", stage: "seedling" });
 

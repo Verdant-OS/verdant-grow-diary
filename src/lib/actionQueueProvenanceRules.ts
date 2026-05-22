@@ -14,12 +14,13 @@ export type ActionQueueSource =
   | "manual"
   | "unknown";
 
-/** Persisted `source` values (kept here so UI never duplicates the strings). */
+/** Persisted `source` values. UI imports these so it never inlines the strings. */
 export const ACTION_QUEUE_SOURCE_VALUES = {
   ENVIRONMENT_ALERT: "environment_alert",
-  AI_COACH: ["ai", "coach"].join("_"),
+  AI_COACH: "ai_coach",
   MANUAL: "manual",
 } as const;
+
 
 export interface SourceLabelInput {
   source?: string | null;

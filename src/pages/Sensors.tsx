@@ -3,7 +3,9 @@ import { Activity } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import SensorChart from "@/components/SensorChart";
 import GrowDataSourceBadge from "@/components/GrowDataSourceBadge";
+import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
 import { useGrowTents, useGrowSensorReadings } from "@/hooks/useGrowData";
+import { useTents as useTentRows } from "@/hooks/use-tents";
 import { classifyGrowDataSource } from "@/lib/growDataSourceLabelRules";
 import { cn } from "@/lib/utils";
 

@@ -30,6 +30,7 @@ import {
   type EnvironmentAlert,
 } from "@/lib/environmentAlerts";
 import { saveAlert, logAlertEvent } from "@/lib/alerts";
+import { usePersistEnvironmentAlerts } from "@/hooks/usePersistEnvironmentAlerts";
 import { toast } from "sonner";
 
 
@@ -108,6 +109,22 @@ export default function Dashboard() {
   );
   const targetsState = useGrowTargets(scopedGrowId ?? null);
   const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);
+
+  // Persist derived Environment Alerts into public.alerts when (and only
+  // when) they are backed by real, valid sensor readings. Idempotent and
+  // user-scoped via RLS. Not automation; not device control.
+  usePersistEnvironmentAlerts({
+    growId: scopedGrowId ?? null,
+    snapshot: sensorState.status === "ok" ? sensorState.snapshot : null,
+    quality: evaluateSensorQuality(
+      sensorState.status === "ok" ? sensorState.snapshot : null,
+    ),
+    targets: compareSnapshotToTargets(
+      sensorState.status === "ok" ? sensorState.snapshot : null,
+      targetsState.status === "ok" ? targetsState.targets : null,
+    ),
+    enabled: !!scopedGrowId,
+  });
 
 
 

@@ -192,6 +192,48 @@ export default function AlertDetail() {
     };
   }, [alert]);
 
+  // Read-only reverse provenance: list action_queue rows derived from this alert.
+  useEffect(() => {
+    let cancelled = false;
+    setRelatedActions([]);
+    setRelatedLoaded(false);
+    if (!alert || !alert.grow_id) return;
+    (async () => {
+      const { data, error: relErr } = await supabase
+        .from("action_queue")
+        .select(
+          "id,grow_id,source,reason,status,risk_level,suggested_change,action_type,created_at",
+        )
+        .eq("grow_id", alert.grow_id)
+        .eq("source", "environment_alert")
+        .like("reason", `%[alert:${alert.id}]%`)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (cancelled) return;
+      if (relErr) {
+        setRelatedLoaded(true);
+        return;
+      }
+      const rows = (data ?? []) as RelatedActionRow[];
+      // Deterministic filter via shared pure helper — no inline regex.
+      const matched = rows
+        .filter((r) => isActionDerivedFromAlert(r, alert.id))
+        .sort((a, b) => {
+          const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+          if (tb !== ta) return tb - ta;
+          return a.id.localeCompare(b.id);
+        });
+      setRelatedActions(matched);
+      setRelatedLoaded(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [alert]);
+
+
+
   async function addAlertToActionQueue() {
     if (!alert || !draftResult || !draftResult.ok || existingActionId) return;
     setQueuing(true);

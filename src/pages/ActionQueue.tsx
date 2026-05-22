@@ -490,6 +490,15 @@ export default function ActionQueue() {
                   <Badge variant="outline" className={`text-[10px] uppercase ${RISK_VARIANT[row.risk_level]}`}>
                     {row.risk_level}
                   </Badge>
+                  {isAlertDerived(row) && (
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] uppercase border-primary text-primary"
+                    >
+                      {getActionQueueSourceLabel(row)}
+                    </Badge>
+                  )}
+
                   <span className="truncate flex-1">{row.suggested_change}</span>
                   <span className="text-xs text-muted-foreground">{row.action_type}</span>
                   {canComplete(row.status) && (

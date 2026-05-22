@@ -209,6 +209,7 @@ function dataHealthFor(
 ): DataHealth {
   if (snapshotState === "missing") return "missing";
   if (snapshotState === "stale") return "stale";
+  if (snapshotState === "demo") return "attention";
   if (openAlertCount === 0) return "healthy";
   return HEALTH_FROM_SEVERITY[severity];
 }

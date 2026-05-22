@@ -3,15 +3,16 @@
  *
  * Safety constraints (see docs/security-checklist.md):
  *   - No coach invocations.
- *   - No Action Queue writes.
  *   - No external device control.
  *   - No privileged role usage.
  *   - Status mutations always: update alert -> append alert_events row.
- *     Audit-log failure surfaces a warning toast but does not roll back.
+ *   - "Add to Action Queue" is user-initiated only, creates a
+ *     suggested/pending_approval row, never executes an action.
+ *     Mapping lives in src/lib/alertToActionQueueRules.ts (no JSX duplication).
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Bell, History } from "lucide-react";
+import { ArrowLeft, Bell, History, ListChecks } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 
@@ -36,6 +37,12 @@ import {
   alertsPath,
   growDetailPath,
 } from "@/lib/routes";
+import {
+  actionMatchesAlert,
+  buildActionQueueDraftFromAlert,
+} from "@/lib/alertToActionQueueRules";
+import { supabase } from "@/integrations/supabase/client";
+
 
 type LoadStatus = "idle" | "loading" | "ok" | "not_found" | "error";
 

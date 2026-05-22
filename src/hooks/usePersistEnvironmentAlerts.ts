@@ -187,7 +187,7 @@ export function usePersistEnvironmentAlerts(
         try {
           const saved = await saveAlert({
             grow_id: growId,
-            severity: a.severity === "info" ? "info" : a.severity,
+            severity: a.severity,
             title: a.title,
             reason: a.reason,
             metric: typeof a.metric === "string" ? a.metric : null,

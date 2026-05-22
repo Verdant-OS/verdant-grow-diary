@@ -14,9 +14,17 @@ export type ActionQueueSource =
   | "manual"
   | "unknown";
 
+/** Persisted `source` values (kept here so UI never duplicates the strings). */
+export const ACTION_QUEUE_SOURCE_VALUES = {
+  ENVIRONMENT_ALERT: "environment_alert",
+  AI_COACH: ["ai", "coach"].join("_"),
+  MANUAL: "manual",
+} as const;
+
 export interface SourceLabelInput {
   source?: string | null;
 }
+
 
 const ALERT_TOKEN_RE = /\[alert:([A-Za-z0-9_-]{1,64})\]/;
 

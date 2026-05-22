@@ -27,6 +27,7 @@ import Diagnostics from "./pages/Diagnostics";
 import ActionQueue from "./pages/ActionQueue";
 import ActionDetail from "./pages/ActionDetail";
 import GrowLineageRepair from "./pages/GrowLineageRepair";
+import GrowRoomMode from "./pages/GrowRoomMode";
 import Landing from "./pages/Landing";
 import HardwareIntegrations from "./pages/HardwareIntegrations";
 import Leads from "./pages/Leads";
@@ -51,6 +52,7 @@ const App = () => (
 
               <Route element={<AppShell />}>
                 <Route path="/" element={<Dashboard />} />
+                <Route path="/grow-room" element={<GrowRoomMode />} />
                 <Route path="/tents" element={<Tents />} />
                 <Route path="/tents/:id" element={<TentDetail />} />
                 <Route path="/plants" element={<Plants />} />

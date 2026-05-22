@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Box, Sprout, Camera, Activity, NotebookText,
-  ListChecks, Bell, Stethoscope, Settings, ShieldCheck, Wrench,
+  ListChecks, Bell, Stethoscope, Settings, ShieldCheck, Wrench, LayoutGrid,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -14,7 +14,10 @@ import BrandLogo from "@/components/BrandLogo";
 interface NavItem { to: string; label: string; icon: LucideIcon; end?: boolean }
 
 const groups: { label: string; items: NavItem[] }[] = [
-  { label: "Overview", items: [{ to: "/", label: "Dashboard", icon: LayoutDashboard, end: true }] },
+  { label: "Overview", items: [
+    { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
+    { to: "/grow-room", label: "Grow-Room Mode", icon: LayoutGrid },
+  ]},
   { label: "Grow", items: [
     { to: "/tents", label: "Tents", icon: Box },
     { to: "/plants", label: "Plants", icon: Sprout },

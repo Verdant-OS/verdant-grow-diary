@@ -294,7 +294,8 @@ export default function ActionQueue() {
     };
     const list = rows
       .filter((r) => matchesStatus(r.status))
-      .filter((r) => riskFilter === "all" || r.risk_level === riskFilter);
+      .filter((r) => riskFilter === "all" || r.risk_level === riskFilter)
+      .filter((r) => sourceFilter === "all" || (r.source ?? "") === sourceFilter);
     const sorted = [...list].sort((a, b) => {
       if (sortOrder === "risk") return RISK_RANK[b.risk_level] - RISK_RANK[a.risk_level];
       const ta = new Date(a.created_at).getTime();
@@ -302,7 +303,7 @@ export default function ActionQueue() {
       return sortOrder === "oldest" ? ta - tb : tb - ta;
     });
     return sorted;
-  }, [rows, statusFilter, riskFilter, sortOrder]);
+  }, [rows, statusFilter, riskFilter, sourceFilter, sortOrder]);
 
   const pending = useMemo(
     () => filtered.filter((r) => r.status === "pending_approval"),
@@ -314,7 +315,11 @@ export default function ActionQueue() {
   );
 
   const filtersActive =
-    statusFilter !== "all" || riskFilter !== "all" || sortOrder !== "newest";
+    statusFilter !== "all" ||
+    riskFilter !== "all" ||
+    sourceFilter !== "all" ||
+    sortOrder !== "newest";
+
 
   return (
     <div>

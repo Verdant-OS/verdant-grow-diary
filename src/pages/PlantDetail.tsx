@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Sprout } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Box, Sprout } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
 import EmptyState from "@/components/EmptyState";
@@ -58,7 +58,26 @@ export default function PlantDetail() {
         </div>
         <div className="lg:col-span-2 glass rounded-2xl p-5 space-y-3">
           <div className="grid grid-cols-2 gap-3 text-sm">
-            <div><div className="text-xs text-muted-foreground uppercase tracking-wider">Tent</div><div>{tent?.name ?? "—"}</div></div>
+            <div data-testid="plant-detail-tent">
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">Tent</div>
+              {tent ? (
+                <div className="flex items-center justify-between gap-2">
+                  <span>{tent.name}</span>
+                  <Button asChild variant="ghost" size="sm" className="h-7 px-2 gap-1" data-testid="plant-detail-view-tent">
+                    <Link to={`/tents/${tent.id}`}>
+                      <Box className="h-3.5 w-3.5" /> View Tent <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </Button>
+                </div>
+              ) : (
+                <div
+                  className="flex items-center gap-1.5 text-[hsl(var(--warning))]"
+                  data-testid="plant-detail-no-tent"
+                >
+                  <AlertTriangle className="h-3.5 w-3.5" /> No tent assigned.
+                </div>
+              )}
+            </div>
             <div><div className="text-xs text-muted-foreground uppercase tracking-wider">Age</div><div>{ageDays} days</div></div>
             <div><div className="text-xs text-muted-foreground uppercase tracking-wider">Started</div><div>{format(new Date(plant.startedAt), "PP")}</div></div>
             <div><div className="text-xs text-muted-foreground uppercase tracking-wider">Health</div><div className="capitalize">{plant.health}</div></div>

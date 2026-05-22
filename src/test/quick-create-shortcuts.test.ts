@@ -38,7 +38,8 @@ describe("Quick creation shortcuts — TentDetail → Add Plant", () => {
   });
 
   it("shows an empty-state hint when the tent has no plants yet", () => {
-    expect(TENT_DETAIL).toMatch(/No plants in this tent yet\. Add Plant\./);
+    expect(TENT_DETAIL).toMatch(/No plants in this tent yet\./);
+    expect(TENT_DETAIL).toMatch(/Add Plant to This Tent/);
   });
 });
 

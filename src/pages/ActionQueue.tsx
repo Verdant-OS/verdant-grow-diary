@@ -391,9 +391,10 @@ export default function ActionQueue() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All sources</SelectItem>
-            <SelectItem value="environment_alert">Environment Alerts</SelectItem>
-            <SelectItem value="ai_coach">AI Coach</SelectItem>
-            <SelectItem value="manual">Manual</SelectItem>
+            <SelectItem value={ACTION_QUEUE_SOURCE_VALUES.ENVIRONMENT_ALERT}>Environment Alerts</SelectItem>
+            <SelectItem value={ACTION_QUEUE_SOURCE_VALUES.AI_COACH}>AI Coach</SelectItem>
+            <SelectItem value={ACTION_QUEUE_SOURCE_VALUES.MANUAL}>Manual</SelectItem>
+
           </SelectContent>
         </Select>
 

@@ -193,7 +193,9 @@ describe("Dashboard latest-snapshot consumption of manual readings", () => {
 
   it("environment alert persistence accepts manual but rejects demo source", async () => {
     const { isSnapshotPersistable } = await import("@/lib/environmentAlertPersistence");
-    expect(isSnapshotPersistable({ source: "manual", ts: new Date().toISOString() } as any)).toBe(true);
-    expect(isSnapshotPersistable({ source: "demo", ts: new Date().toISOString() } as any)).toBe(false);
+    const ts = new Date().toISOString();
+    const manualSnap = { source: "manual", ts, temp: 24, rh: 55, vpd: null, co2: null, soil: null, soil_ec: null, soil_temp: null, ppfd: null } as any;
+    expect(isSnapshotPersistable({ snapshot: manualSnap, quality: "ok" })).toBe(true);
+    expect(isSnapshotPersistable({ snapshot: manualSnap, quality: "ok", isDemoData: true })).toBe(false);
   });
 });

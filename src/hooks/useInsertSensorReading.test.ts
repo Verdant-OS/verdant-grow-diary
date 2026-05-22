@@ -89,10 +89,14 @@ describe("validateSensorReadingPayload", () => {
   it("accepts a valid payload", () => {
     expect(() => validateSensorReadingPayload(goodPayload)).not.toThrow();
   });
-  it("rejects missing user_id, tent_id, bad metric, non-finite value", () => {
+  it("rejects empty user_id, missing tent_id, bad metric, non-finite value", () => {
     expect(() => validateSensorReadingPayload({ ...goodPayload, user_id: "" })).toThrow(/user_id/);
     expect(() => validateSensorReadingPayload({ ...goodPayload, tent_id: "" })).toThrow(/tent_id/);
     expect(() => validateSensorReadingPayload({ ...goodPayload, metric: "x" })).toThrow(/metric/);
     expect(() => validateSensorReadingPayload({ ...goodPayload, value: Number.NaN })).toThrow(/finite/);
+  });
+  it("accepts a payload without user_id (DB default auth.uid() handles ownership)", () => {
+    const { user_id, ...noUid } = goodPayload as any;
+    expect(() => validateSensorReadingPayload(noUid)).not.toThrow();
   });
 });

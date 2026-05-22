@@ -53,7 +53,12 @@ type EventType = ActionEventType;
 
 type StatusFilter = "all" | "pending" | "simulated" | "approved" | "rejected" | "completed" | "cancelled";
 type RiskFilter = "all" | "low" | "medium" | "high" | "critical";
-type SourceFilter = "all" | "environment_alert" | "ai_coach" | "manual";
+type SourceFilter =
+  | "all"
+  | typeof ACTION_QUEUE_SOURCE_VALUES.ENVIRONMENT_ALERT
+  | typeof ACTION_QUEUE_SOURCE_VALUES.AI_COACH
+  | typeof ACTION_QUEUE_SOURCE_VALUES.MANUAL;
+
 type SortOrder = "newest" | "oldest" | "risk";
 
 

@@ -197,8 +197,9 @@ export default function GrowRoomMode() {
     <div className="space-y-6">
       <PageHeader
         title="Grow-Room Mode"
-        subtitle="Read-only operator view across your tents. Verdant never executes equipment changes."
+        description="Read-only operator view across your tents. Verdant never executes equipment changes."
       />
+
 
       {showEmpty && (
         <EmptyState

@@ -84,6 +84,9 @@ export default function AlertDetail() {
   const [eventsKey, setEventsKey] = useState(0);
   const [existingActionId, setExistingActionId] = useState<string | null>(null);
   const [queuing, setQueuing] = useState(false);
+  const [relatedActions, setRelatedActions] = useState<RelatedActionRow[]>([]);
+  const [relatedLoaded, setRelatedLoaded] = useState(false);
+
 
 
   const load = useCallback(async () => {

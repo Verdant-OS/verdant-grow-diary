@@ -30,6 +30,7 @@ import {
   type EnvironmentAlert,
 } from "@/lib/environmentAlerts";
 import { saveAlert, logAlertEvent } from "@/lib/alerts";
+import { usePersistEnvironmentAlerts } from "@/hooks/usePersistEnvironmentAlerts";
 import { toast } from "sonner";
 
 

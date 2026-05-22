@@ -113,15 +113,43 @@ export default function TentDetail() {
           />
         </div>
         {plants.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No plants in this tent yet. Add Plant.</p>
+          <div
+            className="flex flex-col items-start gap-3 py-4"
+            data-testid="tent-detail-plants-empty"
+          >
+            <p className="text-sm text-muted-foreground">
+              No plants in this tent yet.
+            </p>
+            <CreatePlantDialog
+              defaultTentId={id}
+              defaultGrowId={tent.growId ?? undefined}
+              trigger={
+                <Button
+                  size="sm"
+                  className="gradient-leaf text-primary-foreground gap-1"
+                  data-testid="tent-detail-empty-add-plant"
+                >
+                  <Plus className="h-4 w-4" /> Add Plant to This Tent
+                </Button>
+              }
+            />
+          </div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3" data-testid="tent-detail-plants-grid">
             {plants.map((p) => (
-              <Link key={p.id} to={`/plants/${p.id}`} className="rounded-xl border border-border/40 overflow-hidden hover:border-primary/50 transition">
+              <Link
+                key={p.id}
+                to={`/plants/${p.id}`}
+                className="rounded-xl border border-border/40 overflow-hidden hover:border-primary/50 transition"
+                data-testid="tent-detail-plant-card"
+              >
                 <div className="aspect-video bg-secondary/40"><img src={p.photo} alt="" className="w-full h-full object-cover" /></div>
                 <div className="p-3">
-                  <div className="flex items-center justify-between"><span className="font-medium text-sm">{p.name}</span><StageBadge stage={p.stage} /></div>
-                  <p className="text-xs text-muted-foreground mt-0.5">{p.strain}</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-sm" data-testid="tent-detail-plant-name">{p.name}</span>
+                    <StageBadge stage={p.stage} />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5" data-testid="tent-detail-plant-strain">{p.strain}</p>
                 </div>
               </Link>
             ))}

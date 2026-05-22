@@ -87,8 +87,7 @@ end-to-end demo flow, partner framing, and the V0 contract test reference.
 
 ## 6. Partner demo positioning
 
-> Your hardware collects the data. Verdant turns it into plant memory, alert
-> context, and approval-required decisions.
+> Your hardware collects the data. Verdant turns it into plant memory, alert context, and approval-required decisions.
 
 ---
 

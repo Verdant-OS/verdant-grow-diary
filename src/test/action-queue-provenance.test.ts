@@ -83,10 +83,11 @@ describe("ActionQueue UI — provenance presentation", () => {
     ).toBeLessThanOrEqual(2);
   });
   it("offers an Environment Alerts filter chip", () => {
-    expect(QUEUE).toMatch(/value="environment_alert"/);
+    expect(QUEUE).toMatch(/ACTION_QUEUE_SOURCE_VALUES\.ENVIRONMENT_ALERT/);
     expect(QUEUE).toMatch(/Environment Alerts/);
     expect(QUEUE).toMatch(/sourceFilter/);
   });
+
   it("renders the Environment Alert badge for alert-derived rows", () => {
     // Badge appears in both pending and reviewed lists via isAlertDerived().
     expect((QUEUE.match(/isAlertDerived\(row\)/g) ?? []).length).toBeGreaterThanOrEqual(2);

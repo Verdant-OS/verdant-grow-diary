@@ -429,7 +429,55 @@ export default function AlertDetail() {
                 </Button>
               )}
             </div>
+
+            {alert.status === "open" && (
+              <div
+                className="mt-4 rounded-lg border border-border/40 bg-secondary/10 p-3"
+                aria-label="Action queue handoff"
+              >
+                <div className="flex items-start gap-2">
+                  <ListChecks className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                  <div className="flex-1">
+                    <p className="text-xs font-medium">Suggested action</p>
+                    {draftResult && draftResult.ok ? (
+                      <>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {draftResult.draft.suggested_change}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground/80 mt-1">
+                          Approval-required. No device commands will run.
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Not enough alert context to draft a safe action.
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {existingActionId ? (
+                        <Button asChild size="sm" variant="outline">
+                          <Link to={`/actions/${existingActionId}`}>
+                            Already in Action Queue
+                          </Link>
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={!canQueue || queuing}
+                          onClick={addAlertToActionQueue}
+                        >
+                          {queuing ? "Adding…" : "Add to Action Queue"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
+
+
 
           <section className="glass rounded-2xl p-4" aria-label="Alert history">
             <div className="flex items-center gap-2 mb-2">

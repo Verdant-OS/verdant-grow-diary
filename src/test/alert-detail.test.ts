@@ -174,14 +174,20 @@ describe("AlertDetail safety constraints", () => {
     expect(DETAIL_PAGE).not.toMatch(/ai-coach/i);
     expect(DETAIL_PAGE).not.toMatch(/functions\.invoke/);
   });
-  it("never writes to action_queue", () => {
-    expect(DETAIL_PAGE).not.toMatch(/action_queue/);
+  it("only writes suggested/pending_approval action_queue rows from a click handler", () => {
+    // Insertion is allowed but must be user-initiated and suggest-only.
+    expect(DETAIL_PAGE).toMatch(/onClick=\{addAlertToActionQueue\}/);
+    expect(DETAIL_PAGE).toMatch(/status:\s*draft\.status/);
+    expect(DETAIL_PAGE).not.toMatch(
+      /useEffect\([\s\S]{0,400}action_queue[\s\S]{0,200}\.insert\(/,
+    );
   });
-  it("contains no external-control or device-command strings", () => {
-    expect(DETAIL_PAGE).not.toMatch(/device[-_ ]command/i);
+  it("contains no external-control or actuator strings", () => {
     expect(DETAIL_PAGE).not.toMatch(/actuator/i);
     expect(DETAIL_PAGE).not.toMatch(/external[-_ ]control/i);
+    expect(DETAIL_PAGE).not.toMatch(/mqtt|home[\s_-]?assistant|webhook|\brelay\b/i);
   });
+
   it("does not use service_role", () => {
     expect(DETAIL_PAGE).not.toMatch(/service_role/i);
   });

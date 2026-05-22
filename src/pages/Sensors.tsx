@@ -20,6 +20,9 @@ const METRICS = [
 export default function Sensors() {
   const { data: tents = [] } = useGrowTents();
   const { data: readings = [] } = useGrowSensorReadings();
+  // Real DB tents (uuid-backed) for the manual entry form — only these can
+  // be written to via RLS. The display list above may include mock tents.
+  const { data: realTents = [] } = useTentRows();
   const [tentId, setTentId] = useState<string>(tents[0]?.id ?? "t1");
   const filtered = readings.filter((r) => r.tentId === tentId);
   const latest = filtered.length > 0 ? filtered[filtered.length - 1] : null;
@@ -33,6 +36,9 @@ export default function Sensors() {
       ? { source: "demo", value: latest.temp, timestamp: latest.ts }
       : { source: null, value: null, timestamp: null },
   );
+
+  const manualTents = realTents.map((t) => ({ id: t.id as string, name: t.name as string }));
+  const defaultManualTentId = manualTents.find((t) => t.id === tentId)?.id ?? manualTents[0]?.id;
 
   return (
     <div>
@@ -63,6 +69,11 @@ export default function Sensors() {
           </div>
         ))}
       </div>
+      {manualTents.length > 0 && (
+        <div className="mt-4 max-w-xl">
+          <ManualSensorReadingCard tents={manualTents} defaultTentId={defaultManualTentId} />
+        </div>
+      )}
     </div>
   );
 }

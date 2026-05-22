@@ -136,6 +136,102 @@ export default function AlertDetail() {
     setEventsKey((k) => k + 1);
   };
 
+  const draftResult = useMemo(
+    () => (alert ? buildActionQueueDraftFromAlert(alert) : null),
+    [alert],
+  );
+  const canQueue = !!draftResult && draftResult.ok && alert?.status === "open";
+
+  // Idempotency probe: look for an existing pending/approved action row that
+  // already references this alert via its back-pointer token.
+  useEffect(() => {
+    let cancelled = false;
+    setExistingActionId(null);
+    if (!alert || !alert.grow_id) return;
+    (async () => {
+      const { data, error: probeErr } = await supabase
+        .from("action_queue")
+        .select("id,source,status,reason,grow_id")
+        .eq("grow_id", alert.grow_id)
+        .eq("source", "environment_alert")
+        .in("status", ["pending_approval", "approved"])
+        .like("reason", `%[alert:${alert.id}]%`)
+        .limit(1);
+      if (cancelled || probeErr) return;
+      const match = (data ?? []).find((r) =>
+        actionMatchesAlert(r as never, alert),
+      );
+      if (match) setExistingActionId(match.id);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [alert]);
+
+  async function addAlertToActionQueue() {
+    if (!alert || !draftResult || !draftResult.ok || existingActionId) return;
+    setQueuing(true);
+    const { draft } = draftResult;
+    // SECURITY: never send user_id from the client. DB default (auth.uid()) wins.
+    const { data: inserted, error: insErr } = await supabase
+      .from("action_queue")
+      .insert({
+        grow_id: draft.grow_id,
+        tent_id: draft.tent_id,
+        plant_id: draft.plant_id,
+        action_type: draft.action_type,
+        target_metric: draft.target_metric,
+        suggested_change: draft.suggested_change,
+        reason: draft.reason,
+        risk_level: draft.risk_level,
+        source: draft.source,
+        status: draft.status,
+      })
+      .select("id,grow_id")
+      .single();
+    if (insErr) {
+      setQueuing(false);
+      const msg = (insErr.message || "").toLowerCase();
+      if (
+        insErr.code === "42501" ||
+        msg.includes("row-level security") ||
+        msg.includes("violates")
+      ) {
+        toast.error(
+          "This action cannot be queued until the plant/tent is assigned to this grow.",
+          { description: "Open Lineage Repair to assign tents to this grow." },
+        );
+        return;
+      }
+      toast.error(insErr.message);
+      return;
+    }
+    if (inserted?.id) {
+      setExistingActionId(inserted.id);
+      const { error: auditError } = await supabase
+        .from("action_queue_events")
+        .insert({
+          action_queue_id: inserted.id,
+          grow_id: inserted.grow_id ?? draft.grow_id,
+          event_type: "created",
+          previous_status: null,
+          new_status: "pending_approval",
+          note: draft.audit_note,
+        });
+      if (auditError) {
+        setQueuing(false);
+        toast.warning("Action queued, but audit log failed.", {
+          description: auditError.message,
+        });
+        return;
+      }
+    }
+    setQueuing(false);
+    toast.success("Action queued for approval.");
+  }
+
+
+
   return (
     <div>
       <GrowBreadcrumbs

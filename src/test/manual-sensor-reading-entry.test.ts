@@ -155,7 +155,7 @@ describe("safety — manual sensor form does not write to other systems", () => 
   });
 
   it("typedWateringWriteEnabled remains false", () => {
-    expect(typedWateringWriteEnabled()).toBe(false);
+    expect(typedWateringWriteEnabled).toBe(false);
   });
 
   it("does not modify Leads", () => {

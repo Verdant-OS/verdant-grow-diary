@@ -378,6 +378,20 @@ export default function ActionQueue() {
           </SelectContent>
         </Select>
 
+        <Select value={sourceFilter} onValueChange={(v) => setSourceFilter(v as SourceFilter)}>
+          <SelectTrigger className="h-9 w-[170px]" aria-label="Source filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All sources</SelectItem>
+            <SelectItem value="environment_alert">Environment Alerts</SelectItem>
+            <SelectItem value="ai_coach">AI Coach</SelectItem>
+            <SelectItem value="manual">Manual</SelectItem>
+          </SelectContent>
+        </Select>
+
+
+
         <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as SortOrder)}>
           <SelectTrigger className="h-9 w-[170px]" aria-label="Sort order">
             <SelectValue />

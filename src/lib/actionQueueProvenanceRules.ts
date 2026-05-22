@@ -124,4 +124,17 @@ export function hasPendingActionsForClosedAlert(
   return false;
 }
 
+/**
+ * Warn when a pending action's source alert has been closed
+ * (resolved/dismissed). Pure, null-safe, and deterministic.
+ */
+export function shouldWarnPendingActionHasClosedSourceAlert(
+  actionStatus: string | null | undefined,
+  sourceAlertStatus: string | null | undefined,
+): boolean {
+  if (actionStatus !== "pending_approval") return false;
+  return isClosedAlertStatus(sourceAlertStatus);
+}
+
+
 

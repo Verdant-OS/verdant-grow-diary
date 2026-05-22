@@ -111,9 +111,15 @@ export default function Dashboard() {
   const readings = groupReadings(rawReadings);
   const { data: insights = [] } = useAIInsights();
   const { recent, pending } = useDashboardScopedData(scopedGrowId ?? null);
+  // Multi-tent selector for the Latest Environment card. Defaults to "all"
+  // (matches prior behavior); when a specific tent is chosen the snapshot
+  // hook only queries that tent so the displayed reading matches context.
+  const [tentSelection, setTentSelection] = useState<TentSelection>("all");
+  const selectableTents = tents.map((t) => ({ id: t.id, name: t.name }));
+  const selectedTentIds = resolveSelectedTentIds(selectableTents, tentSelection);
   const sensorState = useLatestSensorSnapshot(
     scopedGrowId ?? null,
-    tents.map((t) => t.id),
+    selectedTentIds,
   );
   const trendsState = useEnvironmentTrends(
     scopedGrowId ?? null,

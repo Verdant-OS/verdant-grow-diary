@@ -557,3 +557,140 @@ Deno.test("index.ts has no decryption / direct env reads / DB writes", async () 
     assert(!re.test(src), `index.ts contains forbidden surface: ${label}`);
   }
 });
+
+// ---------- Request envelope validation gate ----------
+
+async function postEnvelope(
+  overrides: Record<string, unknown>,
+  trackers: { tentsCalled?: boolean } = {},
+) {
+  const rawBody = validEnvelopeBody(overrides);
+  const headers = await signedPostHeaders(rawBody);
+  const client = makeClient(
+    { data: [await defaultRow()], error: null },
+    { data: [{ user_id: "user-xyz" }], error: null },
+    trackers as { tentsCalled: boolean },
+  );
+  return handlePiIngestReadingsRequest(
+    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+    defaultDeps(client),
+  );
+}
+
+for (const source of ["sim", "manual", "telnyx_webhook"] as const) {
+  Deno.test(`POST source=${source} returns 400 invalid_request`, async () => {
+    const res = await postEnvelope({ source });
+    assertEquals(res.status, 400);
+    const body = await res.json();
+    assertEquals(body.error, "invalid_request");
+  });
+}
+
+for (const metric of ["soil_ec", "ppfd", "dli", "reservoir_ph"] as const) {
+  Deno.test(`POST unsupported metric=${metric} returns 400`, async () => {
+    const res = await postEnvelope({
+      readings: [{ metric, value: 1, unit: "ppm" }],
+    });
+    assertEquals(res.status, 400);
+    assertEquals((await res.json()).error, "invalid_request");
+  });
+}
+
+Deno.test("POST missing readings returns 400", async () => {
+  const res = await postEnvelope({ readings: undefined });
+  assertEquals(res.status, 400);
+  assertEquals((await res.json()).error, "invalid_request");
+});
+
+Deno.test("POST empty readings returns 400", async () => {
+  const res = await postEnvelope({ readings: [] });
+  assertEquals(res.status, 400);
+  assertEquals((await res.json()).error, "invalid_request");
+});
+
+Deno.test("POST invalid unit returns 400", async () => {
+  const res = await postEnvelope({
+    readings: [{ metric: "temperature_c", value: 22, unit: "kPa" }],
+  });
+  assertEquals(res.status, 400);
+});
+
+Deno.test("POST non-finite value returns 400", async () => {
+  const res = await postEnvelope({
+    readings: [{ metric: "temperature_c", value: Number.NaN, unit: "C" }],
+  });
+  // NaN serializes as null -> validator rejects as missing/non-finite value.
+  assertEquals(res.status, 400);
+});
+
+Deno.test("POST future captured_at returns 400", async () => {
+  const future = new Date(NOW_MS + 60 * 60 * 1000).toISOString();
+  const res = await postEnvelope({ captured_at: future });
+  assertEquals(res.status, 400);
+});
+
+Deno.test("POST client-provided user_id returns 400", async () => {
+  const res = await postEnvelope({ user_id: "user-attacker" });
+  assertEquals(res.status, 400);
+});
+
+Deno.test("POST invalid envelope response leaks nothing sensitive", async () => {
+  const rawBody = validEnvelopeBody({ source: "sim", marker: "RAW_MARK_XYZ" });
+  const headers = await signedPostHeaders(rawBody);
+  const sig = headers["x-bridge-signature"];
+  const client = makeClient(
+    { data: [await defaultRow()], error: null },
+    { data: [{ user_id: "user-xyz" }], error: null },
+  );
+  const res = await handlePiIngestReadingsRequest(
+    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+    defaultDeps(client),
+  );
+  assertEquals(res.status, 400);
+  const text = await res.text();
+  for (const forbidden of [
+    "RAW_MARK_XYZ",
+    sig,
+    PLAINTEXT_SECRET,
+    "user-xyz",
+    "tent-1",
+    "secret_ciphertext",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "nonce",
+  ]) {
+    assert(!text.includes(forbidden), `response leaked: ${forbidden}`);
+  }
+});
+
+Deno.test("envelope validation is skipped when HMAC fails", async () => {
+  const rawBody = validEnvelopeBody({ source: "sim" }); // would fail validation
+  const headers = {
+    "Content-Type": "application/json",
+    "x-bridge-id": "bridge-abc",
+    "x-bridge-signature": "00".repeat(32),
+    "x-bridge-timestamp": NOW_ISO,
+  };
+  const client = makeClient({ data: [await defaultRow()], error: null });
+  const res = await handlePiIngestReadingsRequest(
+    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+    defaultDeps(client),
+  );
+  // HMAC fails first → 401, not 400.
+  assertEquals(res.status, 401);
+  assertEquals((await res.json()).error, "unauthorized");
+});
+
+Deno.test("envelope validation is skipped when authorization fails", async () => {
+  const rawBody = validEnvelopeBody({ source: "sim" });
+  const headers = await signedPostHeaders(rawBody);
+  const client = makeClient(
+    { data: [await defaultRow()], error: null },
+    { data: [{ user_id: "user-other" }], error: null }, // owner mismatch
+  );
+  const res = await handlePiIngestReadingsRequest(
+    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+    defaultDeps(client),
+  );
+  assertEquals(res.status, 401);
+  assertEquals((await res.json()).error, "unauthorized");
+});

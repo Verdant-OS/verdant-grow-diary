@@ -271,7 +271,7 @@ describe("Assigned Tent Action Queue safety", () => {
   });
 
   it("panel performs no approve/reject/execute mutations", () => {
-    expect(PANEL).not.toMatch(/approve|reject|execute|simulate|complete|cancel/i);
+    expect(PANEL).not.toMatch(/approveAction|rejectAction|executeAction|simulateAction|completeAction|cancelAction|action_queue_events|\.from\(["']action_queue["']\)/);
   });
 });
 

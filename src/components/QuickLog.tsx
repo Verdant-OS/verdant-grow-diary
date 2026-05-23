@@ -57,6 +57,9 @@ export default function QuickLog({ open, onOpenChange, onCreated, prefill }: Pro
   const [remindAt, setRemindAt] = useState<string>("");
   const [showMore, setShowMore] = useState(false);
   const [details, setDetails] = useState({ ph: "", ec: "", runoff: "", nutrients: "", training: "", watering: "" });
+  const [hardware, setHardware] = useState<QuickLogHardwareReadings>({
+    inputPh: "", inputEc: "", runoffPh: "", runoffEc: "", ppfdCanopy: "", lightDistance: "",
+  });
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 

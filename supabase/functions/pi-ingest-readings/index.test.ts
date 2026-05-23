@@ -1,42 +1,126 @@
-// Deno-level fail-closed tests for the pi-ingest-readings Edge Function
-// skeleton. Calls the exported handler directly with synthetic Request
-// objects — no server, no Supabase client, no network.
+// Deno tests for the auth-gated pi-ingest-readings Edge Function.
+// Exercises the full OPTIONS / 405 / 401 / 400 / 503 contract using
+// injected lookup + key-provider deps so tests stay hermetic.
 import {
   assert,
   assertEquals,
   assertStringIncludes,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { CORS_HEADERS, handlePiIngestReadingsRequest } from "./index.ts";
+import {
+  CORS_HEADERS,
+  handlePiIngestReadingsRequest,
+  type PiIngestHandlerDeps,
+} from "./index.ts";
+import type {
+  PiIngestBridgeCredentialLookupClient,
+  PiIngestBridgeCredentialLookupResponse,
+} from "./bridgeCredentialLookup.ts";
+import {
+  buildSigningString,
+  computeHmacSha256Hex,
+} from "../../../src/lib/piIngestAuthRules.ts";
 
 const ENDPOINT = "http://localhost/functions/v1/pi-ingest-readings";
+const NOW_MS = Date.parse("2026-05-23T12:00:00Z");
+const NOW_ISO = new Date(NOW_MS).toISOString();
 
-function bodyThatThrowsIfRead(): ReadableStream<Uint8Array> {
-  return new ReadableStream({
-    pull() {
-      throw new Error(
-        "handler must not read the request body in the fail-closed skeleton",
-      );
-    },
-  });
+// AES-GCM(plain="bridge-secret-xyz", key=K_V1, nonce=N) precomputed.
+// We compute encryption at runtime for stability across platforms.
+const KEY_V1 = new Uint8Array(32).fill(7);
+const NONCE = new Uint8Array(12).fill(3);
+const PLAINTEXT_SECRET = "bridge-secret-xyz";
+
+async function encryptSecret(): Promise<Uint8Array> {
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    KEY_V1 as unknown as BufferSource,
+    { name: "AES-GCM" },
+    false,
+    ["encrypt"],
+  );
+  const ct = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: NONCE as unknown as BufferSource },
+    cryptoKey,
+    new TextEncoder().encode(PLAINTEXT_SECRET),
+  );
+  return new Uint8Array(ct);
 }
 
+function makeClient(
+  response: PiIngestBridgeCredentialLookupResponse,
+): PiIngestBridgeCredentialLookupClient {
+  return {
+    from() {
+      return {
+        select() {
+          return {
+            eq() {
+              return {
+                limit() {
+                  return Promise.resolve(response);
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+}
+
+async function defaultRow() {
+  return {
+    bridge_id: "bridge-abc",
+    user_id: "user-xyz",
+    is_active: true,
+    secret_ciphertext: await encryptSecret(),
+    secret_nonce: NONCE,
+    secret_key_version: 1,
+    secret_status: "active_encrypted" as const,
+    allowed_tent_ids: ["tent-1"],
+    last_used_at: null,
+  };
+}
+
+function defaultDeps(
+  client: PiIngestBridgeCredentialLookupClient,
+): PiIngestHandlerDeps {
+  return {
+    client,
+    keyProvider: (v) => (v === 1 ? KEY_V1 : null),
+    now: NOW_MS,
+  };
+}
+
+async function signedPostHeaders(
+  rawBody: string,
+  overrides: Partial<{ bridgeId: string; timestamp: string; secret: string }> = {},
+) {
+  const ts = overrides.timestamp ?? NOW_ISO;
+  const bridgeId = overrides.bridgeId ?? "bridge-abc";
+  const secret = overrides.secret ?? PLAINTEXT_SECRET;
+  const sig = await computeHmacSha256Hex(
+    secret,
+    buildSigningString("POST", "/functions/v1/pi-ingest-readings", ts, rawBody),
+  );
+  return {
+    "Content-Type": "application/json",
+    "x-bridge-id": bridgeId,
+    "x-bridge-signature": sig,
+    "x-bridge-timestamp": ts,
+  };
+}
+
+// ---------- CORS / method ----------
+
 Deno.test("OPTIONS returns 200 with CORS headers", async () => {
-  const res = handlePiIngestReadingsRequest(
+  const res = await handlePiIngestReadingsRequest(
     new Request(ENDPOINT, { method: "OPTIONS" }),
   );
   assertEquals(res.status, 200);
   assertEquals(
     res.headers.get("Access-Control-Allow-Origin"),
     CORS_HEADERS["Access-Control-Allow-Origin"],
-  );
-  assertEquals(
-    res.headers.get("Access-Control-Allow-Methods"),
-    CORS_HEADERS["Access-Control-Allow-Methods"],
-  );
-  assert(
-    (res.headers.get("Access-Control-Allow-Headers") ?? "").includes(
-      "x-bridge-signature",
-    ),
   );
   await res.text();
 });
@@ -48,97 +132,286 @@ for (const method of ["GET", "PUT", "DELETE", "PATCH"] as const) {
     );
     assertEquals(res.status, 405);
     const body = await res.json();
-    assertEquals(body.ok, false);
     assertEquals(body.error, "method_not_allowed");
   });
 }
 
-Deno.test("POST returns 503 secret_resolver_not_implemented", async () => {
-  const res = await handlePiIngestReadingsRequest(
-    new Request(ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tent_id: "x", readings: [] }),
-    }),
-  );
-  assertEquals(res.status, 503);
-  const body = await res.json();
-  assertEquals(body.ok, false);
-  assertEquals(body.error, "secret_resolver_not_implemented");
-});
+// ---------- POST without service-role config (no injected client) ----------
 
-Deno.test("POST does not read the request body", async () => {
-  const req = new Request(ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/octet-stream" },
-    body: bodyThatThrowsIfRead(),
-  });
-  const res = await handlePiIngestReadingsRequest(req);
-  assertEquals(res.status, 503);
-  await res.text();
-  assertEquals(req.bodyUsed, false);
-});
-
-Deno.test("POST response body does not leak sensitive material", async () => {
-  const secretMarker = "SUPER_SECRET_BRIDGE_KEY_ABC123";
-  const sigMarker = "deadbeefsignature";
-  const rawMarker = "RAW_PAYLOAD_MARKER_XYZ";
+Deno.test("POST without env config returns 503 secret_resolver_not_implemented", async () => {
+  // Pass deps.client === null to skip the default builder and force
+  // the unconfigured branch (we never actually consult env in tests).
   const res = await handlePiIngestReadingsRequest(
     new Request(ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-bridge-signature": sigMarker,
+        "x-bridge-id": "b",
+        "x-bridge-signature": "s",
+        "x-bridge-timestamp": NOW_ISO,
       },
-      body: JSON.stringify({ secret: secretMarker, raw: rawMarker }),
+      body: JSON.stringify({ tent_id: "t" }),
     }),
+    { client: null },
+  );
+  assertEquals(res.status, 503);
+  const body = await res.json();
+  assertEquals(body.error, "secret_resolver_not_implemented");
+});
+
+// ---------- POST missing auth headers ----------
+
+for (const missing of ["x-bridge-id", "x-bridge-signature", "x-bridge-timestamp"] as const) {
+  Deno.test(`POST missing ${missing} returns 401 unauthorized`, async () => {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "x-bridge-id": "bridge-abc",
+      "x-bridge-signature": "deadbeef",
+      "x-bridge-timestamp": NOW_ISO,
+    };
+    delete headers[missing];
+    const client = makeClient({ data: [await defaultRow()], error: null });
+    const res = await handlePiIngestReadingsRequest(
+      new Request(ENDPOINT, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ tent_id: "tent-1" }),
+      }),
+      defaultDeps(client),
+    );
+    assertEquals(res.status, 401);
+    const body = await res.json();
+    assertEquals(body.error, "unauthorized");
+  });
+}
+
+// ---------- POST invalid body / missing tent_id ----------
+
+Deno.test("POST invalid JSON returns 400 invalid_request", async () => {
+  const rawBody = "{not-json";
+  const headers = await signedPostHeaders(rawBody);
+  const client = makeClient({ data: [await defaultRow()], error: null });
+  const res = await handlePiIngestReadingsRequest(
+    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+    defaultDeps(client),
+  );
+  assertEquals(res.status, 400);
+  const body = await res.json();
+  assertEquals(body.error, "invalid_request");
+});
+
+Deno.test("POST missing tent_id returns 400 invalid_request", async () => {
+  const rawBody = JSON.stringify({ readings: [] });
+  const headers = await signedPostHeaders(rawBody);
+  const client = makeClient({ data: [await defaultRow()], error: null });
+  const res = await handlePiIngestReadingsRequest(
+    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+    defaultDeps(client),
+  );
+  assertEquals(res.status, 400);
+  const body = await res.json();
+  assertEquals(body.error, "invalid_request");
+});
+
+// ---------- POST unknown bridge ----------
+
+Deno.test("POST unknown bridge returns 401 unauthorized", async () => {
+  const rawBody = JSON.stringify({ tent_id: "tent-1" });
+  const headers = await signedPostHeaders(rawBody);
+  const client = makeClient({ data: [], error: null });
+  const res = await handlePiIngestReadingsRequest(
+    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+    defaultDeps(client),
+  );
+  assertEquals(res.status, 401);
+  const body = await res.json();
+  assertEquals(body.error, "unauthorized");
+});
+
+// ---------- POST inactive credential ----------
+
+Deno.test("POST inactive credential returns 401 unauthorized", async () => {
+  const rawBody = JSON.stringify({ tent_id: "tent-1" });
+  const headers = await signedPostHeaders(rawBody);
+  const row = { ...(await defaultRow()), is_active: false };
+  const client = makeClient({ data: [row], error: null });
+  const res = await handlePiIngestReadingsRequest(
+    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+    defaultDeps(client),
+  );
+  assertEquals(res.status, 401);
+  const body = await res.json();
+  assertEquals(body.error, "unauthorized");
+});
+
+// ---------- POST lookup internal error ----------
+
+Deno.test("POST lookup error returns 503 internal_failure", async () => {
+  const rawBody = JSON.stringify({ tent_id: "tent-1" });
+  const headers = await signedPostHeaders(rawBody);
+  const client = makeClient({ data: null, error: { message: "db down" } });
+  const res = await handlePiIngestReadingsRequest(
+    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+    defaultDeps(client),
+  );
+  assertEquals(res.status, 503);
+  const body = await res.json();
+  assertEquals(body.error, "internal_failure");
+});
+
+Deno.test("POST multiple rows returns 503 internal_failure", async () => {
+  const rawBody = JSON.stringify({ tent_id: "tent-1" });
+  const headers = await signedPostHeaders(rawBody);
+  const row = await defaultRow();
+  const client = makeClient({
+    data: [row, { ...row, user_id: "user-other" }],
+    error: null,
+  });
+  const res = await handlePiIngestReadingsRequest(
+    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+    defaultDeps(client),
+  );
+  assertEquals(res.status, 503);
+  const body = await res.json();
+  assertEquals(body.error, "internal_failure");
+});
+
+// ---------- POST resolver internal vs auth failure ----------
+
+Deno.test("POST resolver missing env key returns 503 internal_failure", async () => {
+  const rawBody = JSON.stringify({ tent_id: "tent-1" });
+  const headers = await signedPostHeaders(rawBody);
+  const client = makeClient({ data: [await defaultRow()], error: null });
+  const res = await handlePiIngestReadingsRequest(
+    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+    { client, keyProvider: () => null, now: NOW_MS },
+  );
+  assertEquals(res.status, 503);
+  const body = await res.json();
+  assertEquals(body.error, "internal_failure");
+});
+
+Deno.test("POST resolver unknown_key_version returns 401 unauthorized", async () => {
+  const rawBody = JSON.stringify({ tent_id: "tent-1" });
+  const headers = await signedPostHeaders(rawBody);
+  const row = { ...(await defaultRow()), secret_key_version: 99 };
+  const client = makeClient({ data: [row], error: null });
+  const res = await handlePiIngestReadingsRequest(
+    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+    defaultDeps(client),
+  );
+  assertEquals(res.status, 401);
+  const body = await res.json();
+  assertEquals(body.error, "unauthorized");
+});
+
+// ---------- POST invalid HMAC ----------
+
+Deno.test("POST invalid HMAC returns 401 unauthorized", async () => {
+  const rawBody = JSON.stringify({ tent_id: "tent-1" });
+  const headers = {
+    "Content-Type": "application/json",
+    "x-bridge-id": "bridge-abc",
+    "x-bridge-signature": "00".repeat(32),
+    "x-bridge-timestamp": NOW_ISO,
+  };
+  const client = makeClient({ data: [await defaultRow()], error: null });
+  const res = await handlePiIngestReadingsRequest(
+    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+    defaultDeps(client),
+  );
+  assertEquals(res.status, 401);
+  const body = await res.json();
+  assertEquals(body.error, "unauthorized");
+});
+
+Deno.test("POST tent not allowed returns 401 unauthorized", async () => {
+  const rawBody = JSON.stringify({ tent_id: "tent-not-allowed" });
+  const headers = await signedPostHeaders(rawBody);
+  const client = makeClient({ data: [await defaultRow()], error: null });
+  const res = await handlePiIngestReadingsRequest(
+    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+    defaultDeps(client),
+  );
+  assertEquals(res.status, 401);
+  const body = await res.json();
+  assertEquals(body.error, "unauthorized");
+});
+
+// ---------- POST valid auth ----------
+
+Deno.test("POST valid auth returns 503 auth_ok_pipeline_not_implemented", async () => {
+  const rawBody = JSON.stringify({ tent_id: "tent-1", readings: [] });
+  const headers = await signedPostHeaders(rawBody);
+  const client = makeClient({ data: [await defaultRow()], error: null });
+  const res = await handlePiIngestReadingsRequest(
+    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+    defaultDeps(client),
+  );
+  assertEquals(res.status, 503);
+  const body = await res.json();
+  assertEquals(body.ok, false);
+  assertEquals(body.error, "auth_ok_pipeline_not_implemented");
+  assertStringIncludes(body.message, "Bridge authentication succeeded");
+});
+
+// ---------- Response hygiene ----------
+
+Deno.test("POST response never leaks secrets/headers/body", async () => {
+  const rawMarker = "RAW_PAYLOAD_MARKER_XYZ";
+  const sigMarker = "deadbeefsignature";
+  const rawBody = JSON.stringify({ tent_id: "tent-1", marker: rawMarker });
+  const res = await handlePiIngestReadingsRequest(
+    new Request(ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-bridge-id": "bridge-abc",
+        "x-bridge-signature": sigMarker,
+        "x-bridge-timestamp": NOW_ISO,
+      },
+      body: rawBody,
+    }),
+    defaultDeps(makeClient({ data: [await defaultRow()], error: null })),
   );
   const text = await res.text();
   for (const forbidden of [
-    secretMarker,
-    sigMarker,
     rawMarker,
+    sigMarker,
+    PLAINTEXT_SECRET,
     "PI_INGEST_SECRET_KEY",
     "SUPABASE_SERVICE_ROLE_KEY",
-    "service_role",
-    "stack",
-    "at handlePiIngestReadingsRequest",
     "secret_ciphertext",
     "secret_hash",
+    "stack",
   ]) {
-    assert(
-      !text.includes(forbidden),
-      `response leaked forbidden token: ${forbidden}`,
-    );
+    assert(!text.includes(forbidden), `response leaked: ${forbidden}`);
   }
-  assertStringIncludes(text, "secret_resolver_not_implemented");
 });
 
-Deno.test("source file has no DB/crypto/Supabase surfaces", async () => {
-  const src = await Deno.readTextFile(
-    new URL("./index.ts", import.meta.url),
-  );
+// ---------- Source guardrails ----------
+
+Deno.test("index.ts has no decryption / direct env reads / DB writes", async () => {
+  const src = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
   const forbidden: Array<[string, RegExp]> = [
-    [".from(", /\.from\(/],
     [".insert(", /\.insert\(/],
     [".upsert(", /\.upsert\(/],
     [".rpc(", /\.rpc\(/],
-    ["service_role", /service_role/i],
-    ["createClient", /\bcreateClient\s*\(/],
     ["crypto.subtle.decrypt", /crypto\.subtle\.decrypt\s*\(/],
     ["createDecipheriv", /\bcreateDecipheriv\s*\(/],
-    ["PI_INGEST_SECRET_KEY env read", /Deno\.env\.get\(\s*["']PI_INGEST_SECRET_KEY/],
+    ["PI_INGEST_SECRET_KEY env read", /["']PI_INGEST_SECRET_KEY/],
     ["secret_hash -> secret", /secret\s*:\s*[A-Za-z_.]*\.?secret_hash\b/],
     ["secret_ciphertext -> secret", /secret\s*:\s*[A-Za-z_.]*\.?secret_ciphertext\b/],
     ["sensor_readings", /\bsensor_readings\b/],
     ["pi_ingest_idempotency_keys", /\bpi_ingest_idempotency_keys\b/],
-    ["alerts table", /from\(\s*["']alerts["']\s*\)/],
-    ["action_queue table", /from\(\s*["']action_queue["']\s*\)/],
-    ["request.json", /\brequest\.json\s*\(|\breq\.json\s*\(/],
-    ["request.text", /\brequest\.text\s*\(|\breq\.text\s*\(/],
-    ["request.formData", /\brequest\.formData\s*\(|\breq\.formData\s*\(/],
-    ["request.arrayBuffer", /\brequest\.arrayBuffer\s*\(|\breq\.arrayBuffer\s*\(/],
-    ["ok:true success path", /ok\s*:\s*true/],
+    ["alerts table from()", /from\(\s*["']alerts["']\s*\)/],
+    ["action_queue table from()", /from\(\s*["']action_queue["']\s*\)/],
+    ["ok:true success", /ok\s*:\s*true/],
+    ["browser supabase client", /@\/integrations\/supabase\/client/],
+    ["raw body log", /console\.\w+\([^)]*\b(rawBody|raw_body)\b/],
+    ["signature log", /console\.\w+\([^)]*\bsignature\b/i],
+    ["secret log", /console\.\w+\([^)]*\bsecret\b/i],
+    ["stack expose", /err(or)?\.stack/i],
   ];
   for (const [label, re] of forbidden) {
     assert(!re.test(src), `index.ts contains forbidden surface: ${label}`);

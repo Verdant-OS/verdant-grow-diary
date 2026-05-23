@@ -51,6 +51,9 @@ import {
   type PiIngestSecretKeyProvider,
   resolveBridgeSecret,
 } from "./secretResolver.ts";
+import { loadTentOwnerUserId } from "./tentOwnerLookup.ts";
+import { evaluateBridgeAuthorization } from "../../../src/lib/piIngestBridgeAuthorizationRules.ts";
+import type { BridgeCredentialMetadata } from "../../../src/lib/piIngestBridgeCredentialMetadataResolver.ts";
 
 export const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",

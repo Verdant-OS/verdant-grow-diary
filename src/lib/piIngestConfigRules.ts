@@ -40,8 +40,8 @@ export interface PiIngestConfigIssue {
 }
 
 export type PiIngestConfigValidationResult =
-  | { readonly ok: true; readonly config: PiIngestConfig }
-  | { readonly ok: false; readonly issues: readonly PiIngestConfigIssue[] };
+  | { ok: true; config: PiIngestConfig }
+  | { ok: false; issues: readonly PiIngestConfigIssue[] };
 
 // ----------------------------- Defaults -----------------------------
 
@@ -142,7 +142,7 @@ export function validatePiIngestConfig(raw: unknown): PiIngestConfigValidationRe
     "empty_allowed_sources",
     "allowedSources",
   );
-  if (!sources.ok) issues.push(sources.issue);
+  if (sources.ok === false) issues.push(sources.issue);
 
   const metrics = validateStringList(
     raw.allowedMetrics,
@@ -150,7 +150,7 @@ export function validatePiIngestConfig(raw: unknown): PiIngestConfigValidationRe
     "empty_allowed_metrics",
     "allowedMetrics",
   );
-  if (!metrics.ok) issues.push(metrics.issue);
+  if (metrics.ok === false) issues.push(metrics.issue);
 
   if (issues.length > 0) return { ok: false, issues: Object.freeze(issues) };
 

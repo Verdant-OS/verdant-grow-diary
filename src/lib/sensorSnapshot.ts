@@ -5,7 +5,7 @@
  * NOT an AI diagnosis. NOT live device control.
  */
 
-export type SnapshotSource = "live" | "manual" | "diary" | "unavailable";
+export type SnapshotSource = "live" | "manual" | "sim" | "diary" | "unavailable";
 
 export interface SensorSnapshot {
   source: SnapshotSource;
@@ -43,6 +43,7 @@ export function toFiniteNumber(v: unknown): number | null {
 export const SOURCE_LABEL: Record<SnapshotSource, string> = {
   live: "Live sensor",
   manual: "Manual",
+  sim: "Simulated",
   diary: "Diary snapshot",
   unavailable: "Unavailable",
 };
@@ -86,8 +87,15 @@ export function snapshotFromReadings(
     return r ? toFiniteNumber(r.value) : null;
   };
   const anyManual = latest.some((r) => r.source === "manual");
+  const allSim =
+    latest.length > 0 && latest.every((r) => r.source === "sim");
+  const source: SnapshotSource = anyManual
+    ? "manual"
+    : allSim
+      ? "sim"
+      : "live";
   return {
-    source: anyManual ? "manual" : "live",
+    source,
     ts: latestTs,
     temp: get("temperature_c"),
     rh: get("humidity_pct"),

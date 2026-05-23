@@ -112,6 +112,15 @@ function defaultDeps(
     client,
     keyProvider: (v) => (v === 1 ? KEY_V1 : null),
     now: NOW_MS,
+    // Default success commit for happy-path tests. Returns
+    // inserted == rows.length so per-test assertions can derive
+    // expected counts deterministically.
+    commitPiIngestBatch: (_c, input) =>
+      Promise.resolve({
+        ok: true as const,
+        inserted: input.rows.length,
+        rejected: 0,
+      }),
   };
 }
 

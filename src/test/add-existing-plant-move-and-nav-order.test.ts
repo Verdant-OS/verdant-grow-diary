@@ -105,26 +105,26 @@ function navOrder(text: string, paths: string[]): number[] {
   return paths.map((p) => text.indexOf(`to: "${p}"`));
 }
 
-describe("Navigation order · Plants above Tents", () => {
-  it("AppSidebar lists Plants before Tents", () => {
-    const [plants, tents] = navOrder(SIDEBAR, ["/plants", "/tents"]);
-    expect(plants).toBeGreaterThan(-1);
+describe("Navigation order · Tents above Plants (workspace-first)", () => {
+  it("AppSidebar lists Tents before Plants", () => {
+    const [tents, plants] = navOrder(SIDEBAR, ["/tents", "/plants"]);
     expect(tents).toBeGreaterThan(-1);
-    expect(plants).toBeLessThan(tents);
+    expect(plants).toBeGreaterThan(-1);
+    expect(tents).toBeLessThan(plants);
   });
 
-  it("MobileNav lists Plants before Tents when both are present", () => {
-    const [plants, tents] = navOrder(MOBILE_NAV, ["/plants", "/tents"]);
-    expect(plants).toBeGreaterThan(-1);
+  it("MobileNav lists Tents before Plants when both are present", () => {
+    const [tents, plants] = navOrder(MOBILE_NAV, ["/tents", "/plants"]);
     expect(tents).toBeGreaterThan(-1);
-    expect(plants).toBeLessThan(tents);
+    expect(plants).toBeGreaterThan(-1);
+    expect(tents).toBeLessThan(plants);
   });
 
-  it("Dashboard / Grow Room stay above Plants and Tents in the sidebar", () => {
+  it("Dashboard / Grow Room stay above Tents and Plants in the sidebar", () => {
     const dashIdx = SIDEBAR.indexOf('to: "/"');
-    const plantsIdx = SIDEBAR.indexOf('to: "/plants"');
+    const tentsIdx = SIDEBAR.indexOf('to: "/tents"');
     expect(dashIdx).toBeGreaterThan(-1);
-    expect(plantsIdx).toBeGreaterThan(-1);
-    expect(dashIdx).toBeLessThan(plantsIdx);
+    expect(tentsIdx).toBeGreaterThan(-1);
+    expect(dashIdx).toBeLessThan(tentsIdx);
   });
 });

@@ -179,17 +179,19 @@ Deno.test("doc includes stop-ship conditions", async () => {
 
 // ---------- Static guardrails ----------
 
-Deno.test("no lookup implementation file exists yet in Edge Function dir", async () => {
+Deno.test("only the sanctioned lookup file exists in Edge Function dir", async () => {
   const files: string[] = [];
   for await (const e of Deno.readDir(HERE)) files.push(e.name);
+  // The sanctioned helper is bridgeCredentialLookup.ts (added once
+  // global bridge_id uniqueness was enforced). Other variants remain
+  // forbidden to keep the lookup surface single-sourced.
   for (
     const forbidden of [
-      "bridgeCredentialLookup.ts",
       "loadBridgeCredential.ts",
       "credentialLookup.ts",
     ]
   ) {
-    assert(!files.includes(forbidden), `${forbidden} must not exist yet`);
+    assert(!files.includes(forbidden), `${forbidden} must not exist`);
   }
 });
 

@@ -19,8 +19,8 @@ const groups: { label: string; items: NavItem[] }[] = [
     { to: "/grow-room", label: "Grow-Room Mode", icon: LayoutGrid },
   ]},
   { label: "Grow", items: [
-    { to: "/tents", label: "Tents", icon: Box },
     { to: "/plants", label: "Plants", icon: Sprout },
+    { to: "/tents", label: "Tents", icon: Box },
   ]},
   { label: "Data", items: [
     { to: "/sensors", label: "Sensor Data", icon: Activity },

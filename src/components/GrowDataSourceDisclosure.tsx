@@ -12,6 +12,7 @@ import {
   combineGrowDataMeta,
   type GrowDataSourceMeta,
 } from "@/hooks/useGrowData";
+import type { SnapshotSource } from "@/lib/sensorSnapshot";
 
 type Label = "Live" | "Demo" | "Mixed" | "Unavailable";
 

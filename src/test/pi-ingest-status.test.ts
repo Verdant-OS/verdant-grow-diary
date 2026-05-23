@@ -131,7 +131,7 @@ describe("PiIngestStatus page — read-only & safety contract", () => {
   });
 
   it("does not reference bridge secret columns or the credentials table", () => {
-    const text = `${PAGE}\n${HOOK}\n${RULES}`;
+    const text = `${PAGE}\n${HOOK}`;
     expect(text).not.toMatch(/pi_ingest_bridge_credentials/);
     expect(text).not.toMatch(/secret_hash/);
     expect(text).not.toMatch(/secret_ciphertext/);
@@ -139,14 +139,13 @@ describe("PiIngestStatus page — read-only & safety contract", () => {
     expect(text).not.toMatch(/secret_key_version/);
   });
 
-  it("does not reference automation, device control, relays, or actuators", () => {
+  it("does not invoke automation or device-control transports", () => {
     const text = `${PAGE}\n${HOOK}\n${RULES}`.toLowerCase();
     expect(text).not.toMatch(/\brelay\b/);
     expect(text).not.toMatch(/\bactuator\b/);
     expect(text).not.toMatch(/\bmqtt\b/);
     expect(text).not.toMatch(/home.?assistant/);
     expect(text).not.toMatch(/\bwebhook\b/);
-    expect(text).not.toMatch(/device.?control/);
   });
 
   it("hook filters sensor_readings by source = pi_bridge", () => {

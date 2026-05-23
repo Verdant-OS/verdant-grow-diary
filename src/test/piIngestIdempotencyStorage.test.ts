@@ -112,8 +112,10 @@ describe("pi_ingest_idempotency_keys — RLS", () => {
   it("does NOT define a DELETE policy", () => {
     expect(SQL).not.toMatch(/FOR\s+DELETE/i);
   });
-  it("never uses service_role", () => {
-    expect(SQL).not.toMatch(/service_role/i);
+  it("never grants to service_role", () => {
+    // strip SQL line comments before scanning so explanatory comments are OK
+    const noComments = SQL.replace(/^\s*--.*$/gm, "");
+    expect(noComments).not.toMatch(/service_role/i);
   });
 });
 

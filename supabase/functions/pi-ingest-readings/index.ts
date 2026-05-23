@@ -17,14 +17,14 @@
 // be replaced with the real verifier and insert pipeline. Until then:
 // 503 secret_resolver_not_implemented.
 
-const CORS_HEADERS = {
+export const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-bridge-id, x-bridge-signature, x-bridge-timestamp, x-idempotency-key",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-Deno.serve((req: Request) => {
+export function handlePiIngestReadingsRequest(req: Request): Response {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS_HEADERS });
   }
@@ -53,4 +53,10 @@ Deno.serve((req: Request) => {
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
     },
   );
-});
+}
+
+// @ts-ignore Deno runtime entrypoint
+if (typeof Deno !== "undefined" && typeof Deno.serve === "function") {
+  // @ts-ignore
+  Deno.serve(handlePiIngestReadingsRequest);
+}

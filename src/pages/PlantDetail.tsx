@@ -106,7 +106,7 @@ export default function PlantDetail() {
             <p className="text-sm">{plant.lastNote}</p>
             <p className="text-xs text-muted-foreground mt-1">Updated {formatDistanceToNow(new Date(plant.startedAt), { addSuffix: true })}</p>
           </div>
-          <Button asChild variant="outline" size="sm"><Link to="/logs">Open grow logs</Link></Button>
+          <Button asChild variant="outline" size="sm"><Link to="/logs">Open Logs</Link></Button>
           <PlantTentEnvironmentPanel
             tentId={plant.tentId ?? null}
             tentName={tent?.name ?? null}

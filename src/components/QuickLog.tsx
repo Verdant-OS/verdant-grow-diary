@@ -159,9 +159,10 @@ export default function QuickLog({ open, onOpenChange, onCreated, prefill }: Pro
       }
       if (eventType === "reminder" && remindAt) cleanDetails.remind_at = remindAt;
 
+      const finalNote = appendHardwareReadingsToNote(note, hardware);
       const { error: insErr } = await supabase.from("diary_entries").insert({
         user_id: user.id, grow_id: activeGrowId, photo_url: uploadedPath,
-        note: note.trim(), stage, details: cleanDetails as Record<string, never>,
+        note: finalNote, stage, details: cleanDetails as Record<string, never>,
         plant_id: selectedPlant?.id ?? null,
         tent_id: selectedPlant?.tent_id ?? null,
       });

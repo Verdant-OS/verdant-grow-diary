@@ -53,20 +53,38 @@ function makeClient(
     error: null,
   },
   tracker?: { tentsCalled: boolean },
+  idempotencyResponse: PiIngestBridgeCredentialLookupResponse = {
+    data: [],
+    error: null,
+  },
 ): PiIngestBridgeCredentialLookupClient {
   return {
     from(table: string) {
-      const res = table === "tents" ? tentsResponse : response;
+      const isTents = table === "tents";
+      const isIdem = table === "pi_ingest_idempotency_keys";
+      const res = isTents
+        ? tentsResponse
+        : isIdem
+        ? idempotencyResponse
+        : response;
       return {
         select() {
           return {
             eq() {
               return {
                 limit() {
-                  if (table === "tents" && tracker) tracker.tentsCalled = true;
+                  if (isTents && tracker) tracker.tentsCalled = true;
                   return Promise.resolve(res);
                 },
-              };
+                // Real idempotency lookup uses .in() after .eq().
+                in() {
+                  return Promise.resolve(res);
+                },
+              } as unknown as ReturnType<
+                ReturnType<
+                  ReturnType<PiIngestBridgeCredentialLookupClient["from"]>["select"]
+                >["eq"]
+              >;
             },
           };
         },

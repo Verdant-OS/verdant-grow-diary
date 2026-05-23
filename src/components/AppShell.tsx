@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { Bell, LogOut, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,8 +7,9 @@ import { useAuth } from "@/store/auth";
 import { useAlerts } from "@/hooks/useMockData";
 import AppSidebar from "./AppSidebar";
 import MobileNav from "./MobileNav";
-import QuickLog from "./QuickLog";
+import QuickLog, { type QuickLogPrefill } from "./QuickLog";
 import BrandLogo from "./BrandLogo";
+import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 
 
 export default function AppShell() {
@@ -16,6 +17,17 @@ export default function AppShell() {
   const { data: alerts } = useAlerts();
   const nav = useNavigate();
   const [openLog, setOpenLog] = useState(false);
+  const [prefill, setPrefill] = useState<QuickLogPrefill | null>(null);
+
+  useEffect(() => {
+    function onOpen(e: Event) {
+      const detail = (e as CustomEvent<QuickLogPrefill>).detail ?? null;
+      setPrefill(detail);
+      setOpenLog(true);
+    }
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, onOpen as EventListener);
+    return () => window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, onOpen as EventListener);
+  }, []);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
   if (!user) { nav("/auth", { replace: true }); return null; }

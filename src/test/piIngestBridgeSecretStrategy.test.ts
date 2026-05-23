@@ -98,9 +98,12 @@ describe("pi-ingest bridge secret — repo guardrails", () => {
     }
   });
 
-  it("no pi-ingest-readings Edge Function exists yet", () => {
-    expect(
-      existsSync(resolve(ROOT, "supabase/functions/pi-ingest-readings")),
-    ).toBe(false);
+  it("pi-ingest-readings Edge Function, if present, is fail-closed and decryption-free", () => {
+    const fn = resolve(ROOT, "supabase/functions/pi-ingest-readings/index.ts");
+    if (!existsSync(fn)) return;
+    const src = readFileSync(fn, "utf8");
+    expect(src).toMatch(/secret_resolver_not_implemented/);
+    expect(src).not.toMatch(/crypto\.subtle\.decrypt\s*\(/);
+    expect(src).not.toMatch(/\bcreateDecipheriv\s*\(/);
   });
 });

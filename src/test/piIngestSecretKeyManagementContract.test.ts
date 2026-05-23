@@ -165,10 +165,12 @@ describe("pi-ingest secret key management — repo guardrails", () => {
     ).toBe(false);
   });
 
-  it("no pi-ingest-readings Edge Function directory exists yet", () => {
-    expect(
-      existsSync(resolve(ROOT, "supabase/functions/pi-ingest-readings")),
-    ).toBe(false);
+  it("pi-ingest-readings Edge Function, if present, does not yet read PI_INGEST_SECRET_KEY", () => {
+    const fn = resolve(ROOT, "supabase/functions/pi-ingest-readings/index.ts");
+    if (!existsSync(fn)) return;
+    const src = readFileSync(fn, "utf8");
+    expect(src).not.toMatch(/PI_INGEST_SECRET_KEY/);
+    expect(src).toMatch(/secret_resolver_not_implemented/);
   });
 
   it("no code maps secret_hash to a secret field", () => {

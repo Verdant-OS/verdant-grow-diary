@@ -105,10 +105,13 @@ describe("pi-ingest tent-owner lookup — repo guardrails", () => {
     }
   });
 
-  it("no pi-ingest-readings Edge Function directory exists yet", () => {
-    expect(
-      existsSync(resolve(ROOT, "supabase/functions/pi-ingest-readings")),
-    ).toBe(false);
+  it("pi-ingest-readings Edge Function, if present, does not perform tent-owner lookup yet", () => {
+    const fn = resolve(ROOT, "supabase/functions/pi-ingest-readings/index.ts");
+    if (!existsSync(fn)) return;
+    const src = readFileSync(fn, "utf8");
+    expect(src).toMatch(/secret_resolver_not_implemented/);
+    expect(src).not.toMatch(/tentOwnerUserId/);
+    expect(src).not.toMatch(/from\(\s*["']tents["']\s*\)/);
   });
 
   it("no new service_role usage in src/lib pi-ingest modules", () => {

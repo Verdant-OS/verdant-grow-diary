@@ -110,20 +110,26 @@ function walk(dir: string, acc: string[] = []): string[] {
 const SELF = resolve(__dirname, "piIngestServerSecretResolverContract.test.ts");
 
 describe("pi-ingest server secret resolver — repo guardrails", () => {
-  it("no server secret resolver module exists yet", () => {
+  it("no server secret resolver module exists yet (types-only modules allowed)", () => {
     const files = walk(resolve(ROOT, "src/lib")).filter((p) =>
       /\.(ts|tsx)$/.test(p),
     );
     for (const f of files) {
       const base = f.split("/").pop() ?? "";
-      expect(
+      // Types/contracts-only modules (e.g. *ResolverTypes.ts) are permitted
+      // per docs/pi-ingest-server-secret-resolver-implementation-plan.md.
+      const isTypesOnly = /Types\.ts$/.test(base);
+      const looksLikeResolver =
         /ServerSecretResolver|BridgeSecretResolver|BridgeCredentialResolver/.test(
           base,
-        ),
+        );
+      expect(
+        looksLikeResolver && !isTypesOnly,
         `unexpected secret resolver: ${f}`,
       ).toBe(false);
     }
   });
+
 
   it("pi-ingest-readings Edge Function, if present, is fail-closed (no secret resolver)", () => {
     const fn = resolve(ROOT, "supabase/functions/pi-ingest-readings/index.ts");

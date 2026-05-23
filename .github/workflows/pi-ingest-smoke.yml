@@ -3,7 +3,7 @@
 # WARNING: This workflow exercises the DEPLOYED `pi-ingest-readings` Edge Function
 # using test-only bridge credentials supplied via GitHub Actions secrets. It writes
 # sensor_readings + pi_ingest_idempotency_keys rows for the configured test-only
-# tent/bridge. Do NOT point this workflow at production tents, bridges, or users.
+# tent/bridge. Do NOT point this workflow at live tents, bridges, or users.
 #
 # This workflow is `workflow_dispatch`-only by design — it must never run on push,
 # pull_request, or schedule. Secrets are passed through env vars; they are never

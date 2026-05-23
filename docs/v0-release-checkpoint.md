@@ -1,7 +1,7 @@
 # Verdant V0 Operating Loop Protected Build
 
 **Release name:** Verdant V0 Operating Loop Protected Build
-**Test count at checkpoint:** 2666/2666 passing
+**Test count at checkpoint:** 2688/2688 passing
 
 This document is the baseline for the current protected Verdant build. It
 exists so future work has an unambiguous reference for what shipped, what

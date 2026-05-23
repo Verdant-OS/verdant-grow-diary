@@ -114,6 +114,11 @@ export default function PlantDetail() {
             growId={plant.growId ?? null}
           />
           <PlantRecentActivityPanel plantId={plant.id} plantName={plant.name} />
+          <PlantAssignedTentAlertsPanel
+            tentId={plant.tentId ?? null}
+            tentName={tent?.name ?? null}
+            growId={plant.growId ?? null}
+          />
         </div>
       </div>
     </div>

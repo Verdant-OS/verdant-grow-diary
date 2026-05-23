@@ -127,10 +127,12 @@ describe("resolvePiIngestBridgeCredentialMetadata — dedupe", () => {
 });
 
 describe("resolvePiIngestBridgeCredentialMetadata — static safety", () => {
-  const SRC = readFileSync(
+  const RAW = readFileSync(
     resolve(__dirname, "../lib/piIngestBridgeCredentialMetadataResolver.ts"),
     "utf8",
   );
+  // Strip block + line comments so doc strings don't trip regex scans.
+  const SRC = RAW.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 
   it.each([
     ["no Supabase import", /from\s+["']@\/integrations\/supabase/],

@@ -206,3 +206,20 @@ Any of the following blocks shipping the write path:
 - The endpoint accepts a client-provided owner id.
 - The endpoint logs idempotency keys, raw payload, signature, or
   secret material.
+
+---
+
+## 10. Post-deploy verification
+
+After deploying `pi-ingest-readings`, run the deployed pi-ingest smoke test
+to confirm the live endpoint behaves correctly. Use
+[`docs/pi-ingest-smoke-runbook.md`](./pi-ingest-smoke-runbook.md) to verify:
+
+- a valid signed batch produces an insert,
+- a replay of the same batch is idempotent (rejected as duplicate, no
+  double-insert),
+- a tampered signature is rejected,
+- an unknown bridge is rejected.
+
+The runbook covers the required GitHub Actions secrets and the manual
+`workflow_dispatch` procedure.

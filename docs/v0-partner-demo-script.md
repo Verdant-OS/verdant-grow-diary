@@ -1,7 +1,7 @@
 # Verdant V0 — Partner Demo Script
 
 For hardware partner calls. Run this script on the protected V0 build.
-Green baseline at recording time: **1886/1886 tests passing**.
+Historical V0 RC baseline at recording time: **1886/1886 tests passing**. Current green baseline is tracked in [`docs/v0-release-checkpoint.md`](./v0-release-checkpoint.md).
 
 ---
 

@@ -1,7 +1,7 @@
 # Verdant V0 Release Candidate
 
 **Status:** Release Candidate — protected build
-**Green baseline:** 1886/1886 tests passing across 123 files
+**Historical V0 RC baseline:** 1886/1886 tests passing across 123 files (snapshot at RC cut). Current green baseline is tracked in [`docs/v0-release-checkpoint.md`](./v0-release-checkpoint.md).
 **Reference:** [`docs/v0-release-checkpoint.md`](./v0-release-checkpoint.md)
 
 This document is the partner-ready snapshot of the V0 build. It says exactly

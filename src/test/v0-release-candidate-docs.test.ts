@@ -36,7 +36,6 @@ describe("V0 release candidate · shared content contract", () => {
   const combined = (read(RC) + "\n" + read(DEMO) + "\n" + read(QA)).toLowerCase();
 
   it.each([
-    ["green baseline 1886/1886", /1886\s*\/\s*1886/],
     ["full v0 operating loop (grow → tent → plant)", /grow.*tent.*plant/],
     ["operating loop reaches action queue", /action queue/],
     ["no automation", /no automation/],
@@ -53,6 +52,21 @@ describe("V0 release candidate · shared content contract", () => {
   ])("docs mention %s", (_label, re) => {
     expect(combined).toMatch(re);
   });
+
+  it("any 1886/1886 reference is labeled as historical V0 RC baseline", () => {
+    for (const path of [RC, DEMO, QA]) {
+      const text = read(path);
+      if (/1886\s*\/\s*1886/.test(text)) {
+        expect(text.toLowerCase()).toMatch(/historical/);
+        expect(text).toContain("docs/v0-release-checkpoint.md");
+      }
+    }
+  });
+
+  it("current-baseline pointer references docs/v0-release-checkpoint.md", () => {
+    expect(combined).toContain("docs/v0-release-checkpoint.md");
+  });
+
 
   it.each([
     ["grow-room mode", /grow-room mode/],

@@ -54,6 +54,7 @@ import {
 import { loadTentOwnerUserId } from "./tentOwnerLookup.ts";
 import { evaluateBridgeAuthorization } from "../../../src/lib/piIngestBridgeAuthorizationRules.ts";
 import type { BridgeCredentialMetadata } from "../../../src/lib/piIngestBridgeCredentialMetadataResolver.ts";
+import { validatePiIngestRequestEnvelope } from "../../../src/lib/piIngestRequestRules.ts";
 
 export const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",

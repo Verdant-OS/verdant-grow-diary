@@ -919,10 +919,13 @@ export type Database = {
       }
       sensor_readings: {
         Row: {
+          captured_at: string | null
           created_at: string
+          device_id: string | null
           id: string
           metric: string
           quality: string
+          raw_payload: Json | null
           source: string
           tent_id: string
           ts: string
@@ -930,10 +933,13 @@ export type Database = {
           value: number
         }
         Insert: {
+          captured_at?: string | null
           created_at?: string
+          device_id?: string | null
           id?: string
           metric: string
           quality?: string
+          raw_payload?: Json | null
           source?: string
           tent_id: string
           ts?: string
@@ -941,10 +947,13 @@ export type Database = {
           value: number
         }
         Update: {
+          captured_at?: string | null
           created_at?: string
+          device_id?: string | null
           id?: string
           metric?: string
           quality?: string
+          raw_payload?: Json | null
           source?: string
           tent_id?: string
           ts?: string

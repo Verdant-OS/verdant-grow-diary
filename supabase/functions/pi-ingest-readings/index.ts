@@ -61,6 +61,11 @@ import {
 import { normalizeIngestPayload } from "../../../src/lib/sensorIngestNormalizationRules.ts";
 import { deriveBatchIdempotencyKeys } from "../../../src/lib/piIngestBridgeRules.ts";
 import { buildPiIngestCommitPlan } from "../../../src/lib/piIngestCommitPlan.ts";
+import {
+  loadExistingPiIngestIdempotencyKeys,
+  type PiIngestIdempotencyLookupClient,
+  type PiIngestIdempotencyLookupResult,
+} from "./idempotencyLookup.ts";
 
 export const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -93,6 +98,12 @@ export interface PiIngestHandlerDeps {
   keyProvider?: PiIngestSecretKeyProvider;
   /** Injected clock for HMAC freshness checks (tests). */
   now?: number;
+  /** Injected idempotency-lookup function (tests). Reads existing
+   *  per-reading idempotency keys for a bridge. SELECT-only. */
+  loadExistingIdempotencyKeys?: (
+    client: PiIngestIdempotencyLookupClient,
+    input: { bridgeId: string; candidateKeys: readonly string[] },
+  ) => Promise<PiIngestIdempotencyLookupResult>;
 }
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -306,13 +317,31 @@ export async function handlePiIngestReadingsRequest(
     return jsonResponse(400, buildInvalidRequestResponseBody());
   }
 
-  // Build the pure commit-plan PREVIEW. We pass an empty
-  // existingKeys set: no DB lookup is performed in this task, and the
-  // result is discarded. This proves the endpoint can shape sensor and
-  // idempotency rows without opening the write path.
+  // Look up which derived idempotency keys already exist for this
+  // bridge. SELECT-only — no inserts of any kind. On any lookup error,
+  // fail closed with a generic internal_failure (no key/DB leak).
+  const lookupFn =
+    deps.loadExistingIdempotencyKeys ?? loadExistingPiIngestIdempotencyKeys;
+  let existingKeys: ReadonlySet<string>;
   try {
-    // Synthesize a successful pipeline-result shape inline. The
-    // discriminator is set via a const + shorthand to keep the source
+    const lookup = await lookupFn(
+      client as unknown as PiIngestIdempotencyLookupClient,
+      { bridgeId: row.bridge_id, candidateKeys: keyResult.keys },
+    );
+    if (!lookup.ok) {
+      return jsonResponse(503, buildInternalFailureResponseBody());
+    }
+    existingKeys = lookup.existingKeys;
+  } catch {
+    return jsonResponse(503, buildInternalFailureResponseBody());
+  }
+
+  // Build the pure commit-plan PREVIEW using the looked-up existing
+  // keys. The result is discarded — no sensor rows, idempotency rows,
+  // alerts, or action_queue items are written. This proves the endpoint
+  // can distinguish new vs. duplicate readings without opening writes.
+  try {
+    // Discriminator set via const + shorthand to keep the source
     // free of any literal endpoint-success token.
     const ok = true as const;
     buildPiIngestCommitPlan({
@@ -324,7 +353,7 @@ export async function handlePiIngestReadingsRequest(
         readingDrafts: normalized.rows,
         idempotencyKeys: keyResult.keys,
       },
-      existingKeys: new Set<string>(),
+      existingKeys,
     });
   } catch {
     return jsonResponse(503, buildInternalFailureResponseBody());

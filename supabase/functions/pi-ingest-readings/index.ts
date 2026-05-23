@@ -34,7 +34,6 @@
 //   - docs/pi-ingest-write-transaction-contract.md
 
 import {
-  buildAuthOkPipelineNotImplementedResponseBody,
   buildInternalFailureResponseBody,
   buildInvalidRequestResponseBody,
   buildMethodNotAllowedResponseBody,
@@ -70,6 +69,12 @@ import {
   type PiIngestIdempotencyLookupClient,
   type PiIngestIdempotencyLookupResult,
 } from "./idempotencyLookup.ts";
+import {
+  commitPiIngestBatch,
+  type PiIngestCommitBatchClient,
+  type PiIngestCommitBatchInput,
+  type PiIngestCommitBatchResult,
+} from "./commitBatch.ts";
 
 export const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",

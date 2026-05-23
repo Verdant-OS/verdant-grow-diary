@@ -160,10 +160,12 @@ describe("pi_ingest_bridge_credentials — forbidden payload columns", () => {
 });
 
 describe("pi-ingest bridge credentials — repo-level / project safety", () => {
-  it("does not create a pi-ingest-readings Edge Function", () => {
-    expect(
-      existsSync(resolve(ROOT, "supabase/functions/pi-ingest-readings")),
-    ).toBe(false);
+  it("pi-ingest-readings Edge Function, if present, does not access bridge credential rows", () => {
+    const fn = resolve(ROOT, "supabase/functions/pi-ingest-readings/index.ts");
+    if (!existsSync(fn)) return;
+    const src = readFileSync(fn, "utf8");
+    expect(src).toMatch(/secret_resolver_not_implemented/);
+    expect(src).not.toMatch(/pi_ingest_bridge_credentials/);
   });
 
   it("does not alter sensor_readings to add credential columns", () => {

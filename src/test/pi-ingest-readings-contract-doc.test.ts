@@ -113,9 +113,15 @@ function walk(dir: string, acc: string[] = []): string[] {
   return acc;
 }
 
-describe("pi-ingest-readings — repo guardrails (this task added no implementation)", () => {
-  it("no supabase/functions/pi-ingest-readings directory exists yet", () => {
-    expect(existsSync(resolve(ROOT, "supabase/functions/pi-ingest-readings"))).toBe(false);
+describe("pi-ingest-readings — repo guardrails (fail-closed skeleton allowed)", () => {
+  const FN = resolve(ROOT, "supabase/functions/pi-ingest-readings/index.ts");
+  const SRC = existsSync(FN) ? readFileSync(FN, "utf8") : "";
+
+  it("pi-ingest-readings Edge Function, if present, is fail-closed", () => {
+    if (!existsSync(FN)) return;
+    expect(SRC).toMatch(/secret_resolver_not_implemented/);
+    expect(SRC).toMatch(/status:\s*(503|501)/);
+    expect(SRC).not.toMatch(/ok\s*:\s*true/);
   });
 
   it("no migration mentioning pi_ingest / pi-ingest-readings exists", () => {
@@ -138,17 +144,14 @@ describe("pi-ingest-readings — repo guardrails (this task added no implementat
     }
   });
 
-  it("no new pi-ingest-readings edge function uses service_role yet", () => {
-    const fnDir = resolve(ROOT, "supabase/functions/pi-ingest-readings");
-    expect(existsSync(fnDir)).toBe(false);
+  it("pi-ingest-readings Edge Function does not use service_role", () => {
+    if (!existsSync(FN)) return;
+    expect(SRC).not.toMatch(/service_role/i);
   });
 
-  it("no action_queue or alert write path appears in any edge function for this contract", () => {
-    const dir = resolve(ROOT, "supabase/functions");
-    if (!existsSync(dir)) return;
-    for (const name of readdirSync(dir)) {
-      // Whatever functions may already exist, none may be the pi ingest one.
-      expect(name).not.toMatch(/^pi-ingest-readings$/);
-    }
+  it("pi-ingest-readings Edge Function does not write alerts or action_queue", () => {
+    if (!existsSync(FN)) return;
+    expect(SRC).not.toMatch(/from\(\s*["']alerts["']\s*\)/);
+    expect(SRC).not.toMatch(/from\(\s*["']action_queue["']\s*\)/);
   });
 });

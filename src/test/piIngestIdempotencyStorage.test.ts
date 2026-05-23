@@ -139,8 +139,12 @@ describe("pi-ingest idempotency — repo-level safety", () => {
     }
   });
 
-  it("does not create a pi-ingest-readings Edge Function", () => {
-    expect(existsSync(resolve(ROOT, "supabase/functions/pi-ingest-readings"))).toBe(false);
+  it("Edge Function, if present, does not write idempotency rows yet", () => {
+    const fn = resolve(ROOT, "supabase/functions/pi-ingest-readings/index.ts");
+    if (!existsSync(fn)) return;
+    const src = readFileSync(fn, "utf8");
+    expect(src).toMatch(/secret_resolver_not_implemented/);
+    expect(src).not.toMatch(/\bpi_ingest_idempotency_keys\b/);
   });
 
   function walk(dir: string, acc: string[] = []): string[] {

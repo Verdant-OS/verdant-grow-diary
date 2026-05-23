@@ -229,10 +229,13 @@ function walkSrc(dir: string, acc: string[] = []): string[] {
 }
 
 describe("pi-ingest encrypted secret — repo guardrails", () => {
-  it("no Edge Function exists yet", () => {
-    expect(
-      existsSync(resolve(ROOT, "supabase/functions/pi-ingest-readings")),
-    ).toBe(false);
+  it("Edge Function, if present, is fail-closed and does not touch encrypted credential rows", () => {
+    const fn = resolve(ROOT, "supabase/functions/pi-ingest-readings/index.ts");
+    if (!existsSync(fn)) return;
+    const src = readFileSync(fn, "utf8");
+    expect(src).toMatch(/secret_resolver_not_implemented/);
+    expect(src).not.toMatch(/secret_ciphertext/);
+    expect(src).not.toMatch(/secret_nonce/);
   });
 
   it("no resolver module exists yet", () => {

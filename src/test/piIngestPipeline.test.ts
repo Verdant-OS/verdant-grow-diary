@@ -111,8 +111,8 @@ describe("preparePiIngestReadings — rejection per stage", () => {
     const r = await preparePiIngestReadings(input);
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect(r.stage).toBe("auth");
-      expect(r.issues[0].code).toBe("invalid_signature");
+      expect((r as any).stage).toBe("auth");
+      expect((r as any).issues[0].code).toBe("invalid_signature");
     }
   });
 
@@ -121,8 +121,8 @@ describe("preparePiIngestReadings — rejection per stage", () => {
     const r = await preparePiIngestReadings(input);
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect(r.stage).toBe("envelope");
-      expect(r.issues.some((i) => i.code === "invalid_source")).toBe(true);
+      expect((r as any).stage).toBe("envelope");
+      expect((r as any).issues.some((i) => i.code === "invalid_source")).toBe(true);
     }
   });
 
@@ -140,8 +140,8 @@ describe("preparePiIngestReadings — rejection per stage", () => {
     const r = await preparePiIngestReadings(input);
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect(r.stage).toBe("envelope");
-      expect(r.issues[0].code).toBe("tent_id_mismatch");
+      expect((r as any).stage).toBe("envelope");
+      expect((r as any).issues[0].code).toBe("tent_id_mismatch");
     }
   });
 
@@ -157,9 +157,9 @@ describe("preparePiIngestReadings — rejection per stage", () => {
     const r = await preparePiIngestReadings(input);
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect(r.stage).toBe("abuse_guard");
-      expect(r.issues.some((i) => i.code === "rate_limited")).toBe(true);
-      expect(r.retryAfterMs).toBe(10_000);
+      expect((r as any).stage).toBe("abuse_guard");
+      expect((r as any).issues.some((i) => i.code === "rate_limited")).toBe(true);
+      expect((r as any).retryAfterMs).toBe(10_000);
     }
   });
 
@@ -168,8 +168,8 @@ describe("preparePiIngestReadings — rejection per stage", () => {
     const r = await preparePiIngestReadings(input);
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect(r.stage).toBe("abuse_guard");
-      expect(r.issues.some((i) => i.code === "batch_too_large")).toBe(true);
+      expect((r as any).stage).toBe("abuse_guard");
+      expect((r as any).issues.some((i) => i.code === "batch_too_large")).toBe(true);
     }
   });
 
@@ -186,8 +186,8 @@ describe("preparePiIngestReadings — rejection per stage", () => {
     expect(r.ok).toBe(false);
     if (!r.ok) {
       // Auth stage rejects first via tent_not_allowed.
-      expect(r.stage).toBe("auth");
-      expect(r.issues[0].code).toBe("tent_not_allowed");
+      expect((r as any).stage).toBe("auth");
+      expect((r as any).issues[0].code).toBe("tent_not_allowed");
     }
   });
 
@@ -195,7 +195,7 @@ describe("preparePiIngestReadings — rejection per stage", () => {
     const input = await makeInput();
     const r = await preparePiIngestReadings({ ...input, now: "not-a-date" });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.issues[0].code).toBe("invalid_now");
+    if (!r.ok) expect((r as any).issues[0].code).toBe("invalid_now");
   });
 });
 

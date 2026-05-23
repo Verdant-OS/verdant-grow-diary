@@ -730,11 +730,13 @@ for (const r of [
   { metric: "soil_moisture_pct", value: 40, unit: "%" },
   { metric: "vpd_kpa", value: 1.1, unit: "kPa" },
 ] as const) {
-  Deno.test(`POST normalized ${r.metric}/${r.unit} returns 503 auth_ok_pipeline_not_implemented`, async () => {
+  Deno.test(`POST normalized ${r.metric}/${r.unit} returns 200 success`, async () => {
     const res = await postEnvelope({ readings: [r] });
-    assertEquals(res.status, 503);
+    assertEquals(res.status, 200);
     const body = await res.json();
-    assertEquals(body.error, "auth_ok_pipeline_not_implemented");
+    assertEquals(body.ok, true);
+    assertEquals(body.inserted, 1);
+    assertEquals(body.rejected, 0);
   });
 }
 

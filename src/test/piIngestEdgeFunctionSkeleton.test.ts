@@ -33,9 +33,12 @@ describe("pi-ingest-readings Edge Function skeleton — fail-closed behavior", (
     expect(SRC).toMatch(/method\s*!==?\s*["']POST["']/);
     expect(SRC).toMatch(/status:\s*405/);
   });
-  it("returns secret_resolver_not_implemented (via shared builder)", () => {
+  it("references fail-closed builders (legacy + post-auth)", () => {
     expect(SRC).toMatch(
       /(secret_resolver_not_implemented|buildSecretResolverNotImplementedResponseBody)/,
+    );
+    expect(SRC).toMatch(
+      /(auth_ok_pipeline_not_implemented|buildAuthOkPipelineNotImplementedResponseBody)/,
     );
   });
   it("returns method_not_allowed (via shared builder)", () => {
@@ -51,9 +54,9 @@ describe("pi-ingest-readings Edge Function skeleton — fail-closed behavior", (
   });
 });
 
-describe("pi-ingest-readings Edge Function skeleton — forbidden surfaces", () => {
+describe("pi-ingest-readings Edge Function — forbidden surfaces (post-auth)", () => {
+  // service_role + createClient are now permitted in index.ts only.
   const forbidden: Array<[string, RegExp]> = [
-    ["service_role", /service_role/i],
     ["sensor_readings", /\bsensor_readings\b/],
     ["pi_ingest_idempotency_keys", /\bpi_ingest_idempotency_keys\b/],
     ["alerts table write", /from\(\s*["']alerts["']\s*\)/],
@@ -64,8 +67,6 @@ describe("pi-ingest-readings Edge Function skeleton — forbidden surfaces", () 
     ["createCipheriv", /\bcreateCipheriv\s*\(/],
     ["secret_hash -> secret mapping", /secret\s*:\s*[A-Za-z_.]*\.?secret_hash\b/],
     ["secret_ciphertext -> secret mapping", /secret\s*:\s*[A-Za-z_.]*\.?secret_ciphertext\b/],
-    ["createClient", /\bcreateClient\s*\(/],
-    ["React import", /from\s+["']react["']/],
     ["browser supabase client", /@\/integrations\/supabase\/client/],
     ["raw body log", /console\.\w+\([^)]*\b(rawBody|raw_body|bodyText)\b/],
     ["signature log", /console\.\w+\([^)]*\bsignature\b/i],

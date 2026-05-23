@@ -145,35 +145,17 @@ describe("Option A precondition satisfied for bridge credential lookup contract"
   });
 });
 
-describe("Edge Function remains fail-closed and lookup unimplemented", () => {
-  it("index.ts still returns secret_resolver_not_implemented on POST", () => {
+describe("Edge Function ingestion remains fail-closed", () => {
+  it("index.ts references the fail-closed ingestion markers", () => {
     const idx = readFileSync(
       resolve(ROOT, "supabase/functions/pi-ingest-readings/index.ts"),
       "utf8",
     );
-    expect(idx.includes("secret_resolver_not_implemented")).toBe(true);
-  });
-
-  it("no credential lookup implementation file exists yet", () => {
-    const dir = resolve(ROOT, "supabase/functions/pi-ingest-readings");
-    const files = readdirSync(dir);
-    for (const f of [
-      "bridgeCredentialLookup.ts",
-      "loadBridgeCredential.ts",
-      "credentialLookup.ts",
-    ]) {
-      expect(files.includes(f)).toBe(false);
-    }
-  });
-
-  it("no Supabase client import in Edge Function dir", () => {
-    const dir = resolve(ROOT, "supabase/functions/pi-ingest-readings");
-    for (const f of readdirSync(dir)) {
-      if (!f.endsWith(".ts") || f.endsWith(".test.ts")) continue;
-      const txt = readFileSync(join(dir, f), "utf8");
-      expect(/@supabase\/supabase-js/.test(txt)).toBe(false);
-      expect(/\bcreateClient\s*\(/.test(txt)).toBe(false);
-    }
+    expect(
+      /secret_resolver_not_implemented|auth_ok_pipeline_not_implemented/.test(
+        idx,
+      ),
+    ).toBe(true);
   });
 
   it("no SUPABASE_SERVICE_ROLE_KEY runtime read in src/", () => {

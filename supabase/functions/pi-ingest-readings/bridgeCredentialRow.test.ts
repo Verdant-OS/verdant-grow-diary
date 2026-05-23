@@ -177,11 +177,10 @@ Deno.test("bridgeCredentialRow.ts source contains no forbidden surfaces", async 
   }
 });
 
-Deno.test("index.ts still does not import bridgeCredentialRow or resolver", async () => {
+Deno.test("index.ts imports bridgeCredentialRow + resolver behind auth gate", async () => {
   const src = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
-  assert(src.includes("secret_resolver_not_implemented"));
-  assert(!/from\s+["']\.\/bridgeCredentialRow(\.ts)?["']/.test(src));
-  assert(!/from\s+["']\.\/secretResolver(\.ts)?["']/.test(src));
-  assert(!/\bresolveBridgeSecret\s*\(/.test(src));
+  assert(/secret_resolver_not_implemented|auth_ok_pipeline_not_implemented/.test(src));
+  assert(/from\s+["']\.\/bridgeCredentialRow(\.ts)?["']/.test(src));
+  assert(/from\s+["']\.\/secretResolver(\.ts)?["']/.test(src));
   assert(!/ok\s*:\s*true/.test(src));
 });

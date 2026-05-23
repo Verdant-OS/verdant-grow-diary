@@ -13,9 +13,14 @@
 // columns to a usable secret, any logging of raw body / signature /
 // payload, any leaking of stack traces or internal secret details.
 //
-// When the server-only secret resolver is implemented, this file will
-// be replaced with the real verifier and insert pipeline. Until then:
-// 503 secret_resolver_not_implemented.
+// Wire bodies are produced by the shared pure builders in
+// src/lib/piIngestFailClosedResponses.ts so the Edge Function and its
+// tests share one fail-closed contract.
+
+import {
+  buildMethodNotAllowedResponseBody,
+  buildSecretResolverNotImplementedResponseBody,
+} from "../../../src/lib/piIngestFailClosedResponses.ts";
 
 export const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -24,6 +29,8 @@ export const CORS_HEADERS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const JSON_HEADERS = { ...CORS_HEADERS, "Content-Type": "application/json" };
+
 export function handlePiIngestReadingsRequest(req: Request): Response {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS_HEADERS });
@@ -31,27 +38,16 @@ export function handlePiIngestReadingsRequest(req: Request): Response {
 
   if (req.method !== "POST") {
     return new Response(
-      JSON.stringify({ ok: false, error: "method_not_allowed" }),
-      {
-        status: 405,
-        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
-      },
+      JSON.stringify(buildMethodNotAllowedResponseBody()),
+      { status: 405, headers: JSON_HEADERS },
     );
   }
 
   // Fail-closed. Do not parse the body. Do not log the body. Do not
   // touch the database.
   return new Response(
-    JSON.stringify({
-      ok: false,
-      error: "secret_resolver_not_implemented",
-      message:
-        "pi-ingest-readings is intentionally disabled until the server-only bridge secret resolver is implemented inside this Edge Function.",
-    }),
-    {
-      status: 503,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
-    },
+    JSON.stringify(buildSecretResolverNotImplementedResponseBody()),
+    { status: 503, headers: JSON_HEADERS },
   );
 }
 

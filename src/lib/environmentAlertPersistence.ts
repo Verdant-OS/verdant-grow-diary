@@ -12,7 +12,7 @@
  *
  * Only alerts derived from REAL, VALID sensor readings are eligible:
  *   - snapshot must exist
- *   - snapshot.source must be "live" or "manual" (never "diary", "unavailable")
+ *   - snapshot.source must be "live" or "manual" (never "sim", "diary", "unavailable")
  *   - snapshot must not be stale
  *   - quality must not be "unavailable"
  *   - the alert must not itself be a "data unavailable / stale / missing

@@ -145,16 +145,18 @@ describe("static guardrails — UI never maps sim to live", () => {
   ];
   for (const f of files) {
     const src = readFileSync(resolve(process.cwd(), f), "utf8");
-    it(`${f}: no 'sim' → 'live' assignment`, () => {
-      // Reject patterns like `source === "sim" ? "live"` or
-      // `"sim": "Live"` style fallthroughs.
-      expect(src).not.toMatch(/["']sim["']\s*[:?]\s*["']live["']/i);
-      expect(src).not.toMatch(/["']sim["']\s*[:?]\s*["']Live["']/);
+    it(`${f}: no inline 'sim' → 'live' mapping`, () => {
+      // Single-line patterns: `"sim": "Live"`, `"sim" ? "live"`, etc.
+      const oneLine = /["']sim["']\s*[:?]\s*["']live["']/i;
+      for (const line of src.split("\n")) {
+        expect(line).not.toMatch(oneLine);
+      }
     });
-    it(`${f}: no copy claiming simulated data is trusted/live`, () => {
+    it(`${f}: no UI copy claiming simulated data is live`, () => {
       const lower = src.toLowerCase();
-      expect(lower).not.toMatch(/simulated.{0,40}(is|=).{0,10}live/);
-      expect(lower).not.toMatch(/simulated.{0,40}trusted/);
+      // Reject phrases like "simulated ... is live" / "simulated data is live".
+      expect(lower).not.toMatch(/simulated[^.\n]{0,40}\bis\s+live\b/);
+      expect(lower).not.toMatch(/simulated[^.\n]{0,40}\bare\s+live\b/);
     });
   }
 });

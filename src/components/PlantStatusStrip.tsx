@@ -56,8 +56,7 @@ export default function PlantStatusStrip({ tentId, tentName, growId }: Props) {
           ? `Stale${env.sourceLabel ? ` · ${env.sourceLabel}` : ""}`
           : env.sourceLabel ?? "Live";
 
-  const alertsKnown =
-    hasTent && (alertStatus === "ready" || alertStatus === "loaded");
+  const alertsKnown = hasTent && alertStatus === "ok";
   const alertCount = alertsKnown ? alertRows.length : null;
   const actionsKnown = hasTent && !actionsLoading;
   const actionCount = actionsKnown ? actionRows.length : null;

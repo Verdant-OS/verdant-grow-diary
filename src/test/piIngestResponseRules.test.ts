@@ -6,10 +6,13 @@ import {
   shapePiIngestResponse,
   shapePiIngestSuccessResponse,
 } from "@/lib/piIngestResponseRules";
-import type { PiIngestPipelineResult } from "@/lib/piIngestPipeline";
+import type {
+  PiIngestPipelineResult,
+  PiIngestPipelineStage,
+} from "@/lib/piIngestPipeline";
 
 function failure(
-  stage: PiIngestPipelineResult extends { ok: false; stage: infer S } ? S : never,
+  stage: PiIngestPipelineStage,
   code: string,
   message: string,
   extras: { retryAfterMs?: number; issueRetry?: number } = {},

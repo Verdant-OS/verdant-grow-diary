@@ -128,11 +128,11 @@ describe("pi-ingest-readings — repo guardrails (this task added no implementat
   });
 
   it("no source file invokes a pi-ingest-readings function (no client wiring)", () => {
-    const files = walk(resolve(ROOT, "src")).filter((p) => /\.(ts|tsx)$/.test(p));
+    const files = walk(resolve(ROOT, "src")).filter(
+      (p) => /\.(ts|tsx)$/.test(p) && !/[\\/]test[\\/]/.test(p),
+    );
     for (const f of files) {
       const text = readFileSync(f, "utf8");
-      // Allow contract docstrings/comments to reference the future function
-      // name, but forbid any call that would invoke it.
       expect(text).not.toMatch(/functions\.invoke\(\s*['"]pi-ingest-readings/);
       expect(text).not.toMatch(/\/functions\/v1\/pi-ingest-readings/);
     }

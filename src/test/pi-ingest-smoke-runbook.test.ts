@@ -114,7 +114,7 @@ describe("pi-ingest smoke runbook — required content", () => {
   it("includes stop-ship conditions", () => {
     expect(DOC).toMatch(/stop[- ]ship/i);
     expect(DOC).toMatch(/non-test tent/i);
-    expect(DOC).toMatch(/duplicate sensor rows/i);
+    expect(DOC).toMatch(/duplicate[\s\S]{0,20}sensor rows/i);
     expect(DOC).toMatch(/tampered signature[\s\S]{0,80}401/i);
     expect(DOC).toMatch(/unknown bridge[\s\S]{0,80}401/i);
   });

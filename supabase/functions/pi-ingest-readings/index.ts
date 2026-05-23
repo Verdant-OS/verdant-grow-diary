@@ -164,13 +164,15 @@ export async function handlePiIngestReadingsRequest(
     return jsonResponse(401, buildUnauthorizedResponseBody());
   }
 
-  // Parse JSON only to extract tent_id for the HMAC envelope. The raw
-  // body is what gets signed; the parsed value is read-only.
+  // Parse JSON once. The raw body is what gets signed; the parsed value
+  // is used to extract tent_id for the HMAC envelope, and later (after
+  // authorization) to validate the full request envelope.
+  let parsedBody: unknown = null;
   let tentId: string | null = null;
   try {
-    const parsed = JSON.parse(rawBody);
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      const t = (parsed as Record<string, unknown>).tent_id;
+    parsedBody = JSON.parse(rawBody);
+    if (parsedBody && typeof parsedBody === "object" && !Array.isArray(parsedBody)) {
+      const t = (parsedBody as Record<string, unknown>).tent_id;
       if (typeof t === "string" && t.trim().length > 0) tentId = t.trim();
     }
   } catch {

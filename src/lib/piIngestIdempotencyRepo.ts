@@ -6,7 +6,7 @@
  *  - Touches ONLY `pi_ingest_idempotency_keys`.
  *  - RLS-scoped client only. No elevated key. No raw SQL. No auth bypass.
  *  - No writes to `sensor_readings`, alerts, action_queue, or any other table.
- *  - No `raw_payload`, `signature`, `secret`, or `value` fields.
+ *  - Idempotency-key tracking only. No payload, no signed material.
  *  - Caller-supplied Supabase client (RLS-scoped) for testability.
  *
  * Exposes:

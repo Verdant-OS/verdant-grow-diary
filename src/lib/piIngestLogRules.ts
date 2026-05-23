@@ -103,7 +103,7 @@ export function redactPiIngestLogRecord(
   }
   // Force event marker.
   out.event = "pi_ingest_attempt";
-  return out as PiIngestAttemptLogRecord;
+  return out as unknown as PiIngestAttemptLogRecord;
 }
 
 // ----------------------------- Shaping -----------------------------

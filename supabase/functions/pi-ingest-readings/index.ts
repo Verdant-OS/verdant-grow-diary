@@ -1,15 +1,15 @@
-// pi-ingest-readings Edge Function — auth-gated, ingestion fail-closed.
+// pi-ingest-readings Edge Function — auth-gated, atomic commit.
 //
 // Behavior:
 //   OPTIONS                           → 200 (CORS preflight)
 //   non-POST                          → 405 method_not_allowed
 //   POST without service-role config  → 503 secret_resolver_not_implemented
-//                                       (Edge Function not yet configured)
 //   POST missing/invalid auth headers → 401 unauthorized
 //   POST invalid body / missing tent  → 400 invalid_request
 //   POST lookup/resolver internal err → 503 internal_failure
 //   POST unknown bridge / HMAC fail   → 401 unauthorized
-//   POST valid auth                   → 503 auth_ok_pipeline_not_implemented
+//   POST commit failure               → 503 internal_failure
+//   POST valid auth + commit          → 200 { ok, inserted, rejected }
 //
 // This file is the ONLY place in the project allowed to:
 //   - Construct a Supabase client with the service-role key
@@ -18,8 +18,11 @@
 // This file still MUST NOT:
 //   - Read raw key-version env vars directly (the resolver owns that)
 //   - Decrypt secrets directly
-//   - Write to sensor data, idempotency, alert, action queue, or any
-//     device/automation surface
+//   - Reference sensor/idempotency/alert/action table names directly
+//   - Call .insert / .upsert / .update / .delete / .rpc directly
+//     (the commit goes through the server-only commit helper, which
+//     calls the SECURITY DEFINER `pi_ingest_commit_batch` RPC)
+//   - Write to alerts, action queue, or any device/automation surface
 //   - Log raw body, signature, payload, decrypted secret, ciphertext,
 //     nonce, key version, or stack traces
 //   - Map an encrypted credential field directly to a usable secret
@@ -28,6 +31,7 @@
 //   - docs/pi-ingest-readings-contract.md
 //   - docs/pi-ingest-server-secret-resolver-contract.md
 //   - docs/pi-ingest-bridge-credential-lookup-contract.md
+//   - docs/pi-ingest-write-transaction-contract.md
 
 import {
   buildAuthOkPipelineNotImplementedResponseBody,

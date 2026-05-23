@@ -21,7 +21,6 @@ const groups: { label: string; items: NavItem[] }[] = [
   { label: "Grow", items: [
     { to: "/tents", label: "Tents", icon: Box },
     { to: "/plants", label: "Plants", icon: Sprout },
-    { to: "/cameras", label: "Cameras", icon: Camera },
   ]},
   { label: "Data", items: [
     { to: "/sensors", label: "Sensor Data", icon: Activity },

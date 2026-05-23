@@ -10,7 +10,7 @@ do not ship — regardless of how this checklist scores.
 
 ## 1. Pre-flight
 
-- [ ] Full suite green locally (`bunx vitest run`) — confirm the current baseline documented in [`docs/v0-release-checkpoint.md`](./v0-release-checkpoint.md) (3061/3061 at last checkpoint).
+- [ ] Full suite green locally (`bunx vitest run`) — confirm the current baseline documented in [`docs/v0-release-checkpoint.md`](./v0-release-checkpoint.md) (3074/3074 at last checkpoint).
 - [ ] V0 contract test green in isolation:
       `bunx vitest run src/test/v0-operating-loop-contract.test.ts`.
 - [ ] Signed in as a real test user (not a service account).

@@ -54,7 +54,11 @@ import {
 import { loadTentOwnerUserId } from "./tentOwnerLookup.ts";
 import { evaluateBridgeAuthorization } from "../../../src/lib/piIngestBridgeAuthorizationRules.ts";
 import type { BridgeCredentialMetadata } from "../../../src/lib/piIngestBridgeCredentialMetadataResolver.ts";
-import { validatePiIngestRequestEnvelope } from "../../../src/lib/piIngestRequestRules.ts";
+import {
+  toExternalSensorIngestPayload,
+  validatePiIngestRequestEnvelope,
+} from "../../../src/lib/piIngestRequestRules.ts";
+import { normalizeIngestPayload } from "../../../src/lib/sensorIngestNormalizationRules.ts";
 
 export const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -275,8 +279,18 @@ export async function handlePiIngestReadingsRequest(
     return jsonResponse(400, buildInvalidRequestResponseBody());
   }
 
-  // Auth + authorization + envelope validation passed — pipeline still
-  // fail-closed.
+  // Envelope valid — run pure normalization. Result is discarded; we
+  // never insert sensor rows, idempotency keys, alerts, or actions here.
+  const externalPayload = toExternalSensorIngestPayload(validation.envelope);
+  const normalized = normalizeIngestPayload(externalPayload, {
+    now: deps.now !== undefined ? new Date(deps.now) : undefined,
+  });
+  if (!normalized.ok) {
+    return jsonResponse(400, buildInvalidRequestResponseBody());
+  }
+
+  // Auth + authorization + envelope + normalization passed — pipeline
+  // remains fail-closed.
   return jsonResponse(503, buildAuthOkPipelineNotImplementedResponseBody());
 }
 

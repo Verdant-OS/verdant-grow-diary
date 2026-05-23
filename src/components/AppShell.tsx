@@ -59,7 +59,7 @@ export default function AppShell() {
                   <kbd className="hidden lg:inline ml-2 text-[10px] px-1.5 py-0.5 rounded bg-background/60 border border-border/40">⌘K</kbd>
                 </button>
                 
-                <Button variant="outline" size="sm" onClick={() => setOpenLog(true)} className="hidden md:inline-flex">
+                <Button variant="outline" size="sm" onClick={() => { setPrefill(null); setOpenLog(true); }} className="hidden md:inline-flex">
                   <Plus className="h-4 w-4" /> Quick log
                 </Button>
                 <Button variant="ghost" size="icon" onClick={() => nav("/alerts")} aria-label="Alerts" className="relative">

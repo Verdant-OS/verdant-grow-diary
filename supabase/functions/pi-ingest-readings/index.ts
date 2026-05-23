@@ -21,7 +21,8 @@
 //   - Reference sensor/idempotency/alert/action table names directly
 //   - Call .insert / .upsert / .update / .delete / .rpc directly
 //     (the commit goes through the server-only commit helper, which
-//     calls the SECURITY DEFINER `pi_ingest_commit_batch` RPC)
+//     calls the SECURITY DEFINER atomic-commit RPC)
+
 //   - Write to alerts, action queue, or any device/automation surface
 //   - Log raw body, signature, payload, decrypted secret, ciphertext,
 //     nonce, key version, or stack traces

@@ -229,10 +229,13 @@ Deno.test("lookup source SELECTs the allowlisted columns and only those", async 
 });
 
 Deno.test("index.ts may consume credential lookup for auth gating only, never for ingestion", async () => {
-  const src = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  const raw = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  const src = raw
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
   // Auth gating is now wired — lookup import/usage is permitted.
   assert(
-    /from\s+["']\.\/bridgeCredentialLookup(\.ts)?["']/.test(src),
+    /from\s+["']\.\/bridgeCredentialLookup(\.ts)?["']/.test(raw),
     "index.ts should import the lookup for auth gating",
   );
   assert(
@@ -240,9 +243,9 @@ Deno.test("index.ts may consume credential lookup for auth gating only, never fo
     "index.ts should call loadBridgeCredentialRow for auth gating",
   );
   // Post-auth still fail-closed.
-  assertStringIncludes(src, "auth_ok_pipeline_not_implemented");
+  assertStringIncludes(raw, "auth_ok_pipeline_not_implemented");
   assert(!/ok\s*:\s*true/.test(src), "index.ts must not expose a success path");
-  // No ingestion writes / RPCs.
+  // No ingestion writes / RPCs (comments stripped to avoid false positives).
   for (
     const [label, re] of [
       ["insert", /\.insert\s*\(/],

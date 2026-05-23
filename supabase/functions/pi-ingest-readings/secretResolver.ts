@@ -2,9 +2,9 @@
 //
 // MUST run only inside this Edge Function path. MUST NOT be imported
 // from anywhere under src/. MUST NOT touch Supabase, the database,
-// sensor_readings, pi_ingest_idempotency_keys, alerts, or action_queue.
-// MUST NOT log decrypted secret material, ciphertext, nonce, env key
-// names, or key bytes. Decrypted secrets exist only in-memory for one
+// readings, idempotency keys, alerts, or the action queue. MUST NOT
+// log decrypted secret material, ciphertext, nonce, env key names,
+// or key bytes. Decrypted secrets exist only in-memory for one
 // request and the caller MUST drop the reference immediately after
 // HMAC verification.
 //

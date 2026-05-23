@@ -9,8 +9,8 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Box, Lightbulb, Plus } from "lucide-react";
 import CreatePlantDialog from "@/components/CreatePlantDialog";
 import AddExistingPlantDialog from "@/components/AddExistingPlantDialog";
-import { usePlants, useSensorReadings } from "@/hooks/useMockData";
-import { useGrowTent, getGrowDataMeta, type GrowDataSourceMeta } from "@/hooks/useGrowData";
+import { useSensorReadings } from "@/hooks/useMockData";
+import { useGrowTent, useGrowPlants, getGrowDataMeta, type GrowDataSourceMeta } from "@/hooks/useGrowData";
 
 // Plants and sensor readings inside this page still come from the
 // useMockData hooks (Phase 1 has not migrated them yet). Surface that as

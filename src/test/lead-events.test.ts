@@ -132,16 +132,23 @@ describe("status-change trigger captures old_status and new_status", () => {
   });
 
   it("is hardened: latest definition is SECURITY DEFINER with locked search_path and fully qualified table refs", () => {
+    // Anchor on CREATE OR REPLACE FUNCTION so we never match the REVOKE line
+    // (which has no terminating `$$;` of its own and could otherwise extend
+    // greedily into unrelated later migrations that use `DO $$ ... END $$;`).
     // Use the LAST occurrence so later migrations supersede earlier ones.
     const matches = [
       ...migrationContents.matchAll(
-        /FUNCTION\s+public\.log_lead_status_change[\s\S]*?\$\$;/gi,
+        /CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\.log_lead_status_change[\s\S]*?\$\$;/gi,
       ),
     ];
     expect(matches.length).toBeGreaterThan(0);
     const fn = matches[matches.length - 1][0];
     expect(fn).toMatch(/SECURITY DEFINER/i);
-    expect(fn).toMatch(/SET\s+search_path\s*=\s*public\s*,\s*auth/i);
+    // search_path must start with `public, auth` and may include `pg_temp`
+    // (intentional hardening), but must not silently allow other schemas.
+    expect(fn).toMatch(
+      /SET\s+search_path\s*=\s*public\s*,\s*auth(?:\s*,\s*pg_temp)?\s*(?:\r?\n|AS\b)/i,
+    );
     // Disallow bare (unqualified) writes to lead_events / leads in the body.
     expect(fn).not.toMatch(/INSERT\s+INTO\s+lead_events\b/i);
     expect(fn).toMatch(/INSERT\s+INTO\s+public\.lead_events\b/i);

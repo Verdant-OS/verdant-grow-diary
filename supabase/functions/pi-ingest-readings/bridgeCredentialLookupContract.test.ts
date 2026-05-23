@@ -132,7 +132,7 @@ Deno.test("doc forbids bridge-provided owner id", async () => {
 
 Deno.test("doc says missing bridge id fails closed", async () => {
   const d = await readText(DOC_URL);
-  assert(/Missing\s+`?bridge_id`?[\s\S]{0,200}fail/i.test(d));
+  assert(/Missing\s+`?bridge_id`?[\s\S]{0,200}(fail|reject)/i.test(d));
 });
 
 Deno.test("doc says unknown bridge id fails closed", async () => {

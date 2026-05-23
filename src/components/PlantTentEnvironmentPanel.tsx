@@ -100,6 +100,20 @@ export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, p
             </div>
           </div>
         )}
+        {enabled && prefill ? (
+          <div className="mt-4">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1"
+              onClick={openQuickLog}
+              data-testid="plant-tent-environment-log-with-context"
+            >
+              <NotebookPen className="h-3.5 w-3.5" /> Log observation with this context
+            </Button>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

@@ -177,7 +177,7 @@ describe("mock data immutability", () => {
     // Run mappers over copies just to exercise call sites.
     mapTentRow(tentRow);
     mapPlantRow(plantRow);
-    mapSensorReadingRow({ id: "x", user_id: "u", tent_id: "t", ts: "x", quality: "ok", source: "manual", created_at: "x", metric: "temperature_c", value: 1 });
+    mapSensorReadingRow({ id: "x", user_id: "u", tent_id: "t", ts: "x", quality: "ok", source: "manual", created_at: "x", metric: "temperature_c", value: 1, device_id: null, raw_payload: null, captured_at: null } as any);
     expect(JSON.stringify(tents)).toBe(tentsSnap);
     expect(JSON.stringify(plants)).toBe(plantsSnap);
     expect(JSON.stringify(sensorReadings)).toBe(sensorsSnap);

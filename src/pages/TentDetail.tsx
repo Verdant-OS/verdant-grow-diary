@@ -8,10 +8,11 @@ import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Box, Lightbulb, Plus } from "lucide-react";
 import CreatePlantDialog from "@/components/CreatePlantDialog";
-import { usePlants, useSensorReadings, useCameras } from "@/hooks/useMockData";
+import AddExistingPlantDialog from "@/components/AddExistingPlantDialog";
+import { usePlants, useSensorReadings } from "@/hooks/useMockData";
 import { useGrowTent, getGrowDataMeta, type GrowDataSourceMeta } from "@/hooks/useGrowData";
 
-// Plants, sensor readings, and cameras inside this page still come from the
+// Plants and sensor readings inside this page still come from the
 // useMockData hooks (Phase 1 has not migrated them yet). Surface that as
 // explicit demo metadata so the disclosure honestly reports Mixed/Demo.
 const DEMO_SUBDATA_META: GrowDataSourceMeta = {
@@ -25,8 +26,6 @@ export default function TentDetail() {
   const { data: tent, isLoading } = useGrowTent(id);
   const { data: plants = [] } = usePlants(id);
   const { data: readings = [] } = useSensorReadings(id);
-  const { data: cameras = [] } = useCameras();
-  const cam = cameras.find((c) => c.tentId === id);
   const last = readings.at(-1);
   const tentMeta = getGrowDataMeta(["grow", "tent", id ?? null]);
 
@@ -84,33 +83,29 @@ export default function TentDetail() {
         </span>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4 mb-6">
-        <div className="lg:col-span-2 glass rounded-2xl p-4">
-          <h2 className="font-display font-semibold mb-3">Environment · 7 days</h2>
-          <SensorChart data={readings} metric="temp" height={200} />
-        </div>
-        <div className="glass rounded-2xl p-4">
-          <h2 className="font-display font-semibold mb-3">Camera</h2>
-          {cam ? (
-            <Link to={`/cameras/${cam.id}`} className="block aspect-video rounded-xl overflow-hidden border border-border/40">
-              <img src={cam.thumbnail} alt={cam.name} className="w-full h-full object-cover" />
-            </Link>
-          ) : <p className="text-sm text-muted-foreground">No camera assigned.</p>}
-        </div>
+      <div className="glass rounded-2xl p-4 mb-6">
+        <h2 className="font-display font-semibold mb-3">Environment · 7 days</h2>
+        <SensorChart data={readings} metric="temp" height={200} />
       </div>
 
       <div className="glass rounded-2xl p-4">
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <h2 className="font-display font-semibold">Plants in this tent ({plants.length})</h2>
-          <CreatePlantDialog
-            defaultTentId={id}
-            defaultGrowId={tent.growId ?? undefined}
-            trigger={
-              <Button size="sm" className="gradient-leaf text-primary-foreground gap-1">
-                <Plus className="h-4 w-4" /> Add Plant to This Tent
-              </Button>
-            }
-          />
+          <div className="flex flex-wrap gap-2">
+            <AddExistingPlantDialog
+              tentId={id ?? ""}
+              growId={tent.growId ?? null}
+            />
+            <CreatePlantDialog
+              defaultTentId={id}
+              defaultGrowId={tent.growId ?? undefined}
+              trigger={
+                <Button size="sm" className="gradient-leaf text-primary-foreground gap-1">
+                  <Plus className="h-4 w-4" /> Add Plant to This Tent
+                </Button>
+              }
+            />
+          </div>
         </div>
         {plants.length === 0 ? (
           <div
@@ -120,19 +115,35 @@ export default function TentDetail() {
             <p className="text-sm text-muted-foreground">
               No plants in this tent yet.
             </p>
-            <CreatePlantDialog
-              defaultTentId={id}
-              defaultGrowId={tent.growId ?? undefined}
-              trigger={
-                <Button
-                  size="sm"
-                  className="gradient-leaf text-primary-foreground gap-1"
-                  data-testid="tent-detail-empty-add-plant"
-                >
-                  <Plus className="h-4 w-4" /> Add Plant to This Tent
-                </Button>
-              }
-            />
+            <div className="flex flex-wrap gap-2">
+              <AddExistingPlantDialog
+                tentId={id ?? ""}
+                growId={tent.growId ?? null}
+                trigger={
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1"
+                    data-testid="tent-detail-empty-add-existing-plant"
+                  >
+                    Add Existing Plant
+                  </Button>
+                }
+              />
+              <CreatePlantDialog
+                defaultTentId={id}
+                defaultGrowId={tent.growId ?? undefined}
+                trigger={
+                  <Button
+                    size="sm"
+                    className="gradient-leaf text-primary-foreground gap-1"
+                    data-testid="tent-detail-empty-add-plant"
+                  >
+                    <Plus className="h-4 w-4" /> Add Plant to This Tent
+                  </Button>
+                }
+              />
+            </div>
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3" data-testid="tent-detail-plants-grid">

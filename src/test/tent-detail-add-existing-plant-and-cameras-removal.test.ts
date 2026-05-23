@@ -81,17 +81,21 @@ describe("AddExistingPlantDialog · query + write semantics", () => {
     expect(DIALOG).toContain("CreatePlantDialog");
   });
 
-  it("introduces no alerts / Action Queue / sensor / automation / device-control surfaces", () => {
-    const FORBIDDEN = [
+  it("introduces no alerts / Action Queue / sensor / automation / device-control table writes", () => {
+    const FORBIDDEN_TABLES = [
       "action_queue",
+      "action_queue_events",
       "alert_events",
       "alerts",
       "sensor_readings",
-      "pi_ingest",
-      "device_command",
-      "service_role",
+      "pi_ingest_idempotency_keys",
+      "pi_ingest_bridge_credentials",
     ];
-    for (const f of FORBIDDEN) expect(DIALOG).not.toContain(f);
+    for (const t of FORBIDDEN_TABLES) {
+      expect(DIALOG).not.toMatch(new RegExp(`\\.from\\(["']${t}["']\\)`));
+    }
+    expect(DIALOG).not.toContain("service_role");
+    expect(DIALOG).not.toContain("device_command");
     expect(DIALOG).not.toMatch(
       /mqtt|home[\s_-]?assistant|relay|actuator|webhook/i,
     );

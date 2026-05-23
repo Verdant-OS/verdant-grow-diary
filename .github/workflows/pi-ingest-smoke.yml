@@ -6,9 +6,10 @@
 # tent/bridge. Do NOT point this workflow at live tents, bridges, or users.
 #
 # This workflow is `workflow_dispatch`-only by design — it must never run on push,
-# pull_request, or schedule. Secrets are passed through env vars; they are never
+# PR events, or schedules. Secrets are passed through env vars; they are never
 # echoed and the smoke test itself never prints secrets, signatures, raw body,
 # ciphertext, nonce, or service-role values.
+
 
 name: pi-ingest smoke (manual)
 

@@ -1,0 +1,45 @@
+# pi-ingest-readings deployed smoke test (MANUAL ONLY)
+#
+# WARNING: This workflow exercises the DEPLOYED `pi-ingest-readings` Edge Function
+# using test-only bridge credentials supplied via GitHub Actions secrets. It writes
+# sensor_readings + pi_ingest_idempotency_keys rows for the configured test-only
+# tent/bridge. Do NOT point this workflow at production tents, bridges, or users.
+#
+# This workflow is `workflow_dispatch`-only by design — it must never run on push,
+# pull_request, or schedule. Secrets are passed through env vars; they are never
+# echoed and the smoke test itself never prints secrets, signatures, raw body,
+# ciphertext, nonce, or service-role values.
+
+name: pi-ingest smoke (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: deployed pi-ingest-readings smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      - name: Run deployed smoke test
+        env:
+          PI_INGEST_SMOKE_FUNCTION_URL: ${{ secrets.PI_INGEST_SMOKE_FUNCTION_URL }}
+          PI_INGEST_SMOKE_BRIDGE_ID: ${{ secrets.PI_INGEST_SMOKE_BRIDGE_ID }}
+          PI_INGEST_SMOKE_BRIDGE_SECRET: ${{ secrets.PI_INGEST_SMOKE_BRIDGE_SECRET }}
+          PI_INGEST_SMOKE_TENT_ID: ${{ secrets.PI_INGEST_SMOKE_TENT_ID }}
+          PI_INGEST_SMOKE_DEVICE_ID: ${{ secrets.PI_INGEST_SMOKE_DEVICE_ID }}
+          PI_INGEST_SMOKE_TIMESTAMP_MS: ${{ secrets.PI_INGEST_SMOKE_TIMESTAMP_MS }}
+        run: |
+          deno test --allow-net --allow-env \
+            supabase/functions/pi-ingest-readings/smoke.test.ts

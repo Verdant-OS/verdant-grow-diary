@@ -133,7 +133,7 @@ export default function PlantAssignedTentActionsPanel({
     <Card data-testid="plant-assigned-tent-actions-panel" className="mt-4">
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
         <CardTitle className="text-base flex items-center gap-2">
-          <ListTodo className="h-4 w-4" /> Assigned Tent Action Queue
+          <ListTodo className="h-4 w-4" /> Pending Tasks
           {tentName ? (
             <span className="text-xs font-normal text-muted-foreground">
               · {tentName}

@@ -196,7 +196,7 @@ export default function GrowRoomMode() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Grow-Room Mode"
+        title="Live Dashboard"
         description="Read-only operator view across your tents. Verdant never executes equipment changes."
       />
 

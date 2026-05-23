@@ -29,7 +29,7 @@ export default function Plants() {
   return (
     <div>
       <GrowBreadcrumbs growId={urlGrowId} growName={scopedGrowName} current="Plants" section="plants" />
-      <PageHeader title="Plants" description="Every plant across every tent." icon={<Sprout className="h-5 w-5" />} actions={<CreatePlantDialog defaultGrowId={validGrowId} />} />
+      <PageHeader title="Plants" description="Every plant you're tracking, across every tent." icon={<Sprout className="h-5 w-5" />} actions={<CreatePlantDialog defaultGrowId={validGrowId} />} />
       {urlGrowId && (
         <ScopedGrowBanner
           growId={urlGrowId}
@@ -54,7 +54,7 @@ export default function Plants() {
           </button>
         ))}
       </div>
-      {filtered.length === 0 ? <EmptyState icon={<Sprout className="h-6 w-6" />} title="No plants" /> : (
+      {filtered.length === 0 ? <EmptyState icon={<Sprout className="h-6 w-6" />} title="No plants yet" description="Add your first plant and assign it to a tent." /> : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filtered.map((p) => {
             const tent = tents.find((t) => t.id === p.tentId);

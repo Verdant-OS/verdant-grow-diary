@@ -11,10 +11,10 @@ import { resolve, join } from "node:path";
 
 const ROOT = resolve(__dirname, "../..");
 const CHECKPOINT_DOC = "docs/v0-release-checkpoint.md";
-const CURRENT_BASELINE = "3170";
+const CURRENT_BASELINE = "3225";
 
 // Counts that were ever pinned as a full-suite baseline at some point.
-const KNOWN_HISTORICAL = ["1886", "2878", "2932", "2933", "2944", "2972", "2981", "2982", "3010", "3023", "3035", "3089", "3111", "3134", "3162"];
+const KNOWN_HISTORICAL = ["1886", "2878", "2932", "2933", "2944", "2972", "2981", "2982", "3010", "3023", "3035", "3089", "3111", "3134", "3162", "3170"];
 
 const SCAN_DIRS = ["docs"];
 

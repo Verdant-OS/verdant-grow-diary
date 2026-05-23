@@ -18,22 +18,24 @@ const groups: { label: string; items: NavItem[] }[] = [
     { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
     { to: "/grow-room", label: "Grow-Room Mode", icon: LayoutGrid },
   ]},
-  { label: "Grow", items: [
-    { to: "/plants", label: "Plants", icon: Sprout },
+  { label: "Cultivation", items: [
     { to: "/tents", label: "Tents", icon: Box },
+    { to: "/plants", label: "Plants", icon: Sprout },
   ]},
   { label: "Data", items: [
     { to: "/sensors", label: "Sensor Data", icon: Activity },
-    { to: "/logs", label: "Grow Logs", icon: NotebookText },
+    { to: "/logs", label: "Logs", icon: NotebookText },
   ]},
   { label: "Operations", items: [
     { to: "/tasks", label: "Tasks", icon: ListChecks },
     { to: "/alerts", label: "Alerts", icon: Bell },
+    { to: "/actions", label: "Action Queue", icon: ShieldCheck },
   ]},
   { label: "Intelligence", items: [
     { to: "/doctor", label: "AI Grow Doctor", icon: Stethoscope },
-    { to: "/actions", label: "Action Queue", icon: ShieldCheck },
-    { to: "/grows", label: "Grows", icon: Sprout },
+  ]},
+  { label: "Archive", items: [
+    { to: "/grows", label: "Harvest Archive", icon: Sprout },
     { to: "/grow-lineage", label: "Lineage Repair", icon: Wrench },
   ]},
   { label: "Account", items: [{ to: "/settings", label: "Settings", icon: Settings }] },

@@ -33,7 +33,7 @@ export default function PlantDetail() {
         <EmptyState
           icon={<Sprout className="h-6 w-6" />}
           title="Plant not found"
-          description="This plant does not exist in your real grow data."
+          description="This plant isn't in your tracked plants yet."
           action={
             <Button asChild variant="outline">
               <Link to="/plants">
@@ -106,7 +106,7 @@ export default function PlantDetail() {
             <p className="text-sm">{plant.lastNote}</p>
             <p className="text-xs text-muted-foreground mt-1">Updated {formatDistanceToNow(new Date(plant.startedAt), { addSuffix: true })}</p>
           </div>
-          <Button asChild variant="outline" size="sm"><Link to="/logs">Open grow logs</Link></Button>
+          <Button asChild variant="outline" size="sm"><Link to="/logs">Open Logs</Link></Button>
           <PlantTentEnvironmentPanel
             tentId={plant.tentId ?? null}
             tentName={tent?.name ?? null}

@@ -6,8 +6,8 @@ import { useState } from "react";
 
 const primary = [
   { to: "/", label: "Home", icon: LayoutDashboard, end: true },
-  { to: "/plants", label: "Plants", icon: Sprout },
   { to: "/tents", label: "Tents", icon: Box },
+  { to: "/plants", label: "Plants", icon: Sprout },
   { to: "/logs", label: "Logs", icon: NotebookText },
   { to: "/alerts", label: "Alerts", icon: Bell },
 ];
@@ -16,7 +16,7 @@ const more = [
   { to: "/tasks", label: "Tasks", icon: ListChecks },
   { to: "/sensors", label: "Sensor Data", icon: Activity },
   { to: "/doctor", label: "AI Grow Doctor", icon: Stethoscope },
-  { to: "/grows", label: "Grows", icon: Sprout },
+  { to: "/grows", label: "Harvest Archive", icon: Sprout },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 

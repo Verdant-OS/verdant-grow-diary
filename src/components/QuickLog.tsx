@@ -87,7 +87,7 @@ export default function QuickLog({ open, onOpenChange, onCreated, prefill }: Pro
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!user || !activeGrowId) { toast.error("Pick a grow first"); return; }
+    if (!user || !activeGrowId) { toast.error("Pick a workspace first"); return; }
     if (!note.trim()) { toast.error("Add a quick note"); return; }
     setBusy(true);
     let uploadedPath: string | null = null;
@@ -239,10 +239,10 @@ export default function QuickLog({ open, onOpenChange, onCreated, prefill }: Pro
             </div>
           </div>
 
-          {/* Grow + Plant */}
+          {/* Workspace + Plant */}
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <Label className="text-xs">Grow</Label>
+              <Label className="text-xs">Workspace</Label>
               <Select value={activeGrowId ?? ""} onValueChange={setActiveGrowId}>
                 <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                 <SelectContent>{grows.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}</SelectContent>

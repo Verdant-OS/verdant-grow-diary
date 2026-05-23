@@ -42,7 +42,7 @@ export default function TentDetail() {
         <EmptyState
           icon={<Box className="h-6 w-6" />}
           title="Tent not found"
-          description="This tent does not exist in your real grow data."
+          description="This tent isn't in your tracked tents yet."
           action={
             <Button asChild variant="outline">
               <Link to="/tents">

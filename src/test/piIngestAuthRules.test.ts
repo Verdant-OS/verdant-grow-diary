@@ -100,42 +100,48 @@ describe("piIngestAuthRules — rejection branches", () => {
     const req = await signedReq();
     const r = await verifyBridgeRequest({ ...req, bridgeId: "" }, [credential]);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.code).toBe("missing_bridge_id");
+    if (r.ok) throw new Error("expected failure");
+    expect(r.code).toBe("missing_bridge_id");
   });
 
   it("unknown bridgeId rejects", async () => {
     const req = await signedReq({ bridgeId: "nope" });
     const r = await verifyBridgeRequest(req, [credential]);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.code).toBe("unknown_bridge_id");
+    if (r.ok) throw new Error("expected failure");
+    expect(r.code).toBe("unknown_bridge_id");
   });
 
   it("inactive credential rejects", async () => {
     const inactive = { ...credential, isActive: false };
     const r = await verifyBridgeRequest(await signedReq(), [inactive]);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.code).toBe("inactive_credential");
+    if (r.ok) throw new Error("expected failure");
+    expect(r.code).toBe("inactive_credential");
   });
 
   it("missing signature rejects", async () => {
     const req = await signedReq();
     const r = await verifyBridgeRequest({ ...req, signature: "" }, [credential]);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.code).toBe("missing_signature");
+    if (r.ok) throw new Error("expected failure");
+    expect(r.code).toBe("missing_signature");
   });
 
   it("missing timestamp rejects", async () => {
     const req = await signedReq();
     const r = await verifyBridgeRequest({ ...req, timestamp: "" }, [credential]);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.code).toBe("missing_timestamp");
+    if (r.ok) throw new Error("expected failure");
+    expect(r.code).toBe("missing_timestamp");
   });
 
   it("invalid timestamp rejects", async () => {
     const req = await signedReq({ timestamp: "not-a-date" });
     const r = await verifyBridgeRequest(req, [credential]);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.code).toBe("invalid_timestamp");
+    if (r.ok) throw new Error("expected failure");
+    expect(r.code).toBe("invalid_timestamp");
   });
 
   it("timestamp older than 5 minutes rejects", async () => {
@@ -143,7 +149,8 @@ describe("piIngestAuthRules — rejection branches", () => {
     const req = await signedReq({ timestamp: old });
     const r = await verifyBridgeRequest(req, [credential]);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.code).toBe("timestamp_too_old");
+    if (r.ok) throw new Error("expected failure");
+    expect(r.code).toBe("timestamp_too_old");
   });
 
   it("timestamp more than 5 minutes in the future rejects", async () => {
@@ -151,21 +158,24 @@ describe("piIngestAuthRules — rejection branches", () => {
     const req = await signedReq({ timestamp: future });
     const r = await verifyBridgeRequest(req, [credential]);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.code).toBe("timestamp_too_far_future");
+    if (r.ok) throw new Error("expected failure");
+    expect(r.code).toBe("timestamp_too_far_future");
   });
 
   it("missing tentId rejects", async () => {
     const req = await signedReq();
     const r = await verifyBridgeRequest({ ...req, tentId: "" }, [credential]);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.code).toBe("missing_tent_id");
+    if (r.ok) throw new Error("expected failure");
+    expect(r.code).toBe("missing_tent_id");
   });
 
   it("tentId not in allowedTentIds rejects", async () => {
     const req = await signedReq({ tentId: OTHER_TENT });
     const r = await verifyBridgeRequest(req, [credential]);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.code).toBe("tent_not_allowed");
+    if (r.ok) throw new Error("expected failure");
+    expect(r.code).toBe("tent_not_allowed");
   });
 
   it("tampered rawBody rejects (signature stale)", async () => {
@@ -175,14 +185,16 @@ describe("piIngestAuthRules — rejection branches", () => {
       [credential],
     );
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.code).toBe("invalid_signature");
+    if (r.ok) throw new Error("expected failure");
+    expect(r.code).toBe("invalid_signature");
   });
 
   it("wrong HTTP method rejects", async () => {
     const req = await signedReq();
     const r = await verifyBridgeRequest({ ...req, method: "PUT" }, [credential]);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.code).toBe("invalid_signature");
+    if (r.ok) throw new Error("expected failure");
+    expect(r.code).toBe("invalid_signature");
   });
 
   it("wrong path rejects", async () => {
@@ -192,14 +204,16 @@ describe("piIngestAuthRules — rejection branches", () => {
       [credential],
     );
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.code).toBe("invalid_signature");
+    if (r.ok) throw new Error("expected failure");
+    expect(r.code).toBe("invalid_signature");
   });
 
   it("wrong secret rejects", async () => {
     const wrong = { ...credential, secret: "different-secret" };
     const r = await verifyBridgeRequest(await signedReq(), [wrong]);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.code).toBe("invalid_signature");
+    if (r.ok) throw new Error("expected failure");
+    expect(r.code).toBe("invalid_signature");
   });
 });
 

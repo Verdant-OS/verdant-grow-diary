@@ -814,7 +814,10 @@ Deno.test("index.ts wires commit-plan preview imports", async () => {
   const raw = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
   assert(/buildPiIngestCommitPlan/.test(raw));
   assert(/deriveBatchIdempotencyKeys/.test(raw));
-  // Idempotency lookup must NOT yet be wired.
+  // Idempotency lookup is now wired via the helper module — but the raw
+  // table name must still NEVER appear in index.ts (lives only in the
+  // helper).
+  assert(/loadExistingPiIngestIdempotencyKeys/.test(raw));
   assert(!/pi_ingest_idempotency_keys/.test(raw));
   // Per-reading idempotency only; no requestHash.
   assert(!/requestHash|request_hash/i.test(raw));

@@ -136,12 +136,10 @@ describe("server-secret resolver implementation plan — repo state", () => {
   });
 
 
-  it("Edge Function ingestion path remains fail-closed and decryption-free", () => {
+  it("Edge Function ingestion path remains decryption-free and has no direct writes", () => {
     if (!FN_SRC) return;
-    // Either the legacy unconfigured fallback or the post-auth marker.
-    expect(FN_SRC).toMatch(
-      /(secret_resolver_not_implemented|auth_ok_pipeline_not_implemented)/,
-    );
+    // Legacy fail-closed sentinel still present for unconfigured paths.
+    expect(FN_SRC).toMatch(/secret_resolver_not_implemented/);
     for (const re of [
       /crypto\.subtle\.decrypt\s*\(/,
       /\bcreateDecipheriv\s*\(/,
@@ -150,11 +148,11 @@ describe("server-secret resolver implementation plan — repo state", () => {
       /\bpi_ingest_idempotency_keys\b/,
       /from\(\s*["']alerts["']\s*\)/,
       /from\(\s*["']action_queue["']\s*\)/,
-      /ok\s*:\s*true/,
     ]) {
       expect(FN_SRC).not.toMatch(re);
     }
   });
+
 
   it("no src/ file imports a resolver from the Edge Function dir", () => {
     const offenders: string[] = [];

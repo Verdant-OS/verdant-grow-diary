@@ -54,6 +54,7 @@ export default function DashboardDataSourceDisclosure({
   scopedGrowId,
   hasAnyData,
   metas,
+  snapshotSource,
   className,
 }: Props) {
   const resolved =
@@ -65,6 +66,9 @@ export default function DashboardDataSourceDisclosure({
         ];
   const combined = combineGrowDataMeta(resolved);
   const label: Label = LABEL_BY_SOURCE[combined.dataSource];
+  const isSimulated = snapshotSource === "sim";
+  const simulatedNotice =
+    "Simulated sensor data shown — for testing/demo only. Not real tent data and not used for persisted alerts.";
 
   // Welcome / empty state — no usable data anywhere.
   if (!hasAnyData && combined.dataSource === "unavailable") {
@@ -97,6 +101,7 @@ export default function DashboardDataSourceDisclosure({
     <div
       data-testid="dashboard-data-source-disclosure"
       data-source={combined.dataSource}
+      data-snapshot-source={snapshotSource ?? ""}
       className={cn("mb-4 flex items-center gap-2 flex-wrap", className)}
       aria-label="Grow data source"
     >
@@ -109,6 +114,24 @@ export default function DashboardDataSourceDisclosure({
         {label} data
       </Badge>
       <span className="text-xs text-muted-foreground">{DESCRIPTION[label]}</span>
+      {isSimulated && (
+        <>
+          <Badge
+            variant="outline"
+            data-testid="dashboard-data-source-simulated-badge"
+            data-label="Simulated"
+            className="text-[10px] uppercase tracking-wide"
+          >
+            Simulated
+          </Badge>
+          <span
+            className="text-xs text-muted-foreground basis-full"
+            data-testid="dashboard-data-source-simulated-notice"
+          >
+            {simulatedNotice}
+          </span>
+        </>
+      )}
     </div>
   );
 }

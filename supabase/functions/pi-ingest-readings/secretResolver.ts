@@ -175,15 +175,15 @@ export async function resolveBridgeSecret(
   try {
     const cryptoKey = await crypto.subtle.importKey(
       "raw",
-      keyBytes,
+      keyBytes as unknown as BufferSource,
       { name: "AES-GCM" },
       false,
       ["decrypt"],
     );
     const plain = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: nonce },
+      { name: "AES-GCM", iv: nonce as unknown as BufferSource },
       cryptoKey,
-      ciphertext,
+      ciphertext as unknown as BufferSource,
     );
     const text = new TextDecoder().decode(plain);
     if (!text || text.length === 0) {

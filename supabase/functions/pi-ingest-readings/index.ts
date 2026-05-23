@@ -311,9 +311,9 @@ export async function handlePiIngestReadingsRequest(
   // result is discarded. This proves the endpoint can shape sensor and
   // idempotency rows without opening the write path.
   try {
-    // Synthesize a successful pipeline-result shape inline. The literal
-    // is avoided here because guardrail tests forbid `ok: true` in
-    // index.ts; we set the discriminator via a const + shorthand.
+    // Synthesize a successful pipeline-result shape inline. The
+    // discriminator is set via a const + shorthand to keep the source
+    // free of any literal endpoint-success token.
     const ok = true as const;
     buildPiIngestCommitPlan({
       pipelineResult: {

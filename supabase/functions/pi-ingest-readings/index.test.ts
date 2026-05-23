@@ -410,7 +410,7 @@ Deno.test("POST response never leaks secrets/headers/body", async () => {
 // ---------- POST tent-owner / authorization gate ----------
 
 Deno.test("POST tent owned by same user returns 503 auth_ok_pipeline_not_implemented", async () => {
-  const rawBody = JSON.stringify({ tent_id: "tent-1" });
+  const rawBody = validEnvelopeBody();
   const headers = await signedPostHeaders(rawBody);
   const client = makeClient(
     { data: [await defaultRow()], error: null },

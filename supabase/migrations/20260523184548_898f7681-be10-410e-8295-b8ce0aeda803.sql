@@ -1,7 +1,7 @@
 -- Atomic pi-ingest commit RPC.
 -- Inserts sensor_readings and matching pi_ingest_idempotency_keys in a single
 -- transaction. Skips rows whose (user_id, idempotency_key) already exists.
--- Service-role only. Never writes alerts or action_queue.
+-- Service-role only. Never writes alerts or action-queue.
 
 CREATE OR REPLACE FUNCTION public.pi_ingest_commit_batch(
   p_user_id uuid,
@@ -118,4 +118,4 @@ REVOKE ALL ON FUNCTION public.pi_ingest_commit_batch(uuid, text, uuid, jsonb) FR
 GRANT EXECUTE ON FUNCTION public.pi_ingest_commit_batch(uuid, text, uuid, jsonb) TO service_role;
 
 COMMENT ON FUNCTION public.pi_ingest_commit_batch(uuid, text, uuid, jsonb) IS
-  'Atomic pi-ingest commit. Inserts sensor_readings + matching pi_ingest_idempotency_keys in one transaction. Service-role only. Skips rows whose (user_id, idempotency_key) already exists. Never writes alerts or action_queue.';
+  'Atomic pi-ingest commit. Inserts sensor_readings + matching pi_ingest_idempotency_keys in one transaction. Service-role only. Skips rows whose (user_id, idempotency_key) already exists. Never writes alerts or action-queue.';

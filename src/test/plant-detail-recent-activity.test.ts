@@ -116,7 +116,7 @@ describe("buildPlantRecentActivity (pure)", () => {
       { plantId: "p1", now: NOW },
     );
     expect(row.hasSnapshot).toBe(true);
-    expect(row.snapshotAt).toBe("2026-05-23T11:55:00Z");
+    expect(row.snapshotAt).toBe("2026-05-23T11:55:00.000Z");
     expect(row.snapshotStale).toBe(false);
   });
 

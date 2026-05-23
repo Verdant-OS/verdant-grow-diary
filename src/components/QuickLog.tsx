@@ -91,6 +91,7 @@ export default function QuickLog({ open, onOpenChange, onCreated, prefill }: Pro
     setPhotoFile(null); setPreview(null); setNote(""); setShowMore(false);
     setEventType("observation"); setPlantId(""); setSnapshot(false); setRemindAt("");
     setDetails({ ph: "", ec: "", runoff: "", nutrients: "", training: "", watering: "" });
+    setHardware({ inputPh: "", inputEc: "", runoffPh: "", runoffEc: "", ppfdCanopy: "", lightDistance: "" });
   }
 
   async function submit(e: React.FormEvent) {

@@ -117,8 +117,12 @@ function resolveCredential(
     | readonly BridgeCredential[]
     | ReadonlyMap<string, BridgeCredential>,
 ): BridgeCredential | undefined {
-  if (credentials instanceof Map) return credentials.get(bridgeId);
-  return credentials.find((c) => c.bridgeId === bridgeId);
+  if (Array.isArray(credentials)) {
+    return (credentials as readonly BridgeCredential[]).find(
+      (c) => c.bridgeId === bridgeId,
+    );
+  }
+  return (credentials as ReadonlyMap<string, BridgeCredential>).get(bridgeId);
 }
 
 function fail(

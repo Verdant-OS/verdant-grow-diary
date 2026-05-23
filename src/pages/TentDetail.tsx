@@ -1,4 +1,5 @@
 import { useParams, Link } from "react-router-dom";
+import { formatDistanceToNow } from "date-fns";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
 import MetricChip from "@/components/MetricChip";
@@ -9,24 +10,21 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Box, Lightbulb, Plus } from "lucide-react";
 import CreatePlantDialog from "@/components/CreatePlantDialog";
 import AddExistingPlantDialog from "@/components/AddExistingPlantDialog";
-import { useSensorReadings } from "@/hooks/useMockData";
-import { useGrowTent, useGrowPlants, getGrowDataMeta, type GrowDataSourceMeta } from "@/hooks/useGrowData";
-
-// Plants and sensor readings inside this page still come from the
-// useMockData hooks (Phase 1 has not migrated them yet). Surface that as
-// explicit demo metadata so the disclosure honestly reports Mixed/Demo.
-const DEMO_SUBDATA_META: GrowDataSourceMeta = {
-  isDemoData: true,
-  dataSource: "mock",
-  sourceReason: "tent-detail:subdata-mock",
-};
+import { useSensorReadings } from "@/hooks/use-sensor-readings";
+import { useGrowTent, useGrowPlants, getGrowDataMeta } from "@/hooks/useGrowData";
+import {
+  buildTentSensorChartSeries,
+  buildTentSensorHeaderView,
+} from "@/lib/tentSensorChartRules";
 
 export default function TentDetail() {
   const { id } = useParams();
   const { data: tent, isLoading } = useGrowTent(id);
   const { data: plants = [] } = useGrowPlants(id);
   const { data: readings = [] } = useSensorReadings(id);
-  const last = readings.at(-1);
+  const series = buildTentSensorChartSeries(readings);
+  const header = buildTentSensorHeaderView(readings);
+  const snap = header.snapshot;
   const tentMeta = getGrowDataMeta(["grow", "tent", id ?? null]);
 
   if (isLoading) return <div className="glass rounded-2xl h-64 animate-pulse" />;
@@ -68,15 +66,23 @@ export default function TentDetail() {
       <GrowDataSourceDisclosure
         resource="tent"
         hasAnyData
-        metas={[tentMeta, DEMO_SUBDATA_META]}
+        metas={[tentMeta]}
         testId="tent-detail-data-source-disclosure"
       />
 
-      <div className="flex flex-wrap gap-2 mb-5">
-        {last && <MetricChip label="T" value={last.temp} unit="°C" status={last.temp > 28 || last.temp < 19 ? "warn" : "ok"} />}
-        {last && <MetricChip label="RH" value={last.rh} unit="%" status={last.rh > 65 || last.rh < 35 ? "warn" : "ok"} />}
-        {last && <MetricChip label="VPD" value={last.vpd} unit=" kPa" status={last.vpd > 1.6 || last.vpd < 0.6 ? "warn" : "ok"} />}
-        {last && <MetricChip label="CO₂" value={last.co2} unit=" ppm" />}
+      <div className="flex flex-wrap gap-2 mb-5" data-testid="tent-detail-metric-chips">
+        {snap?.temp !== null && snap?.temp !== undefined && (
+          <MetricChip label="T" value={snap.temp} unit="°C" status={snap.temp > 28 || snap.temp < 19 ? "warn" : "ok"} />
+        )}
+        {snap?.rh !== null && snap?.rh !== undefined && (
+          <MetricChip label="RH" value={snap.rh} unit="%" status={snap.rh > 65 || snap.rh < 35 ? "warn" : "ok"} />
+        )}
+        {snap?.vpd !== null && snap?.vpd !== undefined && (
+          <MetricChip label="VPD" value={snap.vpd} unit=" kPa" status={snap.vpd > 1.6 || snap.vpd < 0.6 ? "warn" : "ok"} />
+        )}
+        {snap?.co2 !== null && snap?.co2 !== undefined && (
+          <MetricChip label="CO₂" value={snap.co2} unit=" ppm" />
+        )}
         <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
           <Lightbulb className={`h-3.5 w-3.5 ${tent.light.on ? "text-[hsl(var(--warning))]" : ""}`} />
           {tent.light.schedule} · {tent.light.wattage}W
@@ -84,8 +90,44 @@ export default function TentDetail() {
       </div>
 
       <div className="glass rounded-2xl p-4 mb-6">
-        <h2 className="font-display font-semibold mb-3">Environment · 7 days</h2>
-        <SensorChart data={readings} metric="temp" height={200} />
+        <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
+          <h2 className="font-display font-semibold">Environment</h2>
+          {header.hasReadings && (
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              {header.capturedAt && (
+                <span data-testid="tent-detail-sensor-captured">
+                  Captured {formatDistanceToNow(new Date(header.capturedAt), { addSuffix: true })}
+                </span>
+              )}
+              {header.sourceLabel && (
+                <span
+                  className="rounded-md border px-1.5 py-0.5"
+                  data-testid="tent-detail-sensor-source"
+                >
+                  {header.sourceLabel}
+                </span>
+              )}
+              {header.stale && (
+                <span
+                  className="rounded-md border border-[hsl(var(--warning))] px-1.5 py-0.5 text-[hsl(var(--warning))]"
+                  data-testid="tent-detail-sensor-stale"
+                >
+                  Stale
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+        {series.length === 0 ? (
+          <p
+            className="text-sm text-muted-foreground py-6 text-center"
+            data-testid="tent-detail-sensor-empty"
+          >
+            No sensor readings yet.
+          </p>
+        ) : (
+          <SensorChart data={series as unknown as Parameters<typeof SensorChart>[0]["data"]} metric="temp" height={200} />
+        )}
       </div>
 
       <div className="glass rounded-2xl p-4">

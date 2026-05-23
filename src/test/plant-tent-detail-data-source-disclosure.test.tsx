@@ -195,8 +195,10 @@ describe("TentDetail page wiring", () => {
     expect(TENT_DETAIL).toMatch(/getGrowDataMeta/);
   });
 
-  it("explicitly labels still-mock subdata so disclosure stays honest", () => {
-    expect(TENT_DETAIL).toMatch(/DEMO_SUBDATA_META|dataSource:\s*["']mock["']/);
+  it("no longer relies on mock subdata — sensors and plants are real", () => {
+    expect(TENT_DETAIL).not.toMatch(/DEMO_SUBDATA_META/);
+    expect(TENT_DETAIL).not.toMatch(/from\s+["']@\/hooks\/useMockData["']/);
+    expect(TENT_DETAIL).toMatch(/from\s+["']@\/hooks\/use-sensor-readings["']/);
   });
 
   it("renders a not-found empty state when tent is missing", () => {

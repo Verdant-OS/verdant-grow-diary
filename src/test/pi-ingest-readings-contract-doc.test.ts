@@ -120,7 +120,7 @@ describe("pi-ingest-readings — repo guardrails (fail-closed skeleton allowed)"
   it("pi-ingest-readings Edge Function, if present, is ingestion-fail-closed", () => {
     if (!existsSync(FN)) return;
     expect(SRC).toMatch(/(secret_resolver_not_implemented|auth_ok_pipeline_not_implemented)/);
-    expect(SRC).toMatch(/status:\s*(503|501)/);
+    expect(SRC).toMatch(/(status:\s*(503|501)|jsonResponse\s*\(\s*(503|501))/);
     expect(SRC).not.toMatch(/ok\s*:\s*true/);
   });
 

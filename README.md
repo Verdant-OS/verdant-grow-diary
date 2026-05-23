@@ -186,6 +186,19 @@ grow-owned data should honor the scoped grow rather than ignore it.
 
 ---
 
+## pi-ingest deployed smoke test
+
+After deploying the `pi-ingest-readings` Edge Function, operators verify the
+live endpoint with the deployed pi-ingest smoke test. The full operator
+procedure — required GitHub Actions secrets, how to dispatch the manual
+workflow, and how to interpret valid-insert, replay idempotency, tampered
+signature, and unknown bridge outcomes — lives in
+[`docs/pi-ingest-smoke-runbook.md`](docs/pi-ingest-smoke-runbook.md).
+The write-path contract is documented in
+[`docs/pi-ingest-write-transaction-contract.md`](docs/pi-ingest-write-transaction-contract.md).
+
+---
+
 ## Known accepted security exception
 
 - **Supabase linter 0029** — `public.has_role(uuid, public.app_role)` is a

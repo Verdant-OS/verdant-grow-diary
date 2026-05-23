@@ -1355,6 +1355,18 @@ export type Database = {
         Returns: boolean
       }
       max_level_for_user: { Args: { _user_id: string }; Returns: number }
+      pi_ingest_commit_batch: {
+        Args: {
+          p_bridge_id: string
+          p_rows: Json
+          p_tent_id: string
+          p_user_id: string
+        }
+        Returns: {
+          inserted: number
+          rejected: number
+        }[]
+      }
     }
     Enums: {
       app_role: "operator" | "customer"

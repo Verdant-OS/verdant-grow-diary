@@ -264,7 +264,29 @@ export default function GrowRoomMode() {
                   <span data-testid="grow-room-source">
                     {SNAPSHOT_STATE_LABEL[card.snapshotState]}
                   </span>
+                  {card.snapshot?.source === "sim" && (
+                    <Badge
+                      variant="outline"
+                      data-testid="grow-room-simulated-badge"
+                      data-label="Simulated"
+                      className="text-[10px] uppercase tracking-wide"
+                    >
+                      Simulated
+                    </Badge>
+                  )}
                 </div>
+
+                {card.snapshot?.source === "sim" && (
+                  <div
+                    data-testid="grow-room-simulated-notice"
+                    className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-200"
+                  >
+                    <AlertTriangle className="h-3.5 w-3.5 mt-0.5" />
+                    <span>
+                      Simulated sensor data shown — for testing/demo only. Not real tent data and not used for persisted alerts.
+                    </span>
+                  </div>
+                )}
 
                 {showWarning && (
                   <div

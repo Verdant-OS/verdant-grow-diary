@@ -359,7 +359,7 @@ Deno.test("POST tent not allowed returns 401 unauthorized", async () => {
 // ---------- POST valid auth ----------
 
 Deno.test("POST valid auth returns 503 auth_ok_pipeline_not_implemented", async () => {
-  const rawBody = JSON.stringify({ tent_id: "tent-1", readings: [] });
+  const rawBody = validEnvelopeBody();
   const headers = await signedPostHeaders(rawBody);
   const client = makeClient({ data: [await defaultRow()], error: null });
   const res = await handlePiIngestReadingsRequest(

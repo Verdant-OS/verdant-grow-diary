@@ -229,7 +229,7 @@ export function deriveBatchIdempotencyKeys(
       metric: r.metric,
       capturedAt: r.capturedAt,
     });
-    if (!res.ok) return fail(res.code, res.message, i);
+    if (res.ok !== true) return fail(res.code, res.message, i);
     if (seen.has(res.key))
       return fail(
         "duplicate_reading_in_batch",

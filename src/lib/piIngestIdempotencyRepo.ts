@@ -4,7 +4,7 @@
  *
  * STRICT SCOPE:
  *  - Touches ONLY `pi_ingest_idempotency_keys`.
- *  - No service_role. No raw SQL. No auth bypass.
+ *  - RLS-scoped client only. No elevated key. No raw SQL. No auth bypass.
  *  - No writes to `sensor_readings`, alerts, action_queue, or any other table.
  *  - No `raw_payload`, `signature`, `secret`, or `value` fields.
  *  - Caller-supplied Supabase client (RLS-scoped) for testability.

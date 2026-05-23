@@ -13,6 +13,7 @@ import {
   getGrowDataMeta,
   type GrowDataSourceMeta,
 } from "@/hooks/useGrowData";
+import type { SnapshotSource } from "@/lib/sensorSnapshot";
 
 type Label = "Live" | "Demo" | "Mixed" | "Unavailable";
 
@@ -43,6 +44,9 @@ interface Props {
   hasAnyData: boolean;
   /** Test/override hook. When omitted, metadata is read from getGrowDataMeta. */
   metas?: readonly GrowDataSourceMeta[];
+  /** Optional sensor snapshot source — when "sim", a simulated-data notice
+   * is appended so the UI never presents simulated readings as live. */
+  snapshotSource?: SnapshotSource;
   className?: string;
 }
 

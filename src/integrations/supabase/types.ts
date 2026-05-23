@@ -830,8 +830,12 @@ export type Database = {
           id: string
           is_active: boolean
           last_used_at: string | null
+          secret_ciphertext: string | null
           secret_hash: string
           secret_hint: string | null
+          secret_key_version: number | null
+          secret_nonce: string | null
+          secret_status: string
           updated_at: string
           user_id: string
         }
@@ -842,8 +846,12 @@ export type Database = {
           id?: string
           is_active?: boolean
           last_used_at?: string | null
+          secret_ciphertext?: string | null
           secret_hash: string
           secret_hint?: string | null
+          secret_key_version?: number | null
+          secret_nonce?: string | null
+          secret_status?: string
           updated_at?: string
           user_id?: string
         }
@@ -854,8 +862,12 @@ export type Database = {
           id?: string
           is_active?: boolean
           last_used_at?: string | null
+          secret_ciphertext?: string | null
           secret_hash?: string
           secret_hint?: string | null
+          secret_key_version?: number | null
+          secret_nonce?: string | null
+          secret_status?: string
           updated_at?: string
           user_id?: string
         }
@@ -1261,7 +1273,45 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      pi_ingest_bridge_credentials_safe: {
+        Row: {
+          allowed_tent_ids: string[] | null
+          bridge_id: string | null
+          created_at: string | null
+          id: string | null
+          is_active: boolean | null
+          last_used_at: string | null
+          secret_hint: string | null
+          secret_status: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          allowed_tent_ids?: string[] | null
+          bridge_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          last_used_at?: string | null
+          secret_hint?: string | null
+          secret_status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          allowed_tent_ids?: string[] | null
+          bridge_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          last_used_at?: string | null
+          secret_hint?: string | null
+          secret_status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       award_nugs: {

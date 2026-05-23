@@ -134,6 +134,22 @@ export function classifyGrowDataSource(
     };
   }
 
+  // 1b. Simulated — never trusted, never Live, but distinct from Demo so
+  //     the UI can disclose "simulated/testing data" honestly.
+  if (source && SIMULATED_SOURCES.has(source)) {
+    reasons.push("source marked as simulated");
+    return {
+      label: "Simulated",
+      severity: "info",
+      message:
+        "Simulated data — for testing only. Not real tent data and not used for persisted alerts.",
+      shouldDisplayBadge: true,
+      isTrustedForAi: false,
+      reasons,
+    };
+  }
+
+
   // 2. Unavailable: no source AND no value.
   if (!source && !valuePresent) {
     reasons.push("missing source");

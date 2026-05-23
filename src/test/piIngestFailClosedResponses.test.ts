@@ -73,6 +73,104 @@ describe("piIngestFailClosedResponses — secret_resolver_not_implemented", () =
   });
 });
 
+describe("piIngestFailClosedResponses — unauthorized", () => {
+  const body = buildUnauthorizedResponseBody();
+  it("ok is exactly false", () => expect(body.ok).toBe(false));
+  it("error is unauthorized", () => {
+    expect(body.error).toBe("unauthorized");
+    expect(PI_INGEST_UNAUTHORIZED_ERROR).toBe("unauthorized");
+  });
+  it("message matches the documented unauthorized message", () => {
+    expect(body.message).toBe(PI_INGEST_UNAUTHORIZED_MESSAGE);
+  });
+  it("has only ok/error/message keys", () => {
+    expect(Object.keys(body).sort()).toEqual(["error", "message", "ok"]);
+  });
+});
+
+describe("piIngestFailClosedResponses — invalid_request", () => {
+  const body = buildInvalidRequestResponseBody();
+  it("ok is exactly false", () => expect(body.ok).toBe(false));
+  it("error is invalid_request", () => {
+    expect(body.error).toBe("invalid_request");
+    expect(PI_INGEST_INVALID_REQUEST_ERROR).toBe("invalid_request");
+  });
+  it("message matches the documented invalid_request message", () => {
+    expect(body.message).toBe(PI_INGEST_INVALID_REQUEST_MESSAGE);
+  });
+  it("has only ok/error/message keys", () => {
+    expect(Object.keys(body).sort()).toEqual(["error", "message", "ok"]);
+  });
+});
+
+describe("piIngestFailClosedResponses — internal_failure", () => {
+  const body = buildInternalFailureResponseBody();
+  it("ok is exactly false", () => expect(body.ok).toBe(false));
+  it("error is internal_failure", () => {
+    expect(body.error).toBe("internal_failure");
+    expect(PI_INGEST_INTERNAL_FAILURE_ERROR).toBe("internal_failure");
+  });
+  it("message matches the documented internal_failure message", () => {
+    expect(body.message).toBe(PI_INGEST_INTERNAL_FAILURE_MESSAGE);
+  });
+  it("has only ok/error/message keys", () => {
+    expect(Object.keys(body).sort()).toEqual(["error", "message", "ok"]);
+  });
+});
+
+describe("piIngestFailClosedResponses — auth_ok_pipeline_not_implemented", () => {
+  const body = buildAuthOkPipelineNotImplementedResponseBody();
+  it("ok is exactly false (no success path)", () => expect(body.ok).toBe(false));
+  it("error is auth_ok_pipeline_not_implemented", () => {
+    expect(body.error).toBe("auth_ok_pipeline_not_implemented");
+    expect(PI_INGEST_AUTH_OK_PIPELINE_NOT_IMPLEMENTED_ERROR).toBe(
+      "auth_ok_pipeline_not_implemented",
+    );
+  });
+  it("message matches the documented post-auth message", () => {
+    expect(body.message).toBe(PI_INGEST_AUTH_OK_PIPELINE_NOT_IMPLEMENTED_MESSAGE);
+    expect(body.message).toMatch(/pipeline is not enabled/i);
+  });
+  it("has only ok/error/message keys", () => {
+    expect(Object.keys(body).sort()).toEqual(["error", "message", "ok"]);
+  });
+});
+
+describe("piIngestFailClosedResponses — secret leakage invariants", () => {
+  it("no builder leaks secret, signature, raw body/payload, or service-role strings", async () => {
+    const mod = await import("@/lib/piIngestFailClosedResponses");
+    const forbidden = [
+      /secret/i,
+      /signature/i,
+      /raw[_\s]?body/i,
+      /raw[_\s]?payload/i,
+      /service[_\s-]?role/i,
+      /ciphertext/i,
+      /nonce/i,
+    ];
+    for (const [name, value] of Object.entries(mod)) {
+      if (typeof value !== "function") continue;
+      const serialized = JSON.stringify((value as () => unknown)());
+      for (const re of forbidden) {
+        expect(
+          re.test(serialized),
+          `${name} response body leaked forbidden token matching ${re}`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it("no builder returns ok:true via value", async () => {
+    const mod = await import("@/lib/piIngestFailClosedResponses");
+    for (const [name, value] of Object.entries(mod)) {
+      if (typeof value !== "function") continue;
+      const result = (value as () => { ok: unknown })();
+      expect(result.ok, `${name} must be ok:false`).toBe(false);
+      expect(result.ok).not.toBe(true);
+    }
+  });
+});
+
 describe("piIngestFailClosedResponses — fail-closed invariants", () => {
   it("no exported builder ever returns ok:true", async () => {
     const mod = await import("@/lib/piIngestFailClosedResponses");

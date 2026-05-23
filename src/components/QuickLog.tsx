@@ -17,6 +17,11 @@ import { EVENT_TYPES } from "@/lib/diary";
 import { usePlants } from "@/hooks/use-plants";
 import type { SensorReadingRow } from "@/lib/db";
 import { evaluateQuickLogPreview } from "@/lib/quickLogPreviewRules";
+import {
+  appendHardwareReadingsToNote,
+  hasAnyHardwareReading,
+  type QuickLogHardwareReadings,
+} from "@/lib/quickLogHardwareReadingsRules";
 import { AlertTriangle, Info } from "lucide-react";
 import { toast } from "sonner";
 

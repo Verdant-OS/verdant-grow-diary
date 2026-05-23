@@ -26,7 +26,7 @@ const limitMock = vi.fn();
 const orderMock = vi.fn(() => ({ limit: limitMock }));
 const eqMock = vi.fn(() => ({ order: orderMock }));
 const selectMock = vi.fn(() => ({ eq: eqMock }));
-const fromMock = vi.fn(() => ({ select: selectMock }));
+const fromMock: ReturnType<typeof vi.fn> = vi.fn(() => ({ select: selectMock }));
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { from: (table: string) => fromMock(table) },

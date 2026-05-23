@@ -4,7 +4,7 @@
  *
  * STRICT SCOPE:
  *  - Pure TypeScript. No Supabase. No React. No I/O. No network.
- *  - No writes. No service_role. No schema knowledge.
+ *  - No writes. No elevated keys. No schema knowledge.
  *  - Verification only. Caller is responsible for fetching credentials and
  *    persisting the validated readings later, behind its own gates.
  *

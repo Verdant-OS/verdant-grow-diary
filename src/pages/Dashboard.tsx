@@ -253,11 +253,11 @@ export default function Dashboard() {
             {recentAlerts.map((a) => (
               <li key={a.id} className="rounded-xl border border-border/40 p-3">
                 <div className="flex items-center gap-2 mb-1">
-                  <SeverityBadge severity={a.severity} />
-                  <span className="text-[11px] text-muted-foreground">{formatDistanceToNow(new Date(a.createdAt), { addSuffix: true })}</span>
+                  <SeverityBadge severity={a.severity === "watch" ? "warning" : a.severity} />
+                  <span className="text-[11px] text-muted-foreground">{formatDistanceToNow(new Date(a.created_at), { addSuffix: true })}</span>
                 </div>
                 <p className="text-sm font-medium">{a.title}</p>
-                <p className="text-xs text-muted-foreground">{a.detail}</p>
+                <p className="text-xs text-muted-foreground">{a.reason}</p>
               </li>
             ))}
           </ul>

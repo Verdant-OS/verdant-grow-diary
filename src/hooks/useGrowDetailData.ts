@@ -122,18 +122,14 @@ export function useGrowDetailData(): UseGrowDetailData {
         | "action_queue"
         | "action_queue_events"
         | "alerts",
-      extra?: (
-        q: ReturnType<typeof supabase.from> extends infer _T
-          ? ReturnType<typeof supabase.from>
-          : never,
-      ) => unknown,
+      extra?: (q: any) => any,
     ): Promise<CountValue> {
       try {
-        let q = supabase
+        let q: any = (supabase as any)
           .from(table)
           .select("id", { count: "exact", head: true })
           .eq("grow_id", growId!);
-        if (extra) q = extra(q) as typeof q;
+        if (extra) q = extra(q);
         const { count, error: cErr } = await q;
         if (cErr) return "unavailable";
         return count ?? 0;

@@ -8,8 +8,8 @@
  * STRICT SCOPE:
  * - Types/contracts only. No runtime logic.
  * - No encryption. No decryption. No env reads.
- * - No Supabase client. No service_role.
- * - Must not import any crypto API.
+ * - No Supabase client. No elevated DB role.
+ * - Must not import any decryption API.
  * - Must not be used in browser/client bundles for resolution; types
  *   may be imported by shared modules for shape compatibility only.
  *

@@ -3,9 +3,8 @@
 // touching Supabase. If any row is invalid, the whole batch is rejected and
 // no insert happens. On success, invalidates sensor query families.
 //
-// Safety: writes only to `sensor_readings`. Does not touch alerts,
-// action_queue, devices, automations, or any other surface. Does not derive
-// snapshots or alerts.
+// Safety: writes only to the sensor readings table. No side effects on other
+// surfaces.
 import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
 import { insertSensorReadingsBatch } from "@/lib/growRepo";
 import {

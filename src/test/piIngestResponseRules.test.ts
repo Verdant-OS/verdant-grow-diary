@@ -133,8 +133,8 @@ describe("shapePiIngestFailureResponse — status per stage", () => {
     const r = shapePiIngestFailureResponse(
       failure("envelope", "missing_tent_id", "x"),
     );
-    expect((r.body as Record<string, unknown>).inserted).toBeUndefined();
-    expect((r.body as Record<string, unknown>).rejected).toBeUndefined();
+    expect((r.body as unknown as Record<string, unknown>).inserted).toBeUndefined();
+    expect((r.body as unknown as Record<string, unknown>).rejected).toBeUndefined();
   });
 });
 

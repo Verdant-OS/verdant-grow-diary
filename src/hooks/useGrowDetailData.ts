@@ -153,25 +153,16 @@ export function useGrowDetailData(): UseGrowDetailData {
       countFrom("tents"),
       countFrom("diary_entries"),
       countFrom("action_queue", (q) =>
-        (q as ReturnType<typeof supabase.from>).eq(
-          "status",
-          "pending_approval",
-        ),
+        q.eq("status", "pending_approval"),
       ),
       countFrom("action_queue"),
       countFrom("action_queue_events"),
+      countFrom("alerts", (q) => q.eq("status", "open")),
       countFrom("alerts", (q) =>
-        (q as ReturnType<typeof supabase.from>).eq("status", "open"),
+        q.eq("status", "open").eq("severity", "critical"),
       ),
       countFrom("alerts", (q) =>
-        (q as ReturnType<typeof supabase.from>)
-          .eq("status", "open")
-          .eq("severity", "critical"),
-      ),
-      countFrom("alerts", (q) =>
-        (q as ReturnType<typeof supabase.from>)
-          .eq("status", "open")
-          .eq("severity", "warning"),
+        q.eq("status", "open").eq("severity", "warning"),
       ),
     ]);
     setCounts({

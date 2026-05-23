@@ -55,7 +55,7 @@ export default function Tents() {
           {[0, 1, 2].map((i) => <div key={i} className="glass rounded-2xl h-48 animate-pulse" />)}
         </div>
       ) : tents.length === 0 ? (
-        <EmptyState icon={<Box className="h-6 w-6" />} title="No tents yet" description="Add your first grow tent to start tracking." />
+        <EmptyState icon={<Box className="h-6 w-6" />} title="No tents yet" description="Set up your first tent to start tracking." />
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {tents.map((t) => {

@@ -15,7 +15,6 @@ const primary = [
 const more = [
   { to: "/plants", label: "Plants", icon: Sprout },
   { to: "/sensors", label: "Sensor Data", icon: Activity },
-  { to: "/cameras", label: "Cameras", icon: Camera },
   { to: "/doctor", label: "AI Grow Doctor", icon: Stethoscope },
   { to: "/grows", label: "Grows", icon: Sprout },
   { to: "/settings", label: "Settings", icon: Settings },

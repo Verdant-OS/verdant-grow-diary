@@ -77,7 +77,7 @@ describe("DashboardDataSourceDisclosure — simulated snapshot notice", () => {
     render(
       <DashboardDataSourceDisclosure
         hasAnyData
-        metas={[{ dataSource: "supabase", fromCache: false, hasError: false }]}
+        metas={[{ dataSource: "supabase", isDemoData: false, sourceReason: "supabase" }]}
         snapshotSource="sim"
       />,
     );
@@ -93,7 +93,7 @@ describe("DashboardDataSourceDisclosure — simulated snapshot notice", () => {
     render(
       <DashboardDataSourceDisclosure
         hasAnyData
-        metas={[{ dataSource: "supabase", fromCache: false, hasError: false }]}
+        metas={[{ dataSource: "supabase", isDemoData: false, sourceReason: "supabase" }]}
         snapshotSource="live"
       />,
     );
@@ -109,7 +109,7 @@ describe("GrowDataSourceDisclosure — simulated snapshot notice", () => {
       <GrowDataSourceDisclosure
         resource="tents"
         hasAnyData
-        metas={[{ dataSource: "supabase", fromCache: false, hasError: false }]}
+        metas={[{ dataSource: "supabase", isDemoData: false, sourceReason: "supabase" }]}
         snapshotSource="sim"
       />,
     );
@@ -124,7 +124,7 @@ describe("GrowDataSourceDisclosure — simulated snapshot notice", () => {
       <GrowDataSourceDisclosure
         resource="tents"
         hasAnyData
-        metas={[{ dataSource: "supabase", fromCache: false, hasError: false }]}
+        metas={[{ dataSource: "supabase", isDemoData: false, sourceReason: "supabase" }]}
         snapshotSource="manual"
       />,
     );

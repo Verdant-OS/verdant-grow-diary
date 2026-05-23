@@ -104,7 +104,13 @@ export default function PlantDetail() {
             <p className="text-xs text-muted-foreground mt-1">Updated {formatDistanceToNow(new Date(plant.startedAt), { addSuffix: true })}</p>
           </div>
           <Button asChild variant="outline" size="sm"><Link to="/logs">Open grow logs</Link></Button>
-          <PlantTentEnvironmentPanel tentId={plant.tentId ?? null} tentName={tent?.name ?? null} />
+          <PlantTentEnvironmentPanel
+            tentId={plant.tentId ?? null}
+            tentName={tent?.name ?? null}
+            plantId={plant.id}
+            plantName={plant.name}
+            growId={plant.growId ?? null}
+          />
         </div>
       </div>
     </div>

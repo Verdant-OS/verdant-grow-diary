@@ -77,7 +77,7 @@ describe("pi-ingest write-transaction contract — repo guardrails", () => {
     expect(existsSync(join(FN_DIR, "sensorReadingsWriter.ts"))).toBe(false);
   });
 
-  it("index.ts has no .insert/.upsert/.update/.delete/.rpc", () => {
+  it("index.ts has no .insert/.upsert/.update/.delete/.rpc (commit goes through helper)", () => {
     if (!existsSync(INDEX_PATH)) return;
     expect(INDEX_SRC).not.toMatch(/\.insert\s*\(/);
     expect(INDEX_SRC).not.toMatch(/\.upsert\s*\(/);
@@ -86,9 +86,10 @@ describe("pi-ingest write-transaction contract — repo guardrails", () => {
     expect(INDEX_SRC).not.toMatch(/\.rpc\s*\(/);
   });
 
-  it("index.ts has no { ok: true } success path", () => {
+  it("index.ts wires the commit helper (no raw RPC name in index)", () => {
     if (!existsSync(INDEX_PATH)) return;
-    expect(INDEX_SRC).not.toMatch(/ok\s*:\s*true/);
+    expect(INDEX_SRC).toMatch(/commitPiIngestBatch/);
+    expect(INDEX_SRC).not.toMatch(/pi_ingest_commit_batch/);
   });
 
   it("no requestHash/request_hash in pi-ingest Edge Function source files", () => {

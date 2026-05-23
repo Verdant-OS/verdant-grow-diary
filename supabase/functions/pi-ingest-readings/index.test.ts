@@ -112,6 +112,15 @@ function defaultDeps(
     client,
     keyProvider: (v) => (v === 1 ? KEY_V1 : null),
     now: NOW_MS,
+    // Default success commit for happy-path tests. Returns
+    // inserted == rows.length so per-test assertions can derive
+    // expected counts deterministically.
+    commitPiIngestBatch: (_c, input) =>
+      Promise.resolve({
+        ok: true as const,
+        inserted: input.rows.length,
+        rejected: 0,
+      }),
   };
 }
 
@@ -374,7 +383,7 @@ Deno.test("POST tent not allowed returns 401 unauthorized", async () => {
 
 // ---------- POST valid auth ----------
 
-Deno.test("POST valid auth returns 503 auth_ok_pipeline_not_implemented", async () => {
+Deno.test("POST valid auth returns 200 success after atomic commit", async () => {
   const rawBody = validEnvelopeBody();
   const headers = await signedPostHeaders(rawBody);
   const client = makeClient({ data: [await defaultRow()], error: null });
@@ -382,11 +391,11 @@ Deno.test("POST valid auth returns 503 auth_ok_pipeline_not_implemented", async 
     new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
     defaultDeps(client),
   );
-  assertEquals(res.status, 503);
+  assertEquals(res.status, 200);
   const body = await res.json();
-  assertEquals(body.ok, false);
-  assertEquals(body.error, "auth_ok_pipeline_not_implemented");
-  assertStringIncludes(body.message, "Bridge authentication succeeded");
+  assertEquals(body.ok, true);
+  assertEquals(body.inserted, 1);
+  assertEquals(body.rejected, 0);
 });
 
 // ---------- Response hygiene ----------
@@ -425,7 +434,7 @@ Deno.test("POST response never leaks secrets/headers/body", async () => {
 
 // ---------- POST tent-owner / authorization gate ----------
 
-Deno.test("POST tent owned by same user returns 503 auth_ok_pipeline_not_implemented", async () => {
+Deno.test("POST tent owned by same user returns 200 success", async () => {
   const rawBody = validEnvelopeBody();
   const headers = await signedPostHeaders(rawBody);
   const client = makeClient(
@@ -436,9 +445,9 @@ Deno.test("POST tent owned by same user returns 503 auth_ok_pipeline_not_impleme
     new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
     defaultDeps(client),
   );
-  assertEquals(res.status, 503);
+  assertEquals(res.status, 200);
   const body = await res.json();
-  assertEquals(body.error, "auth_ok_pipeline_not_implemented");
+  assertEquals(body.ok, true);
 });
 
 Deno.test("POST tent owned by different user returns 401 unauthorized", async () => {
@@ -560,9 +569,9 @@ Deno.test("index.ts has no decryption / direct env reads / DB writes", async () 
     ["secret_ciphertext -> secret", /secret\s*:\s*[A-Za-z_.]*\.?secret_ciphertext\b/],
     ["sensor_readings", /\bsensor_readings\b/],
     ["pi_ingest_idempotency_keys", /\bpi_ingest_idempotency_keys\b/],
+    ["pi_ingest_commit_batch literal", /pi_ingest_commit_batch/],
     ["alerts table from()", /from\(\s*["']alerts["']\s*\)/],
     ["action_queue table from()", /from\(\s*["']action_queue["']\s*\)/],
-    ["ok:true success", /ok\s*:\s*true/],
     ["browser supabase client", /@\/integrations\/supabase\/client/],
     ["raw body log", /console\.\w+\([^)]*\b(rawBody|raw_body)\b/],
     ["signature log", /console\.\w+\([^)]*\bsignature\b/i],
@@ -721,11 +730,13 @@ for (const r of [
   { metric: "soil_moisture_pct", value: 40, unit: "%" },
   { metric: "vpd_kpa", value: 1.1, unit: "kPa" },
 ] as const) {
-  Deno.test(`POST normalized ${r.metric}/${r.unit} returns 503 auth_ok_pipeline_not_implemented`, async () => {
+  Deno.test(`POST normalized ${r.metric}/${r.unit} returns 200 success`, async () => {
     const res = await postEnvelope({ readings: [r] });
-    assertEquals(res.status, 503);
+    assertEquals(res.status, 200);
     const body = await res.json();
-    assertEquals(body.error, "auth_ok_pipeline_not_implemented");
+    assertEquals(body.ok, true);
+    assertEquals(body.inserted, 1);
+    assertEquals(body.rejected, 0);
   });
 }
 
@@ -772,7 +783,7 @@ Deno.test("index.ts wires normalization after validation", async () => {
 
 // ---------- Commit-plan preview wiring ----------
 
-Deno.test("POST multi-reading batch returns 503 auth_ok_pipeline_not_implemented", async () => {
+Deno.test("POST multi-reading batch returns 200 success with all rows", async () => {
   const res = await postEnvelope({
     readings: [
       { metric: "temperature_c", value: 22.5, unit: "C" },
@@ -780,8 +791,11 @@ Deno.test("POST multi-reading batch returns 503 auth_ok_pipeline_not_implemented
       { metric: "co2_ppm", value: 800, unit: "ppm" },
     ],
   });
-  assertEquals(res.status, 503);
-  assertEquals((await res.json()).error, "auth_ok_pipeline_not_implemented");
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.ok, true);
+  assertEquals(body.inserted, 3);
+  assertEquals(body.rejected, 0);
 });
 
 Deno.test("POST duplicate readings in same batch returns 400 invalid_request", async () => {
@@ -791,7 +805,7 @@ Deno.test("POST duplicate readings in same batch returns 400 invalid_request", a
   assertEquals((await res.json()).error, "invalid_request");
 });
 
-Deno.test("POST commit-plan preview response leaks nothing sensitive", async () => {
+Deno.test("POST commit success response leaks nothing sensitive", async () => {
   const rawBody = validEnvelopeBody({
     marker: "RAW_MARK_PLAN",
     readings: [{ metric: "temperature_c", value: 22.5, unit: "C" }],
@@ -806,7 +820,7 @@ Deno.test("POST commit-plan preview response leaks nothing sensitive", async () 
     new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
     defaultDeps(client),
   );
-  assertEquals(res.status, 503);
+  assertEquals(res.status, 200);
   const text = await res.text();
   for (const forbidden of [
     "RAW_MARK_PLAN",
@@ -896,8 +910,8 @@ Deno.test("valid planned request calls idempotency lookup with derived keys", as
     new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
     depsWith(client, lookup),
   );
-  assertEquals(res.status, 503);
-  assertEquals((await res.json()).error, "auth_ok_pipeline_not_implemented");
+  assertEquals(res.status, 200);
+  assertEquals((await res.json()).ok, true);
   assertEquals(lookup.calls.length, 1);
   assertEquals(lookup.calls[0].bridgeId, "bridge-abc");
   assertEquals(lookup.calls[0].candidateKeys.length, 2);
@@ -982,7 +996,7 @@ Deno.test("idempotency lookup failure response leaks nothing sensitive", async (
   }
 });
 
-Deno.test("all candidate keys existing still returns 503 auth_ok_pipeline_not_implemented", async () => {
+Deno.test("all candidate keys existing → 200 inserted=0 rejected=duplicates", async () => {
   const rawBody = validEnvelopeBody({
     readings: [
       { metric: "temperature_c", value: 22.5, unit: "C" },
@@ -994,7 +1008,6 @@ Deno.test("all candidate keys existing still returns 503 auth_ok_pipeline_not_im
     { data: [await defaultRow()], error: null },
     { data: [{ user_id: "user-xyz" }], error: null },
   );
-  // Capture derived keys via lookup1, then re-run with all marked existing.
   const captured: LookupCall[] = [];
   const cap = makeLookup({ ok: true, existingKeys: new Set<string>() }, captured);
   await handlePiIngestReadingsRequest(
@@ -1007,11 +1020,14 @@ Deno.test("all candidate keys existing still returns 503 auth_ok_pipeline_not_im
     new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
     depsWith(client, lookup),
   );
-  assertEquals(res.status, 503);
-  assertEquals((await res.json()).error, "auth_ok_pipeline_not_implemented");
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.ok, true);
+  assertEquals(body.inserted, 0);
+  assertEquals(body.rejected, 2);
 });
 
-Deno.test("partial duplicate keys still returns 503 auth_ok_pipeline_not_implemented", async () => {
+Deno.test("partial duplicate keys → 200 inserted=2 rejected=1", async () => {
   const rawBody = validEnvelopeBody({
     readings: [
       { metric: "temperature_c", value: 22.5, unit: "C" },
@@ -1038,11 +1054,14 @@ Deno.test("partial duplicate keys still returns 503 auth_ok_pipeline_not_impleme
     new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
     depsWith(client, lookup),
   );
-  assertEquals(res.status, 503);
-  assertEquals((await res.json()).error, "auth_ok_pipeline_not_implemented");
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.ok, true);
+  assertEquals(body.inserted, 2);
+  assertEquals(body.rejected, 1);
 });
 
-Deno.test("no duplicate keys still returns 503 auth_ok_pipeline_not_implemented", async () => {
+Deno.test("no duplicate keys → 200 inserted=1 rejected=0", async () => {
   const rawBody = validEnvelopeBody();
   const headers = await signedPostHeaders(rawBody);
   const client = makeClient(
@@ -1054,8 +1073,11 @@ Deno.test("no duplicate keys still returns 503 auth_ok_pipeline_not_implemented"
     new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
     depsWith(client, lookup),
   );
-  assertEquals(res.status, 503);
-  assertEquals((await res.json()).error, "auth_ok_pipeline_not_implemented");
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.ok, true);
+  assertEquals(body.inserted, 1);
+  assertEquals(body.rejected, 0);
 });
 
 Deno.test("idempotency lookup skipped when HMAC fails", async () => {

@@ -1,15 +1,15 @@
-// pi-ingest-readings Edge Function — auth-gated, ingestion fail-closed.
+// pi-ingest-readings Edge Function — auth-gated, atomic commit.
 //
 // Behavior:
 //   OPTIONS                           → 200 (CORS preflight)
 //   non-POST                          → 405 method_not_allowed
 //   POST without service-role config  → 503 secret_resolver_not_implemented
-//                                       (Edge Function not yet configured)
 //   POST missing/invalid auth headers → 401 unauthorized
 //   POST invalid body / missing tent  → 400 invalid_request
 //   POST lookup/resolver internal err → 503 internal_failure
 //   POST unknown bridge / HMAC fail   → 401 unauthorized
-//   POST valid auth                   → 503 auth_ok_pipeline_not_implemented
+//   POST commit failure               → 503 internal_failure
+//   POST valid auth + commit          → 200 { ok, inserted, rejected }
 //
 // This file is the ONLY place in the project allowed to:
 //   - Construct a Supabase client with the service-role key
@@ -18,8 +18,11 @@
 // This file still MUST NOT:
 //   - Read raw key-version env vars directly (the resolver owns that)
 //   - Decrypt secrets directly
-//   - Write to sensor data, idempotency, alert, action queue, or any
-//     device/automation surface
+//   - Reference sensor/idempotency/alert/action table names directly
+//   - Call .insert / .upsert / .update / .delete / .rpc directly
+//     (the commit goes through the server-only commit helper, which
+//     calls the SECURITY DEFINER `pi_ingest_commit_batch` RPC)
+//   - Write to alerts, action queue, or any device/automation surface
 //   - Log raw body, signature, payload, decrypted secret, ciphertext,
 //     nonce, key version, or stack traces
 //   - Map an encrypted credential field directly to a usable secret
@@ -28,9 +31,9 @@
 //   - docs/pi-ingest-readings-contract.md
 //   - docs/pi-ingest-server-secret-resolver-contract.md
 //   - docs/pi-ingest-bridge-credential-lookup-contract.md
+//   - docs/pi-ingest-write-transaction-contract.md
 
 import {
-  buildAuthOkPipelineNotImplementedResponseBody,
   buildInternalFailureResponseBody,
   buildInvalidRequestResponseBody,
   buildMethodNotAllowedResponseBody,
@@ -66,6 +69,12 @@ import {
   type PiIngestIdempotencyLookupClient,
   type PiIngestIdempotencyLookupResult,
 } from "./idempotencyLookup.ts";
+import {
+  commitPiIngestBatch,
+  type PiIngestCommitBatchClient,
+  type PiIngestCommitBatchInput,
+  type PiIngestCommitBatchResult,
+} from "./commitBatch.ts";
 
 export const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -104,6 +113,13 @@ export interface PiIngestHandlerDeps {
     client: PiIngestIdempotencyLookupClient,
     input: { bridgeId: string; candidateKeys: readonly string[] },
   ) => Promise<PiIngestIdempotencyLookupResult>;
+  /** Injected atomic commit helper (tests). In production this is the
+   *  server-only `commitPiIngestBatch` which calls the SECURITY DEFINER
+   *  RPC inside a single transaction. */
+  commitPiIngestBatch?: (
+    client: PiIngestCommitBatchClient,
+    input: PiIngestCommitBatchInput,
+  ) => Promise<PiIngestCommitBatchResult>;
 }
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -336,17 +352,15 @@ export async function handlePiIngestReadingsRequest(
     return jsonResponse(503, buildInternalFailureResponseBody());
   }
 
-  // Build the pure commit-plan PREVIEW using the looked-up existing
-  // keys. The result is discarded — no sensor rows, idempotency rows,
-  // alerts, or action_queue items are written. This proves the endpoint
-  // can distinguish new vs. duplicate readings without opening writes.
+  // Build the deterministic commit plan from normalized rows + the
+  // looked-up existing idempotency keys, then perform the atomic
+  // commit via the server-only helper (which calls the SECURITY
+  // DEFINER RPC). No table names appear in this file.
+  let plan;
   try {
-    // Discriminator set via const + shorthand to keep the source
-    // free of any literal endpoint-success token.
-    const ok = true as const;
-    buildPiIngestCommitPlan({
+    plan = buildPiIngestCommitPlan({
       pipelineResult: {
-        ok,
+        ok: true as const,
         ownerUserId: tentOwner.tentOwnerUserId,
         bridgeId: row.bridge_id,
         tentId: validation.envelope.tent_id,
@@ -359,9 +373,71 @@ export async function handlePiIngestReadingsRequest(
     return jsonResponse(503, buildInternalFailureResponseBody());
   }
 
-  // Auth + authorization + envelope + normalization + commit-plan
-  // preview passed — endpoint remains fail-closed (no writes).
-  return jsonResponse(503, buildAuthOkPipelineNotImplementedResponseBody());
+  const duplicateCount = plan.duplicates.length;
+
+  // All readings already recorded — short-circuit without invoking the
+  // commit helper. Nothing is inserted; only counts are returned.
+  if (plan.toInsertSensorRows.length === 0) {
+    return jsonResponse(200, {
+      ok: true as const,
+      inserted: 0,
+      rejected: duplicateCount,
+    });
+  }
+
+  // Pair sensor rows with their idempotency rows by index (the commit
+  // plan guarantees same-index correlation) and hand off to the
+  // server-only commit helper.
+  const commitRows = plan.toInsertSensorRows.map((sensorRow, i) => {
+    const idemRow = plan.toInsertIdempotencyRows[i];
+    return {
+      idempotencyKey: idemRow.idempotency_key,
+      sensor: {
+        tent_id: sensorRow.tent_id as string,
+        metric: sensorRow.metric as string,
+        value: sensorRow.value as number,
+        source: "pi_bridge" as const,
+        quality: (sensorRow.quality ?? null) as string | null,
+        device_id: (sensorRow.device_id ?? null) as string | null,
+        captured_at: (sensorRow.captured_at ?? null) as string | null,
+        raw_payload: sensorRow.raw_payload,
+      },
+      idempotency: {
+        tent_id: idemRow.tent_id,
+        bridge_id: idemRow.bridge_id,
+        device_id: idemRow.device_id,
+        metric: idemRow.metric,
+        captured_at: idemRow.captured_at,
+        idempotency_key: idemRow.idempotency_key,
+      },
+    };
+  });
+
+  const commitFn = deps.commitPiIngestBatch ?? commitPiIngestBatch;
+  let commitResult: PiIngestCommitBatchResult;
+  try {
+    commitResult = await commitFn(
+      client as unknown as PiIngestCommitBatchClient,
+      {
+        userId: tentOwner.tentOwnerUserId,
+        bridgeId: row.bridge_id,
+        tentId: validation.envelope.tent_id,
+        rows: commitRows,
+      },
+    );
+  } catch {
+    return jsonResponse(503, buildInternalFailureResponseBody());
+  }
+
+  if (!commitResult.ok) {
+    return jsonResponse(503, buildInternalFailureResponseBody());
+  }
+
+  return jsonResponse(200, {
+    ok: true as const,
+    inserted: commitResult.inserted,
+    rejected: commitResult.rejected + duplicateCount,
+  });
 }
 
 // @ts-ignore Deno runtime entrypoint — only start the server when run directly.

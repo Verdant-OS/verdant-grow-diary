@@ -112,6 +112,7 @@ export default function PlantDetail() {
             plantName={plant.name}
             growId={plant.growId ?? null}
           />
+          <PlantRecentActivityPanel plantId={plant.id} plantName={plant.name} />
         </div>
       </div>
     </div>

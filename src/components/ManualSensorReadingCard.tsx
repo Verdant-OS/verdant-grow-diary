@@ -84,11 +84,14 @@ export default function ManualSensorReadingCard({ tents, defaultTentId }: Props)
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-start gap-2 rounded-md border border-border/50 bg-muted/40 p-2 text-xs text-muted-foreground">
+        <div
+          className="flex items-start gap-2 rounded-md border border-border/50 bg-muted/40 p-2 text-xs text-muted-foreground"
+          data-testid="manual-reading-helper"
+        >
           <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
           <span>
-            Manual readings are user-entered and are not live hardware data.
-            They are tagged <strong>Manual</strong> for downstream use.
+            Saved as a <strong>manual snapshot</strong>, not live sensor data.
+            Good for handheld tools like the SwitchBot CO₂/temp/RH monitor.
           </span>
         </div>
 
@@ -112,43 +115,61 @@ export default function ManualSensorReadingCard({ tents, defaultTentId }: Props)
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
+        <Section title="Air" testId="manual-reading-section-air">
           <Field
             id="m-air-temp"
-            label="Air temp (°F)"
+            label="Air temp"
+            unit="°F"
             value={form.airTempF as string}
             onChange={(v) => update("airTempF", v)}
             placeholder="75"
           />
           <Field
             id="m-humidity"
-            label="Humidity (%)"
+            label="Humidity"
+            unit="%"
             value={form.humidityPct as string}
             onChange={(v) => update("humidityPct", v)}
             placeholder="55"
           />
           <Field
-            id="m-vpd"
-            label="VPD (kPa, optional)"
-            value={form.vpdKpa as string}
-            onChange={(v) => update("vpdKpa", v)}
-            placeholder="auto"
-          />
-          <Field
             id="m-co2"
-            label="CO₂ (ppm)"
+            label="CO₂"
+            unit="ppm"
             value={form.co2Ppm as string}
             onChange={(v) => update("co2Ppm", v)}
             placeholder="e.g. 800 from SwitchBot CO₂ Monitor"
           />
           <Field
+            id="m-vpd"
+            label="VPD"
+            unit="kPa"
+            value={form.vpdKpa as string}
+            onChange={(v) => update("vpdKpa", v)}
+            placeholder="auto from temp + RH"
+          />
+        </Section>
+
+        <Section title="Root zone" testId="manual-reading-section-root">
+          <Field
             id="m-soil"
-            label="Soil water (%)"
+            label="Soil water"
+            unit="%"
             value={form.soilMoisturePct as string}
             onChange={(v) => update("soilMoisturePct", v)}
             placeholder="45"
           />
-        </div>
+        </Section>
+
+        <p
+          className="text-[11px] text-muted-foreground"
+          data-testid="manual-reading-out-of-scope-hint"
+        >
+          pH, EC/TDS, water temp, and PPFD/DLI from pens like the Spider Farmer
+          pH/EC combo or PAR meter aren't stored as sensor metrics yet — log
+          them as a Quick Log feeding or observation note for now.
+        </p>
+
 
         {validation.warnings.length > 0 && (
           <ul className="space-y-1" data-testid="manual-reading-warnings">
@@ -203,23 +224,47 @@ export default function ManualSensorReadingCard({ tents, defaultTentId }: Props)
   );
 }
 
+function Section({
+  title,
+  testId,
+  children,
+}: {
+  title: string;
+  testId: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-2" data-testid={testId}>
+      <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {title}
+      </h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{children}</div>
+    </section>
+  );
+}
+
 function Field({
   id,
   label,
+  unit,
   value,
   onChange,
   placeholder,
 }: {
   id: string;
   label: string;
+  unit?: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
 }) {
   return (
     <div className="space-y-1">
-      <Label htmlFor={id} className="text-xs">
-        {label}
+      <Label htmlFor={id} className="text-xs flex items-center justify-between gap-2">
+        <span>{label}</span>
+        {unit ? (
+          <span className="text-[10px] font-normal text-muted-foreground">{unit}</span>
+        ) : null}
       </Label>
       <Input
         id={id}
@@ -233,3 +278,4 @@ function Field({
     </div>
   );
 }
+

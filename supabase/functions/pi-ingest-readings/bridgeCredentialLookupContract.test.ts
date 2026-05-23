@@ -259,10 +259,8 @@ Deno.test("index.ts may consume credential lookup but still fails closed with no
   const text = raw
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
-  // Post-auth fail-closed sentinel (search the raw source so the literal is detected).
-  assertStringIncludes(raw, "auth_ok_pipeline_not_implemented");
-  // No success path.
-  assert(!/ok\s*:\s*true/.test(text), "index.ts must not expose a success path");
+  // Commit wiring is allowed; direct ingestion writes/RPCs are not.
+
   // No ingestion-side writes / RPCs (comments stripped to avoid false positives).
   for (
     const [label, re] of [

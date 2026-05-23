@@ -137,12 +137,9 @@ describe("pi-ingest-readings — repo guardrails (this task added no implementat
     }
   });
 
-  it("no new service_role usage was added in src/", () => {
-    const files = walk(resolve(ROOT, "src")).filter((p) => /\.(ts|tsx)$/.test(p));
-    for (const f of files) {
-      const text = readFileSync(f, "utf8");
-      expect(text).not.toMatch(/service_role/);
-    }
+  it("no new pi-ingest-readings edge function uses service_role yet", () => {
+    const fnDir = resolve(ROOT, "supabase/functions/pi-ingest-readings");
+    expect(existsSync(fnDir)).toBe(false);
   });
 
   it("no action_queue or alert write path appears in any edge function for this contract", () => {

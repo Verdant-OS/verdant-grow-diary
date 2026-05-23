@@ -98,6 +98,12 @@ export interface PiIngestHandlerDeps {
   keyProvider?: PiIngestSecretKeyProvider;
   /** Injected clock for HMAC freshness checks (tests). */
   now?: number;
+  /** Injected idempotency-lookup function (tests). Reads existing
+   *  per-reading idempotency keys for a bridge. SELECT-only. */
+  loadExistingIdempotencyKeys?: (
+    client: PiIngestIdempotencyLookupClient,
+    input: { bridgeId: string; candidateKeys: readonly string[] },
+  ) => Promise<PiIngestIdempotencyLookupResult>;
 }
 
 function jsonResponse(status: number, body: unknown): Response {

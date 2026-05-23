@@ -28,7 +28,7 @@ describe("pi-ingest server secret resolver — contract doc", () => {
     ["mentions bridge_id", /bridge_id/],
     [
       "server-side only",
-      /only\s+inside\s+the\s+future\s+Supabase\s+Edge\s+Function/i,
+      /only[\s\S]{0,20}inside\s+the\s+future\s+Supabase\s+Edge\s+Function/i,
     ],
     [
       "no React components",

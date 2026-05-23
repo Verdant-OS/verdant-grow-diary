@@ -16,7 +16,7 @@ interface NavItem { to: string; label: string; icon: LucideIcon; end?: boolean }
 const groups: { label: string; items: NavItem[] }[] = [
   { label: "Overview", items: [
     { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
-    { to: "/grow-room", label: "Grow-Room Mode", icon: LayoutGrid },
+    { to: "/grow-room", label: "Live Dashboard", icon: LayoutGrid },
   ]},
   { label: "Cultivation", items: [
     { to: "/tents", label: "Tents", icon: Box },

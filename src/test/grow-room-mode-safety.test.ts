@@ -111,9 +111,10 @@ describe("Grow-Room Mode · route + nav wiring", () => {
     expect(app).toMatch(/<GrowRoomMode\s*\/?>/);
   });
 
-  it("Sidebar surfaces Grow-Room Mode", () => {
+  it("Sidebar surfaces the Live Dashboard entry on the /grow-room route", () => {
     expect(sidebar).toMatch(/\/grow-room/);
-    expect(sidebar).toMatch(/Grow-Room Mode/);
+    expect(sidebar).toMatch(/Live Dashboard/);
+    expect(sidebar).not.toMatch(/"Grow-Room Mode"/);
   });
 });
 

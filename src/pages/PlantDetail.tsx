@@ -9,6 +9,7 @@ import PlantTentEnvironmentPanel from "@/components/PlantTentEnvironmentPanel";
 import PlantRecentActivityPanel from "@/components/PlantRecentActivityPanel";
 import PlantAssignedTentAlertsPanel from "@/components/PlantAssignedTentAlertsPanel";
 import PlantAssignedTentActionsPanel from "@/components/PlantAssignedTentActionsPanel";
+import PlantStatusStrip from "@/components/PlantStatusStrip";
 import { Button } from "@/components/ui/button";
 import { useGrowPlant, useGrowTent, getGrowDataMeta } from "@/hooks/useGrowData";
 import { format, formatDistanceToNow } from "date-fns";
@@ -62,6 +63,11 @@ export default function PlantDetail() {
           <div className="aspect-square bg-secondary/40"><img src={plant.photo} alt="" className="w-full h-full object-cover" /></div>
         </div>
         <div className="lg:col-span-2 glass rounded-2xl p-5 space-y-3">
+          <PlantStatusStrip
+            tentId={plant.tentId ?? null}
+            tentName={tent?.name ?? null}
+            growId={plant.growId ?? null}
+          />
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div data-testid="plant-detail-tent">
               <div className="text-xs text-muted-foreground uppercase tracking-wider">Tent</div>

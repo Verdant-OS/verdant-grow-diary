@@ -35,7 +35,7 @@ export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, p
     <Card data-testid="plant-tent-environment-panel" className="mt-4">
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
         <CardTitle className="text-base flex items-center gap-2">
-          <Gauge className="h-4 w-4" /> Assigned Tent Environment
+          <Gauge className="h-4 w-4" /> Current Environment
         </CardTitle>
         {tentId ? (
           <Button asChild variant="ghost" size="sm" className="h-7 px-2 gap-1" data-testid="plant-tent-environment-view-tent">

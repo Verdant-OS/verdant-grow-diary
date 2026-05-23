@@ -239,10 +239,10 @@ export default function QuickLog({ open, onOpenChange, onCreated, prefill }: Pro
             </div>
           </div>
 
-          {/* Workspace + Plant */}
+          {/* Current Setup + Plant */}
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <Label className="text-xs">Workspace</Label>
+              <Label className="text-xs">Current Setup</Label>
               <Select value={activeGrowId ?? ""} onValueChange={setActiveGrowId}>
                 <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                 <SelectContent>{grows.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}</SelectContent>

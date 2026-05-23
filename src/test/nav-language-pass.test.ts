@@ -51,9 +51,12 @@ describe("Primary navigation: Tents and Plants are emphasized", () => {
 });
 
 describe("QuickLog reads plant/tent-first, not grow-first", () => {
-  it("renames the grow selector label to 'Workspace'", () => {
-    expect(QUICKLOG).toMatch(/<Label[^>]*>Workspace<\/Label>/);
+  it("renames the grow selector label to 'Current Setup'", () => {
+    expect(QUICKLOG).toMatch(/<Label[^>]*>Current Setup<\/Label>/);
+    expect(QUICKLOG).not.toMatch(/<Label[^>]*>Workspace<\/Label>/);
     expect(QUICKLOG).not.toMatch(/<Label[^>]*>Grow<\/Label>/);
+    // Guardrail: must not be renamed to "Strain".
+    expect(QUICKLOG).not.toMatch(/<Label[^>]*>Strain<\/Label>/);
   });
 
   it("error toast no longer says 'Pick a grow first'", () => {

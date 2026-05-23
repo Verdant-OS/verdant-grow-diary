@@ -112,7 +112,7 @@ export default function PlantAssignedTentAlertsPanel({ tentId, tentName, growId 
     <Card data-testid="plant-assigned-tent-alerts-panel" className="mt-4">
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
         <CardTitle className="text-base flex items-center gap-2">
-          <Bell className="h-4 w-4" /> Assigned Tent Alerts
+          <Bell className="h-4 w-4" /> Tent Alerts
           {tentName ? (
             <span className="text-xs font-normal text-muted-foreground">· {tentName}</span>
           ) : null}

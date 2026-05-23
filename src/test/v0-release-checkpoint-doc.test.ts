@@ -21,7 +21,7 @@ describe("V0 release checkpoint doc", () => {
   });
 
   it("declares the current test count (2352/2352)", () => {
-    expect(d).toMatch(/2332\s*\/\s*2332/);
+    expect(d).toMatch(/2352\s*\/\s*2352/);
   });
 
   it.each([

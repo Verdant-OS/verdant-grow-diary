@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, Box, NotebookText, ListChecks, Bell, MoreHorizontal, Camera, Sprout, Activity, Stethoscope, Settings } from "lucide-react";
+import { LayoutDashboard, Box, NotebookText, ListChecks, Bell, MoreHorizontal, Sprout, Activity, Stethoscope, Settings } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -15,7 +15,6 @@ const primary = [
 const more = [
   { to: "/plants", label: "Plants", icon: Sprout },
   { to: "/sensors", label: "Sensor Data", icon: Activity },
-  { to: "/cameras", label: "Cameras", icon: Camera },
   { to: "/doctor", label: "AI Grow Doctor", icon: Stethoscope },
   { to: "/grows", label: "Grows", icon: Sprout },
   { to: "/settings", label: "Settings", icon: Settings },

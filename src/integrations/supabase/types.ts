@@ -822,6 +822,45 @@ export type Database = {
           },
         ]
       }
+      pi_ingest_bridge_credentials: {
+        Row: {
+          allowed_tent_ids: string[]
+          bridge_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          last_used_at: string | null
+          secret_hash: string
+          secret_hint: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          allowed_tent_ids?: string[]
+          bridge_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_used_at?: string | null
+          secret_hash: string
+          secret_hint?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          allowed_tent_ids?: string[]
+          bridge_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_used_at?: string | null
+          secret_hash?: string
+          secret_hint?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       pi_ingest_idempotency_keys: {
         Row: {
           bridge_id: string

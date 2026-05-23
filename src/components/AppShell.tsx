@@ -91,7 +91,7 @@ export default function AppShell() {
 
         <MobileNav />
 
-        <QuickLog open={openLog} onOpenChange={setOpenLog} onCreated={() => window.dispatchEvent(new Event("verdant:entry-created"))} />
+        <QuickLog open={openLog} onOpenChange={(o) => { setOpenLog(o); if (!o) setPrefill(null); }} prefill={prefill} onCreated={() => window.dispatchEvent(new Event("verdant:entry-created"))} />
       </div>
     </SidebarProvider>
   );

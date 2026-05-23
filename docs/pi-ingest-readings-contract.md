@@ -223,3 +223,76 @@ Tracked for future build prompts. Do not implement here.
 - [ ] Add RLS / ownership tests.
 - [ ] Add a local Pi client example.
 - [ ] Add Home Assistant / MQTT adapters later (separate scope).
+
+---
+
+## 12. Bridge secret resolution strategy (audit finding)
+
+This section captures the result of the bridge credential secret-model
+audit. It governs how the future resolver and Edge Function must handle
+bridge HMAC secrets.
+
+### 12.1 Finding
+
+The current durable table `pi_ingest_bridge_credentials` stores
+`secret_hash`, never plaintext. Standard HMAC verification (as
+implemented in `src/lib/piIngestAuthRules.ts` via `computeHmacSha256Hex`)
+requires the **raw shared secret material** to recompute the signature
+over the canonical signing string.
+
+Therefore:
+
+- **`secret_hash` alone cannot verify a standard HMAC signature.** A
+  one-way hash of the secret is not usable as the HMAC key without
+  redefining the protocol so that the hash *is* the shared secret —
+  which would make the stored hash functionally equivalent to plaintext
+  secret material.
+- **A resolver must not map `secret_hash` to `BridgeCredential.secret`.**
+  Doing so would silently turn the hash column into sensitive credential
+  material while pretending it is only a hash.
+- **Usable secret material must be resolved server-side**, inside the
+  Edge Function, through a server-only mechanism. The browser/client
+  bundle must never receive raw secret material.
+
+### 12.2 Required properties
+
+1. The browser/client must never receive the raw bridge secret.
+2. If a credential-issuance UI is later added, the bridge secret is
+   shown to the operator **only once at creation** and never retrievable
+   again from the server.
+3. The database must not store the plaintext bridge secret.
+4. Standard HMAC verification requires server-side access to **usable
+   shared secret material** (raw secret bytes).
+5. `secret_hash` alone is **not** sufficient to verify an HMAC signature.
+6. A resolver must not pass `secret_hash` as `secret` on
+   `BridgeCredential` unless the column is explicitly redefined as
+   sensitive secret material (renamed and documented as such).
+7. The Edge Function implementation is **blocked** until the secret
+   resolution strategy is finalized and implemented.
+
+### 12.3 Strategy options
+
+**Option A — Encrypted shared secret (recommended).**
+Store `secret_ciphertext` in the database, encrypted with a
+server-only environment key held by the Edge Function runtime. The
+Edge Function decrypts at verification time and uses the plaintext
+secret only in-memory to recompute HMAC. Plaintext is never returned
+to the client and never logged.
+
+**Option B — Server-side secret store / Vault reference.**
+Store an opaque reference (e.g. a Vault key id) in the database. The
+Edge Function resolves the actual secret server-side through the
+managed secret store. The database row by itself is non-sensitive.
+
+**Option C — Treat the stored value as credential material (not
+recommended).** Only acceptable if the column is renamed to clearly
+indicate it is sensitive HMAC key material and is protected with the
+same care as plaintext secret. Default posture is to reject this
+option.
+
+### 12.4 Preferred direction
+
+- Do **not** use `secret_hash` as `BridgeCredential.secret`.
+- The future resolver must not map `secret_hash` to raw `secret`.
+- The future endpoint must only verify HMAC after resolving usable
+  secret material through a server-only mechanism (Option A or B).

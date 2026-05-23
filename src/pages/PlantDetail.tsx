@@ -62,20 +62,34 @@ export default function PlantDetail() {
             <div data-testid="plant-detail-tent">
               <div className="text-xs text-muted-foreground uppercase tracking-wider">Tent</div>
               {tent ? (
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
                   <span>{tent.name}</span>
-                  <Button asChild variant="ghost" size="sm" className="h-7 px-2 gap-1" data-testid="plant-detail-view-tent">
-                    <Link to={`/tents/${tent.id}`}>
-                      <Box className="h-3.5 w-3.5" /> View Tent <ArrowRight className="h-3.5 w-3.5" />
-                    </Link>
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button asChild variant="ghost" size="sm" className="h-7 px-2 gap-1" data-testid="plant-detail-view-tent">
+                      <Link to={`/tents/${tent.id}`}>
+                        <Box className="h-3.5 w-3.5" /> View Tent <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    </Button>
+                    <AssignTentDialog
+                      plantId={plant.id}
+                      growId={plant.growId ?? null}
+                      currentTentId={plant.tentId ?? null}
+                    />
+                  </div>
                 </div>
               ) : (
-                <div
-                  className="flex items-center gap-1.5 text-[hsl(var(--warning))]"
-                  data-testid="plant-detail-no-tent"
-                >
-                  <AlertTriangle className="h-3.5 w-3.5" /> No tent assigned.
+                <div className="flex flex-col gap-1.5">
+                  <div
+                    className="flex items-center gap-1.5 text-[hsl(var(--warning))]"
+                    data-testid="plant-detail-no-tent"
+                  >
+                    <AlertTriangle className="h-3.5 w-3.5" /> No tent assigned.
+                  </div>
+                  <AssignTentDialog
+                    plantId={plant.id}
+                    growId={plant.growId ?? null}
+                    currentTentId={null}
+                  />
                 </div>
               )}
             </div>

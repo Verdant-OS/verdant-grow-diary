@@ -77,30 +77,26 @@ describe("pi_ingest_commit_batch RPC — signature & safety", () => {
   });
 });
 
-describe("pi_ingest_commit_batch RPC — not wired into Edge Function yet", () => {
+describe("pi_ingest_commit_batch RPC — wired via server-only helper", () => {
   const INDEX_PATH = resolve(
     ROOT,
     "supabase/functions/pi-ingest-readings/index.ts",
   );
   const src = existsSync(INDEX_PATH) ? readFileSync(INDEX_PATH, "utf8") : "";
 
-  it("index.ts does not call pi_ingest_commit_batch", () => {
+  it("index.ts wires commitPiIngestBatch helper", () => {
+    expect(src).toMatch(/commitPiIngestBatch/);
+  });
+
+  it("index.ts never references the raw RPC name", () => {
     expect(src).not.toMatch(/pi_ingest_commit_batch/);
   });
 
-  it("index.ts still has no .rpc()/.insert()/.upsert()/.update()/.delete()", () => {
+  it("index.ts still has no direct .rpc()/.insert()/.upsert()/.update()/.delete()", () => {
     expect(src).not.toMatch(/\.rpc\s*\(/);
     expect(src).not.toMatch(/\.insert\s*\(/);
     expect(src).not.toMatch(/\.upsert\s*\(/);
     expect(src).not.toMatch(/\.update\s*\(/);
     expect(src).not.toMatch(/\.delete\s*\(/);
-  });
-
-  it("index.ts has no { ok: true } success path", () => {
-    expect(src).not.toMatch(/ok\s*:\s*true/);
-  });
-
-  it("index.ts still returns auth_ok_pipeline_not_implemented", () => {
-    expect(src).toMatch(/auth_ok_pipeline_not_implemented/);
   });
 });

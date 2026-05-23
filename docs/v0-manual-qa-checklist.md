@@ -1,7 +1,7 @@
 # Verdant V0 — Manual QA Checklist
 
 Run before any partner demo or release-candidate sign-off.
-Green baseline at this checkpoint: **1886/1886 tests passing**.
+Historical V0 RC baseline: **1886/1886 tests passing** (snapshot at RC cut). Current green baseline is tracked in [`docs/v0-release-checkpoint.md`](./v0-release-checkpoint.md).
 
 Stop-ship rule: if `src/test/v0-operating-loop-contract.test.ts` fails,
 do not ship — regardless of how this checklist scores.

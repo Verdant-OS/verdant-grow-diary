@@ -23,6 +23,7 @@ const VARIANT_BY_LABEL: Record<
 > = {
   Live: "default",
   Manual: "secondary",
+  Simulated: "outline",
   Demo: "outline",
   Stale: "destructive",
   Unavailable: "destructive",

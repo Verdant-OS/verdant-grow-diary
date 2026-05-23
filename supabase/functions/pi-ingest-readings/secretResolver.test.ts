@@ -32,15 +32,15 @@ async function encryptForTest(
   const nonce = randomBytes(12);
   const cryptoKey = await crypto.subtle.importKey(
     "raw",
-    keyBytes,
+    keyBytes as unknown as BufferSource,
     { name: "AES-GCM" },
     false,
     ["encrypt"],
   );
   const ct = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv: nonce },
+    { name: "AES-GCM", iv: nonce as unknown as BufferSource },
     cryptoKey,
-    new TextEncoder().encode(plaintext),
+    new TextEncoder().encode(plaintext) as unknown as BufferSource,
   );
   return { ciphertext: new Uint8Array(ct), nonce };
 }

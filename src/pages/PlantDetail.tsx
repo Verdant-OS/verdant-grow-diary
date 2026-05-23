@@ -8,6 +8,7 @@ import AssignTentDialog from "@/components/AssignTentDialog";
 import PlantTentEnvironmentPanel from "@/components/PlantTentEnvironmentPanel";
 import PlantRecentActivityPanel from "@/components/PlantRecentActivityPanel";
 import PlantAssignedTentAlertsPanel from "@/components/PlantAssignedTentAlertsPanel";
+import PlantAssignedTentActionsPanel from "@/components/PlantAssignedTentActionsPanel";
 import { Button } from "@/components/ui/button";
 import { useGrowPlant, useGrowTent, getGrowDataMeta } from "@/hooks/useGrowData";
 import { format, formatDistanceToNow } from "date-fns";
@@ -115,6 +116,11 @@ export default function PlantDetail() {
           />
           <PlantRecentActivityPanel plantId={plant.id} plantName={plant.name} />
           <PlantAssignedTentAlertsPanel
+            tentId={plant.tentId ?? null}
+            tentName={tent?.name ?? null}
+            growId={plant.growId ?? null}
+          />
+          <PlantAssignedTentActionsPanel
             tentId={plant.tentId ?? null}
             tentName={tent?.name ?? null}
             growId={plant.growId ?? null}

@@ -12,7 +12,7 @@ import SensorChart from "@/components/SensorChart";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import DashboardDataSourceDisclosure from "@/components/DashboardDataSourceDisclosure";
-import { useAlerts, useTasks, useAIInsights } from "@/hooks/useMockData";
+import { useTasks, useAIInsights } from "@/hooks/useMockData";
 import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
@@ -106,7 +106,6 @@ export default function Dashboard() {
   const { data: tents = [] } = useGrowTents(scopedGrowId);
   const { data: plants = [] } = useGrowPlants(undefined, scopedGrowId);
   const { data: tasks = [] } = useTasks();
-  const { data: alerts = [] } = useAlerts();
   const { data: rawReadings = [] } = useSensorReadings();
   const readings = groupReadings(rawReadings);
   const { data: insights = [] } = useAIInsights();
@@ -156,7 +155,8 @@ export default function Dashboard() {
 
 
   const dueToday = tasks.filter((t) => t.status === "today").length;
-  const openAlerts = alerts.filter((a) => !a.acknowledged).length;
+  // Open alert count and recent alerts come from real persisted alerts (RLS).
+  const openAlerts = persistedAlertsState.alerts.filter((a) => a.status === "open").length;
 
   // Latest reading per tent for the strip
   const latestPerTent = tents.map((t) => {
@@ -164,7 +164,7 @@ export default function Dashboard() {
     return { tent: t, last: rs[rs.length - 1] };
   });
 
-  const recentAlerts = alerts.slice(0, 3);
+  const recentAlerts = persistedAlertsState.alerts.slice(0, 3);
 
   return (
     <div>
@@ -253,11 +253,11 @@ export default function Dashboard() {
             {recentAlerts.map((a) => (
               <li key={a.id} className="rounded-xl border border-border/40 p-3">
                 <div className="flex items-center gap-2 mb-1">
-                  <SeverityBadge severity={a.severity} />
-                  <span className="text-[11px] text-muted-foreground">{formatDistanceToNow(new Date(a.createdAt), { addSuffix: true })}</span>
+                  <SeverityBadge severity={a.severity === "watch" ? "warning" : a.severity} />
+                  <span className="text-[11px] text-muted-foreground">{formatDistanceToNow(new Date(a.created_at), { addSuffix: true })}</span>
                 </div>
                 <p className="text-sm font-medium">{a.title}</p>
-                <p className="text-xs text-muted-foreground">{a.detail}</p>
+                <p className="text-xs text-muted-foreground">{a.reason}</p>
               </li>
             ))}
           </ul>

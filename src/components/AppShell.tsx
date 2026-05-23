@@ -4,7 +4,7 @@ import { Bell, LogOut, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/store/auth";
-import { useAlerts } from "@/hooks/useMockData";
+import { useAlertsList } from "@/hooks/useAlertsList";
 import AppSidebar from "./AppSidebar";
 import MobileNav from "./MobileNav";
 import QuickLog, { type QuickLogPrefill } from "./QuickLog";
@@ -14,7 +14,9 @@ import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 
 export default function AppShell() {
   const { user, loading, signOut } = useAuth();
-  const { data: alerts } = useAlerts();
+  // Real persisted alerts (open only). RLS-scoped to the signed-in user.
+  // Replaces the prior mock badge to remove the demo-vs-live mismatch.
+  const { alerts: openAlerts } = useAlertsList({ status: "open" });
   const nav = useNavigate();
   const [openLog, setOpenLog] = useState(false);
   const [prefill, setPrefill] = useState<QuickLogPrefill | null>(null);
@@ -32,7 +34,7 @@ export default function AppShell() {
   if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
   if (!user) { nav("/auth", { replace: true }); return null; }
 
-  const unread = (alerts || []).filter((a) => !a.acknowledged).length;
+  const unread = openAlerts.filter((a) => a.status === "open").length;
 
   return (
     <SidebarProvider defaultOpen>

@@ -173,6 +173,10 @@ export default function QuickLog({ open, onOpenChange, onCreated, prefill }: Pro
       reset();
       onOpenChange(false);
       onCreated?.();
+      // Refresh diary-backed views (Recent Plant Activity, Timeline, etc.)
+      // so the just-saved entry appears without a hard refresh.
+      queryClient.invalidateQueries({ queryKey: ["plant_recent_activity"] });
+      queryClient.invalidateQueries({ queryKey: ["diary_entries"] });
       window.dispatchEvent(new CustomEvent("verdant:entry-created"));
     } catch (err: unknown) {
       if (uploadedPath) {

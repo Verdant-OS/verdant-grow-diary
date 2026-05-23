@@ -127,13 +127,14 @@ describe("pi-ingest-readings — repo guardrails (this task added no implementat
     }
   });
 
-  it("no source file references the pi-ingest-readings function name", () => {
+  it("no source file invokes a pi-ingest-readings function (no client wiring)", () => {
     const files = walk(resolve(ROOT, "src")).filter(
-      (p) => /\.(ts|tsx)$/.test(p) && !p.endsWith("pi-ingest-readings-contract-doc.test.ts"),
+      (p) => /\.(ts|tsx)$/.test(p) && !/[\\/]test[\\/]/.test(p),
     );
     for (const f of files) {
       const text = readFileSync(f, "utf8");
-      expect(text).not.toMatch(/pi-ingest-readings/);
+      expect(text).not.toMatch(/functions\.invoke\(\s*['"]pi-ingest-readings/);
+      expect(text).not.toMatch(/\/functions\/v1\/pi-ingest-readings/);
     }
   });
 

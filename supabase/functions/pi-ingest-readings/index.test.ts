@@ -434,7 +434,7 @@ Deno.test("POST response never leaks secrets/headers/body", async () => {
 
 // ---------- POST tent-owner / authorization gate ----------
 
-Deno.test("POST tent owned by same user returns 503 auth_ok_pipeline_not_implemented", async () => {
+Deno.test("POST tent owned by same user returns 200 success", async () => {
   const rawBody = validEnvelopeBody();
   const headers = await signedPostHeaders(rawBody);
   const client = makeClient(
@@ -445,9 +445,9 @@ Deno.test("POST tent owned by same user returns 503 auth_ok_pipeline_not_impleme
     new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
     defaultDeps(client),
   );
-  assertEquals(res.status, 503);
+  assertEquals(res.status, 200);
   const body = await res.json();
-  assertEquals(body.error, "auth_ok_pipeline_not_implemented");
+  assertEquals(body.ok, true);
 });
 
 Deno.test("POST tent owned by different user returns 401 unauthorized", async () => {

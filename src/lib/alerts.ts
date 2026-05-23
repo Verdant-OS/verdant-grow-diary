@@ -194,10 +194,8 @@ export interface LogAlertEventInput {
   note?: string | null;
 }
 
-function alertEventsTable() {
-  return (supabase as unknown as {
-    from: (t: string) => ReturnType<typeof supabase.from>;
-  }).from("alert_events");
+function alertEventsTable(): any {
+  return (supabase as any).from("alert_events");
 }
 
 /**

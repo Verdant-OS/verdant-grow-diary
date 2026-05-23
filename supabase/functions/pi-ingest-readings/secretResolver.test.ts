@@ -327,11 +327,11 @@ Deno.test("secretResolver.ts source contains no forbidden surfaces", async () =>
   }
 });
 
-Deno.test("index.ts remains fail-closed and does not consume the resolver", async () => {
+Deno.test("index.ts imports the resolver behind the auth gate", async () => {
   const src = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
-  assert(src.includes("secret_resolver_not_implemented"));
-  assert(!/from\s+["']\.\/secretResolver(\.ts)?["']/.test(src));
-  assert(!/resolveBridgeSecret\s*\(/.test(src));
+  assert(/secret_resolver_not_implemented|auth_ok_pipeline_not_implemented/.test(src));
+  assert(/from\s+["']\.\/secretResolver(\.ts)?["']/.test(src));
+  assert(/resolveBridgeSecret\s*\(/.test(src));
   assert(!/ok\s*:\s*true/.test(src));
 });
 

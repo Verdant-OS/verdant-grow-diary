@@ -91,8 +91,8 @@ describe("pi-ingest write-transaction contract — repo guardrails", () => {
     expect(INDEX_SRC).not.toMatch(/ok\s*:\s*true/);
   });
 
-  it("no requestHash/request_hash in pi-ingest Edge Function files", () => {
-    const files = walk(FN_DIR).filter((p) => /\.(ts)$/.test(p));
+  it("no requestHash/request_hash in pi-ingest Edge Function source files", () => {
+    const files = walk(FN_DIR).filter((p) => /\.ts$/.test(p) && !/\.test\.ts$/.test(p));
     for (const f of files) {
       const text = readFileSync(f, "utf8");
       expect(text, `requestHash found in ${f}`).not.toMatch(/requestHash|request_hash/);

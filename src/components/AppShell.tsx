@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { Bell, LogOut, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,8 +7,9 @@ import { useAuth } from "@/store/auth";
 import { useAlerts } from "@/hooks/useMockData";
 import AppSidebar from "./AppSidebar";
 import MobileNav from "./MobileNav";
-import QuickLog from "./QuickLog";
+import QuickLog, { type QuickLogPrefill } from "./QuickLog";
 import BrandLogo from "./BrandLogo";
+import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 
 
 export default function AppShell() {
@@ -16,6 +17,17 @@ export default function AppShell() {
   const { data: alerts } = useAlerts();
   const nav = useNavigate();
   const [openLog, setOpenLog] = useState(false);
+  const [prefill, setPrefill] = useState<QuickLogPrefill | null>(null);
+
+  useEffect(() => {
+    function onOpen(e: Event) {
+      const detail = (e as CustomEvent<QuickLogPrefill>).detail ?? null;
+      setPrefill(detail);
+      setOpenLog(true);
+    }
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, onOpen as EventListener);
+    return () => window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, onOpen as EventListener);
+  }, []);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
   if (!user) { nav("/auth", { replace: true }); return null; }
@@ -47,7 +59,7 @@ export default function AppShell() {
                   <kbd className="hidden lg:inline ml-2 text-[10px] px-1.5 py-0.5 rounded bg-background/60 border border-border/40">⌘K</kbd>
                 </button>
                 
-                <Button variant="outline" size="sm" onClick={() => setOpenLog(true)} className="hidden md:inline-flex">
+                <Button variant="outline" size="sm" onClick={() => { setPrefill(null); setOpenLog(true); }} className="hidden md:inline-flex">
                   <Plus className="h-4 w-4" /> Quick log
                 </Button>
                 <Button variant="ghost" size="icon" onClick={() => nav("/alerts")} aria-label="Alerts" className="relative">
@@ -70,7 +82,7 @@ export default function AppShell() {
 
         {/* Mobile floating + */}
         <button
-          onClick={() => setOpenLog(true)}
+          onClick={() => { setPrefill(null); setOpenLog(true); }}
           aria-label="Quick log"
           className="md:hidden fixed z-40 bottom-20 right-4 h-14 w-14 rounded-full gradient-leaf shadow-elevated flex items-center justify-center text-primary-foreground hover:scale-105 transition active:scale-95 glow-accent"
         >
@@ -79,7 +91,7 @@ export default function AppShell() {
 
         <MobileNav />
 
-        <QuickLog open={openLog} onOpenChange={setOpenLog} onCreated={() => window.dispatchEvent(new Event("verdant:entry-created"))} />
+        <QuickLog open={openLog} onOpenChange={(o) => { setOpenLog(o); if (!o) setPrefill(null); }} prefill={prefill} onCreated={() => window.dispatchEvent(new Event("verdant:entry-created"))} />
       </div>
     </SidebarProvider>
   );

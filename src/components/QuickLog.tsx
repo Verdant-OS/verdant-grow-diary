@@ -19,9 +19,22 @@ import { evaluateQuickLogPreview } from "@/lib/quickLogPreviewRules";
 import { AlertTriangle, Info } from "lucide-react";
 import { toast } from "sonner";
 
-interface Props { open: boolean; onOpenChange: (v: boolean) => void; onCreated?: () => void; }
+export interface QuickLogPrefill {
+  plantId?: string | null;
+  growId?: string | null;
+  tentId?: string | null;
+  eventType?: string | null;
+  suggestSnapshot?: boolean | null;
+}
 
-export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
+interface Props {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onCreated?: () => void;
+  prefill?: QuickLogPrefill | null;
+}
+
+export default function QuickLog({ open, onOpenChange, onCreated, prefill }: Props) {
   const { user } = useAuth();
   const { grows, activeGrow, activeGrowId, setActiveGrowId } = useGrows();
   const { data: plants = [] } = usePlants();
@@ -38,6 +51,19 @@ export default function QuickLog({ open, onOpenChange, onCreated }: Props) {
   const [details, setDetails] = useState({ ph: "", ec: "", runoff: "", nutrients: "", training: "", watering: "" });
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Apply prefill when the dialog opens. Does NOT submit — grower still
+  // chooses to save the entry.
+  useEffect(() => {
+    if (!open || !prefill) return;
+    if (prefill.growId && prefill.growId !== activeGrowId) {
+      setActiveGrowId(prefill.growId);
+    }
+    if (prefill.plantId) setPlantId(prefill.plantId);
+    if (prefill.eventType) setEventType(prefill.eventType);
+    if (prefill.suggestSnapshot && prefill.tentId) setSnapshot(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, prefill?.plantId, prefill?.growId, prefill?.tentId, prefill?.eventType, prefill?.suggestSnapshot]);
 
   // Auto-pick a sensible event type when adding a photo
   // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,20 +1,35 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, Box, Gauge } from "lucide-react";
+import { ArrowRight, Box, Gauge, NotebookPen } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { usePlantTentLatestReadings } from "@/hooks/usePlantTentLatestReadings";
 import { buildPlantTentEnvironmentView } from "@/lib/plantTentEnvironmentRules";
+import {
+  buildPlantQuickLogPrefill,
+  PLANT_QUICKLOG_PREFILL_EVENT,
+} from "@/lib/plantQuickLogPrefillRules";
 
 interface Props {
   tentId: string | null | undefined;
   tentName?: string | null;
+  plantId?: string | null;
+  plantName?: string | null;
+  growId?: string | null;
 }
 
-export default function PlantTentEnvironmentPanel({ tentId, tentName }: Props) {
+export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, plantName, growId }: Props) {
   const enabled = !!tentId;
   const { data, isLoading } = usePlantTentLatestReadings(tentId ?? null);
   const view = buildPlantTentEnvironmentView(enabled ? data ?? [] : []);
+  const prefill = buildPlantQuickLogPrefill({ plantId, plantName, growId, tentId, tentName });
+
+  function openQuickLog() {
+    if (!prefill) return;
+    window.dispatchEvent(
+      new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: prefill }),
+    );
+  }
 
   return (
     <Card data-testid="plant-tent-environment-panel" className="mt-4">
@@ -85,6 +100,20 @@ export default function PlantTentEnvironmentPanel({ tentId, tentName }: Props) {
             </div>
           </div>
         )}
+        {enabled && prefill ? (
+          <div className="mt-4">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1"
+              onClick={openQuickLog}
+              data-testid="plant-tent-environment-log-with-context"
+            >
+              <NotebookPen className="h-3.5 w-3.5" /> Log observation with this context
+            </Button>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

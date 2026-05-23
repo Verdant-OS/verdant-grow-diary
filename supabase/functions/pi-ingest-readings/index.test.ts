@@ -8,7 +8,7 @@ import {
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { CORS_HEADERS, handlePiIngestReadingsRequest } from "./index.ts";
 
-const URL = "http://localhost/functions/v1/pi-ingest-readings";
+const ENDPOINT = "http://localhost/functions/v1/pi-ingest-readings";
 
 function bodyThatThrowsIfRead(): ReadableStream<Uint8Array> {
   return new ReadableStream({

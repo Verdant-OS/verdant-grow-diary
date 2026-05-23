@@ -209,11 +209,14 @@ Deno.test("no Supabase client import exists in pi-ingest-readings Edge Function 
   }
 });
 
-Deno.test("no SUPABASE_SERVICE_ROLE_KEY read exists anywhere in src/", async () => {
+Deno.test("no SUPABASE_SERVICE_ROLE_KEY runtime read exists anywhere in src/", async () => {
   const srcDir = new URL("src/", ROOT);
   const files = await walk(srcDir);
   for (const p of files) {
     if (!/\.(ts|tsx)$/.test(p)) continue;
+    // Guardrail tests legitimately enumerate the literal string as a
+    // forbidden token; only runtime code is forbidden from reading it.
+    if (/\.test\.(ts|tsx)$/.test(p)) continue;
     const text = await Deno.readTextFile(p);
     assert(
       !/SUPABASE_SERVICE_ROLE_KEY/.test(text),

@@ -96,7 +96,10 @@ describe("mapSensorReadingRow", () => {
     quality: "ok",
     source: "manual",
     created_at: "2026-05-01T12:00:00Z",
-  };
+    device_id: null,
+    raw_payload: null,
+    captured_at: null,
+  } as any;
   it("maps each metric onto the correct field", () => {
     expect(mapSensorReadingRow({ ...base, metric: "temperature_c", value: 24.5 })).toMatchObject({ temp: 24.5, rh: 0, vpd: 0, co2: 0, soil: 0 });
     expect(mapSensorReadingRow({ ...base, metric: "humidity_pct", value: 55 })).toMatchObject({ rh: 55 });

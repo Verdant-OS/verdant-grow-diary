@@ -16,13 +16,13 @@
 //   - Read SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY at runtime
 //
 // This file still MUST NOT:
-//   - Read PI_INGEST_SECRET_KEY_Vn env vars (the resolver owns that)
+//   - Read raw key-version env vars directly (the resolver owns that)
 //   - Decrypt secrets directly
-//   - Write to sensor_readings, pi_ingest_idempotency_keys, alerts,
-//     action_queue, or any device/automation surface
+//   - Write to sensor data, idempotency, alert, action queue, or any
+//     device/automation surface
 //   - Log raw body, signature, payload, decrypted secret, ciphertext,
 //     nonce, key version, or stack traces
-//   - Map secret_hash / secret_ciphertext directly to a usable secret
+//   - Map an encrypted credential field directly to a usable secret
 //
 // See:
 //   - docs/pi-ingest-readings-contract.md

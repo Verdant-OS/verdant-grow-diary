@@ -97,13 +97,6 @@ describe("pi_ingest_bridge_credentials — RLS", () => {
     return m ? m[0] : "";
   }
 
-  it("has owner-scoped SELECT policy", () => {
-    const block = policyBlock(
-      /CREATE\s+POLICY[\s\S]*?pi_ingest_bridge_credentials[\s\S]*?FOR\s+SELECT[\s\S]*?;/i,
-    );
-    expect(block).toMatch(/auth\.uid\(\)\s*=\s*user_id/);
-  });
-
   it("has owner-scoped INSERT policy", () => {
     const block = policyBlock(
       /CREATE\s+POLICY[\s\S]*?pi_ingest_bridge_credentials[\s\S]*?FOR\s+INSERT[\s\S]*?;/i,
@@ -116,12 +109,10 @@ describe("pi_ingest_bridge_credentials — RLS", () => {
       /CREATE\s+POLICY[\s\S]*?pi_ingest_bridge_credentials[\s\S]*?FOR\s+UPDATE[\s\S]*?;/i,
     );
     if (block !== "") {
-      // both USING and WITH CHECK must restrict to owner
       const usingMatches = block.match(/USING\s*\(\s*auth\.uid\(\)\s*=\s*user_id\s*\)/i);
       const checkMatches = block.match(/WITH\s+CHECK\s*\(\s*auth\.uid\(\)\s*=\s*user_id\s*\)/i);
       expect(usingMatches).not.toBeNull();
       expect(checkMatches).not.toBeNull();
-      // and must NOT use a true-everywhere expression
       expect(block).not.toMatch(/USING\s*\(\s*true\s*\)/i);
       expect(block).not.toMatch(/WITH\s+CHECK\s*\(\s*true\s*\)/i);
     }

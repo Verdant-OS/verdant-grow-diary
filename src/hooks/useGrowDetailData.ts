@@ -122,18 +122,14 @@ export function useGrowDetailData(): UseGrowDetailData {
         | "action_queue"
         | "action_queue_events"
         | "alerts",
-      extra?: (
-        q: ReturnType<typeof supabase.from> extends infer _T
-          ? ReturnType<typeof supabase.from>
-          : never,
-      ) => unknown,
+      extra?: (q: any) => any,
     ): Promise<CountValue> {
       try {
-        let q = supabase
+        let q: any = (supabase as any)
           .from(table)
           .select("id", { count: "exact", head: true })
           .eq("grow_id", growId!);
-        if (extra) q = extra(q) as typeof q;
+        if (extra) q = extra(q);
         const { count, error: cErr } = await q;
         if (cErr) return "unavailable";
         return count ?? 0;
@@ -157,25 +153,16 @@ export function useGrowDetailData(): UseGrowDetailData {
       countFrom("tents"),
       countFrom("diary_entries"),
       countFrom("action_queue", (q) =>
-        (q as ReturnType<typeof supabase.from>).eq(
-          "status",
-          "pending_approval",
-        ),
+        q.eq("status", "pending_approval"),
       ),
       countFrom("action_queue"),
       countFrom("action_queue_events"),
+      countFrom("alerts", (q) => q.eq("status", "open")),
       countFrom("alerts", (q) =>
-        (q as ReturnType<typeof supabase.from>).eq("status", "open"),
+        q.eq("status", "open").eq("severity", "critical"),
       ),
       countFrom("alerts", (q) =>
-        (q as ReturnType<typeof supabase.from>)
-          .eq("status", "open")
-          .eq("severity", "critical"),
-      ),
-      countFrom("alerts", (q) =>
-        (q as ReturnType<typeof supabase.from>)
-          .eq("status", "open")
-          .eq("severity", "warning"),
+        q.eq("status", "open").eq("severity", "warning"),
       ),
     ]);
     setCounts({

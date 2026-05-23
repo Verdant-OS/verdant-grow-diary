@@ -33,7 +33,7 @@ export default function PlantDetail() {
         <EmptyState
           icon={<Sprout className="h-6 w-6" />}
           title="Plant not found"
-          description="This plant does not exist in your real grow data."
+          description="This plant isn't in your tracked plants yet."
           action={
             <Button asChild variant="outline">
               <Link to="/plants">

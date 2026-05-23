@@ -13,7 +13,7 @@
  *   - a per-window cap
  *   - a per-batch cap
  *
- * It never calls `Date.now()` directly — the current time is always injected.
+ * It never reads the wall clock directly — the current time is always injected.
  */
 
 // ----------------------------- Types -----------------------------

@@ -10,6 +10,7 @@ import { Camera, Loader2, Sparkles, Gauge } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { STAGES } from "@/lib/grow";
 import { EVENT_TYPES } from "@/lib/diary";
@@ -38,6 +39,8 @@ export default function QuickLog({ open, onOpenChange, onCreated, prefill }: Pro
   const { user } = useAuth();
   const { grows, activeGrow, activeGrowId, setActiveGrowId } = useGrows();
   const { data: plants = [] } = usePlants();
+  const queryClient = useQueryClient();
+
   
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -170,6 +173,10 @@ export default function QuickLog({ open, onOpenChange, onCreated, prefill }: Pro
       reset();
       onOpenChange(false);
       onCreated?.();
+      // Refresh diary-backed views (Recent Plant Activity, Timeline, etc.)
+      // so the just-saved entry appears without a hard refresh.
+      queryClient.invalidateQueries({ queryKey: ["plant_recent_activity"] });
+      queryClient.invalidateQueries({ queryKey: ["diary_entries"] });
       window.dispatchEvent(new CustomEvent("verdant:entry-created"));
     } catch (err: unknown) {
       if (uploadedPath) {

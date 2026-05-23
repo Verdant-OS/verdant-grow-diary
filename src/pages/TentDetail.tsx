@@ -9,8 +9,8 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Box, Lightbulb, Plus } from "lucide-react";
 import CreatePlantDialog from "@/components/CreatePlantDialog";
 import AddExistingPlantDialog from "@/components/AddExistingPlantDialog";
-import { usePlants, useSensorReadings } from "@/hooks/useMockData";
-import { useGrowTent, getGrowDataMeta, type GrowDataSourceMeta } from "@/hooks/useGrowData";
+import { useSensorReadings } from "@/hooks/useMockData";
+import { useGrowTent, useGrowPlants, getGrowDataMeta, type GrowDataSourceMeta } from "@/hooks/useGrowData";
 
 // Plants and sensor readings inside this page still come from the
 // useMockData hooks (Phase 1 has not migrated them yet). Surface that as
@@ -24,7 +24,7 @@ const DEMO_SUBDATA_META: GrowDataSourceMeta = {
 export default function TentDetail() {
   const { id } = useParams();
   const { data: tent, isLoading } = useGrowTent(id);
-  const { data: plants = [] } = usePlants(id);
+  const { data: plants = [] } = useGrowPlants(id);
   const { data: readings = [] } = useSensorReadings(id);
   const last = readings.at(-1);
   const tentMeta = getGrowDataMeta(["grow", "tent", id ?? null]);

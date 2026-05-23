@@ -59,9 +59,9 @@ describe("server-secret resolver implementation plan — content invariants", ()
     );
   });
   it("documents Edge-Function-only runtime boundary", () => {
-    expect(PLAN).toMatch(/only inside the `?pi-ingest-readings`? Edge Function/i);
-    expect(PLAN).toMatch(/must not.*src\/lib/i);
-    expect(PLAN).toMatch(/must not.*browser\/client bundle/i);
+    expect(PLAN).toMatch(/only inside the [`*]*pi-ingest-readings[`*]*\s+Edge Function/i);
+    expect(PLAN).toMatch(/must\s+\**not\**[^\n]*src\/lib/i);
+    expect(PLAN).toMatch(/must\s+\**not\**[^\n]*browser\/client bundle/i);
   });
   it.each([
     "secret_ciphertext",

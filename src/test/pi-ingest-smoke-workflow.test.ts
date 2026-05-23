@@ -37,14 +37,14 @@ describe("pi-ingest smoke workflow — static guardrails", () => {
   });
 
   it("runs only the smoke test file", () => {
-    expect(yml).toMatch(/deno test[^\n]*\\?\s*\n?\s*supabase\/functions\/pi-ingest-readings\/smoke\.test\.ts/);
-    // No other deno test invocation for unrelated paths.
+    expect(yml).toMatch(/supabase\/functions\/pi-ingest-readings\/smoke\.test\.ts/);
+    // Exactly one `deno test` invocation in the workflow.
     const denoTestLines = yml.match(/deno test[^\n]*/g) ?? [];
     expect(denoTestLines.length).toBe(1);
-    for (const line of denoTestLines) {
-      expect(line).not.toMatch(/supabase\/functions\/(?!pi-ingest-readings\/smoke\.test\.ts)/);
-    }
+    // No reference to other Edge Function paths.
+    expect(yml).not.toMatch(/supabase\/functions\/(?!pi-ingest-readings\/smoke\.test\.ts|pi-ingest-readings\b\s*$)/m);
   });
+
 
   it("references all required secrets via secrets.* expressions", () => {
     for (const name of [

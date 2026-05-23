@@ -383,7 +383,7 @@ Deno.test("POST tent not allowed returns 401 unauthorized", async () => {
 
 // ---------- POST valid auth ----------
 
-Deno.test("POST valid auth returns 503 auth_ok_pipeline_not_implemented", async () => {
+Deno.test("POST valid auth returns 200 success after atomic commit", async () => {
   const rawBody = validEnvelopeBody();
   const headers = await signedPostHeaders(rawBody);
   const client = makeClient({ data: [await defaultRow()], error: null });
@@ -391,11 +391,11 @@ Deno.test("POST valid auth returns 503 auth_ok_pipeline_not_implemented", async 
     new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
     defaultDeps(client),
   );
-  assertEquals(res.status, 503);
+  assertEquals(res.status, 200);
   const body = await res.json();
-  assertEquals(body.ok, false);
-  assertEquals(body.error, "auth_ok_pipeline_not_implemented");
-  assertStringIncludes(body.message, "Bridge authentication succeeded");
+  assertEquals(body.ok, true);
+  assertEquals(body.inserted, 1);
+  assertEquals(body.rejected, 0);
 });
 
 // ---------- Response hygiene ----------

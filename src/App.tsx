@@ -31,6 +31,7 @@ import GrowRoomMode from "./pages/GrowRoomMode";
 import Landing from "./pages/Landing";
 import HardwareIntegrations from "./pages/HardwareIntegrations";
 import Leads from "./pages/Leads";
+import PiIngestStatus from "./pages/PiIngestStatus";
 import NotFound from "./pages/NotFound";
 
 
@@ -73,6 +74,7 @@ const App = () => (
 
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/diagnostics" element={<Diagnostics />} />
+                <Route path="/pi-ingest-status" element={<PiIngestStatus />} />
                 {/* Leads is an internal admin/operator module, intentionally not
                     surfaced in grower-facing navigation. Primary route is
                     /admin/leads; /leads is retained as a back-compat alias. */}

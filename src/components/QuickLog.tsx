@@ -39,6 +39,8 @@ export default function QuickLog({ open, onOpenChange, onCreated, prefill }: Pro
   const { user } = useAuth();
   const { grows, activeGrow, activeGrowId, setActiveGrowId } = useGrows();
   const { data: plants = [] } = usePlants();
+  const queryClient = useQueryClient();
+
   
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);

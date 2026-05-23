@@ -60,7 +60,7 @@ describe("isSnapshotPersistable — source allowlist", () => {
     expect(
       isSnapshotPersistable({
         snapshot: { ...base, source: "manual" },
-        quality: "ok",
+        quality: "good",
         now: NOW,
       }),
     ).toBe(true);
@@ -69,7 +69,7 @@ describe("isSnapshotPersistable — source allowlist", () => {
     expect(
       isSnapshotPersistable({
         snapshot: { ...base, source: "live" },
-        quality: "ok",
+        quality: "good",
         now: NOW,
       }),
     ).toBe(true);
@@ -78,7 +78,7 @@ describe("isSnapshotPersistable — source allowlist", () => {
     expect(
       isSnapshotPersistable({
         snapshot: { ...base, source: "sim" },
-        quality: "ok",
+        quality: "good",
         now: NOW,
       }),
     ).toBe(false);
@@ -87,7 +87,7 @@ describe("isSnapshotPersistable — source allowlist", () => {
     expect(
       isSnapshotPersistable({
         snapshot: { ...base, source: "diary" },
-        quality: "ok",
+        quality: "good",
         now: NOW,
       }),
     ).toBe(false);
@@ -96,7 +96,7 @@ describe("isSnapshotPersistable — source allowlist", () => {
     expect(
       isSnapshotPersistable({
         snapshot: { ...base, source: "unavailable" },
-        quality: "ok",
+        quality: "good",
         now: NOW,
       }),
     ).toBe(false);
@@ -109,7 +109,7 @@ describe("isSnapshotPersistable — source allowlist", () => {
           source: "manual",
           ts: new Date(NOW - 60 * 60 * 1000).toISOString(),
         },
-        quality: "ok",
+        quality: "good",
         now: NOW,
       }),
     ).toBe(false);
@@ -122,7 +122,7 @@ describe("isSnapshotPersistable — source allowlist", () => {
           source: "live",
           ts: new Date(NOW - 60 * 60 * 1000).toISOString(),
         },
-        quality: "ok",
+        quality: "good",
         now: NOW,
       }),
     ).toBe(false);
@@ -137,7 +137,7 @@ describe("end-to-end: sim sensor readings never persist alerts", () => {
     ]);
     expect(s?.source).toBe("sim");
     expect(
-      isSnapshotPersistable({ snapshot: s, quality: "ok", now: NOW }),
+      isSnapshotPersistable({ snapshot: s, quality: "good", now: NOW }),
     ).toBe(false);
   });
 });

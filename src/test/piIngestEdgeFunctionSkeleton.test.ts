@@ -33,12 +33,9 @@ describe("pi-ingest-readings Edge Function skeleton — fail-closed behavior", (
     expect(SRC).toMatch(/method\s*!==?\s*["']POST["']/);
     expect(SRC).toMatch(/(status:\s*405|jsonResponse\s*\(\s*405)/);
   });
-  it("references fail-closed builders (legacy + post-auth)", () => {
+  it("references fail-closed builders (legacy)", () => {
     expect(SRC).toMatch(
       /(secret_resolver_not_implemented|buildSecretResolverNotImplementedResponseBody)/,
-    );
-    expect(SRC).toMatch(
-      /(auth_ok_pipeline_not_implemented|buildAuthOkPipelineNotImplementedResponseBody)/,
     );
   });
   it("returns method_not_allowed (via shared builder)", () => {
@@ -46,13 +43,19 @@ describe("pi-ingest-readings Edge Function skeleton — fail-closed behavior", (
       /(method_not_allowed|buildMethodNotAllowedResponseBody)/,
     );
   });
-  it("returns a fail-closed status (503 or 501)", () => {
+  it("returns a fail-closed status (503 or 501) for failure paths", () => {
     expect(SRC).toMatch(/(status:\s*(503|501)|jsonResponse\s*\(\s*(503|501))/);
   });
-  it("never returns ok:true", () => {
-    expect(SRC).not.toMatch(/ok\s*:\s*true/);
+  it("success path is the wired commit-helper shape only", () => {
+    // ok:true is allowed only as the wired commit success response.
+    const successMatches = SRC.match(/ok\s*:\s*true/g) ?? [];
+    // Must have at least one (commit success) and the success block must include inserted/rejected.
+    expect(successMatches.length).toBeGreaterThan(0);
+    expect(SRC).toMatch(/inserted\s*:/);
+    expect(SRC).toMatch(/rejected\s*:/);
   });
 });
+
 
 describe("pi-ingest-readings Edge Function — forbidden surfaces (post-auth)", () => {
   // service_role + createClient are now permitted in index.ts only.

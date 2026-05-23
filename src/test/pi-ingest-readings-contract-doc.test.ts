@@ -117,12 +117,18 @@ describe("pi-ingest-readings — repo guardrails (fail-closed skeleton allowed)"
   const FN = resolve(ROOT, "supabase/functions/pi-ingest-readings/index.ts");
   const SRC = existsSync(FN) ? readFileSync(FN, "utf8") : "";
 
-  it("pi-ingest-readings Edge Function, if present, is ingestion-fail-closed", () => {
+  it("pi-ingest-readings Edge Function, if present, retains fail-closed failure paths", () => {
     if (!existsSync(FN)) return;
-    expect(SRC).toMatch(/(secret_resolver_not_implemented|auth_ok_pipeline_not_implemented)/);
+    expect(SRC).toMatch(/(secret_resolver_not_implemented|internal_failure)/);
     expect(SRC).toMatch(/(status:\s*(503|501)|jsonResponse\s*\(\s*(503|501))/);
-    expect(SRC).not.toMatch(/ok\s*:\s*true/);
+    // Success path only via commit helper, must include inserted/rejected.
+    if (/ok\s*:\s*true/.test(SRC)) {
+      expect(SRC).toMatch(/inserted\s*:/);
+      expect(SRC).toMatch(/rejected\s*:/);
+      expect(SRC).toMatch(/commitPiIngestBatch/);
+    }
   });
+
 
   it("no migration mentioning pi_ingest / pi-ingest-readings exists", () => {
     const dir = resolve(ROOT, "supabase/migrations");

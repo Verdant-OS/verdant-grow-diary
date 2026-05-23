@@ -104,10 +104,11 @@ describe("piIngestServerSecretResolverTypes — shape compatibility", () => {
       { ok: false, reason: "missing_credential", message: "m" },
     ];
     for (const r of results) {
-      if (r.ok) {
+      if (r.ok === true) {
         expect(typeof r.secret).toBe("string");
       } else {
         expect(typeof r.reason).toBe("string");
+        expect(typeof r.message).toBe("string");
       }
     }
   });

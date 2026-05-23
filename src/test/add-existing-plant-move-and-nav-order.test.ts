@@ -27,7 +27,7 @@ describe("AddExistingPlantDialog · categorization + move semantics", () => {
 
   it("shows plants already in the current tent as disabled (not assignable)", () => {
     expect(DIALOG).toContain("Already in this tent");
-    expect(DIALOG).toMatch(/disabled[\s\S]{0,120}data-testid=`add-existing-plant-option-current/);
+    expect(DIALOG).toMatch(/value=\{p\.id\}[\s\S]{0,80}disabled[\s\S]{0,200}add-existing-plant-option-current/);
   });
 
   it("categorizes client-side from a single same-grow query", () => {

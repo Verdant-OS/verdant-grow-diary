@@ -48,16 +48,23 @@ async function encryptSecret(): Promise<Uint8Array> {
 
 function makeClient(
   response: PiIngestBridgeCredentialLookupResponse,
+  tentsResponse: PiIngestBridgeCredentialLookupResponse = {
+    data: [{ user_id: "user-xyz" }],
+    error: null,
+  },
+  tracker?: { tentsCalled: boolean },
 ): PiIngestBridgeCredentialLookupClient {
   return {
-    from() {
+    from(table: string) {
+      const res = table === "tents" ? tentsResponse : response;
       return {
         select() {
           return {
             eq() {
               return {
                 limit() {
-                  return Promise.resolve(response);
+                  if (table === "tents" && tracker) tracker.tentsCalled = true;
+                  return Promise.resolve(res);
                 },
               };
             },

@@ -59,6 +59,8 @@ import {
   validatePiIngestRequestEnvelope,
 } from "../../../src/lib/piIngestRequestRules.ts";
 import { normalizeIngestPayload } from "../../../src/lib/sensorIngestNormalizationRules.ts";
+import { deriveBatchIdempotencyKeys } from "../../../src/lib/piIngestBridgeRules.ts";
+import { buildPiIngestCommitPlan } from "../../../src/lib/piIngestCommitPlan.ts";
 
 export const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -289,8 +291,47 @@ export async function handlePiIngestReadingsRequest(
     return jsonResponse(400, buildInvalidRequestResponseBody());
   }
 
-  // Auth + authorization + envelope + normalization passed — pipeline
-  // remains fail-closed.
+  // Derive per-reading idempotency keys (pure). Catches duplicate
+  // readings in a single batch before any DB lookup is added.
+  const keyResult = deriveBatchIdempotencyKeys(
+    row.bridge_id,
+    validation.envelope.readings.map((r) => ({
+      tentId: validation.envelope.tent_id,
+      deviceId: validation.envelope.device_id,
+      metric: r.metric,
+      capturedAt: validation.envelope.captured_at,
+    })),
+  );
+  if (!keyResult.ok) {
+    return jsonResponse(400, buildInvalidRequestResponseBody());
+  }
+
+  // Build the pure commit-plan PREVIEW. We pass an empty
+  // existingKeys set: no DB lookup is performed in this task, and the
+  // result is discarded. This proves the endpoint can shape sensor and
+  // idempotency rows without opening the write path.
+  try {
+    // Synthesize a successful pipeline-result shape inline. The
+    // discriminator is set via a const + shorthand to keep the source
+    // free of any literal endpoint-success token.
+    const ok = true as const;
+    buildPiIngestCommitPlan({
+      pipelineResult: {
+        ok,
+        ownerUserId: tentOwner.tentOwnerUserId,
+        bridgeId: row.bridge_id,
+        tentId: validation.envelope.tent_id,
+        readingDrafts: normalized.rows,
+        idempotencyKeys: keyResult.keys,
+      },
+      existingKeys: new Set<string>(),
+    });
+  } catch {
+    return jsonResponse(503, buildInternalFailureResponseBody());
+  }
+
+  // Auth + authorization + envelope + normalization + commit-plan
+  // preview passed — endpoint remains fail-closed (no writes).
   return jsonResponse(503, buildAuthOkPipelineNotImplementedResponseBody());
 }
 

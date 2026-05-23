@@ -116,14 +116,27 @@ describe("server-secret resolver implementation plan — content invariants", ()
 });
 
 describe("server-secret resolver implementation plan — repo state", () => {
-  it("no resolver file exists yet under the Edge Function dir", () => {
-    const forbidden = ["secretResolver.ts", "crypto.ts"];
+  it("resolver lives only under the Edge Function dir (not in src/)", () => {
     if (!existsSync(FN_DIR)) return;
     const entries = readdirSync(FN_DIR);
-    for (const f of forbidden) {
-      expect(entries.includes(f), `${f} must not exist yet`).toBe(false);
-    }
+    // secretResolver.ts is allowed here; crypto.ts remains optional.
+    // Anything resolver-named MUST stay in this folder only — checked
+    // by the src/ scan below.
+    expect(
+      entries.includes("secretResolver.ts") ||
+        entries.includes("secretResolver.test.ts"),
+      "secretResolver should live under the Edge Function dir",
+    ).toBe(true);
   });
+
+  it("Edge Function index.ts does not import or call the resolver yet", () => {
+    if (!FN_SRC) return;
+    expect(FN_SRC).not.toMatch(
+      /from\s+["']\.\/secretResolver(\.ts)?["']/,
+    );
+    expect(FN_SRC).not.toMatch(/\bresolveBridgeSecret\s*\(/);
+  });
+
 
   it("Edge Function skeleton remains fail-closed and decryption-free", () => {
     if (!FN_SRC) return;

@@ -1027,7 +1027,7 @@ Deno.test("all candidate keys existing → 200 inserted=0 rejected=duplicates", 
   assertEquals(body.rejected, 2);
 });
 
-Deno.test("partial duplicate keys still returns 503 auth_ok_pipeline_not_implemented", async () => {
+Deno.test("partial duplicate keys → 200 inserted=2 rejected=1", async () => {
   const rawBody = validEnvelopeBody({
     readings: [
       { metric: "temperature_c", value: 22.5, unit: "C" },
@@ -1054,11 +1054,14 @@ Deno.test("partial duplicate keys still returns 503 auth_ok_pipeline_not_impleme
     new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
     depsWith(client, lookup),
   );
-  assertEquals(res.status, 503);
-  assertEquals((await res.json()).error, "auth_ok_pipeline_not_implemented");
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.ok, true);
+  assertEquals(body.inserted, 2);
+  assertEquals(body.rejected, 1);
 });
 
-Deno.test("no duplicate keys still returns 503 auth_ok_pipeline_not_implemented", async () => {
+Deno.test("no duplicate keys → 200 inserted=1 rejected=0", async () => {
   const rawBody = validEnvelopeBody();
   const headers = await signedPostHeaders(rawBody);
   const client = makeClient(
@@ -1070,8 +1073,11 @@ Deno.test("no duplicate keys still returns 503 auth_ok_pipeline_not_implemented"
     new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
     depsWith(client, lookup),
   );
-  assertEquals(res.status, 503);
-  assertEquals((await res.json()).error, "auth_ok_pipeline_not_implemented");
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.ok, true);
+  assertEquals(body.inserted, 1);
+  assertEquals(body.rejected, 0);
 });
 
 Deno.test("idempotency lookup skipped when HMAC fails", async () => {

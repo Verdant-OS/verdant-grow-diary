@@ -10,6 +10,7 @@ import { Camera, Loader2, Sparkles, Gauge } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { STAGES } from "@/lib/grow";
 import { EVENT_TYPES } from "@/lib/diary";

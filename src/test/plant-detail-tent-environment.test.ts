@@ -29,7 +29,7 @@ const selectMock = vi.fn(() => ({ eq: eqMock }));
 const fromMock = vi.fn(() => ({ select: selectMock }));
 
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { from: (...a: unknown[]) => fromMock(...a) },
+  supabase: { from: (table: string) => fromMock(table) },
 }));
 
 import { usePlantTentLatestReadings } from "@/hooks/usePlantTentLatestReadings";

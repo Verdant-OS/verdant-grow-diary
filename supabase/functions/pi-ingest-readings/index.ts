@@ -329,8 +329,6 @@ export async function handlePiIngestReadingsRequest(
   } catch {
     return jsonResponse(503, buildInternalFailureResponseBody());
   }
-    return jsonResponse(503, buildInternalFailureResponseBody());
-  }
 
   // Auth + authorization + envelope + normalization + commit-plan
   // preview passed — endpoint remains fail-closed (no writes).

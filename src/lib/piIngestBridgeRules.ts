@@ -261,7 +261,7 @@ export function validateBridgeBatchScope(
     | ReadonlyMap<string, BridgeCredential>,
 ): BridgeBatchScopeResult {
   const resolved = resolveBridgeCredential(input.bridgeId, credentials);
-  if (!resolved.ok) return { ok: false, code: resolved.code, message: resolved.message };
+  if (resolved.ok !== true) return resolved;
   const cred = resolved.credential;
 
   if (!input.readings || input.readings.length === 0)
@@ -270,13 +270,12 @@ export function validateBridgeBatchScope(
   for (let i = 0; i < input.readings.length; i++) {
     const r = input.readings[i];
     const tentRes = assertBridgeCanWriteTent(cred, r.tentId);
-    if (!tentRes.ok)
+    if (tentRes.ok !== true)
       return { ok: false, code: tentRes.code, message: tentRes.message, index: i };
   }
 
   const keys = deriveBatchIdempotencyKeys(cred.bridgeId, input.readings);
-  if (!keys.ok)
-    return { ok: false, code: keys.code, message: keys.message, index: keys.index };
+  if (keys.ok !== true) return keys;
 
   return {
     ok: true,
@@ -285,3 +284,4 @@ export function validateBridgeBatchScope(
     keys: keys.keys,
   };
 }
+

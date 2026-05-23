@@ -51,6 +51,9 @@ import {
   type PiIngestSecretKeyProvider,
   resolveBridgeSecret,
 } from "./secretResolver.ts";
+import { loadTentOwnerUserId } from "./tentOwnerLookup.ts";
+import { evaluateBridgeAuthorization } from "../../../src/lib/piIngestBridgeAuthorizationRules.ts";
+import type { BridgeCredentialMetadata } from "../../../src/lib/piIngestBridgeCredentialMetadataResolver.ts";
 
 export const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -224,7 +227,42 @@ export async function handlePiIngestReadingsRequest(
     return jsonResponse(401, buildUnauthorizedResponseBody());
   }
 
-  // Auth passed — ingestion pipeline still fail-closed.
+  // HMAC verified — resolve tent owner and run authorization checks.
+  let tentOwner;
+  try {
+    tentOwner = await loadTentOwnerUserId(tentId, client);
+  } catch {
+    return jsonResponse(503, buildInternalFailureResponseBody());
+  }
+  if (!tentOwner.ok) {
+    if (tentOwner.reason === "tent_owner_lookup_failed") {
+      return jsonResponse(503, buildInternalFailureResponseBody());
+    }
+    return jsonResponse(401, buildUnauthorizedResponseBody());
+  }
+
+  const credentialMetadata: BridgeCredentialMetadata = {
+    id: row.bridge_id,
+    userId: row.user_id,
+    bridgeId: row.bridge_id,
+    secretHint: null,
+    allowedTentIds: row.allowed_tent_ids,
+    isActive: row.is_active,
+    secretStatus: row.secret_status,
+    createdAt: "",
+    updatedAt: "",
+    lastUsedAt: row.last_used_at,
+  };
+  const authorization = evaluateBridgeAuthorization({
+    credential: credentialMetadata,
+    tentId,
+    tentOwnerUserId: tentOwner.tentOwnerUserId,
+  });
+  if (!authorization.ok) {
+    return jsonResponse(401, buildUnauthorizedResponseBody());
+  }
+
+  // Auth + authorization passed — ingestion pipeline still fail-closed.
   return jsonResponse(503, buildAuthOkPipelineNotImplementedResponseBody());
 }
 

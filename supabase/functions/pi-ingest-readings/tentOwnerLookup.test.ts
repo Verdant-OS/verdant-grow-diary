@@ -209,11 +209,10 @@ Deno.test("tent-owner lookup SELECTs only user_id from tents", () => {
   assertEquals(TENT_OWNER_LOOKUP_COLUMNS, ["user_id"]);
 });
 
-Deno.test("index.ts has not yet wired the tent-owner lookup (contract scope)", async () => {
+Deno.test("index.ts wires the tent-owner lookup after HMAC verification", async () => {
   const raw = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
-  // This task only adds the helper; wiring lands in a follow-up build.
   assert(
-    !/\bloadTentOwnerUserId\s*\(/.test(raw),
-    "index.ts must not yet call loadTentOwnerUserId in this task",
+    /\bloadTentOwnerUserId\s*\(/.test(raw),
+    "index.ts must call loadTentOwnerUserId after HMAC verification",
   );
 });

@@ -118,6 +118,17 @@ async function signedPostHeaders(
   };
 }
 
+function validEnvelopeBody(overrides: Record<string, unknown> = {}): string {
+  return JSON.stringify({
+    tent_id: "tent-1",
+    device_id: "device-1",
+    captured_at: NOW_ISO,
+    source: "pi_bridge",
+    readings: [{ metric: "temperature_c", value: 22.5, unit: "C" }],
+    ...overrides,
+  });
+}
+
 // ---------- CORS / method ----------
 
 Deno.test("OPTIONS returns 200 with CORS headers", async () => {

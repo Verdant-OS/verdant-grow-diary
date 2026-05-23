@@ -182,7 +182,7 @@ export function normalizeIngestPayload(
       return;
     }
     const conv = convertUnit(r.metric, numeric, r.unit);
-    if (!conv.ok) {
+    if (conv.ok !== true) {
       errors.push(`reading ${idx}: ${conv.error}`);
       return;
     }

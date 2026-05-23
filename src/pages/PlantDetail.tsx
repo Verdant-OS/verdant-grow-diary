@@ -7,6 +7,7 @@ import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
 import AssignTentDialog from "@/components/AssignTentDialog";
 import PlantTentEnvironmentPanel from "@/components/PlantTentEnvironmentPanel";
 import PlantRecentActivityPanel from "@/components/PlantRecentActivityPanel";
+import PlantAssignedTentAlertsPanel from "@/components/PlantAssignedTentAlertsPanel";
 import { Button } from "@/components/ui/button";
 import { useGrowPlant, useGrowTent, getGrowDataMeta } from "@/hooks/useGrowData";
 import { format, formatDistanceToNow } from "date-fns";
@@ -113,6 +114,11 @@ export default function PlantDetail() {
             growId={plant.growId ?? null}
           />
           <PlantRecentActivityPanel plantId={plant.id} plantName={plant.name} />
+          <PlantAssignedTentAlertsPanel
+            tentId={plant.tentId ?? null}
+            tentName={tent?.name ?? null}
+            growId={plant.growId ?? null}
+          />
         </div>
       </div>
     </div>

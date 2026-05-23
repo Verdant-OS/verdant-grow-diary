@@ -24,7 +24,7 @@ const DEMO_SUBDATA_META: GrowDataSourceMeta = {
 export default function TentDetail() {
   const { id } = useParams();
   const { data: tent, isLoading } = useGrowTent(id);
-  const { data: plants = [] } = usePlants(id);
+  const { data: plants = [] } = useGrowPlants(id, tent?.growId ?? undefined);
   const { data: readings = [] } = useSensorReadings(id);
   const last = readings.at(-1);
   const tentMeta = getGrowDataMeta(["grow", "tent", id ?? null]);

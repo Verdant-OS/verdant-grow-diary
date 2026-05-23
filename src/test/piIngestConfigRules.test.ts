@@ -75,7 +75,7 @@ describe("validatePiIngestConfig", () => {
     for (const v of [null, undefined, 1, "x", []]) {
       const r = validatePiIngestConfig(v);
       expect(r.ok).toBe(false);
-      if (!r.ok) expect(r.issues[0].code).toBe("not_an_object");
+      if (r.ok === false) expect(r.issues[0].code).toBe("not_an_object");
     }
   });
 
@@ -90,7 +90,7 @@ describe("validatePiIngestConfig", () => {
   ])("rejects invalid %s=%s", (field, value, code) => {
     const r = validatePiIngestConfig({ ...VALID, [field as string]: value });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.issues.some((i) => i.code === code)).toBe(true);
+    if (r.ok === false) expect(r.issues.some((i) => i.code === code)).toBe(true);
   });
 
   it("allows clockSkewMs = 0", () => {
@@ -101,19 +101,19 @@ describe("validatePiIngestConfig", () => {
   it("rejects non-array allowedSources", () => {
     const r = validatePiIngestConfig({ ...VALID, allowedSources: "pi_bridge" });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.issues[0].code).toBe("invalid_allowed_sources");
+    if (r.ok === false) expect(r.issues[0].code).toBe("invalid_allowed_sources");
   });
 
   it("rejects empty allowedSources", () => {
     const r = validatePiIngestConfig({ ...VALID, allowedSources: [] });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.issues[0].code).toBe("empty_allowed_sources");
+    if (r.ok === false) expect(r.issues[0].code).toBe("empty_allowed_sources");
   });
 
   it("rejects empty allowedMetrics", () => {
     const r = validatePiIngestConfig({ ...VALID, allowedMetrics: [] });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.issues[0].code).toBe("empty_allowed_metrics");
+    if (r.ok === false) expect(r.issues[0].code).toBe("empty_allowed_metrics");
   });
 
   it("rejects non-string source entries", () => {
@@ -145,7 +145,7 @@ describe("validatePiIngestConfig", () => {
       allowedMetrics: [],
     });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.issues.length).toBeGreaterThanOrEqual(4);
+    if (r.ok === false) expect(r.issues.length).toBeGreaterThanOrEqual(4);
   });
 
   it("returns a frozen config on success", () => {

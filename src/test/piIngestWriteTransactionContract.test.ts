@@ -51,7 +51,7 @@ describe("pi-ingest write-transaction contract — required content", () => {
     ["no idempotency_key column on sensor_readings", /sensor_readings[\s\S]{0,80}MUST NOT[\s\S]{0,80}idempotency_key/],
     ["unique constraint (user_id, idempotency_key)", /\(user_id,\s*idempotency_key\)/],
     ["server-resolved user_id", /server-resolved\s+`?user_id`?/i],
-    ["no client-provided user_id", /no\s+client-provided\s+(owner\s+id|`?user_id`?)/i],
+    ["no client-provided user_id", /(no|MUST\s+NOT\s+accept)\s+(a\s+)?client-(provided|controlled)\s+(owner\s+id|`?user_id`?)/i],
     ["recommends RPC / SQL transaction", /RPC[\s\S]{0,80}transaction|Postgres\s+(RPC|function)/i],
     ["no alerts writes", /no\s+alerts?\s+writes|no\s+direct\s+alert\s+writes|MUST\s+NOT\s+create\s+alerts/i],
     ["no Action Queue writes", /no\s+`?action_queue`?\s+writes|MUST\s+NOT\s+create\s+Action\s+Queue/i],

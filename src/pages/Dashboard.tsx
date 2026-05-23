@@ -193,6 +193,9 @@ export default function Dashboard() {
       <DashboardDataSourceDisclosure
         scopedGrowId={scopedGrowId}
         hasAnyData={tents.length > 0 || plants.length > 0}
+        snapshotSource={
+          sensorState.status === "ok" ? sensorState.snapshot.source : undefined
+        }
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">

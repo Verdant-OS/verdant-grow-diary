@@ -1,16 +1,13 @@
 /**
  * Pure pi-ingest bridge credential METADATA resolver.
  *
- * Converts rows from the `pi_ingest_bridge_credentials_safe` view into a
- * normalized `BridgeCredentialMetadata` shape for use by future
- * server-side code paths.
+ * Converts rows from the metadata-only safe view into a normalized
+ * BridgeCredentialMetadata shape for use by future server-side code.
  *
  * Hard rules (enforced by static tests):
  * - No Supabase imports.
- * - No secret material on input or output (no `secret`, `secret_hash`,
- *   `secret_ciphertext`, `secret_nonce`, `secret_key_version`).
+ * - No secret material on input or output.
  * - No decryption.
- * - No service_role.
  * - Inactive rows are skipped.
  * - Duplicate (user_id, bridge_id) pairs collapse to the most recently
  *   updated row.

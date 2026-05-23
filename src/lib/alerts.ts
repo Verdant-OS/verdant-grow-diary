@@ -49,10 +49,8 @@ export interface SaveAlertInput {
 
 // The Supabase types file is regenerated after this migration; until then we
 // access the table through an untyped client. RLS still enforces ownership.
-function alertsTable() {
-  return (supabase as unknown as {
-    from: (t: string) => ReturnType<typeof supabase.from>;
-  }).from("alerts");
+function alertsTable(): any {
+  return (supabase as any).from("alerts");
 }
 
 /** Persist a generated alert candidate. Omits user_id (DB default = auth.uid()). */

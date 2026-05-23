@@ -15,7 +15,9 @@
 //
 // Wire bodies are produced by the shared pure builders in
 // src/lib/piIngestFailClosedResponses.ts so the Edge Function and its
-// tests share one fail-closed contract.
+// tests share one fail-closed contract. Wire error codes documented
+// here for grep-based guardrails: "method_not_allowed" and
+// "secret_resolver_not_implemented".
 
 import {
   buildMethodNotAllowedResponseBody,

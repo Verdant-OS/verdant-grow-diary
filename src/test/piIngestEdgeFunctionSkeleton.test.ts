@@ -33,8 +33,15 @@ describe("pi-ingest-readings Edge Function skeleton — fail-closed behavior", (
     expect(SRC).toMatch(/method\s*!==?\s*["']POST["']/);
     expect(SRC).toMatch(/status:\s*405/);
   });
-  it("returns secret_resolver_not_implemented", () => {
-    expect(SRC).toMatch(/secret_resolver_not_implemented/);
+  it("returns secret_resolver_not_implemented (via shared builder)", () => {
+    expect(SRC).toMatch(
+      /(secret_resolver_not_implemented|buildSecretResolverNotImplementedResponseBody)/,
+    );
+  });
+  it("returns method_not_allowed (via shared builder)", () => {
+    expect(SRC).toMatch(
+      /(method_not_allowed|buildMethodNotAllowedResponseBody)/,
+    );
   });
   it("returns a fail-closed status (503 or 501)", () => {
     expect(SRC).toMatch(/status:\s*(503|501)/);

@@ -96,7 +96,10 @@ describe("mapSensorReadingRow", () => {
     quality: "ok",
     source: "manual",
     created_at: "2026-05-01T12:00:00Z",
-  };
+    device_id: null,
+    raw_payload: null,
+    captured_at: null,
+  } as any;
   it("maps each metric onto the correct field", () => {
     expect(mapSensorReadingRow({ ...base, metric: "temperature_c", value: 24.5 })).toMatchObject({ temp: 24.5, rh: 0, vpd: 0, co2: 0, soil: 0 });
     expect(mapSensorReadingRow({ ...base, metric: "humidity_pct", value: 55 })).toMatchObject({ rh: 55 });
@@ -174,7 +177,7 @@ describe("mock data immutability", () => {
     // Run mappers over copies just to exercise call sites.
     mapTentRow(tentRow);
     mapPlantRow(plantRow);
-    mapSensorReadingRow({ id: "x", user_id: "u", tent_id: "t", ts: "x", quality: "ok", source: "manual", created_at: "x", metric: "temperature_c", value: 1 });
+    mapSensorReadingRow({ id: "x", user_id: "u", tent_id: "t", ts: "x", quality: "ok", source: "manual", created_at: "x", metric: "temperature_c", value: 1, device_id: null, raw_payload: null, captured_at: null } as any);
     expect(JSON.stringify(tents)).toBe(tentsSnap);
     expect(JSON.stringify(plants)).toBe(plantsSnap);
     expect(JSON.stringify(sensorReadings)).toBe(sensorsSnap);

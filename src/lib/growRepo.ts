@@ -72,3 +72,21 @@ export async function insertSensorReading(
   const { error } = await supabase.from("sensor_readings").insert(row);
   if (error) fail("insertSensorReading", error);
 }
+
+/**
+ * Batch insert sensor readings. All rows are inserted in a single request to
+ * the `sensor_readings` table; if any row is rejected by RLS or the validator
+ * trigger, the entire batch fails (Postgres atomicity). Callers are expected
+ * to pre-validate every row (see `useInsertSensorReadings`).
+ *
+ * Safety: writes only to `sensor_readings`. Does not touch alerts,
+ * action_queue, devices, or any other table. Does not derive snapshots or
+ * alerts as a side effect.
+ */
+export async function insertSensorReadingsBatch(
+  rows: SensorReadingInsert[],
+): Promise<void> {
+  if (!rows || rows.length === 0) return;
+  const { error } = await supabase.from("sensor_readings").insert(rows);
+  if (error) fail("insertSensorReadingsBatch", error);
+}

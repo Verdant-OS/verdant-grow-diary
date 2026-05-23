@@ -14,7 +14,7 @@ import Plants from "./pages/Plants";
 import PlantDetail from "./pages/PlantDetail";
 import Sensors from "./pages/Sensors";
 import Tasks from "./pages/Tasks";
-import Cameras from "./pages/Cameras";
+// Cameras removed from current Verdant build (out of V0 scope).
 import Alerts from "./pages/Alerts";
 import AlertDetail from "./pages/AlertDetail";
 import Settings from "./pages/Settings";

@@ -71,7 +71,7 @@ function makeClient(
         select() {
           return {
             eq() {
-              return {
+              const chain = {
                 limit() {
                   if (isTents && tracker) tracker.tentsCalled = true;
                   return Promise.resolve(res);
@@ -80,11 +80,9 @@ function makeClient(
                 in() {
                   return Promise.resolve(res);
                 },
-              } as unknown as ReturnType<
-                ReturnType<
-                  ReturnType<PiIngestBridgeCredentialLookupClient["from"]>["select"]
-                >["eq"]
-              >;
+              };
+              // deno-lint-ignore no-explicit-any
+              return chain as any;
             },
           };
         },

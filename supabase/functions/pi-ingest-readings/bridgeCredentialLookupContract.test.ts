@@ -159,7 +159,7 @@ Deno.test("doc says lookup failure records zero idempotency keys", async () => {
 Deno.test("doc says service role, if used, is Edge Function only", async () => {
   const d = await readText(DOC_URL);
   assertStringIncludes(d, "SUPABASE_SERVICE_ROLE_KEY");
-  assert(/inside this Edge Function/i.test(d));
+  assert(/inside\s+this\s+Edge Function/i.test(d));
 });
 
 Deno.test("doc says service role is never exposed to browser/client", async () => {

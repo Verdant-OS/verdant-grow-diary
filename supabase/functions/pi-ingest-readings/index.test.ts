@@ -910,8 +910,8 @@ Deno.test("valid planned request calls idempotency lookup with derived keys", as
     new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
     depsWith(client, lookup),
   );
-  assertEquals(res.status, 503);
-  assertEquals((await res.json()).error, "auth_ok_pipeline_not_implemented");
+  assertEquals(res.status, 200);
+  assertEquals((await res.json()).ok, true);
   assertEquals(lookup.calls.length, 1);
   assertEquals(lookup.calls[0].bridgeId, "bridge-abc");
   assertEquals(lookup.calls[0].candidateKeys.length, 2);

@@ -2,20 +2,17 @@
 //
 // MUST run only inside this Edge Function path. MUST NOT be imported
 // from any file under src/. Reads exactly the columns enumerated in
-// docs/pi-ingest-bridge-credential-lookup-contract.md and never
-// selects secret_hash, plaintext secret, raw body, raw payload,
-// signature, or sensor value columns. Relies on the database-level
-// global uniqueness constraint on `bridge_id` enforced by migration
-// 20260523164651; throws `multiple_rows_unexpected` as defense in
-// depth if more than one row is ever returned.
+// the lookup contract document and never selects forbidden columns
+// (see contract). Relies on the database-level global uniqueness
+// constraint on `bridge_id` enforced by migration 20260523164651;
+// throws `multiple_rows_unexpected` as defense in depth if more than
+// one row is ever returned.
 //
 // This module does not authenticate the bridge, decrypt secrets,
 // insert sensor readings, write idempotency keys, derive alerts,
 // enqueue actions, or control devices. It is read-only.
 //
-// See:
-// - docs/pi-ingest-bridge-credential-lookup-contract.md
-// - docs/pi-ingest-readings-contract.md
+// See: docs/pi-ingest-bridge-credential-lookup-contract.md
 
 import type {
   PiIngestBridgeCredentialRow,

@@ -753,3 +753,69 @@ Deno.test("index.ts wires normalization after validation", async () => {
   assert(/normalizeIngestPayload/.test(raw));
   assert(/toExternalSensorIngestPayload/.test(raw));
 });
+
+// ---------- Commit-plan preview wiring ----------
+
+Deno.test("POST multi-reading batch returns 503 auth_ok_pipeline_not_implemented", async () => {
+  const res = await postEnvelope({
+    readings: [
+      { metric: "temperature_c", value: 22.5, unit: "C" },
+      { metric: "humidity_pct", value: 55, unit: "%" },
+      { metric: "co2_ppm", value: 800, unit: "ppm" },
+    ],
+  });
+  assertEquals(res.status, 503);
+  assertEquals((await res.json()).error, "auth_ok_pipeline_not_implemented");
+});
+
+Deno.test("POST duplicate readings in same batch returns 400 invalid_request", async () => {
+  const dup = { metric: "temperature_c", value: 22.5, unit: "C" } as const;
+  const res = await postEnvelope({ readings: [dup, dup] });
+  assertEquals(res.status, 400);
+  assertEquals((await res.json()).error, "invalid_request");
+});
+
+Deno.test("POST commit-plan preview response leaks nothing sensitive", async () => {
+  const rawBody = validEnvelopeBody({
+    marker: "RAW_MARK_PLAN",
+    readings: [{ metric: "temperature_c", value: 22.5, unit: "C" }],
+  });
+  const headers = await signedPostHeaders(rawBody);
+  const sig = headers["x-bridge-signature"];
+  const client = makeClient(
+    { data: [await defaultRow()], error: null },
+    { data: [{ user_id: "user-xyz" }], error: null },
+  );
+  const res = await handlePiIngestReadingsRequest(
+    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+    defaultDeps(client),
+  );
+  assertEquals(res.status, 503);
+  const text = await res.text();
+  for (const forbidden of [
+    "RAW_MARK_PLAN",
+    sig,
+    PLAINTEXT_SECRET,
+    "user-xyz",
+    "tent-1",
+    "device-1",
+    "22.5",
+    "idempotency_key",
+    "pi:bridge-abc",
+    "secret_ciphertext",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "nonce",
+  ]) {
+    assert(!text.includes(forbidden), `response leaked: ${forbidden}`);
+  }
+});
+
+Deno.test("index.ts wires commit-plan preview imports", async () => {
+  const raw = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  assert(/buildPiIngestCommitPlan/.test(raw));
+  assert(/deriveBatchIdempotencyKeys/.test(raw));
+  // Idempotency lookup must NOT yet be wired.
+  assert(!/pi_ingest_idempotency_keys/.test(raw));
+  // Per-reading idempotency only; no requestHash.
+  assert(!/requestHash|request_hash/i.test(raw));
+});

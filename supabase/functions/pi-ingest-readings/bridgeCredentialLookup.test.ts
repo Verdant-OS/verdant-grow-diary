@@ -242,10 +242,7 @@ Deno.test("index.ts may consume credential lookup for auth gating only, never fo
     /\bloadBridgeCredentialRow\s*\(/.test(src),
     "index.ts should call loadBridgeCredentialRow for auth gating",
   );
-  // Post-auth still fail-closed.
-  assertStringIncludes(raw, "auth_ok_pipeline_not_implemented");
-  assert(!/ok\s*:\s*true/.test(src), "index.ts must not expose a success path");
-  // No ingestion writes / RPCs (comments stripped to avoid false positives).
+  // Commit wiring is allowed; direct ingestion writes/RPCs are not.
   for (
     const [label, re] of [
       ["insert", /\.insert\s*\(/],
@@ -262,3 +259,4 @@ Deno.test("index.ts may consume credential lookup for auth gating only, never fo
     assert(!re.test(src), `index.ts must not contain forbidden ingestion surface: ${label}`);
   }
 });
+

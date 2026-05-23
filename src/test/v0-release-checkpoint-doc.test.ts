@@ -20,8 +20,8 @@ describe("V0 release checkpoint doc", () => {
     expect(d).toMatch(/Verdant V0 Operating Loop Protected Build/);
   });
 
-  it("declares the current test count (2284/2284)", () => {
-    expect(d).toMatch(/2284\s*\/\s*2284/);
+  it("declares the current test count (2320/2320)", () => {
+    expect(d).toMatch(/2320\s*\/\s*2320/);
   });
 
   it.each([

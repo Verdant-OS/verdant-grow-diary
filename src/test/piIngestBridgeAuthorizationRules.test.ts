@@ -130,7 +130,7 @@ describe("evaluateBridgeAuthorization — stage ordering", () => {
       tentOwnerUserId: "user-1",
     });
     expect(out.ok).toBe(false);
-    if (!out.ok) expect(out.stage).toBe("tent");
+    if (out.ok === false) expect(out.stage).toBe("tent");
   });
 });
 

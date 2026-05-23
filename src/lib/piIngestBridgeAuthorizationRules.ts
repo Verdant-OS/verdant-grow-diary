@@ -54,12 +54,12 @@ export function evaluateBridgeAuthorization(
     input ?? ({} as EvaluateBridgeAuthorizationInput);
 
   const owner = evaluateBridgeOwnerScope({ credential, tentOwnerUserId });
-  if (!owner.ok) {
+  if (owner.ok === false) {
     return { ok: false, stage: "owner", reason: owner.reason };
   }
 
   const tent = evaluateBridgeTentScope({ credential, tentId });
-  if (!tent.ok) {
+  if (tent.ok === false) {
     return { ok: false, stage: "tent", reason: tent.reason };
   }
 

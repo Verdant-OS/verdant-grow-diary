@@ -55,8 +55,12 @@ export function handlePiIngestReadingsRequest(req: Request): Response {
   );
 }
 
-// @ts-ignore Deno runtime entrypoint
-if (typeof Deno !== "undefined" && typeof Deno.serve === "function") {
+// @ts-ignore Deno runtime entrypoint — only start the server when run directly.
+if (
+  typeof Deno !== "undefined" &&
+  typeof Deno.serve === "function" &&
+  import.meta.main
+) {
   // @ts-ignore
   Deno.serve(handlePiIngestReadingsRequest);
 }

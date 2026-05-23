@@ -805,7 +805,7 @@ Deno.test("POST duplicate readings in same batch returns 400 invalid_request", a
   assertEquals((await res.json()).error, "invalid_request");
 });
 
-Deno.test("POST commit-plan preview response leaks nothing sensitive", async () => {
+Deno.test("POST commit success response leaks nothing sensitive", async () => {
   const rawBody = validEnvelopeBody({
     marker: "RAW_MARK_PLAN",
     readings: [{ metric: "temperature_c", value: 22.5, unit: "C" }],
@@ -820,7 +820,7 @@ Deno.test("POST commit-plan preview response leaks nothing sensitive", async () 
     new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
     defaultDeps(client),
   );
-  assertEquals(res.status, 503);
+  assertEquals(res.status, 200);
   const text = await res.text();
   for (const forbidden of [
     "RAW_MARK_PLAN",

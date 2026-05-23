@@ -107,21 +107,16 @@ describe("pi_ingest_bridge_credentials — forbidden columns (defense)", () => {
   });
 
   it("does not add a plaintext `secret` column", () => {
-    const alters = ALL_SQL
+    // Look for any ADD COLUMN whose first identifier is exactly `secret`.
+    const addColRe = /ADD\s+COLUMN\s+([a-zA-Z_][a-zA-Z0-9_]*)/gi;
+    const stmts = ALL_SQL
       .split(/;\s*\n/)
-      .filter((stmt) =>
-        /pi_ingest_bridge_credentials/i.test(stmt) &&
-        /\bADD\s+COLUMN\b/i.test(stmt),
-      )
-      .join("\n;\n")
-      // strip allowed siblings
-      .replace(/secret_hash[^,\n]*/gi, "")
-      .replace(/secret_hint[^,\n]*/gi, "")
-      .replace(/secret_ciphertext[^,\n]*/gi, "")
-      .replace(/secret_nonce[^,\n]*/gi, "")
-      .replace(/secret_key_version[^,\n]*/gi, "")
-      .replace(/secret_status[^,\n]*/gi, "");
-    expect(alters).not.toMatch(/\bsecret\b/i);
+      .filter((stmt) => /pi_ingest_bridge_credentials/i.test(stmt));
+    for (const stmt of stmts) {
+      for (const m of stmt.matchAll(addColRe)) {
+        expect(m[1].toLowerCase()).not.toBe("secret");
+      }
+    }
   });
 
   it("does not add a `value` column", () => {

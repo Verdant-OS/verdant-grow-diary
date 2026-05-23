@@ -264,8 +264,8 @@ describe("evaluateBridgeAbuseGuard", () => {
     });
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect(r.failures.some((f) => f.code === "rate_limited")).toBe(true);
-      expect(r.retryAfterMs).toBe(10_000);
+      expect((r as any).failures.some((f) => f.code === "rate_limited")).toBe(true);
+      expect((r as any).retryAfterMs).toBe(10_000);
     }
   });
 
@@ -276,7 +276,7 @@ describe("evaluateBridgeAbuseGuard", () => {
     });
     expect(r.ok).toBe(false);
     if (!r.ok)
-      expect(r.failures.some((f) => f.code === "batch_too_large")).toBe(true);
+      expect((r as any).failures.some((f) => f.code === "batch_too_large")).toBe(true);
   });
 
   it("returns multiple failure reasons when both checks fail", () => {
@@ -293,11 +293,11 @@ describe("evaluateBridgeAbuseGuard", () => {
     });
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      const codes = r.failures.map((f) => f.code);
+      const codes = (r as any).failures.map((f) => f.code);
       expect(codes).toContain("rate_limited");
       expect(codes).toContain("batch_too_large");
-      expect(r.failures.length).toBeGreaterThanOrEqual(2);
-      expect(r.retryAfterMs).toBe(10_000);
+      expect((r as any).failures.length).toBeGreaterThanOrEqual(2);
+      expect((r as any).retryAfterMs).toBe(10_000);
     }
   });
 });

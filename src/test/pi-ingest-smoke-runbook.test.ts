@@ -88,9 +88,10 @@ describe("pi-ingest smoke runbook — required content", () => {
     ["no Action Queue", /must not.*write[^.\n]*action_queue/i],
     ["no automation", /must not[\s\S]{0,40}automation/i],
     ["no device control", /must not[\s\S]{0,40}device control/i],
-    ["no log secrets", /must not log[^.\n]*secret/i],
-    ["no log signatures", /must not log[^.\n]*signature/i],
-    ["no log service-role", /must not log[^.\n]*service-role/i],
+    ["no log secrets", /must\s*\**\s*not\**\s*log[^.\n]*secret/i],
+    ["no log signatures", /must\s*\**\s*not\**\s*log[^.\n]*signature/i],
+    ["no log service-role", /must\s*\**\s*not\**\s*log[^.\n]*service-role/i],
+
   ])("safety: runbook says %s", (_label, re) => {
     expect(DOC).toMatch(re);
   });

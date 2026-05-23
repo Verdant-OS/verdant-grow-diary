@@ -145,7 +145,12 @@ export function samplesFromReadings(
         temp: null,
         rh: null,
         vpd: null,
-        source: r.source === "manual" ? "manual" : "live",
+        source:
+          r.source === "manual"
+            ? "manual"
+            : r.source === "sim"
+              ? "sim"
+              : "live",
       };
       byKey.set(key, s);
     }

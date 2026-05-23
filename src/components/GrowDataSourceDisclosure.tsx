@@ -12,6 +12,7 @@ import {
   combineGrowDataMeta,
   type GrowDataSourceMeta,
 } from "@/hooks/useGrowData";
+import type { SnapshotSource } from "@/lib/sensorSnapshot";
 
 type Label = "Live" | "Demo" | "Mixed" | "Unavailable";
 
@@ -38,6 +39,9 @@ interface Props {
   metas: readonly GrowDataSourceMeta[];
   /** Optional welcome action (e.g. create button) for the empty state. */
   welcomeAction?: React.ReactNode;
+  /** Optional sensor snapshot source — when "sim", appends a simulated-data
+   * notice so the UI never presents simulated readings as live. */
+  snapshotSource?: SnapshotSource;
   className?: string;
   testId?: string;
 }
@@ -47,11 +51,14 @@ export default function GrowDataSourceDisclosure({
   hasAnyData,
   metas,
   welcomeAction,
+  snapshotSource,
   className,
   testId = "grow-data-source-disclosure",
 }: Props) {
   const combined = combineGrowDataMeta(metas);
   const label: Label = LABEL_BY_SOURCE[combined.dataSource];
+  const isSimulated = snapshotSource === "sim";
+  const simulatedNotice = `Simulated ${resource} sensor data shown — for testing/demo only. Not real tent data and not used for persisted alerts.`;
 
   const description: Record<Label, string> = {
     Live: `Live ${resource} data from your grow backend.`,
@@ -92,6 +99,7 @@ export default function GrowDataSourceDisclosure({
     <div
       data-testid={testId}
       data-source={combined.dataSource}
+      data-snapshot-source={snapshotSource ?? ""}
       className={cn("mb-4 flex items-center gap-2 flex-wrap", className)}
       aria-label={`Grow ${resource} data source`}
     >
@@ -104,6 +112,24 @@ export default function GrowDataSourceDisclosure({
         {label} data
       </Badge>
       <span className="text-xs text-muted-foreground">{description[label]}</span>
+      {isSimulated && (
+        <>
+          <Badge
+            variant="outline"
+            data-testid={`${testId}-simulated-badge`}
+            data-label="Simulated"
+            className="text-[10px] uppercase tracking-wide"
+          >
+            Simulated
+          </Badge>
+          <span
+            className="text-xs text-muted-foreground basis-full"
+            data-testid={`${testId}-simulated-notice`}
+          >
+            {simulatedNotice}
+          </span>
+        </>
+      )}
     </div>
   );
 }

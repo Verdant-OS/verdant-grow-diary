@@ -27,7 +27,7 @@ export default function Tents() {
       <GrowBreadcrumbs growId={urlGrowId} growName={scopedGrowName} current="Tents" section="tents" />
       <PageHeader
         title="Tents"
-        description="Every grow space, environment, and lighting status."
+        description="Your grow tents — environment, lighting, and assigned plants."
         icon={<Box className="h-5 w-5" />}
         actions={<CreateTentDialog defaultGrowId={validGrowId} />}
       />

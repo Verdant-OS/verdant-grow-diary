@@ -80,13 +80,13 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
   it("rejects non-object body", () => {
     const r = validatePiIngestRequestEnvelope(null, { now: NOW });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.issues[0].code).toBe("invalid_envelope");
+    if (!r.ok) expect((r as any).issues[0].code).toBe("invalid_envelope");
   });
 
   it("rejects array body", () => {
     const r = validatePiIngestRequestEnvelope([], { now: NOW });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.issues[0].code).toBe("invalid_envelope");
+    if (!r.ok) expect((r as any).issues[0].code).toBe("invalid_envelope");
   });
 
   it("rejects missing tent_id", () => {
@@ -95,7 +95,7 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
       { now: NOW },
     );
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.issues.map((i) => i.code)).toContain("missing_tent_id");
+    if (!r.ok) expect((r as any).issues.map((i) => i.code)).toContain("missing_tent_id");
   });
 
   it("rejects missing device_id", () => {
@@ -104,7 +104,7 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
     const r = validatePiIngestRequestEnvelope(b, { now: NOW });
     expect(r.ok).toBe(false);
     if (!r.ok)
-      expect(r.issues.map((i) => i.code)).toContain("missing_device_id");
+      expect((r as any).issues.map((i) => i.code)).toContain("missing_device_id");
   });
 
   it("rejects missing captured_at", () => {
@@ -113,7 +113,7 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
     const r = validatePiIngestRequestEnvelope(b, { now: NOW });
     expect(r.ok).toBe(false);
     if (!r.ok)
-      expect(r.issues.map((i) => i.code)).toContain("missing_captured_at");
+      expect((r as any).issues.map((i) => i.code)).toContain("missing_captured_at");
   });
 
   it("rejects invalid captured_at", () => {
@@ -123,7 +123,7 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
     );
     expect(r.ok).toBe(false);
     if (!r.ok)
-      expect(r.issues.map((i) => i.code)).toContain("invalid_captured_at");
+      expect((r as any).issues.map((i) => i.code)).toContain("invalid_captured_at");
   });
 
   it("rejects captured_at more than 5 minutes in the future and does not clamp", () => {
@@ -134,7 +134,7 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
     );
     expect(r.ok).toBe(false);
     if (!r.ok)
-      expect(r.issues.map((i) => i.code)).toContain("captured_at_too_far_future");
+      expect((r as any).issues.map((i) => i.code)).toContain("captured_at_too_far_future");
   });
 
   it("accepts captured_at slightly in the future within tolerance", () => {
@@ -151,7 +151,7 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
     delete b.source;
     const r = validatePiIngestRequestEnvelope(b, { now: NOW });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.issues.map((i) => i.code)).toContain("missing_source");
+    if (!r.ok) expect((r as any).issues.map((i) => i.code)).toContain("missing_source");
   });
 
   it("rejects source = sim", () => {
@@ -160,7 +160,7 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
       { now: NOW },
     );
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.issues.map((i) => i.code)).toContain("invalid_source");
+    if (!r.ok) expect((r as any).issues.map((i) => i.code)).toContain("invalid_source");
   });
 
   it("rejects source = manual", () => {
@@ -169,7 +169,7 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
       { now: NOW },
     );
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.issues.map((i) => i.code)).toContain("invalid_source");
+    if (!r.ok) expect((r as any).issues.map((i) => i.code)).toContain("invalid_source");
   });
 
   it("rejects unknown source like home_assistant or mqtt", () => {
@@ -189,7 +189,7 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
     );
     expect(r.ok).toBe(false);
     if (!r.ok)
-      expect(r.issues.map((i) => i.code)).toContain("client_user_id_forbidden");
+      expect((r as any).issues.map((i) => i.code)).toContain("client_user_id_forbidden");
   });
 
   it("rejects missing readings", () => {
@@ -198,7 +198,7 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
     const r = validatePiIngestRequestEnvelope(b, { now: NOW });
     expect(r.ok).toBe(false);
     if (!r.ok)
-      expect(r.issues.map((i) => i.code)).toContain("missing_readings");
+      expect((r as any).issues.map((i) => i.code)).toContain("missing_readings");
   });
 
   it("rejects empty readings", () => {
@@ -207,7 +207,7 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
       { now: NOW },
     );
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.issues.map((i) => i.code)).toContain("empty_readings");
+    if (!r.ok) expect((r as any).issues.map((i) => i.code)).toContain("empty_readings");
   });
 
   it("rejects unknown metrics", () => {
@@ -219,7 +219,7 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
       { now: NOW },
     );
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.issues.map((i) => i.code)).toContain("invalid_metric");
+    if (!r.ok) expect((r as any).issues.map((i) => i.code)).toContain("invalid_metric");
   });
 
   it("rejects every forbidden metric (PPFD/EC/reservoir/etc.)", () => {
@@ -233,7 +233,7 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
       );
       expect(r.ok).toBe(false);
       if (!r.ok)
-        expect(r.issues.map((i) => i.code)).toContain("forbidden_metric");
+        expect((r as any).issues.map((i) => i.code)).toContain("forbidden_metric");
     }
   });
 
@@ -246,7 +246,7 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
       { now: NOW },
     );
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.issues.map((i) => i.code)).toContain("invalid_unit");
+    if (!r.ok) expect((r as any).issues.map((i) => i.code)).toContain("invalid_unit");
   });
 
   it("rejects non-finite values (NaN, Infinity, -Infinity)", () => {
@@ -260,7 +260,7 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
       );
       expect(r.ok).toBe(false);
       if (!r.ok)
-        expect(r.issues.map((i) => i.code)).toContain("non_finite_value");
+        expect((r as any).issues.map((i) => i.code)).toContain("non_finite_value");
     }
   });
 
@@ -274,7 +274,7 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
     );
     expect(r.ok).toBe(false);
     if (!r.ok)
-      expect(r.issues.map((i) => i.code)).toContain("non_finite_value");
+      expect((r as any).issues.map((i) => i.code)).toContain("non_finite_value");
   });
 
   it("rejects missing value", () => {
@@ -286,7 +286,7 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
       { now: NOW },
     );
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.issues.map((i) => i.code)).toContain("missing_value");
+    if (!r.ok) expect((r as any).issues.map((i) => i.code)).toContain("missing_value");
   });
 
   it("rejects missing unit", () => {
@@ -298,7 +298,7 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
       { now: NOW },
     );
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.issues.map((i) => i.code)).toContain("missing_unit");
+    if (!r.ok) expect((r as any).issues.map((i) => i.code)).toContain("missing_unit");
   });
 
   it("reports issues for every invalid reading in the batch (all-or-nothing)", () => {
@@ -315,12 +315,12 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
     );
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      const codes = r.issues.map((i) => i.code);
+      const codes = (r as any).issues.map((i) => i.code);
       expect(codes).toContain("non_finite_value");
       expect(codes).toContain("forbidden_metric");
       // indexes recorded for caller debugging
-      expect(r.issues.some((i) => i.index === 1)).toBe(true);
-      expect(r.issues.some((i) => i.index === 2)).toBe(true);
+      expect((r as any).issues.some((i) => i.index === 1)).toBe(true);
+      expect((r as any).issues.some((i) => i.index === 2)).toBe(true);
     }
   });
 });
@@ -375,7 +375,7 @@ describe("toExternalSensorIngestPayload + normalizeIngestPayload integration", (
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     const payload = toExternalSensorIngestPayload(r.envelope);
-    expect((payload as Record<string, unknown>).user_id).toBeUndefined();
+    expect((payload as unknown as Record<string, unknown>).user_id).toBeUndefined();
   });
 
   it("preserves the raw envelope verbatim as raw_payload only", () => {

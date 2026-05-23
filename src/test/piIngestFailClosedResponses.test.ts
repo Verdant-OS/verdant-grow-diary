@@ -2,11 +2,23 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  buildAuthOkPipelineNotImplementedResponseBody,
+  buildInternalFailureResponseBody,
+  buildInvalidRequestResponseBody,
   buildMethodNotAllowedResponseBody,
   buildSecretResolverNotImplementedResponseBody,
+  buildUnauthorizedResponseBody,
+  PI_INGEST_AUTH_OK_PIPELINE_NOT_IMPLEMENTED_ERROR,
+  PI_INGEST_AUTH_OK_PIPELINE_NOT_IMPLEMENTED_MESSAGE,
+  PI_INGEST_INTERNAL_FAILURE_ERROR,
+  PI_INGEST_INTERNAL_FAILURE_MESSAGE,
+  PI_INGEST_INVALID_REQUEST_ERROR,
+  PI_INGEST_INVALID_REQUEST_MESSAGE,
   PI_INGEST_METHOD_NOT_ALLOWED_ERROR,
   PI_INGEST_SECRET_RESOLVER_NOT_IMPLEMENTED_ERROR,
   PI_INGEST_SECRET_RESOLVER_NOT_IMPLEMENTED_MESSAGE,
+  PI_INGEST_UNAUTHORIZED_ERROR,
+  PI_INGEST_UNAUTHORIZED_MESSAGE,
 } from "@/lib/piIngestFailClosedResponses";
 
 describe("piIngestFailClosedResponses — method_not_allowed", () => {

@@ -822,6 +822,60 @@ export type Database = {
           },
         ]
       }
+      pi_ingest_idempotency_keys: {
+        Row: {
+          bridge_id: string
+          captured_at: string
+          created_at: string
+          device_id: string
+          id: string
+          idempotency_key: string
+          metric: string
+          sensor_reading_id: string | null
+          tent_id: string
+          user_id: string
+        }
+        Insert: {
+          bridge_id: string
+          captured_at: string
+          created_at?: string
+          device_id: string
+          id?: string
+          idempotency_key: string
+          metric: string
+          sensor_reading_id?: string | null
+          tent_id: string
+          user_id?: string
+        }
+        Update: {
+          bridge_id?: string
+          captured_at?: string
+          created_at?: string
+          device_id?: string
+          id?: string
+          idempotency_key?: string
+          metric?: string
+          sensor_reading_id?: string | null
+          tent_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pi_ingest_idempotency_keys_sensor_reading_id_fkey"
+            columns: ["sensor_reading_id"]
+            isOneToOne: false
+            referencedRelation: "sensor_readings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pi_ingest_idempotency_keys_tent_id_fkey"
+            columns: ["tent_id"]
+            isOneToOne: false
+            referencedRelation: "tents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plants: {
         Row: {
           created_at: string

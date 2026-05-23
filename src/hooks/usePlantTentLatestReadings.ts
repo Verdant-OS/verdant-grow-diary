@@ -3,8 +3,8 @@
  * "Assigned Tent Environment" panel. Returns the latest sensor_readings
  * rows for a single assigned tent id, scoped by that tent id only.
  *
- * No writes. No alerts. No action_queue. No device control. No automation.
- * Disabled when no tentId is provided so unassigned plants never query.
+ * Read-only loader; disabled when no tentId is provided so unassigned
+ * plants never trigger a query.
  */
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";

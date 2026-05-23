@@ -255,12 +255,15 @@ Deno.test("SUPABASE_SERVICE_ROLE_KEY runtime read is limited to index.ts", async
 });
 
 Deno.test("index.ts may consume credential lookup but still fails closed with no ingestion writes", async () => {
-  const text = await readText(new URL("index.ts", HERE));
-  // Post-auth fail-closed sentinel.
-  assertStringIncludes(text, "auth_ok_pipeline_not_implemented");
+  const raw = await readText(new URL("index.ts", HERE));
+  const text = raw
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  // Post-auth fail-closed sentinel (search the raw source so the literal is detected).
+  assertStringIncludes(raw, "auth_ok_pipeline_not_implemented");
   // No success path.
   assert(!/ok\s*:\s*true/.test(text), "index.ts must not expose a success path");
-  // No ingestion-side writes / RPCs.
+  // No ingestion-side writes / RPCs (comments stripped to avoid false positives).
   for (
     const [label, re] of [
       ["insert", /\.insert\s*\(/],

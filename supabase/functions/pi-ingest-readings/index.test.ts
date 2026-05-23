@@ -22,7 +22,7 @@ function bodyThatThrowsIfRead(): ReadableStream<Uint8Array> {
 
 Deno.test("OPTIONS returns 200 with CORS headers", async () => {
   const res = handlePiIngestReadingsRequest(
-    new Request(URL, { method: "OPTIONS" }),
+    new Request(ENDPOINT, { method: "OPTIONS" }),
   );
   assertEquals(res.status, 200);
   assertEquals(
@@ -44,7 +44,7 @@ Deno.test("OPTIONS returns 200 with CORS headers", async () => {
 for (const method of ["GET", "PUT", "DELETE", "PATCH"] as const) {
   Deno.test(`${method} returns 405 method_not_allowed`, async () => {
     const res = await handlePiIngestReadingsRequest(
-      new Request(URL, { method }),
+      new Request(ENDPOINT, { method }),
     );
     assertEquals(res.status, 405);
     const body = await res.json();
@@ -55,7 +55,7 @@ for (const method of ["GET", "PUT", "DELETE", "PATCH"] as const) {
 
 Deno.test("POST returns 503 secret_resolver_not_implemented", async () => {
   const res = await handlePiIngestReadingsRequest(
-    new Request(URL, {
+    new Request(ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tent_id: "x", readings: [] }),
@@ -68,7 +68,7 @@ Deno.test("POST returns 503 secret_resolver_not_implemented", async () => {
 });
 
 Deno.test("POST does not read the request body", async () => {
-  const req = new Request(URL, {
+  const req = new Request(ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/octet-stream" },
     body: bodyThatThrowsIfRead(),
@@ -84,7 +84,7 @@ Deno.test("POST response body does not leak sensitive material", async () => {
   const sigMarker = "deadbeefsignature";
   const rawMarker = "RAW_PAYLOAD_MARKER_XYZ";
   const res = await handlePiIngestReadingsRequest(
-    new Request(URL, {
+    new Request(ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

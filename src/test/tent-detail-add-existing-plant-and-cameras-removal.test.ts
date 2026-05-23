@@ -56,10 +56,13 @@ describe("AddExistingPlantDialog · query + write semantics", () => {
     expect(DIALOG.length).toBeGreaterThan(0);
   });
 
-  it("queries plants filtered to unassigned (tent_id IS NULL) and same grow", () => {
+  it("queries plants in the same grow (no query-level tent_id IS NULL filter so move candidates are included)", () => {
     expect(DIALOG).toMatch(/\.from\(["']plants["']\)/);
-    expect(DIALOG).toMatch(/\.is\(["']tent_id["'],\s*null\)/);
-    expect(DIALOG).toMatch(/grow_id/);
+    expect(DIALOG).toMatch(/\.eq\(["']grow_id["'],\s*growId/);
+    // Query must NOT pre-filter by tent_id IS NULL — categorization is
+    // done client-side so plants in another tent in the same grow remain
+    // eligible as move candidates.
+    expect(DIALOG).not.toMatch(/\.is\(["']tent_id["'],\s*null\)/);
   });
 
   it("excludes archived plants from the eligible list", () => {
@@ -72,12 +75,22 @@ describe("AddExistingPlantDialog · query + write semantics", () => {
     );
   });
 
-  it("never sets user_id from the client (RLS owns ownership)", () => {
-    expect(DIALOG).not.toMatch(/user_id\s*:/);
+  it("never sets user_id / grow_id / strain / stage from the client", () => {
+    // Limit scan to update payload(s) only — query selects may legitimately
+    // include grow_id / strain.
+    const updateCalls = [...DIALOG.matchAll(/\.update\(\s*\{([^}]*)\}\s*\)/g)];
+    expect(updateCalls.length).toBeGreaterThan(0);
+    for (const m of updateCalls) {
+      const payload = m[1];
+      expect(payload).not.toMatch(/\buser_id\b/);
+      expect(payload).not.toMatch(/\bgrow_id\b/);
+      expect(payload).not.toMatch(/\bstrain\b/);
+      expect(payload).not.toMatch(/\bstage\b/);
+    }
   });
 
   it("offers a 'create new plant' fallback when no eligible plants exist", () => {
-    expect(DIALOG).toContain("No unassigned plants available for this grow.");
+    expect(DIALOG).toContain("No available plants for this grow.");
     expect(DIALOG).toContain("CreatePlantDialog");
   });
 

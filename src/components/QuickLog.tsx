@@ -87,7 +87,7 @@ export default function QuickLog({ open, onOpenChange, onCreated, prefill }: Pro
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!user || !activeGrowId) { toast.error("Pick a grow first"); return; }
+    if (!user || !activeGrowId) { toast.error("Pick a workspace first"); return; }
     if (!note.trim()) { toast.error("Add a quick note"); return; }
     setBusy(true);
     let uploadedPath: string | null = null;

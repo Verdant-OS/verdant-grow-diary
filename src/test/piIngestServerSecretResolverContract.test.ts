@@ -131,15 +131,14 @@ describe("pi-ingest server secret resolver — repo guardrails", () => {
   });
 
 
-  it("pi-ingest-readings Edge Function, if present, is fail-closed (no secret resolver)", () => {
+  it("pi-ingest-readings Edge Function, if present, performs no decryption inline", () => {
     const fn = resolve(ROOT, "supabase/functions/pi-ingest-readings/index.ts");
     if (!existsSync(fn)) return;
     const src = readFileSync(fn, "utf8");
-    expect(src).toMatch(/secret_resolver_not_implemented/);
+    expect(src).toMatch(/(secret_resolver_not_implemented|auth_ok_pipeline_not_implemented)/);
     expect(src).not.toMatch(/crypto\.subtle\.decrypt\s*\(/);
     expect(src).not.toMatch(/\bcreateDecipheriv\s*\(/);
     expect(src).not.toMatch(/PI_INGEST_SECRET_KEY/);
-    expect(src).not.toMatch(/service_role/i);
   });
 
   it("no PI_INGEST_SECRET_KEY env reads anywhere in src/", () => {

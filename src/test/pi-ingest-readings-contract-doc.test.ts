@@ -117,9 +117,9 @@ describe("pi-ingest-readings — repo guardrails (fail-closed skeleton allowed)"
   const FN = resolve(ROOT, "supabase/functions/pi-ingest-readings/index.ts");
   const SRC = existsSync(FN) ? readFileSync(FN, "utf8") : "";
 
-  it("pi-ingest-readings Edge Function, if present, is fail-closed", () => {
+  it("pi-ingest-readings Edge Function, if present, is ingestion-fail-closed", () => {
     if (!existsSync(FN)) return;
-    expect(SRC).toMatch(/secret_resolver_not_implemented/);
+    expect(SRC).toMatch(/(secret_resolver_not_implemented|auth_ok_pipeline_not_implemented)/);
     expect(SRC).toMatch(/status:\s*(503|501)/);
     expect(SRC).not.toMatch(/ok\s*:\s*true/);
   });
@@ -142,11 +142,6 @@ describe("pi-ingest-readings — repo guardrails (fail-closed skeleton allowed)"
       expect(text).not.toMatch(/functions\.invoke\(\s*['"]pi-ingest-readings/);
       expect(text).not.toMatch(/\/functions\/v1\/pi-ingest-readings/);
     }
-  });
-
-  it("pi-ingest-readings Edge Function does not use service_role", () => {
-    if (!existsSync(FN)) return;
-    expect(SRC).not.toMatch(/service_role/i);
   });
 
   it("pi-ingest-readings Edge Function does not write alerts or action_queue", () => {

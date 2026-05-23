@@ -129,26 +129,23 @@ describe("server-secret resolver implementation plan — repo state", () => {
     ).toBe(true);
   });
 
-  it("Edge Function index.ts does not import or call the resolver yet", () => {
+  it("Edge Function index.ts wires the resolver behind the auth gate", () => {
     if (!FN_SRC) return;
-    expect(FN_SRC).not.toMatch(
-      /from\s+["']\.\/secretResolver(\.ts)?["']/,
-    );
-    expect(FN_SRC).not.toMatch(/\bresolveBridgeSecret\s*\(/);
+    expect(FN_SRC).toMatch(/from\s+["']\.\/secretResolver(\.ts)?["']/);
+    expect(FN_SRC).toMatch(/\bresolveBridgeSecret\s*\(/);
   });
 
 
-  it("Edge Function skeleton remains fail-closed and decryption-free", () => {
+  it("Edge Function ingestion path remains fail-closed and decryption-free", () => {
     if (!FN_SRC) return;
+    // Either the legacy unconfigured fallback or the post-auth marker.
     expect(FN_SRC).toMatch(
-      /(secret_resolver_not_implemented|buildSecretResolverNotImplementedResponseBody)/,
+      /(secret_resolver_not_implemented|auth_ok_pipeline_not_implemented)/,
     );
     for (const re of [
       /crypto\.subtle\.decrypt\s*\(/,
       /\bcreateDecipheriv\s*\(/,
       /Deno\.env\.get\(\s*["']PI_INGEST_SECRET_KEY/,
-      /\bcreateClient\s*\(/,
-      /service_role/i,
       /\bsensor_readings\b/,
       /\bpi_ingest_idempotency_keys\b/,
       /from\(\s*["']alerts["']\s*\)/,

@@ -996,7 +996,7 @@ Deno.test("idempotency lookup failure response leaks nothing sensitive", async (
   }
 });
 
-Deno.test("all candidate keys existing still returns 503 auth_ok_pipeline_not_implemented", async () => {
+Deno.test("all candidate keys existing → 200 inserted=0 rejected=duplicates", async () => {
   const rawBody = validEnvelopeBody({
     readings: [
       { metric: "temperature_c", value: 22.5, unit: "C" },
@@ -1008,7 +1008,6 @@ Deno.test("all candidate keys existing still returns 503 auth_ok_pipeline_not_im
     { data: [await defaultRow()], error: null },
     { data: [{ user_id: "user-xyz" }], error: null },
   );
-  // Capture derived keys via lookup1, then re-run with all marked existing.
   const captured: LookupCall[] = [];
   const cap = makeLookup({ ok: true, existingKeys: new Set<string>() }, captured);
   await handlePiIngestReadingsRequest(
@@ -1021,8 +1020,11 @@ Deno.test("all candidate keys existing still returns 503 auth_ok_pipeline_not_im
     new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
     depsWith(client, lookup),
   );
-  assertEquals(res.status, 503);
-  assertEquals((await res.json()).error, "auth_ok_pipeline_not_implemented");
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.ok, true);
+  assertEquals(body.inserted, 0);
+  assertEquals(body.rejected, 2);
 });
 
 Deno.test("partial duplicate keys still returns 503 auth_ok_pipeline_not_implemented", async () => {

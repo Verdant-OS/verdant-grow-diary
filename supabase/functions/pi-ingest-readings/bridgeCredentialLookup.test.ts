@@ -228,11 +228,37 @@ Deno.test("lookup source SELECTs the allowlisted columns and only those", async 
   }
 });
 
-Deno.test("index.ts still does not import the lookup and remains fail-closed", async () => {
-  const src = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
-  assertStringIncludes(src, "secret_resolver_not_implemented");
-  assert(!/from\s+["']\.\/bridgeCredentialLookup(\.ts)?["']/.test(src));
-  assert(!/\bloadBridgeCredentialRow\s*\(/.test(src));
-  assert(!/ok\s*:\s*true/.test(src));
-  assert(!/\bcreateClient\s*\(/.test(src));
+Deno.test("index.ts may consume credential lookup for auth gating only, never for ingestion", async () => {
+  const raw = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  const src = raw
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  // Auth gating is now wired — lookup import/usage is permitted.
+  assert(
+    /from\s+["']\.\/bridgeCredentialLookup(\.ts)?["']/.test(raw),
+    "index.ts should import the lookup for auth gating",
+  );
+  assert(
+    /\bloadBridgeCredentialRow\s*\(/.test(src),
+    "index.ts should call loadBridgeCredentialRow for auth gating",
+  );
+  // Post-auth still fail-closed.
+  assertStringIncludes(raw, "auth_ok_pipeline_not_implemented");
+  assert(!/ok\s*:\s*true/.test(src), "index.ts must not expose a success path");
+  // No ingestion writes / RPCs (comments stripped to avoid false positives).
+  for (
+    const [label, re] of [
+      ["insert", /\.insert\s*\(/],
+      ["upsert", /\.upsert\s*\(/],
+      ["update", /\.update\s*\(/],
+      ["delete", /\.delete\s*\(/],
+      ["rpc", /\.rpc\s*\(/],
+      ["sensor_readings", /\bsensor_readings\b/],
+      ["pi_ingest_idempotency_keys", /\bpi_ingest_idempotency_keys\b/],
+      ["alerts from()", /from\(\s*["']alerts["']\s*\)/],
+      ["action_queue from()", /from\(\s*["']action_queue["']\s*\)/],
+    ] as Array<[string, RegExp]>
+  ) {
+    assert(!re.test(src), `index.ts must not contain forbidden ingestion surface: ${label}`);
+  }
 });

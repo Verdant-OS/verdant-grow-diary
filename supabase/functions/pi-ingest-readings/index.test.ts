@@ -391,11 +391,20 @@ Deno.test("POST response never leaks secrets/headers/body", async () => {
 
 // ---------- Source guardrails ----------
 
+function stripComments(s: string): string {
+  return s
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+}
+
 Deno.test("index.ts has no decryption / direct env reads / DB writes", async () => {
-  const src = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  const raw = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  const src = stripComments(raw);
   const forbidden: Array<[string, RegExp]> = [
     [".insert(", /\.insert\(/],
     [".upsert(", /\.upsert\(/],
+    [".update(", /\.update\(/],
+    [".delete(", /\.delete\(/],
     [".rpc(", /\.rpc\(/],
     ["crypto.subtle.decrypt", /crypto\.subtle\.decrypt\s*\(/],
     ["createDecipheriv", /\bcreateDecipheriv\s*\(/],

@@ -31,7 +31,7 @@ describe("pi-ingest-readings Edge Function skeleton — fail-closed behavior", (
   });
   it("rejects non-POST with 405", () => {
     expect(SRC).toMatch(/method\s*!==?\s*["']POST["']/);
-    expect(SRC).toMatch(/status:\s*405/);
+    expect(SRC).toMatch(/(status:\s*405|jsonResponse\s*\(\s*405)/);
   });
   it("references fail-closed builders (legacy + post-auth)", () => {
     expect(SRC).toMatch(
@@ -47,7 +47,7 @@ describe("pi-ingest-readings Edge Function skeleton — fail-closed behavior", (
     );
   });
   it("returns a fail-closed status (503 or 501)", () => {
-    expect(SRC).toMatch(/status:\s*(503|501)/);
+    expect(SRC).toMatch(/(status:\s*(503|501)|jsonResponse\s*\(\s*(503|501))/);
   });
   it("never returns ok:true", () => {
     expect(SRC).not.toMatch(/ok\s*:\s*true/);

@@ -195,18 +195,19 @@ Deno.test("only the sanctioned lookup file exists in Edge Function dir", async (
   }
 });
 
-Deno.test("no Supabase client import exists in pi-ingest-readings Edge Function dir", async () => {
+Deno.test("Supabase client import/construction is allowed in index.ts only", async () => {
   for await (const e of Deno.readDir(HERE)) {
     if (!e.isFile || !e.name.endsWith(".ts")) continue;
     if (e.name.endsWith(".test.ts")) continue;
+    if (e.name === "index.ts") continue; // index.ts is the sanctioned site.
     const text = await readText(new URL(e.name, HERE));
     assert(
       !/from\s+["'][^"']*@supabase\/supabase-js[^"']*["']/.test(text),
-      `${e.name} must not import @supabase/supabase-js yet`,
+      `${e.name} must not import @supabase/supabase-js (allowed in index.ts only)`,
     );
     assert(
       !/\bcreateClient\s*\(/.test(text),
-      `${e.name} must not construct a Supabase client yet`,
+      `${e.name} must not construct a Supabase client (allowed in index.ts only)`,
     );
   }
 });
@@ -240,17 +241,42 @@ Deno.test("no service_role string in src/lib pi-ingest modules", async () => {
   }
 });
 
-Deno.test("index.ts remains fail-closed and does not consume credential lookup", async () => {
-  const text = await readText(new URL("index.ts", HERE));
-  assertStringIncludes(text, "secret_resolver_not_implemented");
-  assert(
-    !/from\s+["']\.\/bridgeCredentialLookup(\.ts)?["']/.test(text),
-    "index.ts must not import a credential lookup module",
-  );
-  assert(
-    !/loadBridgeCredentialRow\s*\(|loadBridgeCredentialCandidates\s*\(/.test(text),
-    "index.ts must not call a credential lookup yet",
-  );
+Deno.test("SUPABASE_SERVICE_ROLE_KEY runtime read is limited to index.ts", async () => {
+  for await (const e of Deno.readDir(HERE)) {
+    if (!e.isFile || !e.name.endsWith(".ts")) continue;
+    if (e.name.endsWith(".test.ts")) continue;
+    if (e.name === "index.ts") continue;
+    const text = await readText(new URL(e.name, HERE));
+    assert(
+      !/SUPABASE_SERVICE_ROLE_KEY/.test(text),
+      `${e.name} must not reference SUPABASE_SERVICE_ROLE_KEY (allowed in index.ts only)`,
+    );
+  }
+});
+
+Deno.test("index.ts may consume credential lookup but still fails closed with no ingestion writes", async () => {
+  const raw = await readText(new URL("index.ts", HERE));
+  const text = raw
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  // Post-auth fail-closed sentinel (search the raw source so the literal is detected).
+  assertStringIncludes(raw, "auth_ok_pipeline_not_implemented");
+  // No success path.
   assert(!/ok\s*:\s*true/.test(text), "index.ts must not expose a success path");
-  assertEquals(/createClient\s*\(/.test(text), false);
+  // No ingestion-side writes / RPCs (comments stripped to avoid false positives).
+  for (
+    const [label, re] of [
+      ["insert", /\.insert\s*\(/],
+      ["upsert", /\.upsert\s*\(/],
+      ["update", /\.update\s*\(/],
+      ["delete", /\.delete\s*\(/],
+      ["rpc", /\.rpc\s*\(/],
+      ["sensor_readings", /\bsensor_readings\b/],
+      ["pi_ingest_idempotency_keys", /\bpi_ingest_idempotency_keys\b/],
+      ["alerts from()", /from\(\s*["']alerts["']\s*\)/],
+      ["action_queue from()", /from\(\s*["']action_queue["']\s*\)/],
+    ] as Array<[string, RegExp]>
+  ) {
+    assert(!re.test(text), `index.ts must not contain forbidden ingestion surface: ${label}`);
+  }
 });

@@ -139,7 +139,7 @@ export default function ManualSensorReadingCard({ tents, defaultTentId }: Props)
             label="CO₂ (ppm)"
             value={form.co2Ppm as string}
             onChange={(v) => update("co2Ppm", v)}
-            placeholder="800"
+            placeholder="e.g. 800 from SwitchBot CO₂ Monitor"
           />
           <Field
             id="m-soil"

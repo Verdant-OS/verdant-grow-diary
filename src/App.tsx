@@ -61,7 +61,7 @@ const App = () => (
                 <Route path="/logs" element={<Timeline />} />
                 <Route path="/timeline" element={<Timeline />} />
                 <Route path="/tasks" element={<Tasks />} />
-                <Route path="/cameras" element={<Cameras />} />
+                {/* /cameras route removed — out of current V0 scope. */}
                 <Route path="/alerts" element={<Alerts />} />
                 <Route path="/alerts/:alertId" element={<AlertDetail />} />
                 <Route path="/doctor" element={<Coach />} />

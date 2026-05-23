@@ -265,7 +265,18 @@ export async function handlePiIngestReadingsRequest(
     return jsonResponse(401, buildUnauthorizedResponseBody());
   }
 
-  // Auth + authorization passed — ingestion pipeline still fail-closed.
+  // Authorization passed — validate full request envelope (pure rules).
+  // Validation does not normalize/insert; on failure return 400 with a
+  // generic body that never echoes raw body, signature, ids, or secrets.
+  const validation = validatePiIngestRequestEnvelope(parsedBody, {
+    now: deps.now !== undefined ? new Date(deps.now) : undefined,
+  });
+  if (!validation.ok) {
+    return jsonResponse(400, buildInvalidRequestResponseBody());
+  }
+
+  // Auth + authorization + envelope validation passed — pipeline still
+  // fail-closed.
   return jsonResponse(503, buildAuthOkPipelineNotImplementedResponseBody());
 }
 

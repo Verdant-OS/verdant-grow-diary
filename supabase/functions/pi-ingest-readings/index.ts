@@ -61,6 +61,11 @@ import {
 import { normalizeIngestPayload } from "../../../src/lib/sensorIngestNormalizationRules.ts";
 import { deriveBatchIdempotencyKeys } from "../../../src/lib/piIngestBridgeRules.ts";
 import { buildPiIngestCommitPlan } from "../../../src/lib/piIngestCommitPlan.ts";
+import {
+  loadExistingPiIngestIdempotencyKeys,
+  type PiIngestIdempotencyLookupClient,
+  type PiIngestIdempotencyLookupResult,
+} from "./idempotencyLookup.ts";
 
 export const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",

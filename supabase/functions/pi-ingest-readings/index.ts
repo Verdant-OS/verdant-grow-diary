@@ -113,6 +113,13 @@ export interface PiIngestHandlerDeps {
     client: PiIngestIdempotencyLookupClient,
     input: { bridgeId: string; candidateKeys: readonly string[] },
   ) => Promise<PiIngestIdempotencyLookupResult>;
+  /** Injected atomic commit helper (tests). In production this is the
+   *  server-only `commitPiIngestBatch` which calls the SECURITY DEFINER
+   *  RPC inside a single transaction. */
+  commitPiIngestBatch?: (
+    client: PiIngestCommitBatchClient,
+    input: PiIngestCommitBatchInput,
+  ) => Promise<PiIngestCommitBatchResult>;
 }
 
 function jsonResponse(status: number, body: unknown): Response {

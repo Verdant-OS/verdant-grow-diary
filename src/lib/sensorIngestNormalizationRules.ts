@@ -51,7 +51,7 @@ export const ALLOWED_SOURCES: readonly AllowedSource[] = [
  *
  * NOTE: This is a forward-looking policy helper for the future ingest path.
  * It declares that `sim` data must NOT contribute to persisted alert rows.
- * does NOT yet alter the live alert-persistence pipeline; that pipeline
+ * It does NOT yet alter the live alert-persistence pipeline; that pipeline
  * currently keys off `snapshot.source` ("live" | "manual" | "diary" |
  * "unavailable") and treats any non-"manual" sensor reading as "live",
  * which means `sim` rows could currently flow through. Wiring this helper

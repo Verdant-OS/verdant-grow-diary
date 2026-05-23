@@ -224,23 +224,47 @@ export default function ManualSensorReadingCard({ tents, defaultTentId }: Props)
   );
 }
 
+function Section({
+  title,
+  testId,
+  children,
+}: {
+  title: string;
+  testId: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-2" data-testid={testId}>
+      <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {title}
+      </h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{children}</div>
+    </section>
+  );
+}
+
 function Field({
   id,
   label,
+  unit,
   value,
   onChange,
   placeholder,
 }: {
   id: string;
   label: string;
+  unit?: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
 }) {
   return (
     <div className="space-y-1">
-      <Label htmlFor={id} className="text-xs">
-        {label}
+      <Label htmlFor={id} className="text-xs flex items-center justify-between gap-2">
+        <span>{label}</span>
+        {unit ? (
+          <span className="text-[10px] font-normal text-muted-foreground">{unit}</span>
+        ) : null}
       </Label>
       <Input
         id={id}
@@ -254,3 +278,4 @@ function Field({
     </div>
   );
 }
+

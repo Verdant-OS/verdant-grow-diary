@@ -783,7 +783,7 @@ Deno.test("index.ts wires normalization after validation", async () => {
 
 // ---------- Commit-plan preview wiring ----------
 
-Deno.test("POST multi-reading batch returns 503 auth_ok_pipeline_not_implemented", async () => {
+Deno.test("POST multi-reading batch returns 200 success with all rows", async () => {
   const res = await postEnvelope({
     readings: [
       { metric: "temperature_c", value: 22.5, unit: "C" },
@@ -791,8 +791,11 @@ Deno.test("POST multi-reading batch returns 503 auth_ok_pipeline_not_implemented
       { metric: "co2_ppm", value: 800, unit: "ppm" },
     ],
   });
-  assertEquals(res.status, 503);
-  assertEquals((await res.json()).error, "auth_ok_pipeline_not_implemented");
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.ok, true);
+  assertEquals(body.inserted, 3);
+  assertEquals(body.rejected, 0);
 });
 
 Deno.test("POST duplicate readings in same batch returns 400 invalid_request", async () => {

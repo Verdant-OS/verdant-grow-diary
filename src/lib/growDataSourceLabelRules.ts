@@ -10,6 +10,7 @@
 export type GrowDataSourceLabel =
   | "Live"
   | "Manual"
+  | "Simulated"
   | "Demo"
   | "Stale"
   | "Unavailable";
@@ -44,6 +45,7 @@ export interface GrowDataSourceLabelResult {
 const DEFAULT_STALE_MS = 15 * 60 * 1000;
 
 const DEMO_SOURCES = new Set(["mock", "demo", "fake", "sample", "fixture"]);
+const SIMULATED_SOURCES = new Set(["sim", "simulated", "simulation"]);
 const MANUAL_SOURCES = new Set(["manual", "user", "entry", "log"]);
 // NOTE: source identifiers here intentionally avoid certain reserved
 // vendor literals to keep the action-queue safety contract test clean.

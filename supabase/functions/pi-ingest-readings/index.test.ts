@@ -396,6 +396,119 @@ Deno.test("POST response never leaks secrets/headers/body", async () => {
   }
 });
 
+// ---------- POST tent-owner / authorization gate ----------
+
+Deno.test("POST tent owned by same user returns 503 auth_ok_pipeline_not_implemented", async () => {
+  const rawBody = JSON.stringify({ tent_id: "tent-1" });
+  const headers = await signedPostHeaders(rawBody);
+  const client = makeClient(
+    { data: [await defaultRow()], error: null },
+    { data: [{ user_id: "user-xyz" }], error: null },
+  );
+  const res = await handlePiIngestReadingsRequest(
+    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+    defaultDeps(client),
+  );
+  assertEquals(res.status, 503);
+  const body = await res.json();
+  assertEquals(body.error, "auth_ok_pipeline_not_implemented");
+});
+
+Deno.test("POST tent owned by different user returns 401 unauthorized", async () => {
+  const rawBody = JSON.stringify({ tent_id: "tent-1" });
+  const headers = await signedPostHeaders(rawBody);
+  const client = makeClient(
+    { data: [await defaultRow()], error: null },
+    { data: [{ user_id: "user-other" }], error: null },
+  );
+  const res = await handlePiIngestReadingsRequest(
+    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+    defaultDeps(client),
+  );
+  assertEquals(res.status, 401);
+  const body = await res.json();
+  assertEquals(body.error, "unauthorized");
+  const text = JSON.stringify(body);
+  assert(!text.includes("user-other"));
+  assert(!text.includes("user-xyz"));
+  assert(!text.includes("owner_mismatch"));
+  assert(!text.includes("tent-1"));
+});
+
+Deno.test("POST unknown tent returns 401 unauthorized", async () => {
+  const rawBody = JSON.stringify({ tent_id: "tent-1" });
+  const headers = await signedPostHeaders(rawBody);
+  const client = makeClient(
+    { data: [await defaultRow()], error: null },
+    { data: [], error: null },
+  );
+  const res = await handlePiIngestReadingsRequest(
+    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+    defaultDeps(client),
+  );
+  assertEquals(res.status, 401);
+  const body = await res.json();
+  assertEquals(body.error, "unauthorized");
+});
+
+Deno.test("POST tent without owner returns 401 unauthorized", async () => {
+  const rawBody = JSON.stringify({ tent_id: "tent-1" });
+  const headers = await signedPostHeaders(rawBody);
+  const client = makeClient(
+    { data: [await defaultRow()], error: null },
+    { data: [{ user_id: null }], error: null },
+  );
+  const res = await handlePiIngestReadingsRequest(
+    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+    defaultDeps(client),
+  );
+  assertEquals(res.status, 401);
+  const body = await res.json();
+  assertEquals(body.error, "unauthorized");
+});
+
+Deno.test("POST tent-owner lookup failure returns 503 internal_failure", async () => {
+  const rawBody = JSON.stringify({ tent_id: "tent-1" });
+  const headers = await signedPostHeaders(rawBody);
+  const client = makeClient(
+    { data: [await defaultRow()], error: null },
+    { data: null, error: { message: "db down" } },
+  );
+  const res = await handlePiIngestReadingsRequest(
+    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+    defaultDeps(client),
+  );
+  assertEquals(res.status, 503);
+  const body = await res.json();
+  assertEquals(body.error, "internal_failure");
+  const text = JSON.stringify(body);
+  assert(!text.includes("db down"));
+  assert(!text.includes("stack"));
+});
+
+Deno.test("POST bad HMAC skips tent-owner lookup", async () => {
+  const rawBody = JSON.stringify({ tent_id: "tent-1" });
+  const headers = {
+    "Content-Type": "application/json",
+    "x-bridge-id": "bridge-abc",
+    "x-bridge-signature": "00".repeat(32),
+    "x-bridge-timestamp": NOW_ISO,
+  };
+  const tracker = { tentsCalled: false };
+  const client = makeClient(
+    { data: [await defaultRow()], error: null },
+    { data: [{ user_id: "user-xyz" }], error: null },
+    tracker,
+  );
+  const res = await handlePiIngestReadingsRequest(
+    new Request(ENDPOINT, { method: "POST", headers, body: rawBody }),
+    defaultDeps(client),
+  );
+  assertEquals(res.status, 401);
+  assertEquals(tracker.tentsCalled, false);
+  await res.text();
+});
+
 // ---------- Source guardrails ----------
 
 function stripComments(s: string): string {

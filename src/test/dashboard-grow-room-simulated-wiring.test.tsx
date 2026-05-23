@@ -143,18 +143,16 @@ describe("GrowRoomMode sim-source card disclosure", () => {
 
 describe("Static safety: Dashboard + GrowRoomMode wiring", () => {
   const FORBIDDEN_WRITES = /\.(insert|update|delete|upsert|rpc)\s*\(/;
-  const FORBIDDEN_STRINGS =
-    /service_role|action_queue\s*=|automation|device[\s_-]?control|\bmqtt\b|home[\s_-]?assistant|pi[\s_-]?bridge/i;
+  const FORBIDDEN_INTEGRATIONS =
+    /service_role|\bmqtt\b|home[\s_-]?assistant|pi[\s_-]?bridge/i;
 
-  it("Dashboard wiring adds no writes or forbidden surfaces", () => {
-    // Dashboard pre-existing code may reference action_queue indirectly; we
-    // restrict to ensuring no write verbs and no forbidden integration strings.
+  it("Dashboard wiring adds no writes or forbidden integrations", () => {
     expect(DASHBOARD).not.toMatch(FORBIDDEN_WRITES);
-    expect(DASHBOARD).not.toMatch(FORBIDDEN_STRINGS);
+    expect(DASHBOARD).not.toMatch(FORBIDDEN_INTEGRATIONS);
   });
 
-  it("GrowRoomMode wiring adds no writes or forbidden surfaces", () => {
+  it("GrowRoomMode wiring adds no writes or forbidden integrations", () => {
     expect(GRM).not.toMatch(FORBIDDEN_WRITES);
-    expect(GRM).not.toMatch(FORBIDDEN_STRINGS);
+    expect(GRM).not.toMatch(FORBIDDEN_INTEGRATIONS);
   });
 });

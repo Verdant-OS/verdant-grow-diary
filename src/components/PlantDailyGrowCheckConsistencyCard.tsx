@@ -104,6 +104,7 @@ export default function PlantDailyGrowCheckConsistencyCard({
       data-checked-days={summary.checkedDays}
       data-current-streak={summary.currentStreak}
       data-today-active={summary.todayHasActivity ? "1" : "0"}
+      data-today-method={summary.todayMethod}
       data-guidance-state={guidance.state}
       className="p-4 space-y-3"
     >

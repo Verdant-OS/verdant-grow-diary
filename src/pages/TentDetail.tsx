@@ -16,6 +16,7 @@ import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
 import TentCardActionsMenu from "@/components/TentCardActionsMenu";
 import PlantPhoto from "@/components/PlantPhoto";
 import TentManualSnapshotChangeContext from "@/components/TentManualSnapshotChangeContext";
+import TentManualSnapshotHistoryList from "@/components/TentManualSnapshotHistoryList";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useGrowTent, useGrowPlants, getGrowDataMeta } from "@/hooks/useGrowData";
 import {

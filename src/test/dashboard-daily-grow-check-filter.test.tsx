@@ -187,6 +187,19 @@ function PanelHarness() {
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
+  // jsdom shims for Radix Select pointer capture.
+  if (!(Element.prototype as any).hasPointerCapture) {
+    (Element.prototype as any).hasPointerCapture = () => false;
+  }
+  if (!(Element.prototype as any).setPointerCapture) {
+    (Element.prototype as any).setPointerCapture = () => {};
+  }
+  if (!(Element.prototype as any).releasePointerCapture) {
+    (Element.prototype as any).releasePointerCapture = () => {};
+  }
+  if (!(Element.prototype as any).scrollIntoView) {
+    (Element.prototype as any).scrollIntoView = () => {};
+  }
 });
 
 function changeFilter(value: string) {

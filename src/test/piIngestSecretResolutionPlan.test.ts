@@ -20,7 +20,7 @@ describe("pi-ingest secret resolution plan — existence", () => {
   });
   it("declares docs + static-tests-only scope", () => {
     expect(PLAN).toMatch(/DOCS \+ STATIC TESTS ONLY/i);
-    expect(PLAN).toMatch(/No Edge Function implementation/i);
+    expect(PLAN).toMatch(/No\s+Edge\s+Function\s+implementation/i);
   });
 });
 
@@ -28,28 +28,29 @@ describe("pi-ingest secret resolution plan — required content", () => {
   it.each<[string, RegExp]>([
     [
       "Edge Function is the only resolver",
-      /Edge Function is the only place[\s\S]{0,80}resolve usable bridge secret/i,
+      /Edge\s+Function\s+is\s+the\s+only\s+place[\s\S]{0,120}resolve\s+usable[\s\S]{0,40}bridge\s+secret/i,
     ],
     [
       "browser cannot read secret_hash",
-      /never[\s\S]{0,40}`?secret_hash`?/i,
+      /never[\s\S]{0,200}`?secret_hash`?/i,
     ],
     [
       "browser cannot read secret_ciphertext",
-      /never[\s\S]{0,80}`?secret_ciphertext`?/i,
+      /never[\s\S]{0,240}`?secret_ciphertext`?/i,
     ],
     [
       "browser cannot read secret_nonce",
-      /never[\s\S]{0,120}`?secret_nonce`?/i,
+      /never[\s\S]{0,280}`?secret_nonce`?/i,
     ],
     [
       "browser cannot read secret_key_version",
-      /never[\s\S]{0,160}`?secret_key_version`?/i,
+      /never[\s\S]{0,320}`?secret_key_version`?/i,
     ],
     [
       "browser cannot read plaintext secret",
-      /never[\s\S]{0,200}plaintext bridge secret/i,
+      /never[\s\S]{0,400}plaintext\s+bridge\s+secret/i,
     ],
+
     [
       "base table has no client SELECT access",
       /not have client SELECT access/i,

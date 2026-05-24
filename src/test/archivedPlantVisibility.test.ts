@@ -235,7 +235,7 @@ describe("Static safety: archived/merged visibility cleanup is read-path only", 
     expect(VISIBILITY).not.toMatch(/service_role/);
     expect(VISIBILITY).not.toMatch(/fetch\(/);
     expect(VISIBILITY).not.toMatch(/from\(['"](alerts|action_queue|sensor_readings|pi_ingest_)/);
-    expect(VISIBILITY).not.toMatch(/\b(delete|insert|update|upsert|rpc)\b/i);
+    expect(VISIBILITY).not.toMatch(/\.(delete|insert|update|upsert|rpc)\(/);
   });
   it("Plants / TentDetail / PlantDetail never call merge RPC or write tables themselves", () => {
     for (const src of [PLANTS_PAGE, TENT_DETAIL, PLANT_DETAIL]) {

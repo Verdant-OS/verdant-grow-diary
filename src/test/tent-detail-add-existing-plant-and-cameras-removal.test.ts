@@ -93,7 +93,7 @@ describe("AddExistingPlantDialog · query + write semantics", () => {
   });
 
   it("offers a 'create new plant' fallback when no eligible plants exist", () => {
-    expect(DIALOG).toContain("No available plants for this grow.");
+    expect(DIALOG).toContain("No eligible plants available for this tent.");
     expect(DIALOG).toContain("CreatePlantDialog");
   });
 

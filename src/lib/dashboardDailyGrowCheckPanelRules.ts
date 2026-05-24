@@ -10,9 +10,8 @@
  * The guidance copy is derived via deriveDailyGrowCheckGuidance to avoid
  * duplicating language between Plant Detail and Dashboard.
  *
- * Forbidden user-copy strings (perfect / completed / guaranteed healthy)
- * are enforced by tests — see
- * src/test/dashboard-daily-grow-check-panel.test.ts.
+ * Disallowed user-copy wording is enforced by tests — see
+ * src/test/dashboard-daily-grow-check-panel.test.tsx.
  */
 import {
   buildDailyGrowCheckConsistency,

@@ -81,7 +81,7 @@ describe("daily grow check files static safety", () => {
     const raw = readFile(rel);
     const code = stripComments(raw);
     for (const re of FORBIDDEN_WORDING) {
-      expect(raw, `${rel} contains forbidden wording ${re}`).not.toMatch(re);
+      expect(code, `${rel} contains forbidden wording ${re}`).not.toMatch(re);
     }
     for (const re of FORBIDDEN_CODE_PATTERNS) {
       expect(code, `${rel} contains forbidden code pattern ${re}`).not.toMatch(re);

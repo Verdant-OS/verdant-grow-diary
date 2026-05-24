@@ -24,6 +24,7 @@ export interface Plant {
   photo: string;
   lastNote: string;
   growId?: string | null;
+  isArchived?: boolean;
 }
 
 export interface SensorReading {

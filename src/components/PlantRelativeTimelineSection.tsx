@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import {
   buildRelativeTimelineProjection,
+  groupRelativeTimelineByStage,
   type RelativeTimelineItem,
 } from "@/lib/relativeTimelineProjectionRules";
 

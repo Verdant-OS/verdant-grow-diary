@@ -405,22 +405,13 @@ export default function GrowRoomMode() {
                   </Link>
                 </div>
 
-                <div className="flex items-center justify-between text-xs">
-                  <Link
-                    to="/alerts"
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    {card.openAlertCount} open alert
-                    {card.openAlertCount === 1 ? "" : "s"}
-                  </Link>
-                  <Link
-                    to="/actions"
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    {card.pendingActionCount} pending action
-                    {card.pendingActionCount === 1 ? "" : "s"}
-                  </Link>
+                <div
+                  className="text-sm font-medium"
+                  data-testid="grow-room-recommendation"
+                >
+                  {RECOMMENDATION_LABEL[card.primaryRecommendation]}
                 </div>
+
 
                 <div
                   className="border-t border-border/40 pt-3 space-y-2"

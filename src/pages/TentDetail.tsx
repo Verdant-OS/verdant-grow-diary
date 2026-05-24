@@ -153,6 +153,7 @@ export default function TentDetail() {
             </div>
           )}
         </div>
+        <TentManualSnapshotChangeContext tentId={id ?? null} readings={readings} />
         {series.length === 0 ? (
           <p
             className="text-sm text-muted-foreground py-6 text-center"

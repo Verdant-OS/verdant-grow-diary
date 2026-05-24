@@ -4,18 +4,29 @@
  * Read-only. Reuses the existing Daily Grow Check consistency + guidance
  * rules so Dashboard and Plant Detail never drift apart.
  */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { CheckCircle2, Circle, Sprout, ArrowRight } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import {
   buildDashboardDailyGrowCheckPanel,
+  filterDashboardDailyGrowCheckRows,
+  DASHBOARD_DAILY_GROW_CHECK_FILTER_OPTIONS,
+  DASHBOARD_DAILY_GROW_CHECK_FILTER_EMPTY,
+  type DashboardDailyGrowCheckFilter,
   type PanelPlantInput,
   type PanelTentInput,
 } from "@/lib/dashboardDailyGrowCheckPanelRules";

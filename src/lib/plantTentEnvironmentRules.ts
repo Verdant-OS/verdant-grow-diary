@@ -15,6 +15,7 @@ import {
   type SensorReadingLike,
   type SensorSnapshot,
 } from "@/lib/sensorSnapshot";
+import { tempFFromC } from "@/lib/temperatureUnits";
 
 export interface PlantTentEnvironmentMetric {
   key: string;

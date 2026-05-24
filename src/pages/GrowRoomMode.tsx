@@ -405,25 +405,114 @@ export default function GrowRoomMode() {
                   </Link>
                 </div>
 
-                <div className="flex items-center justify-between gap-2 border-t border-border/40 pt-3">
-                  <span
-                    className="text-sm font-medium"
-                    data-testid="grow-room-recommendation"
-                  >
-                    {RECOMMENDATION_LABEL[card.primaryRecommendation]}
-                  </span>
+                <div className="flex items-center justify-between text-xs">
                   <Link
-                    to={`/tents/${card.tentId}`}
-                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                    to="/alerts"
+                    className="text-muted-foreground hover:text-foreground"
                   >
-                    Open tent <ArrowRight className="h-3.5 w-3.5" />
+                    {card.openAlertCount} open alert
+                    {card.openAlertCount === 1 ? "" : "s"}
                   </Link>
+                  <Link
+                    to="/actions"
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    {card.pendingActionCount} pending action
+                    {card.pendingActionCount === 1 ? "" : "s"}
+                  </Link>
+                </div>
+
+                <div
+                  className="border-t border-border/40 pt-3 space-y-2"
+                  data-testid="grow-room-quick-actions"
+                  data-tent-id={card.tentId}
+                  data-primary-plant-id={primaryPlant?.id ?? ""}
+                >
+                  {tentPlants.length === 0 ? (
+                    <div
+                      data-testid="grow-room-no-plants-empty"
+                      className="rounded-md border border-border/50 bg-muted/30 p-3 text-xs text-muted-foreground space-y-2"
+                    >
+                      <div>No plants in this tent yet.</div>
+                      <Button
+                        asChild
+                        size="sm"
+                        variant="outline"
+                        className="h-9 w-full"
+                        data-testid="grow-room-add-plant-cta"
+                      >
+                        <Link to={`/tents/${card.tentId}`}>
+                          Add Plant to This Tent
+                        </Link>
+                      </Button>
+                    </div>
+                  ) : (
+                    primaryPlant && (
+                      <div
+                        className="text-[11px] text-muted-foreground"
+                        data-testid="grow-room-selected-plant"
+                      >
+                        Plant context: {primaryPlant.name ?? "Unnamed plant"}
+                      </div>
+                    )
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    {quickActions.map((action) => {
+                      const Icon = QUICK_ACTION_ICON[action.kind];
+                      const testId = `grow-room-action-${action.kind}`;
+                      if (action.href) {
+                        return (
+                          <Button
+                            key={action.kind}
+                            asChild
+                            size="sm"
+                            variant="outline"
+                            className="h-11 justify-start"
+                            data-testid={testId}
+                            data-action-kind={action.kind}
+                          >
+                            <Link to={action.href}>
+                              <Icon className="h-4 w-4" />
+                              <span className="truncate">{action.label}</span>
+                            </Link>
+                          </Button>
+                        );
+                      }
+                      return (
+                        <Button
+                          key={action.kind}
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-11 justify-start"
+                          data-testid={testId}
+                          data-action-kind={action.kind}
+                          data-prefill-event-type={action.quickLogPrefill?.eventType}
+                          data-prefill-tent-id={action.quickLogPrefill?.tentId}
+                          data-prefill-plant-id={action.quickLogPrefill?.plantId ?? ""}
+                          onClick={() =>
+                            action.quickLogPrefill && openQuickLog(action.quickLogPrefill)
+                          }
+                        >
+                          <Icon className="h-4 w-4" />
+                          <span className="truncate">{action.label}</span>
+                        </Button>
+                      );
+                    })}
+                  </div>
                 </div>
               </Card>
             );
           })}
         </div>
       )}
+
+      <QuickLog
+        open={quickLogOpen}
+        onOpenChange={setQuickLogOpen}
+        prefill={quickLogPrefill}
+      />
     </div>
   );
 }
+

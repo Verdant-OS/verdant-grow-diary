@@ -36,16 +36,23 @@ import {
 import { AlertTriangle, GitMerge, Info, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { useGrowPlants } from "@/hooks/useGrowData";
+import { useTents } from "@/hooks/use-tents";
 import {
   buildPlantMergePreview,
   summarizePlantMergePlan,
-  validatePlantMerge,
   mapMergeRpcError,
   parseMergeRpcSummary,
   type MergeRpcSummary,
   type PlantForMerge,
 } from "@/lib/plantMergeRules";
 import { buildArchivePlantPayload } from "@/lib/plantTentRelationshipRules";
+import {
+  getEffectivePlantGrowId,
+  validatePlantGrowContextForMerge,
+  buildPlantGrowContextRepairPayload,
+  canRepairPlantGrowContextFromTent,
+  type TentGrowLink,
+} from "@/lib/plantGrowContextRules";
 
 interface Props {
   source: PlantForMerge;
@@ -71,7 +78,33 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<MergeRpcSummary | null>(null);
 
-  const { data: allPlants = [] } = useGrowPlants(undefined, source.grow_id ?? undefined);
+  const { data: allTentsRaw = [] } = useTents();
+  const tentLinks = useMemo<TentGrowLink[]>(
+    () =>
+      (allTentsRaw as Array<{ id: string; grow_id?: string | null }>).map((t) => ({
+        id: t.id,
+        grow_id: t.grow_id ?? null,
+      })),
+    [allTentsRaw],
+  );
+
+  const sourceEffectiveGrowId = useMemo(
+    () => getEffectivePlantGrowId(source, tentLinks),
+    [source, tentLinks],
+  );
+  const sourceCanRepair = useMemo(
+    () => canRepairPlantGrowContextFromTent(source, tentLinks),
+    [source, tentLinks],
+  );
+
+  // Use the effective grow id to scope candidates so a plant whose
+  // `grow_id` is null but whose tent belongs to a grow still loads the
+  // right same-grow targets.
+  const { data: allPlants = [] } = useGrowPlants(
+    undefined,
+    sourceEffectiveGrowId ?? undefined,
+  );
+
   const candidates = useMemo(
     () =>
       (allPlants as unknown as Array<{
@@ -90,8 +123,15 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
           grow_id: p.growId ?? null,
           tent_id: p.tentId ?? null,
           started_at: p.startedAt ?? null,
-        })),
-    [allPlants, source.id],
+        }))
+        // Same effective grow id only. Cross-grow targets are excluded
+        // even if the user briefly held a stale grow_id.
+        .filter((p) => {
+          if (!sourceEffectiveGrowId) return false;
+          const eff = getEffectivePlantGrowId(p, tentLinks);
+          return eff === sourceEffectiveGrowId;
+        }),
+    [allPlants, source.id, sourceEffectiveGrowId, tentLinks],
   );
 
   const target = candidates.find((p) => p.id === targetId);
@@ -133,7 +173,7 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
     return buildPlantMergePreview(source, target, counts.data ?? {});
   }, [source, target, counts.data]);
 
-  const validation = validatePlantMerge(source, target ?? null);
+  const validation = validatePlantGrowContextForMerge(source, target ?? null, tentLinks);
 
   const canExecuteRpc =
     !!preview && validation.ok && preview.recommendedAction === "execute_via_rpc";
@@ -201,6 +241,31 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
     setOpen(false);
   }
 
+  async function repairSourceGrowContext() {
+    if (busy) return;
+    if (!user) return;
+    const payload = buildPlantGrowContextRepairPayload(source, tentLinks);
+    if (!payload) return;
+    setBusy(true);
+    // ONLY updates `grow_id`. Never touches logs, photos, sensor
+    // history, alerts, or Action Queue.
+    const { error } = await supabase
+      .from("plants")
+      .update(payload as never)
+      .eq("id", source.id);
+    setBusy(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Grow context repaired from assigned tent");
+    qc.invalidateQueries({ queryKey: ["plants"] });
+    qc.invalidateQueries({ queryKey: ["grow", "plants"] });
+    qc.invalidateQueries({ queryKey: ["grow", "plant", source.id] });
+    qc.invalidateQueries({ queryKey: ["tent-detail"] });
+    setOpen(false);
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -247,7 +312,33 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
               </div>
             </div>
 
+            {!sourceEffectiveGrowId && (
+              <div
+                className="rounded-md border border-destructive/40 bg-destructive/5 p-3 space-y-2"
+                data-testid="plant-merge-missing-grow-context"
+              >
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 text-destructive shrink-0" />
+                  <p className="text-sm">
+                    This plant is missing grow context. Assign it to a tent in a grow before merging.
+                  </p>
+                </div>
+                {sourceCanRepair && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={repairSourceGrowContext}
+                    data-testid="plant-merge-repair-grow-context"
+                  >
+                    Repair grow context from assigned tent
+                  </Button>
+                )}
+              </div>
+            )}
+
             <div>
+
               <Label>Target plant to keep</Label>
               <Select value={targetId} onValueChange={setTargetId}>
                 <SelectTrigger data-testid="plant-merge-target-select">

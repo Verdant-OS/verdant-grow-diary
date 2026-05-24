@@ -70,7 +70,16 @@ export default function CreatePlantDialog({ trigger, defaultTentId, defaultGrowI
     };
     if (form.tent_id && form.tent_id !== "none") payload.tent_id = form.tent_id;
     // Preselect grow context when provided. RLS enforces ownership server-side.
-    if (defaultGrowId) payload.grow_id = defaultGrowId;
+    // Derive grow_id from selected tent when not explicitly preselected so
+    // newly-created plants never end up with a tent assignment but null grow.
+    if (defaultGrowId) {
+      payload.grow_id = defaultGrowId;
+    } else if (form.tent_id && form.tent_id !== "none") {
+      const selectedTent = (allTents as Array<{ id: string; grow_id: string | null }>).find(
+        (t) => t.id === form.tent_id,
+      );
+      if (selectedTent?.grow_id) payload.grow_id = selectedTent.grow_id;
+    }
     if (form.started_at) payload.started_at = new Date(form.started_at).toISOString();
 
     const { error } = await supabase.from("plants").insert(payload as never);

@@ -15,6 +15,13 @@ import DiaryEntryBadges from "@/components/DiaryEntryBadges";
 import WateringHistoryPanel from "@/components/WateringHistoryPanel";
 import FeedingHistoryPanel from "@/components/FeedingHistoryPanel";
 import PhotoHistoryPanel from "@/components/PhotoHistoryPanel";
+import {
+  RecentQuickLogActivityPanel,
+  PestDiseaseHistoryPanel,
+  TrainingHistoryPanel,
+  MeasurementHistoryPanel,
+} from "@/components/QuickLogHistoryPanels";
+import { hasManualHandheldReadings } from "@/lib/quickLogHistoryRules";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { actionDetailPath, alertDetailPath, logsPath, timelinePath } from "@/lib/routes";
 import { cn } from "@/lib/utils";

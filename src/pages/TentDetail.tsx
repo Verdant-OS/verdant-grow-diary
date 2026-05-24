@@ -1,4 +1,5 @@
 import { useParams, Link } from "react-router-dom";
+import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
@@ -7,7 +8,8 @@ import SensorChart from "@/components/SensorChart";
 import EmptyState from "@/components/EmptyState";
 import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Box, Lightbulb, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Box, Lightbulb, Plus, Archive, GitMerge } from "lucide-react";
 import CreatePlantDialog from "@/components/CreatePlantDialog";
 import AddExistingPlantDialog from "@/components/AddExistingPlantDialog";
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
@@ -20,16 +22,28 @@ import {
   buildTentSensorHeaderView,
 } from "@/lib/tentSensorChartRules";
 import { tempFFromC } from "@/lib/temperatureUnits";
+import {
+  filterVisiblePlants,
+  getActivePlantCount,
+  getArchivedPlantLabel,
+  shouldShowArchivedToggle,
+} from "@/lib/archivedPlantVisibilityRules";
+import { cn } from "@/lib/utils";
 
 export default function TentDetail() {
   const { id } = useParams();
+  const [showArchived, setShowArchived] = useState(false);
   const { data: tent, isLoading } = useGrowTent(id);
-  const { data: plants = [] } = useGrowPlants(id);
+  const { data: activePlants = [] } = useGrowPlants(id);
+  const { data: allPlants = [] } = useGrowPlants(id, undefined, { includeArchived: true });
   const { data: readings = [] } = useSensorReadings(id);
   const series = buildTentSensorChartSeries(readings);
   const header = buildTentSensorHeaderView(readings);
   const snap = header.snapshot;
   const tentMeta = getGrowDataMeta(["grow", "tent", id ?? null]);
+  const activeCount = getActivePlantCount(activePlants);
+  const hasArchived = shouldShowArchivedToggle(allPlants);
+  const visiblePlants = filterVisiblePlants(allPlants, { showArchived });
 
   if (isLoading) return <div className="glass rounded-2xl h-64 animate-pulse" />;
   if (!tent) {

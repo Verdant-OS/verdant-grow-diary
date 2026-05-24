@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import { Sprout, Filter, Archive, GitMerge } from "lucide-react";
-import { useState } from "react";
+import { Sprout, Filter, Archive, GitMerge, Search } from "lucide-react";
+import { useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
 import EmptyState from "@/components/EmptyState";
@@ -12,8 +12,10 @@ import PlantPhoto from "@/components/PlantPhoto";
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
 import InfoPopover, { HELP_COPY } from "@/components/InfoPopover";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { useGrowPlants, useGrowTents, getGrowDataMeta } from "@/hooks/useGrowData";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
+import { useGrows } from "@/store/grows";
 import { plantsPath } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import {
@@ -24,27 +26,57 @@ import {
   isArchivedPlant,
   isMergedPlant,
 } from "@/lib/archivedPlantVisibilityRules";
+import {
+  buildGrowFilterOptions,
+  filterPlantsByGrow,
+  filterPlantsBySearch,
+  summarizePlantsPageFilters,
+  formatPlantsPageFilterSummary,
+  plantsPageEmptyStateCopy,
+} from "@/lib/plantsPageFilterRules";
+import { useNavigate } from "react-router-dom";
 
 export default function Plants() {
   const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
+  const navigate = useNavigate();
+  const { grows } = useGrows();
   const validGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
   const [showArchived, setShowArchived] = useState(false);
+  const [search, setSearch] = useState("");
   const { data: activePlants = [] } = useGrowPlants(undefined, urlGrowId ?? undefined);
   const { data: allPlants = [] } = useGrowPlants(
     undefined,
     urlGrowId ?? undefined,
     { includeArchived: true },
   );
+  // Cross-grow plant list (for grow-filter option counts). Scoped to active
+  // (non-archived/merged) plants — the grow filter intentionally only counts
+  // plants growers normally work with.
+  const { data: allGrowsActivePlants = [] } = useGrowPlants(undefined, undefined);
   const { data: tents = [] } = useGrowTents(urlGrowId ?? undefined);
   const plantsMeta = getGrowDataMeta(["grow", "plants", "all", urlGrowId ?? "all"]);
   const tentsMeta = getGrowDataMeta(["grow", "tents", urlGrowId ?? "all"]);
   const [tentFilter, setTentFilter] = useState<string>("all");
+
+  // Grow filter — sourced from the workspace grows list + active plants.
+  const growFilterOptions = useMemo(
+    () => buildGrowFilterOptions(grows, allGrowsActivePlants),
+    [grows, allGrowsActivePlants],
+  );
+
   const hasArchived = shouldShowArchivedToggle(allPlants);
   const archivedCount = allPlants.filter(
     (p) => isArchivedPlant(p) || isMergedPlant(p),
   ).length;
-  const visible = filterVisiblePlants(allPlants, { showArchived });
-  const filtered = tentFilter === "all" ? visible : visible.filter((p) => p.tentId === tentFilter);
+
+  // Pipeline: archived visibility → grow scope (already in query) →
+  // tent tab → plant search. Each step is independent and labeled in the UI.
+  const visibleAfterArchive = filterVisiblePlants(allPlants, { showArchived });
+  const visibleAfterTent =
+    tentFilter === "all"
+      ? visibleAfterArchive
+      : visibleAfterArchive.filter((p) => p.tentId === tentFilter);
+  const filtered = filterPlantsBySearch(visibleAfterTent, search, tents);
 
   // Filter button entries with per-tent counts (respects archived visibility).
   const filterEntries = [
@@ -60,6 +92,25 @@ export default function Plants() {
     }),
   ];
 
+  // Filter summary — counts only active plants under the current grow scope.
+  const summary = summarizePlantsPageFilters(allPlants, {
+    selectedGrowId: urlGrowId,
+    selectedGrowName: scopedGrowName,
+    search,
+  });
+  const summaryLine = formatPlantsPageFilterSummary(summary);
+
+  const emptyCopy = plantsPageEmptyStateCopy(filtered.length, {
+    selectedGrowId: urlGrowId,
+    selectedGrowName: scopedGrowName,
+    search,
+  });
+
+  const handleGrowFilterChange = (value: string) => {
+    // "" → All grows (clear scope).
+    navigate(value ? plantsPath(value) : plantsPath());
+  };
+
   return (
     <div>
       <GrowBreadcrumbs growId={urlGrowId} growName={scopedGrowName} current="Plants" section="plants" />
@@ -70,21 +121,86 @@ export default function Plants() {
         actions={<CreatePlantDialog defaultGrowId={validGrowId} />}
       />
 
-      {/* Current grow context strip — replaces unclear "selected" state. */}
+      {/* Grow filter + plant search row — the two controls are deliberately
+          labeled separately so the grow filter is not mistaken for a plant
+          picker. */}
+      <div
+        className="mb-3 grid gap-3 sm:grid-cols-2"
+        data-testid="plants-filter-controls"
+      >
+        <div data-testid="plants-grow-filter">
+          <label
+            htmlFor="plants-grow-filter-select"
+            className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-muted-foreground mb-1"
+          >
+            Filter by grow
+            <InfoPopover
+              title="Filter by grow"
+              body="Use this to filter plants by grow. Choose 'All grows' to show every plant you can see."
+              testKey="plants-grow-filter"
+            />
+          </label>
+          <select
+            id="plants-grow-filter-select"
+            data-testid="plants-grow-filter-select"
+            aria-label="Filter plants by grow"
+            value={urlGrowId ?? ""}
+            onChange={(e) => handleGrowFilterChange(e.target.value)}
+            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            {growFilterOptions.map((o) => (
+              <option
+                key={o.id || "__all__"}
+                value={o.id}
+                data-testid={`plants-grow-filter-option-${o.id || "all"}`}
+                data-plant-count={o.plantCount}
+              >
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div data-testid="plants-search">
+          <label
+            htmlFor="plants-search-input"
+            className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-muted-foreground mb-1"
+          >
+            Search plants
+            <InfoPopover
+              title="Search plants"
+              body="Search visible plants by name, strain, or tent. This does not change which grow is selected."
+              testKey="plants-search"
+            />
+          </label>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              id="plants-search-input"
+              data-testid="plants-search-input"
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search plants by name, strain, or tent…"
+              className="h-9 pl-8 text-sm"
+              aria-label="Search plants by name, strain, or tent"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Current grow context strip — explains exactly what is shown. */}
       <div
         className="mb-3 flex items-center gap-2 text-xs text-muted-foreground flex-wrap"
         data-testid="plants-current-grow-strip"
       >
-        {urlGrowId ? (
-          <span>
-            Current grow:{" "}
-            <span className="text-foreground font-medium" data-testid="plants-current-grow-name">
-              {scopedGrowName ?? "this grow"}
-            </span>
-          </span>
-        ) : (
-          <span data-testid="plants-current-grow-empty">
-            No grow selected. Showing plants across every grow you can see.
+        <span data-testid="plants-filter-summary">{summaryLine}</span>
+        {summary.archivedHiddenCount > 0 && !showArchived && (
+          <span
+            className="text-muted-foreground/80"
+            data-testid="plants-archived-hidden-note"
+          >
+            · {summary.archivedHiddenCount} archived/merged hidden
           </span>
         )}
         <InfoPopover
@@ -190,11 +306,21 @@ export default function Plants() {
       {filtered.length === 0 ? (
         <EmptyState
           icon={<Sprout className="h-6 w-6" />}
-          title="No plants yet"
-          description="Add your first plant and assign it to a tent."
+          title={emptyCopy ?? "No plants yet"}
+          description={
+            search.trim()
+              ? "Try a different name, strain, or tent."
+              : urlGrowId
+                ? "Add your first plant to this grow."
+                : "Add your first plant and assign it to a tent."
+          }
         />
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div
+          className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+          data-testid="plants-grid"
+          data-visible-count={filtered.length}
+        >
           {filtered.map((p) => {
             const tent = tents.find((t) => t.id === p.tentId);
             const dot =

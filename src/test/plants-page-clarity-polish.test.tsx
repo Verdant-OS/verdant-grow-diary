@@ -147,7 +147,9 @@ describe("Plants page wiring", () => {
   it("renders the current grow context strip with help popover", () => {
     expect(PLANTS).toMatch(/plants-current-grow-strip/);
     expect(PLANTS).toMatch(/plants-current-grow-data/);
-    expect(PLANTS).toMatch(/plants-current-grow-empty|plants-current-grow-name/);
+    // The strip now uses the deterministic filter-summary line instead of
+    // the older "current grow name / empty" testids.
+    expect(PLANTS).toMatch(/plants-filter-summary/);
   });
 
   it("renders the contextual help cluster with required popovers", () => {

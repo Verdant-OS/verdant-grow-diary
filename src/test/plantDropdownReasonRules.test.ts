@@ -260,12 +260,14 @@ describe("AddExistingPlantDialog · helper text wiring", () => {
 describe("PlantMergeDialog · helper text wiring", () => {
   it("renders helper text under the target picker", () => {
     expect(MERGE).toMatch(/data-testid=["']plant-merge-target-helper["']/);
-    expect(MERGE).toMatch(/getPlantDropdownHelperText/);
+    // Merge target picker now uses the dedicated merge-target reason
+    // module instead of the generic plant-dropdown helper.
+    expect(MERGE).toMatch(/formatMergeTargetHelperText/);
   });
 
   it("uses the empty-state helper copy for no eligible targets", () => {
     expect(MERGE).toMatch(/data-testid=["']plant-merge-target-empty["']/);
-    expect(MERGE).toMatch(/formatPlantDropdownEmptyState\(\s*["']merge_target["']\s*\)/);
+    expect(MERGE).toMatch(/MERGE_TARGET_EMPTY_STATE/);
   });
 });
 

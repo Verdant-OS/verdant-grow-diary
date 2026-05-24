@@ -123,18 +123,21 @@ describe("merge_duplicate_plant RPC — signature & safety", () => {
   });
 });
 
-describe("merge_duplicate_plant RPC — not yet wired into client", () => {
-  it("plantMergeRules.ts does not call the RPC yet", () => {
-    const rulesPath = resolve(ROOT, "src/lib/plantMergeRules.ts");
-    if (!existsSync(rulesPath)) return; // file optional
-    const src = readFileSync(rulesPath, "utf8");
-    expect(src).not.toMatch(/merge_duplicate_plant/);
+describe("merge_duplicate_plant RPC — client wiring uses RPC only", () => {
+  const dlgPath = resolve(ROOT, "src/components/PlantMergeDialog.tsx");
+  const src = existsSync(dlgPath) ? readFileSync(dlgPath, "utf8") : "";
+
+  it("PlantMergeDialog calls supabase.rpc('merge_duplicate_plant', ...)", () => {
+    expect(src).toMatch(/supabase\.rpc\(\s*["']merge_duplicate_plant["']/);
+    expect(src).toMatch(/source_plant_id:\s*source\.id/);
+    expect(src).toMatch(/target_plant_id:\s*target\.id/);
   });
 
-  it("PlantMergeDialog does not call the RPC yet", () => {
-    const dlgPath = resolve(ROOT, "src/components/PlantMergeDialog.tsx");
-    if (!existsSync(dlgPath)) return;
-    const src = readFileSync(dlgPath, "utf8");
-    expect(src).not.toMatch(/merge_duplicate_plant/);
+  it("PlantMergeDialog does not directly update plant-linked tables", () => {
+    expect(src).not.toMatch(/from\(\s*["']grow_events["']\s*\)\s*\.update/);
+    expect(src).not.toMatch(/from\(\s*["']diary_entries["']\s*\)\s*\.update/);
+    expect(src).not.toMatch(/from\(\s*["']alerts["']\s*\)\s*\.update/);
+    expect(src).not.toMatch(/from\(\s*["']action_queue["']\s*\)\s*\.update/);
+    expect(src).not.toMatch(/from\(\s*["']plants["']\s*\)\s*\.delete/);
   });
 });

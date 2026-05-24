@@ -26,8 +26,13 @@ import CreatePlantDialog from "@/components/CreatePlantDialog";
 import { useGrowTents } from "@/hooks/useGrowData";
 import {
   getEffectivePlantGrowId,
+  summarizePlantDropdown,
   type TentGrowRef,
 } from "@/lib/plantDropdownEligibilityRules";
+import {
+  formatPlantDropdownEmptyState,
+  getPlantDropdownHelperText,
+} from "@/lib/plantDropdownReasonRules";
 
 interface PlantRow {
   id: string;

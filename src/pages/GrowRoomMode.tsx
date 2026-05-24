@@ -14,7 +14,18 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, ArrowRight, Box, ClipboardCheck, Clock, Sprout } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Box,
+  Camera,
+  ClipboardCheck,
+  Clock,
+  Droplets,
+  NotebookPen,
+  Sprout,
+  Utensils,
+} from "lucide-react";
 
 import PageHeader from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
@@ -22,8 +33,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import EmptyState from "@/components/EmptyState";
 import DailyGrowCheckStatusCard from "@/components/DailyGrowCheckStatusCard";
+import QuickLog, { type QuickLogPrefill } from "@/components/QuickLog";
 import { supabase } from "@/integrations/supabase/client";
 import { useTents } from "@/hooks/use-tents";
+import { usePlants } from "@/hooks/use-plants";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import {
   EMPTY_SNAPSHOT,
@@ -41,6 +54,22 @@ import {
   type GrowRoomTentCard,
   type SnapshotState,
 } from "@/lib/growRoomModeRules";
+import {
+  buildGrowRoomQuickActionLinks,
+  getPrimaryPlantForTent,
+  type QuickActionKind,
+  type QuickActionPlantLite,
+} from "@/lib/growRoomQuickActionRules";
+
+const QUICK_ACTION_ICON: Record<QuickActionKind, typeof Sprout> = {
+  quick_log: NotebookPen,
+  watering: Droplets,
+  feeding: Utensils,
+  photo: Camera,
+  daily_check: ClipboardCheck,
+  view_tent: ArrowRight,
+};
+
 
 const HEALTH_CLASS: Record<DataHealth, string> = {
   healthy: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",

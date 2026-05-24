@@ -6,7 +6,7 @@
  * no health claims based on check frequency.
  */
 import { Link } from "react-router-dom";
-import { Activity, ArrowRight } from "lucide-react";
+import { Activity, ArrowRight, CheckCircle2, Info } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -17,6 +17,7 @@ import {
   buildDailyGrowCheckConsistency,
   CONSISTENCY_WINDOW_DAYS,
 } from "@/lib/dailyGrowCheckConsistencyRules";
+import { deriveDailyGrowCheckGuidance } from "@/lib/dailyGrowCheckGuidanceRules";
 
 interface Props {
   plantId: string;
@@ -58,9 +59,8 @@ export default function PlantDailyGrowCheckConsistencyCard({
     })),
   });
 
-  const todayLabel = summary.todayHasActivity
-    ? "Check activity detected"
-    : "No check activity today";
+  const guidance = deriveDailyGrowCheckGuidance(summary);
+  const ctaHref = `/daily-check?plantId=${plantId}`;
 
   return (
     <Card
@@ -69,6 +69,7 @@ export default function PlantDailyGrowCheckConsistencyCard({
       data-checked-days={summary.checkedDays}
       data-current-streak={summary.currentStreak}
       data-today-active={summary.todayHasActivity ? "1" : "0"}
+      data-guidance-state={guidance.state}
       className="p-4 space-y-3"
     >
       <div className="flex items-start justify-between gap-2">
@@ -85,20 +86,47 @@ export default function PlantDailyGrowCheckConsistencyCard({
           className="gradient-leaf text-primary-foreground shrink-0"
           data-testid="plant-daily-grow-check-consistency-cta"
         >
-          <Link to={`/daily-check?plantId=${plantId}`}>
-            Start Daily Grow Check <ArrowRight className="h-4 w-4" />
+          <Link to={ctaHref}>
+            {guidance.ctaLabel} <ArrowRight className="h-4 w-4" />
           </Link>
         </Button>
       </div>
 
-      {summary.hasAnyActivity ? (
+      {/* Guidance block — empty state, today-unchecked, inconsistent, or
+          today-checked confirmation. */}
+      <div
+        className="space-y-1"
+        data-testid="plant-daily-grow-check-guidance"
+        data-guidance-state={guidance.state}
+      >
+        <div
+          className="text-base font-semibold flex items-center gap-2"
+          data-testid="plant-daily-grow-check-guidance-headline"
+        >
+          {guidance.isPositive && (
+            <CheckCircle2
+              className="h-4 w-4 text-emerald-400"
+              aria-hidden="true"
+            />
+          )}
+          <span>{guidance.headline}</span>
+        </div>
+        <p
+          className="text-sm text-muted-foreground"
+          data-testid="plant-daily-grow-check-guidance-body"
+        >
+          {guidance.body}
+        </p>
+        <p
+          className="text-sm"
+          data-testid="plant-daily-grow-check-guidance-next-step"
+        >
+          {guidance.nextStep}
+        </p>
+      </div>
+
+      {summary.hasAnyActivity && (
         <div className="space-y-1">
-          <div
-            className="text-base font-semibold"
-            data-testid="plant-daily-grow-check-consistency-main"
-          >
-            Checked {summary.checkedDays} of last {summary.windowDays} days
-          </div>
           <div
             className="text-sm text-muted-foreground"
             data-testid="plant-daily-grow-check-consistency-streak"
@@ -114,21 +142,25 @@ export default function PlantDailyGrowCheckConsistencyCard({
               Missed days: {summary.missedDays}
             </div>
           )}
-          <div
-            className="text-sm"
-            data-testid="plant-daily-grow-check-consistency-today"
-          >
-            Today: {todayLabel}
-          </div>
-        </div>
-      ) : (
-        <div
-          className="text-sm text-muted-foreground"
-          data-testid="plant-daily-grow-check-consistency-empty"
-        >
-          No check activity in the last {summary.windowDays} days.
         </div>
       )}
+
+      {!summary.hasAnyActivity && (
+        <div
+          className="text-sm text-muted-foreground sr-only"
+          data-testid="plant-daily-grow-check-consistency-empty"
+        >
+          Checked {summary.checkedDays} of last {summary.windowDays} days.
+        </div>
+      )}
+
+      <p
+        className="text-xs text-muted-foreground flex items-start gap-1"
+        data-testid="plant-daily-grow-check-what-counts"
+      >
+        <Info className="h-3 w-3 mt-0.5 shrink-0" aria-hidden="true" />
+        <span>{guidance.whatCountsHint}</span>
+      </p>
 
       {!currentTentId && (
         <p

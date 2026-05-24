@@ -274,8 +274,11 @@ describe("PlantMergeDialog · helper text wiring", () => {
 describe("QuickLog · grow-name helper text", () => {
   it("renders grow-name helper line under the plant picker", () => {
     expect(QL).toMatch(/data-testid=["']quick-log-plant-helper["']/);
-    expect(QL).toMatch(/Showing plants from \{activeGrow\.name\}/);
-    expect(QL).toMatch(/Archived\/merged plants hidden/);
+    // QuickLog now routes helper copy through the pure
+    // `quickLogPlantHelperText` rule (audit fix: the dropdown is now
+    // actually scoped by activeGrowId, so the helper text must be
+    // produced deterministically rather than hand-rolled).
+    expect(QL).toMatch(/quickLogPlantHelperText\s*\(/);
   });
 });
 

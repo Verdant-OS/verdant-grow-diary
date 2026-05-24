@@ -22,6 +22,10 @@ import {
   hasAnyHardwareReading,
   type QuickLogHardwareReadings,
 } from "@/lib/quickLogHardwareReadingsRules";
+import {
+  filterQuickLogPlantOptions,
+  quickLogPlantHelperText,
+} from "@/lib/quickLogPlantOptionRules";
 import { AlertTriangle, Info } from "lucide-react";
 import { toast } from "sonner";
 
@@ -80,7 +84,11 @@ export default function QuickLog({ open, onOpenChange, onCreated, prefill }: Pro
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (photoFile && eventType === "observation") setEventType("photo"); }, [photoFile]);
 
-  const selectedPlant = useMemo(() => plants.find((p) => p.id === plantId) ?? null, [plantId, plants]);
+  const scopedPlants = useMemo(
+    () => filterQuickLogPlantOptions(plants, activeGrowId),
+    [plants, activeGrowId],
+  );
+  const selectedPlant = useMemo(() => scopedPlants.find((p) => p.id === plantId) ?? null, [plantId, scopedPlants]);
 
   function handleFile(f: File | null) {
     setPhotoFile(f);
@@ -261,22 +269,20 @@ export default function QuickLog({ open, onOpenChange, onCreated, prefill }: Pro
             <div>
               <Label className="text-xs">Plant (optional)</Label>
               <Select value={plantId || "__none"} onValueChange={(v) => setPlantId(v === "__none" ? "" : v)}>
-                <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                <SelectTrigger data-testid="quick-log-plant-select"><SelectValue placeholder="None" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none">No specific plant</SelectItem>
-                  {plants.map((p) => (
+                  {scopedPlants.map((p) => (
                     <SelectItem key={p.id} value={p.id}>{p.name}{p.strain ? ` · ${p.strain}` : ""}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {activeGrow?.name && (
-                <p
-                  className="text-[11px] text-muted-foreground mt-1"
-                  data-testid="quick-log-plant-helper"
-                >
-                  Showing plants from {activeGrow.name}. Archived/merged plants hidden.
-                </p>
-              )}
+              <p
+                className="text-[11px] text-muted-foreground mt-1"
+                data-testid="quick-log-plant-helper"
+              >
+                {quickLogPlantHelperText(activeGrow?.name ?? null, !!activeGrowId)}
+              </p>
             </div>
           </div>
 

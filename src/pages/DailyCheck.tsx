@@ -213,6 +213,7 @@ export default function DailyCheck() {
       const raw = detail?.createdAt;
       const parsed = raw != null ? new Date(raw).getTime() : NaN;
       setLastSubmittedAt(Number.isFinite(parsed) ? parsed : Date.now());
+      setLastSubmittedSource("note");
       setState((s) => {
         const next = { ...s };
         if (step === "quicklog" && s.quicklog === "pending") next.quicklog = "added";

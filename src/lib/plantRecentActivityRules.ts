@@ -12,6 +12,7 @@ import {
   type NormalizedDiaryEntry,
 } from "@/lib/diaryEntryRules";
 import { isStale } from "@/lib/sensorSnapshot";
+import { splitHardwareReadingsFromNote } from "@/lib/quickLogHardwareReadingsDisplayRules";
 
 export interface PlantRecentActivityRow {
   id: string;
@@ -30,6 +31,10 @@ export interface PlantRecentActivityRow {
   /** Source label only when explicitly stored on the entry. */
   snapshotSourceLabel: string | null;
   warnings: string[];
+  /** True when QuickLog appended its deterministic handheld readings block. */
+  hasHardwareReadings: boolean;
+  /** Trimmed lines from the hardware readings block. Display-only. */
+  hardwareReadingLines: string[];
 }
 
 const NOTE_PREVIEW_MAX = 140;
@@ -48,12 +53,13 @@ function toRow(
   const snap = entry.details.sensorSnapshot;
   const snapshotAt = snap?.at ?? null;
   const hasSnapshot = !!snap;
+  const split = splitHardwareReadingsFromNote(entry.note);
   return {
     id: entry.id,
     eventType: entry.eventType,
     occurredAt: entry.createdAt,
     occurredAtLabel: entry.createdAtLabel,
-    notePreview: previewNote(entry.note),
+    notePreview: previewNote(split.body),
     plantId: entry.plantId,
     tentId: entry.tentId,
     hasPhoto: !!entry.photoUrl,
@@ -64,6 +70,8 @@ function toRow(
     // We never invent one — leave null unless future writers store it.
     snapshotSourceLabel: null,
     warnings: entry.warnings,
+    hasHardwareReadings: split.hasHardwareBlock,
+    hardwareReadingLines: split.hardwareLines,
   };
 }
 

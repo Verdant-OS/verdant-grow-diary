@@ -5,7 +5,7 @@
  * to). No writes. No sensor_readings access. No action_queue / alerts.
  */
 import { Link } from "react-router-dom";
-import { ArrowRight, Camera, Gauge, NotebookPen } from "lucide-react";
+import { ArrowRight, Camera, Gauge, NotebookPen, Wrench } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -57,9 +57,29 @@ function EntryRow({ row, plantName }: { row: PlantRecentActivityRow; plantName?:
       </div>
       {row.notePreview ? (
         <p className="mt-2 text-sm leading-snug">{row.notePreview}</p>
-      ) : (
+      ) : !row.hasHardwareReadings ? (
         <p className="mt-2 text-xs text-muted-foreground italic">No note</p>
-      )}
+      ) : null}
+      {row.hasHardwareReadings ? (
+        <div
+          className="mt-2 rounded-md border border-dashed bg-muted/40 p-2"
+          data-testid="plant-recent-activity-hardware-readings"
+        >
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <Wrench className="h-3 w-3" />
+            Manual handheld readings
+          </div>
+          {row.hardwareReadingLines.length > 0 ? (
+            <ul className="mt-1 space-y-0.5 text-xs leading-snug">
+              {row.hardwareReadingLines.map((line, i) => (
+                <li key={i} data-testid="plant-recent-activity-hardware-line">
+                  {line.replace(/^[-•]\s*/, "")}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
       <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
         {plantName ? <span>{plantName}</span> : null}
         {row.tentId ? (

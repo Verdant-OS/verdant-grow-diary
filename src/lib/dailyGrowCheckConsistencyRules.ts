@@ -20,17 +20,49 @@ export interface ConsistencyInput
   windowDays?: number;
 }
 
+/**
+ * Method used to satisfy today's Daily Grow Check.
+ *  - "note":            only a QuickLog plant note exists today
+ *  - "sensor-snapshot": only a current-tent manual sensor snapshot exists today
+ *  - "both":            both a note AND a current-tent manual snapshot exist today
+ *  - "none":            nothing counts toward today's check
+ * Never implies plant health, completion, or quality.
+ */
+export type TodayCheckMethod = "none" | "note" | "sensor-snapshot" | "both";
+
 export interface ConsistencySummary {
   windowDays: number;
   checkedDays: number;
   currentStreak: number;
   missedDays: number;
   todayHasActivity: boolean;
+  /** What kinds of activity counted for today. Derived, read-only. */
+  todayMethod: TodayCheckMethod;
   hasAnyActivity: boolean;
   /** Includes any tent-level sensor day where multiple plants share the tent. */
   tentLevelDays: number;
   /** Day rows newest-first (today index 0). */
   rows: DailyHistoryRow[];
+}
+
+/**
+ * Short, grower-friendly method label. Returns null when nothing counts so
+ * callers can fall back to existing "Needs check" wording.
+ */
+export function formatTodayCheckMethodLabel(
+  method: TodayCheckMethod,
+): string | null {
+  switch (method) {
+    case "note":
+      return "Checked by note";
+    case "sensor-snapshot":
+      return "Checked by sensor snapshot";
+    case "both":
+      return "Checked by note + sensor snapshot";
+    case "none":
+    default:
+      return null;
+  }
 }
 
 const ACTIVE_KINDS = new Set<DailyHistoryRow["kind"]>([

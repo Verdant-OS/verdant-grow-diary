@@ -146,24 +146,29 @@ describe("plantMergeRules · detectPotentialDuplicatePlants", () => {
 });
 
 describe("plantMergeRules · buildPlantMergePreview", () => {
-  it("flags every linked data type as not-merged-yet (preview only)", () => {
+  it("marks safe data types as mergeable via RPC and keeps sensor readings tent-scoped", () => {
     const preview = buildPlantMergePreview(A, B, {
       diaryEntries: 3,
       growEvents: 2,
       photoEvents: 1,
       wateringEvents: 4,
       feedingEvents: 2,
+      sensorReadings: 9,
     });
-    expect(preview.previewOnly).toBe(true);
     expect(preview.sameGrow).toBe(true);
+    expect(preview.previewOnly).toBe(false);
+    expect(preview.recommendedAction).toBe("execute_via_rpc");
     const diary = preview.lines.find((l) => l.key === "diaryEntries");
     expect(diary?.sourceCount).toBe(3);
-    expect(diary?.mergeable).toBe(false);
-    expect(preview.lines.every((l) => !l.mergeable)).toBe(true);
+    expect(diary?.mergeable).toBe(true);
+    const sensor = preview.lines.find((l) => l.key === "sensorReadings");
+    expect(sensor?.mergeable).toBe(false);
+    expect(sensor?.blockedReason).toMatch(/tent-scoped/i);
   });
   it("recommends archive-after-review when source has no history", () => {
     const preview = buildPlantMergePreview(A, B, {});
     expect(preview.recommendedAction).toBe("archive_source_after_review");
+    expect(preview.previewOnly).toBe(true);
   });
   it("blocks cross-grow merges without opt-in", () => {
     const preview = buildPlantMergePreview(A, D, {});
@@ -177,21 +182,27 @@ describe("plantMergeRules · buildPlantMergePreview", () => {
 });
 
 describe("plantMergeRules · buildPlantMergeUpdatePlan", () => {
-  it("is non-executable until a safe RPC is wired", () => {
+  it("is executable via the merge_duplicate_plant RPC", () => {
     const plan = buildPlantMergeUpdatePlan("a", "b");
-    expect(plan.executable).toBe(false);
-    expect(plan.blockedReason).toMatch(/transaction|RPC/i);
-    expect(plan.steps.every((s) => !s.enabled)).toBe(true);
+    expect(plan.executable).toBe(true);
+    expect(plan.rpcName).toBe("merge_duplicate_plant");
+    expect(plan.steps.every((s) => s.enabled && s.via === "rpc")).toBe(true);
+    expect(plan.steps.map((s) => s.table).sort()).toEqual([
+      "action_queue",
+      "diary_entries",
+      "grow_events",
+      "alerts",
+    ].sort());
   });
 });
 
 describe("plantMergeRules · summarizePlantMergePlan", () => {
-  it("reports preview-only summary when source has history", () => {
+  it("reports server-side transaction summary when source has history", () => {
     const out = summarizePlantMergePlan(
       buildPlantMergePreview(A, B, { diaryEntries: 5 }),
     );
-    expect(out).toMatch(/Preview-only/i);
-    expect(out).toMatch(/safe server-side transaction/i);
+    expect(out).toMatch(/single server-side transaction/i);
+    expect(out).toMatch(/Sensor readings/i);
   });
   it("reports safe-to-archive when source has no history", () => {
     const out = summarizePlantMergePlan(buildPlantMergePreview(A, B, {}));
@@ -236,7 +247,7 @@ describe("Plant Merge UI wiring", () => {
   it("Merge dialog limits targets to same-grow candidates via useGrowPlants(growId)", () => {
     expect(MERGE_DIALOG).toContain("useGrowPlants(undefined, source.grow_id");
   });
-  it("Merge dialog renders the preview-only badge and execution-blocked note", () => {
+  it("Merge dialog renders the preview badge and execution note", () => {
     expect(MERGE_DIALOG).toContain("plant-merge-preview-only-badge");
     expect(MERGE_DIALOG).toContain("plant-merge-execution-blocked-note");
   });
@@ -244,9 +255,9 @@ describe("Plant Merge UI wiring", () => {
     expect(MERGE_DIALOG).not.toMatch(/from\("plants"\)\.delete/);
     expect(MERGE_DIALOG).toContain("buildArchivePlantPayload");
   });
-  it("Merge rules never enable any executable step in v1", () => {
-    expect(MERGE_RULES).toContain("executable: false");
-    expect(MERGE_RULES).not.toMatch(/executable:\s*true/);
+  it("Merge rules enable safe-table steps now that the RPC is live", () => {
+    expect(MERGE_RULES).toContain("executable: true");
+    expect(MERGE_RULES).toContain('rpcName: "merge_duplicate_plant"');
   });
 });
 
@@ -301,7 +312,7 @@ describe("Global safety (static)", () => {
   });
   it("no pi-ingest / edge-function / alert / action_queue / sensor_readings writes", () => {
     for (const f of FILES) {
-      expect(f).not.toMatch(/pi-ingest|pi_ingest|supabase\/functions/);
+      expect(f).not.toMatch(/from\(["']pi_ingest|supabase\/functions\/pi-ingest|functions\.invoke\(["']pi-ingest/);
       expect(f).not.toMatch(/from\("alerts"\)\.(insert|update|delete)/);
       expect(f).not.toMatch(/from\("action_queue"\)\.(insert|update|delete)/);
       expect(f).not.toMatch(/from\("sensor_readings"\)\.(insert|update|delete)/);

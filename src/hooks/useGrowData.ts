@@ -186,13 +186,11 @@ export function useGrowPlants(
   opts: UseGrowPlantsOptions = {},
 ): UseQueryResult<Plant[]> {
   const includeArchived = !!opts.includeArchived;
-  const key = [
-    "grow",
-    "plants",
-    tentId ?? "all",
-    growId ?? "all",
-    includeArchived ? "with-archived" : "active",
-  ] as const;
+  const key = (
+    includeArchived
+      ? ["grow", "plants", tentId ?? "all", growId ?? "all", "with-archived"]
+      : ["grow", "plants", tentId ?? "all", growId ?? "all"]
+  ) as readonly unknown[];
   return useQuery({
     queryKey: [...key],
     queryFn: () =>

@@ -190,6 +190,11 @@ export default function PlantDetail() {
             growId={plant.growId ?? null}
           />
           <PlantRecentActivityPanel plantId={plant.id} plantName={plant.name} />
+          <PlantRelativeTimelineSection
+            plantId={plant.id}
+            plantStartedAt={plant.startedAt}
+            currentStage={plant.stage}
+          />
           <DailyGrowCheckOnboardingCard
             focusedPlantId={plant.id}
             focusedTentId={plant.tentId ?? null}

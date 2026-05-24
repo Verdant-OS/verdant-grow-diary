@@ -244,8 +244,9 @@ describe("Plant Merge UI wiring", () => {
     expect(PLANT_ACTIONS).toContain("plant-detail-merge-duplicate");
     expect(PLANT_ACTIONS).toContain("PlantMergeDialog");
   });
-  it("Merge dialog limits targets to same-grow candidates via useGrowPlants(growId)", () => {
-    expect(MERGE_DIALOG).toContain("useGrowPlants(undefined, source.grow_id");
+  it("Merge dialog limits targets to same-grow candidates via effective grow id", () => {
+    expect(MERGE_DIALOG).toContain("useGrowPlants(");
+    expect(MERGE_DIALOG).toContain("sourceEffectiveGrowId");
   });
   it("Merge dialog renders the preview badge and execution note", () => {
     expect(MERGE_DIALOG).toContain("plant-merge-preview-only-badge");

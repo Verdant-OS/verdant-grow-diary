@@ -408,6 +408,7 @@ export default function DailyCheck() {
               data-testid="daily-grow-check-choose"
               data-plant-id={selectedPlant?.id ?? ""}
               data-plant-tent-id={selectedPlant?.tent_id ?? ""}
+              data-method-hint={methodHint ?? ""}
             >
               <div>
                 <h2 className="font-display font-semibold text-base flex items-center gap-2">
@@ -422,8 +423,12 @@ export default function DailyCheck() {
               <div className="grid gap-2 sm:grid-cols-2">
                 <Button
                   variant="outline"
-                  className="h-auto py-3 flex-col items-start gap-1"
+                  className={`h-auto py-3 flex-col items-start gap-1 ${
+                    methodHint === "note" ? "ring-2 ring-primary" : ""
+                  }`}
                   data-testid="daily-grow-check-choose-quicklog"
+                  data-method-focused={methodHint === "note" ? "1" : "0"}
+                  aria-pressed={methodHint === "note"}
                   onClick={() => {
                     setStep("quicklog");
                     setQuickLogOpen(true);
@@ -438,8 +443,16 @@ export default function DailyCheck() {
                 </Button>
                 <Button
                   variant="outline"
-                  className="h-auto py-3 flex-col items-start gap-1"
+                  className={`h-auto py-3 flex-col items-start gap-1 ${
+                    methodHint === "sensor" && !!selectedPlant?.tent_id
+                      ? "ring-2 ring-primary"
+                      : ""
+                  }`}
                   data-testid="daily-grow-check-choose-snapshot"
+                  data-method-focused={
+                    methodHint === "sensor" && !!selectedPlant?.tent_id ? "1" : "0"
+                  }
+                  aria-pressed={methodHint === "sensor" && !!selectedPlant?.tent_id}
                   disabled={!!selectedPlant && !selectedPlant.tent_id}
                   onClick={() => setStep("manual")}
                 >
@@ -451,6 +464,7 @@ export default function DailyCheck() {
                   </span>
                 </Button>
               </div>
+
               {selectedPlant && !selectedPlant.tent_id && (
                 <p
                   className="text-xs text-amber-300 flex items-start gap-1"

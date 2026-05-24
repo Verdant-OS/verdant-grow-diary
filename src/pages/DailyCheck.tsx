@@ -74,6 +74,11 @@ import {
   DAILY_CHECK_WHAT_COUNTS_HINT,
   resolveDailyCheckPlantSelection,
 } from "@/lib/dailyCheckPlantSelectionRules";
+import {
+  DAILY_CHECK_SUCCESS_BODY,
+  DAILY_CHECK_SUCCESS_TITLE,
+  buildDailyCheckPostSubmitActions,
+} from "@/lib/dailyCheckPostSubmitRules";
 import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingCard";
 
 function useQueryParam(name: string): string | null {

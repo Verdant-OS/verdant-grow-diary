@@ -108,6 +108,7 @@ export default function DailyGrowCheckOnboardingCard({
   });
 
   if (hideWhenReady && guidance.isReady) return null;
+  if (isDismissed) return null;
 
   return (
     <Card

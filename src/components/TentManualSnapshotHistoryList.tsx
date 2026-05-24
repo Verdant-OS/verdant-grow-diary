@@ -4,8 +4,8 @@
  * - Pure render. Filtering/grouping/delta logic lives in
  *   `manualSensorSnapshotHistoryListRules.ts` and
  *   `manualSensorSnapshotChangeContextRules.ts`.
- * - Only manual-source rows for the active tent are surfaced — demo,
- *   live, imported, csv, pi_bridge, home_assistant, mqtt, api are excluded
+ * - Only manual-source rows for the active tent are surfaced — any other
+ *   ingestion or bridge sources are excluded by the rule helpers.
  *   by the rule helpers.
  * - Never implies plant health, quality, or completion.
  * - Never reads or writes notes, alert rows, queued actions, or hardware

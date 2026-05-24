@@ -120,9 +120,10 @@ describe("usePlantTentLatestReadings (scoping)", () => {
       wrapper: wrapper(),
     });
     await waitFor(() => expect(fromMock).toHaveBeenCalledWith("sensor_readings"));
-    expect(selectMock).toHaveBeenCalledWith("ts,metric,value,source");
+    expect(selectMock).toHaveBeenCalledWith("ts,metric,value,source,created_at");
     expect(eqMock).toHaveBeenCalledWith("tent_id", "tent-123");
     expect(orderMock).toHaveBeenCalledWith("ts", { ascending: false });
+    expect(orderMock).toHaveBeenCalledWith("created_at", { ascending: false });
   });
 });
 

@@ -129,7 +129,9 @@ export function buildGrowRoomQuickActionLinks(
     {
       kind: "daily_check",
       label: "Daily Check",
-      href: "/daily-check",
+      href: safePlantId
+        ? `/daily-check?plantId=${encodeURIComponent(safePlantId)}`
+        : "/daily-check",
     },
     {
       kind: "view_tent",

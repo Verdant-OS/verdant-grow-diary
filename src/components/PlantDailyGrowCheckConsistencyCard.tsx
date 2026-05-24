@@ -161,7 +161,7 @@ export default function PlantDailyGrowCheckConsistencyCard({
             data-testid="plant-daily-grow-check-consistency-cta"
           >
             <Link to={ctaHref} aria-label={guidance.ctaLabel}>
-              Open Daily Check <ArrowRight className="h-4 w-4" />
+              Start Daily Grow Check <ArrowRight className="h-4 w-4" />
             </Link>
           </Button>
         )}

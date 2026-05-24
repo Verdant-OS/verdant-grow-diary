@@ -399,8 +399,13 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
                   <SelectGroup>
                     <SelectLabel>Same grow</SelectLabel>
                     {candidates.length === 0 && (
-                      <SelectItem value="__none__" disabled>
-                        No other plants in this grow
+                      <SelectItem
+                        value="__none__"
+                        disabled
+                        aria-label={formatPlantDropdownEmptyState("merge_target")}
+                        data-testid="plant-merge-target-empty"
+                      >
+                        {formatPlantDropdownEmptyState("merge_target")}
                       </SelectItem>
                     )}
                     {candidates.map((p) => (
@@ -412,6 +417,14 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
                   </SelectGroup>
                 </SelectContent>
               </Select>
+              {mergeHelperText && (
+                <p
+                  className="text-xs text-muted-foreground mt-1"
+                  data-testid="plant-merge-target-helper"
+                >
+                  {mergeHelperText}
+                </p>
+              )}
               {!validation.ok && targetId && (
                 <p
                   className="text-xs text-destructive mt-1 flex items-center gap-1"

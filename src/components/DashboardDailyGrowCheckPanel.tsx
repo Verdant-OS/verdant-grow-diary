@@ -6,7 +6,7 @@
  */
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, Circle, Sprout, ArrowRight } from "lucide-react";
+import { CheckCircle2, Circle, Sprout, ArrowRight, Sparkles, Gauge } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { Card } from "@/components/ui/card";

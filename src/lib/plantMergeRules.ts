@@ -153,6 +153,9 @@ export function validatePlantMerge(
   target: PlantForMerge | null | undefined,
   opts: { allowCrossGrow?: boolean } = {},
 ): PlantMergeValidation {
+  if (source.is_archived) {
+    return { ok: false, reason: "This plant is already archived or merged." };
+  }
   if (!target) return { ok: false, reason: "Pick a target plant to keep." };
   if (source.id === target.id) {
     return { ok: false, reason: "Cannot merge a plant into itself." };

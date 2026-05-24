@@ -100,7 +100,10 @@ export default function PlantDailyGrowCheckConsistencyCard({
     ? formatTodayCheckMethodLabel(summary.todayMethod)
     : null;
   const breakdown = buildDailyMethodBreakdown(summary, "oldest-first");
-  const ctaHref = `/daily-check?plantId=${plantId}&from=plant-detail`;
+  const ctaHref = buildDailyCheckEntryHref({ plantId, source: "plant-detail" });
+  const noteHref = buildDailyCheckEntryHref({ plantId, source: "plant-detail", method: "note" });
+  const sensorHref = buildDailyCheckEntryHref({ plantId, source: "plant-detail", method: "sensor" });
+  const showQuickActions = !summary.todayHasActivity;
 
 
   return (

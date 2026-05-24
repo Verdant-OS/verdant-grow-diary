@@ -33,10 +33,25 @@ export default function DashboardDailyGrowCheckPanel({
   scopedGrowId,
   className,
 }: Props) {
+  const queryClient = useQueryClient();
   const { data: rawPlants = [] } = useGrowPlants(undefined, scopedGrowId ?? undefined);
   const { data: rawTents = [] } = useGrowTents(scopedGrowId ?? undefined);
   const { data: rawReadings = [] } = useSensorReadings(undefined, 500);
   const { data: rawDiary = [] } = useDiaryEntries();
+
+  // Belt-and-suspenders refresh: when QuickLog (or any successful diary
+  // insert anywhere in the app) dispatches `verdant:entry-created`, force
+  // the diary + sensor reading caches that back checked-today to refetch.
+  // QuickLog already invalidates these on its own; this guarantees the
+  // panel never shows stale checked status if the panel mounts in a tree
+  // where QuickLog's own invalidation has already settled.
+  useEffect(() => {
+    function onEntry() {
+      refreshDailyCheckQueries(queryClient);
+    }
+    window.addEventListener(ENTRY_CREATED_EVENT, onEntry);
+    return () => window.removeEventListener(ENTRY_CREATED_EVENT, onEntry);
+  }, [queryClient]);
 
   const plants: PanelPlantInput[] = rawPlants.map((p) => ({
     id: p.id,

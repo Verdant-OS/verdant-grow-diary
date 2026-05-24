@@ -34,7 +34,7 @@ const VARIANT_BY_LABEL: Record<Label, "default" | "secondary" | "outline" | "des
 const DESCRIPTION: Record<Label, string> = {
   Live: "Live data from your grow backend.",
   Demo: "Showing demo data. Connect real tents, plants, and sensors to replace it.",
-  Mixed: "Showing a mix of live and demo data. Some sections are not yet backed by real data.",
+  Mixed: "Some data is real, some is demo or manual. Add or connect more to replace the demo data.",
   Unavailable: "No grow data available yet.",
 };
 

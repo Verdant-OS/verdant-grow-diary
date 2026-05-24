@@ -350,6 +350,46 @@ export default function DailyCheck() {
               )}
             </div>
           </div>
+          {lastSubmittedSource === "sensor" && (
+            <div
+              className="rounded-md border border-emerald-500/20 bg-background/30 p-2"
+              data-testid="daily-grow-check-change-context"
+              data-first-snapshot={changeContext.firstSnapshot ? "true" : "false"}
+            >
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+                Changed since last snapshot
+              </div>
+              {changeContext.firstSnapshot ? (
+                <p
+                  className="text-xs text-muted-foreground"
+                  data-testid="daily-grow-check-change-context-first"
+                >
+                  First snapshot for this tent
+                </p>
+              ) : changeContext.deltas.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No comparable metrics moved.
+                </p>
+              ) : (
+                <ul
+                  className="flex flex-wrap gap-x-3 gap-y-1 text-xs"
+                  data-testid="daily-grow-check-change-context-deltas"
+                >
+                  {changeContext.deltas.map((d) => (
+                    <li
+                      key={d.key}
+                      data-testid={`daily-grow-check-change-context-delta-${d.key}`}
+                      data-direction={d.direction}
+                      className="text-foreground/90"
+                    >
+                      <span className="text-muted-foreground">{d.label}</span>{" "}
+                      <strong>{d.formatted}</strong>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
           <div
             className="grid grid-cols-1 sm:grid-cols-2 gap-2"
             data-testid="daily-grow-check-post-submit-actions"

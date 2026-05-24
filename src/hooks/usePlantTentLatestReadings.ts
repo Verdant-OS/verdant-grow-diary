@@ -25,9 +25,13 @@ export function usePlantTentLatestReadings(
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sensor_readings")
-        .select("ts,metric,value,source")
+        .select("ts,metric,value,source,created_at")
+        // Deterministic ordering: latest ts first, with created_at as a
+        // tie-breaker so the ≤5 metrics from a single manual entry (which
+        // share `ts`) come back in a stable, repeatable order.
         .eq("tent_id", tentId as string)
         .order("ts", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(50);
       if (error) throw error;
       return (data ?? []) as PlantTentReadingRow[];

@@ -301,6 +301,24 @@ export default function PlantCardActionsMenu({
               <Unlink className="h-4 w-4 mr-2" /> Remove from Tent
             </DropdownMenuItem>
           )}
+          <PlantMergeDialog
+            source={{
+              id: plant.id,
+              name: plant.name,
+              strain: plant.strain,
+              grow_id: plant.growId ?? null,
+              tent_id: plant.tentId ?? null,
+              started_at: plant.startedAt ?? null,
+            }}
+            trigger={
+              <DropdownMenuItem
+                onSelect={(e) => e.preventDefault()}
+                data-testid="plant-card-action-merge"
+              >
+                <GitMerge className="h-4 w-4 mr-2" /> Merge Duplicate
+              </DropdownMenuItem>
+            }
+          />
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="text-destructive focus:text-destructive"

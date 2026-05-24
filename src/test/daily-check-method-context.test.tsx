@@ -215,7 +215,7 @@ describe("dashboard panel UI — shows method context for checked plants", () =>
     expect(mangoRow.textContent).toContain("Checked by note + sensor snapshot");
   });
 
-  it("unchecked rows still show Start check CTA", async () => {
+  it("Blueberry shares the tent so it's also checked-today (tent-level snapshot)", async () => {
     const { default: DashboardDailyGrowCheckPanel } = await import(
       "@/components/DashboardDailyGrowCheckPanel"
     );

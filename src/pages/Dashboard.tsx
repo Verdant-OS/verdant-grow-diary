@@ -60,6 +60,7 @@ import { Button } from "@/components/ui/button";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
 import DailyGrowCheckStatusCard from "@/components/DailyGrowCheckStatusCard";
 import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingCard";
+import DashboardDailyGrowCheckPanel from "@/components/DashboardDailyGrowCheckPanel";
 
 import { Badge } from "@/components/ui/badge";
 import { actionDetailPath, actionsPath, alertDetailPath, dashboardPath, logsPath } from "@/lib/routes";

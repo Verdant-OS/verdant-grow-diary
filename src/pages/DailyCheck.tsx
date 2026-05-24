@@ -199,6 +199,9 @@ export default function DailyCheck() {
   // `verdant:entry-created` window event, which is dispatched ONLY after a
   // successful insert. Failed submits never set this state.
   const [lastSubmittedAt, setLastSubmittedAt] = useState<number | null>(null);
+  const [lastSubmittedSource, setLastSubmittedSource] = useState<
+    "note" | "sensor" | null
+  >(null);
 
   // Listen for QuickLog success to mark steps as added + drive confirmation.
   // We prefer the `createdAt` carried on the event detail (set by QuickLog

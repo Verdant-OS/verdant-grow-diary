@@ -36,16 +36,23 @@ import {
 import { AlertTriangle, GitMerge, Info, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { useGrowPlants } from "@/hooks/useGrowData";
+import { useTents } from "@/hooks/use-tents";
 import {
   buildPlantMergePreview,
   summarizePlantMergePlan,
-  validatePlantMerge,
   mapMergeRpcError,
   parseMergeRpcSummary,
   type MergeRpcSummary,
   type PlantForMerge,
 } from "@/lib/plantMergeRules";
 import { buildArchivePlantPayload } from "@/lib/plantTentRelationshipRules";
+import {
+  getEffectivePlantGrowId,
+  validatePlantGrowContextForMerge,
+  buildPlantGrowContextRepairPayload,
+  canRepairPlantGrowContextFromTent,
+  type TentGrowLink,
+} from "@/lib/plantGrowContextRules";
 
 interface Props {
   source: PlantForMerge;

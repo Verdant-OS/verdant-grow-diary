@@ -140,7 +140,8 @@ describe("lint-fix migration — safety guardrails", () => {
   });
 
   it("lint-fix migration does not introduce SECURITY DEFINER", () => {
-    expect(FIX).not.toMatch(/SECURITY\s+DEFINER/i);
+    const noComments = FIX.replace(/^\s*--.*$/gm, "");
+    expect(noComments).not.toMatch(/SECURITY\s+DEFINER/i);
   });
 
   it("lint-fix migration does not touch sensor_readings, alerts, action_queue, or idempotency tables", () => {

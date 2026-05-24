@@ -43,8 +43,13 @@ export function useInsertSensorReading(): UseMutationResult<
       await insertSensorReading(payload);
     },
     onSuccess: () => {
+      // Refresh every surface that consumes latest readings for the
+      // affected tent/grow, so manual entries appear without a hard refresh.
       qc.invalidateQueries({ queryKey: ["grow", "sensors"] });
       qc.invalidateQueries({ queryKey: ["sensor_readings"] });
+      qc.invalidateQueries({ queryKey: ["latest-sensor-snapshot"] });
+      qc.invalidateQueries({ queryKey: ["plant-tent-environment"] });
+      qc.invalidateQueries({ queryKey: ["environment-trends"] });
     },
   });
 }

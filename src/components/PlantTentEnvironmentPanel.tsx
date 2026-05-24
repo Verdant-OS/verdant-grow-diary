@@ -24,7 +24,9 @@ interface Props {
 export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, plantName, growId }: Props) {
   const enabled = !!tentId;
   const { data, isLoading } = usePlantTentLatestReadings(tentId ?? null);
-  const view = buildPlantTentEnvironmentView(enabled ? data ?? [] : []);
+  const rows = enabled ? data ?? [] : [];
+  const view = buildPlantTentEnvironmentView(rows);
+  const recent = buildRecentSensorSnapshotHistory(rows, { limit: 5 });
   const prefill = buildPlantQuickLogPrefill({ plantId, plantName, growId, tentId, tentName });
 
   function openQuickLog() {

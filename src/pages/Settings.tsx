@@ -17,7 +17,7 @@ export default function Settings() {
         </div>
         <div className="glass rounded-2xl p-5">
           <h2 className="font-display font-semibold mb-3">Units</h2>
-          <p className="text-sm text-muted-foreground">Temperature: °C · Nutrients: EC</p>
+          <p className="text-sm text-muted-foreground">Temperature: °F · Nutrients: EC</p>
         </div>
         <div className="glass rounded-2xl p-5">
           <h2 className="font-display font-semibold mb-3">Notifications</h2>

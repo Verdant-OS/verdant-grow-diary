@@ -57,8 +57,13 @@ function fmt(v: number | null, unit: string) {
 
 function snapshotSummary(s: SensorSnapshot | null) {
   if (!s) return "No snapshot";
+  // Temperature stored in Celsius, displayed in Fahrenheit (Verdant convention).
+  const tempF =
+    s.temp === null || !Number.isFinite(s.temp)
+      ? "—"
+      : `${(s.temp * 9 / 5 + 32).toFixed(1)}°F`;
   return [
-    `Temp ${fmt(s.temp, "°C")}`,
+    `Temp ${tempF}`,
     `RH ${fmt(s.rh, "%")}`,
     `VPD ${s.vpd === null ? "—" : `${s.vpd.toFixed(2)} kPa`}`,
   ].join(" · ");

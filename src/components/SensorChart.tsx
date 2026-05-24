@@ -10,7 +10,7 @@ interface Props {
 }
 
 const meta = {
-  temp: { label: "Temperature", unit: "°C", color: "hsl(var(--warning))" },
+  temp: { label: "Temperature", unit: "°F", color: "hsl(var(--warning))" },
   rh:   { label: "Humidity",    unit: "%",  color: "hsl(var(--info))" },
   vpd:  { label: "VPD",         unit: " kPa", color: "hsl(var(--primary))" },
   co2:  { label: "CO₂",         unit: " ppm", color: "hsl(var(--leaf-glow))" },
@@ -19,7 +19,12 @@ const meta = {
 
 export default function SensorChart({ data, metric, height = 220, variant = "area" }: Props) {
   const m = meta[metric];
-  const chartData = data.map((r) => ({ ts: r.ts, value: r[metric] }));
+  // Temperature is stored in Celsius; render Fahrenheit per Verdant convention.
+  const chartData = data.map((r) => {
+    const raw = r[metric];
+    const v = metric === "temp" && typeof raw === "number" ? raw * 9 / 5 + 32 : raw;
+    return { ts: r.ts, value: v };
+  });
   const Comp = (variant === "area" ? AreaChart : LineChart) as React.ComponentType<React.ComponentProps<typeof AreaChart>>;
   const Series = (variant === "area" ? Area : Line) as React.ComponentType<React.ComponentProps<typeof Area>>;
   const id = `grad-${metric}`;

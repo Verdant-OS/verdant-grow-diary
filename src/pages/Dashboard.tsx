@@ -52,6 +52,7 @@ import {
   isStale,
 } from "@/lib/sensorSnapshot";
 import { evaluateSensorQuality } from "@/lib/sensorQuality";
+import { tempFFromC, formatTempFFromC } from "@/lib/temperatureUnits";
 
 
 import type { SensorReadingRow } from "@/lib/db";
@@ -231,7 +232,7 @@ export default function Dashboard() {
                 </div>
                 {last && (
                   <div className="flex flex-wrap gap-1.5">
-                    <MetricChip label="T" value={last.temp ?? "—"} unit="°C" status={last.temp != null && (last.temp > 28 || last.temp < 19) ? "warn" : "ok"} />
+                    <MetricChip label="T" value={last.temp != null ? (tempFFromC(last.temp) ?? 0).toFixed(1) : "—"} unit="°F" status={last.temp != null && (last.temp > 28 || last.temp < 19) ? "warn" : "ok"} />
                     <MetricChip label="RH" value={last.rh ?? "—"} unit="%" status={last.rh != null && (last.rh > 65 || last.rh < 35) ? "warn" : "ok"} />
                     <MetricChip label="VPD" value={last.vpd ?? "—"} unit=" kPa" status={last.vpd != null && (last.vpd > 1.6 || last.vpd < 0.6) ? "warn" : "ok"} />
                   </div>
@@ -376,12 +377,12 @@ export default function Dashboard() {
               </div>
               <dl className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
                 {[
-                  { label: "Temperature", value: formatValue(sensorState.snapshot.temp, "°C") },
+                  { label: "Temperature", value: formatTempFFromC(sensorState.snapshot.temp) },
                   { label: "Humidity", value: formatValue(sensorState.snapshot.rh, "%") },
                   { label: "VPD", value: formatValue(sensorState.snapshot.vpd, " kPa", 2) },
                   { label: "Soil water", value: formatValue(sensorState.snapshot.soil, "%") },
                   { label: "Soil EC", value: formatValue(sensorState.snapshot.soil_ec, " mS/cm", 2) },
-                  { label: "Soil temp", value: formatValue(sensorState.snapshot.soil_temp, "°C") },
+                  { label: "Soil temp", value: formatTempFFromC(sensorState.snapshot.soil_temp) },
                   { label: "PPFD", value: formatValue(sensorState.snapshot.ppfd, " µmol", 0) },
                 ].map((m) => (
                   <div
@@ -507,8 +508,8 @@ export default function Dashboard() {
                 {[
                   {
                     label: "Temperature",
-                    avg: formatValue(trendsState.trends.temp.avg, "°C"),
-                    range: `${formatValue(trendsState.trends.temp.min, "°C")} – ${formatValue(trendsState.trends.temp.max, "°C")}`,
+                    avg: formatTempFFromC(trendsState.trends.temp.avg),
+                    range: `${formatTempFFromC(trendsState.trends.temp.min)} – ${formatTempFFromC(trendsState.trends.temp.max)}`,
                   },
                   {
                     label: "Humidity",

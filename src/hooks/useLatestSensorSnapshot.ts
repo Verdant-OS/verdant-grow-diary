@@ -7,10 +7,16 @@
  *  2. latest diary_entries.details.sensor_snapshot for the scoped grow
  *  3. otherwise EMPTY_SNAPSHOT (rendered as "No sensor data yet.")
  *
+ * Backed by TanStack Query so manual sensor inserts that invalidate
+ * `["latest-sensor-snapshot"]` (or `["sensor_readings"]`) trigger a refetch
+ * without a hard refresh. Sort uses `ts desc, created_at desc` as a
+ * deterministic tie-breaker for rows sharing a timestamp (multi-metric
+ * manual entries always share `ts`).
+ *
  * Read-only: no .insert/.update/.delete/.upsert/.rpc. No ai-coach call.
  * No device-control surface. No elevated keys. RLS enforces ownership.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import {
@@ -31,88 +37,71 @@ export function useLatestSensorSnapshot(
   tentIds: string[],
 ): SnapshotState {
   const { user } = useAuth();
-  const [state, setState] = useState<SnapshotState>({
-    status: "idle",
-    snapshot: EMPTY_SNAPSHOT,
-  });
-  // Stable dependency: tent ids are short uuid strings, joining is fine.
   const tentKey = tentIds.join("|");
 
-  const load = useCallback(async () => {
-    if (!user || !growId) {
-      setState({ status: "idle", snapshot: EMPTY_SNAPSHOT });
-      return;
-    }
-    setState({ status: "loading", snapshot: EMPTY_SNAPSHOT });
-
-    try {
-      // 1) Prefer live sensor_readings if any tents are scoped.
-      if (tentIds.length > 0) {
-        const { data, error } = await supabase
-          .from("sensor_readings")
-          .select("ts,metric,value,source,tent_id")
-          .in("tent_id", tentIds)
-          .order("ts", { ascending: false })
-          .limit(50);
-        if (!error && data && data.length > 0) {
-          const snap = snapshotFromReadings(
-            data.map((r) => ({
-              ts: r.ts,
-              metric: r.metric,
-              value: r.value as number | string | null,
-              source: r.source as string | null,
-            })),
-          );
-          if (snap) {
-            setState({ status: "ok", snapshot: snap });
-            return;
+  const query = useQuery<SensorSnapshot>({
+    queryKey: ["latest-sensor-snapshot", user?.id ?? "anon", growId ?? "none", tentKey],
+    enabled: !!user && !!growId,
+    queryFn: async () => {
+      try {
+        // 1) Prefer live sensor_readings if any tents are scoped.
+        if (tentIds.length > 0) {
+          const { data, error } = await supabase
+            .from("sensor_readings")
+            .select("ts,metric,value,source,tent_id,created_at")
+            .in("tent_id", tentIds)
+            .order("ts", { ascending: false })
+            .order("created_at", { ascending: false })
+            .limit(50);
+          if (!error && data && data.length > 0) {
+            const snap = snapshotFromReadings(
+              data.map((r) => ({
+                ts: r.ts,
+                metric: r.metric,
+                value: r.value as number | string | null,
+                source: r.source as string | null,
+              })),
+            );
+            if (snap) return snap;
           }
         }
-        if (error) {
-          // Fall through to diary fallback; don't crash.
+        // 2) Fall back to latest diary_entries.details.sensor_snapshot.
+        const { data: diaryRows, error: diaryErr } = await supabase
+          .from("diary_entries")
+          .select("entry_at,details")
+          .eq("grow_id", growId)
+          .order("entry_at", { ascending: false })
+          .limit(20);
+        if (diaryErr) throw diaryErr;
+        for (const row of diaryRows ?? []) {
+          const details = (row.details ?? null) as Record<string, unknown> | null;
+          const snap =
+            details && typeof details === "object"
+              ? snapshotFromDiary(
+                  row.entry_at,
+                  details.sensor_snapshot as Record<string, unknown> | undefined,
+                )
+              : null;
+          if (snap) return snap;
         }
+        // 3) Nothing available.
+        return EMPTY_SNAPSHOT;
+      } catch {
+        throw new Error("unavailable");
       }
+    },
+  });
 
-      // 2) Fall back to latest diary_entries.details.sensor_snapshot.
-      const { data: diaryRows, error: diaryErr } = await supabase
-        .from("diary_entries")
-        .select("entry_at,details")
-        .eq("grow_id", growId)
-        .order("entry_at", { ascending: false })
-        .limit(20);
-      if (diaryErr) {
-        setState({ status: "unavailable", snapshot: EMPTY_SNAPSHOT });
-        return;
-      }
-      for (const row of diaryRows ?? []) {
-        const details = (row.details ?? null) as Record<string, unknown> | null;
-        const snap = details && typeof details === "object"
-          ? snapshotFromDiary(
-              row.entry_at,
-              details.sensor_snapshot as Record<string, unknown> | undefined,
-            )
-          : null;
-        if (snap) {
-          setState({ status: "ok", snapshot: snap });
-          return;
-        }
-      }
-
-      // 3) Nothing available.
-      setState({ status: "ok", snapshot: EMPTY_SNAPSHOT });
-    } catch {
-      setState({ status: "unavailable", snapshot: EMPTY_SNAPSHOT });
-    }
-    // tentKey ensures we re-fetch when the underlying tent ids change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, growId, tentKey]);
-
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  return state;
+  if (!user || !growId) {
+    return { status: "idle", snapshot: EMPTY_SNAPSHOT };
+  }
+  if (query.isLoading || query.isFetching && !query.data) {
+    return { status: "loading", snapshot: EMPTY_SNAPSHOT };
+  }
+  if (query.isError) {
+    return { status: "unavailable", snapshot: EMPTY_SNAPSHOT };
+  }
+  return { status: "ok", snapshot: query.data ?? EMPTY_SNAPSHOT };
 }
 
 export default useLatestSensorSnapshot;

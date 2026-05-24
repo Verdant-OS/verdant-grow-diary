@@ -224,6 +224,12 @@ export function buildPlantMergePreview(
   const warnings: string[] = [];
   const blockers: string[] = [];
 
+  if (source.is_archived) {
+    blockers.push("This plant is already archived or merged.");
+  }
+  if (target.is_archived) {
+    blockers.push("Target plant is archived or merged.");
+  }
   if (!sameGrow) {
     if (opts.allowCrossGrow) {
       warnings.push(

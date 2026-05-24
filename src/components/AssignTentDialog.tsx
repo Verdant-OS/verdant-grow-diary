@@ -184,7 +184,7 @@ export default function AssignTentDialog({
       >
         <DialogHeader>
           <DialogTitle className="font-display">
-            {isMove ? "Move to another tent" : "Assign to tent"}
+            {isMove ? "Move Plant" : "Assign to tent"}
           </DialogTitle>
         </DialogHeader>
 
@@ -229,7 +229,7 @@ export default function AssignTentDialog({
                   )}
                   {current.length > 0 && (
                     <SelectGroup>
-                      <SelectLabel>Current tent</SelectLabel>
+                      <SelectLabel>Current Tent</SelectLabel>
                       {current.map((t) => (
                         <SelectItem
                           key={t.id}
@@ -244,6 +244,14 @@ export default function AssignTentDialog({
                   )}
                 </SelectContent>
               </Select>
+              {isMove && current[0]?.name && (
+                <p
+                  className="text-xs text-muted-foreground mt-1"
+                  data-testid="assign-tent-previous-tent"
+                >
+                  Previous Tent: {current[0].name}
+                </p>
+              )}
             </div>
             <Button
               type="submit"
@@ -251,7 +259,7 @@ export default function AssignTentDialog({
               className="gradient-leaf text-primary-foreground"
               data-testid="assign-tent-submit"
             >
-              {isMove ? "Move plant" : "Assign plant"}
+              {isMove ? "Move Plant" : "Assign plant"}
             </Button>
           </form>
         )}

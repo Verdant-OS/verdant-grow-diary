@@ -58,7 +58,10 @@ describe("AddExistingPlantDialog · query + write semantics", () => {
 
   it("queries plants in the same grow (no query-level tent_id IS NULL filter so move candidates are included)", () => {
     expect(DIALOG).toMatch(/\.from\(["']plants["']\)/);
-    expect(DIALOG).toMatch(/\.eq\(["']grow_id["'],\s*growId/);
+    // Widened OR filter: includes plants whose raw grow_id matches OR whose
+    // tent belongs to the current grow (covers legacy null-grow plants).
+    expect(DIALOG).toMatch(/grow_id\.eq\./);
+    expect(DIALOG).toMatch(/\.or\(/);
     // Query must NOT pre-filter by tent_id IS NULL — categorization is
     // done client-side so plants in another tent in the same grow remain
     // eligible as move candidates.

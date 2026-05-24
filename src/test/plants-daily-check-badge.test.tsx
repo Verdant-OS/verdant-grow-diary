@@ -52,11 +52,15 @@ const PLANTS = [
   },
 ];
 
-vi.mock("@/hooks/useGrowData", () => ({
-  useGrowPlants: () => ({ data: PLANTS }),
-  useGrowTents: () => ({ data: [{ id: "t1", name: "Tent A" }] }),
-  getGrowDataMeta: () => undefined,
-}));
+vi.mock("@/hooks/useGrowData", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/hooks/useGrowData")>();
+  return {
+    ...actual,
+    useGrowPlants: () => ({ data: PLANTS }),
+    useGrowTents: () => ({ data: [{ id: "t1", name: "Tent A" }] }),
+    getGrowDataMeta: () => undefined,
+  };
+});
 
 vi.mock("@/hooks/use-diary-entries", () => ({
   useDiaryEntries: () => ({

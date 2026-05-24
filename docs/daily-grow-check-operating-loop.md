@@ -18,6 +18,12 @@ A plant is considered "checked today" when either:
 No other source counts. There is no separate streak table and no fake local
 checked state.
 
+Both paths are exposed on `/daily-check` as first-class options in the
+**Choose today's check** section: "Add plant note" opens the existing
+QuickLog dialog, "Add sensor snapshot" jumps to the existing manual
+sensor reading card and is disabled (with a safe message) when the
+selected plant has no tent assignment.
+
 ## Happy path (from Dashboard)
 
 1. Dashboard renders the **Today's Grow Checks** panel listing active plants

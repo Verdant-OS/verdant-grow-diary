@@ -4,8 +4,10 @@
  * Read-only. Reuses the existing Daily Grow Check consistency + guidance
  * rules so Dashboard and Plant Detail never drift apart.
  */
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { CheckCircle2, Circle, Sprout, ArrowRight } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +19,10 @@ import {
   type PanelPlantInput,
   type PanelTentInput,
 } from "@/lib/dashboardDailyGrowCheckPanelRules";
+import {
+  ENTRY_CREATED_EVENT,
+  refreshDailyCheckQueries,
+} from "@/lib/dailyCheckRefreshRules";
 
 interface Props {
   scopedGrowId: string | null;

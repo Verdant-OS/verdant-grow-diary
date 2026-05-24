@@ -26,8 +26,9 @@ export default function PlantPhoto({
   className,
   iconClassName = "h-6 w-6",
   caption = "No plant photo yet",
+  ctaLabel = "Add photo",
   testId = "plant-photo",
-}: Props) {
+}: Props & { ctaLabel?: string | null }) {
   const trimmed = typeof src === "string" ? src.trim() : "";
   const [errored, setErrored] = useState(false);
   const showPlaceholder = !trimmed || errored;
@@ -47,7 +48,20 @@ export default function PlantPhoto({
           <Sprout className={iconClassName} />
           <ImageOff className="h-3.5 w-3.5" />
         </div>
-        <span className="text-[10px] uppercase tracking-wider">{caption}</span>
+        <span
+          className="text-[10px] uppercase tracking-wider"
+          data-testid={`${testId}-placeholder-caption`}
+        >
+          {caption}
+        </span>
+        {ctaLabel && (
+          <span
+            className="text-[10px] uppercase tracking-wider text-primary/80"
+            data-testid={`${testId}-placeholder-cta`}
+          >
+            {ctaLabel}
+          </span>
+        )}
       </div>
     );
   }

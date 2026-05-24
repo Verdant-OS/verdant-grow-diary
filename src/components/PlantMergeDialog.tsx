@@ -147,6 +147,32 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
 
   const target = candidates.find((p) => p.id === targetId);
 
+  // Helper-text summary for the merge target picker. Uses the same
+  // centralized rule that classifies dropdown options so the counts in
+  // the helper line match the options the user actually sees.
+  const mergeHelperText = useMemo(() => {
+    if (!sourceEffectiveGrowId) return "";
+    const inputs = (allPlants as unknown as Array<{
+      id: string;
+      growId?: string | null;
+      tentId?: string | null;
+      isArchived?: boolean | null;
+      lastNote?: string | null;
+    }>).map((p) => ({
+      id: p.id,
+      grow_id: p.growId ?? null,
+      tent_id: p.tentId ?? null,
+      is_archived: p.isArchived ?? false,
+      last_note: p.lastNote ?? null,
+    }));
+    const summary = summarizePlantDropdown(inputs, tentLinks, {
+      context: "merge_target",
+      growId: sourceEffectiveGrowId,
+      sourcePlantId: source.id,
+    });
+    return getPlantDropdownHelperText(summary);
+  }, [allPlants, tentLinks, sourceEffectiveGrowId, source.id]);
+
   // Counts: queried for preview; the actual merge runs server-side.
   const counts = useQuery({
     queryKey: ["plant-merge-counts", source.id],

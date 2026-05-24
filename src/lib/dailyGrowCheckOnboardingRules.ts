@@ -40,6 +40,8 @@ export interface OnboardingInput {
   /** Optional focus plant (e.g. came from /daily-check?plantId=). */
   focusedPlantId?: string | null;
   focusedPlantTentId?: string | null;
+  /** Optional focus tent (e.g. came from /tents/:id or single-tent setups). */
+  focusedTentId?: string | null;
   /** True if at least one manual (source = manual) sensor reading exists. */
   hasAnyManualSnapshot: boolean;
   /** True if at least one diary entry exists. */

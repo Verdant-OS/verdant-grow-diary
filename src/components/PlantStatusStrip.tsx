@@ -74,7 +74,7 @@ export default function PlantStatusStrip({ tentId, tentName, growId }: Props) {
           data-testid="plant-status-tent"
         >
           <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-            <Box className="h-3 w-3" /> Tent
+            <Box className="h-3 w-3" /> Current Tent
           </div>
           <div className="text-sm font-medium truncate mt-0.5">
             {tentName ?? "Assigned"}
@@ -86,10 +86,10 @@ export default function PlantStatusStrip({ tentId, tentName, growId }: Props) {
           data-testid="plant-status-tent"
         >
           <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-            <Box className="h-3 w-3" /> Tent
+            <Box className="h-3 w-3" /> Current Tent
           </div>
           <div className="text-sm font-medium mt-0.5 flex items-center gap-1 text-[hsl(var(--warning))]">
-            <AlertTriangle className="h-3 w-3" /> No tent
+            <AlertTriangle className="h-3 w-3" /> No tent assigned
           </div>
         </div>
       )}
@@ -102,7 +102,7 @@ export default function PlantStatusStrip({ tentId, tentName, growId }: Props) {
         data-stale={String(env.stale)}
       >
         <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-          <Gauge className="h-3 w-3" /> Environment
+          <Gauge className="h-3 w-3" /> Current Environment
         </div>
         <div
           className={`text-sm font-medium mt-0.5 truncate ${
@@ -120,7 +120,7 @@ export default function PlantStatusStrip({ tentId, tentName, growId }: Props) {
         data-count={alertCount ?? "unknown"}
       >
         <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-          <Bell className="h-3 w-3" /> Open Alerts
+          <Bell className="h-3 w-3" /> Tent Alerts
         </div>
         <div className="text-sm font-medium mt-0.5 flex items-center gap-2">
           {!hasTent ? (

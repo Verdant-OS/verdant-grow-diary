@@ -22,6 +22,10 @@ import {
 } from "@/components/ui/select";
 import { Move } from "lucide-react";
 import { toast } from "sonner";
+import {
+  buildPlantTentMovementDetails,
+  formatPlantTentMovementNote,
+} from "@/lib/plantTentMovementRules";
 
 interface TentRow {
   id: string;
@@ -109,22 +113,56 @@ export default function AssignTentDialog({
       .from("plants")
       .update({ tent_id: selected })
       .eq("id", plantId);
-    setBusy(false);
     if (error) {
+      setBusy(false);
       toast.error(error.message);
       return;
     }
-    toast.success(isMove ? "Plant moved to selected tent" : "Plant assigned to tent");
+
+    // Append a single timeline event so the move is visible in
+    // Plant Recent Activity / Timeline. Past entries are not rewritten.
+    // No sensor_readings, alerts, or action_queue writes happen here.
+    const prevName = current[0]?.name ?? null;
+    const nextName = others.find((t) => t.id === selected)?.name ?? null;
+    if (growId) {
+      const { error: diaryErr } = await supabase
+        .from("diary_entries")
+        .insert({
+          user_id: user.id,
+          grow_id: growId,
+          plant_id: plantId,
+          tent_id: selected,
+          note: formatPlantTentMovementNote({
+            previousTentName: prevName,
+            nextTentName: nextName,
+          }),
+          details: buildPlantTentMovementDetails({
+            previousTentId: currentTentId ?? null,
+            nextTentId: selected,
+            previousTentName: prevName,
+            nextTentName: nextName,
+          }) as unknown as Record<string, never>,
+        });
+      if (diaryErr) {
+        console.error("[AssignTentDialog] movement diary insert failed", diaryErr);
+        // Non-fatal: the plant has been moved successfully.
+      }
+    }
+
+    setBusy(false);
+    toast.success(isMove ? "Plant moved to new current tent" : "Plant assigned to tent");
     qc.invalidateQueries({ queryKey: ["plants"] });
     qc.invalidateQueries({ queryKey: ["grow", "plants"] });
     qc.invalidateQueries({ queryKey: ["grow", "plant", plantId] });
     qc.invalidateQueries({ queryKey: ["tent-detail"] });
     qc.invalidateQueries({ queryKey: ["grow", "tent"] });
+    qc.invalidateQueries({ queryKey: ["plant_recent_activity", plantId] });
+    qc.invalidateQueries({ queryKey: ["diary_entries"] });
     setSelected("");
     setOpen(false);
   }
 
-  const ctaLabel = isMove ? "Move to another tent" : "Assign to tent";
+  const ctaLabel = isMove ? "Move Plant" : "Assign to tent";
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -146,7 +184,7 @@ export default function AssignTentDialog({
       >
         <DialogHeader>
           <DialogTitle className="font-display">
-            {isMove ? "Move to another tent" : "Assign to tent"}
+            {isMove ? "Move Plant" : "Assign to tent"}
           </DialogTitle>
         </DialogHeader>
 
@@ -191,7 +229,7 @@ export default function AssignTentDialog({
                   )}
                   {current.length > 0 && (
                     <SelectGroup>
-                      <SelectLabel>Current tent</SelectLabel>
+                      <SelectLabel>Current Tent</SelectLabel>
                       {current.map((t) => (
                         <SelectItem
                           key={t.id}
@@ -206,6 +244,14 @@ export default function AssignTentDialog({
                   )}
                 </SelectContent>
               </Select>
+              {isMove && current[0]?.name && (
+                <p
+                  className="text-xs text-muted-foreground mt-1"
+                  data-testid="assign-tent-previous-tent"
+                >
+                  Previous Tent: {current[0].name}
+                </p>
+              )}
             </div>
             <Button
               type="submit"
@@ -213,7 +259,7 @@ export default function AssignTentDialog({
               className="gradient-leaf text-primary-foreground"
               data-testid="assign-tent-submit"
             >
-              {isMove ? "Move plant" : "Assign plant"}
+              {isMove ? "Move Plant" : "Assign plant"}
             </Button>
           </form>
         )}

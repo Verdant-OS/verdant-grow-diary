@@ -29,7 +29,7 @@ describe("AssignTentDialog · same-grow tent assignment", () => {
   });
 
   it("marks the current tent as disabled / labeled current", () => {
-    expect(DIALOG).toContain("Current tent");
+    expect(DIALOG).toContain("Current Tent");
     expect(DIALOG).toMatch(/value=\{t\.id\}[\s\S]{0,80}disabled[\s\S]{0,200}assign-tent-option-current/);
     expect(DIALOG).toContain("Plant is already in this tent");
   });
@@ -55,9 +55,8 @@ describe("AssignTentDialog · same-grow tent assignment", () => {
     expect(DIALOG).toMatch(/invalidateQueries\(\{\s*queryKey:\s*\["tent-detail"\]/);
   });
 
-  it("does not write to diary / sensor / alert / action_queue / pi-ingest tables", () => {
+  it("does not write to sensor / alert / action_queue / pi-ingest tables", () => {
     for (const t of [
-      "diary_entries",
       "sensor_readings",
       "alerts",
       "alert_events",

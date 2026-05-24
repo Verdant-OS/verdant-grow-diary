@@ -125,16 +125,46 @@ export default function PlantDailyGrowCheckConsistencyCard({
           </div>
           <p className="text-xs text-muted-foreground mt-1">Current rhythm</p>
         </div>
-        <Button
-          asChild
-          size="sm"
-          className="gradient-leaf text-primary-foreground shrink-0"
-          data-testid="plant-daily-grow-check-consistency-cta"
-        >
-          <Link to={ctaHref} aria-label={guidance.ctaLabel}>
-            Start Daily Grow Check <ArrowRight className="h-4 w-4" />
-          </Link>
-        </Button>
+        {showQuickActions ? (
+          <div
+            className="flex flex-wrap gap-2 shrink-0"
+            data-testid="plant-daily-grow-check-quick-actions"
+            data-plant-id={plantId}
+          >
+            <Button
+              asChild
+              size="sm"
+              variant="outline"
+              data-testid="plant-daily-grow-check-quick-action-note"
+            >
+              <Link to={noteHref} aria-label="Add note for today's Daily Grow Check">
+                <Sparkles className="h-3 w-3" /> Add note
+              </Link>
+            </Button>
+            <Button
+              asChild
+              size="sm"
+              className="gradient-leaf text-primary-foreground"
+              data-testid="plant-daily-grow-check-quick-action-sensor"
+            >
+              <Link to={sensorHref} aria-label="Add sensor snapshot for today's Daily Grow Check">
+                <Gauge className="h-3 w-3" /> Add sensor snapshot
+              </Link>
+            </Button>
+          </div>
+        ) : (
+          <Button
+            asChild
+            size="sm"
+            variant="outline"
+            className="shrink-0"
+            data-testid="plant-daily-grow-check-consistency-cta"
+          >
+            <Link to={ctaHref} aria-label={guidance.ctaLabel}>
+              Open Daily Check <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        )}
       </div>
 
       {/* Guidance block — empty state, today-unchecked, inconsistent, or

@@ -166,9 +166,15 @@ export default function DailyCheck() {
   const [lastSubmittedAt, setLastSubmittedAt] = useState<number | null>(null);
 
   // Listen for QuickLog success to mark steps as added + drive confirmation.
+  // We prefer the `createdAt` carried on the event detail (set by QuickLog
+  // after a successful insert) so the "Logged at" stamp reflects the
+  // real save time, not the moment the React listener happened to run.
   useEffect(() => {
-    function onEntry() {
-      setLastSubmittedAt(Date.now());
+    function onEntry(e: Event) {
+      const detail = (e as CustomEvent<{ createdAt?: string | number | Date }>).detail;
+      const raw = detail?.createdAt;
+      const parsed = raw != null ? new Date(raw).getTime() : NaN;
+      setLastSubmittedAt(Number.isFinite(parsed) ? parsed : Date.now());
       setState((s) => {
         const next = { ...s };
         if (step === "quicklog" && s.quicklog === "pending") next.quicklog = "added";
@@ -181,8 +187,17 @@ export default function DailyCheck() {
   }, [step]);
 
   const postSubmitActions = useMemo(
-    () => buildDailyCheckPostSubmitActions({ plantId: selectedPlant?.id ?? null }),
-    [selectedPlant?.id],
+    () =>
+      buildDailyCheckPostSubmitActions({
+        plantId: selectedPlant?.id ?? null,
+        source: entrySource,
+      }),
+    [selectedPlant?.id, entrySource],
+  );
+
+  const loggedAtLabel = useMemo(
+    () => formatDailyCheckLoggedAt(lastSubmittedAt),
+    [lastSubmittedAt],
   );
 
   const progress = stepProgress(step);

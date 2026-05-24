@@ -102,7 +102,13 @@ export default function DailyCheck() {
     () => parseDailyCheckEntrySource(fromParam),
     [fromParam],
   );
+  const methodParam = useQueryParam("method");
+  const methodHint = useMemo(
+    () => parseDailyCheckMethodHint(methodParam),
+    [methodParam],
+  );
   const { urlGrowId } = useScopedGrow();
+
 
   const [plantId, setPlantId] = useState<string>("");
   const [tentId, setTentId] = useState<string>("");

@@ -373,8 +373,10 @@ export default function Plants() {
                   : "bg-destructive";
             const archivedLabel = getArchivedPlantLabel(p);
             const isInactive = archivedLabel.kind !== "active";
-            const checkedToday = !isInactive && dailyCheckByPlant.get(p.id) === true;
+            const dailyCheckEntry = dailyCheckByPlant.get(p.id);
+            const checkedToday = !isInactive && dailyCheckEntry?.checkedToday === true;
             const showDailyCheckBadge = !isInactive && dailyCheckByPlant.has(p.id);
+            const methodLabel = checkedToday ? dailyCheckEntry?.methodLabel ?? null : null;
             return (
               <div key={p.id} className="relative animate-fade-in">
                 <Link

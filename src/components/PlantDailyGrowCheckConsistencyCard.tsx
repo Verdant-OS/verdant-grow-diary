@@ -79,7 +79,7 @@ export default function PlantDailyGrowCheckConsistencyCard({
   });
 
   const guidance = deriveDailyGrowCheckGuidance(summary);
-  const ctaHref = `/daily-check?plantId=${plantId}`;
+  const ctaHref = `/daily-check?plantId=${plantId}&from=plant-detail`;
 
   return (
     <Card

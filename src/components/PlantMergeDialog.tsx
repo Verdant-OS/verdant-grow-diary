@@ -53,6 +53,11 @@ import {
   canRepairPlantGrowContextFromTent,
   type TentGrowLink,
 } from "@/lib/plantGrowContextRules";
+import { summarizePlantDropdown } from "@/lib/plantDropdownEligibilityRules";
+import {
+  formatPlantDropdownEmptyState,
+  getPlantDropdownHelperText,
+} from "@/lib/plantDropdownReasonRules";
 
 interface Props {
   source: PlantForMerge;

@@ -19,6 +19,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   Bell,
@@ -27,6 +28,7 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Gauge,
+  Info,
   ListTodo,
   Sparkles,
   Sprout,
@@ -53,6 +55,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useTents } from "@/hooks/use-tents";
 import { usePlants } from "@/hooks/use-plants";
+import { useScopedGrow } from "@/hooks/useScopedGrow";
 import {
   DAILY_GROW_CHECK_STEPS,
   INITIAL_DAILY_GROW_CHECK_STATE,
@@ -67,6 +70,10 @@ import {
   type DailyGrowCheckStep,
   type StepOutcome,
 } from "@/lib/dailyGrowCheckRules";
+import {
+  DAILY_CHECK_WHAT_COUNTS_HINT,
+  resolveDailyCheckPlantSelection,
+} from "@/lib/dailyCheckPlantSelectionRules";
 import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingCard";
 
 function useQueryParam(name: string): string | null {
@@ -81,6 +88,7 @@ export default function DailyCheck() {
   const { data: tents = [], isLoading: tentsLoading } = useTents();
   const { data: plants = [], isLoading: plantsLoading } = usePlants();
   const initialPlantId = useQueryParam("plantId");
+  const { urlGrowId } = useScopedGrow();
 
   const [plantId, setPlantId] = useState<string>("");
   const [tentId, setTentId] = useState<string>("");
@@ -90,16 +98,26 @@ export default function DailyCheck() {
   );
   const [quickLogOpen, setQuickLogOpen] = useState(false);
 
-  // Seed plant from query param once data loads
+  // Pure resolution of the ?plantId= URL param against the active plant
+  // list and current grow scope. Never silently picks a different plant.
+  const plantResolution = useMemo(
+    () =>
+      resolveDailyCheckPlantSelection({
+        plantIdParam: initialPlantId,
+        plants,
+        activeGrowId: urlGrowId,
+      }),
+    [initialPlantId, plants, urlGrowId],
+  );
+
+  // Seed plant from query param ONLY when the resolution is valid. Invalid
+  // / out-of-scope / unknown cases fall through to the picker + banner.
   useEffect(() => {
-    if (initialPlantId && !plantId) {
-      const match = plants.find((p) => p.id === initialPlantId);
-      if (match) {
-        setPlantId(match.id);
-        if (match.tent_id) setTentId(match.tent_id);
-      }
-    }
-  }, [initialPlantId, plants, plantId]);
+    if (plantId) return;
+    if (plantResolution.status !== "valid" || !plantResolution.plant) return;
+    setPlantId(plantResolution.plant.id);
+    if (plantResolution.plant.tent_id) setTentId(plantResolution.plant.tent_id);
+  }, [plantResolution, plantId]);
 
   // When a plant is chosen, sync its assigned tent
   useEffect(() => {
@@ -167,8 +185,31 @@ export default function DailyCheck() {
         icon={<ClipboardCheck className="h-5 w-5" />}
       />
 
+      {/* Plain-language explanation of what a check actually is. */}
+      <p
+        className="text-xs text-muted-foreground flex items-start gap-1 mb-3"
+        data-testid="daily-grow-check-what-counts"
+      >
+        <Info className="h-3 w-3 mt-0.5 shrink-0" aria-hidden="true" />
+        <span>{DAILY_CHECK_WHAT_COUNTS_HINT}</span>
+      </p>
+
+      {/* Visible rejection banner when ?plantId= cannot be honored. */}
+      {plantResolution.message && (
+        <div
+          className="rounded-lg border border-[hsl(var(--warning))]/40 bg-[hsl(var(--warning))]/10 p-3 text-sm flex items-start gap-2 mb-4"
+          data-testid="daily-grow-check-plant-rejected"
+          data-rejection-status={plantResolution.status}
+          data-requested-plant-id={plantResolution.requestedPlantId ?? ""}
+          role="status"
+        >
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" aria-hidden="true" />
+          <span>{plantResolution.message}</span>
+        </div>
+      )}
+
       <DailyGrowCheckOnboardingCard
-        focusedPlantId={selectedPlant?.id ?? initialPlantId ?? null}
+        focusedPlantId={selectedPlant?.id ?? plantResolution.plant?.id ?? null}
         hideWhenReady
         className="mb-4"
       />

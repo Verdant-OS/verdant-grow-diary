@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Box, Lightbulb, Plus } from "lucide-react";
 import CreatePlantDialog from "@/components/CreatePlantDialog";
 import AddExistingPlantDialog from "@/components/AddExistingPlantDialog";
+import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useGrowTent, useGrowPlants, getGrowDataMeta } from "@/hooks/useGrowData";
 import {
@@ -191,21 +192,38 @@ export default function TentDetail() {
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3" data-testid="tent-detail-plants-grid">
             {plants.map((p) => (
-              <Link
+              <div
                 key={p.id}
-                to={`/plants/${p.id}`}
-                className="rounded-xl border border-border/40 overflow-hidden hover:border-primary/50 transition"
+                className="rounded-xl border border-border/40 overflow-hidden hover:border-primary/50 transition relative"
                 data-testid="tent-detail-plant-card"
               >
-                <div className="aspect-video bg-secondary/40"><img src={p.photo} alt="" className="w-full h-full object-cover" /></div>
-                <div className="p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium text-sm" data-testid="tent-detail-plant-name">{p.name}</span>
-                    <StageBadge stage={p.stage} />
+                <Link to={`/plants/${p.id}`} className="block">
+                  <div className="aspect-video bg-secondary/40"><img src={p.photo} alt="" className="w-full h-full object-cover" /></div>
+                  <div className="p-3">
+                    <div className="flex items-center justify-between gap-2 pr-8">
+                      <span className="font-medium text-sm" data-testid="tent-detail-plant-name">{p.name}</span>
+                      <StageBadge stage={p.stage} />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5" data-testid="tent-detail-plant-strain">{p.strain}</p>
+                    <p className="text-[11px] text-muted-foreground mt-1 capitalize">{p.health}</p>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5" data-testid="tent-detail-plant-strain">{p.strain}</p>
+                </Link>
+                <div className="absolute top-2 right-2">
+                  <PlantCardActionsMenu
+                    plant={{
+                      id: p.id,
+                      name: p.name,
+                      strain: p.strain,
+                      stage: p.stage,
+                      health: p.health,
+                      startedAt: p.startedAt,
+                      tentId: p.tentId ?? tent.id,
+                      growId: p.growId ?? tent.growId ?? null,
+                      lastNote: p.lastNote,
+                    }}
+                  />
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         )}

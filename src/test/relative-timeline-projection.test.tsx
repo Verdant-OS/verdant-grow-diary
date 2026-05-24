@@ -848,3 +848,233 @@ describe("filter chip — static safety", () => {
 });
 
 
+
+// ---------------------------------------------------------------------------
+// Summary strip — pure rules + render
+// ---------------------------------------------------------------------------
+
+import {
+  summarizeRelativeTimelineItems,
+  formatRelativeTimelineSummary,
+} from "@/lib/relativeTimelineProjectionRules";
+
+const NOW_MS = Date.parse("2026-05-01T12:00:00Z");
+
+describe("summarizeRelativeTimelineItems — pure rules", () => {
+  it("returns zero counts and null last activity for empty input", () => {
+    const s = summarizeRelativeTimelineItems([], { now: NOW_MS });
+    expect(s.total).toBe(0);
+    expect(s.counts).toEqual({
+      photos: 0,
+      watering: 0,
+      feeding: 0,
+      symptoms: 0,
+      training: 0,
+      notes: 0,
+    });
+    expect(s.lastActivityAt).toBeNull();
+    expect(s.lastActivityRelative).toBeNull();
+    expect(summarizeRelativeTimelineItems(null as any).total).toBe(0);
+  });
+
+  it("counts totals across categories", () => {
+    const items: RelativeTimelineItem[] = [
+      tItem({ id: "ph", eventType: "photo", source: "photo" }),
+      tItem({ id: "w1", eventType: "watering" }),
+      tItem({ id: "w2", eventType: "watering" }),
+      tItem({ id: "f1", eventType: "feeding" }),
+      tItem({ id: "s1", eventType: "pest_disease" }),
+      tItem({ id: "t1", eventType: "training" }),
+      tItem({ id: "t2", eventType: "defoliation" }),
+      tItem({ id: "n1", eventType: "note" }),
+    ];
+    const s = summarizeRelativeTimelineItems(items, { now: NOW_MS });
+    expect(s.total).toBe(8);
+    expect(s.counts).toEqual({
+      photos: 1,
+      watering: 2,
+      feeding: 1,
+      symptoms: 1,
+      training: 2,
+      notes: 1,
+    });
+  });
+
+  it("classifies unknown / null event types as notes", () => {
+    const items: RelativeTimelineItem[] = [
+      tItem({ id: "u", eventType: "weirdstuff" }),
+      tItem({ id: "z", eventType: "" }),
+    ];
+    const s = summarizeRelativeTimelineItems(items, { now: NOW_MS });
+    expect(s.counts.notes).toBe(2);
+    expect(s.total).toBe(2);
+  });
+
+  it("lastActivityAt picks the most recent valid date", () => {
+    const items: RelativeTimelineItem[] = [
+      tItem({ id: "a", occurredAt: "2026-04-10T00:00:00Z" }),
+      tItem({ id: "b", occurredAt: "2026-04-29T00:00:00Z" }),
+      tItem({ id: "c", occurredAt: "2026-04-20T00:00:00Z" }),
+    ];
+    const s = summarizeRelativeTimelineItems(items, { now: NOW_MS });
+    expect(s.lastActivityAt).toBe("2026-04-29T00:00:00Z");
+    expect(s.lastActivityRelative).toBe("2 days ago");
+  });
+
+  it("ignores invalid / missing dates for last activity", () => {
+    const items: RelativeTimelineItem[] = [
+      tItem({ id: "a", occurredAt: null }),
+      tItem({ id: "b", occurredAt: "not-a-date" }),
+    ];
+    const s = summarizeRelativeTimelineItems(items, { now: NOW_MS });
+    expect(s.lastActivityAt).toBeNull();
+    expect(s.lastActivityRelative).toBeNull();
+  });
+
+  it("relative copy is deterministic with injected now (Today / Yesterday / N days)", () => {
+    const mk = (iso: string) =>
+      summarizeRelativeTimelineItems([tItem({ id: "x", occurredAt: iso })], {
+        now: NOW_MS,
+      }).lastActivityRelative;
+    expect(mk("2026-05-01T08:00:00Z")).toBe("Today");
+    expect(mk("2026-04-30T11:00:00Z")).toBe("Yesterday");
+    expect(mk("2026-04-25T12:00:00Z")).toBe("6 days ago");
+  });
+});
+
+describe("formatRelativeTimelineSummary — pure rules", () => {
+  it("omits zero-count category chips when any non-zero category exists", () => {
+    const s = summarizeRelativeTimelineItems(
+      [tItem({ id: "w", eventType: "watering" })],
+      { now: NOW_MS },
+    );
+    const f = formatRelativeTimelineSummary(s);
+    const keys = f.chips.map((c) => c.key);
+    expect(keys).toContain("total");
+    expect(keys).toContain("watering");
+    expect(keys).not.toContain("photos");
+    expect(keys).not.toContain("feeding");
+  });
+
+  it("renders concise pluralized labels", () => {
+    const items: RelativeTimelineItem[] = [
+      tItem({ id: "ph1", eventType: "photo", source: "photo" }),
+      tItem({ id: "ph2", eventType: "photo", source: "photo" }),
+      tItem({ id: "w", eventType: "watering" }),
+      tItem({ id: "s", eventType: "symptoms" }),
+    ];
+    const f = formatRelativeTimelineSummary(
+      summarizeRelativeTimelineItems(items, { now: NOW_MS }),
+    );
+    const byKey = Object.fromEntries(f.chips.map((c) => [c.key, c.label]));
+    expect(byKey.total).toBe("4 events");
+    expect(byKey.photos).toBe("2 photos");
+    expect(byKey.watering).toBe("1 watering");
+    expect(byKey.symptoms).toBe("1 symptom");
+  });
+
+  it("renders Last activity copy when a valid date exists, otherwise null", () => {
+    const withDate = formatRelativeTimelineSummary(
+      summarizeRelativeTimelineItems(
+        [tItem({ id: "x", occurredAt: "2026-04-29T00:00:00Z" })],
+        { now: NOW_MS },
+      ),
+    );
+    expect(withDate.lastActivity).toBe("Last activity: 2 days ago");
+    const noDate = formatRelativeTimelineSummary(
+      summarizeRelativeTimelineItems([tItem({ id: "x", occurredAt: null })], {
+        now: NOW_MS,
+      }),
+    );
+    expect(noDate.lastActivity).toBeNull();
+  });
+});
+
+describe("PlantRelativeTimelineSection — summary strip render", () => {
+  it("summary strip appears above filter chips and reflects FULL timeline", () => {
+    mockUse.mockReturnValue({
+      data: [
+        entry({ id: "w", entry_at: "2026-04-05T00:00:00Z", entry_type: "watering" }),
+        entry({ id: "f", entry_at: "2026-04-06T00:00:00Z", entry_type: "feeding" }),
+        entry({ id: "n", entry_at: "2026-04-07T00:00:00Z", entry_type: "note" }),
+      ],
+      isLoading: false,
+    });
+    const { container } = render(
+      <PlantRelativeTimelineSection
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+      />,
+    );
+    const summary = screen.getByTestId("relative-timeline-summary");
+    const filters = screen.getByTestId("relative-timeline-filters");
+    expect(summary.getAttribute("data-total")).toBe("3");
+    // DOM order: summary before filters
+    const all = Array.from(container.querySelectorAll("[data-testid]"));
+    expect(all.indexOf(summary)).toBeLessThan(all.indexOf(filters));
+    expect(screen.getByTestId("relative-timeline-summary-chip-total")).toHaveTextContent(
+      "3 events",
+    );
+  });
+
+  it("selecting a filter does not change full summary counts", () => {
+    mockUse.mockReturnValue({
+      data: [
+        entry({ id: "w", entry_at: "2026-04-05T00:00:00Z", entry_type: "watering" }),
+        entry({ id: "n", entry_at: "2026-04-06T00:00:00Z", entry_type: "note" }),
+      ],
+      isLoading: false,
+    });
+    render(
+      <PlantRelativeTimelineSection
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+      />,
+    );
+    const before = screen
+      .getByTestId("relative-timeline-summary-chip-total")
+      .textContent;
+    fireEvent.click(screen.getByTestId("relative-timeline-filter-watering"));
+    const after = screen
+      .getByTestId("relative-timeline-summary-chip-total")
+      .textContent;
+    expect(after).toBe(before);
+    expect(after).toContain("2 events");
+  });
+
+  it("empty timeline preserves the original empty state (no summary strip)", () => {
+    mockUse.mockReturnValue({ data: [], isLoading: false });
+    render(
+      <PlantRelativeTimelineSection
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+      />,
+    );
+    expect(screen.getByTestId("relative-timeline-empty")).toBeTruthy();
+    expect(screen.queryByTestId("relative-timeline-summary")).toBeNull();
+  });
+});
+
+describe("summary strip — static safety", () => {
+  it("rules summary additions stay free of writes / RPC / schema strings", () => {
+    expect(RULES).not.toMatch(/calendar_events/);
+    expect(RULES).not.toMatch(/action_queue/);
+    expect(RULES).not.toMatch(/service_role/);
+    expect(RULES).not.toMatch(/\.(insert|update|delete|upsert)\s*\(/);
+    expect(RULES).not.toMatch(/\.rpc\(/);
+  });
+
+  it("component does not duplicate summary category mapping tables", () => {
+    expect(COMPONENT).not.toMatch(/CATEGORY_SINGULAR/);
+    expect(COMPONENT).not.toMatch(/CATEGORY_PLURAL/);
+    expect(COMPONENT).not.toMatch(/const\s+\w*CATEGORY\w*\s*=\s*[\[{]/);
+    expect(COMPONENT).toContain("formatRelativeTimelineSummary");
+    expect(COMPONENT).toContain("summarizeRelativeTimelineItems");
+  });
+
+  it("component does not introduce write / action_queue / device strings", () => {
+    expect(COMPONENT).not.toMatch(/action_queue/);
+    expect(COMPONENT).not.toMatch(/service_role/);
+    expect(COMPONENT).not.toMatch(/\.(insert|update|delete|upsert)\s*\(/);
+  });
+});

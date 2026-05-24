@@ -15,12 +15,15 @@ import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import {
   buildRelativeTimelineProjection,
   filterRelativeTimelineItems,
+  formatRelativeTimelineSummary,
   getRelativeTimelineFilterEmptyState,
   groupRelativeTimelineByStage,
   RELATIVE_TIMELINE_FILTERS,
+  summarizeRelativeTimelineItems,
   type RelativeTimelineFilterKey,
   type RelativeTimelineItem,
 } from "@/lib/relativeTimelineProjectionRules";
+
 
 
 interface Props {
@@ -155,12 +158,49 @@ export default function PlantRelativeTimelineSection({
           </p>
         ) : (
           <div className="space-y-3">
+            {(() => {
+              const formatted = formatRelativeTimelineSummary(
+                summarizeRelativeTimelineItems(items),
+              );
+              return (
+                <div
+                  data-testid="relative-timeline-summary"
+                  data-total={formatted.chips.find((c) => c.key === "total")?.count ?? 0}
+                  className="flex flex-wrap items-center gap-1.5 rounded-md border border-border/40 bg-muted/20 p-2 text-xs"
+                >
+                  {formatted.chips.map((chip) => (
+                    <span
+                      key={chip.key}
+                      data-testid={`relative-timeline-summary-chip-${chip.key}`}
+                      data-count={chip.count}
+                      className={cn(
+                        "inline-flex items-center rounded-full px-2 py-0.5 border",
+                        chip.key === "total"
+                          ? "bg-primary/10 text-foreground border-primary/30 font-medium"
+                          : "bg-secondary/40 text-muted-foreground border-border/40",
+                      )}
+                    >
+                      {chip.label}
+                    </span>
+                  ))}
+                  {formatted.lastActivity && (
+                    <span
+                      data-testid="relative-timeline-summary-last-activity"
+                      className="ml-auto text-muted-foreground"
+                    >
+                      {formatted.lastActivity}
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
             <div
               role="radiogroup"
               aria-label="Filter timeline by event type"
               data-testid="relative-timeline-filters"
               className="flex flex-wrap gap-1.5"
             >
+
               {RELATIVE_TIMELINE_FILTERS.map((f) => {
                 const selected = filter === f.key;
                 return (

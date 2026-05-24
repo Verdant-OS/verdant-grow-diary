@@ -95,23 +95,26 @@ export default function ManualSensorReadingCard({ tents, defaultTentId }: Props)
           </span>
         </div>
 
-        {tents.length > 1 && (
-          <div className="space-y-1">
+        {tents.length > 0 && (
+          <div className="space-y-1" data-testid="manual-reading-tent-row">
             <Label htmlFor="manual-reading-tent" className="text-xs">
               Tent
             </Label>
             <Select value={tentId} onValueChange={setTentId}>
-              <SelectTrigger id="manual-reading-tent">
+              <SelectTrigger id="manual-reading-tent" data-testid="manual-reading-tent-select">
                 <SelectValue placeholder="Select tent" />
               </SelectTrigger>
               <SelectContent>
                 {tents.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>
+                  <SelectItem key={t.id} value={t.id} data-testid={`manual-reading-tent-option-${t.id}`}>
                     {t.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <p className="text-[11px] text-muted-foreground">
+              Saving to: <strong>{tents.find((t) => t.id === tentId)?.name ?? "—"}</strong>
+            </p>
           </div>
         )}
 

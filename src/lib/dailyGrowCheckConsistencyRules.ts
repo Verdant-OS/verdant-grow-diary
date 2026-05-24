@@ -106,7 +106,15 @@ export function buildDailyGrowCheckConsistency(
     else break;
   }
 
-  const todayHasActivity = rows.length > 0 && ACTIVE_KINDS.has(rows[0].kind);
+  const todayRow = rows[0];
+  const todayHasActivity = !!todayRow && ACTIVE_KINDS.has(todayRow.kind);
+
+  let todayMethod: TodayCheckMethod = "none";
+  if (todayHasActivity && todayRow) {
+    if (todayRow.hasManual && todayRow.hasQuickLog) todayMethod = "both";
+    else if (todayRow.hasManual) todayMethod = "sensor-snapshot";
+    else if (todayRow.hasQuickLog) todayMethod = "note";
+  }
 
   return {
     windowDays,
@@ -114,6 +122,7 @@ export function buildDailyGrowCheckConsistency(
     currentStreak,
     missedDays: windowDays - checkedDays,
     todayHasActivity,
+    todayMethod,
     hasAnyActivity: checkedDays > 0,
     tentLevelDays,
     rows,

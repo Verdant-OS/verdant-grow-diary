@@ -15,6 +15,7 @@ import AddExistingPlantDialog from "@/components/AddExistingPlantDialog";
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
 import TentCardActionsMenu from "@/components/TentCardActionsMenu";
 import PlantPhoto from "@/components/PlantPhoto";
+import TentManualSnapshotChangeContext from "@/components/TentManualSnapshotChangeContext";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useGrowTent, useGrowPlants, getGrowDataMeta } from "@/hooks/useGrowData";
 import {
@@ -152,6 +153,7 @@ export default function TentDetail() {
             </div>
           )}
         </div>
+        <TentManualSnapshotChangeContext tentId={id ?? null} readings={readings} />
         {series.length === 0 ? (
           <p
             className="text-sm text-muted-foreground py-6 text-center"

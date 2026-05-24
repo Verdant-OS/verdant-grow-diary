@@ -128,3 +128,59 @@ export function buildDailyGrowCheckConsistency(
     rows,
   };
 }
+
+/**
+ * Method classification for a single day in the 7-day breakdown.
+ *  - "note":   only a plant QuickLog counted that day
+ *  - "sensor": only a current-tent manual sensor snapshot counted
+ *  - "both":   both kinds counted
+ *  - "missed": nothing counted
+ * Never implies plant health, completion, or quality.
+ */
+export type DailyMethodBreakdownMethod = "note" | "sensor" | "both" | "missed";
+
+export interface DailyMethodBreakdownDay {
+  dayKey: string;
+  label: string;
+  method: DailyMethodBreakdownMethod;
+}
+
+export type DailyMethodBreakdownOrder = "oldest-first" | "newest-first";
+
+/**
+ * Derive a deterministic 7-day method breakdown from an existing
+ * ConsistencySummary. Pure — no fetching, no writes.
+ */
+export function buildDailyMethodBreakdown(
+  summary: Pick<ConsistencySummary, "rows">,
+  order: DailyMethodBreakdownOrder = "oldest-first",
+): DailyMethodBreakdownDay[] {
+  const days: DailyMethodBreakdownDay[] = summary.rows.map((r) => {
+    let method: DailyMethodBreakdownMethod;
+    if (r.hasManual && r.hasQuickLog) method = "both";
+    else if (r.hasManual) method = "sensor";
+    else if (r.hasQuickLog) method = "note";
+    else method = "missed";
+    return { dayKey: r.dayKey, label: r.label, method };
+  });
+  // rows are newest-first; reverse for oldest-first.
+  if (order === "oldest-first") days.reverse();
+  return days;
+}
+
+export function formatDailyMethodBreakdownLabel(
+  method: DailyMethodBreakdownMethod,
+): string {
+  switch (method) {
+    case "note":
+      return "Note";
+    case "sensor":
+      return "Sensor";
+    case "both":
+      return "Both";
+    case "missed":
+    default:
+      return "Missed";
+  }
+}
+

@@ -78,7 +78,33 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<MergeRpcSummary | null>(null);
 
-  const { data: allPlants = [] } = useGrowPlants(undefined, source.grow_id ?? undefined);
+  const { data: allTentsRaw = [] } = useTents();
+  const tentLinks = useMemo<TentGrowLink[]>(
+    () =>
+      (allTentsRaw as Array<{ id: string; grow_id?: string | null }>).map((t) => ({
+        id: t.id,
+        grow_id: t.grow_id ?? null,
+      })),
+    [allTentsRaw],
+  );
+
+  const sourceEffectiveGrowId = useMemo(
+    () => getEffectivePlantGrowId(source, tentLinks),
+    [source, tentLinks],
+  );
+  const sourceCanRepair = useMemo(
+    () => canRepairPlantGrowContextFromTent(source, tentLinks),
+    [source, tentLinks],
+  );
+
+  // Use the effective grow id to scope candidates so a plant whose
+  // `grow_id` is null but whose tent belongs to a grow still loads the
+  // right same-grow targets.
+  const { data: allPlants = [] } = useGrowPlants(
+    undefined,
+    sourceEffectiveGrowId ?? undefined,
+  );
+
   const candidates = useMemo(
     () =>
       (allPlants as unknown as Array<{
@@ -97,8 +123,15 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
           grow_id: p.growId ?? null,
           tent_id: p.tentId ?? null,
           started_at: p.startedAt ?? null,
-        })),
-    [allPlants, source.id],
+        }))
+        // Same effective grow id only. Cross-grow targets are excluded
+        // even if the user briefly held a stale grow_id.
+        .filter((p) => {
+          if (!sourceEffectiveGrowId) return false;
+          const eff = getEffectivePlantGrowId(p, tentLinks);
+          return eff === sourceEffectiveGrowId;
+        }),
+    [allPlants, source.id, sourceEffectiveGrowId, tentLinks],
   );
 
   const target = candidates.find((p) => p.id === targetId);
@@ -140,7 +173,7 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
     return buildPlantMergePreview(source, target, counts.data ?? {});
   }, [source, target, counts.data]);
 
-  const validation = validatePlantMerge(source, target ?? null);
+  const validation = validatePlantGrowContextForMerge(source, target ?? null, tentLinks);
 
   const canExecuteRpc =
     !!preview && validation.ok && preview.recommendedAction === "execute_via_rpc";

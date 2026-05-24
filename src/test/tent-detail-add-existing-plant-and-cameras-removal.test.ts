@@ -93,7 +93,8 @@ describe("AddExistingPlantDialog · query + write semantics", () => {
   });
 
   it("offers a 'create new plant' fallback when no eligible plants exist", () => {
-    expect(DIALOG).toContain("No available plants for this grow.");
+    // Empty-state copy is rendered via the centralized helper.
+    expect(DIALOG).toMatch(/formatPlantDropdownEmptyState\(\s*["']add_existing_to_tent["']\s*\)/);
     expect(DIALOG).toContain("CreatePlantDialog");
   });
 

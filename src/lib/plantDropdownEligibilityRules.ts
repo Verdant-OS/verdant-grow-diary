@@ -278,6 +278,8 @@ export interface PlantDropdownExclusionSummary {
   hiddenCrossGrow: number;
   hiddenMissingGrow: number;
   hiddenSourcePlant: number;
+  /** Disabled in-place (still visible) — only relevant for add_existing_to_tent. */
+  hiddenAlreadyInTent: number;
 }
 
 export function summarizePlantDropdown(
@@ -292,6 +294,7 @@ export function summarizePlantDropdown(
     hiddenCrossGrow: 0,
     hiddenMissingGrow: 0,
     hiddenSourcePlant: 0,
+    hiddenAlreadyInTent: 0,
   };
   const includeArchived =
     opts.includeArchived === true || opts.context === "logs_filter";
@@ -314,6 +317,14 @@ export function summarizePlantDropdown(
       summary.hiddenCrossGrow += 1;
       continue;
     }
+    if (
+      opts.context === "add_existing_to_tent" &&
+      opts.tentId &&
+      readTentId(p) === opts.tentId
+    ) {
+      summary.hiddenAlreadyInTent += 1;
+      continue;
+    }
     summary.visible += 1;
   }
   return summary;
@@ -333,9 +344,7 @@ export function formatPlantDropdownHelper(
   if (growName) parts[parts.length - 1] += ` in ${growName}`;
   parts[parts.length - 1] += ".";
   if (summary.hiddenArchived > 0) {
-    parts.push(
-      `${summary.hiddenArchived} archived/merged hidden.`,
-    );
+    parts.push(`${summary.hiddenArchived} archived/merged hidden.`);
   }
   if (summary.hiddenMissingGrow > 0) {
     parts.push(
@@ -343,8 +352,11 @@ export function formatPlantDropdownHelper(
     );
   }
   if (summary.hiddenCrossGrow > 0) {
+    parts.push(`${summary.hiddenCrossGrow} in another grow.`);
+  }
+  if (summary.hiddenAlreadyInTent > 0) {
     parts.push(
-      `${summary.hiddenCrossGrow} in another grow.`,
+      `${summary.hiddenAlreadyInTent} plant${summary.hiddenAlreadyInTent === 1 ? "" : "s"} already in this tent.`,
     );
   }
   return parts.join(" ");

@@ -53,6 +53,11 @@ import {
   canRepairPlantGrowContextFromTent,
   type TentGrowLink,
 } from "@/lib/plantGrowContextRules";
+import { summarizePlantDropdown } from "@/lib/plantDropdownEligibilityRules";
+import {
+  formatPlantDropdownEmptyState,
+  getPlantDropdownHelperText,
+} from "@/lib/plantDropdownReasonRules";
 
 interface Props {
   source: PlantForMerge;
@@ -141,6 +146,32 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
   );
 
   const target = candidates.find((p) => p.id === targetId);
+
+  // Helper-text summary for the merge target picker. Uses the same
+  // centralized rule that classifies dropdown options so the counts in
+  // the helper line match the options the user actually sees.
+  const mergeHelperText = useMemo(() => {
+    if (!sourceEffectiveGrowId) return "";
+    const inputs = (allPlants as unknown as Array<{
+      id: string;
+      growId?: string | null;
+      tentId?: string | null;
+      isArchived?: boolean | null;
+      lastNote?: string | null;
+    }>).map((p) => ({
+      id: p.id,
+      grow_id: p.growId ?? null,
+      tent_id: p.tentId ?? null,
+      is_archived: p.isArchived ?? false,
+      last_note: p.lastNote ?? null,
+    }));
+    const summary = summarizePlantDropdown(inputs, tentLinks, {
+      context: "merge_target",
+      growId: sourceEffectiveGrowId,
+      sourcePlantId: source.id,
+    });
+    return getPlantDropdownHelperText(summary);
+  }, [allPlants, tentLinks, sourceEffectiveGrowId, source.id]);
 
   // Counts: queried for preview; the actual merge runs server-side.
   const counts = useQuery({
@@ -368,8 +399,13 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
                   <SelectGroup>
                     <SelectLabel>Same grow</SelectLabel>
                     {candidates.length === 0 && (
-                      <SelectItem value="__none__" disabled>
-                        No other plants in this grow
+                      <SelectItem
+                        value="__none__"
+                        disabled
+                        aria-label={formatPlantDropdownEmptyState("merge_target")}
+                        data-testid="plant-merge-target-empty"
+                      >
+                        {formatPlantDropdownEmptyState("merge_target")}
                       </SelectItem>
                     )}
                     {candidates.map((p) => (
@@ -381,6 +417,14 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
                   </SelectGroup>
                 </SelectContent>
               </Select>
+              {mergeHelperText && (
+                <p
+                  className="text-xs text-muted-foreground mt-1"
+                  data-testid="plant-merge-target-helper"
+                >
+                  {mergeHelperText}
+                </p>
+              )}
               {!validation.ok && targetId && (
                 <p
                   className="text-xs text-destructive mt-1 flex items-center gap-1"

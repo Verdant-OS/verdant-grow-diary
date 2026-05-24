@@ -26,8 +26,13 @@ import CreatePlantDialog from "@/components/CreatePlantDialog";
 import { useGrowTents } from "@/hooks/useGrowData";
 import {
   getEffectivePlantGrowId,
+  summarizePlantDropdown,
   type TentGrowRef,
 } from "@/lib/plantDropdownEligibilityRules";
+import {
+  formatPlantDropdownEmptyState,
+  getPlantDropdownHelperText,
+} from "@/lib/plantDropdownReasonRules";
 
 interface PlantRow {
   id: string;
@@ -131,6 +136,19 @@ export default function AddExistingPlantDialog({ tentId, growId, trigger }: Prop
 
   const eligibleCount = unassigned.length + otherTent.length;
 
+  // Helper-text summary: counts archived/missing-grow/cross-grow are
+  // already enforced by the supabase query (`is_archived = false` + grow
+  // OR filter), but already-in-this-tent is computed from local rows.
+  const helperText = useMemo(() => {
+    if (!growId) return "";
+    const summary = summarizePlantDropdown(rows, tentRefs, {
+      context: "add_existing_to_tent",
+      growId,
+      tentId,
+    });
+    return getPlantDropdownHelperText(summary);
+  }, [rows, tentRefs, growId, tentId]);
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!user) {
@@ -203,8 +221,16 @@ export default function AddExistingPlantDialog({ tentId, growId, trigger }: Prop
             data-testid="add-existing-plant-empty"
           >
             <p className="text-sm text-muted-foreground">
-              No available plants for this grow.
+              {formatPlantDropdownEmptyState("add_existing_to_tent")}
             </p>
+            {helperText && (
+              <p
+                className="text-xs text-muted-foreground"
+                data-testid="add-existing-plant-helper"
+              >
+                {helperText}
+              </p>
+            )}
             <CreatePlantDialog
               defaultTentId={tentId}
               defaultGrowId={growId ?? undefined}
@@ -264,6 +290,8 @@ export default function AddExistingPlantDialog({ tentId, growId, trigger }: Prop
                           key={p.id}
                           value={p.id}
                           disabled
+                          aria-label={`${renderLabel(p)} — already in this tent`}
+                          title="Already in this tent"
                           data-testid={`add-existing-plant-option-current-${p.id}`}
                         >
                           {renderLabel(p)} — already in this tent
@@ -273,6 +301,14 @@ export default function AddExistingPlantDialog({ tentId, growId, trigger }: Prop
                   )}
                 </SelectContent>
               </Select>
+              {helperText && (
+                <p
+                  className="text-xs text-muted-foreground mt-1"
+                  data-testid="add-existing-plant-helper"
+                >
+                  {helperText}
+                </p>
+              )}
             </div>
             <Button
               type="submit"

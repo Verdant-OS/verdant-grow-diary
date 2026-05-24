@@ -17,7 +17,10 @@ import { resolve } from "node:path";
 import {
   DAILY_CHECK_SUCCESS_BODY,
   DAILY_CHECK_SUCCESS_TITLE,
+  buildDailyCheckEntryHref,
   buildDailyCheckPostSubmitActions,
+  formatDailyCheckLoggedAt,
+  parseDailyCheckEntrySource,
 } from "@/lib/dailyCheckPostSubmitRules";
 
 // ---------------------------------------------------------------------------
@@ -31,14 +34,51 @@ describe("buildDailyCheckPostSubmitActions · pure rules", () => {
     expect(actions[0].primary).toBe(true);
   });
 
-  it("returns both actions when a plant is selected and points View Plant at /plants/<id>", () => {
+  it("with no source + plantId, primary is Back to Dashboard and secondary is View Plant", () => {
     const actions = buildDailyCheckPostSubmitActions({ plantId: "p-123" });
     expect(actions.map((a) => a.key)).toEqual(["dashboard", "plant"]);
-    const plant = actions.find((a) => a.key === "plant")!;
-    expect(plant.href).toBe("/plants/p-123");
-    expect(plant.primary).toBe(true);
     const dash = actions.find((a) => a.key === "dashboard")!;
+    const plant = actions.find((a) => a.key === "plant")!;
+    expect(dash.primary).toBe(true);
     expect(dash.href).toBe("/");
+    expect(plant.primary).toBe(false);
+    expect(plant.href).toBe("/plants/p-123");
+    expect(plant.label).toBe("View Plant");
+  });
+
+  it("with source=dashboard, primary is Back to Dashboard", () => {
+    const actions = buildDailyCheckPostSubmitActions({
+      plantId: "p-1",
+      source: "dashboard",
+    });
+    const primary = actions.find((a) => a.primary)!;
+    expect(primary.key).toBe("dashboard");
+    expect(primary.href).toBe("/");
+    expect(primary.label).toBe("Back to Dashboard");
+  });
+
+  it("with source=plant-detail and a valid plantId, primary is Back to Plant", () => {
+    const actions = buildDailyCheckPostSubmitActions({
+      plantId: "p-9",
+      source: "plant-detail",
+    });
+    // Primary renders first.
+    expect(actions[0].key).toBe("plant");
+    expect(actions[0].primary).toBe(true);
+    expect(actions[0].label).toBe("Back to Plant");
+    expect(actions[0].href).toBe("/plants/p-9");
+    expect(actions[1].key).toBe("dashboard");
+    expect(actions[1].primary).toBe(false);
+  });
+
+  it("with source=plant-detail but no plantId, falls back safely to Dashboard primary", () => {
+    const actions = buildDailyCheckPostSubmitActions({
+      plantId: null,
+      source: "plant-detail",
+    });
+    expect(actions).toHaveLength(1);
+    expect(actions[0].key).toBe("dashboard");
+    expect(actions[0].primary).toBe(true);
   });
 
   it("success copy avoids forbidden wording", () => {
@@ -46,6 +86,63 @@ describe("buildDailyCheckPostSubmitActions · pure rules", () => {
     expect(s).not.toMatch(/\bperfect\b/);
     expect(s).not.toMatch(/\bcompleted\b/);
     expect(s).not.toMatch(/guaranteed healthy/);
+  });
+});
+
+describe("parseDailyCheckEntrySource · pure rules", () => {
+  it("recognizes the two known sources, case-insensitively", () => {
+    expect(parseDailyCheckEntrySource("dashboard")).toBe("dashboard");
+    expect(parseDailyCheckEntrySource("PLANT-DETAIL")).toBe("plant-detail");
+    expect(parseDailyCheckEntrySource("  dashboard  ")).toBe("dashboard");
+  });
+
+  it("returns null for missing or unknown sources", () => {
+    expect(parseDailyCheckEntrySource(null)).toBeNull();
+    expect(parseDailyCheckEntrySource(undefined)).toBeNull();
+    expect(parseDailyCheckEntrySource("")).toBeNull();
+    expect(parseDailyCheckEntrySource("hacker")).toBeNull();
+    expect(parseDailyCheckEntrySource("plant_detail")).toBeNull();
+  });
+});
+
+describe("buildDailyCheckEntryHref · pure rules", () => {
+  it("keeps the bare ?plantId= contract when no source is provided", () => {
+    expect(buildDailyCheckEntryHref({ plantId: "p-1" })).toBe(
+      "/daily-check?plantId=p-1",
+    );
+  });
+
+  it("appends a known source", () => {
+    expect(
+      buildDailyCheckEntryHref({ plantId: "p-1", source: "dashboard" }),
+    ).toBe("/daily-check?plantId=p-1&from=dashboard");
+    expect(
+      buildDailyCheckEntryHref({ plantId: "p-1", source: "plant-detail" }),
+    ).toBe("/daily-check?plantId=p-1&from=plant-detail");
+  });
+});
+
+describe("formatDailyCheckLoggedAt · pure rules", () => {
+  it("formats a real timestamp deterministically", () => {
+    const ts = new Date("2026-05-24T15:42:00Z").getTime();
+    const now = new Date("2026-05-24T15:43:00Z");
+    const out = formatDailyCheckLoggedAt(ts, now);
+    expect(out).toMatch(/^Logged at /);
+    // Just assert the structure — clock formatting varies by tz, so the
+    // important guarantee is non-null + the prefix + a digit pattern.
+    expect(out).toMatch(/\d{1,2}:\d{2}/);
+  });
+
+  it("returns null for missing, invalid, or future timestamps", () => {
+    const now = new Date("2026-05-24T15:42:00Z");
+    expect(formatDailyCheckLoggedAt(null, now)).toBeNull();
+    expect(formatDailyCheckLoggedAt(undefined, now)).toBeNull();
+    expect(formatDailyCheckLoggedAt(Number.NaN, now)).toBeNull();
+    expect(formatDailyCheckLoggedAt("not-a-date", now)).toBeNull();
+    // 5 minutes in the future → reject.
+    expect(
+      formatDailyCheckLoggedAt(now.getTime() + 5 * 60_000, now),
+    ).toBeNull();
   });
 });
 

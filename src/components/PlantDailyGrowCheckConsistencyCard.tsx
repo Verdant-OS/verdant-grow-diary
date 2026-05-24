@@ -147,10 +147,10 @@ export default function PlantDailyGrowCheckConsistencyCard({
 
       {!summary.hasAnyActivity && (
         <div
-          className="text-sm text-muted-foreground sr-only"
+          className="sr-only"
           data-testid="plant-daily-grow-check-consistency-empty"
         >
-          Checked {summary.checkedDays} of last {summary.windowDays} days.
+          No check activity in the last {summary.windowDays} days.
         </div>
       )}
 

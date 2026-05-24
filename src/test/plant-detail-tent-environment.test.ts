@@ -23,7 +23,7 @@ const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 
 // --- Mock supabase BEFORE importing the hook ---
 const limitMock = vi.fn();
-const orderMock = vi.fn(() => ({ limit: limitMock }));
+const orderMock: ReturnType<typeof vi.fn> = vi.fn(() => ({ order: orderMock, limit: limitMock }));
 const eqMock = vi.fn(() => ({ order: orderMock }));
 const selectMock = vi.fn(() => ({ eq: eqMock }));
 const fromMock: ReturnType<typeof vi.fn> = vi.fn(() => ({ select: selectMock }));

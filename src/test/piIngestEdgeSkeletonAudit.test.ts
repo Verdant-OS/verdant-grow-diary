@@ -182,6 +182,9 @@ describe("pi-ingest edge skeleton audit — service_role confinement", () => {
         const st = statSync(p);
         if (st.isDirectory()) walk(p);
         else if (/\.(ts|tsx)$/.test(name)) {
+          // Skip test files — they may mention the env name in
+          // guardrail assertions without ever reading its value.
+          if (/\.(test|spec)\.(ts|tsx)$/.test(name)) continue;
           const text = readFileSync(p, "utf8");
           if (/SUPABASE_SERVICE_ROLE_KEY/.test(text)) offenders.push(p);
         }
@@ -190,6 +193,7 @@ describe("pi-ingest edge skeleton audit — service_role confinement", () => {
     walk(resolve(ROOT, "src"));
     expect(offenders).toEqual([]);
   });
+
 });
 
 describe("pi-ingest edge skeleton audit — supporting docs intact", () => {

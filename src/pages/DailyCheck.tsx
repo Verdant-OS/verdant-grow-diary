@@ -294,7 +294,7 @@ export default function DailyCheck() {
                   variant="outline"
                   className="flex-1"
                   data-testid="daily-grow-check-mark-manual-added"
-                  onClick={() => markAndAdvance("manual", "added")}
+                  onClick={() => markAndAdvance("manual", "visited")}
                 >
                   <Check className="h-4 w-4" /> Saved snapshot
                 </Button>

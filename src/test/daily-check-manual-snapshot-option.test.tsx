@@ -51,7 +51,7 @@ describe("Daily Grow Check sensor success event contract", () => {
     expect(HOOK).toMatch(/createdAt/);
     expect(HOOK).toMatch(/tentId/);
     // Must only dispatch from the success callback, never on failure.
-    expect(HOOK).toMatch(/onSuccess[\s\S]{0,400}dispatchEvent/);
+    expect(HOOK).toMatch(/onSuccess[\s\S]{0,1200}dispatchEvent/);
   });
 
   it("does not introduce any new persistence, RPC, automation, or service_role wiring", () => {

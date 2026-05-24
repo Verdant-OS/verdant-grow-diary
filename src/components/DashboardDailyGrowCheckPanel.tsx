@@ -24,6 +24,7 @@ import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import {
   buildDashboardDailyGrowCheckPanel,
   filterDashboardDailyGrowCheckRows,
+  buildDashboardDailyGrowCheckMethodChips,
   DASHBOARD_DAILY_GROW_CHECK_FILTER_OPTIONS,
   DASHBOARD_DAILY_GROW_CHECK_FILTER_EMPTY,
   type DashboardDailyGrowCheckFilter,

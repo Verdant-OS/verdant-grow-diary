@@ -158,16 +158,23 @@ describe("Static safety · no forbidden wording or write/control surface", () =>
     PLANT_HISTORY: stripComments(PLANT_HISTORY),
   };
 
-  it("post-submit user-visible copy constants avoid forbidden wording", () => {
-    // Scope to the actual rendered copy + action labels, not the whole module.
-    const userCopy = [
-      ...POST_RULES.match(/"[^"\n]+"/g) ?? [],
+  it("post-submit user-visible copy constants avoid forbidden wording", async () => {
+    const mod = await import("@/lib/dailyCheckPostSubmitRules");
+    const copy = [
+      mod.DAILY_CHECK_SUCCESS_TITLE,
+      mod.DAILY_CHECK_SUCCESS_BODY,
+      ...mod
+        .buildDailyCheckPostSubmitActions({ plantId: "p1", source: "plant-detail" })
+        .map((a) => `${a.label}`),
+      ...mod
+        .buildDailyCheckPostSubmitActions({ plantId: "p1", source: "dashboard" })
+        .map((a) => `${a.label}`),
     ]
       .join(" ")
       .toLowerCase();
-    expect(userCopy).not.toMatch(/\bperfect\b/);
-    expect(userCopy).not.toMatch(/\bcompleted\b/);
-    expect(userCopy).not.toMatch(/guaranteed healthy/);
+    expect(copy).not.toMatch(/\bperfect\b/);
+    expect(copy).not.toMatch(/\bcompleted\b/);
+    expect(copy).not.toMatch(/guaranteed healthy/);
   });
 
   it("no new persistence, RPC, ingestion, action queue, automation, device control, or service_role surface", () => {

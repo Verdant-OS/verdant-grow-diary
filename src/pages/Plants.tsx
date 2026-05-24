@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Sprout, Filter, Archive, GitMerge, Search } from "lucide-react";
+import { Sprout, Filter, Archive, GitMerge, Search, CheckCircle2, Circle, ArrowRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { useGrowPlants, useGrowTents, getGrowDataMeta } from "@/hooks/useGrowData";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useGrows } from "@/store/grows";
+import { useDiaryEntries } from "@/hooks/use-diary-entries";
+import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { plantsPath } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import {
@@ -34,6 +36,7 @@ import {
   formatPlantsPageFilterSummary,
   plantsPageEmptyStateCopy,
 } from "@/lib/plantsPageFilterRules";
+import { buildDashboardDailyGrowCheckPanel } from "@/lib/dashboardDailyGrowCheckPanelRules";
 import { useNavigate } from "react-router-dom";
 
 export default function Plants() {

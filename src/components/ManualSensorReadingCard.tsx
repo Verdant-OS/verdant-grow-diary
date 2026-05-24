@@ -41,6 +41,7 @@ const EMPTY: ManualEntryInput = {
 export default function ManualSensorReadingCard({ tents, defaultTentId }: Props) {
   const [tentId, setTentId] = useState<string>(defaultTentId ?? tents[0]?.id ?? "");
   const [form, setForm] = useState<ManualEntryInput>(EMPTY);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const insert = useInsertSensorReading();
 
   const validation = useMemo(() => validateManualEntry(form), [form]);
@@ -48,17 +49,12 @@ export default function ManualSensorReadingCard({ tents, defaultTentId }: Props)
 
   function update<K extends keyof ManualEntryInput>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
+    // Any edit invalidates a previously-shown review prompt so it must be
+    // re-triggered on the next save attempt against the new values.
+    if (reviewOpen) setReviewOpen(false);
   }
 
-  async function onSave() {
-    if (!tentId) {
-      toast.error("Pick a tent first.");
-      return;
-    }
-    if (!validation.ok) {
-      toast.error(validation.errors[0] ?? "Reading is invalid.");
-      return;
-    }
+  async function doSave() {
     const payloads = buildManualReadingPayloads({
       tentId,
       metrics: validation.metrics,
@@ -71,10 +67,29 @@ export default function ManualSensorReadingCard({ tents, defaultTentId }: Props)
       }
       toast.success(`Saved ${payloads.length} manual reading${payloads.length === 1 ? "" : "s"}.`);
       setForm(EMPTY);
+      setReviewOpen(false);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Save failed.";
       toast.error(msg);
     }
+  }
+
+  async function onSave() {
+    if (!tentId) {
+      toast.error("Pick a tent first.");
+      return;
+    }
+    if (!validation.ok) {
+      toast.error(validation.errors[0] ?? "Reading is invalid.");
+      return;
+    }
+    // Suspicious values → show review prompt instead of saving immediately.
+    // Normal readings (no advisor warnings) save exactly as before.
+    if (advisor.warnings.length > 0 && !reviewOpen) {
+      setReviewOpen(true);
+      return;
+    }
+    await doSave();
   }
 
   return (
@@ -225,6 +240,55 @@ export default function ManualSensorReadingCard({ tents, defaultTentId }: Props)
               </li>
             ))}
           </ul>
+        )}
+
+        {reviewOpen && advisor.warnings.length > 0 && (
+          <div
+            className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 space-y-2"
+            data-testid="manual-reading-review-prompt"
+            role="alertdialog"
+            aria-label="Review suspicious readings before saving"
+          >
+            <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+              Double-check these readings before saving.
+            </p>
+            <ul className="space-y-1">
+              {advisor.warnings.map((w, i) => (
+                <li
+                  key={`rev-${i}`}
+                  className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-300"
+                >
+                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  <span>{w}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex flex-col sm:flex-row gap-2 pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setReviewOpen(false)}
+                data-testid="manual-reading-review-edit"
+              >
+                Edit readings
+              </Button>
+              <Button
+                size="sm"
+                onClick={doSave}
+                disabled={insert.isPending}
+                data-testid="manual-reading-review-save-anyway"
+              >
+                {insert.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving
+                  </>
+                ) : (
+                  "Save anyway"
+                )}
+              </Button>
+            </div>
+          </div>
         )}
 
         <div className="flex items-center justify-between gap-2 pt-1">

@@ -219,6 +219,15 @@ export default function GrowRoomMode() {
         }
       />
 
+      {!showEmpty && (
+        <DailyGrowCheckStatusCard
+          compact
+          tentIds={tentIds}
+        />
+      )}
+
+
+
 
       {showEmpty && (
         <EmptyState

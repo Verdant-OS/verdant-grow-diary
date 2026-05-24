@@ -7,7 +7,7 @@
  * - Compares only same-tent manual snapshots.
  * - Never implies plant health, quality, or completion.
  * - Never reads or writes notes, alert rows, queued actions, or hardware
- *   control surfaces. No persistence, no RPC, no service_role.
+ *   control surfaces. No persistence and no privileged backend access.
  */
 import { Gauge } from "lucide-react";
 import type { SensorReadingRow } from "@/lib/db";

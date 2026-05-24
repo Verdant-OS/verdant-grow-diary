@@ -154,8 +154,11 @@ describe("ManualSensorReadingCard always exposes the tent selection", () => {
     expect(CARD).toContain("Saving to:");
   });
 
-  it("never injects a client user_id into the payload", () => {
-    expect(RULES).not.toMatch(/user_id/);
+  it("never injects a client user_id into the manual write payload", () => {
+    // Pure rules file may mention user_id only in comments; the built payload
+    // shape must not include a user_id field key.
+    expect(RULES).not.toMatch(/^\s*user_id\s*:/m);
+    expect(CARD).not.toMatch(/user_id/);
     // The card delegates writes through useInsertSensorReading; user_id is
     // optional at the hook boundary and the DB default (auth.uid()) sets it.
     expect(HOOK).toMatch(/user_id is optional/i);

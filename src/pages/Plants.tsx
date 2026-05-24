@@ -25,9 +25,11 @@ export default function Plants() {
   const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
   const validGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
   const [showArchived, setShowArchived] = useState(false);
-  // Always pull archived plants for the toggle visibility check; UI filters
-  // archived/merged plants out by default per Verdant UX rule.
-  const { data: plants = [] } = useGrowPlants(
+  // Active plants drive default UX + data-source meta lookups.
+  const { data: activePlants = [] } = useGrowPlants(undefined, urlGrowId ?? undefined);
+  // Archived plants are loaded separately so we can show the toggle when
+  // any exist and surface them when the grower opts in.
+  const { data: allPlants = [] } = useGrowPlants(
     undefined,
     urlGrowId ?? undefined,
     { includeArchived: true },
@@ -38,8 +40,8 @@ export default function Plants() {
   const plantsMeta = getGrowDataMeta(["grow", "plants", "all", urlGrowId ?? "all"]);
   const tentsMeta = getGrowDataMeta(["grow", "tents", urlGrowId ?? "all"]);
   const [tentFilter, setTentFilter] = useState<string>("all");
-  const hasArchived = shouldShowArchivedToggle(plants);
-  const visible = filterVisiblePlants(plants, { showArchived });
+  const hasArchived = shouldShowArchivedToggle(allPlants);
+  const visible = filterVisiblePlants(allPlants, { showArchived });
   const filtered = tentFilter === "all" ? visible : visible.filter((p) => p.tentId === tentFilter);
 
   return (

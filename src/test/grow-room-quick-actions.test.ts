@@ -182,13 +182,25 @@ describe("getGrowRoomEmptyState", () => {
 
 describe("GrowRoomMode page · quick action wiring", () => {
   it("renders Quick Log, Watering, Feeding, Add Photo, Daily Check, View Tent buttons", () => {
-    expect(PAGE).toMatch(/grow-room-action-quick_log/);
-    expect(PAGE).toMatch(/grow-room-action-watering/);
-    expect(PAGE).toMatch(/grow-room-action-feeding/);
-    expect(PAGE).toMatch(/grow-room-action-photo/);
-    expect(PAGE).toMatch(/grow-room-action-daily_check/);
-    expect(PAGE).toMatch(/grow-room-action-view_tent/);
+    // Page builds testIds as `grow-room-action-${action.kind}` from the
+    // helper, so verify the testId prefix and that the helper supplies all
+    // six kinds.
+    expect(PAGE).toMatch(/grow-room-action-\$\{action\.kind\}/);
+    const kinds = buildGrowRoomQuickActionLinks({ tent, plantId: null }).map(
+      (l) => l.kind,
+    );
+    for (const k of [
+      "quick_log",
+      "watering",
+      "feeding",
+      "photo",
+      "daily_check",
+      "view_tent",
+    ]) {
+      expect(kinds).toContain(k);
+    }
   });
+
 
   it("wires QuickLog dialog with prefill from quick-action click", () => {
     expect(PAGE).toMatch(/from\s+"@\/components\/QuickLog"/);

@@ -22,6 +22,8 @@ interface Props {
   compact?: boolean;
   /** Optional plant focus (e.g. coming from /daily-check?plantId=). */
   focusedPlantId?: string | null;
+  /** Optional tent focus (e.g. coming from /tents/:id). */
+  focusedTentId?: string | null;
   /** Optional scope filter for "any snapshot/quicklog exists" checks. */
   tentIds?: string[] | null;
   /** When true, the card hides itself once setup is ready. */

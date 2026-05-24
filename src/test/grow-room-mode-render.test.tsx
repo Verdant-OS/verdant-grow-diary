@@ -17,6 +17,18 @@ vi.mock("@/hooks/useAlertsList", () => ({
   useAlertsList: () => ({ alerts: EMPTY_ALERTS, isLoading: false, error: null }),
 }));
 
+vi.mock("@/hooks/use-sensor-readings", () => ({
+  useSensorReadings: () => ({ data: [], isLoading: false, error: null }),
+}));
+
+vi.mock("@/hooks/use-diary-entries", () => ({
+  useDiaryEntries: () => ({ data: [], isLoading: false, error: null }),
+}));
+
+vi.mock("@/hooks/use-plants", () => ({
+  usePlants: () => ({ data: [], isLoading: false, error: null }),
+}));
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: () => ({

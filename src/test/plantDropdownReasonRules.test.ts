@@ -252,7 +252,7 @@ describe("AddExistingPlantDialog · helper text wiring", () => {
   });
 
   it("disabled already-in-tent options expose reason via aria-label and title", () => {
-    expect(ADD).toMatch(/aria-label=\{`?[^}]*already in this tent/i);
+    expect(ADD).toMatch(/aria-label=\{`[\s\S]*?already in this tent/i);
     expect(ADD).toMatch(/title=["']Already in this tent["']/);
   });
 });

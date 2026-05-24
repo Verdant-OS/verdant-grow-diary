@@ -98,7 +98,6 @@ export default function Plants() {
     for (const row of panel.rows) map.set(row.plantId, row.checkedToday);
     return map;
   }, [allPlants, tents, rawReadings, rawDiary, urlGrowId]);
-  const [tentFilter, setTentFilter] = useState<string>("all");
 
   // Grow filter — sourced from the workspace grows list + active plants.
   const growFilterOptions = useMemo(

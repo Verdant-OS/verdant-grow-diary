@@ -63,15 +63,17 @@ describe("QuickLog Gate 1 friction audit — entry-point source contract", () =>
     }
   });
 
-  it("scoped quick-action surfaces carry plantId + from + method=note|sensor", () => {
+  it("scoped quick-action surfaces emit method=note and method=sensor handoffs", () => {
     for (const f of [
       "src/components/DashboardDailyGrowCheckPanel.tsx",
       "src/pages/Plants.tsx",
       "src/components/PlantDailyGrowCheckConsistencyCard.tsx",
     ]) {
       const src = read(f);
-      expect(src).toMatch(/data-method="note"/);
-      expect(src).toMatch(/data-method="sensor"/);
+      // Either rendered as data-method attribute or built via the
+      // shared `method: "note" | "sensor"` route helper.
+      expect(src).toMatch(/data-method="note"|method:\s*"note"/);
+      expect(src).toMatch(/data-method="sensor"|method:\s*"sensor"/);
       expect(src).toMatch(/plantId/);
     }
   });

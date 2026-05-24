@@ -514,8 +514,12 @@ describe("PlantRelativeTimelineSection — render", () => {
         plantStartedAt={PLANT_STARTED}
       />,
     );
-    // No buttons in the rendered timeline section.
-    expect(container.querySelectorAll("button").length).toBe(0);
+    // Filter chips are allowed (read-only radios). No mutating labels.
+    const buttons = Array.from(container.querySelectorAll("button"));
+    for (const b of buttons) {
+      expect(b.getAttribute("role")).toBe("radio");
+      expect(b.textContent ?? "").not.toMatch(/create|add|edit|delete|move|drag/i);
+    }
     expect(container.querySelectorAll("[draggable]").length).toBe(0);
     expect(container.querySelectorAll("input, textarea, select").length).toBe(0);
   });

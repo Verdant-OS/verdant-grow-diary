@@ -4,7 +4,7 @@
  * loop. Reuses existing add/edit/move surfaces. No writes here.
  */
 import { Link } from "react-router-dom";
-import { ArrowRight, ClipboardCheck, HelpCircle } from "lucide-react";
+import { ArrowRight, ClipboardCheck, HelpCircle, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -22,6 +22,7 @@ import {
   type OnboardingGuidance,
 } from "@/lib/dailyGrowCheckOnboardingRules";
 import { deriveDailyGrowCheckStatus } from "@/lib/dailyGrowCheckStatusRules";
+import { useOnboardingDismissed } from "@/lib/dailyGrowCheckOnboardingDismissStore";
 
 interface Props {
   compact?: boolean;
@@ -33,6 +34,13 @@ interface Props {
   tentIds?: string[] | null;
   /** When true, the card hides itself once setup is ready. */
   hideWhenReady?: boolean;
+  /**
+   * Scope key for the one-session "Hide guidance" dismissal. Cards sharing
+   * the same key dismiss together (e.g. all Dashboard cards). Defaults to
+   * the focused plant/tent identity so per-plant dismissals don't bleed
+   * across screens.
+   */
+  dismissScope?: string;
   className?: string;
 }
 
@@ -42,8 +50,13 @@ export default function DailyGrowCheckOnboardingCard({
   focusedTentId = null,
   tentIds = null,
   hideWhenReady = false,
+  dismissScope,
   className,
 }: Props) {
+  const scopeKey =
+    dismissScope ??
+    `daily-grow-check:${focusedPlantId ?? "_"}:${focusedTentId ?? "_"}`;
+  const { isDismissed, dismiss } = useOnboardingDismissed(scopeKey);
   const { data: tents = [] } = useTents();
   const { data: plants = [] } = usePlants();
   const { data: rawReadings = [] } = useSensorReadings();

@@ -42,17 +42,42 @@ export function parseDailyCheckEntrySource(
 }
 
 /**
+ * Recognized values for `?method=` quick-action hint. Pure UX prioritization
+ * hint; the Daily Check page uses it only to focus the matching option.
+ * Unknown / missing values resolve to `null` so the page falls back to
+ * the existing default selector. The page never auto-submits based on
+ * this hint and never silently picks a tent.
+ */
+export type DailyCheckMethodHint = "note" | "sensor";
+
+const ALLOWED_METHODS: ReadonlyArray<DailyCheckMethodHint> = ["note", "sensor"];
+
+export function parseDailyCheckMethodHint(
+  raw: string | null | undefined,
+): DailyCheckMethodHint | null {
+  if (!raw) return null;
+  const v = raw.trim().toLowerCase();
+  return (ALLOWED_METHODS as ReadonlyArray<string>).includes(v)
+    ? (v as DailyCheckMethodHint)
+    : null;
+}
+
+/**
  * Build a `/daily-check` href for a given plant + entry source. Keeps the
- * existing `?plantId=` contract backward compatible — `from` is appended
- * only when known.
+ * existing `?plantId=` contract backward compatible — `from` and `method`
+ * are appended only when known.
  */
 export function buildDailyCheckEntryHref(input: {
   plantId: string;
   source?: DailyCheckEntrySource | null;
+  method?: DailyCheckMethodHint | null;
 }): string {
-  const base = `/daily-check?plantId=${input.plantId}`;
-  return input.source ? `${base}&from=${input.source}` : base;
+  let href = `/daily-check?plantId=${input.plantId}`;
+  if (input.source) href += `&from=${input.source}`;
+  if (input.method) href += `&method=${input.method}`;
+  return href;
 }
+
 
 export interface DailyCheckPostSubmitAction {
   key: "dashboard" | "plant" | "plants";

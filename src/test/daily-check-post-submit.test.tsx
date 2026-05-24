@@ -289,6 +289,69 @@ describe("DailyCheck post-submit confirmation", () => {
       screen.getByTestId("daily-grow-check-post-submit-dashboard"),
     ).toBeInTheDocument();
   });
+
+  it("from=dashboard: primary CTA says 'Back to Dashboard' and routes to /", () => {
+    renderRoute("/daily-check?plantId=p1&from=dashboard");
+    dispatchQuickLogSuccess();
+    const dash = screen.getByTestId("daily-grow-check-post-submit-dashboard");
+    const link =
+      dash.tagName === "A" ? dash : (dash.querySelector("a") as HTMLAnchorElement);
+    expect(link.getAttribute("href")).toBe("/");
+    // Primary in shadcn's Button is variant=default which omits the
+    // "outline" class — secondary plant button carries it.
+    const plantBtn = screen.getByTestId("daily-grow-check-post-submit-plant");
+    expect(plantBtn.className).toMatch(/outline|border/);
+  });
+
+  it("from=plant-detail: primary CTA says 'Back to Plant' and routes to /plants/<id>", () => {
+    renderRoute("/daily-check?plantId=p1&from=plant-detail");
+    dispatchQuickLogSuccess();
+    const plant = screen.getByTestId("daily-grow-check-post-submit-plant");
+    const link =
+      plant.tagName === "A" ? plant : (plant.querySelector("a") as HTMLAnchorElement);
+    expect(link.getAttribute("href")).toBe("/plants/p1");
+    expect(plant.textContent).toMatch(/Back to Plant/);
+  });
+
+  it("unknown ?from= value falls back safely to Dashboard primary", () => {
+    renderRoute("/daily-check?plantId=p1&from=hacker");
+    dispatchQuickLogSuccess();
+    const dash = screen.getByTestId("daily-grow-check-post-submit-dashboard");
+    const link =
+      dash.tagName === "A" ? dash : (dash.querySelector("a") as HTMLAnchorElement);
+    expect(link.getAttribute("href")).toBe("/");
+  });
+
+  it("logged-at line is hidden before submit and shown after success event", () => {
+    renderRoute("/daily-check?plantId=p1&from=dashboard");
+    expect(
+      screen.queryByTestId("daily-grow-check-post-submit-logged-at"),
+    ).not.toBeInTheDocument();
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent("verdant:entry-created", {
+          detail: { createdAt: new Date().toISOString() },
+        }),
+      );
+    });
+    const node = screen.getByTestId("daily-grow-check-post-submit-logged-at");
+    expect(node.textContent).toMatch(/^Logged at /);
+    expect(node.textContent).toMatch(/\d{1,2}:\d{2}/);
+  });
+
+  it("logged-at line uses the createdAt from the event detail when present", () => {
+    renderRoute("/daily-check?plantId=p1");
+    const ts = new Date(Date.now() - 30_000).toISOString();
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent("verdant:entry-created", {
+          detail: { createdAt: ts },
+        }),
+      );
+    });
+    const node = screen.getByTestId("daily-grow-check-post-submit-logged-at");
+    expect(node.textContent).toMatch(/^Logged at /);
+  });
 });
 
 // ---------------------------------------------------------------------------

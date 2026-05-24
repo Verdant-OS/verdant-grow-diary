@@ -41,6 +41,7 @@ const EMPTY: ManualEntryInput = {
 export default function ManualSensorReadingCard({ tents, defaultTentId }: Props) {
   const [tentId, setTentId] = useState<string>(defaultTentId ?? tents[0]?.id ?? "");
   const [form, setForm] = useState<ManualEntryInput>(EMPTY);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const insert = useInsertSensorReading();
 
   const validation = useMemo(() => validateManualEntry(form), [form]);
@@ -48,17 +49,12 @@ export default function ManualSensorReadingCard({ tents, defaultTentId }: Props)
 
   function update<K extends keyof ManualEntryInput>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
+    // Any edit invalidates a previously-shown review prompt so it must be
+    // re-triggered on the next save attempt against the new values.
+    if (reviewOpen) setReviewOpen(false);
   }
 
-  async function onSave() {
-    if (!tentId) {
-      toast.error("Pick a tent first.");
-      return;
-    }
-    if (!validation.ok) {
-      toast.error(validation.errors[0] ?? "Reading is invalid.");
-      return;
-    }
+  async function doSave() {
     const payloads = buildManualReadingPayloads({
       tentId,
       metrics: validation.metrics,
@@ -71,10 +67,29 @@ export default function ManualSensorReadingCard({ tents, defaultTentId }: Props)
       }
       toast.success(`Saved ${payloads.length} manual reading${payloads.length === 1 ? "" : "s"}.`);
       setForm(EMPTY);
+      setReviewOpen(false);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Save failed.";
       toast.error(msg);
     }
+  }
+
+  async function onSave() {
+    if (!tentId) {
+      toast.error("Pick a tent first.");
+      return;
+    }
+    if (!validation.ok) {
+      toast.error(validation.errors[0] ?? "Reading is invalid.");
+      return;
+    }
+    // Suspicious values → show review prompt instead of saving immediately.
+    // Normal readings (no advisor warnings) save exactly as before.
+    if (advisor.warnings.length > 0 && !reviewOpen) {
+      setReviewOpen(true);
+      return;
+    }
+    await doSave();
   }
 
   return (

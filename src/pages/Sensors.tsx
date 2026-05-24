@@ -38,7 +38,10 @@ export default function Sensors() {
   );
 
   const manualTents = realTents.map((t) => ({ id: t.id as string, name: t.name as string }));
-  const defaultManualTentId = manualTents.find((t) => t.id === tentId)?.id ?? manualTents[0]?.id;
+  // Only auto-default when the chip-selected tent exists as a real DB tent;
+  // otherwise leave it undefined so the user must consciously pick from the
+  // tent dropdown rather than silently writing to manualTents[0].
+  const defaultManualTentId = manualTents.find((t) => t.id === tentId)?.id;
 
   return (
     <div>

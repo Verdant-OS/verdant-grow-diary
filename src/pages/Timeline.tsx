@@ -383,7 +383,7 @@ export default function Timeline() {
                                   <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
                                     <Gauge className="h-3 w-3" />Snapshot
                                   </span>
-                                  {sensor.temp != null && <SnapChip>{sensor.temp}°C</SnapChip>}
+                                  {sensor.temp != null && <SnapChip>{(sensor.temp * 9 / 5 + 32).toFixed(1)}°F</SnapChip>}
                                   {sensor.rh != null && <SnapChip>{sensor.rh}% RH</SnapChip>}
                                   {sensor.vpd != null && <SnapChip>VPD {sensor.vpd}</SnapChip>}
                                   {sensor.co2 != null && <SnapChip>CO₂ {sensor.co2}</SnapChip>}

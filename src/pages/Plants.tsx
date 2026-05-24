@@ -94,8 +94,9 @@ export default function Plants() {
         tent_id: e.tent_id,
       })),
     });
-    const map = new Map<string, boolean>();
-    for (const row of panel.rows) map.set(row.plantId, row.checkedToday);
+    const map = new Map<string, { checkedToday: boolean; methodLabel: string | null }>();
+    for (const row of panel.rows)
+      map.set(row.plantId, { checkedToday: row.checkedToday, methodLabel: row.methodLabel });
     return map;
   }, [allPlants, tents, rawReadings, rawDiary, urlGrowId]);
 

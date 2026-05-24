@@ -6,8 +6,8 @@
  * ConsistencySummary as its only input — never re-derives activity from
  * raw data and never claims plant health from check frequency.
  *
- * Forbidden wording (enforced by tests): "completed", "perfect", "perfect
- * grow", "guaranteed", "healthy".
+ * Forbidden wording is enforced by guidance tests — see
+ * src/test/daily-grow-check-guidance.test.ts.
  */
 import type { ConsistencySummary } from "@/lib/dailyGrowCheckConsistencyRules";
 

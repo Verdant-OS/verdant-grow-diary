@@ -271,6 +271,22 @@ export default function PlantRelativeTimelineSection({
                         {group.count} {group.count === 1 ? "event" : "events"}
                       </span>
                     </header>
+                    {(() => {
+                      const gs = formatRelativeTimelineGroupSummary(
+                        summarizeRelativeTimelineItems(group.items),
+                      );
+                      return gs.compact ? (
+                        <p
+                          data-testid="relative-timeline-group-summary"
+                          data-stage-key={group.key}
+                          data-total={gs.totalLabel ? group.count : 0}
+                          className="text-xs text-muted-foreground/90 flex flex-wrap gap-x-1.5"
+                        >
+                          {gs.compact}
+                        </p>
+                      ) : null;
+                    })()}
+
                     <ol className="space-y-2">
                       {group.items.map((item) => (
                         <TimelineRow key={item.id} item={item} />

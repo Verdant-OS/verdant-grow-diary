@@ -136,6 +136,19 @@ export default function AddExistingPlantDialog({ tentId, growId, trigger }: Prop
 
   const eligibleCount = unassigned.length + otherTent.length;
 
+  // Helper-text summary: counts archived/missing-grow/cross-grow are
+  // already enforced by the supabase query (`is_archived = false` + grow
+  // OR filter), but already-in-this-tent is computed from local rows.
+  const helperText = useMemo(() => {
+    if (!growId) return "";
+    const summary = summarizePlantDropdown(rows, tentRefs, {
+      context: "add_existing_to_tent",
+      growId,
+      tentId,
+    });
+    return getPlantDropdownHelperText(summary);
+  }, [rows, tentRefs, growId, tentId]);
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!user) {

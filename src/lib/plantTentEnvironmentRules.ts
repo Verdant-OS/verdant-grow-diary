@@ -68,12 +68,13 @@ export function buildPlantTentEnvironmentView(
     sourceLabel: SOURCE_LABEL[snap.source] ?? null,
     stale: isStale(snap.ts, now),
     metrics: [
-      metric("temp", "Temperature", snap.temp, "°C"),
+      // Stored as Celsius; displayed as Fahrenheit per Verdant convention.
+      metric("temp", "Temperature", tempFFromC(snap.temp), "°F"),
       metric("rh", "Humidity", snap.rh, "%"),
       metric("vpd", "VPD", snap.vpd, " kPa", 2),
       metric("soil", "Soil moisture", snap.soil, "%"),
       metric("soil_ec", "Soil EC", snap.soil_ec, " mS/cm", 2),
-      metric("soil_temp", "Soil temp", snap.soil_temp, "°C"),
+      metric("soil_temp", "Soil temp", tempFFromC(snap.soil_temp), "°F"),
       metric("ppfd", "PPFD", snap.ppfd, " µmol", 0),
       metric("co2", "CO₂", snap.co2, " ppm", 0),
     ],

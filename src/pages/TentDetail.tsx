@@ -98,7 +98,7 @@ export default function TentDetail() {
             stage: tent.stage,
             light: tent.light,
           }}
-          assignedPlantCount={plants.length}
+          assignedPlantCount={activeCount}
           variant="row"
           hideView
         />

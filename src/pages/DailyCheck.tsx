@@ -185,8 +185,31 @@ export default function DailyCheck() {
         icon={<ClipboardCheck className="h-5 w-5" />}
       />
 
+      {/* Plain-language explanation of what a check actually is. */}
+      <p
+        className="text-xs text-muted-foreground flex items-start gap-1 mb-3"
+        data-testid="daily-grow-check-what-counts"
+      >
+        <Info className="h-3 w-3 mt-0.5 shrink-0" aria-hidden="true" />
+        <span>{DAILY_CHECK_WHAT_COUNTS_HINT}</span>
+      </p>
+
+      {/* Visible rejection banner when ?plantId= cannot be honored. */}
+      {plantResolution.message && (
+        <div
+          className="rounded-lg border border-[hsl(var(--warning))]/40 bg-[hsl(var(--warning))]/10 p-3 text-sm flex items-start gap-2 mb-4"
+          data-testid="daily-grow-check-plant-rejected"
+          data-rejection-status={plantResolution.status}
+          data-requested-plant-id={plantResolution.requestedPlantId ?? ""}
+          role="status"
+        >
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" aria-hidden="true" />
+          <span>{plantResolution.message}</span>
+        </div>
+      )}
+
       <DailyGrowCheckOnboardingCard
-        focusedPlantId={selectedPlant?.id ?? initialPlantId ?? null}
+        focusedPlantId={selectedPlant?.id ?? plantResolution.plant?.id ?? null}
         hideWhenReady
         className="mb-4"
       />

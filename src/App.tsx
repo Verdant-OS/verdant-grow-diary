@@ -55,6 +55,7 @@ const App = () => (
               <Route element={<AppShell />}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/grow-room" element={<GrowRoomMode />} />
+                <Route path="/daily-check" element={<DailyCheck />} />
                 <Route path="/tents" element={<Tents />} />
                 <Route path="/tents/:id" element={<TentDetail />} />
                 <Route path="/plants" element={<Plants />} />

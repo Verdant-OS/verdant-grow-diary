@@ -98,7 +98,9 @@ export default function PlantDailyGrowCheckConsistencyCard({
   const methodLabel = summary.todayHasActivity
     ? formatTodayCheckMethodLabel(summary.todayMethod)
     : null;
+  const breakdown = buildDailyMethodBreakdown(summary, "oldest-first");
   const ctaHref = `/daily-check?plantId=${plantId}&from=plant-detail`;
+
 
   return (
     <Card

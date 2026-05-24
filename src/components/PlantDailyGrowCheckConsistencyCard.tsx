@@ -7,7 +7,7 @@
  */
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Activity, ArrowRight, CheckCircle2, Info } from "lucide-react";
+import { Activity, ArrowRight, CheckCircle2, Gauge, Info, Sparkles } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";

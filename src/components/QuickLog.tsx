@@ -84,7 +84,11 @@ export default function QuickLog({ open, onOpenChange, onCreated, prefill }: Pro
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (photoFile && eventType === "observation") setEventType("photo"); }, [photoFile]);
 
-  const selectedPlant = useMemo(() => plants.find((p) => p.id === plantId) ?? null, [plantId, plants]);
+  const scopedPlants = useMemo(
+    () => filterQuickLogPlantOptions(plants, activeGrowId),
+    [plants, activeGrowId],
+  );
+  const selectedPlant = useMemo(() => scopedPlants.find((p) => p.id === plantId) ?? null, [plantId, scopedPlants]);
 
   function handleFile(f: File | null) {
     setPhotoFile(f);

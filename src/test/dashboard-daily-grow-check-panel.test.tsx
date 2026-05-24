@@ -58,7 +58,7 @@ describe("buildDashboardDailyGrowCheckPanel · pure rules", () => {
     expect(p1.showCta).toBe(false);
     expect(p2.checkedToday).toBe(false);
     expect(p2.showCta).toBe(true);
-    expect(p2.ctaHref).toBe("/daily-check?plantId=p2");
+    expect(p2.ctaHref).toBe("/daily-check?plantId=p2&from=dashboard");
     expect(p1.tentName).toBe("Tent A");
   });
 
@@ -164,7 +164,7 @@ describe("buildDashboardDailyGrowCheckPanel · pure rules", () => {
       manualReadings: [],
       diaryEntries: [],
     });
-    expect(panel.rows[0].ctaHref).toBe("/daily-check?plantId=p1");
+    expect(panel.rows[0].ctaHref).toBe("/daily-check?plantId=p1&from=dashboard");
   });
 
   it("manual sensor snapshots in plant's tent today count as a check", () => {
@@ -262,7 +262,7 @@ describe("DashboardDailyGrowCheckPanel · component", () => {
     renderPanel();
     const cta = screen.getByTestId("dashboard-daily-grow-check-panel-row-cta");
     const link = (cta.tagName === "A" ? cta : cta.querySelector("a")) as HTMLAnchorElement;
-    expect(link.getAttribute("href")).toBe("/daily-check?plantId=p2");
+    expect(link.getAttribute("href")).toBe("/daily-check?plantId=p2&from=dashboard");
   });
 });
 

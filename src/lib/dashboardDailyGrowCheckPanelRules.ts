@@ -165,9 +165,10 @@ export function buildDashboardDailyGrowCheckPanel(
       });
 
       const checkedToday = summary.todayHasActivity;
+      const methodLabel = formatTodayCheckMethodLabel(summary.todayMethod);
 
       const shortGuidance = checkedToday
-        ? "Today's check is logged."
+        ? methodLabel ?? "Today's check is logged."
         : "No check logged for today yet.";
 
       const row: DashboardDailyGrowCheckRow = {
@@ -177,6 +178,8 @@ export function buildDashboardDailyGrowCheckPanel(
         tentName: tId ? tentName.get(tId) ?? null : null,
         checkedToday,
         shortGuidance,
+        todayMethod: summary.todayMethod,
+        methodLabel,
         ctaHref: `/daily-check?plantId=${plant.id}&from=dashboard`,
         showCta: !checkedToday,
       };

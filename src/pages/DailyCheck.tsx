@@ -258,6 +258,15 @@ export default function DailyCheck() {
     [lastSubmittedAt],
   );
 
+  // Pull the latest manual readings for the current tent so we can show a
+  // compact "Changed since last snapshot" panel after a sensor save.
+  // Read-only — no writes, no ingestion changes.
+  const { data: tentReadings = [] } = useSensorReadings(tentId || undefined, 50);
+  const changeContext = useMemo(
+    () => deriveChangeContextFromReadings(tentReadings, { tentId }),
+    [tentReadings, tentId],
+  );
+
   const progress = stepProgress(step);
 
   function markAndAdvance(field: keyof DailyGrowCheckState, value: StepOutcome) {

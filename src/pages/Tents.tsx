@@ -5,6 +5,7 @@ import StageBadge from "@/components/StageBadge";
 import MetricChip from "@/components/MetricChip";
 import EmptyState from "@/components/EmptyState";
 import CreateTentDialog from "@/components/CreateTentDialog";
+import TentCardActionsMenu from "@/components/TentCardActionsMenu";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";

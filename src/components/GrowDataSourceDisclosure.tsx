@@ -63,7 +63,7 @@ export default function GrowDataSourceDisclosure({
   const description: Record<Label, string> = {
     Live: `Live ${resource} data from your grow backend.`,
     Demo: `Showing demo ${resource}. Connect real ${resource} to replace it.`,
-    Mixed: `Showing a mix of live and demo ${resource}.`,
+    Mixed: `Some ${resource} are real, some are demo or manual. Add or connect more to replace the demo data.`,
     Unavailable: `No ${resource} data available yet.`,
   };
 

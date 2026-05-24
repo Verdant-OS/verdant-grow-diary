@@ -226,10 +226,13 @@ export function buildDashboardDailyGrowCheckPanel(
     summaryText: `Checked ${checked} of ${total} plant${total === 1 ? "" : "s"} today`,
     allChecked,
     isEmpty: false,
-    emptyMessage: EMPTY_MESSAGE,
+    emptyVariant: "none",
+    emptyTitle: "",
+    emptyMessage: "",
     emptyCtaHref: EMPTY_CTA_HREF,
     emptyCtaLabel: EMPTY_CTA_LABEL,
     positiveConfirmation: allChecked ? POSITIVE_ALL : null,
+    firstRunHint: checked === 0 ? FIRST_RUN_HINT : null,
   };
 }
 

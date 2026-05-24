@@ -6,8 +6,8 @@
  *   `manualSensorSnapshotChangeContextRules.ts`.
  * - Compares only same-tent manual snapshots.
  * - Never implies plant health, quality, or completion.
- * - Never reads/writes QuickLog notes, alerts, action_queue, or device
- *   control. No persistence, no RPC, no service_role.
+ * - Never reads or writes notes, alert rows, queued actions, or hardware
+ *   control surfaces. No persistence, no RPC, no service_role.
  */
 import { Gauge } from "lucide-react";
 import type { SensorReadingRow } from "@/lib/db";

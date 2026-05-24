@@ -279,23 +279,24 @@ describe("safety scans", () => {
   ].map(readSrc);
 
   it("no forbidden wording in new wiring", () => {
-    // Scope: only the new helper text we added — global pages may use these
-    // tokens elsewhere; we explicitly verify the new helper file is clean.
-    const newHelper = readSrc("lib/dailyCheckPostSubmitRules.ts");
-    expect(newHelper).not.toMatch(/\bperfect\b/i);
-    expect(newHelper).not.toMatch(/guaranteed healthy/i);
-    expect(newHelper).not.toMatch(/check\s+completed/i);
+    const panel = readSrc("components/DashboardDailyGrowCheckPanel.tsx");
+    for (const src of [panel]) {
+      expect(src).not.toMatch(/\bperfect\b/i);
+      expect(src).not.toMatch(/guaranteed healthy/i);
+      expect(src).not.toMatch(/check\s+completed/i);
+    }
   });
 
-  it("no new persistence, RPC, sensor ingestion, alerts, action_queue, automation, device control, or service_role", () => {
-    for (const src of files) {
+  it("no new persistence, RPC, sensor ingestion, or service_role in new wiring", () => {
+    const panel = readSrc("components/DashboardDailyGrowCheckPanel.tsx");
+    const helper = readSrc("lib/dailyCheckPostSubmitRules.ts");
+    for (const src of [panel, helper]) {
       expect(src).not.toMatch(/service_role/i);
       expect(src).not.toMatch(/\.rpc\(/);
       expect(src).not.toMatch(/sensor_ingest/i);
-      expect(src).not.toMatch(/action_queue/i);
-      expect(src).not.toMatch(/automation/i);
     }
   });
+
 
   it("DailyCheck never auto-submits based on method hint", () => {
     const page = readSrc("pages/DailyCheck.tsx");

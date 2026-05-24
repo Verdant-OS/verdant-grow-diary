@@ -223,6 +223,59 @@ export default function DailyCheck() {
         </div>
       )}
 
+      {/* Post-submit confirmation. Only renders after QuickLog dispatches
+          `verdant:entry-created`, which only fires after a successful insert. */}
+      {lastSubmittedAt !== null && (
+        <div
+          className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 mb-4 space-y-2"
+          data-testid="daily-grow-check-post-submit"
+          data-submitted-at={lastSubmittedAt}
+          role="status"
+          aria-live="polite"
+        >
+          <div className="flex items-start gap-2">
+            <CheckCircle2
+              className="h-4 w-4 mt-0.5 text-emerald-400 shrink-0"
+              aria-hidden="true"
+            />
+            <div className="min-w-0">
+              <div
+                className="text-sm font-semibold"
+                data-testid="daily-grow-check-post-submit-title"
+              >
+                {DAILY_CHECK_SUCCESS_TITLE}
+              </div>
+              <p
+                className="text-xs text-muted-foreground"
+                data-testid="daily-grow-check-post-submit-body"
+              >
+                {DAILY_CHECK_SUCCESS_BODY}
+              </p>
+            </div>
+          </div>
+          <div
+            className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+            data-testid="daily-grow-check-post-submit-actions"
+          >
+            {postSubmitActions.map((a) => (
+              <Button
+                key={a.key}
+                asChild
+                size="sm"
+                variant={a.primary ? "default" : "outline"}
+                className="h-10 justify-between"
+                data-testid={`daily-grow-check-post-submit-${a.key}`}
+              >
+                <Link to={a.href}>
+                  {a.label}
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <DailyGrowCheckOnboardingCard
         focusedPlantId={selectedPlant?.id ?? plantResolution.plant?.id ?? null}
         hideWhenReady

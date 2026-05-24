@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import EmptyState from "@/components/EmptyState";
+import DailyGrowCheckStatusCard from "@/components/DailyGrowCheckStatusCard";
 import { supabase } from "@/integrations/supabase/client";
 import { useTents } from "@/hooks/use-tents";
 import { useAlertsList } from "@/hooks/useAlertsList";
@@ -217,6 +218,15 @@ export default function GrowRoomMode() {
           </Button>
         }
       />
+
+      {!showEmpty && (
+        <DailyGrowCheckStatusCard
+          compact
+          tentIds={tentIds}
+        />
+      )}
+
+
 
 
       {showEmpty && (

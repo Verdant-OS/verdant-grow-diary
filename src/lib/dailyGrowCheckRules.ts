@@ -24,7 +24,7 @@ export const DAILY_GROW_CHECK_STEPS = [
 ] as const;
 export type DailyGrowCheckStep = (typeof DAILY_GROW_CHECK_STEPS)[number];
 
-export type StepOutcome = "added" | "skipped" | "pending";
+export type StepOutcome = "added" | "skipped" | "visited" | "pending";
 
 export interface DailyGrowCheckState {
   manual: StepOutcome;

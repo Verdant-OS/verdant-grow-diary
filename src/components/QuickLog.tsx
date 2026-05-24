@@ -269,6 +269,14 @@ export default function QuickLog({ open, onOpenChange, onCreated, prefill }: Pro
                   ))}
                 </SelectContent>
               </Select>
+              {activeGrow?.name && (
+                <p
+                  className="text-[11px] text-muted-foreground mt-1"
+                  data-testid="quick-log-plant-helper"
+                >
+                  Showing plants from {activeGrow.name}. Archived/merged plants hidden.
+                </p>
+              )}
             </div>
           </div>
 

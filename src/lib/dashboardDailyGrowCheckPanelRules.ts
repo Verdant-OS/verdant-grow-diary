@@ -257,3 +257,67 @@ export function filterDashboardDailyGrowCheckRows(
       return rows;
   }
 }
+
+/**
+ * Per-method counts for the "Today's Grow Checks" summary chips.
+ *
+ * Derived from the same row set the panel renders. Always reflects the full
+ * grow — never affected by the active display filter.
+ */
+export interface DashboardDailyGrowCheckMethodCounts {
+  needs: number;
+  note: number;
+  sensorSnapshot: number;
+  both: number;
+}
+
+export interface DashboardDailyGrowCheckMethodChip {
+  key: "needs" | "note" | "sensor-snapshot" | "both";
+  /** Filter value to apply when the chip is clicked. */
+  filterValue: DashboardDailyGrowCheckFilter;
+  label: string;
+  count: number;
+}
+
+export function buildDashboardDailyGrowCheckMethodCounts(
+  rows: DashboardDailyGrowCheckRow[],
+): DashboardDailyGrowCheckMethodCounts {
+  let needs = 0;
+  let note = 0;
+  let sensorSnapshot = 0;
+  let both = 0;
+  for (const r of rows) {
+    if (!r.checkedToday) {
+      needs += 1;
+      continue;
+    }
+    if (r.todayMethod === "note") note += 1;
+    else if (r.todayMethod === "sensor-snapshot") sensorSnapshot += 1;
+    else if (r.todayMethod === "both") both += 1;
+  }
+  return { needs, note, sensorSnapshot, both };
+}
+
+/**
+ * Build the chip view-model. When there are no rows we return [] so callers
+ * never render meaningless zero chips. Always returns all four chips
+ * (including zero counts) when at least one active plant exists, so the
+ * grid is stable and predictable.
+ */
+export function buildDashboardDailyGrowCheckMethodChips(
+  rows: DashboardDailyGrowCheckRow[],
+): DashboardDailyGrowCheckMethodChip[] {
+  if (rows.length === 0) return [];
+  const c = buildDashboardDailyGrowCheckMethodCounts(rows);
+  return [
+    { key: "needs", filterValue: "needs", label: "Needs check", count: c.needs },
+    { key: "note", filterValue: "note", label: "Note", count: c.note },
+    {
+      key: "sensor-snapshot",
+      filterValue: "sensor-snapshot",
+      label: "Sensor",
+      count: c.sensorSnapshot,
+    },
+    { key: "both", filterValue: "both", label: "Both", count: c.both },
+  ];
+}

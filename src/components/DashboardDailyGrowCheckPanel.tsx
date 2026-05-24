@@ -24,6 +24,7 @@ import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import {
   buildDashboardDailyGrowCheckPanel,
   filterDashboardDailyGrowCheckRows,
+  buildDashboardDailyGrowCheckMethodChips,
   DASHBOARD_DAILY_GROW_CHECK_FILTER_OPTIONS,
   DASHBOARD_DAILY_GROW_CHECK_FILTER_EMPTY,
   type DashboardDailyGrowCheckFilter,
@@ -111,6 +112,9 @@ export default function DashboardDailyGrowCheckPanel({
   const visibleRows = filterDashboardDailyGrowCheckRows(panel.rows, filter);
   const filterHasNoMatches =
     !panel.isEmpty && panel.rows.length > 0 && visibleRows.length === 0;
+  // Chip counts are derived from the unfiltered row set so they always
+  // reflect the whole grow regardless of the active filter.
+  const methodChips = buildDashboardDailyGrowCheckMethodChips(panel.rows);
 
   return (
     <Card
@@ -165,6 +169,43 @@ export default function DashboardDailyGrowCheckPanel({
           </Select>
         )}
       </div>
+
+      {methodChips.length > 0 && (
+        <div
+          className="flex flex-wrap gap-1.5"
+          data-testid="dashboard-daily-grow-check-panel-chips"
+        >
+          {methodChips.map((chip) => {
+            const active = filter === chip.filterValue;
+            return (
+              <button
+                key={chip.key}
+                type="button"
+                onClick={() => setFilter(active ? "all" : chip.filterValue)}
+                data-testid={`dashboard-daily-grow-check-panel-chip-${chip.key}`}
+                data-chip-key={chip.key}
+                data-count={chip.count}
+                data-active={active ? "1" : "0"}
+                aria-pressed={active}
+                aria-label={`${chip.label}: ${chip.count}`}
+                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition tap-target ${
+                  active
+                    ? "border-primary/60 bg-primary/15 text-primary"
+                    : "border-border/60 bg-muted/30 text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <span>{chip.label}</span>
+                <span
+                  className="tabular-nums"
+                  data-testid={`dashboard-daily-grow-check-panel-chip-${chip.key}-count`}
+                >
+                  {chip.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
 
       {panel.isEmpty && (

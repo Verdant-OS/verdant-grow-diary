@@ -64,30 +64,45 @@ export default function Tents() {
             const last = readings.filter((r) => r.tentId === t.id).at(-1);
             const plantCount = plants.filter((p) => p.tentId === t.id).length;
             return (
-              <Link key={t.id} to={`/tents/${t.id}`} className="glass rounded-2xl p-5 hover:border-primary/50 transition group flex flex-col gap-3 animate-fade-in">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="font-display text-lg font-semibold group-hover:text-primary transition">{t.name}</h3>
-                    <p className="text-xs text-muted-foreground">{t.brand} · {t.size}</p>
+              <div key={t.id} className="relative animate-fade-in">
+                <Link to={`/tents/${t.id}`} className="glass rounded-2xl p-5 hover:border-primary/50 transition group flex flex-col gap-3">
+                  <div className="flex items-start justify-between pr-8">
+                    <div>
+                      <h3 className="font-display text-lg font-semibold group-hover:text-primary transition">{t.name}</h3>
+                      <p className="text-xs text-muted-foreground">{t.brand} · {t.size}</p>
+                    </div>
+                    <StageBadge stage={t.stage} />
                   </div>
-                  <StageBadge stage={t.stage} />
-                </div>
 
-                <div className="flex flex-wrap gap-1.5">
-                  {last && <MetricChip label="T" value={(tempFFromC(last.temp) ?? 0).toFixed(1)} unit="°F" status={last.temp > 28 || last.temp < 19 ? "warn" : "ok"} />}
-                  {last && <MetricChip label="RH" value={last.rh} unit="%" status={last.rh > 65 || last.rh < 35 ? "warn" : "ok"} />}
-                  {last && <MetricChip label="VPD" value={last.vpd} unit=" kPa" status={last.vpd > 1.6 || last.vpd < 0.6 ? "warn" : "ok"} />}
-                </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {last && <MetricChip label="T" value={(tempFFromC(last.temp) ?? 0).toFixed(1)} unit="°F" status={last.temp > 28 || last.temp < 19 ? "warn" : "ok"} />}
+                    {last && <MetricChip label="RH" value={last.rh} unit="%" status={last.rh > 65 || last.rh < 35 ? "warn" : "ok"} />}
+                    {last && <MetricChip label="VPD" value={last.vpd} unit=" kPa" status={last.vpd > 1.6 || last.vpd < 0.6 ? "warn" : "ok"} />}
+                  </div>
 
-                <div className="mt-auto flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/40">
-                  <span>{plantCount} plants</span>
-                  <span className="inline-flex items-center gap-1">
-                    <Lightbulb className={`h-3 w-3 ${t.light.on ? "text-[hsl(var(--warning))]" : "text-muted-foreground"}`} />
-                    {t.light.on ? `On · ${t.light.schedule}` : "Off"}
-                  </span>
-                  {t.alertCount > 0 ? <span className="text-destructive">● {t.alertCount} alert{t.alertCount > 1 ? "s" : ""}</span> : <span className="text-[hsl(var(--success))]">● healthy</span>}
+                  <div className="mt-auto flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/40">
+                    <span>{plantCount} plants</span>
+                    <span className="inline-flex items-center gap-1">
+                      <Lightbulb className={`h-3 w-3 ${t.light.on ? "text-[hsl(var(--warning))]" : "text-muted-foreground"}`} />
+                      {t.light.on ? `On · ${t.light.schedule}` : "Off"}
+                    </span>
+                    {t.alertCount > 0 ? <span className="text-destructive">● {t.alertCount} alert{t.alertCount > 1 ? "s" : ""}</span> : <span className="text-[hsl(var(--success))]">● healthy</span>}
+                  </div>
+                </Link>
+                <div className="absolute top-3 right-3 z-10">
+                  <TentCardActionsMenu
+                    tent={{
+                      id: t.id,
+                      name: t.name,
+                      brand: t.brand,
+                      size: t.size,
+                      stage: t.stage,
+                      light: t.light,
+                    }}
+                    assignedPlantCount={plantCount}
+                  />
                 </div>
-              </Link>
+              </div>
             );
           })}
         </div>

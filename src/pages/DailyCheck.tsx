@@ -84,6 +84,8 @@ import {
 } from "@/lib/dailyCheckPostSubmitRules";
 
 import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingCard";
+import { useSensorReadings } from "@/hooks/use-sensor-readings";
+import { deriveChangeContextFromReadings } from "@/lib/manualSensorSnapshotChangeContextRules";
 
 function useQueryParam(name: string): string | null {
   const loc = useLocation();
@@ -197,6 +199,9 @@ export default function DailyCheck() {
   // `verdant:entry-created` window event, which is dispatched ONLY after a
   // successful insert. Failed submits never set this state.
   const [lastSubmittedAt, setLastSubmittedAt] = useState<number | null>(null);
+  const [lastSubmittedSource, setLastSubmittedSource] = useState<
+    "note" | "sensor" | null
+  >(null);
 
   // Listen for QuickLog success to mark steps as added + drive confirmation.
   // We prefer the `createdAt` carried on the event detail (set by QuickLog
@@ -208,6 +213,7 @@ export default function DailyCheck() {
       const raw = detail?.createdAt;
       const parsed = raw != null ? new Date(raw).getTime() : NaN;
       setLastSubmittedAt(Number.isFinite(parsed) ? parsed : Date.now());
+      setLastSubmittedSource("note");
       setState((s) => {
         const next = { ...s };
         if (step === "quicklog" && s.quicklog === "pending") next.quicklog = "added";
@@ -223,6 +229,7 @@ export default function DailyCheck() {
       const raw = detail?.createdAt;
       const parsed = raw != null ? new Date(raw).getTime() : NaN;
       setLastSubmittedAt(Number.isFinite(parsed) ? parsed : Date.now());
+      setLastSubmittedSource("sensor");
       setState((s) =>
         step === "manual" && s.manual === "pending"
           ? { ...s, manual: "added" }
@@ -249,6 +256,15 @@ export default function DailyCheck() {
   const loggedAtLabel = useMemo(
     () => formatDailyCheckLoggedAt(lastSubmittedAt),
     [lastSubmittedAt],
+  );
+
+  // Pull the latest manual readings for the current tent so we can show a
+  // compact "Changed since last snapshot" panel after a sensor save.
+  // Read-only — no writes, no ingestion changes.
+  const { data: tentReadings = [] } = useSensorReadings(tentId || undefined, 50);
+  const changeContext = useMemo(
+    () => deriveChangeContextFromReadings(tentReadings, { tentId }),
+    [tentReadings, tentId],
   );
 
   const progress = stepProgress(step);
@@ -334,6 +350,46 @@ export default function DailyCheck() {
               )}
             </div>
           </div>
+          {lastSubmittedSource === "sensor" && (
+            <div
+              className="rounded-md border border-emerald-500/20 bg-background/30 p-2"
+              data-testid="daily-grow-check-change-context"
+              data-first-snapshot={changeContext.firstSnapshot ? "true" : "false"}
+            >
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+                Changed since last snapshot
+              </div>
+              {changeContext.firstSnapshot ? (
+                <p
+                  className="text-xs text-muted-foreground"
+                  data-testid="daily-grow-check-change-context-first"
+                >
+                  First snapshot for this tent
+                </p>
+              ) : changeContext.deltas.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No comparable metrics moved.
+                </p>
+              ) : (
+                <ul
+                  className="flex flex-wrap gap-x-3 gap-y-1 text-xs"
+                  data-testid="daily-grow-check-change-context-deltas"
+                >
+                  {changeContext.deltas.map((d) => (
+                    <li
+                      key={d.key}
+                      data-testid={`daily-grow-check-change-context-delta-${d.key}`}
+                      data-direction={d.direction}
+                      className="text-foreground/90"
+                    >
+                      <span className="text-muted-foreground">{d.label}</span>{" "}
+                      <strong>{d.formatted}</strong>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
           <div
             className="grid grid-cols-1 sm:grid-cols-2 gap-2"
             data-testid="daily-grow-check-post-submit-actions"

@@ -469,7 +469,7 @@ export default function Plants() {
                           data-testid="plant-card-daily-check-action-note"
                           data-method="note"
                           aria-label={`Add note for ${p.name}`}
-                          href={buildDailyCheckEntryHref({ plantId: p.id, source: "plants", method: "note" })}
+                          data-href={buildDailyCheckEntryHref({ plantId: p.id, source: "plants", method: "note" })}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -484,7 +484,7 @@ export default function Plants() {
                           data-testid="plant-card-daily-check-action-sensor"
                           data-method="sensor"
                           aria-label={`Add sensor snapshot for ${p.name}`}
-                          href={buildDailyCheckEntryHref({ plantId: p.id, source: "plants", method: "sensor" })}
+                          data-href={buildDailyCheckEntryHref({ plantId: p.id, source: "plants", method: "sensor" })}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();

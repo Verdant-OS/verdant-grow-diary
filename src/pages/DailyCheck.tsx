@@ -67,6 +67,7 @@ import {
   type DailyGrowCheckStep,
   type StepOutcome,
 } from "@/lib/dailyGrowCheckRules";
+import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingCard";
 
 function useQueryParam(name: string): string | null {
   const loc = useLocation();

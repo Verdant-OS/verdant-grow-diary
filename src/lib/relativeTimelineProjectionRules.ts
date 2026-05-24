@@ -347,3 +347,161 @@ export function getRelativeTimelineFilterEmptyState(
 }
 
 
+// ---------------------------------------------------------------------------
+// Summary strip (read-only, derived from the FULL projected timeline)
+// ---------------------------------------------------------------------------
+
+export type RelativeTimelineCategoryKey = Exclude<RelativeTimelineFilterKey, "all">;
+
+export interface RelativeTimelineSummary {
+  total: number;
+  counts: Record<RelativeTimelineCategoryKey, number>;
+  lastActivityAt: string | null;
+  /** Relative copy ("Today", "Yesterday", "3 days ago"). Null when no date. */
+  lastActivityRelative: string | null;
+}
+
+export interface SummarizeRelativeTimelineOptions {
+  /** Injected clock for deterministic relative-time copy in tests. */
+  now?: number;
+}
+
+const CATEGORY_KEYS: readonly RelativeTimelineCategoryKey[] = [
+  "photos",
+  "watering",
+  "feeding",
+  "symptoms",
+  "training",
+  "notes",
+];
+
+const CATEGORY_SINGULAR: Record<RelativeTimelineCategoryKey, string> = {
+  photos: "photo",
+  watering: "watering",
+  feeding: "feeding",
+  symptoms: "symptom",
+  training: "training event",
+  notes: "note",
+};
+
+const CATEGORY_PLURAL: Record<RelativeTimelineCategoryKey, string> = {
+  photos: "photos",
+  watering: "waterings",
+  feeding: "feedings",
+  symptoms: "symptoms",
+  training: "training events",
+  notes: "notes",
+};
+
+function emptyCounts(): Record<RelativeTimelineCategoryKey, number> {
+  return {
+    photos: 0,
+    watering: 0,
+    feeding: 0,
+    symptoms: 0,
+    training: 0,
+    notes: 0,
+  };
+}
+
+function relativeDaysCopy(eventMs: number, nowMs: number): string {
+  const MS_PER_DAY = 86_400_000;
+  const diff = nowMs - eventMs;
+  if (!Number.isFinite(diff)) return "";
+  if (diff < 0) return "Just now";
+  const days = Math.floor(diff / MS_PER_DAY);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  return `${days} days ago`;
+}
+
+/**
+ * Build a deterministic summary of the FULL projected timeline. Always
+ * derived from the unfiltered items so the strip reflects the plant's
+ * full visible history, not the current filter chip.
+ */
+export function summarizeRelativeTimelineItems(
+  items: ReadonlyArray<RelativeTimelineItem> | null | undefined,
+  options?: SummarizeRelativeTimelineOptions,
+): RelativeTimelineSummary {
+  const counts = emptyCounts();
+  if (!Array.isArray(items) || items.length === 0) {
+    return { total: 0, counts, lastActivityAt: null, lastActivityRelative: null };
+  }
+  let total = 0;
+  let lastMs = -Infinity;
+  let lastIso: string | null = null;
+  for (const item of items) {
+    total += 1;
+    const key = classifyRelativeTimelineFilter(item);
+    counts[key] += 1;
+    const iso = item.occurredAt;
+    if (typeof iso === "string" && iso) {
+      const ms = Date.parse(iso);
+      if (Number.isFinite(ms) && ms > lastMs) {
+        lastMs = ms;
+        lastIso = iso;
+      }
+    }
+  }
+  const now = options?.now ?? Date.now();
+  const lastActivityRelative =
+    lastIso !== null && Number.isFinite(lastMs) ? relativeDaysCopy(lastMs, now) : null;
+  return {
+    total,
+    counts,
+    lastActivityAt: lastIso,
+    lastActivityRelative: lastActivityRelative || null,
+  };
+}
+
+export interface RelativeTimelineSummaryChip {
+  key: "total" | RelativeTimelineCategoryKey;
+  label: string;
+  count: number;
+}
+
+export interface FormattedRelativeTimelineSummary {
+  chips: RelativeTimelineSummaryChip[];
+  lastActivity: string | null;
+}
+
+function pluralize(count: number, singular: string, plural: string): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+/**
+ * Format a summary for display. Zero-count category chips are hidden
+ * unless every category is zero. The total chip always appears when
+ * total > 0.
+ */
+export function formatRelativeTimelineSummary(
+  summary: RelativeTimelineSummary,
+): FormattedRelativeTimelineSummary {
+  const chips: RelativeTimelineSummaryChip[] = [];
+  if (summary.total > 0) {
+    chips.push({
+      key: "total",
+      count: summary.total,
+      label: pluralize(summary.total, "event", "events"),
+    });
+  }
+  const allZero = CATEGORY_KEYS.every((k) => summary.counts[k] === 0);
+  for (const key of CATEGORY_KEYS) {
+    const count = summary.counts[key];
+    if (count === 0 && !allZero) continue;
+    if (count === 0 && summary.total === 0) continue;
+    chips.push({
+      key,
+      count,
+      label: pluralize(count, CATEGORY_SINGULAR[key], CATEGORY_PLURAL[key]),
+    });
+  }
+  const lastActivity = summary.lastActivityRelative
+    ? `Last activity: ${summary.lastActivityRelative}`
+    : null;
+  return { chips, lastActivity };
+}
+
+
+

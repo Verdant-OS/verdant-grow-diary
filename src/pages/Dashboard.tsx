@@ -377,12 +377,12 @@ export default function Dashboard() {
               </div>
               <dl className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
                 {[
-                  { label: "Temperature", value: formatValue(sensorState.snapshot.temp, "°C") },
+                  { label: "Temperature", value: formatTempFFromC(sensorState.snapshot.temp) },
                   { label: "Humidity", value: formatValue(sensorState.snapshot.rh, "%") },
                   { label: "VPD", value: formatValue(sensorState.snapshot.vpd, " kPa", 2) },
                   { label: "Soil water", value: formatValue(sensorState.snapshot.soil, "%") },
                   { label: "Soil EC", value: formatValue(sensorState.snapshot.soil_ec, " mS/cm", 2) },
-                  { label: "Soil temp", value: formatValue(sensorState.snapshot.soil_temp, "°C") },
+                  { label: "Soil temp", value: formatTempFFromC(sensorState.snapshot.soil_temp) },
                   { label: "PPFD", value: formatValue(sensorState.snapshot.ppfd, " µmol", 0) },
                 ].map((m) => (
                   <div

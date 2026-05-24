@@ -14,10 +14,11 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, ArrowRight, Box, Clock, Sprout } from "lucide-react";
+import { AlertTriangle, ArrowRight, Box, ClipboardCheck, Clock, Sprout } from "lucide-react";
 
 import PageHeader from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import EmptyState from "@/components/EmptyState";
 import { supabase } from "@/integrations/supabase/client";

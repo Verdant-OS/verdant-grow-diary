@@ -143,7 +143,7 @@ describe("deriveDailyGrowCheckOnboarding · pure rules", () => {
   });
 
   it("only CTAs point to existing in-app flows (no new routes)", () => {
-    const allowed = new Set([
+    const allowedExact = new Set([
       "/grows",
       "/tents",
       "/plants",
@@ -161,10 +161,57 @@ describe("deriveDailyGrowCheckOnboarding · pure rules", () => {
     ];
     for (const i of inputs) {
       const g = deriveDailyGrowCheckOnboarding(i);
-      // Allow /plants/:id for assign-plant
-      const base = g.ctaHref.startsWith("/plants/") ? "/plants" : g.ctaHref;
-      expect(allowed.has(base)).toBe(true);
+      const ok =
+        allowedExact.has(g.ctaHref) ||
+        /^\/plants\/[^/]+$/.test(g.ctaHref) ||
+        /^\/tents\/[^/]+$/.test(g.ctaHref);
+      expect(ok).toBe(true);
     }
+  });
+
+  it("Add Plant routes to focused tent when known", () => {
+    const g = deriveDailyGrowCheckOnboarding({
+      ...READY_INPUT,
+      plantsCount: 0,
+      focusedTentId: "tent-9",
+    });
+    expect(g.ctaHref).toBe("/tents/tent-9");
+  });
+
+  it("Add Manual Snapshot routes to the focused plant's assigned tent", () => {
+    const g = deriveDailyGrowCheckOnboarding({
+      ...READY_INPUT,
+      hasAnyManualSnapshot: false,
+      focusedPlantId: "p-1",
+      focusedPlantTentId: "tent-7",
+    });
+    expect(g.step).toBe("add-manual-snapshot");
+    expect(g.ctaHref).toBe("/tents/tent-7");
+  });
+
+  it("Add Manual Snapshot falls back to focused tent, then /daily-check", () => {
+    const withTent = deriveDailyGrowCheckOnboarding({
+      ...READY_INPUT,
+      hasAnyManualSnapshot: false,
+      focusedTentId: "tent-3",
+    });
+    expect(withTent.ctaHref).toBe("/tents/tent-3");
+
+    const noContext = deriveDailyGrowCheckOnboarding({
+      ...READY_INPUT,
+      hasAnyManualSnapshot: false,
+    });
+    expect(noContext.ctaHref).toBe("/daily-check");
+  });
+
+  it("Add Quick Log routes to focused plant detail when known", () => {
+    const g = deriveDailyGrowCheckOnboarding({
+      ...READY_INPUT,
+      hasAnyQuickLog: false,
+      focusedPlantId: "p-42",
+      focusedPlantTentId: "tent-1",
+    });
+    expect(g.ctaHref).toBe("/plants/p-42");
   });
 });
 

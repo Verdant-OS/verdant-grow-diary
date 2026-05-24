@@ -22,6 +22,8 @@ interface Props {
   compact?: boolean;
   /** Optional plant focus (e.g. coming from /daily-check?plantId=). */
   focusedPlantId?: string | null;
+  /** Optional tent focus (e.g. coming from /tents/:id). */
+  focusedTentId?: string | null;
   /** Optional scope filter for "any snapshot/quicklog exists" checks. */
   tentIds?: string[] | null;
   /** When true, the card hides itself once setup is ready. */
@@ -32,6 +34,7 @@ interface Props {
 export default function DailyGrowCheckOnboardingCard({
   compact = false,
   focusedPlantId = null,
+  focusedTentId = null,
   tentIds = null,
   hideWhenReady = false,
   className,
@@ -79,6 +82,8 @@ export default function DailyGrowCheckOnboardingCard({
     plantsWithoutTentCount: plants.filter((p) => !p.tent_id).length,
     focusedPlantId: focusedPlant?.id ?? null,
     focusedPlantTentId: focusedPlant?.tent_id ?? null,
+    focusedTentId:
+      focusedTentId ?? focusedPlant?.tent_id ?? (tents.length === 1 ? tents[0].id : null),
     hasAnyManualSnapshot: scopedManual.length > 0,
     hasAnyQuickLog: scopedDiary.length > 0,
     hasTodayCheckActivity: status.occurredToday,

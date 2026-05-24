@@ -40,6 +40,8 @@ export interface OnboardingInput {
   /** Optional focus plant (e.g. came from /daily-check?plantId=). */
   focusedPlantId?: string | null;
   focusedPlantTentId?: string | null;
+  /** Optional focus tent (e.g. came from /tents/:id or single-tent setups). */
+  focusedTentId?: string | null;
   /** True if at least one manual (source = manual) sensor reading exists. */
   hasAnyManualSnapshot: boolean;
   /** True if at least one diary entry exists. */
@@ -98,21 +100,26 @@ export function deriveDailyGrowCheckOnboarding(
     };
   }
 
-  // 3. No plants.
+  // Prefer a focused tent for tent-scoped flows (add plant / add snapshot).
+  const tentScopedHref = input.focusedTentId
+    ? `/tents/${input.focusedTentId}`
+    : null;
+
+  // 3. No plants — route to the focused tent (where plants can be added)
+  //    when known, otherwise the plants list.
   if (input.plantsCount <= 0) {
     return {
       step: "add-plant",
       title: ONBOARDING_TITLE,
       subtitle: "Add your first plant to start tracking history.",
       ctaLabel: "Add Plant",
-      ctaHref: "/plants",
+      ctaHref: tentScopedHref ?? "/plants",
       isReady: false,
     };
   }
 
-  // 4. Plant exists but no tent assigned.
-  //    Prefer a focused plant when caller passed one; otherwise trigger when
-  //    every plant in scope is unassigned.
+  // 4. Plant exists but no tent assigned. Route to the focused plant's
+  //    detail page where the Assign Tent dialog lives.
   const focusedPlantNeedsTent =
     !!input.focusedPlantId && !input.focusedPlantTentId;
   const allPlantsUnassigned =
@@ -131,27 +138,35 @@ export function deriveDailyGrowCheckOnboarding(
     };
   }
 
-  // 5. No manual snapshot yet (anywhere in scope).
+  // 5. No manual snapshot yet. Prefer the focused plant's assigned tent,
+  //    then the focused tent, then the guided flow.
   if (!input.hasAnyManualSnapshot) {
+    const snapshotHref =
+      (input.focusedPlantTentId && `/tents/${input.focusedPlantTentId}`) ||
+      tentScopedHref ||
+      "/daily-check";
     return {
       step: "add-manual-snapshot",
       title: ONBOARDING_TITLE,
       subtitle:
         "Add your first manual snapshot. This is not live sensor data.",
       ctaLabel: "Add Manual Snapshot",
-      ctaHref: "/daily-check",
+      ctaHref: snapshotHref,
       isReady: false,
     };
   }
 
-  // 6. No QuickLog yet.
+  // 6. No QuickLog yet. Prefer the focused plant's detail page where the
+  //    QuickLog dialog lives; otherwise fall back to the guided flow.
   if (!input.hasAnyQuickLog) {
     return {
       step: "add-quicklog",
       title: ONBOARDING_TITLE,
       subtitle: "Add a quick note so Verdant has plant memory.",
       ctaLabel: "Add Quick Log",
-      ctaHref: "/daily-check",
+      ctaHref: input.focusedPlantId
+        ? `/plants/${input.focusedPlantId}`
+        : "/daily-check",
       isReady: false,
     };
   }

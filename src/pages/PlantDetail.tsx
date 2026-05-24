@@ -109,6 +109,7 @@ export default function PlantDetail() {
             tentId: plant.tentId ?? null,
             growId: plant.growId ?? null,
             lastNote: plant.lastNote,
+            isArchived: plant.isArchived ?? false,
           }}
           variant="row"
           hideView

@@ -67,6 +67,7 @@ import {
   type DailyGrowCheckStep,
   type StepOutcome,
 } from "@/lib/dailyGrowCheckRules";
+import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingCard";
 
 function useQueryParam(name: string): string | null {
   const loc = useLocation();
@@ -164,6 +165,12 @@ export default function DailyCheck() {
         title="Daily Grow Check"
         description="A guided daily walkthrough — current tent, environment, manual snapshot, Quick Log, and review."
         icon={<ClipboardCheck className="h-5 w-5" />}
+      />
+
+      <DailyGrowCheckOnboardingCard
+        focusedPlantId={selectedPlant?.id ?? initialPlantId ?? null}
+        hideWhenReady
+        className="mb-4"
       />
 
       {/* Empty / guard states */}

@@ -59,6 +59,7 @@ import type { SensorReadingRow } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
 import DailyGrowCheckStatusCard from "@/components/DailyGrowCheckStatusCard";
+import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingCard";
 
 import { Badge } from "@/components/ui/badge";
 import { actionDetailPath, actionsPath, alertDetailPath, dashboardPath, logsPath } from "@/lib/routes";
@@ -205,6 +206,13 @@ export default function Dashboard() {
         snapshotSource={
           sensorState.status === "ok" ? sensorState.snapshot.source : undefined
         }
+      />
+
+      <DailyGrowCheckOnboardingCard
+        compact
+        hideWhenReady
+        tentIds={tents.map((t) => t.id)}
+        className="mb-3"
       />
 
       <DailyGrowCheckStatusCard

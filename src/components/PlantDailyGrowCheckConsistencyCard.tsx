@@ -18,6 +18,7 @@ import { usePlants } from "@/hooks/use-plants";
 import {
   buildDailyGrowCheckConsistency,
   CONSISTENCY_WINDOW_DAYS,
+  formatTodayCheckMethodLabel,
 } from "@/lib/dailyGrowCheckConsistencyRules";
 import { deriveDailyGrowCheckGuidance } from "@/lib/dailyGrowCheckGuidanceRules";
 import {

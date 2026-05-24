@@ -57,8 +57,47 @@ export default function Plants() {
   // plants growers normally work with.
   const { data: allGrowsActivePlants = [] } = useGrowPlants(undefined, undefined);
   const { data: tents = [] } = useGrowTents(urlGrowId ?? undefined);
+  const { data: rawDiary = [] } = useDiaryEntries();
+  const { data: rawReadings = [] } = useSensorReadings(undefined, 500);
   const plantsMeta = getGrowDataMeta(["grow", "plants", "all", urlGrowId ?? "all"]);
   const tentsMeta = getGrowDataMeta(["grow", "tents", urlGrowId ?? "all"]);
+  const [tentFilter, setTentFilter] = useState<string>("all");
+
+  // Daily Grow Check: derive checked-today per plant using the same rules
+  // module Dashboard and Plant Detail use. Read-only; never invents state.
+  const dailyCheckByPlant = useMemo(() => {
+    const panel = buildDashboardDailyGrowCheckPanel({
+      now: new Date(),
+      scopedGrowId: urlGrowId ?? null,
+      plants: allPlants.map((p) => ({
+        id: p.id,
+        name: p.name,
+        tentId: p.tentId,
+        growId: (p as { growId?: string | null }).growId ?? null,
+        isArchived: p.isArchived,
+        lastNote: p.lastNote,
+      })),
+      tents: tents.map((t) => ({ id: t.id, name: t.name })),
+      manualReadings: rawReadings
+        .filter((r) => r.source === "manual")
+        .map((r) => ({
+          ts: r.ts,
+          created_at: r.created_at,
+          id: r.id,
+          tent_id: r.tent_id,
+        })),
+      diaryEntries: rawDiary.map((e) => ({
+        entry_at: e.entry_at,
+        created_at: e.created_at,
+        id: e.id,
+        plant_id: e.plant_id,
+        tent_id: e.tent_id,
+      })),
+    });
+    const map = new Map<string, boolean>();
+    for (const row of panel.rows) map.set(row.plantId, row.checkedToday);
+    return map;
+  }, [allPlants, tents, rawReadings, rawDiary, urlGrowId]);
   const [tentFilter, setTentFilter] = useState<string>("all");
 
   // Grow filter — sourced from the workspace grows list + active plants.

@@ -63,13 +63,40 @@ export default function PlantDetail() {
   return (
     <div>
       <Button asChild variant="ghost" size="sm" className="mb-3"><Link to="/plants"><ArrowLeft className="h-4 w-4" /> Plants</Link></Button>
-      <PageHeader title={plant.name} description={plant.strain} icon={<Sprout className="h-5 w-5" />} actions={<StageBadge stage={plant.stage} />} />
+      <PageHeader
+        title={plant.name}
+        description={plant.strain}
+        icon={<Sprout className="h-5 w-5" />}
+        actions={
+          <div className="flex items-center gap-2">
+            {!isActivePlant(plant) && (
+              <Badge
+                variant="outline"
+                data-testid="plant-detail-archived-badge"
+                data-archived-kind={getArchivedPlantLabel(plant).kind}
+                className="gap-1 border-amber-500/40 text-amber-300"
+              >
+                {getArchivedPlantLabel(plant).kind === "merged" ? (
+                  <GitMerge className="h-3 w-3" />
+                ) : (
+                  <Archive className="h-3 w-3" />
+                )}
+                {getArchivedPlantLabel(plant).label}
+              </Badge>
+            )}
+            <StageBadge stage={plant.stage} />
+          </div>
+        }
+      />
       <GrowDataSourceDisclosure
         resource="plant"
         hasAnyData
         metas={[plantMeta, tentMeta]}
         testId="plant-detail-data-source-disclosure"
       />
+      {!isActivePlant(plant) && (
+        <ArchivedPlantBanner plantId={plant.id} lastNote={plant.lastNote} />
+      )}
       <div className="mb-3">
         <PlantCardActionsMenu
           plant={{

@@ -43,48 +43,52 @@ export function useLatestSensorSnapshot(
     queryKey: ["latest-sensor-snapshot", user?.id ?? "anon", growId ?? "none", tentKey],
     enabled: !!user && !!growId,
     queryFn: async () => {
-      // 1) Prefer live sensor_readings if any tents are scoped.
-      if (tentIds.length > 0) {
-        const { data, error } = await supabase
-          .from("sensor_readings")
-          .select("ts,metric,value,source,tent_id,created_at")
-          .in("tent_id", tentIds)
-          .order("ts", { ascending: false })
-          .order("created_at", { ascending: false })
-          .limit(50);
-        if (!error && data && data.length > 0) {
-          const snap = snapshotFromReadings(
-            data.map((r) => ({
-              ts: r.ts,
-              metric: r.metric,
-              value: r.value as number | string | null,
-              source: r.source as string | null,
-            })),
-          );
+      try {
+        // 1) Prefer live sensor_readings if any tents are scoped.
+        if (tentIds.length > 0) {
+          const { data, error } = await supabase
+            .from("sensor_readings")
+            .select("ts,metric,value,source,tent_id,created_at")
+            .in("tent_id", tentIds)
+            .order("ts", { ascending: false })
+            .order("created_at", { ascending: false })
+            .limit(50);
+          if (!error && data && data.length > 0) {
+            const snap = snapshotFromReadings(
+              data.map((r) => ({
+                ts: r.ts,
+                metric: r.metric,
+                value: r.value as number | string | null,
+                source: r.source as string | null,
+              })),
+            );
+            if (snap) return snap;
+          }
+        }
+        // 2) Fall back to latest diary_entries.details.sensor_snapshot.
+        const { data: diaryRows, error: diaryErr } = await supabase
+          .from("diary_entries")
+          .select("entry_at,details")
+          .eq("grow_id", growId)
+          .order("entry_at", { ascending: false })
+          .limit(20);
+        if (diaryErr) throw diaryErr;
+        for (const row of diaryRows ?? []) {
+          const details = (row.details ?? null) as Record<string, unknown> | null;
+          const snap =
+            details && typeof details === "object"
+              ? snapshotFromDiary(
+                  row.entry_at,
+                  details.sensor_snapshot as Record<string, unknown> | undefined,
+                )
+              : null;
           if (snap) return snap;
         }
+        // 3) Nothing available.
+        return EMPTY_SNAPSHOT;
+      } catch {
+        throw new Error("unavailable");
       }
-      // 2) Fall back to latest diary_entries.details.sensor_snapshot.
-      const { data: diaryRows, error: diaryErr } = await supabase
-        .from("diary_entries")
-        .select("entry_at,details")
-        .eq("grow_id", growId as string)
-        .order("entry_at", { ascending: false })
-        .limit(20);
-      if (diaryErr) return EMPTY_SNAPSHOT;
-      for (const row of diaryRows ?? []) {
-        const details = (row.details ?? null) as Record<string, unknown> | null;
-        const snap =
-          details && typeof details === "object"
-            ? snapshotFromDiary(
-                row.entry_at,
-                details.sensor_snapshot as Record<string, unknown> | undefined,
-              )
-            : null;
-        if (snap) return snap;
-      }
-      // 3) Nothing available.
-      return EMPTY_SNAPSHOT;
     },
   });
 

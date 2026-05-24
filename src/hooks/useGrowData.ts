@@ -175,19 +175,36 @@ export function useGrowTent(id?: string): UseQueryResult<Tent | null> {
   });
 }
 
-export function useGrowPlants(tentId?: string, growId?: string): UseQueryResult<Plant[]> {
-  const key = ["grow", "plants", tentId ?? "all", growId ?? "all"] as const;
+export interface UseGrowPlantsOptions {
+  /** Include archived/merged plants. Defaults to false. */
+  includeArchived?: boolean;
+}
+
+export function useGrowPlants(
+  tentId?: string,
+  growId?: string,
+  opts: UseGrowPlantsOptions = {},
+): UseQueryResult<Plant[]> {
+  const includeArchived = !!opts.includeArchived;
+  const key = [
+    "grow",
+    "plants",
+    tentId ?? "all",
+    growId ?? "all",
+    includeArchived ? "with-archived" : "active",
+  ] as const;
   return useQuery({
     queryKey: [...key],
     queryFn: () =>
       withFallback(
         "plants",
         key,
-        () => fetchPlants(tentId, growId),
+        () => fetchPlants(tentId, growId, { includeArchived }),
         () => {
           let list = plants;
           if (tentId) list = list.filter((p) => p.tentId === tentId);
           if (growId) list = list.filter((p) => p.growId === growId);
+          if (!includeArchived) list = list.filter((p) => !p.isArchived);
           return list;
         },
         isArrEmpty,

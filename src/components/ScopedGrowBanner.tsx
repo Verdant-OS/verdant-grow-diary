@@ -36,15 +36,11 @@ export default function ScopedGrowBanner({
       aria-label="Grow filter banner"
     >
       {growName ? (
-        <span className="text-muted-foreground" data-testid="scoped-grow-banner-current">
-          Current grow: <span className="text-foreground font-medium">{growName}</span>
-          <span className="ml-1 text-muted-foreground/80">· {label}</span>
+        <span className="text-muted-foreground">
+          Showing {label} for <span className="text-foreground font-medium">{growName}</span>
         </span>
       ) : (
-        <span className="text-muted-foreground" data-testid="scoped-grow-banner-current">
-          Current grow: <span className="text-foreground font-medium">this grow</span>
-          <span className="ml-1 text-muted-foreground/80">· {label}</span>
-        </span>
+        <span className="text-muted-foreground">Showing {label} for this grow</span>
       )}
       <span className="flex items-center gap-3">
         {backHref && (

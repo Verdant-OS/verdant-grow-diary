@@ -23,12 +23,18 @@ import {
 import { Link2 } from "lucide-react";
 import { toast } from "sonner";
 import CreatePlantDialog from "@/components/CreatePlantDialog";
+import { useGrowTents } from "@/hooks/useGrowData";
+import {
+  getEffectivePlantGrowId,
+  type TentGrowRef,
+} from "@/lib/plantDropdownEligibilityRules";
 
 interface PlantRow {
   id: string;
   name: string;
   strain: string | null;
   tent_id: string | null;
+  grow_id: string | null;
 }
 
 interface Props {
@@ -38,14 +44,15 @@ interface Props {
 }
 
 /**
- * Assigns or moves an existing plant (same grow, non-archived) into the
- * current tent by updating only that plant's `tent_id`. RLS enforces
- * ownership; the client never sets user_id / grow_id / strain / stage.
+ * Assigns or moves an existing plant (same effective grow, non-archived)
+ * into the current tent by updating only that plant's `tent_id`. RLS
+ * enforces ownership; the client never sets user_id / grow_id / strain /
+ * stage.
  *
- * Categorization is performed client-side from a single same-grow query
- * so plants already living in another tent in the same grow are eligible
- * as "move" candidates. Plants already in the current tent are shown
- * disabled. Cross-grow plants are never queried or shown.
+ * Eligibility uses *effective* grow id (plant.grow_id ?? tent.grow_id) so
+ * a plant whose `grow_id` is null but whose `tent_id` is a tent in the
+ * same grow is still offered as a move candidate. Cross-grow plants are
+ * excluded. Plants already in the current tent are shown disabled.
  *
  * Out of scope: alerts, Action Queue, sensor ingestion, automation,
  * device control — no writes to those tables.
@@ -59,27 +66,54 @@ export default function AddExistingPlantDialog({ tentId, growId, trigger }: Prop
 
   const hasGrowContext = Boolean(growId);
 
+  // Same-grow tents drive the OR(grow_id, tent_id IN ...) widening so
+  // legacy plants with null grow_id but a tent in this grow are loaded.
+  const { data: growTents = [] } = useGrowTents(growId ?? undefined);
+  const tentIds = useMemo(() => growTents.map((t) => t.id), [growTents]);
+  const tentRefs = useMemo<TentGrowRef[]>(
+    () => growTents.map((t) => ({ id: t.id, grow_id: t.growId ?? null })),
+    [growTents],
+  );
+
   const { data: rows = [], isLoading } = useQuery({
-    queryKey: ["tent-detail", "eligible-plants", tentId, growId ?? null],
+    queryKey: [
+      "tent-detail",
+      "eligible-plants",
+      tentId,
+      growId ?? null,
+      tentIds.slice().sort().join(","),
+    ],
     enabled: open && hasGrowContext,
     queryFn: async (): Promise<PlantRow[]> => {
-      // Same-grow, non-archived plants. We intentionally do NOT filter
-      // by `tent_id IS NULL` here so plants in another tent in the same
-      // grow are eligible as move candidates. Cross-grow plants are
-      // excluded by the explicit grow_id filter.
+      // Match plants where EITHER raw grow_id matches OR the assigned
+      // tent belongs to this grow. This rescues legacy/orphan plants
+      // whose `grow_id` is null. Cross-grow plants are still excluded
+      // because the OR filter is bounded by this grow's tents.
+      const orParts: string[] = [`grow_id.eq.${growId}`];
+      if (tentIds.length > 0) {
+        orParts.push(`tent_id.in.(${tentIds.join(",")})`);
+      }
       const { data, error } = await supabase
         .from("plants")
         .select("id, name, strain, tent_id, grow_id, is_archived")
-        .eq("grow_id", growId as string)
         .eq("is_archived", false)
+        .or(orParts.join(","))
         .order("created_at", { ascending: true });
       if (error) throw error;
-      return (data ?? []).map((p) => ({
-        id: p.id as string,
-        name: (p.name as string) ?? "Unnamed",
-        strain: (p.strain as string | null) ?? null,
-        tent_id: (p.tent_id as string | null) ?? null,
-      }));
+      // Belt-and-suspenders: re-verify effective grow id client-side so a
+      // stale tent cache can never leak a cross-grow row in.
+      return (data ?? [])
+        .map((p) => ({
+          id: p.id as string,
+          name: (p.name as string) ?? "Unnamed",
+          strain: (p.strain as string | null) ?? null,
+          tent_id: (p.tent_id as string | null) ?? null,
+          grow_id: (p.grow_id as string | null) ?? null,
+        }))
+        .filter((p) => {
+          const eff = getEffectivePlantGrowId(p, tentRefs);
+          return eff === growId;
+        });
     },
   });
 

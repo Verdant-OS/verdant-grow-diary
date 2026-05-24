@@ -5,6 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { usePlantTentLatestReadings } from "@/hooks/usePlantTentLatestReadings";
 import { buildPlantTentEnvironmentView } from "@/lib/plantTentEnvironmentRules";
+import { buildRecentSensorSnapshotHistory } from "@/lib/recentSensorSnapshotHistoryRules";
+import { SOURCE_LABEL, formatValue } from "@/lib/sensorSnapshot";
+import { tempFFromC } from "@/lib/temperatureUnits";
 import {
   buildPlantQuickLogPrefill,
   PLANT_QUICKLOG_PREFILL_EVENT,
@@ -21,7 +24,9 @@ interface Props {
 export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, plantName, growId }: Props) {
   const enabled = !!tentId;
   const { data, isLoading } = usePlantTentLatestReadings(tentId ?? null);
-  const view = buildPlantTentEnvironmentView(enabled ? data ?? [] : []);
+  const rows = enabled ? data ?? [] : [];
+  const view = buildPlantTentEnvironmentView(rows);
+  const recent = buildRecentSensorSnapshotHistory(rows, { limit: 5 });
   const prefill = buildPlantQuickLogPrefill({ plantId, plantName, growId, tentId, tentName });
 
   function openQuickLog() {
@@ -100,6 +105,71 @@ export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, p
             </div>
           </div>
         )}
+        {enabled && !isLoading ? (
+          <div
+            className="mt-5 border-t pt-3"
+            data-testid="plant-tent-environment-recent-history"
+          >
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+              Recent Sensor Readings
+            </div>
+            {recent.length === 0 ? (
+              <p
+                className="text-xs text-muted-foreground"
+                data-testid="plant-tent-environment-recent-empty"
+              >
+                No recent sensor readings yet. Add a manual snapshot to start
+                tracking tent conditions.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {recent.map((r) => {
+                  const tempF = tempFFromC(r.temp);
+                  return (
+                    <li
+                      key={r.ts}
+                      className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs"
+                      data-testid="plant-tent-environment-recent-row"
+                    >
+                      <span
+                        className="rounded-md border px-1.5 py-0.5"
+                        data-testid="plant-tent-environment-recent-source"
+                      >
+                        {SOURCE_LABEL[r.source]}
+                      </span>
+                      <span
+                        className="text-muted-foreground"
+                        data-testid="plant-tent-environment-recent-captured"
+                      >
+                        {formatDistanceToNow(new Date(r.ts), { addSuffix: true })}
+                      </span>
+                      {r.stale ? (
+                        <span
+                          className="rounded-md border border-[hsl(var(--warning))] px-1.5 py-0.5 text-[hsl(var(--warning))]"
+                          data-testid="plant-tent-environment-recent-stale"
+                        >
+                          Stale
+                        </span>
+                      ) : null}
+                      {tempF !== null ? (
+                        <span>{formatValue(tempF, "°F", 1)}</span>
+                      ) : null}
+                      {r.rh !== null ? (
+                        <span>{formatValue(r.rh, "%", 0)}</span>
+                      ) : null}
+                      {r.vpd !== null ? (
+                        <span>{formatValue(r.vpd, " kPa", 2)}</span>
+                      ) : null}
+                      {r.co2 !== null ? (
+                        <span>{formatValue(r.co2, " ppm", 0)}</span>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        ) : null}
         {enabled && prefill ? (
           <div className="mt-4">
             <Button

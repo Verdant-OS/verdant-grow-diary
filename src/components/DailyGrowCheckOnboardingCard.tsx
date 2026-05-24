@@ -34,6 +34,7 @@ interface Props {
 export default function DailyGrowCheckOnboardingCard({
   compact = false,
   focusedPlantId = null,
+  focusedTentId = null,
   tentIds = null,
   hideWhenReady = false,
   className,

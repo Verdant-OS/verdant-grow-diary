@@ -80,7 +80,9 @@ import {
   buildDailyCheckPostSubmitActions,
   formatDailyCheckLoggedAt,
   parseDailyCheckEntrySource,
+  parseDailyCheckMethodHint,
 } from "@/lib/dailyCheckPostSubmitRules";
+
 import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingCard";
 
 function useQueryParam(name: string): string | null {

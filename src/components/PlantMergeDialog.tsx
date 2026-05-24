@@ -114,8 +114,14 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
         growId?: string | null;
         tentId?: string | null;
         startedAt?: string | null;
+        isArchived?: boolean | null;
+        lastNote?: string | null;
       }>)
         .filter((p) => p.id !== source.id)
+        // Hide archived/merged plants from the target picker. Default
+        // queries already exclude them; this is a belt-and-suspenders
+        // guard so a stale cache or fallback can never offer one.
+        .filter((p) => !p.isArchived)
         .map<PlantForMerge>((p) => ({
           id: p.id,
           name: p.name,
@@ -123,6 +129,7 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
           grow_id: p.growId ?? null,
           tent_id: p.tentId ?? null,
           started_at: p.startedAt ?? null,
+          is_archived: p.isArchived ?? false,
         }))
         // Same effective grow id only. Cross-grow targets are excluded
         // even if the user briefly held a stale grow_id.

@@ -13,6 +13,7 @@ const primary = [
 ];
 
 const more = [
+  { to: "/daily-check", label: "Daily Grow Check", icon: ClipboardCheck },
   { to: "/tasks", label: "Tasks", icon: ListChecks },
   { to: "/sensors", label: "Sensor Data", icon: Activity },
   { to: "/doctor", label: "AI Grow Doctor", icon: Stethoscope },

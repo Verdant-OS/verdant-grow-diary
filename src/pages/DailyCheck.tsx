@@ -273,6 +273,14 @@ export default function DailyCheck() {
               >
                 {DAILY_CHECK_SUCCESS_BODY}
               </p>
+              {loggedAtLabel && (
+                <p
+                  className="text-xs text-emerald-300/90 mt-1"
+                  data-testid="daily-grow-check-post-submit-logged-at"
+                >
+                  {loggedAtLabel}
+                </p>
+              )}
             </div>
           </div>
           <div

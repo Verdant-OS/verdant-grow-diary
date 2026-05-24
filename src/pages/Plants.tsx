@@ -419,6 +419,33 @@ export default function Plants() {
                       <span className="capitalize">{p.health}</span>
                       {tent && <span>· {tent.name}</span>}
                     </div>
+                    {showDailyCheckBadge && (
+                      <div
+                        className="mt-2 flex items-center justify-between gap-2"
+                        data-testid="plant-card-daily-check-row"
+                        data-plant-id={p.id}
+                        data-checked-today={checkedToday ? "1" : "0"}
+                      >
+                        <Badge
+                          variant="outline"
+                          data-testid="plant-card-daily-check-badge"
+                          data-state={checkedToday ? "checked" : "needs"}
+                          className={cn(
+                            "text-[10px] gap-1",
+                            checkedToday
+                              ? "border-emerald-500/40 text-emerald-300"
+                              : "border-amber-500/40 text-amber-300",
+                          )}
+                        >
+                          {checkedToday ? (
+                            <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+                          ) : (
+                            <Circle className="h-3 w-3" aria-hidden="true" />
+                          )}
+                          {checkedToday ? "Checked today" : "Needs check"}
+                        </Badge>
+                      </div>
+                    )}
                   </div>
                 </Link>
                 {/* Always-visible Manage menu — never hover-only. */}

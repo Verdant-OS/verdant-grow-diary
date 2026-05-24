@@ -257,29 +257,63 @@ export default function AddExistingPlantDialog({ tentId, growId, trigger }: Prop
                   {unassigned.length > 0 && (
                     <SelectGroup>
                       <SelectLabel>Unassigned plants</SelectLabel>
-                      {unassigned.map((p) => (
-                        <SelectItem
-                          key={p.id}
-                          value={p.id}
-                          data-testid={`add-existing-plant-option-unassigned-${p.id}`}
-                        >
-                          {renderLabel(p)}
-                        </SelectItem>
-                      ))}
+                      {unassigned.map((p) => {
+                        const legacy = p.grow_id == null;
+                        const suffix = legacy
+                          ? " — unassigned, legacy plant (grow derived from assigned tent)"
+                          : " — unassigned, can add to this tent";
+                        const label = `${renderLabel(p)}${suffix}`;
+                        return (
+                          <SelectItem
+                            key={p.id}
+                            value={p.id}
+                            aria-label={label}
+                            title={
+                              legacy
+                                ? "Legacy plant — grow derived from assigned tent"
+                                : "Unassigned — can add to this tent"
+                            }
+                            data-legacy={legacy ? "true" : "false"}
+                            data-testid={`add-existing-plant-option-unassigned-${p.id}`}
+                          >
+                            <span>{renderLabel(p)}</span>
+                            <span className="text-xs text-muted-foreground ml-1">
+                              {legacy
+                                ? "— unassigned · legacy plant"
+                                : "— unassigned"}
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
                     </SelectGroup>
                   )}
                   {otherTent.length > 0 && (
                     <SelectGroup>
                       <SelectLabel>Plants in another tent</SelectLabel>
-                      {otherTent.map((p) => (
-                        <SelectItem
-                          key={p.id}
-                          value={p.id}
-                          data-testid={`add-existing-plant-option-other-${p.id}`}
-                        >
-                          {renderLabel(p)}
-                        </SelectItem>
-                      ))}
+                      {otherTent.map((p) => {
+                        const legacy = p.grow_id == null;
+                        const reason = legacy
+                          ? "In another tent, legacy plant — will move to this tent"
+                          : "In another tent — will move to this tent";
+                        const label = `${renderLabel(p)} — ${reason}`;
+                        return (
+                          <SelectItem
+                            key={p.id}
+                            value={p.id}
+                            aria-label={label}
+                            title={reason}
+                            data-legacy={legacy ? "true" : "false"}
+                            data-testid={`add-existing-plant-option-other-${p.id}`}
+                          >
+                            <span>{renderLabel(p)}</span>
+                            <span className="text-xs text-muted-foreground ml-1">
+                              {legacy
+                                ? "— will move here · legacy plant"
+                                : "— will move here"}
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
                     </SelectGroup>
                   )}
                   {currentTent.length > 0 && (

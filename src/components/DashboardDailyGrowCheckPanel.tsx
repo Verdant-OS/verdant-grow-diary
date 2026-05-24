@@ -173,7 +173,10 @@ export default function DashboardDailyGrowCheckPanel({
                 )}
                 <div className="min-w-0">
                   <div className="text-sm font-medium truncate">{row.plantName}</div>
-                  <div className="text-xs text-muted-foreground truncate">
+                  <div
+                    className="text-xs text-muted-foreground truncate"
+                    data-testid="dashboard-daily-grow-check-panel-row-method"
+                  >
                     {row.tentName ? `${row.tentName} · ` : ""}
                     {row.shortGuidance}
                   </div>

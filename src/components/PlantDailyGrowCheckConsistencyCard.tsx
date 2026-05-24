@@ -158,6 +158,7 @@ export default function PlantDailyGrowCheckConsistencyCard({
           data-testid="plant-daily-grow-check-guidance-next-step"
         >
           {guidance.nextStep}
+        </p>
         {methodLabel && (
           <p
             className="text-xs text-muted-foreground"
@@ -166,7 +167,6 @@ export default function PlantDailyGrowCheckConsistencyCard({
             {methodLabel}
           </p>
         )}
-        </p>
       </div>
 
       {summary.hasAnyActivity && (

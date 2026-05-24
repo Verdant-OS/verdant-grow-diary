@@ -64,6 +64,11 @@ export interface DashboardDailyGrowCheckRow {
   showCta: boolean;
 }
 
+export type DashboardDailyGrowCheckEmptyVariant =
+  | "none"
+  | "no-plants-scoped"
+  | "no-plants-all";
+
 export interface DashboardDailyGrowCheckPanel {
   rows: DashboardDailyGrowCheckRow[];
   checked: number;
@@ -71,18 +76,28 @@ export interface DashboardDailyGrowCheckPanel {
   summaryText: string;
   allChecked: boolean;
   isEmpty: boolean;
+  emptyVariant: DashboardDailyGrowCheckEmptyVariant;
+  emptyTitle: string;
   emptyMessage: string;
   emptyCtaHref: string;
   emptyCtaLabel: string;
   positiveConfirmation: string | null;
+  /** Short first-run helper shown when plants exist but no checks today. */
+  firstRunHint: string | null;
 }
 
-const EMPTY_MESSAGE =
-  "No active plants in this grow yet. Add a plant to start tracking daily checks.";
+const EMPTY_TITLE_SCOPED = "No active plants in this grow yet";
+const EMPTY_TITLE_ALL = "No active plants yet";
+const EMPTY_MESSAGE_SCOPED =
+  "Daily Grow Checks start after you add a plant. Add one to this grow to begin tracking notes and sensor snapshots day by day.";
+const EMPTY_MESSAGE_ALL =
+  "Daily Grow Checks appear here for the current grow. Add your first plant to start tracking notes and sensor snapshots day by day.";
 const EMPTY_CTA_HREF = "/plants";
 const EMPTY_CTA_LABEL = "Add a plant";
 const POSITIVE_ALL =
   "Every active plant has a check logged today. Keep the rhythm going tomorrow.";
+const FIRST_RUN_HINT =
+  "Start with one plant note or sensor snapshot.";
 
 function plantTentId(p: PanelPlantInput): string | null {
   return (p.tentId ?? p.tent_id ?? null) || null;

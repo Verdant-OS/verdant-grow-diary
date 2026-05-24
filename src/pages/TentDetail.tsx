@@ -16,6 +16,7 @@ import {
   buildTentSensorChartSeries,
   buildTentSensorHeaderView,
 } from "@/lib/tentSensorChartRules";
+import { tempFFromC } from "@/lib/temperatureUnits";
 
 export default function TentDetail() {
   const { id } = useParams();

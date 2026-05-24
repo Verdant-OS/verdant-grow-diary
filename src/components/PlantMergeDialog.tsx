@@ -312,7 +312,33 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
               </div>
             </div>
 
+            {!sourceEffectiveGrowId && (
+              <div
+                className="rounded-md border border-destructive/40 bg-destructive/5 p-3 space-y-2"
+                data-testid="plant-merge-missing-grow-context"
+              >
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 text-destructive shrink-0" />
+                  <p className="text-sm">
+                    This plant is missing grow context. Assign it to a tent in a grow before merging.
+                  </p>
+                </div>
+                {sourceCanRepair && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={repairSourceGrowContext}
+                    data-testid="plant-merge-repair-grow-context"
+                  >
+                    Repair grow context from assigned tent
+                  </Button>
+                )}
+              </div>
+            )}
+
             <div>
+
               <Label>Target plant to keep</Label>
               <Select value={targetId} onValueChange={setTargetId}>
                 <SelectTrigger data-testid="plant-merge-target-select">

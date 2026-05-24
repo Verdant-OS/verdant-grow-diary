@@ -57,9 +57,7 @@ describe("Plant Detail · Daily Check quick method actions", () => {
     diaryEntries = [];
     manualReadings = [];
     renderCard();
-    const a = screen
-      .getByTestId("plant-daily-grow-check-quick-action-note")
-      .querySelector("a")!;
+    const a = screen.getByTestId("plant-daily-grow-check-quick-action-note") as HTMLAnchorElement;
     expect(a.getAttribute("href")).toBe(
       `/daily-check?plantId=${PLANT}&from=plant-detail&method=note`,
     );
@@ -69,9 +67,7 @@ describe("Plant Detail · Daily Check quick method actions", () => {
     diaryEntries = [];
     manualReadings = [];
     renderCard();
-    const a = screen
-      .getByTestId("plant-daily-grow-check-quick-action-sensor")
-      .querySelector("a")!;
+    const a = screen.getByTestId("plant-daily-grow-check-quick-action-sensor") as HTMLAnchorElement;
     expect(a.getAttribute("href")).toBe(
       `/daily-check?plantId=${PLANT}&from=plant-detail&method=sensor`,
     );

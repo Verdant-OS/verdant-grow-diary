@@ -508,8 +508,8 @@ export default function Dashboard() {
                 {[
                   {
                     label: "Temperature",
-                    avg: formatValue(trendsState.trends.temp.avg, "°C"),
-                    range: `${formatValue(trendsState.trends.temp.min, "°C")} – ${formatValue(trendsState.trends.temp.max, "°C")}`,
+                    avg: formatTempFFromC(trendsState.trends.temp.avg),
+                    range: `${formatTempFFromC(trendsState.trends.temp.min)} – ${formatTempFFromC(trendsState.trends.temp.max)}`,
                   },
                   {
                     label: "Humidity",

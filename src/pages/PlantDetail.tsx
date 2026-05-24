@@ -8,6 +8,7 @@ import AssignTentDialog from "@/components/AssignTentDialog";
 import PlantTentEnvironmentPanel from "@/components/PlantTentEnvironmentPanel";
 import PlantRecentActivityPanel from "@/components/PlantRecentActivityPanel";
 import PlantDailyGrowCheckHistoryCard from "@/components/PlantDailyGrowCheckHistoryCard";
+import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingCard";
 import PlantDailyGrowCheckConsistencyCard from "@/components/PlantDailyGrowCheckConsistencyCard";
 import PlantRecentMoveCard from "@/components/PlantRecentMoveCard";
 import PlantAssignedTentAlertsPanel from "@/components/PlantAssignedTentAlertsPanel";
@@ -135,6 +136,12 @@ export default function PlantDetail() {
             growId={plant.growId ?? null}
           />
           <PlantRecentActivityPanel plantId={plant.id} plantName={plant.name} />
+          <DailyGrowCheckOnboardingCard
+            focusedPlantId={plant.id}
+            focusedTentId={plant.tentId ?? null}
+            tentIds={plant.tentId ? [plant.tentId] : null}
+            hideWhenReady
+          />
           <PlantDailyGrowCheckHistoryCard
             plantId={plant.id}
             currentTentId={plant.tentId ?? null}

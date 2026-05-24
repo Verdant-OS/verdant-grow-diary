@@ -16,6 +16,7 @@ import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
 import TentCardActionsMenu from "@/components/TentCardActionsMenu";
 import PlantPhoto from "@/components/PlantPhoto";
 import TentManualSnapshotChangeContext from "@/components/TentManualSnapshotChangeContext";
+import TentManualSnapshotHistoryList from "@/components/TentManualSnapshotHistoryList";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useGrowTent, useGrowPlants, getGrowDataMeta } from "@/hooks/useGrowData";
 import {
@@ -165,6 +166,8 @@ export default function TentDetail() {
           <SensorChart data={series as unknown as Parameters<typeof SensorChart>[0]["data"]} metric="temp" height={200} />
         )}
       </div>
+
+      <TentManualSnapshotHistoryList tentId={id ?? null} readings={readings} />
 
       <div className="glass rounded-2xl p-4">
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">

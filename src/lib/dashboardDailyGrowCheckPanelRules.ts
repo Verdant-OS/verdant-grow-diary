@@ -55,6 +55,10 @@ export interface DashboardDailyGrowCheckRow {
   tentName: string | null;
   checkedToday: boolean;
   shortGuidance: string;
+  /** Method that satisfied today's check ("none" when unchecked). */
+  todayMethod: TodayCheckMethod;
+  /** Short grower-friendly label like "Checked by note". Null when unchecked. */
+  methodLabel: string | null;
   ctaHref: string;
   /** True when CTA should be rendered. False when already checked today. */
   showCta: boolean;

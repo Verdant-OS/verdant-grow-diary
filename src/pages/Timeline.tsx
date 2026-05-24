@@ -73,7 +73,12 @@ const MEASUREMENT_KEYS = new Set(["ph", "ec", "runoff", "watering"]);
 function entryKinds(e: Entry): EventFilter[] {
   const kinds: EventFilter[] = ["note"];
   if (e.photo_url) kinds.push("photo");
-  if (e.details && Object.keys(e.details).some((k) => MEASUREMENT_KEYS.has(k))) kinds.push("measurement");
+  const hasDetailMeasurement =
+    e.details && Object.keys(e.details).some((k) => MEASUREMENT_KEYS.has(k));
+  // Manual handheld readings are appended to the note text by Quick Log.
+  // Surface them in the Measurements filter so they aren't hidden.
+  const hasHandheld = hasManualHandheldReadings(e.note);
+  if (hasDetailMeasurement || hasHandheld) kinds.push("measurement");
   return kinds;
 }
 

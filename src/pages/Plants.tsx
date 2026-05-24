@@ -59,7 +59,7 @@ export default function Plants() {
       )}
       <GrowDataSourceDisclosure
         resource="plants"
-        hasAnyData={plants.length > 0}
+        hasAnyData={activePlants.length > 0 || allPlants.length > 0}
         metas={[plantsMeta, tentsMeta]}
         testId="plants-data-source-disclosure"
       />

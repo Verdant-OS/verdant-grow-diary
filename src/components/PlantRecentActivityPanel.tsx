@@ -5,7 +5,7 @@
  * to). No writes. No sensor_readings access. No action_queue / alerts.
  */
 import { Link } from "react-router-dom";
-import { ArrowRight, Camera, Gauge, NotebookPen } from "lucide-react";
+import { ArrowRight, Camera, Gauge, NotebookPen, Wrench } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

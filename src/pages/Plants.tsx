@@ -464,26 +464,36 @@ export default function Plants() {
                         data-testid="plant-card-daily-check-actions"
                         data-plant-id={p.id}
                       >
-                        <Link
-                          to={buildDailyCheckEntryHref({ plantId: p.id, source: "plants", method: "note" })}
+                        <button
+                          type="button"
                           data-testid="plant-card-daily-check-action-note"
                           data-method="note"
                           aria-label={`Add note for ${p.name}`}
-                          onClick={(e) => e.stopPropagation()}
+                          href={buildDailyCheckEntryHref({ plantId: p.id, source: "plants", method: "note" })}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            navigate(buildDailyCheckEntryHref({ plantId: p.id, source: "plants", method: "note" }));
+                          }}
                           className="inline-flex items-center gap-1 rounded-md border border-border bg-background/40 text-[10px] px-2 py-1 hover:bg-accent transition"
                         >
                           <Sparkles className="h-3 w-3" aria-hidden="true" /> Add note
-                        </Link>
-                        <Link
-                          to={buildDailyCheckEntryHref({ plantId: p.id, source: "plants", method: "sensor" })}
+                        </button>
+                        <button
+                          type="button"
                           data-testid="plant-card-daily-check-action-sensor"
                           data-method="sensor"
                           aria-label={`Add sensor snapshot for ${p.name}`}
-                          onClick={(e) => e.stopPropagation()}
+                          href={buildDailyCheckEntryHref({ plantId: p.id, source: "plants", method: "sensor" })}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            navigate(buildDailyCheckEntryHref({ plantId: p.id, source: "plants", method: "sensor" }));
+                          }}
                           className="inline-flex items-center gap-1 rounded-md border border-border bg-background/40 text-[10px] px-2 py-1 hover:bg-accent transition"
                         >
                           <Gauge className="h-3 w-3" aria-hidden="true" /> Add sensor snapshot
-                        </Link>
+                        </button>
                       </div>
                     )}
                   </div>

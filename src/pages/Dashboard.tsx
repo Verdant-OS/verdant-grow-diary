@@ -58,6 +58,7 @@ import { tempFFromC, formatTempFFromC } from "@/lib/temperatureUnits";
 import type { SensorReadingRow } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
+import DailyGrowCheckStatusCard from "@/components/DailyGrowCheckStatusCard";
 
 import { Badge } from "@/components/ui/badge";
 import { actionDetailPath, actionsPath, alertDetailPath, dashboardPath, logsPath } from "@/lib/routes";
@@ -206,7 +207,13 @@ export default function Dashboard() {
         }
       />
 
+      <DailyGrowCheckStatusCard
+        className="mb-6"
+        tentIds={tents.map((t) => t.id)}
+      />
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+
         <KpiCard label="Active tents" value={tents.length} icon={<Box className="h-3.5 w-3.5" />} />
         <KpiCard label="Plants" value={plants.length} icon={<Sprout className="h-3.5 w-3.5" />} hint={`${plants.filter((p) => p.health === "healthy").length} healthy`} accent="success" />
         <KpiCard label="Open alerts" value={openAlerts} icon={<AlertTriangle className="h-3.5 w-3.5" />} accent={openAlerts > 0 ? "destructive" : "success"} />

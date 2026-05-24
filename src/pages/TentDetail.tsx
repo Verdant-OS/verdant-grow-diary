@@ -73,7 +73,7 @@ export default function TentDetail() {
 
       <div className="flex flex-wrap gap-2 mb-5" data-testid="tent-detail-metric-chips">
         {snap?.temp !== null && snap?.temp !== undefined && (
-          <MetricChip label="T" value={snap.temp} unit="°C" status={snap.temp > 28 || snap.temp < 19 ? "warn" : "ok"} />
+          <MetricChip label="T" value={(tempFFromC(snap.temp) ?? 0).toFixed(1)} unit="°F" status={snap.temp > 28 || snap.temp < 19 ? "warn" : "ok"} />
         )}
         {snap?.rh !== null && snap?.rh !== undefined && (
           <MetricChip label="RH" value={snap.rh} unit="%" status={snap.rh > 65 || snap.rh < 35 ? "warn" : "ok"} />

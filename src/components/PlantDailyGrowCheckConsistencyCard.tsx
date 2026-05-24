@@ -5,8 +5,10 @@
  * readings for the plant's current tent — no writes, no persistence,
  * no health claims based on check frequency.
  */
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Activity, ArrowRight, CheckCircle2, Info } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -18,6 +20,10 @@ import {
   CONSISTENCY_WINDOW_DAYS,
 } from "@/lib/dailyGrowCheckConsistencyRules";
 import { deriveDailyGrowCheckGuidance } from "@/lib/dailyGrowCheckGuidanceRules";
+import {
+  ENTRY_CREATED_EVENT,
+  refreshDailyCheckQueries,
+} from "@/lib/dailyCheckRefreshRules";
 
 interface Props {
   plantId: string;

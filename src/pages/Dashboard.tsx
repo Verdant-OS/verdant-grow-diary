@@ -60,6 +60,7 @@ import { Button } from "@/components/ui/button";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
 import DailyGrowCheckStatusCard from "@/components/DailyGrowCheckStatusCard";
 import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingCard";
+import DashboardDailyGrowCheckPanel from "@/components/DashboardDailyGrowCheckPanel";
 
 import { Badge } from "@/components/ui/badge";
 import { actionDetailPath, actionsPath, alertDetailPath, dashboardPath, logsPath } from "@/lib/routes";
@@ -218,6 +219,11 @@ export default function Dashboard() {
       <DailyGrowCheckStatusCard
         className="mb-6"
         tentIds={tents.map((t) => t.id)}
+      />
+
+      <DashboardDailyGrowCheckPanel
+        scopedGrowId={scopedGrowId ?? null}
+        className="mb-6"
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">

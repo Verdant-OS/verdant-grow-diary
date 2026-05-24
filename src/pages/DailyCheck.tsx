@@ -95,6 +95,11 @@ export default function DailyCheck() {
   const { data: tents = [], isLoading: tentsLoading } = useTents();
   const { data: plants = [], isLoading: plantsLoading } = usePlants();
   const initialPlantId = useQueryParam("plantId");
+  const fromParam = useQueryParam("from");
+  const entrySource = useMemo(
+    () => parseDailyCheckEntrySource(fromParam),
+    [fromParam],
+  );
   const { urlGrowId } = useScopedGrow();
 
   const [plantId, setPlantId] = useState<string>("");

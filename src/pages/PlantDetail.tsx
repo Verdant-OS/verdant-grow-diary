@@ -7,6 +7,7 @@ import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
 import AssignTentDialog from "@/components/AssignTentDialog";
 import PlantTentEnvironmentPanel from "@/components/PlantTentEnvironmentPanel";
 import PlantRecentActivityPanel from "@/components/PlantRecentActivityPanel";
+import PlantRecentMoveCard from "@/components/PlantRecentMoveCard";
 import PlantAssignedTentAlertsPanel from "@/components/PlantAssignedTentAlertsPanel";
 import PlantAssignedTentActionsPanel from "@/components/PlantAssignedTentActionsPanel";
 import PlantStatusStrip from "@/components/PlantStatusStrip";
@@ -68,6 +69,7 @@ export default function PlantDetail() {
             tentName={tent?.name ?? null}
             growId={plant.growId ?? null}
           />
+          <PlantRecentMoveCard plantId={plant.id} />
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div data-testid="plant-detail-tent">
               <div className="text-xs text-muted-foreground uppercase tracking-wider">Tent</div>

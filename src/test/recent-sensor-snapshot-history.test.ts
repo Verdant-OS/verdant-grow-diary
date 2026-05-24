@@ -141,10 +141,14 @@ describe("Sensor Context — latest display remains intact", () => {
 });
 
 describe("Static safety — recentSensorSnapshotHistoryRules.ts", () => {
-  const src = readFileSync(
+  const raw = readFileSync(
     resolve(__dirname, "../lib/recentSensorSnapshotHistoryRules.ts"),
     "utf8",
   );
+  // Strip block + line comments so safety check matches actual code only.
+  const src = raw
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
   it.each([
     "webhook",
     "action_queue",

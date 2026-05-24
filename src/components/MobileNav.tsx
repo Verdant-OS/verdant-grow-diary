@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, Box, NotebookText, ListChecks, Bell, MoreHorizontal, Sprout, Activity, Stethoscope, Settings } from "lucide-react";
+import { LayoutDashboard, Box, NotebookText, ListChecks, Bell, MoreHorizontal, Sprout, Activity, Stethoscope, Settings, ClipboardCheck } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { useState } from "react";

@@ -153,10 +153,15 @@ export default function DailyCheck() {
     hasSelectedPlant: !!selectedPlant,
   });
 
-  // Listen for QuickLog success to mark steps as added
+  // Post-submit confirmation is driven exclusively by QuickLog's
+  // `verdant:entry-created` window event, which is dispatched ONLY after a
+  // successful insert. Failed submits never set this state.
+  const [lastSubmittedAt, setLastSubmittedAt] = useState<number | null>(null);
+
+  // Listen for QuickLog success to mark steps as added + drive confirmation.
   useEffect(() => {
     function onEntry() {
-      // Only mark "added" while user is on QuickLog-related steps.
+      setLastSubmittedAt(Date.now());
       setState((s) => {
         const next = { ...s };
         if (step === "quicklog" && s.quicklog === "pending") next.quicklog = "added";
@@ -167,6 +172,11 @@ export default function DailyCheck() {
     window.addEventListener("verdant:entry-created", onEntry);
     return () => window.removeEventListener("verdant:entry-created", onEntry);
   }, [step]);
+
+  const postSubmitActions = useMemo(
+    () => buildDailyCheckPostSubmitActions({ plantId: selectedPlant?.id ?? null }),
+    [selectedPlant?.id],
+  );
 
   const progress = stepProgress(step);
 

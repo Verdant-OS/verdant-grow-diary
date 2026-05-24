@@ -18,7 +18,6 @@ import {
   buildDailyGrowCheckConsistency,
   type ConsistencyInput,
 } from "@/lib/dailyGrowCheckConsistencyRules";
-import { deriveDailyGrowCheckGuidance } from "@/lib/dailyGrowCheckGuidanceRules";
 import {
   isActivePlant,
   type ArchivedPlantLike,

@@ -133,12 +133,22 @@ export default function DashboardDailyGrowCheckPanel({
           >
             Today's Grow Checks
           </h2>
-          <p
-            className="text-xs text-muted-foreground mt-0.5"
-            data-testid="dashboard-daily-grow-check-panel-summary"
-          >
-            {panel.summaryText}
-          </p>
+          {!panel.isEmpty && (
+            <p
+              className="text-xs text-muted-foreground mt-0.5"
+              data-testid="dashboard-daily-grow-check-panel-summary"
+            >
+              {panel.summaryText}
+            </p>
+          )}
+          {panel.isEmpty && (
+            <p
+              className="text-xs text-muted-foreground mt-0.5"
+              data-testid="dashboard-daily-grow-check-panel-empty-subtitle"
+            >
+              Daily Grow Checks appear here once you have an active plant.
+            </p>
+          )}
         </div>
         {!panel.isEmpty && (
           <Select

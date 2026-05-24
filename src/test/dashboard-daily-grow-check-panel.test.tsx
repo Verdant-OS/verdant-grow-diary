@@ -261,7 +261,7 @@ describe("DashboardDailyGrowCheckPanel · component", () => {
   it("unchecked plant CTA links to /daily-check?plantId=<id>", () => {
     renderPanel();
     const cta = screen.getByTestId("dashboard-daily-grow-check-panel-row-cta");
-    const link = cta.querySelector("a")!;
+    const link = (cta.tagName === "A" ? cta : cta.querySelector("a")) as HTMLAnchorElement;
     expect(link.getAttribute("href")).toBe("/daily-check?plantId=p2");
   });
 });

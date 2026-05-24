@@ -178,7 +178,7 @@ export default function PlantDetail() {
               className="gradient-leaf text-primary-foreground"
               data-testid="plant-detail-daily-grow-check-entry"
             >
-              <Link to={`/daily-check?plantId=${plant.id}`}>Daily Grow Check</Link>
+              <Link to={`/daily-check?plantId=${plant.id}&from=plant-detail`}>Daily Grow Check</Link>
             </Button>
           </div>
           <PlantTentEnvironmentPanel

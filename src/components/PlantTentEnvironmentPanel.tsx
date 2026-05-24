@@ -5,6 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { usePlantTentLatestReadings } from "@/hooks/usePlantTentLatestReadings";
 import { buildPlantTentEnvironmentView } from "@/lib/plantTentEnvironmentRules";
+import { buildRecentSensorSnapshotHistory } from "@/lib/recentSensorSnapshotHistoryRules";
+import { SOURCE_LABEL, formatValue } from "@/lib/sensorSnapshot";
+import { tempFFromC } from "@/lib/temperatureUnits";
 import {
   buildPlantQuickLogPrefill,
   PLANT_QUICKLOG_PREFILL_EVENT,

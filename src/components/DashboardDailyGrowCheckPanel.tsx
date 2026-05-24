@@ -190,12 +190,21 @@ export default function DashboardDailyGrowCheckPanel({
         </p>
       )}
 
-      {!panel.isEmpty && panel.rows.length > 0 && (
+      {filterHasNoMatches && (
+        <p
+          className="text-sm text-muted-foreground rounded-md border border-dashed border-border/50 p-3 text-center"
+          data-testid="dashboard-daily-grow-check-panel-filter-empty"
+        >
+          {DASHBOARD_DAILY_GROW_CHECK_FILTER_EMPTY}
+        </p>
+      )}
+
+      {!panel.isEmpty && visibleRows.length > 0 && (
         <ul
           className="divide-y divide-border/40"
           data-testid="dashboard-daily-grow-check-panel-list"
         >
-          {panel.rows.map((row) => (
+          {visibleRows.map((row) => (
             <li
               key={row.plantId}
               data-testid="dashboard-daily-grow-check-panel-row"

@@ -11,6 +11,8 @@ import { ArrowLeft, Box, Lightbulb, Plus } from "lucide-react";
 import CreatePlantDialog from "@/components/CreatePlantDialog";
 import AddExistingPlantDialog from "@/components/AddExistingPlantDialog";
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
+import TentCardActionsMenu from "@/components/TentCardActionsMenu";
+import PlantPhoto from "@/components/PlantPhoto";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useGrowTent, useGrowPlants, getGrowDataMeta } from "@/hooks/useGrowData";
 import {
@@ -71,6 +73,22 @@ export default function TentDetail() {
         metas={[tentMeta]}
         testId="tent-detail-data-source-disclosure"
       />
+
+      <div className="mb-3">
+        <TentCardActionsMenu
+          tent={{
+            id: tent.id,
+            name: tent.name,
+            brand: tent.brand,
+            size: tent.size,
+            stage: tent.stage,
+            light: tent.light,
+          }}
+          assignedPlantCount={plants.length}
+          variant="row"
+          hideView
+        />
+      </div>
 
       <div className="flex flex-wrap gap-2 mb-5" data-testid="tent-detail-metric-chips">
         {snap?.temp !== null && snap?.temp !== undefined && (
@@ -198,7 +216,7 @@ export default function TentDetail() {
                 data-testid="tent-detail-plant-card"
               >
                 <Link to={`/plants/${p.id}`} className="block">
-                  <div className="aspect-video bg-secondary/40"><img src={p.photo} alt="" className="w-full h-full object-cover" /></div>
+                  <PlantPhoto src={p.photo} alt={p.name} className="aspect-video" caption="No plant photo yet" />
                   <div className="p-3">
                     <div className="flex items-center justify-between gap-2 pr-8">
                       <span className="font-medium text-sm" data-testid="tent-detail-plant-name">{p.name}</span>

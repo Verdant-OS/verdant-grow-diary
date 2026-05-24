@@ -8,6 +8,7 @@ import CreatePlantDialog from "@/components/CreatePlantDialog";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
+import PlantPhoto from "@/components/PlantPhoto";
 import { useGrowPlants, useGrowTents, getGrowDataMeta } from "@/hooks/useGrowData";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { plantsPath } from "@/lib/routes";
@@ -61,7 +62,7 @@ export default function Plants() {
             const dot = p.health === "healthy" ? "bg-[hsl(var(--success))]" : p.health === "watch" ? "bg-[hsl(var(--warning))]" : "bg-destructive";
             return (
               <Link key={p.id} to={`/plants/${p.id}`} className="glass rounded-2xl overflow-hidden hover:border-primary/50 transition animate-fade-in">
-                <div className="aspect-[4/3] bg-secondary/40"><img src={p.photo} alt="" className="w-full h-full object-cover" /></div>
+                <PlantPhoto src={p.photo} alt={p.name} className="aspect-[4/3]" caption="No plant photo yet" />
                 <div className="p-3">
                   <div className="flex items-center justify-between mb-1"><span className="font-medium text-sm">{p.name}</span><StageBadge stage={p.stage} /></div>
                   <p className="text-xs text-muted-foreground">{p.strain}</p>

@@ -27,10 +27,12 @@ import {
   Move,
   Unlink,
   Archive,
+  GitMerge,
 } from "lucide-react";
 import { toast } from "sonner";
 import EditPlantDialog from "@/components/EditPlantDialog";
 import AssignTentDialog from "@/components/AssignTentDialog";
+import PlantMergeDialog from "@/components/PlantMergeDialog";
 import {
   buildArchivePlantPayload,
   buildRemovePlantFromTentPayload,
@@ -207,6 +209,26 @@ export default function PlantCardActionsMenu({
             <Unlink className="h-4 w-4" /> Remove from Tent
           </Button>
         )}
+        <PlantMergeDialog
+          source={{
+            id: plant.id,
+            name: plant.name,
+            strain: plant.strain,
+            grow_id: plant.growId ?? null,
+            tent_id: plant.tentId ?? null,
+            started_at: plant.startedAt ?? null,
+          }}
+          trigger={
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1"
+              data-testid="plant-detail-merge-duplicate"
+            >
+              <GitMerge className="h-4 w-4" /> Merge Duplicate
+            </Button>
+          }
+        />
         <Button
           size="sm"
           variant="outline"
@@ -279,6 +301,24 @@ export default function PlantCardActionsMenu({
               <Unlink className="h-4 w-4 mr-2" /> Remove from Tent
             </DropdownMenuItem>
           )}
+          <PlantMergeDialog
+            source={{
+              id: plant.id,
+              name: plant.name,
+              strain: plant.strain,
+              grow_id: plant.growId ?? null,
+              tent_id: plant.tentId ?? null,
+              started_at: plant.startedAt ?? null,
+            }}
+            trigger={
+              <DropdownMenuItem
+                onSelect={(e) => e.preventDefault()}
+                data-testid="plant-card-action-merge"
+              >
+                <GitMerge className="h-4 w-4 mr-2" /> Merge Duplicate
+              </DropdownMenuItem>
+            }
+          />
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="text-destructive focus:text-destructive"

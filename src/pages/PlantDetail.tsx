@@ -15,6 +15,7 @@ import PlantAssignedTentAlertsPanel from "@/components/PlantAssignedTentAlertsPa
 import PlantAssignedTentActionsPanel from "@/components/PlantAssignedTentActionsPanel";
 import PlantStatusStrip from "@/components/PlantStatusStrip";
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
+import PlantPhoto from "@/components/PlantPhoto";
 import { Button } from "@/components/ui/button";
 import { useGrowPlant, useGrowTent, getGrowDataMeta } from "@/hooks/useGrowData";
 import { format, formatDistanceToNow } from "date-fns";
@@ -82,7 +83,7 @@ export default function PlantDetail() {
       </div>
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="lg:col-span-1 glass rounded-2xl overflow-hidden">
-          <div className="aspect-square bg-secondary/40"><img src={plant.photo} alt="" className="w-full h-full object-cover" /></div>
+          <PlantPhoto src={plant.photo} alt={plant.name} className="aspect-square" caption="No plant photo yet" />
         </div>
         <div className="lg:col-span-2 glass rounded-2xl p-5 space-y-3">
           <PlantStatusStrip

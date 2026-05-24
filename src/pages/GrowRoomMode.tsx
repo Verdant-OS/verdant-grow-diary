@@ -14,10 +14,11 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, ArrowRight, Box, Clock, Sprout } from "lucide-react";
+import { AlertTriangle, ArrowRight, Box, ClipboardCheck, Clock, Sprout } from "lucide-react";
 
 import PageHeader from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import EmptyState from "@/components/EmptyState";
 import { supabase } from "@/integrations/supabase/client";
@@ -203,6 +204,18 @@ export default function GrowRoomMode() {
       <PageHeader
         title="Live Dashboard"
         description="Read-only operator view across your tents. Verdant never executes equipment changes."
+        actions={
+          <Button
+            asChild
+            size="lg"
+            className="gradient-leaf text-primary-foreground h-11"
+            data-testid="grow-room-daily-grow-check-entry"
+          >
+            <Link to="/daily-check">
+              <ClipboardCheck className="h-4 w-4" /> Start Check
+            </Link>
+          </Button>
+        }
       />
 
 

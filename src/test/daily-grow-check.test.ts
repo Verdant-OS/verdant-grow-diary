@@ -296,3 +296,38 @@ describe("DailyCheck — completion screen polish", () => {
     expect(RULES).not.toMatch(/import.*supabase/i);
   });
 });
+
+const GROW_ROOM = read("src/pages/GrowRoomMode.tsx");
+const MOBILE_NAV = read("src/components/MobileNav.tsx");
+
+describe("Daily Grow Check entry access — multi-surface", () => {
+  it("GrowRoomMode (Live Dashboard) exposes a Start Check entry", () => {
+    expect(GROW_ROOM).toMatch(/data-testid="grow-room-daily-grow-check-entry"/);
+    expect(GROW_ROOM).toMatch(/\/daily-check/);
+    expect(GROW_ROOM).toMatch(/Start Check/);
+  });
+  it("Dashboard entry still routes to /daily-check with grower-native copy", () => {
+    expect(DASHBOARD).toMatch(/Daily Grow Check/);
+    expect(DASHBOARD).toMatch(/\/daily-check/);
+  });
+  it("Plant Detail entry preserves ?plantId= prefill", () => {
+    expect(PLANT_DETAIL).toMatch(/\/daily-check\?plantId=/);
+  });
+  it("Mobile nav 'More' sheet includes Daily Grow Check", () => {
+    expect(MOBILE_NAV).toMatch(/Daily Grow Check/);
+    expect(MOBILE_NAV).toMatch(/\/daily-check/);
+  });
+  it("does not duplicate DailyCheck flow logic outside the page/rules", () => {
+    for (const surface of [GROW_ROOM, MOBILE_NAV, DASHBOARD, PLANT_DETAIL]) {
+      expect(surface).not.toMatch(/DAILY_GROW_CHECK_STEPS/);
+      expect(surface).not.toMatch(/buildDailyGrowCheckSummary/);
+      expect(surface).not.toMatch(/buildDailyGrowCheckReviewLinks/);
+    }
+  });
+  it("entry surfaces contain no forbidden integration strings", () => {
+    const FORBIDDEN = [/service_role/i, /\bmqtt\b/i, /\bhome_assistant\b/i, /\bpi_bridge\b/i, /actuator/i, /device_command/i, /autopilot/i];
+    for (const surface of [GROW_ROOM, MOBILE_NAV]) {
+      for (const re of FORBIDDEN) expect(surface).not.toMatch(re);
+    }
+  });
+});

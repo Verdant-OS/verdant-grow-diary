@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, Box, NotebookText, ListChecks, Bell, MoreHorizontal, Sprout, Activity, Stethoscope, Settings } from "lucide-react";
+import { LayoutDashboard, Box, NotebookText, ListChecks, Bell, MoreHorizontal, Sprout, Activity, Stethoscope, Settings, ClipboardCheck } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -13,6 +13,7 @@ const primary = [
 ];
 
 const more = [
+  { to: "/daily-check", label: "Daily Grow Check", icon: ClipboardCheck },
   { to: "/tasks", label: "Tasks", icon: ListChecks },
   { to: "/sensors", label: "Sensor Data", icon: Activity },
   { to: "/doctor", label: "AI Grow Doctor", icon: Stethoscope },

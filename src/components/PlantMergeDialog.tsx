@@ -319,6 +319,20 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
               </div>
             </div>
 
+            {source.is_archived && (
+              <div
+                className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3"
+                data-testid="plant-merge-source-archived"
+              >
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 text-amber-300 shrink-0" />
+                  <p className="text-sm text-amber-100">
+                    This plant is already archived or merged. Merge is blocked.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {!sourceEffectiveGrowId && (
               <div
                 className="rounded-md border border-destructive/40 bg-destructive/5 p-3 space-y-2"

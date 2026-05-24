@@ -68,7 +68,9 @@ describe("buildPlantTentEnvironmentView (pure)", () => {
     const temp = view.metrics.find((m) => m.key === "temp")!;
     const vpd = view.metrics.find((m) => m.key === "vpd")!;
     expect(temp.hasValue).toBe(true);
-    expect(temp.display).toContain("24.5");
+    // 24.5°C displayed as Fahrenheit per Verdant convention: 24.5*9/5+32 = 76.1°F
+    expect(temp.display).toContain("76.1");
+    expect(temp.display).toContain("°F");
     expect(vpd.hasValue).toBe(false);
     expect(vpd.display).toBe("Unknown");
   });

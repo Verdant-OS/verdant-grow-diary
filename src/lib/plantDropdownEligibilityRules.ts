@@ -11,7 +11,7 @@
  * to a known tent). This mirrors `plantGrowContextRules.ts` but is kept
  * decoupled so this module stays usable by tests with simple object shapes.
  *
- * No I/O. No Supabase. No React. No writes. No service_role.
+ * No I/O. No Supabase. No React. No writes. No privileged backend access.
  */
 
 export type PlantDropdownContext =

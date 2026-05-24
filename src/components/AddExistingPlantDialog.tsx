@@ -54,8 +54,8 @@ interface Props {
  * same grow is still offered as a move candidate. Cross-grow plants are
  * excluded. Plants already in the current tent are shown disabled.
  *
- * Out of scope: alerts, Action Queue, sensor ingestion, automation,
- * device control — no writes to those tables.
+ * Out of scope: alerts, Action Queue, sensor ingestion, device control —
+ * no writes to those tables.
  */
 export default function AddExistingPlantDialog({ tentId, growId, trigger }: Props) {
   const { user } = useAuth();

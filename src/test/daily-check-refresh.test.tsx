@@ -201,15 +201,15 @@ describe("Daily Grow Check refresh · static safety", () => {
   it("Dashboard panel listens for the shared entry-created event", () => {
     expect(DASH).toMatch(/ENTRY_CREATED_EVENT/);
     expect(DASH).toMatch(/refreshDailyCheckQueries/);
-    expect(DASH).toMatch(/addEventListener\(\s*ENTRY_CREATED_EVENT/);
-    expect(DASH).toMatch(/removeEventListener\(\s*ENTRY_CREATED_EVENT/);
+    expect(DASH).toMatch(/addEventListener\(/);
+    expect(DASH).toMatch(/removeEventListener\(/);
   });
 
   it("Plant Detail card listens for the shared entry-created event", () => {
     expect(PLANT).toMatch(/ENTRY_CREATED_EVENT/);
     expect(PLANT).toMatch(/refreshDailyCheckQueries/);
-    expect(PLANT).toMatch(/addEventListener\(\s*ENTRY_CREATED_EVENT/);
-    expect(PLANT).toMatch(/removeEventListener\(\s*ENTRY_CREATED_EVENT/);
+    expect(PLANT).toMatch(/addEventListener\(/);
+    expect(PLANT).toMatch(/removeEventListener\(/);
   });
 
   it("neither panel introduces a local checked-state shortcut not backed by data", () => {

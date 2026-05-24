@@ -254,17 +254,18 @@ describe("DashboardDailyGrowCheckPanel · component", () => {
       .toHaveTextContent(/checked 1 of 2 plants today/i);
     const rows = within(panel).getAllByTestId("dashboard-daily-grow-check-panel-row");
     expect(rows).toHaveLength(2);
-    // Unchecked row shows a CTA, checked row does not
-    expect(within(panel).getAllByTestId("dashboard-daily-grow-check-panel-row-cta")).toHaveLength(1);
+    // Unchecked row shows quick-action buttons, checked row does not
+    expect(within(panel).getAllByTestId("dashboard-daily-grow-check-panel-row-actions")).toHaveLength(1);
   });
 
-  it("unchecked plant CTA links to /daily-check?plantId=<id>", () => {
+  it("unchecked plant Add note action links to /daily-check?plantId=<id>&from=dashboard&method=note", () => {
     renderPanel();
-    const cta = screen.getByTestId("dashboard-daily-grow-check-panel-row-cta");
-    const link = (cta.tagName === "A" ? cta : cta.querySelector("a")) as HTMLAnchorElement;
-    expect(link.getAttribute("href")).toBe("/daily-check?plantId=p2&from=dashboard");
+    const action = screen.getByTestId("dashboard-daily-grow-check-panel-row-action-note");
+    const link = (action.tagName === "A" ? action : action.querySelector("a")) as HTMLAnchorElement;
+    expect(link.getAttribute("href")).toBe("/daily-check?plantId=p2&from=dashboard&method=note");
   });
 });
+
 
 // -----------------------------------------------------------------------
 // Static safety audit

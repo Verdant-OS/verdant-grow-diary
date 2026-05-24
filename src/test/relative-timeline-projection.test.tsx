@@ -1078,3 +1078,170 @@ describe("summary strip — static safety", () => {
     expect(COMPONENT).not.toMatch(/\.(insert|update|delete|upsert)\s*\(/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Per-stage-group summary — pure rules + render
+// ---------------------------------------------------------------------------
+
+import { formatRelativeTimelineGroupSummary } from "@/lib/relativeTimelineProjectionRules";
+
+const G_NOW = Date.parse("2026-05-01T12:00:00Z");
+
+describe("formatRelativeTimelineGroupSummary — pure rules", () => {
+  it("returns empty labels for an empty group", () => {
+    const g = formatRelativeTimelineGroupSummary(
+      summarizeRelativeTimelineItems([], { now: G_NOW }),
+    );
+    expect(g.totalLabel).toBeNull();
+    expect(g.categoryLabels).toEqual([]);
+    expect(g.lastActivityLabel).toBeNull();
+    expect(g.compact).toBe("");
+  });
+
+  it("counts visible items and concise per-category labels", () => {
+    const items: RelativeTimelineItem[] = [
+      tItem({ id: "w", eventType: "watering", occurredAt: "2026-04-29T00:00:00Z" }),
+      tItem({ id: "p1", eventType: "photo", source: "photo", occurredAt: "2026-04-28T00:00:00Z" }),
+      tItem({ id: "p2", eventType: "photo", source: "photo", occurredAt: "2026-04-27T00:00:00Z" }),
+    ];
+    const g = formatRelativeTimelineGroupSummary(
+      summarizeRelativeTimelineItems(items, { now: G_NOW }),
+    );
+    expect(g.totalLabel).toBe("3 items");
+    expect(g.categoryLabels).toEqual(["2 photos", "1 watering"]);
+    expect(g.lastActivityLabel).toBe("Last: 2 days ago");
+    expect(g.compact).toBe("3 items · 2 photos · 1 watering · Last: 2 days ago");
+  });
+
+  it("hides zero-count categories", () => {
+    const g = formatRelativeTimelineGroupSummary(
+      summarizeRelativeTimelineItems(
+        [tItem({ id: "n", eventType: "note", occurredAt: "2026-05-01T00:00:00Z" })],
+        { now: G_NOW },
+      ),
+    );
+    expect(g.categoryLabels).toEqual(["1 note"]);
+    expect(g.compact).toBe("1 item · 1 note · Last: Today");
+  });
+
+  it("unknown/null event types count as notes", () => {
+    const g = formatRelativeTimelineGroupSummary(
+      summarizeRelativeTimelineItems(
+        [
+          tItem({ id: "u", eventType: "weirdstuff", occurredAt: null }),
+          tItem({ id: "z", eventType: "" , occurredAt: null}),
+        ],
+        { now: G_NOW },
+      ),
+    );
+    expect(g.categoryLabels).toEqual(["2 notes"]);
+    expect(g.lastActivityLabel).toBeNull();
+  });
+
+  it("invalid/missing dates omit last-activity label", () => {
+    const g = formatRelativeTimelineGroupSummary(
+      summarizeRelativeTimelineItems(
+        [tItem({ id: "a", occurredAt: null }), tItem({ id: "b", occurredAt: "nope" })],
+        { now: G_NOW },
+      ),
+    );
+    expect(g.lastActivityLabel).toBeNull();
+    expect(g.compact).not.toMatch(/Last:/);
+  });
+
+  it("deterministic Today / Yesterday / N-days copy with injected now", () => {
+    const mk = (iso: string) =>
+      formatRelativeTimelineGroupSummary(
+        summarizeRelativeTimelineItems([tItem({ id: "x", occurredAt: iso })], {
+          now: G_NOW,
+        }),
+      ).lastActivityLabel;
+    expect(mk("2026-05-01T08:00:00Z")).toBe("Last: Today");
+    expect(mk("2026-04-30T11:00:00Z")).toBe("Last: Yesterday");
+    expect(mk("2026-04-28T12:00:00Z")).toBe("Last: 3 days ago");
+  });
+
+  it("singular vs plural is concise (1 watering vs 2 waterings, 1 symptom vs 2 symptoms)", () => {
+    const g1 = formatRelativeTimelineGroupSummary(
+      summarizeRelativeTimelineItems(
+        [
+          tItem({ id: "w", eventType: "watering" }),
+          tItem({ id: "s", eventType: "symptoms" }),
+        ],
+        { now: G_NOW },
+      ),
+    );
+    expect(g1.categoryLabels).toEqual(["1 watering", "1 symptom"]);
+    const g2 = formatRelativeTimelineGroupSummary(
+      summarizeRelativeTimelineItems(
+        [
+          tItem({ id: "w1", eventType: "watering" }),
+          tItem({ id: "w2", eventType: "watering" }),
+          tItem({ id: "s1", eventType: "symptoms" }),
+          tItem({ id: "s2", eventType: "pest_disease" }),
+        ],
+        { now: G_NOW },
+      ),
+    );
+    expect(g2.categoryLabels).toEqual(["2 waterings", "2 symptoms"]);
+  });
+});
+
+describe("PlantRelativeTimelineSection — per-group summary render", () => {
+  it("renders a group summary near each stage header and respects the active filter", () => {
+    mockUse.mockReturnValue({
+      data: [
+        entry({ id: "w", entry_at: "2026-04-05T00:00:00Z", entry_type: "watering" }),
+        entry({ id: "n", entry_at: "2026-04-06T00:00:00Z", entry_type: "note" }),
+      ],
+      isLoading: false,
+    });
+    render(
+      <PlantRelativeTimelineSection
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+        currentStage="vegetation"
+      />,
+    );
+    const summariesBefore = screen.getAllByTestId("relative-timeline-group-summary");
+    expect(summariesBefore.length).toBe(1);
+    expect(summariesBefore[0].textContent).toMatch(/2 items/);
+    fireEvent.click(screen.getByTestId("relative-timeline-filter-watering"));
+    const summariesAfter = screen.getAllByTestId("relative-timeline-group-summary");
+    expect(summariesAfter.length).toBe(1);
+    expect(summariesAfter[0].textContent).toMatch(/1 item\b/);
+    expect(summariesAfter[0].textContent).toMatch(/1 watering/);
+    // Top full-timeline summary unaffected.
+    expect(
+      screen.getByTestId("relative-timeline-summary-chip-total").textContent,
+    ).toContain("2 events");
+  });
+
+  it("empty timeline still shows the original empty state, no group summaries", () => {
+    mockUse.mockReturnValue({ data: [], isLoading: false });
+    render(
+      <PlantRelativeTimelineSection
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+      />,
+    );
+    expect(screen.getByTestId("relative-timeline-empty")).toBeTruthy();
+    expect(screen.queryAllByTestId("relative-timeline-group-summary").length).toBe(0);
+  });
+});
+
+describe("group summary — static safety", () => {
+  it("rules additions stay free of writes / RPC / schema strings", () => {
+    expect(RULES).not.toMatch(/action_queue/);
+    expect(RULES).not.toMatch(/service_role/);
+    expect(RULES).not.toMatch(/\.(insert|update|delete|upsert)\s*\(/);
+    expect(RULES).not.toMatch(/\.rpc\(/);
+  });
+
+  it("component does not duplicate category mapping tables", () => {
+    expect(COMPONENT).not.toMatch(/CATEGORY_SINGULAR/);
+    expect(COMPONENT).not.toMatch(/CATEGORY_PLURAL/);
+    expect(COMPONENT).not.toMatch(/const\s+\w*CATEGORY\w*\s*=\s*[\[{]/);
+    expect(COMPONENT).toContain("formatRelativeTimelineGroupSummary");
+  });
+});

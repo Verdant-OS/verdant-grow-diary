@@ -505,3 +505,54 @@ export function formatRelativeTimelineSummary(
 
 
 
+
+// ---------------------------------------------------------------------------
+// Per-stage-group compact summary (read-only, filter-aware)
+// ---------------------------------------------------------------------------
+
+export interface FormattedRelativeTimelineGroupSummary {
+  /** "3 items" — always present when total > 0, otherwise null. */
+  totalLabel: string | null;
+  /** Per-category concise labels, zero-count categories omitted. */
+  categoryLabels: string[];
+  /** "Last: Today" / "Last: Yesterday" / "Last: 3 days ago" or null. */
+  lastActivityLabel: string | null;
+  /** Joined compact one-liner, e.g. "3 items · 1 watering · Last: Yesterday". */
+  compact: string;
+}
+
+/**
+ * Compact formatter for a per-stage-group summary. Reuses the same
+ * `summarizeRelativeTimelineItems` totals so classification stays
+ * consistent with the top summary strip and the filter chips.
+ *
+ * Group summaries reflect items *currently visible* in that group
+ * (after the active filter is applied). Pass the visible items only.
+ */
+export function formatRelativeTimelineGroupSummary(
+  summary: RelativeTimelineSummary,
+): FormattedRelativeTimelineGroupSummary {
+  const totalLabel =
+    summary.total > 0 ? pluralize(summary.total, "item", "items") : null;
+  const categoryLabels: string[] = [];
+  for (const key of CATEGORY_KEYS) {
+    const count = summary.counts[key];
+    if (count === 0) continue;
+    categoryLabels.push(
+      pluralize(count, CATEGORY_SINGULAR[key], CATEGORY_PLURAL[key]),
+    );
+  }
+  const lastActivityLabel = summary.lastActivityRelative
+    ? `Last: ${summary.lastActivityRelative}`
+    : null;
+  const parts: string[] = [];
+  if (totalLabel) parts.push(totalLabel);
+  for (const c of categoryLabels) parts.push(c);
+  if (lastActivityLabel) parts.push(lastActivityLabel);
+  return {
+    totalLabel,
+    categoryLabels,
+    lastActivityLabel,
+    compact: parts.join(" · "),
+  };
+}

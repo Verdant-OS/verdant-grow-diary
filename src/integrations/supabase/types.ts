@@ -1317,6 +1317,10 @@ export type Database = {
         Returns: boolean
       }
       max_level_for_user: { Args: { _user_id: string }; Returns: number }
+      merge_duplicate_plant: {
+        Args: { source_plant_id: string; target_plant_id: string }
+        Returns: Json
+      }
       pi_ingest_commit_batch: {
         Args: {
           p_bridge_id: string

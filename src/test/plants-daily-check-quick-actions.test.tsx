@@ -102,16 +102,16 @@ describe("Plants page · Daily Check quick method actions", () => {
 
   it("Add note href is /daily-check?plantId=...&from=plants&method=note", () => {
     renderPlants();
-    const a = screen.getByTestId("plant-card-daily-check-action-note") as HTMLAnchorElement;
-    expect(a.getAttribute("href")).toBe(
+    const a = screen.getByTestId("plant-card-daily-check-action-note");
+    expect(a.getAttribute("data-href")).toBe(
       "/daily-check?plantId=p-needs&from=plants&method=note",
     );
   });
 
   it("Add sensor snapshot href is /daily-check?plantId=...&from=plants&method=sensor", () => {
     renderPlants();
-    const a = screen.getByTestId("plant-card-daily-check-action-sensor") as HTMLAnchorElement;
-    expect(a.getAttribute("href")).toBe(
+    const a = screen.getByTestId("plant-card-daily-check-action-sensor");
+    expect(a.getAttribute("data-href")).toBe(
       "/daily-check?plantId=p-needs&from=plants&method=sensor",
     );
   });

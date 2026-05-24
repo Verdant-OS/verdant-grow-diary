@@ -4,18 +4,29 @@
  * Read-only. Reuses the existing Daily Grow Check consistency + guidance
  * rules so Dashboard and Plant Detail never drift apart.
  */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { CheckCircle2, Circle, Sprout, ArrowRight } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import {
   buildDashboardDailyGrowCheckPanel,
+  filterDashboardDailyGrowCheckRows,
+  DASHBOARD_DAILY_GROW_CHECK_FILTER_OPTIONS,
+  DASHBOARD_DAILY_GROW_CHECK_FILTER_EMPTY,
+  type DashboardDailyGrowCheckFilter,
   type PanelPlantInput,
   type PanelTentInput,
 } from "@/lib/dashboardDailyGrowCheckPanelRules";
@@ -36,6 +47,7 @@ export default function DashboardDailyGrowCheckPanel({
   className,
 }: Props) {
   const queryClient = useQueryClient();
+  const [filter, setFilter] = useState<DashboardDailyGrowCheckFilter>("all");
   const { data: rawPlants = [] } = useGrowPlants(undefined, scopedGrowId ?? undefined);
   const { data: rawTents = [] } = useGrowTents(scopedGrowId ?? undefined);
   const { data: rawReadings = [] } = useSensorReadings(undefined, 500);
@@ -96,6 +108,10 @@ export default function DashboardDailyGrowCheckPanel({
     })),
   });
 
+  const visibleRows = filterDashboardDailyGrowCheckRows(panel.rows, filter);
+  const filterHasNoMatches =
+    !panel.isEmpty && panel.rows.length > 0 && visibleRows.length === 0;
+
   return (
     <Card
       data-testid="dashboard-daily-grow-check-panel"
@@ -105,7 +121,7 @@ export default function DashboardDailyGrowCheckPanel({
       data-is-empty={panel.isEmpty ? "1" : "0"}
       className={`p-4 space-y-3 ${className ?? ""}`}
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start justify-between gap-2 flex-wrap">
         <div className="min-w-0">
           <h2
             className="font-display font-semibold text-base"
@@ -120,7 +136,36 @@ export default function DashboardDailyGrowCheckPanel({
             {panel.summaryText}
           </p>
         </div>
+        {!panel.isEmpty && (
+          <Select
+            value={filter}
+            onValueChange={(v) =>
+              setFilter(v as DashboardDailyGrowCheckFilter)
+            }
+          >
+            <SelectTrigger
+              className="h-8 w-[180px] text-xs"
+              aria-label="Filter today's grow checks"
+              data-testid="dashboard-daily-grow-check-panel-filter"
+              data-filter={filter}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {DASHBOARD_DAILY_GROW_CHECK_FILTER_OPTIONS.map((opt) => (
+                <SelectItem
+                  key={opt.value}
+                  value={opt.value}
+                  data-testid={`dashboard-daily-grow-check-panel-filter-option-${opt.value}`}
+                >
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
+
 
       {panel.isEmpty && (
         <div
@@ -145,12 +190,21 @@ export default function DashboardDailyGrowCheckPanel({
         </p>
       )}
 
-      {!panel.isEmpty && panel.rows.length > 0 && (
+      {filterHasNoMatches && (
+        <p
+          className="text-sm text-muted-foreground rounded-md border border-dashed border-border/50 p-3 text-center"
+          data-testid="dashboard-daily-grow-check-panel-filter-empty"
+        >
+          {DASHBOARD_DAILY_GROW_CHECK_FILTER_EMPTY}
+        </p>
+      )}
+
+      {!panel.isEmpty && visibleRows.length > 0 && (
         <ul
           className="divide-y divide-border/40"
           data-testid="dashboard-daily-grow-check-panel-list"
         >
-          {panel.rows.map((row) => (
+          {visibleRows.map((row) => (
             <li
               key={row.plantId}
               data-testid="dashboard-daily-grow-check-panel-row"

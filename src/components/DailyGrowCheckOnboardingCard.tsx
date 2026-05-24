@@ -4,10 +4,15 @@
  * loop. Reuses existing add/edit/move surfaces. No writes here.
  */
 import { Link } from "react-router-dom";
-import { ArrowRight, ClipboardCheck } from "lucide-react";
+import { ArrowRight, ClipboardCheck, HelpCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useTents } from "@/hooks/use-tents";
 import { usePlants } from "@/hooks/use-plants";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
@@ -112,10 +117,42 @@ export default function DailyGrowCheckOnboardingCard({
           </span>
         </div>
         <p
-          className="text-sm text-foreground/90"
+          className="text-sm text-foreground/90 flex flex-wrap items-center gap-1"
           data-testid="daily-grow-check-onboarding-subtitle"
         >
-          {guidance.subtitle}
+          <span>{guidance.subtitle}</span>
+          {guidance.step === "add-manual-snapshot" && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="What is a manual snapshot?"
+                  data-testid="daily-grow-check-onboarding-help-trigger"
+                  className="inline-flex items-center text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <HelpCircle className="h-3.5 w-3.5" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                side="top"
+                align="start"
+                className="text-sm max-w-xs"
+                data-testid="daily-grow-check-onboarding-help-content"
+              >
+                <p className="font-medium mb-1">What is a manual snapshot?</p>
+                <p className="text-muted-foreground">
+                  A manual snapshot is a reading you type in yourself —
+                  temperature, humidity, VPD, soil moisture, etc. — captured at
+                  a single moment in time.
+                </p>
+                <p className="text-muted-foreground mt-2">
+                  It's saved as <strong>manual</strong>, not live sensor data.
+                  Verdant won't poll, stream, or auto-update it. It only
+                  reflects what you observed when you saved it.
+                </p>
+              </PopoverContent>
+            </Popover>
+          )}
         </p>
       </div>
       <Button

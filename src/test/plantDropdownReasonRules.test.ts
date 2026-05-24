@@ -272,7 +272,7 @@ describe("PlantMergeDialog · helper text wiring", () => {
 describe("QuickLog · grow-name helper text", () => {
   it("renders grow-name helper line under the plant picker", () => {
     expect(QL).toMatch(/data-testid=["']quick-log-plant-helper["']/);
-    expect(QL).toMatch(/Showing plants from \$\{activeGrow\.name\}/);
+    expect(QL).toMatch(/Showing plants from \{activeGrow\.name\}/);
     expect(QL).toMatch(/Archived\/merged plants hidden/);
   });
 });

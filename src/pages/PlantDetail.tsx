@@ -217,3 +217,58 @@ export default function PlantDetail() {
     </div>
   );
 }
+
+function ArchivedPlantBanner({
+  plantId,
+  lastNote,
+}: {
+  plantId: string;
+  lastNote: string;
+}) {
+  const targetId = getMergeTargetPlantId({ lastNote });
+  const isMerged = !!targetId;
+  return (
+    <div
+      data-testid="plant-detail-archived-banner"
+      data-merge-target-id={targetId ?? ""}
+      className="my-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100 space-y-2"
+    >
+      <div className="flex items-start gap-2">
+        {isMerged ? (
+          <GitMerge className="h-4 w-4 mt-0.5 shrink-0" />
+        ) : (
+          <Archive className="h-4 w-4 mt-0.5 shrink-0" />
+        )}
+        <div>
+          <div className="font-medium">
+            {isMerged
+              ? "This plant was merged into another plant."
+              : "This plant was archived."}
+          </div>
+          <p className="text-xs text-amber-200/80 mt-0.5">
+            History is preserved for audit. No data was deleted.
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button asChild variant="outline" size="sm" data-testid="plant-detail-archived-back">
+          <Link to="/plants">
+            <ArrowLeft className="h-3.5 w-3.5" /> Back to Plants
+          </Link>
+        </Button>
+        {targetId && targetId !== plantId && (
+          <Button
+            asChild
+            size="sm"
+            className="gradient-leaf text-primary-foreground"
+            data-testid="plant-detail-archived-view-target"
+          >
+            <Link to={`/plants/${targetId}`}>
+              View target plant <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -469,6 +469,17 @@ export default function Plants() {
                     }}
                   />
                 </div>
+                {showDailyCheckBadge && !checkedToday && (
+                  <Link
+                    to={`/daily-check?plantId=${p.id}&from=plants`}
+                    data-testid="plant-card-daily-check-cta"
+                    data-plant-id={p.id}
+                    aria-label={`Start today's check for ${p.name}`}
+                    className="absolute bottom-3 right-3 z-10 inline-flex items-center gap-1 rounded-full bg-primary text-primary-foreground text-[11px] px-2.5 py-1 hover:bg-primary/90 transition"
+                  >
+                    Start check <ArrowRight className="h-3 w-3" />
+                  </Link>
+                )}
               </div>
             );
           })}

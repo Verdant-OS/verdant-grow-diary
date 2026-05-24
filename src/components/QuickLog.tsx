@@ -269,22 +269,20 @@ export default function QuickLog({ open, onOpenChange, onCreated, prefill }: Pro
             <div>
               <Label className="text-xs">Plant (optional)</Label>
               <Select value={plantId || "__none"} onValueChange={(v) => setPlantId(v === "__none" ? "" : v)}>
-                <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                <SelectTrigger data-testid="quick-log-plant-select"><SelectValue placeholder="None" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none">No specific plant</SelectItem>
-                  {plants.map((p) => (
+                  {scopedPlants.map((p) => (
                     <SelectItem key={p.id} value={p.id}>{p.name}{p.strain ? ` · ${p.strain}` : ""}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {activeGrow?.name && (
-                <p
-                  className="text-[11px] text-muted-foreground mt-1"
-                  data-testid="quick-log-plant-helper"
-                >
-                  Showing plants from {activeGrow.name}. Archived/merged plants hidden.
-                </p>
-              )}
+              <p
+                className="text-[11px] text-muted-foreground mt-1"
+                data-testid="quick-log-plant-helper"
+              >
+                {quickLogPlantHelperText(activeGrow?.name ?? null, !!activeGrowId)}
+              </p>
             </div>
           </div>
 

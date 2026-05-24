@@ -55,7 +55,7 @@ export function buildDailyCheckEntryHref(input: {
 }
 
 export interface DailyCheckPostSubmitAction {
-  key: "dashboard" | "plant";
+  key: "dashboard" | "plant" | "plants";
   label: string;
   href: string;
   primary: boolean;
@@ -73,6 +73,7 @@ export interface DailyCheckPostSubmitInput {
  *
  * Primary CTA is source-aware:
  *  - from=plant-detail → "Back to Plant" (requires a valid plantId)
+ *  - from=plants → "Back to Plants" (plant list)
  *  - from=dashboard or unknown → "Back to Dashboard"
  *
  * Secondary CTA points at the other useful destination when a plant is
@@ -83,14 +84,31 @@ export function buildDailyCheckPostSubmitActions(
 ): DailyCheckPostSubmitAction[] {
   const plantId = input.plantId || null;
   const source = input.source ?? null;
+
+  // from=plants — primary is the plant list, optional secondary is View Plant.
+  if (source === "plants") {
+    const plants: DailyCheckPostSubmitAction = {
+      key: "plants",
+      label: "Back to Plants",
+      href: "/plants",
+      primary: true,
+    };
+    if (!plantId) return [plants];
+    const plant: DailyCheckPostSubmitAction = {
+      key: "plant",
+      label: "View Plant",
+      href: `/plants/${plantId}`,
+      primary: false,
+    };
+    return [plants, plant];
+  }
+
   const plantPrimary = source === "plant-detail" && !!plantId;
 
   const dashboard: DailyCheckPostSubmitAction = {
     key: "dashboard",
     label: "Back to Dashboard",
     href: "/",
-    // Dashboard is primary unless the grower came from a plant page AND we
-    // have a valid plant target to send them back to.
     primary: !plantPrimary,
   };
 
@@ -105,7 +123,6 @@ export function buildDailyCheckPostSubmitActions(
     primary: plantPrimary,
   };
 
-  // Stable order: primary first so it renders left/top.
   return plantPrimary ? [plant, dashboard] : [dashboard, plant];
 }
 

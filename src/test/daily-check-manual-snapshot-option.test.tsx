@@ -23,6 +23,11 @@ import {
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
+function stripComments(src: string): string {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+}
 
 const PAGE = read("src/pages/DailyCheck.tsx");
 const HOOK = read("src/hooks/useInsertSensorReading.ts");

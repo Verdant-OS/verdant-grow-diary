@@ -66,7 +66,14 @@ selected plant has no tent assignment.
   the event but the "Logged at" line is omitted rather than showing a bogus
   time.
 - **Manual current-tent sensor snapshot**: counts as a check for that plant
-  for the day, exactly like a QuickLog.
+  for the day, exactly like a QuickLog. The manual sensor reading hook
+  dispatches `verdant:sensor-reading-created` with `detail.createdAt` and
+  `detail.tentId` on a successful insert; the Daily Check success card,
+  Dashboard panel, and Plant Detail consistency card all listen for both
+  `verdant:entry-created` and `verdant:sensor-reading-created`.
+- **Plant without tent on manual snapshot**: the "Add sensor snapshot"
+  option is disabled and a safe "Sensor snapshots need a tent assignment."
+  message renders. No tent is silently selected.
 
 ## What must not happen
 

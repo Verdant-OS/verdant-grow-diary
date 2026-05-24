@@ -18,6 +18,12 @@ A plant is considered "checked today" when either:
 No other source counts. There is no separate streak table and no fake local
 checked state.
 
+Both paths are exposed on `/daily-check` as first-class options in the
+**Choose today's check** section: "Add plant note" opens the existing
+QuickLog dialog, "Add sensor snapshot" jumps to the existing manual
+sensor reading card and is disabled (with a safe message) when the
+selected plant has no tent assignment.
+
 ## Happy path (from Dashboard)
 
 1. Dashboard renders the **Today's Grow Checks** panel listing active plants
@@ -60,7 +66,14 @@ checked state.
   the event but the "Logged at" line is omitted rather than showing a bogus
   time.
 - **Manual current-tent sensor snapshot**: counts as a check for that plant
-  for the day, exactly like a QuickLog.
+  for the day, exactly like a QuickLog. The manual sensor reading hook
+  dispatches `verdant:sensor-reading-created` with `detail.createdAt` and
+  `detail.tentId` on a successful insert; the Daily Check success card,
+  Dashboard panel, and Plant Detail consistency card all listen for both
+  `verdant:entry-created` and `verdant:sensor-reading-created`.
+- **Plant without tent on manual snapshot**: the "Add sensor snapshot"
+  option is disabled and a safe "Sensor snapshots need a tent assignment."
+  message renders. No tent is silently selected.
 
 ## What must not happen
 

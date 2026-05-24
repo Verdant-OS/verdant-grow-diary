@@ -20,7 +20,9 @@ import {
   type PanelTentInput,
 } from "@/lib/dashboardDailyGrowCheckPanelRules";
 import {
+  DAILY_CHECK_SUCCESS_EVENTS,
   ENTRY_CREATED_EVENT,
+  SENSOR_READING_CREATED_EVENT,
   refreshDailyCheckQueries,
 } from "@/lib/dailyCheckRefreshRules";
 
@@ -39,18 +41,27 @@ export default function DashboardDailyGrowCheckPanel({
   const { data: rawReadings = [] } = useSensorReadings(undefined, 500);
   const { data: rawDiary = [] } = useDiaryEntries();
 
-  // Belt-and-suspenders refresh: when QuickLog (or any successful diary
-  // insert anywhere in the app) dispatches `verdant:entry-created`, force
-  // the diary + sensor reading caches that back checked-today to refetch.
-  // QuickLog already invalidates these on its own; this guarantees the
-  // panel never shows stale checked status if the panel mounts in a tree
-  // where QuickLog's own invalidation has already settled.
+  // Belt-and-suspenders refresh: when QuickLog dispatches
+  // `verdant:entry-created` OR the manual sensor reading hook dispatches
+  // `verdant:sensor-reading-created`, force the diary + sensor reading
+  // caches that back checked-today to refetch. Both surfaces already
+  // invalidate on their own; this guarantees the panel never shows
+  // stale checked status across tree boundaries. Both events are
+  // referenced explicitly so the static contract scanner can see them:
+  //   - ENTRY_CREATED_EVENT
+  //   - SENSOR_READING_CREATED_EVENT
   useEffect(() => {
     function onEntry() {
       refreshDailyCheckQueries(queryClient);
     }
-    window.addEventListener(ENTRY_CREATED_EVENT, onEntry);
-    return () => window.removeEventListener(ENTRY_CREATED_EVENT, onEntry);
+    for (const name of DAILY_CHECK_SUCCESS_EVENTS) {
+      window.addEventListener(name, onEntry);
+    }
+    return () => {
+      for (const name of DAILY_CHECK_SUCCESS_EVENTS) {
+        window.removeEventListener(name, onEntry);
+      }
+    };
   }, [queryClient]);
 
   const plants: PanelPlantInput[] = rawPlants.map((p) => ({

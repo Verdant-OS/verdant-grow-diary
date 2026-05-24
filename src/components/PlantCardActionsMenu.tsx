@@ -48,6 +48,7 @@ interface Plant {
   tentId?: string | null;
   growId?: string | null;
   lastNote?: string | null;
+  isArchived?: boolean | null;
 }
 
 interface Props {

@@ -166,8 +166,31 @@ export default function TentDetail() {
 
       <div className="glass rounded-2xl p-4">
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-          <h2 className="font-display font-semibold">Plants in this tent ({plants.length})</h2>
-          <div className="flex flex-wrap gap-2">
+          <h2 className="font-display font-semibold">
+            Plants in this tent ({activeCount}
+            {hasArchived && allPlants.length > activeCount
+              ? ` active · ${allPlants.length - activeCount} archived`
+              : ""}
+            )
+          </h2>
+          <div className="flex flex-wrap items-center gap-2">
+            {hasArchived && (
+              <button
+                type="button"
+                onClick={() => setShowArchived((v) => !v)}
+                data-testid="tent-detail-show-archived-toggle"
+                aria-pressed={showArchived}
+                className={cn(
+                  "text-xs px-2.5 py-1 rounded-full border transition inline-flex items-center gap-1",
+                  showArchived
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-secondary/50 border-border/50 hover:bg-secondary",
+                )}
+              >
+                <Archive className="h-3 w-3" />
+                {showArchived ? "Hide archived plants" : "Show archived plants"}
+              </button>
+            )}
             <AddExistingPlantDialog
               tentId={id ?? ""}
               growId={tent.growId ?? null}
@@ -183,13 +206,15 @@ export default function TentDetail() {
             />
           </div>
         </div>
-        {plants.length === 0 ? (
+        {visiblePlants.length === 0 ? (
           <div
             className="flex flex-col items-start gap-3 py-4"
             data-testid="tent-detail-plants-empty"
           >
             <p className="text-sm text-muted-foreground">
-              No plants in this tent yet.
+              {activeCount === 0 && hasArchived
+                ? "No active plants in this tent."
+                : "No plants in this tent yet."}
             </p>
             <div className="flex flex-wrap gap-2">
               <AddExistingPlantDialog
@@ -223,40 +248,64 @@ export default function TentDetail() {
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3" data-testid="tent-detail-plants-grid">
-            {plants.map((p) => (
-              <div
-                key={p.id}
-                className="rounded-xl border border-border/40 overflow-hidden hover:border-primary/50 transition relative"
-                data-testid="tent-detail-plant-card"
-              >
-                <Link to={`/plants/${p.id}`} className="block">
-                  <PlantPhoto src={p.photo} alt={p.name} className="aspect-video" caption="No plant photo yet" />
-                  <div className="p-3">
-                    <div className="flex items-center justify-between gap-2 pr-8">
-                      <span className="font-medium text-sm" data-testid="tent-detail-plant-name">{p.name}</span>
-                      <StageBadge stage={p.stage} />
+            {visiblePlants.map((p) => {
+              const archivedLabel = getArchivedPlantLabel(p);
+              const isInactive = archivedLabel.kind !== "active";
+              return (
+                <div
+                  key={p.id}
+                  className={cn(
+                    "rounded-xl border border-border/40 overflow-hidden hover:border-primary/50 transition relative",
+                    isInactive && "opacity-70",
+                  )}
+                  data-testid="tent-detail-plant-card"
+                  data-archived={isInactive ? "true" : "false"}
+                  data-archived-kind={archivedLabel.kind}
+                >
+                  <Link to={`/plants/${p.id}`} className="block">
+                    <PlantPhoto src={p.photo} alt={p.name} className="aspect-video" caption="No plant photo yet" />
+                    <div className="p-3">
+                      <div className="flex items-center justify-between gap-2 pr-8">
+                        <span className="font-medium text-sm" data-testid="tent-detail-plant-name">{p.name}</span>
+                        <StageBadge stage={p.stage} />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5" data-testid="tent-detail-plant-strain">{p.strain}</p>
+                      {isInactive && (
+                        <Badge
+                          variant="outline"
+                          data-testid="tent-detail-plant-archived-badge"
+                          data-archived-kind={archivedLabel.kind}
+                          className="mt-1 text-[10px] gap-1 border-amber-500/40 text-amber-300"
+                        >
+                          {archivedLabel.kind === "merged" ? (
+                            <GitMerge className="h-3 w-3" />
+                          ) : (
+                            <Archive className="h-3 w-3" />
+                          )}
+                          {archivedLabel.kind === "merged" ? "Merged / Archived" : "Archived"}
+                        </Badge>
+                      )}
+                      <p className="text-[11px] text-muted-foreground mt-1 capitalize">{p.health}</p>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5" data-testid="tent-detail-plant-strain">{p.strain}</p>
-                    <p className="text-[11px] text-muted-foreground mt-1 capitalize">{p.health}</p>
+                  </Link>
+                  <div className="absolute top-2 right-2">
+                    <PlantCardActionsMenu
+                      plant={{
+                        id: p.id,
+                        name: p.name,
+                        strain: p.strain,
+                        stage: p.stage,
+                        health: p.health,
+                        startedAt: p.startedAt,
+                        tentId: p.tentId ?? tent.id,
+                        growId: p.growId ?? tent.growId ?? null,
+                        lastNote: p.lastNote,
+                      }}
+                    />
                   </div>
-                </Link>
-                <div className="absolute top-2 right-2">
-                  <PlantCardActionsMenu
-                    plant={{
-                      id: p.id,
-                      name: p.name,
-                      strain: p.strain,
-                      stage: p.stage,
-                      health: p.health,
-                      startedAt: p.startedAt,
-                      tentId: p.tentId ?? tent.id,
-                      growId: p.growId ?? tent.growId ?? null,
-                      lastNote: p.lastNote,
-                    }}
-                  />
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

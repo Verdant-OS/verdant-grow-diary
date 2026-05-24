@@ -88,6 +88,7 @@ export default function DailyCheck() {
   const { data: tents = [], isLoading: tentsLoading } = useTents();
   const { data: plants = [], isLoading: plantsLoading } = usePlants();
   const initialPlantId = useQueryParam("plantId");
+  const { urlGrowId } = useScopedGrow();
 
   const [plantId, setPlantId] = useState<string>("");
   const [tentId, setTentId] = useState<string>("");
@@ -97,16 +98,26 @@ export default function DailyCheck() {
   );
   const [quickLogOpen, setQuickLogOpen] = useState(false);
 
-  // Seed plant from query param once data loads
+  // Pure resolution of the ?plantId= URL param against the active plant
+  // list and current grow scope. Never silently picks a different plant.
+  const plantResolution = useMemo(
+    () =>
+      resolveDailyCheckPlantSelection({
+        plantIdParam: initialPlantId,
+        plants,
+        activeGrowId: urlGrowId,
+      }),
+    [initialPlantId, plants, urlGrowId],
+  );
+
+  // Seed plant from query param ONLY when the resolution is valid. Invalid
+  // / out-of-scope / unknown cases fall through to the picker + banner.
   useEffect(() => {
-    if (initialPlantId && !plantId) {
-      const match = plants.find((p) => p.id === initialPlantId);
-      if (match) {
-        setPlantId(match.id);
-        if (match.tent_id) setTentId(match.tent_id);
-      }
-    }
-  }, [initialPlantId, plants, plantId]);
+    if (plantId) return;
+    if (plantResolution.status !== "valid" || !plantResolution.plant) return;
+    setPlantId(plantResolution.plant.id);
+    if (plantResolution.plant.tent_id) setTentId(plantResolution.plant.tent_id);
+  }, [plantResolution, plantId]);
 
   // When a plant is chosen, sync its assigned tent
   useEffect(() => {

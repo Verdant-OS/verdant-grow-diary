@@ -12,6 +12,7 @@ import {
   type NormalizedDiaryEntry,
 } from "@/lib/diaryEntryRules";
 import { isStale } from "@/lib/sensorSnapshot";
+import { splitHardwareReadingsFromNote } from "@/lib/quickLogHardwareReadingsDisplayRules";
 
 export interface PlantRecentActivityRow {
   id: string;

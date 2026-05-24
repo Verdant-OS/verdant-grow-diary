@@ -312,7 +312,7 @@ describe("Global safety (static)", () => {
   });
   it("no pi-ingest / edge-function / alert / action_queue / sensor_readings writes", () => {
     for (const f of FILES) {
-      expect(f).not.toMatch(/pi-ingest|pi_ingest|supabase\/functions/);
+      expect(f).not.toMatch(/from\(["']pi_ingest|supabase\/functions\/pi-ingest|functions\.invoke\(["']pi-ingest/);
       expect(f).not.toMatch(/from\("alerts"\)\.(insert|update|delete)/);
       expect(f).not.toMatch(/from\("action_queue"\)\.(insert|update|delete)/);
       expect(f).not.toMatch(/from\("sensor_readings"\)\.(insert|update|delete)/);

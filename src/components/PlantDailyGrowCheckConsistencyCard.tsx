@@ -34,9 +34,22 @@ export default function PlantDailyGrowCheckConsistencyCard({
   plantId,
   currentTentId,
 }: Props) {
+  const queryClient = useQueryClient();
   const { data: rawReadings = [] } = useSensorReadings(currentTentId ?? undefined);
   const { data: rawDiary = [] } = useDiaryEntries();
   const { data: plants = [] } = usePlants();
+
+  // Belt-and-suspenders: when QuickLog dispatches `verdant:entry-created`
+  // (after a successful insert), force the diary + sensor reading caches
+  // that back checked-today to refetch so the card never lingers stale
+  // after returning from /daily-check.
+  useEffect(() => {
+    function onEntry() {
+      refreshDailyCheckQueries(queryClient);
+    }
+    window.addEventListener(ENTRY_CREATED_EVENT, onEntry);
+    return () => window.removeEventListener(ENTRY_CREATED_EVENT, onEntry);
+  }, [queryClient]);
 
   const plantsInTentCount = currentTentId
     ? plants.filter((p) => p.tent_id === currentTentId).length

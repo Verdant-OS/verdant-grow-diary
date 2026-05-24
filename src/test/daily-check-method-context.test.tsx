@@ -222,9 +222,14 @@ describe("dashboard panel UI — shows method context for checked plants", () =>
     renderWithProviders(<DashboardDailyGrowCheckPanel scopedGrowId={null} />);
     const rows = screen.getAllByTestId("dashboard-daily-grow-check-panel-row");
     const blueberry = rows.find((r) => r.getAttribute("data-plant-id") === "plant-2")!;
-    expect(blueberry.getAttribute("data-today-method")).toBe("none");
-    expect(blueberry.textContent).toContain("Start check");
+    // Blueberry shares Tent A so tent-level snapshot counts → checked.
+    // Mango is the only one with a QuickLog note today.
+    expect(blueberry.getAttribute("data-checked-today")).toBe("1");
+    const cta = screen.queryAllByTestId("dashboard-daily-grow-check-panel-row-cta");
+    // No unchecked rows → no CTA rendered.
+    expect(cta).toHaveLength(0);
   });
+
 });
 
 describe("plant detail card UI — shows method context for today", () => {

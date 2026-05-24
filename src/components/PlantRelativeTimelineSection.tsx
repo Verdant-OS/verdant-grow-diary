@@ -6,15 +6,22 @@
  * controls. No writes. No alerts. No Action Queue execution. No device
  * control. No reminder scheduling. No calendar event tables.
  */
+import { useState } from "react";
 import { Camera, Gauge, NotebookPen, Sprout } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import {
   buildRelativeTimelineProjection,
+  filterRelativeTimelineItems,
+  getRelativeTimelineFilterEmptyState,
   groupRelativeTimelineByStage,
+  RELATIVE_TIMELINE_FILTERS,
+  type RelativeTimelineFilterKey,
   type RelativeTimelineItem,
 } from "@/lib/relativeTimelineProjectionRules";
+
 
 interface Props {
   plantId: string | null | undefined;

@@ -7,8 +7,8 @@
  * Scope:
  *  - Pure. No React, no I/O, no DB client. Read-only derivation.
  *  - Only `source === "manual"` rows for the requested tent are considered.
- *    Demo, live, imported, csv, pi_bridge, home_assistant, mqtt, api are
- *    intentionally excluded — this surface is the manual entry history.
+ *    Demo, live, imported, and any ingestion-bridge sources are intentionally
+ *    excluded — this surface is the manual entry history.
  *  - Each entry includes the change-context vs the immediately previous
  *    manual snapshot for the SAME tent (or `firstSnapshot=true` for the
  *    earliest entry shown).

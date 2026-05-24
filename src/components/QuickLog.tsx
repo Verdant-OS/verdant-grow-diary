@@ -195,7 +195,11 @@ export default function QuickLog({ open, onOpenChange, onCreated, prefill }: Pro
       // so the just-saved entry appears without a hard refresh.
       queryClient.invalidateQueries({ queryKey: ["plant_recent_activity"] });
       queryClient.invalidateQueries({ queryKey: ["diary_entries"] });
-      window.dispatchEvent(new CustomEvent("verdant:entry-created"));
+      window.dispatchEvent(
+        new CustomEvent("verdant:entry-created", {
+          detail: { createdAt: new Date().toISOString() },
+        }),
+      );
     } catch (err: unknown) {
       if (uploadedPath) {
         await supabase.storage.from("diary-photos").remove([uploadedPath]).catch(() => {});

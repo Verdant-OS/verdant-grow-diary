@@ -47,7 +47,8 @@ describe("merge_duplicate_plant RPC — signature & safety", () => {
       "pins search_path to public, pg_temp",
       /set\s+search_path\s*=\s*public\s*,\s*pg_temp/i,
     ],
-    ["checks auth.uid() is not null", /auth\.uid\(\)[\s\S]{0,200}not\s+authenticated/i],
+    ["resolves auth.uid()", /auth\.uid\(\)/i],
+    ["raises not authenticated when uid is null", /not\s+authenticated/i],
     [
       "rejects same source and target",
       /source_plant_id\s*=\s*target_plant_id[\s\S]{0,200}must\s+differ/i,

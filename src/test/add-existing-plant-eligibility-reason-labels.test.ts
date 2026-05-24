@@ -68,13 +68,13 @@ describe("Add Existing Plant · legacy null-grow_id regression", () => {
     expect(legacy.tent_id).not.toBe(TENT_A);
   });
 
-  it("legacy plant (grow_id=null, tent_id=null) is silently excluded for add_existing_to_tent (no usable grow context)", () => {
+  it("legacy plant (grow_id=null, tent_id=null) is surfaced as disabled with a missing-grow-context reason (no silent disappearance)", () => {
     const legacy = p("legacy-orphan", { grow_id: null, tent_id: null });
     expect(getEffectivePlantGrowId(legacy, tents)).toBeNull();
-    // The dialog's data path uses an OR(grow_id, tent_id IN ...) filter
-    // which cannot match this row at all, so the centralized rule
-    // silently excludes it from the add_existing_to_tent picker.
-    expect(shouldIncludePlantInDropdown(legacy, tents, opts)).toBe(false);
+    const decision = classifyPlantForDropdown(legacy, tents, opts);
+    expect(decision).not.toBeNull();
+    expect(decision!.disabled).toBe(true);
+    expect(decision!.reasonCode).toBe("missing_grow_context");
   });
 
   it("legacy plant whose tent belongs to OTHER grow is excluded (no cross-grow leak)", () => {

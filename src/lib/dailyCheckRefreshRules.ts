@@ -14,7 +14,7 @@
  * recompute against the same two read paths — never inventing a local
  * checked state that is not backed by real data.
  *
- * No persistence. No writes. No RPC. No automation. No device control.
+ * No persistence. No writes. No RPC. No background jobs. No device control.
  */
 
 /** Window event QuickLog dispatches after a successful diary insert. */

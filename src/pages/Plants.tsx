@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Sprout, Filter, Archive, GitMerge, Search, CheckCircle2, Circle, ArrowRight } from "lucide-react";
+import { Sprout, Filter, Archive, GitMerge, Search, CheckCircle2, Circle, ArrowRight, Sparkles, Gauge } from "lucide-react";
 import { useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";

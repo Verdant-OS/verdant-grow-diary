@@ -159,14 +159,13 @@ export function buildDashboardDailyGrowCheckPanel(
         diaryEntries: input.diaryEntries,
       });
 
-      const guidance = deriveDailyGrowCheckGuidance(summary);
       const checkedToday = summary.todayHasActivity;
 
       const shortGuidance = checkedToday
         ? "Today's check is logged."
         : "No check logged for today yet.";
 
-      return {
+      const row: DashboardDailyGrowCheckRow = {
         plantId: plant.id,
         plantName: plant.name ?? "Unnamed plant",
         tentId: tId,
@@ -175,12 +174,9 @@ export function buildDashboardDailyGrowCheckPanel(
         shortGuidance,
         ctaHref: `/daily-check?plantId=${plant.id}`,
         showCta: !checkedToday,
-        // guidance.state is intentionally not surfaced here — Plant Detail
-        // owns the richer guidance UI. We only consume the boolean.
-        _guidance: guidance,
-      } as DashboardDailyGrowCheckRow & { _guidance: unknown };
+      };
+      return row;
     })
-    .map(({ _guidance, ...row }) => row)
     .sort((a, b) => {
       if (a.checkedToday !== b.checkedToday) return a.checkedToday ? 1 : -1;
       return a.plantName.localeCompare(b.plantName);

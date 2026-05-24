@@ -128,6 +128,12 @@ export default function PlantDailyGrowCheckConsistencyCard({
       {summary.hasAnyActivity && (
         <div className="space-y-1">
           <div
+            className="text-sm"
+            data-testid="plant-daily-grow-check-consistency-main"
+          >
+            Checked {summary.checkedDays} of last {summary.windowDays} days
+          </div>
+          <div
             className="text-sm text-muted-foreground"
             data-testid="plant-daily-grow-check-consistency-streak"
           >

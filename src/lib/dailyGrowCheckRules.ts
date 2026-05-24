@@ -24,7 +24,7 @@ export const DAILY_GROW_CHECK_STEPS = [
 ] as const;
 export type DailyGrowCheckStep = (typeof DAILY_GROW_CHECK_STEPS)[number];
 
-export type StepOutcome = "added" | "skipped" | "pending";
+export type StepOutcome = "added" | "skipped" | "visited" | "pending";
 
 export interface DailyGrowCheckState {
   manual: StepOutcome;
@@ -131,4 +131,64 @@ export function buildDailyGrowCheckSummary(
  */
 export function canCompleteDailyGrowCheck(_state: DailyGrowCheckState): boolean {
   return true;
+}
+
+/**
+ * Conservative human-facing label for a step outcome. Save-confirmed steps
+ * render as "Added"; user-marked steps without save confirmation render as
+ * "Visited" so we never overclaim that data was written.
+ */
+export function formatOutcomeLabel(
+  outcome: StepOutcome | "reviewed" | "not-reviewed",
+): string {
+  switch (outcome) {
+    case "added": return "Added";
+    case "skipped": return "Skipped";
+    case "visited": return "Visited";
+    case "reviewed": return "Reviewed";
+    case "not-reviewed": return "Not reviewed";
+    case "pending":
+    default: return "Pending";
+  }
+}
+
+export interface DailyGrowCheckReviewLink {
+  key: string;
+  label: string;
+  href: string;
+  primary?: boolean;
+}
+
+/**
+ * Builds direct navigation links shown on the completion screen. Falls back
+ * to safe navigation (Dashboard / Add Tent) when there is no tent context.
+ */
+export function buildDailyGrowCheckReviewLinks(input: {
+  plantId: string | null | undefined;
+  tentId: string | null | undefined;
+}): DailyGrowCheckReviewLink[] {
+  const links: DailyGrowCheckReviewLink[] = [];
+  if (input.plantId) {
+    links.push({
+      key: "plant",
+      label: "View Plant Detail",
+      href: `/plants/${input.plantId}`,
+      primary: true,
+    });
+  }
+  if (input.tentId) {
+    links.push({
+      key: "tent",
+      label: "View Current Tent",
+      href: `/tents/${input.tentId}`,
+    });
+  }
+  if (input.tentId || input.plantId) {
+    links.push({ key: "timeline", label: "View Recent Activity", href: "/timeline" });
+  }
+  if (!input.tentId) {
+    links.push({ key: "dashboard", label: "Back to Dashboard", href: "/" });
+    links.push({ key: "add-tent", label: "Add Tent", href: "/tents" });
+  }
+  return links;
 }

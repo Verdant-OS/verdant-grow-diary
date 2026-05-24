@@ -56,8 +56,10 @@ import { usePlants } from "@/hooks/use-plants";
 import {
   DAILY_GROW_CHECK_STEPS,
   INITIAL_DAILY_GROW_CHECK_STATE,
+  buildDailyGrowCheckReviewLinks,
   buildDailyGrowCheckSummary,
   evaluateDailyGrowCheckGuard,
+  formatOutcomeLabel,
   nextStep,
   previousStep,
   stepProgress,
@@ -292,9 +294,9 @@ export default function DailyCheck() {
                   variant="outline"
                   className="flex-1"
                   data-testid="daily-grow-check-mark-manual-added"
-                  onClick={() => markAndAdvance("manual", "added")}
+                  onClick={() => markAndAdvance("manual", "visited")}
                 >
-                  <Check className="h-4 w-4" /> Saved snapshot
+                  <Check className="h-4 w-4" /> I saved it
                 </Button>
                 <Button
                   size="sm"
@@ -430,7 +432,10 @@ export default function DailyCheck() {
           )}
 
           {step === "done" && (
-            <StepCard title="All done" icon={<CheckCircle2 className="h-4 w-4" />}>
+            <StepCard title="Today's check is saved" icon={<CheckCircle2 className="h-4 w-4" />}>
+              <p className="text-sm text-muted-foreground mb-3" data-testid="daily-grow-check-done-subtitle">
+                Review what changed below, then jump back into the plant or tent.
+              </p>
               <ul
                 className="grid gap-2"
                 data-testid="daily-grow-check-summary"
@@ -450,25 +455,44 @@ export default function DailyCheck() {
                        <Sparkles className="h-3.5 w-3.5" />}
                       {row.label}
                     </span>
-                    <Badge variant="outline" className="capitalize">
-                      {row.outcome === "not-reviewed" ? "not reviewed" : row.outcome}
+                    <Badge variant="outline" data-testid={`daily-grow-check-summary-${row.key}-label`}>
+                      {formatOutcomeLabel(row.outcome)}
                     </Badge>
                   </li>
                 ))}
               </ul>
-              <div className="flex gap-2 mt-4">
-                <Button asChild variant="outline" className="flex-1">
-                  <Link to="/">Back to Dashboard</Link>
-                </Button>
+
+              <div
+                className="grid gap-2 mt-4"
+                data-testid="daily-grow-check-review-links"
+              >
+                {buildDailyGrowCheckReviewLinks({
+                  plantId: selectedPlant?.id ?? null,
+                  tentId: tentId || null,
+                }).map((link) => (
+                  <Button
+                    key={link.key}
+                    asChild
+                    variant={link.primary ? "default" : "outline"}
+                    className="justify-between h-11"
+                    data-testid={`daily-grow-check-review-link-${link.key}`}
+                  >
+                    <Link to={link.href}>
+                      {link.label}
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                ))}
                 <Button
-                  className="flex-1"
+                  variant="ghost"
+                  className="h-11"
                   onClick={() => {
                     setState(INITIAL_DAILY_GROW_CHECK_STATE);
                     setStep("select");
                   }}
                   data-testid="daily-grow-check-restart"
                 >
-                  Run again
+                  Run another check
                 </Button>
               </div>
             </StepCard>

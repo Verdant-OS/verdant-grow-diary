@@ -111,7 +111,16 @@ function snapshotAgeLabel(ageMin: number | null): string {
 
 export default function GrowRoomMode() {
   const { data: tents } = useTents();
+  const { data: plants = [] } = usePlants();
   const { alerts } = useAlertsList({});
+  const [quickLogPrefill, setQuickLogPrefill] = useState<QuickLogPrefill | null>(null);
+  const [quickLogOpen, setQuickLogOpen] = useState(false);
+
+  function openQuickLog(prefill: QuickLogPrefill) {
+    setQuickLogPrefill(prefill);
+    setQuickLogOpen(true);
+  }
+
 
   // Latest sensor_readings per tent (read-only). One bounded query.
   const [snapshotsByTentId, setSnapshotsByTentId] = useState<

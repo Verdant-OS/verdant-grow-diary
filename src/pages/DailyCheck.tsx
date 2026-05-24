@@ -296,7 +296,7 @@ export default function DailyCheck() {
                   data-testid="daily-grow-check-mark-manual-added"
                   onClick={() => markAndAdvance("manual", "visited")}
                 >
-                  <Check className="h-4 w-4" /> Saved snapshot
+                  <Check className="h-4 w-4" /> I saved it
                 </Button>
                 <Button
                   size="sm"

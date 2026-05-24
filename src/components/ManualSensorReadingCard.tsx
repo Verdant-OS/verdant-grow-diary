@@ -242,6 +242,55 @@ export default function ManualSensorReadingCard({ tents, defaultTentId }: Props)
           </ul>
         )}
 
+        {reviewOpen && advisor.warnings.length > 0 && (
+          <div
+            className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 space-y-2"
+            data-testid="manual-reading-review-prompt"
+            role="alertdialog"
+            aria-label="Review suspicious readings before saving"
+          >
+            <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+              Double-check these readings before saving.
+            </p>
+            <ul className="space-y-1">
+              {advisor.warnings.map((w, i) => (
+                <li
+                  key={`rev-${i}`}
+                  className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-300"
+                >
+                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  <span>{w}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex flex-col sm:flex-row gap-2 pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setReviewOpen(false)}
+                data-testid="manual-reading-review-edit"
+              >
+                Edit readings
+              </Button>
+              <Button
+                size="sm"
+                onClick={doSave}
+                disabled={insert.isPending}
+                data-testid="manual-reading-review-save-anyway"
+              >
+                {insert.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving
+                  </>
+                ) : (
+                  "Save anyway"
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center justify-between gap-2 pt-1">
           <p className="text-[11px] text-muted-foreground">
             {validation.metrics.length > 0

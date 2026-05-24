@@ -22,6 +22,10 @@ import {
 } from "@/components/ui/select";
 import { Move } from "lucide-react";
 import { toast } from "sonner";
+import {
+  buildPlantTentMovementDetails,
+  formatPlantTentMovementNote,
+} from "@/lib/plantTentMovementRules";
 
 interface TentRow {
   id: string;

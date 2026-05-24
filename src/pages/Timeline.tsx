@@ -308,8 +308,13 @@ export default function Timeline() {
         </div>
       </div>
 
-      <ActionQueueEventsSection events={actionEvents} />
-      <AlertEventsSection events={alertEvents} />
+      {/* Quick Log history lanes (read-only). Order: recent activity first
+          so growers always see what they just saved, then per-event-type
+          lanes. Action Queue / Alert event logs are surfaced at the
+          bottom so Quick Log entries are not buried. */}
+      <div className="mt-4">
+        <RecentQuickLogActivityPanel rawEntries={entries} limit={10} />
+      </div>
 
       <div className="mt-4">
         <WateringHistoryPanel rawEntries={entries} limit={20} />
@@ -320,8 +325,26 @@ export default function Timeline() {
       </div>
 
       <div className="mt-4">
+        <PestDiseaseHistoryPanel rawEntries={entries} limit={20} />
+      </div>
+
+      <div className="mt-4">
+        <TrainingHistoryPanel rawEntries={entries} limit={20} />
+      </div>
+
+      <div className="mt-4">
+        <MeasurementHistoryPanel rawEntries={entries} limit={20} />
+      </div>
+
+      <div className="mt-4">
         <PhotoHistoryPanel rawEntries={entries} limit={24} />
       </div>
+
+      <div className="mt-4">
+        <ActionQueueEventsSection events={actionEvents} />
+        <AlertEventsSection events={alertEvents} />
+      </div>
+
 
 
 

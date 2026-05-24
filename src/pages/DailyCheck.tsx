@@ -182,8 +182,26 @@ export default function DailyCheck() {
         return next;
       });
     }
+    function onSensor(e: Event) {
+      // Manual sensor snapshot success — counts as today's check and
+      // shows the same source-aware confirmation card. Drives the
+      // `manual` step outcome when the grower is on that step.
+      const detail = (e as CustomEvent<{ createdAt?: string | number | Date }>).detail;
+      const raw = detail?.createdAt;
+      const parsed = raw != null ? new Date(raw).getTime() : NaN;
+      setLastSubmittedAt(Number.isFinite(parsed) ? parsed : Date.now());
+      setState((s) =>
+        step === "manual" && s.manual === "pending"
+          ? { ...s, manual: "added" }
+          : s,
+      );
+    }
     window.addEventListener("verdant:entry-created", onEntry);
-    return () => window.removeEventListener("verdant:entry-created", onEntry);
+    window.addEventListener("verdant:sensor-reading-created", onSensor);
+    return () => {
+      window.removeEventListener("verdant:entry-created", onEntry);
+      window.removeEventListener("verdant:sensor-reading-created", onSensor);
+    };
   }, [step]);
 
   const postSubmitActions = useMemo(

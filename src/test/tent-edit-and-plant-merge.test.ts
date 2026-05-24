@@ -252,7 +252,7 @@ describe("Plant Merge UI wiring", () => {
 
 describe("Plant photo placeholder", () => {
   it("PlantPhoto renders themed placeholder on missing src / error", () => {
-    expect(PLANT_PHOTO).toContain("plant-photo-placeholder");
+    expect(PLANT_PHOTO).toContain("${testId}-placeholder");
     expect(PLANT_PHOTO).toContain("onError");
   });
   it("Plants page, Plant Detail, Tent Detail use PlantPhoto", () => {

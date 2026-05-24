@@ -418,24 +418,41 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
                 <SelectContent>
                   <SelectGroup>
                     <SelectLabel>Same grow</SelectLabel>
-                    {candidates.length === 0 && (
+                    {visibleOptions.length === 0 && (
                       <SelectItem
                         value="__none__"
                         disabled
-                        aria-label={formatPlantDropdownEmptyState("merge_target")}
+                        aria-label={MERGE_TARGET_EMPTY_STATE}
                         data-testid="plant-merge-target-empty"
                       >
-                        {formatPlantDropdownEmptyState("merge_target")}
+                        {MERGE_TARGET_EMPTY_STATE}
                       </SelectItem>
                     )}
-                    {candidates.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                        {p.strain ? ` · ${p.strain}` : ""}
-                      </SelectItem>
-                    ))}
+                    {visibleOptions.map((opt) => {
+                      const p = opt.plant;
+                      const reasonLabel = formatMergeTargetReason(opt.reason);
+                      const baseName = `${p.name ?? ""}${p.strain ? ` · ${p.strain}` : ""}`;
+                      return (
+                        <SelectItem
+                          key={p.id}
+                          value={p.id}
+                          disabled={opt.disabled}
+                          aria-label={`${baseName} — ${reasonLabel}`}
+                          title={reasonLabel}
+                          data-testid={`plant-merge-target-option-${opt.reason}`}
+                        >
+                          <span className="flex flex-col">
+                            <span>{baseName}</span>
+                            <span className="text-[11px] text-muted-foreground">
+                              {reasonLabel}
+                            </span>
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectGroup>
                 </SelectContent>
+
               </Select>
               {mergeHelperText && (
                 <p

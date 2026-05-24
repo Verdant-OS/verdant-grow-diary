@@ -96,7 +96,7 @@ export default function PlantDailyGrowCheckHistoryCard({
           className="gradient-leaf text-primary-foreground shrink-0"
           data-testid="plant-daily-grow-check-history-cta"
         >
-          <Link to={`/daily-check?plantId=${plantId}`}>
+          <Link to={`/daily-check?plantId=${plantId}&from=plant-detail`}>
             Start Daily Grow Check <ArrowRight className="h-4 w-4" />
           </Link>
         </Button>

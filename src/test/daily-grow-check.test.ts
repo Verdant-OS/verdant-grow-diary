@@ -218,3 +218,80 @@ describe("DailyCheck — static safety audit", () => {
     expect(PAGE).not.toMatch(/Assignment mapping/);
   });
 });
+
+import {
+  buildDailyGrowCheckReviewLinks,
+  formatOutcomeLabel,
+} from "@/lib/dailyGrowCheckRules";
+
+describe("buildDailyGrowCheckReviewLinks", () => {
+  it("includes plant + tent + timeline when both are present", () => {
+    const links = buildDailyGrowCheckReviewLinks({ plantId: "p1", tentId: "t1" });
+    const keys = links.map((l) => l.key);
+    expect(keys).toContain("plant");
+    expect(keys).toContain("tent");
+    expect(keys).toContain("timeline");
+    expect(links.find((l) => l.key === "plant")?.href).toBe("/plants/p1");
+    expect(links.find((l) => l.key === "tent")?.href).toBe("/tents/t1");
+    expect(links.find((l) => l.key === "plant")?.primary).toBe(true);
+  });
+  it("hides plant link when no plant is selected (tent-only nav)", () => {
+    const links = buildDailyGrowCheckReviewLinks({ plantId: null, tentId: "t1" });
+    expect(links.find((l) => l.key === "plant")).toBeUndefined();
+    expect(links.find((l) => l.key === "tent")).toBeDefined();
+  });
+  it("falls back to safe Dashboard + Add Tent when no tent context", () => {
+    const links = buildDailyGrowCheckReviewLinks({ plantId: null, tentId: null });
+    const keys = links.map((l) => l.key);
+    expect(keys).toEqual(["dashboard", "add-tent"]);
+    expect(links.find((l) => l.key === "dashboard")?.href).toBe("/");
+    expect(links.find((l) => l.key === "add-tent")?.href).toBe("/tents");
+  });
+  it("preserves plant context when plant is set", () => {
+    const links = buildDailyGrowCheckReviewLinks({ plantId: "abc", tentId: "xyz" });
+    expect(links[0].href).toBe("/plants/abc");
+  });
+});
+
+describe("formatOutcomeLabel — conservative copy", () => {
+  it("renders confirmed states verbatim", () => {
+    expect(formatOutcomeLabel("added")).toBe("Added");
+    expect(formatOutcomeLabel("skipped")).toBe("Skipped");
+    expect(formatOutcomeLabel("reviewed")).toBe("Reviewed");
+  });
+  it("uses Visited when save was not confirmed", () => {
+    expect(formatOutcomeLabel("visited")).toBe("Visited");
+  });
+  it("shows Not reviewed clearly", () => {
+    expect(formatOutcomeLabel("not-reviewed")).toBe("Not reviewed");
+  });
+});
+
+describe("DailyCheck — completion screen polish", () => {
+  it("uses grower-native completion copy", () => {
+    expect(PAGE).toMatch(/Today's check is saved/);
+    expect(PAGE).toMatch(/Review what changed/);
+    expect(PAGE).toMatch(/Run another check/);
+  });
+  it("manual step uses conservative 'visited' outcome (no save confirmation)", () => {
+    expect(PAGE).toMatch(/markAndAdvance\("manual", "visited"\)/);
+  });
+  it("renders review links container and restart action", () => {
+    expect(PAGE).toMatch(/data-testid="daily-grow-check-review-links"/);
+    expect(PAGE).toMatch(/data-testid="daily-grow-check-restart"/);
+  });
+  it("does not claim live data on the completion screen", () => {
+    // "live sensor data" only appears in the negation copy ("not live sensor data").
+    const liveMatches = PAGE.match(/\blive\b/g) ?? [];
+    for (const _ of liveMatches) {
+      // every occurrence must be inside a "not live" phrase
+      expect(PAGE).not.toMatch(/is live data/i);
+      expect(PAGE).not.toMatch(/now live/i);
+    }
+  });
+  it("does not introduce a persistent checklist write path", () => {
+    expect(PAGE).not.toMatch(/daily_check/);
+    expect(PAGE).not.toMatch(/checklist/i);
+    expect(RULES).not.toMatch(/supabase/i);
+  });
+});

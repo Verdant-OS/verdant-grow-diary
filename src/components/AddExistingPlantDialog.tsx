@@ -290,6 +290,8 @@ export default function AddExistingPlantDialog({ tentId, growId, trigger }: Prop
                           key={p.id}
                           value={p.id}
                           disabled
+                          aria-label={`${renderLabel(p)} — already in this tent`}
+                          title="Already in this tent"
                           data-testid={`add-existing-plant-option-current-${p.id}`}
                         >
                           {renderLabel(p)} — already in this tent
@@ -299,6 +301,14 @@ export default function AddExistingPlantDialog({ tentId, growId, trigger }: Prop
                   )}
                 </SelectContent>
               </Select>
+              {helperText && (
+                <p
+                  className="text-xs text-muted-foreground mt-1"
+                  data-testid="add-existing-plant-helper"
+                >
+                  {helperText}
+                </p>
+              )}
             </div>
             <Button
               type="submit"

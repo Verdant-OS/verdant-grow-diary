@@ -158,6 +158,14 @@ export default function PlantDailyGrowCheckConsistencyCard({
           data-testid="plant-daily-grow-check-guidance-next-step"
         >
           {guidance.nextStep}
+        {methodLabel && (
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid="plant-daily-grow-check-today-method"
+          >
+            {methodLabel}
+          </p>
+        )}
         </p>
       </div>
 

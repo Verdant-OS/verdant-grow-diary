@@ -151,6 +151,31 @@ export default function DailyCheck() {
     if (!tentId && !plantId && tents[0]?.id) setTentId(tents[0].id);
   }, [tentId, plantId, tents]);
 
+  // Apply ?method= hint exactly once: when the plant resolution is valid
+  // and the grower is still on the default "select" step. Sensor focus is
+  // gated on a tent assignment — never silently pick a different tent.
+  // Never auto-submits; only prioritizes the matching option/dialog.
+  const [methodHintApplied, setMethodHintApplied] = useState(false);
+  useEffect(() => {
+    if (methodHintApplied) return;
+    if (!methodHint) return;
+    if (step !== "select") return;
+    if (plantResolution.status !== "valid" || !plantResolution.plant) return;
+    if (methodHint === "note") {
+      setStep("quicklog");
+      setQuickLogOpen(true);
+      setMethodHintApplied(true);
+      return;
+    }
+    if (methodHint === "sensor") {
+      // Sensor focus requires a tent. If missing, leave step alone —
+      // the existing `plant-needs-tent` guard renders the safe message.
+      if (!plantResolution.plant.tent_id) return;
+      setStep("manual");
+      setMethodHintApplied(true);
+    }
+  }, [methodHint, methodHintApplied, plantResolution, step]);
+
   const selectedPlant = useMemo(
     () => plants.find((p) => p.id === plantId) ?? null,
     [plantId, plants],

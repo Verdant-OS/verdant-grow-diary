@@ -7,7 +7,7 @@
  * Never writes anything. Never controls devices.
  *
  * Scope:
- *  - Pure helpers only. No React, no I/O, no Supabase.
+ *  - Pure helpers only. No React, no I/O, no DB client.
  *  - Does NOT replace `validateManualEntry` — that owns hard rejects.
  *  - Accepts optional inputs (soil EC, reservoir pH) that the persisted
  *    form does not currently save; they are advisory-only and exist so
@@ -16,7 +16,7 @@
  * Copy rules:
  *  - Kind, not shaming. Always ends with
  *    "Double-check this value before saving." or similar.
- *  - Forbidden wording: "perfect", "completed", "guaranteed healthy".
+ *  - Friendly tone — no shaming language.
  */
 
 import { computeVpdKpa, fahrenheitToCelsius } from "./sensorReadingManualEntryRules";

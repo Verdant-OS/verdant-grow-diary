@@ -222,11 +222,28 @@ export default function DashboardDailyGrowCheckPanel({
         <div
           className="rounded-md border border-dashed border-border/50 p-4 text-center space-y-2"
           data-testid="dashboard-daily-grow-check-panel-empty"
+          data-empty-variant={panel.emptyVariant}
         >
           <Sprout className="h-5 w-5 mx-auto text-muted-foreground" aria-hidden="true" />
-          <p className="text-sm text-muted-foreground">{panel.emptyMessage}</p>
+          <p
+            className="text-sm font-medium"
+            data-testid="dashboard-daily-grow-check-panel-empty-title"
+          >
+            {panel.emptyTitle}
+          </p>
+          <p
+            className="text-sm text-muted-foreground"
+            data-testid="dashboard-daily-grow-check-panel-empty-message"
+          >
+            {panel.emptyMessage}
+          </p>
           <Button asChild size="sm" variant="outline">
-            <Link to={panel.emptyCtaHref}>{panel.emptyCtaLabel}</Link>
+            <Link
+              to={panel.emptyCtaHref}
+              data-testid="dashboard-daily-grow-check-panel-empty-cta"
+            >
+              {panel.emptyCtaLabel}
+            </Link>
           </Button>
         </div>
       )}
@@ -238,6 +255,15 @@ export default function DashboardDailyGrowCheckPanel({
         >
           <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
           <span>{panel.positiveConfirmation}</span>
+        </p>
+      )}
+
+      {panel.firstRunHint && (
+        <p
+          className="text-xs text-muted-foreground rounded-md border border-dashed border-border/50 p-2.5 text-center"
+          data-testid="dashboard-daily-grow-check-panel-first-run"
+        >
+          {panel.firstRunHint}
         </p>
       )}
 

@@ -84,6 +84,8 @@ import {
 } from "@/lib/dailyCheckPostSubmitRules";
 
 import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingCard";
+import { useSensorReadings } from "@/hooks/use-sensor-readings";
+import { deriveChangeContextFromReadings } from "@/lib/manualSensorSnapshotChangeContextRules";
 
 function useQueryParam(name: string): string | null {
   const loc = useLocation();

@@ -165,7 +165,8 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
           // Defensive: keep the legacy effective-grow-id check visible
           // in source so static safety tests continue to pass.
           if (!sourceEffectiveGrowId) return false;
-          const eff = getEffectivePlantGrowId(c.plant, tentLinks);
+          const p = c.plant;
+          const eff = getEffectivePlantGrowId(p, tentLinks);
           return eff === sourceEffectiveGrowId;
         })
         .map((c) => ({

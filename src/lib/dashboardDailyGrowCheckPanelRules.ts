@@ -171,7 +171,7 @@ export function buildDashboardDailyGrowCheckPanel(
         tentName: tId ? tentName.get(tId) ?? null : null,
         checkedToday,
         shortGuidance,
-        ctaHref: `/daily-check?plantId=${plant.id}`,
+        ctaHref: `/daily-check?plantId=${plant.id}&from=dashboard`,
         showCta: !checkedToday,
       };
       return row;

@@ -18,11 +18,12 @@ export const DAILY_CHECK_SUCCESS_BODY =
   "Your Daily Grow Check entry is saved. You can keep going or jump back to your plant.";
 
 /** Recognized entry-point query values for `?from=`. */
-export type DailyCheckEntrySource = "dashboard" | "plant-detail";
+export type DailyCheckEntrySource = "dashboard" | "plant-detail" | "plants";
 
 const ALLOWED_SOURCES: ReadonlyArray<DailyCheckEntrySource> = [
   "dashboard",
   "plant-detail",
+  "plants",
 ];
 
 /**

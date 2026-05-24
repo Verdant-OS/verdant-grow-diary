@@ -114,6 +114,8 @@ export default function PlantRelativeTimelineSection({
   stageStartedAt,
 }: Props) {
   const { data, isLoading } = usePlantRecentActivity(plantId);
+  const [filter, setFilter] = useState<RelativeTimelineFilterKey>("all");
+
   const items = buildRelativeTimelineProjection({
     rawEntries: data ?? [],
     plantId: plantId ?? null,
@@ -121,6 +123,8 @@ export default function PlantRelativeTimelineSection({
     currentStage: currentStage ?? null,
     stageStartedAt: stageStartedAt ?? null,
   });
+  const visibleItems = filterRelativeTimelineItems(items, filter);
+  const groups = groupRelativeTimelineByStage(visibleItems);
 
   return (
     <Card data-testid="plant-relative-timeline-section">
@@ -150,48 +154,90 @@ export default function PlantRelativeTimelineSection({
             snapshot.
           </p>
         ) : (
-          <div
-            className="space-y-4 max-h-[28rem] overflow-y-auto pr-1"
-            data-testid="relative-timeline-list"
-          >
-            {groupRelativeTimelineByStage(items).map((group) => (
-              <section
-                key={group.key}
-                data-testid="relative-timeline-stage-group"
-                data-stage-key={group.key}
-                data-stage-color-token={group.colorToken ?? ""}
-                data-count={group.count}
-                className="space-y-2"
-              >
-                <header className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      variant="outline"
-                      className={
-                        group.colorToken
-                          ? `stage-token-${group.colorToken}`
-                          : undefined
-                      }
-                      data-testid="relative-timeline-group-stage-badge"
-                      data-stage-color-token={group.colorToken ?? ""}
-                    >
-                      {group.label}
-                    </Badge>
-                  </div>
-                  <span
-                    className="text-xs text-muted-foreground"
-                    data-testid="relative-timeline-group-count"
+          <div className="space-y-3">
+            <div
+              role="radiogroup"
+              aria-label="Filter timeline by event type"
+              data-testid="relative-timeline-filters"
+              className="flex flex-wrap gap-1.5"
+            >
+              {RELATIVE_TIMELINE_FILTERS.map((f) => {
+                const selected = filter === f.key;
+                return (
+                  <button
+                    key={f.key}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    aria-label={`Filter timeline by ${f.label}`}
+                    data-testid={`relative-timeline-filter-${f.key}`}
+                    data-selected={selected ? "true" : "false"}
+                    onClick={() => setFilter(f.key)}
+                    className={cn(
+                      "text-xs px-3 py-1 rounded-full border transition-colors min-h-[32px]",
+                      selected
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-secondary/40 text-foreground border-border/40 hover:bg-secondary/60",
+                    )}
                   >
-                    {group.count} {group.count === 1 ? "event" : "events"}
-                  </span>
-                </header>
-                <ol className="space-y-2">
-                  {group.items.map((item) => (
-                    <TimelineRow key={item.id} item={item} />
-                  ))}
-                </ol>
-              </section>
-            ))}
+                    {f.label}
+                  </button>
+                );
+              })}
+            </div>
+            {visibleItems.length === 0 ? (
+              <p
+                className="text-sm text-muted-foreground"
+                data-testid="relative-timeline-filter-empty"
+                data-filter-key={filter}
+              >
+                {getRelativeTimelineFilterEmptyState(filter)}
+              </p>
+            ) : (
+              <div
+                className="space-y-4 max-h-[28rem] overflow-y-auto pr-1"
+                data-testid="relative-timeline-list"
+              >
+                {groups.map((group) => (
+                  <section
+                    key={group.key}
+                    data-testid="relative-timeline-stage-group"
+                    data-stage-key={group.key}
+                    data-stage-color-token={group.colorToken ?? ""}
+                    data-count={group.count}
+                    className="space-y-2"
+                  >
+                    <header className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant="outline"
+                          className={
+                            group.colorToken
+                              ? `stage-token-${group.colorToken}`
+                              : undefined
+                          }
+                          data-testid="relative-timeline-group-stage-badge"
+                          data-stage-color-token={group.colorToken ?? ""}
+                        >
+                          {group.label}
+                        </Badge>
+                      </div>
+                      <span
+                        className="text-xs text-muted-foreground"
+                        data-testid="relative-timeline-group-count"
+                      >
+                        {group.count} {group.count === 1 ? "event" : "events"}
+                      </span>
+                    </header>
+                    <ol className="space-y-2">
+                      {group.items.map((item) => (
+                        <TimelineRow key={item.id} item={item} />
+                      ))}
+                    </ol>
+                  </section>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </CardContent>

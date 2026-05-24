@@ -156,14 +156,33 @@ describe("pi_ingest_bridge_credentials — base-table SELECT removal", () => {
   });
 });
 
-describe("pi_ingest_bridge_credentials_safe — metadata-only view", () => {
-  const hasView =
-    /CREATE\s+(OR\s+REPLACE\s+)?VIEW\s+public\.pi_ingest_bridge_credentials_safe/i.test(
-      SQL,
-    );
+describe("pi_ingest_bridge_credentials_safe — metadata-only view (deferred)", () => {
+  // The view was originally created with SECURITY DEFINER behavior
+  // (security_invoker = false). To resolve Supabase lint 0010
+  // (Security Definer View) without weakening credential secrecy by
+  // re-adding a base-table SELECT policy, a later migration drops the
+  // view entirely. A safer server-only access path is deferred until
+  // bridge management UI ships.
+  const createCount = (
+    ALL_SQL.match(
+      /CREATE\s+(OR\s+REPLACE\s+)?VIEW\s+public\.pi_ingest_bridge_credentials_safe/gi,
+    ) ?? []
+  ).length;
+  const dropCount = (
+    ALL_SQL.match(
+      /DROP\s+VIEW\s+(IF\s+EXISTS\s+)?public\.pi_ingest_bridge_credentials_safe/gi,
+    ) ?? []
+  ).length;
+  const viewExistsAfterMigrations = createCount > dropCount;
 
-  it("safe view is created", () => {
-    expect(hasView).toBe(true);
+  it("either drops the safe view or keeps it free of SECURITY DEFINER behavior", () => {
+    if (viewExistsAfterMigrations) {
+      expect(ALL_SQL).toMatch(
+        /CREATE\s+(OR\s+REPLACE\s+)?VIEW\s+public\.pi_ingest_bridge_credentials_safe[\s\S]*?security_invoker\s*=\s*true/i,
+      );
+    } else {
+      expect(dropCount).toBeGreaterThanOrEqual(1);
+    }
   });
 
   it.each([
@@ -171,26 +190,34 @@ describe("pi_ingest_bridge_credentials_safe — metadata-only view", () => {
     "secret_ciphertext",
     "secret_nonce",
     "secret_key_version",
-  ])("safe view does not expose %s", (col) => {
-    if (!hasView) return;
+  ])("if view exists, it does not expose %s", (col) => {
+    if (!viewExistsAfterMigrations) return;
     const viewBlock =
-      SQL.match(
+      ALL_SQL.match(
         /CREATE\s+(OR\s+REPLACE\s+)?VIEW\s+public\.pi_ingest_bridge_credentials_safe[\s\S]*?FROM\s+public\.pi_ingest_bridge_credentials[\s\S]*?;/i,
       )?.[0] ?? "";
     expect(viewBlock).not.toMatch(new RegExp(`\\b${col}\\b`, "i"));
   });
 
-  it("safe view exposes only owner rows via auth.uid()", () => {
-    if (!hasView) return;
-    expect(SQL).toMatch(
+  it("if view exists, it filters by auth.uid()", () => {
+    if (!viewExistsAfterMigrations) return;
+    expect(ALL_SQL).toMatch(
       /pi_ingest_bridge_credentials_safe[\s\S]*?auth\.uid\(\)\s*=\s*user_id/i,
     );
   });
 
-  it("safe view is not granted to anon or public", () => {
-    const grants = (SQL.match(/GRANT[\s\S]*?pi_ingest_bridge_credentials_safe[\s\S]*?;/gi) ?? []).join("\n");
-    expect(grants).not.toMatch(/\bTO\s+anon\b/i);
-    expect(grants).not.toMatch(/\bTO\s+public\b/i);
+  it("safe view is not granted to anon or public in any migration", () => {
+    // Statement-scoped: each GRANT statement individually must not target anon/public.
+    const grants = ALL_SQL
+      .split(/;\s*\n/)
+      .filter((stmt) =>
+        /^\s*GRANT\b/i.test(stmt) &&
+        /pi_ingest_bridge_credentials_safe/i.test(stmt),
+      );
+    for (const stmt of grants) {
+      expect(stmt).not.toMatch(/\bTO\s+anon\b/i);
+      expect(stmt).not.toMatch(/\bTO\s+public\b/i);
+    }
   });
 });
 

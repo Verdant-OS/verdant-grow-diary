@@ -1273,45 +1273,7 @@ export type Database = {
       }
     }
     Views: {
-      pi_ingest_bridge_credentials_safe: {
-        Row: {
-          allowed_tent_ids: string[] | null
-          bridge_id: string | null
-          created_at: string | null
-          id: string | null
-          is_active: boolean | null
-          last_used_at: string | null
-          secret_hint: string | null
-          secret_status: string | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          allowed_tent_ids?: string[] | null
-          bridge_id?: string | null
-          created_at?: string | null
-          id?: string | null
-          is_active?: boolean | null
-          last_used_at?: string | null
-          secret_hint?: string | null
-          secret_status?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          allowed_tent_ids?: string[] | null
-          bridge_id?: string | null
-          created_at?: string | null
-          id?: string | null
-          is_active?: boolean | null
-          last_used_at?: string | null
-          secret_hint?: string | null
-          secret_status?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       award_nugs: {

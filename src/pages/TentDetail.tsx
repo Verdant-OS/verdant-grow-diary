@@ -300,6 +300,7 @@ export default function TentDetail() {
                         tentId: p.tentId ?? tent.id,
                         growId: p.growId ?? tent.growId ?? null,
                         lastNote: p.lastNote,
+                        isArchived: p.isArchived ?? false,
                       }}
                     />
                   </div>

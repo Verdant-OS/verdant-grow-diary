@@ -209,6 +209,43 @@ export default function PlantDailyGrowCheckConsistencyCard({
         </div>
       )}
 
+      <div
+        className="space-y-1"
+        data-testid="plant-daily-grow-check-method-breakdown"
+        data-order="oldest-first"
+        data-day-count={breakdown.length}
+      >
+        <div className="text-xs text-muted-foreground">Last 7 days</div>
+        <ol
+          className="grid grid-cols-7 gap-1"
+          aria-label="Daily Grow Check method, last 7 days"
+        >
+          {breakdown.map((d) => {
+            const label = formatDailyMethodBreakdownLabel(d.method);
+            return (
+              <li
+                key={d.dayKey}
+                data-testid="plant-daily-grow-check-method-breakdown-day"
+                data-day-key={d.dayKey}
+                data-method={d.method}
+                className="flex flex-col items-center gap-0.5 rounded border border-border/40 bg-muted/30 px-1 py-1 text-center"
+                title={`${d.label}: ${label}`}
+              >
+                <span className="text-[10px] text-muted-foreground truncate max-w-full">
+                  {d.label}
+                </span>
+                <span
+                  className="text-[10px] font-medium"
+                  data-testid="plant-daily-grow-check-method-breakdown-day-label"
+                >
+                  {label}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+
       <p
         className="text-xs text-muted-foreground flex items-start gap-1"
         data-testid="plant-daily-grow-check-what-counts"

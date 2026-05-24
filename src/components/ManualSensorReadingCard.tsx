@@ -44,6 +44,7 @@ export default function ManualSensorReadingCard({ tents, defaultTentId }: Props)
   const insert = useInsertSensorReading();
 
   const validation = useMemo(() => validateManualEntry(form), [form]);
+  const advisor = useMemo(() => evaluateManualSnapshotAdvisor(form), [form]);
 
   function update<K extends keyof ManualEntryInput>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));

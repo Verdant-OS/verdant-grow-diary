@@ -167,6 +167,12 @@ export default function DailyCheck() {
         icon={<ClipboardCheck className="h-5 w-5" />}
       />
 
+      <DailyGrowCheckOnboardingCard
+        focusedPlantId={selectedPlant?.id ?? initialPlantId ?? null}
+        hideWhenReady
+        className="mb-4"
+      />
+
       {/* Empty / guard states */}
       {!guard.ok && guard.reason === "no-tents" && (
         <EmptyState

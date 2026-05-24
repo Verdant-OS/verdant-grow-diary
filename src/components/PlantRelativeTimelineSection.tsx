@@ -143,16 +143,52 @@ export default function PlantRelativeTimelineSection({
             snapshot.
           </p>
         ) : (
-          <ol
-            className="space-y-2 max-h-[28rem] overflow-y-auto pr-1"
+          <div
+            className="space-y-4 max-h-[28rem] overflow-y-auto pr-1"
             data-testid="relative-timeline-list"
           >
-            {items.map((item) => (
-              <TimelineRow key={item.id} item={item} />
+            {groupRelativeTimelineByStage(items).map((group) => (
+              <section
+                key={group.key}
+                data-testid="relative-timeline-stage-group"
+                data-stage-key={group.key}
+                data-stage-color-token={group.colorToken ?? ""}
+                data-count={group.count}
+                className="space-y-2"
+              >
+                <header className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant="outline"
+                      className={
+                        group.colorToken
+                          ? `stage-token-${group.colorToken}`
+                          : undefined
+                      }
+                      data-testid="relative-timeline-group-stage-badge"
+                      data-stage-color-token={group.colorToken ?? ""}
+                    >
+                      {group.label}
+                    </Badge>
+                  </div>
+                  <span
+                    className="text-xs text-muted-foreground"
+                    data-testid="relative-timeline-group-count"
+                  >
+                    {group.count} {group.count === 1 ? "event" : "events"}
+                  </span>
+                </header>
+                <ol className="space-y-2">
+                  {group.items.map((item) => (
+                    <TimelineRow key={item.id} item={item} />
+                  ))}
+                </ol>
+              </section>
             ))}
-          </ol>
+          </div>
         )}
       </CardContent>
     </Card>
   );
 }
+

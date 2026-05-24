@@ -316,20 +316,51 @@ export default function DashboardDailyGrowCheckPanel({
                 </div>
               </div>
               {row.showCta && (
-                <Button
-                  asChild
-                  size="sm"
-                  className="gradient-leaf text-primary-foreground shrink-0"
-                  data-testid="dashboard-daily-grow-check-panel-row-cta"
+                <div
+                  className="flex flex-wrap items-center gap-1.5 shrink-0"
+                  data-testid="dashboard-daily-grow-check-panel-row-actions"
                 >
-                  <Link
-                    to={row.ctaHref}
-                    aria-label={`Start today's check for ${row.plantName}`}
+                  <Button
+                    asChild
+                    size="sm"
+                    variant="outline"
+                    className="h-8 px-2 text-xs"
+                    data-testid="dashboard-daily-grow-check-panel-row-action-note"
+                    data-method="note"
                   >
-                    Start check <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </Button>
+                    <Link
+                      to={buildDailyCheckEntryHref({
+                        plantId: row.plantId,
+                        source: "dashboard",
+                        method: "note",
+                      })}
+                      aria-label={`Add note for ${row.plantName}`}
+                    >
+                      <Sparkles className="h-3.5 w-3.5" /> Add note
+                    </Link>
+                  </Button>
+                  <Button
+                    asChild
+                    size="sm"
+                    variant="outline"
+                    className="h-8 px-2 text-xs"
+                    data-testid="dashboard-daily-grow-check-panel-row-action-sensor"
+                    data-method="sensor"
+                  >
+                    <Link
+                      to={buildDailyCheckEntryHref({
+                        plantId: row.plantId,
+                        source: "dashboard",
+                        method: "sensor",
+                      })}
+                      aria-label={`Add sensor snapshot for ${row.plantName}`}
+                    >
+                      <Gauge className="h-3.5 w-3.5" /> Add sensor snapshot
+                    </Link>
+                  </Button>
+                </div>
               )}
+
             </li>
           ))}
         </ul>

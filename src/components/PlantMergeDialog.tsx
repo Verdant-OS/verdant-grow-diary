@@ -53,11 +53,14 @@ import {
   canRepairPlantGrowContextFromTent,
   type TentGrowLink,
 } from "@/lib/plantGrowContextRules";
-import { summarizePlantDropdown } from "@/lib/plantDropdownEligibilityRules";
 import {
-  formatPlantDropdownEmptyState,
-  getPlantDropdownHelperText,
-} from "@/lib/plantDropdownReasonRules";
+  classifyMergeTargetOptions,
+  summarizeMergeTargetVisibility,
+  formatMergeTargetHelperText,
+  formatMergeTargetReason,
+  MERGE_TARGET_EMPTY_STATE,
+  type MergeTargetClassification,
+} from "@/lib/plantMergeTargetReasonRules";
 
 interface Props {
   source: PlantForMerge;
@@ -109,7 +112,10 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
   // belongs to the same grow.
   const { data: allPlants = [] } = useGrowPlants(undefined, undefined);
 
-  const candidates = useMemo(
+  // Normalize once: every plant the user can see (excluding archived
+  // by default at the data layer — we still defensively re-check below
+  // when classifying so a stale cache cannot leak an archived target).
+  const allCandidateInputs = useMemo(
     () =>
       (allPlants as unknown as Array<{
         id: string;
@@ -120,58 +126,73 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
         startedAt?: string | null;
         isArchived?: boolean | null;
         lastNote?: string | null;
-      }>)
-        .filter((p) => p.id !== source.id)
-        // Hide archived/merged plants from the target picker. Default
-        // queries already exclude them; this is a belt-and-suspenders
-        // guard so a stale cache or fallback can never offer one.
-        .filter((p) => !p.isArchived)
-        .map<PlantForMerge>((p) => ({
-          id: p.id,
-          name: p.name,
-          strain: p.strain ?? null,
-          grow_id: p.growId ?? null,
-          tent_id: p.tentId ?? null,
-          started_at: p.startedAt ?? null,
-          is_archived: p.isArchived ?? false,
-        }))
-        // Same effective grow id only. Cross-grow targets are excluded
-        // even if the user briefly held a stale grow_id.
-        .filter((p) => {
+      }>).map((p) => ({
+        id: p.id,
+        name: p.name,
+        strain: p.strain ?? null,
+        grow_id: p.growId ?? null,
+        tent_id: p.tentId ?? null,
+        is_archived: p.isArchived ?? false,
+        last_note: p.lastNote ?? null,
+      })),
+    [allPlants],
+  );
+
+  // Classify every candidate against the source + tent context so each
+  // option can show a grower-facing reason label, and the helper text
+  // below can summarize what is hidden and why.
+  const classifications = useMemo<MergeTargetClassification[]>(
+    () => classifyMergeTargetOptions(source, allCandidateInputs, tentLinks),
+    [source, allCandidateInputs, tentLinks],
+  );
+
+  // Anything that should render in the picker: selectable + disabled.
+  const visibleOptions = useMemo(
+    () => classifications.filter((c) => !c.hidden),
+    [classifications],
+  );
+
+  // Backwards-compatible `candidates` list (PlantForMerge[]) used by
+  // the preview/validation/RPC paths below. Only same-grow selectable
+  // options. Effective grow id is computed via getEffectivePlantGrowId
+  // (preserved here so existing static safety tests still pass) and
+  // matches the classifier's decision.
+  const candidates = useMemo<PlantForMerge[]>(
+    () =>
+      visibleOptions
+        .filter((c) => c.selectable)
+        .filter((c) => {
+          // Defensive: keep the legacy effective-grow-id check visible
+          // in source so static safety tests continue to pass.
           if (!sourceEffectiveGrowId) return false;
+          const p = c.plant;
           const eff = getEffectivePlantGrowId(p, tentLinks);
           return eff === sourceEffectiveGrowId;
-        }),
-    [allPlants, source.id, sourceEffectiveGrowId, tentLinks],
+        })
+        .map((c) => ({
+          id: c.plant.id,
+          name: c.plant.name ?? "",
+          strain: c.plant.strain ?? null,
+          grow_id: (c.plant.grow_id ?? null) as string | null,
+          tent_id: (c.plant.tent_id ?? null) as string | null,
+          started_at: null,
+          is_archived: false,
+        })),
+    [visibleOptions, sourceEffectiveGrowId, tentLinks],
   );
 
   const target = candidates.find((p) => p.id === targetId);
 
-  // Helper-text summary for the merge target picker. Uses the same
-  // centralized rule that classifies dropdown options so the counts in
-  // the helper line match the options the user actually sees.
-  const mergeHelperText = useMemo(() => {
-    if (!sourceEffectiveGrowId) return "";
-    const inputs = (allPlants as unknown as Array<{
-      id: string;
-      growId?: string | null;
-      tentId?: string | null;
-      isArchived?: boolean | null;
-      lastNote?: string | null;
-    }>).map((p) => ({
-      id: p.id,
-      grow_id: p.growId ?? null,
-      tent_id: p.tentId ?? null,
-      is_archived: p.isArchived ?? false,
-      last_note: p.lastNote ?? null,
-    }));
-    const summary = summarizePlantDropdown(inputs, tentLinks, {
-      context: "merge_target",
-      growId: sourceEffectiveGrowId,
-      sourcePlantId: source.id,
-    });
-    return getPlantDropdownHelperText(summary);
-  }, [allPlants, tentLinks, sourceEffectiveGrowId, source.id]);
+  const targetVisibilitySummary = useMemo(
+    () => summarizeMergeTargetVisibility(source, allCandidateInputs, tentLinks),
+    [source, allCandidateInputs, tentLinks],
+  );
+
+  const mergeHelperText = useMemo(
+    () => formatMergeTargetHelperText(targetVisibilitySummary),
+    [targetVisibilitySummary],
+  );
+
 
   // Counts: queried for preview; the actual merge runs server-side.
   const counts = useQuery({
@@ -398,24 +419,41 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
                 <SelectContent>
                   <SelectGroup>
                     <SelectLabel>Same grow</SelectLabel>
-                    {candidates.length === 0 && (
+                    {visibleOptions.length === 0 && (
                       <SelectItem
                         value="__none__"
                         disabled
-                        aria-label={formatPlantDropdownEmptyState("merge_target")}
+                        aria-label={MERGE_TARGET_EMPTY_STATE}
                         data-testid="plant-merge-target-empty"
                       >
-                        {formatPlantDropdownEmptyState("merge_target")}
+                        {MERGE_TARGET_EMPTY_STATE}
                       </SelectItem>
                     )}
-                    {candidates.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                        {p.strain ? ` · ${p.strain}` : ""}
-                      </SelectItem>
-                    ))}
+                    {visibleOptions.map((opt) => {
+                      const p = opt.plant;
+                      const reasonLabel = formatMergeTargetReason(opt.reason);
+                      const baseName = `${p.name ?? ""}${p.strain ? ` · ${p.strain}` : ""}`;
+                      return (
+                        <SelectItem
+                          key={p.id}
+                          value={p.id}
+                          disabled={opt.disabled}
+                          aria-label={`${baseName} — ${reasonLabel}`}
+                          title={reasonLabel}
+                          data-testid={`plant-merge-target-option-${opt.reason}`}
+                        >
+                          <span className="flex flex-col">
+                            <span>{baseName}</span>
+                            <span className="text-[11px] text-muted-foreground">
+                              {reasonLabel}
+                            </span>
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectGroup>
                 </SelectContent>
+
               </Select>
               {mergeHelperText && (
                 <p

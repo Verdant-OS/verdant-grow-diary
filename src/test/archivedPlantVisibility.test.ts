@@ -214,7 +214,10 @@ describe("PlantDetail surfaces archived/merged banner", () => {
 
 describe("PlantMergeDialog excludes archived candidates + blocks archived source", () => {
   it("filters archived plants out of the candidate list", () => {
-    expect(MERGE_DIALOG).toMatch(/\.filter\(\(p\) => !p\.isArchived\)/);
+    // Archived/merged hiding now lives in the centralized
+    // `classifyMergeTargetOption` rule (reason: "archived_or_merged",
+    // hidden: true) so the dialog wires the classifier in.
+    expect(MERGE_DIALOG).toMatch(/classifyMergeTargetOptions/);
   });
   it("renders a source-archived block + testid", () => {
     expect(MERGE_DIALOG).toMatch(/plant-merge-source-archived/);

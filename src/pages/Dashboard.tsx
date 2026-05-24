@@ -179,7 +179,14 @@ export default function Dashboard() {
         title="Dashboard"
         description="Live status across every tent, plant, and sensor."
         icon={<Sparkles className="h-5 w-5" />}
-        actions={<Button asChild className="gradient-leaf text-primary-foreground"><Link to="/tents">Open tents</Link></Button>}
+        actions={
+          <div className="flex gap-2">
+            <Button asChild variant="outline" data-testid="dashboard-daily-grow-check-entry">
+              <Link to="/daily-check">Daily Grow Check</Link>
+            </Button>
+            <Button asChild className="gradient-leaf text-primary-foreground"><Link to="/tents">Open tents</Link></Button>
+          </div>
+        }
       />
       {urlGrowId && (
         <ScopedGrowBanner

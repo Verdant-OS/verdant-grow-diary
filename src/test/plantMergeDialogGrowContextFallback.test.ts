@@ -19,8 +19,11 @@ describe("PlantMergeDialog grow-context fallback", () => {
     expect(DIALOG).toMatch(/getEffectivePlantGrowId/);
   });
 
-  it("scopes candidates by sourceEffectiveGrowId, not raw plant.grow_id", () => {
-    expect(DIALOG).toMatch(/useGrowPlants\(\s*undefined,\s*sourceEffectiveGrowId/);
+  it("loads all visible plants (no DB grow filter) and scopes client-side by effective grow id", () => {
+    // Regression: previously the DB-level grow filter dropped legacy
+    // plants whose grow_id was null but whose tent_id matched the grow.
+    expect(DIALOG).toMatch(/useGrowPlants\(\s*undefined\s*,\s*undefined\s*\)/);
+    expect(DIALOG).toMatch(/sourceEffectiveGrowId/);
     expect(DIALOG).not.toMatch(/useGrowPlants\(undefined,\s*source\.grow_id/);
   });
 

@@ -22,6 +22,7 @@ import {
   formatDailyMethodBreakdownLabel,
   formatTodayCheckMethodLabel,
 } from "@/lib/dailyGrowCheckConsistencyRules";
+import { buildDailyCheckEntryHref } from "@/lib/dailyCheckPostSubmitRules";
 
 import { deriveDailyGrowCheckGuidance } from "@/lib/dailyGrowCheckGuidanceRules";
 import {

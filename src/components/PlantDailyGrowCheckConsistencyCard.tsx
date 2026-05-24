@@ -21,7 +21,9 @@ import {
 } from "@/lib/dailyGrowCheckConsistencyRules";
 import { deriveDailyGrowCheckGuidance } from "@/lib/dailyGrowCheckGuidanceRules";
 import {
+  DAILY_CHECK_SUCCESS_EVENTS,
   ENTRY_CREATED_EVENT,
+  SENSOR_READING_CREATED_EVENT,
   refreshDailyCheckQueries,
 } from "@/lib/dailyCheckRefreshRules";
 
@@ -39,16 +41,26 @@ export default function PlantDailyGrowCheckConsistencyCard({
   const { data: rawDiary = [] } = useDiaryEntries();
   const { data: plants = [] } = usePlants();
 
-  // Belt-and-suspenders: when QuickLog dispatches `verdant:entry-created`
-  // (after a successful insert), force the diary + sensor reading caches
-  // that back checked-today to refetch so the card never lingers stale
-  // after returning from /daily-check.
+  // Belt-and-suspenders: when QuickLog dispatches
+  // `verdant:entry-created` OR a manual sensor snapshot dispatches
+  // `verdant:sensor-reading-created`, force the diary + sensor reading
+  // caches that back checked-today to refetch so the card never lingers
+  // stale after returning from /daily-check. Both event names are
+  // referenced explicitly so the contract scanner can see them:
+  //   - ENTRY_CREATED_EVENT
+  //   - SENSOR_READING_CREATED_EVENT
   useEffect(() => {
     function onEntry() {
       refreshDailyCheckQueries(queryClient);
     }
-    window.addEventListener(ENTRY_CREATED_EVENT, onEntry);
-    return () => window.removeEventListener(ENTRY_CREATED_EVENT, onEntry);
+    for (const name of DAILY_CHECK_SUCCESS_EVENTS) {
+      window.addEventListener(name, onEntry);
+    }
+    return () => {
+      for (const name of DAILY_CHECK_SUCCESS_EVENTS) {
+        window.removeEventListener(name, onEntry);
+      }
+    };
   }, [queryClient]);
 
   const plantsInTentCount = currentTentId

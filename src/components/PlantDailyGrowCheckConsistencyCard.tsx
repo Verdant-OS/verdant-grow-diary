@@ -86,8 +86,8 @@ export default function PlantDailyGrowCheckConsistencyCard({
           className="gradient-leaf text-primary-foreground shrink-0"
           data-testid="plant-daily-grow-check-consistency-cta"
         >
-          <Link to={ctaHref}>
-            {guidance.ctaLabel} <ArrowRight className="h-4 w-4" />
+          <Link to={ctaHref} aria-label={guidance.ctaLabel}>
+            Start Daily Grow Check <ArrowRight className="h-4 w-4" />
           </Link>
         </Button>
       </div>

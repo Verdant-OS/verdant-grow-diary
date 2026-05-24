@@ -127,6 +127,9 @@ export function buildDashboardDailyGrowCheckPanel(
   const active = scoped.filter(isActivePlant);
 
   if (active.length === 0) {
+    const variant: DashboardDailyGrowCheckEmptyVariant = input.scopedGrowId
+      ? "no-plants-scoped"
+      : "no-plants-all";
     return {
       rows: [],
       checked: 0,
@@ -134,10 +137,17 @@ export function buildDashboardDailyGrowCheckPanel(
       summaryText: "No active plants to check",
       allChecked: false,
       isEmpty: true,
-      emptyMessage: EMPTY_MESSAGE,
+      emptyVariant: variant,
+      emptyTitle:
+        variant === "no-plants-scoped" ? EMPTY_TITLE_SCOPED : EMPTY_TITLE_ALL,
+      emptyMessage:
+        variant === "no-plants-scoped"
+          ? EMPTY_MESSAGE_SCOPED
+          : EMPTY_MESSAGE_ALL,
       emptyCtaHref: EMPTY_CTA_HREF,
       emptyCtaLabel: EMPTY_CTA_LABEL,
       positiveConfirmation: null,
+      firstRunHint: null,
     };
   }
 

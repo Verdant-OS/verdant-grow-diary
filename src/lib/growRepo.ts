@@ -37,12 +37,25 @@ export async function fetchTent(id: string): Promise<Tent | null> {
   return data ? mapTentRow(data) : null;
 }
 
-export async function fetchPlants(tentId?: string, growId?: string): Promise<Plant[]> {
+export interface FetchPlantsOptions {
+  /**
+   * Include archived (and merged-archived) plants in the result set.
+   * Default false — archived plants are hidden from active grow work.
+   */
+  includeArchived?: boolean;
+}
+
+export async function fetchPlants(
+  tentId?: string,
+  growId?: string,
+  opts: FetchPlantsOptions = {},
+): Promise<Plant[]> {
   // Non-UUID tentId (e.g. mock "t1") would 400 against a uuid column.
   // Return empty so the hook falls back to mock-filtered plants.
   if (tentId !== undefined && !isUuid(tentId)) return [];
   if (growId !== undefined && !isUuid(growId)) return [];
-  let q = supabase.from("plants").select("*").eq("is_archived", false);
+  let q = supabase.from("plants").select("*");
+  if (!opts.includeArchived) q = q.eq("is_archived", false);
   if (tentId) q = q.eq("tent_id", tentId);
   if (growId) q = q.eq("grow_id", growId);
   const { data, error } = await q.order("created_at", { ascending: false });

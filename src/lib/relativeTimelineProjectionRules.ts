@@ -150,6 +150,10 @@ export function buildRelativeTimelineProjection(
             eventAt: entry.createdAt,
           })
         : null;
+    // Prefer the per-entry stage when available; fall back to the plant's
+    // current stage. Never invent a stage if neither resolves.
+    const itemPreset =
+      resolveStagePreset(entry.stage) ?? stagePreset;
     return {
       id: entry.id,
       eventType: entry.eventType,
@@ -159,7 +163,7 @@ export function buildRelativeTimelineProjection(
       plantDay,
       stageDay,
       source: deriveSource(entry),
-      stagePreset,
+      stagePreset: itemPreset,
       plantId: entry.plantId,
       tentId: entry.tentId,
     };
@@ -168,3 +172,65 @@ export function buildRelativeTimelineProjection(
   items.sort(compareAscending);
   return items.slice(0, limit);
 }
+
+// ---------------------------------------------------------------------------
+// Stage grouping (read-only, deterministic)
+// ---------------------------------------------------------------------------
+
+export const UNSTAGED_GROUP_KEY = "unstaged" as const;
+
+export interface RelativeTimelineStageGroup {
+  /** Stage preset key, or "unstaged" when no valid stage resolved. */
+  key: string;
+  label: string;
+  /** Stable color token from relativeStageTimelineRules, or null for unstaged. */
+  colorToken: string | null;
+  /** Deterministic order: stage preset sortOrder, unstaged sorts last. */
+  sortOrder: number;
+  count: number;
+  items: RelativeTimelineItem[];
+}
+
+const UNSTAGED_SORT_ORDER = Number.MAX_SAFE_INTEGER;
+
+/**
+ * Group an already-projected timeline by stage preset.
+ *
+ * - Items with a valid stagePreset are grouped under that preset key.
+ * - Items with no valid stage land in the "unstaged" group (only created
+ *   when at least one item has no stage — never an empty stub group).
+ * - Stage preset groups are sorted by preset sortOrder; unstaged sorts last.
+ * - Items inside each group preserve the input ordering (callers should
+ *   pass a deterministically sorted list).
+ */
+export function groupRelativeTimelineByStage(
+  items: ReadonlyArray<RelativeTimelineItem>,
+): RelativeTimelineStageGroup[] {
+  if (!Array.isArray(items) || items.length === 0) return [];
+  const byKey = new Map<string, RelativeTimelineStageGroup>();
+  for (const item of items) {
+    const preset = item.stagePreset;
+    const key = preset?.key ?? UNSTAGED_GROUP_KEY;
+    let group = byKey.get(key);
+    if (!group) {
+      group = {
+        key,
+        label: preset?.label ?? "Unstaged",
+        colorToken: preset?.colorToken ?? null,
+        sortOrder: preset?.sortOrder ?? UNSTAGED_SORT_ORDER,
+        count: 0,
+        items: [],
+      };
+      byKey.set(key, group);
+    }
+    group.items.push(item);
+    group.count += 1;
+  }
+  const out = [...byKey.values()];
+  out.sort((a, b) => {
+    if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+    return a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
+  });
+  return out;
+}
+

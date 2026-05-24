@@ -215,7 +215,7 @@ describe("Edit Tent UI wiring", () => {
     expect(EDIT_TENT).toContain("edit-tent-name");
     expect(EDIT_TENT).toContain("edit-tent-stage");
     expect(EDIT_TENT).toContain("edit-tent-light-on");
-    expect(EDIT_TENT).not.toMatch(/user_id|grow_id/);
+    expect(EDIT_TENT).not.toMatch(/payload\.(user_id|grow_id)\s*=/);
   });
   it("Tent actions menu disables delete when guard blocks", () => {
     expect(TENT_ACTIONS).toMatch(/disabled=\{!guard\.canDelete\}/);

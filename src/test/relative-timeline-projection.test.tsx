@@ -18,6 +18,8 @@ import { render, screen } from "@testing-library/react";
 
 import {
   buildRelativeTimelineProjection,
+  groupRelativeTimelineByStage,
+  UNSTAGED_GROUP_KEY,
   type RelativeTimelineItem,
 } from "@/lib/relativeTimelineProjectionRules";
 
@@ -324,8 +326,115 @@ describe("buildRelativeTimelineProjection — pure rules", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Render coverage
+// Stage grouping
 // ---------------------------------------------------------------------------
+
+describe("groupRelativeTimelineByStage — pure rules", () => {
+  function preset(over: { key: string; label: string; colorToken: string; sortOrder: number }) {
+    return {
+      key: over.key,
+      label: over.label,
+      description: "",
+      colorToken: over.colorToken,
+      colorDirection: "",
+      suggestedDurationDays: null,
+      sortOrder: over.sortOrder,
+    } as any;
+  }
+  function item(
+    over: Partial<RelativeTimelineItem> & { id: string },
+  ): RelativeTimelineItem {
+    return {
+      id: over.id,
+      eventType: "note",
+      title: "t",
+      occurredAt: "2026-04-05T00:00:00Z",
+      occurredAtLabel: "2026-04-05T00:00:00Z",
+      plantDay: 0,
+      stageDay: null,
+      source: "note",
+      stagePreset: null,
+      plantId: PLANT,
+      tentId: null,
+      ...over,
+    };
+  }
+  const VEG = preset({ key: "vegetation", label: "Vegetation", colorToken: "stage-vegetation", sortOrder: 30 });
+  const FLOWER = preset({ key: "flower", label: "Flower", colorToken: "stage-flower", sortOrder: 40 });
+  const SEEDLING = preset({ key: "seedling", label: "Seedling", colorToken: "stage-seedling", sortOrder: 10 });
+
+  it("returns [] for empty input", () => {
+    expect(groupRelativeTimelineByStage([])).toEqual([]);
+  });
+
+  it("groups items by stage preset and exposes the preset color token + count", () => {
+    const groups = groupRelativeTimelineByStage([
+      item({ id: "v1", stagePreset: VEG }),
+      item({ id: "v2", stagePreset: VEG }),
+      item({ id: "f1", stagePreset: FLOWER }),
+    ]);
+    expect(groups.map((g) => g.key)).toEqual(["vegetation", "flower"]);
+    expect(groups[0].count).toBe(2);
+    expect(groups[0].colorToken).toBe("stage-vegetation");
+    expect(groups[1].count).toBe(1);
+    expect(groups[1].colorToken).toBe("stage-flower");
+  });
+
+  it("places items with no resolved stage into the Unstaged group (sorted last)", () => {
+    const groups = groupRelativeTimelineByStage([
+      item({ id: "a", stagePreset: null }),
+      item({ id: "b", stagePreset: SEEDLING }),
+    ]);
+    expect(groups.map((g) => g.key)).toEqual(["seedling", UNSTAGED_GROUP_KEY]);
+    expect(groups[1].label).toBe("Unstaged");
+    expect(groups[1].colorToken).toBeNull();
+    expect(groups[1].count).toBe(1);
+  });
+
+  it("does not create empty stage groups by default", () => {
+    const groups = groupRelativeTimelineByStage([
+      item({ id: "a", stagePreset: FLOWER }),
+    ]);
+    expect(groups.length).toBe(1);
+    expect(groups[0].key).toBe("flower");
+  });
+
+  it("preserves input order of items inside each group (deterministic)", () => {
+    const groups = groupRelativeTimelineByStage([
+      item({ id: "x", stagePreset: VEG }),
+      item({ id: "y", stagePreset: VEG }),
+      item({ id: "z", stagePreset: VEG }),
+    ]);
+    expect(groups[0].items.map((i) => i.id)).toEqual(["x", "y", "z"]);
+  });
+
+  it("orders groups by stage preset sortOrder ascending", () => {
+    const groups = groupRelativeTimelineByStage([
+      item({ id: "1", stagePreset: FLOWER }),
+      item({ id: "2", stagePreset: SEEDLING }),
+      item({ id: "3", stagePreset: VEG }),
+    ]);
+    expect(groups.map((g) => g.key)).toEqual(["seedling", "vegetation", "flower"]);
+  });
+
+  it("integrates with projection: per-entry stage wins, otherwise plant currentStage applies", () => {
+    const items = buildRelativeTimelineProjection({
+      rawEntries: [
+        entry({ id: "perEntry", entry_at: "2026-04-05T00:00:00Z", plant_id: PLANT, ...({ stage: "flower" } as any) }),
+        entry({ id: "fallback", entry_at: "2026-04-06T00:00:00Z" }),
+      ],
+      plantId: PLANT,
+      plantStartedAt: PLANT_STARTED,
+      currentStage: "veg",
+    });
+    const groups = groupRelativeTimelineByStage(items);
+    expect(groups.map((g) => g.key)).toEqual(["vegetation", "flower"]);
+    expect(groups[0].items[0].id).toBe("fallback");
+    expect(groups[1].items[0].id).toBe("perEntry");
+  });
+});
+
+
 
 vi.mock("@/hooks/usePlantRecentActivity", () => ({
   usePlantRecentActivity: vi.fn(),
@@ -410,4 +519,40 @@ describe("PlantRelativeTimelineSection — render", () => {
     expect(container.querySelectorAll("[draggable]").length).toBe(0);
     expect(container.querySelectorAll("input, textarea, select").length).toBe(0);
   });
+
+  it("renders grouped stage headers with badge, count, and item rows", () => {
+    mockUse.mockReturnValue({
+      data: [
+        entry({ id: "fallback", entry_at: "2026-04-05T00:00:00Z" }),
+        entry({
+          id: "perEntry",
+          entry_at: "2026-04-06T00:00:00Z",
+          ...({ stage: "flower" } as any),
+        }),
+      ],
+      isLoading: false,
+    });
+    render(
+      <PlantRelativeTimelineSection
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+        currentStage="vegetation"
+      />,
+    );
+    const groups = screen.getAllByTestId("relative-timeline-stage-group");
+    expect(groups.length).toBe(2);
+    expect(groups[0].getAttribute("data-stage-key")).toBe("vegetation");
+    expect(groups[0].getAttribute("data-stage-color-token")).toBe("stage-vegetation");
+    expect(groups[0].getAttribute("data-count")).toBe("1");
+    expect(groups[1].getAttribute("data-stage-key")).toBe("flower");
+    expect(groups[1].getAttribute("data-stage-color-token")).toBe("stage-flower");
+    const counts = screen.getAllByTestId("relative-timeline-group-count");
+    expect(counts[0]).toHaveTextContent(/1 event/);
+    const groupBadges = screen.getAllByTestId("relative-timeline-group-stage-badge");
+    expect(groupBadges[0]).toHaveTextContent("Vegetation");
+    expect(groupBadges[1]).toHaveTextContent("Flower");
+    // Item rows still render inside groups.
+    expect(screen.getAllByTestId("relative-timeline-item").length).toBe(2);
+  });
 });
+

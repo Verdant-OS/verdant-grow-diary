@@ -247,7 +247,7 @@ describe("Plant Merge UI wiring", () => {
   it("Merge dialog limits targets to same-grow candidates via useGrowPlants(growId)", () => {
     expect(MERGE_DIALOG).toContain("useGrowPlants(undefined, source.grow_id");
   });
-  it("Merge dialog renders the preview-only badge and execution-blocked note", () => {
+  it("Merge dialog renders the preview badge and execution note", () => {
     expect(MERGE_DIALOG).toContain("plant-merge-preview-only-badge");
     expect(MERGE_DIALOG).toContain("plant-merge-execution-blocked-note");
   });
@@ -255,9 +255,9 @@ describe("Plant Merge UI wiring", () => {
     expect(MERGE_DIALOG).not.toMatch(/from\("plants"\)\.delete/);
     expect(MERGE_DIALOG).toContain("buildArchivePlantPayload");
   });
-  it("Merge rules never enable any executable step in v1", () => {
-    expect(MERGE_RULES).toContain("executable: false");
-    expect(MERGE_RULES).not.toMatch(/executable:\s*true/);
+  it("Merge rules enable safe-table steps now that the RPC is live", () => {
+    expect(MERGE_RULES).toContain("executable: true");
+    expect(MERGE_RULES).toContain('rpcName: "merge_duplicate_plant"');
   });
 });
 

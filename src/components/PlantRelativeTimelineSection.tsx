@@ -15,12 +15,15 @@ import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import {
   buildRelativeTimelineProjection,
   filterRelativeTimelineItems,
+  formatRelativeTimelineSummary,
   getRelativeTimelineFilterEmptyState,
   groupRelativeTimelineByStage,
   RELATIVE_TIMELINE_FILTERS,
+  summarizeRelativeTimelineItems,
   type RelativeTimelineFilterKey,
   type RelativeTimelineItem,
 } from "@/lib/relativeTimelineProjectionRules";
+
 
 
 interface Props {

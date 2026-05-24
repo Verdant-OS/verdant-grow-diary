@@ -73,7 +73,7 @@ export default function Tents() {
                 </div>
 
                 <div className="flex flex-wrap gap-1.5">
-                  {last && <MetricChip label="T" value={last.temp} unit="°C" status={last.temp > 28 || last.temp < 19 ? "warn" : "ok"} />}
+                  {last && <MetricChip label="T" value={(tempFFromC(last.temp) ?? 0).toFixed(1)} unit="°F" status={last.temp > 28 || last.temp < 19 ? "warn" : "ok"} />}
                   {last && <MetricChip label="RH" value={last.rh} unit="%" status={last.rh > 65 || last.rh < 35 ? "warn" : "ok"} />}
                   {last && <MetricChip label="VPD" value={last.vpd} unit=" kPa" status={last.vpd > 1.6 || last.vpd < 0.6 ? "warn" : "ok"} />}
                 </div>

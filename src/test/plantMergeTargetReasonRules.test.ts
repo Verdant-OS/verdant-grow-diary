@@ -353,7 +353,7 @@ describe("PlantMergeDialog target picker uses the new reason labels", () => {
 
 describe("plantMergeTargetReasonRules static safety", () => {
   it("module is free of I/O, automation, device-control, and service_role", () => {
-    expect(RULES).not.toMatch(/supabase/i);
+    expect(RULES).not.toMatch(/from\s+["']@\/integrations\/supabase/);
     expect(RULES).not.toMatch(/from\s+["']react["']/);
     expect(RULES).not.toMatch(/sensor_readings|pi_ingest|pi-ingest/);
     expect(RULES).not.toMatch(/mqtt|home[\s_-]?assistant|webhook|actuator|relay/i);

@@ -1,7 +1,7 @@
 /**
  * Pure rules for deriving a plant's Daily Grow Check history.
  *
- * Read-only. No writes. No new persistence. Never claims "completed".
+ * Read-only. No writes. No new persistence. Never claims a check is finished.
  *
  * History is derived conservatively from existing activity:
  *   - QuickLog diary entries scoped to the plant.

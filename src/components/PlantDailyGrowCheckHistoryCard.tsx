@@ -16,7 +16,6 @@ import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import { usePlants } from "@/hooks/use-plants";
 import {
   buildDailyGrowCheckHistory,
-  HISTORY_LABELS,
   type DailyHistoryRow,
 } from "@/lib/dailyGrowCheckHistoryRules";
 
@@ -147,10 +146,6 @@ export default function PlantDailyGrowCheckHistoryCard({
         ))}
       </ul>
 
-      {/* Static sentinel: ensure we never accidentally render "completed". */}
-      <span className="sr-only" data-testid="plant-daily-grow-check-history-no-completed">
-        {Object.values(HISTORY_LABELS).join(" ")}
-      </span>
     </Card>
   );
 }

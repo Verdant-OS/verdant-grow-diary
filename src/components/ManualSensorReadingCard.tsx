@@ -18,6 +18,7 @@ import {
   validateManualEntry,
   type ManualEntryInput,
 } from "@/lib/sensorReadingManualEntryRules";
+import { evaluateManualSnapshotAdvisor } from "@/lib/manualSensorSnapshotAdvisorRules";
 
 interface TentOption {
   id: string;

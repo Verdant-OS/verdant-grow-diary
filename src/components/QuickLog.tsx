@@ -22,6 +22,10 @@ import {
   hasAnyHardwareReading,
   type QuickLogHardwareReadings,
 } from "@/lib/quickLogHardwareReadingsRules";
+import {
+  filterQuickLogPlantOptions,
+  quickLogPlantHelperText,
+} from "@/lib/quickLogPlantOptionRules";
 import { AlertTriangle, Info } from "lucide-react";
 import { toast } from "sonner";
 

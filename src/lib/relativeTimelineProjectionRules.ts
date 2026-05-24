@@ -234,3 +234,116 @@ export function groupRelativeTimelineByStage(
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// Filter chips (read-only UI filter — no writes, no schema)
+// ---------------------------------------------------------------------------
+
+export type RelativeTimelineFilterKey =
+  | "all"
+  | "photos"
+  | "watering"
+  | "feeding"
+  | "symptoms"
+  | "training"
+  | "notes";
+
+export interface RelativeTimelineFilterDef {
+  key: RelativeTimelineFilterKey;
+  label: string;
+  /** Short copy shown when this filter has no matching items. */
+  emptyCopy: string;
+}
+
+export const RELATIVE_TIMELINE_FILTERS: readonly RelativeTimelineFilterDef[] = [
+  {
+    key: "all",
+    label: "All",
+    emptyCopy:
+      "Your plant timeline starts with the first quick log, photo, or sensor snapshot.",
+  },
+  {
+    key: "photos",
+    label: "Photos",
+    emptyCopy: "No photos in this plant's timeline yet.",
+  },
+  {
+    key: "watering",
+    label: "Watering",
+    emptyCopy: "No watering events in this plant's timeline yet.",
+  },
+  {
+    key: "feeding",
+    label: "Feeding",
+    emptyCopy: "No feeding events in this plant's timeline yet.",
+  },
+  {
+    key: "symptoms",
+    label: "Symptoms",
+    emptyCopy: "No symptom or problem observations in this plant's timeline yet.",
+  },
+  {
+    key: "training",
+    label: "Training",
+    emptyCopy: "No training events in this plant's timeline yet.",
+  },
+  {
+    key: "notes",
+    label: "Notes",
+    emptyCopy: "No notes or observations in this plant's timeline yet.",
+  },
+] as const;
+
+const SYMPTOM_EVENT_TYPES = new Set([
+  "symptoms",
+  "pest_disease",
+  "diagnosis",
+]);
+const TRAINING_EVENT_TYPES = new Set(["training", "defoliation"]);
+
+/**
+ * Classify a projected timeline item to one filter category. Pure and
+ * null-safe. Unknown / misc / sensor / null types fall back to "notes".
+ */
+export function classifyRelativeTimelineFilter(
+  item: Pick<RelativeTimelineItem, "eventType" | "source"> | null | undefined,
+): Exclude<RelativeTimelineFilterKey, "all"> {
+  if (!item) return "notes";
+  const type = typeof item.eventType === "string" ? item.eventType.toLowerCase() : "";
+  if (item.source === "photo" || type === "photo") return "photos";
+  if (type === "watering") return "watering";
+  if (type === "feeding") return "feeding";
+  if (SYMPTOM_EVENT_TYPES.has(type)) return "symptoms";
+  if (TRAINING_EVENT_TYPES.has(type)) return "training";
+  return "notes";
+}
+
+/**
+ * Filter projected timeline items by the selected chip. Preserves input
+ * ordering. "all" returns the input as-is. Unknown keys behave like "all"
+ * to stay safe.
+ */
+export function filterRelativeTimelineItems(
+  items: ReadonlyArray<RelativeTimelineItem>,
+  filterKey: RelativeTimelineFilterKey,
+): RelativeTimelineItem[] {
+  if (!Array.isArray(items) || items.length === 0) return [];
+  if (filterKey === "all" || !filterKey) return [...items];
+  const known = RELATIVE_TIMELINE_FILTERS.some((f) => f.key === filterKey);
+  if (!known) return [...items];
+  return items.filter((i) => classifyRelativeTimelineFilter(i) === filterKey);
+}
+
+/**
+ * Empty-state copy for a given filter. Falls back to the "all" copy when
+ * the key is unknown so the UI always renders safe wording.
+ */
+export function getRelativeTimelineFilterEmptyState(
+  filterKey: RelativeTimelineFilterKey,
+): string {
+  const def =
+    RELATIVE_TIMELINE_FILTERS.find((f) => f.key === filterKey) ??
+    RELATIVE_TIMELINE_FILTERS[0];
+  return def.emptyCopy;
+}
+
+

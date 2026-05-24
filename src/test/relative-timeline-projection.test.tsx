@@ -514,8 +514,12 @@ describe("PlantRelativeTimelineSection — render", () => {
         plantStartedAt={PLANT_STARTED}
       />,
     );
-    // No buttons in the rendered timeline section.
-    expect(container.querySelectorAll("button").length).toBe(0);
+    // Filter chips are allowed (read-only radios). No mutating labels.
+    const buttons = Array.from(container.querySelectorAll("button"));
+    for (const b of buttons) {
+      expect(b.getAttribute("role")).toBe("radio");
+      expect(b.textContent ?? "").not.toMatch(/create|add|edit|delete|move|drag/i);
+    }
     expect(container.querySelectorAll("[draggable]").length).toBe(0);
     expect(container.querySelectorAll("input, textarea, select").length).toBe(0);
   });
@@ -555,4 +559,292 @@ describe("PlantRelativeTimelineSection — render", () => {
     expect(screen.getAllByTestId("relative-timeline-item").length).toBe(2);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Filter chips — pure rules + render
+// ---------------------------------------------------------------------------
+
+import {
+  RELATIVE_TIMELINE_FILTERS,
+  filterRelativeTimelineItems,
+  getRelativeTimelineFilterEmptyState,
+  classifyRelativeTimelineFilter,
+} from "@/lib/relativeTimelineProjectionRules";
+import { fireEvent } from "@testing-library/react";
+
+function tItem(
+  over: Partial<RelativeTimelineItem> & { id: string },
+): RelativeTimelineItem {
+  return {
+    id: over.id,
+    eventType: "note",
+    title: "t",
+    occurredAt: "2026-04-05T00:00:00Z",
+    occurredAtLabel: "2026-04-05T00:00:00Z",
+    plantDay: 0,
+    stageDay: null,
+    source: "note",
+    stagePreset: null,
+    plantId: PLANT,
+    tentId: null,
+    ...over,
+  };
+}
+
+describe("filterRelativeTimelineItems — pure rules", () => {
+  const sample: RelativeTimelineItem[] = [
+    tItem({ id: "n1", eventType: "note" }),
+    tItem({ id: "obs", eventType: "observation" }),
+    tItem({ id: "w", eventType: "watering" }),
+    tItem({ id: "f", eventType: "feeding" }),
+    tItem({ id: "ph", eventType: "photo", source: "photo" }),
+    tItem({ id: "sym", eventType: "symptoms" }),
+    tItem({ id: "pst", eventType: "pest_disease" }),
+    tItem({ id: "tr", eventType: "training" }),
+    tItem({ id: "def", eventType: "defoliation" }),
+    tItem({ id: "sensor", eventType: "environment", source: "sensor" }),
+    tItem({ id: "unk", eventType: "weirdstuff" }),
+    tItem({ id: "null", eventType: "" }),
+  ];
+
+  it("All returns all items in original order", () => {
+    const out = filterRelativeTimelineItems(sample, "all");
+    expect(out.map((i) => i.id)).toEqual(sample.map((i) => i.id));
+  });
+
+  it("Photos returns photo-typed/photo-source items only", () => {
+    expect(filterRelativeTimelineItems(sample, "photos").map((i) => i.id)).toEqual(["ph"]);
+  });
+
+  it("Watering returns watering items only", () => {
+    expect(filterRelativeTimelineItems(sample, "watering").map((i) => i.id)).toEqual(["w"]);
+  });
+
+  it("Feeding returns feeding items only", () => {
+    expect(filterRelativeTimelineItems(sample, "feeding").map((i) => i.id)).toEqual(["f"]);
+  });
+
+  it("Symptoms returns symptom/pest/diagnosis items", () => {
+    expect(filterRelativeTimelineItems(sample, "symptoms").map((i) => i.id)).toEqual([
+      "sym",
+      "pst",
+    ]);
+  });
+
+  it("Training returns training/defoliation items", () => {
+    expect(filterRelativeTimelineItems(sample, "training").map((i) => i.id)).toEqual([
+      "tr",
+      "def",
+    ]);
+  });
+
+  it("Notes returns note/observation/sensor/unknown safe fallback items", () => {
+    expect(filterRelativeTimelineItems(sample, "notes").map((i) => i.id)).toEqual([
+      "n1",
+      "obs",
+      "sensor",
+      "unk",
+      "null",
+    ]);
+  });
+
+  it("classifies unknown/null event types safely as 'notes'", () => {
+    expect(classifyRelativeTimelineFilter({ eventType: "", source: "note" })).toBe("notes");
+    expect(classifyRelativeTimelineFilter(null as any)).toBe("notes");
+    expect(classifyRelativeTimelineFilter(undefined as any)).toBe("notes");
+    expect(
+      classifyRelativeTimelineFilter({ eventType: "anything-new", source: "note" }),
+    ).toBe("notes");
+  });
+
+  it("preserves input ordering after filtering", () => {
+    const ordered: RelativeTimelineItem[] = [
+      tItem({ id: "w1", eventType: "watering" }),
+      tItem({ id: "w2", eventType: "watering" }),
+      tItem({ id: "w3", eventType: "watering" }),
+    ];
+    expect(filterRelativeTimelineItems(ordered, "watering").map((i) => i.id)).toEqual([
+      "w1",
+      "w2",
+      "w3",
+    ]);
+  });
+
+  it("filters BEFORE grouping: group counts reflect only filtered items", () => {
+    const VEG = {
+      key: "vegetation",
+      label: "Vegetation",
+      description: "",
+      colorToken: "stage-vegetation",
+      colorDirection: "",
+      suggestedDurationDays: null,
+      sortOrder: 30,
+    } as any;
+    const FLOWER = {
+      key: "flower",
+      label: "Flower",
+      description: "",
+      colorToken: "stage-flower",
+      colorDirection: "",
+      suggestedDurationDays: null,
+      sortOrder: 40,
+    } as any;
+    const items: RelativeTimelineItem[] = [
+      tItem({ id: "vw", eventType: "watering", stagePreset: VEG }),
+      tItem({ id: "vn", eventType: "note", stagePreset: VEG }),
+      tItem({ id: "fw", eventType: "watering", stagePreset: FLOWER }),
+      tItem({ id: "fn", eventType: "note", stagePreset: FLOWER }),
+    ];
+    const groups = groupRelativeTimelineByStage(
+      filterRelativeTimelineItems(items, "watering"),
+    );
+    expect(groups.map((g) => `${g.key}:${g.count}`)).toEqual([
+      "vegetation:1",
+      "flower:1",
+    ]);
+  });
+
+  it("does not create empty stage groups after filtering", () => {
+    const VEG = {
+      key: "vegetation",
+      label: "Vegetation",
+      description: "",
+      colorToken: "stage-vegetation",
+      colorDirection: "",
+      suggestedDurationDays: null,
+      sortOrder: 30,
+    } as any;
+    const FLOWER = {
+      key: "flower",
+      label: "Flower",
+      description: "",
+      colorToken: "stage-flower",
+      colorDirection: "",
+      suggestedDurationDays: null,
+      sortOrder: 40,
+    } as any;
+    const items: RelativeTimelineItem[] = [
+      tItem({ id: "vw", eventType: "watering", stagePreset: VEG }),
+      tItem({ id: "fn", eventType: "note", stagePreset: FLOWER }),
+    ];
+    const groups = groupRelativeTimelineByStage(
+      filterRelativeTimelineItems(items, "watering"),
+    );
+    expect(groups.map((g) => g.key)).toEqual(["vegetation"]);
+  });
+
+  it("getRelativeTimelineFilterEmptyState returns filter-specific copy", () => {
+    const photos = getRelativeTimelineFilterEmptyState("photos");
+    expect(photos.toLowerCase()).toContain("photo");
+    const watering = getRelativeTimelineFilterEmptyState("watering");
+    expect(watering.toLowerCase()).toContain("watering");
+    expect(photos).not.toEqual(watering);
+  });
+
+  it("RELATIVE_TIMELINE_FILTERS exposes the required keys in order", () => {
+    expect(RELATIVE_TIMELINE_FILTERS.map((f) => f.key)).toEqual([
+      "all",
+      "photos",
+      "watering",
+      "feeding",
+      "symptoms",
+      "training",
+      "notes",
+    ]);
+  });
+});
+
+describe("PlantRelativeTimelineSection — filter chip render", () => {
+  it("renders all filter chips with accessible labels and All selected by default", () => {
+    mockUse.mockReturnValue({
+      data: [entry({ id: "e1", entry_at: "2026-04-05T00:00:00Z" })],
+      isLoading: false,
+    });
+    render(
+      <PlantRelativeTimelineSection
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+      />,
+    );
+    for (const f of RELATIVE_TIMELINE_FILTERS) {
+      const chip = screen.getByTestId(`relative-timeline-filter-${f.key}`);
+      expect(chip.getAttribute("aria-label")).toMatch(new RegExp(f.label, "i"));
+    }
+    const all = screen.getByTestId("relative-timeline-filter-all");
+    expect(all.getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("selecting a filter updates visible rows and group counts", () => {
+    mockUse.mockReturnValue({
+      data: [
+        entry({ id: "w", entry_at: "2026-04-05T00:00:00Z", entry_type: "watering" }),
+        entry({ id: "n", entry_at: "2026-04-06T00:00:00Z", entry_type: "note" }),
+      ],
+      isLoading: false,
+    });
+    render(
+      <PlantRelativeTimelineSection
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+        currentStage="vegetation"
+      />,
+    );
+    expect(screen.getAllByTestId("relative-timeline-item").length).toBe(2);
+    fireEvent.click(screen.getByTestId("relative-timeline-filter-watering"));
+    const rows = screen.getAllByTestId("relative-timeline-item");
+    expect(rows.length).toBe(1);
+    expect(rows[0].getAttribute("data-item-id")).toBe("w");
+    const groups = screen.getAllByTestId("relative-timeline-stage-group");
+    expect(groups[0].getAttribute("data-count")).toBe("1");
+  });
+
+  it("renders filter-specific empty copy when filter has no matches", () => {
+    mockUse.mockReturnValue({
+      data: [entry({ id: "n", entry_at: "2026-04-05T00:00:00Z", entry_type: "note" })],
+      isLoading: false,
+    });
+    render(
+      <PlantRelativeTimelineSection
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("relative-timeline-filter-photos"));
+    const empty = screen.getByTestId("relative-timeline-filter-empty");
+    expect(empty.getAttribute("data-filter-key")).toBe("photos");
+    expect(empty.textContent?.toLowerCase()).toContain("photo");
+    expect(screen.queryAllByTestId("relative-timeline-stage-group").length).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Filter chip — static safety
+// ---------------------------------------------------------------------------
+
+describe("filter chip — static safety", () => {
+  it("rules module filter additions stay free of writes / RPC / schema strings", () => {
+    expect(RULES).not.toMatch(/calendar_events/);
+    expect(RULES).not.toMatch(/action_queue/);
+    expect(RULES).not.toMatch(/service_role/);
+    expect(RULES).not.toMatch(/\.(insert|update|delete|upsert)\s*\(/);
+    expect(RULES).not.toMatch(/\.rpc\(/);
+  });
+
+  it("component does not duplicate the filter mapping table", () => {
+    expect(COMPONENT).toContain("RELATIVE_TIMELINE_FILTERS");
+    expect(COMPONENT).not.toMatch(/const\s+\w*FILTERS\s*=\s*\[/);
+    expect(COMPONENT).not.toMatch(/case\s+["']watering["']/);
+    expect(COMPONENT).not.toMatch(/case\s+["']feeding["']/);
+  });
+
+  it("component does not add write / device / action_queue / service_role strings", () => {
+    expect(COMPONENT).not.toMatch(/action_queue/);
+    expect(COMPONENT).not.toMatch(/service_role/);
+    expect(COMPONENT).not.toMatch(/\.(insert|update|delete|upsert)\s*\(/);
+    expect(COMPONENT).not.toMatch(
+      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator|device_command|autopilot/i,
+    );
+  });
+});
+
 

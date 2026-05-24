@@ -15,6 +15,13 @@ import DiaryEntryBadges from "@/components/DiaryEntryBadges";
 import WateringHistoryPanel from "@/components/WateringHistoryPanel";
 import FeedingHistoryPanel from "@/components/FeedingHistoryPanel";
 import PhotoHistoryPanel from "@/components/PhotoHistoryPanel";
+import {
+  RecentQuickLogActivityPanel,
+  PestDiseaseHistoryPanel,
+  TrainingHistoryPanel,
+  MeasurementHistoryPanel,
+} from "@/components/QuickLogHistoryPanels";
+import { hasManualHandheldReadings } from "@/lib/quickLogHistoryRules";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { actionDetailPath, alertDetailPath, logsPath, timelinePath } from "@/lib/routes";
 import { cn } from "@/lib/utils";
@@ -66,7 +73,12 @@ const MEASUREMENT_KEYS = new Set(["ph", "ec", "runoff", "watering"]);
 function entryKinds(e: Entry): EventFilter[] {
   const kinds: EventFilter[] = ["note"];
   if (e.photo_url) kinds.push("photo");
-  if (e.details && Object.keys(e.details).some((k) => MEASUREMENT_KEYS.has(k))) kinds.push("measurement");
+  const hasDetailMeasurement =
+    e.details && Object.keys(e.details).some((k) => MEASUREMENT_KEYS.has(k));
+  // Manual handheld readings are appended to the note text by Quick Log.
+  // Surface them in the Measurements filter so they aren't hidden.
+  const hasHandheld = hasManualHandheldReadings(e.note);
+  if (hasDetailMeasurement || hasHandheld) kinds.push("measurement");
   return kinds;
 }
 
@@ -296,8 +308,13 @@ export default function Timeline() {
         </div>
       </div>
 
-      <ActionQueueEventsSection events={actionEvents} />
-      <AlertEventsSection events={alertEvents} />
+      {/* Quick Log history lanes (read-only). Order: recent activity first
+          so growers always see what they just saved, then per-event-type
+          lanes. Action Queue / Alert event logs are surfaced at the
+          bottom so Quick Log entries are not buried. */}
+      <div className="mt-4">
+        <RecentQuickLogActivityPanel rawEntries={entries} limit={10} />
+      </div>
 
       <div className="mt-4">
         <WateringHistoryPanel rawEntries={entries} limit={20} />
@@ -308,8 +325,26 @@ export default function Timeline() {
       </div>
 
       <div className="mt-4">
+        <PestDiseaseHistoryPanel rawEntries={entries} limit={20} />
+      </div>
+
+      <div className="mt-4">
+        <TrainingHistoryPanel rawEntries={entries} limit={20} />
+      </div>
+
+      <div className="mt-4">
+        <MeasurementHistoryPanel rawEntries={entries} limit={20} />
+      </div>
+
+      <div className="mt-4">
         <PhotoHistoryPanel rawEntries={entries} limit={24} />
       </div>
+
+      <div className="mt-4">
+        <ActionQueueEventsSection events={actionEvents} />
+        <AlertEventsSection events={alertEvents} />
+      </div>
+
 
 
 

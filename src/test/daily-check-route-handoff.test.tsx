@@ -268,7 +268,12 @@ describe("Daily Check CTA contract + safety", () => {
   );
 
   it("Dashboard panel CTA still routes to /daily-check?plantId=<id>", () => {
-    expect(dashboardPanel).toMatch(/\/daily-check\?plantId=\$\{plant\.id\}/);
+    const dashboardRules = readFileSync(
+      resolve(root, "src/lib/dashboardDailyGrowCheckPanelRules.ts"),
+      "utf8",
+    );
+    expect(dashboardRules).toMatch(/\/daily-check\?plantId=\$\{plant\.id\}/);
+    expect(dashboardPanel).toMatch(/row\.ctaHref/);
   });
 
   it("Plant Detail consistency card CTA still routes to /daily-check?plantId=<id>", () => {

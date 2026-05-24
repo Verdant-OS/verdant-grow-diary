@@ -63,6 +63,23 @@ export default function PlantDetail() {
         metas={[plantMeta, tentMeta]}
         testId="plant-detail-data-source-disclosure"
       />
+      <div className="mb-3">
+        <PlantCardActionsMenu
+          plant={{
+            id: plant.id,
+            name: plant.name,
+            strain: plant.strain,
+            stage: plant.stage,
+            health: plant.health,
+            startedAt: plant.startedAt,
+            tentId: plant.tentId ?? null,
+            growId: plant.growId ?? null,
+            lastNote: plant.lastNote,
+          }}
+          variant="row"
+          hideView
+        />
+      </div>
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="lg:col-span-1 glass rounded-2xl overflow-hidden">
           <div className="aspect-square bg-secondary/40"><img src={plant.photo} alt="" className="w-full h-full object-cover" /></div>

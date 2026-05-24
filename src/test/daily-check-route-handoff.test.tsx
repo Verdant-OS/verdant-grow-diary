@@ -273,7 +273,9 @@ describe("Daily Check CTA contract + safety", () => {
       "utf8",
     );
     expect(dashboardRules).toMatch(/\/daily-check\?plantId=\$\{plant\.id\}/);
-    expect(dashboardPanel).toMatch(/row\.ctaHref/);
+    expect(dashboardPanel).toMatch(/buildDailyCheckEntryHref/);
+    expect(dashboardPanel).toMatch(/source:\s*"dashboard"/);
+
   });
 
   it("Plant Detail consistency card CTA still routes to /daily-check?plantId=<id>", () => {

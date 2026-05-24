@@ -498,11 +498,13 @@ export default function GrowRoomMode() {
         </div>
       )}
 
-      <QuickLog
-        open={quickLogOpen}
-        onOpenChange={setQuickLogOpen}
-        prefill={quickLogPrefill}
-      />
+      {quickLogOpen && (
+        <QuickLog
+          open={quickLogOpen}
+          onOpenChange={setQuickLogOpen}
+          prefill={quickLogPrefill}
+        />
+      )}
     </div>
   );
 }

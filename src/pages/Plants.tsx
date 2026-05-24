@@ -37,6 +37,7 @@ import {
   plantsPageEmptyStateCopy,
 } from "@/lib/plantsPageFilterRules";
 import { buildDashboardDailyGrowCheckPanel } from "@/lib/dashboardDailyGrowCheckPanelRules";
+import { buildDailyCheckEntryHref } from "@/lib/dailyCheckPostSubmitRules";
 import { useNavigate } from "react-router-dom";
 
 export default function Plants() {

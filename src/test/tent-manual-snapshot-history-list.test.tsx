@@ -126,7 +126,7 @@ describe("buildManualSnapshotHistoryList — pure rules", () => {
     });
     expect(list.length).toBe(MAX_HISTORY_LIMIT);
     // newest-first
-    expect(list[0].ts).toBe(T[6]);
+    expect(new Date(list[0].ts).toISOString()).toBe(new Date(T[6]).toISOString());
   });
 
   it("excludes demo / live / imported / non-manual readings", () => {
@@ -139,7 +139,7 @@ describe("buildManualSnapshotHistoryList — pure rules", () => {
     ];
     const list = buildManualSnapshotHistoryList(rows, { tentId: TENT_A });
     expect(list.length).toBe(1);
-    expect(list[0].ts).toBe(T[0]);
+    expect(new Date(list[0].ts).toISOString()).toBe(new Date(T[0]).toISOString());
   });
 
   it("restricts to the requested tent", () => {

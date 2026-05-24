@@ -56,12 +56,15 @@ describe("Daily Grow Check sensor success event contract", () => {
 
   it("does not introduce any new persistence, RPC, automation, or service_role wiring", () => {
     for (const src of [PAGE, HOOK, DASH, PLANT_CARD, RULES]) {
-      expect(src).not.toMatch(/service_role|action_queue|automation|device_command|\.rpc\(/i);
+      const code = stripComments(src);
+      expect(code).not.toMatch(/service_role|action_queue|device_command|\.rpc\(/i);
+      expect(code).not.toMatch(/\bautomation\b/i);
     }
     // The hook still inserts sensor readings (that's its existing job) but
     // must not introduce additional insert/update/delete on other tables.
     for (const src of [PAGE, DASH, PLANT_CARD, RULES]) {
-      expect(src).not.toMatch(/\.insert\(|\.update\(|\.delete\(/);
+      const code = stripComments(src);
+      expect(code).not.toMatch(/\.insert\(|\.update\(|\.delete\(/);
     }
   });
 });

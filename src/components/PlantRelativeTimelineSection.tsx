@@ -15,6 +15,7 @@ import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import {
   buildRelativeTimelineProjection,
   filterRelativeTimelineItems,
+  formatRelativeTimelineGroupSummary,
   formatRelativeTimelineSummary,
   getRelativeTimelineFilterEmptyState,
   groupRelativeTimelineByStage,
@@ -23,6 +24,7 @@ import {
   type RelativeTimelineFilterKey,
   type RelativeTimelineItem,
 } from "@/lib/relativeTimelineProjectionRules";
+
 
 
 

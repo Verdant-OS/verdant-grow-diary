@@ -447,6 +447,14 @@ export default function Plants() {
                           )}
                           {checkedToday ? "Checked today" : "Needs check"}
                         </Badge>
+                        {checkedToday && methodLabel && (
+                          <span
+                            className="text-[10px] text-muted-foreground truncate"
+                            data-testid="plant-card-daily-check-method"
+                          >
+                            {methodLabel}
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>

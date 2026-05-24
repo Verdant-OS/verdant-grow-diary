@@ -1,20 +1,23 @@
 /**
  * Pure helpers for the duplicate-plant Merge workflow.
  *
- * Strategy: PREVIEW-ONLY at v1.
+ * v2: the server-side RPC `public.merge_duplicate_plant(uuid, uuid)`
+ * exists and is the *only* execution path. The client never updates
+ * grow_events / diary_entries / alerts / action_queue directly.
+ *
  *   - Detects likely-duplicate candidates within the same grow.
- *   - Builds a merge preview describing what would move, what is blocked,
- *     and which data types require a server-side transaction/RPC before a
- *     safe execution path can be added.
+ *   - Builds a merge preview describing what would move and what is
+ *     skipped (sensor readings stay tent-scoped, pi-ingest stays
+ *     bridge-scoped).
  *   - Never hard-deletes the source plant.
  *   - Never deletes diary entries, photos, watering/feeding/observation
  *     events, sensor readings, alerts, action queue items, or tasks.
  *   - Cross-grow merges are disallowed by default. Caller may explicitly
- *     opt in with `allowCrossGrow: true`, which is still surfaced as a
- *     warning in the preview.
+ *     opt in with `allowCrossGrow: true`; the RPC itself rejects them.
  *
- * Out of scope: alerts, Action Queue, sensors, automation, device control.
- * No React, no Supabase, no I/O — safe to unit-test in isolation.
+ * Out of scope: alerts persistence, Action Queue behavior, sensors,
+ * automation, device control. No React, no Supabase, no I/O — safe to
+ * unit-test in isolation.
  */
 
 export interface PlantForMerge {
@@ -49,9 +52,10 @@ export interface MergePreviewLine {
   /** Count of rows referencing the source plant. May be 0. */
   sourceCount: number;
   /**
-   * Whether v1 can move this data type today via plant_id update only.
-   * Tables joined indirectly (via event_id) are flagged as blocked because
-   * a multi-table transaction/RPC would be required to keep things safe.
+   * Whether the safe server-side RPC will move this data type as part
+   * of the same transaction. Subtype event tables (watering/feeding/
+   * training/observation/environment/photo) follow `grow_events` via
+   * `event_id` and are reassigned transitively.
    */
   mergeable: boolean;
   /** Optional reason shown in the UI when `mergeable` is false. */
@@ -65,11 +69,12 @@ export interface PlantMergePreview {
   lines: MergePreviewLine[];
   warnings: string[];
   blockers: string[];
-  /** True when no v1 execution path exists for any non-zero data type. */
+  /** True when no executable step exists (e.g. blocked or zero history). */
   previewOnly: boolean;
   recommendedAction:
     | "preview_only"
     | "archive_source_after_review"
+    | "execute_via_rpc"
     | "blocked";
 }
 
@@ -87,70 +92,59 @@ const DATA_LINES: ReadonlyArray<{
   {
     key: "diaryEntries",
     label: "Diary entries / Quick Logs",
-    mergeable: false,
-    blockedReason:
-      "Needs a safe transaction/RPC to repoint diary_entries.plant_id without losing history.",
+    mergeable: true,
   },
   {
     key: "growEvents",
     label: "Grow events",
-    mergeable: false,
-    blockedReason:
-      "Needs a safe transaction/RPC to repoint grow_events.plant_id without losing history.",
+    mergeable: true,
   },
   {
     key: "photoEvents",
     label: "Photos",
-    mergeable: false,
-    blockedReason: "Photo events join via event_id; safe RPC required.",
+    mergeable: true,
   },
   {
     key: "wateringEvents",
     label: "Watering events",
-    mergeable: false,
-    blockedReason: "Watering events join via event_id; safe RPC required.",
+    mergeable: true,
   },
   {
     key: "feedingEvents",
     label: "Feeding events",
-    mergeable: false,
-    blockedReason: "Feeding events join via event_id; safe RPC required.",
+    mergeable: true,
   },
   {
     key: "observationEvents",
     label: "Observations",
-    mergeable: false,
-    blockedReason: "Observation events join via event_id; safe RPC required.",
+    mergeable: true,
   },
   {
     key: "trainingEvents",
     label: "Training events",
-    mergeable: false,
-    blockedReason: "Training events join via event_id; safe RPC required.",
+    mergeable: true,
   },
   {
     key: "sensorReadings",
     label: "Sensor readings (plant-linked)",
     mergeable: false,
-    blockedReason: "Sensor readings are tent-scoped; do not move with a plant merge.",
+    blockedReason:
+      "Sensor readings are tent-scoped and stay with the tent — they are not moved by a plant merge.",
   },
   {
     key: "alerts",
     label: "Alerts",
-    mergeable: false,
-    blockedReason: "Alert persistence is out of scope for this workflow.",
+    mergeable: true,
   },
   {
     key: "actionQueueItems",
     label: "Action Queue items",
-    mergeable: false,
-    blockedReason: "Action Queue is out of scope for this workflow.",
+    mergeable: true,
   },
   {
     key: "dailyGrowChecks",
     label: "Daily Grow Check history",
-    mergeable: false,
-    blockedReason: "Tracked via diary_entries; covered by the same safe RPC requirement.",
+    mergeable: true,
   },
 ];
 
@@ -247,11 +241,13 @@ export function buildPlantMergePreview(
 
   const anyData = lines.some((l) => l.sourceCount > 0);
   const anyExecutable = lines.some((l) => l.mergeable && l.sourceCount > 0);
-  const previewOnly = !anyExecutable;
 
   let recommendedAction: PlantMergePreview["recommendedAction"] = "preview_only";
   if (blockers.length > 0) recommendedAction = "blocked";
   else if (!anyData) recommendedAction = "archive_source_after_review";
+  else if (anyExecutable) recommendedAction = "execute_via_rpc";
+
+  const previewOnly = recommendedAction !== "execute_via_rpc";
 
   return {
     source,
@@ -267,29 +263,29 @@ export function buildPlantMergePreview(
 
 export function summarizePlantMergePlan(preview: PlantMergePreview): string {
   const totals = preview.lines.reduce((acc, l) => acc + l.sourceCount, 0);
-  const blockedTypes = preview.lines.filter(
-    (l) => !l.mergeable && l.sourceCount > 0,
-  ).length;
   if (preview.recommendedAction === "blocked") {
     return preview.blockers.join(" ");
   }
   if (totals === 0) {
     return `No history on "${preview.source.name}". Safe to archive it as a duplicate of "${preview.target.name}".`;
   }
-  return `"${preview.source.name}" has ${totals} linked record(s) across ${blockedTypes} data type(s) that need a safe server-side transaction before they can move to "${preview.target.name}". Preview-only at this stage.`;
+  return `"${preview.source.name}" has ${totals} linked record(s) that will move to "${preview.target.name}" in a single server-side transaction. Sensor readings stay tent-scoped and are not moved.`;
 }
 
 /**
- * Build the (currently empty) update plan. Returned shape is stable so a
- * future RPC integration can fill it in without changing call sites.
+ * Build the update plan. With the server-side RPC available, the safe
+ * tables (grow_events, diary_entries, alerts, action_queue) are
+ * reassigned via `merge_duplicate_plant`. Subtype event tables follow
+ * `grow_events` via `event_id` transitively. The client never updates
+ * any of these tables directly.
  */
 export interface PlantMergeUpdatePlan {
   sourcePlantId: string;
   targetPlantId: string;
-  /** Tables this plan would update if execution were enabled. */
-  steps: Array<{ table: string; via: "plant_id" | "rpc"; enabled: boolean }>;
+  steps: Array<{ table: string; via: "rpc"; enabled: boolean }>;
   executable: boolean;
-  blockedReason: string;
+  rpcName: "merge_duplicate_plant";
+  blockedReason?: string;
 }
 
 export function buildPlantMergeUpdatePlan(
@@ -300,11 +296,113 @@ export function buildPlantMergeUpdatePlan(
     sourcePlantId,
     targetPlantId,
     steps: [
-      { table: "diary_entries", via: "rpc", enabled: false },
-      { table: "grow_events", via: "rpc", enabled: false },
+      { table: "grow_events", via: "rpc", enabled: true },
+      { table: "diary_entries", via: "rpc", enabled: true },
+      { table: "alerts", via: "rpc", enabled: true },
+      { table: "action_queue", via: "rpc", enabled: true },
     ],
-    executable: false,
-    blockedReason:
-      "Merge execution needs a safe transaction/RPC before moving data. Preview-only.",
+    executable: true,
+    rpcName: "merge_duplicate_plant",
+  };
+}
+
+// ---------------------------------------------------------------------------
+// RPC return-summary + error mapping
+// ---------------------------------------------------------------------------
+
+export interface MergeRpcMovedSummary {
+  grow_events: number;
+  diary_entries: number;
+  alerts: number;
+  action_queue: number;
+}
+
+export interface MergeRpcSummary {
+  source_plant_id: string;
+  target_plant_id: string;
+  moved: MergeRpcMovedSummary;
+  skipped?: Record<string, boolean>;
+  source_status?: string;
+  audit_logged?: boolean;
+}
+
+export function parseMergeRpcSummary(raw: unknown): MergeRpcSummary | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const moved = (r.moved ?? {}) as Record<string, unknown>;
+  const toInt = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  if (typeof r.source_plant_id !== "string" || typeof r.target_plant_id !== "string") {
+    return null;
+  }
+  return {
+    source_plant_id: r.source_plant_id,
+    target_plant_id: r.target_plant_id,
+    moved: {
+      grow_events: toInt(moved.grow_events),
+      diary_entries: toInt(moved.diary_entries),
+      alerts: toInt(moved.alerts),
+      action_queue: toInt(moved.action_queue),
+    },
+    skipped: (r.skipped as Record<string, boolean> | undefined) ?? undefined,
+    source_status: typeof r.source_status === "string" ? r.source_status : undefined,
+    audit_logged: typeof r.audit_logged === "boolean" ? r.audit_logged : undefined,
+  };
+}
+
+export type MergeRpcErrorKind =
+  | "plant_already_merged"
+  | "same_source_target"
+  | "cross_grow_merge_blocked"
+  | "ownership_or_not_found"
+  | "not_authenticated"
+  | "generic";
+
+export interface MergeRpcErrorMapping {
+  kind: MergeRpcErrorKind;
+  message: string;
+}
+
+/**
+ * Map a Postgres / supabase-js error from the RPC into a friendly UI
+ * message + stable kind. Inspects code + message text.
+ */
+export function mapMergeRpcError(err: unknown): MergeRpcErrorMapping {
+  const e = (err ?? {}) as { code?: string; message?: string };
+  const msg = (e.message ?? "").toLowerCase();
+
+  if (msg.includes("plant_already_merged")) {
+    return {
+      kind: "plant_already_merged",
+      message: "This plant has already been merged or archived.",
+    };
+  }
+  if (msg.includes("must differ")) {
+    return {
+      kind: "same_source_target",
+      message: "Choose a different target plant.",
+    };
+  }
+  if (msg.includes("cross-grow")) {
+    return {
+      kind: "cross_grow_merge_blocked",
+      message: "Plants must be in the same grow to merge.",
+    };
+  }
+  if (e.code === "42501" || msg.includes("not found or not owned")) {
+    return {
+      kind: "ownership_or_not_found",
+      message:
+        "Plant could not be merged. Check that both plants still exist and belong to this grow.",
+    };
+  }
+  if (e.code === "28000" || msg.includes("not authenticated")) {
+    return {
+      kind: "not_authenticated",
+      message: "Please sign in again and retry.",
+    };
+  }
+  return {
+    kind: "generic",
+    message: "Merge failed. No data was moved.",
   };
 }

@@ -8,7 +8,7 @@
  *  - Does not invent placeholder/dummy events.
  *  - Does not auto-shift stages.
  *  - Does not write to plants, diary_entries, sensor_readings,
- *    action_queue, alerts, or any device control surface.
+ *    Action Queue, alerts, or any device control surface.
  */
 import {
   normalizeDiaryEntries,

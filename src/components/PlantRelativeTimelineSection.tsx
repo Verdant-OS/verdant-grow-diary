@@ -3,7 +3,7 @@
  *
  * Read-only: projects existing diary entries onto plant-day / stage-day
  * via `relativeTimelineProjectionRules`. No create/edit/delete/drag
- * controls. No writes. No alerts. No action_queue execution. No device
+ * controls. No writes. No alerts. No Action Queue execution. No device
  * control. No reminders. No calendar_events.
  */
 import { Camera, Gauge, NotebookPen, Sprout } from "lucide-react";

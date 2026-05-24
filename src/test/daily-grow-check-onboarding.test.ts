@@ -75,7 +75,6 @@ describe("deriveDailyGrowCheckOnboarding · pure rules", () => {
     });
     expect(g.step).toBe("add-manual-snapshot");
     expect(g.subtitle).toMatch(/manual snapshot/i);
-    expect(g.subtitle).not.toMatch(/live sensor data/i.source);
     // Must explicitly disclaim live sensor data:
     expect(g.subtitle.toLowerCase()).toContain("not live sensor data");
     expect(g.ctaHref).toBe("/daily-check");

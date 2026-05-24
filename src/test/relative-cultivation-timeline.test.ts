@@ -122,8 +122,7 @@ describe("relativeStageTimelineRules — sorting", () => {
 
   it("handles empty/invalid input safely", () => {
     expect(sortStageTimelineItems([])).toEqual([]);
-    // @ts-expect-error testing defensive path
-    expect(sortStageTimelineItems(null)).toEqual([]);
+    expect(sortStageTimelineItems(null as never)).toEqual([]);
   });
 });
 
@@ -138,8 +137,7 @@ describe("relativeStageTimelineRules — stage shift recommendation draft", () =
   };
 
   it("returns null for invalid input", () => {
-    // @ts-expect-error
-    expect(buildStageShiftRecommendationDraft(null)).toBeNull();
+    expect(buildStageShiftRecommendationDraft(null as never)).toBeNull();
     expect(
       buildStageShiftRecommendationDraft({ ...baseInput, plantId: "" }),
     ).toBeNull();

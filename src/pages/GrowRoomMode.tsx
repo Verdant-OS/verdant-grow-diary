@@ -290,6 +290,24 @@ export default function GrowRoomMode() {
         >
           {cards.map((card) => {
             const showWarning = STALE_OR_MISSING.has(card.snapshotState);
+            const tentPlants: QuickActionPlantLite[] = plants
+              .filter((p) => p.tent_id === card.tentId)
+              .map((p) => ({
+                id: p.id,
+                name: p.name ?? null,
+                tent_id: p.tent_id ?? null,
+                is_archived: p.is_archived ?? false,
+                created_at: p.created_at ?? null,
+              }));
+            const primaryPlant = getPrimaryPlantForTent(card.tentId, tentPlants);
+            const quickActions = buildGrowRoomQuickActionLinks({
+              tent: {
+                id: card.tentId,
+                name: card.tentName,
+                grow_id: card.growId,
+              },
+              plantId: primaryPlant?.id ?? null,
+            });
             return (
               <Card
                 key={card.tentId}

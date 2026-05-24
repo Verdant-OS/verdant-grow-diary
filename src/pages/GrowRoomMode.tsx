@@ -14,7 +14,18 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, ArrowRight, Box, ClipboardCheck, Clock, Sprout } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Box,
+  Camera,
+  ClipboardCheck,
+  Clock,
+  Droplets,
+  NotebookPen,
+  Sprout,
+  Utensils,
+} from "lucide-react";
 
 import PageHeader from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
@@ -22,8 +33,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import EmptyState from "@/components/EmptyState";
 import DailyGrowCheckStatusCard from "@/components/DailyGrowCheckStatusCard";
+import QuickLog, { type QuickLogPrefill } from "@/components/QuickLog";
 import { supabase } from "@/integrations/supabase/client";
 import { useTents } from "@/hooks/use-tents";
+import { usePlants } from "@/hooks/use-plants";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import {
   EMPTY_SNAPSHOT,
@@ -41,6 +54,22 @@ import {
   type GrowRoomTentCard,
   type SnapshotState,
 } from "@/lib/growRoomModeRules";
+import {
+  buildGrowRoomQuickActionLinks,
+  getPrimaryPlantForTent,
+  type QuickActionKind,
+  type QuickActionPlantLite,
+} from "@/lib/growRoomQuickActionRules";
+
+const QUICK_ACTION_ICON: Record<QuickActionKind, typeof Sprout> = {
+  quick_log: NotebookPen,
+  watering: Droplets,
+  feeding: Utensils,
+  photo: Camera,
+  daily_check: ClipboardCheck,
+  view_tent: ArrowRight,
+};
+
 
 const HEALTH_CLASS: Record<DataHealth, string> = {
   healthy: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
@@ -82,7 +111,16 @@ function snapshotAgeLabel(ageMin: number | null): string {
 
 export default function GrowRoomMode() {
   const { data: tents } = useTents();
+  const { data: plants = [] } = usePlants();
   const { alerts } = useAlertsList({});
+  const [quickLogPrefill, setQuickLogPrefill] = useState<QuickLogPrefill | null>(null);
+  const [quickLogOpen, setQuickLogOpen] = useState(false);
+
+  function openQuickLog(prefill: QuickLogPrefill) {
+    setQuickLogPrefill(prefill);
+    setQuickLogOpen(true);
+  }
+
 
   // Latest sensor_readings per tent (read-only). One bounded query.
   const [snapshotsByTentId, setSnapshotsByTentId] = useState<
@@ -252,6 +290,24 @@ export default function GrowRoomMode() {
         >
           {cards.map((card) => {
             const showWarning = STALE_OR_MISSING.has(card.snapshotState);
+            const tentPlants: QuickActionPlantLite[] = plants
+              .filter((p) => p.tent_id === card.tentId)
+              .map((p) => ({
+                id: p.id,
+                name: p.name ?? null,
+                tent_id: p.tent_id ?? null,
+                is_archived: p.is_archived ?? false,
+                created_at: p.created_at ?? null,
+              }));
+            const primaryPlant = getPrimaryPlantForTent(card.tentId, tentPlants);
+            const quickActions = buildGrowRoomQuickActionLinks({
+              tent: {
+                id: card.tentId,
+                name: card.tentName,
+                grow_id: card.growId,
+              },
+              plantId: primaryPlant?.id ?? null,
+            });
             return (
               <Card
                 key={card.tentId}
@@ -349,25 +405,107 @@ export default function GrowRoomMode() {
                   </Link>
                 </div>
 
-                <div className="flex items-center justify-between gap-2 border-t border-border/40 pt-3">
-                  <span
-                    className="text-sm font-medium"
-                    data-testid="grow-room-recommendation"
-                  >
-                    {RECOMMENDATION_LABEL[card.primaryRecommendation]}
-                  </span>
-                  <Link
-                    to={`/tents/${card.tentId}`}
-                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                  >
-                    Open tent <ArrowRight className="h-3.5 w-3.5" />
-                  </Link>
+                <div
+                  className="text-sm font-medium"
+                  data-testid="grow-room-recommendation"
+                >
+                  {RECOMMENDATION_LABEL[card.primaryRecommendation]}
+                </div>
+
+
+                <div
+                  className="border-t border-border/40 pt-3 space-y-2"
+                  data-testid="grow-room-quick-actions"
+                  data-tent-id={card.tentId}
+                  data-primary-plant-id={primaryPlant?.id ?? ""}
+                >
+                  {tentPlants.length === 0 ? (
+                    <div
+                      data-testid="grow-room-no-plants-empty"
+                      className="rounded-md border border-border/50 bg-muted/30 p-3 text-xs text-muted-foreground space-y-2"
+                    >
+                      <div>No plants in this tent yet.</div>
+                      <Button
+                        asChild
+                        size="sm"
+                        variant="outline"
+                        className="h-9 w-full"
+                        data-testid="grow-room-add-plant-cta"
+                      >
+                        <Link to={`/tents/${card.tentId}`}>
+                          Add Plant to This Tent
+                        </Link>
+                      </Button>
+                    </div>
+                  ) : (
+                    primaryPlant && (
+                      <div
+                        className="text-[11px] text-muted-foreground"
+                        data-testid="grow-room-selected-plant"
+                      >
+                        Plant context: {primaryPlant.name ?? "Unnamed plant"}
+                      </div>
+                    )
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    {quickActions.map((action) => {
+                      const Icon = QUICK_ACTION_ICON[action.kind];
+                      const testId = `grow-room-action-${action.kind}`;
+                      if (action.href) {
+                        return (
+                          <Button
+                            key={action.kind}
+                            asChild
+                            size="sm"
+                            variant="outline"
+                            className="h-11 justify-start"
+                            data-testid={testId}
+                            data-action-kind={action.kind}
+                          >
+                            <Link to={action.href}>
+                              <Icon className="h-4 w-4" />
+                              <span className="truncate">{action.label}</span>
+                            </Link>
+                          </Button>
+                        );
+                      }
+                      return (
+                        <Button
+                          key={action.kind}
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-11 justify-start"
+                          data-testid={testId}
+                          data-action-kind={action.kind}
+                          data-prefill-event-type={action.quickLogPrefill?.eventType}
+                          data-prefill-tent-id={action.quickLogPrefill?.tentId}
+                          data-prefill-plant-id={action.quickLogPrefill?.plantId ?? ""}
+                          onClick={() =>
+                            action.quickLogPrefill && openQuickLog(action.quickLogPrefill)
+                          }
+                        >
+                          <Icon className="h-4 w-4" />
+                          <span className="truncate">{action.label}</span>
+                        </Button>
+                      );
+                    })}
+                  </div>
                 </div>
               </Card>
             );
           })}
         </div>
       )}
+
+      {quickLogOpen && (
+        <QuickLog
+          open={quickLogOpen}
+          onOpenChange={setQuickLogOpen}
+          prefill={quickLogPrefill}
+        />
+      )}
     </div>
   );
 }
+

@@ -154,11 +154,12 @@ describe("pi-ingest edge skeleton audit — secret mapping prohibitions", () => 
     expect(FN_ALL).not.toMatch(/\bsecret_hash\s+as\s+secret\b/);
   });
   it("no secret_ciphertext directly assigned as BridgeCredential.secret", () => {
-    // secret: row.secret_ciphertext (or similar) is forbidden — must
-    // pass through the resolver instead.
+    // Direct assignment of the encrypted column to a usable secret
+    // field is forbidden — material must pass through the resolver.
     expect(FN_ALL).not.toMatch(/secret\s*:\s*[A-Za-z_.]*\.?secret_ciphertext\b/);
     expect(FN_ALL).not.toMatch(/\bsecret_ciphertext\s+as\s+secret\b/);
   });
+
 });
 
 describe("pi-ingest edge skeleton audit — logging prohibitions", () => {

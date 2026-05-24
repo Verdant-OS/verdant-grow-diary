@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Sprout, Filter, Archive, GitMerge, Search } from "lucide-react";
+import { Sprout, Filter, Archive, GitMerge, Search, CheckCircle2, Circle, ArrowRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { useGrowPlants, useGrowTents, getGrowDataMeta } from "@/hooks/useGrowData";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useGrows } from "@/store/grows";
+import { useDiaryEntries } from "@/hooks/use-diary-entries";
+import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { plantsPath } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import {
@@ -34,6 +36,7 @@ import {
   formatPlantsPageFilterSummary,
   plantsPageEmptyStateCopy,
 } from "@/lib/plantsPageFilterRules";
+import { buildDashboardDailyGrowCheckPanel } from "@/lib/dashboardDailyGrowCheckPanelRules";
 import { useNavigate } from "react-router-dom";
 
 export default function Plants() {
@@ -54,9 +57,47 @@ export default function Plants() {
   // plants growers normally work with.
   const { data: allGrowsActivePlants = [] } = useGrowPlants(undefined, undefined);
   const { data: tents = [] } = useGrowTents(urlGrowId ?? undefined);
+  const { data: rawDiary = [] } = useDiaryEntries();
+  const { data: rawReadings = [] } = useSensorReadings(undefined, 500);
   const plantsMeta = getGrowDataMeta(["grow", "plants", "all", urlGrowId ?? "all"]);
   const tentsMeta = getGrowDataMeta(["grow", "tents", urlGrowId ?? "all"]);
   const [tentFilter, setTentFilter] = useState<string>("all");
+
+  // Daily Grow Check: derive checked-today per plant using the same rules
+  // module Dashboard and Plant Detail use. Read-only; never invents state.
+  const dailyCheckByPlant = useMemo(() => {
+    const panel = buildDashboardDailyGrowCheckPanel({
+      now: new Date(),
+      scopedGrowId: urlGrowId ?? null,
+      plants: allPlants.map((p) => ({
+        id: p.id,
+        name: p.name,
+        tentId: p.tentId,
+        growId: (p as { growId?: string | null }).growId ?? null,
+        isArchived: p.isArchived,
+        lastNote: p.lastNote,
+      })),
+      tents: tents.map((t) => ({ id: t.id, name: t.name })),
+      manualReadings: rawReadings
+        .filter((r) => r.source === "manual")
+        .map((r) => ({
+          ts: r.ts,
+          created_at: r.created_at,
+          id: r.id,
+          tent_id: r.tent_id,
+        })),
+      diaryEntries: rawDiary.map((e) => ({
+        entry_at: e.entry_at,
+        created_at: e.created_at,
+        id: e.id,
+        plant_id: e.plant_id,
+        tent_id: e.tent_id,
+      })),
+    });
+    const map = new Map<string, boolean>();
+    for (const row of panel.rows) map.set(row.plantId, row.checkedToday);
+    return map;
+  }, [allPlants, tents, rawReadings, rawDiary, urlGrowId]);
 
   // Grow filter — sourced from the workspace grows list + active plants.
   const growFilterOptions = useMemo(
@@ -331,6 +372,8 @@ export default function Plants() {
                   : "bg-destructive";
             const archivedLabel = getArchivedPlantLabel(p);
             const isInactive = archivedLabel.kind !== "active";
+            const checkedToday = !isInactive && dailyCheckByPlant.get(p.id) === true;
+            const showDailyCheckBadge = !isInactive && dailyCheckByPlant.has(p.id);
             return (
               <div key={p.id} className="relative animate-fade-in">
                 <Link
@@ -376,6 +419,33 @@ export default function Plants() {
                       <span className="capitalize">{p.health}</span>
                       {tent && <span>· {tent.name}</span>}
                     </div>
+                    {showDailyCheckBadge && (
+                      <div
+                        className="mt-2 flex items-center justify-between gap-2"
+                        data-testid="plant-card-daily-check-row"
+                        data-plant-id={p.id}
+                        data-checked-today={checkedToday ? "1" : "0"}
+                      >
+                        <Badge
+                          variant="outline"
+                          data-testid="plant-card-daily-check-badge"
+                          data-state={checkedToday ? "checked" : "needs"}
+                          className={cn(
+                            "text-[10px] gap-1",
+                            checkedToday
+                              ? "border-emerald-500/40 text-emerald-300"
+                              : "border-amber-500/40 text-amber-300",
+                          )}
+                        >
+                          {checkedToday ? (
+                            <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+                          ) : (
+                            <Circle className="h-3 w-3" aria-hidden="true" />
+                          )}
+                          {checkedToday ? "Checked today" : "Needs check"}
+                        </Badge>
+                      </div>
+                    )}
                   </div>
                 </Link>
                 {/* Always-visible Manage menu — never hover-only. */}
@@ -399,6 +469,17 @@ export default function Plants() {
                     }}
                   />
                 </div>
+                {showDailyCheckBadge && !checkedToday && (
+                  <Link
+                    to={`/daily-check?plantId=${p.id}&from=plants`}
+                    data-testid="plant-card-daily-check-cta"
+                    data-plant-id={p.id}
+                    aria-label={`Start today's check for ${p.name}`}
+                    className="absolute bottom-3 right-3 z-10 inline-flex items-center gap-1 rounded-full bg-primary text-primary-foreground text-[11px] px-2.5 py-1 hover:bg-primary/90 transition"
+                  >
+                    Start check <ArrowRight className="h-3 w-3" />
+                  </Link>
+                )}
               </div>
             );
           })}

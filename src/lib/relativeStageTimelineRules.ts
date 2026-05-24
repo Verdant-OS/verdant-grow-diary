@@ -2,7 +2,7 @@
  * relativeStageTimelineRules — pure stage presets + plant-relative timeline
  * helpers for Verdant's future cultivation timeline.
  *
- * Pure & deterministic. No React. No Supabase. No persistence. No device
+ * Pure & deterministic. No React. No data layer. No persistence. No device
  * control. No automation. No auto stage mutation. Stage shift drafts are
  * always approval-required.
  *

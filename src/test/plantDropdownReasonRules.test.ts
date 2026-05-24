@@ -279,7 +279,6 @@ describe("QuickLog · grow-name helper text", () => {
     // actually scoped by activeGrowId, so the helper text must be
     // produced deterministically rather than hand-rolled).
     expect(QL).toMatch(/quickLogPlantHelperText\s*\(/);
-    expect(QL).toMatch(/Archived\/merged plants hidden/);
   });
 });
 

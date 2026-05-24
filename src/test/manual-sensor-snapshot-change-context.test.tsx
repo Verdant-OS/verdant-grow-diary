@@ -186,6 +186,16 @@ describe("DailyCheck post-submit — change context surfacing", () => {
           : [],
       }),
     }));
+    vi.doMock("@/components/QuickLog", () => ({
+      default: () => <div data-testid="mock-quicklog" />,
+    }));
+    vi.doMock("@/components/ManualSensorReadingCard", () => ({
+      default: () => <div data-testid="mock-manual-card" />,
+    }));
+    vi.doMock("@/components/PlantStatusStrip", () => ({ default: () => null }));
+    vi.doMock("@/components/PlantAssignedTentAlertsPanel", () => ({ default: () => null }));
+    vi.doMock("@/components/PlantAssignedTentActionsPanel", () => ({ default: () => null }));
+    vi.doMock("@/components/DailyGrowCheckOnboardingCard", () => ({ default: () => null }));
 
     const DailyCheck = (await import("@/pages/DailyCheck")).default;
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });

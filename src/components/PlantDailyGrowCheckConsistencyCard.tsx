@@ -17,9 +17,12 @@ import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import { usePlants } from "@/hooks/use-plants";
 import {
   buildDailyGrowCheckConsistency,
+  buildDailyMethodBreakdown,
   CONSISTENCY_WINDOW_DAYS,
+  formatDailyMethodBreakdownLabel,
   formatTodayCheckMethodLabel,
 } from "@/lib/dailyGrowCheckConsistencyRules";
+
 import { deriveDailyGrowCheckGuidance } from "@/lib/dailyGrowCheckGuidanceRules";
 import {
   DAILY_CHECK_SUCCESS_EVENTS,

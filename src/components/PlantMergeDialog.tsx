@@ -97,13 +97,12 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
     [source, tentLinks],
   );
 
-  // Use the effective grow id to scope candidates so a plant whose
-  // `grow_id` is null but whose tent belongs to a grow still loads the
-  // right same-grow targets.
-  const { data: allPlants = [] } = useGrowPlants(
-    undefined,
-    sourceEffectiveGrowId ?? undefined,
-  );
+  // Load ALL non-archived plants the user can see and filter to the
+  // source's effective grow id client-side. This fixes the "2 of 3
+  // plants" bug: a database-level `grow_id = X` filter would drop a
+  // candidate whose `grow_id` is null even when its assigned tent
+  // belongs to the same grow.
+  const { data: allPlants = [] } = useGrowPlants(undefined, undefined);
 
   const candidates = useMemo(
     () =>

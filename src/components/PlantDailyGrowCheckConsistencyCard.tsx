@@ -18,6 +18,7 @@ import { usePlants } from "@/hooks/use-plants";
 import {
   buildDailyGrowCheckConsistency,
   CONSISTENCY_WINDOW_DAYS,
+  formatTodayCheckMethodLabel,
 } from "@/lib/dailyGrowCheckConsistencyRules";
 import { deriveDailyGrowCheckGuidance } from "@/lib/dailyGrowCheckGuidanceRules";
 import {
@@ -91,6 +92,9 @@ export default function PlantDailyGrowCheckConsistencyCard({
   });
 
   const guidance = deriveDailyGrowCheckGuidance(summary);
+  const methodLabel = summary.todayHasActivity
+    ? formatTodayCheckMethodLabel(summary.todayMethod)
+    : null;
   const ctaHref = `/daily-check?plantId=${plantId}&from=plant-detail`;
 
   return (
@@ -100,6 +104,7 @@ export default function PlantDailyGrowCheckConsistencyCard({
       data-checked-days={summary.checkedDays}
       data-current-streak={summary.currentStreak}
       data-today-active={summary.todayHasActivity ? "1" : "0"}
+      data-today-method={summary.todayMethod}
       data-guidance-state={guidance.state}
       className="p-4 space-y-3"
     >
@@ -154,6 +159,14 @@ export default function PlantDailyGrowCheckConsistencyCard({
         >
           {guidance.nextStep}
         </p>
+        {methodLabel && (
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid="plant-daily-grow-check-today-method"
+          >
+            {methodLabel}
+          </p>
+        )}
       </div>
 
       {summary.hasAnyActivity && (

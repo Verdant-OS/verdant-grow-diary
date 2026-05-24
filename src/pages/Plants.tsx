@@ -94,8 +94,9 @@ export default function Plants() {
         tent_id: e.tent_id,
       })),
     });
-    const map = new Map<string, boolean>();
-    for (const row of panel.rows) map.set(row.plantId, row.checkedToday);
+    const map = new Map<string, { checkedToday: boolean; methodLabel: string | null }>();
+    for (const row of panel.rows)
+      map.set(row.plantId, { checkedToday: row.checkedToday, methodLabel: row.methodLabel });
     return map;
   }, [allPlants, tents, rawReadings, rawDiary, urlGrowId]);
 
@@ -372,8 +373,10 @@ export default function Plants() {
                   : "bg-destructive";
             const archivedLabel = getArchivedPlantLabel(p);
             const isInactive = archivedLabel.kind !== "active";
-            const checkedToday = !isInactive && dailyCheckByPlant.get(p.id) === true;
+            const dailyCheckEntry = dailyCheckByPlant.get(p.id);
+            const checkedToday = !isInactive && dailyCheckEntry?.checkedToday === true;
             const showDailyCheckBadge = !isInactive && dailyCheckByPlant.has(p.id);
+            const methodLabel = checkedToday ? dailyCheckEntry?.methodLabel ?? null : null;
             return (
               <div key={p.id} className="relative animate-fade-in">
                 <Link
@@ -444,6 +447,14 @@ export default function Plants() {
                           )}
                           {checkedToday ? "Checked today" : "Needs check"}
                         </Badge>
+                        {checkedToday && methodLabel && (
+                          <span
+                            className="text-[10px] text-muted-foreground truncate"
+                            data-testid="plant-card-daily-check-method"
+                          >
+                            {methodLabel}
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>

@@ -15,7 +15,9 @@
  */
 import {
   buildDailyGrowCheckConsistency,
+  formatTodayCheckMethodLabel,
   type ConsistencyInput,
+  type TodayCheckMethod,
 } from "@/lib/dailyGrowCheckConsistencyRules";
 import {
   isActivePlant,
@@ -53,6 +55,10 @@ export interface DashboardDailyGrowCheckRow {
   tentName: string | null;
   checkedToday: boolean;
   shortGuidance: string;
+  /** Method that satisfied today's check ("none" when unchecked). */
+  todayMethod: TodayCheckMethod;
+  /** Short grower-friendly label like "Checked by note". Null when unchecked. */
+  methodLabel: string | null;
   ctaHref: string;
   /** True when CTA should be rendered. False when already checked today. */
   showCta: boolean;
@@ -159,9 +165,10 @@ export function buildDashboardDailyGrowCheckPanel(
       });
 
       const checkedToday = summary.todayHasActivity;
+      const methodLabel = formatTodayCheckMethodLabel(summary.todayMethod);
 
       const shortGuidance = checkedToday
-        ? "Today's check is logged."
+        ? methodLabel ?? "Today's check is logged."
         : "No check logged for today yet.";
 
       const row: DashboardDailyGrowCheckRow = {
@@ -171,6 +178,8 @@ export function buildDashboardDailyGrowCheckPanel(
         tentName: tId ? tentName.get(tId) ?? null : null,
         checkedToday,
         shortGuidance,
+        todayMethod: summary.todayMethod,
+        methodLabel,
         ctaHref: `/daily-check?plantId=${plant.id}&from=dashboard`,
         showCta: !checkedToday,
       };

@@ -156,6 +156,7 @@ export default function DashboardDailyGrowCheckPanel({
               data-testid="dashboard-daily-grow-check-panel-row"
               data-plant-id={row.plantId}
               data-checked-today={row.checkedToday ? "1" : "0"}
+              data-today-method={row.todayMethod}
               className="py-2 flex items-center justify-between gap-3"
             >
               <div className="flex items-start gap-2 min-w-0">
@@ -172,7 +173,10 @@ export default function DashboardDailyGrowCheckPanel({
                 )}
                 <div className="min-w-0">
                   <div className="text-sm font-medium truncate">{row.plantName}</div>
-                  <div className="text-xs text-muted-foreground truncate">
+                  <div
+                    className="text-xs text-muted-foreground truncate"
+                    data-testid="dashboard-daily-grow-check-panel-row-method"
+                  >
                     {row.tentName ? `${row.tentName} · ` : ""}
                     {row.shortGuidance}
                   </div>

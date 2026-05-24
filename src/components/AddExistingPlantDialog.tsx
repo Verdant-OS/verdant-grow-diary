@@ -221,8 +221,16 @@ export default function AddExistingPlantDialog({ tentId, growId, trigger }: Prop
             data-testid="add-existing-plant-empty"
           >
             <p className="text-sm text-muted-foreground">
-              No available plants for this grow.
+              {formatPlantDropdownEmptyState("add_existing_to_tent")}
             </p>
+            {helperText && (
+              <p
+                className="text-xs text-muted-foreground"
+                data-testid="add-existing-plant-helper"
+              >
+                {helperText}
+              </p>
+            )}
             <CreatePlantDialog
               defaultTentId={tentId}
               defaultGrowId={growId ?? undefined}

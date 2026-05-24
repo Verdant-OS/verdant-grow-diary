@@ -207,9 +207,17 @@ describe("pi_ingest_bridge_credentials_safe — metadata-only view (deferred)", 
   });
 
   it("safe view is not granted to anon or public in any migration", () => {
-    const grants = (ALL_SQL.match(/GRANT[\s\S]*?pi_ingest_bridge_credentials_safe[\s\S]*?;/gi) ?? []).join("\n");
-    expect(grants).not.toMatch(/\bTO\s+anon\b/i);
-    expect(grants).not.toMatch(/\bTO\s+public\b/i);
+    // Statement-scoped: each GRANT statement individually must not target anon/public.
+    const grants = ALL_SQL
+      .split(/;\s*\n/)
+      .filter((stmt) =>
+        /^\s*GRANT\b/i.test(stmt) &&
+        /pi_ingest_bridge_credentials_safe/i.test(stmt),
+      );
+    for (const stmt of grants) {
+      expect(stmt).not.toMatch(/\bTO\s+anon\b/i);
+      expect(stmt).not.toMatch(/\bTO\s+public\b/i);
+    }
   });
 });
 

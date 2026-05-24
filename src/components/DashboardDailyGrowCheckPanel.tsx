@@ -112,6 +112,9 @@ export default function DashboardDailyGrowCheckPanel({
   const visibleRows = filterDashboardDailyGrowCheckRows(panel.rows, filter);
   const filterHasNoMatches =
     !panel.isEmpty && panel.rows.length > 0 && visibleRows.length === 0;
+  // Chip counts are derived from the unfiltered row set so they always
+  // reflect the whole grow regardless of the active filter.
+  const methodChips = buildDashboardDailyGrowCheckMethodChips(panel.rows);
 
   return (
     <Card

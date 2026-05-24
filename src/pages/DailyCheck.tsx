@@ -229,6 +229,7 @@ export default function DailyCheck() {
       const raw = detail?.createdAt;
       const parsed = raw != null ? new Date(raw).getTime() : NaN;
       setLastSubmittedAt(Number.isFinite(parsed) ? parsed : Date.now());
+      setLastSubmittedSource("sensor");
       setState((s) =>
         step === "manual" && s.manual === "pending"
           ? { ...s, manual: "added" }

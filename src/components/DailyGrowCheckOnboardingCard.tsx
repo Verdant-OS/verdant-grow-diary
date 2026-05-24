@@ -169,17 +169,31 @@ export default function DailyGrowCheckOnboardingCard({
           )}
         </p>
       </div>
-      <Button
-        asChild
-        size={compact ? "sm" : "default"}
-        className="gradient-leaf text-primary-foreground shrink-0"
-        data-testid="daily-grow-check-onboarding-cta"
-      >
-        <Link to={guidance.ctaHref}>
-          {guidance.ctaLabel}
-          <ArrowRight className="h-4 w-4" />
-        </Link>
-      </Button>
+      <div className="flex items-center gap-2 shrink-0">
+        <Button
+          asChild
+          size={compact ? "sm" : "default"}
+          className="gradient-leaf text-primary-foreground"
+          data-testid="daily-grow-check-onboarding-cta"
+        >
+          <Link to={guidance.ctaHref}>
+            {guidance.ctaLabel}
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="Hide guidance for this session"
+          title="Hide guidance until you refresh"
+          data-testid="daily-grow-check-onboarding-dismiss"
+          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+          onClick={dismiss}
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
     </Card>
   );
 }

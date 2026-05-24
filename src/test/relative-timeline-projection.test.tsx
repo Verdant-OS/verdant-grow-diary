@@ -519,4 +519,40 @@ describe("PlantRelativeTimelineSection — render", () => {
     expect(container.querySelectorAll("[draggable]").length).toBe(0);
     expect(container.querySelectorAll("input, textarea, select").length).toBe(0);
   });
+
+  it("renders grouped stage headers with badge, count, and item rows", () => {
+    mockUse.mockReturnValue({
+      data: [
+        entry({ id: "fallback", entry_at: "2026-04-05T00:00:00Z" }),
+        entry({
+          id: "perEntry",
+          entry_at: "2026-04-06T00:00:00Z",
+          ...({ stage: "flower" } as any),
+        }),
+      ],
+      isLoading: false,
+    });
+    render(
+      <PlantRelativeTimelineSection
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+        currentStage="vegetation"
+      />,
+    );
+    const groups = screen.getAllByTestId("relative-timeline-stage-group");
+    expect(groups.length).toBe(2);
+    expect(groups[0].getAttribute("data-stage-key")).toBe("vegetation");
+    expect(groups[0].getAttribute("data-stage-color-token")).toBe("stage-vegetation");
+    expect(groups[0].getAttribute("data-count")).toBe("1");
+    expect(groups[1].getAttribute("data-stage-key")).toBe("flower");
+    expect(groups[1].getAttribute("data-stage-color-token")).toBe("stage-flower");
+    const counts = screen.getAllByTestId("relative-timeline-group-count");
+    expect(counts[0]).toHaveTextContent(/1 event/);
+    const groupBadges = screen.getAllByTestId("relative-timeline-group-stage-badge");
+    expect(groupBadges[0]).toHaveTextContent("Vegetation");
+    expect(groupBadges[1]).toHaveTextContent("Flower");
+    // Item rows still render inside groups.
+    expect(screen.getAllByTestId("relative-timeline-item").length).toBe(2);
+  });
 });
+

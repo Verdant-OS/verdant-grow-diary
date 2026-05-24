@@ -19,6 +19,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   Bell,
@@ -27,6 +28,7 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Gauge,
+  Info,
   ListTodo,
   Sparkles,
   Sprout,
@@ -53,6 +55,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useTents } from "@/hooks/use-tents";
 import { usePlants } from "@/hooks/use-plants";
+import { useScopedGrow } from "@/hooks/useScopedGrow";
 import {
   DAILY_GROW_CHECK_STEPS,
   INITIAL_DAILY_GROW_CHECK_STATE,
@@ -67,6 +70,10 @@ import {
   type DailyGrowCheckStep,
   type StepOutcome,
 } from "@/lib/dailyGrowCheckRules";
+import {
+  DAILY_CHECK_WHAT_COUNTS_HINT,
+  resolveDailyCheckPlantSelection,
+} from "@/lib/dailyCheckPlantSelectionRules";
 import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingCard";
 
 function useQueryParam(name: string): string | null {

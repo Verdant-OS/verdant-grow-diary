@@ -108,6 +108,10 @@ export default function DashboardDailyGrowCheckPanel({
     })),
   });
 
+  const visibleRows = filterDashboardDailyGrowCheckRows(panel.rows, filter);
+  const filterHasNoMatches =
+    !panel.isEmpty && panel.rows.length > 0 && visibleRows.length === 0;
+
   return (
     <Card
       data-testid="dashboard-daily-grow-check-panel"

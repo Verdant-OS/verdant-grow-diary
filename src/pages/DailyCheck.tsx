@@ -74,6 +74,11 @@ import {
   DAILY_CHECK_WHAT_COUNTS_HINT,
   resolveDailyCheckPlantSelection,
 } from "@/lib/dailyCheckPlantSelectionRules";
+import {
+  DAILY_CHECK_SUCCESS_BODY,
+  DAILY_CHECK_SUCCESS_TITLE,
+  buildDailyCheckPostSubmitActions,
+} from "@/lib/dailyCheckPostSubmitRules";
 import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingCard";
 
 function useQueryParam(name: string): string | null {
@@ -148,10 +153,15 @@ export default function DailyCheck() {
     hasSelectedPlant: !!selectedPlant,
   });
 
-  // Listen for QuickLog success to mark steps as added
+  // Post-submit confirmation is driven exclusively by QuickLog's
+  // `verdant:entry-created` window event, which is dispatched ONLY after a
+  // successful insert. Failed submits never set this state.
+  const [lastSubmittedAt, setLastSubmittedAt] = useState<number | null>(null);
+
+  // Listen for QuickLog success to mark steps as added + drive confirmation.
   useEffect(() => {
     function onEntry() {
-      // Only mark "added" while user is on QuickLog-related steps.
+      setLastSubmittedAt(Date.now());
       setState((s) => {
         const next = { ...s };
         if (step === "quicklog" && s.quicklog === "pending") next.quicklog = "added";
@@ -162,6 +172,11 @@ export default function DailyCheck() {
     window.addEventListener("verdant:entry-created", onEntry);
     return () => window.removeEventListener("verdant:entry-created", onEntry);
   }, [step]);
+
+  const postSubmitActions = useMemo(
+    () => buildDailyCheckPostSubmitActions({ plantId: selectedPlant?.id ?? null }),
+    [selectedPlant?.id],
+  );
 
   const progress = stepProgress(step);
 
@@ -205,6 +220,59 @@ export default function DailyCheck() {
         >
           <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" aria-hidden="true" />
           <span>{plantResolution.message}</span>
+        </div>
+      )}
+
+      {/* Post-submit confirmation. Only renders after QuickLog dispatches
+          `verdant:entry-created`, which only fires after a successful insert. */}
+      {lastSubmittedAt !== null && (
+        <div
+          className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 mb-4 space-y-2"
+          data-testid="daily-grow-check-post-submit"
+          data-submitted-at={lastSubmittedAt}
+          role="status"
+          aria-live="polite"
+        >
+          <div className="flex items-start gap-2">
+            <CheckCircle2
+              className="h-4 w-4 mt-0.5 text-emerald-400 shrink-0"
+              aria-hidden="true"
+            />
+            <div className="min-w-0">
+              <div
+                className="text-sm font-semibold"
+                data-testid="daily-grow-check-post-submit-title"
+              >
+                {DAILY_CHECK_SUCCESS_TITLE}
+              </div>
+              <p
+                className="text-xs text-muted-foreground"
+                data-testid="daily-grow-check-post-submit-body"
+              >
+                {DAILY_CHECK_SUCCESS_BODY}
+              </p>
+            </div>
+          </div>
+          <div
+            className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+            data-testid="daily-grow-check-post-submit-actions"
+          >
+            {postSubmitActions.map((a) => (
+              <Button
+                key={a.key}
+                asChild
+                size="sm"
+                variant={a.primary ? "default" : "outline"}
+                className="h-10 justify-between"
+                data-testid={`daily-grow-check-post-submit-${a.key}`}
+              >
+                <Link to={a.href}>
+                  {a.label}
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            ))}
+          </div>
         </div>
       )}
 

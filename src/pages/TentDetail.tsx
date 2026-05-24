@@ -216,7 +216,7 @@ export default function TentDetail() {
                 data-testid="tent-detail-plant-card"
               >
                 <Link to={`/plants/${p.id}`} className="block">
-                  <div className="aspect-video bg-secondary/40"><img src={p.photo} alt="" className="w-full h-full object-cover" /></div>
+                  <PlantPhoto src={p.photo} alt={p.name} className="aspect-video" caption="No plant photo yet" />
                   <div className="p-3">
                     <div className="flex items-center justify-between gap-2 pr-8">
                       <span className="font-medium text-sm" data-testid="tent-detail-plant-name">{p.name}</span>

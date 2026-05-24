@@ -74,6 +74,22 @@ export default function TentDetail() {
         testId="tent-detail-data-source-disclosure"
       />
 
+      <div className="mb-3">
+        <TentCardActionsMenu
+          tent={{
+            id: tent.id,
+            name: tent.name,
+            brand: tent.brand,
+            size: tent.size,
+            stage: tent.stage,
+            light: tent.light,
+          }}
+          assignedPlantCount={plants.length}
+          variant="row"
+          hideView
+        />
+      </div>
+
       <div className="flex flex-wrap gap-2 mb-5" data-testid="tent-detail-metric-chips">
         {snap?.temp !== null && snap?.temp !== undefined && (
           <MetricChip label="T" value={(tempFFromC(snap.temp) ?? 0).toFixed(1)} unit="°F" status={snap.temp > 28 || snap.temp < 19 ? "warn" : "ok"} />

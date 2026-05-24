@@ -97,6 +97,9 @@ vi.mock("@/components/PlantCardActionsMenu", () => ({
 vi.mock("@/components/PlantPhoto", () => ({
   default: () => null,
 }));
+vi.mock("@/components/GrowDataSourceDisclosure", () => ({
+  default: () => null,
+}));
 
 import Plants from "@/pages/Plants";
 

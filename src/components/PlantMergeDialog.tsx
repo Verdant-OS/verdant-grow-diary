@@ -241,6 +241,31 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
     setOpen(false);
   }
 
+  async function repairSourceGrowContext() {
+    if (busy) return;
+    if (!user) return;
+    const payload = buildPlantGrowContextRepairPayload(source, tentLinks);
+    if (!payload) return;
+    setBusy(true);
+    // ONLY updates `grow_id`. Never touches logs, photos, sensor
+    // history, alerts, or Action Queue.
+    const { error } = await supabase
+      .from("plants")
+      .update(payload as never)
+      .eq("id", source.id);
+    setBusy(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Grow context repaired from assigned tent");
+    qc.invalidateQueries({ queryKey: ["plants"] });
+    qc.invalidateQueries({ queryKey: ["grow", "plants"] });
+    qc.invalidateQueries({ queryKey: ["grow", "plant", source.id] });
+    qc.invalidateQueries({ queryKey: ["tent-detail"] });
+    setOpen(false);
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>

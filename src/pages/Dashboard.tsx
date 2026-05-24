@@ -52,6 +52,7 @@ import {
   isStale,
 } from "@/lib/sensorSnapshot";
 import { evaluateSensorQuality } from "@/lib/sensorQuality";
+import { tempFFromC, formatTempFFromC } from "@/lib/temperatureUnits";
 
 
 import type { SensorReadingRow } from "@/lib/db";

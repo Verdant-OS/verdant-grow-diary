@@ -18,6 +18,8 @@ import { render, screen } from "@testing-library/react";
 
 import {
   buildRelativeTimelineProjection,
+  groupRelativeTimelineByStage,
+  UNSTAGED_GROUP_KEY,
   type RelativeTimelineItem,
 } from "@/lib/relativeTimelineProjectionRules";
 

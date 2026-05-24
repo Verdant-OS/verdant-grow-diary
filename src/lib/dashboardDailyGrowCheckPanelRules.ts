@@ -15,7 +15,9 @@
  */
 import {
   buildDailyGrowCheckConsistency,
+  formatTodayCheckMethodLabel,
   type ConsistencyInput,
+  type TodayCheckMethod,
 } from "@/lib/dailyGrowCheckConsistencyRules";
 import {
   isActivePlant,

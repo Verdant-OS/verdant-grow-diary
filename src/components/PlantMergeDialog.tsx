@@ -114,8 +114,14 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
         growId?: string | null;
         tentId?: string | null;
         startedAt?: string | null;
+        isArchived?: boolean | null;
+        lastNote?: string | null;
       }>)
         .filter((p) => p.id !== source.id)
+        // Hide archived/merged plants from the target picker. Default
+        // queries already exclude them; this is a belt-and-suspenders
+        // guard so a stale cache or fallback can never offer one.
+        .filter((p) => !p.isArchived)
         .map<PlantForMerge>((p) => ({
           id: p.id,
           name: p.name,
@@ -123,6 +129,7 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
           grow_id: p.growId ?? null,
           tent_id: p.tentId ?? null,
           started_at: p.startedAt ?? null,
+          is_archived: p.isArchived ?? false,
         }))
         // Same effective grow id only. Cross-grow targets are excluded
         // even if the user briefly held a stale grow_id.
@@ -311,6 +318,20 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
                 {source.strain || "—"}
               </div>
             </div>
+
+            {source.is_archived && (
+              <div
+                className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3"
+                data-testid="plant-merge-source-archived"
+              >
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 text-amber-300 shrink-0" />
+                  <p className="text-sm text-amber-100">
+                    This plant is already archived or merged. Merge is blocked.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {!sourceEffectiveGrowId && (
               <div

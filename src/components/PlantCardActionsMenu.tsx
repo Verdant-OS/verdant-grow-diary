@@ -48,6 +48,7 @@ interface Plant {
   tentId?: string | null;
   growId?: string | null;
   lastNote?: string | null;
+  isArchived?: boolean | null;
 }
 
 interface Props {
@@ -217,6 +218,7 @@ export default function PlantCardActionsMenu({
             grow_id: plant.growId ?? null,
             tent_id: plant.tentId ?? null,
             started_at: plant.startedAt ?? null,
+              is_archived: plant.isArchived ?? false,
           }}
           trigger={
             <Button
@@ -309,6 +311,7 @@ export default function PlantCardActionsMenu({
               grow_id: plant.growId ?? null,
               tent_id: plant.tentId ?? null,
               started_at: plant.startedAt ?? null,
+              is_archived: plant.isArchived ?? false,
             }}
             trigger={
               <DropdownMenuItem

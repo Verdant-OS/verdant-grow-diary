@@ -72,7 +72,7 @@ describe("growRepo — query-level grow filtering", () => {
     expect(REPO).toMatch(/if\s*\(\s*growId\s*\)\s*q\s*=\s*q\.eq\(\s*["']grow_id["']\s*,\s*growId\s*\)/);
   });
   it("fetchPlants adds .eq('grow_id', growId) when growId provided", () => {
-    expect(REPO).toMatch(/fetchPlants\(tentId\?:\s*string,\s*growId\?:\s*string\)/);
+    expect(REPO).toMatch(/fetchPlants\(\s*tentId\?:\s*string,\s*growId\?:\s*string/);
     expect(REPO).toMatch(/if\s*\(\s*growId\s*\)\s*q\s*=\s*q\.eq\(\s*["']grow_id["']\s*,\s*growId\s*\)/);
   });
 });

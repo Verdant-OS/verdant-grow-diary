@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { AlertTriangle, ArrowLeft, ArrowRight, Box, Sprout } from "lucide-react";
+import { AlertTriangle, Archive, ArrowLeft, ArrowRight, Box, GitMerge, Sprout } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
 import EmptyState from "@/components/EmptyState";
@@ -16,6 +16,12 @@ import PlantAssignedTentActionsPanel from "@/components/PlantAssignedTentActions
 import PlantStatusStrip from "@/components/PlantStatusStrip";
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
 import PlantPhoto from "@/components/PlantPhoto";
+import { Badge } from "@/components/ui/badge";
+import {
+  getArchivedPlantLabel,
+  getMergeTargetPlantId,
+  isActivePlant,
+} from "@/lib/archivedPlantVisibilityRules";
 import { Button } from "@/components/ui/button";
 import { useGrowPlant, useGrowTent, getGrowDataMeta } from "@/hooks/useGrowData";
 import { format, formatDistanceToNow } from "date-fns";
@@ -57,13 +63,40 @@ export default function PlantDetail() {
   return (
     <div>
       <Button asChild variant="ghost" size="sm" className="mb-3"><Link to="/plants"><ArrowLeft className="h-4 w-4" /> Plants</Link></Button>
-      <PageHeader title={plant.name} description={plant.strain} icon={<Sprout className="h-5 w-5" />} actions={<StageBadge stage={plant.stage} />} />
+      <PageHeader
+        title={plant.name}
+        description={plant.strain}
+        icon={<Sprout className="h-5 w-5" />}
+        actions={
+          <div className="flex items-center gap-2">
+            {!isActivePlant(plant) && (
+              <Badge
+                variant="outline"
+                data-testid="plant-detail-archived-badge"
+                data-archived-kind={getArchivedPlantLabel(plant).kind}
+                className="gap-1 border-amber-500/40 text-amber-300"
+              >
+                {getArchivedPlantLabel(plant).kind === "merged" ? (
+                  <GitMerge className="h-3 w-3" />
+                ) : (
+                  <Archive className="h-3 w-3" />
+                )}
+                {getArchivedPlantLabel(plant).label}
+              </Badge>
+            )}
+            <StageBadge stage={plant.stage} />
+          </div>
+        }
+      />
       <GrowDataSourceDisclosure
         resource="plant"
         hasAnyData
         metas={[plantMeta, tentMeta]}
         testId="plant-detail-data-source-disclosure"
       />
+      {!isActivePlant(plant) && (
+        <ArchivedPlantBanner plantId={plant.id} lastNote={plant.lastNote} />
+      )}
       <div className="mb-3">
         <PlantCardActionsMenu
           plant={{
@@ -76,6 +109,7 @@ export default function PlantDetail() {
             tentId: plant.tentId ?? null,
             growId: plant.growId ?? null,
             lastNote: plant.lastNote,
+            isArchived: plant.isArchived ?? false,
           }}
           variant="row"
           hideView
@@ -180,6 +214,61 @@ export default function PlantDetail() {
             growId={plant.growId ?? null}
           />
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ArchivedPlantBanner({
+  plantId,
+  lastNote,
+}: {
+  plantId: string;
+  lastNote: string;
+}) {
+  const targetId = getMergeTargetPlantId({ lastNote });
+  const isMerged = !!targetId;
+  return (
+    <div
+      data-testid="plant-detail-archived-banner"
+      data-merge-target-id={targetId ?? ""}
+      className="my-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100 space-y-2"
+    >
+      <div className="flex items-start gap-2">
+        {isMerged ? (
+          <GitMerge className="h-4 w-4 mt-0.5 shrink-0" />
+        ) : (
+          <Archive className="h-4 w-4 mt-0.5 shrink-0" />
+        )}
+        <div>
+          <div className="font-medium">
+            {isMerged
+              ? "This plant was merged into another plant."
+              : "This plant was archived."}
+          </div>
+          <p className="text-xs text-amber-200/80 mt-0.5">
+            History is preserved for audit. No data was deleted.
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button asChild variant="outline" size="sm" data-testid="plant-detail-archived-back">
+          <Link to="/plants">
+            <ArrowLeft className="h-3.5 w-3.5" /> Back to Plants
+          </Link>
+        </Button>
+        {targetId && targetId !== plantId && (
+          <Button
+            asChild
+            size="sm"
+            className="gradient-leaf text-primary-foreground"
+            data-testid="plant-detail-archived-view-target"
+          >
+            <Link to={`/plants/${targetId}`}>
+              View target plant <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+        )}
       </div>
     </div>
   );

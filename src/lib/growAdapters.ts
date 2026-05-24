@@ -43,6 +43,7 @@ export function mapPlantRow(row: PlantRow): Plant {
     photo: row.photo_url ?? "",
     lastNote: row.last_note ?? "",
     growId: (row as { grow_id?: string | null }).grow_id ?? null,
+    isArchived: Boolean((row as { is_archived?: boolean | null }).is_archived ?? false),
   };
 }
 

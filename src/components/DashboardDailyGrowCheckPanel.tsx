@@ -47,6 +47,7 @@ export default function DashboardDailyGrowCheckPanel({
   className,
 }: Props) {
   const queryClient = useQueryClient();
+  const [filter, setFilter] = useState<DashboardDailyGrowCheckFilter>("all");
   const { data: rawPlants = [] } = useGrowPlants(undefined, scopedGrowId ?? undefined);
   const { data: rawTents = [] } = useGrowTents(scopedGrowId ?? undefined);
   const { data: rawReadings = [] } = useSensorReadings(undefined, 500);

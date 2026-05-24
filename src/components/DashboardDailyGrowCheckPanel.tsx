@@ -121,7 +121,7 @@ export default function DashboardDailyGrowCheckPanel({
       data-is-empty={panel.isEmpty ? "1" : "0"}
       className={`p-4 space-y-3 ${className ?? ""}`}
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start justify-between gap-2 flex-wrap">
         <div className="min-w-0">
           <h2
             className="font-display font-semibold text-base"
@@ -136,7 +136,36 @@ export default function DashboardDailyGrowCheckPanel({
             {panel.summaryText}
           </p>
         </div>
+        {!panel.isEmpty && (
+          <Select
+            value={filter}
+            onValueChange={(v) =>
+              setFilter(v as DashboardDailyGrowCheckFilter)
+            }
+          >
+            <SelectTrigger
+              className="h-8 w-[180px] text-xs"
+              aria-label="Filter today's grow checks"
+              data-testid="dashboard-daily-grow-check-panel-filter"
+              data-filter={filter}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {DASHBOARD_DAILY_GROW_CHECK_FILTER_OPTIONS.map((opt) => (
+                <SelectItem
+                  key={opt.value}
+                  value={opt.value}
+                  data-testid={`dashboard-daily-grow-check-panel-filter-option-${opt.value}`}
+                >
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
+
 
       {panel.isEmpty && (
         <div

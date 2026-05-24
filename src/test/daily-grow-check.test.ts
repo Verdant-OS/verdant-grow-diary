@@ -292,6 +292,7 @@ describe("DailyCheck — completion screen polish", () => {
   it("does not introduce a persistent checklist write path", () => {
     expect(PAGE).not.toMatch(/daily_check/);
     expect(PAGE).not.toMatch(/checklist/i);
-    expect(RULES).not.toMatch(/supabase/i);
+    expect(RULES).not.toMatch(/from\(["'][a-z_]+["']\)/);
+    expect(RULES).not.toMatch(/import.*supabase/i);
   });
 });

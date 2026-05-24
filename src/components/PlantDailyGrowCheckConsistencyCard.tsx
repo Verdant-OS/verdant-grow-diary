@@ -92,6 +92,9 @@ export default function PlantDailyGrowCheckConsistencyCard({
   });
 
   const guidance = deriveDailyGrowCheckGuidance(summary);
+  const methodLabel = summary.todayHasActivity
+    ? formatTodayCheckMethodLabel(summary.todayMethod)
+    : null;
   const ctaHref = `/daily-check?plantId=${plantId}&from=plant-detail`;
 
   return (

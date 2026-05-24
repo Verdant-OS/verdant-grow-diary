@@ -27,10 +27,12 @@ import {
   Move,
   Unlink,
   Archive,
+  GitMerge,
 } from "lucide-react";
 import { toast } from "sonner";
 import EditPlantDialog from "@/components/EditPlantDialog";
 import AssignTentDialog from "@/components/AssignTentDialog";
+import PlantMergeDialog from "@/components/PlantMergeDialog";
 import {
   buildArchivePlantPayload,
   buildRemovePlantFromTentPayload,

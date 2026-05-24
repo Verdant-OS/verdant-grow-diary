@@ -362,6 +362,74 @@ export default function DailyCheck() {
 
       {guard.ok || guard.reason === "plant-needs-tent" ? (
         <>
+          {/* Choose today's check — first-class quick entry to either of the
+              two read paths that count as a Daily Grow Check:
+                - plant QuickLog note
+                - current-tent manual sensor snapshot
+              No new persistence. No new sensor ingestion. Sensor snapshot
+              option is gated on the selected plant having an assigned tent;
+              we never silently pick a tent on the grower's behalf. */}
+          {step !== "done" && (
+            <section
+              className="glass rounded-2xl p-4 mb-4 space-y-3"
+              data-testid="daily-grow-check-choose"
+              data-plant-id={selectedPlant?.id ?? ""}
+              data-plant-tent-id={selectedPlant?.tent_id ?? ""}
+            >
+              <div>
+                <h2 className="font-display font-semibold text-base flex items-center gap-2">
+                  <ClipboardCheck className="h-4 w-4" />
+                  Choose today's check
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Either path counts. Logging a check does not mean the plant
+                  is healthy — it just records what you observed today.
+                </p>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Button
+                  variant="outline"
+                  className="h-auto py-3 flex-col items-start gap-1"
+                  data-testid="daily-grow-check-choose-quicklog"
+                  onClick={() => {
+                    setStep("quicklog");
+                    setQuickLogOpen(true);
+                  }}
+                >
+                  <span className="flex items-center gap-2 font-medium">
+                    <Sparkles className="h-4 w-4" /> Add plant note
+                  </span>
+                  <span className="text-[11px] text-muted-foreground text-left">
+                    Quick Log a short observation or photo for this plant.
+                  </span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-auto py-3 flex-col items-start gap-1"
+                  data-testid="daily-grow-check-choose-snapshot"
+                  disabled={!!selectedPlant && !selectedPlant.tent_id}
+                  onClick={() => setStep("manual")}
+                >
+                  <span className="flex items-center gap-2 font-medium">
+                    <Gauge className="h-4 w-4" /> Add sensor snapshot
+                  </span>
+                  <span className="text-[11px] text-muted-foreground text-left">
+                    Save a manual reading for this plant's current tent.
+                  </span>
+                </Button>
+              </div>
+              {selectedPlant && !selectedPlant.tent_id && (
+                <p
+                  className="text-xs text-amber-300 flex items-start gap-1"
+                  data-testid="daily-grow-check-choose-no-tent"
+                >
+                  <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" aria-hidden="true" />
+                  <span>Sensor snapshots need a tent assignment.</span>
+                </p>
+              )}
+            </section>
+          )}
+
           {/* Progress */}
           {step !== "done" && (
             <div className="glass rounded-2xl p-3 mb-4" data-testid="daily-grow-check-progress">

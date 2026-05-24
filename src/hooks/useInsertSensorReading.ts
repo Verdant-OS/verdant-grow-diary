@@ -42,7 +42,7 @@ export function useInsertSensorReading(): UseMutationResult<
       validateSensorReadingPayload(payload);
       await insertSensorReading(payload);
     },
-    onSuccess: () => {
+    onSuccess: (_data, payload) => {
       // Refresh every surface that consumes latest readings for the
       // affected tent/grow, so manual entries appear without a hard refresh.
       qc.invalidateQueries({ queryKey: ["grow", "sensors"] });
@@ -50,6 +50,20 @@ export function useInsertSensorReading(): UseMutationResult<
       qc.invalidateQueries({ queryKey: ["latest-sensor-snapshot"] });
       qc.invalidateQueries({ queryKey: ["plant-tent-environment"] });
       qc.invalidateQueries({ queryKey: ["environment-trends"] });
+      // Cross-component success event so Daily Grow Check surfaces
+      // (Dashboard panel, Plants badge, Plant Detail consistency card,
+      // Daily Check post-submit confirmation) can treat a manual snapshot
+      // as today's check without inventing a fake local state.
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("verdant:sensor-reading-created", {
+            detail: {
+              createdAt: new Date().toISOString(),
+              tentId: payload?.tent_id ?? null,
+            },
+          }),
+        );
+      }
     },
   });
 }

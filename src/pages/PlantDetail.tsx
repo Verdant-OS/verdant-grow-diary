@@ -14,6 +14,7 @@ import PlantRecentMoveCard from "@/components/PlantRecentMoveCard";
 import PlantAssignedTentAlertsPanel from "@/components/PlantAssignedTentAlertsPanel";
 import PlantAssignedTentActionsPanel from "@/components/PlantAssignedTentActionsPanel";
 import PlantStatusStrip from "@/components/PlantStatusStrip";
+import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
 import { Button } from "@/components/ui/button";
 import { useGrowPlant, useGrowTent, getGrowDataMeta } from "@/hooks/useGrowData";
 import { format, formatDistanceToNow } from "date-fns";

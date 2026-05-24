@@ -207,3 +207,53 @@ export function buildDashboardDailyGrowCheckPanel(
     positiveConfirmation: allChecked ? POSITIVE_ALL : null,
   };
 }
+
+/**
+ * Filter values for the Dashboard "Today's Grow Checks" panel.
+ * Read-only display filter — never affects the underlying summary calculation.
+ */
+export type DashboardDailyGrowCheckFilter =
+  | "all"
+  | "needs"
+  | "note"
+  | "sensor-snapshot"
+  | "both";
+
+export const DASHBOARD_DAILY_GROW_CHECK_FILTER_OPTIONS: ReadonlyArray<{
+  value: DashboardDailyGrowCheckFilter;
+  label: string;
+}> = [
+  { value: "all", label: "All" },
+  { value: "needs", label: "Needs check" },
+  { value: "note", label: "Checked by note" },
+  { value: "sensor-snapshot", label: "Checked by sensor snapshot" },
+  { value: "both", label: "Checked by both" },
+];
+
+export const DASHBOARD_DAILY_GROW_CHECK_FILTER_EMPTY =
+  "No plants match this filter today.";
+
+/**
+ * Pure filter applied to already-sorted panel rows. Preserves order.
+ * Never recomputes "checked" / "total" — those reflect the full grow.
+ */
+export function filterDashboardDailyGrowCheckRows(
+  rows: DashboardDailyGrowCheckRow[],
+  filter: DashboardDailyGrowCheckFilter,
+): DashboardDailyGrowCheckRow[] {
+  switch (filter) {
+    case "needs":
+      return rows.filter((r) => !r.checkedToday);
+    case "note":
+      return rows.filter((r) => r.checkedToday && r.todayMethod === "note");
+    case "sensor-snapshot":
+      return rows.filter(
+        (r) => r.checkedToday && r.todayMethod === "sensor-snapshot",
+      );
+    case "both":
+      return rows.filter((r) => r.checkedToday && r.todayMethod === "both");
+    case "all":
+    default:
+      return rows;
+  }
+}

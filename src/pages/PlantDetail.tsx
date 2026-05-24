@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { AlertTriangle, ArrowLeft, ArrowRight, Box, Sprout } from "lucide-react";
+import { AlertTriangle, Archive, ArrowLeft, ArrowRight, Box, GitMerge, Sprout } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
 import EmptyState from "@/components/EmptyState";
@@ -16,6 +16,12 @@ import PlantAssignedTentActionsPanel from "@/components/PlantAssignedTentActions
 import PlantStatusStrip from "@/components/PlantStatusStrip";
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
 import PlantPhoto from "@/components/PlantPhoto";
+import { Badge } from "@/components/ui/badge";
+import {
+  getArchivedPlantLabel,
+  getMergeTargetPlantId,
+  isActivePlant,
+} from "@/lib/archivedPlantVisibilityRules";
 import { Button } from "@/components/ui/button";
 import { useGrowPlant, useGrowTent, getGrowDataMeta } from "@/hooks/useGrowData";
 import { format, formatDistanceToNow } from "date-fns";

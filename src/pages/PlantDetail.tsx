@@ -7,6 +7,7 @@ import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
 import AssignTentDialog from "@/components/AssignTentDialog";
 import PlantTentEnvironmentPanel from "@/components/PlantTentEnvironmentPanel";
 import PlantRecentActivityPanel from "@/components/PlantRecentActivityPanel";
+import PlantDailyGrowCheckHistoryCard from "@/components/PlantDailyGrowCheckHistoryCard";
 import PlantRecentMoveCard from "@/components/PlantRecentMoveCard";
 import PlantAssignedTentAlertsPanel from "@/components/PlantAssignedTentAlertsPanel";
 import PlantAssignedTentActionsPanel from "@/components/PlantAssignedTentActionsPanel";
@@ -133,6 +134,10 @@ export default function PlantDetail() {
             growId={plant.growId ?? null}
           />
           <PlantRecentActivityPanel plantId={plant.id} plantName={plant.name} />
+          <PlantDailyGrowCheckHistoryCard
+            plantId={plant.id}
+            currentTentId={plant.tentId ?? null}
+          />
           <PlantAssignedTentAlertsPanel
             tentId={plant.tentId ?? null}
             tentName={tent?.name ?? null}

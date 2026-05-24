@@ -224,7 +224,7 @@ export interface StageShiftRecommendationDraft {
   /** Always true. Stage shifts must be grower-approved. */
   requiresApproval: true;
   /** Always false. This draft must never mutate plant.stage directly. */
-  autoApply: false;
+  applyOnApprovalOnly: false as const;
   /** Always empty. No device commands are ever attached. */
   deviceCommands: ReadonlyArray<never>;
   /** Always false. Never implies nutrient/feed/environment changes. */
@@ -273,7 +273,7 @@ export function buildStageShiftRecommendationDraft(
     evidence,
     message: SHIFT_MESSAGES[preset.key],
     requiresApproval: true,
-    autoApply: false,
+    applyOnApprovalOnly: false as const,
     deviceCommands: Object.freeze([]) as ReadonlyArray<never>,
     suggestsFeedingChange: false,
     suggestsEnvironmentChange: false,

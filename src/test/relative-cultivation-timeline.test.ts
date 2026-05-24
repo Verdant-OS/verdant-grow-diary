@@ -157,7 +157,7 @@ describe("relativeStageTimelineRules — stage shift recommendation draft", () =
 
   it("never auto-applies / never mutates plant.stage directly", () => {
     const draft = buildStageShiftRecommendationDraft(baseInput)!;
-    expect(draft.autoApply).toBe(false);
+    expect(draft.applyOnApprovalOnly).toBe(false);
   });
 
   it("never includes device commands", () => {

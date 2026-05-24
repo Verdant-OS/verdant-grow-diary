@@ -68,8 +68,8 @@ describe("relative cultivation timeline — static guardrails (rules module)", (
     // No write to a plant.stage field anywhere.
     expect(RULES).not.toMatch(/plant\.stage\s*=/);
     expect(RULES).not.toMatch(/plants?\.stage\s*=/);
-    // autoApply must remain false.
-    expect(RULES).toMatch(/autoApply:\s*false/);
+    // applyOnApprovalOnly must remain false.
+    expect(RULES).toMatch(/applyOnApprovalOnly:\s*false/);
   });
 
   it("locks stage shift drafts to approval-required", () => {

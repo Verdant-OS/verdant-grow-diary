@@ -18,6 +18,7 @@ import {
   validateManualEntry,
   type ManualEntryInput,
 } from "@/lib/sensorReadingManualEntryRules";
+import { evaluateManualSnapshotAdvisor } from "@/lib/manualSensorSnapshotAdvisorRules";
 
 interface TentOption {
   id: string;
@@ -43,6 +44,7 @@ export default function ManualSensorReadingCard({ tents, defaultTentId }: Props)
   const insert = useInsertSensorReading();
 
   const validation = useMemo(() => validateManualEntry(form), [form]);
+  const advisor = useMemo(() => evaluateManualSnapshotAdvisor(form), [form]);
 
   function update<K extends keyof ManualEntryInput>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -173,6 +175,30 @@ export default function ManualSensorReadingCard({ tents, defaultTentId }: Props)
           them as a Quick Log feeding or observation note for now.
         </p>
 
+
+        {advisor.derivedVpdKpa !== null && (
+          <p
+            className="text-[11px] text-muted-foreground"
+            data-testid="manual-reading-derived-vpd"
+          >
+            Derived VPD ≈ <strong>{advisor.derivedVpdKpa} kPa</strong> from your
+            air temp + humidity. Saved as the VPD value unless you enter one.
+          </p>
+        )}
+
+        {advisor.warnings.length > 0 && (
+          <ul className="space-y-1" data-testid="manual-reading-advisor-warnings">
+            {advisor.warnings.map((w, i) => (
+              <li
+                key={`adv-${i}`}
+                className="flex items-start gap-2 text-xs text-amber-600 dark:text-amber-400"
+              >
+                <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                <span>{w}</span>
+              </li>
+            ))}
+          </ul>
+        )}
 
         {validation.warnings.length > 0 && (
           <ul className="space-y-1" data-testid="manual-reading-warnings">

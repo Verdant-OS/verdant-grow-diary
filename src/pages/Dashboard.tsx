@@ -220,6 +220,11 @@ export default function Dashboard() {
         tentIds={tents.map((t) => t.id)}
       />
 
+      <DashboardDailyGrowCheckPanel
+        scopedGrowId={scopedGrowId ?? null}
+        className="mb-6"
+      />
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
 
         <KpiCard label="Active tents" value={tents.length} icon={<Box className="h-3.5 w-3.5" />} />

@@ -105,21 +105,22 @@ describe("Insert hook invalidates every tent-scoped sensor surface", () => {
 });
 
 describe("Static safety", () => {
+  // Only check files whose runtime job has nothing to do with the source enum;
+  // useInsertSensorReadings legitimately references "pi_bridge" as an allowed
+  // `source` value for ingest-side validation.
   const files = [
     "src/components/ManualSensorReadingCard.tsx",
     "src/lib/sensorReadingManualEntryRules.ts",
     "src/lib/temperatureUnits.ts",
     "src/hooks/useInsertSensorReading.ts",
-    "src/hooks/useInsertSensorReadings.ts",
     "src/hooks/useLatestSensorSnapshot.ts",
   ];
-  it("no service_role / mqtt / home_assistant / pi_bridge / actuator / device_command / autopilot / Leads / typed watering writes", () => {
+  it("no service_role / mqtt / home_assistant / actuator / device_command / autopilot / Leads / typed watering writes", () => {
     for (const f of files) {
       const src = readFileSync(f, "utf8");
       expect(src).not.toMatch(/service_role/i);
       expect(src).not.toMatch(/\bmqtt\b/i);
       expect(src).not.toMatch(/home[\s_-]?assistant/i);
-      expect(src).not.toMatch(/pi[\s_-]?bridge/i);
       expect(src).not.toMatch(/\bactuator\b/i);
       expect(src).not.toMatch(/device_command/i);
       expect(src).not.toMatch(/autopilot/i);

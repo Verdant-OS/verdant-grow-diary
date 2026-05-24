@@ -60,11 +60,40 @@ export default function GrowDataSourceDisclosure({
   const isSimulated = snapshotSource === "sim";
   const simulatedNotice = `Simulated ${resource} sensor data shown — for testing/demo only. Not real tent data and not used for persisted alerts.`;
 
+  // Honest, non-misleading labels. "Live" is reserved for sensor readings;
+  // saved grow records are now disclosed as "Current grow data" so growers
+  // don't confuse stored plant/tent records with real-time telemetry.
+  const badgeText: Record<Label, string> = {
+    Live: "Current data",
+    Demo: "Demo data",
+    Mixed: "Mixed data",
+    Unavailable: "Unavailable",
+  };
+
   const description: Record<Label, string> = {
-    Live: `Live ${resource} data from your grow backend.`,
+    Live: `Current grow data — ${resource} saved in your Verdant workspace. Not live sensor readings.`,
     Demo: `Showing demo ${resource}. Connect real ${resource} to replace it.`,
     Mixed: `Some ${resource} are real, some are demo or manual. Add or connect more to replace the demo data.`,
     Unavailable: `No ${resource} data available yet.`,
+  };
+
+  const helpCopyByLabel: Record<Label, { title: string; body: string }> = {
+    Live: {
+      title: "Current grow data",
+      body: `Plants, tents, and ${resource} you saved in your Verdant workspace. This is your grow record, not a live sensor reading. Live sensor data shows up separately on the dashboard and tent detail.`,
+    },
+    Demo: {
+      title: "Demo data",
+      body: "This is test/demo data. Use it to explore Verdant, but do not treat it as real tent data.",
+    },
+    Mixed: {
+      title: "Mixed data",
+      body: "Some information here comes from real/manual readings and some may be demo, missing, or older context.",
+    },
+    Unavailable: {
+      title: "Unavailable",
+      body: `No ${resource} data is loaded yet. Add a record to start tracking real data.`,
+    },
   };
 
   // Welcome / empty state — no usable data anywhere.
@@ -95,6 +124,8 @@ export default function GrowDataSourceDisclosure({
     );
   }
 
+  const help = helpCopyByLabel[label];
+
   return (
     <div
       data-testid={testId}
@@ -109,9 +140,14 @@ export default function GrowDataSourceDisclosure({
         data-label={label}
         className="text-[10px] uppercase tracking-wide"
       >
-        {label} data
+        {badgeText[label]}
       </Badge>
       <span className="text-xs text-muted-foreground">{description[label]}</span>
+      <InfoPopover
+        title={help.title}
+        body={help.body}
+        testKey={`${testId}-source`}
+      />
       {isSimulated && (
         <>
           <Badge
@@ -128,6 +164,11 @@ export default function GrowDataSourceDisclosure({
           >
             {simulatedNotice}
           </span>
+          <InfoPopover
+            title="Simulated data"
+            body="This is test/demo data. Use it to explore Verdant, but do not treat it as real tent data."
+            testKey={`${testId}-simulated`}
+          />
         </>
       )}
     </div>

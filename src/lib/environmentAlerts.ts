@@ -183,6 +183,18 @@ export function buildEnvironmentAlerts(
       }
     }
   }
+  // --- 4. Default-threshold fallback --------------------------------------
+  // When no grow targets exist, evaluate temp/RH/VPD against conservative
+  // default ranges. Only triggers from real, non-stale, non-sim snapshots.
+  if (targets && targets.status === "missing_targets") {
+    const defaults = buildDefaultThresholdAlerts({
+      snapshot,
+      now,
+      deviceLabel: inputs.deviceLabel ?? null,
+      createdAt,
+    });
+    alerts.push(...defaults);
+  }
 
   // --- Deterministic ordering ---------------------------------------------
   alerts.sort((a, b) => {

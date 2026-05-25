@@ -43,6 +43,8 @@ export interface AlertInputs {
   quality: SensorQualityResult;
   targets: TargetComparisonResult;
   now?: number;
+  /** Optional source/device detail surfaced in default-threshold alert text. */
+  deviceLabel?: string | null;
 }
 
 const SEVERITY_WEIGHT: Record<AlertSeverity, number> = {

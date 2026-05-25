@@ -158,6 +158,14 @@ function renderCard() {
 }
 
 describe("PlantDailyGrowCheckConsistencyCard — 7-day method breakdown", () => {
+  beforeAll(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
   it("renders the 7-day method breakdown with labels", () => {
     renderCard();
     const region = screen.getByTestId("plant-daily-grow-check-method-breakdown");

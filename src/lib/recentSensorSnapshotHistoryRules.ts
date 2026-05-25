@@ -19,7 +19,7 @@ import {
   type SensorReadingLike,
   type SnapshotSource,
 } from "@/lib/sensorSnapshot";
-import { formatSensorDeviceDetail } from "@/lib/shellyHtWebhookRules";
+import { formatSensorDeviceDetail } from "@/lib/sensorDeviceLabels";
 
 export const RECENT_HISTORY_DEFAULT_LIMIT = 5;
 export const RECENT_HISTORY_MIN_LIMIT = 3;

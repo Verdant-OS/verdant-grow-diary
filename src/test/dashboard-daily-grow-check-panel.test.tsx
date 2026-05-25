@@ -245,6 +245,14 @@ function renderPanel(scopedGrowId: string | null = "g1") {
 }
 
 describe("DashboardDailyGrowCheckPanel · component", () => {
+  beforeAll(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
   it("renders checked and unchecked rows and summary", () => {
     renderPanel();
     const panel = screen.getByTestId("dashboard-daily-grow-check-panel");

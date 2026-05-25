@@ -418,7 +418,14 @@ const edgeSrc = readFileSync(
 
 describe("Shelly H&T setup card — static safety", () => {
   it("no automation, device control, action_queue, alerts, or service_role in client code", () => {
-    for (const src of [cardSrc, rulesSrc, hookSrc]) {
+    // Strip block + line comments so descriptive prose ("no alerts…") in
+    // file-level docs doesn't trip the scan — only real code is checked.
+    const stripComments = (s: string) =>
+      s
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/(^|[^:])\/\/.*$/gm, "$1");
+    for (const raw of [cardSrc, rulesSrc, hookSrc]) {
+      const src = stripComments(raw);
       for (const re of [
         /service_role/i,
         /action[_-]?queue/i,
@@ -436,6 +443,7 @@ describe("Shelly H&T setup card — static safety", () => {
       }
     }
   });
+
 
   it("rules module has no React, no Supabase imports", () => {
     expect(rulesSrc).not.toMatch(/@\/integrations\/supabase/);

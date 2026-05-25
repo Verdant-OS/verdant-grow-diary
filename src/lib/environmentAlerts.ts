@@ -19,13 +19,15 @@ import type {
   TargetComparisonResult,
 } from "@/lib/environmentTargetComparison";
 import { METRIC_LABELS } from "@/lib/environmentTargetComparison";
+import { buildDefaultThresholdAlerts } from "@/lib/defaultEnvironmentThresholds";
 
 export type AlertSeverity = "info" | "watch" | "warning" | "critical";
 
 export type AlertSource =
   | "sensor_snapshot"
   | "sensor_quality"
-  | "target_comparison";
+  | "target_comparison"
+  | "default_thresholds";
 
 export interface EnvironmentAlert {
   id: string;
@@ -42,6 +44,8 @@ export interface AlertInputs {
   quality: SensorQualityResult;
   targets: TargetComparisonResult;
   now?: number;
+  /** Optional source/device detail surfaced in default-threshold alert text. */
+  deviceLabel?: string | null;
 }
 
 const SEVERITY_WEIGHT: Record<AlertSeverity, number> = {
@@ -178,6 +182,18 @@ export function buildEnvironmentAlerts(
         }
       }
     }
+  }
+  // --- 4. Default-threshold fallback --------------------------------------
+  // When no grow targets exist, evaluate temp/RH/VPD against conservative
+  // default ranges. Only triggers from real, non-stale, non-sim snapshots.
+  if (targets && targets.status === "missing_targets") {
+    const defaults = buildDefaultThresholdAlerts({
+      snapshot,
+      now,
+      deviceLabel: inputs.deviceLabel ?? null,
+      createdAt,
+    });
+    alerts.push(...defaults);
   }
 
   // --- Deterministic ordering ---------------------------------------------

@@ -11,9 +11,11 @@ import { resolve } from "node:path";
 import {
   actionMatchesAlert,
   buildActionQueueDraftFromAlert,
+  isAlertEligibleForActionQueue,
   recommendedActionForAlert,
   type AlertLike,
 } from "@/lib/alertToActionQueueRules";
+
 
 const ROOT = resolve(__dirname, "../..");
 const ALERT_DETAIL = readFileSync(
@@ -51,8 +53,9 @@ describe("alertToActionQueueRules — pure mapping", () => {
     const r = buildActionQueueDraftFromAlert(baseAlert());
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.draft.suggested_change).toMatch(/lower RH target gradually/i);
+    expect(r.draft.suggested_change).toMatch(/airflow or dehumidification/i);
     expect(r.draft.action_type).toBe("advisory");
+
     expect(r.draft.source).toBe("environment_alert");
     expect(r.draft.status).toBe("pending_approval");
     expect(r.draft.risk_level).toBe("high");
@@ -168,3 +171,92 @@ describe("Alert persistence stays non-automated", () => {
     expect(DASHBOARD).not.toMatch(/\.from\(\s*["']action_queue["']\s*\)[\s\S]{0,200}\.insert\(/);
   });
 });
+
+describe("Eligibility — environment alert source filtering", () => {
+  it("eligible: target_comparison high humidity (real metric, open)", () => {
+    const a = baseAlert({
+      id: "real-uuid-1",
+      source: "environment_alerts",
+      metric: "humidity_pct",
+      reason: "Humidity is high (78% > 65%)",
+    });
+    expect(isAlertEligibleForActionQueue(a)).toBe(true);
+    const r = buildActionQueueDraftFromAlert(a);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.draft.suggested_change).toMatch(/airflow or dehumidification/i);
+      expect(r.draft.reason).toContain("[alert:real-uuid-1]");
+    }
+  });
+
+  it("eligible: default_thresholds high humidity", () => {
+    const a = baseAlert({
+      id: "real-uuid-2",
+      source: "environment_alerts",
+      metric: "humidity_pct",
+      reason: "Humidity is high (above default threshold 70%)",
+    });
+    expect(isAlertEligibleForActionQueue(a)).toBe(true);
+    expect(buildActionQueueDraftFromAlert(a).ok).toBe(true);
+  });
+
+  it("temp + VPD high/low map to the spec-approved review-first text", () => {
+    const hot = recommendedActionForAlert(baseAlert({ metric: "temperature_c", reason: "high" }));
+    const cold = recommendedActionForAlert(baseAlert({ metric: "temperature_c", reason: "low" }));
+    const highVpd = recommendedActionForAlert(baseAlert({ metric: "vpd_kpa", reason: "high" }));
+    const lowVpd = recommendedActionForAlert(baseAlert({ metric: "vpd_kpa", reason: "low" }));
+    expect(hot).toBe("Review heat load, exhaust, and light intensity before making changes.");
+    expect(cold).toBe("Review heater/environment settings and raise temperature gradually.");
+    expect(highVpd).toBe("Review RH and temperature balance before changing irrigation or feed.");
+    expect(lowVpd).toBe("Review RH and airflow to reduce overly humid conditions.");
+  });
+
+  it("low humidity returns avoid-swings text", () => {
+    expect(
+      recommendedActionForAlert(baseAlert({ metric: "humidity_pct", reason: "Humidity is low" })),
+    ).toBe("Review humidification and avoid large humidity swings.");
+  });
+
+  it("ineligible: snapshot:unavailable synthetic alert", () => {
+    const a = baseAlert({ id: "snapshot:unavailable", metric: "snapshot", reason: "no data" });
+    expect(isAlertEligibleForActionQueue(a)).toBe(false);
+    expect(buildActionQueueDraftFromAlert(a).ok).toBe(false);
+  });
+
+  it("ineligible: snapshot:stale synthetic alert", () => {
+    const a = baseAlert({ id: "snapshot:stale", metric: "snapshot", reason: "stale" });
+    expect(isAlertEligibleForActionQueue(a)).toBe(false);
+    expect(buildActionQueueDraftFromAlert(a).ok).toBe(false);
+  });
+
+  it("ineligible: targets:missing synthetic alert", () => {
+    const a = baseAlert({ id: "targets:missing", metric: "targets", reason: "missing targets" });
+    expect(isAlertEligibleForActionQueue(a)).toBe(false);
+    expect(buildActionQueueDraftFromAlert(a).ok).toBe(false);
+  });
+
+  it("ineligible: alert with synthetic metric even when id is a real uuid", () => {
+    expect(
+      isAlertEligibleForActionQueue(baseAlert({ id: "real-uuid", metric: "snapshot" })),
+    ).toBe(false);
+    expect(
+      isAlertEligibleForActionQueue(baseAlert({ id: "real-uuid", metric: "targets" })),
+    ).toBe(false);
+  });
+
+  it("ineligible: resolved or dismissed alerts", () => {
+    expect(isAlertEligibleForActionQueue(baseAlert({ status: "resolved" }))).toBe(false);
+    expect(isAlertEligibleForActionQueue(baseAlert({ status: "dismissed" }))).toBe(false);
+  });
+
+  it("recommendation text contains no executable device or nutrient language", () => {
+    for (const m of ["humidity_pct", "temperature_c", "vpd_kpa"]) {
+      for (const dir of ["high", "low"]) {
+        const t = recommendedActionForAlert(baseAlert({ metric: m, reason: dir })).toLowerCase();
+        expect(t).not.toMatch(/turn on|turn off|execute|relay|actuator|mqtt|webhook/);
+        expect(t).not.toMatch(/nutrient|feed strength|ec to|ph to|increase nutrient/);
+      }
+    }
+  });
+});
+

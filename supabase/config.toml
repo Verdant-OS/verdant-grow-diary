@@ -5,3 +5,7 @@ verify_jwt = false
 
 [functions.shelly-ht-webhook]
 verify_jwt = false
+
+[functions.shelly-ht-status]
+verify_jwt = false
+

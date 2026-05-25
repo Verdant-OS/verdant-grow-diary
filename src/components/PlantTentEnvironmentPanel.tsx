@@ -194,6 +194,8 @@ export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, p
             </Button>
           </div>
         ) : null}
+        {enabled ? <ShellyHtSetupCard rows={rows} /> : null}
+
       </CardContent>
     </Card>
   );

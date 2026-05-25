@@ -19,6 +19,7 @@ import {
   type SensorReadingLike,
   type SnapshotSource,
 } from "@/lib/sensorSnapshot";
+import { formatSensorDeviceDetail } from "@/lib/shellyHtWebhookRules";
 
 export const RECENT_HISTORY_DEFAULT_LIMIT = 5;
 export const RECENT_HISTORY_MIN_LIMIT = 3;
@@ -32,6 +33,10 @@ export interface RecentSensorSnapshot {
   rh: number | null;
   vpd: number | null;
   co2: number | null;
+  /** Optional device-specific label (e.g. "Shelly H&T Gen4"). Null when
+   *  unknown. Always derived through the shared pure helper — never a
+   *  duplicated mapping table. */
+  deviceDetail: string | null;
 }
 
 function clampLimit(n: number | undefined): number {

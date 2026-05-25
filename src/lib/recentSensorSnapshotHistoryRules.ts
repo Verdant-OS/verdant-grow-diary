@@ -104,6 +104,14 @@ export function buildRecentSensorSnapshotHistory(
   for (const ts of order) {
     if (out.length >= limit) break;
     const group = byTs.get(ts)!;
+    let deviceDetail: string | null = null;
+    for (const r of group) {
+      const d = formatSensorDeviceDetail(r.device_id);
+      if (d) {
+        deviceDetail = d;
+        break;
+      }
+    }
     out.push({
       ts,
       source: classifySource(group),
@@ -112,6 +120,7 @@ export function buildRecentSensorSnapshotHistory(
       rh: pickMetric(group, "humidity_pct"),
       vpd: pickMetric(group, "vpd_kpa"),
       co2: pickMetric(group, "co2_ppm"),
+      deviceDetail,
     });
   }
   return out;

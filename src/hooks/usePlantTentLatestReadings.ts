@@ -14,6 +14,7 @@ export interface PlantTentReadingRow {
   metric: string;
   value: number | string | null;
   source: string | null;
+  device_id?: string | null;
 }
 
 export function usePlantTentLatestReadings(

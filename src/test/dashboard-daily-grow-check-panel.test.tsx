@@ -4,7 +4,7 @@
  * Covers pure rules + component wiring/safety. Reuses the existing
  * Daily Grow Check consistency basis — does not re-test that calculation.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, within } from "@testing-library/react";
@@ -245,6 +245,14 @@ function renderPanel(scopedGrowId: string | null = "g1") {
 }
 
 describe("DashboardDailyGrowCheckPanel · component", () => {
+  beforeAll(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
   it("renders checked and unchecked rows and summary", () => {
     renderPanel();
     const panel = screen.getByTestId("dashboard-daily-grow-check-panel");

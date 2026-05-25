@@ -4,7 +4,7 @@
  * Read-only UI/copy only. Same basis as Daily Grow Check (plant QuickLogs
  * + current-tent manual sensor snapshots). No persistence, no writes.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, within } from "@testing-library/react";
@@ -158,6 +158,14 @@ function renderCard() {
 }
 
 describe("PlantDailyGrowCheckConsistencyCard — 7-day method breakdown", () => {
+  beforeAll(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
   it("renders the 7-day method breakdown with labels", () => {
     renderCard();
     const region = screen.getByTestId("plant-daily-grow-check-method-breakdown");

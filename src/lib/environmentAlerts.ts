@@ -25,7 +25,8 @@ export type AlertSeverity = "info" | "watch" | "warning" | "critical";
 export type AlertSource =
   | "sensor_snapshot"
   | "sensor_quality"
-  | "target_comparison";
+  | "target_comparison"
+  | "default_thresholds";
 
 export interface EnvironmentAlert {
   id: string;

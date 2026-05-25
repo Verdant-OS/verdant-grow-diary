@@ -19,6 +19,7 @@ import type {
   TargetComparisonResult,
 } from "@/lib/environmentTargetComparison";
 import { METRIC_LABELS } from "@/lib/environmentTargetComparison";
+import { buildDefaultThresholdAlerts } from "@/lib/defaultEnvironmentThresholds";
 
 export type AlertSeverity = "info" | "watch" | "warning" | "critical";
 

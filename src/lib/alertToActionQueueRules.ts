@@ -69,8 +69,8 @@ export function recommendedActionForAlert(alert: AlertLike): string {
   const isLow = /\blow\b|\bbelow\b|\bunder\b|too low/.test(reason);
 
   if (metric.includes("humid") || metric === "rh" || metric === "humidity_pct") {
-    if (isLow) return "Review humidification and raise RH gradually.";
-    return "Review humidity control and lower RH target gradually.";
+    if (isLow) return "Review humidification and avoid large humidity swings.";
+    return "Review humidity control and increase airflow or dehumidification gradually.";
   }
   if (metric.includes("temp")) {
     if (isLow) return "Review heater/environment settings and raise temperature gradually.";
@@ -89,6 +89,27 @@ export function recommendedActionForAlert(alert: AlertLike): string {
   return "Review environment conditions before making any grow changes.";
 }
 
+/** Synthetic "data unavailable" markers — never eligible for handoff. */
+const SYNTHETIC_METRICS = new Set<string>(["snapshot", "targets"]);
+const SYNTHETIC_ALERT_IDS = new Set<string>([
+  "snapshot:unavailable",
+  "snapshot:stale",
+  "targets:missing",
+]);
+
+/** Deterministic eligibility check. Pure, null-safe. */
+export function isAlertEligibleForActionQueue(alert: AlertLike | null | undefined): boolean {
+  if (!alert) return false;
+  if (alert.status !== "open") return false;
+  if (!alert.grow_id) return false;
+  if (!alert.id) return false;
+  if (!alert.reason || !alert.reason.trim()) return false;
+  if (!alert.metric || !alert.metric.trim()) return false;
+  if (SYNTHETIC_ALERT_IDS.has(alert.id)) return false;
+  if (SYNTHETIC_METRICS.has(alert.metric.trim().toLowerCase())) return false;
+  return true;
+}
+
 export function buildActionQueueDraftFromAlert(alert: AlertLike): DraftResult {
   if (!alert) return { ok: false, reason: "missing_alert" };
   if (alert.status !== "open") return { ok: false, reason: "alert_not_open" };
@@ -96,6 +117,11 @@ export function buildActionQueueDraftFromAlert(alert: AlertLike): DraftResult {
   if (!alert.id) return { ok: false, reason: "missing_alert_id" };
   if (!alert.reason || !alert.reason.trim()) return { ok: false, reason: "missing_reason" };
   if (!alert.metric || !alert.metric.trim()) return { ok: false, reason: "missing_metric" };
+  if (SYNTHETIC_ALERT_IDS.has(alert.id)) return { ok: false, reason: "synthetic_alert" };
+  if (SYNTHETIC_METRICS.has(alert.metric.trim().toLowerCase())) {
+    return { ok: false, reason: "synthetic_metric" };
+  }
+
 
   const backPointer = `[alert:${alert.id}]`;
   const suggested = recommendedActionForAlert(alert);

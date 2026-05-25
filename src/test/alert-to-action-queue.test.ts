@@ -53,8 +53,9 @@ describe("alertToActionQueueRules — pure mapping", () => {
     const r = buildActionQueueDraftFromAlert(baseAlert());
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.draft.suggested_change).toMatch(/lower RH target gradually/i);
+    expect(r.draft.suggested_change).toMatch(/airflow or dehumidification/i);
     expect(r.draft.action_type).toBe("advisory");
+
     expect(r.draft.source).toBe("environment_alert");
     expect(r.draft.status).toBe("pending_approval");
     expect(r.draft.risk_level).toBe("high");

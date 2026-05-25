@@ -19,6 +19,7 @@ import {
   type SensorReadingLike,
   type SnapshotSource,
 } from "@/lib/sensorSnapshot";
+import { formatSensorDeviceDetail } from "@/lib/sensorDeviceLabels";
 
 export const RECENT_HISTORY_DEFAULT_LIMIT = 5;
 export const RECENT_HISTORY_MIN_LIMIT = 3;
@@ -32,6 +33,10 @@ export interface RecentSensorSnapshot {
   rh: number | null;
   vpd: number | null;
   co2: number | null;
+  /** Optional device-specific label (e.g. "Shelly H&T Gen4"). Null when
+   *  unknown. Always derived through the shared pure helper — never a
+   *  duplicated mapping table. */
+  deviceDetail: string | null;
 }
 
 function clampLimit(n: number | undefined): number {
@@ -99,6 +104,14 @@ export function buildRecentSensorSnapshotHistory(
   for (const ts of order) {
     if (out.length >= limit) break;
     const group = byTs.get(ts)!;
+    let deviceDetail: string | null = null;
+    for (const r of group) {
+      const d = formatSensorDeviceDetail(r.device_id);
+      if (d) {
+        deviceDetail = d;
+        break;
+      }
+    }
     out.push({
       ts,
       source: classifySource(group),
@@ -107,6 +120,7 @@ export function buildRecentSensorSnapshotHistory(
       rh: pickMetric(group, "humidity_pct"),
       vpd: pickMetric(group, "vpd_kpa"),
       co2: pickMetric(group, "co2_ppm"),
+      deviceDetail,
     });
   }
   return out;

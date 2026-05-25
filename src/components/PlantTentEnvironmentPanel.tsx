@@ -137,6 +137,14 @@ export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, p
                       >
                         {SOURCE_LABEL[r.source]}
                       </span>
+                      {r.deviceDetail ? (
+                        <span
+                          className="rounded-md border px-1.5 py-0.5 text-muted-foreground"
+                          data-testid="plant-tent-environment-recent-device"
+                        >
+                          {r.deviceDetail}
+                        </span>
+                      ) : null}
                       <span
                         className="text-muted-foreground"
                         data-testid="plant-tent-environment-recent-captured"

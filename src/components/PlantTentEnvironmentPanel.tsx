@@ -12,6 +12,8 @@ import {
   buildPlantQuickLogPrefill,
   PLANT_QUICKLOG_PREFILL_EVENT,
 } from "@/lib/plantQuickLogPrefillRules";
+import ShellyHtSetupCard from "@/components/ShellyHtSetupCard";
+
 
 interface Props {
   tentId: string | null | undefined;

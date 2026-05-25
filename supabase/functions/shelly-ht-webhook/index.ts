@@ -3,15 +3,16 @@
 // Security model (smallest safe setup):
 //  - Token required via `x-verdant-webhook-token` header or `token` query.
 //  - Token compared (constant-time) against the `SHELLY_HT_WEBHOOK_TOKEN`
-//    server secret. Missing/invalid token → respond 200 `{status:"received"}`
-//    but persist nothing trusted (prevents Shelly retry storms).
+//    server secret. Missing/invalid token -> respond 200 ack but persist
+//    nothing trusted (prevents Shelly retry storms).
 //  - Resolved tent comes from `SHELLY_HT_TENT_ID` server env. We NEVER
 //    accept tent_id or user_id from the client payload.
 //  - user_id is resolved server-side from `tents.user_id` via service role.
-//  - No alerts, no action_queue, no device control, no automation.
+//  - Read-only sensor logging only. No notifications, no queues, no
+//    device control, no auto-actions.
 //
-// Returns: always HTTP 200 `{status:"received"}` so the Shelly retries do
-// not storm. Failures are logged server-side only.
+// Returns: always HTTP 200 ack so the Shelly retries do not storm.
+// Failures are logged server-side only.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 

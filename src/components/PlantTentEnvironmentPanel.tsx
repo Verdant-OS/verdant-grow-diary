@@ -7,7 +7,6 @@ import { usePlantTentLatestReadings } from "@/hooks/usePlantTentLatestReadings";
 import { buildPlantTentEnvironmentView } from "@/lib/plantTentEnvironmentRules";
 import { buildRecentSensorSnapshotHistory } from "@/lib/recentSensorSnapshotHistoryRules";
 import { SOURCE_LABEL, formatValue } from "@/lib/sensorSnapshot";
-import { formatSensorDeviceDetail } from "@/lib/shellyHtWebhookRules";
 import { tempFFromC } from "@/lib/temperatureUnits";
 import {
   buildPlantQuickLogPrefill,

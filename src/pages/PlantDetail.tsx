@@ -205,6 +205,10 @@ export default function PlantDetail() {
             growId={plant.growId ?? null}
             tentId={plant.tentId ?? null}
           />
+          <PlantManualSensorFreshnessCard
+            plantId={plant.id}
+            onUpdate={() => setQuickLogOpen(true)}
+          />
           <PlantTentEnvironmentPanel
             tentId={plant.tentId ?? null}
             tentName={tent?.name ?? null}

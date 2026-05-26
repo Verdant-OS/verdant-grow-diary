@@ -67,7 +67,7 @@ interface AlertEventRow {
   } | null;
 }
 
-type EventFilter = "all" | "photo" | "note" | "measurement";
+type EventFilter = "all" | "photo" | "note" | "measurement" | "followup";
 const MEASUREMENT_KEYS = new Set(["ph", "ec", "runoff", "watering"]);
 
 function entryKinds(e: Entry): EventFilter[] {
@@ -79,6 +79,11 @@ function entryKinds(e: Entry): EventFilter[] {
   // Surface them in the Measurements filter so they aren't hidden.
   const hasHandheld = hasManualHandheldReadings(e.note);
   if (hasDetailMeasurement || hasHandheld) kinds.push("measurement");
+  const eventType =
+    e.details && typeof (e.details as Record<string, unknown>).event_type === "string"
+      ? ((e.details as Record<string, unknown>).event_type as string)
+      : null;
+  if (eventType === "action_followup") kinds.push("followup");
   return kinds;
 }
 

@@ -10,7 +10,7 @@ import {
   Sparkles,
   Bell,
 } from "lucide-react";
-import { useGrowDetailData } from "@/hooks/useGrowDetailData";
+import { useGrowDetailData, type GrowOutcomesState } from "@/hooks/useGrowDetailData";
 import {
   type CountValue,
   type GrowStatus,
@@ -18,7 +18,9 @@ import {
   formatCount,
 } from "@/lib/growStatus";
 import {
+  actionDetailPath,
   actionsPath,
+  alertDetailPath,
   alertsPath,
   dashboardPath,
   logsPath,

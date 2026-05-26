@@ -60,6 +60,7 @@ export default function PlantQuickLog({
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const { data: history } = usePlantManualSensorHistory(open ? plantId : null);
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -67,6 +68,12 @@ export default function PlantQuickLog({
   const [sensors, setSensors] = useState<QuickLogSensorInput>(EMPTY_SENSORS);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  function deltaFor(metric: ManualSensorMetric, raw: string) {
+    const current = parseOptionalNumber(raw);
+    const prev = history?.[metric]?.value ?? null;
+    return computeManualSensorDelta(metric, current, prev);
+  }
 
   function resetForm() {
     setPhotoFile(null);

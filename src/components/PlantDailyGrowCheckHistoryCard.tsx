@@ -192,6 +192,29 @@ export default function PlantDailyGrowCheckHistoryCard({ plantId, currentTentId 
           </p>
         </div>
       ) : (
+        <>
+          {recentActivityCue.shouldShow && (
+            <div
+              data-testid="plant-daily-grow-check-recent-activity-cue"
+              className="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200"
+            >
+              <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span
+                className="font-medium"
+                data-testid="plant-daily-grow-check-recent-activity-cue-label"
+              >
+                {recentActivityCue.label}
+              </span>
+              {recentActivityCue.detail && (
+                <span
+                  className="text-xs text-emerald-200/80"
+                  data-testid="plant-daily-grow-check-recent-activity-cue-detail"
+                >
+                  {recentActivityCue.detail}
+                </span>
+              )}
+            </div>
+          )}
         <ul
           className="divide-y divide-border/40 rounded-md border border-border/40"
           data-testid="plant-daily-grow-check-history-rows"

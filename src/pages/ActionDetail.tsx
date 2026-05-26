@@ -317,7 +317,7 @@ export default function ActionDetail() {
     const { draft } = result;
 
     // Pre-insert idempotency check: query for existing outcome row before insert.
-    const { data: existingRows } = await supabase
+    const { data: existingRows, error: lookupError } = await supabase
       .from("diary_entries")
       .select("id,details")
       .eq("grow_id", draft.grow_id)
@@ -327,6 +327,11 @@ export default function ActionDetail() {
         outcome_kind: ACTION_OUTCOME_KIND,
       })
       .limit(1);
+    if (lookupError) {
+      toast.error("Failed to check for existing outcome", { description: lookupError.message });
+      setOutcomeBusy(false);
+      return;
+    }
     if (existingRows && existingRows.length > 0) {
       const d = existingRows[0].details as Record<string, unknown> | null;
       setExistingOutcome({ status: (d?.outcome_status as string) ?? "unknown" });

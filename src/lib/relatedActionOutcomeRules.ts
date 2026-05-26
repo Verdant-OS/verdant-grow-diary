@@ -9,6 +9,7 @@
  *  - Never infers outcome via AI / sensor / status.
  *  - Grower-recorded outcome is the sole source of truth.
  *  - No device control or automation surface.
+ */
 import {
   ACTION_OUTCOME_EVENT_TYPE,
   ACTION_OUTCOME_KIND,

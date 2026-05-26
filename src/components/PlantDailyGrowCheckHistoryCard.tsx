@@ -249,6 +249,7 @@ export default function PlantDailyGrowCheckHistoryCard({ plantId, currentTentId 
             </li>
           ))}
         </ul>
+        </>
       )}
     </Card>
   );

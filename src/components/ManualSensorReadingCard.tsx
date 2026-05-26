@@ -98,6 +98,8 @@ export default function ManualSensorReadingCard({
         createdAt: new Date().toISOString(),
       });
       setForm(EMPTY);
+      setDevicePreset("none");
+      setDeviceCustom("");
       setReviewOpen(false);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Save failed.";

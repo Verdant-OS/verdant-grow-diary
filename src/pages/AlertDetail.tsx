@@ -471,14 +471,9 @@ export default function AlertDetail() {
                       automatically.
                     </p>
                     {draftResult && draftResult.ok ? (
-                      <>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {draftResult.draft.suggested_change}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground/80 mt-1">
-                          Approval-required. No device commands will run.
-                        </p>
-                      </>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {draftResult.draft.suggested_change}
+                      </p>
                     ) : (
                       <p className="text-xs text-muted-foreground mt-1">
                         Not enough alert context to draft a safe action.
@@ -486,11 +481,17 @@ export default function AlertDetail() {
                     )}
                     <div className="flex flex-wrap gap-2 mt-2">
                       {existingActionId ? (
-                        <Button asChild size="sm" variant="secondary">
-                          <Link to={`/actions/${existingActionId}`}>
-                            ✓ Action already queued — view details
-                          </Link>
-                        </Button>
+                        <>
+                          <Button asChild size="sm" variant="secondary">
+                            <Link to={`/actions/${existingActionId}`}>
+                              ✓ Action already queued — view details
+                            </Link>
+                          </Button>
+                          <p className="w-full text-[10px] text-muted-foreground/80">
+                            A recommended action for this alert already exists and is awaiting your
+                            review.
+                          </p>
+                        </>
                       ) : (
                         <Button
                           size="sm"
@@ -523,7 +524,8 @@ export default function AlertDetail() {
                 data-testid="stale-action-warning"
                 className="mb-3 rounded-lg border border-amber-500/60 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300"
               >
-                This alert is no longer open, but related actions are still pending review. Confirm the current grow conditions before approving.
+                This alert is no longer open, but related actions are still pending review. Confirm
+                the current grow conditions before approving.
               </div>
             )}
 

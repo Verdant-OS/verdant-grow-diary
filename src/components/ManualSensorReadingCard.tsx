@@ -28,6 +28,8 @@ interface TentOption {
 interface Props {
   tents: TentOption[];
   defaultTentId?: string;
+  successMessage?: string;
+  onSaved?: (meta: { tentId: string; metricsSaved: number; createdAt: string }) => void;
 }
 
 const EMPTY: ManualEntryInput = {
@@ -38,7 +40,12 @@ const EMPTY: ManualEntryInput = {
   soilMoisturePct: "",
 };
 
-export default function ManualSensorReadingCard({ tents, defaultTentId }: Props) {
+export default function ManualSensorReadingCard({
+  tents,
+  defaultTentId,
+  successMessage,
+  onSaved,
+}: Props) {
   const [tentId, setTentId] = useState<string>(defaultTentId ?? tents[0]?.id ?? "");
   const [form, setForm] = useState<ManualEntryInput>(EMPTY);
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -65,7 +72,15 @@ export default function ManualSensorReadingCard({ tents, defaultTentId }: Props)
       for (const p of payloads) {
         await insert.mutateAsync(p);
       }
-      toast.success(`Saved ${payloads.length} manual reading${payloads.length === 1 ? "" : "s"}.`);
+      toast.success(
+        successMessage ??
+          `Saved ${payloads.length} manual reading${payloads.length === 1 ? "" : "s"}.`,
+      );
+      onSaved?.({
+        tentId,
+        metricsSaved: payloads.length,
+        createdAt: new Date().toISOString(),
+      });
       setForm(EMPTY);
       setReviewOpen(false);
     } catch (err) {
@@ -107,8 +122,8 @@ export default function ManualSensorReadingCard({ tents, defaultTentId }: Props)
         >
           <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
           <span>
-            Saved as a <strong>manual snapshot</strong>, not live sensor data.
-            Good for handheld tools like the SwitchBot CO₂/temp/RH monitor.
+            Saved as a <strong>manual snapshot</strong>, not live sensor data. Good for handheld
+            tools like the SwitchBot CO₂/temp/RH monitor.
           </span>
         </div>
 
@@ -123,7 +138,11 @@ export default function ManualSensorReadingCard({ tents, defaultTentId }: Props)
               </SelectTrigger>
               <SelectContent>
                 {tents.map((t) => (
-                  <SelectItem key={t.id} value={t.id} data-testid={`manual-reading-tent-option-${t.id}`}>
+                  <SelectItem
+                    key={t.id}
+                    value={t.id}
+                    data-testid={`manual-reading-tent-option-${t.id}`}
+                  >
                     {t.name}
                   </SelectItem>
                 ))}
@@ -185,19 +204,15 @@ export default function ManualSensorReadingCard({ tents, defaultTentId }: Props)
           className="text-[11px] text-muted-foreground"
           data-testid="manual-reading-out-of-scope-hint"
         >
-          pH, EC/TDS, water temp, and PPFD/DLI from pens like the Spider Farmer
-          pH/EC combo or PAR meter aren't stored as sensor metrics yet — log
-          them as a Quick Log feeding or observation note for now.
+          pH, EC/TDS, water temp, and PPFD/DLI from pens like the Spider Farmer pH/EC combo or PAR
+          meter aren't stored as sensor metrics yet — log them as a Quick Log feeding or observation
+          note for now.
         </p>
 
-
         {advisor.derivedVpdKpa !== null && (
-          <p
-            className="text-[11px] text-muted-foreground"
-            data-testid="manual-reading-derived-vpd"
-          >
-            Derived VPD ≈ <strong>{advisor.derivedVpdKpa} kPa</strong> from your
-            air temp + humidity. Saved as the VPD value unless you enter one.
+          <p className="text-[11px] text-muted-foreground" data-testid="manual-reading-derived-vpd">
+            Derived VPD ≈ <strong>{advisor.derivedVpdKpa} kPa</strong> from your air temp +
+            humidity. Saved as the VPD value unless you enter one.
           </p>
         )}
 
@@ -231,10 +246,7 @@ export default function ManualSensorReadingCard({ tents, defaultTentId }: Props)
         {validation.errors.length > 0 && (
           <ul className="space-y-1" data-testid="manual-reading-errors">
             {validation.errors.map((e, i) => (
-              <li
-                key={i}
-                className="flex items-start gap-2 text-xs text-destructive"
-              >
+              <li key={i} className="flex items-start gap-2 text-xs text-destructive">
                 <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                 <span>{e}</span>
               </li>
@@ -371,4 +383,3 @@ function Field({
     </div>
   );
 }
-

@@ -9,18 +9,21 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import {
+  DAILY_CHECK_NOTE_SAVED_TOAST,
+  DAILY_CHECK_SENSOR_SAVED_TOAST,
   DAILY_CHECK_SUCCESS_BODY,
   DAILY_CHECK_SUCCESS_TITLE,
   buildDailyCheckEntryHref,
   buildDailyCheckPostSubmitActions,
   formatDailyCheckLoggedAt,
   parseDailyCheckEntrySource,
+  resolveDailyCheckPostSubmitHref,
 } from "@/lib/dailyCheckPostSubmitRules";
 
 // ---------------------------------------------------------------------------
@@ -82,7 +85,10 @@ describe("buildDailyCheckPostSubmitActions · pure rules", () => {
   });
 
   it("success copy avoids forbidden wording", () => {
-    const s = `${DAILY_CHECK_SUCCESS_TITLE} ${DAILY_CHECK_SUCCESS_BODY}`.toLowerCase();
+    const s =
+      `${DAILY_CHECK_SUCCESS_TITLE} ${DAILY_CHECK_SUCCESS_BODY} ${DAILY_CHECK_NOTE_SAVED_TOAST} ${DAILY_CHECK_SENSOR_SAVED_TOAST}`.toLowerCase();
+    expect(s).not.toMatch(/\bhealthy\b/);
+    expect(s).not.toMatch(/\bcomplete\b/);
     expect(s).not.toMatch(/\bperfect\b/);
     expect(s).not.toMatch(/\bcompleted\b/);
     expect(s).not.toMatch(/guaranteed healthy/);
@@ -107,18 +113,63 @@ describe("parseDailyCheckEntrySource · pure rules", () => {
 
 describe("buildDailyCheckEntryHref · pure rules", () => {
   it("keeps the bare ?plantId= contract when no source is provided", () => {
-    expect(buildDailyCheckEntryHref({ plantId: "p-1" })).toBe(
-      "/daily-check?plantId=p-1",
-    );
+    expect(buildDailyCheckEntryHref({ plantId: "p-1" })).toBe("/daily-check?plantId=p-1");
   });
 
   it("appends a known source", () => {
+    expect(buildDailyCheckEntryHref({ plantId: "p-1", source: "dashboard" })).toBe(
+      "/daily-check?plantId=p-1&from=dashboard",
+    );
+    expect(buildDailyCheckEntryHref({ plantId: "p-1", source: "plant-detail" })).toBe(
+      "/daily-check?plantId=p-1&from=plant-detail",
+    );
+  });
+
+  it("builds note CTA href with plant-detail source context", () => {
     expect(
-      buildDailyCheckEntryHref({ plantId: "p-1", source: "dashboard" }),
-    ).toBe("/daily-check?plantId=p-1&from=dashboard");
+      buildDailyCheckEntryHref({
+        plantId: "p-1",
+        source: "plant-detail",
+        method: "note",
+      }),
+    ).toBe("/daily-check?plantId=p-1&from=plant-detail&method=note");
+  });
+
+  it("builds sensor CTA href with plant-detail source context", () => {
     expect(
-      buildDailyCheckEntryHref({ plantId: "p-1", source: "plant-detail" }),
-    ).toBe("/daily-check?plantId=p-1&from=plant-detail");
+      buildDailyCheckEntryHref({
+        plantId: "p-1",
+        source: "plant-detail",
+        method: "sensor",
+      }),
+    ).toBe("/daily-check?plantId=p-1&from=plant-detail&method=sensor");
+  });
+});
+
+describe("resolveDailyCheckPostSubmitHref · pure rules", () => {
+  it("returns Plant Detail route for valid plant-detail context", () => {
+    expect(
+      resolveDailyCheckPostSubmitHref({
+        plantId: "p-9",
+        source: "plant-detail",
+      }),
+    ).toBe("/plants/p-9");
+  });
+
+  it("falls back safely when context is missing or invalid", () => {
+    expect(
+      resolveDailyCheckPostSubmitHref({
+        plantId: null,
+        source: "plant-detail",
+      }),
+    ).toBe("/");
+    expect(
+      resolveDailyCheckPostSubmitHref({
+        plantId: "p-9",
+        source: null,
+        fallbackHref: "/safe",
+      }),
+    ).toBe("/safe");
   });
 });
 
@@ -140,9 +191,7 @@ describe("formatDailyCheckLoggedAt · pure rules", () => {
     expect(formatDailyCheckLoggedAt(Number.NaN, now)).toBeNull();
     expect(formatDailyCheckLoggedAt("not-a-date", now)).toBeNull();
     // 5 minutes in the future → reject.
-    expect(
-      formatDailyCheckLoggedAt(now.getTime() + 5 * 60_000, now),
-    ).toBeNull();
+    expect(formatDailyCheckLoggedAt(now.getTime() + 5 * 60_000, now)).toBeNull();
   });
 });
 
@@ -177,10 +226,22 @@ vi.mock("@/hooks/useScopedGrow", () => ({
   }),
 }));
 vi.mock("@/components/ManualSensorReadingCard", () => ({
-  default: () => <div data-testid="mock-manual-card" />,
+  default: ({ onSaved, successMessage }: { onSaved?: () => void; successMessage?: string }) => (
+    <div data-testid="mock-manual-card" data-success-message={successMessage ?? ""}>
+      <button type="button" data-testid="mock-manual-save" onClick={() => onSaved?.()}>
+        save
+      </button>
+    </div>
+  ),
 }));
 vi.mock("@/components/QuickLog", () => ({
-  default: () => <div data-testid="mock-quicklog" />,
+  default: ({ onCreated, successMessage }: { onCreated?: () => void; successMessage?: string }) => (
+    <div data-testid="mock-quicklog" data-success-message={successMessage ?? ""}>
+      <button type="button" data-testid="mock-quicklog-submit" onClick={() => onCreated?.()}>
+        submit
+      </button>
+    </div>
+  ),
 }));
 vi.mock("@/components/PlantStatusStrip", () => ({
   default: () => <div />,
@@ -200,10 +261,20 @@ import QuickLog from "@/components/QuickLog";
 
 function renderRoute(initialPath: string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  function RouteProbe() {
+    const location = useLocation();
+    return (
+      <div data-testid="route-probe">
+        {location.pathname}
+        {location.search}
+      </div>
+    );
+  }
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={[initialPath]}>
         <DailyCheck />
+        <RouteProbe />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -222,22 +293,18 @@ describe("DailyCheck post-submit confirmation", () => {
 
   it("does not show confirmation before any submit succeeds", () => {
     renderRoute("/daily-check?plantId=p1");
-    expect(
-      screen.queryByTestId("daily-grow-check-post-submit"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("daily-grow-check-post-submit")).not.toBeInTheDocument();
   });
 
   it("shows confirmation only after the success event fires", () => {
     renderRoute("/daily-check?plantId=p1");
-    expect(
-      screen.queryByTestId("daily-grow-check-post-submit"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("daily-grow-check-post-submit")).not.toBeInTheDocument();
     dispatchQuickLogSuccess();
     const panel = screen.getByTestId("daily-grow-check-post-submit");
     expect(panel).toBeInTheDocument();
-    expect(
-      screen.getByTestId("daily-grow-check-post-submit-title"),
-    ).toHaveTextContent(/today's check was logged/i);
+    expect(screen.getByTestId("daily-grow-check-post-submit-title")).toHaveTextContent(
+      /today's check was logged/i,
+    );
   });
 
   it("confirmation copy avoids forbidden wording", () => {
@@ -254,8 +321,7 @@ describe("DailyCheck post-submit confirmation", () => {
     renderRoute("/daily-check?plantId=p1");
     dispatchQuickLogSuccess();
     const dash = screen.getByTestId("daily-grow-check-post-submit-dashboard");
-    const link =
-      dash.tagName === "A" ? dash : (dash.querySelector("a") as HTMLAnchorElement);
+    const link = dash.tagName === "A" ? dash : (dash.querySelector("a") as HTMLAnchorElement);
     expect(link.getAttribute("href")).toBe("/");
   });
 
@@ -263,39 +329,29 @@ describe("DailyCheck post-submit confirmation", () => {
     renderRoute("/daily-check?plantId=p1");
     dispatchQuickLogSuccess();
     const plant = screen.getByTestId("daily-grow-check-post-submit-plant");
-    const link =
-      plant.tagName === "A" ? plant : (plant.querySelector("a") as HTMLAnchorElement);
+    const link = plant.tagName === "A" ? plant : (plant.querySelector("a") as HTMLAnchorElement);
     expect(link.getAttribute("href")).toBe("/plants/p1");
   });
 
   it("when no plantId is selected, only Back to Dashboard is offered", () => {
     renderRoute("/daily-check");
     dispatchQuickLogSuccess();
-    expect(
-      screen.getByTestId("daily-grow-check-post-submit-dashboard"),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByTestId("daily-grow-check-post-submit-plant"),
-    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("daily-grow-check-post-submit-dashboard")).toBeInTheDocument();
+    expect(screen.queryByTestId("daily-grow-check-post-submit-plant")).not.toBeInTheDocument();
   });
 
   it("when plantId is invalid, no plant is auto-selected and View Plant is not offered after submit", () => {
     renderRoute("/daily-check?plantId=does-not-exist");
     dispatchQuickLogSuccess();
-    expect(
-      screen.queryByTestId("daily-grow-check-post-submit-plant"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByTestId("daily-grow-check-post-submit-dashboard"),
-    ).toBeInTheDocument();
+    expect(screen.queryByTestId("daily-grow-check-post-submit-plant")).not.toBeInTheDocument();
+    expect(screen.getByTestId("daily-grow-check-post-submit-dashboard")).toBeInTheDocument();
   });
 
   it("from=dashboard: primary CTA says 'Back to Dashboard' and routes to /", () => {
     renderRoute("/daily-check?plantId=p1&from=dashboard");
     dispatchQuickLogSuccess();
     const dash = screen.getByTestId("daily-grow-check-post-submit-dashboard");
-    const link =
-      dash.tagName === "A" ? dash : (dash.querySelector("a") as HTMLAnchorElement);
+    const link = dash.tagName === "A" ? dash : (dash.querySelector("a") as HTMLAnchorElement);
     expect(link.getAttribute("href")).toBe("/");
     // Primary in shadcn's Button is variant=default which omits the
     // "outline" class — secondary plant button carries it.
@@ -307,8 +363,7 @@ describe("DailyCheck post-submit confirmation", () => {
     renderRoute("/daily-check?plantId=p1&from=plant-detail");
     dispatchQuickLogSuccess();
     const plant = screen.getByTestId("daily-grow-check-post-submit-plant");
-    const link =
-      plant.tagName === "A" ? plant : (plant.querySelector("a") as HTMLAnchorElement);
+    const link = plant.tagName === "A" ? plant : (plant.querySelector("a") as HTMLAnchorElement);
     expect(link.getAttribute("href")).toBe("/plants/p1");
     expect(plant.textContent).toMatch(/Back to Plant/);
   });
@@ -317,16 +372,13 @@ describe("DailyCheck post-submit confirmation", () => {
     renderRoute("/daily-check?plantId=p1&from=hacker");
     dispatchQuickLogSuccess();
     const dash = screen.getByTestId("daily-grow-check-post-submit-dashboard");
-    const link =
-      dash.tagName === "A" ? dash : (dash.querySelector("a") as HTMLAnchorElement);
+    const link = dash.tagName === "A" ? dash : (dash.querySelector("a") as HTMLAnchorElement);
     expect(link.getAttribute("href")).toBe("/");
   });
 
   it("logged-at line is hidden before submit and shown after success event", () => {
     renderRoute("/daily-check?plantId=p1&from=dashboard");
-    expect(
-      screen.queryByTestId("daily-grow-check-post-submit-logged-at"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("daily-grow-check-post-submit-logged-at")).not.toBeInTheDocument();
     act(() => {
       window.dispatchEvent(
         new CustomEvent("verdant:entry-created", {
@@ -351,6 +403,37 @@ describe("DailyCheck post-submit confirmation", () => {
     });
     const node = screen.getByTestId("daily-grow-check-post-submit-logged-at");
     expect(node.textContent).toMatch(/^Logged at /);
+  });
+
+  it("Quick Log submit from source=plant-detail returns to Plant Detail route", async () => {
+    renderRoute("/daily-check?plantId=p1&from=plant-detail&method=note");
+    const quickLog = screen.getByTestId("mock-quicklog");
+    expect(quickLog.getAttribute("data-success-message")).toBe(DAILY_CHECK_NOTE_SAVED_TOAST);
+    const button = screen.getByTestId("mock-quicklog-submit");
+    act(() => {
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(screen.getByTestId("route-probe")).toHaveTextContent("/plants/p1");
+  });
+
+  it("Manual snapshot submit from source=plant-detail returns to Plant Detail route", async () => {
+    renderRoute("/daily-check?plantId=p1&from=plant-detail&method=sensor");
+    const manual = screen.getByTestId("mock-manual-card");
+    expect(manual.getAttribute("data-success-message")).toBe(DAILY_CHECK_SENSOR_SAVED_TOAST);
+    const button = screen.getByTestId("mock-manual-save");
+    act(() => {
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(screen.getByTestId("route-probe")).toHaveTextContent("/plants/p1");
+  });
+
+  it("missing/invalid return context falls back safely to dashboard route", () => {
+    renderRoute("/daily-check?from=plant-detail&method=note");
+    const button = screen.getByTestId("mock-quicklog-submit");
+    act(() => {
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(screen.getByTestId("route-probe")).toHaveTextContent("/");
   });
 });
 
@@ -379,10 +462,7 @@ describe("QuickLog success contract preserved outside Daily Check", () => {
 // ---------------------------------------------------------------------------
 describe("Daily Check post-submit · static safety", () => {
   const root = resolve(__dirname, "../..");
-  const rules = readFileSync(
-    resolve(root, "src/lib/dailyCheckPostSubmitRules.ts"),
-    "utf8",
-  );
+  const rules = readFileSync(resolve(root, "src/lib/dailyCheckPostSubmitRules.ts"), "utf8");
   const page = readFileSync(resolve(root, "src/pages/DailyCheck.tsx"), "utf8");
 
   it("rules module is I/O-free (no supabase / React)", () => {
@@ -397,14 +477,23 @@ describe("Daily Check post-submit · static safety", () => {
     expect(page).not.toMatch(/setLastSubmittedAt\([^)]*open/);
   });
 
+  it("submit wiring uses shared return helper for Quick Log + manual snapshot", () => {
+    expect(page).toMatch(/resolveDailyCheckPostSubmitHref/);
+    expect(page).toMatch(/handleSubmitSuccess\("note"\)/);
+    expect(page).toMatch(/handleSubmitSuccess\("sensor"\)/);
+  });
+
   it("no new persistence / RPC / ingestion / action queue / automation / service_role in the new rules", () => {
     for (const re of [
       /service_role/i,
       /mqtt/i,
       /home[_-]?assistant/i,
+      // Out-of-scope integrations for this module remain prohibited.
+      /ai[_-]?coach/i,
       /pi[_-]?bridge/i,
       /pi[_-]?ingest/i,
       /action[_-]?queue/i,
+      /device[_-]?command/i,
       /automation/i,
       /\.insert\(/,
       /\.update\(/,

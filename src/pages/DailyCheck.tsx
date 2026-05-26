@@ -17,7 +17,7 @@
  * remain QuickLog note text only. CO2 is context-only.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -75,13 +75,17 @@ import {
   resolveDailyCheckPlantSelection,
 } from "@/lib/dailyCheckPlantSelectionRules";
 import {
+  DAILY_CHECK_NOTE_SAVED_TOAST,
+  DAILY_CHECK_SENSOR_SAVED_TOAST,
   DAILY_CHECK_SUCCESS_BODY,
   DAILY_CHECK_SUCCESS_TITLE,
   buildDailyCheckPostSubmitActions,
   formatDailyCheckLoggedAt,
   parseDailyCheckEntrySource,
   parseDailyCheckMethodHint,
+  resolveDailyCheckPostSubmitHref,
 } from "@/lib/dailyCheckPostSubmitRules";
+import { toast } from "sonner";
 
 import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingCard";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
@@ -89,35 +93,24 @@ import { deriveChangeContextFromReadings } from "@/lib/manualSensorSnapshotChang
 
 function useQueryParam(name: string): string | null {
   const loc = useLocation();
-  return useMemo(
-    () => new URLSearchParams(loc.search).get(name),
-    [loc.search, name],
-  );
+  return useMemo(() => new URLSearchParams(loc.search).get(name), [loc.search, name]);
 }
 
 export default function DailyCheck() {
+  const navigate = useNavigate();
   const { data: tents = [], isLoading: tentsLoading } = useTents();
   const { data: plants = [], isLoading: plantsLoading } = usePlants();
   const initialPlantId = useQueryParam("plantId");
   const fromParam = useQueryParam("from");
-  const entrySource = useMemo(
-    () => parseDailyCheckEntrySource(fromParam),
-    [fromParam],
-  );
+  const entrySource = useMemo(() => parseDailyCheckEntrySource(fromParam), [fromParam]);
   const methodParam = useQueryParam("method");
-  const methodHint = useMemo(
-    () => parseDailyCheckMethodHint(methodParam),
-    [methodParam],
-  );
+  const methodHint = useMemo(() => parseDailyCheckMethodHint(methodParam), [methodParam]);
   const { urlGrowId } = useScopedGrow();
-
 
   const [plantId, setPlantId] = useState<string>("");
   const [tentId, setTentId] = useState<string>("");
   const [step, setStep] = useState<DailyGrowCheckStep>("select");
-  const [state, setState] = useState<DailyGrowCheckState>(
-    INITIAL_DAILY_GROW_CHECK_STATE,
-  );
+  const [state, setState] = useState<DailyGrowCheckState>(INITIAL_DAILY_GROW_CHECK_STATE);
   const [quickLogOpen, setQuickLogOpen] = useState(false);
 
   // Pure resolution of the ?plantId= URL param against the active plant
@@ -182,10 +175,7 @@ export default function DailyCheck() {
     () => plants.find((p) => p.id === plantId) ?? null,
     [plantId, plants],
   );
-  const selectedTent = useMemo(
-    () => tents.find((t) => t.id === tentId) ?? null,
-    [tentId, tents],
-  );
+  const selectedTent = useMemo(() => tents.find((t) => t.id === tentId) ?? null, [tentId, tents]);
   const growId = (selectedPlant as { grow_id?: string | null } | null)?.grow_id ?? null;
 
   const guard = evaluateDailyGrowCheckGuard({
@@ -199,9 +189,7 @@ export default function DailyCheck() {
   // `verdant:entry-created` window event, which is dispatched ONLY after a
   // successful insert. Failed submits never set this state.
   const [lastSubmittedAt, setLastSubmittedAt] = useState<number | null>(null);
-  const [lastSubmittedSource, setLastSubmittedSource] = useState<
-    "note" | "sensor" | null
-  >(null);
+  const [lastSubmittedSource, setLastSubmittedSource] = useState<"note" | "sensor" | null>(null);
 
   // Listen for QuickLog success to mark steps as added + drive confirmation.
   // We prefer the `createdAt` carried on the event detail (set by QuickLog
@@ -231,9 +219,7 @@ export default function DailyCheck() {
       setLastSubmittedAt(Number.isFinite(parsed) ? parsed : Date.now());
       setLastSubmittedSource("sensor");
       setState((s) =>
-        step === "manual" && s.manual === "pending"
-          ? { ...s, manual: "added" }
-          : s,
+        step === "manual" && s.manual === "pending" ? { ...s, manual: "added" } : s,
       );
     }
     window.addEventListener("verdant:entry-created", onEntry);
@@ -252,11 +238,23 @@ export default function DailyCheck() {
       }),
     [selectedPlant?.id, entrySource],
   );
-
-  const loggedAtLabel = useMemo(
-    () => formatDailyCheckLoggedAt(lastSubmittedAt),
-    [lastSubmittedAt],
+  const postSubmitHref = useMemo(
+    () =>
+      resolveDailyCheckPostSubmitHref({
+        plantId: selectedPlant?.id ?? null,
+        source: entrySource,
+      }),
+    [selectedPlant?.id, entrySource],
   );
+
+  const loggedAtLabel = useMemo(() => formatDailyCheckLoggedAt(lastSubmittedAt), [lastSubmittedAt]);
+
+  function handleSubmitSuccess(method: "note" | "sensor") {
+    toast.success(
+      method === "note" ? DAILY_CHECK_NOTE_SAVED_TOAST : DAILY_CHECK_SENSOR_SAVED_TOAST,
+    );
+    navigate(postSubmitHref);
+  }
 
   // Pull the latest manual readings for the current tent so we can show a
   // compact "Changed since last snapshot" panel after a sensor save.
@@ -281,7 +279,9 @@ export default function DailyCheck() {
   return (
     <div className="max-w-2xl mx-auto pb-24" data-testid="daily-grow-check-page">
       <Button asChild variant="ghost" size="sm" className="mb-3">
-        <Link to="/"><ArrowLeft className="h-4 w-4" /> Dashboard</Link>
+        <Link to="/">
+          <ArrowLeft className="h-4 w-4" /> Dashboard
+        </Link>
       </Button>
       <PageHeader
         title="Daily Grow Check"
@@ -323,10 +323,7 @@ export default function DailyCheck() {
           aria-live="polite"
         >
           <div className="flex items-start gap-2">
-            <CheckCircle2
-              className="h-4 w-4 mt-0.5 text-emerald-400 shrink-0"
-              aria-hidden="true"
-            />
+            <CheckCircle2 className="h-4 w-4 mt-0.5 text-emerald-400 shrink-0" aria-hidden="true" />
             <div className="min-w-0">
               <div
                 className="text-sm font-semibold"
@@ -367,9 +364,7 @@ export default function DailyCheck() {
                   First snapshot for this tent
                 </p>
               ) : changeContext.deltas.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  No comparable metrics moved.
-                </p>
+                <p className="text-xs text-muted-foreground">No comparable metrics moved.</p>
               ) : (
                 <ul
                   className="flex flex-wrap gap-x-3 gap-y-1 text-xs"
@@ -472,8 +467,8 @@ export default function DailyCheck() {
                   Choose today's check
                 </h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Either path counts. Logging a check does not mean the plant
-                  is healthy — it just records what you observed today.
+                  Either path counts. Logging a check does not mean the plant is healthy — it just
+                  records what you observed today.
                 </p>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
@@ -500,9 +495,7 @@ export default function DailyCheck() {
                 <Button
                   variant="outline"
                   className={`h-auto py-3 flex-col items-start gap-1 ${
-                    methodHint === "sensor" && !!selectedPlant?.tent_id
-                      ? "ring-2 ring-primary"
-                      : ""
+                    methodHint === "sensor" && !!selectedPlant?.tent_id ? "ring-2 ring-primary" : ""
                   }`}
                   data-testid="daily-grow-check-choose-snapshot"
                   data-method-focused={
@@ -537,7 +530,9 @@ export default function DailyCheck() {
           {step !== "done" && (
             <div className="glass rounded-2xl p-3 mb-4" data-testid="daily-grow-check-progress">
               <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
-                <span>Step {progress.index + 1} of {progress.total}</span>
+                <span>
+                  Step {progress.index + 1} of {progress.total}
+                </span>
                 <span className="capitalize">{step}</span>
               </div>
               <Progress value={progress.percent} className="h-1.5" />
@@ -546,11 +541,17 @@ export default function DailyCheck() {
 
           {/* Step content */}
           {step === "select" && (
-            <StepCard title="Step 1 · Select Current Tent / Plant" icon={<Sprout className="h-4 w-4" />}>
+            <StepCard
+              title="Step 1 · Select Current Tent / Plant"
+              icon={<Sprout className="h-4 w-4" />}
+            >
               <div className="grid gap-3">
                 <div>
                   <Label className="text-xs">Current Plant</Label>
-                  <Select value={plantId || "__none"} onValueChange={(v) => setPlantId(v === "__none" ? "" : v)}>
+                  <Select
+                    value={plantId || "__none"}
+                    onValueChange={(v) => setPlantId(v === "__none" ? "" : v)}
+                  >
                     <SelectTrigger data-testid="daily-grow-check-plant-select">
                       <SelectValue placeholder="Select a plant" />
                     </SelectTrigger>
@@ -558,7 +559,8 @@ export default function DailyCheck() {
                       <SelectItem value="__none">No specific plant</SelectItem>
                       {plants.map((p) => (
                         <SelectItem key={p.id} value={p.id}>
-                          {p.name}{p.strain ? ` · ${p.strain}` : ""}
+                          {p.name}
+                          {p.strain ? ` · ${p.strain}` : ""}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -566,13 +568,19 @@ export default function DailyCheck() {
                 </div>
                 <div>
                   <Label className="text-xs">Current Tent</Label>
-                  <Select value={tentId} onValueChange={setTentId} disabled={!!selectedPlant?.tent_id}>
+                  <Select
+                    value={tentId}
+                    onValueChange={setTentId}
+                    disabled={!!selectedPlant?.tent_id}
+                  >
                     <SelectTrigger data-testid="daily-grow-check-tent-select">
                       <SelectValue placeholder="Select a tent" />
                     </SelectTrigger>
                     <SelectContent>
                       {tents.map((t) => (
-                        <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -601,7 +609,10 @@ export default function DailyCheck() {
           )}
 
           {step === "environment" && (
-            <StepCard title="Step 2 · Review Current Environment" icon={<Gauge className="h-4 w-4" />}>
+            <StepCard
+              title="Step 2 · Review Current Environment"
+              icon={<Gauge className="h-4 w-4" />}
+            >
               <PlantStatusStrip
                 tentId={tentId || null}
                 tentName={selectedTent?.name ?? null}
@@ -615,10 +626,15 @@ export default function DailyCheck() {
           )}
 
           {step === "manual" && (
-            <StepCard title="Step 3 · Add Manual Sensor Snapshot" icon={<Gauge className="h-4 w-4" />}>
+            <StepCard
+              title="Step 3 · Add Manual Sensor Snapshot"
+              icon={<Gauge className="h-4 w-4" />}
+            >
               <ManualSensorReadingCard
                 tents={tents.map((t) => ({ id: t.id, name: t.name }))}
                 defaultTentId={tentId || undefined}
+                successMessage={DAILY_CHECK_SENSOR_SAVED_TOAST}
+                onSaved={() => handleSubmitSuccess("sensor")}
               />
               <p className="text-[11px] text-muted-foreground mt-2">
                 Saved as <strong>manual</strong>, not live sensor data. Temperature uses °F.
@@ -668,7 +684,9 @@ export default function DailyCheck() {
                     size="sm"
                     variant="outline"
                     className="flex-1"
-                    onClick={() => markAndAdvance("quicklog", state.quicklog === "added" ? "added" : "added")}
+                    onClick={() =>
+                      markAndAdvance("quicklog", state.quicklog === "added" ? "added" : "added")
+                    }
                     disabled={state.quicklog !== "added"}
                     data-testid="daily-grow-check-mark-quicklog-added"
                   >
@@ -691,9 +709,8 @@ export default function DailyCheck() {
           {step === "handheld" && (
             <StepCard title="Step 5 · Handheld Readings" icon={<Wrench className="h-4 w-4" />}>
               <p className="text-sm text-muted-foreground mb-3">
-                Optional. Use the Hardware readings block inside Quick Log
-                (Spider Farmer pH/EC pen, PAR/PPFD meter). Saved as note text only —
-                never as live sensor data.
+                Optional. Use the Hardware readings block inside Quick Log (Spider Farmer pH/EC pen,
+                PAR/PPFD meter). Saved as note text only — never as live sensor data.
               </p>
               <div className="flex flex-col gap-2">
                 <Button
@@ -713,7 +730,9 @@ export default function DailyCheck() {
                     size="sm"
                     variant="outline"
                     className="flex-1"
-                    onClick={() => markAndAdvance("handheld", state.handheld === "added" ? "added" : "added")}
+                    onClick={() =>
+                      markAndAdvance("handheld", state.handheld === "added" ? "added" : "added")
+                    }
                     disabled={state.handheld !== "added"}
                     data-testid="daily-grow-check-mark-handheld-added"
                   >
@@ -734,7 +753,10 @@ export default function DailyCheck() {
           )}
 
           {step === "review" && (
-            <StepCard title="Step 6 · Review Alerts & Pending Tasks" icon={<Bell className="h-4 w-4" />}>
+            <StepCard
+              title="Step 6 · Review Alerts & Pending Tasks"
+              icon={<Bell className="h-4 w-4" />}
+            >
               <p className="text-xs text-muted-foreground mb-2">
                 Read-only review. Nothing is approved, dismissed, or executed here.
               </p>
@@ -751,15 +773,14 @@ export default function DailyCheck() {
               <div className="grid grid-cols-2 gap-2 mt-3">
                 <Button
                   variant="outline"
-                  onClick={() => setState((s) => ({ ...s, alertsReviewed: true, tasksReviewed: true }))}
+                  onClick={() =>
+                    setState((s) => ({ ...s, alertsReviewed: true, tasksReviewed: true }))
+                  }
                   data-testid="daily-grow-check-mark-reviewed"
                 >
                   <Check className="h-4 w-4" /> Mark reviewed
                 </Button>
-                <Button
-                  onClick={() => setStep("done")}
-                  data-testid="daily-grow-check-finish"
-                >
+                <Button onClick={() => setStep("done")} data-testid="daily-grow-check-finish">
                   Finish <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
@@ -768,13 +789,13 @@ export default function DailyCheck() {
 
           {step === "done" && (
             <StepCard title="Today's check is saved" icon={<CheckCircle2 className="h-4 w-4" />}>
-              <p className="text-sm text-muted-foreground mb-3" data-testid="daily-grow-check-done-subtitle">
+              <p
+                className="text-sm text-muted-foreground mb-3"
+                data-testid="daily-grow-check-done-subtitle"
+              >
                 Review what changed below, then jump back into the plant or tent.
               </p>
-              <ul
-                className="grid gap-2"
-                data-testid="daily-grow-check-summary"
-              >
+              <ul className="grid gap-2" data-testid="daily-grow-check-summary">
                 {buildDailyGrowCheckSummary(state).map((row) => (
                   <li
                     key={row.key}
@@ -783,24 +804,30 @@ export default function DailyCheck() {
                     data-outcome={row.outcome}
                   >
                     <span className="text-sm flex items-center gap-2">
-                      {row.key === "alerts" ? <Bell className="h-3.5 w-3.5" /> :
-                       row.key === "tasks" ? <ListTodo className="h-3.5 w-3.5" /> :
-                       row.key === "manual" ? <Gauge className="h-3.5 w-3.5" /> :
-                       row.key === "handheld" ? <Wrench className="h-3.5 w-3.5" /> :
-                       <Sparkles className="h-3.5 w-3.5" />}
+                      {row.key === "alerts" ? (
+                        <Bell className="h-3.5 w-3.5" />
+                      ) : row.key === "tasks" ? (
+                        <ListTodo className="h-3.5 w-3.5" />
+                      ) : row.key === "manual" ? (
+                        <Gauge className="h-3.5 w-3.5" />
+                      ) : row.key === "handheld" ? (
+                        <Wrench className="h-3.5 w-3.5" />
+                      ) : (
+                        <Sparkles className="h-3.5 w-3.5" />
+                      )}
                       {row.label}
                     </span>
-                    <Badge variant="outline" data-testid={`daily-grow-check-summary-${row.key}-label`}>
+                    <Badge
+                      variant="outline"
+                      data-testid={`daily-grow-check-summary-${row.key}-label`}
+                    >
                       {formatOutcomeLabel(row.outcome)}
                     </Badge>
                   </li>
                 ))}
               </ul>
 
-              <div
-                className="grid gap-2 mt-4"
-                data-testid="daily-grow-check-review-links"
-              >
+              <div className="grid gap-2 mt-4" data-testid="daily-grow-check-review-links">
                 {buildDailyGrowCheckReviewLinks({
                   plantId: selectedPlant?.id ?? null,
                   tentId: tentId || null,
@@ -873,6 +900,8 @@ export default function DailyCheck() {
           <QuickLog
             open={quickLogOpen}
             onOpenChange={setQuickLogOpen}
+            onCreated={() => handleSubmitSuccess("note")}
+            successMessage={DAILY_CHECK_NOTE_SAVED_TOAST}
             prefill={{
               plantId: selectedPlant?.id ?? null,
               growId,

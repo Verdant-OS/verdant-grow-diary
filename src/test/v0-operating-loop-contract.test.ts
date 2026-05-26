@@ -20,10 +20,7 @@ import { isSnapshotPersistable, selectPersistableAlerts } from "@/lib/environmen
 import type { EnvironmentAlert } from "@/lib/environmentAlerts";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
 import type { SensorQuality } from "@/lib/sensorQuality";
-import {
-  buildActionQueueDraftFromAlert,
-  actionMatchesAlert,
-} from "@/lib/alertToActionQueueRules";
+import { buildActionQueueDraftFromAlert, actionMatchesAlert } from "@/lib/alertToActionQueueRules";
 import {
   ACTION_QUEUE_SOURCE_VALUES,
   extractSourceAlertId,
@@ -84,9 +81,7 @@ describe("V0 loop · manual readings count as real input", () => {
 
   it("rejects stale, unavailable, demo, or non-live/manual snapshots", () => {
     const fresh = freshManualSnapshot();
-    expect(
-      isSnapshotPersistable({ snapshot: null, quality: "good" }),
-    ).toBe(false);
+    expect(isSnapshotPersistable({ snapshot: null, quality: "good" })).toBe(false);
     expect(
       isSnapshotPersistable({
         snapshot: { ...fresh, source: "diary" },
@@ -99,9 +94,7 @@ describe("V0 loop · manual readings count as real input", () => {
         quality: "good",
       }),
     ).toBe(false);
-    expect(
-      isSnapshotPersistable({ snapshot: fresh, quality: "unavailable" }),
-    ).toBe(false);
+    expect(isSnapshotPersistable({ snapshot: fresh, quality: "unavailable" })).toBe(false);
     expect(
       isSnapshotPersistable({
         snapshot: fresh,
@@ -114,9 +107,7 @@ describe("V0 loop · manual readings count as real input", () => {
       ...fresh,
       ts: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
     };
-    expect(
-      isSnapshotPersistable({ snapshot: stale, quality: "good" }),
-    ).toBe(false);
+    expect(isSnapshotPersistable({ snapshot: stale, quality: "good" })).toBe(false);
   });
 });
 
@@ -170,13 +161,11 @@ describe("V0 loop · AlertDetail is the handoff point", () => {
   it("exposes a click-gated Add to Action Queue control", () => {
     expect(ALERT_DETAIL).toMatch(/onClick=\{addAlertToActionQueue\}/);
     expect(ALERT_DETAIL).toMatch(/Add to Action Queue/);
-    expect(ALERT_DETAIL).toMatch(/Already in Action Queue/);
+    expect(ALERT_DETAIL).toMatch(/Action already queued/);
   });
 
   it("does not auto-insert action_queue rows on render", () => {
-    expect(ALERT_DETAIL).not.toMatch(
-      /useEffect\([\s\S]{0,800}action_queue[\s\S]{0,200}\.insert\(/,
-    );
+    expect(ALERT_DETAIL).not.toMatch(/useEffect\([\s\S]{0,800}action_queue[\s\S]{0,200}\.insert\(/);
   });
 });
 
@@ -230,7 +219,6 @@ describe("V0 loop · action drafts are safe by construction", () => {
     expect(block).toMatch(/grow_id\s*:/);
     expect(block).not.toMatch(/\buser_id\s*:/);
   });
-
 });
 
 // ============================================================================
@@ -253,9 +241,7 @@ describe("V0 loop · provenance back-pointers", () => {
 
   it("ActionQueue can filter by source kind", () => {
     expect(ACTION_QUEUE).toMatch(/getActionQueueSourceKind|isAlertDerived/);
-    expect(ACTION_QUEUE).toMatch(
-      /ACTION_QUEUE_SOURCE_VALUES|environment_alert/,
-    );
+    expect(ACTION_QUEUE).toMatch(/ACTION_QUEUE_SOURCE_VALUES|environment_alert/);
   });
 
   it("ActionDetail parses back-pointer and links to source alert", () => {
@@ -273,13 +259,23 @@ describe("V0 loop · provenance back-pointers", () => {
     const a = { id: alertId, grow_id: "g1" };
     expect(
       actionMatchesAlert(
-        { source: "environment_alert", status: "pending_approval", reason: `x [alert:${alertId}]`, grow_id: "g1" },
+        {
+          source: "environment_alert",
+          status: "pending_approval",
+          reason: `x [alert:${alertId}]`,
+          grow_id: "g1",
+        },
         a,
       ),
     ).toBe(true);
     expect(
       actionMatchesAlert(
-        { source: "ai_coach", status: "pending_approval", reason: `x [alert:${alertId}]`, grow_id: "g1" },
+        {
+          source: "ai_coach",
+          status: "pending_approval",
+          reason: `x [alert:${alertId}]`,
+          grow_id: "g1",
+        },
         a,
       ),
     ).toBe(false);
@@ -297,28 +293,20 @@ describe("V0 loop · stale-warning behavior", () => {
   });
 
   it("AlertDetail warns when closed alert has pending related action", () => {
-    expect(
-      hasPendingActionsForClosedAlert("resolved", [{ status: "pending_approval" }]),
-    ).toBe(true);
-    expect(
-      hasPendingActionsForClosedAlert("dismissed", [{ status: "pending_approval" }]),
-    ).toBe(true);
-    expect(
-      hasPendingActionsForClosedAlert("open", [{ status: "pending_approval" }]),
-    ).toBe(false);
+    expect(hasPendingActionsForClosedAlert("resolved", [{ status: "pending_approval" }])).toBe(
+      true,
+    );
+    expect(hasPendingActionsForClosedAlert("dismissed", [{ status: "pending_approval" }])).toBe(
+      true,
+    );
+    expect(hasPendingActionsForClosedAlert("open", [{ status: "pending_approval" }])).toBe(false);
     expect(ALERT_DETAIL).toMatch(/data-testid="stale-action-warning"/);
   });
 
   it("ActionDetail warns when pending action's source alert is closed", () => {
-    expect(
-      shouldWarnPendingActionHasClosedSourceAlert("pending_approval", "resolved"),
-    ).toBe(true);
-    expect(
-      shouldWarnPendingActionHasClosedSourceAlert("pending_approval", "dismissed"),
-    ).toBe(true);
-    expect(
-      shouldWarnPendingActionHasClosedSourceAlert("approved", "resolved"),
-    ).toBe(false);
+    expect(shouldWarnPendingActionHasClosedSourceAlert("pending_approval", "resolved")).toBe(true);
+    expect(shouldWarnPendingActionHasClosedSourceAlert("pending_approval", "dismissed")).toBe(true);
+    expect(shouldWarnPendingActionHasClosedSourceAlert("approved", "resolved")).toBe(false);
     expect(ACTION_DETAIL).toMatch(/data-testid="stale-source-alert-warning"/);
   });
 });
@@ -337,9 +325,7 @@ describe("V0 loop · Coach handoff still works", () => {
 // ============================================================================
 describe("V0 loop · rules live outside JSX", () => {
   it("ActionDetail does not inline closed-status comparisons", () => {
-    expect(ACTION_DETAIL).not.toMatch(
-      /sourceAlertStatus\s*===\s*["'](?:resolved|dismissed)["']/,
-    );
+    expect(ACTION_DETAIL).not.toMatch(/sourceAlertStatus\s*===\s*["'](?:resolved|dismissed)["']/);
   });
 
   it("Detail pages do not inline a raw [alert:...] regex", () => {
@@ -367,10 +353,7 @@ describe("V0 loop · static safety", () => {
   it("contains no device-control or service_role surface", () => {
     for (const f of FILES) {
       const src = read(f);
-      expect(
-        src,
-        `${f} must not reference device/service_role surfaces`,
-      ).not.toMatch(
+      expect(src, `${f} must not reference device/service_role surfaces`).not.toMatch(
         /service_role|mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b/i,
       );
     }

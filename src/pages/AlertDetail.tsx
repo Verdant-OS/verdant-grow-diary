@@ -34,24 +34,15 @@ import {
   type AlertStatusRow,
 } from "@/lib/alerts";
 import { useAlertEvents } from "@/hooks/useAlertEvents";
-import {
-  actionDetailPath,
-  alertsPath,
-  growDetailPath,
-} from "@/lib/routes";
-import {
-  actionMatchesAlert,
-  buildActionQueueDraftFromAlert,
-} from "@/lib/alertToActionQueueRules";
+import { actionDetailPath, alertsPath, growDetailPath } from "@/lib/routes";
+import { actionMatchesAlert, buildActionQueueDraftFromAlert } from "@/lib/alertToActionQueueRules";
 import {
   getActionQueueSourceLabel,
   hasPendingActionsForClosedAlert,
   isActionDerivedFromAlert,
 } from "@/lib/actionQueueProvenanceRules";
 
-
 import { supabase } from "@/integrations/supabase/client";
-
 
 type LoadStatus = "idle" | "loading" | "ok" | "not_found" | "error";
 
@@ -90,8 +81,6 @@ interface RelatedActionRow {
   created_at: string | null;
 }
 
-
-
 export default function AlertDetail() {
   const { alertId } = useParams<{ alertId: string }>();
   const [status, setStatus] = useState<LoadStatus>("idle");
@@ -102,8 +91,6 @@ export default function AlertDetail() {
   const [queuing, setQueuing] = useState(false);
   const [relatedActions, setRelatedActions] = useState<RelatedActionRow[]>([]);
   const [relatedLoaded, setRelatedLoaded] = useState(false);
-
-
 
   const load = useCallback(async () => {
     if (!alertId) return;
@@ -155,9 +142,7 @@ export default function AlertDetail() {
       });
       toast.success(`Alert ${label}d`);
     } catch (logErr) {
-      toast.warning(
-        `Alert ${label}d, but audit log failed: ${(logErr as Error).message}`,
-      );
+      toast.warning(`Alert ${label}d, but audit log failed: ${(logErr as Error).message}`);
     }
     setEventsKey((k) => k + 1);
   };
@@ -173,7 +158,6 @@ export default function AlertDetail() {
     () => hasPendingActionsForClosedAlert(alert?.status, relatedActions),
     [alert?.status, relatedActions],
   );
-
 
   // Idempotency probe: look for an existing pending/approved action row that
   // already references this alert via its back-pointer token.
@@ -191,9 +175,7 @@ export default function AlertDetail() {
         .like("reason", `%[alert:${alert.id}]%`)
         .limit(1);
       if (cancelled || probeErr) return;
-      const match = (data ?? []).find((r) =>
-        actionMatchesAlert(r as never, alert),
-      );
+      const match = (data ?? []).find((r) => actionMatchesAlert(r as never, alert));
       if (match) setExistingActionId(match.id);
     })();
     return () => {
@@ -241,8 +223,6 @@ export default function AlertDetail() {
     };
   }, [alert]);
 
-
-
   async function addAlertToActionQueue() {
     if (!alert || !draftResult || !draftResult.ok || existingActionId) return;
     setQueuing(true);
@@ -272,10 +252,9 @@ export default function AlertDetail() {
         msg.includes("row-level security") ||
         msg.includes("violates")
       ) {
-        toast.error(
-          "This action cannot be queued until the plant/tent is assigned to this grow.",
-          { description: "Open Lineage Repair to assign tents to this grow." },
-        );
+        toast.error("This action cannot be queued until the plant/tent is assigned to this grow.", {
+          description: "Open Lineage Repair to assign tents to this grow.",
+        });
         return;
       }
       toast.error(insErr.message);
@@ -283,16 +262,14 @@ export default function AlertDetail() {
     }
     if (inserted?.id) {
       setExistingActionId(inserted.id);
-      const { error: auditError } = await supabase
-        .from("action_queue_events")
-        .insert({
-          action_queue_id: inserted.id,
-          grow_id: inserted.grow_id ?? draft.grow_id,
-          event_type: "created",
-          previous_status: null,
-          new_status: "pending_approval",
-          note: draft.audit_note,
-        });
+      const { error: auditError } = await supabase.from("action_queue_events").insert({
+        action_queue_id: inserted.id,
+        grow_id: inserted.grow_id ?? draft.grow_id,
+        event_type: "created",
+        previous_status: null,
+        new_status: "pending_approval",
+        note: draft.audit_note,
+      });
       if (auditError) {
         setQueuing(false);
         toast.warning("Action queued, but audit log failed.", {
@@ -304,8 +281,6 @@ export default function AlertDetail() {
     setQueuing(false);
     toast.success("Action queued for approval.");
   }
-
-
 
   return (
     <div>
@@ -369,19 +344,14 @@ export default function AlertDetail() {
                 {alert.source}
               </Badge>
             </div>
-            <h2 className="font-display font-semibold text-base">
-              {alert.title}
-            </h2>
+            <h2 className="font-display font-semibold text-base">{alert.title}</h2>
             <p className="text-sm text-muted-foreground mt-1">{alert.reason}</p>
 
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs mt-4">
               <div className="rounded-lg border border-border/40 bg-secondary/20 p-2">
                 <dt className="uppercase tracking-wider text-muted-foreground">Grow</dt>
                 <dd className="font-medium">
-                  <Link
-                    to={growDetailPath(alert.grow_id)}
-                    className="text-primary hover:underline"
-                  >
+                  <Link to={growDetailPath(alert.grow_id)} className="text-primary hover:underline">
                     {alert.grow_id}
                   </Link>
                 </dd>
@@ -448,11 +418,7 @@ export default function AlertDetail() {
                   size="sm"
                   variant="outline"
                   onClick={() =>
-                    runStatusChange(
-                      "acknowledged",
-                      () => acknowledgeAlert(alert.id),
-                      "acknowledge",
-                    )
+                    runStatusChange("acknowledged", () => acknowledgeAlert(alert.id), "acknowledge")
                   }
                 >
                   Acknowledge
@@ -463,11 +429,7 @@ export default function AlertDetail() {
                   size="sm"
                   variant="outline"
                   onClick={() =>
-                    runStatusChange(
-                      "resolved",
-                      () => resolveAlert(alert.id),
-                      "resolve",
-                    )
+                    runStatusChange("resolved", () => resolveAlert(alert.id), "resolve")
                   }
                 >
                   Resolve
@@ -478,11 +440,7 @@ export default function AlertDetail() {
                   size="sm"
                   variant="ghost"
                   onClick={() =>
-                    runStatusChange(
-                      "dismissed",
-                      () => dismissAlert(alert.id),
-                      "dismiss",
-                    )
+                    runStatusChange("dismissed", () => dismissAlert(alert.id), "dismiss")
                   }
                 >
                   Dismiss
@@ -492,13 +450,7 @@ export default function AlertDetail() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() =>
-                    runStatusChange(
-                      "reopened",
-                      () => reopenAlert(alert.id),
-                      "reopen",
-                    )
-                  }
+                  onClick={() => runStatusChange("reopened", () => reopenAlert(alert.id), "reopen")}
                 >
                   Reopen
                 </Button>
@@ -514,9 +466,13 @@ export default function AlertDetail() {
                   <ListChecks className="h-4 w-4 mt-0.5 text-muted-foreground" />
                   <div className="flex-1">
                     <p className="text-xs font-medium">Suggested action</p>
+                    <p className="text-[11px] text-muted-foreground/90 mt-0.5">
+                      Verdant can prepare a recommended action for review. Nothing is executed
+                      automatically.
+                    </p>
                     {draftResult && draftResult.ok ? (
                       <>
-                        <p className="text-xs text-muted-foreground mt-0.5">
+                        <p className="text-xs text-muted-foreground mt-1">
                           {draftResult.draft.suggested_change}
                         </p>
                         <p className="text-[10px] text-muted-foreground/80 mt-1">
@@ -524,15 +480,15 @@ export default function AlertDetail() {
                         </p>
                       </>
                     ) : (
-                      <p className="text-xs text-muted-foreground mt-0.5">
+                      <p className="text-xs text-muted-foreground mt-1">
                         Not enough alert context to draft a safe action.
                       </p>
                     )}
                     <div className="flex flex-wrap gap-2 mt-2">
                       {existingActionId ? (
-                        <Button asChild size="sm" variant="outline">
+                        <Button asChild size="sm" variant="secondary">
                           <Link to={`/actions/${existingActionId}`}>
-                            Already in Action Queue
+                            ✓ Action already queued — view details
                           </Link>
                         </Button>
                       ) : (
@@ -552,17 +508,12 @@ export default function AlertDetail() {
             )}
           </section>
 
-          <section
-            className="glass rounded-2xl p-4"
-            aria-label="Related Action Queue Items"
-          >
+          <section className="glass rounded-2xl p-4" aria-label="Related Action Queue Items">
             <div className="flex items-center gap-2 mb-2">
               <ListChecks className="h-4 w-4 text-muted-foreground" />
               <h2 className="font-display font-semibold text-sm">
                 Related Action Queue Items{" "}
-                <span className="text-xs text-muted-foreground">
-                  {relatedActions.length}
-                </span>
+                <span className="text-xs text-muted-foreground">{relatedActions.length}</span>
               </h2>
             </div>
             {showStaleActionWarning && (
@@ -572,9 +523,8 @@ export default function AlertDetail() {
                 data-testid="stale-action-warning"
                 className="mb-3 rounded-lg border border-amber-500/60 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300"
               >
-                This alert is no longer open, but related actions are still
-                pending review. Confirm the current grow conditions before
-                approving.
+                This alert is no longer open, but related actions are still pending review. Confirm
+                the current grow conditions before approving.
               </div>
             )}
 
@@ -587,24 +537,15 @@ export default function AlertDetail() {
             ) : (
               <ul className="space-y-2">
                 {relatedActions.map((a) => (
-                  <li
-                    key={a.id}
-                    className="rounded-lg border border-border/40 bg-secondary/20 p-2"
-                  >
+                  <li key={a.id} className="rounded-lg border border-border/40 bg-secondary/20 p-2">
                     <div className="flex items-center gap-2 flex-wrap">
                       {a.status && (
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] uppercase"
-                        >
+                        <Badge variant="outline" className="text-[10px] uppercase">
                           {a.status}
                         </Badge>
                       )}
                       {a.risk_level && (
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] uppercase"
-                        >
+                        <Badge variant="outline" className="text-[10px] uppercase">
                           {a.risk_level}
                         </Badge>
                       )}
@@ -637,15 +578,11 @@ export default function AlertDetail() {
             )}
           </section>
 
-
           <section className="glass rounded-2xl p-4" aria-label="Alert history">
             <div className="flex items-center gap-2 mb-2">
               <History className="h-4 w-4 text-muted-foreground" />
               <h2 className="font-display font-semibold text-sm">
-                History{" "}
-                <span className="text-xs text-muted-foreground">
-                  {events.length}
-                </span>
+                History <span className="text-xs text-muted-foreground">{events.length}</span>
               </h2>
             </div>
             {events.length === 0 ? (
@@ -653,10 +590,7 @@ export default function AlertDetail() {
             ) : (
               <ol className="space-y-1 pl-3 border-l border-border/40">
                 {events.map((e) => (
-                  <li
-                    key={e.id}
-                    className="text-xs text-muted-foreground"
-                  >
+                  <li key={e.id} className="text-xs text-muted-foreground">
                     <span className="font-medium">{e.event_type}</span>
                     {e.previous_status && e.new_status ? (
                       <span>
@@ -669,11 +603,7 @@ export default function AlertDetail() {
                         addSuffix: true,
                       })}
                     </span>
-                    {e.note ? (
-                      <div className="text-[11px] opacity-80 mt-0.5">
-                        {e.note}
-                      </div>
-                    ) : null}
+                    {e.note ? <div className="text-[11px] opacity-80 mt-0.5">{e.note}</div> : null}
                   </li>
                 ))}
               </ol>

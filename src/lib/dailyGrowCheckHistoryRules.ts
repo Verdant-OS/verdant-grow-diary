@@ -75,10 +75,7 @@ function dayKeyOf(d: Date): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
-const MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function dayLabel(dayKey: string, nowKey: string, yesterdayKey: string): string {
   if (dayKey === nowKey) return "Today";
@@ -115,9 +112,7 @@ function sortNewestFirst(items: NormalizedActivity[]): NormalizedActivity[] {
   });
 }
 
-export function buildDailyGrowCheckHistory(
-  input: DailyHistoryInput,
-): DailyHistoryRow[] {
+export function buildDailyGrowCheckHistory(input: DailyHistoryInput): DailyHistoryRow[] {
   const days = Math.max(1, Math.min(14, Math.floor(input.days)));
   const windowMs = Math.max(1, input.combineWindowMinutes ?? 60) * 60_000;
   const tentLevel = (input.plantsInTentCount ?? 0) > 1;
@@ -170,12 +165,8 @@ export function buildDailyGrowCheckHistory(
     .filter((x): x is NormalizedActivity => x !== null);
 
   const rows: DailyHistoryRow[] = dayBuckets.map((b) => {
-    const dayManuals = sortNewestFirst(
-      manuals.filter((m) => m.ts >= b.start && m.ts < b.end),
-    );
-    const dayDiary = sortNewestFirst(
-      diary.filter((m) => m.ts >= b.start && m.ts < b.end),
-    );
+    const dayManuals = sortNewestFirst(manuals.filter((m) => m.ts >= b.start && m.ts < b.end));
+    const dayDiary = sortNewestFirst(diary.filter((m) => m.ts >= b.start && m.ts < b.end));
     const hasManual = dayManuals.length > 0;
     const hasQuickLog = dayDiary.length > 0;
 
@@ -194,9 +185,7 @@ export function buildDailyGrowCheckHistory(
         activityLabel = HISTORY_LABELS.both;
       } else if (tm >= td) {
         kind = tentLevel ? "tent-manual-only" : "manual-only";
-        activityLabel = tentLevel
-          ? HISTORY_LABELS.tentManualOnly
-          : HISTORY_LABELS.manualOnly;
+        activityLabel = tentLevel ? HISTORY_LABELS.tentManualOnly : HISTORY_LABELS.manualOnly;
       } else {
         kind = "quicklog-only";
         activityLabel = HISTORY_LABELS.quickLogOnly;
@@ -204,9 +193,7 @@ export function buildDailyGrowCheckHistory(
       latestAt = new Date(Math.max(tm, td)).toISOString();
     } else if (hasManual) {
       kind = tentLevel ? "tent-manual-only" : "manual-only";
-      activityLabel = tentLevel
-        ? HISTORY_LABELS.tentManualOnly
-        : HISTORY_LABELS.manualOnly;
+      activityLabel = tentLevel ? HISTORY_LABELS.tentManualOnly : HISTORY_LABELS.manualOnly;
       latestAt = new Date(dayManuals[0].ts).toISOString();
     } else {
       kind = "quicklog-only";
@@ -227,4 +214,12 @@ export function buildDailyGrowCheckHistory(
   });
 
   return rows; // already day desc
+}
+
+/**
+ * Returns true when at least one row in the history window has check
+ * activity. Pure — no fetching, no writes.
+ */
+export function hasDailyCheckActivity(rows: DailyHistoryRow[]): boolean {
+  return rows.some((r) => r.kind !== "none");
 }

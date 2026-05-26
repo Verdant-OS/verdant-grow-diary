@@ -229,6 +229,32 @@ export default function AlertDetail() {
     };
   }, [alert]);
 
+  // Read-only outcome rollup: grower-recorded action_outcome diary entries
+  // tied to this alert via details.source_alert_id. RLS handles ownership.
+  // No user_id in payloads. No inserts/updates/deletes.
+  useEffect(() => {
+    let cancelled = false;
+    setOutcomeRows([]);
+    if (!alert || !relatedLoaded || relatedActions.length === 0) return;
+    (async () => {
+      const { data, error: outcomeErr } = await supabase
+        .from("diary_entries")
+        .select("id,entry_at,created_at,note,details")
+        .eq("grow_id", alert.grow_id)
+        .contains("details", {
+          event_type: ACTION_OUTCOME_EVENT_TYPE,
+          source_alert_id: alert.id,
+        })
+        .order("entry_at", { ascending: false })
+        .limit(50);
+      if (cancelled || outcomeErr) return;
+      setOutcomeRows((data ?? []) as RawOutcomeDiaryRow[]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [alert, relatedLoaded, relatedActions.length]);
+
   async function addAlertToActionQueue() {
     if (!alert || !draftResult || !draftResult.ok || existingActionId) return;
     setQueuing(true);

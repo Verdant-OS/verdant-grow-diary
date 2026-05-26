@@ -39,6 +39,14 @@ export const WHAT_COUNTS_HINT =
 export const CTA_START_TODAY = "Start today's check";
 export const CTA_KEEP_RHYTHM = "Open today's check";
 
+export const ONBOARDING_HEADLINE = "Start today's grow check";
+export const ONBOARDING_BODY =
+  "Daily checks help Verdant connect plant notes with tent conditions. A check can come from a plant QuickLog or a manual environment snapshot for this plant's current tent.";
+export const ONBOARDING_SECONDARY =
+  "Even a short note counts. Log what changed, what you saw, or the current tent conditions.";
+export const CTA_QUICK_LOG = "Start Quick Log";
+export const CTA_ENV_SNAPSHOT = "Add environment snapshot";
+
 /**
  * Derive guidance from an existing ConsistencySummary. Deterministic.
  */
@@ -51,10 +59,9 @@ export function deriveDailyGrowCheckGuidance(
   if (!summary.hasAnyActivity) {
     return {
       state: "empty",
-      headline: "No checks logged yet",
-      body: `No check activity in the last ${summary.windowDays} days.`,
-      nextStep:
-        "Start with one quick note or a manual sensor snapshot today.",
+      headline: ONBOARDING_HEADLINE,
+      body: ONBOARDING_BODY,
+      nextStep: ONBOARDING_SECONDARY,
       ctaLabel: CTA_START_TODAY,
       whatCountsHint: WHAT_COUNTS_HINT,
       isPositive: false,
@@ -81,8 +88,7 @@ export function deriveDailyGrowCheckGuidance(
       body: `Missed ${summary.missedDays} day${
         summary.missedDays === 1 ? "" : "s"
       } in this window.`,
-      nextStep:
-        "Start with one quick note or sensor snapshot today — small is fine.",
+      nextStep: "Start with one quick note or sensor snapshot today — small is fine.",
       ctaLabel: CTA_START_TODAY,
       whatCountsHint: WHAT_COUNTS_HINT,
       isPositive: false,
@@ -93,8 +99,7 @@ export function deriveDailyGrowCheckGuidance(
     state: "today-unchecked",
     headline: "Today isn't checked yet",
     body: `Checked ${summary.checkedDays} of last ${summary.windowDays} days.`,
-    nextStep:
-      "Add one quick note or a manual sensor snapshot to mark today.",
+    nextStep: "Add one quick note or a manual sensor snapshot to mark today.",
     ctaLabel: CTA_START_TODAY,
     whatCountsHint: WHAT_COUNTS_HINT,
     isPositive: false,

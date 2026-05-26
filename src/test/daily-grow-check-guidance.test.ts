@@ -13,15 +13,22 @@ import {
   WHAT_COUNTS_HINT,
   CTA_START_TODAY,
   CTA_KEEP_RHYTHM,
+  ONBOARDING_HEADLINE,
+  ONBOARDING_BODY,
+  ONBOARDING_SECONDARY,
+  CTA_QUICK_LOG,
+  CTA_ENV_SNAPSHOT,
 } from "@/lib/dailyGrowCheckGuidanceRules";
 
-const baseSummary = (overrides: Partial<{
-  checkedDays: number;
-  missedDays: number;
-  todayHasActivity: boolean;
-  hasAnyActivity: boolean;
-  windowDays: number;
-}> = {}) => ({
+const baseSummary = (
+  overrides: Partial<{
+    checkedDays: number;
+    missedDays: number;
+    todayHasActivity: boolean;
+    hasAnyActivity: boolean;
+    windowDays: number;
+  }> = {},
+) => ({
   checkedDays: 0,
   missedDays: 7,
   todayHasActivity: false,
@@ -34,7 +41,8 @@ describe("deriveDailyGrowCheckGuidance · pure copy rules", () => {
   it("returns empty state when no activity", () => {
     const g = deriveDailyGrowCheckGuidance(baseSummary());
     expect(g.state).toBe("empty");
-    expect(g.headline).toMatch(/no checks logged yet/i);
+    expect(g.headline).toBe(ONBOARDING_HEADLINE);
+    expect(g.headline).toMatch(/start today's grow check/i);
     expect(g.ctaLabel).toBe(CTA_START_TODAY);
     expect(g.isPositive).toBe(false);
   });
@@ -44,6 +52,19 @@ describe("deriveDailyGrowCheckGuidance · pure copy rules", () => {
     expect(g.whatCountsHint).toBe(WHAT_COUNTS_HINT);
     expect(g.whatCountsHint.toLowerCase()).toMatch(/quick note/);
     expect(g.whatCountsHint.toLowerCase()).toMatch(/manual sensor snapshot/);
+  });
+
+  it("empty state body explains connect-notes-with-conditions purpose", () => {
+    const g = deriveDailyGrowCheckGuidance(baseSummary());
+    expect(g.body).toBe(ONBOARDING_BODY);
+    expect(g.body.toLowerCase()).toMatch(/connect plant notes/);
+    expect(g.body.toLowerCase()).toMatch(/tent conditions/);
+  });
+
+  it("empty state nextStep matches onboarding secondary hint", () => {
+    const g = deriveDailyGrowCheckGuidance(baseSummary());
+    expect(g.nextStep).toBe(ONBOARDING_SECONDARY);
+    expect(g.nextStep.toLowerCase()).toMatch(/short note counts/);
   });
 
   it("today-unchecked shows one clear next step (consistent history)", () => {
@@ -118,7 +139,8 @@ describe("deriveDailyGrowCheckGuidance · pure copy rules", () => {
     ];
     for (const s of states) {
       const g = deriveDailyGrowCheckGuidance(s);
-      const all = `${g.headline} ${g.body} ${g.nextStep} ${g.ctaLabel} ${g.whatCountsHint}`.toLowerCase();
+      const all =
+        `${g.headline} ${g.body} ${g.nextStep} ${g.ctaLabel} ${g.whatCountsHint}`.toLowerCase();
       expect(all).not.toMatch(/\bcompleted\b/);
       expect(all).not.toMatch(/perfect grow/);
       expect(all).not.toMatch(/\bperfect\b/);
@@ -134,10 +156,7 @@ describe("Daily Grow Check guidance · card wiring + safety", () => {
     resolve(root, "src/components/PlantDailyGrowCheckConsistencyCard.tsx"),
     "utf8",
   );
-  const rules = readFileSync(
-    resolve(root, "src/lib/dailyGrowCheckGuidanceRules.ts"),
-    "utf8",
-  );
+  const rules = readFileSync(resolve(root, "src/lib/dailyGrowCheckGuidanceRules.ts"), "utf8");
 
   it("card renders guidance headline / body / next-step blocks", () => {
     expect(card).toMatch(/plant-daily-grow-check-guidance-headline/);

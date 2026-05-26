@@ -5,7 +5,7 @@
  * tent) and QuickLog diary entries scoped to the plant. No writes.
  */
 import { Link } from "react-router-dom";
-import { ClipboardCheck, ArrowRight } from "lucide-react";
+import { ClipboardCheck, ArrowRight, Gauge, Info, Sparkles } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 
 import { Badge } from "@/components/ui/badge";
@@ -16,8 +16,18 @@ import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import { usePlants } from "@/hooks/use-plants";
 import {
   buildDailyGrowCheckHistory,
+  hasDailyCheckActivity,
   type DailyHistoryRow,
 } from "@/lib/dailyGrowCheckHistoryRules";
+import { buildDailyCheckEntryHref } from "@/lib/dailyCheckPostSubmitRules";
+import {
+  CTA_ENV_SNAPSHOT,
+  CTA_QUICK_LOG,
+  ONBOARDING_BODY,
+  ONBOARDING_HEADLINE,
+  ONBOARDING_SECONDARY,
+  WHAT_COUNTS_HINT,
+} from "@/lib/dailyGrowCheckGuidanceRules";
 
 const HISTORY_DAYS = 5;
 
@@ -37,10 +47,7 @@ function rowTone(kind: DailyHistoryRow["kind"]): string {
   }
 }
 
-export default function PlantDailyGrowCheckHistoryCard({
-  plantId,
-  currentTentId,
-}: Props) {
+export default function PlantDailyGrowCheckHistoryCard({ plantId, currentTentId }: Props) {
   const { data: rawReadings = [] } = useSensorReadings(currentTentId ?? undefined);
   const { data: rawDiary = [] } = useDiaryEntries();
   const { data: plants = [] } = usePlants();
@@ -73,6 +80,13 @@ export default function PlantDailyGrowCheckHistoryCard({
   });
 
   const unassigned = !currentTentId;
+  const hasAnyActivity = hasDailyCheckActivity(rows);
+  const noteHref = buildDailyCheckEntryHref({ plantId, source: "plant-detail", method: "note" });
+  const sensorHref = buildDailyCheckEntryHref({
+    plantId,
+    source: "plant-detail",
+    method: "sensor",
+  });
 
   return (
     <Card
@@ -111,41 +125,102 @@ export default function PlantDailyGrowCheckHistoryCard({
         </p>
       )}
 
-      <ul
-        className="divide-y divide-border/40 rounded-md border border-border/40"
-        data-testid="plant-daily-grow-check-history-rows"
-      >
-        {rows.map((row) => (
-          <li
-            key={row.dayKey}
-            data-testid="plant-daily-grow-check-history-row"
-            data-day-key={row.dayKey}
-            data-kind={row.kind}
-            className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
-          >
-            <div className="min-w-0">
-              <div className="font-medium" data-testid="plant-daily-grow-check-history-day-label">
-                {row.label}
-              </div>
-              {row.latestAt && (
-                <div className="text-xs text-muted-foreground">
-                  {formatDistanceToNow(new Date(row.latestAt), { addSuffix: true })}
-                  {" · "}
-                  {format(new Date(row.latestAt), "p")}
-                </div>
-              )}
-            </div>
-            <Badge
-              variant="outline"
-              className={rowTone(row.kind)}
-              data-testid="plant-daily-grow-check-history-label"
+      {!hasAnyActivity ? (
+        <div
+          data-testid="plant-daily-grow-check-history-onboarding"
+          className="space-y-3 rounded-md border border-border/40 bg-muted/30 p-3"
+        >
+          <div>
+            <p
+              className="text-sm font-semibold"
+              data-testid="plant-daily-grow-check-history-onboarding-headline"
             >
-              {row.activityLabel}
-            </Badge>
-          </li>
-        ))}
-      </ul>
-
+              {ONBOARDING_HEADLINE}
+            </p>
+            <p
+              className="text-sm text-muted-foreground mt-1"
+              data-testid="plant-daily-grow-check-history-onboarding-body"
+            >
+              {ONBOARDING_BODY}
+            </p>
+          </div>
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid="plant-daily-grow-check-history-onboarding-secondary"
+          >
+            {ONBOARDING_SECONDARY}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              asChild
+              size="sm"
+              variant="outline"
+              data-testid="plant-daily-grow-check-history-cta-note"
+            >
+              <Link to={noteHref} aria-label="Start a Quick Log for today's Daily Grow Check">
+                <Sparkles className="h-3 w-3" aria-hidden="true" />
+                {CTA_QUICK_LOG}
+              </Link>
+            </Button>
+            <Button
+              asChild
+              size="sm"
+              className="gradient-leaf text-primary-foreground"
+              data-testid="plant-daily-grow-check-history-cta-sensor"
+            >
+              <Link
+                to={sensorHref}
+                aria-label="Add a manual environment snapshot for today's Daily Grow Check"
+              >
+                <Gauge className="h-3 w-3" aria-hidden="true" />
+                {CTA_ENV_SNAPSHOT}
+              </Link>
+            </Button>
+          </div>
+          <p
+            className="text-xs text-muted-foreground flex items-start gap-1"
+            data-testid="plant-daily-grow-check-history-what-counts"
+          >
+            <Info className="h-3 w-3 mt-0.5 shrink-0" aria-hidden="true" />
+            <span>{WHAT_COUNTS_HINT}</span>
+          </p>
+        </div>
+      ) : (
+        <ul
+          className="divide-y divide-border/40 rounded-md border border-border/40"
+          data-testid="plant-daily-grow-check-history-rows"
+        >
+          {rows.map((row) => (
+            <li
+              key={row.dayKey}
+              data-testid="plant-daily-grow-check-history-row"
+              data-day-key={row.dayKey}
+              data-kind={row.kind}
+              className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+            >
+              <div className="min-w-0">
+                <div className="font-medium" data-testid="plant-daily-grow-check-history-day-label">
+                  {row.label}
+                </div>
+                {row.latestAt && (
+                  <div className="text-xs text-muted-foreground">
+                    {formatDistanceToNow(new Date(row.latestAt), { addSuffix: true })}
+                    {" · "}
+                    {format(new Date(row.latestAt), "p")}
+                  </div>
+                )}
+              </div>
+              <Badge
+                variant="outline"
+                className={rowTone(row.kind)}
+                data-testid="plant-daily-grow-check-history-label"
+              >
+                {row.activityLabel}
+              </Badge>
+            </li>
+          ))}
+        </ul>
+      )}
     </Card>
   );
 }

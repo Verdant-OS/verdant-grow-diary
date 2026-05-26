@@ -94,13 +94,15 @@ describe("Daily Grow Check History · onboarding copy safety", () => {
   });
 
   it("onboarding body mentions both check methods", () => {
-    expect(ONBOARDING_BODY.toLowerCase()).toMatch(/quicklog|quick log/);
-    expect(ONBOARDING_BODY.toLowerCase()).toMatch(/manual.*snapshot|snapshot.*manual/);
+    expect(ONBOARDING_BODY.toLowerCase()).toMatch(/\b(quicklog|quick log)\b/);
+    expect(ONBOARDING_BODY.toLowerCase()).toMatch(
+      /\bmanual\b.*\bsnapshot\b|\bsnapshot\b.*\bmanual\b/,
+    );
   });
 
   it("WHAT_COUNTS_HINT explains both check paths", () => {
-    expect(WHAT_COUNTS_HINT.toLowerCase()).toMatch(/quick note/);
-    expect(WHAT_COUNTS_HINT.toLowerCase()).toMatch(/manual sensor snapshot/);
+    expect(WHAT_COUNTS_HINT.toLowerCase()).toMatch(/\bquick note\b/);
+    expect(WHAT_COUNTS_HINT.toLowerCase()).toMatch(/\bmanual sensor snapshot\b/);
   });
 });
 

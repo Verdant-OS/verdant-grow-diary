@@ -14,6 +14,7 @@ import {
 import {
   preparePiIngestReadings,
   type PiIngestPipelineInput,
+  type PiIngestPipelineResult,
 } from "@/lib/piIngestPipeline";
 
 const SECRET = "super-secret-bridge-token";
@@ -27,6 +28,8 @@ const NOW_ISO = "2026-05-23T12:00:00Z";
 const NOW_MS = Date.parse(NOW_ISO);
 const TS_ISO = "2026-05-23T11:59:30Z";
 const PATH = "/functions/v1/pi-ingest-readings";
+
+type FailedPiIngestPipelineResult = Extract<PiIngestPipelineResult, { ok: false }>;
 
 const credential: BridgeCredential = {
   bridgeId: BRIDGE,
@@ -51,14 +54,16 @@ function makeBody(overrides: Record<string, unknown> = {}) {
   };
 }
 
-async function makeInput(overrides: {
-  body?: Record<string, unknown>;
-  recent?: number[];
-  maxReq?: number;
-  maxBatch?: number;
-  credentials?: BridgeCredential[];
-  tampered?: boolean;
-} = {}): Promise<PiIngestPipelineInput> {
+async function makeInput(
+  overrides: {
+    body?: Record<string, unknown>;
+    recent?: number[];
+    maxReq?: number;
+    maxBatch?: number;
+    credentials?: BridgeCredential[];
+    tampered?: boolean;
+  } = {},
+): Promise<PiIngestPipelineInput> {
   const body = overrides.body ?? makeBody();
   const rawBody = JSON.stringify(body);
   const signed = await computeHmacSha256Hex(
@@ -111,8 +116,8 @@ describe("preparePiIngestReadings — rejection per stage", () => {
     const r = await preparePiIngestReadings(input);
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect((r as any).stage).toBe("auth");
-      expect((r as any).issues[0].code).toBe("invalid_signature");
+      expect((r as FailedPiIngestPipelineResult).stage).toBe("auth");
+      expect((r as FailedPiIngestPipelineResult).issues[0].code).toBe("invalid_signature");
     }
   });
 
@@ -121,8 +126,10 @@ describe("preparePiIngestReadings — rejection per stage", () => {
     const r = await preparePiIngestReadings(input);
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect((r as any).stage).toBe("envelope");
-      expect((r as any).issues.some((i) => i.code === "invalid_source")).toBe(true);
+      expect((r as FailedPiIngestPipelineResult).stage).toBe("envelope");
+      expect(
+        (r as FailedPiIngestPipelineResult).issues.some((i) => i.code === "invalid_source"),
+      ).toBe(true);
     }
   });
 
@@ -140,8 +147,8 @@ describe("preparePiIngestReadings — rejection per stage", () => {
     const r = await preparePiIngestReadings(input);
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect((r as any).stage).toBe("envelope");
-      expect((r as any).issues[0].code).toBe("tent_id_mismatch");
+      expect((r as FailedPiIngestPipelineResult).stage).toBe("envelope");
+      expect((r as FailedPiIngestPipelineResult).issues[0].code).toBe("tent_id_mismatch");
     }
   });
 
@@ -157,9 +164,11 @@ describe("preparePiIngestReadings — rejection per stage", () => {
     const r = await preparePiIngestReadings(input);
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect((r as any).stage).toBe("abuse_guard");
-      expect((r as any).issues.some((i) => i.code === "rate_limited")).toBe(true);
-      expect((r as any).retryAfterMs).toBe(10_000);
+      expect((r as FailedPiIngestPipelineResult).stage).toBe("abuse_guard");
+      expect(
+        (r as FailedPiIngestPipelineResult).issues.some((i) => i.code === "rate_limited"),
+      ).toBe(true);
+      expect((r as FailedPiIngestPipelineResult).retryAfterMs).toBe(10_000);
     }
   });
 
@@ -168,8 +177,10 @@ describe("preparePiIngestReadings — rejection per stage", () => {
     const r = await preparePiIngestReadings(input);
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect((r as any).stage).toBe("abuse_guard");
-      expect((r as any).issues.some((i) => i.code === "batch_too_large")).toBe(true);
+      expect((r as FailedPiIngestPipelineResult).stage).toBe("abuse_guard");
+      expect(
+        (r as FailedPiIngestPipelineResult).issues.some((i) => i.code === "batch_too_large"),
+      ).toBe(true);
     }
   });
 
@@ -186,8 +197,8 @@ describe("preparePiIngestReadings — rejection per stage", () => {
     expect(r.ok).toBe(false);
     if (!r.ok) {
       // Auth stage rejects first via tent_not_allowed.
-      expect((r as any).stage).toBe("auth");
-      expect((r as any).issues[0].code).toBe("tent_not_allowed");
+      expect((r as FailedPiIngestPipelineResult).stage).toBe("auth");
+      expect((r as FailedPiIngestPipelineResult).issues[0].code).toBe("tent_not_allowed");
     }
   });
 
@@ -195,16 +206,13 @@ describe("preparePiIngestReadings — rejection per stage", () => {
     const input = await makeInput();
     const r = await preparePiIngestReadings({ ...input, now: "not-a-date" });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).issues[0].code).toBe("invalid_now");
+    if (!r.ok) expect((r as FailedPiIngestPipelineResult).issues[0].code).toBe("invalid_now");
   });
 });
 
 // ------------- Static safety -------------
 
-const SRC = readFileSync(
-  resolve(__dirname, "../lib/piIngestPipeline.ts"),
-  "utf8",
-);
+const SRC = readFileSync(resolve(__dirname, "../lib/piIngestPipeline.ts"), "utf8");
 
 describe("piIngestPipeline — static safety", () => {
   it("does not import Supabase client or React", () => {

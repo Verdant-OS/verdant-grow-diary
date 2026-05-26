@@ -117,7 +117,7 @@ describe("relativeStageTimelineRules — stage shift recommendation draft", () =
     expect(
       buildStageShiftRecommendationDraft({
         ...baseInput,
-        // @ts-expect-error testing invalid stage value
+        // @ts-expect-error -- testing invalid stage value
         suggestedStage: "bogus",
       }),
     ).toBeNull();

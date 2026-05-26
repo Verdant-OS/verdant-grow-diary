@@ -9,9 +9,13 @@ import { resolve } from "node:path";
 import type { BridgeCredential } from "@/lib/piIngestAuthRules";
 import {
   assertBridgeCanWriteTent,
+  type BridgeBatchScopeResult,
   deriveBatchIdempotencyKeys,
   deriveReadingIdempotencyKey,
+  type IdempotencyKeyResult,
   resolveBridgeCredential,
+  type ResolveBridgeResult,
+  type TentAuthorizationResult,
   validateBridgeBatchScope,
 } from "@/lib/piIngestBridgeRules";
 
@@ -22,6 +26,15 @@ const TENT_B = "tent-uuid-b";
 const OTHER_TENT = "tent-uuid-other";
 const DEVICE = "sensorpush-gw-1";
 const TS = "2026-05-23T11:59:30Z";
+
+type FailedResolveBridgeResult = Extract<ResolveBridgeResult, { ok: false }>;
+type FailedTentAuthorizationResult = Extract<TentAuthorizationResult, { ok: false }>;
+type FailedIdempotencyKeyResult = Extract<IdempotencyKeyResult, { ok: false }>;
+type FailedBatchIdempotencyKeysResult = Extract<
+  ReturnType<typeof deriveBatchIdempotencyKeys>,
+  { ok: false }
+>;
+type FailedBridgeBatchScopeResult = Extract<BridgeBatchScopeResult, { ok: false }>;
 
 const credential: BridgeCredential = {
   bridgeId: BRIDGE,
@@ -43,19 +56,19 @@ describe("resolveBridgeCredential", () => {
   it("rejects unknown bridge id", () => {
     const r = resolveBridgeCredential("nope", [credential]);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).code).toBe("unknown_bridge_id");
+    if (!r.ok) expect((r as FailedResolveBridgeResult).code).toBe("unknown_bridge_id");
   });
 
   it("rejects inactive credential", () => {
     const r = resolveBridgeCredential(BRIDGE, [inactive]);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).code).toBe("inactive_credential");
+    if (!r.ok) expect((r as FailedResolveBridgeResult).code).toBe("inactive_credential");
   });
 
   it("rejects missing bridge id", () => {
     const r = resolveBridgeCredential("", [credential]);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).code).toBe("missing_bridge_id");
+    if (!r.ok) expect((r as FailedResolveBridgeResult).code).toBe("missing_bridge_id");
   });
 
   it("works with credentials provided as a Map", () => {
@@ -74,13 +87,13 @@ describe("assertBridgeCanWriteTent", () => {
   it("rejects tent outside allowedTentIds", () => {
     const r = assertBridgeCanWriteTent(credential, OTHER_TENT);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).code).toBe("tent_not_allowed");
+    if (!r.ok) expect((r as FailedTentAuthorizationResult).code).toBe("tent_not_allowed");
   });
 
   it("rejects missing tent id", () => {
     const r = assertBridgeCanWriteTent(credential, "");
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).code).toBe("missing_tent_id");
+    if (!r.ok) expect((r as FailedTentAuthorizationResult).code).toBe("missing_tent_id");
   });
 });
 
@@ -168,37 +181,37 @@ describe("deriveReadingIdempotencyKey", () => {
   it("rejects missing deviceId", () => {
     const r = deriveReadingIdempotencyKey({ ...base, deviceId: "" });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).code).toBe("missing_device_id");
+    if (!r.ok) expect((r as FailedIdempotencyKeyResult).code).toBe("missing_device_id");
   });
 
   it("rejects missing captured_at", () => {
     const r = deriveReadingIdempotencyKey({ ...base, capturedAt: "" });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).code).toBe("missing_captured_at");
+    if (!r.ok) expect((r as FailedIdempotencyKeyResult).code).toBe("missing_captured_at");
   });
 
   it("rejects invalid captured_at", () => {
     const r = deriveReadingIdempotencyKey({ ...base, capturedAt: "not-a-date" });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).code).toBe("invalid_captured_at");
+    if (!r.ok) expect((r as FailedIdempotencyKeyResult).code).toBe("invalid_captured_at");
   });
 
   it("rejects missing metric", () => {
     const r = deriveReadingIdempotencyKey({ ...base, metric: "" });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).code).toBe("missing_metric");
+    if (!r.ok) expect((r as FailedIdempotencyKeyResult).code).toBe("missing_metric");
   });
 
   it("rejects missing tentId", () => {
     const r = deriveReadingIdempotencyKey({ ...base, tentId: "" });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).code).toBe("missing_tent_id");
+    if (!r.ok) expect((r as FailedIdempotencyKeyResult).code).toBe("missing_tent_id");
   });
 
   it("rejects missing bridgeId", () => {
     const r = deriveReadingIdempotencyKey({ ...base, bridgeId: "" });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).code).toBe("missing_bridge_id");
+    if (!r.ok) expect((r as FailedIdempotencyKeyResult).code).toBe("missing_bridge_id");
   });
 });
 
@@ -220,8 +233,8 @@ describe("deriveBatchIdempotencyKeys", () => {
     const r = deriveBatchIdempotencyKeys(BRIDGE, [r1, r2, r1]);
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect((r as any).code).toBe("duplicate_reading_in_batch");
-      expect((r as any).index).toBe(2);
+      expect((r as FailedBatchIdempotencyKeysResult).code).toBe("duplicate_reading_in_batch");
+      expect((r as FailedBatchIdempotencyKeysResult).index).toBe(2);
     }
   });
 
@@ -237,18 +250,15 @@ describe("deriveBatchIdempotencyKeys", () => {
   it("rejects empty batch", () => {
     const r = deriveBatchIdempotencyKeys(BRIDGE, []);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).code).toBe("empty_batch");
+    if (!r.ok) expect((r as FailedBatchIdempotencyKeysResult).code).toBe("empty_batch");
   });
 
   it("rejects whole batch if any reading is invalid", () => {
-    const r = deriveBatchIdempotencyKeys(BRIDGE, [
-      r1,
-      { ...r2, capturedAt: "" },
-    ]);
+    const r = deriveBatchIdempotencyKeys(BRIDGE, [r1, { ...r2, capturedAt: "" }]);
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect((r as any).code).toBe("missing_captured_at");
-      expect((r as any).index).toBe(1);
+      expect((r as FailedBatchIdempotencyKeysResult).code).toBe("missing_captured_at");
+      expect((r as FailedBatchIdempotencyKeysResult).index).toBe(1);
     }
   });
 });
@@ -260,10 +270,7 @@ describe("validateBridgeBatchScope", () => {
   ];
 
   it("accepts a valid batch and returns ownerUserId from credential (never client)", () => {
-    const r = validateBridgeBatchScope(
-      { bridgeId: BRIDGE, readings: goodReadings },
-      [credential],
-    );
+    const r = validateBridgeBatchScope({ bridgeId: BRIDGE, readings: goodReadings }, [credential]);
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.ownerUserId).toBe(OWNER);
@@ -276,36 +283,27 @@ describe("validateBridgeBatchScope", () => {
     const r = validateBridgeBatchScope(
       {
         bridgeId: BRIDGE,
-        readings: [
-          goodReadings[0],
-          { ...goodReadings[1], tentId: OTHER_TENT },
-        ],
+        readings: [goodReadings[0], { ...goodReadings[1], tentId: OTHER_TENT }],
       },
       [credential],
     );
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect((r as any).code).toBe("tent_not_allowed");
-      expect((r as any).index).toBe(1);
+      expect((r as FailedBridgeBatchScopeResult).code).toBe("tent_not_allowed");
+      expect((r as FailedBridgeBatchScopeResult).index).toBe(1);
     }
   });
 
   it("rejects entire batch on inactive credential", () => {
-    const r = validateBridgeBatchScope(
-      { bridgeId: BRIDGE, readings: goodReadings },
-      [inactive],
-    );
+    const r = validateBridgeBatchScope({ bridgeId: BRIDGE, readings: goodReadings }, [inactive]);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).code).toBe("inactive_credential");
+    if (!r.ok) expect((r as FailedBridgeBatchScopeResult).code).toBe("inactive_credential");
   });
 
   it("rejects entire batch on unknown credential", () => {
-    const r = validateBridgeBatchScope(
-      { bridgeId: "nope", readings: goodReadings },
-      [credential],
-    );
+    const r = validateBridgeBatchScope({ bridgeId: "nope", readings: goodReadings }, [credential]);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).code).toBe("unknown_bridge_id");
+    if (!r.ok) expect((r as FailedBridgeBatchScopeResult).code).toBe("unknown_bridge_id");
   });
 
   it("rejects entire batch on duplicates", () => {
@@ -314,7 +312,7 @@ describe("validateBridgeBatchScope", () => {
       [credential],
     );
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).code).toBe("duplicate_reading_in_batch");
+    if (!r.ok) expect((r as FailedBridgeBatchScopeResult).code).toBe("duplicate_reading_in_batch");
   });
 
   it("does not return or accept any client-provided user_id", () => {
@@ -337,10 +335,7 @@ describe("validateBridgeBatchScope", () => {
 
 // ------------- Static safety: module surface restrictions -------------
 
-const SRC = readFileSync(
-  resolve(__dirname, "../lib/piIngestBridgeRules.ts"),
-  "utf8",
-);
+const SRC = readFileSync(resolve(__dirname, "../lib/piIngestBridgeRules.ts"), "utf8");
 
 describe("piIngestBridgeRules — static safety", () => {
   it("does not import Supabase or React", () => {
@@ -363,8 +358,6 @@ describe("piIngestBridgeRules — static safety", () => {
   });
 
   it("does not reference MQTT/Home Assistant/Pi bridge runtime or automation", () => {
-    expect(SRC).not.toMatch(
-      /\bmqtt\b|home[\s_-]?assistant|automation|device[\s_-]?control/i,
-    );
+    expect(SRC).not.toMatch(/\bmqtt\b|home[\s_-]?assistant|automation|device[\s_-]?control/i);
   });
 });

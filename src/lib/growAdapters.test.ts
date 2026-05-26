@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { mapTentRow, mapPlantRow, mapSensorReadingRow, groupSensorReadingRows } from "./growAdapters";
+import {
+  mapTentRow,
+  mapPlantRow,
+  mapSensorReadingRow,
+  groupSensorReadingRows,
+} from "./growAdapters";
+import type { SensorReadingRow } from "./db";
 import { tents, plants, sensorReadings } from "@/mock";
 
 const tentRow = {
@@ -52,7 +58,14 @@ describe("mapTentRow", () => {
     });
   });
   it("applies safe defaults for nullable fields", () => {
-    const t = mapTentRow({ ...tentRow, brand: null, size: null, light_schedule: null, light_wattage: null, stage: "bogus" });
+    const t = mapTentRow({
+      ...tentRow,
+      brand: null,
+      size: null,
+      light_schedule: null,
+      light_wattage: null,
+      stage: "bogus",
+    });
     expect(t.brand).toBe("");
     expect(t.size).toBe("");
     expect(t.light.schedule).toBe("");
@@ -79,7 +92,14 @@ describe("mapPlantRow", () => {
     });
   });
   it("defaults null tent_id, strain, photo, note, and invalid health", () => {
-    const p = mapPlantRow({ ...plantRow, tent_id: null, strain: null, photo_url: null, last_note: null, health: "weird" });
+    const p = mapPlantRow({
+      ...plantRow,
+      tent_id: null,
+      strain: null,
+      photo_url: null,
+      last_note: null,
+      health: "weird",
+    });
     expect(p.tentId).toBe("");
     expect(p.strain).toBe("");
     expect(p.photo).toBe("");
@@ -89,7 +109,7 @@ describe("mapPlantRow", () => {
 });
 
 describe("mapSensorReadingRow", () => {
-  const base = {
+  const base: Omit<SensorReadingRow, "metric" | "value"> = {
     id: "r1",
     user_id: "u1",
     tent_id: "tent-1",
@@ -100,13 +120,27 @@ describe("mapSensorReadingRow", () => {
     device_id: null,
     raw_payload: null,
     captured_at: null,
-  } as any;
+  };
   it("maps each metric onto the correct field", () => {
-    expect(mapSensorReadingRow({ ...base, metric: "temperature_c", value: 24.5 })).toMatchObject({ temp: 24.5, rh: 0, vpd: 0, co2: 0, soil: 0 });
-    expect(mapSensorReadingRow({ ...base, metric: "humidity_pct", value: 55 })).toMatchObject({ rh: 55 });
-    expect(mapSensorReadingRow({ ...base, metric: "vpd_kpa", value: 1.2 })).toMatchObject({ vpd: 1.2 });
-    expect(mapSensorReadingRow({ ...base, metric: "co2_ppm", value: 800 })).toMatchObject({ co2: 800 });
-    expect(mapSensorReadingRow({ ...base, metric: "soil_moisture_pct", value: 40 })).toMatchObject({ soil: 40 });
+    expect(mapSensorReadingRow({ ...base, metric: "temperature_c", value: 24.5 })).toMatchObject({
+      temp: 24.5,
+      rh: 0,
+      vpd: 0,
+      co2: 0,
+      soil: 0,
+    });
+    expect(mapSensorReadingRow({ ...base, metric: "humidity_pct", value: 55 })).toMatchObject({
+      rh: 55,
+    });
+    expect(mapSensorReadingRow({ ...base, metric: "vpd_kpa", value: 1.2 })).toMatchObject({
+      vpd: 1.2,
+    });
+    expect(mapSensorReadingRow({ ...base, metric: "co2_ppm", value: 800 })).toMatchObject({
+      co2: 800,
+    });
+    expect(mapSensorReadingRow({ ...base, metric: "soil_moisture_pct", value: 40 })).toMatchObject({
+      soil: 40,
+    });
   });
   it("preserves ts and tentId", () => {
     const r = mapSensorReadingRow({ ...base, metric: "temperature_c", value: 22 });
@@ -120,9 +154,23 @@ describe("mapSensorReadingRow", () => {
 });
 
 describe("groupSensorReadingRows", () => {
-  const base = { id: "r", user_id: "u", quality: "ok", source: "manual", created_at: "x" };
-  const row = (tent_id: string, ts: string, metric: string, value: number, id = `${tent_id}-${ts}-${metric}`) =>
-    ({ ...base, id, tent_id, ts, metric, value }) as any;
+  const base: Omit<SensorReadingRow, "tent_id" | "ts" | "metric" | "value"> = {
+    id: "r",
+    user_id: "u",
+    quality: "ok",
+    source: "manual",
+    created_at: "x",
+    device_id: null,
+    raw_payload: null,
+    captured_at: null,
+  };
+  const row = (
+    tent_id: string,
+    ts: string,
+    metric: string,
+    value: number,
+    id = `${tent_id}-${ts}-${metric}`,
+  ): SensorReadingRow => ({ ...base, id, tent_id, ts, metric, value });
 
   it("merges five metrics at the same ts/tent into one reading", () => {
     const ts = "2026-05-01T12:00:00Z";
@@ -178,7 +226,20 @@ describe("mock data immutability", () => {
     // Run mappers over copies just to exercise call sites.
     mapTentRow(tentRow);
     mapPlantRow(plantRow);
-    mapSensorReadingRow({ id: "x", user_id: "u", tent_id: "t", ts: "x", quality: "ok", source: "manual", created_at: "x", metric: "temperature_c", value: 1, device_id: null, raw_payload: null, captured_at: null } as any);
+    mapSensorReadingRow({
+      id: "x",
+      user_id: "u",
+      tent_id: "t",
+      ts: "x",
+      quality: "ok",
+      source: "manual",
+      created_at: "x",
+      metric: "temperature_c",
+      value: 1,
+      device_id: null,
+      raw_payload: null,
+      captured_at: null,
+    });
     expect(JSON.stringify(tents)).toBe(tentsSnap);
     expect(JSON.stringify(plants)).toBe(plantsSnap);
     expect(JSON.stringify(sensorReadings)).toBe(sensorsSnap);

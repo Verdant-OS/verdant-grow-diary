@@ -18,7 +18,10 @@ import {
 } from "@/lib/dashboardDailyGrowCheckPanelRules";
 
 const NOW = new Date(2026, 4, 24, 15, 0, 0);
-const A = "tent-a", B = "tent-b", C = "tent-c", D = "tent-d";
+const A = "tent-a",
+  B = "tent-b",
+  C = "tent-c",
+  D = "tent-d";
 
 function iso(y: number, m: number, d: number, hh = 9) {
   return new Date(y, m, d, hh, 0, 0).toISOString();
@@ -71,19 +74,9 @@ describe("buildDashboardDailyGrowCheckMethodCounts · pure rules", () => {
 describe("buildDashboardDailyGrowCheckMethodChips · pure rules", () => {
   it("returns 4 chips in fixed order with counts when rows exist", () => {
     const chips = buildDashboardDailyGrowCheckMethodChips(buildPanel().rows);
-    expect(chips.map((c) => c.key)).toEqual([
-      "needs",
-      "note",
-      "sensor-snapshot",
-      "both",
-    ]);
+    expect(chips.map((c) => c.key)).toEqual(["needs", "note", "sensor-snapshot", "both"]);
     expect(chips.map((c) => c.count)).toEqual([1, 1, 1, 1]);
-    expect(chips.map((c) => c.filterValue)).toEqual([
-      "needs",
-      "note",
-      "sensor-snapshot",
-      "both",
-    ]);
+    expect(chips.map((c) => c.filterValue)).toEqual(["needs", "note", "sensor-snapshot", "both"]);
   });
 
   it("returns [] when there are no rows (no meaningless zero chips)", () => {
@@ -124,14 +117,23 @@ function renderPanel() {
   );
 }
 
+interface ElementPrototypeWithPointerCapture {
+  hasPointerCapture?: () => boolean;
+  setPointerCapture?: () => void;
+  releasePointerCapture?: () => void;
+  scrollIntoView?: () => void;
+}
+
+const elementPrototype = Element.prototype as unknown as ElementPrototypeWithPointerCapture;
+
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
-  if (!(Element.prototype as any).hasPointerCapture) {
-    (Element.prototype as any).hasPointerCapture = () => false;
-    (Element.prototype as any).setPointerCapture = () => {};
-    (Element.prototype as any).releasePointerCapture = () => {};
-    (Element.prototype as any).scrollIntoView = () => {};
+  if (!elementPrototype.hasPointerCapture) {
+    elementPrototype.hasPointerCapture = () => false;
+    elementPrototype.setPointerCapture = () => {};
+    elementPrototype.releasePointerCapture = () => {};
+    elementPrototype.scrollIntoView = () => {};
   }
 });
 
@@ -141,23 +143,22 @@ describe("DashboardDailyGrowCheckPanel summary chips UI", () => {
     expect(
       screen.getByTestId("dashboard-daily-grow-check-panel-chip-needs-count").textContent,
     ).toBe("1");
+    expect(screen.getByTestId("dashboard-daily-grow-check-panel-chip-note-count").textContent).toBe(
+      "1",
+    );
     expect(
-      screen.getByTestId("dashboard-daily-grow-check-panel-chip-note-count").textContent,
+      screen.getByTestId("dashboard-daily-grow-check-panel-chip-sensor-snapshot-count").textContent,
     ).toBe("1");
-    expect(
-      screen.getByTestId("dashboard-daily-grow-check-panel-chip-sensor-snapshot-count")
-        .textContent,
-    ).toBe("1");
-    expect(
-      screen.getByTestId("dashboard-daily-grow-check-panel-chip-both-count").textContent,
-    ).toBe("1");
+    expect(screen.getByTestId("dashboard-daily-grow-check-panel-chip-both-count").textContent).toBe(
+      "1",
+    );
   });
 
   it("summary text is unchanged regardless of chips", () => {
     renderPanel();
-    expect(
-      screen.getByTestId("dashboard-daily-grow-check-panel-summary").textContent,
-    ).toBe("Checked 3 of 4 plants today");
+    expect(screen.getByTestId("dashboard-daily-grow-check-panel-summary").textContent).toBe(
+      "Checked 3 of 4 plants today",
+    );
   });
 
   it("chip click sets the filter; counts stay the same after filtering", () => {
@@ -165,33 +166,25 @@ describe("DashboardDailyGrowCheckPanel summary chips UI", () => {
     const before = screen.getByTestId(
       "dashboard-daily-grow-check-panel-chip-note-count",
     ).textContent;
-    fireEvent.click(
-      screen.getByTestId("dashboard-daily-grow-check-panel-chip-note"),
-    );
+    fireEvent.click(screen.getByTestId("dashboard-daily-grow-check-panel-chip-note"));
     // Filter applied → only note row visible.
     const rows = screen.getAllByTestId("dashboard-daily-grow-check-panel-row");
     expect(rows).toHaveLength(1);
     expect(rows[0].getAttribute("data-today-method")).toBe("note");
     // Counts unchanged.
-    expect(
-      screen.getByTestId("dashboard-daily-grow-check-panel-chip-note-count").textContent,
-    ).toBe(before);
+    expect(screen.getByTestId("dashboard-daily-grow-check-panel-chip-note-count").textContent).toBe(
+      before,
+    );
     expect(
       screen.getByTestId("dashboard-daily-grow-check-panel-chip-needs-count").textContent,
     ).toBe("1");
     // Active chip reflects state.
     expect(
-      screen
-        .getByTestId("dashboard-daily-grow-check-panel-chip-note")
-        .getAttribute("data-active"),
+      screen.getByTestId("dashboard-daily-grow-check-panel-chip-note").getAttribute("data-active"),
     ).toBe("1");
     // Clicking the active chip again clears the filter back to "all".
-    fireEvent.click(
-      screen.getByTestId("dashboard-daily-grow-check-panel-chip-note"),
-    );
-    expect(
-      screen.getAllByTestId("dashboard-daily-grow-check-panel-row"),
-    ).toHaveLength(4);
+    fireEvent.click(screen.getByTestId("dashboard-daily-grow-check-panel-chip-note"));
+    expect(screen.getAllByTestId("dashboard-daily-grow-check-panel-row")).toHaveLength(4);
   });
 });
 
@@ -211,9 +204,7 @@ describe("DashboardDailyGrowCheckPanel chip suppression when no active plants", 
     vi.doMock("@/hooks/use-diary-entries", () => ({
       useDiaryEntries: () => ({ data: [] }),
     }));
-    const { default: Panel } = await import(
-      "@/components/DashboardDailyGrowCheckPanel"
-    );
+    const { default: Panel } = await import("@/components/DashboardDailyGrowCheckPanel");
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={qc}>
@@ -222,12 +213,8 @@ describe("DashboardDailyGrowCheckPanel chip suppression when no active plants", 
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    expect(
-      screen.queryByTestId("dashboard-daily-grow-check-panel-chips"),
-    ).toBeNull();
-    expect(
-      screen.getByTestId("dashboard-daily-grow-check-panel-empty"),
-    ).toBeTruthy();
+    expect(screen.queryByTestId("dashboard-daily-grow-check-panel-chips")).toBeNull();
+    expect(screen.getByTestId("dashboard-daily-grow-check-panel-empty")).toBeTruthy();
   });
 });
 
@@ -240,9 +227,7 @@ describe("safety — chip surfaces", () => {
   ];
   it.each(files)("%s contains no unsafe surfaces or forbidden wording", (rel) => {
     const txt = readFileSync(resolve(__dirname, "..", rel), "utf-8");
-    const stripped = txt
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/^\s*\/\/.*$/gm, "");
+    const stripped = txt.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
     expect(stripped).not.toMatch(/service_role/);
     expect(stripped).not.toMatch(/\.rpc\(/);
     expect(stripped).not.toMatch(/sensor_readings.*\.insert\(/);

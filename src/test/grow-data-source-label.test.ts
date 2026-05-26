@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { classifyGrowDataSource } from "@/lib/growDataSourceLabelRules";
+import { classifyGrowDataSource, type GrowDataSourceInput } from "@/lib/growDataSourceLabelRules";
 
 const NOW = new Date("2026-05-21T12:00:00.000Z").getTime();
 const recent = new Date(NOW - 60 * 1000).toISOString(); // 1 min ago
@@ -8,10 +8,7 @@ const old = new Date(NOW - 60 * 60 * 1000).toISOString(); // 1 hour ago
 describe("classifyGrowDataSource", () => {
   it("classifies recent supabase/sensor reading as Live and trusted", () => {
     for (const source of ["supabase", "sensor", "hassio", "broker", "api"]) {
-      const r = classifyGrowDataSource(
-        { source, value: 24.5, timestamp: recent },
-        { now: NOW },
-      );
+      const r = classifyGrowDataSource({ source, value: 24.5, timestamp: recent }, { now: NOW });
       expect(r.label).toBe("Live");
       expect(r.severity).toBe("good");
       expect(r.isTrustedForAi).toBe(true);
@@ -31,10 +28,7 @@ describe("classifyGrowDataSource", () => {
 
   it("classifies mock/demo as Demo and not trusted", () => {
     for (const source of ["mock", "demo", "MOCK", " demo "]) {
-      const r = classifyGrowDataSource(
-        { source, value: 24.5, timestamp: recent },
-        { now: NOW },
-      );
+      const r = classifyGrowDataSource({ source, value: 24.5, timestamp: recent }, { now: NOW });
       expect(r.label).toBe("Demo");
       expect(r.isTrustedForAi).toBe(false);
       expect(r.shouldDisplayBadge).toBe(true);
@@ -60,19 +54,13 @@ describe("classifyGrowDataSource", () => {
   });
 
   it("classifies stale manual entry as Stale and not trusted", () => {
-    const r = classifyGrowDataSource(
-      { source: "manual", value: 6, timestamp: old },
-      { now: NOW },
-    );
+    const r = classifyGrowDataSource({ source: "manual", value: 6, timestamp: old }, { now: NOW });
     expect(r.label).toBe("Stale");
     expect(r.isTrustedForAi).toBe(false);
   });
 
   it("classifies missing source as Unavailable", () => {
-    const r = classifyGrowDataSource(
-      { value: 24.5, timestamp: recent },
-      { now: NOW },
-    );
+    const r = classifyGrowDataSource({ value: 24.5, timestamp: recent }, { now: NOW });
     expect(r.label).toBe("Unavailable");
     expect(r.isTrustedForAi).toBe(false);
     expect(r.reasons).toContain("missing source");
@@ -110,26 +98,18 @@ describe("classifyGrowDataSource", () => {
   });
 
   it("treats NaN timestamp as invalid", () => {
-    const r = classifyGrowDataSource(
-      { source: "sensor", value: 1, timestamp: NaN },
-      { now: NOW },
-    );
+    const r = classifyGrowDataSource({ source: "sensor", value: 1, timestamp: NaN }, { now: NOW });
     expect(r.label).toBe("Stale");
     expect(r.isTrustedForAi).toBe(false);
   });
 
   it("handles null and undefined input safely", () => {
     expect(classifyGrowDataSource(null, { now: NOW }).label).toBe("Unavailable");
-    expect(classifyGrowDataSource(undefined, { now: NOW }).label).toBe(
-      "Unavailable",
-    );
+    expect(classifyGrowDataSource(undefined, { now: NOW }).label).toBe("Unavailable");
   });
 
   it("handles empty strings safely", () => {
-    const r = classifyGrowDataSource(
-      { source: "", value: "", timestamp: "" },
-      { now: NOW },
-    );
+    const r = classifyGrowDataSource({ source: "", value: "", timestamp: "" }, { now: NOW });
     expect(r.label).toBe("Unavailable");
     expect(r.isTrustedForAi).toBe(false);
   });
@@ -157,7 +137,7 @@ describe("classifyGrowDataSource", () => {
   });
 
   it("never trusts demo/missing/stale/invalid for AI", () => {
-    const cases = [
+    const cases: GrowDataSourceInput[] = [
       { source: "mock", value: 1, timestamp: recent },
       { source: "sensor", value: null, timestamp: recent },
       { value: 1, timestamp: recent },
@@ -165,9 +145,7 @@ describe("classifyGrowDataSource", () => {
       { source: "sensor", value: 1, timestamp: "bad" },
     ];
     for (const c of cases) {
-      expect(
-        classifyGrowDataSource(c as any, { now: NOW }).isTrustedForAi,
-      ).toBe(false);
+      expect(classifyGrowDataSource(c, { now: NOW }).isTrustedForAi).toBe(false);
     }
   });
 

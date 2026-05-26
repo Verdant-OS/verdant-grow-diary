@@ -9,7 +9,11 @@ vi.mock("@/lib/growRepo", () => ({
 
 import * as repo from "@/lib/growRepo";
 import { tents, plants, sensorReadings } from "@/mock";
-import { useInsertSensorReading, validateSensorReadingPayload } from "./useInsertSensorReading";
+import {
+  useInsertSensorReading,
+  validateSensorReadingPayload,
+  type InsertSensorReadingPayload,
+} from "./useInsertSensorReading";
 
 function makeWrapper() {
   const client = new QueryClient({
@@ -26,7 +30,7 @@ const goodPayload = {
   tent_id: "t1",
   metric: "temperature_c",
   value: 24.5,
-} as any;
+} satisfies InsertSensorReadingPayload;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -34,7 +38,7 @@ beforeEach(() => {
 
 describe("useInsertSensorReading", () => {
   it("calls repo with the exact payload on success", async () => {
-    (repo.insertSensorReading as any).mockResolvedValue(undefined);
+    vi.mocked(repo.insertSensorReading).mockResolvedValue(undefined);
     const { wrapper } = makeWrapper();
     const { result } = renderHook(() => useInsertSensorReading(), { wrapper });
     result.current.mutate(goodPayload);
@@ -44,7 +48,7 @@ describe("useInsertSensorReading", () => {
   });
 
   it("invalidates the ['grow','sensors'] query on success", async () => {
-    (repo.insertSensorReading as any).mockResolvedValue(undefined);
+    vi.mocked(repo.insertSensorReading).mockResolvedValue(undefined);
     const { wrapper, invalidateSpy } = makeWrapper();
     const { result } = renderHook(() => useInsertSensorReading(), { wrapper });
     result.current.mutate(goodPayload);
@@ -53,7 +57,7 @@ describe("useInsertSensorReading", () => {
   });
 
   it("surfaces repo errors via mutation state", async () => {
-    (repo.insertSensorReading as any).mockRejectedValue(new Error("rls denied"));
+    vi.mocked(repo.insertSensorReading).mockRejectedValue(new Error("rls denied"));
     const { wrapper } = makeWrapper();
     const { result } = renderHook(() => useInsertSensorReading(), { wrapper });
     result.current.mutate(goodPayload);
@@ -71,7 +75,7 @@ describe("useInsertSensorReading", () => {
   });
 
   it("does not mutate exported mock arrays", async () => {
-    (repo.insertSensorReading as any).mockResolvedValue(undefined);
+    vi.mocked(repo.insertSensorReading).mockResolvedValue(undefined);
     const tentsSnap = JSON.stringify(tents);
     const plantsSnap = JSON.stringify(plants);
     const sensorsSnap = JSON.stringify(sensorReadings);
@@ -93,10 +97,12 @@ describe("validateSensorReadingPayload", () => {
     expect(() => validateSensorReadingPayload({ ...goodPayload, user_id: "" })).toThrow(/user_id/);
     expect(() => validateSensorReadingPayload({ ...goodPayload, tent_id: "" })).toThrow(/tent_id/);
     expect(() => validateSensorReadingPayload({ ...goodPayload, metric: "x" })).toThrow(/metric/);
-    expect(() => validateSensorReadingPayload({ ...goodPayload, value: Number.NaN })).toThrow(/finite/);
+    expect(() => validateSensorReadingPayload({ ...goodPayload, value: Number.NaN })).toThrow(
+      /finite/,
+    );
   });
   it("accepts a payload without user_id (DB default auth.uid() handles ownership)", () => {
-    const { user_id, ...noUid } = goodPayload as any;
+    const { user_id, ...noUid } = goodPayload;
     expect(() => validateSensorReadingPayload(noUid)).not.toThrow();
   });
 });

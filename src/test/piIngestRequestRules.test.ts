@@ -12,12 +12,18 @@ import {
   isAllowedPiIngestUnit,
   PI_INGEST_FORBIDDEN_METRICS,
   toExternalSensorIngestPayload,
+  type PiIngestRequestValidationResult,
   validatePiIngestRequestEnvelope,
 } from "@/lib/piIngestRequestRules";
 import { normalizeIngestPayload } from "@/lib/sensorIngestNormalizationRules";
 
 const NOW = new Date("2026-05-23T12:00:00Z");
 const TS = "2026-05-23T11:59:30Z";
+
+type FailedPiIngestRequestValidationResult = Extract<
+  PiIngestRequestValidationResult,
+  { ok: false }
+>;
 
 function validBody() {
   return {
@@ -80,22 +86,24 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
   it("rejects non-object body", () => {
     const r = validatePiIngestRequestEnvelope(null, { now: NOW });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).issues[0].code).toBe("invalid_envelope");
+    if (!r.ok)
+      expect((r as FailedPiIngestRequestValidationResult).issues[0].code).toBe("invalid_envelope");
   });
 
   it("rejects array body", () => {
     const r = validatePiIngestRequestEnvelope([], { now: NOW });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).issues[0].code).toBe("invalid_envelope");
+    if (!r.ok)
+      expect((r as FailedPiIngestRequestValidationResult).issues[0].code).toBe("invalid_envelope");
   });
 
   it("rejects missing tent_id", () => {
-    const r = validatePiIngestRequestEnvelope(
-      { ...validBody(), tent_id: "" },
-      { now: NOW },
-    );
+    const r = validatePiIngestRequestEnvelope({ ...validBody(), tent_id: "" }, { now: NOW });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).issues.map((i) => i.code)).toContain("missing_tent_id");
+    if (!r.ok)
+      expect((r as FailedPiIngestRequestValidationResult).issues.map((i) => i.code)).toContain(
+        "missing_tent_id",
+      );
   });
 
   it("rejects missing device_id", () => {
@@ -104,7 +112,9 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
     const r = validatePiIngestRequestEnvelope(b, { now: NOW });
     expect(r.ok).toBe(false);
     if (!r.ok)
-      expect((r as any).issues.map((i) => i.code)).toContain("missing_device_id");
+      expect((r as FailedPiIngestRequestValidationResult).issues.map((i) => i.code)).toContain(
+        "missing_device_id",
+      );
   });
 
   it("rejects missing captured_at", () => {
@@ -113,7 +123,9 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
     const r = validatePiIngestRequestEnvelope(b, { now: NOW });
     expect(r.ok).toBe(false);
     if (!r.ok)
-      expect((r as any).issues.map((i) => i.code)).toContain("missing_captured_at");
+      expect((r as FailedPiIngestRequestValidationResult).issues.map((i) => i.code)).toContain(
+        "missing_captured_at",
+      );
   });
 
   it("rejects invalid captured_at", () => {
@@ -123,7 +135,9 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
     );
     expect(r.ok).toBe(false);
     if (!r.ok)
-      expect((r as any).issues.map((i) => i.code)).toContain("invalid_captured_at");
+      expect((r as FailedPiIngestRequestValidationResult).issues.map((i) => i.code)).toContain(
+        "invalid_captured_at",
+      );
   });
 
   it("rejects captured_at more than 5 minutes in the future and does not clamp", () => {
@@ -134,7 +148,9 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
     );
     expect(r.ok).toBe(false);
     if (!r.ok)
-      expect((r as any).issues.map((i) => i.code)).toContain("captured_at_too_far_future");
+      expect((r as FailedPiIngestRequestValidationResult).issues.map((i) => i.code)).toContain(
+        "captured_at_too_far_future",
+      );
   });
 
   it("accepts captured_at slightly in the future within tolerance", () => {
@@ -151,45 +167,46 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
     delete b.source;
     const r = validatePiIngestRequestEnvelope(b, { now: NOW });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).issues.map((i) => i.code)).toContain("missing_source");
+    if (!r.ok)
+      expect((r as FailedPiIngestRequestValidationResult).issues.map((i) => i.code)).toContain(
+        "missing_source",
+      );
   });
 
   it("rejects source = sim", () => {
-    const r = validatePiIngestRequestEnvelope(
-      { ...validBody(), source: "sim" },
-      { now: NOW },
-    );
+    const r = validatePiIngestRequestEnvelope({ ...validBody(), source: "sim" }, { now: NOW });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).issues.map((i) => i.code)).toContain("invalid_source");
+    if (!r.ok)
+      expect((r as FailedPiIngestRequestValidationResult).issues.map((i) => i.code)).toContain(
+        "invalid_source",
+      );
   });
 
   it("rejects source = manual", () => {
-    const r = validatePiIngestRequestEnvelope(
-      { ...validBody(), source: "manual" },
-      { now: NOW },
-    );
+    const r = validatePiIngestRequestEnvelope({ ...validBody(), source: "manual" }, { now: NOW });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).issues.map((i) => i.code)).toContain("invalid_source");
+    if (!r.ok)
+      expect((r as FailedPiIngestRequestValidationResult).issues.map((i) => i.code)).toContain(
+        "invalid_source",
+      );
   });
 
   it("rejects unknown source like home_assistant or mqtt", () => {
     for (const source of ["home_assistant", "mqtt", "sensorpush"]) {
-      const r = validatePiIngestRequestEnvelope(
-        { ...validBody(), source },
-        { now: NOW },
-      );
+      const r = validatePiIngestRequestEnvelope({ ...validBody(), source }, { now: NOW });
       expect(r.ok).toBe(false);
     }
   });
 
   it("rejects client-provided user_id", () => {
-    const r = validatePiIngestRequestEnvelope(
-      { ...validBody(), user_id: "attacker" } as object,
-      { now: NOW },
-    );
+    const r = validatePiIngestRequestEnvelope({ ...validBody(), user_id: "attacker" } as object, {
+      now: NOW,
+    });
     expect(r.ok).toBe(false);
     if (!r.ok)
-      expect((r as any).issues.map((i) => i.code)).toContain("client_user_id_forbidden");
+      expect((r as FailedPiIngestRequestValidationResult).issues.map((i) => i.code)).toContain(
+        "client_user_id_forbidden",
+      );
   });
 
   it("rejects missing readings", () => {
@@ -198,16 +215,18 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
     const r = validatePiIngestRequestEnvelope(b, { now: NOW });
     expect(r.ok).toBe(false);
     if (!r.ok)
-      expect((r as any).issues.map((i) => i.code)).toContain("missing_readings");
+      expect((r as FailedPiIngestRequestValidationResult).issues.map((i) => i.code)).toContain(
+        "missing_readings",
+      );
   });
 
   it("rejects empty readings", () => {
-    const r = validatePiIngestRequestEnvelope(
-      { ...validBody(), readings: [] },
-      { now: NOW },
-    );
+    const r = validatePiIngestRequestEnvelope({ ...validBody(), readings: [] }, { now: NOW });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).issues.map((i) => i.code)).toContain("empty_readings");
+    if (!r.ok)
+      expect((r as FailedPiIngestRequestValidationResult).issues.map((i) => i.code)).toContain(
+        "empty_readings",
+      );
   });
 
   it("rejects unknown metrics", () => {
@@ -219,7 +238,10 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
       { now: NOW },
     );
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).issues.map((i) => i.code)).toContain("invalid_metric");
+    if (!r.ok)
+      expect((r as FailedPiIngestRequestValidationResult).issues.map((i) => i.code)).toContain(
+        "invalid_metric",
+      );
   });
 
   it("rejects every forbidden metric (PPFD/EC/reservoir/etc.)", () => {
@@ -233,7 +255,9 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
       );
       expect(r.ok).toBe(false);
       if (!r.ok)
-        expect((r as any).issues.map((i) => i.code)).toContain("forbidden_metric");
+        expect((r as FailedPiIngestRequestValidationResult).issues.map((i) => i.code)).toContain(
+          "forbidden_metric",
+        );
     }
   });
 
@@ -246,7 +270,10 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
       { now: NOW },
     );
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).issues.map((i) => i.code)).toContain("invalid_unit");
+    if (!r.ok)
+      expect((r as FailedPiIngestRequestValidationResult).issues.map((i) => i.code)).toContain(
+        "invalid_unit",
+      );
   });
 
   it("rejects non-finite values (NaN, Infinity, -Infinity)", () => {
@@ -260,7 +287,9 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
       );
       expect(r.ok).toBe(false);
       if (!r.ok)
-        expect((r as any).issues.map((i) => i.code)).toContain("non_finite_value");
+        expect((r as FailedPiIngestRequestValidationResult).issues.map((i) => i.code)).toContain(
+          "non_finite_value",
+        );
     }
   });
 
@@ -274,7 +303,9 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
     );
     expect(r.ok).toBe(false);
     if (!r.ok)
-      expect((r as any).issues.map((i) => i.code)).toContain("non_finite_value");
+      expect((r as FailedPiIngestRequestValidationResult).issues.map((i) => i.code)).toContain(
+        "non_finite_value",
+      );
   });
 
   it("rejects missing value", () => {
@@ -286,7 +317,10 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
       { now: NOW },
     );
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).issues.map((i) => i.code)).toContain("missing_value");
+    if (!r.ok)
+      expect((r as FailedPiIngestRequestValidationResult).issues.map((i) => i.code)).toContain(
+        "missing_value",
+      );
   });
 
   it("rejects missing unit", () => {
@@ -298,7 +332,10 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
       { now: NOW },
     );
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).issues.map((i) => i.code)).toContain("missing_unit");
+    if (!r.ok)
+      expect((r as FailedPiIngestRequestValidationResult).issues.map((i) => i.code)).toContain(
+        "missing_unit",
+      );
   });
 
   it("reports issues for every invalid reading in the batch (all-or-nothing)", () => {
@@ -315,12 +352,16 @@ describe("validatePiIngestRequestEnvelope — rejections", () => {
     );
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      const codes = (r as any).issues.map((i) => i.code);
+      const codes = (r as FailedPiIngestRequestValidationResult).issues.map((i) => i.code);
       expect(codes).toContain("non_finite_value");
       expect(codes).toContain("forbidden_metric");
       // indexes recorded for caller debugging
-      expect((r as any).issues.some((i) => i.index === 1)).toBe(true);
-      expect((r as any).issues.some((i) => i.index === 2)).toBe(true);
+      expect((r as FailedPiIngestRequestValidationResult).issues.some((i) => i.index === 1)).toBe(
+        true,
+      );
+      expect((r as FailedPiIngestRequestValidationResult).issues.some((i) => i.index === 2)).toBe(
+        true,
+      );
     }
   });
 });
@@ -389,10 +430,7 @@ describe("toExternalSensorIngestPayload + normalizeIngestPayload integration", (
 
 // ------------- Static safety -------------
 
-const SRC = readFileSync(
-  resolve(__dirname, "../lib/piIngestRequestRules.ts"),
-  "utf8",
-);
+const SRC = readFileSync(resolve(__dirname, "../lib/piIngestRequestRules.ts"), "utf8");
 
 describe("piIngestRequestRules — static safety", () => {
   it("does not import Supabase runtime/client or React", () => {

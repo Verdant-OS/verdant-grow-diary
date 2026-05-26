@@ -38,9 +38,7 @@ beforeEach(() => {
 
 describe("useGrowData source metadata", () => {
   it("marks real supabase rows as supabase / not demo", async () => {
-    (repo.fetchTents as any).mockResolvedValue([
-      { ...tents[0], id: "live-1", name: "Live" },
-    ]);
+    vi.mocked(repo.fetchTents).mockResolvedValue([{ ...tents[0], id: "live-1", name: "Live" }]);
     const { result } = renderHook(() => useGrowTents(), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     const meta = getGrowDataMeta(["grow", "tents", "all"]);
@@ -50,7 +48,7 @@ describe("useGrowData source metadata", () => {
   });
 
   it("marks empty supabase + mock fallback as mock / demo", async () => {
-    (repo.fetchTents as any).mockResolvedValue([]);
+    vi.mocked(repo.fetchTents).mockResolvedValue([]);
     const { result } = renderHook(() => useGrowTents(), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     const meta = getGrowDataMeta(["grow", "tents", "all"]);
@@ -60,9 +58,7 @@ describe("useGrowData source metadata", () => {
   });
 
   it("marks supabase error + mock fallback as mock / demo with error reason", async () => {
-    (repo.fetchPlants as any).mockRejectedValue(
-      new Error("secret token leaked details"),
-    );
+    vi.mocked(repo.fetchPlants).mockRejectedValue(new Error("secret token leaked details"));
     const { result } = renderHook(() => useGrowPlants("t1"), {
       wrapper: wrapper(),
     });
@@ -76,11 +72,10 @@ describe("useGrowData source metadata", () => {
   });
 
   it("marks unknown tentId with no mock match as unavailable", async () => {
-    (repo.fetchSensorReadings as any).mockResolvedValue([]);
-    const { result } = renderHook(
-      () => useGrowSensorReadings("nope-no-such-tent"),
-      { wrapper: wrapper() },
-    );
+    vi.mocked(repo.fetchSensorReadings).mockResolvedValue([]);
+    const { result } = renderHook(() => useGrowSensorReadings("nope-no-such-tent"), {
+      wrapper: wrapper(),
+    });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     const meta = getGrowDataMeta(["grow", "sensors", "nope-no-such-tent"]);
     expect(meta.dataSource).toBe("unavailable");
@@ -88,12 +83,12 @@ describe("useGrowData source metadata", () => {
   });
 
   it("metadata is deterministic for the same outcome", async () => {
-    (repo.fetchTents as any).mockResolvedValue([]);
+    vi.mocked(repo.fetchTents).mockResolvedValue([]);
     const a = renderHook(() => useGrowTents("g1"), { wrapper: wrapper() });
     await waitFor(() => expect(a.result.current.isSuccess).toBe(true));
     const m1 = getGrowDataMeta(["grow", "tents", "g1"]);
     __resetGrowDataMeta();
-    (repo.fetchTents as any).mockResolvedValue([]);
+    vi.mocked(repo.fetchTents).mockResolvedValue([]);
     const b = renderHook(() => useGrowTents("g1"), { wrapper: wrapper() });
     await waitFor(() => expect(b.result.current.isSuccess).toBe(true));
     const m2 = getGrowDataMeta(["grow", "tents", "g1"]);
@@ -101,9 +96,7 @@ describe("useGrowData source metadata", () => {
   });
 
   it("getGrowDataMeta returns a safe default for unknown keys", () => {
-    expect(getGrowDataMeta(["grow", "tents", "never-set"])).toEqual(
-      DEFAULT_GROW_DATA_META,
-    );
+    expect(getGrowDataMeta(["grow", "tents", "never-set"])).toEqual(DEFAULT_GROW_DATA_META);
   });
 });
 

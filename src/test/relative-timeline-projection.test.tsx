@@ -22,6 +22,7 @@ import {
   UNSTAGED_GROUP_KEY,
   type RelativeTimelineItem,
 } from "@/lib/relativeTimelineProjectionRules";
+import type { RelativeStagePreset } from "@/lib/relativeStageTimelineRules";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) =>
@@ -48,6 +49,7 @@ interface RawEntry {
   note?: string;
   photo_url?: string | null;
   details?: Record<string, unknown> | null;
+  stage?: string | null;
 }
 
 function entry(over: Partial<RawEntry> & { id: string }): RawEntry {
@@ -328,7 +330,9 @@ describe("buildRelativeTimelineProjection — pure rules", () => {
 // ---------------------------------------------------------------------------
 
 describe("groupRelativeTimelineByStage — pure rules", () => {
-  function preset(over: { key: string; label: string; colorToken: string; sortOrder: number }) {
+  function preset(
+    over: Pick<RelativeStagePreset, "key" | "label" | "colorToken" | "sortOrder">,
+  ): RelativeStagePreset {
     return {
       key: over.key,
       label: over.label,
@@ -337,7 +341,7 @@ describe("groupRelativeTimelineByStage — pure rules", () => {
       colorDirection: "",
       suggestedDurationDays: null,
       sortOrder: over.sortOrder,
-    } as any;
+    };
   }
   function item(over: Partial<RelativeTimelineItem> & { id: string }): RelativeTimelineItem {
     return {
@@ -433,7 +437,7 @@ describe("groupRelativeTimelineByStage — pure rules", () => {
           id: "perEntry",
           entry_at: "2026-04-05T00:00:00Z",
           plant_id: PLANT,
-          ...({ stage: "flower" } as any),
+          stage: "flower",
         }),
         entry({ id: "fallback", entry_at: "2026-04-06T00:00:00Z" }),
       ],
@@ -526,7 +530,7 @@ describe("PlantRelativeTimelineSection — render", () => {
         entry({
           id: "perEntry",
           entry_at: "2026-04-06T00:00:00Z",
-          ...({ stage: "flower" } as any),
+          stage: "flower",
         }),
       ],
       isLoading: false,
@@ -640,8 +644,8 @@ describe("filterRelativeTimelineItems — pure rules", () => {
 
   it("classifies unknown/null event types safely as 'notes'", () => {
     expect(classifyRelativeTimelineFilter({ eventType: "", source: "note" })).toBe("notes");
-    expect(classifyRelativeTimelineFilter(null as any)).toBe("notes");
-    expect(classifyRelativeTimelineFilter(undefined as any)).toBe("notes");
+    expect(classifyRelativeTimelineFilter(null)).toBe("notes");
+    expect(classifyRelativeTimelineFilter(undefined)).toBe("notes");
     expect(classifyRelativeTimelineFilter({ eventType: "anything-new", source: "note" })).toBe(
       "notes",
     );
@@ -661,7 +665,7 @@ describe("filterRelativeTimelineItems — pure rules", () => {
   });
 
   it("filters BEFORE grouping: group counts reflect only filtered items", () => {
-    const VEG = {
+    const VEG: RelativeStagePreset = {
       key: "vegetation",
       label: "Vegetation",
       description: "",
@@ -669,8 +673,8 @@ describe("filterRelativeTimelineItems — pure rules", () => {
       colorDirection: "",
       suggestedDurationDays: null,
       sortOrder: 30,
-    } as any;
-    const FLOWER = {
+    };
+    const FLOWER: RelativeStagePreset = {
       key: "flower",
       label: "Flower",
       description: "",
@@ -678,7 +682,7 @@ describe("filterRelativeTimelineItems — pure rules", () => {
       colorDirection: "",
       suggestedDurationDays: null,
       sortOrder: 40,
-    } as any;
+    };
     const items: RelativeTimelineItem[] = [
       tItem({ id: "vw", eventType: "watering", stagePreset: VEG }),
       tItem({ id: "vn", eventType: "note", stagePreset: VEG }),
@@ -690,7 +694,7 @@ describe("filterRelativeTimelineItems — pure rules", () => {
   });
 
   it("does not create empty stage groups after filtering", () => {
-    const VEG = {
+    const VEG: RelativeStagePreset = {
       key: "vegetation",
       label: "Vegetation",
       description: "",
@@ -698,8 +702,8 @@ describe("filterRelativeTimelineItems — pure rules", () => {
       colorDirection: "",
       suggestedDurationDays: null,
       sortOrder: 30,
-    } as any;
-    const FLOWER = {
+    };
+    const FLOWER: RelativeStagePreset = {
       key: "flower",
       label: "Flower",
       description: "",
@@ -707,7 +711,7 @@ describe("filterRelativeTimelineItems — pure rules", () => {
       colorDirection: "",
       suggestedDurationDays: null,
       sortOrder: 40,
-    } as any;
+    };
     const items: RelativeTimelineItem[] = [
       tItem({ id: "vw", eventType: "watering", stagePreset: VEG }),
       tItem({ id: "fn", eventType: "note", stagePreset: FLOWER }),
@@ -845,7 +849,7 @@ describe("summarizeRelativeTimelineItems — pure rules", () => {
     });
     expect(s.lastActivityAt).toBeNull();
     expect(s.lastActivityRelative).toBeNull();
-    expect(summarizeRelativeTimelineItems(null as any).total).toBe(0);
+    expect(summarizeRelativeTimelineItems(null).total).toBe(0);
   });
 
   it("counts totals across categories", () => {

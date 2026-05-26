@@ -23,8 +23,7 @@ export const REASON_LABELS: Record<ExclusionReason, string> = {
   no_tent_assigned: "No tent assignment.",
 };
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface PlantDropdownVisibility extends PlantDropdownExclusionSummary {}
+export type PlantDropdownVisibility = PlantDropdownExclusionSummary;
 
 /** Pass-through alias so dialogs can rename for clarity at call sites. */
 export function summarizePlantDropdownVisibility(

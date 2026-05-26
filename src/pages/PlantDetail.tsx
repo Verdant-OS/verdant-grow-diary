@@ -198,19 +198,19 @@ export default function PlantDetail() {
           <section
             aria-labelledby="plant-daily-grow-check-section-heading"
             data-testid="plant-daily-grow-check-section"
-            className="space-y-3"
+            className="space-y-4 sm:space-y-3"
           >
-            <div className="flex items-baseline justify-between gap-2">
+            <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
               <h2
                 id="plant-daily-grow-check-section-heading"
                 className="text-base font-semibold tracking-tight"
               >
                 Daily Grow Check
               </h2>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs leading-snug text-muted-foreground">
                 <span>Status: today's entry and recent activity.</span>
-                <span aria-hidden="true"> · </span>
-                <span>Next: log today's check to keep rhythm.</span>
+                <span aria-hidden="true" className="hidden sm:inline"> · </span>
+                <span className="block sm:inline">Next: log today's check to keep rhythm.</span>
               </p>
             </div>
             <DailyGrowCheckOnboardingCard

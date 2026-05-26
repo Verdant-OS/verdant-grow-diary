@@ -27,7 +27,12 @@ import { Button } from "@/components/ui/button";
 import { useGrowPlant, useGrowTent, getGrowDataMeta } from "@/hooks/useGrowData";
 import { format, formatDistanceToNow } from "date-fns";
 
+import PlantQuickLog from "@/components/PlantQuickLog";
+import { useState } from "react";
+import { Zap } from "lucide-react";
+
 export default function PlantDetail() {
+  const [quickLogOpen, setQuickLogOpen] = useState(false);
   const { id } = useParams();
   const { data: plant, isLoading } = useGrowPlant(id);
   const { data: tent } = useGrowTent(plant?.tentId);

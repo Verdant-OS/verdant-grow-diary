@@ -29,8 +29,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import {
   buildQuickLogInsertDraft,
+  parseOptionalNumber,
   type QuickLogSensorInput,
 } from "@/lib/quickLogRules";
+import { computeManualSensorDelta } from "@/lib/manualSensorDeltaRules";
+import type { ManualSensorMetric } from "@/lib/manualSensorFreshnessRules";
+import { usePlantManualSensorHistory } from "@/hooks/usePlantManualSensorHistory";
 
 interface Props {
   open: boolean;
@@ -56,6 +60,7 @@ export default function PlantQuickLog({
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const { data: history } = usePlantManualSensorHistory(open ? plantId : null);
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -63,6 +68,12 @@ export default function PlantQuickLog({
   const [sensors, setSensors] = useState<QuickLogSensorInput>(EMPTY_SENSORS);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  function deltaFor(metric: ManualSensorMetric, raw: string) {
+    const current = parseOptionalNumber(raw);
+    const prev = history?.[metric]?.value ?? null;
+    return computeManualSensorDelta(metric, current, prev);
+  }
 
   function resetForm() {
     setPhotoFile(null);
@@ -156,6 +167,7 @@ export default function PlantQuickLog({
       toast.success("Saved to timeline 🌱");
       queryClient.invalidateQueries({ queryKey: ["plant_recent_activity"] });
       queryClient.invalidateQueries({ queryKey: ["diary_entries"] });
+      queryClient.invalidateQueries({ queryKey: ["plant_manual_sensor_history"] });
       window.dispatchEvent(
         new CustomEvent("verdant:entry-created", {
           detail: { plantId, createdAt: new Date().toISOString() },
@@ -268,6 +280,7 @@ export default function PlantQuickLog({
               onChange={(v) => setSensors((s) => ({ ...s, temp: v }))}
               inputMode="decimal"
               step="any"
+              delta={deltaFor("temp_f", sensors.temp)}
             />
             <SensorField
               id="plant-quick-log-humidity"
@@ -276,6 +289,7 @@ export default function PlantQuickLog({
               onChange={(v) => setSensors((s) => ({ ...s, humidity: v }))}
               inputMode="decimal"
               step="any"
+              delta={deltaFor("humidity_percent", sensors.humidity)}
             />
             <SensorField
               id="plant-quick-log-ph"
@@ -284,6 +298,7 @@ export default function PlantQuickLog({
               onChange={(v) => setSensors((s) => ({ ...s, ph: v }))}
               inputMode="decimal"
               step="0.1"
+              delta={deltaFor("ph", sensors.ph)}
             />
             <SensorField
               id="plant-quick-log-ec"
@@ -292,6 +307,7 @@ export default function PlantQuickLog({
               onChange={(v) => setSensors((s) => ({ ...s, ec: v }))}
               inputMode="decimal"
               step="0.01"
+              delta={deltaFor("ec", sensors.ec)}
             />
           </fieldset>
 
@@ -337,9 +353,16 @@ interface SensorFieldProps {
   onChange: (v: string) => void;
   inputMode: "decimal" | "numeric";
   step: string;
+  delta: import("@/lib/manualSensorDeltaRules").ManualSensorDelta | null;
 }
 
-function SensorField({ id, label, value, onChange, inputMode, step }: SensorFieldProps) {
+function SensorField({ id, label, value, onChange, inputMode, step, delta }: SensorFieldProps) {
+  const deltaTone =
+    delta?.direction === "up"
+      ? "text-primary"
+      : delta?.direction === "down"
+        ? "text-amber-400/90"
+        : "text-muted-foreground";
   return (
     <div className="grid gap-1">
       <Label htmlFor={id} className="text-xs text-muted-foreground">
@@ -356,6 +379,15 @@ function SensorField({ id, label, value, onChange, inputMode, step }: SensorFiel
         placeholder="—"
         className="text-base"
       />
+      {delta && (
+        <span
+          data-testid={`${id}-delta`}
+          data-direction={delta.direction}
+          className={cn("text-[10px] leading-tight", deltaTone)}
+        >
+          {delta.label}
+        </span>
+      )}
     </div>
   );
 }

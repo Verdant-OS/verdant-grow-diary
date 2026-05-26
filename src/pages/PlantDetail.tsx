@@ -28,6 +28,7 @@ import { useGrowPlant, useGrowTent, getGrowDataMeta } from "@/hooks/useGrowData"
 import { format, formatDistanceToNow } from "date-fns";
 
 import PlantQuickLog from "@/components/PlantQuickLog";
+import PlantManualSensorFreshnessCard from "@/components/PlantManualSensorFreshnessCard";
 import { useState } from "react";
 import { Zap } from "lucide-react";
 
@@ -203,6 +204,10 @@ export default function PlantDetail() {
             plantName={plant.name}
             growId={plant.growId ?? null}
             tentId={plant.tentId ?? null}
+          />
+          <PlantManualSensorFreshnessCard
+            plantId={plant.id}
+            onUpdate={() => setQuickLogOpen(true)}
           />
           <PlantTentEnvironmentPanel
             tentId={plant.tentId ?? null}

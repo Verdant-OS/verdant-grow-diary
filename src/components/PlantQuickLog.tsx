@@ -353,9 +353,16 @@ interface SensorFieldProps {
   onChange: (v: string) => void;
   inputMode: "decimal" | "numeric";
   step: string;
+  delta: import("@/lib/manualSensorDeltaRules").ManualSensorDelta | null;
 }
 
-function SensorField({ id, label, value, onChange, inputMode, step }: SensorFieldProps) {
+function SensorField({ id, label, value, onChange, inputMode, step, delta }: SensorFieldProps) {
+  const deltaTone =
+    delta?.direction === "up"
+      ? "text-primary"
+      : delta?.direction === "down"
+        ? "text-amber-400/90"
+        : "text-muted-foreground";
   return (
     <div className="grid gap-1">
       <Label htmlFor={id} className="text-xs text-muted-foreground">
@@ -372,6 +379,15 @@ function SensorField({ id, label, value, onChange, inputMode, step }: SensorFiel
         placeholder="—"
         className="text-base"
       />
+      {delta && (
+        <span
+          data-testid={`${id}-delta`}
+          data-direction={delta.direction}
+          className={cn("text-[10px] leading-tight", deltaTone)}
+        >
+          {delta.label}
+        </span>
+      )}
     </div>
   );
 }

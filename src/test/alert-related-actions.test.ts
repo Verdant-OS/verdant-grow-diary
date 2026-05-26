@@ -8,15 +8,10 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import {
-  isActionDerivedFromAlert,
-} from "@/lib/actionQueueProvenanceRules";
+import { isActionDerivedFromAlert } from "@/lib/actionQueueProvenanceRules";
 
 const ROOT = resolve(__dirname, "../..");
-const ALERT_DETAIL = readFileSync(
-  resolve(ROOT, "src/pages/AlertDetail.tsx"),
-  "utf8",
-);
+const ALERT_DETAIL = readFileSync(resolve(ROOT, "src/pages/AlertDetail.tsx"), "utf8");
 
 describe("isActionDerivedFromAlert", () => {
   it("identifies an action carrying the matching back-pointer", () => {
@@ -39,10 +34,7 @@ describe("isActionDerivedFromAlert", () => {
 
   it("rejects malformed or missing alert tokens", () => {
     expect(
-      isActionDerivedFromAlert(
-        { source: "environment_alert", reason: "no token here" },
-        "abc-1",
-      ),
+      isActionDerivedFromAlert({ source: "environment_alert", reason: "no token here" }, "abc-1"),
     ).toBe(false);
     expect(
       isActionDerivedFromAlert(
@@ -51,36 +43,30 @@ describe("isActionDerivedFromAlert", () => {
       ),
     ).toBe(false);
     expect(
-      isActionDerivedFromAlert(
-        { source: "ai_coach", reason: "RH high [alert:abc-1]" },
-        "abc-1",
-      ),
+      isActionDerivedFromAlert({ source: "ai_coach", reason: "RH high [alert:abc-1]" }, "abc-1"),
     ).toBe(false);
   });
 
   it("is null-safe and deterministic", () => {
     expect(isActionDerivedFromAlert(null, "abc-1")).toBe(false);
+    expect(isActionDerivedFromAlert({ source: "environment_alert", reason: null }, "abc-1")).toBe(
+      false,
+    );
     expect(
-      isActionDerivedFromAlert(
-        { source: "environment_alert", reason: null },
-        "abc-1",
-      ),
+      isActionDerivedFromAlert({ source: "environment_alert", reason: "x [alert:abc-1]" }, null),
     ).toBe(false);
-    expect(isActionDerivedFromAlert({ source: "environment_alert", reason: "x [alert:abc-1]" }, null)).toBe(false);
-    expect(isActionDerivedFromAlert({ source: "environment_alert", reason: "x [alert:abc-1]" }, "")).toBe(false);
+    expect(
+      isActionDerivedFromAlert({ source: "environment_alert", reason: "x [alert:abc-1]" }, ""),
+    ).toBe(false);
     // determinism
     const a = { source: "environment_alert", reason: "x [alert:zzz]" };
-    expect(isActionDerivedFromAlert(a, "zzz")).toBe(
-      isActionDerivedFromAlert(a, "zzz"),
-    );
+    expect(isActionDerivedFromAlert(a, "zzz")).toBe(isActionDerivedFromAlert(a, "zzz"));
   });
 });
 
 describe("AlertDetail — Related Action Queue Items section", () => {
   it("imports the shared provenance helper (no inline regex)", () => {
-    expect(ALERT_DETAIL).toMatch(
-      /from "@\/lib\/actionQueueProvenanceRules"/,
-    );
+    expect(ALERT_DETAIL).toMatch(/from "@\/lib\/actionQueueProvenanceRules"/);
     expect(ALERT_DETAIL).toMatch(/isActionDerivedFromAlert/);
     // No inline [alert:...] regex in JSX
     expect(ALERT_DETAIL).not.toMatch(/new RegExp\(["']\\\[alert:/);
@@ -92,9 +78,7 @@ describe("AlertDetail — Related Action Queue Items section", () => {
   });
 
   it("renders an empty state when no related items exist", () => {
-    expect(ALERT_DETAIL).toMatch(
-      /No queue items have been created from this alert yet/,
-    );
+    expect(ALERT_DETAIL).toMatch(/No queue items have been created from this alert yet/);
   });
 
   it("links each related item via actionDetailPath", () => {
@@ -108,15 +92,13 @@ describe("AlertDetail — Related Action Queue Items section", () => {
   });
 
   it("does not auto-create action_queue items on render", () => {
-    expect(ALERT_DETAIL).not.toMatch(
-      /useEffect\([\s\S]{0,600}action_queue[\s\S]{0,200}\.insert\(/,
-    );
+    expect(ALERT_DETAIL).not.toMatch(/useEffect\([\s\S]{0,600}action_queue[\s\S]{0,200}\.insert\(/);
   });
 
   it("preserves the existing 'Add to Action Queue' click handler", () => {
     expect(ALERT_DETAIL).toMatch(/onClick=\{addAlertToActionQueue\}/);
     expect(ALERT_DETAIL).toMatch(/Add to Action Queue/);
-    expect(ALERT_DETAIL).toMatch(/Already in Action Queue/);
+    expect(ALERT_DETAIL).toMatch(/Action already queued/);
   });
 
   it("introduces no device-control or service_role surface", () => {

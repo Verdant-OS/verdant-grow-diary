@@ -15,18 +15,13 @@ import {
 } from "@/lib/actionQueueProvenanceRules";
 
 const ROOT = resolve(__dirname, "../..");
-const ALERT_DETAIL = readFileSync(
-  resolve(ROOT, "src/pages/AlertDetail.tsx"),
-  "utf8",
-);
+const ALERT_DETAIL = readFileSync(resolve(ROOT, "src/pages/AlertDetail.tsx"), "utf8");
 
 describe("hasPendingActionsForClosedAlert", () => {
   it("returns true for resolved alert with a pending related action", () => {
-    expect(
-      hasPendingActionsForClosedAlert("resolved", [
-        { status: "pending_approval" },
-      ]),
-    ).toBe(true);
+    expect(hasPendingActionsForClosedAlert("resolved", [{ status: "pending_approval" }])).toBe(
+      true,
+    );
   });
 
   it("returns true for dismissed alert with a pending related action", () => {
@@ -39,16 +34,10 @@ describe("hasPendingActionsForClosedAlert", () => {
   });
 
   it("returns false for open alerts even with pending related actions", () => {
-    expect(
-      hasPendingActionsForClosedAlert("open", [
-        { status: "pending_approval" },
-      ]),
-    ).toBe(false);
-    expect(
-      hasPendingActionsForClosedAlert("acknowledged", [
-        { status: "pending_approval" },
-      ]),
-    ).toBe(false);
+    expect(hasPendingActionsForClosedAlert("open", [{ status: "pending_approval" }])).toBe(false);
+    expect(hasPendingActionsForClosedAlert("acknowledged", [{ status: "pending_approval" }])).toBe(
+      false,
+    );
   });
 
   it("returns false when all related actions are completed/rejected/canceled", () => {
@@ -66,9 +55,7 @@ describe("hasPendingActionsForClosedAlert", () => {
     expect(hasPendingActionsForClosedAlert(null, null)).toBe(false);
     expect(hasPendingActionsForClosedAlert(undefined, undefined)).toBe(false);
     expect(hasPendingActionsForClosedAlert("resolved", [])).toBe(false);
-    expect(hasPendingActionsForClosedAlert("resolved", [null, undefined])).toBe(
-      false,
-    );
+    expect(hasPendingActionsForClosedAlert("resolved", [null, undefined])).toBe(false);
     const input = [{ status: "pending_approval" }];
     expect(hasPendingActionsForClosedAlert("resolved", input)).toBe(
       hasPendingActionsForClosedAlert("resolved", input),
@@ -84,9 +71,7 @@ describe("hasPendingActionsForClosedAlert", () => {
 describe("AlertDetail — stale-action warning", () => {
   it("imports and uses the helper rather than inlining the rule in JSX", () => {
     expect(ALERT_DETAIL).toMatch(/hasPendingActionsForClosedAlert/);
-    expect(ALERT_DETAIL).toMatch(
-      /from "@\/lib\/actionQueueProvenanceRules"/,
-    );
+    expect(ALERT_DETAIL).toMatch(/from "@\/lib\/actionQueueProvenanceRules"/);
   });
 
   it("renders the stale-action warning with the required copy", () => {
@@ -115,7 +100,7 @@ describe("AlertDetail — stale-action warning", () => {
   it("preserves existing Add / Already in Action Queue behavior", () => {
     expect(ALERT_DETAIL).toMatch(/onClick=\{addAlertToActionQueue\}/);
     expect(ALERT_DETAIL).toMatch(/Add to Action Queue/);
-    expect(ALERT_DETAIL).toMatch(/Already in Action Queue/);
+    expect(ALERT_DETAIL).toMatch(/Action already queued/);
   });
 
   it("preserves the related items list rendering", () => {
@@ -128,8 +113,6 @@ describe("AlertDetail — stale-action warning", () => {
       /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b|service_role/i,
     );
     // No auto-cancel of pending actions when alert closes.
-    expect(ALERT_DETAIL).not.toMatch(
-      /auto[_-]?cancel|cancelPendingActions|bulkCancel/i,
-    );
+    expect(ALERT_DETAIL).not.toMatch(/auto[_-]?cancel|cancelPendingActions|bulkCancel/i);
   });
 });

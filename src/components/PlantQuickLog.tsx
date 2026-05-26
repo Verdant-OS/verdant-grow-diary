@@ -280,6 +280,7 @@ export default function PlantQuickLog({
               onChange={(v) => setSensors((s) => ({ ...s, temp: v }))}
               inputMode="decimal"
               step="any"
+              delta={deltaFor("temp_f", sensors.temp)}
             />
             <SensorField
               id="plant-quick-log-humidity"
@@ -288,6 +289,7 @@ export default function PlantQuickLog({
               onChange={(v) => setSensors((s) => ({ ...s, humidity: v }))}
               inputMode="decimal"
               step="any"
+              delta={deltaFor("humidity_percent", sensors.humidity)}
             />
             <SensorField
               id="plant-quick-log-ph"
@@ -296,6 +298,7 @@ export default function PlantQuickLog({
               onChange={(v) => setSensors((s) => ({ ...s, ph: v }))}
               inputMode="decimal"
               step="0.1"
+              delta={deltaFor("ph", sensors.ph)}
             />
             <SensorField
               id="plant-quick-log-ec"
@@ -304,6 +307,7 @@ export default function PlantQuickLog({
               onChange={(v) => setSensors((s) => ({ ...s, ec: v }))}
               inputMode="decimal"
               step="0.01"
+              delta={deltaFor("ec", sensors.ec)}
             />
           </fieldset>
 

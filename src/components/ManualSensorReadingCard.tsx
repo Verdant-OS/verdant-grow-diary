@@ -172,6 +172,57 @@ export default function ManualSensorReadingCard({
           </div>
         )}
 
+        <div className="space-y-1" data-testid="manual-reading-device-row">
+          <Label htmlFor="manual-reading-device" className="text-xs">
+            Reading source / device <span className="text-muted-foreground">(optional)</span>
+          </Label>
+          <Select value={devicePreset} onValueChange={setDevicePreset}>
+            <SelectTrigger
+              id="manual-reading-device"
+              data-testid="manual-reading-device-select"
+            >
+              <SelectValue placeholder="Where did this reading come from?" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none" data-testid="manual-reading-device-option-none">
+                Not specified
+              </SelectItem>
+              {devicePresets.map((opt) => (
+                <SelectItem
+                  key={opt.id}
+                  value={opt.id}
+                  data-testid={`manual-reading-device-option-${opt.id}`}
+                >
+                  {opt.label}
+                </SelectItem>
+              ))}
+              <SelectItem value="custom" data-testid="manual-reading-device-option-custom">
+                Other (type a short note)
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          {devicePreset === "custom" && (
+            <Input
+              id="manual-reading-device-custom"
+              data-testid="manual-reading-device-custom"
+              value={deviceCustom}
+              onChange={(e) => setDeviceCustom(e.target.value)}
+              maxLength={MAX_MANUAL_DEVICE_NOTE_LEN}
+              placeholder="e.g. SensorPush HT.w"
+              className="mt-1"
+            />
+          )}
+          <p
+            className="text-[11px] text-muted-foreground"
+            data-testid="manual-reading-device-hint"
+          >
+            Optional note about where this reading came from. Stays labeled as a manual,
+            user-entered reading — not a connected device.
+          </p>
+        </div>
+
+
+
         <Section title="Air" testId="manual-reading-section-air">
           <Field
             id="m-air-temp"

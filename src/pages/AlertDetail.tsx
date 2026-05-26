@@ -471,15 +471,9 @@ export default function AlertDetail() {
                       automatically.
                     </p>
                     {draftResult && draftResult.ok ? (
-                      <>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {draftResult.draft.suggested_change}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground/80 mt-1">
-                          Verdant can prepare a recommended action for review. Nothing is executed
-                          automatically.
-                        </p>
-                      </>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {draftResult.draft.suggested_change}
+                      </p>
                     ) : (
                       <p className="text-xs text-muted-foreground mt-1">
                         Not enough alert context to draft a safe action.
@@ -487,11 +481,17 @@ export default function AlertDetail() {
                     )}
                     <div className="flex flex-wrap gap-2 mt-2">
                       {existingActionId ? (
-                        <Button asChild size="sm" variant="secondary">
-                          <Link to={`/actions/${existingActionId}`}>
-                            ✓ Action already queued — view details
-                          </Link>
-                        </Button>
+                        <>
+                          <Button asChild size="sm" variant="secondary">
+                            <Link to={`/actions/${existingActionId}`}>
+                              ✓ Action already queued — view details
+                            </Link>
+                          </Button>
+                          <p className="w-full text-[10px] text-muted-foreground/80">
+                            A recommended action for this alert already exists and is awaiting your
+                            review.
+                          </p>
+                        </>
                       ) : (
                         <Button
                           size="sm"

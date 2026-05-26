@@ -80,6 +80,7 @@ export default function ManualSensorReadingCard({
     const payloads = buildManualReadingPayloads({
       tentId,
       metrics: validation.metrics,
+      deviceNote,
     });
     try {
       // Sequential keeps ordering deterministic and per-row error surfacing

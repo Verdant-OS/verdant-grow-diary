@@ -195,20 +195,37 @@ export default function PlantDetail() {
             plantStartedAt={plant.startedAt}
             currentStage={plant.stage}
           />
-          <DailyGrowCheckOnboardingCard
-            focusedPlantId={plant.id}
-            focusedTentId={plant.tentId ?? null}
-            tentIds={plant.tentId ? [plant.tentId] : null}
-            hideWhenReady
-          />
-          <PlantDailyGrowCheckHistoryCard
-            plantId={plant.id}
-            currentTentId={plant.tentId ?? null}
-          />
-          <PlantDailyGrowCheckConsistencyCard
-            plantId={plant.id}
-            currentTentId={plant.tentId ?? null}
-          />
+          <section
+            aria-labelledby="plant-daily-grow-check-section-heading"
+            data-testid="plant-daily-grow-check-section"
+            className="space-y-3"
+          >
+            <div className="flex items-baseline justify-between gap-2">
+              <h2
+                id="plant-daily-grow-check-section-heading"
+                className="text-base font-semibold tracking-tight"
+              >
+                Daily Grow Check
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Today's status, recent activity, and rhythm.
+              </p>
+            </div>
+            <DailyGrowCheckOnboardingCard
+              focusedPlantId={plant.id}
+              focusedTentId={plant.tentId ?? null}
+              tentIds={plant.tentId ? [plant.tentId] : null}
+              hideWhenReady
+            />
+            <PlantDailyGrowCheckConsistencyCard
+              plantId={plant.id}
+              currentTentId={plant.tentId ?? null}
+            />
+            <PlantDailyGrowCheckHistoryCard
+              plantId={plant.id}
+              currentTentId={plant.tentId ?? null}
+            />
+          </section>
           <PlantAssignedTentAlertsPanel
             tentId={plant.tentId ?? null}
             tentName={tent?.name ?? null}

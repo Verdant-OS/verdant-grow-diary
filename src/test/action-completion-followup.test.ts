@@ -328,3 +328,187 @@ describe("Static safety — actionFollowupRules + ActionDetail", () => {
     expect(ALERT_DETAIL).toMatch(/Action queued for approval\./);
   });
 });
+
+/**
+ * Duplicate-completion + retry idempotency.
+ *
+ * Mirrors the production flow in ActionDetail.maybeCreateFollowupDiaryEntry():
+ *   1. buildActionFollowupDiaryDraft(completed)
+ *   2. lookup existing diary_entries where details contains
+ *      { event_type: action_followup, action_queue_id: completed.id }
+ *   3. if a match is found (verified via followupMatchesAction), bail out
+ *   4. otherwise insert exactly one diary row
+ *
+ * The test uses a small in-memory fake of the Supabase chain so we can prove
+ * that a second completion of the same action id never produces a second row,
+ * regardless of timestamp drift or regenerated note text.
+ */
+describe("maybeCreateFollowupDiaryEntry — duplicate completion retry idempotency", () => {
+  type DiaryRow = {
+    id: string;
+    grow_id: string;
+    tent_id: string | null;
+    plant_id: string | null;
+    note: string;
+    details: { event_type?: unknown; action_queue_id?: unknown } & Record<string, unknown>;
+  };
+
+  function makeFakeSupabase(initial: DiaryRow[] = []) {
+    const rows: DiaryRow[] = [...initial];
+    const insertCalls: Array<Record<string, unknown>> = [];
+    let nextId = initial.length + 1;
+
+    function from(_table: string) {
+      const select = (_cols: string) => {
+        const filters: Array<(r: DiaryRow) => boolean> = [];
+        const api = {
+          eq(col: keyof DiaryRow, val: unknown) {
+            filters.push((r) => r[col] === val);
+            return api;
+          },
+          contains(_col: "details", needle: Record<string, unknown>) {
+            filters.push((r) =>
+              Object.entries(needle).every(
+                ([k, v]) => (r.details as Record<string, unknown>)[k] === v,
+              ),
+            );
+            return api;
+          },
+          async limit(n: number) {
+            const data = rows.filter((r) => filters.every((f) => f(r))).slice(0, n);
+            return { data, error: null as null };
+          },
+        };
+        return api;
+      };
+      const insert = async (payload: Record<string, unknown>) => {
+        insertCalls.push(payload);
+        rows.push({
+          id: `diary-${nextId++}`,
+          grow_id: payload.grow_id as string,
+          tent_id: (payload.tent_id as string | null) ?? null,
+          plant_id: (payload.plant_id as string | null) ?? null,
+          note: payload.note as string,
+          details: payload.details as DiaryRow["details"],
+        });
+        return { error: null as null };
+      };
+      return { select, insert };
+    }
+    return { from, rows, insertCalls };
+  }
+
+  // Mirrors ActionDetail.maybeCreateFollowupDiaryEntry() exactly: pure helpers
+  // + lookup-by-action-id + idempotent bail-out + single insert.
+  async function runFollowup(
+    db: ReturnType<typeof makeFakeSupabase>,
+    completed: CompletedActionInput,
+  ): Promise<{ inserted: boolean }> {
+    const result = buildActionFollowupDiaryDraft(completed);
+    if (!result.ok) return { inserted: false };
+    const { draft } = result;
+
+    const lookup = await db
+      .from("diary_entries")
+      .select("id,details")
+      .eq("grow_id", draft.grow_id)
+      .contains("details", {
+        event_type: ACTION_FOLLOWUP_EVENT_TYPE,
+        action_queue_id: completed.id,
+      })
+      .limit(1);
+
+    if (lookup.data && lookup.data.length > 0) {
+      const row = lookup.data[0] as { id: string; details: unknown };
+      if (
+        followupMatchesAction(
+          { details: row.details as { event_type?: unknown; action_queue_id?: unknown } | null },
+          completed.id,
+        )
+      ) {
+        return { inserted: false };
+      }
+    }
+
+    await db.from("diary_entries").insert({
+      grow_id: draft.grow_id,
+      tent_id: draft.tent_id,
+      plant_id: draft.plant_id,
+      note: draft.note,
+      details: draft.details,
+    });
+    return { inserted: true };
+  }
+
+  it("does not insert a second action_followup when the same action completion is retried", async () => {
+    const db = makeFakeSupabase();
+    const first = baseCompleted({ id: "action-dup-1", completed_at: "2026-05-26T10:00:00.000Z" });
+
+    const r1 = await runFollowup(db, first);
+    expect(r1.inserted).toBe(true);
+    expect(db.rows.length).toBe(1);
+    expect(db.insertCalls.length).toBe(1);
+
+    // Retry with the same action id but a later completed_at — idempotency
+    // must be action-id based, not timestamp-equality based.
+    const retry = baseCompleted({
+      id: "action-dup-1",
+      completed_at: "2026-05-26T10:05:30.000Z",
+    });
+    const r2 = await runFollowup(db, retry);
+    expect(r2.inserted).toBe(false);
+    expect(db.rows.length).toBe(1);
+    expect(db.insertCalls.length).toBe(1);
+
+    const stored = db.rows[0];
+    expect(followupMatchesAction({ details: stored.details }, "action-dup-1")).toBe(true);
+    expect(stored.details.action_queue_id).toBe("action-dup-1");
+    expect(stored.details.event_type).toBe(ACTION_FOLLOWUP_EVENT_TYPE);
+
+    // Safety: insert payload never includes user_id.
+    expect(Object.keys(db.insertCalls[0])).not.toContain("user_id");
+    expect(Object.keys(db.insertCalls[0].details as Record<string, unknown>)).not.toContain(
+      "user_id",
+    );
+  });
+
+  it("uses the action id back-pointer to treat an existing follow-up as already created", async () => {
+    // Seed a follow-up row from a prior run; current process has no memory of it.
+    const db = makeFakeSupabase([
+      {
+        id: "diary-seed",
+        grow_id: "grow-1",
+        tent_id: "tent-1",
+        plant_id: null,
+        note: "Re-check RH in ~24h and confirm humidity stayed closer to target.",
+        details: {
+          event_type: ACTION_FOLLOWUP_EVENT_TYPE,
+          action_queue_id: "action-existing",
+        },
+      },
+    ]);
+
+    const completed = baseCompleted({
+      id: "action-existing",
+      // Different reason wording so any "same generated text" idempotency
+      // would falsely allow a second insert.
+      reason: "Humidity high again [alert:alert-77]",
+      completed_at: "2026-05-27T09:00:00.000Z",
+    });
+
+    const r = await runFollowup(db, completed);
+    expect(r.inserted).toBe(false);
+    expect(db.rows.length).toBe(1);
+    expect(db.insertCalls.length).toBe(0);
+  });
+
+  it("inserts when a different action id is completed (sanity: idempotency is per action id)", async () => {
+    const db = makeFakeSupabase();
+    await runFollowup(db, baseCompleted({ id: "action-A" }));
+    await runFollowup(db, baseCompleted({ id: "action-B" }));
+    expect(db.rows.length).toBe(2);
+    expect(db.insertCalls.length).toBe(2);
+    expect(db.rows[0].details.action_queue_id).toBe("action-A");
+    expect(db.rows[1].details.action_queue_id).toBe("action-B");
+  });
+});

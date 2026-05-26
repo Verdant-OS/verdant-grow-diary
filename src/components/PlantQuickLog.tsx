@@ -167,6 +167,7 @@ export default function PlantQuickLog({
       toast.success("Saved to timeline 🌱");
       queryClient.invalidateQueries({ queryKey: ["plant_recent_activity"] });
       queryClient.invalidateQueries({ queryKey: ["diary_entries"] });
+      queryClient.invalidateQueries({ queryKey: ["plant_manual_sensor_history"] });
       window.dispatchEvent(
         new CustomEvent("verdant:entry-created", {
           detail: { plantId, createdAt: new Date().toISOString() },

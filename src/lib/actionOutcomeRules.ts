@@ -53,6 +53,10 @@ export interface OutcomeFollowupRef {
   followup_entry_id?: string | null;
 }
 
+export interface OutcomeDraftOptions {
+  recordedAt?: string | null;
+}
+
 // ---------------------------------------------------------------------------
 // Output types
 // ---------------------------------------------------------------------------
@@ -129,6 +133,7 @@ export function buildActionOutcomeDiaryDraft(
   action: OutcomeActionInput | null | undefined,
   grower: OutcomeGrowerInput | null | undefined,
   followup?: OutcomeFollowupRef | null,
+  options?: OutcomeDraftOptions | null,
 ): OutcomeDraftResult {
   if (!action) return { ok: false, reason: "missing_action" };
 
@@ -148,6 +153,9 @@ export function buildActionOutcomeDiaryDraft(
   if (!isValidOutcomeStatus(outcomeStatus)) {
     return { ok: false, reason: "invalid_outcome_status" };
   }
+
+  const recordedAt = nonEmptyString(options?.recordedAt);
+  if (!recordedAt) return { ok: false, reason: "missing_recorded_at" };
 
   const growerNote = nonEmptyString(grower.note);
   const note = growerNote ?? DEFAULT_NOTES[outcomeStatus];
@@ -178,7 +186,7 @@ export function buildActionOutcomeDiaryDraft(
         reason,
         suggested_change: suggested,
         completed_at: completedAt,
-        recorded_at: new Date().toISOString(),
+        recorded_at: recordedAt,
       },
     },
   };

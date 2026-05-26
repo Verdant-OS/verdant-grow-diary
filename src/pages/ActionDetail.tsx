@@ -300,10 +300,12 @@ export default function ActionDetail() {
   async function recordOutcome() {
     if (!row || row.status !== "completed" || !outcomeStatus) return;
     setOutcomeBusy(true);
+    const recordedAt = new Date().toISOString();
     const result = buildActionOutcomeDiaryDraft(
       row,
       { outcome_status: outcomeStatus, note: outcomeNote },
       { followup_entry_id: followupEntryId },
+      { recordedAt },
     );
     if (!result.ok) {
       toast.error(

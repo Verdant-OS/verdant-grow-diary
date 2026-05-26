@@ -39,6 +39,8 @@ export const QUICK_LOG_EVENT_LANES: Record<string, HistoryLane> = {
   transplant: "activity",
   harvest: "activity",
   reminder: "activity",
+  action_followup: "activity",
+  action_outcome: "activity",
   other: "activity",
 };
 
@@ -49,9 +51,7 @@ export function laneForEventType(eventType: string | null | undefined): HistoryL
 }
 
 /** All known Quick Log event values from src/lib/diary.ts EVENT_TYPES. */
-export const QUICK_LOG_EVENT_VALUES: readonly string[] = EVENT_TYPES.map(
-  (e) => e.value,
-);
+export const QUICK_LOG_EVENT_VALUES: readonly string[] = EVENT_TYPES.map((e) => e.value);
 
 // ---------------------------------------------------------------------------
 // Manual handheld readings
@@ -109,9 +109,7 @@ export function parseManualHandheldReadings(
   return out;
 }
 
-export function hasManualHandheldReadings(
-  note: string | null | undefined,
-): boolean {
+export function hasManualHandheldReadings(note: string | null | undefined): boolean {
   return splitHardwareReadingsFromNote(note).hasHardwareBlock;
 }
 

@@ -12,7 +12,7 @@ import {
   ACTION_OUTCOME_EVENT_TYPE,
   ACTION_OUTCOME_KIND,
   OUTCOME_STATUSES,
-  buildActionOutcomeDiaryDraft,
+  buildActionOutcomeDiaryDraft as buildActionOutcomeDiaryDraftBase,
   outcomeMatchesAction,
   isValidOutcome,
   type OutcomeActionInput,
@@ -25,6 +25,21 @@ const ROOT = resolve(__dirname, "../..");
 const ACTION_DETAIL = readFileSync(resolve(ROOT, "src/pages/ActionDetail.tsx"), "utf8");
 const RULES = readFileSync(resolve(ROOT, "src/lib/actionOutcomeRules.ts"), "utf8");
 const BADGES = readFileSync(resolve(ROOT, "src/components/DiaryEntryBadges.tsx"), "utf8");
+const FIXED_RECORDED_AT = "2026-05-26T10:30:00.000Z";
+
+function buildActionOutcomeDiaryDraft(
+  action: OutcomeActionInput | null | undefined,
+  grower: OutcomeGrowerInput | null | undefined,
+  followup?: { followup_entry_id?: string | null } | null,
+  options?: { recordedAt?: string | null } | null,
+) {
+  return buildActionOutcomeDiaryDraftBase(
+    action,
+    grower,
+    followup,
+    options ?? { recordedAt: FIXED_RECORDED_AT },
+  );
+}
 
 function baseAction(overrides: Partial<OutcomeActionInput> = {}): OutcomeActionInput {
   return {
@@ -150,7 +165,37 @@ describe("actionOutcomeRules — draft includes all fields", () => {
     expect(d.outcome_status).toBe("worsened");
     expect(d.outcome_kind).toBe("24h_recheck");
     expect(d.recorded_by).toBe("grower");
-    expect(d.recorded_at).toBeTruthy();
+    expect(d.recorded_at).toBe(FIXED_RECORDED_AT);
+  });
+});
+
+describe("actionOutcomeRules — deterministic recorded_at", () => {
+  it("uses injected recordedAt exactly", () => {
+    const result = buildActionOutcomeDiaryDraft(baseAction(), baseGrowerInput(), undefined, {
+      recordedAt: "2026-05-26T11:11:11.111Z",
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.draft.details.recorded_at).toBe("2026-05-26T11:11:11.111Z");
+  });
+
+  it("returns missing_recorded_at when recordedAt is null", () => {
+    const result = buildActionOutcomeDiaryDraftBase(baseAction(), baseGrowerInput(), undefined, {
+      recordedAt: null,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok)
+      expect((result as Extract<OutcomeDraftResult, { ok: false }>).reason).toBe(
+        "missing_recorded_at",
+      );
+  });
+
+  it("returns missing_recorded_at when options are omitted", () => {
+    const result = buildActionOutcomeDiaryDraftBase(baseAction(), baseGrowerInput());
+    expect(result.ok).toBe(false);
+    if (!result.ok)
+      expect((result as Extract<OutcomeDraftResult, { ok: false }>).reason).toBe(
+        "missing_recorded_at",
+      );
   });
 });
 
@@ -384,6 +429,9 @@ describe("actionOutcomeRules — static safety", () => {
   it("no service_role in rules or ActionDetail", () => {
     expect(RULES).not.toContain("service_role");
     expect(ACTION_DETAIL).not.toContain("service_role");
+  });
+  it("rules do not generate timestamps internally", () => {
+    expect(RULES).not.toContain("toISOString(");
   });
   it("no device-control calls in ActionDetail outcome section", () => {
     expect(ACTION_DETAIL).not.toMatch(/home.assistant/i);

@@ -42,20 +42,32 @@ const supabase = createClient(url, key, {
 
 type Row = Record<string, unknown>;
 
+type QueryResult = {
+  data: Row[] | null;
+  count: number | null;
+  error: { message: string } | null;
+};
+
+interface SeedQuery extends PromiseLike<QueryResult> {
+  eq(column: string, value: string): SeedQuery;
+  limit(count: number): SeedQuery;
+  order(column: string, options: { ascending: boolean }): SeedQuery;
+}
+
 async function fetchRows(
   table: "tents" | "plants" | "sensor_readings",
   columns: string,
-  extra?: (q: ReturnType<typeof supabase.from>) => unknown,
+  extra?: (q: SeedQuery) => SeedQuery,
 ) {
   let q = supabase
     .from(table)
     .select(columns, { count: "exact" })
     .eq("user_id", userId)
-    .limit(limit);
-  if (extra) q = extra(q as never) as typeof q;
+    .limit(limit) as unknown as SeedQuery;
+  if (extra) q = extra(q);
   const { data, count, error } = await q;
   if (error) die(`query ${table} failed: ${error.message}`);
-  return { rows: (data ?? []) as Row[], count: count ?? 0 };
+  return { rows: data ?? [], count: count ?? 0 };
 }
 
 function header(label: string) {
@@ -70,7 +82,7 @@ async function main() {
   console.log(`[verify-seed] user_id=${userId}${tentFilter ? ` tent_id=${tentFilter}` : ""}`);
 
   const tents = await fetchRows("tents", "id,name,stage,is_archived,created_at", (q) =>
-    tentFilter ? (q as any).eq("id", tentFilter) : q,
+    tentFilter ? q.eq("id", tentFilter) : q,
   );
   header(`tents (${tents.count} total, showing ${tents.rows.length})`);
   for (const r of tents.rows) {
@@ -80,7 +92,7 @@ async function main() {
   const plants = await fetchRows(
     "plants",
     "id,name,tent_id,stage,health,is_archived,created_at",
-    (q) => (tentFilter ? (q as any).eq("tent_id", tentFilter) : q),
+    (q) => (tentFilter ? q.eq("tent_id", tentFilter) : q),
   );
   header(`plants (${plants.count} total, showing ${plants.rows.length})`);
   for (const r of plants.rows) {
@@ -93,7 +105,7 @@ async function main() {
     "sensor_readings",
     "id,tent_id,metric,value,quality,source,ts",
     (q) => {
-      let next = (q as any).order("ts", { ascending: false });
+      let next = q.order("ts", { ascending: false });
       if (tentFilter) next = next.eq("tent_id", tentFilter);
       return next;
     },
@@ -123,4 +135,4 @@ async function main() {
   console.log("[verify-seed] OK: tent, plant, and sensor rows all present.");
 }
 
-main().catch((e) => die(e?.message ?? String(e)));
+main().catch((e: unknown) => die(e instanceof Error ? e.message : String(e)));

@@ -15,6 +15,9 @@
  *    before save. VPD is auto-computed from temp+RH when not provided.
  */
 
+import { buildManualDeviceId } from "@/lib/manualSensorSourceLabel";
+
+
 export type ManualMetric =
   | "temperature_c"
   | "humidity_pct"

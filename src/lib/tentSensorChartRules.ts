@@ -9,11 +9,11 @@
 import {
   snapshotFromReadings,
   isStale,
-  SOURCE_LABEL,
   toFiniteNumber,
   type SensorReadingLike,
   type SensorSnapshot,
 } from "@/lib/sensorSnapshot";
+import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
 
 export interface TentSensorChartPoint {
   ts: string;
@@ -80,7 +80,10 @@ export function buildTentSensorHeaderView(
   return {
     hasReadings: true,
     capturedAt: snap.ts,
-    sourceLabel: SOURCE_LABEL[snap.source] ?? null,
+    sourceLabel: formatSensorSourceLabel({
+      source: snap.source,
+      deviceId: snap.device_id ?? null,
+    }),
     stale: isStale(snap.ts, now),
     snapshot: snap,
   };

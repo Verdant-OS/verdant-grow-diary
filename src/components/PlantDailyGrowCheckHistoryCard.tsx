@@ -35,6 +35,12 @@ const HISTORY_DAYS = 5;
 interface Props {
   plantId: string;
   currentTentId: string | null;
+  /**
+   * When true, suppress the header "Start Daily Grow Check" CTA to avoid
+   * duplicating the primary CTA shown by a sibling Consistency card.
+   * Onboarding (empty-state) note + sensor CTAs are unaffected.
+   */
+  hideHeaderCta?: boolean;
 }
 
 function rowTone(kind: DailyHistoryRow["kind"]): string {
@@ -48,7 +54,11 @@ function rowTone(kind: DailyHistoryRow["kind"]): string {
   }
 }
 
-export default function PlantDailyGrowCheckHistoryCard({ plantId, currentTentId }: Props) {
+export default function PlantDailyGrowCheckHistoryCard({
+  plantId,
+  currentTentId,
+  hideHeaderCta = false,
+}: Props) {
   const { data: rawReadings = [] } = useSensorReadings(currentTentId ?? undefined);
   const { data: rawDiary = [] } = useDiaryEntries();
   const { data: plants = [] } = usePlants();
@@ -110,16 +120,18 @@ export default function PlantDailyGrowCheckHistoryCard({ plantId, currentTentId 
             Last {HISTORY_DAYS} days · derived from your existing activity.
           </p>
         </div>
-        <Button
-          asChild
-          size="sm"
-          className="gradient-leaf text-primary-foreground shrink-0"
-          data-testid="plant-daily-grow-check-history-cta"
-        >
-          <Link to={`/daily-check?plantId=${plantId}&from=plant-detail`}>
-            Start Daily Grow Check <ArrowRight className="h-4 w-4" />
-          </Link>
-        </Button>
+        {!hideHeaderCta && (
+          <Button
+            asChild
+            size="sm"
+            className="gradient-leaf text-primary-foreground shrink-0"
+            data-testid="plant-daily-grow-check-history-cta"
+          >
+            <Link to={`/daily-check?plantId=${plantId}&from=plant-detail`}>
+              Start Daily Grow Check <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        )}
       </div>
 
       {unassigned && (

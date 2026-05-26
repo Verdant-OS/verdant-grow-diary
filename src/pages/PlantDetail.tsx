@@ -224,6 +224,7 @@ export default function PlantDetail() {
             <PlantDailyGrowCheckHistoryCard
               plantId={plant.id}
               currentTentId={plant.tentId ?? null}
+              hideHeaderCta
             />
           </section>
           <PlantAssignedTentAlertsPanel

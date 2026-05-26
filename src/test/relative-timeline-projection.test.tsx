@@ -117,9 +117,7 @@ describe("relative timeline projection — static guardrails", () => {
 
   it("PlantDetail mounts the relative timeline section", () => {
     expect(PLANT_DETAIL).toContain("PlantRelativeTimelineSection");
-    expect(PLANT_DETAIL).toMatch(
-      /from\s+["']@\/components\/PlantRelativeTimelineSection["']/,
-    );
+    expect(PLANT_DETAIL).toMatch(/from\s+["']@\/components\/PlantRelativeTimelineSection["']/);
   });
 
   it("component delegates projection logic to the pure rules module", () => {
@@ -341,9 +339,7 @@ describe("groupRelativeTimelineByStage — pure rules", () => {
       sortOrder: over.sortOrder,
     } as any;
   }
-  function item(
-    over: Partial<RelativeTimelineItem> & { id: string },
-  ): RelativeTimelineItem {
+  function item(over: Partial<RelativeTimelineItem> & { id: string }): RelativeTimelineItem {
     return {
       id: over.id,
       eventType: "note",
@@ -359,9 +355,24 @@ describe("groupRelativeTimelineByStage — pure rules", () => {
       ...over,
     };
   }
-  const VEG = preset({ key: "vegetation", label: "Vegetation", colorToken: "stage-vegetation", sortOrder: 30 });
-  const FLOWER = preset({ key: "flower", label: "Flower", colorToken: "stage-flower", sortOrder: 40 });
-  const SEEDLING = preset({ key: "seedling", label: "Seedling", colorToken: "stage-seedling", sortOrder: 10 });
+  const VEG = preset({
+    key: "vegetation",
+    label: "Vegetation",
+    colorToken: "stage-vegetation",
+    sortOrder: 30,
+  });
+  const FLOWER = preset({
+    key: "flower",
+    label: "Flower",
+    colorToken: "stage-flower",
+    sortOrder: 40,
+  });
+  const SEEDLING = preset({
+    key: "seedling",
+    label: "Seedling",
+    colorToken: "stage-seedling",
+    sortOrder: 10,
+  });
 
   it("returns [] for empty input", () => {
     expect(groupRelativeTimelineByStage([])).toEqual([]);
@@ -392,9 +403,7 @@ describe("groupRelativeTimelineByStage — pure rules", () => {
   });
 
   it("does not create empty stage groups by default", () => {
-    const groups = groupRelativeTimelineByStage([
-      item({ id: "a", stagePreset: FLOWER }),
-    ]);
+    const groups = groupRelativeTimelineByStage([item({ id: "a", stagePreset: FLOWER })]);
     expect(groups.length).toBe(1);
     expect(groups[0].key).toBe("flower");
   });
@@ -420,7 +429,12 @@ describe("groupRelativeTimelineByStage — pure rules", () => {
   it("integrates with projection: per-entry stage wins, otherwise plant currentStage applies", () => {
     const items = buildRelativeTimelineProjection({
       rawEntries: [
-        entry({ id: "perEntry", entry_at: "2026-04-05T00:00:00Z", plant_id: PLANT, ...({ stage: "flower" } as any) }),
+        entry({
+          id: "perEntry",
+          entry_at: "2026-04-05T00:00:00Z",
+          plant_id: PLANT,
+          ...({ stage: "flower" } as any),
+        }),
         entry({ id: "fallback", entry_at: "2026-04-06T00:00:00Z" }),
       ],
       plantId: PLANT,
@@ -433,8 +447,6 @@ describe("groupRelativeTimelineByStage — pure rules", () => {
     expect(groups[1].items[0].id).toBe("perEntry");
   });
 });
-
-
 
 vi.mock("@/hooks/usePlantRecentActivity", () => ({
   usePlantRecentActivity: vi.fn(),
@@ -449,25 +461,13 @@ const mockUse = usePlantRecentActivity as unknown as ReturnType<typeof vi.fn>;
 describe("PlantRelativeTimelineSection — render", () => {
   it("renders the helper line about plant days", () => {
     mockUse.mockReturnValue({ data: [], isLoading: false });
-    render(
-      <PlantRelativeTimelineSection
-        plantId={PLANT}
-        plantStartedAt={PLANT_STARTED}
-      />,
-    );
-    expect(screen.getByTestId("relative-timeline-helper")).toHaveTextContent(
-      /plant days/i,
-    );
+    render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
+    expect(screen.getByTestId("relative-timeline-helper")).toHaveTextContent(/plant days/i);
   });
 
   it("renders empty state when no events exist", () => {
     mockUse.mockReturnValue({ data: [], isLoading: false });
-    render(
-      <PlantRelativeTimelineSection
-        plantId={PLANT}
-        plantStartedAt={PLANT_STARTED}
-      />,
-    );
+    render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
     expect(screen.getByTestId("relative-timeline-empty")).toHaveTextContent(
       /first quick log, photo, or sensor snapshot/i,
     );
@@ -498,9 +498,7 @@ describe("PlantRelativeTimelineSection — render", () => {
     expect(items[1].getAttribute("data-source")).toBe("photo");
     // Stage badge uses the rules color token.
     const stageBadges = screen.getAllByTestId("relative-timeline-stage-badge");
-    expect(stageBadges[0].getAttribute("data-stage-color-token")).toBe(
-      "stage-vegetation",
-    );
+    expect(stageBadges[0].getAttribute("data-stage-color-token")).toBe("stage-vegetation");
   });
 
   it("does not render any create/edit/delete/drag controls", () => {
@@ -509,10 +507,7 @@ describe("PlantRelativeTimelineSection — render", () => {
       isLoading: false,
     });
     const { container } = render(
-      <PlantRelativeTimelineSection
-        plantId={PLANT}
-        plantStartedAt={PLANT_STARTED}
-      />,
+      <PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />,
     );
     // Filter chips are allowed (read-only radios). No mutating labels.
     const buttons = Array.from(container.querySelectorAll("button"));
@@ -572,9 +567,7 @@ import {
 } from "@/lib/relativeTimelineProjectionRules";
 import { fireEvent } from "@testing-library/react";
 
-function tItem(
-  over: Partial<RelativeTimelineItem> & { id: string },
-): RelativeTimelineItem {
+function tItem(over: Partial<RelativeTimelineItem> & { id: string }): RelativeTimelineItem {
   return {
     id: over.id,
     eventType: "note",
@@ -632,10 +625,7 @@ describe("filterRelativeTimelineItems — pure rules", () => {
   });
 
   it("Training returns training/defoliation items", () => {
-    expect(filterRelativeTimelineItems(sample, "training").map((i) => i.id)).toEqual([
-      "tr",
-      "def",
-    ]);
+    expect(filterRelativeTimelineItems(sample, "training").map((i) => i.id)).toEqual(["tr", "def"]);
   });
 
   it("Notes returns note/observation/sensor/unknown safe fallback items", () => {
@@ -652,9 +642,9 @@ describe("filterRelativeTimelineItems — pure rules", () => {
     expect(classifyRelativeTimelineFilter({ eventType: "", source: "note" })).toBe("notes");
     expect(classifyRelativeTimelineFilter(null as any)).toBe("notes");
     expect(classifyRelativeTimelineFilter(undefined as any)).toBe("notes");
-    expect(
-      classifyRelativeTimelineFilter({ eventType: "anything-new", source: "note" }),
-    ).toBe("notes");
+    expect(classifyRelativeTimelineFilter({ eventType: "anything-new", source: "note" })).toBe(
+      "notes",
+    );
   });
 
   it("preserves input ordering after filtering", () => {
@@ -695,13 +685,8 @@ describe("filterRelativeTimelineItems — pure rules", () => {
       tItem({ id: "fw", eventType: "watering", stagePreset: FLOWER }),
       tItem({ id: "fn", eventType: "note", stagePreset: FLOWER }),
     ];
-    const groups = groupRelativeTimelineByStage(
-      filterRelativeTimelineItems(items, "watering"),
-    );
-    expect(groups.map((g) => `${g.key}:${g.count}`)).toEqual([
-      "vegetation:1",
-      "flower:1",
-    ]);
+    const groups = groupRelativeTimelineByStage(filterRelativeTimelineItems(items, "watering"));
+    expect(groups.map((g) => `${g.key}:${g.count}`)).toEqual(["vegetation:1", "flower:1"]);
   });
 
   it("does not create empty stage groups after filtering", () => {
@@ -727,9 +712,7 @@ describe("filterRelativeTimelineItems — pure rules", () => {
       tItem({ id: "vw", eventType: "watering", stagePreset: VEG }),
       tItem({ id: "fn", eventType: "note", stagePreset: FLOWER }),
     ];
-    const groups = groupRelativeTimelineByStage(
-      filterRelativeTimelineItems(items, "watering"),
-    );
+    const groups = groupRelativeTimelineByStage(filterRelativeTimelineItems(items, "watering"));
     expect(groups.map((g) => g.key)).toEqual(["vegetation"]);
   });
 
@@ -760,12 +743,7 @@ describe("PlantRelativeTimelineSection — filter chip render", () => {
       data: [entry({ id: "e1", entry_at: "2026-04-05T00:00:00Z" })],
       isLoading: false,
     });
-    render(
-      <PlantRelativeTimelineSection
-        plantId={PLANT}
-        plantStartedAt={PLANT_STARTED}
-      />,
-    );
+    render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
     for (const f of RELATIVE_TIMELINE_FILTERS) {
       const chip = screen.getByTestId(`relative-timeline-filter-${f.key}`);
       expect(chip.getAttribute("aria-label")).toMatch(new RegExp(f.label, "i"));
@@ -803,12 +781,7 @@ describe("PlantRelativeTimelineSection — filter chip render", () => {
       data: [entry({ id: "n", entry_at: "2026-04-05T00:00:00Z", entry_type: "note" })],
       isLoading: false,
     });
-    render(
-      <PlantRelativeTimelineSection
-        plantId={PLANT}
-        plantStartedAt={PLANT_STARTED}
-      />,
-    );
+    render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
     fireEvent.click(screen.getByTestId("relative-timeline-filter-photos"));
     const empty = screen.getByTestId("relative-timeline-filter-empty");
     expect(empty.getAttribute("data-filter-key")).toBe("photos");
@@ -846,8 +819,6 @@ describe("filter chip — static safety", () => {
     );
   });
 });
-
-
 
 // ---------------------------------------------------------------------------
 // Summary strip — pure rules + render
@@ -944,10 +915,9 @@ describe("summarizeRelativeTimelineItems — pure rules", () => {
 
 describe("formatRelativeTimelineSummary — pure rules", () => {
   it("omits zero-count category chips when any non-zero category exists", () => {
-    const s = summarizeRelativeTimelineItems(
-      [tItem({ id: "w", eventType: "watering" })],
-      { now: NOW_MS },
-    );
+    const s = summarizeRelativeTimelineItems([tItem({ id: "w", eventType: "watering" })], {
+      now: NOW_MS,
+    });
     const f = formatRelativeTimelineSummary(s);
     const keys = f.chips.map((c) => c.key);
     expect(keys).toContain("total");
@@ -963,9 +933,7 @@ describe("formatRelativeTimelineSummary — pure rules", () => {
       tItem({ id: "w", eventType: "watering" }),
       tItem({ id: "s", eventType: "symptoms" }),
     ];
-    const f = formatRelativeTimelineSummary(
-      summarizeRelativeTimelineItems(items, { now: NOW_MS }),
-    );
+    const f = formatRelativeTimelineSummary(summarizeRelativeTimelineItems(items, { now: NOW_MS }));
     const byKey = Object.fromEntries(f.chips.map((c) => [c.key, c.label]));
     expect(byKey.total).toBe("4 events");
     expect(byKey.photos).toBe("2 photos");
@@ -975,10 +943,9 @@ describe("formatRelativeTimelineSummary — pure rules", () => {
 
   it("renders Last activity copy when a valid date exists, otherwise null", () => {
     const withDate = formatRelativeTimelineSummary(
-      summarizeRelativeTimelineItems(
-        [tItem({ id: "x", occurredAt: "2026-04-29T00:00:00Z" })],
-        { now: NOW_MS },
-      ),
+      summarizeRelativeTimelineItems([tItem({ id: "x", occurredAt: "2026-04-29T00:00:00Z" })], {
+        now: NOW_MS,
+      }),
     );
     expect(withDate.lastActivity).toBe("Last activity: 2 days ago");
     const noDate = formatRelativeTimelineSummary(
@@ -1001,10 +968,7 @@ describe("PlantRelativeTimelineSection — summary strip render", () => {
       isLoading: false,
     });
     const { container } = render(
-      <PlantRelativeTimelineSection
-        plantId={PLANT}
-        plantStartedAt={PLANT_STARTED}
-      />,
+      <PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />,
     );
     const summary = screen.getByTestId("relative-timeline-summary");
     const filters = screen.getByTestId("relative-timeline-filters");
@@ -1025,31 +989,17 @@ describe("PlantRelativeTimelineSection — summary strip render", () => {
       ],
       isLoading: false,
     });
-    render(
-      <PlantRelativeTimelineSection
-        plantId={PLANT}
-        plantStartedAt={PLANT_STARTED}
-      />,
-    );
-    const before = screen
-      .getByTestId("relative-timeline-summary-chip-total")
-      .textContent;
+    render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
+    const before = screen.getByTestId("relative-timeline-summary-chip-total").textContent;
     fireEvent.click(screen.getByTestId("relative-timeline-filter-watering"));
-    const after = screen
-      .getByTestId("relative-timeline-summary-chip-total")
-      .textContent;
+    const after = screen.getByTestId("relative-timeline-summary-chip-total").textContent;
     expect(after).toBe(before);
     expect(after).toContain("2 events");
   });
 
   it("empty timeline preserves the original empty state (no summary strip)", () => {
     mockUse.mockReturnValue({ data: [], isLoading: false });
-    render(
-      <PlantRelativeTimelineSection
-        plantId={PLANT}
-        plantStartedAt={PLANT_STARTED}
-      />,
-    );
+    render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
     expect(screen.getByTestId("relative-timeline-empty")).toBeTruthy();
     expect(screen.queryByTestId("relative-timeline-summary")).toBeNull();
   });
@@ -1067,7 +1017,7 @@ describe("summary strip — static safety", () => {
   it("component does not duplicate summary category mapping tables", () => {
     expect(COMPONENT).not.toMatch(/CATEGORY_SINGULAR/);
     expect(COMPONENT).not.toMatch(/CATEGORY_PLURAL/);
-    expect(COMPONENT).not.toMatch(/const\s+\w*CATEGORY\w*\s*=\s*[\[{]/);
+    expect(COMPONENT).not.toMatch(/const\s+\w*CATEGORY\w*\s*=\s*[[{]/);
     expect(COMPONENT).toContain("formatRelativeTimelineSummary");
     expect(COMPONENT).toContain("summarizeRelativeTimelineItems");
   });
@@ -1129,7 +1079,7 @@ describe("formatRelativeTimelineGroupSummary — pure rules", () => {
       summarizeRelativeTimelineItems(
         [
           tItem({ id: "u", eventType: "weirdstuff", occurredAt: null }),
-          tItem({ id: "z", eventType: "" , occurredAt: null}),
+          tItem({ id: "z", eventType: "", occurredAt: null }),
         ],
         { now: G_NOW },
       ),
@@ -1164,10 +1114,7 @@ describe("formatRelativeTimelineGroupSummary — pure rules", () => {
   it("singular vs plural is concise (1 watering vs 2 waterings, 1 symptom vs 2 symptoms)", () => {
     const g1 = formatRelativeTimelineGroupSummary(
       summarizeRelativeTimelineItems(
-        [
-          tItem({ id: "w", eventType: "watering" }),
-          tItem({ id: "s", eventType: "symptoms" }),
-        ],
+        [tItem({ id: "w", eventType: "watering" }), tItem({ id: "s", eventType: "symptoms" })],
         { now: G_NOW },
       ),
     );
@@ -1212,19 +1159,14 @@ describe("PlantRelativeTimelineSection — per-group summary render", () => {
     expect(summariesAfter[0].textContent).toMatch(/1 item\b/);
     expect(summariesAfter[0].textContent).toMatch(/1 watering/);
     // Top full-timeline summary unaffected.
-    expect(
-      screen.getByTestId("relative-timeline-summary-chip-total").textContent,
-    ).toContain("2 events");
+    expect(screen.getByTestId("relative-timeline-summary-chip-total").textContent).toContain(
+      "2 events",
+    );
   });
 
   it("empty timeline still shows the original empty state, no group summaries", () => {
     mockUse.mockReturnValue({ data: [], isLoading: false });
-    render(
-      <PlantRelativeTimelineSection
-        plantId={PLANT}
-        plantStartedAt={PLANT_STARTED}
-      />,
-    );
+    render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
     expect(screen.getByTestId("relative-timeline-empty")).toBeTruthy();
     expect(screen.queryAllByTestId("relative-timeline-group-summary").length).toBe(0);
   });
@@ -1241,7 +1183,7 @@ describe("group summary — static safety", () => {
   it("component does not duplicate category mapping tables", () => {
     expect(COMPONENT).not.toMatch(/CATEGORY_SINGULAR/);
     expect(COMPONENT).not.toMatch(/CATEGORY_PLURAL/);
-    expect(COMPONENT).not.toMatch(/const\s+\w*CATEGORY\w*\s*=\s*[\[{]/);
+    expect(COMPONENT).not.toMatch(/const\s+\w*CATEGORY\w*\s*=\s*[[{]/);
     expect(COMPONENT).toContain("formatRelativeTimelineGroupSummary");
   });
 });

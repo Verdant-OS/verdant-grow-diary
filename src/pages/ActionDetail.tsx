@@ -312,7 +312,7 @@ export default function ActionDetail() {
         tent_id: draft.tent_id,
         plant_id: draft.plant_id,
         note: draft.note,
-        details: draft.details as unknown as Record<string, unknown>,
+        details: draft.details as unknown as Json,
       });
     if (insErr) {
       toast.warning("Action completed, but follow-up note could not be created.", {

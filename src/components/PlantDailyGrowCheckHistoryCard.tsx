@@ -5,7 +5,7 @@
  * tent) and QuickLog diary entries scoped to the plant. No writes.
  */
 import { Link } from "react-router-dom";
-import { ClipboardCheck, ArrowRight, Gauge, Info, Sparkles } from "lucide-react";
+import { ClipboardCheck, ArrowRight, CheckCircle2, Gauge, Info, Sparkles } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,7 @@ import {
   ONBOARDING_HEADLINE,
   ONBOARDING_SECONDARY,
   WHAT_COUNTS_HINT,
+  getDailyGrowCheckRecentActivityCue,
 } from "@/lib/dailyGrowCheckGuidanceRules";
 
 const HISTORY_DAYS = 5;
@@ -81,6 +82,11 @@ export default function PlantDailyGrowCheckHistoryCard({ plantId, currentTentId 
 
   const unassigned = !currentTentId;
   const hasAnyActivity = hasDailyCheckActivity(rows);
+  const todayRow = rows[0];
+  const recentActivityCue = getDailyGrowCheckRecentActivityCue({
+    todayHasActivity: !!todayRow && todayRow.kind !== "none",
+    latestAt: todayRow?.latestAt ?? null,
+  });
   const noteHref = buildDailyCheckEntryHref({ plantId, source: "plant-detail", method: "note" });
   const sensorHref = buildDailyCheckEntryHref({
     plantId,
@@ -186,6 +192,29 @@ export default function PlantDailyGrowCheckHistoryCard({ plantId, currentTentId 
           </p>
         </div>
       ) : (
+        <>
+          {recentActivityCue.shouldShow && (
+            <div
+              data-testid="plant-daily-grow-check-recent-activity-cue"
+              className="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200"
+            >
+              <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span
+                className="font-medium"
+                data-testid="plant-daily-grow-check-recent-activity-cue-label"
+              >
+                {recentActivityCue.label}
+              </span>
+              {recentActivityCue.detail && (
+                <span
+                  className="text-xs text-emerald-200/80"
+                  data-testid="plant-daily-grow-check-recent-activity-cue-detail"
+                >
+                  {recentActivityCue.detail}
+                </span>
+              )}
+            </div>
+          )}
         <ul
           className="divide-y divide-border/40 rounded-md border border-border/40"
           data-testid="plant-daily-grow-check-history-rows"
@@ -220,6 +249,7 @@ export default function PlantDailyGrowCheckHistoryCard({ plantId, currentTentId 
             </li>
           ))}
         </ul>
+        </>
       )}
     </Card>
   );

@@ -18,6 +18,7 @@ const TAG_LABELS: Record<string, string> = {
   "sensor-snapshot": "Sensor",
   nutrient: "Nutrient",
   symptoms: "Symptoms",
+  action_followup: "Follow-up",
 };
 
 const PRIMARY_TAGS = [
@@ -29,6 +30,7 @@ const PRIMARY_TAGS = [
   "sensor-snapshot",
   "nutrient",
   "symptoms",
+  "action_followup",
 ];
 
 export interface DiaryEntryBadgesProps {

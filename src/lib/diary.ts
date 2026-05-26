@@ -1,6 +1,7 @@
 import {
   Droplets, Utensils, Scissors, Camera, Stethoscope, Gauge,
   Sprout, Bell, Eye, FlaskConical, Bug, ArrowRightLeft, MoreHorizontal,
+  ClipboardCheck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -25,6 +26,7 @@ export const EVENT_TYPES: EventTypeDef[] = [
   { value: "diagnosis", label: "Diagnosis", icon: Stethoscope, tone: "bg-rose-500/15 text-rose-300 border-rose-500/30" },
   { value: "pest_disease", label: "Pest / Disease", icon: Bug, tone: "bg-rose-500/15 text-rose-300 border-rose-500/30" },
   { value: "harvest", label: "Harvest", icon: Sprout, tone: "bg-primary/20 text-primary border-primary/40" },
+  { value: "action_followup", label: "Follow-up", icon: ClipboardCheck, tone: "bg-orange-500/15 text-orange-300 border-orange-500/30" },
   { value: "reminder", label: "Reminder", icon: Bell, tone: "bg-yellow-500/15 text-yellow-300 border-yellow-500/30" },
   { value: "other", label: "Other", icon: MoreHorizontal, tone: "bg-secondary/60 text-foreground border-border/50" },
 ];

@@ -466,9 +466,13 @@ export default function AlertDetail() {
                   <ListChecks className="h-4 w-4 mt-0.5 text-muted-foreground" />
                   <div className="flex-1">
                     <p className="text-xs font-medium">Suggested action</p>
+                    <p className="text-[11px] text-muted-foreground/90 mt-0.5">
+                      Verdant can prepare a recommended action for review. Nothing is executed
+                      automatically.
+                    </p>
                     {draftResult && draftResult.ok ? (
                       <>
-                        <p className="text-xs text-muted-foreground mt-0.5">
+                        <p className="text-xs text-muted-foreground mt-1">
                           {draftResult.draft.suggested_change}
                         </p>
                         <p className="text-[10px] text-muted-foreground/80 mt-1">
@@ -477,21 +481,17 @@ export default function AlertDetail() {
                         </p>
                       </>
                     ) : (
-                      <p className="text-xs text-muted-foreground mt-0.5">
+                      <p className="text-xs text-muted-foreground mt-1">
                         Not enough alert context to draft a safe action.
                       </p>
                     )}
                     <div className="flex flex-wrap gap-2 mt-2">
                       {existingActionId ? (
-                        <>
-                          <Button asChild size="sm" variant="outline">
-                            <Link to={`/actions/${existingActionId}`}>Already in Action Queue</Link>
-                          </Button>
-                          <p className="w-full text-[10px] text-muted-foreground/80">
-                            A recommended action for this alert already exists and is awaiting your
-                            review.
-                          </p>
-                        </>
+                        <Button asChild size="sm" variant="secondary">
+                          <Link to={`/actions/${existingActionId}`}>
+                            ✓ Action already queued — view details
+                          </Link>
+                        </Button>
                       ) : (
                         <Button
                           size="sm"

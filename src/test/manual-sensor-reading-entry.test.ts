@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
-import { execSync } from "node:child_process";
 
 import {
   buildManualReadingPayloads,
@@ -9,19 +8,7 @@ import {
   validateManualEntry,
 } from "@/lib/sensorReadingManualEntryRules";
 import { typedWateringWriteEnabled } from "@/lib/featureFlags";
-
-function rg(args: string[]): string {
-  try {
-    return execSync(`rg ${args.map((a) => JSON.stringify(a)).join(" ")}`, {
-      cwd: process.cwd(),
-      encoding: "utf8",
-    });
-  } catch (err: unknown) {
-    const e = err as { status?: number; stdout?: string };
-    if (e && e.status === 1) return "";
-    throw err;
-  }
-}
+import { findMatches } from "./testFileSearchRules";
 
 describe("sensorReadingManualEntryRules — pure validation", () => {
   it("accepts a normal manual reading", () => {
@@ -164,8 +151,11 @@ describe("safety — manual sensor form does not write to other systems", () => 
   });
 
   it("no runtime UI code calls create_watering_event", () => {
-    const hits = rg(["-n", "create_watering_event", "src/components", "src/pages", "src/hooks"]);
-    expect(hits).toBe("");
+    const hits = findMatches(
+      ["src/components", "src/pages", "src/hooks"],
+      "create_watering_event",
+    );
+    expect(hits).toEqual([]);
   });
 });
 

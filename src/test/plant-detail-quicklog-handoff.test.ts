@@ -25,15 +25,9 @@ const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 describe("buildPlantQuickLogPrefill (pure)", () => {
   it("returns null when plant, grow, or tent is missing", () => {
     expect(buildPlantQuickLogPrefill(null)).toBeNull();
-    expect(
-      buildPlantQuickLogPrefill({ plantId: "p1", growId: "g1", tentId: null }),
-    ).toBeNull();
-    expect(
-      buildPlantQuickLogPrefill({ plantId: "p1", growId: null, tentId: "t1" }),
-    ).toBeNull();
-    expect(
-      buildPlantQuickLogPrefill({ plantId: null, growId: "g1", tentId: "t1" }),
-    ).toBeNull();
+    expect(buildPlantQuickLogPrefill({ plantId: "p1", growId: "g1", tentId: null })).toBeNull();
+    expect(buildPlantQuickLogPrefill({ plantId: "p1", growId: null, tentId: "t1" })).toBeNull();
+    expect(buildPlantQuickLogPrefill({ plantId: null, growId: "g1", tentId: "t1" })).toBeNull();
   });
 
   it("builds a prefill payload with observation + snapshot suggestion", () => {
@@ -62,16 +56,7 @@ describe("buildPlantQuickLogPrefill (pure)", () => {
       tentId: "t1",
     });
     const json = JSON.stringify(r);
-    for (const k of [
-      "temp",
-      "rh",
-      "vpd",
-      "co2",
-      "soil",
-      "ts",
-      "captured_at",
-      "value",
-    ]) {
+    for (const k of ["temp", "rh", "vpd", "co2", "soil", "ts", "captured_at", "value"]) {
       expect(json).not.toContain(`"${k}"`);
     }
   });
@@ -110,7 +95,7 @@ describe("Plant Detail → QuickLog handoff wiring", () => {
 
   it("QuickLog accepts an optional prefill prop and applies it on open", () => {
     expect(QUICKLOG).toContain("QuickLogPrefill");
-    expect(QUICKLOG).toMatch(/prefill\?\:\s*QuickLogPrefill\s*\|\s*null/);
+    expect(QUICKLOG).toMatch(/prefill\?:\s*QuickLogPrefill\s*\|\s*null/);
     expect(QUICKLOG).toMatch(/setActiveGrowId\(prefill\.growId\)/);
     expect(QUICKLOG).toMatch(/setPlantId\(prefill\.plantId\)/);
     expect(QUICKLOG).toMatch(/setEventType\(prefill\.eventType\)/);
@@ -187,9 +172,7 @@ describe("PlantTentEnvironmentPanel dispatch behavior", () => {
       tentId: "t1",
       tentName: "Tent A",
     });
-    window.dispatchEvent(
-      new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: prefill }),
-    );
+    window.dispatchEvent(new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: prefill }));
     expect(spy).toHaveBeenCalledTimes(1);
     const ev = spy.mock.calls[0][0] as CustomEvent;
     expect(ev.type).toBe("verdant:open-quicklog");
@@ -197,8 +180,6 @@ describe("PlantTentEnvironmentPanel dispatch behavior", () => {
   });
 
   it("never builds a prefill for unassigned plants (no event would fire)", () => {
-    expect(
-      buildPlantQuickLogPrefill({ plantId: "p1", growId: "g1", tentId: null }),
-    ).toBeNull();
+    expect(buildPlantQuickLogPrefill({ plantId: "p1", growId: "g1", tentId: null })).toBeNull();
   });
 });

@@ -17,14 +17,7 @@ import {
 describe("relativeStageTimelineRules — presets", () => {
   it("includes Seedling, Clone, Vegetation, Flower, Dry, Cure", () => {
     const keys = listRelativeStagePresets().map((p) => p.key);
-    expect(keys).toEqual([
-      "seedling",
-      "clone",
-      "vegetation",
-      "flower",
-      "dry",
-      "cure",
-    ]);
+    expect(keys).toEqual(["seedling", "clone", "vegetation", "flower", "dry", "cure"]);
   });
 
   it("preset order is deterministic across calls", () => {
@@ -35,22 +28,12 @@ describe("relativeStageTimelineRules — presets", () => {
 
   it("preset color tokens and directions are stable", () => {
     expect(getRelativeStagePreset("seedling")?.colorToken).toBe("stage-seedling");
-    expect(getRelativeStagePreset("seedling")?.colorDirection).toBe(
-      "Soft Mint Green",
-    );
-    expect(getRelativeStagePreset("clone")?.colorDirection).toBe(
-      "Vibrant Teal",
-    );
-    expect(getRelativeStagePreset("vegetation")?.colorDirection).toBe(
-      "Lush Emerald Green",
-    );
-    expect(getRelativeStagePreset("flower")?.colorDirection).toBe(
-      "Deep Ultraviolet / Magenta",
-    );
+    expect(getRelativeStagePreset("seedling")?.colorDirection).toBe("Soft Mint Green");
+    expect(getRelativeStagePreset("clone")?.colorDirection).toBe("Vibrant Teal");
+    expect(getRelativeStagePreset("vegetation")?.colorDirection).toBe("Lush Emerald Green");
+    expect(getRelativeStagePreset("flower")?.colorDirection).toBe("Deep Ultraviolet / Magenta");
     expect(getRelativeStagePreset("dry")?.colorDirection).toBe("Amber / Gold");
-    expect(getRelativeStagePreset("cure")?.colorDirection).toBe(
-      "Rich Earthy Brown",
-    );
+    expect(getRelativeStagePreset("cure")?.colorDirection).toBe("Rich Earthy Brown");
   });
 
   it("getRelativeStagePreset returns null for unknown/invalid keys", () => {
@@ -70,32 +53,24 @@ describe("relativeStageTimelineRules — relative day calculations", () => {
   it("plant-relative day is deterministic", () => {
     const start = "2026-05-01T00:00:00.000Z";
     const event = "2026-05-08T12:00:00.000Z";
-    expect(
-      calculatePlantRelativeDay({ plantStartedAt: start, eventAt: event }),
-    ).toBe(7);
+    expect(calculatePlantRelativeDay({ plantStartedAt: start, eventAt: event })).toBe(7);
   });
 
   it("stage-relative day is deterministic", () => {
     const start = new Date("2026-05-01T00:00:00.000Z");
     const event = new Date("2026-05-15T00:00:00.000Z");
-    expect(
-      calculateStageRelativeDay({ stageStartedAt: start, eventAt: event }),
-    ).toBe(14);
+    expect(calculateStageRelativeDay({ stageStartedAt: start, eventAt: event })).toBe(14);
   });
 
   it("invalid/missing dates return null", () => {
-    expect(
-      calculatePlantRelativeDay({ plantStartedAt: null, eventAt: "x" }),
-    ).toBeNull();
+    expect(calculatePlantRelativeDay({ plantStartedAt: null, eventAt: "x" })).toBeNull();
     expect(
       calculatePlantRelativeDay({
         plantStartedAt: "not-a-date",
         eventAt: "2026-01-01",
       }),
     ).toBeNull();
-    expect(
-      calculateStageRelativeDay({ stageStartedAt: undefined, eventAt: null }),
-    ).toBeNull();
+    expect(calculateStageRelativeDay({ stageStartedAt: undefined, eventAt: null })).toBeNull();
   });
 
   it("event before anchor returns null (no negative days)", () => {
@@ -138,13 +113,11 @@ describe("relativeStageTimelineRules — stage shift recommendation draft", () =
 
   it("returns null for invalid input", () => {
     expect(buildStageShiftRecommendationDraft(null as never)).toBeNull();
-    expect(
-      buildStageShiftRecommendationDraft({ ...baseInput, plantId: "" }),
-    ).toBeNull();
+    expect(buildStageShiftRecommendationDraft({ ...baseInput, plantId: "" })).toBeNull();
     expect(
       buildStageShiftRecommendationDraft({
         ...baseInput,
-        // @ts-expect-error
+        // @ts-expect-error -- testing invalid stage value
         suggestedStage: "bogus",
       }),
     ).toBeNull();

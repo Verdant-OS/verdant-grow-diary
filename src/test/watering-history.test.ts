@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { execSync } from "node:child_process";
 import { resolve } from "node:path";
 
 import {
@@ -9,21 +8,9 @@ import {
 } from "@/lib/diaryEntryRules";
 import { buildWateringHistory } from "@/lib/wateringHistoryRules";
 import { typedWateringWriteEnabled } from "@/lib/featureFlags";
+import { findMatches } from "./testFileSearchRules";
 
 const REPO_ROOT = process.cwd();
-
-function rg(args: string[]): string {
-  try {
-    return execSync(`rg ${args.map((a) => JSON.stringify(a)).join(" ")}`, {
-      cwd: REPO_ROOT,
-      encoding: "utf8",
-    });
-  } catch (err: unknown) {
-    const e = err as { status?: number; stdout?: string };
-    if (e && e.status === 1) return "";
-    throw err;
-  }
-}
 
 function normalize(raw: unknown[]): NormalizedDiaryEntry[] {
   return normalizeDiaryEntries({ rawEntries: raw });
@@ -167,21 +154,12 @@ describe("WateringHistoryPanel runtime safety", () => {
   });
 
   it("no runtime code calls create_watering_event RPC", () => {
-    const hits = rg(["-n", "create_watering_event", "src"])
-      .split("\n")
-      .map((l) => l.trim())
-      .filter(Boolean)
-      // Generated types, pure adapter, disabled helper, the flag's doc
-      // comment, docs, and tests are allowed.
-      .filter((line) => {
-        const path = line.split(":")[0];
-        if (path === "src/integrations/supabase/types.ts") return false;
-        if (path === "src/lib/quickLogTypedEventPayloadRules.ts") return false;
-        if (path === "src/lib/writeWateringTypedEvent.ts") return false;
-        if (path === "src/lib/featureFlags.ts") return false;
-        if (path.startsWith("src/test/")) return false;
-        return true;
-      });
+    const hits = findMatches(["src"], "create_watering_event")
+      .filter((path) => path !== "src/integrations/supabase/types.ts")
+      .filter((path) => path !== "src/lib/quickLogTypedEventPayloadRules.ts")
+      .filter((path) => path !== "src/lib/writeWateringTypedEvent.ts")
+      .filter((path) => path !== "src/lib/featureFlags.ts")
+      .filter((path) => !path.startsWith("src/test/"));
     expect(hits).toEqual([]);
   });
 

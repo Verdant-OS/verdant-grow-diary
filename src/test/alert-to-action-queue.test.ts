@@ -16,21 +16,14 @@ import {
   type AlertLike,
 } from "@/lib/alertToActionQueueRules";
 
-
 const ROOT = resolve(__dirname, "../..");
-const ALERT_DETAIL = readFileSync(
-  resolve(ROOT, "src/pages/AlertDetail.tsx"),
-  "utf8",
-);
+const ALERT_DETAIL = readFileSync(resolve(ROOT, "src/pages/AlertDetail.tsx"), "utf8");
 const PERSIST_HOOK = readFileSync(
   resolve(ROOT, "src/hooks/usePersistEnvironmentAlerts.ts"),
   "utf8",
 );
 const DASHBOARD = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8");
-const RULES = readFileSync(
-  resolve(ROOT, "src/lib/alertToActionQueueRules.ts"),
-  "utf8",
-);
+const RULES = readFileSync(resolve(ROOT, "src/lib/alertToActionQueueRules.ts"), "utf8");
 
 function baseAlert(overrides: Partial<AlertLike> = {}): AlertLike {
   return {
@@ -96,7 +89,9 @@ describe("alertToActionQueueRules — pure mapping", () => {
     const metrics = ["humidity_pct", "temperature_c", "vpd_kpa", "co2_ppm", "soil_moisture_pct"];
     for (const m of metrics) {
       const txt = recommendedActionForAlert(baseAlert({ metric: m })).toLowerCase();
-      expect(txt).not.toMatch(/mqtt|webhook|relay|actuator|home[- ]?assistant|turn on|turn off|execute|nutrient|feed strength|ec to|ph to/);
+      expect(txt).not.toMatch(
+        /mqtt|webhook|relay|actuator|home[- ]?assistant|turn on|turn off|execute|nutrient|feed strength|ec to|ph to/,
+      );
       expect(txt).toMatch(/review/);
     }
   });
@@ -124,7 +119,7 @@ describe("AlertDetail — static safety", () => {
   });
 
   it("renders Already in Action Queue state when an existing row is found", () => {
-    expect(ALERT_DETAIL).toMatch(/Already in Action Queue/);
+    expect(ALERT_DETAIL).toMatch(/Action already queued/);
     expect(ALERT_DETAIL).toMatch(/existingActionId/);
   });
 
@@ -236,12 +231,12 @@ describe("Eligibility — environment alert source filtering", () => {
   });
 
   it("ineligible: alert with synthetic metric even when id is a real uuid", () => {
-    expect(
-      isAlertEligibleForActionQueue(baseAlert({ id: "real-uuid", metric: "snapshot" })),
-    ).toBe(false);
-    expect(
-      isAlertEligibleForActionQueue(baseAlert({ id: "real-uuid", metric: "targets" })),
-    ).toBe(false);
+    expect(isAlertEligibleForActionQueue(baseAlert({ id: "real-uuid", metric: "snapshot" }))).toBe(
+      false,
+    );
+    expect(isAlertEligibleForActionQueue(baseAlert({ id: "real-uuid", metric: "targets" }))).toBe(
+      false,
+    );
   });
 
   it("ineligible: resolved or dismissed alerts", () => {
@@ -259,4 +254,3 @@ describe("Eligibility — environment alert source filtering", () => {
     }
   });
 });
-

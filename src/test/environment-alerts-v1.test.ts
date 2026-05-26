@@ -11,10 +11,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import {
-  buildEnvironmentAlerts,
-  type EnvironmentAlert,
-} from "@/lib/environmentAlerts";
+import { buildEnvironmentAlerts, type EnvironmentAlert } from "@/lib/environmentAlerts";
 import {
   buildDefaultThresholdAlerts,
   DEFAULT_RECOMMENDATIONS,
@@ -51,9 +48,7 @@ function runAll(input: {
 describe("Environment Alert v1 — default thresholds", () => {
   it("1. manual reading with high RH generates a high-humidity alert", () => {
     const s = snap({ source: "manual", temp: 24, rh: 85, vpd: 0.6 });
-    const a = runAll({ snapshot: s }).find(
-      (x) => x.id === "default_target:rh:high",
-    );
+    const a = runAll({ snapshot: s }).find((x) => x.id === "default_target:rh:high");
     expect(a).toBeDefined();
     expect(a?.severity).toBe("warning");
     expect(a?.source).toBe("default_thresholds");
@@ -184,14 +179,8 @@ describe("Environment Alert v1 — default thresholds", () => {
 // ---------------------------------------------------------------------------
 // Static safety — no automation / device control / action_queue writes / etc.
 // ---------------------------------------------------------------------------
-const HELPER = readFileSync(
-  resolve(__dirname, "../lib/defaultEnvironmentThresholds.ts"),
-  "utf8",
-);
-const ENV_ALERTS = readFileSync(
-  resolve(__dirname, "../lib/environmentAlerts.ts"),
-  "utf8",
-);
+const HELPER = readFileSync(resolve(__dirname, "../lib/defaultEnvironmentThresholds.ts"), "utf8");
+const ENV_ALERTS = readFileSync(resolve(__dirname, "../lib/environmentAlerts.ts"), "utf8");
 
 describe("Environment Alert v1 — static safety", () => {
   it("rules file contains no automation / device control / write paths", () => {
@@ -215,6 +204,7 @@ describe("Environment Alert v1 — static safety", () => {
     // Search the components tree for hard-coded copies of the constant.
     // Allowed: imports of the constant. Forbidden: literal re-declarations.
     const componentsDir = resolve(__dirname, "../components");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { readdirSync, statSync } = require("node:fs") as typeof import("node:fs");
     const walk = (dir: string): string[] => {
       const out: string[] = [];

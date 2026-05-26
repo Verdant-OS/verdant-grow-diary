@@ -6,7 +6,7 @@
  *  - Pure data only. No I/O, no React, no DB.
  *  - Suggest-only. Output is a diary-entry draft for grower memory.
  *  - NEVER emits device commands, automation text, MQTT/webhook/relay/actuator
- *    /Home Assistant strings, nutrient/feed strength changes, or scheduling.
+ *    external-control strings, nutrient/feed strength changes, or scheduling.
  *  - NEVER mutates alerts.
  *  - NEVER includes user_id (DB default `auth.uid()` is the sole source of truth).
  *  - The originating action's `reason` (with `[alert:<id>]` back-pointer) is

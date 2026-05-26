@@ -33,7 +33,7 @@ describe("Logs — preselect grow on create from /logs?growId=…", () => {
   });
 
   it("QuickLog enumerates only RLS-loaded grows from the store", () => {
-    expect(QUICKLOG).toMatch(/grows\.map\(\(g\)\s*=>\s*<SelectItem/);
+    expect(QUICKLOG).toMatch(/grows\.map\(\(g\)\s*=>\s*\(?\s*<SelectItem/);
   });
 
   it("Edit dialog does not consume URL growId / activeGrow for grow assignment", () => {

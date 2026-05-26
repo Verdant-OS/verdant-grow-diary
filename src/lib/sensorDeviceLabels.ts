@@ -12,7 +12,7 @@
  * Recognized `device_id` shapes:
  *  - `manual:<note>` — grower-entered sanitized device/source note. The
  *    row's `source` stays `manual`; the device note never upgrades it.
- *  - `shelly-ht-gen4[:<sub>]` — Shelly H&T Gen4 webhook ingest.
+ *  - `shelly-ht-gen4[:<sub>]` — Shelly H&T Gen4 live ingest.
  *  - anything else — returns null (caller falls back to source label).
  */
 import { formatSensorDeviceDetail as formatShellyDeviceDetail } from "@/lib/shellyHtWebhookRules";

@@ -32,7 +32,7 @@ describe("DiaryEntryBadges — follow-up caption", () => {
 describe("Timeline — Follow-ups filter chip", () => {
   it("registers followup in EventFilter and detects action_followup entries", () => {
     expect(TIMELINE).toMatch(/"followup"/);
-    expect(TIMELINE).toMatch(/event_type === "action_followup"/);
+    expect(TIMELINE).toMatch(/=== "action_followup"/);
   });
   it("renders a Follow-ups chip with count", () => {
     expect(TIMELINE).toMatch(/label="Follow-ups"/);

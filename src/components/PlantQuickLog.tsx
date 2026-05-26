@@ -29,8 +29,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import {
   buildQuickLogInsertDraft,
+  parseOptionalNumber,
   type QuickLogSensorInput,
 } from "@/lib/quickLogRules";
+import { computeManualSensorDelta } from "@/lib/manualSensorDeltaRules";
+import type { ManualSensorMetric } from "@/lib/manualSensorFreshnessRules";
+import { usePlantManualSensorHistory } from "@/hooks/usePlantManualSensorHistory";
 
 interface Props {
   open: boolean;

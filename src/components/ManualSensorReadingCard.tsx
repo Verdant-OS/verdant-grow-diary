@@ -18,6 +18,11 @@ import {
   validateManualEntry,
   type ManualEntryInput,
 } from "@/lib/sensorReadingManualEntryRules";
+import {
+  getManualSensorDeviceOptions,
+  normalizeManualSourceNote,
+  MAX_MANUAL_DEVICE_NOTE_LEN,
+} from "@/lib/manualSensorSourceLabel";
 import { evaluateManualSnapshotAdvisor } from "@/lib/manualSensorSnapshotAdvisorRules";
 
 interface TentOption {
@@ -48,8 +53,18 @@ export default function ManualSensorReadingCard({
 }: Props) {
   const [tentId, setTentId] = useState<string>(defaultTentId ?? tents[0]?.id ?? "");
   const [form, setForm] = useState<ManualEntryInput>(EMPTY);
+  const [devicePreset, setDevicePreset] = useState<string>("none");
+  const [deviceCustom, setDeviceCustom] = useState<string>("");
   const [reviewOpen, setReviewOpen] = useState(false);
   const insert = useInsertSensorReading();
+
+  const devicePresets = useMemo(() => getManualSensorDeviceOptions(), []);
+  const deviceNote = useMemo(() => {
+    if (devicePreset === "custom") return normalizeManualSourceNote(deviceCustom);
+    if (devicePreset === "none" || !devicePreset) return null;
+    const preset = devicePresets.find((p) => p.id === devicePreset);
+    return preset ? normalizeManualSourceNote(preset.label) : null;
+  }, [devicePreset, deviceCustom, devicePresets]);
 
   const validation = useMemo(() => validateManualEntry(form), [form]);
   const advisor = useMemo(() => evaluateManualSnapshotAdvisor(form), [form]);
@@ -65,6 +80,7 @@ export default function ManualSensorReadingCard({
     const payloads = buildManualReadingPayloads({
       tentId,
       metrics: validation.metrics,
+      deviceNote,
     });
     try {
       // Sequential keeps ordering deterministic and per-row error surfacing
@@ -82,6 +98,8 @@ export default function ManualSensorReadingCard({
         createdAt: new Date().toISOString(),
       });
       setForm(EMPTY);
+      setDevicePreset("none");
+      setDeviceCustom("");
       setReviewOpen(false);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Save failed.";
@@ -153,6 +171,57 @@ export default function ManualSensorReadingCard({
             </p>
           </div>
         )}
+
+        <div className="space-y-1" data-testid="manual-reading-device-row">
+          <Label htmlFor="manual-reading-device" className="text-xs">
+            Reading source / device <span className="text-muted-foreground">(optional)</span>
+          </Label>
+          <Select value={devicePreset} onValueChange={setDevicePreset}>
+            <SelectTrigger
+              id="manual-reading-device"
+              data-testid="manual-reading-device-select"
+            >
+              <SelectValue placeholder="Where did this reading come from?" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none" data-testid="manual-reading-device-option-none">
+                Not specified
+              </SelectItem>
+              {devicePresets.map((opt) => (
+                <SelectItem
+                  key={opt.id}
+                  value={opt.id}
+                  data-testid={`manual-reading-device-option-${opt.id}`}
+                >
+                  {opt.label}
+                </SelectItem>
+              ))}
+              <SelectItem value="custom" data-testid="manual-reading-device-option-custom">
+                Other (type a short note)
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          {devicePreset === "custom" && (
+            <Input
+              id="manual-reading-device-custom"
+              data-testid="manual-reading-device-custom"
+              value={deviceCustom}
+              onChange={(e) => setDeviceCustom(e.target.value)}
+              maxLength={MAX_MANUAL_DEVICE_NOTE_LEN}
+              placeholder="e.g. SensorPush HT.w"
+              className="mt-1"
+            />
+          )}
+          <p
+            className="text-[11px] text-muted-foreground"
+            data-testid="manual-reading-device-hint"
+          >
+            Optional note about where this reading came from. Stays labeled as a manual,
+            user-entered reading — not a connected device.
+          </p>
+        </div>
+
+
 
         <Section title="Air" testId="manual-reading-section-air">
           <Field

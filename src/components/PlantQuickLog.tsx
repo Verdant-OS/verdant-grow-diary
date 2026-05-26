@@ -8,14 +8,10 @@
  *   3) 2x2 grid: Temp °F, Humidity %, pH, EC (all optional, decimals allowed)
  *   4) Full-width "Save to Timeline" button
  *
- * SAFETY (do not regress):
- *   - No AI, no Doctor, no chat, no auto-analysis.
- *   - No alert / action_queue / sensor_readings writes.
- *   - No automation, no device control, no MQTT, no Home Assistant, no webhook.
- *   - Manual sensor values are stored as `details.manual_sensor_snapshot` with
- *     `source: "manual"` — never blended with live readings.
- *   - `user_id` is never included in the insert payload (DB default auth.uid()
- *     is the sole source of truth).
+ * Safety contract is enforced by src/test/plant-quick-log.test.ts — keep this
+ * component a presenter writing only to diary_entries + diary-photos storage.
+ * Manual sensor values are stored under details.manual_sensor_snapshot with
+ * source set to "manual" by the pure helper in src/lib/quickLogRules.ts.
  */
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";

@@ -92,7 +92,7 @@ describe("formatSensorSourceLabel", () => {
   it("never returns Live/Synced/Connected for manual", () => {
     const label = formatSensorSourceLabel({
       source: "manual",
-      deviceNote: "Home Assistant copy",
+      deviceNote: "Smart home dashboard copy",
     }).toLowerCase();
     for (const banned of ["live", "synced", "connected", "automatic"]) {
       expect(label).not.toContain(banned);

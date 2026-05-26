@@ -506,9 +506,7 @@ export default function ActionDetail() {
         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
           <IdField label="Grow" id={row.grow_id} to={growDetailPath(row.grow_id)} />
           {row.tent_id && <IdField label="Tent" id={row.tent_id} to={`/tents/${row.tent_id}`} />}
-          {row.plant_id && (
-            <IdField label="Plant" id={row.plant_id} to={`/plants/${row.plant_id}`} />
-          )}
+          {row.plant_id && <IdField label="Plant" id={row.plant_id} to={`/plants/${row.plant_id}`} />}
           <Field label="Created" value={new Date(row.created_at).toLocaleString()} />
           <Field label="Updated" value={new Date(row.updated_at).toLocaleString()} />
           {row.completed_at && (
@@ -556,8 +554,7 @@ export default function ActionDetail() {
                     data-testid="stale-source-alert-warning"
                     className="mt-3 rounded-lg border border-amber-500/60 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300"
                   >
-                    The source alert is no longer open. Re-check current grow conditions before
-                    approving this action.
+                    The source alert is no longer open. Re-check current grow conditions before approving this action.
                   </div>
                 )}
               </div>

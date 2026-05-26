@@ -5,7 +5,7 @@
  * tent) and QuickLog diary entries scoped to the plant. No writes.
  */
 import { Link } from "react-router-dom";
-import { ClipboardCheck, ArrowRight, Gauge, Info, Sparkles } from "lucide-react";
+import { ClipboardCheck, ArrowRight, CheckCircle2, Gauge, Info, Sparkles } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 
 import { Badge } from "@/components/ui/badge";

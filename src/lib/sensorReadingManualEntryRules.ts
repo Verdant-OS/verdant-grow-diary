@@ -179,9 +179,6 @@ export function buildManualReadingPayloads(args: {
   deviceNote?: string | null;
 }): ManualReadingPayload[] {
   const ts = args.ts ?? new Date().toISOString();
-  // Lazy require to keep this file free of circular imports at module load.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { buildManualDeviceId } = require("@/lib/manualSensorSourceLabel") as typeof import("@/lib/manualSensorSourceLabel");
   const deviceId = buildManualDeviceId(args.deviceNote ?? null);
   return args.metrics.map((m) => {
     const row: ManualReadingPayload = {

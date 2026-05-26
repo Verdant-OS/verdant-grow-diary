@@ -107,6 +107,15 @@ export function followupNoteForAction(
     if (isLow) return LOW_RH_NOTE;
     return HIGH_RH_NOTE;
   }
+  // Check soil / root-zone BEFORE temperature so "root_zone_temp_c" doesn't
+  // get misclassified as a generic temperature metric.
+  if (
+    metric.includes("soil") ||
+    metric.includes("moisture") ||
+    metric.includes("root")
+  ) {
+    return SOIL_NOTE;
+  }
   if (metric.includes("temp")) {
     if (isLow) return LOW_TEMP_NOTE;
     return HIGH_TEMP_NOTE;
@@ -117,13 +126,6 @@ export function followupNoteForAction(
   }
   if (metric.includes("co2")) {
     return CO2_NOTE;
-  }
-  if (
-    metric.includes("soil") ||
-    metric.includes("moisture") ||
-    metric.includes("root")
-  ) {
-    return SOIL_NOTE;
   }
   return UNKNOWN_NOTE;
 }

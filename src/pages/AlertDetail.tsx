@@ -96,6 +96,7 @@ export default function AlertDetail() {
   const [queuing, setQueuing] = useState(false);
   const [relatedActions, setRelatedActions] = useState<RelatedActionRow[]>([]);
   const [relatedLoaded, setRelatedLoaded] = useState(false);
+  const [outcomeRows, setOutcomeRows] = useState<RawOutcomeDiaryRow[]>([]);
 
   const load = useCallback(async () => {
     if (!alertId) return;

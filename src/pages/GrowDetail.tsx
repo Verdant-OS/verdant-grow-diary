@@ -10,7 +10,7 @@ import {
   Sparkles,
   Bell,
 } from "lucide-react";
-import { useGrowDetailData } from "@/hooks/useGrowDetailData";
+import { useGrowDetailData, type GrowOutcomesState } from "@/hooks/useGrowDetailData";
 import {
   type CountValue,
   type GrowStatus,
@@ -18,7 +18,9 @@ import {
   formatCount,
 } from "@/lib/growStatus";
 import {
+  actionDetailPath,
   actionsPath,
+  alertDetailPath,
   alertsPath,
   dashboardPath,
   logsPath,
@@ -33,7 +35,7 @@ import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
  * No writes. No ai-coach call. No device-control surface.
  */
 export default function GrowDetail() {
-  const { grow, growId, loading, notFound, counts, recent, status } = useGrowDetailData();
+  const { grow, growId, loading, notFound, counts, recent, status, outcomes } = useGrowDetailData();
 
   if (loading) {
     return (
@@ -185,7 +187,112 @@ export default function GrowDetail() {
           </ul>
         )}
       </section>
+
+      <RecentOutcomesCard outcomes={outcomes} />
     </div>
+  );
+}
+
+function RecentOutcomesCard({ outcomes }: { outcomes: GrowOutcomesState }) {
+  const { status, summary, recent } = outcomes;
+  return (
+    <section className="glass rounded-2xl p-4 mt-4" aria-label="Recent outcomes">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          Recent Outcomes
+        </h2>
+        <span className="text-[11px] text-muted-foreground">Grower-recorded</span>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-3" data-testid="outcome-count-chips">
+        <OutcomeChip label="Improved" count={summary.improved} tone="success" />
+        <OutcomeChip label="Unchanged" count={summary.unchanged} tone="muted" />
+        <OutcomeChip label="Worsened" count={summary.worsened} tone="destructive" />
+        <OutcomeChip label="More data needed" count={summary.more_data_needed} tone="warning" />
+      </div>
+
+      {status === "loading" ? (
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : status === "unavailable" ? (
+        <p className="text-sm text-muted-foreground">Recent outcomes unavailable.</p>
+      ) : recent.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No recorded outcomes yet.</p>
+      ) : (
+        <ul className="space-y-2">
+          {recent.map((o) => (
+            <li
+              key={o.diary_entry_id ?? `${o.action_queue_id}-${o.recorded_at}`}
+              className="rounded-lg border border-border/40 bg-secondary/20 p-2 text-sm"
+            >
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="outline" className="text-[10px] uppercase">
+                  {o.label}
+                </Badge>
+                {o.metric && (
+                  <span className="text-[11px] text-muted-foreground">metric: {o.metric}</span>
+                )}
+                <span className="ml-auto text-xs text-muted-foreground">
+                  {o.recorded_at ? new Date(o.recorded_at).toLocaleString() : "—"}
+                </span>
+              </div>
+              {o.suggested_change && (
+                <p className="text-xs mt-1 text-foreground/80">{o.suggested_change}</p>
+              )}
+              {o.note && (
+                <p className="text-xs mt-1 italic text-muted-foreground">{o.note}</p>
+              )}
+              <p className="text-[10px] mt-1 text-muted-foreground">
+                Grower-recorded · Recorded after follow-up
+              </p>
+              <div className="flex gap-3 mt-1 text-xs">
+                {o.action_queue_id && (
+                  <Link
+                    to={actionDetailPath(o.action_queue_id)}
+                    className="text-primary hover:underline"
+                  >
+                    View action →
+                  </Link>
+                )}
+                {o.source_alert_id && (
+                  <Link
+                    to={alertDetailPath(o.source_alert_id)}
+                    className="text-primary hover:underline"
+                  >
+                    View alert →
+                  </Link>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function OutcomeChip({
+  label,
+  count,
+  tone,
+}: {
+  label: string;
+  count: number;
+  tone: "success" | "muted" | "destructive" | "warning";
+}) {
+  const toneMap: Record<typeof tone, string> = {
+    success:
+      "bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30",
+    muted: "bg-muted text-muted-foreground border-border/40",
+    destructive: "bg-destructive/15 text-destructive border-destructive/30",
+    warning:
+      "bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))] border-[hsl(var(--warning))]/30",
+  };
+  return (
+    <span
+      className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${toneMap[tone]}`}
+    >
+      {label}: {count}
+    </span>
   );
 }
 

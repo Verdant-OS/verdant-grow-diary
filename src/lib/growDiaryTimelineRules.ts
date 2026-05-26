@@ -8,10 +8,7 @@
  * payload values. Unknown event types fall back to safe labels.
  */
 
-import {
-  normalizeDiaryEntry,
-  type NormalizedDiaryEntry,
-} from "./diaryEntryRules";
+import { normalizeDiaryEntry, type NormalizedDiaryEntry } from "./diaryEntryRules";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -87,6 +84,8 @@ const EVENT_TYPE_TITLES: Record<string, string> = {
   pest: "Pest sighting",
   harvest: "Harvest",
   flush: "Flush",
+  action_followup: "Follow-up",
+  action_outcome: "Outcome",
 };
 
 // ---------------------------------------------------------------------------
@@ -126,7 +125,10 @@ function titleForEventType(eventType: string): string {
   // Safe fallback for unknown event types — capitalize the first character
   // of a sanitized key (alnum + dash/underscore/space only). Never echo
   // arbitrary punctuation or html.
-  const sanitized = key.replace(/[^a-z0-9_\-\s]/g, "").slice(0, 32).trim();
+  const sanitized = key
+    .replace(/[^a-z0-9_\-\s]/g, "")
+    .slice(0, 32)
+    .trim();
   if (!sanitized) return "Diary entry";
   return sanitized.charAt(0).toUpperCase() + sanitized.slice(1);
 }
@@ -180,20 +182,14 @@ function buildTags(entry: NormalizedDiaryEntry): string[] {
   return out;
 }
 
-function matchesEventType(
-  ev: string,
-  filter: string | string[] | null | undefined,
-): boolean {
+function matchesEventType(ev: string, filter: string | string[] | null | undefined): boolean {
   if (filter == null) return true;
   const list = Array.isArray(filter) ? filter : [filter];
   const set = new Set(list.map((s) => (s ?? "").toLowerCase()));
   return set.has((ev ?? "").toLowerCase());
 }
 
-function matchesStage(
-  stage: string | null,
-  filter: string | string[] | null | undefined,
-): boolean {
+function matchesStage(stage: string | null, filter: string | string[] | null | undefined): boolean {
   if (filter == null) return true;
   const list = Array.isArray(filter) ? filter : [filter];
   const set = new Set(list.map((s) => (s ?? "").toLowerCase()));

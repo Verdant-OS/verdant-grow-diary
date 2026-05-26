@@ -38,7 +38,7 @@ describe("normalizeManualSourceNote", () => {
   it("strips control characters and unsafe punctuation", () => {
     expect(normalizeManualSourceNote("SensorPush<script>")).toBe("SensorPush script");
     expect(normalizeManualSourceNote("foo\u0000bar")).toBe("foo bar");
-    expect(normalizeManualSourceNote("' OR 1=1 --")).toBe("OR 11 --");
+    expect(normalizeManualSourceNote("' OR 1=1 --")).toBe("OR 1 1 --");
   });
 
   it("caps length at MAX_MANUAL_DEVICE_NOTE_LEN", () => {

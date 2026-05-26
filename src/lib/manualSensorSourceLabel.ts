@@ -41,7 +41,7 @@ const MANUAL_DEVICE_PRESETS: ManualDeviceOption[] = [
   { id: "ac-infinity", label: "AC Infinity controller" },
   { id: "aroya-export", label: "AROYA export" },
   { id: "handheld-meter", label: "Handheld meter" },
-  { id: "home-assistant-copy", label: "Home Assistant copy" },
+  { id: "smart-home-copy", label: "Smart home dashboard copy" },
   { id: "memory", label: "Entered from memory" },
 ];
 

@@ -16,6 +16,13 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ArrowLeft,
   Loader2,
   Check,
@@ -24,6 +31,7 @@ import {
   CheckCircle2,
   Ban,
   History,
+  CircleCheckBig,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -38,7 +46,6 @@ import {
   canComplete,
   canCancel,
   buildTransitionPatch,
-  
   eventTypeFor,
   nextStatusFor,
   normalizeNote,
@@ -55,7 +62,14 @@ import {
   buildActionFollowupDiaryDraft,
   followupMatchesAction,
 } from "@/lib/actionFollowupRules";
-
+import {
+  ACTION_OUTCOME_EVENT_TYPE,
+  ACTION_OUTCOME_KIND,
+  OUTCOME_STATUSES,
+  buildActionOutcomeDiaryDraft,
+  outcomeMatchesAction,
+  type OutcomeStatus,
+} from "@/lib/actionOutcomeRules";
 
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { useGrows } from "@/store/grows";
@@ -102,10 +116,14 @@ const RISK_VARIANT: Record<ActionRow["risk_level"], string> = {
   critical: "bg-red-500/15 text-red-300 border-red-500/30",
 };
 
-const DIALOG_META: Record<Kind, { title: string; description: string; label: string; placeholder: string; confirmLabel: string }> = {
+const DIALOG_META: Record<
+  Kind,
+  { title: string; description: string; label: string; placeholder: string; confirmLabel: string }
+> = {
   approve: {
     title: "Approve Action",
-    description: "Approved actions are recorded for future manual or controlled execution. No equipment command is sent.",
+    description:
+      "Approved actions are recorded for future manual or controlled execution. No equipment command is sent.",
     label: "Approval note",
     placeholder: "Optional — why are you approving?",
     confirmLabel: "Approve",
@@ -126,20 +144,21 @@ const DIALOG_META: Record<Kind, { title: string; description: string; label: str
   },
   complete: {
     title: "Mark Action Complete",
-    description: "Marks this action as manually completed outside Verdant. No equipment command is sent.",
+    description:
+      "Marks this action as manually completed outside Verdant. No equipment command is sent.",
     label: "Completion note",
     placeholder: "Optional — what did you do?",
     confirmLabel: "Mark Complete",
   },
   cancel: {
     title: "Cancel Action",
-    description: "Cancels this action. The grower decided not to proceed. No equipment command is sent.",
+    description:
+      "Cancels this action. The grower decided not to proceed. No equipment command is sent.",
     label: "Cancellation reason",
     placeholder: "Optional — why are you cancelling?",
     confirmLabel: "Cancel Action",
   },
 };
-
 
 export default function ActionDetail() {
   const { actionId } = useParams<{ actionId: string }>();
@@ -152,11 +171,15 @@ export default function ActionDetail() {
   const [busy, setBusy] = useState(false);
   const [dialog, setDialog] = useState<Kind | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
-  const [sourceAlertStatus, setSourceAlertStatus] = useState<string | null>(
-    null,
-  );
+  const [sourceAlertStatus, setSourceAlertStatus] = useState<string | null>(null);
 
-
+  // Outcome capture state
+  const [existingOutcome, setExistingOutcome] = useState<{ status: string } | null>(null);
+  const [followupEntryId, setFollowupEntryId] = useState<string | null>(null);
+  const [outcomeDialogOpen, setOutcomeDialogOpen] = useState(false);
+  const [outcomeStatus, setOutcomeStatus] = useState<OutcomeStatus | "">("");
+  const [outcomeNote, setOutcomeNote] = useState("");
+  const [outcomeBusy, setOutcomeBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!user || !actionId) return;
@@ -206,21 +229,108 @@ export default function ActionDetail() {
         .eq("id", sourceAlertId)
         .maybeSingle();
       if (cancelled || error || !data) return;
-      setSourceAlertStatus(
-        typeof data.status === "string" ? data.status : null,
-      );
+      setSourceAlertStatus(typeof data.status === "string" ? data.status : null);
     })();
     return () => {
       cancelled = true;
     };
   }, [row]);
 
-  const showStaleSourceAlertWarning =
-    shouldWarnPendingActionHasClosedSourceAlert(
-      row?.status,
-      sourceAlertStatus,
-    );
+  const showStaleSourceAlertWarning = shouldWarnPendingActionHasClosedSourceAlert(
+    row?.status,
+    sourceAlertStatus,
+  );
 
+  // Fetch existing outcome and followup diary entries for completed actions.
+  useEffect(() => {
+    let cancelled = false;
+    setExistingOutcome(null);
+    setFollowupEntryId(null);
+    if (!row || row.status !== "completed") return;
+    (async () => {
+      // Check for existing action_outcome
+      const { data: outcomeRows } = await supabase
+        .from("diary_entries")
+        .select("id,details")
+        .eq("grow_id", row.grow_id)
+        .contains("details", {
+          event_type: ACTION_OUTCOME_EVENT_TYPE,
+          action_queue_id: row.id,
+          outcome_kind: ACTION_OUTCOME_KIND,
+        })
+        .limit(1);
+      if (cancelled) return;
+      if (outcomeRows && outcomeRows.length > 0) {
+        const d = outcomeRows[0].details as Record<string, unknown> | null;
+        if (
+          outcomeMatchesAction(
+            {
+              details: d as {
+                event_type?: unknown;
+                action_queue_id?: unknown;
+                outcome_kind?: unknown;
+              } | null,
+            },
+            row.id,
+          )
+        ) {
+          setExistingOutcome({ status: (d?.outcome_status as string) ?? "unknown" });
+        }
+      }
+      // Check for existing action_followup
+      const { data: followupRows } = await supabase
+        .from("diary_entries")
+        .select("id,details")
+        .eq("grow_id", row.grow_id)
+        .contains("details", {
+          event_type: ACTION_FOLLOWUP_EVENT_TYPE,
+          action_queue_id: row.id,
+        })
+        .limit(1);
+      if (cancelled) return;
+      if (followupRows && followupRows.length > 0) {
+        setFollowupEntryId(followupRows[0].id);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [row]);
+
+  async function recordOutcome() {
+    if (!row || row.status !== "completed" || !outcomeStatus) return;
+    setOutcomeBusy(true);
+    const result = buildActionOutcomeDiaryDraft(
+      row,
+      { outcome_status: outcomeStatus, note: outcomeNote },
+      { followup_entry_id: followupEntryId },
+    );
+    if (!result.ok) {
+      toast.error(
+        "Could not build outcome entry: " + (result as { ok: false; reason: string }).reason,
+      );
+      setOutcomeBusy(false);
+      return;
+    }
+    const { draft } = result;
+    const { error } = await supabase.from("diary_entries").insert({
+      grow_id: draft.grow_id,
+      tent_id: draft.tent_id,
+      plant_id: draft.plant_id,
+      note: draft.note,
+      details: draft.details as unknown as Json,
+    });
+    if (error) {
+      toast.error("Failed to record outcome", { description: error.message });
+    } else {
+      setExistingOutcome({ status: outcomeStatus });
+      toast.success("Outcome recorded");
+    }
+    setOutcomeBusy(false);
+    setOutcomeDialogOpen(false);
+    setOutcomeStatus("");
+    setOutcomeNote("");
+  }
 
   // SECURITY: audit-only insert. No device commands. user_id omitted (DB default auth.uid()).
   async function logEvent(
@@ -252,10 +362,7 @@ export default function ActionDetail() {
     note?: string,
   ) {
     setBusy(true);
-    const { error } = await supabase
-      .from("action_queue")
-      .update(next)
-      .eq("id", current.id);
+    const { error } = await supabase.from("action_queue").update(next).eq("id", current.id);
     if (error) {
       setBusy(false);
       toast.error(error.message);
@@ -305,15 +412,13 @@ export default function ActionDetail() {
       }
     }
 
-    const { error: insErr } = await supabase
-      .from("diary_entries")
-      .insert({
-        grow_id: draft.grow_id,
-        tent_id: draft.tent_id,
-        plant_id: draft.plant_id,
-        note: draft.note,
-        details: draft.details as unknown as Json,
-      });
+    const { error: insErr } = await supabase.from("diary_entries").insert({
+      grow_id: draft.grow_id,
+      tent_id: draft.tent_id,
+      plant_id: draft.plant_id,
+      note: draft.note,
+      details: draft.details as unknown as Json,
+    });
     if (insErr) {
       toast.warning("Action completed, but follow-up note could not be created.", {
         description: insErr.message,
@@ -340,7 +445,6 @@ export default function ActionDetail() {
     const patch = buildTransitionPatch(kind);
     await transition(row, patch, eventTypeFor(kind), nextStatusFor(kind), note);
   }
-
 
   function cancelDialog() {
     setDialog(null);
@@ -383,11 +487,14 @@ export default function ActionDetail() {
       />
       <BackLink />
 
-
       <header className="glass rounded-2xl p-4 mb-4">
         <div className="flex items-center gap-2 flex-wrap mb-2">
-          <Badge variant="outline" className="uppercase text-[10px]">{row.status}</Badge>
-          <Badge variant="outline" className={RISK_VARIANT[row.risk_level]}>{row.risk_level}</Badge>
+          <Badge variant="outline" className="uppercase text-[10px]">
+            {row.status}
+          </Badge>
+          <Badge variant="outline" className={RISK_VARIANT[row.risk_level]}>
+            {row.risk_level}
+          </Badge>
           <span className="text-xs text-muted-foreground">{row.action_type}</span>
           <Badge variant="outline" className="text-[10px] uppercase">
             {getActionQueueSourceLabel(row)}
@@ -399,7 +506,9 @@ export default function ActionDetail() {
         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
           <IdField label="Grow" id={row.grow_id} to={growDetailPath(row.grow_id)} />
           {row.tent_id && <IdField label="Tent" id={row.tent_id} to={`/tents/${row.tent_id}`} />}
-          {row.plant_id && <IdField label="Plant" id={row.plant_id} to={`/plants/${row.plant_id}`} />}
+          {row.plant_id && (
+            <IdField label="Plant" id={row.plant_id} to={`/plants/${row.plant_id}`} />
+          )}
           <Field label="Created" value={new Date(row.created_at).toLocaleString()} />
           <Field label="Updated" value={new Date(row.updated_at).toLocaleString()} />
           {row.completed_at && (
@@ -407,89 +516,142 @@ export default function ActionDetail() {
           )}
         </dl>
 
-        {isAlertDerived(row) && (() => {
-          const sourceAlertId = extractSourceAlertId(row.reason);
-          return (
-            <div
-              className="mt-4 rounded-lg border border-border/40 bg-secondary/20 p-3"
-              aria-label="Action source"
-            >
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                Source
-              </p>
-              <p className="text-sm font-medium mt-0.5">Environment Alert</p>
-              <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                {row.target_metric && (
+        {isAlertDerived(row) &&
+          (() => {
+            const sourceAlertId = extractSourceAlertId(row.reason);
+            return (
+              <div
+                className="mt-4 rounded-lg border border-border/40 bg-secondary/20 p-3"
+                aria-label="Action source"
+              >
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Source</p>
+                <p className="text-sm font-medium mt-0.5">Environment Alert</p>
+                <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  {row.target_metric && (
+                    <div>
+                      <dt className="uppercase tracking-wider text-[10px]">Metric</dt>
+                      <dd className="text-foreground">{row.target_metric}</dd>
+                    </div>
+                  )}
                   <div>
-                    <dt className="uppercase tracking-wider text-[10px]">Metric</dt>
-                    <dd className="text-foreground">{row.target_metric}</dd>
+                    <dt className="uppercase tracking-wider text-[10px]">Risk</dt>
+                    <dd className="text-foreground">{row.risk_level}</dd>
                   </div>
-                )}
-                <div>
-                  <dt className="uppercase tracking-wider text-[10px]">Risk</dt>
-                  <dd className="text-foreground">{row.risk_level}</dd>
-                </div>
+                  {sourceAlertId && (
+                    <div className="col-span-2">
+                      <dt className="uppercase tracking-wider text-[10px]">Alert ID</dt>
+                      <dd className="text-foreground font-mono truncate">{sourceAlertId}</dd>
+                    </div>
+                  )}
+                </dl>
                 {sourceAlertId && (
-                  <div className="col-span-2">
-                    <dt className="uppercase tracking-wider text-[10px]">Alert ID</dt>
-                    <dd className="text-foreground font-mono truncate">{sourceAlertId}</dd>
+                  <Button asChild size="sm" variant="outline" className="mt-3">
+                    <Link to={alertDetailPath(sourceAlertId)}>Open source alert</Link>
+                  </Button>
+                )}
+                {showStaleSourceAlertWarning && (
+                  <div
+                    role="alert"
+                    aria-label="Stale source alert warning"
+                    data-testid="stale-source-alert-warning"
+                    className="mt-3 rounded-lg border border-amber-500/60 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300"
+                  >
+                    The source alert is no longer open. Re-check current grow conditions before
+                    approving this action.
                   </div>
                 )}
-              </dl>
-              {sourceAlertId && (
-                <Button asChild size="sm" variant="outline" className="mt-3">
-                  <Link to={alertDetailPath(sourceAlertId)}>Open source alert</Link>
-                </Button>
-              )}
-              {showStaleSourceAlertWarning && (
-                <div
-                  role="alert"
-                  aria-label="Stale source alert warning"
-                  data-testid="stale-source-alert-warning"
-                  className="mt-3 rounded-lg border border-amber-500/60 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300"
-                >
-                  The source alert is no longer open. Re-check current grow
-                  conditions before approving this action.
-                </div>
-              )}
-            </div>
-
-          );
-        })()}
-
-
-
+              </div>
+            );
+          })()}
 
         {!isTerminal(row.status) && (
           <div className="flex flex-wrap gap-2 mt-4">
             {canApprove(row.status) && (
-              <Button size="sm" disabled={busy} onClick={() => openDialog("approve")} className="gradient-leaf text-primary-foreground">
+              <Button
+                size="sm"
+                disabled={busy}
+                onClick={() => openDialog("approve")}
+                className="gradient-leaf text-primary-foreground"
+              >
                 <Check className="h-4 w-4" /> Approve
               </Button>
             )}
             {canSimulate(row.status) && (
-              <Button size="sm" variant="secondary" disabled={busy} onClick={() => openDialog("simulate")}>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={busy}
+                onClick={() => openDialog("simulate")}
+              >
                 <FlaskConical className="h-4 w-4" /> Simulate
               </Button>
             )}
             {canComplete(row.status) && (
-              <Button size="sm" variant="secondary" disabled={busy} onClick={() => openDialog("complete")}>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={busy}
+                onClick={() => openDialog("complete")}
+              >
                 <CheckCircle2 className="h-4 w-4" /> Mark Complete
               </Button>
             )}
             {canReject(row.status) && (
-              <Button size="sm" variant="ghost" disabled={busy} onClick={() => openDialog("reject")}>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={busy}
+                onClick={() => openDialog("reject")}
+              >
                 <X className="h-4 w-4" /> Reject
               </Button>
             )}
             {canCancel(row.status) && (
-              <Button size="sm" variant="ghost" disabled={busy} onClick={() => openDialog("cancel")}>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={busy}
+                onClick={() => openDialog("cancel")}
+              >
                 <Ban className="h-4 w-4" /> Cancel
               </Button>
             )}
           </div>
         )}
       </header>
+
+      {row.status === "completed" && (
+        <section
+          className="glass rounded-2xl p-4 mb-4"
+          aria-label="Record Outcome"
+          data-testid="outcome-section"
+        >
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1">
+            <CircleCheckBig className="h-4 w-4" /> Outcome
+          </h2>
+          {existingOutcome ? (
+            <div data-testid="outcome-recorded" className="flex items-center gap-2 text-sm">
+              <Badge
+                variant="outline"
+                className="bg-teal-500/15 text-teal-300 border-teal-500/30 uppercase text-[10px]"
+              >
+                {existingOutcome.status.replace(/_/g, " ")}
+              </Badge>
+              <span className="text-muted-foreground">Outcome recorded</span>
+            </div>
+          ) : (
+            <Button
+              size="sm"
+              variant="secondary"
+              data-testid="record-outcome-btn"
+              disabled={outcomeBusy}
+              onClick={() => setOutcomeDialogOpen(true)}
+            >
+              <CircleCheckBig className="h-4 w-4" /> Record Outcome
+            </Button>
+          )}
+        </section>
+      )}
 
       <section className="glass rounded-2xl p-4" aria-label="Audit history">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1">
@@ -500,9 +662,14 @@ export default function ActionDetail() {
         ) : (
           <ul className="space-y-2">
             {events.map((e) => (
-              <li key={e.id} className="rounded-lg border border-border/40 bg-secondary/20 p-2 text-sm">
+              <li
+                key={e.id}
+                className="rounded-lg border border-border/40 bg-secondary/20 p-2 text-sm"
+              >
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="outline" className="text-[10px] uppercase">{e.event_type}</Badge>
+                  <Badge variant="outline" className="text-[10px] uppercase">
+                    {e.event_type}
+                  </Badge>
                   <span className="text-xs text-muted-foreground">
                     {e.previous_status ?? "—"} → {e.new_status ?? "—"}
                   </span>
@@ -517,7 +684,12 @@ export default function ActionDetail() {
         )}
       </section>
 
-      <Dialog open={dialog !== null} onOpenChange={(open) => { if (!open) cancelDialog(); }}>
+      <Dialog
+        open={dialog !== null}
+        onOpenChange={(open) => {
+          if (!open) cancelDialog();
+        }}
+      >
         <DialogContent>
           {meta && (
             <>
@@ -535,15 +707,84 @@ export default function ActionDetail() {
                   rows={4}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Leave blank to confirm without a note. Notes are stored in the audit history and cannot be edited.
+                  Leave blank to confirm without a note. Notes are stored in the audit history and
+                  cannot be edited.
                 </p>
               </div>
               <DialogFooter>
-                <Button variant="ghost" onClick={cancelDialog}>Cancel</Button>
+                <Button variant="ghost" onClick={cancelDialog}>
+                  Cancel
+                </Button>
                 <Button onClick={confirmDialog}>{meta.confirmLabel}</Button>
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={outcomeDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setOutcomeDialogOpen(false);
+            setOutcomeStatus("");
+            setOutcomeNote("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Record Outcome</DialogTitle>
+            <DialogDescription>
+              Record what happened after the follow-up re-check. This is grower observation only —
+              no automation is triggered.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="outcome-status-select">Outcome</Label>
+              <Select
+                value={outcomeStatus}
+                onValueChange={(v) => setOutcomeStatus(v as OutcomeStatus)}
+              >
+                <SelectTrigger id="outcome-status-select" data-testid="outcome-status-select">
+                  <SelectValue placeholder="Select outcome…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="improved">Improved</SelectItem>
+                  <SelectItem value="unchanged">Unchanged</SelectItem>
+                  <SelectItem value="worsened">Worsened</SelectItem>
+                  <SelectItem value="more_data_needed">More data needed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="outcome-note">Note (optional)</Label>
+              <Textarea
+                id="outcome-note"
+                data-testid="outcome-note"
+                value={outcomeNote}
+                onChange={(e) => setOutcomeNote(e.target.value)}
+                placeholder="Optional — describe what you observed."
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setOutcomeDialogOpen(false);
+                setOutcomeStatus("");
+                setOutcomeNote("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button disabled={!outcomeStatus || outcomeBusy} onClick={recordOutcome}>
+              Record Outcome
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
@@ -576,7 +817,9 @@ function IdField({ label, id, to }: { label: string; id: string; to: string | nu
       <dt className="text-muted-foreground uppercase tracking-wider text-[10px]">{label}</dt>
       <dd className="font-mono text-[11px] break-all">
         {to ? (
-          <Link to={to} className="text-primary hover:underline">{id}</Link>
+          <Link to={to} className="text-primary hover:underline">
+            {id}
+          </Link>
         ) : (
           <span>{id}</span>
         )}
@@ -584,4 +827,3 @@ function IdField({ label, id, to }: { label: string; id: string; to: string | nu
     </div>
   );
 }
-

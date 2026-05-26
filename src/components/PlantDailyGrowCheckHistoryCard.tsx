@@ -27,6 +27,7 @@ import {
   ONBOARDING_HEADLINE,
   ONBOARDING_SECONDARY,
   WHAT_COUNTS_HINT,
+  getDailyGrowCheckRecentActivityCue,
 } from "@/lib/dailyGrowCheckGuidanceRules";
 
 const HISTORY_DAYS = 5;

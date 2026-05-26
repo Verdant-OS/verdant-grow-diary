@@ -3,11 +3,16 @@
  * normalized diary timeline item.
  *
  * No queries, no writes, no business logic. All transformation lives in
- * src/lib/growDiaryTimelineRules.ts / src/lib/diaryEntryRules.ts.
+ * src/lib/growDiaryTimelineRules.ts / src/lib/diaryEntryRules.ts /
+ * src/lib/actionFollowupVisibilityRules.ts.
  */
 import { AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { GrowDiaryTimelineItem } from "@/lib/growDiaryTimelineRules";
+import {
+  FOLLOWUP_SAFE_CAPTION,
+  normalizeFollowupKindLabel,
+} from "@/lib/actionFollowupVisibilityRules";
 
 const TAG_LABELS: Record<string, string> = {
   watering: "Watering",
@@ -70,6 +75,14 @@ export default function DiaryEntryBadges({ item, className }: DiaryEntryBadgesPr
         >
           <AlertTriangle className="h-3 w-3" />
           Limited data
+        </span>
+      )}
+      {item.tags.includes("action_followup") && (
+        <span
+          data-testid="diary-entry-followup-caption"
+          className="text-[11px] text-muted-foreground"
+        >
+          {normalizeFollowupKindLabel("24h_recheck")} · {FOLLOWUP_SAFE_CAPTION}
         </span>
       )}
     </div>

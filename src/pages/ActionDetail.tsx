@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { useAuth } from "@/store/auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +50,11 @@ import {
   isAlertDerived,
   shouldWarnPendingActionHasClosedSourceAlert,
 } from "@/lib/actionQueueProvenanceRules";
+import {
+  ACTION_FOLLOWUP_EVENT_TYPE,
+  buildActionFollowupDiaryDraft,
+  followupMatchesAction,
+} from "@/lib/actionFollowupRules";
 
 
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
@@ -256,8 +262,63 @@ export default function ActionDetail() {
       return;
     }
     await logEvent(current, event_type, new_status, note);
+    // Follow-up diary entry: ONLY when this transition completes the action.
+    // Non-blocking — if it fails we keep the completed status + audit row.
+    if (new_status === "completed") {
+      await maybeCreateFollowupDiaryEntry({
+        ...current,
+        ...next,
+        status: "completed",
+      });
+    }
     setBusy(false);
     await load();
+  }
+
+  // SECURITY: never sends user_id (diary_entries.user_id now defaults to auth.uid()).
+  // Idempotent: skips when an action_followup diary entry for this action already exists.
+  async function maybeCreateFollowupDiaryEntry(completed: ActionRow) {
+    const result = buildActionFollowupDiaryDraft(completed);
+    if (!result.ok) return;
+    const { draft } = result;
+
+    // Idempotency lookup. RLS scopes this to the current user.
+    const { data: existing, error: lookupErr } = await supabase
+      .from("diary_entries")
+      .select("id,details")
+      .eq("grow_id", draft.grow_id)
+      .contains("details", {
+        event_type: ACTION_FOLLOWUP_EVENT_TYPE,
+        action_queue_id: completed.id,
+      })
+      .limit(1);
+    if (!lookupErr && existing && existing.length > 0) {
+      // Defensive double-check via pure helper before bailing out.
+      const row = existing[0] as { id: string; details: unknown };
+      if (
+        followupMatchesAction(
+          { details: row.details as { event_type?: unknown; action_queue_id?: unknown } | null },
+          completed.id,
+        )
+      ) {
+        return;
+      }
+    }
+
+    const { error: insErr } = await supabase
+      .from("diary_entries")
+      .insert({
+        grow_id: draft.grow_id,
+        tent_id: draft.tent_id,
+        plant_id: draft.plant_id,
+        note: draft.note,
+        details: draft.details as unknown as Json,
+      });
+    if (insErr) {
+      toast.warning("Action completed, but follow-up note could not be created.", {
+        description: insErr.message,
+      });
+    }
   }
 
   function openDialog(kind: Kind) {

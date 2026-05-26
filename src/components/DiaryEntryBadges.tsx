@@ -77,6 +77,14 @@ export default function DiaryEntryBadges({ item, className }: DiaryEntryBadgesPr
           Limited data
         </span>
       )}
+      {item.tags.includes("action_followup") && (
+        <span
+          data-testid="diary-entry-followup-caption"
+          className="text-[11px] text-muted-foreground"
+        >
+          {normalizeFollowupKindLabel("24h_recheck")} · {FOLLOWUP_SAFE_CAPTION}
+        </span>
+      )}
     </div>
   );
 }

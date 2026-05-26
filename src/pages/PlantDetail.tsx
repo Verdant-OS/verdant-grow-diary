@@ -28,6 +28,7 @@ import { useGrowPlant, useGrowTent, getGrowDataMeta } from "@/hooks/useGrowData"
 import { format, formatDistanceToNow } from "date-fns";
 
 import PlantQuickLog from "@/components/PlantQuickLog";
+import PlantManualSensorFreshnessCard from "@/components/PlantManualSensorFreshnessCard";
 import { useState } from "react";
 import { Zap } from "lucide-react";
 

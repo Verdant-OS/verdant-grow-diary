@@ -23,7 +23,7 @@ export const REASON_LABELS: Record<ExclusionReason, string> = {
   no_tent_assigned: "No tent assignment.",
 };
 
-export interface PlantDropdownVisibility extends PlantDropdownExclusionSummary {}
+export type PlantDropdownVisibility = PlantDropdownExclusionSummary;
 
 /** Pass-through alias so dialogs can rename for clarity at call sites. */
 export function summarizePlantDropdownVisibility(
@@ -37,9 +37,7 @@ export function summarizePlantDropdownVisibility(
  * not disabled. Used as visible suffix AND aria-label so screen readers
  * hear it (no hover-only tooltip).
  */
-export function getPlantOptionDisabledReason(
-  option: PlantDropdownOption,
-): string | null {
+export function getPlantOptionDisabledReason(option: PlantDropdownOption): string | null {
   if (!option.disabled) return null;
   if (option.reason) return option.reason;
   if (option.reasonCode) return REASON_LABELS[option.reasonCode];
@@ -50,10 +48,7 @@ export function getPlantOptionDisabledReason(
  * Short, count-aware copy for a single hidden-bucket reason.
  * Returns "" when count <= 0.
  */
-export function formatHiddenPlantReason(
-  reason: ExclusionReason,
-  count: number,
-): string {
+export function formatHiddenPlantReason(reason: ExclusionReason, count: number): string {
   if (!Number.isFinite(count) || count <= 0) return "";
   const n = Math.trunc(count);
   const plural = n === 1 ? "plant" : "plants";
@@ -108,9 +103,7 @@ export function getPlantDropdownHelperText(
 }
 
 /** Empty-state copy when a dropdown has zero selectable options. */
-export function formatPlantDropdownEmptyState(
-  context: PlantDropdownContext,
-): string {
+export function formatPlantDropdownEmptyState(context: PlantDropdownContext): string {
   switch (context) {
     case "add_existing_to_tent":
       return "No eligible plants available for this tent.";

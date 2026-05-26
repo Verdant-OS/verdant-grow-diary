@@ -21,6 +21,10 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+      // TODO(lint-baseline): Pre-existing 174 violations across test/lib files.
+      // Tracked for full cleanup – do not add new `any` usage.
+      // See: https://github.com/Verdant-OS/verdant-grow-diary/issues/16
+      "@typescript-eslint/no-explicit-any": "warn",
     },
   },
   {

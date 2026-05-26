@@ -41,6 +41,11 @@ import {
   hasPendingActionsForClosedAlert,
   isActionDerivedFromAlert,
 } from "@/lib/actionQueueProvenanceRules";
+import {
+  pickLatestOutcomeForAction,
+  type RawOutcomeDiaryRow,
+} from "@/lib/relatedActionOutcomeRules";
+import { ACTION_OUTCOME_EVENT_TYPE } from "@/lib/actionOutcomeRules";
 
 import { supabase } from "@/integrations/supabase/client";
 
@@ -91,6 +96,7 @@ export default function AlertDetail() {
   const [queuing, setQueuing] = useState(false);
   const [relatedActions, setRelatedActions] = useState<RelatedActionRow[]>([]);
   const [relatedLoaded, setRelatedLoaded] = useState(false);
+  const [outcomeRows, setOutcomeRows] = useState<RawOutcomeDiaryRow[]>([]);
 
   const load = useCallback(async () => {
     if (!alertId) return;
@@ -222,6 +228,32 @@ export default function AlertDetail() {
       cancelled = true;
     };
   }, [alert]);
+
+  // Read-only outcome rollup: grower-recorded action_outcome diary entries
+  // tied to this alert via details.source_alert_id. RLS handles ownership.
+  // No user_id in payloads. No inserts/updates/deletes.
+  useEffect(() => {
+    let cancelled = false;
+    setOutcomeRows([]);
+    if (!alert || !relatedLoaded || relatedActions.length === 0) return;
+    (async () => {
+      const { data, error: outcomeErr } = await supabase
+        .from("diary_entries")
+        .select("id,entry_at,created_at,note,details")
+        .eq("grow_id", alert.grow_id)
+        .contains("details", {
+          event_type: ACTION_OUTCOME_EVENT_TYPE,
+          source_alert_id: alert.id,
+        })
+        .order("entry_at", { ascending: false })
+        .limit(50);
+      if (cancelled || outcomeErr) return;
+      setOutcomeRows((data ?? []) as RawOutcomeDiaryRow[]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [alert, relatedLoaded, relatedActions.length]);
 
   async function addAlertToActionQueue() {
     if (!alert || !draftResult || !draftResult.ok || existingActionId) return;
@@ -536,7 +568,10 @@ export default function AlertDetail() {
               </p>
             ) : (
               <ul className="space-y-2">
-                {relatedActions.map((a) => (
+                {relatedActions.map((a) => {
+                  const outcome = pickLatestOutcomeForAction(outcomeRows, a.id);
+                  const isCompleted = a.status === "completed";
+                  return (
                   <li key={a.id} className="rounded-lg border border-border/40 bg-secondary/20 p-2">
                     <div className="flex items-center gap-2 flex-wrap">
                       {a.status && (
@@ -555,6 +590,15 @@ export default function AlertDetail() {
                       >
                         {getActionQueueSourceLabel(a)}
                       </Badge>
+                      {outcome && (
+                        <Badge
+                          variant="outline"
+                          data-testid="related-action-outcome-badge"
+                          className="text-[10px] uppercase border-emerald-500/60 text-emerald-600 dark:text-emerald-300"
+                        >
+                          Outcome: {outcome.label}
+                        </Badge>
+                      )}
                       <Link
                         to={actionDetailPath(a.id)}
                         className="ml-auto text-xs text-primary hover:underline"
@@ -572,8 +616,32 @@ export default function AlertDetail() {
                         })}
                       </p>
                     )}
+                    {outcome ? (
+                      <div className="mt-1 text-[11px] text-muted-foreground">
+                        <span>Grower-recorded outcome</span>
+                        {outcome.recorded_at && (
+                          <span>
+                            {" "}— recorded{" "}
+                            {formatDistanceToNow(new Date(outcome.recorded_at), {
+                              addSuffix: true,
+                            })}
+                          </span>
+                        )}
+                        <div className="text-[10px] opacity-80">Recorded after follow-up</div>
+                        {outcome.note && (
+                          <div className="text-[11px] mt-0.5 opacity-90 break-words">
+                            {outcome.note}
+                          </div>
+                        )}
+                      </div>
+                    ) : isCompleted ? (
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        No outcome recorded yet
+                      </p>
+                    ) : null}
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </section>

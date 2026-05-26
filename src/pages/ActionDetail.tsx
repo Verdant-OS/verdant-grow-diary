@@ -293,12 +293,26 @@ export default function ActionDetail() {
       .limit(1);
     if (!lookupErr && existing && existing.length > 0) {
       // Defensive double-check via pure helper before bailing out.
-      if (followupMatchesAction(existing[0], completed.id)) return;
+      const row = existing[0] as { id: string; details: unknown };
+      if (
+        followupMatchesAction(
+          { details: row.details as { event_type?: unknown; action_queue_id?: unknown } | null },
+          completed.id,
+        )
+      ) {
+        return;
+      }
     }
 
     const { error: insErr } = await supabase
       .from("diary_entries")
-      .insert(draft);
+      .insert({
+        grow_id: draft.grow_id,
+        tent_id: draft.tent_id,
+        plant_id: draft.plant_id,
+        note: draft.note,
+        details: draft.details as unknown as Record<string, unknown>,
+      });
     if (insErr) {
       toast.warning("Action completed, but follow-up note could not be created.", {
         description: insErr.message,

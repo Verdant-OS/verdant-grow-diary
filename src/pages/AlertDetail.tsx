@@ -41,6 +41,11 @@ import {
   hasPendingActionsForClosedAlert,
   isActionDerivedFromAlert,
 } from "@/lib/actionQueueProvenanceRules";
+import {
+  pickLatestOutcomeForAction,
+  type RawOutcomeDiaryRow,
+} from "@/lib/relatedActionOutcomeRules";
+import { ACTION_OUTCOME_EVENT_TYPE } from "@/lib/actionOutcomeRules";
 
 import { supabase } from "@/integrations/supabase/client";
 

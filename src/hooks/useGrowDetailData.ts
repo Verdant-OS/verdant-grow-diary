@@ -106,6 +106,7 @@ export function useGrowDetailData(): UseGrowDetailData {
   const [notFound, setNotFound] = useState(false);
   const [counts, setCounts] = useState<GrowCounts>(EMPTY_COUNTS);
   const [recent, setRecent] = useState<RecentState>({ status: "loading" });
+  const [outcomes, setOutcomes] = useState<GrowOutcomesState>(EMPTY_GROW_OUTCOMES_STATE);
   const [status, setStatus] = useState<GrowStatus>({
     level: "good",
     reason: "Loading…",

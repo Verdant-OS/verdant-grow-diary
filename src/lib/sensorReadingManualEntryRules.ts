@@ -155,6 +155,12 @@ export interface ManualReadingPayload {
   source: "manual";
   ts: string;
   quality: "ok";
+  /**
+   * Optional `manual:<note>` device id capturing where the grower took
+   * the reading (e.g. SwitchBot CO2 Monitor). Omitted when absent so
+   * the column stays null. Never makes the reading appear live.
+   */
+  device_id?: string;
 }
 
 /**
@@ -166,14 +172,24 @@ export function buildManualReadingPayloads(args: {
   tentId: string;
   metrics: ManualReadingMetric[];
   ts?: string;
+  /** Optional grower-entered device/source note (e.g. "SwitchBot CO2 Monitor"). */
+  deviceNote?: string | null;
 }): ManualReadingPayload[] {
   const ts = args.ts ?? new Date().toISOString();
-  return args.metrics.map((m) => ({
-    tent_id: args.tentId,
-    metric: m.metric,
-    value: m.value,
-    source: "manual",
-    ts,
-    quality: "ok",
-  }));
+  // Lazy require to keep this file free of circular imports at module load.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { buildManualDeviceId } = require("@/lib/manualSensorSourceLabel") as typeof import("@/lib/manualSensorSourceLabel");
+  const deviceId = buildManualDeviceId(args.deviceNote ?? null);
+  return args.metrics.map((m) => {
+    const row: ManualReadingPayload = {
+      tent_id: args.tentId,
+      metric: m.metric,
+      value: m.value,
+      source: "manual",
+      ts,
+      quality: "ok",
+    };
+    if (deviceId) row.device_id = deviceId;
+    return row;
+  });
 }

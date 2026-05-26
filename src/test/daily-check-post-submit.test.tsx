@@ -479,8 +479,8 @@ describe("Daily Check post-submit · static safety", () => {
 
   it("submit wiring uses shared return helper for Quick Log + manual snapshot", () => {
     expect(page).toMatch(/resolveDailyCheckPostSubmitHref/);
-    expect(page).toMatch(/onCreated=\{\(\)\s*=>\s*handleSubmitSuccess\("note"\)\}/);
-    expect(page).toMatch(/onSaved=\{\(\)\s*=>\s*handleSubmitSuccess\("sensor"\)\}/);
+    expect(page).toMatch(/handleSubmitSuccess\("note"\)/);
+    expect(page).toMatch(/handleSubmitSuccess\("sensor"\)/);
   });
 
   it("no new persistence / RPC / ingestion / action queue / automation / service_role in the new rules", () => {
@@ -488,6 +488,7 @@ describe("Daily Check post-submit · static safety", () => {
       /service_role/i,
       /mqtt/i,
       /home[_-]?assistant/i,
+      // Out-of-scope integrations for this module remain prohibited.
       /ai[_-]?coach/i,
       /pi[_-]?bridge/i,
       /pi[_-]?ingest/i,

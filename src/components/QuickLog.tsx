@@ -112,10 +112,9 @@ export default function QuickLog({
   ]);
 
   // Auto-pick a sensible event type when adding a photo
-   
   useEffect(() => {
     if (photoFile && eventType === "observation") setEventType("photo");
-  }, [photoFile]);
+  }, [eventType, photoFile]);
 
   const scopedPlants = useMemo(
     () => filterQuickLogPlantOptions(plants, activeGrowId),

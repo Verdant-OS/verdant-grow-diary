@@ -10,11 +10,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export type AlertSeverityRow = "info" | "watch" | "warning" | "critical";
-export type AlertStatusRow =
-  | "open"
-  | "acknowledged"
-  | "resolved"
-  | "dismissed";
+export type AlertStatusRow = "open" | "acknowledged" | "resolved" | "dismissed";
 
 export interface AlertRow {
   id: string;
@@ -47,10 +43,8 @@ export interface SaveAlertInput {
   plant_id?: string | null;
 }
 
-// The Supabase types file is regenerated after this migration; until then we
-// access the table through an untyped client. RLS still enforces ownership.
-function alertsTable(): any {
-  return (supabase as any).from("alerts");
+function alertsTable() {
+  return supabase.from("alerts");
 }
 
 /** Persist a generated alert candidate. Omits user_id (DB default = auth.uid()). */
@@ -66,10 +60,7 @@ export async function saveAlert(input: SaveAlertInput): Promise<AlertRow> {
     plant_id: input.plant_id ?? null,
     status: "open" as AlertStatusRow,
   };
-  const { data, error } = await alertsTable()
-    .insert(payload)
-    .select("*")
-    .single();
+  const { data, error } = await alertsTable().insert(payload).select("*").single();
   if (error) throw error;
   return data as unknown as AlertRow;
 }
@@ -134,10 +125,7 @@ export async function reopenAlert(id: string): Promise<AlertRow> {
 
 /** Read a single alert by id. RLS enforces ownership. */
 export async function getAlertById(id: string): Promise<AlertRow | null> {
-  const { data, error } = await alertsTable()
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
+  const { data, error } = await alertsTable().select("*").eq("id", id).maybeSingle();
   if (error) throw error;
   return (data ?? null) as AlertRow | null;
 }
@@ -149,9 +137,7 @@ export interface AlertsQuery {
 }
 
 export async function listAlerts(query: AlertsQuery = {}): Promise<AlertRow[]> {
-  let q = alertsTable()
-    .select("*")
-    .order("first_seen_at", { ascending: false });
+  let q = alertsTable().select("*").order("first_seen_at", { ascending: false });
   if (query.growId) q = q.eq("grow_id", query.growId);
   if (query.status && query.status !== "all") q = q.eq("status", query.status);
   if (query.severity && query.severity !== "all") {
@@ -166,12 +152,7 @@ export async function listAlerts(query: AlertsQuery = {}): Promise<AlertRow[]> {
 // Alert events — immutable audit trail (append-only)
 // ---------------------------------------------------------------------------
 
-export type AlertEventType =
-  | "created"
-  | "acknowledged"
-  | "resolved"
-  | "dismissed"
-  | "reopened";
+export type AlertEventType = "created" | "acknowledged" | "resolved" | "dismissed" | "reopened";
 
 export interface AlertEventRow {
   id: string;
@@ -194,17 +175,15 @@ export interface LogAlertEventInput {
   note?: string | null;
 }
 
-function alertEventsTable(): any {
-  return (supabase as any).from("alert_events");
+function alertEventsTable() {
+  return supabase.from("alert_events");
 }
 
 /**
  * Append an immutable audit row. user_id is intentionally omitted; the DB
  * default (auth.uid()) plus RLS enforce ownership. Never updates or deletes.
  */
-export async function logAlertEvent(
-  input: LogAlertEventInput,
-): Promise<AlertEventRow> {
+export async function logAlertEvent(input: LogAlertEventInput): Promise<AlertEventRow> {
   const payload = {
     alert_id: input.alert_id,
     grow_id: input.grow_id,
@@ -213,19 +192,13 @@ export async function logAlertEvent(
     new_status: input.new_status ?? null,
     note: input.note ?? null,
   };
-  const { data, error } = await alertEventsTable()
-    .insert(payload)
-    .select("*")
-    .single();
+  const { data, error } = await alertEventsTable().insert(payload).select("*").single();
   if (error) throw error;
   return data as unknown as AlertEventRow;
 }
 
 /** Read recent audit events for an alert (newest first). RLS enforces ownership. */
-export async function listAlertEvents(
-  alertId: string,
-  limit = 20,
-): Promise<AlertEventRow[]> {
+export async function listAlertEvents(alertId: string, limit = 20): Promise<AlertEventRow[]> {
   const { data, error } = await alertEventsTable()
     .select("*")
     .eq("alert_id", alertId)

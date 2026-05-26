@@ -10,38 +10,28 @@ vi.mock("@/lib/growRepo", () => ({
 }));
 
 import * as repo from "@/lib/growRepo";
-import {
-  validateSensorReadingBatch,
-  VALID_SENSOR_SOURCES,
-} from "@/hooks/useInsertSensorReadings";
+import type { SensorReadingInsert } from "@/lib/db";
+import { validateSensorReadingBatch, VALID_SENSOR_SOURCES } from "@/hooks/useInsertSensorReadings";
 
-const goodRow = {
+const goodRow: SensorReadingInsert = {
   tent_id: "11111111-1111-1111-1111-111111111111",
   metric: "temperature_c",
   value: 22.5,
   source: "manual",
-} as any;
+  ts: "2026-05-23T12:00:00.000Z",
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
-const repoSrc = readFileSync(
-  resolve(process.cwd(), "src/lib/growRepo.ts"),
-  "utf8",
-);
+const repoSrc = readFileSync(resolve(process.cwd(), "src/lib/growRepo.ts"), "utf8");
 const hookSrc = readFileSync(
   resolve(process.cwd(), "src/hooks/useInsertSensorReadings.ts"),
   "utf8",
 );
-const typesSrc = readFileSync(
-  resolve(process.cwd(), "src/integrations/supabase/types.ts"),
-  "utf8",
-);
-const snapshotSrc = readFileSync(
-  resolve(process.cwd(), "src/lib/sensorSnapshot.ts"),
-  "utf8",
-);
+const typesSrc = readFileSync(resolve(process.cwd(), "src/integrations/supabase/types.ts"), "utf8");
+const snapshotSrc = readFileSync(resolve(process.cwd(), "src/lib/sensorSnapshot.ts"), "utf8");
 const persistenceSrc = readFileSync(
   resolve(process.cwd(), "src/lib/environmentAlertPersistence.ts"),
   "utf8",
@@ -57,9 +47,7 @@ describe("sensor_readings new nullable columns (generated types)", () => {
 
 describe("source whitelist is unchanged", () => {
   it("only allows manual, pi_bridge, sim", () => {
-    expect([...VALID_SENSOR_SOURCES].sort()).toEqual(
-      ["manual", "pi_bridge", "sim"].sort(),
-    );
+    expect([...VALID_SENSOR_SOURCES].sort()).toEqual(["manual", "pi_bridge", "sim"].sort());
   });
 });
 
@@ -73,27 +61,20 @@ describe("validateSensorReadingBatch", () => {
     ).not.toThrow();
   });
   it("rejects entire batch when one row has invalid metric", () => {
-    expect(() =>
-      validateSensorReadingBatch([goodRow, { ...goodRow, metric: "bogus" }]),
-    ).toThrow(/batch row 1/);
+    expect(() => validateSensorReadingBatch([goodRow, { ...goodRow, metric: "bogus" }])).toThrow(
+      /batch row 1/,
+    );
   });
   it("rejects entire batch when one row has invalid source", () => {
-    expect(() =>
-      validateSensorReadingBatch([
-        goodRow,
-        { ...goodRow, source: "mqtt" },
-      ]),
-    ).toThrow(/invalid source/);
+    expect(() => validateSensorReadingBatch([goodRow, { ...goodRow, source: "mqtt" }])).toThrow(
+      /invalid source/,
+    );
   });
   it("rejects when tent_id is missing", () => {
-    expect(() =>
-      validateSensorReadingBatch([{ ...goodRow, tent_id: "" }]),
-    ).toThrow(/tent_id/);
+    expect(() => validateSensorReadingBatch([{ ...goodRow, tent_id: "" }])).toThrow(/tent_id/);
   });
   it("rejects when value is not finite", () => {
-    expect(() =>
-      validateSensorReadingBatch([{ ...goodRow, value: Number.NaN }]),
-    ).toThrow(/finite/);
+    expect(() => validateSensorReadingBatch([{ ...goodRow, value: Number.NaN }])).toThrow(/finite/);
   });
 });
 
@@ -101,9 +82,7 @@ describe("batch helper write surface", () => {
   it("repo helper only writes to sensor_readings table", () => {
     // Source check: insertSensorReadingsBatch must only reference
     // sensor_readings table, never other tables.
-    const fn = repoSrc.match(
-      /export async function insertSensorReadingsBatch[\s\S]*?\n\}/,
-    )?.[0];
+    const fn = repoSrc.match(/export async function insertSensorReadingsBatch[\s\S]*?\n\}/)?.[0];
     expect(fn).toBeTruthy();
     expect(fn).toMatch(/\.from\("sensor_readings"\)/);
     // No other .from() calls inside the function body

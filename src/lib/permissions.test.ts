@@ -1,4 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type {
+  DiaryEntryInsert,
+  DiaryEntryUpdate,
+  GrowInsert,
+  GrowRow,
+  GrowUpdate,
+  HarvestInsert,
+  UserRoleInsert,
+} from "@/lib/db";
 
 /* ------------------------------------------------------------------ */
 //  Mocks
@@ -28,16 +37,16 @@ vi.mock("@/lib/db", async () => {
     fetchUserRoles: vi.fn(async () => [] as string[]),
     fetchGrowRow: vi.fn(),
     fetchGrowRows: vi.fn(async () => []),
-    insertGrowRow: vi.fn(async (row: any) => ({ ...row, id: "g-new" })),
-    updateGrowRow: vi.fn(async (id: string, patch: any) => ({ id, ...patch })),
+    insertGrowRow: vi.fn(async (row: GrowInsert) => ({ ...row, id: "g-new" })),
+    updateGrowRow: vi.fn(async (id: string, patch: GrowUpdate) => ({ id, ...patch })),
     archiveGrow: vi.fn(async () => undefined),
     fetchDiaryEntryRows: vi.fn(async () => []),
-    insertDiaryEntryRow: vi.fn(async (row: any) => ({ ...row, id: "d-new" })),
-    updateDiaryEntryRow: vi.fn(async (id: string, patch: any) => ({ id, ...patch })),
+    insertDiaryEntryRow: vi.fn(async (row: DiaryEntryInsert) => ({ ...row, id: "d-new" })),
+    updateDiaryEntryRow: vi.fn(async (id: string, patch: DiaryEntryUpdate) => ({ id, ...patch })),
     deleteDiaryEntry: vi.fn(async () => undefined),
     fetchHarvestRows: vi.fn(async () => []),
-    insertHarvestRow: vi.fn(async (row: any) => ({ ...row, id: "h-new" })),
-    assignRole: vi.fn(async (row: any) => ({ ...row, id: "r-new" })),
+    insertHarvestRow: vi.fn(async (row: HarvestInsert) => ({ ...row, id: "h-new" })),
+    assignRole: vi.fn(async (row: UserRoleInsert) => ({ ...row, id: "r-new" })),
   };
 });
 
@@ -65,6 +74,8 @@ import {
 const callerOf = (userId: string, roles: ("operator" | "customer")[] = []): Caller =>
   Object.freeze({ userId, roles: new Set(roles) });
 
+const growRow = (row: Pick<GrowRow, "id" | "user_id">): GrowRow => row as unknown as GrowRow;
+
 beforeEach(() => {
   authState.user = { id: "u-self" };
   authState.error = null;
@@ -77,7 +88,7 @@ beforeEach(() => {
 /* ------------------------------------------------------------------ */
 describe("resolveCaller", () => {
   it("returns userId + roles for a signed-in user", async () => {
-    (db.fetchUserRoles as any).mockResolvedValue(["operator"]);
+    vi.mocked(db.fetchUserRoles).mockResolvedValue(["operator"]);
     const caller = await resolveCaller();
     expect(caller.userId).toBe("u-self");
     expect(caller.roles.has("operator")).toBe(true);
@@ -127,25 +138,25 @@ describe("grow guards", () => {
   });
 
   it("getGrowForCaller returns null when row missing", async () => {
-    (db.fetchGrowRow as any).mockResolvedValue(null);
+    vi.mocked(db.fetchGrowRow).mockResolvedValue(null);
     expect(await getGrowForCaller(callerOf("u-self"), "g1")).toBeNull();
   });
 
   it("getGrowForCaller returns row for owner", async () => {
-    (db.fetchGrowRow as any).mockResolvedValue({ id: "g1", user_id: "u-self" });
+    vi.mocked(db.fetchGrowRow).mockResolvedValue(growRow({ id: "g1", user_id: "u-self" }));
     const r = await getGrowForCaller(callerOf("u-self"), "g1");
     expect(r?.id).toBe("g1");
   });
 
   it("getGrowForCaller blocks non-owner non-operator", async () => {
-    (db.fetchGrowRow as any).mockResolvedValue({ id: "g1", user_id: "u-other" });
+    vi.mocked(db.fetchGrowRow).mockResolvedValue(growRow({ id: "g1", user_id: "u-other" }));
     await expect(getGrowForCaller(callerOf("u-self"), "g1")).rejects.toMatchObject({
       code: "forbidden",
     });
   });
 
   it("getGrowForCaller allows operator on other-user row", async () => {
-    (db.fetchGrowRow as any).mockResolvedValue({ id: "g1", user_id: "u-other" });
+    vi.mocked(db.fetchGrowRow).mockResolvedValue(growRow({ id: "g1", user_id: "u-other" }));
     const r = await getGrowForCaller(callerOf("u-self", ["operator"]), "g1");
     expect(r?.id).toBe("g1");
   });
@@ -155,14 +166,14 @@ describe("grow guards", () => {
       name: "G",
       grow_type: "tent",
       stage: "veg",
-    } as any);
+    } satisfies Omit<GrowInsert, "user_id">);
     expect(db.insertGrowRow).toHaveBeenCalledWith(
       expect.objectContaining({ name: "G", user_id: "u-self" }),
     );
   });
 
   it("updateGrowForCaller blocks non-owner", async () => {
-    (db.fetchGrowRow as any).mockResolvedValue({ id: "g1", user_id: "u-other" });
+    vi.mocked(db.fetchGrowRow).mockResolvedValue(growRow({ id: "g1", user_id: "u-other" }));
     await expect(
       updateGrowForCaller(callerOf("u-self"), "g1", { name: "X" }),
     ).rejects.toMatchObject({ code: "forbidden" });
@@ -170,26 +181,26 @@ describe("grow guards", () => {
   });
 
   it("updateGrowForCaller strips user_id from the patch", async () => {
-    (db.fetchGrowRow as any).mockResolvedValue({ id: "g1", user_id: "u-self" });
+    vi.mocked(db.fetchGrowRow).mockResolvedValue(growRow({ id: "g1", user_id: "u-self" }));
     await updateGrowForCaller(callerOf("u-self"), "g1", {
       name: "X",
       user_id: "u-evil",
-    } as any);
-    const [, patch] = (db.updateGrowRow as any).mock.calls[0];
+    } satisfies GrowUpdate);
+    const [, patch] = vi.mocked(db.updateGrowRow).mock.calls[0];
     expect(patch).toEqual({ name: "X" });
     expect(patch).not.toHaveProperty("user_id");
   });
 
   it("archiveGrowForCaller blocks non-owner", async () => {
-    (db.fetchGrowRow as any).mockResolvedValue({ id: "g1", user_id: "u-other" });
-    await expect(
-      archiveGrowForCaller(callerOf("u-self"), "g1"),
-    ).rejects.toMatchObject({ code: "forbidden" });
+    vi.mocked(db.fetchGrowRow).mockResolvedValue(growRow({ id: "g1", user_id: "u-other" }));
+    await expect(archiveGrowForCaller(callerOf("u-self"), "g1")).rejects.toMatchObject({
+      code: "forbidden",
+    });
     expect(db.archiveGrow).not.toHaveBeenCalled();
   });
 
   it("archiveGrowForCaller archives when owner", async () => {
-    (db.fetchGrowRow as any).mockResolvedValue({ id: "g1", user_id: "u-self" });
+    vi.mocked(db.fetchGrowRow).mockResolvedValue(growRow({ id: "g1", user_id: "u-self" }));
     await archiveGrowForCaller(callerOf("u-self"), "g1");
     expect(db.archiveGrow).toHaveBeenCalledWith("g1");
   });
@@ -203,7 +214,7 @@ describe("diary guards", () => {
     await createDiaryEntryForCaller(callerOf("u-self"), {
       grow_id: "g1",
       note: "hi",
-    } as any);
+    } satisfies Omit<DiaryEntryInsert, "user_id">);
     expect(db.insertDiaryEntryRow).toHaveBeenCalledWith(
       expect.objectContaining({ user_id: "u-self", note: "hi" }),
     );
@@ -220,10 +231,10 @@ describe("diary guards", () => {
     await updateDiaryEntryForCaller(
       callerOf("u-self"),
       "d1",
-      { note: "x", user_id: "u-evil" } as any,
+      { note: "x", user_id: "u-evil" } satisfies DiaryEntryUpdate,
       "u-self",
     );
-    const [, patch] = (db.updateDiaryEntryRow as any).mock.calls[0];
+    const [, patch] = vi.mocked(db.updateDiaryEntryRow).mock.calls[0];
     expect(patch).not.toHaveProperty("user_id");
   });
 
@@ -241,7 +252,7 @@ describe("harvest guards", () => {
     await createHarvestForCaller(callerOf("u-self"), {
       grow_id: "g1",
       grow_type: "tent",
-    } as any);
+    } satisfies Omit<HarvestInsert, "user_id">);
     expect(db.insertHarvestRow).toHaveBeenCalledWith(
       expect.objectContaining({ user_id: "u-self" }),
     );
@@ -260,11 +271,7 @@ describe("operator-only guards", () => {
   });
 
   it("moderatePlantAsOperator runs for operator", async () => {
-    await moderatePlantAsOperator(
-      callerOf("u-self", ["operator"]),
-      "p1",
-      { health: "watch" },
-    );
+    await moderatePlantAsOperator(callerOf("u-self", ["operator"]), "p1", { health: "watch" });
     expect(updateMock).toHaveBeenCalledWith({ health: "watch" });
   });
 

@@ -109,12 +109,7 @@ describe("filterDashboardDailyGrowCheckRows · pure rules", () => {
     ]);
     // Filtering preserves the original order.
     const out = filterDashboardDailyGrowCheckRows(panel.rows, "all");
-    expect(out.map((r) => r.plantId)).toEqual([
-      "p-needs",
-      "p-note",
-      "p-snap",
-      "p-both",
-    ]);
+    expect(out.map((r) => r.plantId)).toEqual(["p-needs", "p-note", "p-snap", "p-both"]);
   });
 
   it("returns [] when no rows match the filter (used to show empty state)", () => {
@@ -184,21 +179,30 @@ function PanelHarness() {
   return <DashboardDailyGrowCheckPanel scopedGrowId={null} />;
 }
 
+interface ElementPrototypeWithPointerCapture {
+  hasPointerCapture?: () => boolean;
+  setPointerCapture?: () => void;
+  releasePointerCapture?: () => void;
+  scrollIntoView?: () => void;
+}
+
+const elementPrototype = Element.prototype as unknown as ElementPrototypeWithPointerCapture;
+
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
   // jsdom shims for Radix Select pointer capture.
-  if (!(Element.prototype as any).hasPointerCapture) {
-    (Element.prototype as any).hasPointerCapture = () => false;
+  if (!elementPrototype.hasPointerCapture) {
+    elementPrototype.hasPointerCapture = () => false;
   }
-  if (!(Element.prototype as any).setPointerCapture) {
-    (Element.prototype as any).setPointerCapture = () => {};
+  if (!elementPrototype.setPointerCapture) {
+    elementPrototype.setPointerCapture = () => {};
   }
-  if (!(Element.prototype as any).releasePointerCapture) {
-    (Element.prototype as any).releasePointerCapture = () => {};
+  if (!elementPrototype.releasePointerCapture) {
+    elementPrototype.releasePointerCapture = () => {};
   }
-  if (!(Element.prototype as any).scrollIntoView) {
-    (Element.prototype as any).scrollIntoView = () => {};
+  if (!elementPrototype.scrollIntoView) {
+    elementPrototype.scrollIntoView = () => {};
   }
 });
 
@@ -208,9 +212,7 @@ function changeFilter(value: string) {
   const trigger = screen.getByTestId("dashboard-daily-grow-check-panel-filter");
   fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false });
   fireEvent.click(trigger);
-  const option = screen.getByTestId(
-    `dashboard-daily-grow-check-panel-filter-option-${value}`,
-  );
+  const option = screen.getByTestId(`dashboard-daily-grow-check-panel-filter-option-${value}`);
   fireEvent.click(option);
 }
 
@@ -219,13 +221,11 @@ describe("DashboardDailyGrowCheckPanel filter UI", () => {
     renderPanel();
     const rows = screen.getAllByTestId("dashboard-daily-grow-check-panel-row");
     expect(rows).toHaveLength(4);
+    expect(screen.getByTestId("dashboard-daily-grow-check-panel-summary").textContent).toBe(
+      "Checked 3 of 4 plants today",
+    );
     expect(
-      screen.getByTestId("dashboard-daily-grow-check-panel-summary").textContent,
-    ).toBe("Checked 3 of 4 plants today");
-    expect(
-      screen
-        .getByTestId("dashboard-daily-grow-check-panel-filter")
-        .getAttribute("data-filter"),
+      screen.getByTestId("dashboard-daily-grow-check-panel-filter").getAttribute("data-filter"),
     ).toBe("all");
   });
 
@@ -235,9 +235,9 @@ describe("DashboardDailyGrowCheckPanel filter UI", () => {
     const rows = screen.getAllByTestId("dashboard-daily-grow-check-panel-row");
     expect(rows).toHaveLength(1);
     expect(rows[0].getAttribute("data-plant-id")).toBe("p-needs");
-    expect(
-      screen.getByTestId("dashboard-daily-grow-check-panel-summary").textContent,
-    ).toBe("Checked 3 of 4 plants today");
+    expect(screen.getByTestId("dashboard-daily-grow-check-panel-summary").textContent).toBe(
+      "Checked 3 of 4 plants today",
+    );
   });
 
   it("'checked by note' filter shows only note-method plants", () => {
@@ -294,9 +294,7 @@ describe("DashboardDailyGrowCheckPanel filter empty state", () => {
         ],
       }),
     }));
-    const { default: Panel } = await import(
-      "@/components/DashboardDailyGrowCheckPanel"
-    );
+    const { default: Panel } = await import("@/components/DashboardDailyGrowCheckPanel");
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={qc}>
@@ -306,23 +304,16 @@ describe("DashboardDailyGrowCheckPanel filter empty state", () => {
       </QueryClientProvider>,
     );
     // 1 row by default.
-    expect(
-      screen.getAllByTestId("dashboard-daily-grow-check-panel-row"),
-    ).toHaveLength(1);
+    expect(screen.getAllByTestId("dashboard-daily-grow-check-panel-row")).toHaveLength(1);
     // Switch to 'needs' → no matches.
     const trigger = screen.getByTestId("dashboard-daily-grow-check-panel-filter");
     fireEvent.pointerDown(trigger, { button: 0 });
     fireEvent.click(trigger);
-    fireEvent.click(
-      screen.getByTestId("dashboard-daily-grow-check-panel-filter-option-needs"),
+    fireEvent.click(screen.getByTestId("dashboard-daily-grow-check-panel-filter-option-needs"));
+    expect(screen.queryAllByTestId("dashboard-daily-grow-check-panel-row")).toHaveLength(0);
+    expect(screen.getByTestId("dashboard-daily-grow-check-panel-filter-empty").textContent).toBe(
+      DASHBOARD_DAILY_GROW_CHECK_FILTER_EMPTY,
     );
-    expect(
-      screen.queryAllByTestId("dashboard-daily-grow-check-panel-row"),
-    ).toHaveLength(0);
-    expect(
-      screen.getByTestId("dashboard-daily-grow-check-panel-filter-empty")
-        .textContent,
-    ).toBe(DASHBOARD_DAILY_GROW_CHECK_FILTER_EMPTY);
   });
 });
 
@@ -335,9 +326,7 @@ describe("safety — filter surfaces do not introduce unsafe writes", () => {
   ];
   it.each(files)("%s contains no unsafe surfaces or forbidden wording", (rel) => {
     const txt = readFileSync(resolve(__dirname, "..", rel), "utf-8");
-    const stripped = txt
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/^\s*\/\/.*$/gm, "");
+    const stripped = txt.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
     expect(stripped).not.toMatch(/service_role/);
     expect(stripped).not.toMatch(/\.rpc\(/);
     expect(stripped).not.toMatch(/sensor_readings.*\.insert\(/);

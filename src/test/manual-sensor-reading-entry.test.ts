@@ -8,6 +8,7 @@ import {
   validateManualEntry,
 } from "@/lib/sensorReadingManualEntryRules";
 import { typedWateringWriteEnabled } from "@/lib/featureFlags";
+import type { SensorSnapshot } from "@/lib/sensorSnapshot";
 import { findMatches } from "./testFileSearchRules";
 
 describe("sensorReadingManualEntryRules — pure validation", () => {
@@ -100,7 +101,9 @@ describe("hook + save side effects", () => {
   });
 
   it("invalidates sensor query keys on success and forwards payload without user_id", async () => {
-    vi.doMock("@/lib/growRepo", () => ({ insertSensorReading: vi.fn().mockResolvedValue(undefined) }));
+    vi.doMock("@/lib/growRepo", () => ({
+      insertSensorReading: vi.fn().mockResolvedValue(undefined),
+    }));
     const repo = await import("@/lib/growRepo");
     const { QueryClient, QueryClientProvider } = await import("@tanstack/react-query");
     const React = (await import("react")).default;
@@ -118,11 +121,12 @@ describe("hook + save side effects", () => {
     const [payload] = buildManualReadingPayloads({ tentId: "tent-1", metrics: v.metrics });
 
     const { result } = renderHook(() => useInsertSensorReading(), { wrapper });
-    result.current.mutate(payload as any);
+    result.current.mutate(payload);
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect((repo.insertSensorReading as any).mock.calls[0][0]).toEqual(payload);
-    expect("user_id" in (repo.insertSensorReading as any).mock.calls[0][0]).toBe(false);
+    const [insertedPayload] = vi.mocked(repo.insertSensorReading).mock.calls[0] as [typeof payload];
+    expect(insertedPayload).toEqual(payload);
+    expect("user_id" in insertedPayload).toBe(false);
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["grow", "sensors"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["sensor_readings"] });
   });
@@ -151,10 +155,7 @@ describe("safety — manual sensor form does not write to other systems", () => 
   });
 
   it("no runtime UI code calls create_watering_event", () => {
-    const hits = findMatches(
-      ["src/components", "src/pages", "src/hooks"],
-      "create_watering_event",
-    );
+    const hits = findMatches(["src/components", "src/pages", "src/hooks"], "create_watering_event");
     expect(hits).toEqual([]);
   });
 });
@@ -184,8 +185,21 @@ describe("Dashboard latest-snapshot consumption of manual readings", () => {
   it("environment alert persistence accepts manual but rejects demo source", async () => {
     const { isSnapshotPersistable } = await import("@/lib/environmentAlertPersistence");
     const ts = new Date().toISOString();
-    const manualSnap = { source: "manual", ts, temp: 24, rh: 55, vpd: null, co2: null, soil: null, soil_ec: null, soil_temp: null, ppfd: null } as any;
+    const manualSnap: SensorSnapshot = {
+      source: "manual",
+      ts,
+      temp: 24,
+      rh: 55,
+      vpd: null,
+      co2: null,
+      soil: null,
+      soil_ec: null,
+      soil_temp: null,
+      ppfd: null,
+    };
     expect(isSnapshotPersistable({ snapshot: manualSnap, quality: "good" })).toBe(true);
-    expect(isSnapshotPersistable({ snapshot: manualSnap, quality: "good", isDemoData: true })).toBe(false);
+    expect(isSnapshotPersistable({ snapshot: manualSnap, quality: "good", isDemoData: true })).toBe(
+      false,
+    );
   });
 });

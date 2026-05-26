@@ -39,7 +39,7 @@ beforeEach(() => {
 describe("useGrowTents", () => {
   it("returns supabase rows on happy path", async () => {
     const live = [{ ...tents[0], id: "live-1", name: "Live" }];
-    (repo.fetchTents as any).mockResolvedValue(live);
+    vi.mocked(repo.fetchTents).mockResolvedValue(live);
     const { result } = renderHook(() => useGrowTents(), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.[0].id).toBe("live-1");
@@ -47,7 +47,7 @@ describe("useGrowTents", () => {
   });
 
   it("falls back to mock on supabase error", async () => {
-    (repo.fetchTents as any).mockRejectedValue(new Error("boom"));
+    vi.mocked(repo.fetchTents).mockRejectedValue(new Error("boom"));
     const { result } = renderHook(() => useGrowTents(), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(tents);
@@ -56,7 +56,7 @@ describe("useGrowTents", () => {
   });
 
   it("falls back to mock on empty result", async () => {
-    (repo.fetchTents as any).mockResolvedValue([]);
+    vi.mocked(repo.fetchTents).mockResolvedValue([]);
     const { result } = renderHook(() => useGrowTents(), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(tents);
@@ -66,14 +66,14 @@ describe("useGrowTents", () => {
 
 describe("useGrowPlants", () => {
   it("filters mock by tentId on fallback", async () => {
-    (repo.fetchPlants as any).mockRejectedValue(new Error("nope"));
+    vi.mocked(repo.fetchPlants).mockRejectedValue(new Error("nope"));
     const { result } = renderHook(() => useGrowPlants("t1"), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.every((p) => p.tentId === "t1")).toBe(true);
   });
 
   it("returns all mock plants when no tentId on fallback", async () => {
-    (repo.fetchPlants as any).mockResolvedValue([]);
+    vi.mocked(repo.fetchPlants).mockResolvedValue([]);
     const { result } = renderHook(() => useGrowPlants(), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(plants);
@@ -82,7 +82,7 @@ describe("useGrowPlants", () => {
 
 describe("useGrowSensorReadings", () => {
   it("filters mock by tentId on fallback", async () => {
-    (repo.fetchSensorReadings as any).mockRejectedValue(new Error("x"));
+    vi.mocked(repo.fetchSensorReadings).mockRejectedValue(new Error("x"));
     const { result } = renderHook(() => useGrowSensorReadings("t2"), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.length).toBeGreaterThan(0);
@@ -90,8 +90,10 @@ describe("useGrowSensorReadings", () => {
   });
 
   it("returns live data when repo returns non-empty", async () => {
-    const live = [{ ts: "2026-01-01T00:00:00Z", tentId: "t1", temp: 22, rh: 50, vpd: 1, co2: 800, soil: 40 }];
-    (repo.fetchSensorReadings as any).mockResolvedValue(live);
+    const live = [
+      { ts: "2026-01-01T00:00:00Z", tentId: "t1", temp: 22, rh: 50, vpd: 1, co2: 800, soil: 40 },
+    ];
+    vi.mocked(repo.fetchSensorReadings).mockResolvedValue(live);
     const { result } = renderHook(() => useGrowSensorReadings("t1"), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(live);
@@ -101,7 +103,7 @@ describe("useGrowSensorReadings", () => {
 
 describe("useGrowTent / useGrowPlant", () => {
   it("useGrowTent falls back to mock match on error", async () => {
-    (repo.fetchTent as any).mockRejectedValue(new Error("nope"));
+    vi.mocked(repo.fetchTent).mockRejectedValue(new Error("nope"));
     const { result } = renderHook(() => useGrowTent("t1"), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.id).toBe("t1");
@@ -114,14 +116,14 @@ describe("useGrowTent / useGrowPlant", () => {
   });
 
   it("useGrowPlant returns null fallback when id not in mock", async () => {
-    (repo.fetchPlant as any).mockRejectedValue(new Error("nope"));
+    vi.mocked(repo.fetchPlant).mockRejectedValue(new Error("nope"));
     const { result } = renderHook(() => useGrowPlant("does-not-exist"), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toBeNull();
   });
 
   it("useGrowPlant returns supabase row on success", async () => {
-    (repo.fetchPlant as any).mockResolvedValue({ ...plants[0], id: "live-p", name: "Live P" });
+    vi.mocked(repo.fetchPlant).mockResolvedValue({ ...plants[0], id: "live-p", name: "Live P" });
     const { result } = renderHook(() => useGrowPlant("live-p"), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.name).toBe("Live P");

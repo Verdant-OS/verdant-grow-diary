@@ -18,6 +18,14 @@ export interface SensorSnapshot {
   soil_ec: number | null;
   soil_temp: number | null;
   ppfd: number | null;
+  /**
+   * Raw `device_id` from the contributing sensor row (when one is
+   * available). Display surfaces pair this with `source` via
+   * `formatSensorSourceLabel` to render labels like
+   * "Manual reading · SwitchBot CO2 Monitor" without ever upgrading
+   * a manual row to live.
+   */
+  device_id?: string | null;
 }
 
 export const EMPTY_SNAPSHOT: SensorSnapshot = {
@@ -31,6 +39,7 @@ export const EMPTY_SNAPSHOT: SensorSnapshot = {
   soil_ec: null,
   soil_temp: null,
   ppfd: null,
+  device_id: null,
 };
 
 /** Coerce numeric DB values; returns null for null/undefined/NaN/Infinity. */
@@ -95,6 +104,12 @@ export function snapshotFromReadings(
     : allSim
       ? "sim"
       : "live";
+  // Prefer a device_id from a row matching the resolved source so manual
+  // device notes (device_id = "manual:...") are surfaced for manual
+  // snapshots; otherwise fall back to any device_id at the latest ts.
+  const deviceRow =
+    latest.find((r) => r.source === source && !!r.device_id) ??
+    latest.find((r) => !!r.device_id);
   return {
     source,
     ts: latestTs,
@@ -106,6 +121,7 @@ export function snapshotFromReadings(
     soil_ec: get("soil_ec"),
     soil_temp: get("soil_temp_c"),
     ppfd: get("ppfd"),
+    device_id: deviceRow?.device_id ?? null,
   };
 }
 
@@ -131,6 +147,7 @@ export function snapshotFromDiary(
     soil_ec: toFiniteNumber(snap.soil_ec),
     soil_temp: toFiniteNumber(snap.soil_temp),
     ppfd: toFiniteNumber(snap.ppfd),
+    device_id: null,
   };
 }
 

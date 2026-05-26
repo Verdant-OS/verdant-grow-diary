@@ -120,16 +120,18 @@ export default function PlantDailyGrowCheckHistoryCard({
             Last {HISTORY_DAYS} days · derived from your existing activity.
           </p>
         </div>
-        <Button
-          asChild
-          size="sm"
-          className="gradient-leaf text-primary-foreground shrink-0"
-          data-testid="plant-daily-grow-check-history-cta"
-        >
-          <Link to={`/daily-check?plantId=${plantId}&from=plant-detail`}>
-            Start Daily Grow Check <ArrowRight className="h-4 w-4" />
-          </Link>
-        </Button>
+        {!hideHeaderCta && (
+          <Button
+            asChild
+            size="sm"
+            className="gradient-leaf text-primary-foreground shrink-0"
+            data-testid="plant-daily-grow-check-history-cta"
+          >
+            <Link to={`/daily-check?plantId=${plantId}&from=plant-detail`}>
+              Start Daily Grow Check <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        )}
       </div>
 
       {unassigned && (

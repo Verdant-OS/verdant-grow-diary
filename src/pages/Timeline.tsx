@@ -173,7 +173,7 @@ export default function Timeline() {
   }, [entries]);
 
   const eventCounts = useMemo(() => {
-    const m = { all: entries.length, photo: 0, note: 0, measurement: 0 };
+    const m = { all: entries.length, photo: 0, note: 0, measurement: 0, followup: 0 };
     entries.forEach((e) => entryKinds(e).forEach((k) => { m[k] = (m[k] || 0) + 1; }));
     return m;
   }, [entries]);

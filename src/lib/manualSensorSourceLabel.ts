@@ -67,7 +67,6 @@ export function normalizeManualSourceNote(
   // Anything else (control chars, angle brackets, quotes, backticks, etc.)
   // is stripped.
   const safe = input
-    .replace(/[\u0000-\u001f\u007f]/g, " ")
     .replace(/[^A-Za-z0-9 .,/\-_+&()°²³%]/g, " ")
     .replace(/\s+/g, " ")
     .trim();

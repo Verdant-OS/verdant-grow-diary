@@ -300,10 +300,12 @@ export default function ActionDetail() {
   async function recordOutcome() {
     if (!row || row.status !== "completed" || !outcomeStatus) return;
     setOutcomeBusy(true);
+    const recordedAt = new Date().toISOString();
     const result = buildActionOutcomeDiaryDraft(
       row,
       { outcome_status: outcomeStatus, note: outcomeNote },
       { followup_entry_id: followupEntryId },
+      { recordedAt },
     );
     if (!result.ok) {
       toast.error(
@@ -313,6 +315,27 @@ export default function ActionDetail() {
       return;
     }
     const { draft } = result;
+
+    // Pre-insert idempotency check: query for existing outcome row before insert.
+    const { data: existingRows } = await supabase
+      .from("diary_entries")
+      .select("id,details")
+      .eq("grow_id", draft.grow_id)
+      .contains("details", {
+        event_type: ACTION_OUTCOME_EVENT_TYPE,
+        action_queue_id: row.id,
+        outcome_kind: ACTION_OUTCOME_KIND,
+      })
+      .limit(1);
+    if (existingRows && existingRows.length > 0) {
+      const d = existingRows[0].details as Record<string, unknown> | null;
+      setExistingOutcome({ status: (d?.outcome_status as string) ?? "unknown" });
+      toast.info("Outcome already recorded");
+      setOutcomeBusy(false);
+      setOutcomeDialogOpen(false);
+      return;
+    }
+
     const { error } = await supabase.from("diary_entries").insert({
       grow_id: draft.grow_id,
       tent_id: draft.tent_id,

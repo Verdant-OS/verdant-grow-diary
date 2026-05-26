@@ -155,6 +155,41 @@ describe("actionOutcomeRules — draft includes all fields", () => {
 });
 
 // ---------------------------------------------------------------------------
+// 5b. Deterministic recorded_at from injected timestamp
+// ---------------------------------------------------------------------------
+describe("actionOutcomeRules — deterministic recorded_at", () => {
+  it("uses the injected recordedAt timestamp", () => {
+    const ts = "2026-05-26T12:34:56.789Z";
+    const result = buildActionOutcomeDiaryDraft(
+      baseAction(),
+      baseGrowerInput(),
+      { followup_entry_id: null },
+      { recordedAt: ts },
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.draft.details.recorded_at).toBe(ts);
+  });
+
+  it("falls back to a generated timestamp when recordedAt is null", () => {
+    const result = buildActionOutcomeDiaryDraft(baseAction(), baseGrowerInput(), null, {
+      recordedAt: null,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // Should be a valid ISO string (fallback)
+    expect(result.draft.details.recorded_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it("falls back to a generated timestamp when options are omitted", () => {
+    const result = buildActionOutcomeDiaryDraft(baseAction(), baseGrowerInput());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.draft.details.recorded_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 6. Uses grower note when provided
 // ---------------------------------------------------------------------------
 describe("actionOutcomeRules — grower note", () => {
@@ -322,6 +357,23 @@ describe("ActionDetail — idempotency check", () => {
     expect(ACTION_DETAIL).toContain(ACTION_OUTCOME_EVENT_TYPE);
     expect(ACTION_DETAIL).toContain("outcomeMatchesAction");
     expect(ACTION_DETAIL).toContain("existingOutcome");
+  });
+
+  it("recordOutcome contains a pre-insert contains() lookup before .insert()", () => {
+    const outcomeBlock = ACTION_DETAIL.slice(
+      ACTION_DETAIL.indexOf("async function recordOutcome"),
+      ACTION_DETAIL.indexOf(
+        "setOutcomeBusy(false);\n    setOutcomeDialogOpen(false);\n    setOutcomeStatus",
+      ),
+    );
+    // The pre-insert idempotency check must use .contains() with the outcome fields
+    expect(outcomeBlock).toMatch(/\.contains\(["']details["']/);
+    // It must appear before the .insert() call
+    const containsIdx = outcomeBlock.indexOf(".contains(");
+    const insertIdx = outcomeBlock.indexOf(".insert(");
+    expect(containsIdx).toBeGreaterThan(-1);
+    expect(insertIdx).toBeGreaterThan(-1);
+    expect(containsIdx).toBeLessThan(insertIdx);
   });
 });
 

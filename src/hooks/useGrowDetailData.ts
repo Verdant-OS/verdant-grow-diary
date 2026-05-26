@@ -94,6 +94,7 @@ export interface UseGrowDetailData {
   counts: GrowCounts;
   recent: RecentState;
   status: GrowStatus;
+  outcomes: GrowOutcomesState;
   growId: string | undefined;
 }
 

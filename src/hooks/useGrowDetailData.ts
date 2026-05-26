@@ -332,6 +332,38 @@ export function useGrowDetailData(): UseGrowDetailData {
       setStatus(UNAVAILABLE_STATUS);
     }
 
+    // Recent grower-recorded action outcomes (read-only).
+    // Scoped by grow_id; filtered to action_outcome diary entries.
+    try {
+      const { data: outcomeRows, error: outcomeErr } = await supabase
+        .from("diary_entries")
+        .select("id,entry_at,created_at,note,details")
+        .eq("grow_id", growId)
+        .eq("details->>event_type", "action_outcome")
+        .order("entry_at", { ascending: false })
+        .limit(20);
+      if (outcomeErr) {
+        setOutcomes({
+          status: "unavailable",
+          summary: EMPTY_GROW_OUTCOME_SUMMARY,
+          recent: [],
+        });
+      } else {
+        const rows = (outcomeRows ?? []) as RawGrowOutcomeRow[];
+        setOutcomes({
+          status: "ready",
+          summary: summarizeGrowOutcomes(rows),
+          recent: pickRecentGrowOutcomes(rows, 5),
+        });
+      }
+    } catch {
+      setOutcomes({
+        status: "unavailable",
+        summary: EMPTY_GROW_OUTCOME_SUMMARY,
+        recent: [],
+      });
+    }
+
     setLoading(false);
   }, [user, growId]);
 
@@ -339,5 +371,5 @@ export function useGrowDetailData(): UseGrowDetailData {
     load();
   }, [load]);
 
-  return { grow, loading, notFound, counts, recent, status, growId };
+  return { grow, loading, notFound, counts, recent, status, outcomes, growId };
 }

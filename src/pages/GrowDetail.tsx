@@ -35,7 +35,7 @@ import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
  * No writes. No ai-coach call. No device-control surface.
  */
 export default function GrowDetail() {
-  const { grow, growId, loading, notFound, counts, recent, status } = useGrowDetailData();
+  const { grow, growId, loading, notFound, counts, recent, status, outcomes } = useGrowDetailData();
 
   if (loading) {
     return (

@@ -105,3 +105,44 @@ export function deriveDailyGrowCheckGuidance(
     isPositive: false,
   };
 }
+
+/**
+ * Visible "today has a check entry" confirmation cue for the Daily Grow
+ * Check area. Factual only — never claims health, completion, or success.
+ *
+ * Pure and deterministic. No I/O. Reuses existing derived values
+ * (`todayHasActivity`, `latestAt`) rather than re-deriving activity.
+ */
+export interface DailyGrowCheckRecentActivityCue {
+  shouldShow: boolean;
+  label: string;
+  detail: string | null;
+}
+
+export const RECENT_ACTIVITY_CUE_LABEL = "Today has a Daily Grow Check entry.";
+export const RECENT_ACTIVITY_CUE_DETAIL_PREFIX = "Latest check:";
+
+function formatLatestTime(latestAt: string | null | undefined): string | null {
+  if (!latestAt) return null;
+  const t = Date.parse(latestAt);
+  if (!Number.isFinite(t)) return null;
+  const d = new Date(t);
+  const hh = d.getHours();
+  const mm = d.getMinutes();
+  const h12 = ((hh + 11) % 12) + 1;
+  const ampm = hh >= 12 ? "PM" : "AM";
+  const mmStr = mm < 10 ? `0${mm}` : String(mm);
+  return `${h12}:${mmStr} ${ampm}`;
+}
+
+export function getDailyGrowCheckRecentActivityCue(input: {
+  todayHasActivity: boolean;
+  latestAt?: string | null;
+}): DailyGrowCheckRecentActivityCue {
+  if (!input.todayHasActivity) {
+    return { shouldShow: false, label: RECENT_ACTIVITY_CUE_LABEL, detail: null };
+  }
+  const time = formatLatestTime(input.latestAt);
+  const detail = time ? `${RECENT_ACTIVITY_CUE_DETAIL_PREFIX} ${time}` : null;
+  return { shouldShow: true, label: RECENT_ACTIVITY_CUE_LABEL, detail };
+}

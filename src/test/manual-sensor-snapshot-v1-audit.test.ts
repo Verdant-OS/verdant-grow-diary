@@ -114,7 +114,7 @@ describe("Sensor Context — source labeling", () => {
       new Date(ts).getTime() + 1000,
     );
     expect(view.capturedAt).toBe(ts);
-    expect(view.sourceLabel).toBe("Manual");
+    expect(view.sourceLabel).toBe("Manual reading");
   });
 });
 

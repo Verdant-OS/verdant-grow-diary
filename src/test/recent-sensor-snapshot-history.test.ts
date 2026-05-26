@@ -135,7 +135,7 @@ describe("Sensor Context — latest display remains intact", () => {
     ];
     const view = buildPlantTentEnvironmentView(rows, NOW);
     expect(view.hasReadings).toBe(true);
-    expect(view.sourceLabel).toBe("Manual");
+    expect(view.sourceLabel).toBe("Manual reading");
     expect(view.capturedAt).toBe("2026-05-24T11:00:00Z");
   });
 });

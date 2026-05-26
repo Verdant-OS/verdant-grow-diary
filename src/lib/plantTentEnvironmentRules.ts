@@ -10,11 +10,11 @@
 import {
   snapshotFromReadings,
   isStale,
-  SOURCE_LABEL,
   formatValue,
   type SensorReadingLike,
   type SensorSnapshot,
 } from "@/lib/sensorSnapshot";
+import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
 import { tempFFromC } from "@/lib/temperatureUnits";
 
 export interface PlantTentEnvironmentMetric {
@@ -65,7 +65,10 @@ export function buildPlantTentEnvironmentView(
   return {
     hasReadings: true,
     capturedAt: snap.ts,
-    sourceLabel: SOURCE_LABEL[snap.source] ?? null,
+    sourceLabel: formatSensorSourceLabel({
+      source: snap.source,
+      deviceId: snap.device_id ?? null,
+    }),
     stale: isStale(snap.ts, now),
     metrics: [
       // Stored as Celsius; displayed as Fahrenheit per Verdant convention.

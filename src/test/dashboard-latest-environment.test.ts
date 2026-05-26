@@ -186,7 +186,16 @@ describe("Dashboard — Latest Environment card wiring", () => {
     expect(DASHBOARD).toMatch(/No sensor data yet\./);
     expect(DASHBOARD).toMatch(/Sensor data unavailable\./);
     expect(DASHBOARD).toMatch(/Stale reading/);
-    expect(DASHBOARD).toMatch(/SOURCE_LABEL\[sensorState\.snapshot\.source\]/);
+    // Source label is rendered via the shared formatSensorSourceLabel
+    // helper so manual rows with a device_id can read e.g.
+    // "Manual reading · SwitchBot CO2 Monitor" without ever upgrading
+    // the row to live/synced/connected.
+    expect(DASHBOARD).toMatch(
+      /formatSensorSourceLabel\(\{[\s\S]{0,200}source:\s*sensorState\.snapshot\.source/,
+    );
+    expect(DASHBOARD).toMatch(
+      /deviceId:\s*sensorState\.snapshot\.device_id/,
+    );
   });
 
   it("links to the timeline via logsPath (no dead links)", () => {

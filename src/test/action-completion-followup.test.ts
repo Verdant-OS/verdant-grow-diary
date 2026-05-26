@@ -326,11 +326,13 @@ describe("ActionDetail — follow-up wiring (static)", () => {
 
 describe("Static safety — actionFollowupRules + ActionDetail", () => {
   it("rules module contains no device-control surface or service_role", () => {
-    expect(RULES).not.toMatch(
+    // Strip block + line comments so the safety docstring (which legitimately
+    // names the forbidden surfaces) doesn't trip the scan.
+    const code = RULES.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    expect(code).not.toMatch(
       /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b|service_role/i,
     );
-    // No external control or nutrient-change strings.
-    expect(RULES).not.toMatch(/nutrient|feed strength|ec to|ph to|turn on|turn off|execute/i);
+    expect(code).not.toMatch(/nutrient|feed strength|ec to|ph to|turn on|turn off|execute/i);
   });
 
   it("ActionDetail introduces no device-control surface", () => {

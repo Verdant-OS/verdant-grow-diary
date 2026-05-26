@@ -49,6 +49,11 @@ import {
   isAlertDerived,
   shouldWarnPendingActionHasClosedSourceAlert,
 } from "@/lib/actionQueueProvenanceRules";
+import {
+  ACTION_FOLLOWUP_EVENT_TYPE,
+  buildActionFollowupDiaryDraft,
+  followupMatchesAction,
+} from "@/lib/actionFollowupRules";
 
 
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";

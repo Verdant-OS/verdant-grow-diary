@@ -3,12 +3,9 @@
  *
  * Compares the value the grower is currently typing against the previous
  * manually-logged value for the same plant + metric. Pure math only.
- *
- * Safety contract:
- *  - No AI / no recommendations / no good-or-bad judgment.
- *  - Never compares across plants. Caller scopes by plant_id.
- *  - Never compares against demo/live values. Caller scopes by source = "manual".
- *  - Never mutates inputs. Read-only.
+ * Safety contract is enforced by
+ * src/test/manual-sensor-freshness-and-delta.test.ts — keep this file a pure
+ * read-only helper scoped per plant + per metric, manual source only.
  */
 import type { ManualSensorMetric } from "./manualSensorFreshnessRules";
 import { METRIC_UNITS } from "./manualSensorFreshnessRules";

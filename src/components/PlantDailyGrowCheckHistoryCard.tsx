@@ -82,6 +82,11 @@ export default function PlantDailyGrowCheckHistoryCard({ plantId, currentTentId 
 
   const unassigned = !currentTentId;
   const hasAnyActivity = hasDailyCheckActivity(rows);
+  const todayRow = rows[0];
+  const recentActivityCue = getDailyGrowCheckRecentActivityCue({
+    todayHasActivity: !!todayRow && todayRow.kind !== "none",
+    latestAt: todayRow?.latestAt ?? null,
+  });
   const noteHref = buildDailyCheckEntryHref({ plantId, source: "plant-detail", method: "note" });
   const sensorHref = buildDailyCheckEntryHref({
     plantId,

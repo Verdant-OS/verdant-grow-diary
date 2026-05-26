@@ -10,7 +10,12 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-import { buildDashboardDailyGrowCheckPanel } from "@/lib/dashboardDailyGrowCheckPanelRules";
+import {
+  buildDashboardDailyGrowCheckPanel,
+  type DashboardDailyGrowCheckPanelInput,
+  type PanelPlantInput,
+  type PanelTentInput,
+} from "@/lib/dashboardDailyGrowCheckPanelRules";
 
 const NOW = new Date(2026, 4, 24, 15, 0, 0);
 const FORBIDDEN = /\b(perfect|completed|guaranteed healthy)\b/i;
@@ -79,9 +84,7 @@ describe("buildDashboardDailyGrowCheckPanel · empty + first-run state", () => {
       plants: [{ id: "p1", name: "Mango", tentId: null, isArchived: false }],
       tents: [],
       manualReadings: [],
-      diaryEntries: [
-        { entry_at: iso(2026, 4, 24, 10), id: "d1", plant_id: "p1" },
-      ],
+      diaryEntries: [{ entry_at: iso(2026, 4, 24, 10), id: "d1", plant_id: "p1" }],
     });
     expect(p.firstRunHint).toBeNull();
   });
@@ -90,10 +93,10 @@ describe("buildDashboardDailyGrowCheckPanel · empty + first-run state", () => {
 // --- UI render tests ------------------------------------------------------
 
 function renderWith(modules: {
-  plants: any[];
-  tents?: any[];
-  readings?: any[];
-  diary?: any[];
+  plants: PanelPlantInput[];
+  tents?: PanelTentInput[];
+  readings?: DashboardDailyGrowCheckPanelInput["manualReadings"];
+  diary?: DashboardDailyGrowCheckPanelInput["diaryEntries"];
 }) {
   vi.resetModules();
   vi.doMock("@/hooks/useGrowData", () => ({
@@ -107,20 +110,18 @@ function renderWith(modules: {
   vi.doMock("@/hooks/use-diary-entries", () => ({
     useDiaryEntries: () => ({ data: modules.diary ?? [] }),
   }));
-  return import("@/components/DashboardDailyGrowCheckPanel").then(
-    ({ default: Panel }) => {
-      const qc = new QueryClient({
-        defaultOptions: { queries: { retry: false } },
-      });
-      return render(
-        <QueryClientProvider client={qc}>
-          <MemoryRouter>
-            <Panel scopedGrowId={null} />
-          </MemoryRouter>
-        </QueryClientProvider>,
-      );
-    },
-  );
+  return import("@/components/DashboardDailyGrowCheckPanel").then(({ default: Panel }) => {
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    return render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <Panel scopedGrowId={null} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+  });
 }
 
 beforeEach(() => {
@@ -133,22 +134,16 @@ describe("DashboardDailyGrowCheckPanel UI · empty + first-run states", () => {
     await renderWith({ plants: [] });
     const empty = screen.getByTestId("dashboard-daily-grow-check-panel-empty");
     expect(empty.getAttribute("data-empty-variant")).toBe("no-plants-all");
-    expect(
-      screen.getByTestId("dashboard-daily-grow-check-panel-empty-title").textContent,
-    ).toMatch(/no active plants/i);
+    expect(screen.getByTestId("dashboard-daily-grow-check-panel-empty-title").textContent).toMatch(
+      /no active plants/i,
+    );
     const cta = screen.getByTestId("dashboard-daily-grow-check-panel-empty-cta");
     expect(cta.getAttribute("href")).toBe("/plants");
     // Chips hidden.
-    expect(
-      screen.queryByTestId("dashboard-daily-grow-check-panel-chips"),
-    ).toBeNull();
+    expect(screen.queryByTestId("dashboard-daily-grow-check-panel-chips")).toBeNull();
     // Misleading checked summary hidden — replaced with neutral subtitle.
-    expect(
-      screen.queryByTestId("dashboard-daily-grow-check-panel-summary"),
-    ).toBeNull();
-    expect(
-      screen.getByTestId("dashboard-daily-grow-check-panel-empty-subtitle"),
-    ).toBeTruthy();
+    expect(screen.queryByTestId("dashboard-daily-grow-check-panel-summary")).toBeNull();
+    expect(screen.getByTestId("dashboard-daily-grow-check-panel-empty-subtitle")).toBeTruthy();
   });
 
   it("scoped grow with no plants → 'no-plants-scoped' variant + CTA", async () => {
@@ -164,9 +159,7 @@ describe("DashboardDailyGrowCheckPanel UI · empty + first-run states", () => {
     vi.doMock("@/hooks/use-diary-entries", () => ({
       useDiaryEntries: () => ({ data: [] }),
     }));
-    const { default: Panel } = await import(
-      "@/components/DashboardDailyGrowCheckPanel"
-    );
+    const { default: Panel } = await import("@/components/DashboardDailyGrowCheckPanel");
     const qc = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
@@ -182,30 +175,26 @@ describe("DashboardDailyGrowCheckPanel UI · empty + first-run states", () => {
         .getByTestId("dashboard-daily-grow-check-panel-empty")
         .getAttribute("data-empty-variant"),
     ).toBe("no-plants-scoped");
-    expect(
-      screen.getByTestId("dashboard-daily-grow-check-panel-empty-title").textContent,
-    ).toMatch(/in this grow/i);
+    expect(screen.getByTestId("dashboard-daily-grow-check-panel-empty-title").textContent).toMatch(
+      /in this grow/i,
+    );
   });
 
   it("active plants with zero checks today → first-run hint shown; summary unchanged", async () => {
     await renderWith({
-      plants: [
-        { id: "p1", name: "Mango", tentId: null, growId: null, isArchived: false },
-      ],
+      plants: [{ id: "p1", name: "Mango", tentId: null, growId: null, isArchived: false }],
     });
-    expect(
-      screen.getByTestId("dashboard-daily-grow-check-panel-first-run").textContent,
-    ).toBe("Start with one plant note or sensor snapshot.");
-    expect(
-      screen.getByTestId("dashboard-daily-grow-check-panel-summary").textContent,
-    ).toBe("Checked 0 of 1 plant today");
+    expect(screen.getByTestId("dashboard-daily-grow-check-panel-first-run").textContent).toBe(
+      "Start with one plant note or sensor snapshot.",
+    );
+    expect(screen.getByTestId("dashboard-daily-grow-check-panel-summary").textContent).toBe(
+      "Checked 0 of 1 plant today",
+    );
   });
 
   it("active plants with checks → no first-run hint; existing list still renders", async () => {
     await renderWith({
-      plants: [
-        { id: "p1", name: "Mango", tentId: null, growId: null, isArchived: false },
-      ],
+      plants: [{ id: "p1", name: "Mango", tentId: null, growId: null, isArchived: false }],
       diary: [
         {
           id: "d1",
@@ -216,15 +205,11 @@ describe("DashboardDailyGrowCheckPanel UI · empty + first-run states", () => {
         },
       ],
     });
-    expect(
-      screen.queryByTestId("dashboard-daily-grow-check-panel-first-run"),
-    ).toBeNull();
-    expect(
-      screen.getAllByTestId("dashboard-daily-grow-check-panel-row"),
-    ).toHaveLength(1);
-    expect(
-      screen.getByTestId("dashboard-daily-grow-check-panel-summary").textContent,
-    ).toBe("Checked 1 of 1 plant today");
+    expect(screen.queryByTestId("dashboard-daily-grow-check-panel-first-run")).toBeNull();
+    expect(screen.getAllByTestId("dashboard-daily-grow-check-panel-row")).toHaveLength(1);
+    expect(screen.getByTestId("dashboard-daily-grow-check-panel-summary").textContent).toBe(
+      "Checked 1 of 1 plant today",
+    );
   });
 });
 
@@ -237,9 +222,7 @@ describe("safety — empty/first-run surfaces", () => {
   ];
   it.each(files)("%s contains no unsafe surfaces or forbidden wording", (rel) => {
     const txt = readFileSync(resolve(__dirname, "..", rel), "utf-8");
-    const stripped = txt
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/^\s*\/\/.*$/gm, "");
+    const stripped = txt.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
     expect(stripped).not.toMatch(/service_role/);
     expect(stripped).not.toMatch(/\.rpc\(/);
     expect(stripped).not.toMatch(/sensor_readings.*\.insert\(/);

@@ -100,9 +100,7 @@ export function useGrowDetailData(): UseGrowDetailData {
 
     const { data, error } = await supabase
       .from("grows")
-      .select(
-        "id,name,stage,grow_type,is_archived,started_at,created_at,updated_at,notes",
-      )
+      .select("id,name,stage,grow_type,is_archived,started_at,created_at,updated_at,notes")
       .eq("id", growId)
       .maybeSingle();
     if (error || !data) {
@@ -114,6 +112,10 @@ export function useGrowDetailData(): UseGrowDetailData {
     setGrow(data as GrowRow);
 
     // Read-only count queries. Any failure degrades to "unavailable".
+    type CountQuery = { eq: (col: string, val: unknown) => CountQuery } & PromiseLike<{
+      count: number | null;
+      error: unknown;
+    }>;
     async function countFrom(
       table:
         | "plants"
@@ -122,14 +124,14 @@ export function useGrowDetailData(): UseGrowDetailData {
         | "action_queue"
         | "action_queue_events"
         | "alerts",
-      extra?: (q: any) => any,
+      extra?: (q: CountQuery) => CountQuery,
     ): Promise<CountValue> {
       try {
-        let q: any = (supabase as any)
+        const base = supabase
           .from(table)
           .select("id", { count: "exact", head: true })
-          .eq("grow_id", growId!);
-        if (extra) q = extra(q);
+          .eq("grow_id", growId!) as unknown as CountQuery;
+        const q = extra ? extra(base) : base;
         const { count, error: cErr } = await q;
         if (cErr) return "unavailable";
         return count ?? 0;
@@ -152,18 +154,12 @@ export function useGrowDetailData(): UseGrowDetailData {
       countFrom("plants"),
       countFrom("tents"),
       countFrom("diary_entries"),
-      countFrom("action_queue", (q) =>
-        q.eq("status", "pending_approval"),
-      ),
+      countFrom("action_queue", (q) => q.eq("status", "pending_approval")),
       countFrom("action_queue"),
       countFrom("action_queue_events"),
       countFrom("alerts", (q) => q.eq("status", "open")),
-      countFrom("alerts", (q) =>
-        q.eq("status", "open").eq("severity", "critical"),
-      ),
-      countFrom("alerts", (q) =>
-        q.eq("status", "open").eq("severity", "warning"),
-      ),
+      countFrom("alerts", (q) => q.eq("status", "open").eq("severity", "critical")),
+      countFrom("alerts", (q) => q.eq("status", "open").eq("severity", "warning")),
     ]);
     setCounts({
       plants,
@@ -189,17 +185,13 @@ export function useGrowDetailData(): UseGrowDetailData {
           .limit(5),
         supabase
           .from("action_queue_events")
-          .select(
-            "id,action_queue_id,event_type,previous_status,new_status,note,created_at",
-          )
+          .select("id,action_queue_id,event_type,previous_status,new_status,note,created_at")
           .eq("grow_id", growId)
           .order("created_at", { ascending: false })
           .limit(5),
         supabase
           .from("alert_events")
-          .select(
-            "id,alert_id,event_type,previous_status,new_status,note,created_at",
-          )
+          .select("id,alert_id,event_type,previous_status,new_status,note,created_at")
           .eq("grow_id", growId)
           .order("created_at", { ascending: false })
           .limit(5),
@@ -217,9 +209,7 @@ export function useGrowDetailData(): UseGrowDetailData {
         }));
 
         const actionIds = Array.from(
-          new Set(
-            (eventsRes.data ?? []).map((e) => e.action_queue_id).filter(Boolean),
-          ),
+          new Set((eventsRes.data ?? []).map((e) => e.action_queue_id).filter(Boolean)),
         );
         let parents: Record<string, { suggested_change: string; reason: string }> = {};
         if (actionIds.length > 0) {
@@ -249,11 +239,7 @@ export function useGrowDetailData(): UseGrowDetailData {
 
         // Resolve parent alerts for context (title/severity/metric).
         const alertIds = Array.from(
-          new Set(
-            (alertEventsRes.data ?? [])
-              .map((e) => e.alert_id)
-              .filter(Boolean),
-          ),
+          new Set((alertEventsRes.data ?? []).map((e) => e.alert_id).filter(Boolean)),
         );
         let alertParents: Record<
           string,
@@ -284,10 +270,7 @@ export function useGrowDetailData(): UseGrowDetailData {
             kind: "alert_event",
             ts: e.created_at,
             title: `${e.event_type}${parent ? `: ${parent.title}` : ""}`,
-            detail:
-              e.note ??
-              (parent?.metric ? `metric: ${parent.metric}` : null) ??
-              null,
+            detail: e.note ?? (parent?.metric ? `metric: ${parent.metric}` : null) ?? null,
             href: alertDetailPath(e.alert_id),
           };
         });
@@ -318,9 +301,7 @@ export function useGrowDetailData(): UseGrowDetailData {
         .eq("grow_id", growId)
         .order("entry_at", { ascending: false })
         .limit(1);
-      const lastDiaryAt = lastDiaryErr
-        ? null
-        : (lastDiaryRows?.[0]?.entry_at ?? null);
+      const lastDiaryAt = lastDiaryErr ? null : (lastDiaryRows?.[0]?.entry_at ?? null);
 
       const pending = actionsPending;
       const { level, reason } = deriveStatus({ pending, highestRisk, lastDiaryAt });

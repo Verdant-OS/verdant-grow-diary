@@ -7,6 +7,9 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import {
+  type BridgeAbuseGuardResult,
+  type BridgeBatchLimitResult,
+  type BridgeRateLimitResult,
   evaluateBridgeAbuseGuard,
   evaluateBridgeBatchLimit,
   evaluateBridgeRateLimit,
@@ -17,6 +20,10 @@ const NOW = 1_700_000_000_000;
 const WINDOW = 60_000; // 1 minute
 const MAX_REQ = 5;
 const MAX_BATCH = 50;
+
+type FailedBridgeRateLimitResult = Extract<BridgeRateLimitResult, { ok: false }>;
+type FailedBridgeBatchLimitResult = Extract<BridgeBatchLimitResult, { ok: false }>;
+type FailedBridgeAbuseGuardResult = Extract<BridgeAbuseGuardResult, { ok: false }>;
 
 const tsAgo = (ms: number) => NOW - ms;
 
@@ -52,9 +59,9 @@ describe("evaluateBridgeRateLimit", () => {
     });
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect((r as any).code).toBe("rate_limited");
+      expect((r as FailedBridgeRateLimitResult).code).toBe("rate_limited");
       // Oldest in-window is 50s ago; retry when it falls out of the window: 10s.
-      expect((r as any).retryAfterMs).toBe(10_000);
+      expect((r as FailedBridgeRateLimitResult).retryAfterMs).toBe(10_000);
     }
   });
 
@@ -64,8 +71,8 @@ describe("evaluateBridgeRateLimit", () => {
       now: NOW,
       recentRequestTimestamps: [
         tsAgo(WINDOW + 1_000), // outside
-        tsAgo(WINDOW * 2),     // outside
-        tsAgo(5_000),          // inside
+        tsAgo(WINDOW * 2), // outside
+        tsAgo(5_000), // inside
       ],
       windowMs: WINDOW,
       maxRequestsPerWindow: MAX_REQ,
@@ -95,7 +102,7 @@ describe("evaluateBridgeRateLimit", () => {
       maxRequestsPerWindow: MAX_REQ,
     });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).code).toBe("missing_bridge_id");
+    if (!r.ok) expect((r as FailedBridgeRateLimitResult).code).toBe("missing_bridge_id");
   });
 
   it("rejects invalid now", () => {
@@ -107,7 +114,7 @@ describe("evaluateBridgeRateLimit", () => {
       maxRequestsPerWindow: MAX_REQ,
     });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).code).toBe("invalid_now");
+    if (!r.ok) expect((r as FailedBridgeRateLimitResult).code).toBe("invalid_now");
   });
 
   it("rejects invalid windowMs", () => {
@@ -119,7 +126,7 @@ describe("evaluateBridgeRateLimit", () => {
       maxRequestsPerWindow: MAX_REQ,
     });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).code).toBe("invalid_window_ms");
+    if (!r.ok) expect((r as FailedBridgeRateLimitResult).code).toBe("invalid_window_ms");
   });
 
   it("rejects invalid maxRequestsPerWindow", () => {
@@ -131,7 +138,7 @@ describe("evaluateBridgeRateLimit", () => {
       maxRequestsPerWindow: 0,
     });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).code).toBe("invalid_max_requests");
+    if (!r.ok) expect((r as FailedBridgeRateLimitResult).code).toBe("invalid_max_requests");
   });
 
   it("does not mutate the input timestamps array", () => {
@@ -176,7 +183,7 @@ describe("evaluateBridgeBatchLimit", () => {
       maxReadingsPerBatch: MAX_BATCH,
     });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).code).toBe("invalid_reading_count");
+    if (!r.ok) expect((r as FailedBridgeBatchLimitResult).code).toBe("invalid_reading_count");
   });
 
   it("rejects negative reading count", () => {
@@ -186,7 +193,7 @@ describe("evaluateBridgeBatchLimit", () => {
       maxReadingsPerBatch: MAX_BATCH,
     });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).code).toBe("invalid_reading_count");
+    if (!r.ok) expect((r as FailedBridgeBatchLimitResult).code).toBe("invalid_reading_count");
   });
 
   it("rejects non-integer reading count", () => {
@@ -196,7 +203,7 @@ describe("evaluateBridgeBatchLimit", () => {
       maxReadingsPerBatch: MAX_BATCH,
     });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).code).toBe("invalid_reading_count");
+    if (!r.ok) expect((r as FailedBridgeBatchLimitResult).code).toBe("invalid_reading_count");
   });
 
   it("rejects batch larger than max", () => {
@@ -206,7 +213,7 @@ describe("evaluateBridgeBatchLimit", () => {
       maxReadingsPerBatch: MAX_BATCH,
     });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).code).toBe("batch_too_large");
+    if (!r.ok) expect((r as FailedBridgeBatchLimitResult).code).toBe("batch_too_large");
   });
 
   it("rejects invalid maxReadingsPerBatch", () => {
@@ -216,7 +223,8 @@ describe("evaluateBridgeBatchLimit", () => {
       maxReadingsPerBatch: 0,
     });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).code).toBe("invalid_max_readings_per_batch");
+    if (!r.ok)
+      expect((r as FailedBridgeBatchLimitResult).code).toBe("invalid_max_readings_per_batch");
   });
 
   it("rejects missing bridgeId", () => {
@@ -226,7 +234,7 @@ describe("evaluateBridgeBatchLimit", () => {
       maxReadingsPerBatch: MAX_BATCH,
     });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect((r as any).code).toBe("missing_bridge_id");
+    if (!r.ok) expect((r as FailedBridgeBatchLimitResult).code).toBe("missing_bridge_id");
   });
 });
 
@@ -264,8 +272,10 @@ describe("evaluateBridgeAbuseGuard", () => {
     });
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect((r as any).failures.some((f) => f.code === "rate_limited")).toBe(true);
-      expect((r as any).retryAfterMs).toBe(10_000);
+      expect(
+        (r as FailedBridgeAbuseGuardResult).failures.some((f) => f.code === "rate_limited"),
+      ).toBe(true);
+      expect((r as FailedBridgeAbuseGuardResult).retryAfterMs).toBe(10_000);
     }
   });
 
@@ -276,7 +286,9 @@ describe("evaluateBridgeAbuseGuard", () => {
     });
     expect(r.ok).toBe(false);
     if (!r.ok)
-      expect((r as any).failures.some((f) => f.code === "batch_too_large")).toBe(true);
+      expect(
+        (r as FailedBridgeAbuseGuardResult).failures.some((f) => f.code === "batch_too_large"),
+      ).toBe(true);
   });
 
   it("returns multiple failure reasons when both checks fail", () => {
@@ -293,21 +305,18 @@ describe("evaluateBridgeAbuseGuard", () => {
     });
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      const codes = (r as any).failures.map((f) => f.code);
+      const codes = (r as FailedBridgeAbuseGuardResult).failures.map((f) => f.code);
       expect(codes).toContain("rate_limited");
       expect(codes).toContain("batch_too_large");
-      expect((r as any).failures.length).toBeGreaterThanOrEqual(2);
-      expect((r as any).retryAfterMs).toBe(10_000);
+      expect((r as FailedBridgeAbuseGuardResult).failures.length).toBeGreaterThanOrEqual(2);
+      expect((r as FailedBridgeAbuseGuardResult).retryAfterMs).toBe(10_000);
     }
   });
 });
 
 // ------------- Static safety -------------
 
-const SRC = readFileSync(
-  resolve(__dirname, "../lib/piIngestRateLimitRules.ts"),
-  "utf8",
-);
+const SRC = readFileSync(resolve(__dirname, "../lib/piIngestRateLimitRules.ts"), "utf8");
 
 describe("piIngestRateLimitRules — static safety", () => {
   it("does not import Supabase or React", () => {
@@ -331,8 +340,6 @@ describe("piIngestRateLimitRules — static safety", () => {
   });
 
   it("does not reference MQTT/Home Assistant/Pi bridge runtime or automation", () => {
-    expect(SRC).not.toMatch(
-      /\bmqtt\b|home[\s_-]?assistant|automation|device[\s_-]?control/i,
-    );
+    expect(SRC).not.toMatch(/\bmqtt\b|home[\s_-]?assistant|automation|device[\s_-]?control/i);
   });
 });

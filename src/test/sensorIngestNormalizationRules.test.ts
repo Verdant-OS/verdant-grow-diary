@@ -11,9 +11,7 @@ import { validateSensorReadingBatch } from "@/hooks/useInsertSensorReadings";
 const TENT = "11111111-1111-1111-1111-111111111111";
 const NOW = new Date("2026-05-23T12:00:00.000Z");
 
-function base(
-  over: Partial<ExternalSensorIngestPayload> = {},
-): ExternalSensorIngestPayload {
+function base(over: Partial<ExternalSensorIngestPayload> = {}): ExternalSensorIngestPayload {
   return {
     tent_id: TENT,
     source: "pi_bridge",
@@ -74,7 +72,7 @@ describe("normalizeIngestPayload — unit conversion", () => {
 describe("normalizeIngestPayload — rejections", () => {
   it("rejects unknown metric", () => {
     const r = normalizeIngestPayload(
-      base({ readings: [{ metric: "ppfd", value: 600, unit: "umol" }] as any }),
+      base({ readings: [{ metric: "ppfd", value: 600, unit: "umol" }] }),
       { now: NOW },
     );
     expect(r.ok).toBe(false);
@@ -153,8 +151,7 @@ describe("normalizeIngestPayload — passthrough + safety", () => {
 
 describe("isSensorSourcePersistable", () => {
   it("manual → true", () => expect(isSensorSourcePersistable("manual")).toBe(true));
-  it("pi_bridge → true", () =>
-    expect(isSensorSourcePersistable("pi_bridge")).toBe(true));
+  it("pi_bridge → true", () => expect(isSensorSourcePersistable("pi_bridge")).toBe(true));
   it("sim → false", () => expect(isSensorSourcePersistable("sim")).toBe(false));
 });
 
@@ -165,7 +162,7 @@ describe("static safety: pure helper", () => {
   );
   const forbidden = [
     "@/integrations/supabase/client",
-    "from \"react\"",
+    'from "react"',
     "from 'react'",
     "useState",
     "useEffect",

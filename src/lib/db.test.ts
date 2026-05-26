@@ -2,6 +2,19 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Chainable fake Supabase query builder.
 type Result = { data: unknown; error: unknown };
+interface FakeBuilder {
+  select: () => FakeBuilder;
+  eq: (col: string, val: unknown) => FakeBuilder;
+  order: (col: string, opts?: unknown) => FakeBuilder;
+  limit: (n: number) => FakeBuilder;
+  maybeSingle: () => Promise<Result>;
+  single: () => Promise<Result>;
+  insert: (row: unknown) => FakeBuilder;
+  update: (patch: unknown) => FakeBuilder;
+  upsert: (row: unknown) => FakeBuilder;
+  delete: () => FakeBuilder;
+  then: (resolve: (r: Result) => unknown) => Promise<unknown>;
+}
 let nextResult: Result = { data: [], error: null };
 const calls: {
   table?: string;
@@ -31,8 +44,8 @@ function reset() {
   calls.upserted = undefined;
 }
 
-function builder() {
-  const b: any = {
+function builder(): FakeBuilder {
+  const b: FakeBuilder = {
     select: () => b,
     eq: (col: string, val: unknown) => {
       calls.filters.push([col, val]);

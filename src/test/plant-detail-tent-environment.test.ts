@@ -99,7 +99,7 @@ describe("buildPlantTentEnvironmentView (pure)", () => {
       buildPlantTentEnvironmentView([
         { ts, metric: "temperature_c", value: 22, source: "manual" },
       ]).sourceLabel,
-    ).toBe("Manual");
+    ).toBe("Manual reading");
   });
 });
 

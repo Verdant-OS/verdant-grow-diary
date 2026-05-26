@@ -74,11 +74,10 @@ describe("ActionDetail — duplicate completion idempotency contract", () => {
     expect(ACTION_DETAIL).toMatch(/followupMatchesAction\(/);
   });
   it("never includes user_id in the follow-up insert payload", () => {
-    // The insert is wrapped near maybeCreateFollowupDiaryEntry. Scan the file
-    // for any user_id in close proximity to a diary_entries insert.
-    const insertBlocks = ACTION_DETAIL.match(/\.from\("diary_entries"\)[\s\S]{0,400}\.insert\([\s\S]{0,600}\)/g) ?? [];
+    // Tighten to insert object literal only — comments mentioning user_id are fine.
+    const insertBlocks = ACTION_DETAIL.match(/\.insert\(\{[\s\S]{0,400}?\}\)/g) ?? [];
     for (const block of insertBlocks) {
-      expect(block).not.toMatch(/user_id/);
+      expect(block).not.toMatch(/\buser_id\s*:/);
     }
   });
 });

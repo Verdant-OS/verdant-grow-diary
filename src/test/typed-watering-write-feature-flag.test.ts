@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { execSync } from "node:child_process";
 import { resolve } from "node:path";
 
 import {
@@ -8,22 +7,9 @@ import {
   typedWateringWriteEnabled,
 } from "@/lib/featureFlags";
 import { writeWateringTypedEvent } from "@/lib/writeWateringTypedEvent";
+import { findMatches } from "./testFileSearchRules";
 
 const REPO_ROOT = process.cwd();
-
-function rg(args: string[]): string {
-  try {
-    return execSync(`rg ${args.map((a) => JSON.stringify(a)).join(" ")}`, {
-      cwd: REPO_ROOT,
-      encoding: "utf8",
-    });
-  } catch (err: unknown) {
-    // rg exits 1 when there are no matches — that's a valid result.
-    const e = err as { status?: number; stdout?: string };
-    if (e && e.status === 1) return "";
-    throw err;
-  }
-}
 
 describe("typed watering write — feature flag scaffold", () => {
   it("feature flag defaults to false", () => {
@@ -84,29 +70,14 @@ describe("typed watering write — feature flag scaffold", () => {
   });
 
   it("no runtime module imports the helper (tests-only seam)", () => {
-    const hits = rg([
-      "-l",
-      "writeWateringTypedEvent",
-      "src",
-    ])
-      .split("\n")
-      .map((l) => l.trim())
-      .filter(Boolean)
-      // Allowed: the helper itself and test files.
+    const hits = findMatches(["src"], "writeWateringTypedEvent")
       .filter((p) => p !== "src/lib/writeWateringTypedEvent.ts")
       .filter((p) => !p.startsWith("src/test/"));
     expect(hits).toEqual([]);
   });
 
   it("QuickLog code does not import or call the helper", () => {
-    const hits = rg([
-      "-l",
-      "writeWateringTypedEvent",
-      "src",
-    ])
-      .split("\n")
-      .map((l) => l.trim())
-      .filter(Boolean)
+    const hits = findMatches(["src"], "writeWateringTypedEvent")
       .filter((p) => /quick.?log/i.test(p));
     expect(hits).toEqual([]);
   });

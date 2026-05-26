@@ -163,7 +163,8 @@ export function buildActionOutcomeDiaryDraft(
   const completedAt = nonEmptyString(action.completed_at);
   const sourceAlertId = extractSourceAlertId(reason ?? undefined);
   const followupEntryId = nonEmptyString(followup?.followup_entry_id);
-  const recordedAt = nonEmptyString(options?.recordedAt) ?? new Date().toISOString();
+  const recordedAt = nonEmptyString(options?.recordedAt);
+  if (!recordedAt) return { ok: false, reason: "missing_recorded_at" };
 
   return {
     ok: true,

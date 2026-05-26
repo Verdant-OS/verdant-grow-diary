@@ -49,13 +49,21 @@ function baseGrowerInput(overrides: Partial<OutcomeGrowerInput> = {}): OutcomeGr
   };
 }
 
+const TEST_RECORDED_AT = "2026-05-26T14:00:00.000Z";
+const TEST_OPTIONS = { recordedAt: TEST_RECORDED_AT };
+
 // ---------------------------------------------------------------------------
 // 1. Accepts all valid outcome statuses
 // ---------------------------------------------------------------------------
 describe("actionOutcomeRules — accepts valid statuses", () => {
   for (const status of OUTCOME_STATUSES) {
     it(`accepts ${status}`, () => {
-      const result = buildActionOutcomeDiaryDraft(baseAction(), { outcome_status: status });
+      const result = buildActionOutcomeDiaryDraft(
+        baseAction(),
+        { outcome_status: status },
+        null,
+        TEST_OPTIONS,
+      );
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.draft.details.outcome_status).toBe(status);
@@ -136,6 +144,7 @@ describe("actionOutcomeRules — draft includes all fields", () => {
       baseAction(),
       baseGrowerInput({ outcome_status: "worsened" }),
       { followup_entry_id: "entry-42" },
+      { recordedAt: "2026-05-26T12:00:00.000Z" },
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -150,7 +159,7 @@ describe("actionOutcomeRules — draft includes all fields", () => {
     expect(d.outcome_status).toBe("worsened");
     expect(d.outcome_kind).toBe("24h_recheck");
     expect(d.recorded_by).toBe("grower");
-    expect(d.recorded_at).toBeTruthy();
+    expect(d.recorded_at).toBe("2026-05-26T12:00:00.000Z");
   });
 });
 
@@ -158,7 +167,7 @@ describe("actionOutcomeRules — draft includes all fields", () => {
 // 5b. Deterministic recorded_at from injected timestamp
 // ---------------------------------------------------------------------------
 describe("actionOutcomeRules — deterministic recorded_at", () => {
-  it("uses the injected recordedAt timestamp", () => {
+  it("uses the injected recordedAt timestamp exactly", () => {
     const ts = "2026-05-26T12:34:56.789Z";
     const result = buildActionOutcomeDiaryDraft(
       baseAction(),
@@ -171,21 +180,24 @@ describe("actionOutcomeRules — deterministic recorded_at", () => {
     expect(result.draft.details.recorded_at).toBe(ts);
   });
 
-  it("falls back to a generated timestamp when recordedAt is null", () => {
+  it("rejects null recordedAt with missing_recorded_at", () => {
     const result = buildActionOutcomeDiaryDraft(baseAction(), baseGrowerInput(), null, {
       recordedAt: null,
     });
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    // Should be a valid ISO string (fallback)
-    expect(result.draft.details.recorded_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(result.ok).toBe(false);
+    if (!result.ok)
+      expect((result as Extract<OutcomeDraftResult, { ok: false }>).reason).toBe(
+        "missing_recorded_at",
+      );
   });
 
-  it("falls back to a generated timestamp when options are omitted", () => {
+  it("rejects omitted options with missing_recorded_at", () => {
     const result = buildActionOutcomeDiaryDraft(baseAction(), baseGrowerInput());
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.draft.details.recorded_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(result.ok).toBe(false);
+    if (!result.ok)
+      expect((result as Extract<OutcomeDraftResult, { ok: false }>).reason).toBe(
+        "missing_recorded_at",
+      );
   });
 });
 
@@ -194,10 +206,15 @@ describe("actionOutcomeRules — deterministic recorded_at", () => {
 // ---------------------------------------------------------------------------
 describe("actionOutcomeRules — grower note", () => {
   it("uses grower note when provided", () => {
-    const result = buildActionOutcomeDiaryDraft(baseAction(), {
-      outcome_status: "improved",
-      note: "Looks much better today!",
-    });
+    const result = buildActionOutcomeDiaryDraft(
+      baseAction(),
+      {
+        outcome_status: "improved",
+        note: "Looks much better today!",
+      },
+      null,
+      TEST_OPTIONS,
+    );
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.draft.note).toBe("Looks much better today!");
   });
@@ -208,30 +225,50 @@ describe("actionOutcomeRules — grower note", () => {
 // ---------------------------------------------------------------------------
 describe("actionOutcomeRules — default notes", () => {
   it("improved default", () => {
-    const result = buildActionOutcomeDiaryDraft(baseAction(), {
-      outcome_status: "improved",
-      note: "",
-    });
+    const result = buildActionOutcomeDiaryDraft(
+      baseAction(),
+      {
+        outcome_status: "improved",
+        note: "",
+      },
+      null,
+      TEST_OPTIONS,
+    );
     expect(result.ok).toBe(true);
     if (result.ok)
       expect(result.draft.note).toBe("Grower recorded this action as improved after follow-up.");
   });
   it("unchanged default", () => {
-    const result = buildActionOutcomeDiaryDraft(baseAction(), { outcome_status: "unchanged" });
+    const result = buildActionOutcomeDiaryDraft(
+      baseAction(),
+      { outcome_status: "unchanged" },
+      null,
+      TEST_OPTIONS,
+    );
     expect(result.ok).toBe(true);
     if (result.ok)
       expect(result.draft.note).toBe("Grower recorded no clear change after follow-up.");
   });
   it("worsened default", () => {
-    const result = buildActionOutcomeDiaryDraft(baseAction(), { outcome_status: "worsened" });
+    const result = buildActionOutcomeDiaryDraft(
+      baseAction(),
+      { outcome_status: "worsened" },
+      null,
+      TEST_OPTIONS,
+    );
     expect(result.ok).toBe(true);
     if (result.ok)
       expect(result.draft.note).toBe("Grower recorded the condition as worsened after follow-up.");
   });
   it("more_data_needed default", () => {
-    const result = buildActionOutcomeDiaryDraft(baseAction(), {
-      outcome_status: "more_data_needed",
-    });
+    const result = buildActionOutcomeDiaryDraft(
+      baseAction(),
+      {
+        outcome_status: "more_data_needed",
+      },
+      null,
+      TEST_OPTIONS,
+    );
     expect(result.ok).toBe(true);
     if (result.ok)
       expect(result.draft.note).toBe("Grower recorded that more data is needed after follow-up.");
@@ -243,7 +280,12 @@ describe("actionOutcomeRules — default notes", () => {
 // ---------------------------------------------------------------------------
 describe("actionOutcomeRules — never includes user_id", () => {
   it("draft does not have user_id property", () => {
-    const result = buildActionOutcomeDiaryDraft(baseAction(), baseGrowerInput());
+    const result = buildActionOutcomeDiaryDraft(
+      baseAction(),
+      baseGrowerInput(),
+      null,
+      TEST_OPTIONS,
+    );
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect("user_id" in result.draft).toBe(false);
@@ -262,7 +304,12 @@ describe("actionOutcomeRules — never includes user_id", () => {
 describe("actionOutcomeRules — no AI-inferred language", () => {
   it("default notes do not contain AI/inferred language", () => {
     for (const status of OUTCOME_STATUSES) {
-      const result = buildActionOutcomeDiaryDraft(baseAction(), { outcome_status: status });
+      const result = buildActionOutcomeDiaryDraft(
+        baseAction(),
+        { outcome_status: status },
+        null,
+        TEST_OPTIONS,
+      );
       if (result.ok) {
         expect(result.draft.note).not.toMatch(/AI|inferred|predicted|automated|algorithm/i);
       }

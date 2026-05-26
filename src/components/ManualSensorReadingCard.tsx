@@ -53,8 +53,18 @@ export default function ManualSensorReadingCard({
 }: Props) {
   const [tentId, setTentId] = useState<string>(defaultTentId ?? tents[0]?.id ?? "");
   const [form, setForm] = useState<ManualEntryInput>(EMPTY);
+  const [devicePreset, setDevicePreset] = useState<string>("none");
+  const [deviceCustom, setDeviceCustom] = useState<string>("");
   const [reviewOpen, setReviewOpen] = useState(false);
   const insert = useInsertSensorReading();
+
+  const devicePresets = useMemo(() => getManualSensorDeviceOptions(), []);
+  const deviceNote = useMemo(() => {
+    if (devicePreset === "custom") return normalizeManualSourceNote(deviceCustom);
+    if (devicePreset === "none" || !devicePreset) return null;
+    const preset = devicePresets.find((p) => p.id === devicePreset);
+    return preset ? normalizeManualSourceNote(preset.label) : null;
+  }, [devicePreset, deviceCustom, devicePresets]);
 
   const validation = useMemo(() => validateManualEntry(form), [form]);
   const advisor = useMemo(() => evaluateManualSnapshotAdvisor(form), [form]);

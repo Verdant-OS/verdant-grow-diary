@@ -177,8 +177,6 @@ export default function PlantDetail() {
             <p className="text-xs text-muted-foreground mt-1">Updated {formatDistanceToNow(new Date(plant.startedAt), { addSuffix: true })}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline" size="sm"><Link to="/logs">Open Logs</Link></Button>
-          <div className="flex flex-wrap gap-2">
             <Button
               size="sm"
               type="button"

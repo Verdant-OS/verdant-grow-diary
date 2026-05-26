@@ -647,6 +647,19 @@ export default function ActionDetail() {
               <CircleCheckBig className="h-4 w-4" /> Record Outcome
             </Button>
           )}
+          {followupEntryId && (
+            <div className="mt-3 text-xs" data-testid="followup-link">
+              <Link
+                to={logsPath(row.grow_id)}
+                className="text-primary hover:underline"
+              >
+                View follow-up diary entry →
+              </Link>
+              <span className="ml-2 text-muted-foreground">
+                24h re-check · Recorded after action completion
+              </span>
+            </div>
+          )}
         </section>
       )}
 

@@ -208,7 +208,9 @@ export default function PlantDetail() {
                 Daily Grow Check
               </h2>
               <p className="text-xs text-muted-foreground">
-                Today's status, recent activity, and rhythm.
+                <span>Status: today's entry and recent activity.</span>
+                <span aria-hidden="true"> · </span>
+                <span>Next: log today's check to keep rhythm.</span>
               </p>
             </div>
             <DailyGrowCheckOnboardingCard

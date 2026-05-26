@@ -25,6 +25,26 @@ import {
   mergeRecent,
   rankRisk,
 } from "@/lib/growStatus";
+import {
+  EMPTY_GROW_OUTCOME_SUMMARY,
+  pickRecentGrowOutcomes,
+  summarizeGrowOutcomes,
+  type GrowOutcomeSummary,
+  type PickedGrowOutcome,
+  type RawGrowOutcomeRow,
+} from "@/lib/growOutcomeRollupRules";
+
+export type GrowOutcomesState = {
+  status: "loading" | "ready" | "unavailable";
+  summary: GrowOutcomeSummary;
+  recent: PickedGrowOutcome[];
+};
+
+export const EMPTY_GROW_OUTCOMES_STATE: GrowOutcomesState = {
+  status: "loading",
+  summary: EMPTY_GROW_OUTCOME_SUMMARY,
+  recent: [],
+};
 
 export interface GrowRow {
   id: string;

@@ -16,6 +16,8 @@
 export const DAILY_CHECK_SUCCESS_TITLE = "Today's check was logged";
 export const DAILY_CHECK_SUCCESS_BODY =
   "Your Daily Grow Check entry is saved. You can keep going or jump back to your plant.";
+export const DAILY_CHECK_NOTE_SAVED_TOAST = "Daily check note saved.";
+export const DAILY_CHECK_SENSOR_SAVED_TOAST = "Environment snapshot saved.";
 
 /** Recognized entry-point query values for `?from=`. */
 export type DailyCheckEntrySource = "dashboard" | "plant-detail" | "plants";
@@ -78,7 +80,6 @@ export function buildDailyCheckEntryHref(input: {
   return href;
 }
 
-
 export interface DailyCheckPostSubmitAction {
   key: "dashboard" | "plant" | "plants";
   label: string;
@@ -91,6 +92,32 @@ export interface DailyCheckPostSubmitInput {
   plantId: string | null | undefined;
   /** Where the grower opened Daily Check from, if recognized. */
   source?: DailyCheckEntrySource | null;
+}
+
+export interface DailyCheckPostSubmitReturnInput {
+  plantId: string | null | undefined;
+  source?: DailyCheckEntrySource | null;
+  fallbackHref?: string | null;
+}
+
+/**
+ * Resolve where Daily Check should return after a successful submit.
+ *
+ * Safe defaults:
+ *  - known plant-detail + valid plantId → Plant Detail
+ *  - known plants source → Plants list
+ *  - known dashboard source → Dashboard
+ *  - missing/invalid context → fallback (defaults to Dashboard)
+ */
+export function resolveDailyCheckPostSubmitHref(input: DailyCheckPostSubmitReturnInput): string {
+  const plantId = input.plantId || null;
+  const source = input.source ?? null;
+  const fallbackHref = input.fallbackHref || "/";
+
+  if (source === "plant-detail" && plantId) return `/plants/${plantId}`;
+  if (source === "plants") return "/plants";
+  if (source === "dashboard") return "/";
+  return fallbackHref;
 }
 
 /**

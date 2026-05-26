@@ -2,13 +2,9 @@
  * Pure helpers for the Plant Detail "Visual Data Decay" surface.
  *
  * Computes a freshness state for the latest manual sensor reading per metric.
- * Time is injectable for deterministic tests.
- *
- * Safety contract:
- *  - Read-only logic.
- *  - Never invents values. Empty/invalid history -> "missing".
- *  - Stale only means "data is old"; never implies "dangerous".
- *  - No alert, action_queue, automation, or device-control surface.
+ * Time is injectable for deterministic tests. Safety contract is enforced by
+ * src/test/manual-sensor-freshness-and-delta.test.ts — keep this file a pure
+ * read-only helper. Stale means "data is old", nothing more.
  */
 
 export type ManualSensorMetric = "temp_f" | "humidity_percent" | "ph" | "ec";

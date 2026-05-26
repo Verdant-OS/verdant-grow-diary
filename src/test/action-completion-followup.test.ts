@@ -70,16 +70,17 @@ describe("actionFollowupRules — note picker", () => {
   });
   it("CO2 returns context-only note (no optimization advice)", () => {
     const note = followupNoteForAction({ target_metric: "co2_ppm", reason: "high" });
-    expect(note).toBe(
-      "Re-check CO2 in ~24h as context only; do not optimize around CO2 alone.",
-    );
+    expect(note).toBe("Re-check CO2 in ~24h as context only; do not optimize around CO2 alone.");
     expect(note).not.toMatch(/increase|decrease|raise|lower|adjust/i);
   });
   it("soil / moisture / root-zone metrics map to root-zone re-check", () => {
-    const expected =
-      "Re-check the root-zone reading in ~24h and compare against plant response.";
-    expect(followupNoteForAction({ target_metric: "soil_moisture_pct", reason: "low" })).toBe(expected);
-    expect(followupNoteForAction({ target_metric: "root_zone_temp_c", reason: "low" })).toBe(expected);
+    const expected = "Re-check the root-zone reading in ~24h and compare against plant response.";
+    expect(followupNoteForAction({ target_metric: "soil_moisture_pct", reason: "low" })).toBe(
+      expected,
+    );
+    expect(followupNoteForAction({ target_metric: "root_zone_temp_c", reason: "low" })).toBe(
+      expected,
+    );
   });
   it("unknown / missing metric returns generic re-check note", () => {
     expect(followupNoteForAction({ target_metric: null, reason: null })).toBe(
@@ -105,25 +106,19 @@ describe("actionFollowupRules — draft builder", () => {
     expect(r.draft.details.action_queue_id).toBe("action-1");
     expect(r.draft.details.source_alert_id).toBe("alert-99");
     expect(r.draft.details.metric).toBe("humidity_pct");
-    expect(r.draft.details.suggested_change).toBe(
-      "Review humidity control and increase airflow.",
-    );
+    expect(r.draft.details.suggested_change).toBe("Review humidity control and increase airflow.");
     expect(r.draft.details.reason).toContain("[alert:alert-99]");
     expect(r.draft.details.completed_at).toBe("2026-05-26T10:00:00.000Z");
   });
 
   it("extracts source alert id from [alert:<id>] in reason", () => {
-    const r = buildActionFollowupDiaryDraft(
-      baseCompleted({ reason: "Temp high [alert:abc-123]" }),
-    );
+    const r = buildActionFollowupDiaryDraft(baseCompleted({ reason: "Temp high [alert:abc-123]" }));
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.draft.details.source_alert_id).toBe("abc-123");
   });
 
   it("source_alert_id is null when no back-pointer present", () => {
-    const r = buildActionFollowupDiaryDraft(
-      baseCompleted({ reason: "Plain reason, no token" }),
-    );
+    const r = buildActionFollowupDiaryDraft(baseCompleted({ reason: "Plain reason, no token" }));
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.draft.details.source_alert_id).toBeNull();
   });
@@ -156,13 +151,7 @@ describe("actionFollowupRules — draft builder", () => {
   });
 
   it("rejects non-completed actions (approve/reject/cancel/simulate/pending)", () => {
-    for (const status of [
-      "pending_approval",
-      "approved",
-      "rejected",
-      "simulated",
-      "cancelled",
-    ]) {
+    for (const status of ["pending_approval", "approved", "rejected", "simulated", "cancelled"]) {
       expect(buildActionFollowupDiaryDraft(baseCompleted({ status })).ok).toBe(false);
     }
   });
@@ -252,9 +241,7 @@ describe("buildTransitionPatch preserves [alert:<id>] back-pointer", () => {
 
 describe("ActionDetail — follow-up wiring (static)", () => {
   it("imports the pure helper, not an inline mapping table", () => {
-    expect(ACTION_DETAIL).toMatch(
-      /from "@\/lib\/actionFollowupRules"/,
-    );
+    expect(ACTION_DETAIL).toMatch(/from "@\/lib\/actionFollowupRules"/);
     expect(ACTION_DETAIL).toMatch(/buildActionFollowupDiaryDraft/);
     expect(ACTION_DETAIL).toMatch(/followupMatchesAction/);
     // No duplicated metric → note table inline.
@@ -279,9 +266,7 @@ describe("ActionDetail — follow-up wiring (static)", () => {
     // Sanity: the simulate toast is unchanged, and no direct diary insert sits
     // next to it.
     expect(ACTION_DETAIL).toMatch(/toast\.message\("Simulated/);
-    expect(ACTION_DETAIL).not.toMatch(
-      /Simulated[\s\S]{0,400}maybeCreateFollowupDiaryEntry/,
-    );
+    expect(ACTION_DETAIL).not.toMatch(/Simulated[\s\S]{0,400}maybeCreateFollowupDiaryEntry/);
   });
 
   it("uses an idempotent contains() lookup before insert", () => {
@@ -299,12 +284,8 @@ describe("ActionDetail — follow-up wiring (static)", () => {
   });
 
   it("failure path is non-blocking (toast.warning, no rollback)", () => {
-    expect(ACTION_DETAIL).toMatch(
-      /Action completed, but follow-up note could not be created\./,
-    );
-    expect(ACTION_DETAIL).not.toMatch(
-      /maybeCreateFollowupDiaryEntry[\s\S]{0,400}rollback/i,
-    );
+    expect(ACTION_DETAIL).toMatch(/Action completed, but follow-up note could not be created\./);
+    expect(ACTION_DETAIL).not.toMatch(/maybeCreateFollowupDiaryEntry[\s\S]{0,400}rollback/i);
   });
 
   it("preserves existing action_queue_events audit insert path", () => {
@@ -315,12 +296,8 @@ describe("ActionDetail — follow-up wiring (static)", () => {
   it("does NOT mutate alerts when completing an action", () => {
     // Reads alerts (stale-source-alert warning) are allowed, but no .update/.insert
     // of alerts must happen inside the transition / follow-up path.
-    expect(ACTION_DETAIL).not.toMatch(
-      /\.from\("alerts"\)[\s\S]{0,400}\.update\(/,
-    );
-    expect(ACTION_DETAIL).not.toMatch(
-      /\.from\("alert_events"\)[\s\S]{0,400}\.insert\(/,
-    );
+    expect(ACTION_DETAIL).not.toMatch(/\.from\("alerts"\)[\s\S]{0,400}\.update\(/);
+    expect(ACTION_DETAIL).not.toMatch(/\.from\("alert_events"\)[\s\S]{0,400}\.insert\(/);
   });
 });
 
@@ -338,7 +315,7 @@ describe("Static safety — actionFollowupRules + ActionDetail", () => {
   it("ActionDetail introduces no device-control surface", () => {
     // ActionDetail mentions "device" only in copy reassuring the grower that
     // no equipment command is sent ("No equipment command is sent"). It must
-    // not call MQTT/webhooks/Home Assistant/Pi bridge/relays/actuators/service_role.
+    // not reference any banned integration or privileged-key pattern.
     expect(ACTION_DETAIL).not.toMatch(
       /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b|service_role/i,
     );

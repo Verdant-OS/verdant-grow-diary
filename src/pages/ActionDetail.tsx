@@ -50,7 +50,7 @@ import {
   nextStatusFor,
   normalizeNote,
 } from "@/lib/actionQueueTransitions";
-import { actionsPath, alertDetailPath, growDetailPath } from "@/lib/routes";
+import { actionsPath, alertDetailPath, growDetailPath, logsPath } from "@/lib/routes";
 import {
   extractSourceAlertId,
   getActionQueueSourceLabel,

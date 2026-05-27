@@ -32,6 +32,16 @@ function EntryRow({ row, plantName }: { row: PlantRecentActivityRow; plantName?:
           <Badge variant="secondary" className="capitalize" data-testid="plant-recent-activity-event-type">
             {row.eventType}
           </Badge>
+          {row.isManualEntry ? (
+            <Badge
+              variant="outline"
+              className="gap-1 text-[10px] uppercase tracking-wide border-primary/40 text-primary"
+              data-testid="plant-recent-activity-manual-badge"
+              title="Logged manually via Quick Log"
+            >
+              Manual entry
+            </Badge>
+          ) : null}
           <span className="text-xs text-muted-foreground" data-testid="plant-recent-activity-timestamp">
             {row.occurredAtLabel}
           </span>

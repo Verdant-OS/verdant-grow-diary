@@ -38,7 +38,6 @@ import {
 } from "@/lib/manualSensorChronologyDeltaRules";
 import type { ManualSensorMetric } from "@/lib/manualSensorFreshnessRules";
 import { usePlantManualSensorLogs } from "@/hooks/usePlantManualSensorHistory";
-import { useMemo } from "react";
 
 interface Props {
   open: boolean;

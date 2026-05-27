@@ -9,6 +9,14 @@ import { AlertTriangle, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { AiContextSufficiencyResult } from "@/lib/aiContextSufficiencyRules";
+import {
+  CONFIDENCE_CEILING_CAPS,
+  CONFIDENCE_LIMITED_COPY,
+} from "@/lib/aiDoctorConfidenceRules";
+
+function ceilingPct(ceiling: AiContextSufficiencyResult["confidenceCeiling"]): number {
+  return Math.round(CONFIDENCE_CEILING_CAPS[ceiling] * 100);
+}
 
 const MISSING_LABEL: Record<string, string> = {
   "active-grow": "An active grow",

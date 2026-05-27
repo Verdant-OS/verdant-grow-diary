@@ -327,15 +327,47 @@ with a `rest_command` and post from there using `source: ha_forwarded`.
 
 ---
 
-## 9. Troubleshooting
+## 9. Sensor placement (SHT31 in a tent)
 
-**Wi-Fi dropouts.** Reconnect inside the read loop, back off on repeated
-failures, and don't block the sensor read on the POST. Buffer the last few
-readings locally so a brief outage doesn't lose them.
+- **Canopy height.** Mount the probe at canopy level, not at the floor or
+  the tent ceiling. The number you care about is what the plant feels.
+- **Avoid direct light/heat.** Keep the sensor out of the direct beam of
+  the grow light. IR heating from the LED panel will skew temperature
+  several degrees and crush the RH reading.
+- **Avoid humidifier mist.** A probe sitting in the mist plume will read
+  ~100% RH constantly and may corrode. Place it at least ~30 cm from the
+  outlet, ideally on the opposite side of the tent.
+- **Avoid direct fan blast.** Strong airflow across the probe biases temp
+  down and RH down. Aim for indirect circulation.
+- **Shield from drip lines.** Liquid contact on an SHT31 will permanently
+  destroy the RH calibration.
 
-**Wrong timestamps.** Use NTP. A clock that is more than 5 minutes ahead
-will be rejected by the ingest. A clock far behind will make readings
-appear stale immediately.
+---
+
+## 10. Troubleshooting
+
+**Wi-Fi dropouts.** Reconnect inside the read loop with a bounded timeout
+and back off on repeated failures. Don't block the sensor read on the
+POST. Buffer the last few readings locally so a brief outage doesn't lose
+them.
+
+**NTP failure.** If `configTime` never returns a valid time, do not send
+a guessed or zero `captured_at` — Verdant will reject it or it will
+appear stale. Retry NTP, then skip the cycle if it still fails.
+
+**Sensor read failure.** `readTemperature()` / `readHumidity()` return
+`NaN` on I²C errors. Skip the post for that cycle. Better to send nothing
+than to send fake data — Verdant will mark the reading stale on its own.
+
+**Wrong units.** Verdant accepts `temp_f` (°F), `humidity_percent` (%
+RH), and `vpd_kpa` (kPa). Sending Celsius into `temp_f` will be flagged
+as out-of-range and rejected; use the canonical `temperature_c` key
+instead, or convert before sending.
+
+**Stale readings in Verdant.** If the freshness card shows your ESP32 as
+stale: check Wi-Fi RSSI in `metadata.rssi`, check that the device clock
+is within 5 minutes of UTC, and confirm the device is actually POSTing
+(serial log). Verdant will not silently upgrade a stale reading to live.
 
 **Bad calibration.** Send `metadata.calibration_offset` and
 `metadata.raw_value` so the audit trail survives. Re-calibrate any time

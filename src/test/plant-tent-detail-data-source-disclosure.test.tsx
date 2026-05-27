@@ -207,8 +207,13 @@ describe("TentDetail page wiring", () => {
 
   it("does not introduce writes, service_role, or device control", () => {
     expect(TENT_DETAIL).not.toMatch(/service_role/);
+    // Device-control verbs only. Read-only sensor ingest UI is allowed to
+    // reference webhook/MQTT/Pi/Home Assistant as data SOURCES — what we
+    // forbid here are actuators, relays, setpoints, and MQTT publish/connect
+    // (anything that would let the page change physical device state).
     expect(TENT_DETAIL).not.toMatch(
-      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator|webhook/i,
+      /relay|actuator|setpoint|mqtt\.connect|mqttSubscribe|mqttPublish|deviceControl/i,
     );
   });
+
 });

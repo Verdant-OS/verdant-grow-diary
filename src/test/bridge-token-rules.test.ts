@@ -33,7 +33,7 @@ describe("bridgeTokenRules", () => {
   });
   it("clampTtlDays returns default on NaN/Infinity", () => {
     expect(clampTtlDays(NaN)).toBe(BRIDGE_TOKEN_DEFAULT_TTL_DAYS);
-    expect(clampTtlDays(Infinity)).toBe(BRIDGE_TOKEN_MAX_TTL_DAYS);
+    expect(clampTtlDays(Infinity)).toBe(BRIDGE_TOKEN_DEFAULT_TTL_DAYS);
   });
   it("clampTtlDays floors fractional values", () => {
     expect(clampTtlDays(30.9)).toBe(30);

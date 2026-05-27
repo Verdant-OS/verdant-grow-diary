@@ -20,14 +20,14 @@ describe("TentDetail VPD stage-missing info badge", () => {
     );
   });
 
-  it("gates the badge on a present VPD value and missing tent stage", () => {
+  it("gates the badge on a present VPD value and unknown-normalized tent stage", () => {
     expect(SRC).toMatch(
-      /snap\?\.vpd\s*!==\s*null\s*&&\s*snap\?\.vpd\s*!==\s*undefined\s*&&\s*tent\.stage\s*==\s*null\s*&&\s*\(\s*<VpdStageMissingBadge[\s\S]*?tent-detail-vpd-stage-missing-badge/,
+      /snap\?\.vpd\s*!==\s*null\s*&&\s*snap\?\.vpd\s*!==\s*undefined\s*&&\s*normalizeVpdStage\(tent\.stage\)\s*===\s*"unknown"\s*&&\s*\(\s*<VpdStageMissingBadge[\s\S]*?tent-detail-vpd-stage-missing-badge/,
     );
   });
 
   it("badge branch performs no alert/queue/automation writes", () => {
-    const m = SRC.match(/tent\.stage\s*==\s*null\s*&&\s*\(([\s\S]*?)\)\}/);
+    const m = SRC.match(/normalizeVpdStage\(tent\.stage\)\s*===\s*"unknown"\s*&&\s*\(([\s\S]*?)\)\}/);
     expect(m).toBeTruthy();
     expect(m![1]).not.toMatch(
       /saveAlert|logAlertEvent|action_queue|service_role|automation|device.control|from\(['"]alerts['"]\)/i,

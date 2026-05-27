@@ -242,7 +242,130 @@ is safe; a payload mutated between retries will be treated as a new reading.
 
 ---
 
-## 10. Known limitations
+## 10. Bridge retry behavior: Full Jitter backoff
+
+Bridge scripts (Raspberry Pi, Node-RED, Python, etc.) should retry **transient**
+network and server failures using Full Jitter exponential backoff. This prevents
+every bridge from hammering the ingest endpoint simultaneously after a Wi-Fi or
+API outage.
+
+### Retry policy
+
+**Retry these (transient failures):**
+
+- Connection timeout / connection refused
+- HTTP `408` Request Timeout
+- HTTP `429` Too Many Requests
+- HTTP `500` Internal Server Error
+- HTTP `502` Bad Gateway
+- HTTP `503` Service Unavailable
+- HTTP `504` Gateway Timeout
+
+**Do NOT retry these (permanent failures):**
+
+- HTTP `400` Bad Request (invalid payload)
+- HTTP `401` Unauthorized (bad or expired token)
+- HTTP `403` Forbidden (tent not owned by caller)
+- HTTP `404` Not Found
+- HTTP `422` Unprocessable Entity
+
+### Formula
+
+```
+delay = random(0, min(max_delay, base_delay * 2^attempt))
+```
+
+| Parameter     | Default          |
+|---------------|------------------|
+| `base_delay`  | 3–4 seconds      |
+| `max_delay`   | 45–60 seconds    |
+| `max_retries` | 4                |
+
+### Key rules
+
+1. Build the payload **once** with a fixed `captured_at` timestamp.
+2. Reuse the **same payload** on every retry — do not regenerate `captured_at`.
+3. Stable payloads allow server-side deduplication (see §9) to work correctly.
+4. After `max_retries` failures, log the error locally and move on.
+
+### Python bridge example
+
+```python
+import random
+import time
+import requests
+from datetime import datetime, timezone
+
+INGEST_URL = "https://<project>.functions.supabase.co/sensor-ingest-webhook"
+SUPABASE_ACCESS_TOKEN = "<SUPABASE_ACCESS_TOKEN>"
+
+MAX_RETRIES = 4
+BASE_DELAY = 3.0   # seconds
+MAX_DELAY = 60.0   # seconds
+
+RETRYABLE_STATUS_CODES = {408, 429, 500, 502, 503, 504}
+
+def build_payload():
+    """Build payload once — captured_at is locked at creation time."""
+    return {
+        "tent_id": "uuid",
+        "source": "pi_bridge",
+        "captured_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "metrics": {
+            "temp_f": 76.4,
+            "humidity_percent": 58.4,
+            "vpd_kpa": 1.25
+        },
+        "metadata": {
+            "device_id": "rpi-garden-01"
+        }
+    }
+
+def send_with_retry(payload):
+    """Post payload with Full Jitter exponential backoff."""
+    headers = {
+        "Authorization": f"******",
+        "Content-Type": "application/json"
+    }
+
+    for attempt in range(MAX_RETRIES + 1):
+        try:
+            response = requests.post(INGEST_URL, json=payload, headers=headers, timeout=10)
+
+            if response.status_code < 400:
+                return response.json()
+
+            if response.status_code not in RETRYABLE_STATUS_CODES:
+                # Permanent failure — do not retry
+                print(f"Non-retryable error {response.status_code}: {response.text}")
+                return None
+
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+            pass  # Transient — fall through to retry
+
+        if attempt < MAX_RETRIES:
+            max_wait = min(MAX_DELAY, BASE_DELAY * (2 ** attempt))
+            delay = random.uniform(0, max_wait)
+            print(f"Retry {attempt + 1}/{MAX_RETRIES} after {delay:.1f}s")
+            time.sleep(delay)
+
+    print("All retries exhausted.")
+    return None
+
+# Usage:
+payload = build_payload()
+send_with_retry(payload)
+```
+
+### Safety note
+
+> **Bridge retries are for transport reliability only.** Retried sensor payloads
+> are still read-only and never trigger AI, alerts, Action Queue, automation, or
+> device control directly.
+
+---
+
+## 11. Known limitations
 
 - No long-lived per-tent ingest tokens yet (V1.5).
 - No DB-level idempotency key — request-level dedupe only.

@@ -1067,6 +1067,45 @@ export type Database = {
         }
         Relationships: []
       }
+      sensor_ingest_audit_log: {
+        Row: {
+          auth_type: string
+          bridge_token_id: string | null
+          captured_at: string
+          created_at: string
+          id: string
+          rows_inserted: number
+          rows_received: number
+          source: string
+          tent_id: string
+          user_id: string
+        }
+        Insert: {
+          auth_type: string
+          bridge_token_id?: string | null
+          captured_at: string
+          created_at?: string
+          id?: string
+          rows_inserted?: number
+          rows_received?: number
+          source: string
+          tent_id: string
+          user_id: string
+        }
+        Update: {
+          auth_type?: string
+          bridge_token_id?: string | null
+          captured_at?: string
+          created_at?: string
+          id?: string
+          rows_inserted?: number
+          rows_received?: number
+          source?: string
+          tent_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       sensor_readings: {
         Row: {
           captured_at: string | null

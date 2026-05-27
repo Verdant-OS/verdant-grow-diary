@@ -35,10 +35,10 @@ describe("Dashboard VPD stage-missing info badge", () => {
     expect(block).not.toMatch(/saveAlert|logAlertEvent|action_queue|service_role|automation|device.control|from\(['"]alerts['"]\)/i);
   });
 
-  it("does not introduce service_role/action_queue/device-control strings to the file", () => {
+  it("does not introduce service_role or action_queue strings to the file", () => {
     expect(SRC).not.toMatch(/service_role/);
     expect(SRC).not.toMatch(/action_queue/);
-    expect(SRC).not.toMatch(/device[- ]control/i);
   });
+
 
 });

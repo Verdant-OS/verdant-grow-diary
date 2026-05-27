@@ -142,8 +142,7 @@ Deno.serve(async (req) => {
   }
 
   // Bump last_used_at only on successful insert.
-  if (auth.kind === "bridge") {
-    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY!);
+  if (auth.kind === "bridge" && admin) {
     await admin
       .from("bridge_tokens")
       .update({ last_used_at: new Date().toISOString() })

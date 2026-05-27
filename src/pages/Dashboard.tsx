@@ -1,3 +1,4 @@
+import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -763,19 +764,10 @@ export default function Dashboard() {
                   </div>
                 </div>
                 {vpdStageMissing && (
-                  <div
-                    data-testid="dashboard-vpd-stage-missing-badge"
-                    role="status"
-                    className="mb-2 rounded-lg border border-border/40 bg-secondary/10 p-2 text-xs text-muted-foreground flex items-center gap-2 flex-wrap"
-                  >
-                    <Badge
-                      variant="outline"
-                      className="text-[10px] uppercase border-muted-foreground text-muted-foreground"
-                    >
-                      Info
-                    </Badge>
-                    <span>Set plant stage to evaluate VPD targets.</span>
-                  </div>
+                  <VpdStageMissingBadge
+                    testId="dashboard-vpd-stage-missing-badge"
+                    className="mb-2"
+                  />
                 )}
                 {alerts.length === 0 ? (
                   <p className="text-sm text-muted-foreground">

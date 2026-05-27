@@ -6,9 +6,7 @@ const SRC = readFileSync(resolve(__dirname, "../pages/Sensors.tsx"), "utf8");
 
 describe("Sensors VPD stage-missing info badge", () => {
   it("still imports from the canonical stage-aware VPD helper module", () => {
-    expect(SRC).toMatch(
-      /from\s+["']@\/lib\/vpdStageTargetRules["']/,
-    );
+    expect(SRC).toMatch(/from\s+["']@\/lib\/vpdStageTargetRules["']/);
   });
 
   it("derives vpdStageMissing from latest VPD value and missing selected-tent stage", () => {
@@ -17,24 +15,27 @@ describe("Sensors VPD stage-missing info badge", () => {
     );
   });
 
-  it("renders the badge with the required copy under the required test hook", () => {
-    expect(SRC).toContain('data-testid="sensors-vpd-stage-missing-badge"');
-    expect(SRC).toContain("Set plant stage to evaluate VPD targets.");
+  it("uses the shared VpdStageMissingBadge component", () => {
+    expect(SRC).toMatch(
+      /import\s+VpdStageMissingBadge\s+from\s+["']@\/components\/VpdStageMissingBadge["']/,
+    );
+    expect(SRC).toMatch(
+      /<VpdStageMissingBadge[\s\S]*?testId=["']sensors-vpd-stage-missing-badge["']/,
+    );
   });
 
   it("gates the badge on the VPD card and vpdStageMissing", () => {
     expect(SRC).toMatch(
-      /m\.key\s*===\s*["']vpd["']\s*&&\s*vpdStageMissing\s*&&\s*\(\s*<div[\s\S]*?sensors-vpd-stage-missing-badge/,
+      /m\.key\s*===\s*["']vpd["']\s*&&\s*vpdStageMissing\s*&&\s*\(\s*<VpdStageMissingBadge[\s\S]*?sensors-vpd-stage-missing-badge/,
     );
   });
 
   it("badge branch performs no alert/queue/automation writes", () => {
-    const match = SRC.match(
+    const m = SRC.match(
       /m\.key\s*===\s*["']vpd["']\s*&&\s*vpdStageMissing\s*&&\s*\(([\s\S]*?)\)\}/,
     );
-    expect(match).toBeTruthy();
-    const block = match![1];
-    expect(block).not.toMatch(
+    expect(m).toBeTruthy();
+    expect(m![1]).not.toMatch(
       /saveAlert|logAlertEvent|action_queue|service_role|automation|device.control|from\(['"]alerts['"]\)/i,
     );
   });

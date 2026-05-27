@@ -2,34 +2,34 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 
-const SRC = readFileSync(
-  resolve(__dirname, "../pages/TentDetail.tsx"),
-  "utf8",
-);
+const SRC = readFileSync(resolve(__dirname, "../pages/TentDetail.tsx"), "utf8");
 
 describe("TentDetail VPD stage-missing info badge", () => {
   it("still imports the canonical stage-aware VPD helper", () => {
-    expect(SRC).toMatch(/classifyVpdAgainstStage[\s\S]*from\s+["']@\/lib\/vpdStageTargetRules["']/);
+    expect(SRC).toMatch(
+      /classifyVpdAgainstStage[\s\S]*from\s+["']@\/lib\/vpdStageTargetRules["']/,
+    );
   });
 
-  it("renders the badge with the required copy under the required test hook", () => {
-    expect(SRC).toContain('data-testid="tent-detail-vpd-stage-missing-badge"');
-    expect(SRC).toContain("Set plant stage to evaluate VPD targets.");
+  it("uses the shared VpdStageMissingBadge component", () => {
+    expect(SRC).toMatch(
+      /import\s+VpdStageMissingBadge\s+from\s+["']@\/components\/VpdStageMissingBadge["']/,
+    );
+    expect(SRC).toMatch(
+      /<VpdStageMissingBadge[\s\S]*?testId=["']tent-detail-vpd-stage-missing-badge["']/,
+    );
   });
 
   it("gates the badge on a present VPD value and missing tent stage", () => {
     expect(SRC).toMatch(
-      /snap\?\.vpd\s*!==\s*null\s*&&\s*snap\?\.vpd\s*!==\s*undefined\s*&&\s*tent\.stage\s*==\s*null\s*&&\s*\(\s*<div[\s\S]*?tent-detail-vpd-stage-missing-badge/,
+      /snap\?\.vpd\s*!==\s*null\s*&&\s*snap\?\.vpd\s*!==\s*undefined\s*&&\s*tent\.stage\s*==\s*null\s*&&\s*\(\s*<VpdStageMissingBadge[\s\S]*?tent-detail-vpd-stage-missing-badge/,
     );
   });
 
   it("badge branch performs no alert/queue/automation writes", () => {
-    const match = SRC.match(
-      /tent\.stage\s*==\s*null\s*&&\s*\(([\s\S]*?)\)\}/,
-    );
-    expect(match).toBeTruthy();
-    const block = match![1];
-    expect(block).not.toMatch(
+    const m = SRC.match(/tent\.stage\s*==\s*null\s*&&\s*\(([\s\S]*?)\)\}/);
+    expect(m).toBeTruthy();
+    expect(m![1]).not.toMatch(
       /saveAlert|logAlertEvent|action_queue|service_role|automation|device.control|from\(['"]alerts['"]\)/i,
     );
   });

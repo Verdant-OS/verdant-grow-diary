@@ -25,15 +25,23 @@ interface Props {
   plantId?: string | null;
   plantName?: string | null;
   growId?: string | null;
+  /** Plant cultivation stage — drives stage-aware VPD classification. */
+  plantStage?: string | null;
 }
 
-export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, plantName, growId }: Props) {
+export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, plantName, growId, plantStage }: Props) {
   const enabled = !!tentId;
   const { data, isLoading } = usePlantTentLatestReadings(tentId ?? null);
   const rows = enabled ? data ?? [] : [];
   const view = buildPlantTentEnvironmentView(rows);
   const recent = buildRecentSensorSnapshotHistory(rows, { limit: 5 });
   const prefill = buildPlantQuickLogPrefill({ plantId, plantName, growId, tentId, tentName });
+  const snap = enabled ? snapshotFromReadings(rows) : null;
+  const vpdClassification = classifyVpdAgainstStage({
+    value: snap?.vpd ?? null,
+    stage: plantStage ?? null,
+    stale: view.stale,
+  });
 
   function openQuickLog() {
     if (!prefill) return;

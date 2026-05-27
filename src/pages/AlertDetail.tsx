@@ -378,6 +378,9 @@ export default function AlertDetail() {
             </div>
             <h2 className="font-display font-semibold text-base">{alert.title}</h2>
             <p className="text-sm text-muted-foreground mt-1">{alert.reason}</p>
+            <div className="mt-3">
+              <AlertWhyContext alert={alert} variant="detailed" />
+            </div>
 
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs mt-4">
               <div className="rounded-lg border border-border/40 bg-secondary/20 p-2">

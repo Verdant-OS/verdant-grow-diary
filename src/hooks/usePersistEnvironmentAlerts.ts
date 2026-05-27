@@ -56,6 +56,11 @@ export interface PersistEnvironmentAlertsInput {
   isDemoData?: boolean;
   /** Default false. Setting false short-circuits the hook entirely. */
   enabled?: boolean;
+  /**
+   * Plant/grow/tent stage. When provided, VPD alerts are evaluated against
+   * stage-aware bands instead of the legacy generic 0.6–1.6 kPa default.
+   */
+  stage?: string | null;
 }
 
 const SOURCE = "environment_alerts";

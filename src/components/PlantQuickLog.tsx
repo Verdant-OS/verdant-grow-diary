@@ -13,7 +13,7 @@
  * Manual sensor values are stored under details.manual_sensor_snapshot with
  * source set to "manual" by the pure helper in src/lib/quickLogRules.ts.
  */
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Camera, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -32,9 +32,12 @@ import {
   parseOptionalNumber,
   type QuickLogSensorInput,
 } from "@/lib/quickLogRules";
-import { computeManualSensorDelta } from "@/lib/manualSensorDeltaRules";
+import {
+  computeChronologyDelta,
+  type ChronologyDelta,
+} from "@/lib/manualSensorChronologyDeltaRules";
 import type { ManualSensorMetric } from "@/lib/manualSensorFreshnessRules";
-import { usePlantManualSensorHistory } from "@/hooks/usePlantManualSensorHistory";
+import { usePlantManualSensorLogs } from "@/hooks/usePlantManualSensorHistory";
 
 interface Props {
   open: boolean;
@@ -60,7 +63,7 @@ export default function PlantQuickLog({
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement | null>(null);
-  const { data: history } = usePlantManualSensorHistory(open ? plantId : null);
+  const { data: logs } = usePlantManualSensorLogs(open ? plantId : null);
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -69,10 +72,17 @@ export default function PlantQuickLog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function deltaFor(metric: ManualSensorMetric, raw: string) {
+  // Fixed "current capture time" for the open session so deltas don't jitter
+  // while typing. Recomputes whenever the sheet re-opens or the underlying
+  // history changes (e.g. after a previous save).
+  const currentCapturedAt = useMemo(
+    () => new Date().toISOString(),
+    [open, logs],
+  );
+
+  function deltaFor(metric: ManualSensorMetric, raw: string): ChronologyDelta | null {
     const current = parseOptionalNumber(raw);
-    const prev = history?.[metric]?.value ?? null;
-    return computeManualSensorDelta(metric, current, prev);
+    return computeChronologyDelta(metric, current, currentCapturedAt, logs ?? []);
   }
 
   function resetForm() {
@@ -353,7 +363,7 @@ interface SensorFieldProps {
   onChange: (v: string) => void;
   inputMode: "decimal" | "numeric";
   step: string;
-  delta: import("@/lib/manualSensorDeltaRules").ManualSensorDelta | null;
+  delta: ChronologyDelta | null;
 }
 
 function SensorField({ id, label, value, onChange, inputMode, step, delta }: SensorFieldProps) {

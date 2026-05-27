@@ -4,6 +4,7 @@ import {
   clampTtlDays,
   sanitizeTokenName,
   looksLikeBridgeToken,
+  formatIngestCount,
   BRIDGE_TOKEN_MAX_TTL_DAYS,
   BRIDGE_TOKEN_MIN_TTL_DAYS,
   BRIDGE_TOKEN_DEFAULT_TTL_DAYS,

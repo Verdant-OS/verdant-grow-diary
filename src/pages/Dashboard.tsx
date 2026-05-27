@@ -21,7 +21,7 @@ import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import DashboardDataSourceDisclosure from "@/components/DashboardDataSourceDisclosure";
 import { useTasks, useAIInsights } from "@/hooks/useMockData";
 import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
-import { useSensorReadings } from "@/hooks/use-sensor-readings";
+import { useSensorReadings, useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useDashboardScopedData } from "@/hooks/useDashboardScopedData";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
@@ -126,6 +126,11 @@ export default function Dashboard() {
   const { data: tasks = [] } = useTasks();
   const { data: rawReadings = [] } = useSensorReadings();
   const readings = groupReadings(rawReadings);
+  // Per-tent sensor windows for the stability summary. Each tent gets its
+  // own 200-row window so a busy tent cannot push another tent's VPD rows
+  // out of a shared global cap. Read-only; no writes.
+  const tentIds = tents.map((t) => t.id);
+  const { byTent: readingsByTent } = useSensorReadingsByTents(tentIds);
   const { data: insights = [] } = useAIInsights();
   const { recent, pending } = useDashboardScopedData(scopedGrowId ?? null);
   // Multi-tent selector for the Latest Environment card. Defaults to "all"
@@ -180,7 +185,8 @@ export default function Dashboard() {
   // Latest reading per tent for the strip + a read-only stability summary
   // computed from the same tent-scoped readings (no extra fetches, no writes).
   const latestPerTent = tents.map((t) => {
-    const rs = readings.filter((r) => r.tentId === t.id);
+    const tentRows = readingsByTent[t.id] ?? [];
+    const rs = groupReadings(tentRows);
     const stability = computeEnvironmentStability(rs, { stage: t.stage });
     return { tent: t, last: rs[rs.length - 1], stability };
   });

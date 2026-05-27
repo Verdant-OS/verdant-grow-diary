@@ -3,6 +3,7 @@ import { Box, Lightbulb } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
 import MetricChip from "@/components/MetricChip";
+import { Badge } from "@/components/ui/badge";
 import EmptyState from "@/components/EmptyState";
 import CreateTentDialog from "@/components/CreateTentDialog";
 import TentCardActionsMenu from "@/components/TentCardActionsMenu";
@@ -90,6 +91,23 @@ export default function Tents() {
                     {last && <MetricChip label="RH" value={last.rh} unit="%" status={last.rh > 65 || last.rh < 35 ? "warn" : "ok"} />}
                     {last && vpdClassification && <MetricChip label="VPD" value={last.vpd} unit=" kPa" status={vpdMetricChipStatus(vpdClassification)} />}
                   </div>
+
+                  {last?.vpd != null && (t.stage ?? null) == null && (
+                    <div
+                      data-testid="tents-list-vpd-stage-missing-badge"
+                      role="status"
+                      className="rounded-lg border border-border/40 bg-secondary/10 p-2 text-xs text-muted-foreground flex items-center gap-2 flex-wrap"
+                    >
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] uppercase border-muted-foreground text-muted-foreground"
+                      >
+                        Info
+                      </Badge>
+                      <span>Set plant stage to evaluate VPD targets.</span>
+                    </div>
+                  )}
+
 
                   <div className="mt-auto flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/40">
                     <span>{plantCount} plants</span>

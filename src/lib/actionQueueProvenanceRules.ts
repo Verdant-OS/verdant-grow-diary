@@ -11,6 +11,7 @@
 export type ActionQueueSource =
   | "environment_alert"
   | "ai_coach"
+  | "ai_doctor"
   | "manual"
   | "unknown";
 
@@ -18,6 +19,7 @@ export type ActionQueueSource =
 export const ACTION_QUEUE_SOURCE_VALUES = {
   ENVIRONMENT_ALERT: "environment_alert",
   AI_COACH: "ai_coach",
+  AI_DOCTOR: "ai_doctor",
   MANUAL: "manual",
 } as const;
 
@@ -50,6 +52,7 @@ export function getActionQueueSourceKind(
   const s = (action?.source ?? "").trim().toLowerCase();
   if (s === "environment_alert") return "environment_alert";
   if (s === "ai_coach") return "ai_coach";
+  if (s === "ai_doctor") return "ai_doctor";
   if (s === "manual") return "manual";
   return "unknown";
 }
@@ -62,6 +65,8 @@ export function getActionQueueSourceLabel(
       return "Environment Alert";
     case "ai_coach":
       return "AI Coach";
+    case "ai_doctor":
+      return "AI Doctor";
     case "manual":
       return "Manual";
     default:

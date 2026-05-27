@@ -1,6 +1,7 @@
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
 import { formatStabilityChipView } from "@/lib/dashboardStabilityChipCopyRules";
+import StabilityChipDrilldown from "@/components/StabilityChipDrilldown";
 import {
   computeStabilityRollup,
   STABILITY_ROLLUP_TONE_CLASS,

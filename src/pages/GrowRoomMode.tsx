@@ -60,6 +60,9 @@ import {
   type QuickActionKind,
   type QuickActionPlantLite,
 } from "@/lib/growRoomQuickActionRules";
+import {
+  classifyVpdAgainstStage,
+} from "@/lib/vpdStageTargetRules";
 
 const QUICK_ACTION_ICON: Record<QuickActionKind, typeof Sprout> = {
   quick_log: NotebookPen,

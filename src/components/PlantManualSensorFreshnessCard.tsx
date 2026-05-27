@@ -157,8 +157,11 @@ function FreshnessTile({ snapshot }: { snapshot: FreshnessSnapshot }) {
             )}
           </span>
           {loggedAt && (
-            <span className="text-[10px] text-muted-foreground/70">
-              {STATE_LABELS[state]} ·{" "}
+            <span
+              className="text-[10px] text-muted-foreground/70"
+              data-testid={`plant-manual-sensor-freshness-${metric}-last-log`}
+            >
+              {STATE_LABELS[state]} · Last manual log{" "}
               {formatDistanceToNow(new Date(loggedAt), { addSuffix: true })}
             </span>
           )}

@@ -160,6 +160,21 @@ export default function TentDetail() {
           </p>
         );
       })()}
+      {snap?.vpd !== null && snap?.vpd !== undefined && tent.stage == null && (
+        <div
+          data-testid="tent-detail-vpd-stage-missing-badge"
+          role="status"
+          className="mb-4 rounded-lg border border-border/40 bg-secondary/10 p-2 text-xs text-muted-foreground flex items-center gap-2 flex-wrap"
+        >
+          <Badge
+            variant="outline"
+            className="text-[10px] uppercase border-muted-foreground text-muted-foreground"
+          >
+            Info
+          </Badge>
+          <span>Set plant stage to evaluate VPD targets.</span>
+        </div>
+      )}
 
       <div className="glass rounded-2xl p-4 mb-6">
         <div className="flex items-center justify-between gap-2 flex-wrap mb-3">

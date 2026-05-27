@@ -252,15 +252,12 @@ export function normalizeWebhookIngestPayload(
         ts: capturedAtIso!,
         quality: "ok",
         device_id:
-          (input.metadata && typeof input.metadata === "object"
-            ? (input.metadata as Record<string, unknown>).device_id
-            : undefined) instanceof Object
-            ? null
-            : (typeof (input.metadata as Record<string, unknown> | null)
-                ?.device_id === "string"
-                ? ((input.metadata as Record<string, unknown>)
-                    .device_id as string)
-                : null),
+          input.metadata &&
+          typeof input.metadata === "object" &&
+          typeof (input.metadata as Record<string, unknown>).device_id ===
+            "string"
+            ? ((input.metadata as Record<string, unknown>).device_id as string)
+            : null,
         raw_payload: sanitizeRawPayload(input) as unknown as NormalizedRow["raw_payload"],
       });
 

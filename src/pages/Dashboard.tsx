@@ -1,6 +1,7 @@
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
 import { formatStabilityChipView } from "@/lib/dashboardStabilityChipCopyRules";
+import StabilityChipDrilldown from "@/components/StabilityChipDrilldown";
 import {
   computeStabilityRollup,
   STABILITY_ROLLUP_TONE_CLASS,
@@ -306,11 +307,13 @@ export default function Dashboard() {
                       <MetricChip label="VPD" value={last.vpd ?? "—"} unit=" kPa" status={vpdMetricChipStatus(classifyVpdAgainstStage({ value: last.vpd ?? null, stage: tent.stage }))} />
                     </div>
                   )}
-                  <div
-                    data-testid={`dashboard-stability-chip-${tent.id}`}
-                    className={`mt-1.5 inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${stabilityView.toneClass}`}
-                  >
-                    {stabilityView.copy}
+                  <div className="mt-1.5">
+                    <StabilityChipDrilldown
+                      tentId={tent.id}
+                      tentName={tent.name}
+                      stability={stability}
+                      view={stabilityView}
+                    />
                   </div>
                 </Link>
               );

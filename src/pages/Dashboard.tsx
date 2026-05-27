@@ -262,20 +262,7 @@ export default function Dashboard() {
           <h2 className="font-display font-semibold mb-3">Environment strip</h2>
           <div className="space-y-2.5">
             {latestPerTent.map(({ tent, last, stability }) => {
-              const stabilityCopy =
-                stability.status === "stage_unknown"
-                  ? "Set stage for VPD stability"
-                  : stability.status === "context_only"
-                    ? "VPD context only"
-                    : stability.status === "unavailable"
-                      ? "Stability: unavailable"
-                      : `Outside 24h: ${Math.round(stability.last24h.hoursOutside * 10) / 10}h`;
-              const stabilityToneClass =
-                stability.status === "unstable"
-                  ? "border-destructive/60 text-destructive"
-                  : stability.status === "watch"
-                    ? "border-[hsl(var(--warning))] text-[hsl(var(--warning))]"
-                    : "border-border/50 text-muted-foreground";
+              const stabilityView = formatStabilityChipView(stability);
               return (
                 <Link key={tent.id} to={`/tents/${tent.id}`} className="block rounded-xl border border-border/40 p-3 hover:bg-secondary/30 transition">
                   <div className="flex items-center justify-between mb-1.5">

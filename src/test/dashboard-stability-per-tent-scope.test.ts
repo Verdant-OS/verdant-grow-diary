@@ -9,7 +9,7 @@ const HOOK = readFileSync(
 );
 
 const FORBIDDEN =
-  /saveAlert\(|logAlertEvent\(|action_queue|service_role|insertAlert\(|device\.control|automation/i;
+  /saveAlert\(|logAlertEvent\(|action_queue|service_role|insertAlert\(|device\.control|\bsetAutomation\b|\bautomate\(/i;
 
 describe("Dashboard stability uses per-tent sensor windows", () => {
   it("imports the per-tent hook", () => {

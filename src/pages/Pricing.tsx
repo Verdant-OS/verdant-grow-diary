@@ -270,7 +270,7 @@ export default function Pricing() {
           <TrustCard
             icon={<ShieldCheck className="h-5 w-5" />}
             title="Grower stays in control"
-            body="Verdant suggests, you decide. AI-assisted insights are cautious by design. Verdant does not control your equipment and there is no autopilot."
+            body="Verdant suggests, you decide. AI-assisted insights are cautious by design. Verdant does not control your equipment and never makes decisions for you."
           />
         </div>
       </section>

@@ -43,6 +43,11 @@ import {
   vpdMetricChipStatus,
   VPD_STAGE_HELPER_TEXT,
 } from "@/lib/vpdStageTargetRules";
+import {
+  classifyTempAgainstStage,
+  classifyRhAgainstStage,
+  environmentMetricChipStatus,
+} from "@/lib/environmentStageTargetRules";
 import { cn } from "@/lib/utils";
 
 export default function TentDetail() {

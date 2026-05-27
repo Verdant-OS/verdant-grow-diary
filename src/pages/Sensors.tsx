@@ -1,4 +1,6 @@
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
+import EnvironmentStabilityCard from "@/components/EnvironmentStabilityCard";
+import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
 import { useState } from "react";
 import { Activity } from "lucide-react";
 import PageHeader from "@/components/PageHeader";

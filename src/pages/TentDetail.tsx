@@ -170,6 +170,10 @@ export default function TentDetail() {
 
       <TentManualSnapshotHistoryList tentId={id ?? null} readings={readings} />
 
+      {id && (
+        <TentCsvImportCard tentId={id} growId={tent.growId ?? null} />
+      )}
+
       <div className="glass rounded-2xl p-4">
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <h2 className="font-display font-semibold">

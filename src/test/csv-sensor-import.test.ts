@@ -250,7 +250,7 @@ const CARD = stripComments(CARD_RAW);
 // NOT banned — Gate 2A is the CSV Drop feature and legitimately uses tokens
 // like `csv_import_ac_infinity`, "CSV Import", file names, etc.
 const BANNED_UNSAFE =
-  /openai|anthropic|ai[-_]?doctor|\bmqtt\b|home[\s_-]?assistant|\bwebhook\b|\brelay\b|\bactuator\b|service_role|autopilot|auto[-_ ]?execute|fetch\(\s*["']https?:/i;
+  /openai|anthropic|ai[-_]?doctor|\bmqtt\b|home[\s_-]?assistant|webhook|\brelay\b|\bactuator\b|service_role|autopilot|auto[-_ ]?execute|fetch\(\s*["']https?:/i;
 
 describe("Gate 2A safety contract (source-level)", () => {
   it("rules + card never write to alerts / action_queue / plants / tents / diary_entries", () => {

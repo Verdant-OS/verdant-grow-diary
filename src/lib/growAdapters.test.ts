@@ -123,6 +123,19 @@ describe("mapPlantRow", () => {
     expect(p.lastNote).toBe("");
     expect(p.health).toBe("healthy");
   });
+  it("preserves null stage as null (does not coerce to seedling)", () => {
+    const p = mapPlantRow({ ...plantRow, stage: null as unknown as string });
+    expect(p.stage).toBeNull();
+  });
+  it("preserves unmapped/invalid stage as null", () => {
+    const p = mapPlantRow({ ...plantRow, stage: "bogus" });
+    expect(p.stage).toBeNull();
+  });
+  it("preserves valid seedling/veg/flower stages", () => {
+    expect(mapPlantRow({ ...plantRow, stage: "seedling" }).stage).toBe("seedling");
+    expect(mapPlantRow({ ...plantRow, stage: "veg" }).stage).toBe("veg");
+    expect(mapPlantRow({ ...plantRow, stage: "flower" }).stage).toBe("flower");
+  });
 });
 
 describe("mapSensorReadingRow", () => {

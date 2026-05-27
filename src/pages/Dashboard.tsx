@@ -260,24 +260,46 @@ export default function Dashboard() {
         <div className="glass rounded-2xl p-4">
           <h2 className="font-display font-semibold mb-3">Environment strip</h2>
           <div className="space-y-2.5">
-            {latestPerTent.map(({ tent, last }) => (
-              <Link key={tent.id} to={`/tents/${tent.id}`} className="block rounded-xl border border-border/40 p-3 hover:bg-secondary/30 transition">
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">{tent.name}</span>
-                    <StageBadge stage={tent.stage as Stage} />
+            {latestPerTent.map(({ tent, last, stability }) => {
+              const stabilityCopy =
+                stability.status === "stage_unknown"
+                  ? "Set stage for VPD stability"
+                  : stability.status === "context_only"
+                    ? "VPD context only"
+                    : stability.status === "unavailable"
+                      ? "Stability: unavailable"
+                      : `Outside 24h: ${Math.round(stability.last24h.hoursOutside * 10) / 10}h`;
+              const stabilityToneClass =
+                stability.status === "unstable"
+                  ? "border-destructive/60 text-destructive"
+                  : stability.status === "watch"
+                    ? "border-[hsl(var(--warning))] text-[hsl(var(--warning))]"
+                    : "border-border/50 text-muted-foreground";
+              return (
+                <Link key={tent.id} to={`/tents/${tent.id}`} className="block rounded-xl border border-border/40 p-3 hover:bg-secondary/30 transition">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm">{tent.name}</span>
+                      <StageBadge stage={tent.stage as Stage} />
+                    </div>
+                    { /* alertCount removed — not available in Supabase schema */ }
                   </div>
-                  { /* alertCount removed — not available in Supabase schema */ }
-                </div>
-                {last && (
-                  <div className="flex flex-wrap gap-1.5">
-                    <MetricChip label="T" value={last.temp != null ? (tempFFromC(last.temp) ?? 0).toFixed(1) : "—"} unit="°F" status={last.temp != null && (last.temp > 28 || last.temp < 19) ? "warn" : "ok"} />
-                    <MetricChip label="RH" value={last.rh ?? "—"} unit="%" status={last.rh != null && (last.rh > 65 || last.rh < 35) ? "warn" : "ok"} />
-                    <MetricChip label="VPD" value={last.vpd ?? "—"} unit=" kPa" status={last.vpd != null && (last.vpd > 1.6 || last.vpd < 0.6) ? "warn" : "ok"} />
+                  {last && (
+                    <div className="flex flex-wrap gap-1.5">
+                      <MetricChip label="T" value={last.temp != null ? (tempFFromC(last.temp) ?? 0).toFixed(1) : "—"} unit="°F" status={last.temp != null && (last.temp > 28 || last.temp < 19) ? "warn" : "ok"} />
+                      <MetricChip label="RH" value={last.rh ?? "—"} unit="%" status={last.rh != null && (last.rh > 65 || last.rh < 35) ? "warn" : "ok"} />
+                      <MetricChip label="VPD" value={last.vpd ?? "—"} unit=" kPa" status={last.vpd != null && (last.vpd > 1.6 || last.vpd < 0.6) ? "warn" : "ok"} />
+                    </div>
+                  )}
+                  <div
+                    data-testid={`dashboard-stability-chip-${tent.id}`}
+                    className={`mt-1.5 inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${stabilityToneClass}`}
+                  >
+                    {stabilityCopy}
                   </div>
-                )}
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         </div>
       </div>

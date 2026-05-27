@@ -23,15 +23,15 @@ describe("GrowRoomMode VPD stage-missing info badge", () => {
     );
   });
 
-  it("gates the badge on a present VPD value and missing tent stage", () => {
+  it("gates the badge on a present VPD value and unknown-normalized tent stage", () => {
     expect(SRC).toMatch(
-      /card\.snapshot\?\.vpd\s*!=\s*null\s*&&\s*\n?\s*\(tentStageById\[card\.tentId\]\s*\?\?\s*null\)\s*===\s*null\s*&&\s*\(\s*<VpdStageMissingBadge[\s\S]*?grow-room-vpd-stage-missing-badge/,
+      /card\.snapshot\?\.vpd\s*!=\s*null\s*&&\s*\n?\s*normalizeVpdStage\(tentStageById\[card\.tentId\]\)\s*===\s*"unknown"\s*&&\s*\(\s*<VpdStageMissingBadge[\s\S]*?grow-room-vpd-stage-missing-badge/,
     );
   });
 
   it("badge branch performs no alert/queue/automation writes", () => {
     const m = SRC.match(
-      /\(tentStageById\[card\.tentId\]\s*\?\?\s*null\)\s*===\s*null\s*&&\s*\(([\s\S]*?)\)\}/,
+      /normalizeVpdStage\(tentStageById\[card\.tentId\]\)\s*===\s*"unknown"\s*&&\s*\(([\s\S]*?)\)\}/,
     );
     expect(m).toBeTruthy();
     expect(m![1]).not.toMatch(

@@ -9,7 +9,8 @@ import TentCardActionsMenu from "@/components/TentCardActionsMenu";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
-import { useSensorReadings, usePlants } from "@/hooks/useMockData";
+import { useSensorReadings } from "@/hooks/useMockData";
+import { useGrowPlants } from "@/hooks/useGrowData";
 import { useGrowTents, getGrowDataMeta } from "@/hooks/useGrowData";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { tentsPath } from "@/lib/routes";
@@ -21,7 +22,10 @@ export default function Tents() {
   const validGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
   const { data: tents = [], isLoading } = useGrowTents(urlGrowId ?? undefined);
   const { data: readings = [] } = useSensorReadings();
-  const { data: plants = [] } = usePlants();
+  // AUD-001 fix: use real plants (Supabase, RLS-scoped) instead of mock
+  // so plant counts match the assigned-tent reality. Mock plants reference
+  // mock tent ids ("t1"..) which never match real tent UUIDs.
+  const { data: plants = [] } = useGrowPlants(undefined, urlGrowId ?? undefined);
   const tentsMeta = getGrowDataMeta(["grow", "tents", urlGrowId ?? "all"]);
 
   return (

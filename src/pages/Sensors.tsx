@@ -27,15 +27,27 @@ export default function Sensors() {
   const filtered = readings.filter((r) => r.tentId === tentId);
   const latest = filtered.length > 0 ? filtered[filtered.length - 1] : null;
 
-  // useGrowSensorReadings currently silently falls back to mock data
-  // (documented in docs/grow-os-architecture.md). Until that fallback is
-  // removed, we honestly label what is on screen as Demo data and surface
-  // Unavailable when the slice is empty.
+  // AUD-003 fix: classify based on the actual latest reading. If a reading
+  // exists but is older than the freshness window, label it "Stale" and
+  // still render the chart instead of hiding it as "Unavailable". Only the
+  // truly-empty case should render the empty state.
+  // `useGrowSensorReadings` currently silently falls back to mock data
+  // (documented in docs/grow-os-architecture.md); when the slice is empty we
+  // honestly classify it as Unavailable rather than fabricating a source.
+  const latestSourceRaw =
+    (latest as unknown as { source?: string | null } | null)?.source ?? null;
+  const latestSource =
+    typeof latestSourceRaw === "string" && latestSourceRaw.length > 0
+      ? latestSourceRaw
+      : latest
+        ? "demo"
+        : null;
   const classification = classifyGrowDataSource(
     latest
-      ? { source: "demo", value: latest.temp, timestamp: latest.ts }
+      ? { source: latestSource, value: latest.temp, timestamp: latest.ts }
       : { source: null, value: null, timestamp: null },
   );
+  const hasReadings = filtered.length > 0;
 
   const manualTents = realTents.map((t) => ({ id: t.id as string, name: t.name as string }));
   // Only auto-default when the chip-selected tent exists as a real DB tent;
@@ -62,8 +74,11 @@ export default function Sensors() {
               <h3 className="font-display font-semibold">{m.label}</h3>
               <GrowDataSourceBadge classification={classification} />
             </div>
-            {classification.label === "Unavailable" ? (
-              <p className="text-xs text-muted-foreground py-6 text-center">
+            {!hasReadings ? (
+              <p
+                className="text-xs text-muted-foreground py-6 text-center"
+                data-testid={`sensors-empty-${m.key}`}
+              >
                 No reading available.
               </p>
             ) : (

@@ -123,13 +123,13 @@ export function usePersistEnvironmentAlerts(
       }
 
       // 3. Load currently-open alerts for this grow and dedupe by rule key.
-      let openRows: { metric: string | null; source: string | null; reason: string }[] = [];
+      let openRows: { metric: string | null; source: string | null; title: string }[] = [];
       try {
         const rows = await listAlerts({ growId, status: "open" });
         openRows = rows.map((r) => ({
           metric: r.metric ?? null,
           source: r.source ?? null,
-          reason: r.reason,
+          title: r.title,
         }));
       } catch (err) {
         if (!cancelled) {
@@ -145,13 +145,13 @@ export function usePersistEnvironmentAlerts(
       const existing = new Set(
         openRows.map((r) =>
           derivedAlertKey(
-            // Shape-compatible: derivedAlertKey only reads metric/reason.
+            // Shape-compatible: derivedAlertKey only reads metric/title.
             {
               id: "",
               severity: "info",
               metric: (r.metric ?? "snapshot") as EnvironmentAlert["metric"],
-              title: "",
-              reason: r.reason,
+              title: r.title,
+              reason: "",
               source: "sensor_snapshot",
               createdAt: "",
             },

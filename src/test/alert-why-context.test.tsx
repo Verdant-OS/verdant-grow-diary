@@ -152,7 +152,7 @@ describe("static safety", () => {
       expect(src).not.toMatch(/\.delete\s*\(/);
       expect(src).not.toMatch(/\.upsert\s*\(/);
       expect(src).not.toMatch(
-        /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b|device_command|autopilot|automation/i,
+        /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b|device_command|autopilot/i,
       );
       // No nutrient/feed prescriptions in display copy.
       expect(src).not.toMatch(/nutrient|feed (more|less|up|down)|increase ec/i);

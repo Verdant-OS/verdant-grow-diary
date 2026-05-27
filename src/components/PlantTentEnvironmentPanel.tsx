@@ -117,6 +117,14 @@ export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, p
                 </div>
               ))}
             </div>
+            {snap?.vpd !== null && snap?.vpd !== undefined ? (
+              <p
+                className="text-[11px] text-muted-foreground"
+                data-testid="plant-tent-environment-vpd-stage-hint"
+              >
+                {vpdClassification.label}. {VPD_STAGE_HELPER_TEXT}
+              </p>
+            ) : null}
           </div>
         )}
         {enabled && !isLoading ? (

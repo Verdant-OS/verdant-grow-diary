@@ -75,6 +75,9 @@ function toRow(
     // QuickLog does not currently persist a source label on the snapshot.
     // We never invent one — leave null unless future writers store it.
     snapshotSourceLabel: null,
+    // Quick Log entries are the only manual diary writers today. We rely on
+    // the deterministic event_type tag from quickLogRules.QUICK_LOG_EVENT_TYPE.
+    isManualEntry: entry.eventType === "quick_log",
     warnings: entry.warnings,
     hasHardwareReadings: split.hasHardwareBlock,
     hardwareReadingLines: split.hardwareLines,

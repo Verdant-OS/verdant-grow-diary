@@ -133,60 +133,146 @@ full contract.
 
 ---
 
-## 7. Arduino sketch example
+## 7. Arduino sketch example (SHT31 → Verdant)
 
-> Placeholders only. **Do not commit real Wi-Fi credentials or bearer
-> tokens to source control.** Use a secrets header, NVS, or a build-time
-> define.
+> Placeholders only. **Do not commit real Wi-Fi credentials, API keys, or
+> bearer tokens to source control.** Use a `secrets.h`, NVS, or a
+> build-time `-D` define.
+
+This sketch matches Verdant's generic webhook payload contract exactly:
+`source = "esp32_arduino_sht31"`, sensor values in `metrics`, device
+diagnostics in `metadata`. `device_id` lives **inside `metadata`**, never
+at the top level.
 
 ```cpp
+// ─────────────────────────────────────────────────────────────────────
+// Verdant ESP32 + SHT31 example sketch
+//
+// Verdant safety notes (read before flashing):
+//   • ESP32 data is *source-tagged* — every row carries
+//     source="esp32_arduino_sht31" and renders with an ESP32/Webhook badge.
+//   • ESP32 data is *read-only* into Verdant. Verdant never sends commands
+//     back to this device, your relays, fans, pumps, or lights.
+//   • ESP32 data *never triggers device control* and never creates
+//     Action Queue items on its own.
+//   • Verdant may mark readings *stale* or *lower-confidence* if reporting
+//     stops, the clock drifts, or values fall outside safe ranges.
+// ─────────────────────────────────────────────────────────────────────
+
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <Wire.h>
+#include <Adafruit_SHT31.h>
+#include <time.h>
 
 // ─── Placeholders — replace at build time or from NVS ────────────────
-const char* WIFI_SSID     = "<YOUR_WIFI_SSID>";
-const char* WIFI_PASSWORD = "<YOUR_WIFI_PASSWORD>";
-const char* VERDANT_URL   = "https://<your-project>.supabase.co/functions/v1/sensor-ingest-webhook";
-const char* BEARER_TOKEN  = "<YOUR_SESSION_OR_BRIDGE_TOKEN>";
-const char* TENT_ID       = "<TENT_UUID>";
+const char* WIFI_SSID       = "<YOUR_WIFI_SSID>";
+const char* WIFI_PASSWORD   = "<YOUR_WIFI_PASSWORD>";
+const char* webhookURL      = "<https://YOUR-PROJECT.functions.supabase.co/sensor-ingest-webhook>";
+const char* verdantApiKey   = "<YOUR_SESSION_OR_BRIDGE_TOKEN>"; // sent as: Authorization: Bearer <token>
+const char* TENT_ID         = "<TENT_UUID>";
+const char* DEVICE_ID       = "esp32-sht31-tent1";
+
+// 2-minute reporting interval is a sensible default.
+// Faster than 60 seconds is usually unnecessary for tent climate and
+// just adds network/battery cost without changing the trend signal.
+const unsigned long REPORT_INTERVAL_MS = 120UL * 1000UL;
+
+Adafruit_SHT31 sht31 = Adafruit_SHT31();
 
 void connectWifi() {
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  while (WiFi.status() != WL_CONNECTED) { delay(500); }
+  unsigned long started = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - started < 15000) {
+    delay(500);
+  }
 }
 
-void postReading(float tempF, float humidityPct, float vpdKpa) {
+void syncClock() {
+  // NTP — required so captured_at is correct.
+  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+  struct tm tm;
+  unsigned long started = millis();
+  while (!getLocalTime(&tm, 500) && millis() - started < 10000) { /* wait */ }
+}
+
+String isoTimestampZ() {
+  time_t now = time(nullptr);
+  struct tm tm;
+  gmtime_r(&now, &tm);
+  char buf[25];
+  strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &tm);
+  return String(buf);
+}
+
+// Basic VPD (kPa) from temperature (°C) and RH (%).
+// Tetens' approximation — good enough for grow-room trend data.
+float vpdKpa(float tempC, float rhPct) {
+  float es = 0.6108f * expf((17.27f * tempC) / (tempC + 237.3f));
+  float ea = es * (rhPct / 100.0f);
+  float v  = es - ea;
+  return v < 0 ? 0 : v;
+}
+
+void postReading() {
   if (WiFi.status() != WL_CONNECTED) connectWifi();
 
+  float tempC = sht31.readTemperature();
+  float rh    = sht31.readHumidity();
+  if (isnan(tempC) || isnan(rh)) {
+    // Skip — Verdant would reject NaN. Better to send nothing than fake data.
+    return;
+  }
+  float tempF = tempC * 9.0f / 5.0f + 32.0f;
+  float vpd   = vpdKpa(tempC, rh);
+
   StaticJsonDocument<512> doc;
+  // tent_id is required by the webhook contract; everything else below
+  // matches the spec payload shape exactly.
   doc["tent_id"]     = TENT_ID;
   doc["source"]      = "esp32_arduino_sht31";
-  doc["captured_at"] = "2026-05-26T20:00:00Z"; // use NTP in production
-  JsonObject m = doc.createNestedObject("metrics");
-  m["temp_f"]          = tempF;
-  m["humidity_percent"] = humidityPct;
-  m["vpd_kpa"]         = vpdKpa;
-  JsonObject meta = doc.createNestedObject("metadata");
-  meta["device_id"]    = "esp32-canopy-1";
-  meta["sensor_model"] = "SHT31";
-  meta["rssi"]         = WiFi.RSSI();
+  doc["captured_at"] = isoTimestampZ();
+
+  JsonObject metrics = doc.createNestedObject("metrics");
+  metrics["temp_f"]           = tempF;        // °F  — Verdant normalizes to temperature_c
+  metrics["humidity_percent"] = rh;           // %RH — Verdant normalizes to humidity_pct
+  metrics["vpd_kpa"]          = vpd;          // kPa
+
+  JsonObject metadata = doc.createNestedObject("metadata");
+  metadata["device_id"]    = DEVICE_ID;       // device_id lives in metadata, not top-level
+  metadata["sensor_model"] = "SHT31";
+  metadata["rssi"]         = WiFi.RSSI();
 
   String body;
   serializeJson(doc, body);
 
   HTTPClient http;
-  http.begin(VERDANT_URL);
+  http.begin(webhookURL);
   http.addHeader("Content-Type", "application/json");
-  http.addHeader("Authorization", String("Bearer ") + BEARER_TOKEN);
+  http.addHeader("Authorization", String("Bearer ") + verdantApiKey);
   int status = http.POST(body);
-  // Handle non-2xx: log, back off, retry on next loop.
+  // Non-2xx: log and back off. Do not retry tightly — Verdant dedupes
+  // identical (tent_id, source, captured_at) payloads but tight retries
+  // still waste battery and Wi-Fi.
+  (void)status;
   http.end();
+}
+
+void setup() {
+  Wire.begin();
+  sht31.begin(0x44);
+  connectWifi();
+  syncClock();
+}
+
+void loop() {
+  postReading();
+  delay(REPORT_INTERVAL_MS);
 }
 ```
 
-Use NTP (`configTime(...)` with a pool server) to keep `captured_at`
-correct. A node with a wrong clock will look stale or future-dated.
+
 
 ---
 

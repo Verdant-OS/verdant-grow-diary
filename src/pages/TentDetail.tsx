@@ -173,8 +173,9 @@ export default function TentDetail() {
       <EnvironmentStabilityCard
         testId="tent-detail-environment-stability"
         className="mb-4"
-        result={computeEnvironmentStability(readings, { stage: tent.stage })}
+        result={computeEnvironmentStability(series, { stage: tent.stage })}
       />
+
 
 
 

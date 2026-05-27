@@ -9,6 +9,14 @@ import { AlertTriangle, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { AiContextSufficiencyResult } from "@/lib/aiContextSufficiencyRules";
+import {
+  CONFIDENCE_CEILING_CAPS,
+  CONFIDENCE_LIMITED_COPY,
+} from "@/lib/aiDoctorConfidenceRules";
+
+function ceilingPct(ceiling: AiContextSufficiencyResult["confidenceCeiling"]): number {
+  return Math.round(CONFIDENCE_CEILING_CAPS[ceiling] * 100);
+}
 
 const MISSING_LABEL: Record<string, string> = {
   "active-grow": "An active grow",
@@ -81,18 +89,19 @@ export default function CoachContextSufficiencyPanel({ result, className }: Prop
           variant="default"
           data-testid="coach-context-confidence-ceiling"
           data-label="high"
+          data-ceiling-pct={ceilingPct("high")}
           className="ml-auto text-[10px] uppercase tracking-wide"
         >
-          High confidence allowed
+          Up to {ceilingPct("high")}% confidence
         </Badge>
       </div>
     );
   }
 
   const headlineByCeiling: Record<AiContextSufficiencyResult["confidenceCeiling"], string> = {
-    high: "AI confidence is not capped, but some context is missing.",
-    medium: "AI confidence will be capped at medium because context is partial or demo-backed.",
-    low: "AI confidence will be capped at low because real grow context is missing or demo-backed.",
+    high: `AI confidence is not capped (up to ${ceilingPct("high")}%), but some context is missing.`,
+    medium: `AI confidence will be capped at ${ceilingPct("medium")}% because context is partial or demo-backed.`,
+    low: `AI confidence will be capped at ${ceilingPct("low")}% because real grow context is missing or demo-backed.`,
   };
 
   const Icon = confidenceCeiling === "low" ? ShieldAlert : AlertTriangle;
@@ -100,6 +109,8 @@ export default function CoachContextSufficiencyPanel({ result, className }: Prop
     confidenceCeiling === "low"
       ? "text-destructive"
       : "text-[hsl(var(--warning))]";
+
+  const isLimited = confidenceCeiling === "low" || confidenceCeiling === "medium";
 
   return (
     <div
@@ -118,13 +129,10 @@ export default function CoachContextSufficiencyPanel({ result, className }: Prop
           variant={confidenceCeiling === "low" ? "destructive" : "secondary"}
           data-testid="coach-context-confidence-ceiling"
           data-label={confidenceCeiling}
+          data-ceiling-pct={ceilingPct(confidenceCeiling)}
           className="ml-auto text-[10px] uppercase tracking-wide"
         >
-          {confidenceCeiling === "low"
-            ? "Low confidence"
-            : confidenceCeiling === "medium"
-              ? "Capped at medium"
-              : "Capped"}
+          Up to {ceilingPct(confidenceCeiling)}% confidence
         </Badge>
       </div>
 
@@ -132,6 +140,16 @@ export default function CoachContextSufficiencyPanel({ result, className }: Prop
         {headlineByCeiling[confidenceCeiling]} You can still ask, but answers will be
         labeled as limited-context guidance.
       </p>
+
+      {isLimited && (
+        <p
+          data-testid="coach-context-confidence-limited-copy"
+          className="text-xs text-muted-foreground italic"
+        >
+          {CONFIDENCE_LIMITED_COPY}
+        </p>
+      )}
+
 
       {missing.length > 0 && (
         <div data-testid="coach-context-missing">

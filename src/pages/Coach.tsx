@@ -160,6 +160,69 @@ export default function Coach() {
     toast.success("Action queued for approval.");
   }
 
+  // Sanitized structured diagnosis from AI Doctor v1 (approval-first).
+  const diagnosis: Diagnosis | null = useMemo(() => {
+    if (!result?.diagnosis) return null;
+    return validateAndSanitizeDiagnosis(result.diagnosis).diagnosis;
+  }, [result?.diagnosis]);
+  const [doctorQueuedKeys, setDoctorQueuedKeys] = useState<Set<string>>(new Set());
+
+  // SECURITY: never send user_id from the client. status pins pending_approval.
+  // Source is "ai_doctor"; no device commands. Idempotent per (title|detail).
+  async function addDoctorSuggestionToQueue(
+    action: DiagnosisSuggestedAction,
+  ): Promise<void> {
+    if (!user || !activeGrowId || !diagnosis) return;
+    const key = `${action.title}::${action.detail}`;
+    if (doctorQueuedKeys.has(key)) return;
+    const risk: "low" | "medium" | "high" = action.priority;
+    const { data: inserted, error } = await supabase
+      .from("action_queue")
+      .insert({
+        grow_id: activeGrowId,
+        action_type: action.type === "task" ? "task" : "advisory",
+        target_metric: "general",
+        suggested_change: `${action.title}: ${action.detail}`,
+        reason:
+          action.reason ||
+          diagnosis.likelyIssue ||
+          diagnosis.summary ||
+          "AI Doctor suggestion",
+        risk_level: risk,
+        source: ACTION_QUEUE_SOURCE_VALUES.AI_DOCTOR,
+        status: "pending_approval",
+      })
+      .select("id,grow_id")
+      .single();
+    if (error) {
+      const msg = (error.message || "").toLowerCase();
+      if (
+        error.code === "42501" ||
+        msg.includes("row-level security") ||
+        msg.includes("violates")
+      ) {
+        toast.error(
+          "This action cannot be queued until the plant/tent is assigned to this grow.",
+          { description: "Open Lineage Repair to assign tents to this grow." },
+        );
+        return;
+      }
+      toast.error(error.message);
+      return;
+    }
+    setDoctorQueuedKeys((s) => new Set(s).add(key));
+    if (inserted?.id) {
+      await supabase.from("action_queue_events").insert({
+        action_queue_id: inserted.id,
+        grow_id: inserted.grow_id ?? activeGrowId,
+        event_type: "created",
+        previous_status: null,
+        new_status: "pending_approval",
+        note: "Created from AI Doctor suggestion (approval required)",
+      });
+    }
+    toast.success("AI Doctor suggestion queued for approval.");
+
   async function ask(mode: Mode) {
     if (!user) return;
     setBusy(true); setResult(null);

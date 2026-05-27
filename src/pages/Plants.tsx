@@ -120,19 +120,14 @@ export default function Plants() {
       : visibleAfterArchive.filter((p) => p.tentId === tentFilter);
   const filtered = filterPlantsBySearch(visibleAfterTent, search, tents);
 
-  // Filter button entries with per-tent counts (respects archived visibility).
-  const filterEntries = [
-    {
-      id: "all",
-      name: "All tents",
-      count: showArchived ? allPlants.length : getActivePlantCount(allPlants),
-    },
-    ...tents.map((t) => {
-      const inTent = allPlants.filter((p) => p.tentId === t.id);
-      const count = showArchived ? inTent.length : getActivePlantCount(inTent);
-      return { id: t.id, name: t.name, count };
-    }),
-  ];
+  // Filter chips — counts MUST match what the grid will render under the
+  // currently-applied archived + search filters (AUD-005). Tent buckets
+  // are derived from the same post-archive + post-search set the grid
+  // uses, so chip totals and visible card counts always agree.
+  const filterEntries = buildPlantsTentFilterChips(allPlants, tents, {
+    showArchived,
+    search,
+  });
 
   // Filter summary — counts only active plants under the current grow scope.
   const summary = summarizePlantsPageFilters(allPlants, {

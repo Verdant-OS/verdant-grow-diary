@@ -39,6 +39,7 @@ import {
 } from "@/lib/archivedPlantVisibilityRules";
 import {
   classifyVpdAgainstStage,
+  normalizeVpdStage,
   vpdMetricChipStatus,
   VPD_STAGE_HELPER_TEXT,
 } from "@/lib/vpdStageTargetRules";

@@ -1,0 +1,392 @@
+# Using ESP32 with Verdant
+
+ESP32 is supported as a **DIY sensor source** for Verdant by POSTing readings
+to Verdant's existing **generic webhook ingest** endpoint. Verdant does **not**
+ship or maintain firmware, no device onboarding UI exists, and there is no
+Verdant-hosted MQTT subscriber. You build the device; Verdant gives it a safe,
+read-only home for its readings.
+
+> **Read-only.** ESP32 readings flow *into* Verdant. They never trigger
+> device control, automation, alerts, the Action Queue, or AI Doctor logic
+> by themselves.
+
+---
+
+## 1. Recommended architecture (direct HTTPS)
+
+```text
+ESP32 (Arduino or ESPHome)
+    │  HTTPS POST (Bearer auth)
+    ▼
+Verdant webhook  →  sensor_readings  →  source badge + staleness + confidence
+```
+
+This is the simplest and most robust pattern for a single ESP32 with Wi-Fi.
+
+## 2. MQTT architecture (bridge pattern)
+
+Verdant does **not** subscribe to MQTT directly. Use a local bridge:
+
+```text
+ESP32  ──MQTT──▶  Local MQTT broker
+                       │
+                       ▼
+              Node-RED / Raspberry Pi bridge
+                       │  HTTPS POST
+                       ▼
+                 Verdant webhook
+```
+
+The bridge is responsible for batching, retrying, and normalizing payloads
+before they reach Verdant.
+
+---
+
+## 3. Payload contract
+
+### Required fields
+
+| Field         | Type   | Notes                                                                |
+|---------------|--------|----------------------------------------------------------------------|
+| `tent_id`     | uuid   | Must belong to the authenticated user. RLS-verified.                 |
+| `source`      | string | Must be an allow-listed source (see §5).                             |
+| `captured_at` | string | ISO 8601 UTC. Cannot be more than 5 minutes in the future.           |
+| `metrics`     | object | At least one finite numeric metric value.                            |
+
+### Recommended optional fields (inside `metadata`)
+
+- `device_id` — stable per-device identifier (e.g. `esp32-canopy-1`)
+- `rssi` — Wi-Fi signal strength in dBm
+- `battery_voltage` — if the node is battery-powered
+- `calibration_offset` — last applied per-sensor offset
+- `sensor_model` — e.g. `SHT31`, `BME280`, `DS18B20`
+- `raw_value` — pre-calibration value for audit
+
+Verdant stores `metadata` verbatim in `sensor_readings.raw_payload`. Do not
+put secrets in it.
+
+---
+
+## 4. Supported `source` examples
+
+These are accepted by the validation trigger today:
+
+- `esp32_arduino`
+- `esp32_arduino_sht31` *(spec alias: `esp32_sht31`)*
+- `esp32_esphome`
+- `esp32_mqtt_bridge`
+- `home_assistant_bridge`
+- `ha_forwarded`
+- `pi_bridge`
+- `node_red_bridge`
+- `webhook_generic`
+
+> A DIY soil node can use `esp32_arduino` with a `metadata.device_id` like
+> `esp32-soil-zone1` to express the same intent as a project-specific
+> source label.
+
+Unknown sources are rejected at the database trigger — Verdant will never
+silently coerce an unknown source to `live`.
+
+---
+
+## 5. Sample JSON payload
+
+```json
+{
+  "tent_id": "uuid",
+  "source": "esp32_arduino_sht31",
+  "captured_at": "2026-05-26T20:00:00Z",
+  "metrics": {
+    "temp_f": 76.4,
+    "humidity_percent": 58,
+    "vpd_kpa": 1.18
+  },
+  "metadata": {
+    "device_id": "esp32-canopy-1",
+    "sensor_model": "SHT31",
+    "rssi": -61
+  }
+}
+```
+
+Aliases (`temp_f`, `humidity_percent`, `soil_moisture`) are normalized to
+the canonical metric names (`temperature_c`, `humidity_pct`,
+`soil_moisture_pct`) before insert. See `docs/v1-sensor-ingest.md` for the
+full contract.
+
+---
+
+## 6. Safety language
+
+- **Source-tagged.** Every ESP32 row carries its `source` and renders with
+  an ESP32/Webhook badge — never a generic "live" badge.
+- **Never assumed perfect.** Range gates run on every metric; out-of-range
+  values are rejected, not stored as zero or smoothed away.
+- **Stale ≠ healthy.** Readings older than the freshness window render as
+  stale in the timeline and freshness card.
+- **No device control.** ESP32 data into Verdant is one-way. Verdant does
+  not send commands back to your ESP32, your relays, your fans, your
+  pumps, or your lights.
+- **No autonomous Action Queue.** ESP32 readings never create Action Queue
+  items on their own. Growers create actions explicitly.
+
+---
+
+## 7. Arduino sketch example (SHT31 → Verdant)
+
+> Placeholders only. **Do not commit real Wi-Fi credentials, API keys, or
+> bearer tokens to source control.** Use a `secrets.h`, NVS, or a
+> build-time `-D` define.
+
+This sketch matches Verdant's generic webhook payload contract exactly:
+`source = "esp32_arduino_sht31"`, sensor values in `metrics`, device
+diagnostics in `metadata`. `device_id` lives **inside `metadata`**, never
+at the top level.
+
+```cpp
+// ─────────────────────────────────────────────────────────────────────
+// Verdant ESP32 + SHT31 example sketch
+//
+// Verdant safety notes (read before flashing):
+//   • ESP32 data is *source-tagged* — every row carries
+//     source="esp32_arduino_sht31" and renders with an ESP32/Webhook badge.
+//   • ESP32 data is *read-only* into Verdant. Verdant never sends commands
+//     back to this device, your relays, fans, pumps, or lights.
+//   • ESP32 data *never triggers device control* and never creates
+//     Action Queue items on its own.
+//   • Verdant may mark readings *stale* or *lower-confidence* if reporting
+//     stops, the clock drifts, or values fall outside safe ranges.
+// ─────────────────────────────────────────────────────────────────────
+
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+#include <Wire.h>
+#include <Adafruit_SHT31.h>
+#include <time.h>
+
+// ─── Placeholders — replace at build time or from NVS ────────────────
+const char* WIFI_SSID       = "<YOUR_WIFI_SSID>";
+const char* WIFI_PASSWORD   = "<YOUR_WIFI_PASSWORD>";
+const char* webhookURL      = "<https://YOUR-PROJECT.functions.supabase.co/sensor-ingest-webhook>";
+const char* verdantApiKey   = "<YOUR_SESSION_OR_BRIDGE_TOKEN>"; // sent as: Authorization: Bearer <token>
+const char* TENT_ID         = "<TENT_UUID>";
+const char* DEVICE_ID       = "esp32-sht31-tent1";
+
+// 2-minute reporting interval is a sensible default.
+// Faster than 60 seconds is usually unnecessary for tent climate and
+// just adds network/battery cost without changing the trend signal.
+const unsigned long REPORT_INTERVAL_MS = 120UL * 1000UL;
+
+Adafruit_SHT31 sht31 = Adafruit_SHT31();
+
+void connectWifi() {
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  unsigned long started = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - started < 15000) {
+    delay(500);
+  }
+}
+
+void syncClock() {
+  // NTP — required so captured_at is correct.
+  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+  struct tm tm;
+  unsigned long started = millis();
+  while (!getLocalTime(&tm, 500) && millis() - started < 10000) { /* wait */ }
+}
+
+String isoTimestampZ() {
+  time_t now = time(nullptr);
+  struct tm tm;
+  gmtime_r(&now, &tm);
+  char buf[25];
+  strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &tm);
+  return String(buf);
+}
+
+// Basic VPD (kPa) from temperature (°C) and RH (%).
+// Tetens' approximation — good enough for grow-room trend data.
+float vpdKpa(float tempC, float rhPct) {
+  float es = 0.6108f * expf((17.27f * tempC) / (tempC + 237.3f));
+  float ea = es * (rhPct / 100.0f);
+  float v  = es - ea;
+  return v < 0 ? 0 : v;
+}
+
+void postReading() {
+  if (WiFi.status() != WL_CONNECTED) connectWifi();
+
+  float tempC = sht31.readTemperature();
+  float rh    = sht31.readHumidity();
+  if (isnan(tempC) || isnan(rh)) {
+    // Skip — Verdant would reject NaN. Better to send nothing than fake data.
+    return;
+  }
+  float tempF = tempC * 9.0f / 5.0f + 32.0f;
+  float vpd   = vpdKpa(tempC, rh);
+
+  StaticJsonDocument<512> doc;
+  // tent_id is required by the webhook contract; everything else below
+  // matches the spec payload shape exactly.
+  doc["tent_id"]     = TENT_ID;
+  doc["source"]      = "esp32_arduino_sht31";
+  doc["captured_at"] = isoTimestampZ();
+
+  JsonObject metrics = doc.createNestedObject("metrics");
+  metrics["temp_f"]           = tempF;        // °F  — Verdant normalizes to temperature_c
+  metrics["humidity_percent"] = rh;           // %RH — Verdant normalizes to humidity_pct
+  metrics["vpd_kpa"]          = vpd;          // kPa
+
+  JsonObject metadata = doc.createNestedObject("metadata");
+  metadata["device_id"]    = DEVICE_ID;       // device_id lives in metadata, not top-level
+  metadata["sensor_model"] = "SHT31";
+  metadata["rssi"]         = WiFi.RSSI();
+
+  String body;
+  serializeJson(doc, body);
+
+  HTTPClient http;
+  http.begin(webhookURL);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("Authorization", String("Bearer ") + verdantApiKey);
+  int status = http.POST(body);
+  // Non-2xx: log and back off. Do not retry tightly — Verdant dedupes
+  // identical (tent_id, source, captured_at) payloads but tight retries
+  // still waste battery and Wi-Fi.
+  (void)status;
+  http.end();
+}
+
+void setup() {
+  Wire.begin();
+  sht31.begin(0x44);
+  connectWifi();
+  syncClock();
+}
+
+void loop() {
+  postReading();
+  delay(REPORT_INTERVAL_MS);
+}
+```
+
+
+
+---
+
+## 8. ESPHome YAML example
+
+```yaml
+# Placeholders only — replace before flashing.
+esphome:
+  name: tent-canopy
+
+wifi:
+  ssid: "<YOUR_WIFI_SSID>"
+  password: "<YOUR_WIFI_PASSWORD>"
+
+sensor:
+  - platform: sht3xd
+    address: 0x44
+    temperature:
+      name: "Canopy Temperature"
+      id: canopy_temp
+    humidity:
+      name: "Canopy Humidity"
+      id: canopy_rh
+    update_interval: 60s
+
+http_request:
+  useragent: "esphome-verdant"
+  verify_ssl: true
+
+interval:
+  - interval: 60s
+    then:
+      - http_request.post:
+          url: "https://<your-project>.supabase.co/functions/v1/sensor-ingest-webhook"
+          headers:
+            Content-Type: application/json
+            Authorization: "Bearer <YOUR_SESSION_OR_BRIDGE_TOKEN>"
+          json: |-
+            root["tent_id"]     = "<TENT_UUID>";
+            root["source"]      = "esp32_esphome";
+            root["captured_at"] = id(homeassistant_time).now().strftime("%Y-%m-%dT%H:%M:%SZ");
+            JsonObject m = root.createNestedObject("metrics");
+            m["temp_f"]           = id(canopy_temp).state * 9.0 / 5.0 + 32.0;
+            m["humidity_percent"] = id(canopy_rh).state;
+            JsonObject meta = root.createNestedObject("metadata");
+            meta["device_id"]    = "tent-canopy";
+            meta["sensor_model"] = "SHT31";
+```
+
+If your ESPHome version cannot inline JSON, forward through Home Assistant
+with a `rest_command` and post from there using `source: ha_forwarded`.
+
+---
+
+## 9. Sensor placement (SHT31 in a tent)
+
+- **Canopy height.** Mount the probe at canopy level, not at the floor or
+  the tent ceiling. The number you care about is what the plant feels.
+- **Avoid direct light/heat.** Keep the sensor out of the direct beam of
+  the grow light. IR heating from the LED panel will skew temperature
+  several degrees and crush the RH reading.
+- **Avoid humidifier mist.** A probe sitting in the mist plume will read
+  ~100% RH constantly and may corrode. Place it at least ~30 cm from the
+  outlet, ideally on the opposite side of the tent.
+- **Avoid direct fan blast.** Strong airflow across the probe biases temp
+  down and RH down. Aim for indirect circulation.
+- **Shield from drip lines.** Liquid contact on an SHT31 will permanently
+  destroy the RH calibration.
+
+---
+
+## 10. Troubleshooting
+
+**Wi-Fi dropouts.** Reconnect inside the read loop with a bounded timeout
+and back off on repeated failures. Don't block the sensor read on the
+POST. Buffer the last few readings locally so a brief outage doesn't lose
+them.
+
+**NTP failure.** If `configTime` never returns a valid time, do not send
+a guessed or zero `captured_at` — Verdant will reject it or it will
+appear stale. Retry NTP, then skip the cycle if it still fails.
+
+**Sensor read failure.** `readTemperature()` / `readHumidity()` return
+`NaN` on I²C errors. Skip the post for that cycle. Better to send nothing
+than to send fake data — Verdant will mark the reading stale on its own.
+
+**Wrong units.** Verdant accepts `temp_f` (°F), `humidity_percent` (%
+RH), and `vpd_kpa` (kPa). Sending Celsius into `temp_f` will be flagged
+as out-of-range and rejected; use the canonical `temperature_c` key
+instead, or convert before sending.
+
+**Stale readings in Verdant.** If the freshness card shows your ESP32 as
+stale: check Wi-Fi RSSI in `metadata.rssi`, check that the device clock
+is within 5 minutes of UTC, and confirm the device is actually POSTing
+(serial log). Verdant will not silently upgrade a stale reading to live.
+
+**Bad calibration.** Send `metadata.calibration_offset` and
+`metadata.raw_value` so the audit trail survives. Re-calibrate any time
+you move the probe or change the medium.
+
+**Humidity drift.** Inexpensive RH sensors drift in saturated grow
+environments. Cross-check against a second sensor every 2–4 weeks and
+replace probes that read above 100% or pegged low.
+
+**pH / EC analog isolation.** pH and EC probes require **galvanically
+isolated** front-ends (e.g. Atlas Scientific EZO + isolator). Sharing
+ground with other analog sensors corrupts both readings and can drift
+slowly enough that the data looks plausible. Verdant range-gates pH and
+EC, but it cannot detect a slow drift caused by missing isolation.
+
+---
+
+## See also
+
+- `docs/v1-sensor-ingest.md` — full webhook contract and unit definitions.
+- `docs/sensor-webhook-ingest.md` — Gate 2B alias and read-only safety statement.
+- `docs/v1-sensor-integration-scope.md` — what is in/out of V1 sensor scope.

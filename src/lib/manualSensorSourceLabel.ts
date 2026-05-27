@@ -114,6 +114,17 @@ const BASE_SOURCE_LABELS: Record<string, string> = {
   sim: "Simulated",
   diary: "Diary snapshot",
   unavailable: "Unavailable",
+  // V1 webhook ingest sources. None of these are "live" by default —
+  // freshness is derived on read; UI must still apply the stale guard.
+  webhook_generic: "Webhook",
+  pi_bridge: "Pi bridge",
+  node_red_bridge: "Node-RED bridge",
+  esp32_arduino: "ESP32",
+  esp32_arduino_sht31: "ESP32 (SHT31)",
+  esp32_esphome: "ESPHome",
+  esp32_mqtt_bridge: "MQTT bridge",
+  home_assistant_bridge: "Home Assistant",
+  ha_forwarded: "Home Assistant",
 };
 
 /**

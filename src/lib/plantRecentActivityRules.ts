@@ -30,6 +30,12 @@ export interface PlantRecentActivityRow {
   snapshotStale: boolean;
   /** Source label only when explicitly stored on the entry. */
   snapshotSourceLabel: string | null;
+  /**
+   * True when this entry came from the manual Quick Log surface. Used by the
+   * presenter to render a "Manual entry" source badge so manual logs stay
+   * visually distinguished from any future live or CSV-imported readings.
+   */
+  isManualEntry: boolean;
   warnings: string[];
   /** True when QuickLog appended its deterministic handheld readings block. */
   hasHardwareReadings: boolean;
@@ -69,6 +75,9 @@ function toRow(
     // QuickLog does not currently persist a source label on the snapshot.
     // We never invent one — leave null unless future writers store it.
     snapshotSourceLabel: null,
+    // Quick Log entries are the only manual diary writers today. We rely on
+    // the deterministic event_type tag from quickLogRules.QUICK_LOG_EVENT_TYPE.
+    isManualEntry: entry.eventType === "quick_log",
     warnings: entry.warnings,
     hasHardwareReadings: split.hasHardwareBlock,
     hardwareReadingLines: split.hardwareLines,

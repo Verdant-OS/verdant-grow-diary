@@ -17,6 +17,9 @@ import TentCardActionsMenu from "@/components/TentCardActionsMenu";
 import PlantPhoto from "@/components/PlantPhoto";
 import TentManualSnapshotChangeContext from "@/components/TentManualSnapshotChangeContext";
 import TentManualSnapshotHistoryList from "@/components/TentManualSnapshotHistoryList";
+import TentCsvImportCard from "@/components/TentCsvImportCard";
+import TentSensorWebhookSettingsCard from "@/components/TentSensorWebhookSettingsCard";
+import TentBridgeTokensCard from "@/components/TentBridgeTokensCard";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useGrowTent, useGrowPlants, getGrowDataMeta } from "@/hooks/useGrowData";
 import {
@@ -168,6 +171,14 @@ export default function TentDetail() {
       </div>
 
       <TentManualSnapshotHistoryList tentId={id ?? null} readings={readings} />
+
+      {id && (
+        <TentCsvImportCard tentId={id} growId={tent.growId ?? null} />
+      )}
+
+      {id && <TentSensorWebhookSettingsCard tentId={id} />}
+      {id && <TentBridgeTokensCard tentId={id} />}
+
 
       <div className="glass rounded-2xl p-4">
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">

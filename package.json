@@ -27,7 +27,8 @@
     "sb:types:local": "supabase gen types typescript --local > src/integrations/supabase/types.ts",
     "sb:functions:serve": "supabase functions serve --env-file .env.local",
     "sb:functions:deploy": "supabase functions deploy",
-    "sb:verify": "tsx scripts/verify-seed.ts"
+    "sb:verify": "tsx scripts/verify-seed.ts",
+    "test:sensor-safety": "vitest run src/test/csv-sensor-import.test.ts src/test/manual-sensor-freshness-and-delta.test.ts src/test/manual-sensor-chronology-delta.test.ts src/test/plant-manual-sensor-freshness-card.test.tsx"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

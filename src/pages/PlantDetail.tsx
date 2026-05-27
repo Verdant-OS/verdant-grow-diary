@@ -27,7 +27,13 @@ import { Button } from "@/components/ui/button";
 import { useGrowPlant, useGrowTent, getGrowDataMeta } from "@/hooks/useGrowData";
 import { format, formatDistanceToNow } from "date-fns";
 
+import PlantQuickLog from "@/components/PlantQuickLog";
+import PlantManualSensorFreshnessCard from "@/components/PlantManualSensorFreshnessCard";
+import { useState } from "react";
+import { Zap } from "lucide-react";
+
 export default function PlantDetail() {
+  const [quickLogOpen, setQuickLogOpen] = useState(false);
   const { id } = useParams();
   const { data: plant, isLoading } = useGrowPlant(id);
   const { data: tent } = useGrowTent(plant?.tentId);
@@ -172,16 +178,37 @@ export default function PlantDetail() {
             <p className="text-xs text-muted-foreground mt-1">Updated {formatDistanceToNow(new Date(plant.startedAt), { addSuffix: true })}</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              type="button"
+              onClick={() => setQuickLogOpen(true)}
+              data-testid="plant-detail-quick-log-open"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1"
+            >
+              <Zap className="h-3.5 w-3.5" /> Quick Log
+            </Button>
             <Button asChild variant="outline" size="sm"><Link to="/logs">Open Logs</Link></Button>
             <Button
               asChild
               size="sm"
-              className="gradient-leaf text-primary-foreground"
+              variant="outline"
               data-testid="plant-detail-daily-grow-check-entry"
             >
               <Link to={`/daily-check?plantId=${plant.id}&from=plant-detail`}>Daily Grow Check</Link>
             </Button>
           </div>
+          <PlantQuickLog
+            open={quickLogOpen}
+            onOpenChange={setQuickLogOpen}
+            plantId={plant.id}
+            plantName={plant.name}
+            growId={plant.growId ?? null}
+            tentId={plant.tentId ?? null}
+          />
+          <PlantManualSensorFreshnessCard
+            plantId={plant.id}
+            onUpdate={() => setQuickLogOpen(true)}
+          />
           <PlantTentEnvironmentPanel
             tentId={plant.tentId ?? null}
             tentName={tent?.name ?? null}

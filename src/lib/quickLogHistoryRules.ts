@@ -39,6 +39,8 @@ export const QUICK_LOG_EVENT_LANES: Record<string, HistoryLane> = {
   transplant: "activity",
   harvest: "activity",
   reminder: "activity",
+  action_followup: "activity",
+  action_outcome: "activity",
   other: "activity",
 };
 

@@ -67,7 +67,7 @@ interface AlertEventRow {
   } | null;
 }
 
-type EventFilter = "all" | "photo" | "note" | "measurement";
+type EventFilter = "all" | "photo" | "note" | "measurement" | "followup";
 const MEASUREMENT_KEYS = new Set(["ph", "ec", "runoff", "watering"]);
 
 function entryKinds(e: Entry): EventFilter[] {
@@ -79,6 +79,11 @@ function entryKinds(e: Entry): EventFilter[] {
   // Surface them in the Measurements filter so they aren't hidden.
   const hasHandheld = hasManualHandheldReadings(e.note);
   if (hasDetailMeasurement || hasHandheld) kinds.push("measurement");
+  const eventType =
+    e.details && typeof (e.details as Record<string, unknown>).event_type === "string"
+      ? ((e.details as Record<string, unknown>).event_type as string)
+      : null;
+  if (eventType === "action_followup") kinds.push("followup");
   return kinds;
 }
 
@@ -168,7 +173,7 @@ export default function Timeline() {
   }, [entries]);
 
   const eventCounts = useMemo(() => {
-    const m = { all: entries.length, photo: 0, note: 0, measurement: 0 };
+    const m = { all: entries.length, photo: 0, note: 0, measurement: 0, followup: 0 };
     entries.forEach((e) => entryKinds(e).forEach((k) => { m[k] = (m[k] || 0) + 1; }));
     return m;
   }, [entries]);
@@ -305,6 +310,7 @@ export default function Timeline() {
           <FilterChip active={eventFilter === "photo"} onClick={() => setEventFilter("photo")} label="Photos" icon={<Camera className="h-3 w-3" />} count={eventCounts.photo} />
           <FilterChip active={eventFilter === "note"} onClick={() => setEventFilter("note")} label="Notes" icon={<FileText className="h-3 w-3" />} count={eventCounts.note} />
           <FilterChip active={eventFilter === "measurement"} onClick={() => setEventFilter("measurement")} label="Measurements" icon={<FlaskConical className="h-3 w-3" />} count={eventCounts.measurement} />
+          <FilterChip active={eventFilter === "followup"} onClick={() => setEventFilter("followup")} label="Follow-ups" icon={<Check className="h-3 w-3" />} count={eventCounts.followup} />
         </div>
       </div>
 

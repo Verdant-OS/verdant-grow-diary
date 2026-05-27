@@ -301,6 +301,11 @@ export default function GrowRoomMode() {
         >
           {cards.map((card) => {
             const showWarning = STALE_OR_MISSING.has(card.snapshotState);
+            const vpdClassification = classifyVpdAgainstStage({
+              value: card.snapshot?.vpd ?? null,
+              stage: tentStageById[card.tentId] ?? null,
+              stale: card.snapshotState === "stale",
+            });
             const tentPlants: QuickActionPlantLite[] = plants
               .filter((p) => p.tent_id === card.tentId)
               .map((p) => ({

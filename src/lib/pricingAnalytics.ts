@@ -15,11 +15,9 @@ export type PricingEvent =
 
 export function trackPricingEvent(event: PricingEvent): void {
   try {
-    if (
-      typeof window !== "undefined" &&
-      typeof (window as Window & { gtag?: (...args: unknown[]) => void }).gtag === "function"
-    ) {
-      (window as Window & { gtag?: (...args: unknown[]) => void }).gtag!("event", event);
+    if (typeof window !== "undefined") {
+      const w = window as Window & { gtag?: (...args: unknown[]) => void };
+      w.gtag?.("event", event);
     }
   } catch {
     // Analytics must never break the page.

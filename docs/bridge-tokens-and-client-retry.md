@@ -139,7 +139,7 @@ TIMEOUT = 12          # seconds
 def post_reading(payload: dict) -> bool:
     """Post a sensor reading with exponential backoff + full jitter."""
     headers = {
-        "Authorization": f"******",
+        "Authorization": f"Bearer {TOKEN}",
         "Content-Type": "application/json",
     }
 
@@ -251,7 +251,7 @@ rest_command:
     url: !secret verdant_webhook_url
     method: POST
     headers:
-      Authorization: "****** states('input_text.verdant_bridge_token') }}"
+      Authorization: "Bearer {{ states('input_text.verdant_bridge_token') }}"
       Content-Type: "application/json"
     payload: >
       {
@@ -275,7 +275,7 @@ Use the **HTTP Request** node with:
 
 - Method: POST
 - URL: `{{env.VERDANT_WEBHOOK_URL}}`
-- Headers: `Authorization: ******
+- Headers: `Authorization: Bearer {{env.VERDANT_BRIDGE_TOKEN}}`
 - Payload: JSON with `source: "node_red_bridge"`
 
 For retry, wire a **Catch** node back to the HTTP Request node through a

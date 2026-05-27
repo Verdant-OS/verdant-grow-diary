@@ -214,5 +214,18 @@ describe("sensor-ingest-webhook safety surface", () => {
     const banned =
       /service_role|action_queue|\.from\(["']alerts["']\)|openai|anthropic|mqtt\.connect|mqttSubscribe|relay|actuator|setpoint|autopilot/i;
     expect(src).not.toMatch(banned);
+
+  it("normalizes alias keys to canonical metric names", () => {
+    const r = normalizeWebhookIngestPayload(
+      base({
+        metrics: { temp_f: 68, humidity_percent: 42, soil_moisture: 35 },
+      }) as never,
+      { now: NOW },
+    );
+    expect(r.ok).toBe(true);
+    const metrics = r.rows.map((row) => row.metric).sort();
+    expect(metrics).toEqual(["humidity_pct", "soil_moisture_pct", "temperature_c"]);
+    const soil = r.rows.find((row) => row.metric === "soil_moisture_pct");
+    expect(soil?.value).toBe(35);
   });
 });

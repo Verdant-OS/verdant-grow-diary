@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
+import { formatDistanceToNowStrict } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Copy, KeyRound, Trash2 } from "lucide-react";
+import { Activity, Copy, KeyRound, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import {
@@ -12,6 +13,7 @@ import {
   type BridgeTokenRow,
   bridgeTokenStatus,
   clampTtlDays,
+  formatIngestCount,
   sanitizeTokenName,
 } from "@/lib/bridgeTokenRules";
 

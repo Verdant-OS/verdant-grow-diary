@@ -355,6 +355,16 @@ export default function GrowRoomMode() {
                   {snapshotSummary(card.snapshot)}
                 </div>
 
+                {vpdClassification.classification !== "unavailable" && (
+                  <p
+                    className="text-[11px] text-muted-foreground"
+                    data-testid="grow-room-vpd-stage-hint"
+                  >
+                    {vpdClassification.label}
+                  </p>
+                )}
+
+
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span className="inline-flex items-center gap-1">
                     <Clock className="h-3 w-3" />

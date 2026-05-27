@@ -13,11 +13,13 @@ import {
   normalizeWebhookIngestPayload,
   type WebhookIngestPayload,
 } from "../../../src/lib/sensorWebhookIngestRules.ts";
+import { buildIngestAuditRecord } from "../../../src/lib/sensorIngestAuditRules.ts";
 import {
   authenticateBearer,
   tentScopeMatches,
   type AuthResult,
 } from "./auth.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

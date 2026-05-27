@@ -31,5 +31,11 @@ export function useShellyHtSetupStatus(): UseQueryResult<ShellyHtSetupStatusPayl
     },
     staleTime: 60_000,
     refetchOnWindowFocus: false,
+    // AUD-007: avoid an indefinite retry storm that traps the card on
+    // "Checking setup…". One retry is enough to absorb a transient
+    // network blip; anything beyond that is surfaced as an error so the
+    // user gets a retry affordance.
+    retry: 1,
+    retryDelay: 1000,
   });
 }

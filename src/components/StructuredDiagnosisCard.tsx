@@ -17,7 +17,6 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, ShieldCheck, Sparkles } from "lucide-react";
 import {
   DIAGNOSIS_SAFETY_COPY,
-  LOW_CONFIDENCE_THRESHOLD,
   SUGGESTION_APPROVAL_COPY,
   type Diagnosis,
   type DiagnosisSuggestedAction,

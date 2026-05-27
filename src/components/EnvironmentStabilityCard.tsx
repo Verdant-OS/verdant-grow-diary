@@ -4,6 +4,7 @@ import {
   STABILITY_STATUS_LABEL,
   type StabilityResult,
 } from "@/lib/environmentStabilityRules";
+import { deriveStabilityWhyContext } from "@/lib/stabilityWhyContext";
 
 /**
  * Presenter-only summary card for stage-aware VPD stability over the last
@@ -45,12 +46,13 @@ export default function EnvironmentStabilityCard({
   testId,
   className,
 }: EnvironmentStabilityCardProps) {
-  const { status, last24h, last7d, sparse, message } = result;
+  const { status, last24h, last7d, sparse, message, stage } = result;
   const label = STABILITY_STATUS_LABEL[status];
   const inactive =
     status === "stage_unknown" ||
     status === "context_only" ||
     status === "unavailable";
+  const why = deriveStabilityWhyContext(stage);
 
   return (
     <div

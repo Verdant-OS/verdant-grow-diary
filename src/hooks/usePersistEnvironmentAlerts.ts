@@ -92,6 +92,8 @@ export function usePersistEnvironmentAlerts(
   const enabled = input.enabled !== false;
   const growId = input.growId ?? null;
   const isDemoData = input.isDemoData === true;
+  const stageProvided = "stage" in input;
+  const stageKey = stageProvided ? input.stage ?? "__unknown__" : "__legacy__";
 
   useEffect(() => {
     if (!enabled || !growId) {
@@ -107,6 +109,7 @@ export function usePersistEnvironmentAlerts(
         snapshot: input.snapshot,
         quality: input.quality,
         targets: input.targets,
+        ...(stageProvided ? { stage: input.stage ?? null } : {}),
       });
 
       // 2. Filter to alerts derived from real, valid sensor readings only.

@@ -52,6 +52,7 @@ describe("bridgeTokenRules", () => {
     expect(looksLikeBridgeToken("vbt_short")).toBe(false);
     expect(looksLikeBridgeToken("eyJhbGciOi.JWT.example")).toBe(false);
     expect(looksLikeBridgeToken("")).toBe(false);
+  });
 
   it("formatIngestCount: zero / null / negative / NaN render as '0'", () => {
     expect(formatIngestCount(0)).toBe("0");

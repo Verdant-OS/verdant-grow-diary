@@ -368,6 +368,7 @@ describe("usePersistEnvironmentAlerts — hook behaviour", () => {
         id: "existing",
         metric: "temp",
         source: "environment_alerts",
+        title: real.title,
         reason: real.reason,
         status: "open",
       },

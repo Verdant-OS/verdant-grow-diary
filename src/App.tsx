@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -74,6 +74,9 @@ const App = () => (
                 <Route path="/doctor" element={<Coach />} />
                 <Route path="/actions" element={<ActionQueue />} />
                 <Route path="/actions/:actionId" element={<ActionDetail />} />
+                {/* Legacy alias — canonical route is /actions. Keeps old
+                    bookmarks, docs, and external links working. */}
+                <Route path="/action-queue" element={<Navigate to="/actions" replace />} />
                 <Route path="/grow-lineage" element={<GrowLineageRepair />} />
                 <Route path="/grows" element={<Grows />} />
                 <Route path="/grows/:growId" element={<GrowDetail />} />

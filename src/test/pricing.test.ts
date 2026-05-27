@@ -276,6 +276,7 @@ describe("No unrelated routes were changed", () => {
       [
         "*",
         "/",
+        "/action-queue",
         "/actions",
         "/actions/:actionId",
         "/admin/leads",

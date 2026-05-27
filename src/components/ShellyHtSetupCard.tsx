@@ -12,9 +12,9 @@
  * Read-only. No automation, no device control, no alerts, no
  * action_queue. Logic lives in `shellyHtSetupRules.ts`.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { Copy, Radio } from "lucide-react";
+import { Copy, Radio, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useShellyHtSetupStatus } from "@/hooks/useShellyHtSetupStatus";
@@ -23,6 +23,10 @@ import {
   deriveShellyHtSetupStatus,
   findLatestShellyHtSnapshot,
 } from "@/lib/shellyHtSetupRules";
+import {
+  deriveShellyHtSetupCardViewState,
+  SHELLY_HT_SETUP_SLOW_THRESHOLD_MS,
+} from "@/lib/shellyHtSetupCardViewStateRules";
 import { SHELLY_HT_DEVICE_LABEL } from "@/lib/shellyHtWebhookRules";
 import { SOURCE_LABEL, formatValue } from "@/lib/sensorSnapshot";
 import { tempFFromC } from "@/lib/temperatureUnits";

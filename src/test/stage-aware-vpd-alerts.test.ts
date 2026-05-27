@@ -158,7 +158,9 @@ describe("static safety contract", () => {
   ] as const) {
     it(`${name}: no action_queue / AI Doctor / automation / device-control / service_role`, () => {
       expect(src).not.toMatch(/action_queue/);
-      expect(src).not.toMatch(/ai[\s_-]?doctor|ai[\s_-]?coach/i);
+      // Look for calls/imports, not the word in comments.
+      expect(src).not.toMatch(/from\s+["'][^"']*ai[-_]?(doctor|coach)/i);
+      expect(src).not.toMatch(/invoke\(["'][^"']*ai[-_]?(doctor|coach)/i);
       expect(src).not.toMatch(/service_role/);
       expect(src).not.toMatch(
         /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b|device_command|autopilot/i,

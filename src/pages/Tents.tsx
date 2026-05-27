@@ -15,6 +15,10 @@ import { useGrowTents, getGrowDataMeta } from "@/hooks/useGrowData";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { tentsPath } from "@/lib/routes";
 import { tempFFromC } from "@/lib/temperatureUnits";
+import {
+  classifyVpdAgainstStage,
+  vpdMetricChipStatus,
+} from "@/lib/vpdStageTargetRules";
 
 export default function Tents() {
   // Shared URL `?growId=` resolution against RLS-loaded grows.
@@ -67,6 +71,9 @@ export default function Tents() {
           {tents.map((t) => {
             const last = readings.filter((r) => r.tentId === t.id).at(-1);
             const plantCount = plants.filter((p) => p.tentId === t.id).length;
+            const vpdClassification = last
+              ? classifyVpdAgainstStage({ value: last.vpd, stage: t.stage })
+              : null;
             return (
               <div key={t.id} className="relative animate-fade-in">
                 <Link to={`/tents/${t.id}`} className="glass rounded-2xl p-5 hover:border-primary/50 transition group flex flex-col gap-3">
@@ -81,7 +88,7 @@ export default function Tents() {
                   <div className="flex flex-wrap gap-1.5">
                     {last && <MetricChip label="T" value={(tempFFromC(last.temp) ?? 0).toFixed(1)} unit="°F" status={last.temp > 28 || last.temp < 19 ? "warn" : "ok"} />}
                     {last && <MetricChip label="RH" value={last.rh} unit="%" status={last.rh > 65 || last.rh < 35 ? "warn" : "ok"} />}
-                    {last && <MetricChip label="VPD" value={last.vpd} unit=" kPa" status={last.vpd > 1.6 || last.vpd < 0.6 ? "warn" : "ok"} />}
+                    {last && vpdClassification && <MetricChip label="VPD" value={last.vpd} unit=" kPa" status={vpdMetricChipStatus(vpdClassification)} />}
                   </div>
 
                   <div className="mt-auto flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/40">

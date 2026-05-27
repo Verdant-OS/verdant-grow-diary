@@ -18,14 +18,11 @@ import PlantPhoto from "@/components/PlantPhoto";
 import TentManualSnapshotChangeContext from "@/components/TentManualSnapshotChangeContext";
 import TentManualSnapshotHistoryList from "@/components/TentManualSnapshotHistoryList";
 import TentCsvImportCard from "@/components/TentCsvImportCard";
-import TentSensorWebhookSettingsCard from "@/components/TentSensorWebhookSettingsCard";
+import TentSensorIngestSettingsCard from "@/components/TentSensorIngestSettingsCard";
 import TentBridgeTokensCard from "@/components/TentBridgeTokensCard";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useGrowTent, useGrowPlants, getGrowDataMeta } from "@/hooks/useGrowData";
-import {
-  buildTentSensorChartSeries,
-  buildTentSensorHeaderView,
-} from "@/lib/tentSensorChartRules";
+import { buildTentSensorChartSeries, buildTentSensorHeaderView } from "@/lib/tentSensorChartRules";
 import { tempFFromC } from "@/lib/temperatureUnits";
 import {
   filterVisiblePlants,
@@ -78,7 +75,11 @@ export default function TentDetail() {
 
   return (
     <div>
-      <Button asChild variant="ghost" size="sm" className="mb-3"><Link to="/tents"><ArrowLeft className="h-4 w-4" /> Tents</Link></Button>
+      <Button asChild variant="ghost" size="sm" className="mb-3">
+        <Link to="/tents">
+          <ArrowLeft className="h-4 w-4" /> Tents
+        </Link>
+      </Button>
       <PageHeader
         title={tent.name}
         description={`${tent.brand} · ${tent.size}`}
@@ -111,19 +112,36 @@ export default function TentDetail() {
 
       <div className="flex flex-wrap gap-2 mb-5" data-testid="tent-detail-metric-chips">
         {snap?.temp !== null && snap?.temp !== undefined && (
-          <MetricChip label="T" value={(tempFFromC(snap.temp) ?? 0).toFixed(1)} unit="°F" status={snap.temp > 28 || snap.temp < 19 ? "warn" : "ok"} />
+          <MetricChip
+            label="T"
+            value={(tempFFromC(snap.temp) ?? 0).toFixed(1)}
+            unit="°F"
+            status={snap.temp > 28 || snap.temp < 19 ? "warn" : "ok"}
+          />
         )}
         {snap?.rh !== null && snap?.rh !== undefined && (
-          <MetricChip label="RH" value={snap.rh} unit="%" status={snap.rh > 65 || snap.rh < 35 ? "warn" : "ok"} />
+          <MetricChip
+            label="RH"
+            value={snap.rh}
+            unit="%"
+            status={snap.rh > 65 || snap.rh < 35 ? "warn" : "ok"}
+          />
         )}
         {snap?.vpd !== null && snap?.vpd !== undefined && (
-          <MetricChip label="VPD" value={snap.vpd} unit=" kPa" status={snap.vpd > 1.6 || snap.vpd < 0.6 ? "warn" : "ok"} />
+          <MetricChip
+            label="VPD"
+            value={snap.vpd}
+            unit=" kPa"
+            status={snap.vpd > 1.6 || snap.vpd < 0.6 ? "warn" : "ok"}
+          />
         )}
         {snap?.co2 !== null && snap?.co2 !== undefined && (
           <MetricChip label="CO₂" value={snap.co2} unit=" ppm" />
         )}
         <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-          <Lightbulb className={`h-3.5 w-3.5 ${tent.light.on ? "text-[hsl(var(--warning))]" : ""}`} />
+          <Lightbulb
+            className={`h-3.5 w-3.5 ${tent.light.on ? "text-[hsl(var(--warning))]" : ""}`}
+          />
           {tent.light.schedule} · {tent.light.wattage}W
         </span>
       </div>
@@ -166,19 +184,20 @@ export default function TentDetail() {
             No sensor readings yet.
           </p>
         ) : (
-          <SensorChart data={series as unknown as Parameters<typeof SensorChart>[0]["data"]} metric="temp" height={200} />
+          <SensorChart
+            data={series as unknown as Parameters<typeof SensorChart>[0]["data"]}
+            metric="temp"
+            height={200}
+          />
         )}
       </div>
 
       <TentManualSnapshotHistoryList tentId={id ?? null} readings={readings} />
 
-      {id && (
-        <TentCsvImportCard tentId={id} growId={tent.growId ?? null} />
-      )}
+      {id && <TentCsvImportCard tentId={id} growId={tent.growId ?? null} />}
 
-      {id && <TentSensorWebhookSettingsCard tentId={id} />}
+      {id && <TentSensorIngestSettingsCard tentId={id} />}
       {id && <TentBridgeTokensCard tentId={id} />}
-
 
       <div className="glass rounded-2xl p-4">
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
@@ -207,10 +226,7 @@ export default function TentDetail() {
                 {showArchived ? "Hide archived plants" : "Show archived plants"}
               </button>
             )}
-            <AddExistingPlantDialog
-              tentId={id ?? ""}
-              growId={tent.growId ?? null}
-            />
+            <AddExistingPlantDialog tentId={id ?? ""} growId={tent.growId ?? null} />
             <CreatePlantDialog
               defaultTentId={id}
               defaultGrowId={tent.growId ?? undefined}
@@ -263,7 +279,10 @@ export default function TentDetail() {
             </div>
           </div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3" data-testid="tent-detail-plants-grid">
+          <div
+            className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3"
+            data-testid="tent-detail-plants-grid"
+          >
             {visiblePlants.map((p) => {
               const archivedLabel = getArchivedPlantLabel(p);
               const isInactive = archivedLabel.kind !== "active";
@@ -279,13 +298,25 @@ export default function TentDetail() {
                   data-archived-kind={archivedLabel.kind}
                 >
                   <Link to={`/plants/${p.id}`} className="block">
-                    <PlantPhoto src={p.photo} alt={p.name} className="aspect-video" caption="No plant photo yet" />
+                    <PlantPhoto
+                      src={p.photo}
+                      alt={p.name}
+                      className="aspect-video"
+                      caption="No plant photo yet"
+                    />
                     <div className="p-3">
                       <div className="flex items-center justify-between gap-2 pr-8">
-                        <span className="font-medium text-sm" data-testid="tent-detail-plant-name">{p.name}</span>
+                        <span className="font-medium text-sm" data-testid="tent-detail-plant-name">
+                          {p.name}
+                        </span>
                         <StageBadge stage={p.stage} />
                       </div>
-                      <p className="text-xs text-muted-foreground mt-0.5" data-testid="tent-detail-plant-strain">{p.strain}</p>
+                      <p
+                        className="text-xs text-muted-foreground mt-0.5"
+                        data-testid="tent-detail-plant-strain"
+                      >
+                        {p.strain}
+                      </p>
                       {isInactive && (
                         <Badge
                           variant="outline"
@@ -301,7 +332,9 @@ export default function TentDetail() {
                           {archivedLabel.kind === "merged" ? "Merged / Archived" : "Archived"}
                         </Badge>
                       )}
-                      <p className="text-[11px] text-muted-foreground mt-1 capitalize">{p.health}</p>
+                      <p className="text-[11px] text-muted-foreground mt-1 capitalize">
+                        {p.health}
+                      </p>
                     </div>
                   </Link>
                   <div className="absolute top-2 right-2">

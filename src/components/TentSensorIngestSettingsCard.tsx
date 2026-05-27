@@ -22,7 +22,7 @@ import {
  * new schema. Webhook sensor ingest is read-only. It never triggers
  * alerts, the Action Queue, AI Doctor, or any device control.
  */
-export default function TentSensorWebhookSettingsCard({ tentId }: { tentId: string }) {
+export default function TentSensorIngestSettingsCard({ tentId }: { tentId: string }) {
   const { toast } = useToast();
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const webhookUrl = buildSensorWebhookUrl(import.meta.env.VITE_SUPABASE_URL);
@@ -69,7 +69,10 @@ export default function TentSensorWebhookSettingsCard({ tentId }: { tentId: stri
   };
 
   return (
-    <div className="glass rounded-2xl p-4 space-y-4" data-testid="tent-sensor-webhook-settings-card">
+    <div
+      className="glass rounded-2xl p-4 space-y-4"
+      data-testid="tent-sensor-webhook-settings-card"
+    >
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h2 className="font-display font-semibold flex items-center gap-2">
@@ -120,9 +123,7 @@ export default function TentSensorWebhookSettingsCard({ tentId }: { tentId: stri
           <div className="text-xs font-medium text-muted-foreground">
             cURL example
             {!sessionToken && (
-              <span className="ml-2 text-amber-600">
-                (sign in to insert your session token)
-              </span>
+              <span className="ml-2 text-amber-600">(sign in to insert your session token)</span>
             )}
           </div>
           <Button

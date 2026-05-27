@@ -8,21 +8,16 @@
 // trigger AI, alerts, Action Queue, automation, or device control directly.
 // Caller-supplied `user_id` in the body is ignored.
 
-import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   normalizeWebhookIngestPayload,
   type WebhookIngestPayload,
 } from "../../../src/lib/sensorWebhookIngestRules.ts";
-import {
-  authenticateBearer,
-  tentScopeMatches,
-  type AuthResult,
-} from "./auth.ts";
+import { authenticateBearer, tentScopeMatches, type AuthResult } from "./auth.ts";
+import { createIngestClients } from "./db.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -41,19 +36,11 @@ Deno.serve(async (req) => {
   if (!authHeader?.startsWith("Bearer ")) return json({ error: "unauthorized" }, 401);
   const rawToken = authHeader.replace("Bearer ", "");
 
-  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-  const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
-  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  const clients = createIngestClients(rawToken);
+  if (!clients) {
     return json({ error: "server_misconfigured" }, 503);
   }
-
-  const admin = SUPABASE_SERVICE_ROLE_KEY
-    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-    : null;
-  const anonForJwt = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: `Bearer ${rawToken}` } },
-  });
+  const { admin, anonForJwt } = clients;
 
   const authRes = await authenticateBearer(rawToken, {
     serviceKeyAvailable: !!admin,
@@ -72,14 +59,20 @@ Deno.serve(async (req) => {
     },
   });
   if (!authRes.ok) {
-    const status = authRes.error === "server_misconfigured" || authRes.error === "auth_lookup_failed" ? 503 : 401;
+    const status =
+      authRes.error === "server_misconfigured" || authRes.error === "auth_lookup_failed"
+        ? 503
+        : 401;
     return json({ error: authRes.error }, status);
   }
   const auth: AuthResult = authRes.auth;
 
   let body: WebhookIngestPayload;
-  try { body = (await req.json()) as WebhookIngestPayload; }
-  catch { return json({ error: "invalid_json" }, 400); }
+  try {
+    body = (await req.json()) as WebhookIngestPayload;
+  } catch {
+    return json({ error: "invalid_json" }, 400);
+  }
 
   const normalized = normalizeWebhookIngestPayload(body);
   if (!normalized.ok) {
@@ -96,7 +89,10 @@ Deno.serve(async (req) => {
   // For bridge path, token is already bound to a tent owned by user_id.
   if (auth.kind === "jwt") {
     const { data: tentRow, error: tentErr } = await anonForJwt
-      .from("tents").select("id, user_id").eq("id", payloadTentId).maybeSingle();
+      .from("tents")
+      .select("id, user_id")
+      .eq("id", payloadTentId)
+      .maybeSingle();
     if (tentErr) return json({ error: "tent_lookup_failed" }, 503);
     if (!tentRow || tentRow.user_id !== auth.userId) {
       return json({ error: "forbidden_tent" }, 403);
@@ -120,20 +116,19 @@ Deno.serve(async (req) => {
     (existing ?? []).map((r) => `${r.metric}:${Number(r.value).toFixed(6)}`),
   );
   const toInsert = normalized.rows
-    .filter(
-      (r) => !existingKey.has(
-        `${r.metric}:${Number(r.value as number).toFixed(6)}`,
-      ),
-    )
+    .filter((r) => !existingKey.has(`${r.metric}:${Number(r.value as number).toFixed(6)}`))
     .map((r) => ({ ...r, user_id: auth.userId }));
 
   if (toInsert.length === 0) {
-    return json({
-      ok: true,
-      inserted: 0,
-      skipped_duplicate: normalized.rows.length,
-      rejected: normalized.errors,
-    }, 200);
+    return json(
+      {
+        ok: true,
+        inserted: 0,
+        skipped_duplicate: normalized.rows.length,
+        rejected: normalized.errors,
+      },
+      200,
+    );
   }
 
   const { error: insErr } = await writer.from("sensor_readings").insert(toInsert);
@@ -149,12 +144,15 @@ Deno.serve(async (req) => {
       .eq("id", auth.tokenId);
   }
 
-  return json({
-    ok: true,
-    inserted: toInsert.length,
-    skipped_duplicate: normalized.rows.length - toInsert.length,
-    rejected: normalized.errors,
-    fingerprint: normalized.fingerprint,
-    auth: auth.kind,
-  }, 200);
+  return json(
+    {
+      ok: true,
+      inserted: toInsert.length,
+      skipped_duplicate: normalized.rows.length - toInsert.length,
+      rejected: normalized.errors,
+      fingerprint: normalized.fingerprint,
+      auth: auth.kind,
+    },
+    200,
+  );
 });

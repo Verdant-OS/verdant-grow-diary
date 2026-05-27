@@ -44,9 +44,7 @@ describe("sensorWebhookIngestRules", () => {
       ["co2_ppm", "ec", "humidity_pct", "ph", "ppfd", "temperature_c", "vpd_kpa"].sort(),
     );
     // Source preserved verbatim.
-    expect(new Set(r.rows.map((row) => row.source))).toEqual(
-      new Set(["esp32_arduino_sht31"]),
-    );
+    expect(new Set(r.rows.map((row) => row.source))).toEqual(new Set(["esp32_arduino_sht31"]));
     // temp_f → C conversion.
     const tempRow = r.rows.find((row) => row.metric === "temperature_c")!;
     expect(Number(tempRow.value)).toBeCloseTo(24.667, 2);
@@ -57,28 +55,21 @@ describe("sensorWebhookIngestRules", () => {
   });
 
   it("rejects missing captured_at", () => {
-    const r = normalizeWebhookIngestPayload(
-      base({ captured_at: undefined }) as never,
-      { now: NOW },
-    );
+    const r = normalizeWebhookIngestPayload(base({ captured_at: undefined }) as never, {
+      now: NOW,
+    });
     expect(r.ok).toBe(false);
     expect(r.errors.join("|")).toMatch(/captured_at/);
   });
 
   it("rejects missing source", () => {
-    const r = normalizeWebhookIngestPayload(
-      base({ source: undefined }) as never,
-      { now: NOW },
-    );
+    const r = normalizeWebhookIngestPayload(base({ source: undefined }) as never, { now: NOW });
     expect(r.ok).toBe(false);
     expect(r.errors.join("|")).toMatch(/source/);
   });
 
   it("rejects unknown source (never defaults to live)", () => {
-    const r = normalizeWebhookIngestPayload(
-      base({ source: "live" }) as never,
-      { now: NOW },
-    );
+    const r = normalizeWebhookIngestPayload(base({ source: "live" }) as never, { now: NOW });
     expect(r.ok).toBe(false);
     expect(r.errors.join("|")).toMatch(/invalid source/);
   });
@@ -93,10 +84,7 @@ describe("sensorWebhookIngestRules", () => {
   });
 
   it("rejects payload with no metrics object", () => {
-    const r = normalizeWebhookIngestPayload(
-      base({ metrics: {} }) as never,
-      { now: NOW },
-    );
+    const r = normalizeWebhookIngestPayload(base({ metrics: {} }) as never, { now: NOW });
     expect(r.ok).toBe(false);
     expect(r.errors.join("|")).toMatch(/metrics required/);
   });
@@ -110,45 +98,36 @@ describe("sensorWebhookIngestRules", () => {
     );
     expect(r.ok).toBe(true);
     expect(r.rows.map((row) => row.metric)).toEqual(["temperature_c"]);
-    expect(r.skipped).toEqual(
-      expect.arrayContaining(["humidity_percent", "ph", "vpd_kpa"]),
-    );
+    expect(r.skipped).toEqual(expect.arrayContaining(["humidity_percent", "ph", "vpd_kpa"]));
     // None of the omitted metrics produced a row, ESPECIALLY not value=0.
     expect(r.rows.find((row) => Number(row.value) === 0)).toBeUndefined();
   });
 
   it("rejects out-of-range humidity", () => {
-    const r = normalizeWebhookIngestPayload(
-      base({ metrics: { humidity_percent: 250 } }) as never,
-      { now: NOW },
-    );
+    const r = normalizeWebhookIngestPayload(base({ metrics: { humidity_percent: 250 } }) as never, {
+      now: NOW,
+    });
     expect(r.ok).toBe(false);
     expect(r.errors.join("|")).toMatch(/humidity_percent.*range/);
   });
 
   it("rejects out-of-range pH", () => {
-    const r = normalizeWebhookIngestPayload(
-      base({ metrics: { ph: 14.5 } }) as never,
-      { now: NOW },
-    );
+    const r = normalizeWebhookIngestPayload(base({ metrics: { ph: 14.5 } }) as never, { now: NOW });
     expect(r.ok).toBe(false);
     expect(r.errors.join("|")).toMatch(/ph.*range/);
   });
 
   it("accepts valid decimal pH and EC", () => {
-    const r = normalizeWebhookIngestPayload(
-      base({ metrics: { ph: 6.25, ec: 1.42 } }) as never,
-      { now: NOW },
-    );
+    const r = normalizeWebhookIngestPayload(base({ metrics: { ph: 6.25, ec: 1.42 } }) as never, {
+      now: NOW,
+    });
     expect(r.ok).toBe(true);
     expect(r.rows.find((row) => row.metric === "ph")?.value).toBe(6.25);
     expect(r.rows.find((row) => row.metric === "ec")?.value).toBe(1.42);
   });
 
   it("strips caller-supplied user_id from raw_payload", () => {
-    const sanitized = sanitizeRawPayload(
-      base({ user_id: "attacker-uuid" }) as never,
-    );
+    const sanitized = sanitizeRawPayload(base({ user_id: "attacker-uuid" }) as never);
     expect(sanitized.user_id).toBeUndefined();
     expect(sanitized.tent_id).toBe(TENT);
   });
@@ -171,52 +150,43 @@ describe("sensorWebhookIngestRules", () => {
   });
 
   it("rejects invalid tent_id (non-uuid)", () => {
-    const r = normalizeWebhookIngestPayload(
-      base({ tent_id: "not-a-uuid" }) as never,
-      { now: NOW },
-    );
+    const r = normalizeWebhookIngestPayload(base({ tent_id: "not-a-uuid" }) as never, { now: NOW });
     expect(r.ok).toBe(false);
     expect(r.errors.join("|")).toMatch(/tent_id/);
   });
 });
 
 function stripComments(src: string): string {
-  return src
-    // Strip /* ... */ block comments (including JSDoc).
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    // Strip // line comments.
-    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  return (
+    src
+      // Strip /* ... */ block comments (including JSDoc).
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      // Strip // line comments.
+      .replace(/(^|[^:])\/\/[^\n]*/g, "$1")
+  );
 }
 
 describe("sensor-ingest-webhook safety surface", () => {
   it("edge function source has no banned automation strings (excluding comments)", async () => {
     const fs = await import("fs/promises");
-    const raw = await fs.readFile(
-      "supabase/functions/sensor-ingest-webhook/index.ts",
-      "utf-8",
-    );
+    const raw = await fs.readFile("supabase/functions/sensor-ingest-webhook/index.ts", "utf-8");
     const src = stripComments(raw);
-    // No service-role, AI, alerts/action_queue writes, device control,
-    // MQTT subscriber in actual code (comments are allowed to mention them
-    // for the documented safety statement).
+    // service_role is allowed — required for bridge token lookup (RLS bypass
+    // on bridge_tokens table). AI, alerts/action_queue writes, device control,
+    // and MQTT subscribers remain banned.
     const banned =
-      /SUPABASE_SERVICE_ROLE_KEY|service_role|action_queue|\.from\(["']alerts["']\)|openai|anthropic|ai-coach|ai_doctor|mqtt\.connect|mqttSubscribe|relay|actuator|setpoint/i;
+      /action_queue|\.from\(["']alerts["']\)|openai|anthropic|ai-coach|ai_doctor|mqtt\.connect|mqttSubscribe|relay|actuator|setpoint/i;
     expect(src).not.toMatch(banned);
   });
 
   it("webhook ingest rules helper has no banned strings (excluding comments)", async () => {
     const fs = await import("fs/promises");
-    const raw = await fs.readFile(
-      "src/lib/sensorWebhookIngestRules.ts",
-      "utf-8",
-    );
+    const raw = await fs.readFile("src/lib/sensorWebhookIngestRules.ts", "utf-8");
     const src = stripComments(raw);
     const banned =
       /service_role|action_queue|\.from\(["']alerts["']\)|openai|anthropic|mqtt\.connect|mqttSubscribe|relay|actuator|setpoint|autopilot/i;
     expect(src).not.toMatch(banned);
   });
-
-
 
   it("normalizes alias keys to canonical metric names", () => {
     const r = normalizeWebhookIngestPayload(

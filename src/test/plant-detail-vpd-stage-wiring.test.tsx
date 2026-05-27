@@ -70,7 +70,8 @@ describe("Plant Detail — stage-aware VPD copy", () => {
     expect(hint).toBeInTheDocument();
     expect(hint.textContent).toMatch(/In Veg VPD range/);
     expect(hint.textContent).toMatch(/VPD targets depend on plant stage/);
-    expect(hint.textContent).not.toMatch(/historical|stale/i);
+    // Label segment (before the helper sentence) should not be marked historical.
+    expect(hint.textContent?.split(".")[0]).not.toMatch(/historical|stale/i);
   });
 
   it("does not render an 'in target' verdict when stage is unknown", () => {

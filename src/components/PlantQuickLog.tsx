@@ -363,7 +363,7 @@ interface SensorFieldProps {
   onChange: (v: string) => void;
   inputMode: "decimal" | "numeric";
   step: string;
-  delta: import("@/lib/manualSensorDeltaRules").ManualSensorDelta | null;
+  delta: ChronologyDelta | null;
 }
 
 function SensorField({ id, label, value, onChange, inputMode, step, delta }: SensorFieldProps) {

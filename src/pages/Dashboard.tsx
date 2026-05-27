@@ -110,7 +110,7 @@ function groupReadings(rows: SensorReadingRow[]): DashReading[] {
 export default function Dashboard() {
   // Shared URL `?growId=` resolution against RLS-loaded grows. When growId is
   // absent or invalid, hooks fetch the user's full set (legacy behavior).
-  const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
+  const { urlGrowId, scopedGrow, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
   const scopedGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
   const { data: tents = [] } = useGrowTents(scopedGrowId);
   const { data: plants = [] } = useGrowPlants(undefined, scopedGrowId);

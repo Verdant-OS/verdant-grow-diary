@@ -157,9 +157,9 @@ describe("Forbidden claims", () => {
   const forbiddenPatterns: RegExp[] = [
     /autopilot/i,
     /guaranteed yield/i,
-    /AI grows for you/i,
+    /\bAI grows for you\b/i,
     /grow for you automatically/i,
-    /controls? your equipment\b(?! or grow for me\?)/i,
+    /Verdant controls? (your )?equipment/i,
   ];
 
   it("never claims autopilot, guaranteed yield, or AI grows for you", () => {

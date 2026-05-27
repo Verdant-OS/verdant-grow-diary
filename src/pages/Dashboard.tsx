@@ -747,6 +747,8 @@ export default function Dashboard() {
               targets: targetsCmp,
               stage: scopedGrow?.stage ?? null,
             });
+            const vpdStageMissing =
+              snap?.vpd != null && (scopedGrow?.stage ?? null) === null;
             return (
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -760,10 +762,26 @@ export default function Dashboard() {
                     </p>
                   </div>
                 </div>
+                {vpdStageMissing && (
+                  <div
+                    data-testid="dashboard-vpd-stage-missing-badge"
+                    role="status"
+                    className="mb-2 rounded-lg border border-border/40 bg-secondary/10 p-2 text-xs text-muted-foreground flex items-center gap-2 flex-wrap"
+                  >
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] uppercase border-muted-foreground text-muted-foreground"
+                    >
+                      Info
+                    </Badge>
+                    <span>Set plant stage to evaluate VPD targets.</span>
+                  </div>
+                )}
                 {alerts.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     {EMPTY_ALERTS_MESSAGE}
                   </p>
+
                 ) : (
                   <ul className="space-y-2">
                     {alerts.map((a) => {

@@ -85,6 +85,14 @@ export default function Sensors() {
             ) : (
               <SensorChart data={filtered} metric={m.key} height={200} />
             )}
+            {m.key === "vpd" && (
+              <p
+                className="text-[11px] text-muted-foreground mt-2"
+                data-testid="sensors-vpd-stage-hint"
+              >
+                {VPD_STAGE_HELPER_TEXT}
+              </p>
+            )}
           </div>
         ))}
       </div>

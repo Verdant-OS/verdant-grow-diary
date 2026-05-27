@@ -131,28 +131,62 @@ Deno.serve(async (req) => {
 
     const system = `You are Verdant's AI Grow Doctor for cannabis cultivation. Use ONLY the provided context. Do not invent sensor values, plants, or history. If data is sparse or a single photo/reading is the only signal, lower confidence and say so.
 
+Verdant has stage-aware environmental truth (VPD/Temp/RH stage bands, stability summaries, default environment alerts). Use that as context but never claim certainty from VPD/Temp/RH alone. Autoflower bias: favor low-stress, root health, avoid heavy defoliation, avoid aggressive feeding/training. NEVER imply Verdant or any AI can send commands, automate equipment, or actuate fans/lights/pumps/heaters/humidifiers/dehumidifiers/valves. Suggested actions are DRAFTS that the grower must explicitly approve.
+
 Return STRICT JSON ONLY (no prose, no markdown) matching this exact shape:
 {
-  "summary": string,
-  "likely_issue": string | null,
-  "confidence": "low" | "medium" | "high",
-  "risk_level": "low" | "medium" | "high" | "unknown",
-  "evidence": string[],
-  "possible_causes": string[],
-  "recommended_actions": string[],
-  "do_not_do": string[],
-  "follow_up_24h": string,
-  "follow_up_3_day": string
+  "analysis": {
+    "summary": string,
+    "likely_issue": string | null,
+    "confidence": "low" | "medium" | "high",
+    "risk_level": "low" | "medium" | "high" | "unknown",
+    "evidence": string[],
+    "possible_causes": string[],
+    "recommended_actions": string[],
+    "do_not_do": string[],
+    "follow_up_24h": string,
+    "follow_up_3_day": string
+  },
+  "diagnosis": {
+    "summary": string,
+    "likelyIssue": string | null,
+    "confidence": number,
+    "evidence": string[],
+    "missingInformation": string[],
+    "possibleCauses": string[],
+    "immediateAction": string | null,
+    "whatNotToDo": string[],
+    "followUp24h": { "summary": string, "checklist": string[] },
+    "recoveryPlan3d": { "summary": string, "checklist": string[] },
+    "riskLevel": "low" | "medium" | "high",
+    "suggestedActions": [
+      {
+        "type": "task" | "alert" | "note",
+        "title": string,
+        "detail": string,
+        "priority": "low" | "medium" | "high",
+        "reason": string,
+        "approvalRequired": true
+      }
+    ]
+  }
 }
 
-Rules:
+Rules for analysis (backward-compatible free-text view):
 - summary: 1-2 sentences in plain language.
-- likely_issue: short label (e.g. "Nitrogen deficiency", "VPD too high"), or null if unclear.
+- likely_issue: short label or null if unclear.
 - confidence: "low" if only one photo OR one sensor reading OR <2 diary entries.
-- evidence: bullet facts pulled DIRECTLY from context (cite entry numbers/dates or snapshot metrics).
-- If context is sparse, say so explicitly in summary and keep recommended_actions to safe, reversible steps.
-- do_not_do: warn against destructive actions a grower might be tempted to take.
+- evidence: bullet facts pulled DIRECTLY from context.
 - ${body.mode === "next_steps" ? "Bias toward forward-looking next steps in recommended_actions." : "Bias toward diagnosis in summary + likely_issue."}
+
+Rules for diagnosis (structured view, approval-first):
+- confidence is a number in [0, 1]. Use <0.5 when evidence is sparse.
+- evidence cites entries or snapshot metrics drawn from context.
+- missingInformation MUST be populated when confidence < 0.5.
+- immediateAction: a single safe, reversible step OR null. Never a device command.
+- whatNotToDo: irreversible/risky moves to avoid.
+- suggestedActions: AT MOST 2. Each is a DRAFT requiring grower approval. Never describe turning equipment on/off, automation, MQTT, Home Assistant, relays, smart plugs, or controllers.
+- Never guarantee recovery, yield, or full success.
 `;
 
     const userContent: Array<Record<string, unknown>> = [];
@@ -178,11 +212,29 @@ Rules:
     if (!r.ok) return json({ error: `AI error ${r.status}` }, 500);
     const data = await r.json();
     const raw = data.choices?.[0]?.message?.content ?? "{}";
-    let analysis: Record<string, unknown>;
-    try { analysis = JSON.parse(raw); }
-    catch { analysis = { ...EMPTY_ANALYSIS, summary: "AI returned unparseable output.", confidence: "low" }; }
+    let parsed: Record<string, unknown> = {};
+    try { parsed = JSON.parse(raw); }
+    catch { parsed = {}; }
 
-    return json({ analysis, sparse, empty: false });
+    // Backward-compatible: the legacy free-text shape lived at the top level.
+    // The new prompt nests it under `analysis`. Fall back to top-level if the
+    // model returned the legacy shape.
+    const analysis =
+      (parsed.analysis && typeof parsed.analysis === "object")
+        ? parsed.analysis as Record<string, unknown>
+        : (parsed.summary || parsed.recommended_actions)
+          ? parsed
+          : { ...EMPTY_ANALYSIS, summary: "AI returned unparseable output.", confidence: "low" };
+
+    // Structured diagnosis is sanitized client-side (canonical rules live in
+    // src/lib/aiDoctorDiagnosisRules.ts). Pass through raw and let the client
+    // run validateAndSanitizeDiagnosis — never auto-execute anything here.
+    const diagnosis =
+      (parsed.diagnosis && typeof parsed.diagnosis === "object")
+        ? parsed.diagnosis
+        : null;
+
+    return json({ analysis, diagnosis, sparse, empty: false });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : "unknown" }, 500);
   }

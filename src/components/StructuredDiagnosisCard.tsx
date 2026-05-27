@@ -11,7 +11,7 @@
  *   - The card never references device-control concepts. The sanitizer
  *     strips them before they ever reach this component.
  */
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, ShieldCheck, Sparkles } from "lucide-react";
@@ -115,15 +115,22 @@ export default function StructuredDiagnosisCard({
 }: StructuredDiagnosisCardProps) {
   const [queuedIdx, setQueuedIdx] = useState<Set<number>>(new Set());
   const [busyIdx, setBusyIdx] = useState<number | null>(null);
+  // Ref-backed guards so synchronous duplicate clicks (before React commits
+  // the state update) cannot enqueue twice.
+  const inFlightRef = useRef<Set<number>>(new Set());
+  const queuedRef = useRef<Set<number>>(new Set());
 
   async function handleClick(action: DiagnosisSuggestedAction, idx: number) {
     if (!onAddToQueue) return;
-    if (queuedIdx.has(idx) || busyIdx !== null) return;
+    if (queuedRef.current.has(idx) || inFlightRef.current.size > 0) return;
+    inFlightRef.current.add(idx);
     setBusyIdx(idx);
     try {
       await onAddToQueue(action, idx);
+      queuedRef.current.add(idx);
       setQueuedIdx((s) => new Set(s).add(idx));
     } finally {
+      inFlightRef.current.delete(idx);
       setBusyIdx(null);
     }
   }

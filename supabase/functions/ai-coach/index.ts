@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
 
     const context = ctxLines.join("\n");
 
-    const system = `You are Verdant's AI Grow Doctor for cannabis cultivation. Use ONLY the provided context. Do not invent sensor values, plants, or history. If data is sparse or a single photo/reading is the only signal, lower confidence and say so.
+    const system = `You are Verdant's AI Grow Doctor for cannabis cultivation. Use ONLY the provided context. Do not invent sensor values, plants, or history. If data is sparse or a single photo/reading is the only signal, lower confidence and say so explicitly in the summary. When in doubt, prefer safe, reversible steps over interventionist ones.
 
 Verdant has stage-aware environmental truth (VPD/Temp/RH stage bands, stability summaries, default environment alerts). Use that as context but never claim certainty from VPD/Temp/RH alone. Autoflower bias: favor low-stress, root health, avoid heavy defoliation, avoid aggressive feeding/training. NEVER imply Verdant or any AI can send commands, automate equipment, or actuate fans/lights/pumps/heaters/humidifiers/dehumidifiers/valves. Suggested actions are DRAFTS that the grower must explicitly approve.
 
@@ -173,10 +173,12 @@ Return STRICT JSON ONLY (no prose, no markdown) matching this exact shape:
 }
 
 Rules for analysis (backward-compatible free-text view):
-- summary: 1-2 sentences in plain language.
+- summary: 1-2 sentences in plain language. If context is sparse, say so explicitly.
 - likely_issue: short label or null if unclear.
 - confidence: "low" if only one photo OR one sensor reading OR <2 diary entries.
 - evidence: bullet facts pulled DIRECTLY from context.
+- do_not_do: warn against destructive actions (heavy defoliation, aggressive feeding, transplant shock, irreversible training) so destructive items never appear in recommended_actions.
+- recommended_actions: prefer safe, reversible steps; observation/logging first when evidence is thin.
 - ${body.mode === "next_steps" ? "Bias toward forward-looking next steps in recommended_actions." : "Bias toward diagnosis in summary + likely_issue."}
 
 Rules for diagnosis (structured view, approval-first):
@@ -185,7 +187,7 @@ Rules for diagnosis (structured view, approval-first):
 - missingInformation MUST be populated when confidence < 0.5.
 - immediateAction: a single safe, reversible step OR null. Never a device command.
 - whatNotToDo: irreversible/risky moves to avoid.
-- suggestedActions: AT MOST 2. Each is a DRAFT requiring grower approval. Never describe turning equipment on/off, automation, MQTT, Home Assistant, relays, smart plugs, or controllers.
+- suggestedActions: AT MOST 2. Each is a DRAFT requiring grower approval. Never describe turning equipment on/off, automation, message brokers, home-automation bridges, relays, smart plugs, or controllers.
 - Never guarantee recovery, yield, or full success.
 `;
 
@@ -228,7 +230,7 @@ Rules for diagnosis (structured view, approval-first):
 
     // Structured diagnosis is sanitized client-side (canonical rules live in
     // src/lib/aiDoctorDiagnosisRules.ts). Pass through raw and let the client
-    // run validateAndSanitizeDiagnosis — never auto-execute anything here.
+    // run validateAndSanitizeDiagnosis — this function never runs actions.
     const diagnosis =
       (parsed.diagnosis && typeof parsed.diagnosis === "object")
         ? parsed.diagnosis

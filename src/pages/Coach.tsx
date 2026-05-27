@@ -294,6 +294,17 @@ export default function Coach() {
         </div>
       </div>
 
+      {diagnosis && (
+        <div className="mt-4 animate-fade-in">
+          <StructuredDiagnosisCard
+            diagnosis={diagnosis}
+            disableQueueing={!activeGrowId}
+            onAddToQueue={(action) => addDoctorSuggestionToQueue(action)}
+            testId="coach-ai-doctor-diagnosis"
+          />
+        </div>
+      )}
+
       {analysis && (
         <div className="glass rounded-2xl p-4 mt-4 animate-fade-in space-y-3 text-sm">
           {(() => {

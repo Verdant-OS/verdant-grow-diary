@@ -6,8 +6,12 @@ import { Button } from "@/components/ui/button";
 import { usePlantTentLatestReadings } from "@/hooks/usePlantTentLatestReadings";
 import { buildPlantTentEnvironmentView } from "@/lib/plantTentEnvironmentRules";
 import { buildRecentSensorSnapshotHistory } from "@/lib/recentSensorSnapshotHistoryRules";
-import { SOURCE_LABEL, formatValue } from "@/lib/sensorSnapshot";
+import { SOURCE_LABEL, formatValue, snapshotFromReadings } from "@/lib/sensorSnapshot";
 import { tempFFromC } from "@/lib/temperatureUnits";
+import {
+  classifyVpdAgainstStage,
+  VPD_STAGE_HELPER_TEXT,
+} from "@/lib/vpdStageTargetRules";
 import {
   buildPlantQuickLogPrefill,
   PLANT_QUICKLOG_PREFILL_EVENT,

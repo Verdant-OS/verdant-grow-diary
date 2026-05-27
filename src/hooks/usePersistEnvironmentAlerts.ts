@@ -56,6 +56,11 @@ export interface PersistEnvironmentAlertsInput {
   isDemoData?: boolean;
   /** Default false. Setting false short-circuits the hook entirely. */
   enabled?: boolean;
+  /**
+   * Plant/grow/tent stage. When provided, VPD alerts are evaluated against
+   * stage-aware bands instead of the legacy generic 0.6–1.6 kPa default.
+   */
+  stage?: string | null;
 }
 
 const SOURCE = "environment_alerts";
@@ -87,6 +92,8 @@ export function usePersistEnvironmentAlerts(
   const enabled = input.enabled !== false;
   const growId = input.growId ?? null;
   const isDemoData = input.isDemoData === true;
+  const stageProvided = "stage" in input;
+  const stageKey = stageProvided ? input.stage ?? "__unknown__" : "__legacy__";
 
   useEffect(() => {
     if (!enabled || !growId) {
@@ -102,6 +109,7 @@ export function usePersistEnvironmentAlerts(
         snapshot: input.snapshot,
         quality: input.quality,
         targets: input.targets,
+        ...(stageProvided ? { stage: input.stage ?? null } : {}),
       });
 
       // 2. Filter to alerts derived from real, valid sensor readings only.
@@ -224,7 +232,7 @@ export function usePersistEnvironmentAlerts(
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, growId, tsKey, sourceKey, qualityKey, targetsKey, isDemoData]);
+  }, [enabled, growId, tsKey, sourceKey, qualityKey, targetsKey, isDemoData, stageKey, stageProvided]);
 
   return state;
 }

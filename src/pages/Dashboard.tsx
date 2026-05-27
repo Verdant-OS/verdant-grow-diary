@@ -156,6 +156,7 @@ export default function Dashboard() {
       targetsState.status === "ok" ? targetsState.targets : null,
     ),
     enabled: !!scopedGrowId,
+    stage: scopedGrow?.stage ?? null,
   });
 
 
@@ -744,6 +745,7 @@ export default function Dashboard() {
               snapshot: snap,
               quality,
               targets: targetsCmp,
+              stage: scopedGrow?.stage ?? null,
             });
             return (
               <div>

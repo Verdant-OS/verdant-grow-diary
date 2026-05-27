@@ -22,6 +22,11 @@
 import { isStale, type SensorSnapshot } from "@/lib/sensorSnapshot";
 import type { EnvironmentAlert } from "@/lib/environmentAlerts";
 import { classifyVpdAgainstStage } from "@/lib/vpdStageTargetRules";
+import {
+  classifyTempAgainstStage,
+  classifyRhAgainstStage,
+  type EnvClassificationResult,
+} from "@/lib/environmentStageTargetRules";
 
 export type DefaultMetric = "temp" | "rh" | "vpd";
 
@@ -48,15 +53,18 @@ export const DEFAULT_THRESHOLD_NOTE =
 export const STAGE_VPD_THRESHOLD_NOTE =
   "Compared against stage-aware VPD targets. VPD targets depend on plant stage.";
 
+export const STAGE_ENV_THRESHOLD_NOTE =
+  "Compared against stage-aware temperature and humidity targets. Targets depend on plant stage.";
+
 /** Cautious review-first recommendations. No device execution. No nutrients. */
 export const DEFAULT_RECOMMENDATIONS: Record<DefaultMetric, { high: string; low: string }> = {
   temp: {
-    high: "Review heat load, exhaust, and light intensity before making changes.",
-    low: "Review heater/environment settings and raise temperature gradually.",
+    high: "Review light intensity, airflow, and room intake temperature before making changes.",
+    low: "Review heater settings and night cycle conditions before changing feeding.",
   },
   rh: {
-    high: "Review humidity control and increase airflow/dehumidification gradually.",
-    low: "Review humidification and avoid large humidity swings.",
+    high: "Review airflow and dehumidification; avoid defoliation as a first move.",
+    low: "Review humidification and air exchange; avoid overwatering to raise humidity.",
   },
   vpd: {
     high: "Review RH and temperature balance before changing irrigation or feed.",

@@ -263,7 +263,22 @@ export default function Dashboard() {
         </div>
 
         <div className="glass rounded-2xl p-4">
-          <h2 className="font-display font-semibold mb-3">Environment strip</h2>
+          <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+            <h2 className="font-display font-semibold">Environment strip</h2>
+            {(() => {
+              const rollup = computeStabilityRollup(
+                latestPerTent.map((x) => x.stability),
+              );
+              return (
+                <div
+                  data-testid="dashboard-stability-rollup"
+                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${STABILITY_ROLLUP_TONE_CLASS[rollup.tone]}`}
+                >
+                  {rollup.copy}
+                </div>
+              );
+            })()}
+          </div>
           <div className="space-y-2.5">
             {latestPerTent.map(({ tent, last, stability }) => {
               const stabilityView = formatStabilityChipView(stability);

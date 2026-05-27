@@ -93,6 +93,15 @@ export default function EnvironmentStabilityCard({
         </Badge>
       </div>
 
+      <p
+        className="text-[11px] text-muted-foreground"
+        data-testid={`${testId}-why-context`}
+        data-why-kind={why.kind}
+      >
+        {why.text}
+      </p>
+
+
       {inactive ? (
         <p
           className="text-xs text-muted-foreground"

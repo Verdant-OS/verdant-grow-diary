@@ -19,6 +19,7 @@ import { tentsPath } from "@/lib/routes";
 import { tempFFromC } from "@/lib/temperatureUnits";
 import {
   classifyVpdAgainstStage,
+  normalizeVpdStage,
   vpdMetricChipStatus,
 } from "@/lib/vpdStageTargetRules";
 

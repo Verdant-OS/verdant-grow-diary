@@ -25,6 +25,10 @@ import {
   STATUS_HEADLINE as TARGET_STATUS_HEADLINE,
 } from "@/lib/environmentTargetComparison";
 import {
+  classifyVpdAgainstStage,
+  VPD_STAGE_HELPER_TEXT,
+} from "@/lib/stageAwareVpdTargets";
+import {
   buildEnvironmentAlerts,
   EMPTY_ALERTS_MESSAGE,
   type EnvironmentAlert,

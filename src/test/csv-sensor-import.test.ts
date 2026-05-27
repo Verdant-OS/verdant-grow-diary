@@ -33,7 +33,10 @@ describe("parseCsv", () => {
     const t = "A,B,C\r\n1,2,3\r\n4,5,6\r\n";
     expect(parseCsv(t)).toEqual({
       headers: ["A", "B", "C"],
-      rows: [["1", "2", "3"], ["4", "5", "6"]],
+      rows: [
+        ["1", "2", "3"],
+        ["4", "5", "6"],
+      ],
     });
   });
   it("handles quoted commas + escaped quotes", () => {
@@ -44,12 +47,7 @@ describe("parseCsv", () => {
 
 describe("planColumns", () => {
   it("detects AC Infinity Timestamp + Temperature(°F) + Humidity + VPD", () => {
-    const p = planColumns([
-      "Timestamp",
-      "Temperature (°F)",
-      "Humidity (%)",
-      "VPD (kPa)",
-    ]);
+    const p = planColumns(["Timestamp", "Temperature (°F)", "Humidity (%)", "VPD (kPa)"]);
     expect(p.timestamp).toBe(0);
     expect(p.temperature).toEqual({ idx: 1, unit: "F" });
     expect(p.humidity).toBe(2);
@@ -124,11 +122,7 @@ describe("normalizeAcInfinityRows", () => {
   });
 
   it("detects metrics and date range", () => {
-    expect(result.metricsDetected).toEqual([
-      "temperature_c",
-      "humidity_pct",
-      "vpd_kpa",
-    ]);
+    expect(result.metricsDetected).toEqual(["temperature_c", "humidity_pct", "vpd_kpa"]);
     expect(result.dateRange).not.toBeNull();
   });
 
@@ -148,23 +142,16 @@ describe("normalizeAcInfinityRows", () => {
   });
 
   it("flags unsupported metrics without persisting them", () => {
-    const withPh = parseCsv(
-      "Timestamp,Temperature (°F),pH\n2026-05-26 14:00:00,77,6.0",
-    );
+    const withPh = parseCsv("Timestamp,Temperature (°F),pH\n2026-05-26 14:00:00,77,6.0");
     const r = normalizeAcInfinityRows(withPh, planColumns(withPh.headers));
     expect(r.unsupportedMetrics).toContain("ph");
-    expect(
-      r.rows[0].readings.some((x) => (x.metric as string) === "ph"),
-    ).toBe(false);
+    expect(r.rows[0].readings.some((x) => (x.metric as string) === "ph")).toBe(false);
   });
 });
 
 describe("buildCsvInsertRows", () => {
   const parsed = parseCsv(
-    [
-      "Timestamp,Temperature (°F),Humidity (%)",
-      "2026-05-26 14:00:00,77,50",
-    ].join("\n"),
+    ["Timestamp,Temperature (°F),Humidity (%)", "2026-05-26 14:00:00,77,50"].join("\n"),
   );
   const result = normalizeAcInfinityRows(parsed, planColumns(parsed.headers));
 
@@ -239,9 +226,7 @@ const CARD_RAW = read("src/components/TentCsvImportCard.tsx");
  * on the client"). Only real code usage should fail the safety contract.
  */
 function stripComments(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 }
 const RULES = stripComments(RULES_RAW);
 const CARD = stripComments(CARD_RAW);
@@ -298,14 +283,56 @@ describe("Gate 2A safety contract (source-level)", () => {
 
   it("safety regex allows legitimate Gate 2A CSV import strings", () => {
     for (const allowed of [
+      // Core identifiers
       "csv",
       "CSV",
       "csv_import_ac_infinity",
+      "csv_import_trolmaster",
+      "csv_import_other",
+      // Parser function & constant names
+      "parseCsv",
+      "buildCsvInsertRows",
+      "normalizeAcInfinityRows",
+      "planColumns",
+      "parseOptionalNumberCell",
+      "parseTimestampCell",
+      "csvSourceTagFor",
+      "isCsvImportSource",
+      "CSV_IMPORT_SOURCE_APPS",
+      "CSV_SOURCE_AC_INFINITY",
+      "CSV_SOURCE_LABEL",
+      "MAX_CSV_BYTES",
+      "CsvImportSourceApp",
+      // UI copy & labels
       "CSV Import",
       "Import Sensor History (CSV)",
       "CSV Import – AC Infinity",
-      "parseCsv",
-      "buildCsvInsertRows",
+      "CSV Import – TrolMaster",
+      "CSV sensor history imported.",
+      "Couldn't import CSV.",
+      "Import Data",
+      "Parse & Preview",
+      "Pick file",
+      "Drag a CSV here, or pick a file",
+      "Source App",
+      "Imported readings are tagged as CSV data and never treated as live sensor readings.",
+      // UI data-testid attributes
+      "tent-csv-import-card",
+      "csv-source-app",
+      "csv-dropzone",
+      "csv-file-input",
+      "csv-pick-file",
+      "csv-parse",
+      "csv-import",
+      "csv-preview",
+      "csv-preview-table",
+      "csv-stat-parsed",
+      "csv-stat-skipped",
+      "csv-stat-range",
+      "csv-stat-metrics",
+      "csv-error",
+      "csv-skipped-warning",
+      "csv-filename",
     ]) {
       expect(allowed).not.toMatch(BANNED_UNSAFE);
     }

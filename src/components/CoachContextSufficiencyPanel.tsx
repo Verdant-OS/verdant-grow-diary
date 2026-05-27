@@ -89,9 +89,10 @@ export default function CoachContextSufficiencyPanel({ result, className }: Prop
           variant="default"
           data-testid="coach-context-confidence-ceiling"
           data-label="high"
+          data-ceiling-pct={ceilingPct("high")}
           className="ml-auto text-[10px] uppercase tracking-wide"
         >
-          High confidence allowed
+          Up to {ceilingPct("high")}% confidence
         </Badge>
       </div>
     );

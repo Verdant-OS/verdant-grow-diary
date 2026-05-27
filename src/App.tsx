@@ -33,9 +33,8 @@ import Landing from "./pages/Landing";
 import HardwareIntegrations from "./pages/HardwareIntegrations";
 import Leads from "./pages/Leads";
 import PiIngestStatus from "./pages/PiIngestStatus";
+import Pricing from "./pages/Pricing";
 import NotFound from "./pages/NotFound";
-
-
 
 const queryClient = new QueryClient();
 
@@ -50,6 +49,7 @@ const App = () => (
             <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/welcome" element={<Landing />} />
+              <Route path="/pricing" element={<Pricing />} />
               <Route path="/hardware-integrations" element={<HardwareIntegrations />} />
 
               <Route element={<AppShell />}>

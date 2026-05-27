@@ -33,7 +33,10 @@ describe("parseCsv", () => {
     const t = "A,B,C\r\n1,2,3\r\n4,5,6\r\n";
     expect(parseCsv(t)).toEqual({
       headers: ["A", "B", "C"],
-      rows: [["1", "2", "3"], ["4", "5", "6"]],
+      rows: [
+        ["1", "2", "3"],
+        ["4", "5", "6"],
+      ],
     });
   });
   it("handles quoted commas + escaped quotes", () => {
@@ -44,12 +47,7 @@ describe("parseCsv", () => {
 
 describe("planColumns", () => {
   it("detects AC Infinity Timestamp + Temperature(°F) + Humidity + VPD", () => {
-    const p = planColumns([
-      "Timestamp",
-      "Temperature (°F)",
-      "Humidity (%)",
-      "VPD (kPa)",
-    ]);
+    const p = planColumns(["Timestamp", "Temperature (°F)", "Humidity (%)", "VPD (kPa)"]);
     expect(p.timestamp).toBe(0);
     expect(p.temperature).toEqual({ idx: 1, unit: "F" });
     expect(p.humidity).toBe(2);
@@ -124,11 +122,7 @@ describe("normalizeAcInfinityRows", () => {
   });
 
   it("detects metrics and date range", () => {
-    expect(result.metricsDetected).toEqual([
-      "temperature_c",
-      "humidity_pct",
-      "vpd_kpa",
-    ]);
+    expect(result.metricsDetected).toEqual(["temperature_c", "humidity_pct", "vpd_kpa"]);
     expect(result.dateRange).not.toBeNull();
   });
 
@@ -148,23 +142,16 @@ describe("normalizeAcInfinityRows", () => {
   });
 
   it("flags unsupported metrics without persisting them", () => {
-    const withPh = parseCsv(
-      "Timestamp,Temperature (°F),pH\n2026-05-26 14:00:00,77,6.0",
-    );
+    const withPh = parseCsv("Timestamp,Temperature (°F),pH\n2026-05-26 14:00:00,77,6.0");
     const r = normalizeAcInfinityRows(withPh, planColumns(withPh.headers));
     expect(r.unsupportedMetrics).toContain("ph");
-    expect(
-      r.rows[0].readings.some((x) => (x.metric as string) === "ph"),
-    ).toBe(false);
+    expect(r.rows[0].readings.some((x) => (x.metric as string) === "ph")).toBe(false);
   });
 });
 
 describe("buildCsvInsertRows", () => {
   const parsed = parseCsv(
-    [
-      "Timestamp,Temperature (°F),Humidity (%)",
-      "2026-05-26 14:00:00,77,50",
-    ].join("\n"),
+    ["Timestamp,Temperature (°F),Humidity (%)", "2026-05-26 14:00:00,77,50"].join("\n"),
   );
   const result = normalizeAcInfinityRows(parsed, planColumns(parsed.headers));
 
@@ -229,28 +216,24 @@ describe("source app gating", () => {
 });
 
 // ---------- Source-level safety contract ----------
+import {
+  stripComments,
+  createGateSafetyScanner,
+  assertAllowedStringsPass,
+  assertBannedStringsFail,
+  GATE_2A_BANNED_TOKENS,
+} from "./utils/gateSafetyScan";
+
 const RULES_RAW = read("src/lib/csvSensorImportRules.ts");
 const CARD_RAW = read("src/components/TentCsvImportCard.tsx");
 
-/**
- * Strip block + line comments so the safety scan only inspects executable
- * code. Gate 2A IS the CSV Drop feature, so words like "csv" and meta-words
- * like "service_role" legitimately appear in prose ("never use service_role
- * on the client"). Only real code usage should fail the safety contract.
- */
-function stripComments(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
-}
 const RULES = stripComments(RULES_RAW);
 const CARD = stripComments(CARD_RAW);
 
-// Targeted unsafe-behavior tokens. The literal word "csv" is intentionally
-// NOT banned — Gate 2A is the CSV Drop feature and legitimately uses tokens
-// like `csv_import_ac_infinity`, "CSV Import", file names, etc.
-const BANNED_UNSAFE =
-  /openai|anthropic|ai[-_]?doctor|\bmqtt\b|home[\s_-]?assistant|webhook|\brelay\b|\bactuator\b|service_role|autopilot|auto[-_ ]?execute|fetch\(\s*["']https?:/i;
+const gate2A = createGateSafetyScanner({
+  bannedTokens: GATE_2A_BANNED_TOKENS,
+  gateName: "Gate 2A",
+});
 
 describe("Gate 2A safety contract (source-level)", () => {
   it("rules + card never write to alerts / action_queue / plants / tents / diary_entries", () => {
@@ -291,39 +274,73 @@ describe("Gate 2A safety contract (source-level)", () => {
   });
 
   it("no AI / Doctor / automation / device-control / external-API surface", () => {
-    for (const src of [RULES, CARD]) {
-      expect(src).not.toMatch(BANNED_UNSAFE);
-    }
+    gate2A.assertNoBannedTokens(RULES);
+    gate2A.assertNoBannedTokens(CARD);
   });
 
-  it("safety regex allows legitimate Gate 2A CSV import strings", () => {
-    for (const allowed of [
-      "csv",
-      "CSV",
-      "csv_import_ac_infinity",
-      "CSV Import",
-      "Import Sensor History (CSV)",
-      "CSV Import – AC Infinity",
-      "parseCsv",
-      "buildCsvInsertRows",
-    ]) {
-      expect(allowed).not.toMatch(BANNED_UNSAFE);
-    }
+  it("allows legitimate CSV import identifiers", () => {
+    assertAllowedStringsPass(
+      [
+        "csv",
+        "CSV",
+        "csv_import_ac_infinity",
+        "csv_import_trolmaster",
+        "CSV Import",
+        "CSV Import – AC Infinity",
+        "CSV Import - AC Infinity",
+        "Import Sensor History (CSV)",
+        "Import Sensor History",
+        "Parse & Preview",
+        "Import Data",
+        "rows parsed",
+        "rows skipped",
+        "metrics detected",
+        "source = csv_import_ac_infinity",
+        "csvSensorImportRules",
+        "parseCsvSensorImport",
+        "normalizeCsvSensorRows",
+        "AC Infinity",
+        "TrolMaster",
+        "Other",
+        "Papa Parse",
+        "papaparse",
+        "parseCsv",
+        "buildCsvInsertRows",
+        "normalizeAcInfinityRows",
+        "planColumns",
+        "csvSourceTagFor",
+        "isCsvImportSource",
+      ],
+      { bannedTokens: GATE_2A_BANNED_TOKENS, gateName: "Gate 2A" },
+    );
   });
 
-  it("safety regex still catches truly unsafe tokens", () => {
-    for (const unsafe of [
-      "service_role",
-      "mqtt.connect()",
-      "home_assistant",
-      "home-assistant",
-      "openai.chat",
-      "autopilot",
-      'fetch("https://evil.example.com")',
-      "webhook_url",
-      "actuator.on()",
-    ]) {
-      expect(unsafe).toMatch(BANNED_UNSAFE);
-    }
+  it("still rejects unsafe automation/device-control tokens", () => {
+    assertBannedStringsFail(
+      [
+        "service_role",
+        "mqtt",
+        "home_assistant",
+        "home-assistant",
+        "Home Assistant",
+        "webhook",
+        "relay",
+        "actuator",
+        "autopilot",
+        "auto-execute",
+        "dispatch_command",
+        "openai",
+        "anthropic",
+        "ai-doctor",
+        'fetch("https://evil.example.com")',
+      ],
+      { bannedTokens: GATE_2A_BANNED_TOKENS, gateName: "Gate 2A" },
+    );
+  });
+
+  it("ignores banned words inside comments", () => {
+    // Verify that comment-stripping prevents false positives
+    const srcWithComments = `// never use service_role\n/* no mqtt here */\nconst x = 1;`;
+    gate2A.assertSourceSafe(srcWithComments);
   });
 });

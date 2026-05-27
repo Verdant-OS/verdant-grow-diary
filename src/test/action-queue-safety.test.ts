@@ -29,16 +29,16 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve, join } from "node:path";
+import {
+  stripComments,
+  createGateSafetyScanner,
+  ACTION_QUEUE_DEVICE_CONTROL_TOKENS,
+  ACTION_QUEUE_AUTO_EXECUTE_TOKENS,
+} from "./utils/gateSafetyScan";
 
 const ROOT = resolve(__dirname, "../..");
-const AI_COACH_SRC = readFileSync(
-  resolve(ROOT, "supabase/functions/ai-coach/index.ts"),
-  "utf8",
-);
-const TYPES_SRC = readFileSync(
-  resolve(ROOT, "src/integrations/supabase/types.ts"),
-  "utf8",
-);
+const AI_COACH_SRC = readFileSync(resolve(ROOT, "supabase/functions/ai-coach/index.ts"), "utf8");
+const TYPES_SRC = readFileSync(resolve(ROOT, "src/integrations/supabase/types.ts"), "utf8");
 
 // Recursively collect text files under a directory, excluding test files and
 // this file (so we don't false-positive on our own regex strings).
@@ -94,9 +94,7 @@ const ALL_ACTION_QUEUE_SQL = readAllActionQueueMigrations();
 const HAS_ACTION_QUEUE_TABLE = /action_queue/i.test(TYPES_SRC) || !!ACTION_QUEUE_SQL;
 
 // Strip JS/TS comments for source-shape checks on ai-coach.
-const AI_COACH_CODE = AI_COACH_SRC
-  .replace(/\/\*[\s\S]*?\*\//g, "")
-  .replace(/(^|[^:])\/\/.*$/gm, "$1");
+const AI_COACH_CODE = stripComments(AI_COACH_SRC);
 
 describe("Action Queue safety — current posture (suggest-only by construction)", () => {
   it("1. ai-coach performs NO writes (no .insert / .upsert / .update / .delete / .rpc)", () => {
@@ -171,7 +169,9 @@ describe("Action Queue safety — future-proof contract (active only when action
     "3. action_queue.status defaults to 'pending_approval' (or equivalent approval-required state)",
     () => {
       const sql = ACTION_QUEUE_SQL ?? "";
-      expect(sql).toMatch(/status[\s\S]{0,80}default\s+['"](pending_approval|awaiting_approval|proposed|suggested)['"]/i);
+      expect(sql).toMatch(
+        /status[\s\S]{0,80}default\s+['"](pending_approval|awaiting_approval|proposed|suggested)['"]/i,
+      );
     },
   );
 
@@ -201,7 +201,9 @@ describe("Action Queue safety — future-proof contract (active only when action
     "5+6+7. action_queue enforces RLS with auth.uid() = user_id (user-scoped writes; client user_id not trusted)",
     () => {
       const sql = ACTION_QUEUE_SQL ?? "";
-      expect(sql).toMatch(/alter\s+table[\s\S]*action_queue[\s\S]*enable\s+row\s+level\s+security/i);
+      expect(sql).toMatch(
+        /alter\s+table[\s\S]*action_queue[\s\S]*enable\s+row\s+level\s+security/i,
+      );
       expect(sql).toMatch(/create\s+policy[\s\S]*action_queue[\s\S]*auth\.uid\(\)\s*=\s*user_id/i);
       // No service_role bypass policy.
       expect(sql).not.toMatch(/service_role/i);
@@ -214,7 +216,9 @@ describe("Action Queue safety — future-proof contract (active only when action
       const sql = ACTION_QUEUE_SQL ?? "";
       // Either a FK to grows(id) plus the RLS-on-user_id above, or an explicit
       // grow-ownership check.
-      const hasGrowFk = /grow_id[\s\S]{0,200}references\s+(public\.)?grows\s*\(\s*id\s*\)/i.test(sql);
+      const hasGrowFk = /grow_id[\s\S]{0,200}references\s+(public\.)?grows\s*\(\s*id\s*\)/i.test(
+        sql,
+      );
       const hasGrowOwnershipCheck = /grows[\s\S]{0,200}user_id[\s\S]{0,40}auth\.uid\(\)/i.test(sql);
       expect(hasGrowFk || hasGrowOwnershipCheck).toBe(true);
     },
@@ -224,7 +228,8 @@ describe("Action Queue safety — future-proof contract (active only when action
     "9. approved actions are separated from suggested (status enum / approved_at column / approvals table)",
     () => {
       const sql = ACTION_QUEUE_SQL ?? "";
-      const hasStatusEnum = /status[\s\S]{0,200}(approved|executed|rejected|pending_approval)/i.test(sql);
+      const hasStatusEnum =
+        /status[\s\S]{0,200}(approved|executed|rejected|pending_approval)/i.test(sql);
       const hasApprovedAt = /\bapproved_at\b/i.test(sql);
       const hasApprovalsTable = /create\s+table[^;]*\baction_approvals?\b/i.test(sql);
       expect(hasStatusEnum || hasApprovedAt || hasApprovalsTable).toBe(true);
@@ -254,12 +259,9 @@ describe("Action Queue safety — tightened plant/tent ownership (active once po
     expect(typeof hasTightening).toBe("boolean");
   });
 
-  (hasTightening ? it : it.skip)(
-    "INSERT WITH CHECK enforces user_id = auth.uid()",
-    () => {
-      expect(INSERT_POLICY).toMatch(/WITH\s+CHECK\s*\([\s\S]*auth\.uid\(\)\s*=\s*user_id/i);
-    },
-  );
+  (hasTightening ? it : it.skip)("INSERT WITH CHECK enforces user_id = auth.uid()", () => {
+    expect(INSERT_POLICY).toMatch(/WITH\s+CHECK\s*\([\s\S]*auth\.uid\(\)\s*=\s*user_id/i);
+  });
 
   (hasTightening ? it : it.skip)(
     "INSERT WITH CHECK enforces grow_id ownership via grows.user_id = auth.uid()",
@@ -352,8 +354,12 @@ describe("Action Queue safety — same-grow lineage (plants/tents must share gro
     }
     return null;
   }
-  const tentsGrowMig = findMigration(/ALTER\s+TABLE\s+public\.tents[\s\S]{0,200}ADD\s+COLUMN[\s\S]{0,80}grow_id/i);
-  const plantsGrowMig = findMigration(/ALTER\s+TABLE\s+public\.plants[\s\S]{0,200}ADD\s+COLUMN[\s\S]{0,80}grow_id/i);
+  const tentsGrowMig = findMigration(
+    /ALTER\s+TABLE\s+public\.tents[\s\S]{0,200}ADD\s+COLUMN[\s\S]{0,80}grow_id/i,
+  );
+  const plantsGrowMig = findMigration(
+    /ALTER\s+TABLE\s+public\.plants[\s\S]{0,200}ADD\s+COLUMN[\s\S]{0,80}grow_id/i,
+  );
   const hasLineage =
     !!tentsGrowMig &&
     !!plantsGrowMig &&
@@ -364,23 +370,17 @@ describe("Action Queue safety — same-grow lineage (plants/tents must share gro
     expect(typeof hasLineage).toBe("boolean");
   });
 
-  (hasLineage ? it : it.skip)(
-    "tents.grow_id exists and references public.grows(id)",
-    () => {
-      expect(tentsGrowMig).toMatch(
-        /ALTER\s+TABLE\s+public\.tents[\s\S]{0,200}ADD\s+COLUMN[\s\S]{0,200}grow_id\s+uuid[\s\S]{0,80}REFERENCES\s+public\.grows\s*\(\s*id\s*\)/i,
-      );
-    },
-  );
+  (hasLineage ? it : it.skip)("tents.grow_id exists and references public.grows(id)", () => {
+    expect(tentsGrowMig).toMatch(
+      /ALTER\s+TABLE\s+public\.tents[\s\S]{0,200}ADD\s+COLUMN[\s\S]{0,200}grow_id\s+uuid[\s\S]{0,80}REFERENCES\s+public\.grows\s*\(\s*id\s*\)/i,
+    );
+  });
 
-  (hasLineage ? it : it.skip)(
-    "plants.grow_id exists and references public.grows(id)",
-    () => {
-      expect(plantsGrowMig).toMatch(
-        /ALTER\s+TABLE\s+public\.plants[\s\S]{0,200}ADD\s+COLUMN[\s\S]{0,200}grow_id\s+uuid[\s\S]{0,80}REFERENCES\s+public\.grows\s*\(\s*id\s*\)/i,
-      );
-    },
-  );
+  (hasLineage ? it : it.skip)("plants.grow_id exists and references public.grows(id)", () => {
+    expect(plantsGrowMig).toMatch(
+      /ALTER\s+TABLE\s+public\.plants[\s\S]{0,200}ADD\s+COLUMN[\s\S]{0,200}grow_id\s+uuid[\s\S]{0,80}REFERENCES\s+public\.grows\s*\(\s*id\s*\)/i,
+    );
+  });
 
   (hasLineage ? it : it.skip)(
     "required indexes added: tents(user_id,grow_id), plants(user_id,grow_id), plants(tent_id)",
@@ -423,21 +423,20 @@ describe("Action Queue safety — same-grow lineage (plants/tents must share gro
     },
   );
 
-  (hasLineage ? it : it.skip)(
-    "plant-in-tent consistency still enforced when both are set",
-    () => {
-      expect(INSERT_POLICY).toMatch(
-        /plant_id\s+IS\s+NULL\s+OR\s+tent_id\s+IS\s+NULL\s+OR\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.plants[\s\S]*?tent_id\s*=\s*tent_id/i,
-      );
-    },
-  );
+  (hasLineage ? it : it.skip)("plant-in-tent consistency still enforced when both are set", () => {
+    expect(INSERT_POLICY).toMatch(
+      /plant_id\s+IS\s+NULL\s+OR\s+tent_id\s+IS\s+NULL\s+OR\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.plants[\s\S]*?tent_id\s*=\s*tent_id/i,
+    );
+  });
 
   (hasLineage ? it : it.skip)(
     "no service_role bypass and no device-control surface introduced",
     () => {
       expect(ALL_ACTION_QUEUE_SQL).not.toMatch(/service_role/i);
       const combined = (tentsGrowMig ?? "") + (plantsGrowMig ?? "") + ALL_ACTION_QUEUE_SQL;
-      expect(combined).not.toMatch(/mqtt|home[\s_-]?assistant|webhook|pi[\s_-]?bridge\.(local|lan|home|io|net|com)/i);
+      expect(combined).not.toMatch(
+        /mqtt|home[\s_-]?assistant|webhook|pi[\s_-]?bridge\.(local|lan|home|io|net|com)/i,
+      );
     },
   );
 });

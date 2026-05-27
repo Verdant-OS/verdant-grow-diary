@@ -39,6 +39,11 @@ import {
   VPD_STAGE_HELPER_TEXT,
 } from "@/lib/stageAwareVpdTargets";
 import {
+  classifyTempAgainstStage,
+  classifyRhAgainstStage,
+  environmentMetricChipStatus,
+} from "@/lib/environmentStageTargetRules";
+import {
   buildEnvironmentAlerts,
   EMPTY_ALERTS_MESSAGE,
   type EnvironmentAlert,
@@ -302,8 +307,8 @@ export default function Dashboard() {
                   </div>
                   {last && (
                     <div className="flex flex-wrap gap-1.5">
-                      <MetricChip label="T" value={last.temp != null ? (tempFFromC(last.temp) ?? 0).toFixed(1) : "—"} unit="°F" status={last.temp != null && (last.temp > 28 || last.temp < 19) ? "warn" : "ok"} />
-                      <MetricChip label="RH" value={last.rh ?? "—"} unit="%" status={last.rh != null && (last.rh > 65 || last.rh < 35) ? "warn" : "ok"} />
+                      <MetricChip label="T" value={last.temp != null ? (tempFFromC(last.temp) ?? 0).toFixed(1) : "—"} unit="°F" status={environmentMetricChipStatus(classifyTempAgainstStage(last.temp ?? null, { stage: tent.stage }))} />
+                      <MetricChip label="RH" value={last.rh ?? "—"} unit="%" status={environmentMetricChipStatus(classifyRhAgainstStage(last.rh ?? null, { stage: tent.stage }))} />
                       <MetricChip label="VPD" value={last.vpd ?? "—"} unit=" kPa" status={vpdMetricChipStatus(classifyVpdAgainstStage({ value: last.vpd ?? null, stage: tent.stage }))} />
                     </div>
                   )}

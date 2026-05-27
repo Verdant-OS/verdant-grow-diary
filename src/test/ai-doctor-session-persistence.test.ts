@@ -51,7 +51,7 @@ function makeClient(insertImpl: (row: unknown) => unknown) {
     insertImpl(row);
     return { select };
   });
-  const from = vi.fn(() => ({ insert }));
+  const from = vi.fn((_table: string) => ({ insert }));
   return { from, _calls: { from, insert, select, single } };
 }
 

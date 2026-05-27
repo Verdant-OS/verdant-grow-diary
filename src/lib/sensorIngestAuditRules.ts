@@ -54,13 +54,21 @@ export function buildIngestAuditRecord(
   if (!Number.isFinite(input.rowsInserted) || input.rowsInserted < 0) return null;
   if (input.rowsInserted > input.rowsReceived) return null;
 
+  // JWT path must never carry a bridge_token_id input.
+  if (
+    input.authKind === "jwt" &&
+    input.bridgeTokenId !== undefined &&
+    input.bridgeTokenId !== null
+  ) {
+    return null;
+  }
+
   const bridgeTokenId =
     input.authKind === "bridge" && isUuidLike(input.bridgeTokenId)
       ? input.bridgeTokenId
       : null;
 
-  // JWT path must never carry a bridge_token_id.
-  if (input.authKind === "jwt" && bridgeTokenId !== null) return null;
+
 
   return {
     user_id: input.userId,

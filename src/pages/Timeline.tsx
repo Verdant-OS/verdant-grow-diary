@@ -27,6 +27,9 @@ import { actionDetailPath, alertDetailPath, logsPath, timelinePath } from "@/lib
 import { cn } from "@/lib/utils";
 import { getEventType } from "@/lib/diary";
 import { buildGrowDiaryTimeline } from "@/lib/growDiaryTimelineRules";
+import { classifyVpdAgainstStage } from "@/lib/vpdStageTargetRules";
+
+const TIMELINE_SNAPSHOT_STALE_MS = 30 * 60 * 1000;
 
 interface Entry {
   id: string; note: string; photo_url: string | null; stage: string | null;

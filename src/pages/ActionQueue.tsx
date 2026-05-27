@@ -329,6 +329,17 @@ export default function ActionQueue() {
     sortOrder !== "newest";
 
 
+  // AUD-008: deterministic grow-context hint built from URL scope, active
+  // grow, and the RLS-visible grows list. Never changes which actions are
+  // loaded — only describes the current scope.
+  const growContextHint = buildActionQueueGrowContextHint({
+    urlGrowId,
+    activeGrowId,
+    activeGrowName: activeGrow?.name ?? null,
+    scopedGrowName,
+    grows,
+  });
+
   return (
     <div>
       <GrowBreadcrumbs growId={urlGrowId} growName={scopedGrowName} current="Action Queue" section="actions" />
@@ -339,9 +350,26 @@ export default function ActionQueue() {
         </h1>
         <p className="text-sm text-muted-foreground">
           Suggestions are <span className="text-foreground">approval-gated</span>.
-          Verdant never sends commands to equipment.{" "}
-          {activeGrow ? <>Showing actions for <span className="text-foreground">{activeGrow.name}</span>.</> : "Showing all grows."}
+          Verdant never sends commands to equipment.
         </p>
+        <div
+          className="mt-2 rounded-lg border border-border/60 bg-secondary/30 px-3 py-2"
+          data-testid="action-queue-grow-context-hint"
+          data-context-kind={growContextHint.kind}
+          data-is-scoped={growContextHint.isScoped ? "1" : "0"}
+        >
+          <p className="text-xs text-foreground" data-testid="action-queue-grow-context-message">
+            {growContextHint.message}
+          </p>
+          {growContextHint.helper && (
+            <p
+              className="text-[11px] text-muted-foreground mt-1"
+              data-testid="action-queue-grow-context-helper"
+            >
+              {growContextHint.helper}
+            </p>
+          )}
+        </div>
       </div>
 
       {urlGrowId && (

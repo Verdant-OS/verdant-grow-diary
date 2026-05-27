@@ -35,7 +35,7 @@ export default function TentBridgeTokensCard({ tentId }: { tentId: string }) {
     setLoading(true);
     const { data, error } = await supabase
       .from("bridge_tokens")
-      .select("id, name, token_prefix, expires_at, last_used_at, revoked_at, created_at")
+      .select("id, name, token_prefix, expires_at, last_used_at, first_used_at, ingest_count, revoked_at, created_at")
       .eq("tent_id", tentId)
       .order("created_at", { ascending: false });
     if (error) {

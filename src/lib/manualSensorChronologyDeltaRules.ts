@@ -1,17 +1,16 @@
 /**
  * Pure helpers for chronology-aware manual sensor deltas.
  *
- * Given a plant's manual log history (newest-first or unsorted) and a "current"
- * manual log (captured_at + per-metric values), returns the correct delta and
- * human-readable time context per metric. No I/O, no React, no advice.
+ * Given a plant's manual log history and a "current" log (captured_at +
+ * per-metric values), returns the per-metric delta plus a human-readable
+ * time context. No I/O, no React.
  *
  * Deltas are derived from captured_at chronology. Manual logs use source='manual'.
- * Per-metric comparison is against the most recent strictly-prior log that has
- * a finite value for the same metric. Back-dated inserts are handled correctly
- * because every read re-sorts; no delta value is ever persisted as truth.
+ * Per-metric comparison is against the most recent strictly-prior log that
+ * has a finite value for the same metric. Back-dated rows are handled by
+ * re-sorting on every read; deltas are never persisted as truth.
  *
- * Safety contract: never mentions alerts, nutrient advice, Action Queue, or AI.
- * Asserted by src/test/manual-sensor-chronology-delta.test.ts.
+ * Safety contract is asserted by src/test/manual-sensor-chronology-delta.test.ts.
  */
 import type { ManualSensorMetric } from "./manualSensorFreshnessRules";
 import { METRIC_UNITS } from "./manualSensorFreshnessRules";

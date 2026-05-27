@@ -7,6 +7,7 @@ import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
 import { useGrowTents, useGrowSensorReadings } from "@/hooks/useGrowData";
 import { useTents as useTentRows } from "@/hooks/use-tents";
 import { classifyGrowDataSource } from "@/lib/growDataSourceLabelRules";
+import { VPD_STAGE_HELPER_TEXT } from "@/lib/vpdStageTargetRules";
 import { cn } from "@/lib/utils";
 
 const METRICS = [

@@ -172,6 +172,63 @@ export function buildDefaultThresholdAlerts(args: BuildArgs): EnvironmentAlert[]
       continue;
     }
 
+    // Temperature & RH via stage-aware classifier when stage is provided.
+    if ((metric === "temp" || metric === "rh") && stageProvided) {
+      const cls: EnvClassificationResult =
+        metric === "temp"
+          ? classifyTempAgainstStage(value, { stage: args.stage ?? null, stale: false })
+          : classifyRhAgainstStage(value, { stage: args.stage ?? null, stale: false });
+      // Skip non-actionable classifications:
+      //   in_target / unavailable / stage_unknown / context_only
+      if (
+        cls.classification !== "below_target" &&
+        cls.classification !== "above_target"
+      ) {
+        continue;
+      }
+      const state: "high" | "low" =
+        cls.classification === "above_target" ? "high" : "low";
+      const recommendation = DEFAULT_RECOMMENDATIONS[metric][state];
+      const stageLabel = cls.band.stage.replace("_", " ");
+      const unit = metric === "temp" ? "°C" : "%";
+      const label = metric === "temp" ? "Temperature" : "Humidity";
+      const rangeText =
+        cls.band.min !== null && cls.band.max !== null
+          ? `${fmt(cls.band.min, unit)}–${fmt(cls.band.max, unit)}`
+          : "stage range";
+      const parts: string[] = [];
+      parts.push(
+        state === "high"
+          ? `${label} is above the ${stageLabel} target range.`
+          : `${label} is below the ${stageLabel} target range.`,
+      );
+      parts.push(
+        `Observed ${fmt(value, unit)} (${stageLabel} range ${rangeText}).`,
+      );
+      if (snapshot.ts) parts.push(`Reading at ${snapshot.ts}.`);
+      if (args.deviceLabel) parts.push(`Source: ${args.deviceLabel}.`);
+      parts.push(STAGE_ENV_THRESHOLD_NOTE);
+      parts.push(`Recommendation: ${recommendation}`);
+
+      out.push({
+        // ID kept stable across stages and observed values for dedupe.
+        id: `default_target:${metric}:${state}`,
+        severity: "warning",
+        metric,
+        // Title omits observed value, timestamp, and stage for stable dedupe.
+        title:
+          state === "high"
+            ? `${label} above stage range`
+            : `${label} below stage range`,
+        reason: parts.join(" "),
+        source: "default_thresholds",
+        createdAt,
+      });
+      continue;
+    }
+
+
+
     const range = DEFAULT_THRESHOLDS[metric];
     let state: "high" | "low" | null = null;
     if (value > range.max) state = "high";

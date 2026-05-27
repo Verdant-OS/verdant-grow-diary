@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
+import { formatDistanceToNowStrict } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Copy, KeyRound, Trash2 } from "lucide-react";
+import { Activity, Copy, KeyRound, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import {
@@ -12,6 +13,7 @@ import {
   type BridgeTokenRow,
   bridgeTokenStatus,
   clampTtlDays,
+  formatIngestCount,
   sanitizeTokenName,
 } from "@/lib/bridgeTokenRules";
 
@@ -33,7 +35,7 @@ export default function TentBridgeTokensCard({ tentId }: { tentId: string }) {
     setLoading(true);
     const { data, error } = await supabase
       .from("bridge_tokens")
-      .select("id, name, token_prefix, expires_at, last_used_at, revoked_at, created_at")
+      .select("id, name, token_prefix, expires_at, last_used_at, first_used_at, ingest_count, revoked_at, created_at")
       .eq("tent_id", tentId)
       .order("created_at", { ascending: false });
     if (error) {
@@ -141,13 +143,31 @@ export default function TentBridgeTokensCard({ tentId }: { tentId: string }) {
         <ul className="divide-y divide-border/50">
           {tokens.map((t) => {
             const status = bridgeTokenStatus(t);
+            const lastUsed = t.last_used_at
+              ? `${formatDistanceToNowStrict(new Date(t.last_used_at))} ago`
+              : "never used";
+            const count = formatIngestCount(t.ingest_count);
             return (
               <li key={t.id} className="flex items-center justify-between py-2 gap-2">
                 <div className="min-w-0">
                   <div className="font-medium text-sm truncate">{t.name}</div>
                   <div className="text-xs text-muted-foreground font-mono">
                     {t.token_prefix}… · expires {new Date(t.expires_at).toLocaleDateString()}
-                    {t.last_used_at ? ` · used ${new Date(t.last_used_at).toLocaleDateString()}` : " · unused"}
+                  </div>
+                  <div
+                    className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5"
+                    data-testid="bridge-token-usage"
+                    title={
+                      t.last_used_at
+                        ? `Last ingest: ${new Date(t.last_used_at).toLocaleString()}`
+                        : "No successful ingests yet"
+                    }
+                  >
+                    <Activity className="size-3" aria-hidden />
+                    <span>
+                      <span className="tabular-nums font-medium text-foreground/80">{count}</span>{" "}
+                      ingest{t.ingest_count === 1 ? "" : "s"} · last used {lastUsed}
+                    </span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">

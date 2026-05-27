@@ -141,12 +141,12 @@ Deno.serve(async (req) => {
     return json({ error: "insert_failed", detail: insErr.message }, 400);
   }
 
-  // Bump last_used_at only on successful insert.
+  // Bump last_used_at, first_used_at, and ingest_count atomically (server-only RPC).
   if (auth.kind === "bridge" && admin) {
-    await admin
-      .from("bridge_tokens")
-      .update({ last_used_at: new Date().toISOString() })
-      .eq("id", auth.tokenId);
+    await admin.rpc("bump_bridge_token_usage", {
+      p_id: auth.tokenId,
+      p_inserted: toInsert.length,
+    });
   }
 
   return json({

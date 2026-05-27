@@ -32,9 +32,13 @@ import {
   parseOptionalNumber,
   type QuickLogSensorInput,
 } from "@/lib/quickLogRules";
-import { computeManualSensorDelta } from "@/lib/manualSensorDeltaRules";
+import {
+  computeChronologyDelta,
+  type ChronologyDelta,
+} from "@/lib/manualSensorChronologyDeltaRules";
 import type { ManualSensorMetric } from "@/lib/manualSensorFreshnessRules";
-import { usePlantManualSensorHistory } from "@/hooks/usePlantManualSensorHistory";
+import { usePlantManualSensorLogs } from "@/hooks/usePlantManualSensorHistory";
+import { useMemo } from "react";
 
 interface Props {
   open: boolean;

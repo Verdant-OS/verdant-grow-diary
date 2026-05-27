@@ -22,6 +22,11 @@ import {
   normalizeVpdStage,
   vpdMetricChipStatus,
 } from "@/lib/vpdStageTargetRules";
+import {
+  classifyTempAgainstStage,
+  classifyRhAgainstStage,
+  environmentMetricChipStatus,
+} from "@/lib/environmentStageTargetRules";
 
 export default function Tents() {
   // Shared URL `?growId=` resolution against RLS-loaded grows.

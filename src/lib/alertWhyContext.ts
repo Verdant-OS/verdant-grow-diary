@@ -41,7 +41,19 @@ export interface AlertWhyUnavailable {
   text: "Target context unavailable for this alert.";
 }
 
-export type AlertWhyContext = AlertWhyStageContext | AlertWhyUnavailable;
+export interface AlertWhyContextOnly {
+  kind: "context_only";
+  metric: AlertWhyMetric;
+  stage: EnvStage;
+  stageLabel: string;
+  /** Compact display string, e.g. "Harvest stage — VPD shown as context only.". */
+  text: string;
+}
+
+export type AlertWhyContext =
+  | AlertWhyStageContext
+  | AlertWhyContextOnly
+  | AlertWhyUnavailable;
 
 const UNAVAILABLE: AlertWhyUnavailable = {
   kind: "unavailable",

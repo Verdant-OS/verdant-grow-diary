@@ -7,6 +7,7 @@ import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
+import { AlertWhyContext } from "@/components/AlertWhyContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -252,6 +253,8 @@ export default function Alerts() {
                       <p className="text-xs text-muted-foreground">
                         {a.reason}
                       </p>
+                      <AlertWhyContext alert={a} variant="compact" />
+
                       <div className="flex flex-wrap gap-2">
                         {a.status !== "acknowledged" &&
                           a.status !== "resolved" && (

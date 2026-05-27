@@ -16,6 +16,7 @@ import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Bell, History, ListChecks } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { AlertWhyContext } from "@/components/AlertWhyContext";
 
 import PageHeader from "@/components/PageHeader";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
@@ -378,6 +379,9 @@ export default function AlertDetail() {
             </div>
             <h2 className="font-display font-semibold text-base">{alert.title}</h2>
             <p className="text-sm text-muted-foreground mt-1">{alert.reason}</p>
+            <div className="mt-3">
+              <AlertWhyContext alert={alert} variant="detailed" />
+            </div>
 
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs mt-4">
               <div className="rounded-lg border border-border/40 bg-secondary/20 p-2">

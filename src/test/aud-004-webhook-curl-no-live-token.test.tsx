@@ -14,7 +14,7 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     auth: {
       getSession: vi.fn().mockResolvedValue({
-        data: { session: { access_token: LIVE_JWT } },
+        data: { session: { access_token: "eyJhbGciOiJIUzI1NiJ9.live-session-token-do-not-leak.sig" } },
       }),
       onAuthStateChange: vi.fn().mockReturnValue({
         data: { subscription: { unsubscribe: vi.fn() } },

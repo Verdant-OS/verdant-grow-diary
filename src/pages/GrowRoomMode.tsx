@@ -63,6 +63,7 @@ import {
 } from "@/lib/growRoomQuickActionRules";
 import {
   classifyVpdAgainstStage,
+  normalizeVpdStage,
 } from "@/lib/vpdStageTargetRules";
 
 const QUICK_ACTION_ICON: Record<QuickActionKind, typeof Sprout> = {

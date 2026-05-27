@@ -4,7 +4,7 @@
  *
  * Strict constraints:
  *   - No I/O. No Supabase. No React. No AI. No automation. No device control.
- *   - No alert writes. No Action Queue writes. No feed/nutrient prescriptions.
+ *   - No alert writes. No Action Queue writes. No prescriptive copy.
  *   - Read-only mapping from (metric, title, reason) → display context.
  *
  * Derivation rules:

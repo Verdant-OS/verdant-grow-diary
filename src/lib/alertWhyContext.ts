@@ -94,6 +94,27 @@ function parseStageFromReason(reason: string): EnvStage | null {
   return null;
 }
 
+/**
+ * Loose stage parser for legacy alerts whose title/reason pre-dates the
+ * canonical "<stage> range" wording. Scans for any stage token with word
+ * boundaries; "drying" maps to the harvest context-only stage. Returns null
+ * when no stage token is detected so callers fall back to "unavailable".
+ */
+function parseStageLoose(text: string): EnvStage | null {
+  // Order matters: longer / more specific needles first.
+  const stages: { needle: RegExp; key: EnvStage }[] = [
+    { needle: /\blate[\s_-]?flower(ing)?\b/, key: "late_flower" },
+    { needle: /\bpre[\s_-]?flower(ing)?\b/, key: "preflower" },
+    { needle: /\bseedling\b/, key: "seedling" },
+    { needle: /\bflower(ing)?\b/, key: "flower" },
+    { needle: /\bveg(etative|etation)?\b/, key: "veg" },
+    { needle: /\b(harvest(ed)?|drying|cure|curing)\b/, key: "harvest" },
+  ];
+  const r = text.toLowerCase();
+  for (const s of stages) if (s.needle.test(r)) return s.key;
+  return null;
+}
+
 function fmtTemp(v: number): string {
   return Number.isInteger(v) ? `${v}` : `${v.toFixed(1)}`;
 }
@@ -112,11 +133,20 @@ export interface AlertLike {
 
 export function deriveAlertWhyContext(alert: AlertLike): AlertWhyContext {
   if (!alert || typeof alert.title !== "string") return UNAVAILABLE;
-  // Only stage-aware alerts encode the stage band in their reason text.
-  if (!/stage range/i.test(alert.title)) return UNAVAILABLE;
-  const stage = parseStageFromReason(alert.reason ?? "");
-  if (!stage || stage === "unknown") return UNAVAILABLE;
   const metric = (alert.metric ?? "").toLowerCase();
+  const isStageAware = /stage range/i.test(alert.title);
+
+  // Stage source: canonical "<stage> range" tail first; for legacy VPD
+  // alerts, fall back to a loose stage scan over title + reason so the
+  // detailed view can still show the canonical VPD band.
+  let stage = parseStageFromReason(alert.reason ?? "");
+  if (!stage && metric === "vpd") {
+    stage = parseStageLoose(`${alert.title} ${alert.reason ?? ""}`);
+  } else if (!isStageAware) {
+    // Non-VPD legacy alerts keep prior behavior — no stage band derivation.
+    return UNAVAILABLE;
+  }
+  if (!stage || stage === "unknown") return UNAVAILABLE;
   const stageLabel = STAGE_DISPLAY[stage];
 
   if (metric === "temp") {
@@ -150,7 +180,16 @@ export function deriveAlertWhyContext(alert: AlertLike): AlertWhyContext {
   if (metric === "vpd") {
     const vstage = normalizeVpdStage(stage);
     const band = getVpdTargetBand(vstage);
-    if (band.min === null || band.max === null) return UNAVAILABLE;
+    if (band.contextOnly || band.min === null || band.max === null) {
+      // Harvest / drying — no breach band; render context-only copy.
+      return {
+        kind: "context_only",
+        metric: "vpd",
+        stage,
+        stageLabel,
+        text: `${stageLabel} stage — VPD shown as context only.`,
+      };
+    }
     return {
       kind: "stage",
       metric: "vpd",

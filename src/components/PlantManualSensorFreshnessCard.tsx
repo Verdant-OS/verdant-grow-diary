@@ -66,27 +66,29 @@ export default function PlantManualSensorFreshnessCard({ plantId, onUpdate }: Pr
     return buildFreshnessSnapshots(data ?? {}, new Date());
   }, [data]);
 
-  const needsNudge = snapshots.some(
-    (s) => s.state === "aging" || s.state === "stale",
-  );
+  const cta = useMemo(() => computeFreshnessCta(snapshots), [snapshots]);
+  const ctaLabel = cta === "add_first" ? "Add first snapshot" : "Update";
+  const showCta = (cta === "update" || cta === "add_first") && !!onUpdate && !isLoading;
 
   return (
     <section
       data-testid="plant-manual-sensor-freshness-card"
+      data-cta={cta}
       className="rounded-2xl border border-border/60 bg-card/40 p-4 grid gap-3"
     >
       <header className="flex items-center justify-between">
         <h3 className="text-sm font-medium">Manual sensor memory</h3>
-        {needsNudge && onUpdate ? (
+        {showCta ? (
           <Button
             type="button"
             size="sm"
             variant="ghost"
             onClick={onUpdate}
             data-testid="plant-manual-sensor-freshness-update"
+            data-cta={cta}
             className="h-7 px-2 text-xs text-primary hover:text-primary"
           >
-            Update
+            {ctaLabel}
           </Button>
         ) : null}
       </header>

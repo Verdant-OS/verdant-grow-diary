@@ -93,12 +93,9 @@ Deno.serve(async (req) => {
   }
 
   // For JWT path, verify tent ownership (RLS would also block).
-  // For bridge path, token already bound to a tent owned by user_id.
+  // For bridge path, token is already bound to a tent owned by user_id.
   if (auth.kind === "jwt") {
-    const jwtClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: `Bearer ${rawToken}` } },
-    });
-    const { data: tentRow, error: tentErr } = await jwtClient
+    const { data: tentRow, error: tentErr } = await anonForJwt
       .from("tents").select("id, user_id").eq("id", payloadTentId).maybeSingle();
     if (tentErr) return json({ error: "tent_lookup_failed" }, 503);
     if (!tentRow || tentRow.user_id !== auth.userId) {
@@ -108,12 +105,7 @@ Deno.serve(async (req) => {
 
   // Choose the client used for read+insert. Bridge path uses service role
   // (token already authenticated), explicitly stamping user_id on each row.
-  const writer =
-    auth.kind === "bridge"
-      ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY!)
-      : createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-          global: { headers: { Authorization: `Bearer ${rawToken}` } },
-        });
+  const writer = auth.kind === "bridge" ? admin! : anonForJwt;
 
   const capturedAt = normalized.rows[0].captured_at as string;
   const source = normalized.rows[0].source as string;

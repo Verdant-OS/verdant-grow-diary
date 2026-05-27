@@ -53,24 +53,44 @@ export function buildSensorWebhookUrl(supabaseUrl: string | null | undefined): s
   return `${trimmed}/functions/v1/sensor-ingest-webhook`;
 }
 
+export const SESSION_TOKEN_PLACEHOLDER = "<YOUR_SESSION_TOKEN>";
+
 export interface BuildCurlExampleOptions {
   webhookUrl: string;
   tentId: string;
-  /** Live session JWT. Pass null to render a `<YOUR_SESSION_TOKEN>` placeholder. */
+  /**
+   * Live session JWT — held only in-memory by the caller. By default the
+   * helper IGNORES this value and always renders the safe placeholder so
+   * the snippet is screenshot/doc/share-safe (AUD-004). The live token is
+   * only interpolated when `revealToken: true` is explicitly passed, which
+   * the UI gates behind an explicit user click.
+   */
   sessionToken: string | null;
+  /**
+   * Explicit opt-in to substitute the live session JWT into the snippet.
+   * Defaults to false. Never default this to true — the on-screen example
+   * must remain safe to screenshot.
+   */
+  revealToken?: boolean;
 }
 
 /**
- * Build a copy-paste cURL example. The session token is interpolated
- * verbatim and is NEVER persisted by this helper. When `sessionToken`
- * is null, a clear placeholder is rendered so the snippet is still
- * readable in screenshots/docs without leaking anything.
+ * Build a copy-paste cURL example. The on-screen / default snippet ALWAYS
+ * uses a `<YOUR_SESSION_TOKEN>` placeholder regardless of whether a live
+ * session token is available, so the panel is safe to screenshot or paste
+ * into docs. The live token is only interpolated when the caller passes
+ * `revealToken: true` (used behind an explicit user action — see
+ * TentSensorWebhookSettingsCard).
+ *
+ * Session JWTs are short-lived and tied to the current browser. For
+ * long-running clients (Raspberry Pi / ESP32 / Node-RED / Home Assistant),
+ * prefer a bridge token instead — see TentSensorBridgeTokenCard.
  */
 export function buildSensorWebhookCurlExample(opts: BuildCurlExampleOptions): string {
-  const { webhookUrl, tentId, sessionToken } = opts;
-  const tokenForSnippet = sessionToken && sessionToken.length > 0
+  const { webhookUrl, tentId, sessionToken, revealToken = false } = opts;
+  const tokenForSnippet = revealToken && sessionToken && sessionToken.length > 0
     ? sessionToken
-    : "<YOUR_SESSION_TOKEN>";
+    : SESSION_TOKEN_PLACEHOLDER;
   const body = {
     tent_id: tentId || "<TENT_ID>",
     source: "webhook_generic",

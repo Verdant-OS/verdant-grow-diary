@@ -139,7 +139,7 @@ describe("Alert persistence gating from manual readings", () => {
       {
         metric: "rh",
         source: "environment_alerts",
-        reason: oorAlert.reason,
+        title: oorAlert.title,
       },
     ];
     expect(dedupeAgainstOpen([oorAlert], open)).toEqual([]);

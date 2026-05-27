@@ -12,9 +12,9 @@
  * Read-only. No automation, no device control, no alerts, no
  * action_queue. Logic lives in `shellyHtSetupRules.ts`.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { Copy, Radio } from "lucide-react";
+import { Copy, Radio, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useShellyHtSetupStatus } from "@/hooks/useShellyHtSetupStatus";
@@ -23,6 +23,10 @@ import {
   deriveShellyHtSetupStatus,
   findLatestShellyHtSnapshot,
 } from "@/lib/shellyHtSetupRules";
+import {
+  deriveShellyHtSetupCardViewState,
+  SHELLY_HT_SETUP_SLOW_THRESHOLD_MS,
+} from "@/lib/shellyHtSetupCardViewStateRules";
 import { SHELLY_HT_DEVICE_LABEL } from "@/lib/shellyHtWebhookRules";
 import { SOURCE_LABEL, formatValue } from "@/lib/sensorSnapshot";
 import { tempFFromC } from "@/lib/temperatureUnits";
@@ -47,8 +51,30 @@ const STATE_LABEL: Record<string, string> = {
 };
 
 export default function ShellyHtSetupCard({ rows }: Props) {
-  const { data: status, isLoading, error } = useShellyHtSetupStatus();
+  const { data: status, isPending, isError, refetch, isFetching } = useShellyHtSetupStatus();
   const [copied, setCopied] = useState(false);
+  // AUD-007: flip into "slow" state after the threshold so the card never
+  // sits indefinitely on the bare "Checking setup…" spinner.
+  const [isSlow, setIsSlow] = useState(false);
+  useEffect(() => {
+    if (!isPending) {
+      setIsSlow(false);
+      return;
+    }
+    const t = window.setTimeout(() => setIsSlow(true), SHELLY_HT_SETUP_SLOW_THRESHOLD_MS);
+    return () => window.clearTimeout(t);
+  }, [isPending]);
+
+  const viewState = useMemo(
+    () =>
+      deriveShellyHtSetupCardViewState({
+        isPending,
+        isError,
+        hasData: !!status,
+        isSlow,
+      }),
+    [isPending, isError, status, isSlow],
+  );
 
   const latest = useMemo(() => {
     const history = buildRecentSensorSnapshotHistory(rows, { limit: 5 });
@@ -83,6 +109,7 @@ export default function ShellyHtSetupCard({ rows }: Props) {
       className="mt-4"
       data-testid="shelly-ht-setup-card"
       data-state={view.state}
+      data-view-state={viewState.state}
     >
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
         <CardTitle className="text-base flex items-center gap-2">
@@ -96,15 +123,28 @@ export default function ShellyHtSetupCard({ rows }: Props) {
         </span>
       </CardHeader>
       <CardContent className="text-sm space-y-3">
-        {isLoading ? (
-          <p className="text-muted-foreground">Checking setup…</p>
-        ) : error ? (
-          <p
-            className="text-muted-foreground"
-            data-testid="shelly-ht-setup-error"
-          >
-            Couldn't load Shelly setup status.
+        {viewState.state === "loading" ? (
+          <p className="text-muted-foreground" data-testid="shelly-ht-setup-loading">
+            {viewState.message}
           </p>
+        ) : viewState.state === "slow" || viewState.state === "error" || viewState.state === "missing" ? (
+          <div className="space-y-2" data-testid={`shelly-ht-setup-${viewState.state}`}>
+            <p className="text-muted-foreground">{viewState.message}</p>
+            {viewState.showRetry && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1"
+                onClick={() => refetch()}
+                disabled={isFetching}
+                data-testid="shelly-ht-setup-retry"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
+                {isFetching ? "Retrying…" : "Retry"}
+              </Button>
+            )}
+          </div>
         ) : (
           <>
             <div className="space-y-1">

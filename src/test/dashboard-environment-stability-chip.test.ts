@@ -61,14 +61,16 @@ describe("Dashboard environment stability chip — wiring", () => {
   });
 
   it("chip region introduces no alert/queue/automation/device-control writes", () => {
-    const blockMatch = SRC.match(
-      /latestPerTent\.map\(\(\{[\s\S]*?dashboard-stability-chip-[\s\S]*?\}\)\;?\s*\}\)\}/,
-    );
-    expect(blockMatch).toBeTruthy();
-    const block = blockMatch![0];
+    const startIdx = SRC.indexOf("latestPerTent.map(");
+    const endIdx = SRC.indexOf("</Link>", startIdx);
+    expect(startIdx).toBeGreaterThan(-1);
+    expect(endIdx).toBeGreaterThan(startIdx);
+    const block = SRC.slice(startIdx, endIdx);
+    expect(block).toContain("dashboard-stability-chip-");
     expect(block).not.toMatch(FORBIDDEN);
     expect(block).not.toMatch(/service_role|action_queue|automation/i);
   });
+
 
   it("copy helper itself has no forbidden surface", () => {
     expect(HELPER_SRC).not.toMatch(FORBIDDEN);

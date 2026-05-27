@@ -43,6 +43,11 @@ import {
   vpdMetricChipStatus,
   VPD_STAGE_HELPER_TEXT,
 } from "@/lib/vpdStageTargetRules";
+import {
+  classifyTempAgainstStage,
+  classifyRhAgainstStage,
+  environmentMetricChipStatus,
+} from "@/lib/environmentStageTargetRules";
 import { cn } from "@/lib/utils";
 
 export default function TentDetail() {
@@ -121,10 +126,10 @@ export default function TentDetail() {
 
       <div className="flex flex-wrap gap-2 mb-5" data-testid="tent-detail-metric-chips">
         {snap?.temp !== null && snap?.temp !== undefined && (
-          <MetricChip label="T" value={(tempFFromC(snap.temp) ?? 0).toFixed(1)} unit="°F" status={snap.temp > 28 || snap.temp < 19 ? "warn" : "ok"} />
+          <MetricChip label="T" value={(tempFFromC(snap.temp) ?? 0).toFixed(1)} unit="°F" status={environmentMetricChipStatus(classifyTempAgainstStage(snap.temp, { stage: tent.stage, stale: header.stale }))} />
         )}
         {snap?.rh !== null && snap?.rh !== undefined && (
-          <MetricChip label="RH" value={snap.rh} unit="%" status={snap.rh > 65 || snap.rh < 35 ? "warn" : "ok"} />
+          <MetricChip label="RH" value={snap.rh} unit="%" status={environmentMetricChipStatus(classifyRhAgainstStage(snap.rh, { stage: tent.stage, stale: header.stale }))} />
         )}
         {snap?.vpd !== null && snap?.vpd !== undefined && (() => {
           const vpd = classifyVpdAgainstStage({

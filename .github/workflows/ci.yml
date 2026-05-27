@@ -42,6 +42,11 @@ jobs:
       - name: V0 operating loop contract test
         run: bunx vitest run src/test/v0-operating-loop-contract.test.ts
 
+      # Stop-ship: Gate 2A CSV import safety + manual sensor freshness/delta
+      # invariants must pass before any sensor-touching change merges.
+      - name: Sensor safety tests (CSV + manual freshness/delta)
+        run: bun run test:sensor-safety
+
       - name: Full test suite
         run: bunx vitest run
 

@@ -252,6 +252,8 @@ export default function Alerts() {
                       <p className="text-xs text-muted-foreground">
                         {a.reason}
                       </p>
+                      <AlertWhyContext alert={a} variant="compact" />
+
                       <div className="flex flex-wrap gap-2">
                         {a.status !== "acknowledged" &&
                           a.status !== "resolved" && (

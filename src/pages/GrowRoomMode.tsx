@@ -60,6 +60,9 @@ import {
   type QuickActionKind,
   type QuickActionPlantLite,
 } from "@/lib/growRoomQuickActionRules";
+import {
+  classifyVpdAgainstStage,
+} from "@/lib/vpdStageTargetRules";
 
 const QUICK_ACTION_ICON: Record<QuickActionKind, typeof Sprout> = {
   quick_log: NotebookPen,
@@ -236,6 +239,14 @@ export default function GrowRoomMode() {
     });
   }, [tents, snapshotsByTentId, alertInputs, actions]);
 
+  const tentStageById = useMemo<Record<string, string | null>>(() => {
+    const m: Record<string, string | null> = {};
+    for (const t of tents ?? []) {
+      m[t.id] = (t as { stage?: string | null }).stage ?? null;
+    }
+    return m;
+  }, [tents]);
+
   const showEmpty = !loading && (!tents || tents.length === 0);
 
   return (
@@ -290,6 +301,11 @@ export default function GrowRoomMode() {
         >
           {cards.map((card) => {
             const showWarning = STALE_OR_MISSING.has(card.snapshotState);
+            const vpdClassification = classifyVpdAgainstStage({
+              value: card.snapshot?.vpd ?? null,
+              stage: tentStageById[card.tentId] ?? null,
+              stale: card.snapshotState === "stale",
+            });
             const tentPlants: QuickActionPlantLite[] = plants
               .filter((p) => p.tent_id === card.tentId)
               .map((p) => ({
@@ -338,6 +354,16 @@ export default function GrowRoomMode() {
                 <div className="text-sm text-foreground/90">
                   {snapshotSummary(card.snapshot)}
                 </div>
+
+                {vpdClassification.classification !== "unavailable" && (
+                  <p
+                    className="text-[11px] text-muted-foreground"
+                    data-testid="grow-room-vpd-stage-hint"
+                  >
+                    {vpdClassification.label}
+                  </p>
+                )}
+
 
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span className="inline-flex items-center gap-1">

@@ -87,6 +87,9 @@ describe("mapTentRow", () => {
     expect(mapTentRow({ ...tentRow, stage: "veg" }).stage).toBe("veg");
     expect(mapTentRow({ ...tentRow, stage: "flower" }).stage).toBe("flower");
   });
+});
+
+
 
 describe("mapPlantRow", () => {
   it("maps a valid plant row", () => {

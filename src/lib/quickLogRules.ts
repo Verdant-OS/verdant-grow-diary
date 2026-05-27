@@ -14,6 +14,9 @@
  */
 
 export const QUICK_LOG_EVENT_TYPE = "quick_log" as const;
+// Manual logs are source-tagged and never trigger alerts or Action Queue.
+// This is intentional for Sensors phase safety defaults — manual values
+// stay clearly distinguished from any future live or CSV-imported readings.
 export const MANUAL_SENSOR_SOURCE = "manual" as const;
 
 export interface QuickLogSensorInput {

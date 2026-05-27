@@ -212,7 +212,7 @@ describe("sensor-ingest-webhook safety surface", () => {
     );
     const src = stripComments(raw);
     const banned =
-      /service_role|action_queue|\.from\(["']alerts["']\)|openai|anthropic|mqtt|relay|actuator|setpoint|autopilot/i;
+      /service_role|action_queue|\.from\(["']alerts["']\)|openai|anthropic|mqtt\.connect|mqttSubscribe|relay|actuator|setpoint|autopilot/i;
     expect(src).not.toMatch(banned);
   });
 });

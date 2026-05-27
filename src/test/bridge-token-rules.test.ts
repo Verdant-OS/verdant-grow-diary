@@ -74,6 +74,5 @@ describe("bridgeTokenRules", () => {
   it("formatIngestCount: millions render with M suffix", () => {
     expect(formatIngestCount(1_500_000)).toBe("1.5M");
     expect(formatIngestCount(12_000_000)).toBe("12M");
-  });
 });
 });

@@ -225,9 +225,7 @@ describe("sensor-ingest-webhook safety surface", () => {
   });
 });
 
-
-
-
+describe("sensorWebhookIngestRules alias normalization", () => {
   it("normalizes alias keys to canonical metric names", () => {
     const r = normalizeWebhookIngestPayload(
       base({
@@ -242,3 +240,4 @@ describe("sensor-ingest-webhook safety surface", () => {
     expect(soil?.value).toBe(35);
   });
 });
+

@@ -1,6 +1,10 @@
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
 import { formatStabilityChipView } from "@/lib/dashboardStabilityChipCopyRules";
+import {
+  computeStabilityRollup,
+  STABILITY_ROLLUP_TONE_CLASS,
+} from "@/lib/dashboardStabilityRollupRules";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 

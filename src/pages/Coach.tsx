@@ -282,7 +282,7 @@ export default function Coach() {
           contextConfidenceCeiling: contextSufficiency.confidenceCeiling ?? null,
           contextSufficiency,
         }).then((res) => {
-          if (!res.ok) {
+          if (res.ok === false) {
             toast.warning("Couldn't save this AI Doctor session for later review.", {
               description: res.error,
             });

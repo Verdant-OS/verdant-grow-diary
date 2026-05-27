@@ -185,7 +185,8 @@ export default function Dashboard() {
   // Latest reading per tent for the strip + a read-only stability summary
   // computed from the same tent-scoped readings (no extra fetches, no writes).
   const latestPerTent = tents.map((t) => {
-    const rs = readings.filter((r) => r.tentId === t.id);
+    const tentRows = readingsByTent[t.id] ?? [];
+    const rs = groupReadings(tentRows);
     const stability = computeEnvironmentStability(rs, { stage: t.stage });
     return { tent: t, last: rs[rs.length - 1], stability };
   });

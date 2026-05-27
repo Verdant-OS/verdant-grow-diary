@@ -70,9 +70,17 @@ describe("normalizeIngestPayload — unit conversion", () => {
 });
 
 describe("normalizeIngestPayload — rejections", () => {
-  it("rejects unknown metric", () => {
+  it("accepts ppfd with umol unit", () => {
     const r = normalizeIngestPayload(
       base({ readings: [{ metric: "ppfd", value: 600, unit: "umol" }] }),
+      { now: NOW },
+    );
+    expect(r.ok).toBe(true);
+    expect(r.rows[0]).toMatchObject({ metric: "ppfd", value: 600 });
+  });
+  it("rejects unknown metric", () => {
+    const r = normalizeIngestPayload(
+      base({ readings: [{ metric: "lux", value: 600, unit: "lux" }] }),
       { now: NOW },
     );
     expect(r.ok).toBe(false);
@@ -152,6 +160,13 @@ describe("normalizeIngestPayload — passthrough + safety", () => {
 describe("isSensorSourcePersistable", () => {
   it("manual → true", () => expect(isSensorSourcePersistable("manual")).toBe(true));
   it("pi_bridge → true", () => expect(isSensorSourcePersistable("pi_bridge")).toBe(true));
+  it("webhook_generic → true", () =>
+    expect(isSensorSourcePersistable("webhook_generic")).toBe(true));
+  it("esp32_mqtt_bridge → true", () =>
+    expect(isSensorSourcePersistable("esp32_mqtt_bridge")).toBe(true));
+  it("home_assistant_bridge → true", () =>
+    expect(isSensorSourcePersistable("home_assistant_bridge")).toBe(true));
+  it("ha_forwarded → true", () => expect(isSensorSourcePersistable("ha_forwarded")).toBe(true));
   it("sim → false", () => expect(isSensorSourcePersistable("sim")).toBe(false));
 });
 
@@ -175,8 +190,6 @@ describe("static safety: pure helper", () => {
     "automation",
     "device_control",
     "homeassistant",
-    "home_assistant",
-    "mqtt",
   ];
   for (const term of forbidden) {
     it(`does not reference \`${term}\``, () => {

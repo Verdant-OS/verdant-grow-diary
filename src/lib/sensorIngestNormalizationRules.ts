@@ -21,16 +21,33 @@ export type AllowedMetric =
   | "humidity_pct"
   | "vpd_kpa"
   | "co2_ppm"
-  | "soil_moisture_pct";
+  | "soil_moisture_pct"
+  | "ph"
+  | "ec"
+  | "ppfd";
 
-export type AllowedSource = "manual" | "pi_bridge" | "sim";
+export type AllowedSource =
+  | "manual"
+  | "pi_bridge"
+  | "sim"
+  | "webhook_generic"
+  | "node_red_bridge"
+  | "esp32_arduino"
+  | "esp32_arduino_sht31"
+  | "esp32_esphome"
+  | "esp32_mqtt_bridge"
+  | "home_assistant_bridge"
+  | "ha_forwarded";
 
 export type AllowedUnit =
   | "temperature_c"
   | "temperature_f"
   | "percent"
   | "kPa"
-  | "ppm";
+  | "ppm"
+  | "ph"
+  | "mS/cm"
+  | "umol";
 
 export const ALLOWED_METRICS: readonly AllowedMetric[] = [
   "temperature_c",
@@ -38,12 +55,23 @@ export const ALLOWED_METRICS: readonly AllowedMetric[] = [
   "vpd_kpa",
   "co2_ppm",
   "soil_moisture_pct",
+  "ph",
+  "ec",
+  "ppfd",
 ] as const;
 
 export const ALLOWED_SOURCES: readonly AllowedSource[] = [
   "manual",
   "pi_bridge",
   "sim",
+  "webhook_generic",
+  "node_red_bridge",
+  "esp32_arduino",
+  "esp32_arduino_sht31",
+  "esp32_esphome",
+  "esp32_mqtt_bridge",
+  "home_assistant_bridge",
+  "ha_forwarded",
 ] as const;
 
 /**
@@ -59,7 +87,7 @@ export const ALLOWED_SOURCES: readonly AllowedSource[] = [
  * cleanup.
  */
 export function isSensorSourcePersistable(source: string): boolean {
-  return source === "manual" || source === "pi_bridge";
+  return source !== "sim";
 }
 
 export interface ExternalSensorReadingInput {
@@ -103,8 +131,7 @@ function convertUnit(
   switch (metric) {
     case "temperature_c":
       if (unit === "temperature_c") return { ok: true, value };
-      if (unit === "temperature_f")
-        return { ok: true, value: (value - 32) * (5 / 9) };
+      if (unit === "temperature_f") return { ok: true, value: (value - 32) * (5 / 9) };
       return { ok: false, error: `unknown unit for temperature_c: ${unit}` };
     case "humidity_pct":
       if (unit === "percent") return { ok: true, value };
@@ -121,6 +148,15 @@ function convertUnit(
         ok: false,
         error: `unknown unit for soil_moisture_pct: ${unit}`,
       };
+    case "ph":
+      if (unit === "ph") return { ok: true, value };
+      return { ok: false, error: `unknown unit for ph: ${unit}` };
+    case "ec":
+      if (unit === "mS/cm") return { ok: true, value };
+      return { ok: false, error: `unknown unit for ec: ${unit}` };
+    case "ppfd":
+      if (unit === "umol") return { ok: true, value };
+      return { ok: false, error: `unknown unit for ppfd: ${unit}` };
   }
 }
 
@@ -137,8 +173,7 @@ export function normalizeIngestPayload(
 
   if (!input.tent_id) errors.push("tent_id required");
   if (!input.source) errors.push("source required");
-  else if (!isAllowedSource(input.source))
-    errors.push(`invalid source: ${input.source}`);
+  else if (!isAllowedSource(input.source)) errors.push(`invalid source: ${input.source}`);
 
   let capturedAt: string | null = null;
   if (input.captured_at !== undefined && input.captured_at !== null) {
@@ -148,9 +183,7 @@ export function normalizeIngestPayload(
     } else {
       const now = (opts.now ?? new Date()).getTime();
       if (t > now + FUTURE_TOLERANCE_MS) {
-        errors.push(
-          `captured_at more than 5 minutes in the future: ${input.captured_at}`,
-        );
+        errors.push(`captured_at more than 5 minutes in the future: ${input.captured_at}`);
       } else {
         capturedAt = new Date(t).toISOString();
       }

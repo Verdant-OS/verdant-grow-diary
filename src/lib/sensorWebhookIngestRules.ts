@@ -53,6 +53,7 @@ export type CanonicalMetric =
   | "humidity_pct"
   | "vpd_kpa"
   | "co2_ppm"
+  | "soil_moisture_pct"
   | "ph"
   | "ec"
   | "ppfd";
@@ -86,6 +87,8 @@ const METRIC_ALIASES: Record<string, MetricRule> = {
   humidity_percent: { canonical: "humidity_pct", min: 0, max: 100 },
   vpd_kpa: { canonical: "vpd_kpa", min: 0, max: 5 },
   co2_ppm: { canonical: "co2_ppm", min: 250, max: 5000 },
+  soil_moisture_pct: { canonical: "soil_moisture_pct", min: 0, max: 100 },
+  soil_moisture: { canonical: "soil_moisture_pct", min: 0, max: 100 },
   ph: { canonical: "ph", min: 3, max: 10 },
   ec: { canonical: "ec", min: 0, max: 10 },
   ec_ms_cm: { canonical: "ec", min: 0, max: 10 },

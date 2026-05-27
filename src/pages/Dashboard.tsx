@@ -744,6 +744,7 @@ export default function Dashboard() {
               snapshot: snap,
               quality,
               targets: targetsCmp,
+              stage: scopedGrow?.stage ?? null,
             });
             return (
               <div>

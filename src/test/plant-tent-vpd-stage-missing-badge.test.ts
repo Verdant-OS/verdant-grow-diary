@@ -14,24 +14,27 @@ describe("PlantTentEnvironmentPanel VPD stage-missing info badge", () => {
     );
   });
 
-  it("renders the badge with required copy and test hook", () => {
-    expect(SRC).toContain('data-testid="plant-tent-vpd-stage-missing-badge"');
-    expect(SRC).toContain("Set plant stage to evaluate VPD targets.");
+  it("uses the shared VpdStageMissingBadge component", () => {
+    expect(SRC).toMatch(
+      /import\s+VpdStageMissingBadge\s+from\s+["']@\/components\/VpdStageMissingBadge["']/,
+    );
+    expect(SRC).toMatch(
+      /<VpdStageMissingBadge[\s\S]*?testId=["']plant-tent-vpd-stage-missing-badge["']/,
+    );
   });
 
   it("gates the badge on a present VPD value and missing plant stage", () => {
     expect(SRC).toMatch(
-      /snap\?\.vpd\s*!==\s*null\s*&&\s*snap\?\.vpd\s*!==\s*undefined\s*&&\s*\(plantStage\s*\?\?\s*null\)\s*===\s*null\s*&&\s*\(\s*<div[\s\S]*?plant-tent-vpd-stage-missing-badge/,
+      /snap\?\.vpd\s*!==\s*null\s*&&\s*snap\?\.vpd\s*!==\s*undefined\s*&&\s*\(plantStage\s*\?\?\s*null\)\s*===\s*null\s*&&\s*\(\s*<VpdStageMissingBadge[\s\S]*?plant-tent-vpd-stage-missing-badge/,
     );
   });
 
   it("badge branch performs no alert/queue/automation writes", () => {
-    const match = SRC.match(
+    const m = SRC.match(
       /\(plantStage\s*\?\?\s*null\)\s*===\s*null\s*&&\s*\(([\s\S]*?)\)\}/,
     );
-    expect(match).toBeTruthy();
-    const block = match![1];
-    expect(block).not.toMatch(
+    expect(m).toBeTruthy();
+    expect(m![1]).not.toMatch(
       /saveAlert|logAlertEvent|action_queue|service_role|automation|device.control|from\(['"]alerts['"]\)/i,
     );
   });

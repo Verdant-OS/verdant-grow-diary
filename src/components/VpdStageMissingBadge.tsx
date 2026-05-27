@@ -3,11 +3,8 @@ import { cn } from "@/lib/utils";
 
 /**
  * Presenter-only info badge shown when a VPD value is present but the
- * relevant grow/plant stage is unknown. Renders nothing else — no alerts,
- * no Action Queue items, no automation, no device control.
- *
- * Gating (whether to render at all) is intentionally left at each call
- * site so existing tests against gating expressions keep passing.
+ * relevant grow/plant stage is unknown. Pure render; gating lives at each
+ * call site so existing gating tests keep passing.
  */
 export interface VpdStageMissingBadgeProps {
   testId: string;

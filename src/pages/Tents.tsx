@@ -71,6 +71,9 @@ export default function Tents() {
           {tents.map((t) => {
             const last = readings.filter((r) => r.tentId === t.id).at(-1);
             const plantCount = plants.filter((p) => p.tentId === t.id).length;
+            const vpdClassification = last
+              ? classifyVpdAgainstStage({ value: last.vpd, stage: t.stage })
+              : null;
             return (
               <div key={t.id} className="relative animate-fade-in">
                 <Link to={`/tents/${t.id}`} className="glass rounded-2xl p-5 hover:border-primary/50 transition group flex flex-col gap-3">

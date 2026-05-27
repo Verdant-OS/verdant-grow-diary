@@ -17,6 +17,7 @@ import {
   computeFreshness,
   buildFreshnessSnapshot,
   buildFreshnessSnapshots,
+  computeFreshnessCta,
   FRESHNESS_FRESH_MAX_HOURS,
   FRESHNESS_AGING_MAX_HOURS,
   MANUAL_SENSOR_METRICS,

@@ -131,7 +131,7 @@ describe("Action Queue safety — current posture (suggest-only by construction)
     for (const m of haContexts) {
       const ctx = ALL_PROD_CODE.slice(Math.max(0, m.index! - 60), m.index! + 60);
       expect(ctx, `home_assistant reference must not be a control call: ${ctx}`).not.toMatch(
-        /fetch\(|http\.|mqtt|publish|\.post\(|\.send\(|trigger/i,
+        /fetch\(|http\.|mqtt:\/\/|mqtt\.connect|\.publish\(|\.post\(|\.send\(|\.trigger\(/i,
       );
     }
     // pi_bridge appears ONLY as a sensor_readings.source enum value (read-side

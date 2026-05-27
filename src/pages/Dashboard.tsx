@@ -126,6 +126,11 @@ export default function Dashboard() {
   const { data: tasks = [] } = useTasks();
   const { data: rawReadings = [] } = useSensorReadings();
   const readings = groupReadings(rawReadings);
+  // Per-tent sensor windows for the stability summary. Each tent gets its
+  // own 200-row window so a busy tent cannot push another tent's VPD rows
+  // out of a shared global cap. Read-only; no writes.
+  const tentIds = tents.map((t) => t.id);
+  const { byTent: readingsByTent } = useSensorReadingsByTents(tentIds);
   const { data: insights = [] } = useAIInsights();
   const { recent, pending } = useDashboardScopedData(scopedGrowId ?? null);
   // Multi-tent selector for the Latest Environment card. Defaults to "all"

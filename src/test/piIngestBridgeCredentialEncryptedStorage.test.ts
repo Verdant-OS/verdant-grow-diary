@@ -10,10 +10,10 @@
  * sanctioned client read path.
  */
 import { describe, it, expect } from "vitest";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve, join } from "node:path";
+import { ROOT, stripSqlComments, walkDir, assertNoBannedTokens } from "./gate-safety-utils";
 
-const ROOT = resolve(__dirname, "../..");
 const MIG_DIR = resolve(ROOT, "supabase/migrations");
 
 function loadAllMigrations(): string {
@@ -28,11 +28,7 @@ function loadEncryptedMigration(): string {
   // add secret_ciphertext.
   for (const f of readdirSync(MIG_DIR).sort()) {
     const txt = readFileSync(join(MIG_DIR, f), "utf8");
-    if (
-      /ALTER\s+TABLE\s+public\.pi_ingest_bridge_credentials[\s\S]*?secret_ciphertext/i.test(
-        txt,
-      )
-    )
+    if (/ALTER\s+TABLE\s+public\.pi_ingest_bridge_credentials[\s\S]*?secret_ciphertext/i.test(txt))
       return txt;
   }
   return "";
@@ -44,9 +40,7 @@ const SQL = loadEncryptedMigration();
 describe("pi_ingest_bridge_credentials — encrypted columns", () => {
   it("migration exists and alters the bridge credentials table", () => {
     expect(SQL).not.toEqual("");
-    expect(SQL).toMatch(
-      /ALTER\s+TABLE\s+public\.pi_ingest_bridge_credentials/i,
-    );
+    expect(SQL).toMatch(/ALTER\s+TABLE\s+public\.pi_ingest_bridge_credentials/i);
   });
 
   it.each([
@@ -89,29 +83,25 @@ describe("pi_ingest_bridge_credentials — encrypted check constraints", () => {
 });
 
 describe("pi_ingest_bridge_credentials — forbidden columns (defense)", () => {
-  it.each([
-    "signature",
-    "raw_body",
-    "raw_payload",
-    "hmac",
-  ])("does not add %s column anywhere across migrations", (col) => {
-    // confine to ALTERs targeting our table
-    const alters = ALL_SQL
-      .split(/;\s*\n/)
-      .filter((stmt) =>
-        /pi_ingest_bridge_credentials/i.test(stmt) &&
-        /\bADD\s+COLUMN\b/i.test(stmt),
-      )
-      .join("\n;\n");
-    expect(alters).not.toMatch(new RegExp(`\\b${col}\\b`, "i"));
-  });
+  it.each(["signature", "raw_body", "raw_payload", "hmac"])(
+    "does not add %s column anywhere across migrations",
+    (col) => {
+      // confine to ALTERs targeting our table
+      const alters = ALL_SQL.split(/;\s*\n/)
+        .filter(
+          (stmt) => /pi_ingest_bridge_credentials/i.test(stmt) && /\bADD\s+COLUMN\b/i.test(stmt),
+        )
+        .join("\n;\n");
+      expect(alters).not.toMatch(new RegExp(`\\b${col}\\b`, "i"));
+    },
+  );
 
   it("does not add a plaintext `secret` column", () => {
     // Look for any ADD COLUMN whose first identifier is exactly `secret`.
     const addColRe = /ADD\s+COLUMN\s+([a-zA-Z_][a-zA-Z0-9_]*)/gi;
-    const stmts = ALL_SQL
-      .split(/;\s*\n/)
-      .filter((stmt) => /pi_ingest_bridge_credentials/i.test(stmt));
+    const stmts = ALL_SQL.split(/;\s*\n/).filter((stmt) =>
+      /pi_ingest_bridge_credentials/i.test(stmt),
+    );
     for (const stmt of stmts) {
       for (const m of stmt.matchAll(addColRe)) {
         expect(m[1].toLowerCase()).not.toBe("secret");
@@ -120,11 +110,9 @@ describe("pi_ingest_bridge_credentials — forbidden columns (defense)", () => {
   });
 
   it("does not add a `value` column", () => {
-    const alters = ALL_SQL
-      .split(/;\s*\n/)
-      .filter((stmt) =>
-        /pi_ingest_bridge_credentials/i.test(stmt) &&
-        /\bADD\s+COLUMN\b/i.test(stmt),
+    const alters = ALL_SQL.split(/;\s*\n/)
+      .filter(
+        (stmt) => /pi_ingest_bridge_credentials/i.test(stmt) && /\bADD\s+COLUMN\b/i.test(stmt),
       )
       .join("\n;\n");
     expect(alters).not.toMatch(/\bvalue\b/i);
@@ -141,15 +129,10 @@ describe("pi_ingest_bridge_credentials — base-table SELECT removal", () => {
   it("no CREATE POLICY ... FOR SELECT exists on the base table after migration sequence", () => {
     // Find the LAST mention of base-table SELECT policy create vs drop.
     const createCount = (
-      ALL_SQL.match(
-        /CREATE\s+POLICY[^;]*pi_ingest_bridge_credentials[^;]*FOR\s+SELECT/gi,
-      ) ?? []
+      ALL_SQL.match(/CREATE\s+POLICY[^;]*pi_ingest_bridge_credentials[^;]*FOR\s+SELECT/gi) ?? []
     ).length;
-    const dropCount = (
-      ALL_SQL.match(
-        /DROP\s+POLICY[^;]*pi_ingest_bridge_credentials/gi,
-      ) ?? []
-    ).length;
+    const dropCount = (ALL_SQL.match(/DROP\s+POLICY[^;]*pi_ingest_bridge_credentials/gi) ?? [])
+      .length;
     // After all migrations: at least one drop offsets the original create.
     expect(dropCount).toBeGreaterThanOrEqual(1);
     expect(createCount).toBeLessThanOrEqual(dropCount);
@@ -169,9 +152,8 @@ describe("pi_ingest_bridge_credentials_safe — metadata-only view (deferred)", 
     ) ?? []
   ).length;
   const dropCount = (
-    ALL_SQL.match(
-      /DROP\s+VIEW\s+(IF\s+EXISTS\s+)?public\.pi_ingest_bridge_credentials_safe/gi,
-    ) ?? []
+    ALL_SQL.match(/DROP\s+VIEW\s+(IF\s+EXISTS\s+)?public\.pi_ingest_bridge_credentials_safe/gi) ??
+    []
   ).length;
   const viewExistsAfterMigrations = createCount > dropCount;
 
@@ -185,19 +167,17 @@ describe("pi_ingest_bridge_credentials_safe — metadata-only view (deferred)", 
     }
   });
 
-  it.each([
-    "secret_hash",
-    "secret_ciphertext",
-    "secret_nonce",
-    "secret_key_version",
-  ])("if view exists, it does not expose %s", (col) => {
-    if (!viewExistsAfterMigrations) return;
-    const viewBlock =
-      ALL_SQL.match(
-        /CREATE\s+(OR\s+REPLACE\s+)?VIEW\s+public\.pi_ingest_bridge_credentials_safe[\s\S]*?FROM\s+public\.pi_ingest_bridge_credentials[\s\S]*?;/i,
-      )?.[0] ?? "";
-    expect(viewBlock).not.toMatch(new RegExp(`\\b${col}\\b`, "i"));
-  });
+  it.each(["secret_hash", "secret_ciphertext", "secret_nonce", "secret_key_version"])(
+    "if view exists, it does not expose %s",
+    (col) => {
+      if (!viewExistsAfterMigrations) return;
+      const viewBlock =
+        ALL_SQL.match(
+          /CREATE\s+(OR\s+REPLACE\s+)?VIEW\s+public\.pi_ingest_bridge_credentials_safe[\s\S]*?FROM\s+public\.pi_ingest_bridge_credentials[\s\S]*?;/i,
+        )?.[0] ?? "";
+      expect(viewBlock).not.toMatch(new RegExp(`\\b${col}\\b`, "i"));
+    },
+  );
 
   it("if view exists, it filters by auth.uid()", () => {
     if (!viewExistsAfterMigrations) return;
@@ -208,12 +188,9 @@ describe("pi_ingest_bridge_credentials_safe — metadata-only view (deferred)", 
 
   it("safe view is not granted to anon or public in any migration", () => {
     // Statement-scoped: each GRANT statement individually must not target anon/public.
-    const grants = ALL_SQL
-      .split(/;\s*\n/)
-      .filter((stmt) =>
-        /^\s*GRANT\b/i.test(stmt) &&
-        /pi_ingest_bridge_credentials_safe/i.test(stmt),
-      );
+    const grants = ALL_SQL.split(/;\s*\n/).filter(
+      (stmt) => /^\s*GRANT\b/i.test(stmt) && /pi_ingest_bridge_credentials_safe/i.test(stmt),
+    );
     for (const stmt of grants) {
       expect(stmt).not.toMatch(/\bTO\s+anon\b/i);
       expect(stmt).not.toMatch(/\bTO\s+public\b/i);
@@ -223,7 +200,7 @@ describe("pi_ingest_bridge_credentials_safe — metadata-only view (deferred)", 
 
 describe("pi_ingest_bridge_credentials — encrypted migration safety guards", () => {
   it("encrypted migration never grants to service_role", () => {
-    const noComments = SQL.replace(/^\s*--.*$/gm, "");
+    const noComments = stripSqlComments(SQL);
     expect(noComments).not.toMatch(/service_role/i);
   });
 
@@ -232,9 +209,7 @@ describe("pi_ingest_bridge_credentials — encrypted migration safety guards", (
   });
 
   it("encrypted migration does not alter idempotency table", () => {
-    expect(SQL).not.toMatch(
-      /ALTER\s+TABLE\s+public\.pi_ingest_idempotency_keys/i,
-    );
+    expect(SQL).not.toMatch(/ALTER\s+TABLE\s+public\.pi_ingest_idempotency_keys/i);
   });
 
   it("encrypted migration does not alter alerts / action_queue", () => {
@@ -242,18 +217,6 @@ describe("pi_ingest_bridge_credentials — encrypted migration safety guards", (
     expect(SQL).not.toMatch(/ALTER\s+TABLE\s+public\.action_queue\b/i);
   });
 });
-
-function walkSrc(dir: string, acc: string[] = []): string[] {
-  if (!existsSync(dir)) return acc;
-  for (const name of readdirSync(dir)) {
-    if (name === "node_modules" || name === ".git" || name === "dist") continue;
-    const p = join(dir, name);
-    const st = statSync(p);
-    if (st.isDirectory()) walkSrc(p, acc);
-    else acc.push(p);
-  }
-  return acc;
-}
 
 describe("pi-ingest encrypted secret — repo guardrails", () => {
   it("Edge Function, if present, is fail-closed and does not touch encrypted credential rows", () => {
@@ -266,15 +229,11 @@ describe("pi-ingest encrypted secret — repo guardrails", () => {
   });
 
   it("no resolver module exists yet", () => {
-    expect(
-      existsSync(resolve(ROOT, "src/lib/piIngestBridgeCredentialResolver.ts")),
-    ).toBe(false);
+    expect(existsSync(resolve(ROOT, "src/lib/piIngestBridgeCredentialResolver.ts"))).toBe(false);
   });
 
   it("no code maps secret_hash or secret_ciphertext into a `secret` field", () => {
-    const files = walkSrc(resolve(ROOT, "src")).filter((p) =>
-      /\.(ts|tsx)$/.test(p),
-    );
+    const files = walkDir(resolve(ROOT, "src"), { extensions: /\.(ts|tsx)$/ });
     const forbidden = [
       /secret\s*:\s*[A-Za-z_.]*\.?secret_hash\b/,
       /secret\s*:\s*[A-Za-z_.]*\.?secret_ciphertext\b/,
@@ -288,14 +247,12 @@ describe("pi-ingest encrypted secret — repo guardrails", () => {
       )
         continue;
       const text = readFileSync(f, "utf8");
-      for (const re of forbidden) {
-        expect(text, `forbidden mapping in ${f}`).not.toMatch(re);
-      }
+      assertNoBannedTokens(text, forbidden, f);
     }
   });
 
   it("no pi-ingest pure module references service_role or device control", () => {
-    const files = walkSrc(resolve(ROOT, "src/lib")).filter((p) =>
+    const files = walkDir(resolve(ROOT, "src/lib"), { extensions: /\.(ts|tsx)$/ }).filter((p) =>
       /piIngest/i.test(p),
     );
     const banned = [
@@ -308,23 +265,19 @@ describe("pi-ingest encrypted secret — repo guardrails", () => {
     ];
     for (const f of files) {
       const txt = readFileSync(f, "utf8");
-      for (const re of banned) {
-        expect(txt, `banned token in ${f}`).not.toMatch(re);
-      }
+      assertNoBannedTokens(txt, banned, f);
     }
   });
 
   it("no pi-ingest module inserts into sensor_readings, alerts, or action_queue", () => {
-    const files = walkSrc(resolve(ROOT, "src/lib")).filter((p) =>
+    const files = walkDir(resolve(ROOT, "src/lib"), { extensions: /\.(ts|tsx)$/ }).filter((p) =>
       /piIngest/i.test(p),
     );
     for (const f of files) {
       const txt = readFileSync(f, "utf8");
       expect(txt).not.toMatch(/from\(\s*['"]action_queue['"]/);
       expect(txt).not.toMatch(/from\(\s*['"]alerts['"]/);
-      expect(txt).not.toMatch(
-        /from\(\s*['"]sensor_readings['"]\s*\)[\s\S]*?\.insert\(/,
-      );
+      expect(txt).not.toMatch(/from\(\s*['"]sensor_readings['"]\s*\)[\s\S]*?\.insert\(/);
     }
   });
 });

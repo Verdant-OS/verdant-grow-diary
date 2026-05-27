@@ -33,7 +33,10 @@ describe("parseCsv", () => {
     const t = "A,B,C\r\n1,2,3\r\n4,5,6\r\n";
     expect(parseCsv(t)).toEqual({
       headers: ["A", "B", "C"],
-      rows: [["1", "2", "3"], ["4", "5", "6"]],
+      rows: [
+        ["1", "2", "3"],
+        ["4", "5", "6"],
+      ],
     });
   });
   it("handles quoted commas + escaped quotes", () => {
@@ -44,12 +47,7 @@ describe("parseCsv", () => {
 
 describe("planColumns", () => {
   it("detects AC Infinity Timestamp + Temperature(°F) + Humidity + VPD", () => {
-    const p = planColumns([
-      "Timestamp",
-      "Temperature (°F)",
-      "Humidity (%)",
-      "VPD (kPa)",
-    ]);
+    const p = planColumns(["Timestamp", "Temperature (°F)", "Humidity (%)", "VPD (kPa)"]);
     expect(p.timestamp).toBe(0);
     expect(p.temperature).toEqual({ idx: 1, unit: "F" });
     expect(p.humidity).toBe(2);
@@ -124,11 +122,7 @@ describe("normalizeAcInfinityRows", () => {
   });
 
   it("detects metrics and date range", () => {
-    expect(result.metricsDetected).toEqual([
-      "temperature_c",
-      "humidity_pct",
-      "vpd_kpa",
-    ]);
+    expect(result.metricsDetected).toEqual(["temperature_c", "humidity_pct", "vpd_kpa"]);
     expect(result.dateRange).not.toBeNull();
   });
 
@@ -148,23 +142,16 @@ describe("normalizeAcInfinityRows", () => {
   });
 
   it("flags unsupported metrics without persisting them", () => {
-    const withPh = parseCsv(
-      "Timestamp,Temperature (°F),pH\n2026-05-26 14:00:00,77,6.0",
-    );
+    const withPh = parseCsv("Timestamp,Temperature (°F),pH\n2026-05-26 14:00:00,77,6.0");
     const r = normalizeAcInfinityRows(withPh, planColumns(withPh.headers));
     expect(r.unsupportedMetrics).toContain("ph");
-    expect(
-      r.rows[0].readings.some((x) => (x.metric as string) === "ph"),
-    ).toBe(false);
+    expect(r.rows[0].readings.some((x) => (x.metric as string) === "ph")).toBe(false);
   });
 });
 
 describe("buildCsvInsertRows", () => {
   const parsed = parseCsv(
-    [
-      "Timestamp,Temperature (°F),Humidity (%)",
-      "2026-05-26 14:00:00,77,50",
-    ].join("\n"),
+    ["Timestamp,Temperature (°F),Humidity (%)", "2026-05-26 14:00:00,77,50"].join("\n"),
   );
   const result = normalizeAcInfinityRows(parsed, planColumns(parsed.headers));
 
@@ -232,19 +219,9 @@ describe("source app gating", () => {
 const RULES_RAW = read("src/lib/csvSensorImportRules.ts");
 const CARD_RAW = read("src/components/TentCsvImportCard.tsx");
 
-/**
- * Strip block + line comments so the safety scan only inspects executable
- * code. Gate 2A IS the CSV Drop feature, so words like "csv" and meta-words
- * like "service_role" legitimately appear in prose ("never use service_role
- * on the client"). Only real code usage should fail the safety contract.
- */
-function stripComments(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
-}
-const RULES = stripComments(RULES_RAW);
-const CARD = stripComments(CARD_RAW);
+import { stripJsComments } from "./gate-safety-utils";
+const RULES = stripJsComments(RULES_RAW);
+const CARD = stripJsComments(CARD_RAW);
 
 // Targeted unsafe-behavior tokens. The literal word "csv" is intentionally
 // NOT banned — Gate 2A is the CSV Drop feature and legitimately uses tokens

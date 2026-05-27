@@ -8,19 +8,16 @@
  * sensor pipeline behavior or the idempotency table.
  */
 import { describe, it, expect } from "vitest";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve, join } from "node:path";
+import { ROOT, stripSqlComments, walkDir, assertNoBannedTokens } from "./gate-safety-utils";
 
-const ROOT = resolve(__dirname, "../..");
 const MIG_DIR = resolve(ROOT, "supabase/migrations");
 
 function loadBridgeCredentialMigration(): string {
   for (const f of readdirSync(MIG_DIR)) {
     const txt = readFileSync(join(MIG_DIR, f), "utf8");
-    if (
-      /CREATE\s+TABLE\s+public\.pi_ingest_bridge_credentials/i.test(txt)
-    )
-      return txt;
+    if (/CREATE\s+TABLE\s+public\.pi_ingest_bridge_credentials/i.test(txt)) return txt;
   }
   return "";
 }
@@ -29,9 +26,7 @@ const SQL = loadBridgeCredentialMigration();
 
 describe("pi_ingest_bridge_credentials — migration exists", () => {
   it("creates the table", () => {
-    expect(SQL).toMatch(
-      /CREATE\s+TABLE\s+public\.pi_ingest_bridge_credentials/i,
-    );
+    expect(SQL).toMatch(/CREATE\s+TABLE\s+public\.pi_ingest_bridge_credentials/i);
   });
 });
 
@@ -125,7 +120,7 @@ describe("pi_ingest_bridge_credentials — RLS", () => {
   });
 
   it("never grants to service_role", () => {
-    const noComments = SQL.replace(/^\s*--.*$/gm, "");
+    const noComments = stripSqlComments(SQL);
     expect(noComments).not.toMatch(/service_role/i);
   });
 });
@@ -143,15 +138,12 @@ describe("pi_ingest_bridge_credentials — forbidden payload columns", () => {
     "plaintext",
   ])("does not include column %s", (col) => {
     const body =
-      SQL.match(
-        /CREATE\s+TABLE\s+public\.pi_ingest_bridge_credentials\s*\(([\s\S]*?)\);/i,
-      )?.[1] ?? "";
+      SQL.match(/CREATE\s+TABLE\s+public\.pi_ingest_bridge_credentials\s*\(([\s\S]*?)\);/i)?.[1] ??
+      "";
     // allow secret_hash and secret_hint, but reject a bare `secret` column.
     if (col === "secret") {
       // strip allowed columns first
-      const stripped = body
-        .replace(/secret_hash[^,\n]*/gi, "")
-        .replace(/secret_hint[^,\n]*/gi, "");
+      const stripped = body.replace(/secret_hash[^,\n]*/gi, "").replace(/secret_hint[^,\n]*/gi, "");
       expect(stripped).not.toMatch(/\bsecret\b/i);
     } else {
       expect(body).not.toMatch(new RegExp(`\\b${col}\\b`, "i"));
@@ -180,46 +172,26 @@ describe("pi-ingest bridge credentials — repo-level / project safety", () => {
     }
   });
 
-  function walk(dir: string, acc: string[] = []): string[] {
-    if (!existsSync(dir)) return acc;
-    for (const name of readdirSync(dir)) {
-      if (name === "node_modules" || name === ".git" || name === "dist") continue;
-      const p = join(dir, name);
-      const st = statSync(p);
-      if (st.isDirectory()) walk(p, acc);
-      else acc.push(p);
-    }
-    return acc;
-  }
-
   it("no src/lib pi-ingest module references service_role", () => {
-    const files = walk(resolve(ROOT, "src/lib")).filter((p) =>
-      /piIngest/i.test(p),
-    );
+    const files = walkDir(resolve(ROOT, "src/lib")).filter((p) => /piIngest/i.test(p));
     for (const f of files) {
       expect(readFileSync(f, "utf8")).not.toMatch(/service_role/i);
     }
   });
 
   it("no src/lib pi-ingest module writes to action_queue, alerts, or sensor_readings", () => {
-    const files = walk(resolve(ROOT, "src/lib")).filter((p) =>
-      /piIngest/i.test(p),
-    );
+    const files = walkDir(resolve(ROOT, "src/lib")).filter((p) => /piIngest/i.test(p));
     for (const f of files) {
       const txt = readFileSync(f, "utf8");
       expect(txt).not.toMatch(/from\(\s*['"]action_queue['"]/);
       expect(txt).not.toMatch(/from\(\s*['"]alerts['"]/);
       // pi-ingest pure modules must not insert into sensor_readings either.
-      expect(txt).not.toMatch(
-        /from\(\s*['"]sensor_readings['"]\s*\)[\s\S]*?\.insert\(/,
-      );
+      expect(txt).not.toMatch(/from\(\s*['"]sensor_readings['"]\s*\)[\s\S]*?\.insert\(/);
     }
   });
 
   it("static safety: no automation / device-control strings in pi-ingest modules", () => {
-    const files = walk(resolve(ROOT, "src/lib")).filter((p) =>
-      /piIngest/i.test(p),
-    );
+    const files = walkDir(resolve(ROOT, "src/lib")).filter((p) => /piIngest/i.test(p));
     const banned = [
       /\bMQTT\b/,
       /\brelay\b/i,
@@ -230,9 +202,7 @@ describe("pi-ingest bridge credentials — repo-level / project safety", () => {
     ];
     for (const f of files) {
       const txt = readFileSync(f, "utf8");
-      for (const re of banned) {
-        expect(txt).not.toMatch(re);
-      }
+      assertNoBannedTokens(txt, banned, f);
     }
   });
 });

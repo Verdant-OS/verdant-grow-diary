@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
+import { stripJsComments, assertNoBannedTokens } from "./gate-safety-utils";
 
 const DOC_PATH = resolve(__dirname, "../../docs/daily-grow-check-operating-loop.md");
 
@@ -57,19 +58,7 @@ describe("daily grow check operating loop doc", () => {
 });
 
 describe("daily grow check files static safety", () => {
-  // Strip JS/TS comments so doc-comments describing what the file MUST NOT do
-  // do not trip the static checks.
-  function stripComments(src: string): string {
-    return src
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/(^|[^:])\/\/.*$/gm, "$1");
-  }
-
-  const FORBIDDEN_WORDING = [
-    /\bperfect grow\b/i,
-    /\bguaranteed healthy\b/i,
-    /\bgrow completed\b/i,
-  ];
+  const FORBIDDEN_WORDING = [/\bperfect grow\b/i, /\bguaranteed healthy\b/i, /\bgrow completed\b/i];
   const FORBIDDEN_CODE_PATTERNS = [
     /service_role/,
     /from\(\s*["']action_queue["']/,
@@ -79,13 +68,9 @@ describe("daily grow check files static safety", () => {
 
   it.each(DAILY_CHECK_FILES)("%s has no forbidden tokens or wording", (rel) => {
     const raw = readFile(rel);
-    const code = stripComments(raw);
-    for (const re of FORBIDDEN_WORDING) {
-      expect(code, `${rel} contains forbidden wording ${re}`).not.toMatch(re);
-    }
-    for (const re of FORBIDDEN_CODE_PATTERNS) {
-      expect(code, `${rel} contains forbidden code pattern ${re}`).not.toMatch(re);
-    }
+    const code = stripJsComments(raw);
+    assertNoBannedTokens(code, FORBIDDEN_WORDING, rel);
+    assertNoBannedTokens(code, FORBIDDEN_CODE_PATTERNS, rel);
   });
 
   it("does not introduce a streak persistence table", () => {

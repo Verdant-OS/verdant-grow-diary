@@ -1,4 +1,6 @@
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
+import EnvironmentStabilityCard from "@/components/EnvironmentStabilityCard";
+import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
 import { useParams, Link } from "react-router-dom";
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";

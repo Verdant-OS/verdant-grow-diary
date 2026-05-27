@@ -29,9 +29,11 @@ function riskClass(risk: string | null): string {
 
 function fmtDate(ts: string | null): string {
   if (!ts) return "";
-  const t = Date.parse(ts);
-  if (!Number.isFinite(t)) return "";
-  return format(new Date(t), "PPp");
+  try {
+    return format(new Date(ts), "PPp");
+  } catch {
+    return "";
+  }
 }
 
 function fmtConfidence(val: number | null): string | null {

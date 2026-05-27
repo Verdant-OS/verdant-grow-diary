@@ -67,9 +67,22 @@ describe("normalizeIngestPayload — unit conversion", () => {
     );
     expect(r.ok).toBe(true);
   });
-});
-
-describe("normalizeIngestPayload — rejections", () => {
+  it("accepts ph with ph unit", () => {
+    const r = normalizeIngestPayload(
+      base({ readings: [{ metric: "ph", value: 6.2, unit: "ph" }] }),
+      { now: NOW },
+    );
+    expect(r.ok).toBe(true);
+    expect(r.rows[0]).toMatchObject({ metric: "ph", value: 6.2 });
+  });
+  it("accepts ec with mS/cm unit", () => {
+    const r = normalizeIngestPayload(
+      base({ readings: [{ metric: "ec", value: 1.8, unit: "mS/cm" }] }),
+      { now: NOW },
+    );
+    expect(r.ok).toBe(true);
+    expect(r.rows[0]).toMatchObject({ metric: "ec", value: 1.8 });
+  });
   it("accepts ppfd with umol unit", () => {
     const r = normalizeIngestPayload(
       base({ readings: [{ metric: "ppfd", value: 600, unit: "umol" }] }),
@@ -78,6 +91,9 @@ describe("normalizeIngestPayload — rejections", () => {
     expect(r.ok).toBe(true);
     expect(r.rows[0]).toMatchObject({ metric: "ppfd", value: 600 });
   });
+});
+
+describe("normalizeIngestPayload — rejections", () => {
   it("rejects unknown metric", () => {
     const r = normalizeIngestPayload(
       base({ readings: [{ metric: "lux", value: 600, unit: "lux" }] }),

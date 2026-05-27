@@ -64,16 +64,23 @@ export function selectPersistableAlerts(
 }
 
 /** Deterministic idempotency key for an environment alert within a grow.
- * Stable across renders so dedupe against existing open `alerts` rows works. */
+ *
+ * AUD-002 fix: keyed on (source, metric, title) rather than reason. The rule
+ * `title` is the stable rule label (e.g. "Temperature above default range")
+ * and does NOT embed per-snapshot numbers/timestamps. Keying on `reason`
+ * previously caused duplicate alert rows because the same rule firing on
+ * consecutive snapshots produced different reason strings (observed values
+ * + reading timestamps inlined into reason).
+ */
 export function alertRuleKey(args: {
   metric: string | null | undefined;
   source: string;
-  reason: string;
+  title: string;
 }): string {
   const metric = (args.metric ?? "").toString().trim().toLowerCase();
   const source = args.source.trim().toLowerCase();
-  const reason = args.reason.trim();
-  return `${source}::${metric}::${reason}`;
+  const title = args.title.trim().toLowerCase();
+  return `${source}::${metric}::${title}`;
 }
 
 /** Build a key from an in-memory derived alert. */
@@ -84,7 +91,7 @@ export function derivedAlertKey(
   return alertRuleKey({
     metric: typeof alert.metric === "string" ? alert.metric : null,
     source,
-    reason: alert.reason,
+    title: alert.title,
   });
 }
 
@@ -92,12 +99,12 @@ export function derivedAlertKey(
 export function persistedAlertKey(row: {
   metric: string | null;
   source: string | null;
-  reason: string;
+  title: string;
 }): string {
   return alertRuleKey({
     metric: row.metric,
     source: row.source ?? "environment_alerts",
-    reason: row.reason,
+    title: row.title,
   });
 }
 
@@ -105,7 +112,7 @@ export function persistedAlertKey(row: {
  * by an open persisted alert row. */
 export function dedupeAgainstOpen(
   persistable: readonly EnvironmentAlert[],
-  openRows: readonly { metric: string | null; source: string | null; reason: string }[],
+  openRows: readonly { metric: string | null; source: string | null; title: string }[],
   source = "environment_alerts",
 ): EnvironmentAlert[] {
   const existing = new Set(openRows.map((r) => persistedAlertKey(r)));

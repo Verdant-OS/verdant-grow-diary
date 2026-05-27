@@ -170,11 +170,14 @@ export default function Dashboard() {
   // Open alert count and recent alerts come from real persisted alerts (RLS).
   const openAlerts = persistedAlertsState.alerts.filter((a) => a.status === "open").length;
 
-  // Latest reading per tent for the strip
+  // Latest reading per tent for the strip + a read-only stability summary
+  // computed from the same tent-scoped readings (no extra fetches, no writes).
   const latestPerTent = tents.map((t) => {
     const rs = readings.filter((r) => r.tentId === t.id);
-    return { tent: t, last: rs[rs.length - 1] };
+    const stability = computeEnvironmentStability(rs, { stage: t.stage });
+    return { tent: t, last: rs[rs.length - 1], stability };
   });
+
 
   const recentAlerts = persistedAlertsState.alerts.slice(0, 3);
 

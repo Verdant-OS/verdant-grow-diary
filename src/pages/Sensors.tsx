@@ -76,6 +76,13 @@ export default function Sensors() {
         ))}
         <GrowDataSourceBadge classification={classification} className="ml-2" />
       </div>
+      <EnvironmentStabilityCard
+        testId="sensors-environment-stability"
+        className="mb-4"
+        result={computeEnvironmentStability(filtered, {
+          stage: selectedTentStage,
+        })}
+      />
       <div className="grid lg:grid-cols-2 gap-4">
         {METRICS.map((m) => (
           <div key={m.key} className="glass rounded-2xl p-4">

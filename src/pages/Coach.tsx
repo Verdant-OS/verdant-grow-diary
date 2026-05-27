@@ -17,6 +17,13 @@ import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import { evaluateAiContextSufficiency } from "@/lib/aiContextSufficiencyRules";
 import { adaptDiaryForAiContext } from "@/lib/coachContextAdapter";
 import CoachContextSufficiencyPanel from "@/components/CoachContextSufficiencyPanel";
+import StructuredDiagnosisCard from "@/components/StructuredDiagnosisCard";
+import {
+  validateAndSanitizeDiagnosis,
+  type Diagnosis,
+  type DiagnosisSuggestedAction,
+} from "@/lib/aiDoctorDiagnosisRules";
+import { ACTION_QUEUE_SOURCE_VALUES } from "@/lib/actionQueueProvenanceRules";
 
 type Mode = "diagnose" | "next_steps";
 
@@ -35,6 +42,8 @@ interface Analysis {
 
 interface CoachResponse {
   analysis?: Analysis;
+  /** Raw structured diagnosis from edge function; sanitize before render. */
+  diagnosis?: unknown;
   sparse?: boolean;
   empty?: boolean;
   error?: string;

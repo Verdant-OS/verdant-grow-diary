@@ -13,7 +13,7 @@
  * Manual sensor values are stored under details.manual_sensor_snapshot with
  * source set to "manual" by the pure helper in src/lib/quickLogRules.ts.
  */
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Camera, Loader2, X } from "lucide-react";
 import { toast } from "sonner";

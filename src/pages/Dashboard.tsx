@@ -39,6 +39,11 @@ import {
   VPD_STAGE_HELPER_TEXT,
 } from "@/lib/stageAwareVpdTargets";
 import {
+  classifyTempAgainstStage,
+  classifyRhAgainstStage,
+  environmentMetricChipStatus,
+} from "@/lib/environmentStageTargetRules";
+import {
   buildEnvironmentAlerts,
   EMPTY_ALERTS_MESSAGE,
   type EnvironmentAlert,

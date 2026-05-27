@@ -126,6 +126,21 @@ export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, p
                 {vpdClassification.label}. {VPD_STAGE_HELPER_TEXT}
               </p>
             ) : null}
+            {snap?.vpd !== null && snap?.vpd !== undefined && (plantStage ?? null) === null && (
+              <div
+                data-testid="plant-tent-vpd-stage-missing-badge"
+                role="status"
+                className="mt-2 rounded-lg border border-border/40 bg-secondary/10 p-2 text-xs text-muted-foreground flex items-center gap-2 flex-wrap"
+              >
+                <Badge
+                  variant="outline"
+                  className="text-[10px] uppercase border-muted-foreground text-muted-foreground"
+                >
+                  Info
+                </Badge>
+                <span>Set plant stage to evaluate VPD targets.</span>
+              </div>
+            )}
           </div>
         )}
         {enabled && !isLoading ? (

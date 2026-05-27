@@ -24,7 +24,7 @@ import {
 import { filterPlantsBySearch } from "./plantsPageFilterRules";
 
 interface ChipPlantLike extends ArchivedPlantLike {
-  id?: string | null;
+  id: string;
   name?: string | null;
   strain?: string | null;
   tentId?: string | null;

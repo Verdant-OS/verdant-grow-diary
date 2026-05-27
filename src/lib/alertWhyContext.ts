@@ -136,15 +136,18 @@ export function deriveAlertWhyContext(alert: AlertLike): AlertWhyContext {
   const metric = (alert.metric ?? "").toLowerCase();
   const isStageAware = /stage range/i.test(alert.title);
 
-  // Stage source: canonical "<stage> range" tail first; for legacy VPD
-  // alerts, fall back to a loose stage scan over title + reason so the
-  // detailed view can still show the canonical VPD band.
-  let stage = parseStageFromReason(alert.reason ?? "");
-  if (!stage && metric === "vpd") {
-    stage = parseStageLoose(`${alert.title} ${alert.reason ?? ""}`);
-  } else if (!isStageAware) {
-    // Non-VPD legacy alerts keep prior behavior — no stage band derivation.
-    return UNAVAILABLE;
+  let stage: EnvStage | null = null;
+  if (metric === "vpd") {
+    // Legacy VPD alerts pre-date the canonical "<stage> range" wording.
+    // Try the canonical parser first, then fall back to a loose stage scan
+    // over title + reason so the detailed view can still show the band.
+    stage =
+      parseStageFromReason(alert.reason ?? "") ??
+      parseStageLoose(`${alert.title} ${alert.reason ?? ""}`);
+  } else {
+    // Non-VPD metrics keep the strict canonical contract.
+    if (!isStageAware) return UNAVAILABLE;
+    stage = parseStageFromReason(alert.reason ?? "");
   }
   if (!stage || stage === "unknown") return UNAVAILABLE;
   const stageLabel = STAGE_DISPLAY[stage];

@@ -38,10 +38,14 @@ export default function TentSensorSourceHealthCard({ tentId }: { tentId: string 
         <Radio className="size-4 text-muted-foreground" />
         <h2 className="font-display font-semibold">Sensor Source Health</h2>
       </div>
-      <p className="text-sm text-muted-foreground mb-3">
-        Per-source freshness for this tent. Sources are marked stale after{" "}
-        {SENSOR_SOURCE_STALE_MINUTES} minutes without a new reading. Source status alone
-        does not mean the plant or environment is unhealthy.
+      <p className="text-sm text-muted-foreground mb-3" data-testid="sensor-source-health-helper">
+        Per-source freshness for this tent. <strong className="text-foreground">Active</strong>,{" "}
+        <strong className="text-foreground">stale</strong>, and{" "}
+        <strong className="text-foreground">no recent data</strong> describe the source
+        connection only — not the plant or environment. A source is marked stale after{" "}
+        {SENSOR_SOURCE_STALE_MINUTES} minutes without a new reading; the last value is
+        kept but flagged so you know it may be out of date. A stale source does not
+        mean the tent is unhealthy — check Sensors or AI Doctor for that.
       </p>
 
       {isLoading ? (

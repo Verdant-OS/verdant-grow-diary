@@ -93,8 +93,17 @@ export default function TentBridgeTokensCard({ tentId }: { tentId: string }) {
         <h2 className="font-display font-semibold">Bridge tokens</h2>
       </div>
       <p className="text-sm text-muted-foreground mb-3">
-        Mint a tent-scoped, expiring API token for headless ESP32 / Pi / Node-RED bridges.
-        Tokens are read-only sensor ingest only — never device control. Shown once at mint time.
+        Mint a tent-scoped, expiring API token for long-running headless clients —
+        Raspberry Pi, ESP32, Node-RED, Home Assistant. Tokens are read-only sensor
+        ingest, never device control. Prefer bridge tokens over your session token
+        for anything that runs longer than a browser tab.
+      </p>
+      <p className="text-xs text-muted-foreground mb-3" data-testid="bridge-token-security-helper">
+        <strong className="text-foreground">Shown once.</strong> Copy the token now
+        and store it somewhere secure (your device config, a password manager, or a
+        secrets vault). We never store the plaintext — if you lose it, mint a new
+        one. If a token is ever exposed in logs, chats, screenshots, or git, revoke
+        it immediately below.
       </p>
 
       <div className="flex flex-col sm:flex-row gap-2 mb-3">
@@ -122,7 +131,9 @@ export default function TentBridgeTokensCard({ tentId }: { tentId: string }) {
 
       {reveal && (
         <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 mb-3" role="alert">
-          <div className="text-xs font-medium mb-1">Your new token (shown once)</div>
+          <div className="text-xs font-medium mb-1">
+            Your new token — shown once, copy now
+          </div>
           <div className="flex items-center gap-2">
             <code className="text-xs break-all flex-1 select-all">{reveal}</code>
             <Button size="sm" variant="outline" onClick={copyReveal}>
@@ -132,6 +143,10 @@ export default function TentBridgeTokensCard({ tentId }: { tentId: string }) {
               Dismiss
             </Button>
           </div>
+          <p className="text-[11px] text-muted-foreground mt-2" data-testid="bridge-token-reveal-helper">
+            Store this somewhere secure right now. We can't show it again. Revoke
+            below if it ever leaks.
+          </p>
         </div>
       )}
 

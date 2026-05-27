@@ -211,7 +211,7 @@ describe("environmentAlertPersistence — pure rules", () => {
     const stored = persistedAlertKey({
       metric: "temp",
       source: "environment_alerts",
-      reason: "Temperature is above the configured maximum.",
+      title: "Temperature above target",
     });
     expect(derived).toBe(stored);
   });
@@ -227,7 +227,7 @@ describe("environmentAlertPersistence — pure rules", () => {
       createdAt: "",
     };
     const out = dedupeAgainstOpen([a], [
-      { metric: "temp", source: "environment_alerts", reason: a.reason },
+      { metric: "temp", source: "environment_alerts", title: a.title },
     ]);
     expect(out).toHaveLength(0);
   });

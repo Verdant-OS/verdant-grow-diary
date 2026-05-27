@@ -108,3 +108,25 @@ export function buildFreshnessSnapshots(
     buildFreshnessSnapshot(m, latest[m] ?? null, now),
   );
 }
+
+/**
+ * CTA decision for the freshness card header.
+ *  - "add_first" : every metric is missing — gently invite the first snapshot.
+ *  - "update"    : at least one metric is aging or stale — nudge an update.
+ *  - "none"      : nothing to nag about (all fresh, or mixed fresh + missing).
+ *
+ * Mixed fresh + missing intentionally returns "none" to preserve the existing
+ * "don't nag" behavior described by the Gate 1B contract.
+ */
+export type FreshnessCta = "add_first" | "update" | "none";
+
+export function computeFreshnessCta(
+  snapshots: ReadonlyArray<FreshnessSnapshot>,
+): FreshnessCta {
+  if (snapshots.length === 0) return "none";
+  if (snapshots.every((s) => s.state === "missing")) return "add_first";
+  if (snapshots.some((s) => s.state === "aging" || s.state === "stale")) {
+    return "update";
+  }
+  return "none";
+}

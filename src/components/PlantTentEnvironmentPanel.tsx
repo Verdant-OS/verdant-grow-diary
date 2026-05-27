@@ -12,6 +12,7 @@ import { SOURCE_LABEL, formatValue, snapshotFromReadings } from "@/lib/sensorSna
 import { tempFFromC } from "@/lib/temperatureUnits";
 import {
   classifyVpdAgainstStage,
+  normalizeVpdStage,
   VPD_STAGE_HELPER_TEXT,
 } from "@/lib/vpdStageTargetRules";
 import {

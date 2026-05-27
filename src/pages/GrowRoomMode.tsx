@@ -364,6 +364,24 @@ export default function GrowRoomMode() {
                   </p>
                 )}
 
+                {card.snapshot?.vpd != null &&
+                  (tentStageById[card.tentId] ?? null) === null && (
+                    <div
+                      data-testid="grow-room-vpd-stage-missing-badge"
+                      role="status"
+                      className="rounded-lg border border-border/40 bg-secondary/10 p-2 text-xs text-muted-foreground flex items-center gap-2 flex-wrap"
+                    >
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] uppercase border-muted-foreground text-muted-foreground"
+                      >
+                        Info
+                      </Badge>
+                      <span>Set plant stage to evaluate VPD targets.</span>
+                    </div>
+                  )}
+
+
 
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span className="inline-flex items-center gap-1">

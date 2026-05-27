@@ -41,7 +41,19 @@ export interface AlertWhyUnavailable {
   text: "Target context unavailable for this alert.";
 }
 
-export type AlertWhyContext = AlertWhyStageContext | AlertWhyUnavailable;
+export interface AlertWhyContextOnly {
+  kind: "context_only";
+  metric: AlertWhyMetric;
+  stage: EnvStage;
+  stageLabel: string;
+  /** Compact display string, e.g. "Harvest stage — VPD shown as context only.". */
+  text: string;
+}
+
+export type AlertWhyContext =
+  | AlertWhyStageContext
+  | AlertWhyContextOnly
+  | AlertWhyUnavailable;
 
 const UNAVAILABLE: AlertWhyUnavailable = {
   kind: "unavailable",
@@ -82,6 +94,27 @@ function parseStageFromReason(reason: string): EnvStage | null {
   return null;
 }
 
+/**
+ * Loose stage parser for legacy alerts whose title/reason pre-dates the
+ * canonical "<stage> range" wording. Scans for any stage token with word
+ * boundaries; "drying" maps to the harvest context-only stage. Returns null
+ * when no stage token is detected so callers fall back to "unavailable".
+ */
+function parseStageLoose(text: string): EnvStage | null {
+  // Order matters: longer / more specific needles first.
+  const stages: { needle: RegExp; key: EnvStage }[] = [
+    { needle: /\blate[\s_-]?flower(ing)?\b/, key: "late_flower" },
+    { needle: /\bpre[\s_-]?flower(ing)?\b/, key: "preflower" },
+    { needle: /\bseedling\b/, key: "seedling" },
+    { needle: /\bflower(ing)?\b/, key: "flower" },
+    { needle: /\bveg(etative|etation)?\b/, key: "veg" },
+    { needle: /\b(harvest(ed)?|drying|cure|curing)\b/, key: "harvest" },
+  ];
+  const r = text.toLowerCase();
+  for (const s of stages) if (s.needle.test(r)) return s.key;
+  return null;
+}
+
 function fmtTemp(v: number): string {
   return Number.isInteger(v) ? `${v}` : `${v.toFixed(1)}`;
 }
@@ -100,11 +133,23 @@ export interface AlertLike {
 
 export function deriveAlertWhyContext(alert: AlertLike): AlertWhyContext {
   if (!alert || typeof alert.title !== "string") return UNAVAILABLE;
-  // Only stage-aware alerts encode the stage band in their reason text.
-  if (!/stage range/i.test(alert.title)) return UNAVAILABLE;
-  const stage = parseStageFromReason(alert.reason ?? "");
-  if (!stage || stage === "unknown") return UNAVAILABLE;
   const metric = (alert.metric ?? "").toLowerCase();
+  const isStageAware = /stage range/i.test(alert.title);
+
+  let stage: EnvStage | null = null;
+  if (metric === "vpd") {
+    // Legacy VPD alerts pre-date the canonical "<stage> range" wording.
+    // Try the canonical parser first, then fall back to a loose stage scan
+    // over title + reason so the detailed view can still show the band.
+    stage =
+      parseStageFromReason(alert.reason ?? "") ??
+      parseStageLoose(`${alert.title} ${alert.reason ?? ""}`);
+  } else {
+    // Non-VPD metrics keep the strict canonical contract.
+    if (!isStageAware) return UNAVAILABLE;
+    stage = parseStageFromReason(alert.reason ?? "");
+  }
+  if (!stage || stage === "unknown") return UNAVAILABLE;
   const stageLabel = STAGE_DISPLAY[stage];
 
   if (metric === "temp") {
@@ -138,7 +183,16 @@ export function deriveAlertWhyContext(alert: AlertLike): AlertWhyContext {
   if (metric === "vpd") {
     const vstage = normalizeVpdStage(stage);
     const band = getVpdTargetBand(vstage);
-    if (band.min === null || band.max === null) return UNAVAILABLE;
+    if (band.contextOnly || band.min === null || band.max === null) {
+      // Harvest / drying — no breach band; render context-only copy.
+      return {
+        kind: "context_only",
+        metric: "vpd",
+        stage,
+        stageLabel,
+        text: `${stageLabel} stage — VPD shown as context only.`,
+      };
+    }
     return {
       kind: "stage",
       metric: "vpd",

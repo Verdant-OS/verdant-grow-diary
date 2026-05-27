@@ -13,6 +13,11 @@ import {
   normalizeWebhookIngestPayload,
   type WebhookIngestPayload,
 } from "../../../src/lib/sensorWebhookIngestRules.ts";
+import {
+  authenticateBearer,
+  tentScopeMatches,
+  type AuthResult,
+} from "./auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,66 +31,6 @@ function json(body: unknown, status: number) {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-}
-
-const BRIDGE_PREFIX = "vbt_";
-
-async function sha256Hex(input: string): Promise<string> {
-  const buf = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(input),
-  );
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-type AuthResult =
-  | { kind: "jwt"; userId: string; tentScope: null }
-  | { kind: "bridge"; userId: string; tentScope: string; tokenId: string };
-
-async function authenticate(
-  rawToken: string,
-  supabaseUrl: string,
-  anonKey: string,
-  serviceKey: string | undefined,
-): Promise<AuthResult | { error: string; status: number }> {
-  if (rawToken.startsWith(BRIDGE_PREFIX)) {
-    if (!serviceKey) return { error: "server_misconfigured", status: 503 };
-    // Basic shape check; reject obvious malformed tokens before DB lookup.
-    if (rawToken.length < BRIDGE_PREFIX.length + 16) {
-      return { error: "unauthorized", status: 401 };
-    }
-    const admin = createClient(supabaseUrl, serviceKey);
-    const hash = await sha256Hex(rawToken);
-    const { data, error } = await admin
-      .from("bridge_tokens")
-      .select("id, user_id, tent_id, expires_at, revoked_at")
-      .eq("token_hash", hash)
-      .maybeSingle();
-    if (error) return { error: "auth_lookup_failed", status: 503 };
-    if (!data) return { error: "unauthorized", status: 401 };
-    if (data.revoked_at) return { error: "token_revoked", status: 401 };
-    if (new Date(data.expires_at).getTime() <= Date.now()) {
-      return { error: "token_expired", status: 401 };
-    }
-    return {
-      kind: "bridge",
-      userId: data.user_id,
-      tentScope: data.tent_id,
-      tokenId: data.id,
-    };
-  }
-  // JWT path
-  const supabase = createClient(supabaseUrl, anonKey, {
-    global: { headers: { Authorization: `Bearer ${rawToken}` } },
-  });
-  const { data: claimsData, error: claimsErr } =
-    await supabase.auth.getClaims(rawToken);
-  if (claimsErr || !claimsData?.claims?.sub) {
-    return { error: "unauthorized", status: 401 };
-  }
-  return { kind: "jwt", userId: claimsData.claims.sub as string, tentScope: null };
 }
 
 Deno.serve(async (req) => {

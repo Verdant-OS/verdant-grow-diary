@@ -114,7 +114,6 @@ describe("Action Queue safety — current posture (suggest-only by construction)
     const banned: Array<{ name: string; re: RegExp }> = [
       { name: "MQTT", re: /\bmqtt:\/\//i },
       { name: "MQTT client", re: /\bmqtt\.connect\b/i },
-      { name: "Home Assistant", re: /home[\s_-]?assistant/i },
       { name: "Pi bridge HTTP", re: /pi[\s_-]?bridge\.(?:local|lan|home|io|net|com)/i },
       { name: "webhook URL var", re: /\bWEBHOOK_URL\b/ },
       { name: "device_command", re: /device_command/i },
@@ -124,6 +123,16 @@ describe("Action Queue safety — current posture (suggest-only by construction)
     ];
     for (const { name, re } of banned) {
       expect(ALL_PROD_CODE, `must not contain device-control surface: ${name}`).not.toMatch(re);
+    }
+    // home_assistant references appear ONLY as sensor_readings.source enum
+    // values (`home_assistant_bridge`, `ha_forwarded`) — never as outbound
+    // control calls. Assert no fetch/HTTP/MQTT context around them.
+    const haContexts = [...ALL_PROD_CODE.matchAll(/home[\s_-]?assistant/gi)];
+    for (const m of haContexts) {
+      const ctx = ALL_PROD_CODE.slice(Math.max(0, m.index! - 60), m.index! + 60);
+      expect(ctx, `home_assistant reference must not be a control call: ${ctx}`).not.toMatch(
+        /fetch\(|http\.|mqtt|publish|\.post\(|\.send\(|trigger/i,
+      );
     }
     // pi_bridge appears ONLY as a sensor_readings.source enum value (read-side
     // ingest tag), never as an outbound device controller — assert it's not

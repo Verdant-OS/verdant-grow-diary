@@ -239,6 +239,14 @@ export default function GrowRoomMode() {
     });
   }, [tents, snapshotsByTentId, alertInputs, actions]);
 
+  const tentStageById = useMemo<Record<string, string | null>>(() => {
+    const m: Record<string, string | null> = {};
+    for (const t of tents ?? []) {
+      m[t.id] = (t as { stage?: string | null }).stage ?? null;
+    }
+    return m;
+  }, [tents]);
+
   const showEmpty = !loading && (!tents || tents.length === 0);
 
   return (

@@ -10,7 +10,9 @@ const map: Record<Stage, { label: string; cls: string }> = {
   cure: { label: "Cure", cls: "bg-muted text-muted-foreground border-border" },
 };
 
-export default function StageBadge({ stage, className }: { stage: Stage; className?: string }) {
-  const m = map[stage] ?? { label: stage, cls: "bg-secondary text-foreground border-border" };
+export default function StageBadge({ stage, className }: { stage: Stage | null; className?: string }) {
+  const m = stage == null
+    ? { label: "Unknown", cls: "bg-secondary text-muted-foreground border-border" }
+    : map[stage] ?? { label: stage, cls: "bg-secondary text-foreground border-border" };
   return <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize", m.cls, className)}>{m.label}</span>;
 }

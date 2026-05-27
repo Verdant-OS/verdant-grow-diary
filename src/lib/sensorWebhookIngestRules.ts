@@ -261,7 +261,7 @@ export function normalizeWebhookIngestPayload(
                 ? ((input.metadata as Record<string, unknown>)
                     .device_id as string)
                 : null),
-        raw_payload: sanitizeRawPayload(input),
+        raw_payload: sanitizeRawPayload(input) as unknown as NormalizedRow["raw_payload"],
       });
 
       fingerprintParts.push(`${rule.canonical}:${converted.toFixed(6)}`);

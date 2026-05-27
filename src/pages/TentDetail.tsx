@@ -19,6 +19,7 @@ import TentManualSnapshotChangeContext from "@/components/TentManualSnapshotChan
 import TentManualSnapshotHistoryList from "@/components/TentManualSnapshotHistoryList";
 import TentCsvImportCard from "@/components/TentCsvImportCard";
 import TentSensorWebhookSettingsCard from "@/components/TentSensorWebhookSettingsCard";
+import TentBridgeTokensCard from "@/components/TentBridgeTokensCard";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useGrowTent, useGrowPlants, getGrowDataMeta } from "@/hooks/useGrowData";
 import {

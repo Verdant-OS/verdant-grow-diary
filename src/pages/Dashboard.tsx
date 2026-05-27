@@ -33,6 +33,7 @@ import {
 } from "@/lib/environmentTargetComparison";
 import {
   classifyVpdAgainstStage,
+  normalizeVpdStage,
   VPD_STAGE_HELPER_TEXT,
 } from "@/lib/stageAwareVpdTargets";
 import {

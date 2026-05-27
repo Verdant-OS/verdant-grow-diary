@@ -59,7 +59,9 @@ describe("CoachContextSufficiencyPanel — harmonized confidence copy", () => {
     expect(
       screen.getByTestId("coach-context-confidence-limited-copy").textContent,
     ).toBe(CONFIDENCE_LIMITED_COPY);
-    expect(screen.getByText(/60%/)).toBeTruthy();
+    expect(
+      screen.getByTestId("coach-context-confidence-ceiling").textContent,
+    ).toMatch(/60%/);
   });
 
   it("does not imply limitation for high ceiling", () => {

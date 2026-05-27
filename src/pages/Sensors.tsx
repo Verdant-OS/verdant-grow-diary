@@ -89,38 +89,75 @@ export default function Sensors() {
         })}
       />
       <div className="grid lg:grid-cols-2 gap-4">
-        {METRICS.map((m) => (
-          <div key={m.key} className="glass rounded-2xl p-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-display font-semibold">{m.label}</h3>
-              <GrowDataSourceBadge classification={classification} />
+        {METRICS.map((m) => {
+          // Stage-aware status pill for Temperature/Humidity using the
+          // latest reading + the selected tent's stage. Stale or missing
+          // stage never reads as ok. Pure presenter; no writes.
+          let envStatus: "ok" | "warn" | "bad" | null = null;
+          let envLabel: string | null = null;
+          if (m.key === "temp" && latest) {
+            const r = classifyTempAgainstStage(latest.temp ?? null, {
+              stage: selectedTentStage,
+            });
+            envStatus = environmentMetricChipStatus(r);
+            envLabel = r.label;
+          } else if (m.key === "rh" && latest) {
+            const r = classifyRhAgainstStage(latest.rh ?? null, {
+              stage: selectedTentStage,
+            });
+            envStatus = environmentMetricChipStatus(r);
+            envLabel = r.label;
+          }
+          const envToneClass =
+            envStatus === "ok"
+              ? "border-[hsl(var(--success))]/60 text-[hsl(var(--success))]"
+              : envStatus === "warn"
+                ? "border-[hsl(var(--warning))] text-[hsl(var(--warning))]"
+                : "border-destructive/60 text-destructive";
+          return (
+            <div key={m.key} className="glass rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-2 gap-2">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-display font-semibold">{m.label}</h3>
+                  {envStatus && envLabel && (
+                    <span
+                      data-testid={`sensors-stage-status-${m.key}`}
+                      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] ${envToneClass}`}
+                      title={envLabel}
+                    >
+                      {envLabel}
+                    </span>
+                  )}
+                </div>
+                <GrowDataSourceBadge classification={classification} />
+              </div>
+              {!hasReadings ? (
+                <p
+                  className="text-xs text-muted-foreground py-6 text-center"
+                  data-testid={`sensors-empty-${m.key}`}
+                >
+                  No reading available.
+                </p>
+              ) : (
+                <SensorChart data={filtered} metric={m.key} height={200} />
+              )}
+              {m.key === "vpd" && (
+                <p
+                  className="text-[11px] text-muted-foreground mt-2"
+                  data-testid="sensors-vpd-stage-hint"
+                >
+                  {VPD_STAGE_HELPER_TEXT}
+                </p>
+              )}
+              {m.key === "vpd" && vpdStageMissing && (
+                <VpdStageMissingBadge
+                  testId="sensors-vpd-stage-missing-badge"
+                  className="mt-2"
+                />
+              )}
             </div>
-            {!hasReadings ? (
-              <p
-                className="text-xs text-muted-foreground py-6 text-center"
-                data-testid={`sensors-empty-${m.key}`}
-              >
-                No reading available.
-              </p>
-            ) : (
-              <SensorChart data={filtered} metric={m.key} height={200} />
-            )}
-            {m.key === "vpd" && (
-              <p
-                className="text-[11px] text-muted-foreground mt-2"
-                data-testid="sensors-vpd-stage-hint"
-              >
-                {VPD_STAGE_HELPER_TEXT}
-              </p>
-            )}
-            {m.key === "vpd" && vpdStageMissing && (
-              <VpdStageMissingBadge
-                testId="sensors-vpd-stage-missing-badge"
-                className="mt-2"
-              />
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
       {manualTents.length > 0 && (
         <div className="mt-4 max-w-xl">

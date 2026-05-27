@@ -89,9 +89,11 @@ describe("Sensors page wiring (source contract)", () => {
     );
   });
 
-  it("labels current mock-backed readings as demo (not live)", () => {
-    // Hook silently falls back to mock data; page must classify as demo.
-    expect(SENSORS).toMatch(/source:\s*["']demo["']/);
+  it("labels current mock-backed readings as demo (not live) when the real source is missing", () => {
+    // AUD-003: the page now classifies on the real reading's source when
+    // present, and falls back to "demo" only when none is known. It must
+    // never hard-label live/supabase/sensor when the data is mock.
+    expect(SENSORS).toMatch(/["']demo["']/);
     expect(SENSORS).not.toMatch(/source:\s*["'](live|supabase|sensor)["']/);
   });
 
@@ -99,8 +101,10 @@ describe("Sensors page wiring (source contract)", () => {
     expect(SENSORS).toMatch(/<GrowDataSourceBadge/);
   });
 
-  it("renders an Unavailable empty state instead of an empty chart", () => {
-    expect(SENSORS).toMatch(/Unavailable/);
+  it("renders an empty state instead of an empty chart when there are no readings", () => {
+    // AUD-003: previously gated on classification.label === "Unavailable";
+    // now gated on hasReadings so valid-but-stale readings still chart.
+    expect(SENSORS).toMatch(/hasReadings/);
     expect(SENSORS).toMatch(/No reading available/i);
   });
 

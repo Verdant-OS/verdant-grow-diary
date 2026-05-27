@@ -34,6 +34,11 @@ import {
   getArchivedPlantLabel,
   shouldShowArchivedToggle,
 } from "@/lib/archivedPlantVisibilityRules";
+import {
+  classifyVpdAgainstStage,
+  vpdMetricChipStatus,
+  VPD_STAGE_HELPER_TEXT,
+} from "@/lib/vpdStageTargetRules";
 import { cn } from "@/lib/utils";
 
 export default function TentDetail() {

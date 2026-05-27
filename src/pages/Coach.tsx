@@ -222,6 +222,9 @@ export default function Coach() {
       });
     }
     toast.success("AI Doctor suggestion queued for approval.");
+  }
+
+
 
   async function ask(mode: Mode) {
     if (!user) return;

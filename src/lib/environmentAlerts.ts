@@ -46,6 +46,12 @@ export interface AlertInputs {
   now?: number;
   /** Optional source/device detail surfaced in default-threshold alert text. */
   deviceLabel?: string | null;
+  /**
+   * Plant/grow/tent stage. When provided (even as null), VPD evaluation in
+   * the default-thresholds fallback uses stage-aware target bands. When
+   * omitted, legacy generic VPD thresholds apply (backward compatibility).
+   */
+  stage?: string | null;
 }
 
 const SEVERITY_WEIGHT: Record<AlertSeverity, number> = {

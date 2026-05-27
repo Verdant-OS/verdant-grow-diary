@@ -214,6 +214,9 @@ describe("sensor-ingest-webhook safety surface", () => {
     const banned =
       /service_role|action_queue|\.from\(["']alerts["']\)|openai|anthropic|mqtt\.connect|mqttSubscribe|relay|actuator|setpoint|autopilot/i;
     expect(src).not.toMatch(banned);
+  });
+
+
 
   it("normalizes alias keys to canonical metric names", () => {
     const r = normalizeWebhookIngestPayload(

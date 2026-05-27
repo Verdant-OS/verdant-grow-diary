@@ -17,10 +17,16 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, ShieldCheck, Sparkles } from "lucide-react";
 import {
   DIAGNOSIS_SAFETY_COPY,
+  LOW_CONFIDENCE_THRESHOLD,
   SUGGESTION_APPROVAL_COPY,
   type Diagnosis,
   type DiagnosisSuggestedAction,
 } from "@/lib/aiDoctorDiagnosisRules";
+import type { AiContextConfidenceCeiling } from "@/lib/aiContextSufficiencyRules";
+import {
+  harmonizeDiagnosisConfidence,
+  isDisplayedConfidenceLow,
+} from "@/lib/aiDoctorConfidenceRules";
 
 export interface StructuredDiagnosisCardProps {
   diagnosis: Diagnosis;
@@ -35,6 +41,13 @@ export interface StructuredDiagnosisCardProps {
   ) => Promise<void> | void;
   /** Disables every queue button (e.g. no active grow). */
   disableQueueing?: boolean;
+  /**
+   * Optional categorical ceiling from `evaluateAiContextSufficiency`. When
+   * supplied, the displayed confidence is harmonized against it so the
+   * structured card never claims more certainty than the legacy
+   * sufficiency surface allows.
+   */
+  contextCeiling?: AiContextConfidenceCeiling | null;
   testId?: string;
 }
 

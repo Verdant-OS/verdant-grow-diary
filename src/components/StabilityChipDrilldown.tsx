@@ -17,6 +17,7 @@ import {
   formatStabilityChipView,
   type StabilityChipView,
 } from "@/lib/dashboardStabilityChipCopyRules";
+import { deriveStabilityWhyContext } from "@/lib/stabilityWhyContext";
 
 export type StabilityCopyVariant =
   | "unavailable"
@@ -70,6 +71,7 @@ export default function StabilityChipDrilldown({
 }: StabilityChipDrilldownProps) {
   const chipView = view ?? formatStabilityChipView(stability);
   const variant = resolveCopyVariant(stability);
+  const why = deriveStabilityWhyContext(stability.stage);
 
   return (
     <Dialog>
@@ -135,6 +137,15 @@ export default function StabilityChipDrilldown({
             <span className="text-muted-foreground">Stage</span>
             <span className="font-mono text-xs">{stability.stage}</span>
           </div>
+
+          <div
+            data-testid={`dashboard-stability-drilldown-${tentId}-why-context`}
+            data-why-kind={why.kind}
+            className="rounded-lg border border-border/40 bg-secondary/10 p-2 text-xs text-muted-foreground"
+          >
+            {why.text}
+          </div>
+
 
           <div className="rounded-lg border border-border/40 p-3 space-y-1.5">
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

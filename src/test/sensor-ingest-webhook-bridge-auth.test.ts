@@ -100,7 +100,7 @@ describe("sensor-ingest-webhook bridge token auth", () => {
     expect(dbCalled).toBe(false);
   });
 
-  it("missing auth (no ****** handled by caller — auth module requires token string", async () => {
+  it("missing auth (no Authorization header) handled by caller — auth module rejects empty token", async () => {
     // The edge function returns 401 before calling authenticateBearer when
     // no Authorization header is present. We verify that the module itself
     // rejects an empty string as unauthorized via JWT path.

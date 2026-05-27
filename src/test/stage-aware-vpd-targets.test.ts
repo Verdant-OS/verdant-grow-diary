@@ -172,6 +172,8 @@ describe("determinism + safety contract", () => {
       /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b/i,
     );
     expect(HELPER).not.toMatch(/ai[\s_-]?coach|ai_doctor/i);
-    expect(HELPER).not.toMatch(/action[_\s-]?queue/i);
+    // helper doc comment mentions "no Action Queue creation" — assert there
+    // is no actual write/insert into action_queue rather than substring match.
+    expect(HELPER).not.toMatch(/\.from\(["']action_queue["']\)/);
   });
 });

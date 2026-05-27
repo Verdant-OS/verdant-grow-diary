@@ -53,6 +53,7 @@ export type CanonicalMetric =
   | "humidity_pct"
   | "vpd_kpa"
   | "co2_ppm"
+  | "soil_moisture_pct"
   | "ph"
   | "ec"
   | "ppfd";

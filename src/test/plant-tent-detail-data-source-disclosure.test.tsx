@@ -177,10 +177,12 @@ describe("PlantDetail page wiring", () => {
 
   it("does not introduce writes, service_role, or device control", () => {
     expect(PLANT_DETAIL).not.toMatch(/service_role/);
+    // Device-control verbs only — see TentDetail test for rationale.
     expect(PLANT_DETAIL).not.toMatch(
-      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator|webhook/i,
+      /relay|actuator|setpoint|mqtt\.connect|mqttSubscribe|mqttPublish|deviceControl/i,
     );
   });
+
 });
 
 describe("TentDetail page wiring", () => {

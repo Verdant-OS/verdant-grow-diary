@@ -22,7 +22,6 @@ import { plantsPath } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import {
   filterVisiblePlants,
-  getActivePlantCount,
   getArchivedPlantLabel,
   shouldShowArchivedToggle,
   isArchivedPlant,
@@ -30,12 +29,12 @@ import {
 } from "@/lib/archivedPlantVisibilityRules";
 import {
   buildGrowFilterOptions,
-  filterPlantsByGrow,
   filterPlantsBySearch,
   summarizePlantsPageFilters,
   formatPlantsPageFilterSummary,
   plantsPageEmptyStateCopy,
 } from "@/lib/plantsPageFilterRules";
+import { buildPlantsTentFilterChips } from "@/lib/plantsTentFilterChipsRules";
 import { buildDashboardDailyGrowCheckPanel } from "@/lib/dashboardDailyGrowCheckPanelRules";
 import { buildDailyCheckEntryHref } from "@/lib/dailyCheckPostSubmitRules";
 import { useNavigate } from "react-router-dom";

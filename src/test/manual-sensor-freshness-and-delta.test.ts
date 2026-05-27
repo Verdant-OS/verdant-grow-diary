@@ -17,6 +17,7 @@ import {
   computeFreshness,
   buildFreshnessSnapshot,
   buildFreshnessSnapshots,
+  computeFreshnessCta,
   FRESHNESS_FRESH_MAX_HOURS,
   FRESHNESS_AGING_MAX_HOURS,
   MANUAL_SENSOR_METRICS,
@@ -91,6 +92,42 @@ describe("buildFreshnessSnapshots", () => {
       NOW,
     );
     expect(s.ageHours).toBeCloseTo(10, 5);
+  });
+});
+
+describe("computeFreshnessCta", () => {
+  it("returns 'add_first' when every metric is missing", () => {
+    const snaps = buildFreshnessSnapshots({}, NOW);
+    expect(computeFreshnessCta(snaps)).toBe("add_first");
+  });
+  it("returns 'update' when any metric is aging or stale", () => {
+    const aging = buildFreshnessSnapshots(
+      { temp_f: { value: 77, loggedAt: hoursAgo(30) } },
+      NOW,
+    );
+    expect(computeFreshnessCta(aging)).toBe("update");
+    const stale = buildFreshnessSnapshots(
+      { ph: { value: 6.1, loggedAt: hoursAgo(72) } },
+      NOW,
+    );
+    expect(computeFreshnessCta(stale)).toBe("update");
+  });
+  it("returns 'none' when all present metrics are fresh (mixed fresh + missing does not nag)", () => {
+    const snaps = buildFreshnessSnapshots(
+      { temp_f: { value: 77, loggedAt: hoursAgo(1) } },
+      NOW,
+    );
+    expect(computeFreshnessCta(snaps)).toBe("none");
+  });
+  it("prefers 'update' over 'add_first' when any non-missing metric is aging/stale", () => {
+    const snaps = buildFreshnessSnapshots(
+      { temp_f: { value: 77, loggedAt: hoursAgo(72) } },
+      NOW,
+    );
+    expect(computeFreshnessCta(snaps)).toBe("update");
+  });
+  it("returns 'none' on empty snapshot list", () => {
+    expect(computeFreshnessCta([])).toBe("none");
   });
 });
 

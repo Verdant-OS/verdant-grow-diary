@@ -151,3 +151,17 @@ Deno.test("sha256Hex produces stable hex digest", async () => {
   const h = await sha256Hex("hello");
   assertEquals(h, "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824");
 });
+
+Deno.test("empty bearer token is rejected (missing auth surrogate)", async () => {
+  // The HTTP handler rejects requests without an `Authorization: Bearer …`
+  // header before calling authenticateBearer. This case covers the path
+  // where the header is present but the token after `Bearer ` is empty:
+  // it must never be treated as a valid JWT or bridge token.
+  const res = await authenticateBearer("", {
+    serviceKeyAvailable: true,
+    lookupBridgeToken: async () => ({ data: makeRow(), error: null }),
+    verifyJwtClaims: async () => ({ sub: null }),
+  });
+  assert(!res.ok);
+  if (!res.ok) assertEquals(res.error, "unauthorized");
+});

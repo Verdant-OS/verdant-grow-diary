@@ -31,6 +31,8 @@ import GrowRoomMode from "./pages/GrowRoomMode";
 import DailyCheck from "./pages/DailyCheck";
 import Landing from "./pages/Landing";
 import HardwareIntegrations from "./pages/HardwareIntegrations";
+import Pricing from "./pages/Pricing";
+import BillingPlaceholder from "./pages/BillingPlaceholder";
 import Leads from "./pages/Leads";
 import PiIngestStatus from "./pages/PiIngestStatus";
 import NotFound from "./pages/NotFound";
@@ -51,6 +53,8 @@ const App = () => (
               <Route path="/auth" element={<Auth />} />
               <Route path="/welcome" element={<Landing />} />
               <Route path="/hardware-integrations" element={<HardwareIntegrations />} />
+              <Route path="/pricing" element={<Pricing />} />
+              <Route path="/billing/:plan" element={<BillingPlaceholder />} />
 
               <Route element={<AppShell />}>
                 <Route path="/" element={<Dashboard />} />

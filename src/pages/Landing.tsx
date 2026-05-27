@@ -69,6 +69,9 @@ export default function Landing() {
           <Link to="/hardware-integrations">
             <Button size="lg" variant="outline">Hardware integrations</Button>
           </Link>
+          <Link to="/pricing">
+            <Button size="lg" variant="outline">Pricing</Button>
+          </Link>
 
         </div>
       </section>

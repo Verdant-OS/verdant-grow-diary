@@ -22,6 +22,11 @@
 import { isStale, type SensorSnapshot } from "@/lib/sensorSnapshot";
 import type { EnvironmentAlert } from "@/lib/environmentAlerts";
 import { classifyVpdAgainstStage } from "@/lib/vpdStageTargetRules";
+import {
+  classifyTempAgainstStage,
+  classifyRhAgainstStage,
+  type EnvClassificationResult,
+} from "@/lib/environmentStageTargetRules";
 
 export type DefaultMetric = "temp" | "rh" | "vpd";
 
@@ -48,15 +53,18 @@ export const DEFAULT_THRESHOLD_NOTE =
 export const STAGE_VPD_THRESHOLD_NOTE =
   "Compared against stage-aware VPD targets. VPD targets depend on plant stage.";
 
+export const STAGE_ENV_THRESHOLD_NOTE =
+  "Compared against stage-aware temperature and humidity targets. Targets depend on plant stage.";
+
 /** Cautious review-first recommendations. No device execution. No nutrients. */
 export const DEFAULT_RECOMMENDATIONS: Record<DefaultMetric, { high: string; low: string }> = {
   temp: {
-    high: "Review heat load, exhaust, and light intensity before making changes.",
-    low: "Review heater/environment settings and raise temperature gradually.",
+    high: "Review light intensity, airflow, and room intake temperature before making changes.",
+    low: "Review heater settings and night cycle conditions before changing feeding.",
   },
   rh: {
-    high: "Review humidity control and increase airflow/dehumidification gradually.",
-    low: "Review humidification and avoid large humidity swings.",
+    high: "Review airflow and dehumidification; avoid defoliation as a first move.",
+    low: "Review humidification and air exchange; avoid overwatering to raise humidity.",
   },
   vpd: {
     high: "Review RH and temperature balance before changing irrigation or feed.",
@@ -163,6 +171,63 @@ export function buildDefaultThresholdAlerts(args: BuildArgs): EnvironmentAlert[]
       });
       continue;
     }
+
+    // Temperature & RH via stage-aware classifier when stage is provided.
+    if ((metric === "temp" || metric === "rh") && stageProvided) {
+      const cls: EnvClassificationResult =
+        metric === "temp"
+          ? classifyTempAgainstStage(value, { stage: args.stage ?? null, stale: false })
+          : classifyRhAgainstStage(value, { stage: args.stage ?? null, stale: false });
+      // Skip non-actionable classifications:
+      //   in_target / unavailable / stage_unknown / context_only
+      if (
+        cls.classification !== "below_target" &&
+        cls.classification !== "above_target"
+      ) {
+        continue;
+      }
+      const state: "high" | "low" =
+        cls.classification === "above_target" ? "high" : "low";
+      const recommendation = DEFAULT_RECOMMENDATIONS[metric][state];
+      const stageLabel = cls.band.stage.replace("_", " ");
+      const unit = metric === "temp" ? "°C" : "%";
+      const label = metric === "temp" ? "Temperature" : "Humidity";
+      const rangeText =
+        cls.band.min !== null && cls.band.max !== null
+          ? `${fmt(cls.band.min, unit)}–${fmt(cls.band.max, unit)}`
+          : "stage range";
+      const parts: string[] = [];
+      parts.push(
+        state === "high"
+          ? `${label} is above the ${stageLabel} target range.`
+          : `${label} is below the ${stageLabel} target range.`,
+      );
+      parts.push(
+        `Observed ${fmt(value, unit)} (${stageLabel} range ${rangeText}).`,
+      );
+      if (snapshot.ts) parts.push(`Reading at ${snapshot.ts}.`);
+      if (args.deviceLabel) parts.push(`Source: ${args.deviceLabel}.`);
+      parts.push(STAGE_ENV_THRESHOLD_NOTE);
+      parts.push(`Recommendation: ${recommendation}`);
+
+      out.push({
+        // ID kept stable across stages and observed values for dedupe.
+        id: `default_target:${metric}:${state}`,
+        severity: "warning",
+        metric,
+        // Title omits observed value, timestamp, and stage for stable dedupe.
+        title:
+          state === "high"
+            ? `${label} above stage range`
+            : `${label} below stage range`,
+        reason: parts.join(" "),
+        source: "default_thresholds",
+        createdAt,
+      });
+      continue;
+    }
+
+
 
     const range = DEFAULT_THRESHOLDS[metric];
     let state: "high" | "low" | null = null;

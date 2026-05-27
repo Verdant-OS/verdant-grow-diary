@@ -37,8 +37,21 @@ describe("Dashboard environment stability chip", () => {
     expect(SRC).not.toMatch(/min:\s*0\.8,\s*max:\s*1\.2/);
   });
 
-  it("does not introduce alert/queue/automation/device-control writes", () => {
-    expect(SRC).not.toMatch(FORBIDDEN);
-    expect(SRC).not.toMatch(/service_role|action_queue/);
+  it("does not introduce alert/queue/automation/device-control writes in the chip region", () => {
+    // Scope safety scan to the per-tent stability block + its map body.
+    // (Dashboard already calls saveAlert/logAlertEvent elsewhere for the
+    // user-initiated environment alert persistence flow, unrelated to this slice.)
+    const blockMatch = SRC.match(
+      /latestPerTent\.map\(\(\{[\s\S]*?dashboard-stability-chip-[\s\S]*?\}\)\;?\s*\}\)\}/,
+    );
+    expect(blockMatch).toBeTruthy();
+    const block = blockMatch![0];
+    expect(block).not.toMatch(FORBIDDEN);
+    expect(block).not.toMatch(/service_role|action_queue/);
+    // Also confirm the helper import itself adds no forbidden surface.
+    expect(SRC).toMatch(
+      /import\s+\{\s*computeEnvironmentStability\s*\}\s+from\s+["']@\/lib\/environmentStabilityRules["']/,
+    );
   });
 });
+

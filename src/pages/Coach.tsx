@@ -249,6 +249,46 @@ export default function Coach() {
       const d = data as CoachResponse | null;
       if (d?.error) throw new Error(d.error);
       setResult(d ?? null);
+
+      // Persist a read-only snapshot of the completed AI Doctor response.
+      // SECURITY: never include user_id (DB default auth.uid()). Only the
+      // sanitized diagnosis is persisted. Persistence is non-blocking —
+      // failures only emit a soft warning and never affect rendering.
+      if (d && (d.analysis || d.diagnosis)) {
+        const sanitized = d.diagnosis
+          ? validateAndSanitizeDiagnosis(d.diagnosis).diagnosis
+          : null;
+        const rawConf =
+          sanitized && typeof sanitized.confidence === "number"
+            ? sanitized.confidence
+            : null;
+        const harmonized =
+          rawConf !== null
+            ? harmonizeDiagnosisConfidence(
+                rawConf,
+                contextSufficiency.confidenceCeiling,
+              )
+            : null;
+        // Fire-and-forget; we intentionally do not await before clearing busy.
+        void persistAiDoctorSession(supabase, {
+          growId: activeGrowId,
+          tentId: null,
+          plantId: null,
+          question: question.trim() || null,
+          analysis: d.analysis ?? null,
+          diagnosis: sanitized,
+          rawConfidence: rawConf,
+          displayedConfidence: harmonized?.displayedConfidence ?? null,
+          contextConfidenceCeiling: contextSufficiency.confidenceCeiling ?? null,
+          contextSufficiency,
+        }).then((res) => {
+          if (!res.ok) {
+            toast.warning("Couldn't save this AI Doctor session for later review.", {
+              description: res.error,
+            });
+          }
+        });
+      }
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Coach failed");
     } finally { setBusy(false); }

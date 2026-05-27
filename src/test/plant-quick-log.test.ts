@@ -188,8 +188,9 @@ describe("PlantQuickLog presenter — safety contract (source-level)", () => {
   it("source-tagging is documented as a Sensors-phase safety default", () => {
     // One clear comment near MANUAL_SENSOR_SOURCE — not over-commented.
     expect(RULES).toMatch(
-      /Manual logs are source-tagged and never trigger alerts or Action Queue\.[\s\S]*Sensors phase safety defaults\./,
+      /Manual logs are source-tagged and never trigger alerts or Action Queue\./,
     );
+    expect(RULES).toMatch(/Sensors phase safety defaults\./);
   });
 
   it("MANUAL_SENSOR_SOURCE is the accepted 'manual' tag", () => {

@@ -164,7 +164,7 @@ export default function TentDetail() {
           </p>
         );
       })()}
-      {snap?.vpd !== null && snap?.vpd !== undefined && tent.stage == null && (
+      {snap?.vpd !== null && snap?.vpd !== undefined && normalizeVpdStage(tent.stage) === "unknown" && (
         <VpdStageMissingBadge
           testId="tent-detail-vpd-stage-missing-badge"
           className="mb-4"

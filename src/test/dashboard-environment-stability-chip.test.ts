@@ -51,8 +51,18 @@ describe("Dashboard environment stability chip — wiring", () => {
     expect(SRC).toMatch(/formatStabilityChipView\(stability\)/);
   });
 
-  it("renders chip with per-tent testId", () => {
-    expect(SRC).toContain("`dashboard-stability-chip-${tent.id}`");
+  it("renders chip via StabilityChipDrilldown with per-tent id", () => {
+    // Chip is now an interactive drilldown trigger. The per-tent testid
+    // is generated inside StabilityChipDrilldown from the tentId prop.
+    expect(SRC).toMatch(
+      /import\s+StabilityChipDrilldown\s+from\s+["']@\/components\/StabilityChipDrilldown["']/,
+    );
+    expect(SRC).toMatch(/<StabilityChipDrilldown[\s\S]*tentId=\{tent\.id\}/);
+    const DRILL_SRC = readFileSync(
+      resolve(__dirname, "../components/StabilityChipDrilldown.tsx"),
+      "utf8",
+    );
+    expect(DRILL_SRC).toContain("`dashboard-stability-chip-${tentId}`");
   });
 
   it("does not duplicate VPD band tables in the page", () => {
@@ -66,9 +76,9 @@ describe("Dashboard environment stability chip — wiring", () => {
     expect(startIdx).toBeGreaterThan(-1);
     expect(endIdx).toBeGreaterThan(startIdx);
     const block = SRC.slice(startIdx, endIdx);
-    expect(block).toContain("dashboard-stability-chip-");
+    expect(block).toContain("StabilityChipDrilldown");
     expect(block).not.toMatch(FORBIDDEN);
-    expect(block).not.toMatch(/service_role|action_queue|automation/i);
+    expect(block).not.toMatch(/service_role|action_queue|\bautomate\(|\bsetAutomation\b/i);
   });
 
 

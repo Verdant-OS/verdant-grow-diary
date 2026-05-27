@@ -13,11 +13,13 @@ import {
   normalizeWebhookIngestPayload,
   type WebhookIngestPayload,
 } from "../../../src/lib/sensorWebhookIngestRules.ts";
+import { buildIngestAuditRecord } from "../../../src/lib/sensorIngestAuditRules.ts";
 import {
   authenticateBearer,
   tentScopeMatches,
   type AuthResult,
 } from "./auth.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -149,6 +151,25 @@ Deno.serve(async (req) => {
     });
   }
 
+  // Append an ingest audit record. Best-effort: never fail the ingest on
+  // audit-log errors. Service role bypasses RLS; no caller-supplied fields.
+  if (admin) {
+    const auditRow = buildIngestAuditRecord({
+      authKind: auth.kind,
+      userId: auth.userId,
+      tentId: payloadTentId,
+      bridgeTokenId: auth.kind === "bridge" ? auth.tokenId : null,
+      source,
+      capturedAt: capturedAt,
+      rowsReceived: normalized.rows.length,
+      rowsInserted: toInsert.length,
+    });
+    if (auditRow) {
+      await admin.from("sensor_ingest_audit_log").insert(auditRow);
+    }
+  }
+
+
   return json({
     ok: true,
     inserted: toInsert.length,
@@ -158,3 +179,4 @@ Deno.serve(async (req) => {
     auth: auth.kind,
   }, 200);
 });
+

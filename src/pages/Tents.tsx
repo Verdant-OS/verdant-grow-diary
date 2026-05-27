@@ -3,6 +3,7 @@ import { Box, Lightbulb } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
 import MetricChip from "@/components/MetricChip";
+import { Badge } from "@/components/ui/badge";
 import EmptyState from "@/components/EmptyState";
 import CreateTentDialog from "@/components/CreateTentDialog";
 import TentCardActionsMenu from "@/components/TentCardActionsMenu";

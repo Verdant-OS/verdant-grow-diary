@@ -281,9 +281,9 @@ export default function Dashboard() {
                   )}
                   <div
                     data-testid={`dashboard-stability-chip-${tent.id}`}
-                    className={`mt-1.5 inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${stabilityToneClass}`}
+                    className={`mt-1.5 inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${stabilityView.toneClass}`}
                   >
-                    {stabilityCopy}
+                    {stabilityView.copy}
                   </div>
                 </Link>
               );

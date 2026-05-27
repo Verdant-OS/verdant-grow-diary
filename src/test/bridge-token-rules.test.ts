@@ -52,5 +52,27 @@ describe("bridgeTokenRules", () => {
     expect(looksLikeBridgeToken("vbt_short")).toBe(false);
     expect(looksLikeBridgeToken("eyJhbGciOi.JWT.example")).toBe(false);
     expect(looksLikeBridgeToken("")).toBe(false);
+
+  it("formatIngestCount: zero / null / negative / NaN render as '0'", () => {
+    expect(formatIngestCount(0)).toBe("0");
+    expect(formatIngestCount(null)).toBe("0");
+    expect(formatIngestCount(undefined)).toBe("0");
+    expect(formatIngestCount(-5)).toBe("0");
+    expect(formatIngestCount(Number.NaN)).toBe("0");
   });
+  it("formatIngestCount: small counts render as integers", () => {
+    expect(formatIngestCount(1)).toBe("1");
+    expect(formatIngestCount(42)).toBe("42");
+    expect(formatIngestCount(999)).toBe("999");
+  });
+  it("formatIngestCount: thousands render with k suffix", () => {
+    expect(formatIngestCount(1000)).toBe("1.0k");
+    expect(formatIngestCount(1234)).toBe("1.2k");
+    expect(formatIngestCount(12_345)).toBe("12k");
+  });
+  it("formatIngestCount: millions render with M suffix", () => {
+    expect(formatIngestCount(1_500_000)).toBe("1.5M");
+    expect(formatIngestCount(12_000_000)).toBe("12M");
+  });
+});
 });

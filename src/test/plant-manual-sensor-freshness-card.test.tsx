@@ -6,9 +6,8 @@
  *  - Aging metric → existing "Update" CTA preserved.
  *  - All fresh → no CTA (no nag).
  */
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import PlantManualSensorFreshnessCard from "@/components/PlantManualSensorFreshnessCard";
@@ -28,6 +27,11 @@ import { usePlantManualSensorHistory } from "@/hooks/usePlantManualSensorHistory
 
 const mocked = usePlantManualSensorHistory as unknown as ReturnType<typeof vi.fn>;
 
+afterEach(() => {
+  cleanup();
+  mocked.mockReset();
+});
+
 function renderCard(onUpdate = vi.fn()) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const utils = render(
@@ -46,15 +50,13 @@ const hoursAgo = (h: number) =>
   new Date(Date.now() - h * 3_600_000).toISOString();
 
 describe("PlantManualSensorFreshnessCard CTA", () => {
-  afterEachCleanup();
-
-  it("renders 'Add first snapshot' and invokes onUpdate when all metrics missing", async () => {
+  it("renders 'Add first snapshot' and invokes onUpdate when all metrics missing", () => {
     setHistory({ temp_f: null, humidity_percent: null, ph: null, ec: null });
     const { onUpdate } = renderCard();
     const btn = screen.getByTestId("plant-manual-sensor-freshness-update");
-    expect(btn).toHaveTextContent(/add first snapshot/i);
-    expect(btn).toHaveAttribute("data-cta", "add_first");
-    await userEvent.click(btn);
+    expect(btn.textContent ?? "").toMatch(/add first snapshot/i);
+    expect(btn.getAttribute("data-cta")).toBe("add_first");
+    fireEvent.click(btn);
     expect(onUpdate).toHaveBeenCalledTimes(1);
   });
 
@@ -67,8 +69,8 @@ describe("PlantManualSensorFreshnessCard CTA", () => {
     });
     renderCard();
     const btn = screen.getByTestId("plant-manual-sensor-freshness-update");
-    expect(btn).toHaveTextContent(/^update$/i);
-    expect(btn).toHaveAttribute("data-cta", "update");
+    expect((btn.textContent ?? "").trim()).toMatch(/^update$/i);
+    expect(btn.getAttribute("data-cta")).toBe("update");
   });
 
   it("renders no CTA when all present metrics are fresh", () => {
@@ -104,11 +106,3 @@ describe("PlantManualSensorFreshnessCard CTA", () => {
     expect(card.textContent ?? "").not.toMatch(/danger|risk|warning|urgent|critical/i);
   });
 });
-
-// Vitest doesn't auto-cleanup between tests with @testing-library/react when
-// not configured globally; do it explicitly here so DOM-state doesn't bleed.
-function afterEachCleanup() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { afterEach } = require("vitest");
-  afterEach(() => cleanup());
-}

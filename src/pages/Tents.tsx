@@ -94,7 +94,7 @@ export default function Tents() {
                     {last && vpdClassification && <MetricChip label="VPD" value={last.vpd} unit=" kPa" status={vpdMetricChipStatus(vpdClassification)} />}
                   </div>
 
-                  {last?.vpd != null && (t.stage ?? null) == null && (
+                  {last?.vpd != null && normalizeVpdStage(t.stage) === "unknown" && (
                     <VpdStageMissingBadge
                       testId="tents-list-vpd-stage-missing-badge"
                     />

@@ -11,7 +11,7 @@
  *   - The card never references device-control concepts. The sanitizer
  *     strips them before they ever reach this component.
  */
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, ShieldCheck, Sparkles } from "lucide-react";

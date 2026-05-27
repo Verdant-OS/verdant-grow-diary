@@ -148,8 +148,9 @@ describe("persistAiDoctorSession", () => {
       diagnosis: sanitized,
     });
     for (const call of client._calls.from.mock.calls) {
-      expect(call[0]).not.toBe("action_queue");
-      expect(call[0]).not.toBe("alerts");
+      const [tableName] = call as [string];
+      expect(tableName).not.toBe("action_queue");
+      expect(tableName).not.toBe("alerts");
     }
   });
 

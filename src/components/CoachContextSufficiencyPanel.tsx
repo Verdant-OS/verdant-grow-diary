@@ -99,9 +99,9 @@ export default function CoachContextSufficiencyPanel({ result, className }: Prop
   }
 
   const headlineByCeiling: Record<AiContextSufficiencyResult["confidenceCeiling"], string> = {
-    high: "AI confidence is not capped, but some context is missing.",
-    medium: "AI confidence will be capped at medium because context is partial or demo-backed.",
-    low: "AI confidence will be capped at low because real grow context is missing or demo-backed.",
+    high: `AI confidence is not capped (up to ${ceilingPct("high")}%), but some context is missing.`,
+    medium: `AI confidence will be capped at ${ceilingPct("medium")}% because context is partial or demo-backed.`,
+    low: `AI confidence will be capped at ${ceilingPct("low")}% because real grow context is missing or demo-backed.`,
   };
 
   const Icon = confidenceCeiling === "low" ? ShieldAlert : AlertTriangle;
@@ -109,6 +109,8 @@ export default function CoachContextSufficiencyPanel({ result, className }: Prop
     confidenceCeiling === "low"
       ? "text-destructive"
       : "text-[hsl(var(--warning))]";
+
+  const isLimited = confidenceCeiling === "low" || confidenceCeiling === "medium";
 
   return (
     <div
@@ -127,13 +129,10 @@ export default function CoachContextSufficiencyPanel({ result, className }: Prop
           variant={confidenceCeiling === "low" ? "destructive" : "secondary"}
           data-testid="coach-context-confidence-ceiling"
           data-label={confidenceCeiling}
+          data-ceiling-pct={ceilingPct(confidenceCeiling)}
           className="ml-auto text-[10px] uppercase tracking-wide"
         >
-          {confidenceCeiling === "low"
-            ? "Low confidence"
-            : confidenceCeiling === "medium"
-              ? "Capped at medium"
-              : "Capped"}
+          Up to {ceilingPct(confidenceCeiling)}% confidence
         </Badge>
       </div>
 
@@ -141,6 +140,16 @@ export default function CoachContextSufficiencyPanel({ result, className }: Prop
         {headlineByCeiling[confidenceCeiling]} You can still ask, but answers will be
         labeled as limited-context guidance.
       </p>
+
+      {isLimited && (
+        <p
+          data-testid="coach-context-confidence-limited-copy"
+          className="text-xs text-muted-foreground italic"
+        >
+          {CONFIDENCE_LIMITED_COPY}
+        </p>
+      )}
+
 
       {missing.length > 0 && (
         <div data-testid="coach-context-missing">

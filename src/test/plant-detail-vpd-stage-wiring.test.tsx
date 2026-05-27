@@ -37,9 +37,9 @@ function renderPanel(stage: string | null, opts?: { stale?: boolean }) {
     ? new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString()
     : new Date().toISOString();
   const rows = [
-    { ts, metric: "vpd", value: 1.0, source: "manual", device_id: null },
-    { ts, metric: "temp", value: 24, source: "manual", device_id: null },
-    { ts, metric: "rh", value: 55, source: "manual", device_id: null },
+    { ts, metric: "vpd_kpa", value: 1.0, source: "manual", device_id: null },
+    { ts, metric: "temperature_c", value: 24, source: "manual", device_id: null },
+    { ts, metric: "humidity_pct", value: 55, source: "manual", device_id: null },
   ];
   (usePlantTentLatestReadings as unknown as ReturnType<typeof vi.fn>)
     .mockReturnValue({ data: rows, isLoading: false });

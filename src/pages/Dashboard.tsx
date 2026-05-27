@@ -21,7 +21,7 @@ import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import DashboardDataSourceDisclosure from "@/components/DashboardDataSourceDisclosure";
 import { useTasks, useAIInsights } from "@/hooks/useMockData";
 import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
-import { useSensorReadings } from "@/hooks/use-sensor-readings";
+import { useSensorReadings, useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useDashboardScopedData } from "@/hooks/useDashboardScopedData";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";

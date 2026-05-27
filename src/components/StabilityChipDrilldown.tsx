@@ -78,8 +78,11 @@ export default function StabilityChipDrilldown({
           type="button"
           // The chip sits inside a <Link> wrapper; stop propagation so
           // opening the drilldown does not also navigate to the tent.
+          // The chip sits inside a <Link> wrapper; stop propagation so
+          // opening the drilldown does not also navigate to the tent. Do
+          // NOT preventDefault — Radix DialogTrigger composes our onClick
+          // and skips opening if the event is default-prevented.
           onClick={(e) => {
-            e.preventDefault();
             e.stopPropagation();
           }}
           data-testid={`dashboard-stability-chip-${tentId}`}

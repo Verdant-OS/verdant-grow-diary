@@ -230,7 +230,7 @@ Rules for diagnosis (structured view, approval-first):
 
     // Structured diagnosis is sanitized client-side (canonical rules live in
     // src/lib/aiDoctorDiagnosisRules.ts). Pass through raw and let the client
-    // run validateAndSanitizeDiagnosis — never auto-execute anything here.
+    // run validateAndSanitizeDiagnosis — this function never runs actions.
     const diagnosis =
       (parsed.diagnosis && typeof parsed.diagnosis === "object")
         ? parsed.diagnosis

@@ -131,7 +131,9 @@ export default function TentBridgeTokensCard({ tentId }: { tentId: string }) {
 
       {reveal && (
         <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 mb-3" role="alert">
-          <div className="text-xs font-medium mb-1">Your new token (shown once)</div>
+          <div className="text-xs font-medium mb-1">
+            Your new token — shown once, copy now
+          </div>
           <div className="flex items-center gap-2">
             <code className="text-xs break-all flex-1 select-all">{reveal}</code>
             <Button size="sm" variant="outline" onClick={copyReveal}>
@@ -141,6 +143,10 @@ export default function TentBridgeTokensCard({ tentId }: { tentId: string }) {
               Dismiss
             </Button>
           </div>
+          <p className="text-[11px] text-muted-foreground mt-2" data-testid="bridge-token-reveal-helper">
+            Store this somewhere secure right now. We can't show it again. Revoke
+            below if it ever leaks.
+          </p>
         </div>
       )}
 

@@ -7,8 +7,14 @@ const VALID_STAGES: readonly Stage[] = ["seedling", "veg", "flower", "flush", "h
 const VALID_HEALTH = ["healthy", "watch", "issue"] as const;
 type Health = (typeof VALID_HEALTH)[number];
 
-function coerceStage(v: string | null | undefined): Stage {
-  return (VALID_STAGES as readonly string[]).includes(v ?? "") ? (v as Stage) : "seedling";
+/**
+ * Preserve the missing/unknown-stage signal so stage-aware UI (VPD badges,
+ * stability summaries) can render the correct guidance. Returns null when the
+ * source row's stage is missing or unmapped — never silently coerces to
+ * "seedling".
+ */
+function coerceStage(v: string | null | undefined): Stage | null {
+  return (VALID_STAGES as readonly string[]).includes(v ?? "") ? (v as Stage) : null;
 }
 function coerceHealth(v: string | null | undefined): Health {
   return (VALID_HEALTH as readonly string[]).includes(v ?? "") ? (v as Health) : "healthy";

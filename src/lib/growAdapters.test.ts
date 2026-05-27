@@ -70,9 +70,26 @@ describe("mapTentRow", () => {
     expect(t.size).toBe("");
     expect(t.light.schedule).toBe("");
     expect(t.light.wattage).toBe(0);
+    // Invalid stage values must NOT be silently coerced to "seedling" — that
+    // would dead-branch the VPD stage-missing badges. Preserve as null so
+    // normalizeVpdStage() classifies it as "unknown".
+    expect(t.stage).toBeNull();
+  });
+  it("preserves null stage as null (does not coerce to seedling)", () => {
+    const t = mapTentRow({ ...tentRow, stage: null as unknown as string });
+    expect(t.stage).toBeNull();
+  });
+  it("preserves valid seedling stage", () => {
+    const t = mapTentRow({ ...tentRow, stage: "seedling" });
     expect(t.stage).toBe("seedling");
   });
+  it("preserves valid veg and flower stages", () => {
+    expect(mapTentRow({ ...tentRow, stage: "veg" }).stage).toBe("veg");
+    expect(mapTentRow({ ...tentRow, stage: "flower" }).stage).toBe("flower");
+  });
 });
+
+
 
 describe("mapPlantRow", () => {
   it("maps a valid plant row", () => {
@@ -105,6 +122,19 @@ describe("mapPlantRow", () => {
     expect(p.photo).toBe("");
     expect(p.lastNote).toBe("");
     expect(p.health).toBe("healthy");
+  });
+  it("preserves null stage as null (does not coerce to seedling)", () => {
+    const p = mapPlantRow({ ...plantRow, stage: null as unknown as string });
+    expect(p.stage).toBeNull();
+  });
+  it("preserves unmapped/invalid stage as null", () => {
+    const p = mapPlantRow({ ...plantRow, stage: "bogus" });
+    expect(p.stage).toBeNull();
+  });
+  it("preserves valid seedling/veg/flower stages", () => {
+    expect(mapPlantRow({ ...plantRow, stage: "seedling" }).stage).toBe("seedling");
+    expect(mapPlantRow({ ...plantRow, stage: "veg" }).stage).toBe("veg");
+    expect(mapPlantRow({ ...plantRow, stage: "flower" }).stage).toBe("flower");
   });
 });
 

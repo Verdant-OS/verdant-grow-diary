@@ -63,6 +63,7 @@ import {
 } from "@/lib/growRoomQuickActionRules";
 import {
   classifyVpdAgainstStage,
+  normalizeVpdStage,
 } from "@/lib/vpdStageTargetRules";
 
 const QUICK_ACTION_ICON: Record<QuickActionKind, typeof Sprout> = {
@@ -366,7 +367,7 @@ export default function GrowRoomMode() {
                 )}
 
                 {card.snapshot?.vpd != null &&
-                  (tentStageById[card.tentId] ?? null) === null && (
+                  normalizeVpdStage(tentStageById[card.tentId]) === "unknown" && (
                     <VpdStageMissingBadge
                       testId="grow-room-vpd-stage-missing-badge"
                     />

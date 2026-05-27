@@ -20,15 +20,15 @@ describe("Tents list VPD stage-missing info badge", () => {
     );
   });
 
-  it("gates the badge on present VPD and missing tent stage", () => {
+  it("gates the badge on present VPD and unknown-normalized tent stage", () => {
     expect(SRC).toMatch(
-      /last\?\.vpd\s*!=\s*null\s*&&\s*\(t\.stage\s*\?\?\s*null\)\s*==\s*null\s*&&\s*\(\s*<VpdStageMissingBadge[\s\S]*?tents-list-vpd-stage-missing-badge/,
+      /last\?\.vpd\s*!=\s*null\s*&&\s*normalizeVpdStage\(t\.stage\)\s*===\s*"unknown"\s*&&\s*\(\s*<VpdStageMissingBadge[\s\S]*?tents-list-vpd-stage-missing-badge/,
     );
   });
 
   it("badge branch performs no alert/queue/automation writes", () => {
     const m = SRC.match(
-      /\(t\.stage\s*\?\?\s*null\)\s*==\s*null\s*&&\s*\(([\s\S]*?)\)\}/,
+      /normalizeVpdStage\(t\.stage\)\s*===\s*"unknown"\s*&&\s*\(([\s\S]*?)\)\}/,
     );
     expect(m).toBeTruthy();
     expect(m![1]).not.toMatch(

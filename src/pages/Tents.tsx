@@ -19,6 +19,7 @@ import { tentsPath } from "@/lib/routes";
 import { tempFFromC } from "@/lib/temperatureUnits";
 import {
   classifyVpdAgainstStage,
+  normalizeVpdStage,
   vpdMetricChipStatus,
 } from "@/lib/vpdStageTargetRules";
 
@@ -93,7 +94,7 @@ export default function Tents() {
                     {last && vpdClassification && <MetricChip label="VPD" value={last.vpd} unit=" kPa" status={vpdMetricChipStatus(vpdClassification)} />}
                   </div>
 
-                  {last?.vpd != null && (t.stage ?? null) == null && (
+                  {last?.vpd != null && normalizeVpdStage(t.stage) === "unknown" && (
                     <VpdStageMissingBadge
                       testId="tents-list-vpd-stage-missing-badge"
                     />

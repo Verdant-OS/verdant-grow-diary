@@ -39,6 +39,7 @@ import {
 } from "@/lib/archivedPlantVisibilityRules";
 import {
   classifyVpdAgainstStage,
+  normalizeVpdStage,
   vpdMetricChipStatus,
   VPD_STAGE_HELPER_TEXT,
 } from "@/lib/vpdStageTargetRules";
@@ -163,7 +164,7 @@ export default function TentDetail() {
           </p>
         );
       })()}
-      {snap?.vpd !== null && snap?.vpd !== undefined && tent.stage == null && (
+      {snap?.vpd !== null && snap?.vpd !== undefined && normalizeVpdStage(tent.stage) === "unknown" && (
         <VpdStageMissingBadge
           testId="tent-detail-vpd-stage-missing-badge"
           className="mb-4"

@@ -10,7 +10,7 @@ import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
 import { useGrowTents, useGrowSensorReadings } from "@/hooks/useGrowData";
 import { useTents as useTentRows } from "@/hooks/use-tents";
 import { classifyGrowDataSource } from "@/lib/growDataSourceLabelRules";
-import { VPD_STAGE_HELPER_TEXT } from "@/lib/vpdStageTargetRules";
+import { VPD_STAGE_HELPER_TEXT, normalizeVpdStage } from "@/lib/vpdStageTargetRules";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -34,7 +34,7 @@ export default function Sensors() {
   const selectedTent = tents.find((t) => t.id === tentId) ?? null;
   const selectedTentStage =
     (selectedTent as unknown as { stage?: string | null } | null)?.stage ?? null;
-  const vpdStageMissing = latest?.vpd != null && selectedTentStage == null;
+  const vpdStageMissing = latest?.vpd != null && normalizeVpdStage(selectedTentStage) === "unknown";
 
   // AUD-003 fix: classify based on the actual latest reading. If a reading
   // exists but is older than the freshness window, label it "Stale" and

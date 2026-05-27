@@ -33,6 +33,7 @@ import {
 } from "@/lib/environmentTargetComparison";
 import {
   classifyVpdAgainstStage,
+  normalizeVpdStage,
   VPD_STAGE_HELPER_TEXT,
 } from "@/lib/stageAwareVpdTargets";
 import {
@@ -782,7 +783,7 @@ export default function Dashboard() {
               stage: scopedGrow?.stage ?? null,
             });
             const vpdStageMissing =
-              snap?.vpd != null && (scopedGrow?.stage ?? null) === null;
+              snap?.vpd != null && normalizeVpdStage(scopedGrow?.stage) === "unknown";
             return (
               <div>
                 <div className="flex items-center justify-between mb-2">

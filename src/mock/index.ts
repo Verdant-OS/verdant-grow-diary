@@ -7,7 +7,8 @@ export interface Tent {
   name: string;
   brand: string;
   size: string;
-  stage: Stage;
+  /** null when the source row has no stage or an unmapped value. */
+  stage: Stage | null;
   light: { on: boolean; schedule: string; wattage: number };
   alertCount: number;
   growId?: string | null;
@@ -18,7 +19,8 @@ export interface Plant {
   name: string;
   strain: string;
   tentId: string;
-  stage: Stage;
+  /** null when the source row has no stage or an unmapped value. */
+  stage: Stage | null;
   startedAt: string;
   health: "healthy" | "watch" | "issue";
   photo: string;

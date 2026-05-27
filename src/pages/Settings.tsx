@@ -24,9 +24,12 @@ function Tile({ name, state, children }: TileProps) {
       data-tile-state={state}
       aria-label={settingsTileAriaLabel(name, state)}
     >
-      <div className="flex items-center justify-between mb-3 gap-2">
+      {/* Stack badge under title on mobile so it doesn't sit under the
+          fixed bottom-right Quick-log FAB (md:hidden, bottom-20 right-4).
+          Restore inline row from sm: upward where the FAB is hidden. */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 gap-2">
         <h2 className="font-display font-semibold">{name}</h2>
-        <Badge variant={badge.variant} data-testid="settings-tile-badge">
+        <Badge variant={badge.variant} data-testid="settings-tile-badge" className="self-start sm:self-auto shrink-0">
           {badge.label}
         </Badge>
       </div>

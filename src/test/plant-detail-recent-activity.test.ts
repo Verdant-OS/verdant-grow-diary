@@ -177,6 +177,26 @@ describe("buildPlantRecentActivity (pure)", () => {
     // Row fields stay null/false rather than fabricating zeros.
     expect((row as unknown as Record<string, unknown>).temp).toBeUndefined();
   });
+
+  it("flags quick_log entries as manual entries for source-badge rendering", () => {
+    const [row] = buildPlantRecentActivity(
+      [entry({ event_type: "quick_log" })],
+      { plantId: "p1", now: NOW },
+    );
+    expect(row.isManualEntry).toBe(true);
+  });
+
+  it("does not flag non-quick_log entries as manual entries", () => {
+    const rows = buildPlantRecentActivity(
+      [
+        entry({ id: "a", event_type: "observation" }),
+        entry({ id: "b", event_type: "watering" }),
+        entry({ id: "c", event_type: "feeding" }),
+      ],
+      { plantId: "p1", now: NOW },
+    );
+    for (const r of rows) expect(r.isManualEntry).toBe(false);
+  });
 });
 
 // ---------- Static source-level guardrails ----------

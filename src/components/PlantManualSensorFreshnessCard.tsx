@@ -77,7 +77,16 @@ export default function PlantManualSensorFreshnessCard({ plantId, onUpdate }: Pr
       className="rounded-2xl border border-border/60 bg-card/40 p-4 grid gap-3"
     >
       <header className="flex items-center justify-between">
-        <h3 className="text-sm font-medium">Manual sensor memory</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-medium">Manual sensor memory</h3>
+          <span
+            data-testid="plant-manual-sensor-freshness-source-badge"
+            title="Values entered manually via Quick Log"
+            className="inline-flex items-center rounded-full border border-primary/40 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-primary"
+          >
+            Manual
+          </span>
+        </div>
         {showCta ? (
           <Button
             type="button"
@@ -148,8 +157,11 @@ function FreshnessTile({ snapshot }: { snapshot: FreshnessSnapshot }) {
             )}
           </span>
           {loggedAt && (
-            <span className="text-[10px] text-muted-foreground/70">
-              {STATE_LABELS[state]} ·{" "}
+            <span
+              className="text-[10px] text-muted-foreground/70"
+              data-testid={`plant-manual-sensor-freshness-${metric}-last-log`}
+            >
+              {STATE_LABELS[state]} · Last manual log{" "}
               {formatDistanceToNow(new Date(loggedAt), { addSuffix: true })}
             </span>
           )}

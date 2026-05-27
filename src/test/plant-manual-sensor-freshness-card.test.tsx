@@ -105,4 +105,44 @@ describe("PlantManualSensorFreshnessCard CTA", () => {
     const card = screen.getByTestId("plant-manual-sensor-freshness-card");
     expect(card.textContent ?? "").not.toMatch(/danger|risk|warning|urgent|critical/i);
   });
+
+  it("renders a 'Manual' source badge in the header", () => {
+    setHistory({ temp_f: null, humidity_percent: null, ph: null, ec: null });
+    renderCard();
+    const badge = screen.getByTestId("plant-manual-sensor-freshness-source-badge");
+    expect((badge.textContent ?? "").trim()).toMatch(/^manual$/i);
+  });
+
+  it("shows a 'Last manual log' timestamp for logged metrics", () => {
+    setHistory({
+      temp_f: { value: 77, loggedAt: hoursAgo(2) },
+      humidity_percent: null,
+      ph: null,
+      ec: null,
+    });
+    renderCard();
+    const stamp = screen.getByTestId("plant-manual-sensor-freshness-temp_f-last-log");
+    expect(stamp.textContent ?? "").toMatch(/last manual log/i);
+    expect(stamp.textContent ?? "").toMatch(/ago/i);
+  });
+
+  it("does NOT show a 'Last manual log' timestamp for missing metrics", () => {
+    setHistory({
+      temp_f: { value: 77, loggedAt: hoursAgo(2) },
+      humidity_percent: null,
+      ph: null,
+      ec: null,
+    });
+    renderCard();
+    // Logged metric has the stamp...
+    expect(
+      screen.queryByTestId("plant-manual-sensor-freshness-temp_f-last-log"),
+    ).not.toBeNull();
+    // ...but missing metrics do not invent one.
+    for (const m of ["humidity_percent", "ph", "ec"]) {
+      expect(
+        screen.queryByTestId(`plant-manual-sensor-freshness-${m}-last-log`),
+      ).toBeNull();
+    }
+  });
 });

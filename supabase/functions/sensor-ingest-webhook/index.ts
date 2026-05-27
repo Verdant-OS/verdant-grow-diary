@@ -154,17 +154,21 @@ Deno.serve(async (req) => {
   // Append an ingest audit record. Best-effort: never fail the ingest on
   // audit-log errors. Service role bypasses RLS; no caller-supplied fields.
   if (admin) {
-    await admin.from("sensor_ingest_audit_log").insert({
-      user_id: auth.userId,
-      tent_id: payloadTentId,
-      auth_type: auth.kind,
-      bridge_token_id: auth.kind === "bridge" ? auth.tokenId : null,
+    const auditRow = buildIngestAuditRecord({
+      authKind: auth.kind,
+      userId: auth.userId,
+      tentId: payloadTentId,
+      bridgeTokenId: auth.kind === "bridge" ? auth.tokenId : null,
       source,
-      captured_at: capturedAt,
-      rows_received: normalized.rows.length,
-      rows_inserted: toInsert.length,
+      capturedAt: capturedAt,
+      rowsReceived: normalized.rows.length,
+      rowsInserted: toInsert.length,
     });
+    if (auditRow) {
+      await admin.from("sensor_ingest_audit_log").insert(auditRow);
+    }
   }
+
 
   return json({
     ok: true,

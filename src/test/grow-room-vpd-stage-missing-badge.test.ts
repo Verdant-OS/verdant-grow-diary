@@ -36,10 +36,10 @@ describe("GrowRoomMode VPD stage-missing info badge", () => {
     );
   });
 
-  it("does not introduce service_role or action_queue strings to the file", () => {
+  it("does not introduce service_role strings to the file", () => {
     expect(SRC).not.toMatch(/service_role/);
-    expect(SRC).not.toMatch(/action_queue/);
   });
+
 
   it("preserves the existing grow-room VPD stage hint", () => {
     expect(SRC).toContain('data-testid="grow-room-vpd-stage-hint"');

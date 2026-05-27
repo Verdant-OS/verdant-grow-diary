@@ -48,13 +48,34 @@ Deno.serve(async (req) => {
     return json({ error: "server_misconfigured" }, 503);
   }
 
-  const auth = await authenticate(
-    rawToken,
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY,
-    SUPABASE_SERVICE_ROLE_KEY,
-  );
-  if ("error" in auth) return json({ error: auth.error }, auth.status);
+  const admin = SUPABASE_SERVICE_ROLE_KEY
+    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    : null;
+  const anonForJwt = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${rawToken}` } },
+  });
+
+  const authRes = await authenticateBearer(rawToken, {
+    serviceKeyAvailable: !!admin,
+    lookupBridgeToken: async (hash) => {
+      if (!admin) return { data: null, error: { message: "no admin" } };
+      const r = await admin
+        .from("bridge_tokens")
+        .select("id, user_id, tent_id, expires_at, revoked_at")
+        .eq("token_hash", hash)
+        .maybeSingle();
+      return { data: r.data as any, error: r.error ? { message: r.error.message } : null };
+    },
+    verifyJwtClaims: async (token) => {
+      const { data } = await anonForJwt.auth.getClaims(token);
+      return { sub: (data?.claims?.sub as string | undefined) ?? null };
+    },
+  });
+  if (!authRes.ok) {
+    const status = authRes.error === "server_misconfigured" || authRes.error === "auth_lookup_failed" ? 503 : 401;
+    return json({ error: authRes.error }, status);
+  }
+  const auth: AuthResult = authRes.auth;
 
   let body: WebhookIngestPayload;
   try { body = (await req.json()) as WebhookIngestPayload; }
@@ -67,10 +88,7 @@ Deno.serve(async (req) => {
 
   const payloadTentId = normalized.rows[0].tent_id as string;
 
-  // Bridge-token tent scope: payload tent (if present and validated) must match
-  // the token's bound tent_id. Normalization always sets tent_id on rows, so we
-  // can always compare here.
-  if (auth.kind === "bridge" && payloadTentId !== auth.tentScope) {
+  if (!tentScopeMatches(auth, payloadTentId)) {
     return json({ error: "forbidden_tent" }, 403);
   }
 

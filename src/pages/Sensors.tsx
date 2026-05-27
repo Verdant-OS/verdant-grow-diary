@@ -28,6 +28,10 @@ export default function Sensors() {
   const [tentId, setTentId] = useState<string>(tents[0]?.id ?? "t1");
   const filtered = readings.filter((r) => r.tentId === tentId);
   const latest = filtered.length > 0 ? filtered[filtered.length - 1] : null;
+  const selectedTent = tents.find((t) => t.id === tentId) ?? null;
+  const selectedTentStage =
+    (selectedTent as unknown as { stage?: string | null } | null)?.stage ?? null;
+  const vpdStageMissing = latest?.vpd != null && selectedTentStage == null;
 
   // AUD-003 fix: classify based on the actual latest reading. If a reading
   // exists but is older than the freshness window, label it "Stale" and

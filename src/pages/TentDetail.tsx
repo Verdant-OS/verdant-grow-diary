@@ -34,6 +34,11 @@ import {
   getArchivedPlantLabel,
   shouldShowArchivedToggle,
 } from "@/lib/archivedPlantVisibilityRules";
+import {
+  classifyVpdAgainstStage,
+  vpdMetricChipStatus,
+  VPD_STAGE_HELPER_TEXT,
+} from "@/lib/vpdStageTargetRules";
 import { cn } from "@/lib/utils";
 
 export default function TentDetail() {
@@ -117,9 +122,21 @@ export default function TentDetail() {
         {snap?.rh !== null && snap?.rh !== undefined && (
           <MetricChip label="RH" value={snap.rh} unit="%" status={snap.rh > 65 || snap.rh < 35 ? "warn" : "ok"} />
         )}
-        {snap?.vpd !== null && snap?.vpd !== undefined && (
-          <MetricChip label="VPD" value={snap.vpd} unit=" kPa" status={snap.vpd > 1.6 || snap.vpd < 0.6 ? "warn" : "ok"} />
-        )}
+        {snap?.vpd !== null && snap?.vpd !== undefined && (() => {
+          const vpd = classifyVpdAgainstStage({
+            value: snap.vpd,
+            stage: tent.stage,
+            stale: header.stale,
+          });
+          return (
+            <MetricChip
+              label="VPD"
+              value={snap.vpd}
+              unit=" kPa"
+              status={vpdMetricChipStatus(vpd)}
+            />
+          );
+        })()}
         {snap?.co2 !== null && snap?.co2 !== undefined && (
           <MetricChip label="CO₂" value={snap.co2} unit=" ppm" />
         )}
@@ -128,6 +145,21 @@ export default function TentDetail() {
           {tent.light.schedule} · {tent.light.wattage}W
         </span>
       </div>
+      {snap?.vpd !== null && snap?.vpd !== undefined && (() => {
+        const vpd = classifyVpdAgainstStage({
+          value: snap.vpd,
+          stage: tent.stage,
+          stale: header.stale,
+        });
+        return (
+          <p
+            className="text-[11px] text-muted-foreground -mt-3 mb-4"
+            data-testid="tent-detail-vpd-stage-hint"
+          >
+            {vpd.label}. {VPD_STAGE_HELPER_TEXT}
+          </p>
+        );
+      })()}
 
       <div className="glass rounded-2xl p-4 mb-6">
         <div className="flex items-center justify-between gap-2 flex-wrap mb-3">

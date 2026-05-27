@@ -1,3 +1,4 @@
+import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
 import { Link } from "react-router-dom";
 import { Box, Lightbulb } from "lucide-react";
 import PageHeader from "@/components/PageHeader";

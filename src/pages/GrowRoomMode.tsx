@@ -12,6 +12,7 @@
  *
  * UI is mobile-first: large status cards, fast scan, clear warnings.
  */
+import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {

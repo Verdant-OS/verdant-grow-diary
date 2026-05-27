@@ -367,7 +367,7 @@ export default function GrowRoomMode() {
                 )}
 
                 {card.snapshot?.vpd != null &&
-                  (tentStageById[card.tentId] ?? null) === null && (
+                  normalizeVpdStage(tentStageById[card.tentId]) === "unknown" && (
                     <VpdStageMissingBadge
                       testId="grow-room-vpd-stage-missing-badge"
                     />

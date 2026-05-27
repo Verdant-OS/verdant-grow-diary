@@ -1,4 +1,6 @@
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
+import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
+import { formatStabilityChipView } from "@/lib/dashboardStabilityChipCopyRules";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -169,11 +171,14 @@ export default function Dashboard() {
   // Open alert count and recent alerts come from real persisted alerts (RLS).
   const openAlerts = persistedAlertsState.alerts.filter((a) => a.status === "open").length;
 
-  // Latest reading per tent for the strip
+  // Latest reading per tent for the strip + a read-only stability summary
+  // computed from the same tent-scoped readings (no extra fetches, no writes).
   const latestPerTent = tents.map((t) => {
     const rs = readings.filter((r) => r.tentId === t.id);
-    return { tent: t, last: rs[rs.length - 1] };
+    const stability = computeEnvironmentStability(rs, { stage: t.stage });
+    return { tent: t, last: rs[rs.length - 1], stability };
   });
+
 
   const recentAlerts = persistedAlertsState.alerts.slice(0, 3);
 
@@ -256,24 +261,33 @@ export default function Dashboard() {
         <div className="glass rounded-2xl p-4">
           <h2 className="font-display font-semibold mb-3">Environment strip</h2>
           <div className="space-y-2.5">
-            {latestPerTent.map(({ tent, last }) => (
-              <Link key={tent.id} to={`/tents/${tent.id}`} className="block rounded-xl border border-border/40 p-3 hover:bg-secondary/30 transition">
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">{tent.name}</span>
-                    <StageBadge stage={tent.stage as Stage} />
+            {latestPerTent.map(({ tent, last, stability }) => {
+              const stabilityView = formatStabilityChipView(stability);
+              return (
+                <Link key={tent.id} to={`/tents/${tent.id}`} className="block rounded-xl border border-border/40 p-3 hover:bg-secondary/30 transition">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm">{tent.name}</span>
+                      <StageBadge stage={tent.stage as Stage} />
+                    </div>
+                    { /* alertCount removed — not available in Supabase schema */ }
                   </div>
-                  { /* alertCount removed — not available in Supabase schema */ }
-                </div>
-                {last && (
-                  <div className="flex flex-wrap gap-1.5">
-                    <MetricChip label="T" value={last.temp != null ? (tempFFromC(last.temp) ?? 0).toFixed(1) : "—"} unit="°F" status={last.temp != null && (last.temp > 28 || last.temp < 19) ? "warn" : "ok"} />
-                    <MetricChip label="RH" value={last.rh ?? "—"} unit="%" status={last.rh != null && (last.rh > 65 || last.rh < 35) ? "warn" : "ok"} />
-                    <MetricChip label="VPD" value={last.vpd ?? "—"} unit=" kPa" status={last.vpd != null && (last.vpd > 1.6 || last.vpd < 0.6) ? "warn" : "ok"} />
+                  {last && (
+                    <div className="flex flex-wrap gap-1.5">
+                      <MetricChip label="T" value={last.temp != null ? (tempFFromC(last.temp) ?? 0).toFixed(1) : "—"} unit="°F" status={last.temp != null && (last.temp > 28 || last.temp < 19) ? "warn" : "ok"} />
+                      <MetricChip label="RH" value={last.rh ?? "—"} unit="%" status={last.rh != null && (last.rh > 65 || last.rh < 35) ? "warn" : "ok"} />
+                      <MetricChip label="VPD" value={last.vpd ?? "—"} unit=" kPa" status={last.vpd != null && (last.vpd > 1.6 || last.vpd < 0.6) ? "warn" : "ok"} />
+                    </div>
+                  )}
+                  <div
+                    data-testid={`dashboard-stability-chip-${tent.id}`}
+                    className={`mt-1.5 inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${stabilityView.toneClass}`}
+                  >
+                    {stabilityView.copy}
                   </div>
-                )}
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         </div>
       </div>

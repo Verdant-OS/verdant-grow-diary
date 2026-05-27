@@ -175,6 +175,9 @@ export default function TentDetail() {
         <TentCsvImportCard tentId={id} growId={tent.growId ?? null} />
       )}
 
+      {id && <TentSensorWebhookSettingsCard tentId={id} />}
+
+
       <div className="glass rounded-2xl p-4">
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <h2 className="font-display font-semibold">

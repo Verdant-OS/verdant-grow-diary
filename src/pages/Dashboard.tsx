@@ -25,6 +25,10 @@ import {
   STATUS_HEADLINE as TARGET_STATUS_HEADLINE,
 } from "@/lib/environmentTargetComparison";
 import {
+  classifyVpdAgainstStage,
+  VPD_STAGE_HELPER_TEXT,
+} from "@/lib/stageAwareVpdTargets";
+import {
   buildEnvironmentAlerts,
   EMPTY_ALERTS_MESSAGE,
   type EnvironmentAlert,
@@ -106,7 +110,7 @@ function groupReadings(rows: SensorReadingRow[]): DashReading[] {
 export default function Dashboard() {
   // Shared URL `?growId=` resolution against RLS-loaded grows. When growId is
   // absent or invalid, hooks fetch the user's full set (legacy behavior).
-  const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
+  const { urlGrowId, scopedGrow, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
   const scopedGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
   const { data: tents = [] } = useGrowTents(scopedGrowId);
   const { data: plants = [] } = useGrowPlants(undefined, scopedGrowId);
@@ -670,6 +674,56 @@ export default function Dashboard() {
                     ))}
                   </ul>
                 )}
+                {(() => {
+                  const vpdValue = snap?.vpd ?? null;
+                  const stale = snap ? isStale(snap.ts) : false;
+                  const vpd = classifyVpdAgainstStage({
+                    value: vpdValue,
+                    stage: scopedGrow?.stage ?? null,
+                    stale,
+                  });
+                  const toneCls =
+                    vpd.classification === "in_target"
+                      ? "border-emerald-500 text-emerald-600"
+                      : vpd.classification === "below_target" ||
+                          vpd.classification === "above_target"
+                        ? "border-amber-500 text-amber-600"
+                        : "border-muted-foreground text-muted-foreground";
+                  const rangeText =
+                    vpd.band.min === null && vpd.band.max === null
+                      ? "no active VPD target"
+                      : `${vpd.band.min ?? "—"}–${vpd.band.max ?? "—"} kPa`;
+                  return (
+                    <div
+                      className="mt-3 rounded-lg border border-border/40 bg-secondary/10 p-2"
+                      aria-label="Stage-aware VPD"
+                      data-testid="dashboard-stage-aware-vpd"
+                    >
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] uppercase ${toneCls}`}
+                        >
+                          Stage VPD · {vpd.band.stage.replace("_", " ")}
+                        </Badge>
+                        <span className="text-xs">
+                          {vpd.value === null ? "—" : `${vpd.value.toFixed(2)} kPa`}{" "}
+                          <span className="text-muted-foreground">
+                            (target {rangeText})
+                          </span>
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        {vpd.label}. {vpd.band.helper}
+                      </p>
+                      {vpd.classification === "stage_unknown" && (
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          {VPD_STAGE_HELPER_TEXT}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             );
           })()}

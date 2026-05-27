@@ -232,7 +232,7 @@ export function usePersistEnvironmentAlerts(
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, growId, tsKey, sourceKey, qualityKey, targetsKey, isDemoData]);
+  }, [enabled, growId, tsKey, sourceKey, qualityKey, targetsKey, isDemoData, stageKey, stageProvided]);
 
   return state;
 }

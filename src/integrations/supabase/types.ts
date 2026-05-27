@@ -287,7 +287,9 @@ export type Database = {
         Row: {
           created_at: string
           expires_at: string
+          first_used_at: string | null
           id: string
+          ingest_count: number
           last_used_at: string | null
           name: string
           revoked_at: string | null
@@ -299,7 +301,9 @@ export type Database = {
         Insert: {
           created_at?: string
           expires_at: string
+          first_used_at?: string | null
           id?: string
+          ingest_count?: number
           last_used_at?: string | null
           name?: string
           revoked_at?: string | null
@@ -311,7 +315,9 @@ export type Database = {
         Update: {
           created_at?: string
           expires_at?: string
+          first_used_at?: string | null
           id?: string
+          ingest_count?: number
           last_used_at?: string | null
           name?: string
           revoked_at?: string | null
@@ -1323,6 +1329,10 @@ export type Database = {
           _quest_key?: string
         }
         Returns: Json
+      }
+      bump_bridge_token_usage: {
+        Args: { p_id: string; p_inserted: number }
+        Returns: undefined
       }
       compute_level: {
         Args: { total: number }

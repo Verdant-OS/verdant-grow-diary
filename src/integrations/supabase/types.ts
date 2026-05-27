@@ -150,6 +150,57 @@ export type Database = {
           },
         ]
       }
+      ai_doctor_sessions: {
+        Row: {
+          analysis: Json | null
+          context_confidence_ceiling: string | null
+          context_sufficiency: Json | null
+          created_at: string
+          diagnosis: Json | null
+          displayed_confidence: number | null
+          grow_id: string | null
+          id: string
+          plant_id: string | null
+          question: string | null
+          raw_confidence: number | null
+          suggested_actions: Json
+          tent_id: string | null
+          user_id: string
+        }
+        Insert: {
+          analysis?: Json | null
+          context_confidence_ceiling?: string | null
+          context_sufficiency?: Json | null
+          created_at?: string
+          diagnosis?: Json | null
+          displayed_confidence?: number | null
+          grow_id?: string | null
+          id?: string
+          plant_id?: string | null
+          question?: string | null
+          raw_confidence?: number | null
+          suggested_actions?: Json
+          tent_id?: string | null
+          user_id?: string
+        }
+        Update: {
+          analysis?: Json | null
+          context_confidence_ceiling?: string | null
+          context_sufficiency?: Json | null
+          created_at?: string
+          diagnosis?: Json | null
+          displayed_confidence?: number | null
+          grow_id?: string | null
+          id?: string
+          plant_id?: string | null
+          question?: string | null
+          raw_confidence?: number | null
+          suggested_actions?: Json
+          tent_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       alert_events: {
         Row: {
           alert_id: string

@@ -11,6 +11,11 @@ import { useGrowTents, useGrowSensorReadings } from "@/hooks/useGrowData";
 import { useTents as useTentRows } from "@/hooks/use-tents";
 import { classifyGrowDataSource } from "@/lib/growDataSourceLabelRules";
 import { VPD_STAGE_HELPER_TEXT, normalizeVpdStage } from "@/lib/vpdStageTargetRules";
+import {
+  classifyTempAgainstStage,
+  classifyRhAgainstStage,
+  environmentMetricChipStatus,
+} from "@/lib/environmentStageTargetRules";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 

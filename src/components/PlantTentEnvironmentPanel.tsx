@@ -128,7 +128,7 @@ export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, p
                 {vpdClassification.label}. {VPD_STAGE_HELPER_TEXT}
               </p>
             ) : null}
-            {snap?.vpd !== null && snap?.vpd !== undefined && (plantStage ?? null) === null && (
+            {snap?.vpd !== null && snap?.vpd !== undefined && normalizeVpdStage(plantStage) === "unknown" && (
               <VpdStageMissingBadge
                 testId="plant-tent-vpd-stage-missing-badge"
                 className="mt-2"

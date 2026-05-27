@@ -198,6 +198,7 @@ export function buildEnvironmentAlerts(
       now,
       deviceLabel: inputs.deviceLabel ?? null,
       createdAt,
+      ...("stage" in inputs ? { stage: inputs.stage ?? null } : {}),
     });
     alerts.push(...defaults);
   }

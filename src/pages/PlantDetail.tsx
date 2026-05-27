@@ -16,6 +16,7 @@ import PlantAssignedTentAlertsPanel from "@/components/PlantAssignedTentAlertsPa
 import PlantAssignedTentActionsPanel from "@/components/PlantAssignedTentActionsPanel";
 import PlantStatusStrip from "@/components/PlantStatusStrip";
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
+import PlantAiDoctorSessionsPanel from "@/components/PlantAiDoctorSessionsPanel";
 import PlantPhoto from "@/components/PlantPhoto";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -69,7 +70,11 @@ export default function PlantDetail() {
   const ageDays = Math.floor((Date.now() - new Date(plant.startedAt).getTime()) / 86400000);
   return (
     <div>
-      <Button asChild variant="ghost" size="sm" className="mb-3"><Link to="/plants"><ArrowLeft className="h-4 w-4" /> Plants</Link></Button>
+      <Button asChild variant="ghost" size="sm" className="mb-3">
+        <Link to="/plants">
+          <ArrowLeft className="h-4 w-4" /> Plants
+        </Link>
+      </Button>
       <PageHeader
         title={plant.name}
         description={plant.strain}
@@ -124,7 +129,12 @@ export default function PlantDetail() {
       </div>
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="lg:col-span-1 glass rounded-2xl overflow-hidden">
-          <PlantPhoto src={plant.photo} alt={plant.name} className="aspect-square" caption="No plant photo yet" />
+          <PlantPhoto
+            src={plant.photo}
+            alt={plant.name}
+            className="aspect-square"
+            caption="No plant photo yet"
+          />
         </div>
         <div className="lg:col-span-2 glass rounded-2xl p-5 space-y-3">
           <PlantStatusStrip
@@ -140,9 +150,16 @@ export default function PlantDetail() {
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <span>{tent.name}</span>
                   <div className="flex items-center gap-1">
-                    <Button asChild variant="ghost" size="sm" className="h-7 px-2 gap-1" data-testid="plant-detail-view-tent">
+                    <Button
+                      asChild
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 gap-1"
+                      data-testid="plant-detail-view-tent"
+                    >
                       <Link to={`/tents/${tent.id}`}>
-                        <Box className="h-3.5 w-3.5" /> View Tent <ArrowRight className="h-3.5 w-3.5" />
+                        <Box className="h-3.5 w-3.5" /> View Tent{" "}
+                        <ArrowRight className="h-3.5 w-3.5" />
                       </Link>
                     </Button>
                     <AssignTentDialog
@@ -168,14 +185,27 @@ export default function PlantDetail() {
                 </div>
               )}
             </div>
-            <div><div className="text-xs text-muted-foreground uppercase tracking-wider">Age</div><div>{ageDays} days</div></div>
-            <div><div className="text-xs text-muted-foreground uppercase tracking-wider">Started</div><div>{format(new Date(plant.startedAt), "PP")}</div></div>
-            <div><div className="text-xs text-muted-foreground uppercase tracking-wider">Health</div><div className="capitalize">{plant.health}</div></div>
+            <div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">Age</div>
+              <div>{ageDays} days</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">Started</div>
+              <div>{format(new Date(plant.startedAt), "PP")}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">Health</div>
+              <div className="capitalize">{plant.health}</div>
+            </div>
           </div>
           <div>
-            <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Last note</div>
+            <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
+              Last note
+            </div>
             <p className="text-sm">{plant.lastNote}</p>
-            <p className="text-xs text-muted-foreground mt-1">Updated {formatDistanceToNow(new Date(plant.startedAt), { addSuffix: true })}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Updated {formatDistanceToNow(new Date(plant.startedAt), { addSuffix: true })}
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -187,14 +217,18 @@ export default function PlantDetail() {
             >
               <Zap className="h-3.5 w-3.5" /> Quick Log
             </Button>
-            <Button asChild variant="outline" size="sm"><Link to="/logs">Open Logs</Link></Button>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/logs">Open Logs</Link>
+            </Button>
             <Button
               asChild
               size="sm"
               variant="outline"
               data-testid="plant-detail-daily-grow-check-entry"
             >
-              <Link to={`/daily-check?plantId=${plant.id}&from=plant-detail`}>Daily Grow Check</Link>
+              <Link to={`/daily-check?plantId=${plant.id}&from=plant-detail`}>
+                Daily Grow Check
+              </Link>
             </Button>
           </div>
           <PlantQuickLog
@@ -238,7 +272,10 @@ export default function PlantDetail() {
               </h2>
               <p className="text-xs leading-snug text-muted-foreground">
                 <span>Status: today's entry and recent activity.</span>
-                <span aria-hidden="true" className="hidden sm:inline"> · </span>
+                <span aria-hidden="true" className="hidden sm:inline">
+                  {" "}
+                  ·{" "}
+                </span>
                 <span className="block sm:inline">Next: log today's check to keep rhythm.</span>
               </p>
             </div>
@@ -268,19 +305,14 @@ export default function PlantDetail() {
             tentName={tent?.name ?? null}
             growId={plant.growId ?? null}
           />
+          <PlantAiDoctorSessionsPanel plantId={plant.id} />
         </div>
       </div>
     </div>
   );
 }
 
-function ArchivedPlantBanner({
-  plantId,
-  lastNote,
-}: {
-  plantId: string;
-  lastNote: string;
-}) {
+function ArchivedPlantBanner({ plantId, lastNote }: { plantId: string; lastNote: string }) {
   const targetId = getMergeTargetPlantId({ lastNote });
   const isMerged = !!targetId;
   return (
@@ -297,9 +329,7 @@ function ArchivedPlantBanner({
         )}
         <div>
           <div className="font-medium">
-            {isMerged
-              ? "This plant was merged into another plant."
-              : "This plant was archived."}
+            {isMerged ? "This plant was merged into another plant." : "This plant was archived."}
           </div>
           <p className="text-xs text-amber-200/80 mt-0.5">
             History is preserved for audit. No data was deleted.

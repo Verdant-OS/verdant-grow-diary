@@ -170,6 +170,14 @@ export default function TentDetail() {
         />
       )}
 
+      <EnvironmentStabilityCard
+        testId="tent-detail-environment-stability"
+        className="mb-4"
+        result={computeEnvironmentStability(readings, { stage: tent.stage })}
+      />
+
+
+
       <div className="glass rounded-2xl p-4 mb-6">
         <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
           <h2 className="font-display font-semibold">Environment</h2>

@@ -149,6 +149,21 @@ Deno.serve(async (req) => {
     });
   }
 
+  // Append an ingest audit record. Best-effort: never fail the ingest on
+  // audit-log errors. Service role bypasses RLS; no caller-supplied fields.
+  if (admin) {
+    await admin.from("sensor_ingest_audit_log").insert({
+      user_id: auth.userId,
+      tent_id: payloadTentId,
+      auth_type: auth.kind,
+      bridge_token_id: auth.kind === "bridge" ? auth.tokenId : null,
+      source,
+      captured_at: capturedAt,
+      rows_received: normalized.rows.length,
+      rows_inserted: toInsert.length,
+    });
+  }
+
   return json({
     ok: true,
     inserted: toInsert.length,
@@ -158,3 +173,4 @@ Deno.serve(async (req) => {
     auth: auth.kind,
   }, 200);
 });
+

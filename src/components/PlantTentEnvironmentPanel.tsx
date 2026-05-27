@@ -6,8 +6,12 @@ import { Button } from "@/components/ui/button";
 import { usePlantTentLatestReadings } from "@/hooks/usePlantTentLatestReadings";
 import { buildPlantTentEnvironmentView } from "@/lib/plantTentEnvironmentRules";
 import { buildRecentSensorSnapshotHistory } from "@/lib/recentSensorSnapshotHistoryRules";
-import { SOURCE_LABEL, formatValue } from "@/lib/sensorSnapshot";
+import { SOURCE_LABEL, formatValue, snapshotFromReadings } from "@/lib/sensorSnapshot";
 import { tempFFromC } from "@/lib/temperatureUnits";
+import {
+  classifyVpdAgainstStage,
+  VPD_STAGE_HELPER_TEXT,
+} from "@/lib/vpdStageTargetRules";
 import {
   buildPlantQuickLogPrefill,
   PLANT_QUICKLOG_PREFILL_EVENT,
@@ -21,15 +25,23 @@ interface Props {
   plantId?: string | null;
   plantName?: string | null;
   growId?: string | null;
+  /** Plant cultivation stage — drives stage-aware VPD classification. */
+  plantStage?: string | null;
 }
 
-export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, plantName, growId }: Props) {
+export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, plantName, growId, plantStage }: Props) {
   const enabled = !!tentId;
   const { data, isLoading } = usePlantTentLatestReadings(tentId ?? null);
   const rows = enabled ? data ?? [] : [];
   const view = buildPlantTentEnvironmentView(rows);
   const recent = buildRecentSensorSnapshotHistory(rows, { limit: 5 });
   const prefill = buildPlantQuickLogPrefill({ plantId, plantName, growId, tentId, tentName });
+  const snap = enabled ? snapshotFromReadings(rows) : null;
+  const vpdClassification = classifyVpdAgainstStage({
+    value: snap?.vpd ?? null,
+    stage: plantStage ?? null,
+    stale: view.stale,
+  });
 
   function openQuickLog() {
     if (!prefill) return;
@@ -105,6 +117,14 @@ export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, p
                 </div>
               ))}
             </div>
+            {snap?.vpd !== null && snap?.vpd !== undefined ? (
+              <p
+                className="text-[11px] text-muted-foreground"
+                data-testid="plant-tent-environment-vpd-stage-hint"
+              >
+                {vpdClassification.label}. {VPD_STAGE_HELPER_TEXT}
+              </p>
+            ) : null}
           </div>
         )}
         {enabled && !isLoading ? (

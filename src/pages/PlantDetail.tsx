@@ -215,7 +215,9 @@ export default function PlantDetail() {
             plantId={plant.id}
             plantName={plant.name}
             growId={plant.growId ?? null}
+            plantStage={plant.stage ?? null}
           />
+
           <PlantRecentActivityPanel plantId={plant.id} plantName={plant.name} />
           <PlantRelativeTimelineSection
             plantId={plant.id}

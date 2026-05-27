@@ -21,6 +21,11 @@ import {
   type Diagnosis,
   type DiagnosisSuggestedAction,
 } from "@/lib/aiDoctorDiagnosisRules";
+import type { AiContextConfidenceCeiling } from "@/lib/aiContextSufficiencyRules";
+import {
+  harmonizeDiagnosisConfidence,
+  isDisplayedConfidenceLow,
+} from "@/lib/aiDoctorConfidenceRules";
 
 export interface StructuredDiagnosisCardProps {
   diagnosis: Diagnosis;
@@ -35,6 +40,13 @@ export interface StructuredDiagnosisCardProps {
   ) => Promise<void> | void;
   /** Disables every queue button (e.g. no active grow). */
   disableQueueing?: boolean;
+  /**
+   * Optional categorical ceiling from `evaluateAiContextSufficiency`. When
+   * supplied, the displayed confidence is harmonized against it so the
+   * structured card never claims more certainty than the legacy
+   * sufficiency surface allows.
+   */
+  contextCeiling?: AiContextConfidenceCeiling | null;
   testId?: string;
 }
 
@@ -111,6 +123,7 @@ export default function StructuredDiagnosisCard({
   diagnosis,
   onAddToQueue,
   disableQueueing,
+  contextCeiling,
   testId = "ai-doctor-diagnosis",
 }: StructuredDiagnosisCardProps) {
   const [queuedIdx, setQueuedIdx] = useState<Set<number>>(new Set());
@@ -134,6 +147,22 @@ export default function StructuredDiagnosisCard({
       setBusyIdx(null);
     }
   }
+
+  // Harmonize the structured confidence with the legacy context ceiling.
+  const harmonized = harmonizeDiagnosisConfidence(
+    diagnosis.confidence,
+    contextCeiling ?? "high",
+  );
+  // If the cap pushed confidence below the low-confidence threshold and the
+  // model did not already provide missing-information guidance, surface a
+  // cautious default so the grower still sees what's missing.
+  const displayedMissing =
+    diagnosis.missingInformation.length === 0 &&
+    isDisplayedConfidenceLow(harmonized)
+      ? [
+          "Evidence is limited — add a fresh photo, recent diary note, or sensor snapshot before acting.",
+        ]
+      : diagnosis.missingInformation;
 
   return (
     <div
@@ -161,10 +190,21 @@ export default function StructuredDiagnosisCard({
         <span
           className="text-[10px] uppercase tracking-wider"
           data-testid={`${testId}-confidence`}
+          data-capped={String(harmonized.wasCapped)}
+          data-raw-confidence={String(harmonized.rawConfidence)}
         >
-          Confidence: {confidencePct(diagnosis.confidence)}
+          Confidence: {confidencePct(harmonized.displayedConfidence)}
         </span>
       </div>
+
+      {harmonized.limitedCopy && (
+        <p
+          className="text-[11px] text-muted-foreground rounded-lg border border-border/40 bg-secondary/10 p-2"
+          data-testid={`${testId}-confidence-limited-copy`}
+        >
+          {harmonized.limitedCopy}
+        </p>
+      )}
 
       <p
         className="flex items-start gap-1.5 text-[11px] text-muted-foreground rounded-lg border border-border/40 bg-secondary/10 p-2"
@@ -191,7 +231,7 @@ export default function StructuredDiagnosisCard({
       />
       <Section
         title="Missing information"
-        items={diagnosis.missingInformation}
+        items={displayedMissing}
         testId={`${testId}-missing-info`}
       />
       <Section

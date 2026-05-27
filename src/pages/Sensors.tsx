@@ -1,4 +1,6 @@
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
+import EnvironmentStabilityCard from "@/components/EnvironmentStabilityCard";
+import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
 import { useState } from "react";
 import { Activity } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
@@ -74,6 +76,13 @@ export default function Sensors() {
         ))}
         <GrowDataSourceBadge classification={classification} className="ml-2" />
       </div>
+      <EnvironmentStabilityCard
+        testId="sensors-environment-stability"
+        className="mb-4"
+        result={computeEnvironmentStability(filtered, {
+          stage: selectedTentStage,
+        })}
+      />
       <div className="grid lg:grid-cols-2 gap-4">
         {METRICS.map((m) => (
           <div key={m.key} className="glass rounded-2xl p-4">

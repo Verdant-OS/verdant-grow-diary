@@ -1,4 +1,6 @@
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
+import EnvironmentStabilityCard from "@/components/EnvironmentStabilityCard";
+import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
 import { useParams, Link } from "react-router-dom";
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
@@ -167,6 +169,15 @@ export default function TentDetail() {
           className="mb-4"
         />
       )}
+
+      <EnvironmentStabilityCard
+        testId="tent-detail-environment-stability"
+        className="mb-4"
+        result={computeEnvironmentStability(series, { stage: tent.stage })}
+      />
+
+
+
 
       <div className="glass rounded-2xl p-4 mb-6">
         <div className="flex items-center justify-between gap-2 flex-wrap mb-3">

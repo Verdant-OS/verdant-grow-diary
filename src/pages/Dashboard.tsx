@@ -34,6 +34,7 @@ import {
 import {
   classifyVpdAgainstStage,
   normalizeVpdStage,
+  vpdMetricChipStatus,
   VPD_STAGE_HELPER_TEXT,
 } from "@/lib/stageAwareVpdTargets";
 import {

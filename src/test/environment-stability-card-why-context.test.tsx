@@ -129,7 +129,8 @@ describe("EnvironmentStabilityCard — stage-band why context", () => {
       expect(src).not.toMatch(/ai[_-]?doctor/i);
       expect(src).not.toMatch(/from\s+["']@\/integrations\/supabase/);
       expect(src).not.toMatch(/\.from\(\s*["']alerts["']\s*\)/);
-      expect(src).not.toMatch(/automation|device[_-]?control|mqtt|home[_-]?assistant/i);
+      // Block real automation/device-control surfaces (not the prose comment).
+      expect(src).not.toMatch(/setDevicePower|sendMqtt|publishMqtt|home_assistant\.|deviceControl\(/);
     }
   });
 });

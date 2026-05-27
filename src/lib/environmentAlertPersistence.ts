@@ -79,7 +79,7 @@ export function alertRuleKey(args: {
 }): string {
   const metric = (args.metric ?? "").toString().trim().toLowerCase();
   const source = args.source.trim().toLowerCase();
-  const title = args.title.trim().toLowerCase();
+  const title = (args.title ?? "").toString().trim().toLowerCase();
   return `${source}::${metric}::${title}`;
 }
 

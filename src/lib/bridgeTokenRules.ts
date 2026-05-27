@@ -16,9 +16,20 @@ export type BridgeTokenRow = {
   token_prefix: string;
   expires_at: string;
   last_used_at: string | null;
+  first_used_at: string | null;
+  ingest_count: number;
   revoked_at: string | null;
   created_at: string;
 };
+
+/** Compact, grower-friendly count label (e.g. 0, 42, 1.2k, 3.4M). */
+export function formatIngestCount(n: number | null | undefined): string {
+  const v = Number(n ?? 0);
+  if (!Number.isFinite(v) || v <= 0) return "0";
+  if (v < 1000) return String(Math.floor(v));
+  if (v < 1_000_000) return `${(v / 1000).toFixed(v < 10_000 ? 1 : 0)}k`;
+  return `${(v / 1_000_000).toFixed(v < 10_000_000 ? 1 : 0)}M`;
+}
 
 export type BridgeTokenStatus = "active" | "revoked" | "expired";
 

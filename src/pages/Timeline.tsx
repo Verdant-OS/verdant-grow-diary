@@ -390,7 +390,7 @@ export default function Timeline() {
                           const et = getEventType((e.details?.event_type as string | undefined) ?? null);
                           const Icon = et.icon;
                           const plantName = e.details?.plant_name as string | undefined;
-                          const sensor = e.details?.sensor as { temp?: number; rh?: number; vpd?: number; co2?: number; soil?: number } | undefined;
+                          const sensor = e.details?.sensor as { ts?: string; temp?: number; rh?: number; vpd?: number; co2?: number; soil?: number } | undefined;
                           const remindAt = e.details?.remind_at as string | undefined;
                           const HIDDEN = ["event_type","plant_id","plant_name","tent_id","sensor","remind_at"];
                           const extra = Object.entries(e.details || {}).filter(([k]) => !HIDDEN.includes(k));

@@ -46,14 +46,34 @@ describe("sensorWebhookSettingsRules", () => {
       webhookUrl: "https://abc.supabase.co/functions/v1/sensor-ingest-webhook",
       tentId: "tent-uuid-1",
     };
-    it("interpolates the live session token verbatim", () => {
+    it("defaults to a safe placeholder even when a live session token is provided (AUD-004)", () => {
+      const snippet = buildSensorWebhookCurlExample({
+        ...baseOpts,
+        sessionToken: "live.jwt.value.do.not.leak",
+      });
+      expect(snippet).toContain("<YOUR_SESSION_TOKEN>");
+      expect(snippet).not.toContain("live.jwt.value.do.not.leak");
+      expect(snippet).toContain("Bearer <YOUR_SESSION_TOKEN>");
+      expect(snippet).toContain("tent-uuid-1");
+      expect(snippet).toContain("webhook_generic");
+    });
+    it("interpolates the live session token only when revealToken is explicitly true", () => {
       const snippet = buildSensorWebhookCurlExample({
         ...baseOpts,
         sessionToken: "live.jwt.value",
+        revealToken: true,
       });
       expect(snippet).toContain("Bearer live.jwt.value");
-      expect(snippet).toContain("tent-uuid-1");
-      expect(snippet).toContain("webhook_generic");
+      expect(snippet).not.toContain("<YOUR_SESSION_TOKEN>");
+    });
+    it("renders the placeholder when revealToken is true but no token exists", () => {
+      const snippet = buildSensorWebhookCurlExample({
+        ...baseOpts,
+        sessionToken: null,
+        revealToken: true,
+      });
+      expect(snippet).toContain("<YOUR_SESSION_TOKEN>");
+      expect(snippet).not.toContain("Bearer null");
     });
     it("renders a placeholder when no token is available (never leaks/persists)", () => {
       const snippet = buildSensorWebhookCurlExample({

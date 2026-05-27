@@ -422,18 +422,36 @@ export default function Timeline() {
                                   <Bell className="h-3 w-3" />Remind {format(new Date(remindAt), "PPp")}
                                 </div>
                               )}
-                              {sensor && (
-                                <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                                  <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
-                                    <Gauge className="h-3 w-3" />Snapshot
-                                  </span>
-                                  {sensor.temp != null && <SnapChip>{(sensor.temp * 9 / 5 + 32).toFixed(1)}°F</SnapChip>}
-                                  {sensor.rh != null && <SnapChip>{sensor.rh}% RH</SnapChip>}
-                                  {sensor.vpd != null && <SnapChip>VPD {sensor.vpd}</SnapChip>}
-                                  {sensor.co2 != null && <SnapChip>CO₂ {sensor.co2}</SnapChip>}
-                                  {sensor.soil != null && <SnapChip>Soil {sensor.soil}%</SnapChip>}
-                                </div>
-                              )}
+                              {sensor && (() => {
+                                const snapTs = sensor.ts ?? e.entry_at;
+                                const snapAgeMs = snapTs ? Date.now() - new Date(snapTs).getTime() : Number.POSITIVE_INFINITY;
+                                const snapStale = !Number.isFinite(snapAgeMs) || snapAgeMs > TIMELINE_SNAPSHOT_STALE_MS;
+                                const vpdClassification = classifyVpdAgainstStage({
+                                  value: sensor.vpd ?? null,
+                                  stage: e.stage ?? null,
+                                  stale: snapStale,
+                                });
+                                return (
+                                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                    <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
+                                      <Gauge className="h-3 w-3" />Snapshot
+                                    </span>
+                                    {sensor.temp != null && <SnapChip>{(sensor.temp * 9 / 5 + 32).toFixed(1)}°F</SnapChip>}
+                                    {sensor.rh != null && <SnapChip>{sensor.rh}% RH</SnapChip>}
+                                    {sensor.vpd != null && <SnapChip>VPD {sensor.vpd}</SnapChip>}
+                                    {sensor.co2 != null && <SnapChip>CO₂ {sensor.co2}</SnapChip>}
+                                    {sensor.soil != null && <SnapChip>Soil {sensor.soil}%</SnapChip>}
+                                    {sensor.vpd != null && (
+                                      <span
+                                        className="text-[11px] text-muted-foreground"
+                                        data-testid="timeline-vpd-stage-hint"
+                                      >
+                                        {vpdClassification.label}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                               {extra.length > 0 && (
                                 <div className="mt-2 flex flex-wrap gap-1.5">
                                   {extra.map(([k, v]) => (

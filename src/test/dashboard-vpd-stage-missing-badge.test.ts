@@ -17,9 +17,9 @@ describe("Dashboard VPD stage-missing info badge", () => {
     );
   });
 
-  it("computes vpdStageMissing from current VPD value and unknown stage", () => {
+  it("computes vpdStageMissing from current VPD value and unknown-normalized stage", () => {
     expect(SRC).toMatch(
-      /vpdStageMissing\s*=\s*\n?\s*snap\?\.vpd\s*!=\s*null\s*&&\s*\(scopedGrow\?\.stage\s*\?\?\s*null\)\s*===\s*null/,
+      /vpdStageMissing\s*=\s*\n?\s*snap\?\.vpd\s*!=\s*null\s*&&\s*normalizeVpdStage\(scopedGrow\?\.stage\)\s*===\s*"unknown"/,
     );
   });
 

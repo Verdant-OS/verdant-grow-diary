@@ -53,6 +53,7 @@ export default function TentSensorWebhookSettingsCard({ tentId }: { tentId: stri
     );
   }
 
+  // On-screen snippet ALWAYS uses a placeholder — never the live JWT (AUD-004).
   const curlSnippet = buildSensorWebhookCurlExample({
     webhookUrl,
     tentId,
@@ -66,6 +67,30 @@ export default function TentSensorWebhookSettingsCard({ tentId }: { tentId: stri
     } catch {
       toast({ title: "Copy failed", variant: "destructive" });
     }
+  };
+
+  const copyWithLiveToken = async () => {
+    if (!sessionToken) {
+      toast({ title: "Sign in to use your session token", variant: "destructive" });
+      return;
+    }
+    const confirmed =
+      typeof window === "undefined" ||
+      window.confirm(
+        "This copies a cURL command containing your live session token. " +
+          "Session tokens are temporary and tied to this browser — do NOT paste " +
+          "into docs, screenshots, chat, or shared notes. For long-running " +
+          "Raspberry Pi / ESP32 / Node-RED clients, use a bridge token instead.\n\n" +
+          "Continue?",
+      );
+    if (!confirmed) return;
+    const withToken = buildSensorWebhookCurlExample({
+      webhookUrl,
+      tentId,
+      sessionToken,
+      revealToken: true,
+    });
+    await copy(withToken, "cURL with session token");
   };
 
   return (
@@ -116,14 +141,9 @@ export default function TentSensorWebhookSettingsCard({ tentId }: { tentId: stri
       </div>
 
       <div>
-        <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
           <div className="text-xs font-medium text-muted-foreground">
             cURL example
-            {!sessionToken && (
-              <span className="ml-2 text-amber-600">
-                (sign in to insert your session token)
-              </span>
-            )}
           </div>
           <Button
             size="sm"
@@ -131,7 +151,7 @@ export default function TentSensorWebhookSettingsCard({ tentId }: { tentId: stri
             onClick={() => copy(curlSnippet, "cURL example")}
             data-testid="tent-sensor-webhook-copy-curl"
           >
-            <Copy className="h-3 w-3 mr-1" /> Copy
+            <Copy className="h-3 w-3 mr-1" /> Copy example
           </Button>
         </div>
         <pre
@@ -140,9 +160,34 @@ export default function TentSensorWebhookSettingsCard({ tentId }: { tentId: stri
         >
           {curlSnippet}
         </pre>
-        <p className="text-[11px] text-muted-foreground mt-1">
-          Your session token is read live from this browser and is never stored by Verdant.
+        <p className="text-[11px] text-muted-foreground mt-2">
+          This example uses a <code className="text-[11px]">&lt;YOUR_SESSION_TOKEN&gt;</code>{" "}
+          placeholder so it&apos;s safe to screenshot or paste into docs. Session JWTs are
+          temporary and tied to this browser — never paste a live token into docs,
+          screenshots, chat, or shared notes.
         </p>
+        <p className="text-[11px] text-muted-foreground mt-1">
+          For long-running clients (Raspberry Pi, ESP32, Node-RED, Home Assistant),
+          generate a <strong>bridge token</strong> instead — it&apos;s scoped to this tent
+          and revocable.
+        </p>
+        <div className="mt-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-[11px] h-7 px-2"
+            disabled={!sessionToken}
+            onClick={copyWithLiveToken}
+            data-testid="tent-sensor-webhook-copy-curl-with-token"
+            title={
+              sessionToken
+                ? "Copies a one-time cURL with your live session token. Do not share."
+                : "Sign in to enable"
+            }
+          >
+            Copy with my session token (one-time, do not share)
+          </Button>
+        </div>
       </div>
     </div>
   );

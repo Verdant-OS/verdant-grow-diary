@@ -156,6 +156,7 @@ export default function Dashboard() {
       targetsState.status === "ok" ? targetsState.targets : null,
     ),
     enabled: !!scopedGrowId,
+    stage: scopedGrow?.stage ?? null,
   });
 
 

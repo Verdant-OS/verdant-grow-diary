@@ -284,6 +284,11 @@ export default function AiDoctorSessionsIndex() {
   const hasMore = !!data?.hasMore;
   const filtersActive = isFiltersActive(filters);
   const activeLabels = formatActiveFilterLabels(filters);
+  const needsAttentionActive = isNeedsAttentionPresetActive(filters);
+  const needsAttentionVisible = useMemo(
+    () => countNeedsAttentionVisible(rawRows),
+    [rawRows],
+  );
 
   const writeParams = (next: SessionsIndexFilters, nextPage: number) => {
     const params = new URLSearchParams();

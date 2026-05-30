@@ -66,6 +66,14 @@ export interface SessionsIndexFilters {
   sort: SortOption;
 }
 
+export const SORT_OPTIONS: SortOption[] = [
+  "newest",
+  "oldest",
+  "highest-risk",
+  "lowest-confidence",
+  "review-priority",
+];
+
 export const DEFAULT_FILTERS: SessionsIndexFilters = {
   risk: "all",
   hasActions: "all",
@@ -74,6 +82,7 @@ export const DEFAULT_FILTERS: SessionsIndexFilters = {
   caution: "all",
   hasChecklist: "all",
   confidence: "all",
+  sort: "newest",
 };
 
 export const RISK_OPTIONS: RiskFilter[] = ["all", "low", "medium", "high", "critical"];

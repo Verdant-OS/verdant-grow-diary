@@ -92,6 +92,7 @@ function IndexRow({ row }: { row: AiDoctorSessionRow }) {
   const confidence = fmtConfidence(row.displayed_confidence ?? row.raw_confidence);
   const actionCount = Array.isArray(row.suggested_actions) ? row.suggested_actions.length : 0;
   const preview = summaryPreview(d?.summary ?? null);
+  const needsReview = sessionNeedsReview(row);
 
   return (
     <li

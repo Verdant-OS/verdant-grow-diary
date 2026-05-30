@@ -173,6 +173,16 @@ function IndexRow({ row }: { row: AiDoctorSessionRow }) {
                 {caution.description}
               </span>
             ) : null}
+            {caution.checklistSummary ? (
+              <span
+                className="text-[11px] text-muted-foreground"
+                data-testid="ai-doctor-sessions-index-caution-checklist-summary"
+                title={caution.checklistDescription ?? undefined}
+                aria-label={caution.checklistDescription ?? undefined}
+              >
+                {caution.checklistSummary}
+              </span>
+            ) : null}
           </>
         ) : null}
         {limitedContext ? (

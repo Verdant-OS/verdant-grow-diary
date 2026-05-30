@@ -105,16 +105,26 @@ function SessionRow({ row }: { row: AiDoctorSessionRow }) {
           </Badge>
         ) : null}
         {caution.show ? (
-          <Badge
-            variant="outline"
-            className="text-[11px] border-amber-500/50 text-amber-700 dark:text-amber-300 inline-flex items-center gap-1"
-            data-testid="tent-ai-doctor-session-caution-indicator"
-            title={caution.title}
-            aria-label={`${caution.label}. ${caution.title}`}
-          >
-            <ShieldAlert className="h-3 w-3" />
-            {caution.label}
-          </Badge>
+          <>
+            <Badge
+              variant="outline"
+              className="text-[11px] border-amber-500/50 text-amber-700 dark:text-amber-300 inline-flex items-center gap-1"
+              data-testid="tent-ai-doctor-session-caution-indicator"
+              title={caution.description ?? caution.title}
+              aria-label={`${caution.label}. ${caution.description ?? caution.title}`}
+            >
+              <ShieldAlert className="h-3 w-3" />
+              {caution.label}
+            </Badge>
+            {caution.description ? (
+              <span
+                className="text-[11px] text-muted-foreground"
+                data-testid="tent-ai-doctor-session-caution-reason"
+              >
+                {caution.description}
+              </span>
+            ) : null}
+          </>
         ) : null}
         {limitedContext ? (
           <Badge

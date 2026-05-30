@@ -241,9 +241,53 @@ export interface SessionRowCautionIndicator {
   label: string;
   /** Longer reason text for tooltip / aria-label. */
   title: string;
+  /**
+   * Concise grower-friendly explainer (e.g.
+   * "Review because: low confidence, elevated risk, missing info.").
+   * Null when no caution applies.
+   */
+  description: string | null;
 }
 
 export const ROW_CAUTION_LABEL = "Review before acting";
+
+/**
+ * Pure helper: derive short caution reason tokens (e.g. "low confidence",
+ * "elevated risk", "missing info") from a review summary view model.
+ * Order is deterministic.
+ */
+export function buildCautionReasonTokens(vm: ReviewSummaryViewModel): string[] {
+  const tokens: string[] = [];
+  if (vm.confidencePct == null) {
+    tokens.push("unrecorded confidence");
+  } else if (vm.confidencePct <= LOW_CONFIDENCE_PCT_THRESHOLD) {
+    tokens.push("low confidence");
+  }
+  if (vm.isHighRisk) {
+    tokens.push("elevated risk");
+  }
+  if (vm.missingInformation.length > 0) {
+    tokens.push("missing info");
+  }
+  return tokens;
+}
+
+/**
+ * Format caution reason tokens as a concise grower-friendly sentence such as
+ * "Review because: low confidence, elevated risk, missing info." Returns null
+ * when there are no tokens (no caution applies).
+ */
+export function formatSessionRowCautionReasonText(
+  tokens: string[],
+): string | null {
+  const cleaned = Array.isArray(tokens)
+    ? tokens
+        .map((t) => (typeof t === "string" ? t.trim() : ""))
+        .filter((t) => t.length > 0)
+    : [];
+  if (cleaned.length === 0) return null;
+  return `Review because: ${cleaned.join(", ")}.`;
+}
 
 export function buildSessionRowCautionIndicator(
   row: SessionRowLike,
@@ -255,10 +299,13 @@ export function buildSessionRowCautionIndicator(
     suggestedActions: row.suggested_actions ?? null,
   });
   const note = buildCautionNote(vm);
+  const tokens = buildCautionReasonTokens(vm);
+  const description = formatSessionRowCautionReasonText(tokens);
   return {
     show: note.show,
     label: ROW_CAUTION_LABEL,
     title: note.reasons.join(" ") || note.text,
+    description,
   };
 }
 

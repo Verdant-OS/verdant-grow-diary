@@ -91,7 +91,7 @@ import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingC
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { deriveChangeContextFromReadings } from "@/lib/manualSensorSnapshotChangeContextRules";
 
-import { plantDetailPath } from "@/lib/routes";
+import { plantDetailPath, plantsPath, tentsPath } from "@/lib/routes";
 
 function useQueryParam(name: string): string | null {
   const loc = useLocation();
@@ -424,7 +424,7 @@ export default function DailyCheck() {
           description="Daily Grow Check needs at least one tent to attach readings to."
           action={
             <Button asChild>
-              <Link to="/tents" data-testid="daily-grow-check-add-tent">
+              <Link to={tentsPath()} data-testid="daily-grow-check-add-tent">
                 Add Tent <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
@@ -438,7 +438,7 @@ export default function DailyCheck() {
           description="Daily Grow Check is plant-centered. Add a plant to begin."
           action={
             <Button asChild>
-              <Link to="/plants" data-testid="daily-grow-check-add-plant">
+              <Link to={plantsPath()} data-testid="daily-grow-check-add-plant">
                 Add Plant <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>

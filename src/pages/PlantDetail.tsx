@@ -33,7 +33,7 @@ import PlantManualSensorFreshnessCard from "@/components/PlantManualSensorFreshn
 import { useState } from "react";
 import { Zap } from "lucide-react";
 
-import { plantDetailPath, tentDetailPath } from "@/lib/routes";
+import { plantDetailPath, plantsPath, tentDetailPath } from "@/lib/routes";
 
 export default function PlantDetail() {
   const [quickLogOpen, setQuickLogOpen] = useState(false);
@@ -59,7 +59,7 @@ export default function PlantDetail() {
           description="This plant isn't in your tracked plants yet."
           action={
             <Button asChild variant="outline">
-              <Link to="/plants">
+              <Link to={plantsPath()}>
                 <ArrowLeft className="h-4 w-4" /> Back
               </Link>
             </Button>
@@ -73,7 +73,7 @@ export default function PlantDetail() {
   return (
     <div>
       <Button asChild variant="ghost" size="sm" className="mb-3">
-        <Link to="/plants">
+        <Link to={plantsPath()}>
           <ArrowLeft className="h-4 w-4" /> Plants
         </Link>
       </Button>
@@ -340,7 +340,7 @@ function ArchivedPlantBanner({ plantId, lastNote }: { plantId: string; lastNote:
       </div>
       <div className="flex flex-wrap gap-2">
         <Button asChild variant="outline" size="sm" data-testid="plant-detail-archived-back">
-          <Link to="/plants">
+          <Link to={plantsPath()}>
             <ArrowLeft className="h-3.5 w-3.5" /> Back to Plants
           </Link>
         </Button>

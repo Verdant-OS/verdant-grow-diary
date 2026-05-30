@@ -39,7 +39,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTents } from "@/hooks/use-tents";
 import { usePlants } from "@/hooks/use-plants";
 import { useAlertsList } from "@/hooks/useAlertsList";
-import { tentDetailPath } from "@/lib/routes";
+import { tentDetailPath, tentsPath } from "@/lib/routes";
 
 import {
   EMPTY_SNAPSHOT,
@@ -289,7 +289,7 @@ export default function GrowRoomMode() {
           description="Create a tent to see grow-room status here."
           action={
             <Link
-              to="/tents"
+              to={tentsPath()}
               className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
             >
               Go to Tents <ArrowRight className="h-4 w-4" />

@@ -51,7 +51,7 @@ import {
 } from "@/lib/environmentStageTargetRules";
 import { cn } from "@/lib/utils";
 
-import { plantDetailPath } from "@/lib/routes";
+import { plantDetailPath, tentsPath } from "@/lib/routes";
 
 export default function TentDetail() {
   const { id } = useParams();
@@ -84,7 +84,7 @@ export default function TentDetail() {
           description="This tent isn't in your tracked tents yet."
           action={
             <Button asChild variant="outline">
-              <Link to="/tents">
+              <Link to={tentsPath()}>
                 <ArrowLeft className="h-4 w-4" /> Back
               </Link>
             </Button>
@@ -96,7 +96,7 @@ export default function TentDetail() {
 
   return (
     <div>
-      <Button asChild variant="ghost" size="sm" className="mb-3"><Link to="/tents"><ArrowLeft className="h-4 w-4" /> Tents</Link></Button>
+      <Button asChild variant="ghost" size="sm" className="mb-3"><Link to={tentsPath()}><ArrowLeft className="h-4 w-4" /> Tents</Link></Button>
       <PageHeader
         title={tent.name}
         description={`${tent.brand} · ${tent.size}`}

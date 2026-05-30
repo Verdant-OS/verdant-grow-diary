@@ -99,6 +99,8 @@ function IndexRow({ row }: { row: AiDoctorSessionRow }) {
   const actionCount = Array.isArray(row.suggested_actions) ? row.suggested_actions.length : 0;
   const preview = summaryPreview(d?.summary ?? null);
   const needsReview = sessionNeedsReview(row);
+  const caution = buildSessionRowCautionIndicator(row);
+  const limitedContext = isSessionLimitedContext(row);
 
   return (
     <li

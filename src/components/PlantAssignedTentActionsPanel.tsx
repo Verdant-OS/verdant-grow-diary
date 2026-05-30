@@ -149,7 +149,7 @@ export default function PlantAssignedTentActionsPanel({
             className="h-7 px-2 gap-1"
             data-testid="plant-assigned-tent-actions-open-queue"
           >
-            <Link to="/actions">
+            <Link to={actionsPath()}>
               Open Action Queue <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </Button>

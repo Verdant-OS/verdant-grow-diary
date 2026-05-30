@@ -262,6 +262,9 @@ export { parsePageParam };
  */
 export const BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID = "builtin:needs-attention";
 
+/** Tooltip/aria text shown next to any built-in saved view in the UI. */
+export const BUILTIN_SAVED_VIEW_TOOLTIP = "System view · always available";
+
 export const BUILTIN_SAVED_VIEWS: ReadonlyArray<SavedView> = Object.freeze([
   Object.freeze({
     id: BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID,

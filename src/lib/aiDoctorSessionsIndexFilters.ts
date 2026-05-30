@@ -163,6 +163,14 @@ export function parseSort(value: unknown): SortOption {
     : "newest";
 }
 
+export function parseReviewStatus(
+  value: unknown,
+): AiDoctorSessionReviewStatusFilter {
+  return REVIEW_STATUS_OPTIONS.includes(value as AiDoctorSessionReviewStatusFilter)
+    ? (value as AiDoctorSessionReviewStatusFilter)
+    : "any";
+}
+
 export function parseFilters(input: Partial<Record<keyof SessionsIndexFilters, unknown>>): SessionsIndexFilters {
   return {
     risk: parseRisk(input.risk),
@@ -172,6 +180,7 @@ export function parseFilters(input: Partial<Record<keyof SessionsIndexFilters, u
     caution: parseCaution(input.caution),
     hasChecklist: parseHasChecklist(input.hasChecklist),
     confidence: parseConfidence(input.confidence),
+    reviewStatus: parseReviewStatus(input.reviewStatus),
     sort: parseSort(input.sort),
   };
 }

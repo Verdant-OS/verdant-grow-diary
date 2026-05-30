@@ -289,6 +289,44 @@ export function formatSessionRowCautionReasonText(
   return `Review because: ${cleaned.join(", ")}.`;
 }
 
+/**
+ * Deterministic mapping of caution reason tokens to short, grower-friendly
+ * review-checklist items. Pure function. Deduped. Stable order.
+ *
+ * Read-only guidance only. Never suggests nutrient, irrigation, or device
+ * actions based on caution status alone.
+ */
+const CAUTION_CHECKLIST_MAP: Record<string, string> = {
+  "low confidence":
+    "Verify the diagnosis against the plant photos and recent logs.",
+  "unrecorded confidence":
+    "Verify the diagnosis against the plant photos and recent logs.",
+  "elevated risk":
+    "Review the risk level before taking corrective action.",
+  "missing info":
+    "Confirm plant, tent, sensor, watering, and feeding context.",
+};
+
+/**
+ * Stable display order for checklist items, independent of input token order.
+ */
+const CAUTION_CHECKLIST_ORDER: string[] = [
+  "Verify the diagnosis against the plant photos and recent logs.",
+  "Review the risk level before taking corrective action.",
+  "Confirm plant, tent, sensor, watering, and feeding context.",
+];
+
+export function buildCautionReviewChecklist(tokens: string[]): string[] {
+  if (!Array.isArray(tokens) || tokens.length === 0) return [];
+  const seen = new Set<string>();
+  for (const t of tokens) {
+    if (typeof t !== "string") continue;
+    const item = CAUTION_CHECKLIST_MAP[t.trim()];
+    if (item) seen.add(item);
+  }
+  return CAUTION_CHECKLIST_ORDER.filter((item) => seen.has(item));
+}
+
 export function buildSessionRowCautionIndicator(
   row: SessionRowLike,
 ): SessionRowCautionIndicator {

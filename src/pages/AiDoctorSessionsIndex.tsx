@@ -11,7 +11,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Stethoscope, Link2, Check, AlertCircle, Bookmark, Trash2 } from "lucide-react";
+import { Stethoscope, Link2, Check, AlertCircle, Bookmark, Trash2, ShieldAlert, Info } from "lucide-react";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

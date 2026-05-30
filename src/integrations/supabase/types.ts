@@ -150,6 +150,33 @@ export type Database = {
           },
         ]
       }
+      ai_doctor_session_reviews: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          note: string | null
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: string
+          note?: string | null
+          session_id: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          note?: string | null
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_doctor_sessions: {
         Row: {
           analysis: Json | null

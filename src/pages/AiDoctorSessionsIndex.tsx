@@ -236,6 +236,50 @@ export default function AiDoctorSessionsIndex() {
     }
   };
 
+  // --- saved views (localStorage) ---
+  const [savedViews, setSavedViews] = useState<SavedView[]>(() => readSavedViews());
+  const [selectedSavedViewId, setSelectedSavedViewId] = useState<string>("");
+  const [savingView, setSavingView] = useState(false);
+  const [pendingLabel, setPendingLabel] = useState("");
+  const [saveError, setSaveError] = useState<SaveViewError | null>(null);
+
+  useEffect(() => {
+    writeSavedViews(savedViews);
+  }, [savedViews]);
+
+  const applySavedView = (id: string) => {
+    setSelectedSavedViewId(id);
+    if (!id) return;
+    const view = findSavedView(savedViews, id);
+    if (!view) return;
+    const next = savedViewToSearchParams(view, searchParams);
+    setSearchParams(next, { replace: true });
+  };
+
+  const handleSaveView = () => {
+    const result = addSavedView({
+      label: pendingLabel,
+      filters,
+      page,
+      existing: savedViews,
+    });
+    if (!result.ok) {
+      setSaveError(result.error);
+      return;
+    }
+    setSavedViews(result.views);
+    setSavingView(false);
+    setPendingLabel("");
+    setSaveError(null);
+  };
+
+  const handleDeleteSavedView = (id: string) => {
+    setSavedViews((prev) => removeSavedView(prev, id));
+    if (selectedSavedViewId === id) setSelectedSavedViewId("");
+  };
+
+
+
   return (
     <div data-testid="ai-doctor-sessions-index-page" className="space-y-4">
       <Card>

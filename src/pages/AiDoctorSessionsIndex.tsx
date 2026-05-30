@@ -134,6 +134,17 @@ function IndexRow({ row }: { row: AiDoctorSessionRow }) {
         >
           {actionCount} action{actionCount !== 1 ? "s" : ""}
         </Badge>
+        {needsReview ? (
+          <Badge
+            variant="destructive"
+            className="text-[11px]"
+            data-testid="ai-doctor-sessions-index-needs-review-badge"
+            title="High risk or suggested actions present."
+            aria-label="High risk or suggested actions present."
+          >
+            Needs review
+          </Badge>
+        ) : null}
       </div>
 
       {d?.likelyIssue ? (

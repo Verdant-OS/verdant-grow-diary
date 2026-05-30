@@ -21,7 +21,7 @@ import {
   isNeedsAttentionPresetActive,
   NEEDS_ATTENTION_PRESET_LABEL,
 } from "@/lib/aiDoctorSessionsIndexFilters";
-import { MANAGED_KEYS } from "@/lib/aiDoctorSessionsSavedViewsRules";
+import { FILTER_PARAM_KEYS } from "@/lib/aiDoctorSessionsIndexFilters";
 import AiDoctorSessionsIndex from "@/pages/AiDoctorSessionsIndex";
 
 let currentRows: AiDoctorSessionRow[] = [];

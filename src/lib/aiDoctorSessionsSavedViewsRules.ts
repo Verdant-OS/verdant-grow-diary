@@ -263,17 +263,15 @@ export type ImportError =
   | "wrong-shape"
   | "no-valid-views";
 
-export interface ImportSuccess {
-  ok: true;
-  views: SavedView[];
-  added: SavedView[];
-  skipped: Array<{ label: string; reason: "duplicate-label" | "duplicate-params" | "invalid" }>;
+export interface ImportResult {
+  ok: boolean;
+  views?: SavedView[];
+  added?: SavedView[];
+  skipped?: Array<{ label: string; reason: "duplicate-label" | "duplicate-params" | "invalid" }>;
+  error?: ImportError;
 }
-export interface ImportFailure {
-  ok: false;
-  error: ImportError;
-}
-export type ImportResult = ImportSuccess | ImportFailure;
+export type ImportSuccess = ImportResult;
+export type ImportFailure = ImportResult;
 
 interface ImportInput {
   raw: string;

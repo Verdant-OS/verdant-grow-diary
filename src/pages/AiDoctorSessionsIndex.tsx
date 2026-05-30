@@ -41,11 +41,14 @@ import {
 } from "@/lib/aiDoctorSessionsIndexFilters";
 import {
   addSavedView,
+  exportSavedViewsToJson,
   findSavedView,
+  importSavedViewsFromJson,
   readSavedViews,
   removeSavedView,
   savedViewToSearchParams,
   writeSavedViews,
+  type ImportError,
   type SavedView,
   type SaveViewError,
 } from "@/lib/aiDoctorSessionsSavedViewsRules";

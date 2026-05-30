@@ -601,7 +601,7 @@ export default function DailyCheck() {
                     Assign this plant to a tent before running Daily Grow Check.
                     <div className="mt-2">
                       <Button asChild size="sm" variant="outline">
-                        <Link to={plantDetailPath(selectedPlant?.id)}>Assign Tent</Link>
+                        <Link to={plantDetailPath(selectedPlant?.id ?? "")}>Assign Tent</Link>
                       </Button>
                     </div>
                   </div>

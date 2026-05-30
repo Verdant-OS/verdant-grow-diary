@@ -33,16 +33,15 @@ export type SaveViewError =
   | "duplicate-params"
   | "limit-reached";
 
-export interface SaveViewSuccess {
-  ok: true;
-  views: SavedView[];
-  view: SavedView;
+export interface SaveViewResult {
+  ok: boolean;
+  views?: SavedView[];
+  view?: SavedView;
+  error?: SaveViewError;
 }
-export interface SaveViewFailure {
-  ok: false;
-  error: SaveViewError;
-}
-export type SaveViewResult = SaveViewSuccess | SaveViewFailure;
+// Back-compat type aliases (unused at runtime).
+export type SaveViewSuccess = SaveViewResult;
+export type SaveViewFailure = SaveViewResult;
 
 /** Stable signature used for duplicate detection. */
 export function viewSignature(filters: SessionsIndexFilters, page: number): string {

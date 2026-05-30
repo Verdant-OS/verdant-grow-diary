@@ -43,6 +43,7 @@ import {
   addSavedView,
   exportSavedViewsToJson,
   findSavedView,
+  formatSavedViewSummary,
   importSavedViewsFromJson,
   readSavedViews,
   removeSavedView,
@@ -52,6 +53,16 @@ import {
   type SavedView,
   type SaveViewError,
 } from "@/lib/aiDoctorSessionsSavedViewsRules";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 function fmtDate(ts: string | null): string {
   if (!ts) return "";
@@ -276,9 +287,29 @@ export default function AiDoctorSessionsIndex() {
     }
   };
 
-  const handleDeleteSavedView = (id: string) => {
-    setSavedViews((prev) => removeSavedView(prev, id));
-    if (selectedSavedViewId === id) setSelectedSavedViewId("");
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const pendingDeleteView = pendingDeleteId
+    ? findSavedView(savedViews, pendingDeleteId)
+    : null;
+  const requestDeleteSavedView = (id: string) => {
+    setPendingDeleteId(id);
+  };
+  const cancelDeleteSavedView = () => setPendingDeleteId(null);
+  const confirmDeleteSavedView = () => {
+    if (!pendingDeleteId) {
+      setPendingDeleteId(null);
+      return;
+    }
+    // Fail-safe: if the view is missing (e.g. removed in another tab),
+    // just refresh the in-memory list from storage and close the dialog.
+    if (!findSavedView(savedViews, pendingDeleteId)) {
+      setSavedViews(readSavedViews());
+      setPendingDeleteId(null);
+      return;
+    }
+    setSavedViews((prev) => removeSavedView(prev, pendingDeleteId));
+    if (selectedSavedViewId === pendingDeleteId) setSelectedSavedViewId("");
+    setPendingDeleteId(null);
   };
 
   // --- import / export ---
@@ -469,7 +500,7 @@ export default function AiDoctorSessionsIndex() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => handleDeleteSavedView(selectedSavedViewId)}
+                onClick={() => requestDeleteSavedView(selectedSavedViewId)}
                 data-testid="ai-doctor-sessions-saved-views-delete"
                 aria-label="Delete saved view"
               >
@@ -743,6 +774,55 @@ export default function AiDoctorSessionsIndex() {
         </CardContent>
       </Card>
 
+      <AlertDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => {
+          if (!open) cancelDeleteSavedView();
+        }}
+      >
+        <AlertDialogContent data-testid="ai-doctor-sessions-saved-views-delete-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete saved view?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDeleteView ? (
+                <>
+                  <span
+                    className="font-medium text-foreground"
+                    data-testid="ai-doctor-sessions-saved-views-delete-dialog-label"
+                  >
+                    {pendingDeleteView.label}
+                  </span>
+                  <br />
+                  <span data-testid="ai-doctor-sessions-saved-views-delete-dialog-summary">
+                    {formatSavedViewSummary(
+                      pendingDeleteView.filters,
+                      pendingDeleteView.page,
+                    )}
+                  </span>
+                </>
+              ) : (
+                <span data-testid="ai-doctor-sessions-saved-views-delete-dialog-missing">
+                  This saved view is no longer available.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              data-testid="ai-doctor-sessions-saved-views-delete-dialog-cancel"
+              onClick={cancelDeleteSavedView}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="ai-doctor-sessions-saved-views-delete-dialog-confirm"
+              onClick={confirmDeleteSavedView}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

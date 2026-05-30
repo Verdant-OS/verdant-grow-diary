@@ -307,6 +307,9 @@ describe("AiDoctorSessionsIndex — saved views UI", () => {
       target: { value: "v-del" },
     });
     fireEvent.click(await screen.findByTestId("ai-doctor-sessions-saved-views-delete"));
+    fireEvent.click(
+      await screen.findByTestId("ai-doctor-sessions-saved-views-delete-dialog-confirm"),
+    );
     await waitFor(() => {
       const stored = parseSavedViews(window.localStorage.getItem(SAVED_VIEWS_STORAGE_KEY));
       expect(stored).toEqual([]);

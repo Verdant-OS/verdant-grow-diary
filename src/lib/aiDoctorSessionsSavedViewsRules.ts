@@ -6,12 +6,34 @@
  */
 import {
   DEFAULT_FILTERS,
+  formatActiveFilterLabels,
+  isFiltersActive,
   serializeFilters,
   serializePageParam,
   parseFilters,
   parsePageParam,
   type SessionsIndexFilters,
 } from "@/lib/aiDoctorSessionsIndexFilters";
+
+/**
+ * Human-readable one-line summary of a saved view's filters + page.
+ * Used in the delete-confirmation dialog so growers can verify what
+ * they're about to remove. Pure: no side effects.
+ */
+export function formatSavedViewSummary(
+  filters: SessionsIndexFilters,
+  page: number,
+): string {
+  const parts: string[] = [];
+  if (isFiltersActive(filters)) {
+    parts.push(...formatActiveFilterLabels(filters));
+  } else {
+    parts.push("All sessions");
+  }
+  const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 0;
+  if (safePage > 0) parts.push(`Page ${safePage + 1}`);
+  return parts.join(" · ");
+}
 
 export const SAVED_VIEWS_STORAGE_KEY = "verdant:ai-doctor-sessions:saved-views:v1";
 export const SAVED_VIEW_MAX_LABEL_LENGTH = 60;

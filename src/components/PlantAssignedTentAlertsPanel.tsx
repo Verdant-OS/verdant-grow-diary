@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { usePlantAssignedTentAlerts } from "@/hooks/usePlantAssignedTentAlerts";
 import type { PlantAssignedTentAlertRow } from "@/lib/plantAssignedTentAlertRules";
+import { alertsPath } from "@/lib/routes";
 
 interface Props {
   tentId: string | null | undefined;

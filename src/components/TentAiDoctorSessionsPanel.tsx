@@ -4,12 +4,18 @@
  * Reads from `ai_doctor_sessions` via `useTentAiDoctorSessions` (RLS-scoped).
  * No writes. No queue action buttons. History view only.
  */
-import { Stethoscope } from "lucide-react";
+import { Stethoscope, ShieldAlert, Info } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { useTentAiDoctorSessions, type AiDoctorSessionRow } from "@/hooks/use-ai-doctor-sessions";
+import {
+  buildSessionRowCautionIndicator,
+  isSessionLimitedContext,
+  LIMITED_CONTEXT_LABEL,
+  LIMITED_CONTEXT_TITLE,
+} from "@/lib/aiDoctorSessionDetailViewModel";
 
 interface Props {
   tentId: string | null | undefined;

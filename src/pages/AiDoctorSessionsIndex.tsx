@@ -303,6 +303,7 @@ export default function AiDoctorSessionsIndex() {
         caution: searchParams.get(FILTER_PARAM_KEYS.caution) ?? undefined,
         hasChecklist: searchParams.get(FILTER_PARAM_KEYS.hasChecklist) ?? undefined,
         confidence: searchParams.get(FILTER_PARAM_KEYS.confidence) ?? undefined,
+        reviewStatus: searchParams.get(FILTER_PARAM_KEYS.reviewStatus) ?? undefined,
         sort: searchParams.get(FILTER_PARAM_KEYS.sort) ?? undefined,
       }),
     [searchParams],

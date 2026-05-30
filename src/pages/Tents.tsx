@@ -15,7 +15,7 @@ import { useSensorReadings } from "@/hooks/useMockData";
 import { useGrowPlants } from "@/hooks/useGrowData";
 import { useGrowTents, getGrowDataMeta } from "@/hooks/useGrowData";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
-import { tentsPath } from "@/lib/routes";
+import { tentDetailPath, tentsPath } from "@/lib/routes";
 import { tempFFromC } from "@/lib/temperatureUnits";
 import {
   classifyVpdAgainstStage,
@@ -84,7 +84,7 @@ export default function Tents() {
               : null;
             return (
               <div key={t.id} className="relative animate-fade-in">
-                <Link to={`/tents/${t.id}`} className="glass rounded-2xl p-5 hover:border-primary/50 transition group flex flex-col gap-3">
+                <Link to={tentDetailPath(t.id)} className="glass rounded-2xl p-5 hover:border-primary/50 transition group flex flex-col gap-3">
                   <div className="flex items-start justify-between pr-8">
                     <div>
                       <h3 className="font-display text-lg font-semibold group-hover:text-primary transition">{t.name}</h3>

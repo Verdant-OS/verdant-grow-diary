@@ -91,13 +91,13 @@ describe("TentDetail wiring", () => {
 
   it("renders the tent plant grid that links to Plant Detail", () => {
     expect(TENT_DETAIL).toContain('data-testid="tent-detail-plants-grid"');
-    expect(TENT_DETAIL).toMatch(/\/plants\//);
+    expect(TENT_DETAIL).toMatch(/plantDetailPath\(/);
   });
 });
 
 describe("PlantDetail wiring", () => {
   it("still exposes a way to view the parent tent", () => {
-    expect(PLANT_DETAIL).toMatch(/\/tents\//);
+    expect(PLANT_DETAIL).toMatch(/tentDetailPath\(/);
   });
 });
 

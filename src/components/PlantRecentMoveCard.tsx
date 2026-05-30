@@ -11,6 +11,8 @@ import { formatDistanceToNow } from "date-fns";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { findLatestPlantTentMovement } from "@/lib/plantTentMovementDisplayRules";
 
+import { tentDetailPath } from "@/lib/routes";
+
 interface Props {
   plantId: string | null | undefined;
 }
@@ -42,7 +44,7 @@ export default function PlantRecentMoveCard({ plantId }: Props) {
       </div>
       {move.nextTentId ? (
         <Link
-          to={`/tents/${move.nextTentId}`}
+          to={tentDetailPath(move.nextTentId)}
           className="text-xs underline hover:text-foreground inline-flex items-center gap-0.5 shrink-0"
           data-testid="plant-recent-move-tent-link"
         >

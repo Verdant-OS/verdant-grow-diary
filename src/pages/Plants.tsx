@@ -18,7 +18,7 @@ import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useGrows } from "@/store/grows";
 import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
-import { plantsPath } from "@/lib/routes";
+import { plantDetailPath, plantsPath } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import {
   filterVisiblePlants,
@@ -375,7 +375,7 @@ export default function Plants() {
             return (
               <div key={p.id} className="relative animate-fade-in">
                 <Link
-                  to={`/plants/${p.id}`}
+                  to={plantDetailPath(p.id)}
                   data-testid="plant-card"
                   data-archived={isInactive ? "true" : "false"}
                   data-archived-kind={archivedLabel.kind}

@@ -83,7 +83,7 @@ import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingC
 import DashboardDailyGrowCheckPanel from "@/components/DashboardDailyGrowCheckPanel";
 
 import { Badge } from "@/components/ui/badge";
-import { actionDetailPath, actionsPath, alertDetailPath, dashboardPath, logsPath } from "@/lib/routes";
+import { actionDetailPath, actionsPath, alertDetailPath, dashboardPath, logsPath, tentDetailPath } from "@/lib/routes";
 import { formatDistanceToNow } from "date-fns";
 
 
@@ -297,7 +297,7 @@ export default function Dashboard() {
             {latestPerTent.map(({ tent, last, stability }) => {
               const stabilityView = formatStabilityChipView(stability);
               return (
-                <Link key={tent.id} to={`/tents/${tent.id}`} className="block rounded-xl border border-border/40 p-3 hover:bg-secondary/30 transition">
+                <Link key={tent.id} to={tentDetailPath(tent.id)} className="block rounded-xl border border-border/40 p-3 hover:bg-secondary/30 transition">
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-sm">{tent.name}</span>

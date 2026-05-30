@@ -91,6 +91,8 @@ import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingC
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { deriveChangeContextFromReadings } from "@/lib/manualSensorSnapshotChangeContextRules";
 
+import { plantDetailPath } from "@/lib/routes";
+
 function useQueryParam(name: string): string | null {
   const loc = useLocation();
   return useMemo(() => new URLSearchParams(loc.search).get(name), [loc.search, name]);
@@ -599,7 +601,7 @@ export default function DailyCheck() {
                     Assign this plant to a tent before running Daily Grow Check.
                     <div className="mt-2">
                       <Button asChild size="sm" variant="outline">
-                        <Link to={`/plants/${selectedPlant?.id}`}>Assign Tent</Link>
+                        <Link to={plantDetailPath(selectedPlant?.id ?? "")}>Assign Tent</Link>
                       </Button>
                     </div>
                   </div>

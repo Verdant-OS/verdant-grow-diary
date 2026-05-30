@@ -22,6 +22,8 @@ import {
 import ShellyHtSetupCard from "@/components/ShellyHtSetupCard";
 
 
+import { tentDetailPath } from "@/lib/routes";
+
 interface Props {
   tentId: string | null | undefined;
   tentName?: string | null;
@@ -61,7 +63,7 @@ export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, p
         </CardTitle>
         {tentId ? (
           <Button asChild variant="ghost" size="sm" className="h-7 px-2 gap-1" data-testid="plant-tent-environment-view-tent">
-            <Link to={`/tents/${tentId}`}>
+            <Link to={tentDetailPath(tentId)}>
               <Box className="h-3.5 w-3.5" /> View Tent <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </Button>

@@ -85,7 +85,7 @@ describe("PlantDetail wiring · assign / move / view tent", () => {
 
   it("keeps the View Tent link when a tent is assigned", () => {
     expect(PLANT_DETAIL).toContain('data-testid="plant-detail-view-tent"');
-    expect(PLANT_DETAIL).toMatch(/\/tents\//);
+    expect(PLANT_DETAIL).toMatch(/tentDetailPath\(/);
   });
 
   it("still surfaces the 'No tent assigned.' empty state", () => {

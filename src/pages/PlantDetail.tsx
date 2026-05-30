@@ -33,6 +33,8 @@ import PlantManualSensorFreshnessCard from "@/components/PlantManualSensorFreshn
 import { useState } from "react";
 import { Zap } from "lucide-react";
 
+import { plantDetailPath, tentDetailPath } from "@/lib/routes";
+
 export default function PlantDetail() {
   const [quickLogOpen, setQuickLogOpen] = useState(false);
   const { id } = useParams();
@@ -157,7 +159,7 @@ export default function PlantDetail() {
                       className="h-7 px-2 gap-1"
                       data-testid="plant-detail-view-tent"
                     >
-                      <Link to={`/tents/${tent.id}`}>
+                      <Link to={tentDetailPath(tent.id)}>
                         <Box className="h-3.5 w-3.5" /> View Tent{" "}
                         <ArrowRight className="h-3.5 w-3.5" />
                       </Link>
@@ -349,7 +351,7 @@ function ArchivedPlantBanner({ plantId, lastNote }: { plantId: string; lastNote:
             className="gradient-leaf text-primary-foreground"
             data-testid="plant-detail-archived-view-target"
           >
-            <Link to={`/plants/${targetId}`}>
+            <Link to={plantDetailPath(targetId)}>
               View target plant <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </Button>

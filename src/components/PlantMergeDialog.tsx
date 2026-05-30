@@ -46,6 +46,8 @@ import {
   type PlantForMerge,
 } from "@/lib/plantMergeRules";
 import { buildArchivePlantPayload } from "@/lib/plantTentRelationshipRules";
+import { plantDetailPath } from "@/lib/routes";
+
 import {
   getEffectivePlantGrowId,
   validatePlantGrowContextForMerge,
@@ -615,7 +617,7 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
                     "{source.name}" will be archived as a duplicate of{" "}
                     <Link
                       className="underline"
-                      to={`/plants/${target.id}`}
+                      to={plantDetailPath(target.id)}
                     >
                       {target.name}
                     </Link>
@@ -723,7 +725,7 @@ function MergeSuccessView({
             data-testid="plant-merge-success-view-target"
             asChild
           >
-            <Link to={`/plants/${target.id}`}>View Target Plant</Link>
+            <Link to={plantDetailPath(target.id)}>View Target Plant</Link>
           </Button>
         )}
       </div>

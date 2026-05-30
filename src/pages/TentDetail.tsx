@@ -238,6 +238,9 @@ export default function TentDetail() {
       {id && <TentBridgeTokensCard tentId={id} />}
       {id && <TentSensorSourceHealthCard tentId={id} />}
 
+      <TentAiDoctorSessionsPanel tentId={id ?? null} />
+
+
 
 
       <div className="glass rounded-2xl p-4">

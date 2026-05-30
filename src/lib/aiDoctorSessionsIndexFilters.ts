@@ -201,6 +201,13 @@ const CONFIDENCE_LABEL: Record<Exclude<ConfidenceFilter, "all">, string> = {
   unknown: "Confidence: Unknown",
 };
 
+const SORT_LABEL: Record<Exclude<SortOption, "newest">, string> = {
+  oldest: "Sort: Oldest first",
+  "highest-risk": "Sort: Highest risk first",
+  "lowest-confidence": "Sort: Lowest confidence first",
+  "review-priority": "Sort: Review priority",
+};
+
 export function formatActiveFilterLabels(f: SessionsIndexFilters): string[] {
   const labels: string[] = [];
   if (f.risk !== "all") labels.push(RISK_LABEL[f.risk]);
@@ -214,6 +221,7 @@ export function formatActiveFilterLabels(f: SessionsIndexFilters): string[] {
   if (f.hasChecklist === "yes") labels.push("Has review checklist");
   if (f.hasChecklist === "no") labels.push("No review checklist");
   if (f.confidence !== "all") labels.push(CONFIDENCE_LABEL[f.confidence]);
+  if (f.sort !== "newest") labels.push(SORT_LABEL[f.sort]);
   return labels;
 }
 
@@ -229,6 +237,7 @@ export const FILTER_PARAM_KEYS = {
   caution: "caution",
   hasChecklist: "hasChecklist",
   confidence: "confidence",
+  sort: "sort",
   page: "page",
 } as const;
 
@@ -248,6 +257,7 @@ export function serializeFilters(f: SessionsIndexFilters): Record<string, string
     out[FILTER_PARAM_KEYS.hasChecklist] = f.hasChecklist;
   if (f.confidence !== DEFAULT_FILTERS.confidence)
     out[FILTER_PARAM_KEYS.confidence] = f.confidence;
+  if (f.sort !== DEFAULT_FILTERS.sort) out[FILTER_PARAM_KEYS.sort] = f.sort;
   return out;
 }
 

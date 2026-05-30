@@ -267,7 +267,8 @@ describe("useAiDoctorSessionReviews", () => {
     const { wrapper } = wrapperFactory();
     const { result } = renderHook(() => useAiDoctorSessionReviews(), { wrapper });
     await waitFor(() => expect(result.current.isError).toBe(true));
-    expect(String(result.current.error)).toMatch(/rls denied/);
+    const err = result.current.error as { message?: string } | null;
+    expect(err?.message).toMatch(/rls denied/);
     expect(result.current.data).toBeUndefined();
   });
 

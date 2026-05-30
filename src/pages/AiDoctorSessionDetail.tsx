@@ -14,9 +14,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAiDoctorSession } from "@/hooks/use-ai-doctor-sessions";
 import {
+  buildCautionNote,
   buildReviewSummaryViewModel,
   EMPTY_FALLBACKS,
   formatDoctorReviewSummaryText,
+  type CautionNote,
   type ReviewRiskTone,
   type ReviewSummaryViewModel,
 } from "@/lib/aiDoctorSessionDetailViewModel";
@@ -397,6 +399,85 @@ function ReviewList({
   );
 }
 
+function CautionBanner({ note }: { note: CautionNote }) {
+  if (!note.show) return null;
+  return (
+    <div
+      role="note"
+      aria-label="Review before acting"
+      data-testid="ai-doctor-session-detail-caution-note"
+      className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-sm"
+    >
+      <div className="flex items-start gap-2">
+        <AlertCircle className="h-4 w-4 mt-0.5 text-amber-600" />
+        <div className="space-y-1">
+          <p className="font-medium" data-testid="ai-doctor-session-detail-caution-note-text">
+            {note.text}
+          </p>
+          {note.reasons.length > 0 ? (
+            <ul
+              className="list-disc pl-5 text-xs text-muted-foreground space-y-0.5"
+              data-testid="ai-doctor-session-detail-caution-note-reasons"
+            >
+              {note.reasons.map((r, i) => (
+                <li key={i}>{r}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EvidenceSection({ items }: { items: string[] }) {
+  return (
+    <div data-testid="ai-doctor-session-detail-evidence">
+      <h3 className="text-sm font-semibold">Evidence</h3>
+      {items.length === 0 ? (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="ai-doctor-session-detail-evidence-empty"
+        >
+          {EMPTY_FALLBACKS.evidence}
+        </p>
+      ) : (
+        <ul className="list-disc pl-5 text-muted-foreground space-y-0.5">
+          {items.map((e, i) => (
+            <li key={i} data-testid="ai-doctor-session-detail-evidence-item">
+              {e}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function MissingInformationSection({ items }: { items: string[] }) {
+  return (
+    <div data-testid="ai-doctor-session-detail-missing-info">
+      <h3 className="text-sm font-semibold">Missing information</h3>
+      {items.length === 0 ? (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="ai-doctor-session-detail-missing-info-empty"
+        >
+          {EMPTY_FALLBACKS.missingInformation}
+        </p>
+      ) : (
+        <ul className="list-disc pl-5 text-muted-foreground space-y-0.5">
+          {items.map((e, i) => (
+            <li key={i} data-testid="ai-doctor-session-detail-missing-info-item">
+              {e}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function fmtDate(ts: string | null): string {
   if (!ts) return "";
   try {
@@ -533,6 +614,7 @@ function SessionDetailBody({
         </Badge>
       </div>
 
+      <CautionBanner note={buildCautionNote(reviewVm)} />
 
       <ReviewSummarySection vm={reviewVm} />
 
@@ -566,27 +648,10 @@ function SessionDetailBody({
         </div>
       ) : null}
 
-      {d?.evidence && d.evidence.length > 0 ? (
-        <div data-testid="ai-doctor-session-detail-evidence">
-          <h3 className="text-sm font-semibold">Evidence</h3>
-          <ul className="list-disc pl-5 text-muted-foreground space-y-0.5">
-            {d.evidence.map((e, i) => (
-              <li key={i}>{e}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      <EvidenceSection items={reviewVm.evidence} />
 
-      {d?.missingInformation && d.missingInformation.length > 0 ? (
-        <div data-testid="ai-doctor-session-detail-missing-info">
-          <h3 className="text-sm font-semibold">Missing information</h3>
-          <ul className="list-disc pl-5 text-muted-foreground space-y-0.5">
-            {d.missingInformation.map((e, i) => (
-              <li key={i}>{e}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      <MissingInformationSection items={reviewVm.missingInformation} />
+
 
       <div>
         <h3 className="text-sm font-semibold">

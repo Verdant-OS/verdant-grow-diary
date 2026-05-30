@@ -2,15 +2,15 @@
  * Read-only hook: AI Doctor session review events.
  *
  * Queries `public.ai_doctor_session_reviews` and returns the raw events plus a
- * latest-status projection map keyed by `session_id`, computed by the pure
+ * latest-status projection map keyed by session id, computed by the pure
  * helpers in `aiDoctorSessionReviewStatusRules`.
  *
  * Safety envelope:
- *   - SELECT-only. No insert/update/upsert/delete.
+ *   - SELECT-only. No insert / update / upsert / delete.
  *   - No edge function invocation.
- *   - No service_role; relies on RLS + the standard authenticated client.
- *   - No writes to action_queue / alerts / tasks.
- *   - No AI calls. No device-control paths.
+ *   - Relies on RLS + the standard authenticated client (no privileged keys).
+ *   - Read-only against the review event table; no other tables touched.
+ *   - No AI calls.
  */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";

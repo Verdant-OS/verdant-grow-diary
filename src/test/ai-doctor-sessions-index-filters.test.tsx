@@ -24,12 +24,15 @@ import {
 // ---- Pure helper tests ----
 
 describe("aiDoctorSessionsIndexFilters — pure helpers", () => {
-  it("default filter state is all/all/all/all", () => {
+  it("default filter state is all across all fields", () => {
     expect(DEFAULT_FILTERS).toEqual({
       risk: "all",
       hasActions: "all",
       dateRange: "all",
       needsReview: "all",
+      caution: "all",
+      hasChecklist: "all",
+      confidence: "all",
     });
   });
 
@@ -59,16 +62,13 @@ describe("aiDoctorSessionsIndexFilters — pure helpers", () => {
 
   it("parseFilters merges defaults for missing/invalid fields", () => {
     expect(parseFilters({ risk: "high" })).toEqual({
+      ...DEFAULT_FILTERS,
       risk: "high",
-      hasActions: "all",
-      dateRange: "all",
-      needsReview: "all",
     });
     expect(parseFilters({ risk: "bogus", hasActions: "yes", dateRange: "7d" })).toEqual({
-      risk: "all",
+      ...DEFAULT_FILTERS,
       hasActions: "yes",
       dateRange: "7d",
-      needsReview: "all",
     });
   });
 
@@ -90,10 +90,10 @@ describe("aiDoctorSessionsIndexFilters — pure helpers", () => {
 
   it("formatActiveFilterLabels returns visible labels", () => {
     expect(
-      formatActiveFilterLabels({ risk: "high", hasActions: "yes", dateRange: "7d", needsReview: "all" }),
+      formatActiveFilterLabels({ ...DEFAULT_FILTERS, risk: "high", hasActions: "yes", dateRange: "7d" }),
     ).toEqual(["Risk: High", "Has suggested actions", "Last 7 days"]);
     expect(
-      formatActiveFilterLabels({ risk: "all", hasActions: "no", dateRange: "30d", needsReview: "all" }),
+      formatActiveFilterLabels({ ...DEFAULT_FILTERS, hasActions: "no", dateRange: "30d" }),
     ).toEqual(["No suggested actions", "Last 30 days"]);
     expect(formatActiveFilterLabels(DEFAULT_FILTERS)).toEqual([]);
   });

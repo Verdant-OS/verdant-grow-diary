@@ -32,6 +32,7 @@ import {
   LIMITED_CONTEXT_TITLE,
 } from "@/lib/aiDoctorSessionDetailViewModel";
 import {
+  applyClientSideFilters,
   DEFAULT_FILTERS,
   FILTER_PARAM_KEYS,
   formatActiveFilterLabels,
@@ -41,8 +42,11 @@ import {
   serializeFilters,
   serializePageParam,
   sessionNeedsReview,
+  type CautionFilter,
+  type ConfidenceFilter,
   type DateRangeFilter,
   type HasActionsFilter,
+  type HasChecklistFilter,
   type NeedsReviewFilter,
   type RiskFilter,
   type SessionsIndexFilters,
@@ -251,6 +255,9 @@ export default function AiDoctorSessionsIndex() {
         hasActions: searchParams.get(FILTER_PARAM_KEYS.hasActions) ?? undefined,
         dateRange: searchParams.get(FILTER_PARAM_KEYS.dateRange) ?? undefined,
         needsReview: searchParams.get(FILTER_PARAM_KEYS.needsReview) ?? undefined,
+        caution: searchParams.get(FILTER_PARAM_KEYS.caution) ?? undefined,
+        hasChecklist: searchParams.get(FILTER_PARAM_KEYS.hasChecklist) ?? undefined,
+        confidence: searchParams.get(FILTER_PARAM_KEYS.confidence) ?? undefined,
       }),
     [searchParams],
   );
@@ -260,7 +267,15 @@ export default function AiDoctorSessionsIndex() {
   );
 
   const { data, isLoading, error } = useAiDoctorSessionsIndex(page, filters);
-  const rows = data?.rows ?? [];
+  const rawRows = data?.rows ?? [];
+  // Apply derived (client-side) filters: caution / hasChecklist / confidence.
+  // Server-side filters (risk, hasActions, dateRange, needsReview) already
+  // applied in the hook. Note: pagination reflects the raw query; rows hidden
+  // by client-side filters do not regress hasMore for the next page.
+  const rows = useMemo(
+    () => applyClientSideFilters(rawRows, filters),
+    [rawRows, filters],
+  );
   const hasMore = !!data?.hasMore;
   const filtersActive = isFiltersActive(filters);
   const activeLabels = formatActiveFilterLabels(filters);
@@ -268,16 +283,18 @@ export default function AiDoctorSessionsIndex() {
   const writeParams = (next: SessionsIndexFilters, nextPage: number) => {
     const params = new URLSearchParams();
     // Preserve any unrelated params already on the URL.
+    const managed = new Set<string>([
+      FILTER_PARAM_KEYS.risk,
+      FILTER_PARAM_KEYS.hasActions,
+      FILTER_PARAM_KEYS.dateRange,
+      FILTER_PARAM_KEYS.needsReview,
+      FILTER_PARAM_KEYS.caution,
+      FILTER_PARAM_KEYS.hasChecklist,
+      FILTER_PARAM_KEYS.confidence,
+      FILTER_PARAM_KEYS.page,
+    ]);
     searchParams.forEach((value, key) => {
-      if (
-        key !== FILTER_PARAM_KEYS.risk &&
-        key !== FILTER_PARAM_KEYS.hasActions &&
-        key !== FILTER_PARAM_KEYS.dateRange &&
-        key !== FILTER_PARAM_KEYS.needsReview &&
-        key !== FILTER_PARAM_KEYS.page
-      ) {
-        params.set(key, value);
-      }
+      if (!managed.has(key)) params.set(key, value);
     });
     for (const [k, v] of Object.entries(serializeFilters(next))) params.set(k, v);
     const pageStr = serializePageParam(nextPage);
@@ -543,6 +560,53 @@ export default function AiDoctorSessionsIndex() {
                 <option value="all">All</option>
                 <option value="yes">Needs review</option>
                 <option value="no">No review needed</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="text-muted-foreground">Caution</span>
+              <select
+                value={filters.caution}
+                onChange={(e) =>
+                  updateFilter("caution", e.target.value as CautionFilter)
+                }
+                data-testid="ai-doctor-sessions-index-filter-caution"
+                className="rounded border bg-background px-2 py-1 text-sm"
+              >
+                <option value="all">All</option>
+                <option value="yes">Caution only</option>
+                <option value="no">No caution</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="text-muted-foreground">Review checklist</span>
+              <select
+                value={filters.hasChecklist}
+                onChange={(e) =>
+                  updateFilter("hasChecklist", e.target.value as HasChecklistFilter)
+                }
+                data-testid="ai-doctor-sessions-index-filter-has-checklist"
+                className="rounded border bg-background px-2 py-1 text-sm"
+              >
+                <option value="all">All</option>
+                <option value="yes">Has checklist</option>
+                <option value="no">No checklist</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="text-muted-foreground">Confidence</span>
+              <select
+                value={filters.confidence}
+                onChange={(e) =>
+                  updateFilter("confidence", e.target.value as ConfidenceFilter)
+                }
+                data-testid="ai-doctor-sessions-index-filter-confidence"
+                className="rounded border bg-background px-2 py-1 text-sm"
+              >
+                <option value="all">All</option>
+                <option value="low">Low (≤60%)</option>
+                <option value="medium">Medium (61–80%)</option>
+                <option value="high">High ({'>'}80%)</option>
+                <option value="unknown">Unknown</option>
               </select>
             </label>
             {filtersActive ? (

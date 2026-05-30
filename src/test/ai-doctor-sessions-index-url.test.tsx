@@ -128,9 +128,9 @@ describe("serializeFilters", () => {
   it("round-trips through parseFilters for all valid values", () => {
     const cases: SessionsIndexFilters[] = [
       DEFAULT_FILTERS,
-      { risk: "low", hasActions: "all", dateRange: "all", needsReview: "all" },
-      { risk: "critical", hasActions: "yes", dateRange: "30d", needsReview: "yes" },
-      { risk: "medium", hasActions: "no", dateRange: "7d", needsReview: "no" },
+      { ...DEFAULT_FILTERS, risk: "low" },
+      { ...DEFAULT_FILTERS, risk: "critical", hasActions: "yes", dateRange: "30d", needsReview: "yes" },
+      { ...DEFAULT_FILTERS, risk: "medium", hasActions: "no", dateRange: "7d", needsReview: "no" },
     ];
     for (const f of cases) {
       const serialized = serializeFilters(f);
@@ -323,12 +323,15 @@ describe("URL persistence — static safety", () => {
       expect(lower).not.toContain(tok);
     }
   });
-  it("FILTER_PARAM_KEYS exposes risk/hasActions/dateRange/needsReview/page", () => {
+  it("FILTER_PARAM_KEYS exposes all filter + page keys", () => {
     expect(FILTER_PARAM_KEYS).toEqual({
       risk: "risk",
       hasActions: "hasActions",
       dateRange: "dateRange",
       needsReview: "needsReview",
+      caution: "caution",
+      hasChecklist: "hasChecklist",
+      confidence: "confidence",
       page: "page",
     });
   });

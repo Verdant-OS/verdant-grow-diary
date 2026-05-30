@@ -33,10 +33,15 @@ import {
 } from "@/lib/aiDoctorSessionDetailViewModel";
 import {
   applyClientSideFilters,
+  applyNeedsAttentionPreset,
+  clearNeedsAttentionPreset,
+  countNeedsAttentionVisible,
   DEFAULT_FILTERS,
   FILTER_PARAM_KEYS,
   formatActiveFilterLabels,
   isFiltersActive,
+  isNeedsAttentionPresetActive,
+  NEEDS_ATTENTION_PRESET_LABEL,
   parseFilters,
   parsePageParam,
   serializeFilters,

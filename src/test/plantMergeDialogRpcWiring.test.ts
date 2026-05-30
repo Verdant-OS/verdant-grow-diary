@@ -177,7 +177,7 @@ describe("PlantMergeDialog static wiring", () => {
   it("offers View Target Plant and Back to Plants after success", () => {
     expect(DIALOG).toContain("plant-merge-success-view-target");
     expect(DIALOG).toContain("plant-merge-success-back");
-    expect(DIALOG).toMatch(/to=\{`\/plants\/\$\{target\.id\}`\}/);
+    expect(DIALOG).toMatch(/to=\{plantDetailPath\(target\.id\)\}/);
     expect(DIALOG).toMatch(/to="\/plants"/);
   });
 

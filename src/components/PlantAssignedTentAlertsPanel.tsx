@@ -126,7 +126,7 @@ export default function PlantAssignedTentAlertsPanel({ tentId, tentName, growId 
             className="h-7 px-2 gap-1"
             data-testid="plant-assigned-tent-alerts-open-alerts"
           >
-            <Link to="/alerts">
+            <Link to={alertsPath()}>
               Open Alerts <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </Button>

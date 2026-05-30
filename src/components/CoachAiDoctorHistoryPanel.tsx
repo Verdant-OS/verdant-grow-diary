@@ -43,6 +43,9 @@ function HistoryRow({ row }: { row: AiDoctorSessionRow }) {
   const d = row.diagnosis;
   const confidence = fmtConfidence(row.displayed_confidence ?? row.raw_confidence);
   const actionCount = Array.isArray(row.suggested_actions) ? row.suggested_actions.length : 0;
+  const caution = buildSessionRowCautionIndicator(row);
+  const limitedContext = isSessionLimitedContext(row);
+
 
   return (
     <li

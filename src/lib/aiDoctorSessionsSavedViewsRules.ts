@@ -251,6 +251,66 @@ export function savedViewToSearchParams(
 
 export { parsePageParam };
 
+// ---------------- built-in (system) saved views ----------------
+
+/**
+ * Built-in saved views are pure, in-memory definitions surfaced alongside
+ * user-created views. They are NEVER persisted to localStorage, NEVER
+ * included in export payloads, and NEVER deletable.
+ *
+ * Read-only. No DB. No automation.
+ */
+export const BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID = "builtin:needs-attention";
+
+export const BUILTIN_SAVED_VIEWS: ReadonlyArray<SavedView> = Object.freeze([
+  Object.freeze({
+    id: BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID,
+    label: "Needs my attention",
+    filters: Object.freeze({
+      ...DEFAULT_FILTERS,
+      caution: "yes",
+      hasChecklist: "yes",
+    }) as SessionsIndexFilters,
+    page: 0,
+    createdAt: "1970-01-01T00:00:00.000Z",
+  }) as SavedView,
+]);
+
+export function isBuiltInSavedViewId(id: string | null | undefined): boolean {
+  if (typeof id !== "string" || id.length === 0) return false;
+  return BUILTIN_SAVED_VIEWS.some((v) => v.id === id);
+}
+
+export function findBuiltInSavedView(id: string | null | undefined): SavedView | null {
+  if (typeof id !== "string") return null;
+  return BUILTIN_SAVED_VIEWS.find((v) => v.id === id) ?? null;
+}
+
+/**
+ * Merge built-in views in front of user views for display. User views are
+ * preserved in their original order. Pure.
+ */
+export function mergeBuiltInSavedViews(user: SavedView[]): SavedView[] {
+  return [...BUILTIN_SAVED_VIEWS, ...user];
+}
+
+/**
+ * Return the built-in view id whose filters/page match the current state,
+ * or null if none match. Used to keep the saved-views select in sync with
+ * the preset button.
+ */
+export function matchingBuiltInSavedViewId(
+  filters: SessionsIndexFilters,
+  page: number,
+): string | null {
+  const sig = viewSignature(filters, page);
+  for (const v of BUILTIN_SAVED_VIEWS) {
+    if (viewSignature(v.filters, v.page) === sig) return v.id;
+  }
+  return null;
+}
+
+
 // ---------------- export / import ----------------
 
 export const SAVED_VIEWS_EXPORT_VERSION = 1;

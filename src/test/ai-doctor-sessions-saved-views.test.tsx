@@ -216,13 +216,16 @@ describe("aiDoctorSessionsSavedViewsRules — pure helpers", () => {
 
 // ---------------- UI integration ----------------
 describe("AiDoctorSessionsIndex — saved views UI", () => {
-  it("renders empty state in the selector when no views exist", async () => {
+  it("renders built-in saved view in the selector when no user views exist", async () => {
     renderAt("/doctor/sessions");
     const select = (await screen.findByTestId(
       "ai-doctor-sessions-saved-views-select",
     )) as HTMLSelectElement;
-    expect(select.disabled).toBe(true);
-    expect(select.options[0].textContent).toMatch(/No saved views/i);
+    // Selector now always contains the built-in "Needs my attention" view.
+    expect(select.disabled).toBe(false);
+    expect(select.options[0].textContent).toMatch(/Apply a saved view/i);
+    const labels = Array.from(select.options).map((o) => o.textContent ?? "");
+    expect(labels.some((l) => l.includes("Needs my attention"))).toBe(true);
   });
 
   it("saves a view storing the current risk filter", async () => {

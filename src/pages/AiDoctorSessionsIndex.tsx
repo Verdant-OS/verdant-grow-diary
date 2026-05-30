@@ -58,10 +58,15 @@ import {
 } from "@/lib/aiDoctorSessionsIndexFilters";
 import {
   addSavedView,
+  BUILTIN_SAVED_VIEWS,
   exportSavedViewsToJson,
+  findBuiltInSavedView,
   findSavedView,
   formatSavedViewSummary,
   importSavedViewsFromJson,
+  isBuiltInSavedViewId,
+  matchingBuiltInSavedViewId,
+  mergeBuiltInSavedViews,
   readSavedViews,
   removeSavedView,
   savedViewToSearchParams,
@@ -365,10 +370,28 @@ export default function AiDoctorSessionsIndex() {
     writeSavedViews(savedViews);
   }, [savedViews]);
 
+  // Display list merges built-in (system) views in front of user views.
+  // Built-in views are never persisted — see write effect below.
+  const displaySavedViews = useMemo(
+    () => mergeBuiltInSavedViews(savedViews),
+    [savedViews],
+  );
+
+  // Auto-select the matching built-in view when current filters/page match it,
+  // so the saved-views select stays in sync with the preset button.
+  const autoSelectedBuiltInId = useMemo(
+    () => matchingBuiltInSavedViewId(filters, page),
+    [filters, page],
+  );
+  const effectiveSelectedSavedViewId =
+    selectedSavedViewId || autoSelectedBuiltInId || "";
+
   const applySavedView = (id: string) => {
     setSelectedSavedViewId(id);
     if (!id) return;
-    const view = findSavedView(savedViews, id);
+    const view = isBuiltInSavedViewId(id)
+      ? findBuiltInSavedView(id)
+      : findSavedView(savedViews, id);
     if (!view) return;
     const next = savedViewToSearchParams(view, searchParams);
     setSearchParams(next, { replace: true });
@@ -379,10 +402,13 @@ export default function AiDoctorSessionsIndex() {
       label: pendingLabel,
       filters,
       page,
-      existing: savedViews,
+      // Include built-in views in dedup so users can't create a duplicate of
+      // a system view by label or by filter signature. Built-ins are not
+      // persisted because we only setSavedViews with the user-view subset.
+      existing: [...BUILTIN_SAVED_VIEWS, ...savedViews],
     });
-    if (result.ok && result.views) {
-      setSavedViews(result.views);
+    if (result.ok && result.view) {
+      setSavedViews([...savedViews, result.view]);
       setSavingView(false);
       setPendingLabel("");
       setSaveError(null);
@@ -664,27 +690,38 @@ export default function AiDoctorSessionsIndex() {
             <label className="flex flex-col gap-1 text-xs">
               <span className="text-muted-foreground">Saved views</span>
               <select
-                value={selectedSavedViewId}
+                value={effectiveSelectedSavedViewId}
                 onChange={(e) => applySavedView(e.target.value)}
                 data-testid="ai-doctor-sessions-saved-views-select"
                 className="rounded border bg-background px-2 py-1 text-sm"
-                disabled={savedViews.length === 0}
+                disabled={displaySavedViews.length === 0}
               >
                 <option value="">
-                  {savedViews.length === 0 ? "No saved views" : "Apply a saved view…"}
+                  {displaySavedViews.length === 0
+                    ? "No saved views"
+                    : "Apply a saved view…"}
                 </option>
-                {savedViews.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.label}
+                {displaySavedViews.map((v) => (
+                  <option
+                    key={v.id}
+                    value={v.id}
+                    data-testid={
+                      isBuiltInSavedViewId(v.id)
+                        ? "ai-doctor-sessions-saved-views-builtin-option"
+                        : undefined
+                    }
+                  >
+                    {isBuiltInSavedViewId(v.id) ? `★ ${v.label}` : v.label}
                   </option>
                 ))}
               </select>
             </label>
-            {selectedSavedViewId ? (
+            {effectiveSelectedSavedViewId &&
+            !isBuiltInSavedViewId(effectiveSelectedSavedViewId) ? (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => requestDeleteSavedView(selectedSavedViewId)}
+                onClick={() => requestDeleteSavedView(effectiveSelectedSavedViewId)}
                 data-testid="ai-doctor-sessions-saved-views-delete"
                 aria-label="Delete saved view"
               >

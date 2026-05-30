@@ -128,7 +128,7 @@ export default function PlantRecentActivityPanel({ plantId, plantName }: Props) 
           className="h-7 px-2 gap-1"
           data-testid="plant-recent-activity-open-timeline"
         >
-          <Link to="/timeline">
+          <Link to={timelinePath()}>
             Open Timeline <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </Button>

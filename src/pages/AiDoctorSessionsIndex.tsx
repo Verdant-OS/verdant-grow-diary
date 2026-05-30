@@ -402,10 +402,13 @@ export default function AiDoctorSessionsIndex() {
       label: pendingLabel,
       filters,
       page,
-      existing: savedViews,
+      // Include built-in views in dedup so users can't create a duplicate of
+      // a system view by label or by filter signature. Built-ins are not
+      // persisted because we only setSavedViews with the user-view subset.
+      existing: [...BUILTIN_SAVED_VIEWS, ...savedViews],
     });
-    if (result.ok && result.views) {
-      setSavedViews(result.views);
+    if (result.ok && result.view) {
+      setSavedViews([...savedViews, result.view]);
       setSavingView(false);
       setPendingLabel("");
       setSaveError(null);

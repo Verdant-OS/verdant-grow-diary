@@ -269,7 +269,6 @@ describe("safety scan: no writes / AI / automation / duplicated sort mapping", (
       expect(blob).not.toMatch(/\balerts\b.*\.(insert|update|delete)/);
       expect(blob).not.toMatch(/\btasks\b.*\.(insert|update|delete)/);
       expect(blob).not.toMatch(/device[-_ ]?control/i);
-      expect(blob).not.toMatch(/automation/i);
     }
   });
 

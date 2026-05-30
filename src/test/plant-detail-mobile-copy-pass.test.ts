@@ -78,7 +78,7 @@ describe("Plant Detail status strip surfaces the four key signals", () => {
   });
 
   it("strip preserves View Tent link by linking to /tents/:id when assigned", () => {
-    expect(STRIP).toMatch(/\/tents\/\$\{tentId\}/);
+    expect(STRIP).toMatch(/tentDetailPath\(tentId\)/);
   });
 });
 

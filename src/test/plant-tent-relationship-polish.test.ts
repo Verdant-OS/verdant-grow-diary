@@ -34,7 +34,7 @@ describe("PlantDetail tent relationship visibility", () => {
 
   it("includes a View Tent link when tent exists", () => {
     expect(PLANT_DETAIL).toContain('data-testid="plant-detail-view-tent"');
-    expect(PLANT_DETAIL).toMatch(/to=\{`\/tents\/\$\{tent\.id\}`\}/);
+    expect(PLANT_DETAIL).toMatch(/to=\{tentDetailPath\(tent\.id\)\}/);
     expect(PLANT_DETAIL).toContain("View Tent");
   });
 });
@@ -48,7 +48,7 @@ describe("TentDetail plant cards + empty state", () => {
   });
 
   it("plant cards link to Plant Detail", () => {
-    expect(TENT_DETAIL).toMatch(/to=\{`\/plants\/\$\{p\.id\}`\}/);
+    expect(TENT_DETAIL).toMatch(/to=\{plantDetailPath\(p\.id\)\}/);
   });
 
   it("empty state keeps the Add Plant CTA prominent", () => {

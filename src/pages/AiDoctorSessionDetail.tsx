@@ -5,7 +5,7 @@
  * Does NOT re-run AI. Does NOT create Action Queue items. Does NOT mutate data.
  * RLS scopes ownership via auth.uid().
  */
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Stethoscope } from "lucide-react";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

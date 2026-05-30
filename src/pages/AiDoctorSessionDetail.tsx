@@ -369,6 +369,10 @@ function SessionDetailBody({
         ) : null}
       </div>
 
+      <ReviewSummarySection vm={reviewVm} />
+
+
+
       {d?.likelyIssue ? (
         <div>
           <h3 className="text-sm font-semibold">Likely issue</h3>

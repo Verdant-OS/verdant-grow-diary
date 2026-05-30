@@ -632,7 +632,10 @@ function SessionDetailBody({
         </Badge>
       </div>
 
-      <CautionBanner note={buildCautionNote(reviewVm)} />
+      <CautionBanner
+        note={buildCautionNote(reviewVm)}
+        description={formatSessionRowCautionReasonText(buildCautionReasonTokens(reviewVm))}
+      />
 
       <ReviewSummarySection vm={reviewVm} />
 

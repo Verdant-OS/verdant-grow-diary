@@ -33,6 +33,7 @@ import {
 } from "@/lib/aiDoctorSessionDetailViewModel";
 import {
   applyClientSideFilters,
+  applyClientSideSort,
   applyNeedsAttentionPreset,
   clearNeedsAttentionPreset,
   countNeedsAttentionVisible,
@@ -47,6 +48,7 @@ import {
   serializeFilters,
   serializePageParam,
   sessionNeedsReview,
+  SORT_OPTIONS,
   type CautionFilter,
   type ConfidenceFilter,
   type DateRangeFilter,
@@ -55,6 +57,7 @@ import {
   type NeedsReviewFilter,
   type RiskFilter,
   type SessionsIndexFilters,
+  type SortOption,
 } from "@/lib/aiDoctorSessionsIndexFilters";
 import {
   addSavedView,
@@ -269,6 +272,7 @@ export default function AiDoctorSessionsIndex() {
         caution: searchParams.get(FILTER_PARAM_KEYS.caution) ?? undefined,
         hasChecklist: searchParams.get(FILTER_PARAM_KEYS.hasChecklist) ?? undefined,
         confidence: searchParams.get(FILTER_PARAM_KEYS.confidence) ?? undefined,
+        sort: searchParams.get(FILTER_PARAM_KEYS.sort) ?? undefined,
       }),
     [searchParams],
   );
@@ -284,7 +288,7 @@ export default function AiDoctorSessionsIndex() {
   // applied in the hook. Note: pagination reflects the raw query; rows hidden
   // by client-side filters do not regress hasMore for the next page.
   const rows = useMemo(
-    () => applyClientSideFilters(rawRows, filters),
+    () => applyClientSideSort(applyClientSideFilters(rawRows, filters), filters.sort),
     [rawRows, filters],
   );
   const hasMore = !!data?.hasMore;
@@ -307,6 +311,7 @@ export default function AiDoctorSessionsIndex() {
       FILTER_PARAM_KEYS.caution,
       FILTER_PARAM_KEYS.hasChecklist,
       FILTER_PARAM_KEYS.confidence,
+      FILTER_PARAM_KEYS.sort,
       FILTER_PARAM_KEYS.page,
     ]);
     searchParams.forEach((value, key) => {
@@ -652,6 +657,24 @@ export default function AiDoctorSessionsIndex() {
                 <option value="medium">Medium (61–80%)</option>
                 <option value="high">High ({'>'}80%)</option>
                 <option value="unknown">Unknown</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="text-muted-foreground">Sort</span>
+              <select
+                value={filters.sort}
+                onChange={(e) =>
+                  updateFilter("sort", e.target.value as SortOption)
+                }
+                data-testid="ai-doctor-sessions-index-filter-sort"
+                className="rounded border bg-background px-2 py-1 text-sm"
+                title="Sort applies to the currently loaded page"
+              >
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="highest-risk">Highest risk first</option>
+                <option value="lowest-confidence">Lowest confidence first</option>
+                <option value="review-priority">Review priority</option>
               </select>
             </label>
             <Button

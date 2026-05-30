@@ -37,6 +37,24 @@ export type HasChecklistFilter = "all" | "yes" | "no";
  */
 export type ConfidenceFilter = "all" | "low" | "medium" | "high" | "unknown";
 
+/**
+ * Sort options for the AI Doctor sessions index. All sorting is performed
+ * client-side over the currently-loaded page of rows. Pure + deterministic.
+ *
+ *   newest:          created_at desc (default; matches existing server order)
+ *   oldest:          created_at asc
+ *   highest-risk:    critical > high > medium > low > unknown, then newest
+ *   lowest-conf:     unknown < low < medium < high, then newest
+ *   review-priority: caution sessions first, then checklist, then risk,
+ *                    then lower/unknown confidence, then newest
+ */
+export type SortOption =
+  | "newest"
+  | "oldest"
+  | "highest-risk"
+  | "lowest-confidence"
+  | "review-priority";
+
 export interface SessionsIndexFilters {
   risk: RiskFilter;
   hasActions: HasActionsFilter;
@@ -45,7 +63,16 @@ export interface SessionsIndexFilters {
   caution: CautionFilter;
   hasChecklist: HasChecklistFilter;
   confidence: ConfidenceFilter;
+  sort: SortOption;
 }
+
+export const SORT_OPTIONS: SortOption[] = [
+  "newest",
+  "oldest",
+  "highest-risk",
+  "lowest-confidence",
+  "review-priority",
+];
 
 export const DEFAULT_FILTERS: SessionsIndexFilters = {
   risk: "all",
@@ -55,6 +82,7 @@ export const DEFAULT_FILTERS: SessionsIndexFilters = {
   caution: "all",
   hasChecklist: "all",
   confidence: "all",
+  sort: "newest",
 };
 
 export const RISK_OPTIONS: RiskFilter[] = ["all", "low", "medium", "high", "critical"];
@@ -111,6 +139,12 @@ export function parseConfidence(value: unknown): ConfidenceFilter {
     : "all";
 }
 
+export function parseSort(value: unknown): SortOption {
+  return SORT_OPTIONS.includes(value as SortOption)
+    ? (value as SortOption)
+    : "newest";
+}
+
 export function parseFilters(input: Partial<Record<keyof SessionsIndexFilters, unknown>>): SessionsIndexFilters {
   return {
     risk: parseRisk(input.risk),
@@ -120,6 +154,7 @@ export function parseFilters(input: Partial<Record<keyof SessionsIndexFilters, u
     caution: parseCaution(input.caution),
     hasChecklist: parseHasChecklist(input.hasChecklist),
     confidence: parseConfidence(input.confidence),
+    sort: parseSort(input.sort),
   };
 }
 
@@ -166,6 +201,13 @@ const CONFIDENCE_LABEL: Record<Exclude<ConfidenceFilter, "all">, string> = {
   unknown: "Confidence: Unknown",
 };
 
+const SORT_LABEL: Record<Exclude<SortOption, "newest">, string> = {
+  oldest: "Sort: Oldest first",
+  "highest-risk": "Sort: Highest risk first",
+  "lowest-confidence": "Sort: Lowest confidence first",
+  "review-priority": "Sort: Review priority",
+};
+
 export function formatActiveFilterLabels(f: SessionsIndexFilters): string[] {
   const labels: string[] = [];
   if (f.risk !== "all") labels.push(RISK_LABEL[f.risk]);
@@ -179,6 +221,7 @@ export function formatActiveFilterLabels(f: SessionsIndexFilters): string[] {
   if (f.hasChecklist === "yes") labels.push("Has review checklist");
   if (f.hasChecklist === "no") labels.push("No review checklist");
   if (f.confidence !== "all") labels.push(CONFIDENCE_LABEL[f.confidence]);
+  if (f.sort !== "newest") labels.push(SORT_LABEL[f.sort]);
   return labels;
 }
 
@@ -194,6 +237,7 @@ export const FILTER_PARAM_KEYS = {
   caution: "caution",
   hasChecklist: "hasChecklist",
   confidence: "confidence",
+  sort: "sort",
   page: "page",
 } as const;
 
@@ -213,6 +257,7 @@ export function serializeFilters(f: SessionsIndexFilters): Record<string, string
     out[FILTER_PARAM_KEYS.hasChecklist] = f.hasChecklist;
   if (f.confidence !== DEFAULT_FILTERS.confidence)
     out[FILTER_PARAM_KEYS.confidence] = f.confidence;
+  if (f.sort !== DEFAULT_FILTERS.sort) out[FILTER_PARAM_KEYS.sort] = f.sort;
   return out;
 }
 
@@ -383,3 +428,118 @@ export function countNeedsAttentionVisible<T extends FilterableSessionRow>(
   }
   return n;
 }
+
+// ---------------- client-side sort ----------------
+
+const RISK_RANK: Record<string, number> = {
+  critical: 4,
+  high: 3,
+  medium: 2,
+  low: 1,
+};
+
+function riskRank(row: FilterableSessionRow): number {
+  const r = row.diagnosis?.riskLevel;
+  if (typeof r === "string" && r in RISK_RANK) return RISK_RANK[r];
+  return 0; // unknown / missing
+}
+
+const CONFIDENCE_RANK: Record<Exclude<ConfidenceFilter, "all">, number> = {
+  // Lower number = lower confidence (sorted first by "lowest-confidence").
+  unknown: 0,
+  low: 1,
+  medium: 2,
+  high: 3,
+};
+
+function createdAtMs(row: FilterableSessionRow): number {
+  const v = (row as { created_at?: unknown }).created_at;
+  if (typeof v !== "string") return 0;
+  const t = Date.parse(v);
+  return Number.isFinite(t) ? t : 0;
+}
+
+/** Newest-first by created_at; stable tie-break by id. */
+function compareNewest(a: FilterableSessionRow, b: FilterableSessionRow): number {
+  const d = createdAtMs(b) - createdAtMs(a);
+  if (d !== 0) return d;
+  return String((a as { id?: unknown }).id ?? "").localeCompare(
+    String((b as { id?: unknown }).id ?? ""),
+  );
+}
+
+function compareOldest(a: FilterableSessionRow, b: FilterableSessionRow): number {
+  return -compareNewest(a, b);
+}
+
+function compareHighestRisk(
+  a: FilterableSessionRow,
+  b: FilterableSessionRow,
+): number {
+  const d = riskRank(b) - riskRank(a);
+  if (d !== 0) return d;
+  return compareNewest(a, b);
+}
+
+function compareLowestConfidence(
+  a: FilterableSessionRow,
+  b: FilterableSessionRow,
+): number {
+  const d = CONFIDENCE_RANK[rowConfidenceBucket(a)] - CONFIDENCE_RANK[rowConfidenceBucket(b)];
+  if (d !== 0) return d;
+  return compareNewest(a, b);
+}
+
+function compareReviewPriority(
+  a: FilterableSessionRow,
+  b: FilterableSessionRow,
+): number {
+  // Caution first.
+  const ca = rowHasCaution(a) ? 1 : 0;
+  const cb = rowHasCaution(b) ? 1 : 0;
+  if (ca !== cb) return cb - ca;
+  // Then checklist.
+  const ka = rowHasChecklist(a) ? 1 : 0;
+  const kb = rowHasChecklist(b) ? 1 : 0;
+  if (ka !== kb) return kb - ka;
+  // Then higher risk.
+  const rd = riskRank(b) - riskRank(a);
+  if (rd !== 0) return rd;
+  // Then lower (or unknown) confidence.
+  const cd = CONFIDENCE_RANK[rowConfidenceBucket(a)] - CONFIDENCE_RANK[rowConfidenceBucket(b)];
+  if (cd !== 0) return cd;
+  // Final tie-break: newest first.
+  return compareNewest(a, b);
+}
+
+const COMPARATORS: Record<
+  SortOption,
+  (a: FilterableSessionRow, b: FilterableSessionRow) => number
+> = {
+  newest: compareNewest,
+  oldest: compareOldest,
+  "highest-risk": compareHighestRisk,
+  "lowest-confidence": compareLowestConfidence,
+  "review-priority": compareReviewPriority,
+};
+
+/**
+ * Apply the chosen sort to currently-loaded rows. Pure + stable +
+ * deterministic. Does NOT mutate the input.
+ *
+ * NOTE: sorting is applied to the currently loaded page only. Pagination
+ * remains driven by the server query (newest-first). Use of non-default
+ * sorts is best paired with a tight filter so the loaded page contains
+ * the rows the grower wants to triage.
+ */
+export function applyClientSideSort<T extends FilterableSessionRow>(
+  rows: T[],
+  sort: SortOption,
+): T[] {
+  if (!Array.isArray(rows) || rows.length <= 1) {
+    return Array.isArray(rows) ? [...rows] : [];
+  }
+  const cmp = COMPARATORS[sort] ?? compareNewest;
+  return [...rows].sort(cmp);
+}
+

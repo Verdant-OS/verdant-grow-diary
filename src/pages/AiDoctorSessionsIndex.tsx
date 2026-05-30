@@ -33,6 +33,7 @@ import {
 } from "@/lib/aiDoctorSessionDetailViewModel";
 import {
   applyClientSideFilters,
+  applyClientSideSort,
   applyNeedsAttentionPreset,
   clearNeedsAttentionPreset,
   countNeedsAttentionVisible,
@@ -47,6 +48,7 @@ import {
   serializeFilters,
   serializePageParam,
   sessionNeedsReview,
+  SORT_OPTIONS,
   type CautionFilter,
   type ConfidenceFilter,
   type DateRangeFilter,
@@ -55,6 +57,7 @@ import {
   type NeedsReviewFilter,
   type RiskFilter,
   type SessionsIndexFilters,
+  type SortOption,
 } from "@/lib/aiDoctorSessionsIndexFilters";
 import {
   addSavedView,

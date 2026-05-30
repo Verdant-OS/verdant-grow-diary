@@ -533,26 +533,6 @@ function SessionDetailBody({
         </Badge>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-        {row.plant_id ? (
-          <Link
-            to={`/plants/${row.plant_id}`}
-            className="underline"
-            data-testid="ai-doctor-session-detail-plant-link"
-          >
-            View plant
-          </Link>
-        ) : null}
-        {row.tent_id ? (
-          <Link
-            to={`/tents/${row.tent_id}`}
-            className="underline"
-            data-testid="ai-doctor-session-detail-tent-link"
-          >
-            View tent
-          </Link>
-        ) : null}
-      </div>
 
       <ReviewSummarySection vm={reviewVm} />
 

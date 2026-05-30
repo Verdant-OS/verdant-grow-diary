@@ -197,7 +197,7 @@ describe("AiDoctorSessionDetail — Copy review summary button", () => {
         writeText: vi.fn().mockRejectedValue(new Error("denied")),
       },
     });
-    vi.spyOn(document, "execCommand").mockImplementation(() => false);
+    (document as unknown as { execCommand: unknown }).execCommand = vi.fn().mockReturnValue(false);
     renderRoute(<AiDoctorSessionDetail />);
     const btn = await screen.findByTestId("ai-doctor-session-detail-copy-review-button");
     fireEvent.click(btn);

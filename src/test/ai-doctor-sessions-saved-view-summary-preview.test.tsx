@@ -183,12 +183,13 @@ describe("Saved-view summary preview", () => {
     );
   });
 
-  it("hides the preview after Clear filters deselects the saved view", async () => {
+  it("hides the preview after Clear filters when built-in was auto-selected via the preset", async () => {
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-saved-views-select"),
-      { target: { value: BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID } },
+    // Use the preset button so selectedSavedViewId stays "" and the
+    // built-in is surfaced via auto-sync only.
+    fireEvent.click(
+      screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"),
     );
     await screen.findByTestId(PREVIEW_TID);
     const clear = await screen.findByTestId(

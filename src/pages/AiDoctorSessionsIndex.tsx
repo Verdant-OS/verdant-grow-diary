@@ -227,6 +227,25 @@ function IndexRow({
             {LIMITED_CONTEXT_LABEL}
           </Badge>
         ) : null}
+        {reviewIndicator.show ? (
+          <Badge
+            variant="outline"
+            className={
+              reviewIndicator.tone === "amber"
+                ? "text-[11px] border-amber-500/50 text-amber-700 dark:text-amber-300"
+                : "text-[11px] text-muted-foreground"
+            }
+            data-testid="ai-doctor-sessions-index-review-status-chip"
+            data-review-status={reviewIndicator.status}
+            data-review-tone={reviewIndicator.tone ?? ""}
+            data-latest-event-at={reviewIndicator.latestEventAt ?? ""}
+            data-latest-note={reviewIndicator.latestNote ?? ""}
+            title={reviewIndicator.title ?? undefined}
+            aria-label={reviewIndicator.title ?? reviewIndicator.label ?? undefined}
+          >
+            {reviewIndicator.label}
+          </Badge>
+        ) : null}
       </div>
 
 

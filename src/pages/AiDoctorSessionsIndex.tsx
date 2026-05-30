@@ -315,18 +315,23 @@ export default function AiDoctorSessionsIndex() {
 
   const { data, isLoading, error } = useAiDoctorSessionsIndex(page, filters);
   const rawRows = data?.rows ?? [];
-  // Apply derived (client-side) filters: caution / hasChecklist / confidence.
-  // Server-side filters (risk, hasActions, dateRange, needsReview) already
-  // applied in the hook. Note: pagination reflects the raw query; rows hidden
-  // by client-side filters do not regress hasMore for the next page.
-  const rows = useMemo(
-    () => applyClientSideSort(applyClientSideFilters(rawRows, filters), filters.sort),
-    [rawRows, filters],
-  );
-  // Scope review-event fetch to the currently visible page's session IDs only.
-  const visibleSessionIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  // Scope review-event fetch to the raw (server-paginated) IDs so the review
+  // filter has data available even when its filter narrows the row set.
+  const visibleSessionIds = useMemo(() => rawRows.map((r) => r.id), [rawRows]);
   const { data: reviewsData } = useAiDoctorSessionReviews(visibleSessionIds);
   const reviewStateBySession = reviewsData?.stateBySession ?? null;
+  // Apply derived (client-side) filters: caution / hasChecklist / confidence /
+  // reviewStatus. Server-side filters (risk, hasActions, dateRange,
+  // needsReview) already applied in the hook. Pagination reflects the raw
+  // query; rows hidden by client-side filters do not regress hasMore.
+  const rows = useMemo(
+    () =>
+      applyClientSideSort(
+        applyClientSideFilters(rawRows, filters, reviewStateBySession),
+        filters.sort,
+      ),
+    [rawRows, filters, reviewStateBySession],
+  );
   const hasMore = !!data?.hasMore;
   const filtersActive = isFiltersActive(filters);
   const activeLabels = formatActiveFilterLabels(filters);

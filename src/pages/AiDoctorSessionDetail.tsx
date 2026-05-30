@@ -6,7 +6,7 @@
  * RLS scopes ownership via auth.uid().
  */
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Stethoscope, Copy, Check, AlertCircle } from "lucide-react";
+import { ArrowLeft, Stethoscope, Copy, Check, AlertCircle, Link as LinkIcon } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

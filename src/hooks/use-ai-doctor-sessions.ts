@@ -15,6 +15,7 @@ import type { DiagnosisSuggestedAction } from "@/lib/aiDoctorDiagnosisRules";
 import type { AiContextConfidenceCeiling } from "@/lib/aiContextSufficiencyRules";
 
 export const AI_DOCTOR_SESSIONS_LIMIT = 10;
+export const AI_DOCTOR_SESSIONS_COACH_LIMIT = 5;
 
 export interface AiDoctorSessionRow {
   id: string;
@@ -83,3 +84,20 @@ export function useAiDoctorSession(sessionId: string | null | undefined) {
   });
 }
 
+
+export function useGrowAiDoctorSessions(growId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["ai_doctor_sessions", "grow", growId ?? null],
+    enabled: !!growId,
+    queryFn: async (): Promise<AiDoctorSessionRow[]> => {
+      const { data, error } = await supabase
+        .from("ai_doctor_sessions" as never)
+        .select(SESSION_SELECT)
+        .eq("grow_id", growId as string)
+        .order("created_at", { ascending: false })
+        .limit(AI_DOCTOR_SESSIONS_COACH_LIMIT);
+      if (error) throw error;
+      return (data ?? []) as AiDoctorSessionRow[];
+    },
+  });
+}

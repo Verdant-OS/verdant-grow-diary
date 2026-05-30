@@ -17,6 +17,7 @@ import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import { evaluateAiContextSufficiency } from "@/lib/aiContextSufficiencyRules";
 import { adaptDiaryForAiContext } from "@/lib/coachContextAdapter";
 import CoachContextSufficiencyPanel from "@/components/CoachContextSufficiencyPanel";
+import CoachAiDoctorHistoryPanel from "@/components/CoachAiDoctorHistoryPanel";
 import StructuredDiagnosisCard from "@/components/StructuredDiagnosisCard";
 import {
   validateAndSanitizeDiagnosis,
@@ -311,6 +312,9 @@ export default function Coach() {
       </div>
 
       <CoachContextSufficiencyPanel result={contextSufficiency} className="mb-4" />
+
+      <CoachAiDoctorHistoryPanel growId={activeGrowId ?? null} />
+
 
       <div className="glass rounded-2xl p-4 space-y-4">
         <button type="button" onClick={() => fileRef.current?.click()}

@@ -62,16 +62,13 @@ describe("aiDoctorSessionsIndexFilters — pure helpers", () => {
 
   it("parseFilters merges defaults for missing/invalid fields", () => {
     expect(parseFilters({ risk: "high" })).toEqual({
+      ...DEFAULT_FILTERS,
       risk: "high",
-      hasActions: "all",
-      dateRange: "all",
-      needsReview: "all",
     });
     expect(parseFilters({ risk: "bogus", hasActions: "yes", dateRange: "7d" })).toEqual({
-      risk: "all",
+      ...DEFAULT_FILTERS,
       hasActions: "yes",
       dateRange: "7d",
-      needsReview: "all",
     });
   });
 

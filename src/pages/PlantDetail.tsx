@@ -33,7 +33,7 @@ import PlantManualSensorFreshnessCard from "@/components/PlantManualSensorFreshn
 import { useState } from "react";
 import { Zap } from "lucide-react";
 
-import { plantDetailPath, plantsPath, tentDetailPath } from "@/lib/routes";
+import { logsPath, plantDetailPath, plantsPath, tentDetailPath } from "@/lib/routes";
 
 export default function PlantDetail() {
   const [quickLogOpen, setQuickLogOpen] = useState(false);
@@ -220,7 +220,7 @@ export default function PlantDetail() {
               <Zap className="h-3.5 w-3.5" /> Quick Log
             </Button>
             <Button asChild variant="outline" size="sm">
-              <Link to="/logs">Open Logs</Link>
+              <Link to={logsPath()}>Open Logs</Link>
             </Button>
             <Button
               asChild

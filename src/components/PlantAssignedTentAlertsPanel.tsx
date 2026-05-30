@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { usePlantAssignedTentAlerts } from "@/hooks/usePlantAssignedTentAlerts";
 import type { PlantAssignedTentAlertRow } from "@/lib/plantAssignedTentAlertRules";
+import { alertsPath } from "@/lib/routes";
 
 interface Props {
   tentId: string | null | undefined;
@@ -125,7 +126,7 @@ export default function PlantAssignedTentAlertsPanel({ tentId, tentName, growId 
             className="h-7 px-2 gap-1"
             data-testid="plant-assigned-tent-alerts-open-alerts"
           >
-            <Link to="/alerts">
+            <Link to={alertsPath()}>
               Open Alerts <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </Button>

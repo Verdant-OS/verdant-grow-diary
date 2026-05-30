@@ -213,7 +213,7 @@ describe("Plant Detail wiring", () => {
 
   it("panel exposes empty state copy and a Timeline link", () => {
     expect(PANEL).toContain("No activity logged for this plant yet.");
-    expect(PANEL).toContain('to="/timeline"');
+    expect(PANEL).toContain("to={timelinePath()}");
     expect(PANEL).toContain("plant-recent-activity-panel");
     expect(PANEL).toContain("plant-recent-activity-empty");
   });

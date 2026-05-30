@@ -72,7 +72,7 @@ describe("AI Coach → Action Queue (manual, suggest-only)", () => {
   });
 
   it("links the user to /actions from the Coach result", () => {
-    expect(COACH).toMatch(/to=["']\/actions["']/);
+    expect(COACH).toMatch(/to=\{actionsPath\(\)\}/);
   });
 
   it("Coach.tsx introduces no device-control surface", () => {

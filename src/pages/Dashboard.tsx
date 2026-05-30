@@ -83,7 +83,7 @@ import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingC
 import DashboardDailyGrowCheckPanel from "@/components/DashboardDailyGrowCheckPanel";
 
 import { Badge } from "@/components/ui/badge";
-import { actionDetailPath, actionsPath, alertDetailPath, dashboardPath, logsPath, tentDetailPath, tentsPath } from "@/lib/routes";
+import { actionDetailPath, actionsPath, alertDetailPath, alertsPath, dashboardPath, logsPath, tentDetailPath, tentsPath } from "@/lib/routes";
 import { formatDistanceToNow } from "date-fns";
 
 
@@ -331,7 +331,7 @@ export default function Dashboard() {
         <div className="glass rounded-2xl p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-display font-semibold">Needs attention</h2>
-            <Button asChild size="sm" variant="ghost"><Link to="/alerts">All alerts <ArrowRight className="h-3 w-3" /></Link></Button>
+            <Button asChild size="sm" variant="ghost"><Link to={alertsPath()}>All alerts <ArrowRight className="h-3 w-3" /></Link></Button>
           </div>
           {recentAlerts.length === 0 && <p className="text-sm text-muted-foreground">All systems nominal.</p>}
           <ul className="space-y-2">
@@ -418,7 +418,7 @@ export default function Dashboard() {
             >
               {persistedOpenCount > 0 ? (
                 <>
-                  <Link to="/alerts" className="text-primary hover:underline">
+                  <Link to={alertsPath()} className="text-primary hover:underline">
                     {persistedOpenCount} persisted open alert
                     {persistedOpenCount === 1 ? "" : "s"}
                   </Link>{" "}

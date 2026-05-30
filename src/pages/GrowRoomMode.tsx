@@ -39,7 +39,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTents } from "@/hooks/use-tents";
 import { usePlants } from "@/hooks/use-plants";
 import { useAlertsList } from "@/hooks/useAlertsList";
-import { tentDetailPath, tentsPath } from "@/lib/routes";
+import { actionsPath, alertsPath, tentDetailPath, tentsPath } from "@/lib/routes";
 
 import {
   EMPTY_SNAPSHOT,
@@ -428,14 +428,14 @@ export default function GrowRoomMode() {
 
                 <div className="flex items-center justify-between text-xs">
                   <Link
-                    to="/alerts"
+                    to={alertsPath()}
                     className="text-muted-foreground hover:text-foreground"
                   >
                     {card.openAlertCount} open alert
                     {card.openAlertCount === 1 ? "" : "s"}
                   </Link>
                   <Link
-                    to="/actions"
+                    to={actionsPath()}
                     className="text-muted-foreground hover:text-foreground"
                   >
                     {card.pendingActionCount} pending action

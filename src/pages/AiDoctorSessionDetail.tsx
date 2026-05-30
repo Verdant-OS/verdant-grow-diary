@@ -6,7 +6,7 @@
  * RLS scopes ownership via auth.uid().
  */
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Stethoscope, Copy, Check, AlertCircle } from "lucide-react";
+import { ArrowLeft, Stethoscope, Copy, Check, AlertCircle, Link as LinkIcon } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -78,6 +78,52 @@ function CopyReviewSummaryButton({ vm }: { vm: ReviewSummaryViewModel }) {
         <>
           <Copy className="h-4 w-4" />
           <span>Copy review summary</span>
+        </>
+      )}
+    </Button>
+  );
+}
+
+export function buildSessionDetailCanonicalUrl(sessionId: string, origin?: string | null): string {
+  const path = `/doctor/sessions/${sessionId}`;
+  const o = (origin ?? "").trim();
+  if (!o) return path;
+  return `${o.replace(/\/+$/, "")}${path}`;
+}
+
+function CopyLinkButton({ sessionId }: { sessionId: string }) {
+  const [state, setState] = useState<"idle" | "copied" | "error">("idle");
+  const onClick = async () => {
+    const origin =
+      typeof window !== "undefined" && window.location?.origin ? window.location.origin : null;
+    const url = buildSessionDetailCanonicalUrl(sessionId, origin);
+    const ok = await copyPlainText(url);
+    setState(ok ? "copied" : "error");
+    setTimeout(() => setState("idle"), 2000);
+  };
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      onClick={onClick}
+      data-testid="ai-doctor-session-detail-copy-link-button"
+      aria-label="Copy link to this session"
+    >
+      {state === "copied" ? (
+        <>
+          <Check className="h-4 w-4" />
+          <span data-testid="ai-doctor-session-detail-copy-link-success">Link copied</span>
+        </>
+      ) : state === "error" ? (
+        <>
+          <AlertCircle className="h-4 w-4" />
+          <span data-testid="ai-doctor-session-detail-copy-link-error">Copy failed</span>
+        </>
+      ) : (
+        <>
+          <LinkIcon className="h-4 w-4" />
+          <span>Copy link</span>
         </>
       )}
     </Button>
@@ -321,18 +367,23 @@ export default function AiDoctorSessionDetail() {
 
       <Card>
         <CardHeader className="space-y-1">
-          <CardTitle
-            className="text-lg flex items-center gap-2"
-            data-testid="ai-doctor-session-detail-title"
-          >
-            <Stethoscope className="h-4 w-4" /> Historical AI Doctor Session
-          </CardTitle>
-          <p
-            className="text-xs text-muted-foreground"
-            data-testid="ai-doctor-session-detail-helper"
-          >
-            This is a saved diagnosis snapshot. It does not re-run AI or execute actions.
-          </p>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="space-y-1">
+              <CardTitle
+                className="text-lg flex items-center gap-2"
+                data-testid="ai-doctor-session-detail-title"
+              >
+                <Stethoscope className="h-4 w-4" /> Historical AI Doctor Session
+              </CardTitle>
+              <p
+                className="text-xs text-muted-foreground"
+                data-testid="ai-doctor-session-detail-helper"
+              >
+                This is a saved diagnosis snapshot. It does not re-run AI or execute actions.
+              </p>
+            </div>
+            {sessionId ? <CopyLinkButton sessionId={sessionId} /> : null}
+          </div>
         </CardHeader>
         <CardContent className="text-sm space-y-4">
           {isLoading ? (

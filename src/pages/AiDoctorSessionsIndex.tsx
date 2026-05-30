@@ -701,21 +701,38 @@ export default function AiDoctorSessionsIndex() {
                     ? "No saved views"
                     : "Apply a saved view…"}
                 </option>
-                {displaySavedViews.map((v) => (
-                  <option
-                    key={v.id}
-                    value={v.id}
-                    data-testid={
-                      isBuiltInSavedViewId(v.id)
-                        ? "ai-doctor-sessions-saved-views-builtin-option"
-                        : undefined
-                    }
-                  >
-                    {isBuiltInSavedViewId(v.id) ? `★ ${v.label}` : v.label}
-                  </option>
-                ))}
+                {displaySavedViews.map((v) => {
+                  const isBuiltIn = isBuiltInSavedViewId(v.id);
+                  return (
+                    <option
+                      key={v.id}
+                      value={v.id}
+                      title={
+                        isBuiltIn ? BUILTIN_SAVED_VIEW_TOOLTIP : undefined
+                      }
+                      data-testid={
+                        isBuiltIn
+                          ? "ai-doctor-sessions-saved-views-builtin-option"
+                          : undefined
+                      }
+                    >
+                      {isBuiltIn ? `★ ${v.label} (Built-in)` : v.label}
+                    </option>
+                  );
+                })}
               </select>
             </label>
+            {isBuiltInSavedViewId(effectiveSelectedSavedViewId) ? (
+              <Badge
+                variant="outline"
+                className="text-[11px]"
+                title={BUILTIN_SAVED_VIEW_TOOLTIP}
+                aria-label={BUILTIN_SAVED_VIEW_TOOLTIP}
+                data-testid="ai-doctor-sessions-saved-views-builtin-badge"
+              >
+                Built-in
+              </Badge>
+            ) : null}
             {effectiveSelectedSavedViewId &&
             !isBuiltInSavedViewId(effectiveSelectedSavedViewId) ? (
               <Button

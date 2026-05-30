@@ -20,23 +20,16 @@ import {
 
 let currentRows: AiDoctorSessionRow[] = [];
 
-vi.mock("@/integrations/supabase/client", () => ({
-  supabase: {
-    from: () => ({
-      select: () => ({
-        order: () => ({
-          range: () => Promise.resolve({ data: currentRows, error: null }),
-          limit: () => Promise.resolve({ data: currentRows, error: null }),
-          eq: () => ({
-            order: () => ({
-              limit: () => Promise.resolve({ data: currentRows, error: null }),
-            }),
-          }),
-        }),
-      }),
-    }),
-  },
-}));
+vi.mock("@/integrations/supabase/client", () => {
+  const result = () => Promise.resolve({ data: currentRows, error: null });
+  const chain: Record<string, unknown> = {};
+  const methods = ["select", "eq", "order", "limit", "range", "not", "gte", "or"];
+  for (const m of methods) chain[m] = () => chain;
+  chain.then = (resolve: (v: unknown) => unknown) => result().then(resolve);
+  return {
+    supabase: { from: () => chain },
+  };
+});
 
 function renderWithProviders(ui: ReactElement) {
   const client = new QueryClient({

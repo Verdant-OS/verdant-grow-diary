@@ -93,6 +93,7 @@ import { useAiDoctorSessionReviews } from "@/hooks/useAiDoctorSessionReviews";
 import {
   buildSessionReviewStatusIndicator,
   type AiDoctorSessionReviewState,
+  type AiDoctorSessionReviewStatusFilter,
 } from "@/lib/aiDoctorSessionReviewStatusRules";
 
 function fmtDate(ts: string | null): string {

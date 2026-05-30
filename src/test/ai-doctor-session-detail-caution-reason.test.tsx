@@ -43,7 +43,7 @@ function renderRoute(row: AiDoctorSessionRow | null) {
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={["/doctor/sessions/sess-x"]}>
         <Routes>
-          <Route path="/doctor/sessions/:id" element={<AiDoctorSessionDetail />} />
+          <Route path="/doctor/sessions/:sessionId" element={<AiDoctorSessionDetail />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,

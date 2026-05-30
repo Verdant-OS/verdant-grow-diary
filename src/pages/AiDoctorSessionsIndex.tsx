@@ -116,7 +116,13 @@ function summaryPreview(text: string | null | undefined): string | null {
   return `${trimmed.slice(0, 140)}…`;
 }
 
-function IndexRow({ row }: { row: AiDoctorSessionRow }) {
+function IndexRow({
+  row,
+  reviewState,
+}: {
+  row: AiDoctorSessionRow;
+  reviewState: AiDoctorSessionReviewState | null;
+}) {
   const d = row.diagnosis;
   const confidence = fmtConfidence(row.displayed_confidence ?? row.raw_confidence);
   const actionCount = Array.isArray(row.suggested_actions) ? row.suggested_actions.length : 0;
@@ -124,6 +130,7 @@ function IndexRow({ row }: { row: AiDoctorSessionRow }) {
   const needsReview = sessionNeedsReview(row);
   const caution = buildSessionRowCautionIndicator(row);
   const limitedContext = isSessionLimitedContext(row);
+  const reviewIndicator = buildSessionReviewStatusIndicator(reviewState);
 
   return (
     <li

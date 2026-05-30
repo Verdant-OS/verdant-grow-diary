@@ -142,12 +142,15 @@ describe("applyClientSideSort", () => {
   });
   it("review-priority orders caution/checklist > risk > low-conf > newest", () => {
     const ids = applyClientSideSort(ALL, "review-priority").map((r) => r.id);
-    // Both old-high and new-uk are caution+checklist; among them risk
-    // ranks high(3) > medium(2), so old-high first, then new-uk.
+    // old-high, new-hr, new-uk all qualify as caution+checklist given the
+    // real buildSessionRowCautionIndicator behavior. Within that group risk
+    // ranks high(3) > medium(2), then lower confidence first:
+    //   old-high → high risk, low conf
+    //   new-hr   → high risk, high conf
+    //   new-uk   → medium risk, unknown conf
     expect(ids[0]).toBe("old-high");
-    expect(ids[1]).toBe("new-uk");
-    // new-crit is critical risk but high confidence + no caution, follows.
-    expect(ids[2]).toBe("new-hr");
+    expect(ids[1]).toBe("new-hr");
+    expect(ids[2]).toBe("new-uk");
     // healthy rows last, newest-first.
     expect(ids.slice(3)).toEqual(["new-healthy", "old-healthy"]);
   });
@@ -266,7 +269,10 @@ describe("AiDoctorSessionsIndex — sort UI", () => {
       { target: { value: "review-priority" } },
     );
     // Preset keeps only caution+checklist rows: old-high, new-uk.
-    expect(rowIds()).toEqual(["old-high", "new-uk"]);
+    // Preset keeps caution+checklist rows: old-high, new-hr, new-uk.
+    // Review-priority sort: high-risk (old-high low conf, new-hr high conf)
+    // before medium (new-uk).
+    expect(rowIds()).toEqual(["old-high", "new-hr", "new-uk"]);
   });
 
   it("sort works after selecting the built-in saved view", async () => {
@@ -281,8 +287,10 @@ describe("AiDoctorSessionsIndex — sort UI", () => {
       screen.getByTestId("ai-doctor-sessions-index-filter-sort"),
       { target: { value: "highest-risk" } },
     );
-    // Built-in keeps caution+checklist rows; highest-risk: high > medium.
-    expect(rowIds()).toEqual(["old-high", "new-uk"]);
+    // Built-in keeps caution+checklist rows (old-high, new-hr, new-uk);
+    // highest-risk: high(old-high, new-hr) > medium(new-uk). Within high,
+    // newest-first tie-break puts new-hr before old-high.
+    expect(rowIds()).toEqual(["new-hr", "old-high", "new-uk"]);
   });
 
   it("Clear filters resets sort back to newest", async () => {
@@ -295,6 +303,7 @@ describe("AiDoctorSessionsIndex — sort UI", () => {
       "ai-doctor-sessions-index-filter-sort",
     )) as HTMLSelectElement;
     expect(sel.value).toBe("newest");
+    await screen.findByTestId("ai-doctor-sessions-index-list");
     expect(rowIds()).toEqual(["new-healthy", "old-healthy"]);
   });
 

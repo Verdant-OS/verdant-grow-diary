@@ -33,6 +33,7 @@ describe("aiDoctorSessionsIndexFilters — pure helpers", () => {
       caution: "all",
       hasChecklist: "all",
       confidence: "all",
+      sort: "newest",
     });
   });
 

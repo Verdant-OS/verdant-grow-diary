@@ -332,6 +332,7 @@ describe("URL persistence — static safety", () => {
       caution: "caution",
       hasChecklist: "hasChecklist",
       confidence: "confidence",
+      sort: "sort",
       page: "page",
     });
   });

@@ -110,6 +110,15 @@ function SessionRow({ row }: { row: AiDoctorSessionRow }) {
           {summary}
         </p>
       ) : null}
+      <div className="pt-1">
+        <Link
+          to={`/doctor/sessions/${row.id}`}
+          className="text-xs text-primary underline"
+          data-testid="tent-ai-doctor-session-view-link"
+        >
+          View session
+        </Link>
+      </div>
     </li>
   );
 }

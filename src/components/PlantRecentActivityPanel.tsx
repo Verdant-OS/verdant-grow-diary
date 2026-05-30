@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
-import { tentDetailPath } from "@/lib/routes";
+import { tentDetailPath, timelinePath } from "@/lib/routes";
 
 import {
   buildPlantRecentActivity,

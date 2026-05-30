@@ -12,6 +12,219 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAiDoctorSession } from "@/hooks/use-ai-doctor-sessions";
+import {
+  buildReviewSummaryViewModel,
+  EMPTY_FALLBACKS,
+  type ReviewRiskTone,
+  type ReviewSummaryViewModel,
+} from "@/lib/aiDoctorSessionDetailViewModel";
+
+const RISK_TONE_CLASSES: Record<ReviewRiskTone, string> = {
+  neutral: "border-border bg-muted/30",
+  info: "border-border bg-muted/20",
+  warn: "border-amber-500/40 bg-amber-500/5",
+  danger: "border-destructive/50 bg-destructive/5",
+};
+
+function ReviewSummarySection({ vm }: { vm: ReviewSummaryViewModel }) {
+  return (
+    <section
+      data-testid="ai-doctor-session-detail-review-summary"
+      aria-label="Review summary"
+      className={`rounded-lg border p-3 space-y-3 ${RISK_TONE_CLASSES[vm.risk.tone]}`}
+    >
+      <header className="flex flex-wrap items-center gap-2">
+        <h3 className="text-sm font-semibold">Review Summary</h3>
+        <Badge
+          variant={vm.isHighRisk ? "destructive" : "outline"}
+          className="capitalize text-[11px]"
+          data-testid="ai-doctor-session-detail-review-risk"
+        >
+          {vm.risk.label}
+        </Badge>
+        {vm.confidencePct != null ? (
+          <Badge
+            variant="outline"
+            className="text-[11px]"
+            data-testid="ai-doctor-session-detail-review-confidence"
+          >
+            Confidence: {vm.confidencePct}%
+          </Badge>
+        ) : null}
+      </header>
+
+      <ReviewBlock
+        title="Likely issue"
+        testid="ai-doctor-session-detail-review-likely-issue"
+        empty={EMPTY_FALLBACKS.likelyIssue}
+      >
+        {vm.likelyIssue}
+      </ReviewBlock>
+
+      <ReviewBlock
+        title="Summary"
+        testid="ai-doctor-session-detail-review-summary-text"
+        empty={EMPTY_FALLBACKS.summary}
+      >
+        {vm.summary}
+      </ReviewBlock>
+
+      <ReviewList
+        title="Evidence"
+        items={vm.evidence}
+        testid="ai-doctor-session-detail-review-evidence"
+        empty={EMPTY_FALLBACKS.evidence}
+      />
+
+      <ReviewList
+        title="Missing information"
+        items={vm.missingInformation}
+        testid="ai-doctor-session-detail-review-missing-info"
+        empty={EMPTY_FALLBACKS.missingInformation}
+      />
+
+      <div data-testid="ai-doctor-session-detail-review-actions">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Suggested actions
+        </h4>
+        {vm.suggestedActions.length === 0 ? (
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid="ai-doctor-session-detail-review-actions-empty"
+          >
+            {EMPTY_FALLBACKS.suggestedActions}
+          </p>
+        ) : (
+          <ul className="space-y-1 mt-1 text-xs">
+            {vm.suggestedActions.map((a, i) => (
+              <li
+                key={i}
+                className="rounded border bg-card/40 px-2 py-1"
+                data-testid="ai-doctor-session-detail-review-action"
+              >
+                <span className="font-medium">{a.title}</span>
+                {a.detail ? (
+                  <span className="text-muted-foreground"> — {a.detail}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <ReviewList
+        title="What not to do"
+        items={vm.whatNotToDo}
+        testid="ai-doctor-session-detail-review-what-not-to-do"
+        empty={EMPTY_FALLBACKS.whatNotToDo}
+      />
+
+      <div data-testid="ai-doctor-session-detail-review-followup">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Follow-up guidance
+        </h4>
+        {!vm.followUp24h && !vm.recoveryPlan3d ? (
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid="ai-doctor-session-detail-review-followup-empty"
+          >
+            {EMPTY_FALLBACKS.followUp}
+          </p>
+        ) : (
+          <div className="space-y-2 mt-1 text-xs">
+            {vm.followUp24h ? (
+              <div data-testid="ai-doctor-session-detail-review-followup-24h">
+                <div className="font-medium">Next 24 hours</div>
+                {vm.followUp24h.summary ? (
+                  <p className="text-muted-foreground">{vm.followUp24h.summary}</p>
+                ) : null}
+                {vm.followUp24h.checklist.length > 0 ? (
+                  <ul className="list-disc pl-5 text-muted-foreground">
+                    {vm.followUp24h.checklist.map((c, i) => (
+                      <li key={i}>{c}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ) : null}
+            {vm.recoveryPlan3d ? (
+              <div data-testid="ai-doctor-session-detail-review-followup-3d">
+                <div className="font-medium">3-day recovery</div>
+                {vm.recoveryPlan3d.summary ? (
+                  <p className="text-muted-foreground">{vm.recoveryPlan3d.summary}</p>
+                ) : null}
+                {vm.recoveryPlan3d.checklist.length > 0 ? (
+                  <ul className="list-disc pl-5 text-muted-foreground">
+                    {vm.recoveryPlan3d.checklist.map((c, i) => (
+                      <li key={i}>{c}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function ReviewBlock({
+  title,
+  children,
+  empty,
+  testid,
+}: {
+  title: string;
+  children: string | null;
+  empty: string;
+  testid: string;
+}) {
+  return (
+    <div data-testid={testid}>
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {title}
+      </h4>
+      <p className={children ? "text-sm" : "text-xs text-muted-foreground"}>
+        {children ?? empty}
+      </p>
+    </div>
+  );
+}
+
+function ReviewList({
+  title,
+  items,
+  empty,
+  testid,
+}: {
+  title: string;
+  items: string[];
+  empty: string;
+  testid: string;
+}) {
+  return (
+    <div data-testid={testid}>
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {title}
+      </h4>
+      {items.length === 0 ? (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid={`${testid}-empty`}
+        >
+          {empty}
+        </p>
+      ) : (
+        <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-0.5">
+          {items.map((s, i) => (
+            <li key={i}>{s}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 function fmtDate(ts: string | null): string {
   if (!ts) return "";
@@ -81,6 +294,12 @@ function SessionDetailBody({
   const d = row.diagnosis;
   const confidence = fmtConfidence(row.displayed_confidence ?? row.raw_confidence);
   const actions = Array.isArray(row.suggested_actions) ? row.suggested_actions : [];
+  const reviewVm = buildReviewSummaryViewModel({
+    diagnosis: d,
+    rawConfidence: row.raw_confidence,
+    displayedConfidence: row.displayed_confidence,
+    suggestedActions: actions,
+  });
 
   return (
     <div className="space-y-4">
@@ -149,6 +368,10 @@ function SessionDetailBody({
           </Link>
         ) : null}
       </div>
+
+      <ReviewSummarySection vm={reviewVm} />
+
+
 
       {d?.likelyIssue ? (
         <div>

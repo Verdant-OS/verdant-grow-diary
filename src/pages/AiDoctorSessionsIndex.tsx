@@ -26,6 +26,12 @@ import {
   type AiDoctorSessionRow,
 } from "@/hooks/use-ai-doctor-sessions";
 import {
+  buildSessionRowCautionIndicator,
+  isSessionLimitedContext,
+  LIMITED_CONTEXT_LABEL,
+  LIMITED_CONTEXT_TITLE,
+} from "@/lib/aiDoctorSessionDetailViewModel";
+import {
   DEFAULT_FILTERS,
   FILTER_PARAM_KEYS,
   formatActiveFilterLabels,

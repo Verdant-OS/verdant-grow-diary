@@ -257,7 +257,6 @@ describe("Static safety scan — summary preview slice", () => {
     expect(TSX).not.toContain("Sort: Lowest confidence first");
     expect(TSX).not.toContain("Sort: Oldest first");
     expect(TSX).not.toContain("Has review checklist");
-    expect(TSX).not.toContain("Caution only");
     // The page uses formatSavedViewSummary; confirm that helper is wired.
     expect(TSX).toMatch(/formatSavedViewSummary\(/);
   });

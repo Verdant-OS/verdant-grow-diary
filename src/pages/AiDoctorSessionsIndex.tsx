@@ -33,10 +33,15 @@ import {
 } from "@/lib/aiDoctorSessionDetailViewModel";
 import {
   applyClientSideFilters,
+  applyNeedsAttentionPreset,
+  clearNeedsAttentionPreset,
+  countNeedsAttentionVisible,
   DEFAULT_FILTERS,
   FILTER_PARAM_KEYS,
   formatActiveFilterLabels,
   isFiltersActive,
+  isNeedsAttentionPresetActive,
+  NEEDS_ATTENTION_PRESET_LABEL,
   parseFilters,
   parsePageParam,
   serializeFilters,
@@ -279,6 +284,11 @@ export default function AiDoctorSessionsIndex() {
   const hasMore = !!data?.hasMore;
   const filtersActive = isFiltersActive(filters);
   const activeLabels = formatActiveFilterLabels(filters);
+  const needsAttentionActive = isNeedsAttentionPresetActive(filters);
+  const needsAttentionVisible = useMemo(
+    () => countNeedsAttentionVisible(rawRows),
+    [rawRows],
+  );
 
   const writeParams = (next: SessionsIndexFilters, nextPage: number) => {
     const params = new URLSearchParams();
@@ -311,6 +321,14 @@ export default function AiDoctorSessionsIndex() {
 
   const clearFilters = () => {
     writeParams(DEFAULT_FILTERS, 0);
+  };
+
+  const applyNeedsAttention = () => {
+    writeParams(applyNeedsAttentionPreset(filters), 0);
+  };
+
+  const clearNeedsAttention = () => {
+    writeParams(clearNeedsAttentionPreset(filters), 0);
   };
 
   const goToPage = (nextPage: number) => {
@@ -609,6 +627,24 @@ export default function AiDoctorSessionsIndex() {
                 <option value="unknown">Unknown</option>
               </select>
             </label>
+            <Button
+              variant={needsAttentionActive ? "secondary" : "outline"}
+              size="sm"
+              onClick={needsAttentionActive ? clearNeedsAttention : applyNeedsAttention}
+              data-testid="ai-doctor-sessions-index-needs-attention-preset"
+              aria-pressed={needsAttentionActive}
+              title="Caution + review checklist"
+            >
+              {NEEDS_ATTENTION_PRESET_LABEL}
+              {needsAttentionVisible > 0 ? (
+                <span
+                  className="ml-1 text-[11px] text-muted-foreground"
+                  data-testid="ai-doctor-sessions-index-needs-attention-count"
+                >
+                  : {needsAttentionVisible} visible
+                </span>
+              ) : null}
+            </Button>
             {filtersActive ? (
               <Button
                 variant="ghost"
@@ -845,6 +881,15 @@ export default function AiDoctorSessionsIndex() {
               className="flex flex-wrap items-center gap-2"
               data-testid="ai-doctor-sessions-index-active-filters"
             >
+              {needsAttentionActive ? (
+                <Badge
+                  variant="default"
+                  className="text-[11px]"
+                  data-testid="ai-doctor-sessions-index-needs-attention-badge"
+                >
+                  {NEEDS_ATTENTION_PRESET_LABEL}
+                </Badge>
+              ) : null}
               {activeLabels.map((label) => (
                 <Badge
                   key={label}

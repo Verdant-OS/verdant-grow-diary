@@ -145,26 +145,63 @@ function IndexRow({ row }: { row: AiDoctorSessionRow }) {
 }
 
 export default function AiDoctorSessionsIndex() {
-  const [page, setPage] = useState(0);
-  const [filters, setFilters] = useState<SessionsIndexFilters>(DEFAULT_FILTERS);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Derive filters + page from URL (single source of truth).
+  const filters = useMemo<SessionsIndexFilters>(
+    () =>
+      parseFilters({
+        risk: searchParams.get(FILTER_PARAM_KEYS.risk) ?? undefined,
+        hasActions: searchParams.get(FILTER_PARAM_KEYS.hasActions) ?? undefined,
+        dateRange: searchParams.get(FILTER_PARAM_KEYS.dateRange) ?? undefined,
+      }),
+    [searchParams],
+  );
+  const page = useMemo(
+    () => parsePageParam(searchParams.get(FILTER_PARAM_KEYS.page) ?? undefined),
+    [searchParams],
+  );
+
   const { data, isLoading, error } = useAiDoctorSessionsIndex(page, filters);
   const rows = data?.rows ?? [];
   const hasMore = !!data?.hasMore;
   const filtersActive = isFiltersActive(filters);
   const activeLabels = formatActiveFilterLabels(filters);
 
+  const writeParams = (next: SessionsIndexFilters, nextPage: number) => {
+    const params = new URLSearchParams();
+    // Preserve any unrelated params already on the URL.
+    searchParams.forEach((value, key) => {
+      if (
+        key !== FILTER_PARAM_KEYS.risk &&
+        key !== FILTER_PARAM_KEYS.hasActions &&
+        key !== FILTER_PARAM_KEYS.dateRange &&
+        key !== FILTER_PARAM_KEYS.page
+      ) {
+        params.set(key, value);
+      }
+    });
+    for (const [k, v] of Object.entries(serializeFilters(next))) params.set(k, v);
+    const pageStr = serializePageParam(nextPage);
+    if (pageStr) params.set(FILTER_PARAM_KEYS.page, pageStr);
+    setSearchParams(params, { replace: true });
+  };
+
   const updateFilter = <K extends keyof SessionsIndexFilters>(
     key: K,
     value: SessionsIndexFilters[K],
   ) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
-    setPage(0);
+    writeParams({ ...filters, [key]: value }, 0);
   };
 
   const clearFilters = () => {
-    setFilters(DEFAULT_FILTERS);
-    setPage(0);
+    writeParams(DEFAULT_FILTERS, 0);
   };
+
+  const goToPage = (nextPage: number) => {
+    writeParams(filters, Math.max(0, nextPage));
+  };
+
 
   return (
     <div data-testid="ai-doctor-sessions-index-page" className="space-y-4">

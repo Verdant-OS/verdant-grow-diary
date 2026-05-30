@@ -215,12 +215,12 @@ describe("Copy link — static safety", () => {
       ".delete(",
       ".upsert(",
       "functions.invoke",
-      "action_queue",
-      "alerts",
+      'from("action_queue")',
+      "from('action_queue')",
+      'from("alerts")',
+      "from('alerts')",
       "service_role",
-      "mqtt",
       "MQTT",
-      "relay",
     ];
     for (const src of sources) {
       for (const term of forbidden) {

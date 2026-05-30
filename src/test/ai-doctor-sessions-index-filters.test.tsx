@@ -112,6 +112,7 @@ describe("aiDoctorSessionsIndexFilters — pure helpers", () => {
 const eqSpy = vi.fn();
 const notSpy = vi.fn();
 const gteSpy = vi.fn();
+const orSpy = vi.fn();
 const rangeSpy = vi.fn(() => Promise.resolve({ data: [], error: null }));
 const orderSpy = vi.fn(() => ({ range: rangeSpy }));
 
@@ -119,6 +120,7 @@ type Builder = {
   eq: (col: string, val: unknown) => Builder;
   not: (col: string, op: string, val: unknown) => Builder;
   gte: (col: string, val: unknown) => Builder;
+  or: (expr: string) => Builder;
   order: typeof orderSpy;
 };
 
@@ -134,6 +136,10 @@ const makeBuilder = (): Builder => {
     },
     gte: (col, val) => {
       gteSpy(col, val);
+      return b;
+    },
+    or: (expr) => {
+      orSpy(expr);
       return b;
     },
     order: orderSpy,

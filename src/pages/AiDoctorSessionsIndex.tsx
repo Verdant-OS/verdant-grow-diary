@@ -352,6 +352,7 @@ export default function AiDoctorSessionsIndex() {
       FILTER_PARAM_KEYS.caution,
       FILTER_PARAM_KEYS.hasChecklist,
       FILTER_PARAM_KEYS.confidence,
+      FILTER_PARAM_KEYS.reviewStatus,
       FILTER_PARAM_KEYS.sort,
       FILTER_PARAM_KEYS.page,
     ]);

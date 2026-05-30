@@ -20,6 +20,7 @@ export interface AiDoctorSessionRow {
   id: string;
   created_at: string;
   plant_id: string | null;
+  tent_id?: string | null;
   grow_id: string | null;
   question: string | null;
   diagnosis: Diagnosis | null;
@@ -29,6 +30,9 @@ export interface AiDoctorSessionRow {
   suggested_actions: DiagnosisSuggestedAction[];
 }
 
+const SESSION_SELECT =
+  "id,created_at,plant_id,tent_id,grow_id,question,diagnosis,raw_confidence,displayed_confidence,context_confidence_ceiling,suggested_actions";
+
 export function useAiDoctorSessions(plantId: string | null | undefined) {
   return useQuery({
     queryKey: ["ai_doctor_sessions", plantId ?? null],
@@ -36,10 +40,25 @@ export function useAiDoctorSessions(plantId: string | null | undefined) {
     queryFn: async (): Promise<AiDoctorSessionRow[]> => {
       const { data, error } = await supabase
         .from("ai_doctor_sessions" as never)
-        .select(
-          "id,created_at,plant_id,grow_id,question,diagnosis,raw_confidence,displayed_confidence,context_confidence_ceiling,suggested_actions",
-        )
+        .select(SESSION_SELECT)
         .eq("plant_id", plantId as string)
+        .order("created_at", { ascending: false })
+        .limit(AI_DOCTOR_SESSIONS_LIMIT);
+      if (error) throw error;
+      return (data ?? []) as AiDoctorSessionRow[];
+    },
+  });
+}
+
+export function useTentAiDoctorSessions(tentId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["ai_doctor_sessions", "tent", tentId ?? null],
+    enabled: !!tentId,
+    queryFn: async (): Promise<AiDoctorSessionRow[]> => {
+      const { data, error } = await supabase
+        .from("ai_doctor_sessions" as never)
+        .select(SESSION_SELECT)
+        .eq("tent_id", tentId as string)
         .order("created_at", { ascending: false })
         .limit(AI_DOCTOR_SESSIONS_LIMIT);
       if (error) throw error;

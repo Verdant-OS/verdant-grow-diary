@@ -95,7 +95,7 @@ const newUnknownConf = makeRow(
   { displayed_confidence: null, raw_confidence: null },
 );
 
-const ALL = [oldHealthy, newHealthy, newCritical, oldHighLowConf, newUnknownConf];
+const ALL = [oldHealthy, newHealthy, newHighRisk, oldHighLowConf, newUnknownConf];
 
 describe("parseSort", () => {
   it("accepts known options and rejects garbage", () => {
@@ -110,7 +110,7 @@ describe("applyClientSideSort", () => {
   it("default (newest) puts most recent created_at first", () => {
     expect(applyClientSideSort(ALL, "newest").map((r) => r.id)).toEqual([
       "new-uk",
-      "new-crit",
+      "new-hr",
       "new-healthy",
       "old-high",
       "old-healthy",
@@ -121,13 +121,13 @@ describe("applyClientSideSort", () => {
       "old-healthy",
       "old-high",
       "new-healthy",
-      "new-crit",
+      "new-hr",
       "new-uk",
     ]);
   });
   it("highest-risk first, then newest tie-break", () => {
     const ids = applyClientSideSort(ALL, "highest-risk").map((r) => r.id);
-    expect(ids[0]).toBe("new-crit"); // critical
+    expect(ids[0]).toBe("new-hr"); // critical
     expect(ids[1]).toBe("old-high"); // high
     expect(ids[2]).toBe("new-uk"); // medium
     // low-risk healthy rows last, newest first among them.
@@ -138,7 +138,7 @@ describe("applyClientSideSort", () => {
     expect(ids[0]).toBe("new-uk"); // unknown
     expect(ids[1]).toBe("old-high"); // low
     // remaining = high confidence, newest-first
-    expect(ids.slice(2)).toEqual(["new-crit", "new-healthy", "old-healthy"]);
+    expect(ids.slice(2)).toEqual(["new-hr", "new-healthy", "old-healthy"]);
   });
   it("review-priority orders caution/checklist > risk > low-conf > newest", () => {
     const ids = applyClientSideSort(ALL, "review-priority").map((r) => r.id);
@@ -147,7 +147,7 @@ describe("applyClientSideSort", () => {
     expect(ids[0]).toBe("old-high");
     expect(ids[1]).toBe("new-uk");
     // new-crit is critical risk but high confidence + no caution, follows.
-    expect(ids[2]).toBe("new-crit");
+    expect(ids[2]).toBe("new-hr");
     // healthy rows last, newest-first.
     expect(ids.slice(3)).toEqual(["new-healthy", "old-healthy"]);
   });

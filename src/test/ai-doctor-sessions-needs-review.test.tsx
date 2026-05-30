@@ -214,7 +214,8 @@ describe("useAiDoctorSessionsIndex — needs-review application", () => {
     await screen.findByTestId("ai-doctor-sessions-index-page");
     await flush();
     expect(orSpy).toHaveBeenCalled();
-    const expr = orSpy.mock.calls.at(-1)?.[0];
+    const lastCall = orSpy.mock.calls.at(-1) as unknown as [string];
+    const expr = lastCall?.[0];
     expect(expr).toMatch(/riskLevel\.eq\.high/);
     expect(expr).toMatch(/riskLevel\.eq\.critical/);
     expect(expr).toMatch(/suggested_actions\.neq\.\[\]/);

@@ -36,6 +36,7 @@ import {
   serializePageParam,
   type DateRangeFilter,
   type HasActionsFilter,
+  type NeedsReviewFilter,
   type RiskFilter,
   type SessionsIndexFilters,
 } from "@/lib/aiDoctorSessionsIndexFilters";

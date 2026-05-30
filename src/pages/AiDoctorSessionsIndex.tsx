@@ -11,7 +11,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Stethoscope, Link2, Check, AlertCircle, Bookmark, Trash2 } from "lucide-react";
+import { Stethoscope, Link2, Check, AlertCircle, Bookmark, Trash2, ShieldAlert, Info } from "lucide-react";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +25,12 @@ import {
   useAiDoctorSessionsIndex,
   type AiDoctorSessionRow,
 } from "@/hooks/use-ai-doctor-sessions";
+import {
+  buildSessionRowCautionIndicator,
+  isSessionLimitedContext,
+  LIMITED_CONTEXT_LABEL,
+  LIMITED_CONTEXT_TITLE,
+} from "@/lib/aiDoctorSessionDetailViewModel";
 import {
   DEFAULT_FILTERS,
   FILTER_PARAM_KEYS,
@@ -93,6 +99,8 @@ function IndexRow({ row }: { row: AiDoctorSessionRow }) {
   const actionCount = Array.isArray(row.suggested_actions) ? row.suggested_actions.length : 0;
   const preview = summaryPreview(d?.summary ?? null);
   const needsReview = sessionNeedsReview(row);
+  const caution = buildSessionRowCautionIndicator(row);
+  const limitedContext = isSessionLimitedContext(row);
 
   return (
     <li
@@ -145,7 +153,32 @@ function IndexRow({ row }: { row: AiDoctorSessionRow }) {
             Needs review
           </Badge>
         ) : null}
+        {caution.show ? (
+          <Badge
+            variant="outline"
+            className="text-[11px] border-amber-500/50 text-amber-700 dark:text-amber-300 inline-flex items-center gap-1"
+            data-testid="ai-doctor-sessions-index-caution-indicator"
+            title={caution.title}
+            aria-label={`${caution.label}. ${caution.title}`}
+          >
+            <ShieldAlert className="h-3 w-3" />
+            {caution.label}
+          </Badge>
+        ) : null}
+        {limitedContext ? (
+          <Badge
+            variant="outline"
+            className="text-[11px] text-muted-foreground inline-flex items-center gap-1"
+            data-testid="ai-doctor-sessions-index-limited-context-indicator"
+            title={LIMITED_CONTEXT_TITLE}
+            aria-label={`${LIMITED_CONTEXT_LABEL}. ${LIMITED_CONTEXT_TITLE}`}
+          >
+            <Info className="h-3 w-3" />
+            {LIMITED_CONTEXT_LABEL}
+          </Badge>
+        ) : null}
       </div>
+
 
       {d?.likelyIssue ? (
         <p

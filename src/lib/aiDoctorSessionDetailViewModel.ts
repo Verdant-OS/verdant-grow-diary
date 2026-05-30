@@ -216,3 +216,66 @@ export function buildCautionNote(vm: ReviewSummaryViewModel): CautionNote {
   };
 }
 
+
+/**
+ * Compact caution indicator for an `ai_doctor_sessions` row on the index list.
+ * Reuses `buildCautionNote` so the index and detail page agree on what counts
+ * as "review before acting".
+ *
+ * Input shape is intentionally minimal — only the fields the index already
+ * fetches — to avoid coupling to the full row type.
+ */
+export interface SessionRowLike {
+  diagnosis: Diagnosis | null | undefined;
+  raw_confidence?: number | null;
+  displayed_confidence?: number | null;
+  suggested_actions?: DiagnosisSuggestedAction[] | null;
+  plant_id?: string | null;
+  tent_id?: string | null;
+  grow_id?: string | null;
+}
+
+export interface SessionRowCautionIndicator {
+  show: boolean;
+  /** Short label safe for a compact badge. */
+  label: string;
+  /** Longer reason text for tooltip / aria-label. */
+  title: string;
+}
+
+export const ROW_CAUTION_LABEL = "Review before acting";
+
+export function buildSessionRowCautionIndicator(
+  row: SessionRowLike,
+): SessionRowCautionIndicator {
+  const vm = buildReviewSummaryViewModel({
+    diagnosis: row.diagnosis ?? null,
+    rawConfidence: row.raw_confidence ?? null,
+    displayedConfidence: row.displayed_confidence ?? null,
+    suggestedActions: row.suggested_actions ?? null,
+  });
+  const note = buildCautionNote(vm);
+  return {
+    show: note.show,
+    label: ROW_CAUTION_LABEL,
+    title: note.reasons.join(" ") || note.text,
+  };
+}
+
+export const LIMITED_CONTEXT_LABEL = "Limited context";
+export const LIMITED_CONTEXT_TITLE =
+  "Evidence and grow/plant/tent context were sparse for this session.";
+
+/**
+ * A session is "limited context" when it lacks both linked grow context AND
+ * captured diagnostic evidence. Used for a calm fallback indicator on the
+ * index list.
+ */
+export function isSessionLimitedContext(row: SessionRowLike): boolean {
+  const evidence = Array.isArray(row.diagnosis?.evidence)
+    ? row.diagnosis!.evidence.filter((s) => typeof s === "string" && s.trim().length > 0)
+    : [];
+  const hasAnyContext =
+    !!row.plant_id || !!row.tent_id || !!row.grow_id || evidence.length > 0;
+  return !hasAnyContext;
+}

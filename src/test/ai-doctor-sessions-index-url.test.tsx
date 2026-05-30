@@ -128,9 +128,9 @@ describe("serializeFilters", () => {
   it("round-trips through parseFilters for all valid values", () => {
     const cases: SessionsIndexFilters[] = [
       DEFAULT_FILTERS,
-      { risk: "low", hasActions: "all", dateRange: "all", needsReview: "all" },
-      { risk: "critical", hasActions: "yes", dateRange: "30d", needsReview: "yes" },
-      { risk: "medium", hasActions: "no", dateRange: "7d", needsReview: "no" },
+      { ...DEFAULT_FILTERS, risk: "low" },
+      { ...DEFAULT_FILTERS, risk: "critical", hasActions: "yes", dateRange: "30d", needsReview: "yes" },
+      { ...DEFAULT_FILTERS, risk: "medium", hasActions: "no", dateRange: "7d", needsReview: "no" },
     ];
     for (const f of cases) {
       const serialized = serializeFilters(f);

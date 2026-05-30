@@ -259,6 +259,8 @@ export function formatActiveFilterLabels(f: SessionsIndexFilters): string[] {
   if (f.hasChecklist === "yes") labels.push("Has review checklist");
   if (f.hasChecklist === "no") labels.push("No review checklist");
   if (f.confidence !== "all") labels.push(CONFIDENCE_LABEL[f.confidence]);
+  if (isReviewStatusFilterActive(f.reviewStatus))
+    labels.push(REVIEW_STATUS_LABEL[f.reviewStatus]);
   if (f.sort !== "newest") labels.push(SORT_LABEL[f.sort]);
   return labels;
 }

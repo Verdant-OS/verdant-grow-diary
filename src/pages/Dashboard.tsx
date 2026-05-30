@@ -83,7 +83,7 @@ import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingC
 import DashboardDailyGrowCheckPanel from "@/components/DashboardDailyGrowCheckPanel";
 
 import { Badge } from "@/components/ui/badge";
-import { actionDetailPath, actionsPath, alertDetailPath, dashboardPath, logsPath, tentDetailPath } from "@/lib/routes";
+import { actionDetailPath, actionsPath, alertDetailPath, dashboardPath, logsPath, tentDetailPath, tentsPath } from "@/lib/routes";
 import { formatDistanceToNow } from "date-fns";
 
 
@@ -217,7 +217,7 @@ export default function Dashboard() {
             <Button asChild variant="outline" data-testid="dashboard-daily-grow-check-entry">
               <Link to="/daily-check">Daily Grow Check</Link>
             </Button>
-            <Button asChild className="gradient-leaf text-primary-foreground"><Link to="/tents">Open tents</Link></Button>
+            <Button asChild className="gradient-leaf text-primary-foreground"><Link to={tentsPath()}>Open tents</Link></Button>
           </div>
         }
       />

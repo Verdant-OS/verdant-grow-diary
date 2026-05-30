@@ -46,7 +46,7 @@ import {
   type PlantForMerge,
 } from "@/lib/plantMergeRules";
 import { buildArchivePlantPayload } from "@/lib/plantTentRelationshipRules";
-import { plantDetailPath } from "@/lib/routes";
+import { plantDetailPath, plantsPath } from "@/lib/routes";
 
 import {
   getEffectivePlantGrowId,
@@ -717,7 +717,7 @@ function MergeSuccessView({
           data-testid="plant-merge-success-back"
           asChild
         >
-          <Link to="/plants">Back to Plants</Link>
+          <Link to={plantsPath()}>Back to Plants</Link>
         </Button>
         {target && (
           <Button

@@ -34,6 +34,7 @@ import {
   parsePageParam,
   serializeFilters,
   serializePageParam,
+  sessionNeedsReview,
   type DateRangeFilter,
   type HasActionsFilter,
   type NeedsReviewFilter,
@@ -91,6 +92,7 @@ function IndexRow({ row }: { row: AiDoctorSessionRow }) {
   const confidence = fmtConfidence(row.displayed_confidence ?? row.raw_confidence);
   const actionCount = Array.isArray(row.suggested_actions) ? row.suggested_actions.length : 0;
   const preview = summaryPreview(d?.summary ?? null);
+  const needsReview = sessionNeedsReview(row);
 
   return (
     <li
@@ -132,6 +134,17 @@ function IndexRow({ row }: { row: AiDoctorSessionRow }) {
         >
           {actionCount} action{actionCount !== 1 ? "s" : ""}
         </Badge>
+        {needsReview ? (
+          <Badge
+            variant="destructive"
+            className="text-[11px]"
+            data-testid="ai-doctor-sessions-index-needs-review-badge"
+            title="High risk or suggested actions present."
+            aria-label="High risk or suggested actions present."
+          >
+            Needs review
+          </Badge>
+        ) : null}
       </div>
 
       {d?.likelyIssue ? (

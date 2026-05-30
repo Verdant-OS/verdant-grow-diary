@@ -130,6 +130,23 @@ function CopyLinkButton({ sessionId }: { sessionId: string }) {
   );
 }
 
+function OpenInNewTabLink({ sessionId }: { sessionId: string }) {
+  const href = buildSessionDetailCanonicalUrl(sessionId);
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      data-testid="ai-doctor-session-detail-open-new-tab-link"
+      aria-label="Open session in new tab"
+      className="inline-flex items-center gap-2 h-9 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+    >
+      <ExternalLink className="h-4 w-4" />
+      <span>Open in new tab</span>
+    </a>
+  );
+}
+
 const RISK_TONE_CLASSES: Record<ReviewRiskTone, string> = {
   neutral: "border-border bg-muted/30",
   info: "border-border bg-muted/20",

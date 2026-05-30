@@ -416,7 +416,7 @@ export default function Coach() {
             </ul>
             <div className="mt-2">
               <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs">
-                <Link to="/actions">
+                <Link to={actionsPath()}>
                   <ListChecks className="h-3 w-3" /> Open Action Queue
                 </Link>
               </Button>

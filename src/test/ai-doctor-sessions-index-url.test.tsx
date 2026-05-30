@@ -323,12 +323,15 @@ describe("URL persistence — static safety", () => {
       expect(lower).not.toContain(tok);
     }
   });
-  it("FILTER_PARAM_KEYS exposes risk/hasActions/dateRange/needsReview/page", () => {
+  it("FILTER_PARAM_KEYS exposes all filter + page keys", () => {
     expect(FILTER_PARAM_KEYS).toEqual({
       risk: "risk",
       hasActions: "hasActions",
       dateRange: "dateRange",
       needsReview: "needsReview",
+      caution: "caution",
+      hasChecklist: "hasChecklist",
+      confidence: "confidence",
       page: "page",
     });
   });

@@ -116,6 +116,9 @@ function ReviewSummarySection({ vm }: { vm: ReviewSummaryViewModel }) {
             Confidence: {vm.confidencePct}%
           </Badge>
         ) : null}
+        <div className="ml-auto">
+          <CopyReviewSummaryButton vm={vm} />
+        </div>
       </header>
 
       <ReviewBlock

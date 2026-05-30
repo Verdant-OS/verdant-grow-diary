@@ -142,12 +142,15 @@ describe("applyClientSideSort", () => {
   });
   it("review-priority orders caution/checklist > risk > low-conf > newest", () => {
     const ids = applyClientSideSort(ALL, "review-priority").map((r) => r.id);
-    // Both old-high and new-uk are caution+checklist; among them risk
-    // ranks high(3) > medium(2), so old-high first, then new-uk.
+    // old-high, new-hr, new-uk all qualify as caution+checklist given the
+    // real buildSessionRowCautionIndicator behavior. Within that group risk
+    // ranks high(3) > medium(2), then lower confidence first:
+    //   old-high → high risk, low conf
+    //   new-hr   → high risk, high conf
+    //   new-uk   → medium risk, unknown conf
     expect(ids[0]).toBe("old-high");
-    expect(ids[1]).toBe("new-uk");
-    // new-crit is critical risk but high confidence + no caution, follows.
-    expect(ids[2]).toBe("new-hr");
+    expect(ids[1]).toBe("new-hr");
+    expect(ids[2]).toBe("new-uk");
     // healthy rows last, newest-first.
     expect(ids.slice(3)).toEqual(["new-healthy", "old-healthy"]);
   });

@@ -881,6 +881,15 @@ export default function AiDoctorSessionsIndex() {
               className="flex flex-wrap items-center gap-2"
               data-testid="ai-doctor-sessions-index-active-filters"
             >
+              {needsAttentionActive ? (
+                <Badge
+                  variant="default"
+                  className="text-[11px]"
+                  data-testid="ai-doctor-sessions-index-needs-attention-badge"
+                >
+                  {NEEDS_ATTENTION_PRESET_LABEL}
+                </Badge>
+              ) : null}
               {activeLabels.map((label) => (
                 <Badge
                   key={label}

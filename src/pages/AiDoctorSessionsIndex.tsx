@@ -255,6 +255,9 @@ export default function AiDoctorSessionsIndex() {
         hasActions: searchParams.get(FILTER_PARAM_KEYS.hasActions) ?? undefined,
         dateRange: searchParams.get(FILTER_PARAM_KEYS.dateRange) ?? undefined,
         needsReview: searchParams.get(FILTER_PARAM_KEYS.needsReview) ?? undefined,
+        caution: searchParams.get(FILTER_PARAM_KEYS.caution) ?? undefined,
+        hasChecklist: searchParams.get(FILTER_PARAM_KEYS.hasChecklist) ?? undefined,
+        confidence: searchParams.get(FILTER_PARAM_KEYS.confidence) ?? undefined,
       }),
     [searchParams],
   );

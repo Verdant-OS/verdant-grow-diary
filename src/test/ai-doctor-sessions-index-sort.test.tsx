@@ -269,7 +269,10 @@ describe("AiDoctorSessionsIndex — sort UI", () => {
       { target: { value: "review-priority" } },
     );
     // Preset keeps only caution+checklist rows: old-high, new-uk.
-    expect(rowIds()).toEqual(["old-high", "new-uk"]);
+    // Preset keeps caution+checklist rows: old-high, new-hr, new-uk.
+    // Review-priority sort: high-risk (old-high low conf, new-hr high conf)
+    // before medium (new-uk).
+    expect(rowIds()).toEqual(["old-high", "new-hr", "new-uk"]);
   });
 
   it("sort works after selecting the built-in saved view", async () => {

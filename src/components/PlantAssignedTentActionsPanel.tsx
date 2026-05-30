@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { usePlantAssignedTentActions } from "@/hooks/usePlantAssignedTentActions";
 import type { PlantAssignedTentActionRow } from "@/lib/plantAssignedTentActionRules";
+import { actionsPath } from "@/lib/routes";
 
 interface Props {
   tentId: string | null | undefined;

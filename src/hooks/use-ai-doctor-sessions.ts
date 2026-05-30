@@ -66,3 +66,20 @@ export function useTentAiDoctorSessions(tentId: string | null | undefined) {
     },
   });
 }
+
+export function useAiDoctorSession(sessionId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["ai_doctor_sessions", "detail", sessionId ?? null],
+    enabled: !!sessionId,
+    queryFn: async (): Promise<AiDoctorSessionRow | null> => {
+      const { data, error } = await supabase
+        .from("ai_doctor_sessions" as never)
+        .select(SESSION_SELECT)
+        .eq("id", sessionId as string)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as AiDoctorSessionRow | null;
+    },
+  });
+}
+

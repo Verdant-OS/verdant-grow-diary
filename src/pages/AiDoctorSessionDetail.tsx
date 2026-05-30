@@ -14,9 +14,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAiDoctorSession } from "@/hooks/use-ai-doctor-sessions";
 import {
+  buildCautionNote,
   buildReviewSummaryViewModel,
   EMPTY_FALLBACKS,
   formatDoctorReviewSummaryText,
+  type CautionNote,
   type ReviewRiskTone,
   type ReviewSummaryViewModel,
 } from "@/lib/aiDoctorSessionDetailViewModel";

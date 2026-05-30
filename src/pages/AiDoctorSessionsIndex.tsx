@@ -343,7 +343,7 @@ export default function AiDoctorSessionsIndex() {
                   variant="outline"
                   size="sm"
                   disabled={page === 0}
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  onClick={() => goToPage(page - 1)}
                   data-testid="ai-doctor-sessions-index-prev"
                 >
                   Previous

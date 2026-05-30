@@ -441,6 +441,10 @@ export default function AiDoctorSessionDetail() {
             </div>
             {sessionId ? (
               <div className="flex flex-wrap items-center gap-2">
+                <SessionQuickJumpLinks
+                  plantId={data?.plant_id ?? null}
+                  tentId={data?.tent_id ?? null}
+                />
                 <CopyLinkButton sessionId={sessionId} />
                 <OpenInNewTabLink sessionId={sessionId} />
               </div>

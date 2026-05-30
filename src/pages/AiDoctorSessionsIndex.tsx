@@ -9,12 +9,17 @@
  *   - No writes. No action_queue. No alerts.
  *   - Rows deep-link to the existing historical detail page.
  */
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Stethoscope } from "lucide-react";
+import { Stethoscope, Link2, Check, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  copyShareLink,
+  readCurrentShareUrl,
+  type CopyLinkStatus,
+} from "@/lib/aiDoctorSessionsShareLinkRules";
 import { Button } from "@/components/ui/button";
 import {
   useAiDoctorSessionsIndex,

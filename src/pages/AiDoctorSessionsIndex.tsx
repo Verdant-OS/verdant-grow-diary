@@ -267,7 +267,15 @@ export default function AiDoctorSessionsIndex() {
   );
 
   const { data, isLoading, error } = useAiDoctorSessionsIndex(page, filters);
-  const rows = data?.rows ?? [];
+  const rawRows = data?.rows ?? [];
+  // Apply derived (client-side) filters: caution / hasChecklist / confidence.
+  // Server-side filters (risk, hasActions, dateRange, needsReview) already
+  // applied in the hook. Note: pagination reflects the raw query; rows hidden
+  // by client-side filters do not regress hasMore for the next page.
+  const rows = useMemo(
+    () => applyClientSideFilters(rawRows, filters),
+    [rawRows, filters],
+  );
   const hasMore = !!data?.hasMore;
   const filtersActive = isFiltersActive(filters);
   const activeLabels = formatActiveFilterLabels(filters);
@@ -275,16 +283,18 @@ export default function AiDoctorSessionsIndex() {
   const writeParams = (next: SessionsIndexFilters, nextPage: number) => {
     const params = new URLSearchParams();
     // Preserve any unrelated params already on the URL.
+    const managed = new Set<string>([
+      FILTER_PARAM_KEYS.risk,
+      FILTER_PARAM_KEYS.hasActions,
+      FILTER_PARAM_KEYS.dateRange,
+      FILTER_PARAM_KEYS.needsReview,
+      FILTER_PARAM_KEYS.caution,
+      FILTER_PARAM_KEYS.hasChecklist,
+      FILTER_PARAM_KEYS.confidence,
+      FILTER_PARAM_KEYS.page,
+    ]);
     searchParams.forEach((value, key) => {
-      if (
-        key !== FILTER_PARAM_KEYS.risk &&
-        key !== FILTER_PARAM_KEYS.hasActions &&
-        key !== FILTER_PARAM_KEYS.dateRange &&
-        key !== FILTER_PARAM_KEYS.needsReview &&
-        key !== FILTER_PARAM_KEYS.page
-      ) {
-        params.set(key, value);
-      }
+      if (!managed.has(key)) params.set(key, value);
     });
     for (const [k, v] of Object.entries(serializeFilters(next))) params.set(k, v);
     const pageStr = serializePageParam(nextPage);

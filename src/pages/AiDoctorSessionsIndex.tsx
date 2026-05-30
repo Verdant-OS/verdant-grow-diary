@@ -93,6 +93,7 @@ import { useAiDoctorSessionReviews } from "@/hooks/useAiDoctorSessionReviews";
 import {
   buildSessionReviewStatusIndicator,
   type AiDoctorSessionReviewState,
+  type AiDoctorSessionReviewStatusFilter,
 } from "@/lib/aiDoctorSessionReviewStatusRules";
 
 function fmtDate(ts: string | null): string {
@@ -303,6 +304,7 @@ export default function AiDoctorSessionsIndex() {
         caution: searchParams.get(FILTER_PARAM_KEYS.caution) ?? undefined,
         hasChecklist: searchParams.get(FILTER_PARAM_KEYS.hasChecklist) ?? undefined,
         confidence: searchParams.get(FILTER_PARAM_KEYS.confidence) ?? undefined,
+        reviewStatus: searchParams.get(FILTER_PARAM_KEYS.reviewStatus) ?? undefined,
         sort: searchParams.get(FILTER_PARAM_KEYS.sort) ?? undefined,
       }),
     [searchParams],
@@ -314,18 +316,23 @@ export default function AiDoctorSessionsIndex() {
 
   const { data, isLoading, error } = useAiDoctorSessionsIndex(page, filters);
   const rawRows = data?.rows ?? [];
-  // Apply derived (client-side) filters: caution / hasChecklist / confidence.
-  // Server-side filters (risk, hasActions, dateRange, needsReview) already
-  // applied in the hook. Note: pagination reflects the raw query; rows hidden
-  // by client-side filters do not regress hasMore for the next page.
-  const rows = useMemo(
-    () => applyClientSideSort(applyClientSideFilters(rawRows, filters), filters.sort),
-    [rawRows, filters],
-  );
-  // Scope review-event fetch to the currently visible page's session IDs only.
-  const visibleSessionIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  // Scope review-event fetch to the raw (server-paginated) IDs so the review
+  // filter has data available even when its filter narrows the row set.
+  const visibleSessionIds = useMemo(() => rawRows.map((r) => r.id), [rawRows]);
   const { data: reviewsData } = useAiDoctorSessionReviews(visibleSessionIds);
   const reviewStateBySession = reviewsData?.stateBySession ?? null;
+  // Apply derived (client-side) filters: caution / hasChecklist / confidence /
+  // reviewStatus. Server-side filters (risk, hasActions, dateRange,
+  // needsReview) already applied in the hook. Pagination reflects the raw
+  // query; rows hidden by client-side filters do not regress hasMore.
+  const rows = useMemo(
+    () =>
+      applyClientSideSort(
+        applyClientSideFilters(rawRows, filters, reviewStateBySession),
+        filters.sort,
+      ),
+    [rawRows, filters, reviewStateBySession],
+  );
   const hasMore = !!data?.hasMore;
   const filtersActive = isFiltersActive(filters);
   const activeLabels = formatActiveFilterLabels(filters);
@@ -346,6 +353,7 @@ export default function AiDoctorSessionsIndex() {
       FILTER_PARAM_KEYS.caution,
       FILTER_PARAM_KEYS.hasChecklist,
       FILTER_PARAM_KEYS.confidence,
+      FILTER_PARAM_KEYS.reviewStatus,
       FILTER_PARAM_KEYS.sort,
       FILTER_PARAM_KEYS.page,
     ]);
@@ -692,6 +700,26 @@ export default function AiDoctorSessionsIndex() {
                 <option value="medium">Medium (61–80%)</option>
                 <option value="high">High ({'>'}80%)</option>
                 <option value="unknown">Unknown</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="text-muted-foreground">Review</span>
+              <select
+                value={filters.reviewStatus}
+                onChange={(e) =>
+                  updateFilter(
+                    "reviewStatus",
+                    e.target.value as AiDoctorSessionReviewStatusFilter,
+                  )
+                }
+                data-testid="ai-doctor-sessions-index-filter-review-status"
+                className="rounded border bg-background px-2 py-1 text-sm"
+                title="Filter by durable review status"
+              >
+                <option value="any">Any</option>
+                <option value="not_reviewed">Not reviewed</option>
+                <option value="reviewed">Reviewed</option>
+                <option value="needs_follow_up">Needs follow-up</option>
               </select>
             </label>
             <label className="flex flex-col gap-1 text-xs">

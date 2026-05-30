@@ -8,6 +8,11 @@ import {
   buildSessionRowCautionIndicator,
   type SessionRowLike,
 } from "@/lib/aiDoctorSessionDetailViewModel";
+import {
+  isReviewStatusFilterActive,
+  type AiDoctorSessionReviewState,
+  type AiDoctorSessionReviewStatusFilter,
+} from "@/lib/aiDoctorSessionReviewStatusRules";
 
 export type RiskFilter = "all" | "low" | "medium" | "high" | "critical";
 export type HasActionsFilter = "all" | "yes" | "no";
@@ -63,6 +68,12 @@ export interface SessionsIndexFilters {
   caution: CautionFilter;
   hasChecklist: HasChecklistFilter;
   confidence: ConfidenceFilter;
+  /**
+   * Durable review status from `ai_doctor_session_reviews`. "any" is the
+   * default and is not active. "not_reviewed" matches rows with no review
+   * events (missing state) and rows whose latest event is "cleared".
+   */
+  reviewStatus: AiDoctorSessionReviewStatusFilter;
   sort: SortOption;
 }
 
@@ -82,6 +93,7 @@ export const DEFAULT_FILTERS: SessionsIndexFilters = {
   caution: "all",
   hasChecklist: "all",
   confidence: "all",
+  reviewStatus: "any",
   sort: "newest",
 };
 
@@ -97,6 +109,12 @@ export const CONFIDENCE_OPTIONS: ConfidenceFilter[] = [
   "medium",
   "high",
   "unknown",
+];
+export const REVIEW_STATUS_OPTIONS: AiDoctorSessionReviewStatusFilter[] = [
+  "any",
+  "not_reviewed",
+  "reviewed",
+  "needs_follow_up",
 ];
 
 export function parseRisk(value: unknown): RiskFilter {
@@ -145,6 +163,14 @@ export function parseSort(value: unknown): SortOption {
     : "newest";
 }
 
+export function parseReviewStatus(
+  value: unknown,
+): AiDoctorSessionReviewStatusFilter {
+  return REVIEW_STATUS_OPTIONS.includes(value as AiDoctorSessionReviewStatusFilter)
+    ? (value as AiDoctorSessionReviewStatusFilter)
+    : "any";
+}
+
 export function parseFilters(input: Partial<Record<keyof SessionsIndexFilters, unknown>>): SessionsIndexFilters {
   return {
     risk: parseRisk(input.risk),
@@ -154,6 +180,7 @@ export function parseFilters(input: Partial<Record<keyof SessionsIndexFilters, u
     caution: parseCaution(input.caution),
     hasChecklist: parseHasChecklist(input.hasChecklist),
     confidence: parseConfidence(input.confidence),
+    reviewStatus: parseReviewStatus(input.reviewStatus),
     sort: parseSort(input.sort),
   };
 }
@@ -167,6 +194,7 @@ export function isFiltersActive(f: SessionsIndexFilters): boolean {
     f.caution !== "all" ||
     f.hasChecklist !== "all" ||
     f.confidence !== "all" ||
+    isReviewStatusFilterActive(f.reviewStatus) ||
     f.sort !== "newest"
   );
 }
@@ -209,6 +237,15 @@ const SORT_LABEL: Record<Exclude<SortOption, "newest">, string> = {
   "review-priority": "Sort: Review priority",
 };
 
+const REVIEW_STATUS_LABEL: Record<
+  Exclude<AiDoctorSessionReviewStatusFilter, "any">,
+  string
+> = {
+  not_reviewed: "Review: Not reviewed",
+  reviewed: "Review: Reviewed",
+  needs_follow_up: "Review: Needs follow-up",
+};
+
 export function formatActiveFilterLabels(f: SessionsIndexFilters): string[] {
   const labels: string[] = [];
   if (f.risk !== "all") labels.push(RISK_LABEL[f.risk]);
@@ -222,6 +259,8 @@ export function formatActiveFilterLabels(f: SessionsIndexFilters): string[] {
   if (f.hasChecklist === "yes") labels.push("Has review checklist");
   if (f.hasChecklist === "no") labels.push("No review checklist");
   if (f.confidence !== "all") labels.push(CONFIDENCE_LABEL[f.confidence]);
+  if (isReviewStatusFilterActive(f.reviewStatus))
+    labels.push(REVIEW_STATUS_LABEL[f.reviewStatus]);
   if (f.sort !== "newest") labels.push(SORT_LABEL[f.sort]);
   return labels;
 }
@@ -238,6 +277,7 @@ export const FILTER_PARAM_KEYS = {
   caution: "caution",
   hasChecklist: "hasChecklist",
   confidence: "confidence",
+  reviewStatus: "reviewStatus",
   sort: "sort",
   page: "page",
 } as const;
@@ -258,6 +298,8 @@ export function serializeFilters(f: SessionsIndexFilters): Record<string, string
     out[FILTER_PARAM_KEYS.hasChecklist] = f.hasChecklist;
   if (f.confidence !== DEFAULT_FILTERS.confidence)
     out[FILTER_PARAM_KEYS.confidence] = f.confidence;
+  if (f.reviewStatus !== DEFAULT_FILTERS.reviewStatus)
+    out[FILTER_PARAM_KEYS.reviewStatus] = f.reviewStatus;
   if (f.sort !== DEFAULT_FILTERS.sort) out[FILTER_PARAM_KEYS.sort] = f.sort;
   return out;
 }
@@ -340,6 +382,7 @@ function pctFromUnit(val: unknown): number | null {
  * returns. Kept loose so tests can pass minimal fixtures.
  */
 export interface FilterableSessionRow extends SessionRowLike {
+  id?: string;
   displayed_confidence?: number | null;
   raw_confidence?: number | null;
 }
@@ -363,17 +406,37 @@ export function rowConfidenceBucket(
 }
 
 /**
- * Apply client-side derived filters (caution, hasChecklist, confidence) to a
- * page of session rows. Risk / hasActions / dateRange / needsReview are
- * already applied server-side by `useAiDoctorSessionsIndex`.
+ * Resolve a row's durable review status from the projected state map. Rows
+ * with no entry (or `cleared` events) project to `not_reviewed`. Pure.
+ */
+export function rowReviewStatus(
+  row: FilterableSessionRow,
+  stateBySession?: ReadonlyMap<string, AiDoctorSessionReviewState> | null,
+): "not_reviewed" | "reviewed" | "needs_follow_up" {
+  const id = typeof row?.id === "string" ? row.id : null;
+  if (!id || !stateBySession) return "not_reviewed";
+  const state = stateBySession.get(id);
+  return state?.status ?? "not_reviewed";
+}
+
+/**
+ * Apply client-side derived filters (caution, hasChecklist, confidence,
+ * reviewStatus) to a page of session rows. Risk / hasActions / dateRange /
+ * needsReview are already applied server-side by `useAiDoctorSessionsIndex`.
+ *
+ * `stateBySession` is the projected review-state map from
+ * `useAiDoctorSessionReviews`. If omitted, every row is treated as
+ * `not_reviewed` (missing state == not reviewed).
  *
  * Pure. Deterministic. Order-preserving.
  */
 export function applyClientSideFilters<T extends FilterableSessionRow>(
   rows: T[],
   f: SessionsIndexFilters,
+  stateBySession?: ReadonlyMap<string, AiDoctorSessionReviewState> | null,
 ): T[] {
   if (!Array.isArray(rows) || rows.length === 0) return [];
+  const reviewActive = isReviewStatusFilterActive(f.reviewStatus);
   return rows.filter((row) => {
     if (f.caution === "yes" && !rowHasCaution(row)) return false;
     if (f.caution === "no" && rowHasCaution(row)) return false;
@@ -381,6 +444,9 @@ export function applyClientSideFilters<T extends FilterableSessionRow>(
     if (f.hasChecklist === "no" && rowHasChecklist(row)) return false;
     if (f.confidence !== "all" && rowConfidenceBucket(row) !== f.confidence)
       return false;
+    if (reviewActive) {
+      if (rowReviewStatus(row, stateBySession) !== f.reviewStatus) return false;
+    }
     return true;
   });
 }

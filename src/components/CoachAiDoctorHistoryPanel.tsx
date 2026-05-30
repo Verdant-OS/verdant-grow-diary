@@ -5,7 +5,7 @@
  * Limited to the latest 5 sessions for the active grow.
  * No writes. No AI re-run. No queue actions.
  */
-import { Stethoscope } from "lucide-react";
+import { Stethoscope, ShieldAlert, Info } from "lucide-react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,12 @@ import {
   useGrowAiDoctorSessions,
   type AiDoctorSessionRow,
 } from "@/hooks/use-ai-doctor-sessions";
+import {
+  buildSessionRowCautionIndicator,
+  isSessionLimitedContext,
+  LIMITED_CONTEXT_LABEL,
+  LIMITED_CONTEXT_TITLE,
+} from "@/lib/aiDoctorSessionDetailViewModel";
 
 interface Props {
   growId: string | null | undefined;

@@ -4,12 +4,18 @@
  * Reads from `ai_doctor_sessions` via `useTentAiDoctorSessions` (RLS-scoped).
  * No writes. No queue action buttons. History view only.
  */
-import { Stethoscope } from "lucide-react";
+import { Stethoscope, ShieldAlert, Info } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { useTentAiDoctorSessions, type AiDoctorSessionRow } from "@/hooks/use-ai-doctor-sessions";
+import {
+  buildSessionRowCautionIndicator,
+  isSessionLimitedContext,
+  LIMITED_CONTEXT_LABEL,
+  LIMITED_CONTEXT_TITLE,
+} from "@/lib/aiDoctorSessionDetailViewModel";
 
 interface Props {
   tentId: string | null | undefined;
@@ -48,6 +54,8 @@ function SessionRow({ row }: { row: AiDoctorSessionRow }) {
   const riskLevel = row.diagnosis?.riskLevel ?? null;
   const confidence = fmtConfidence(row.displayed_confidence ?? row.raw_confidence);
   const actionCount = Array.isArray(row.suggested_actions) ? row.suggested_actions.length : 0;
+  const caution = buildSessionRowCautionIndicator(row);
+  const limitedContext = isSessionLimitedContext(row);
 
   return (
     <li
@@ -96,7 +104,32 @@ function SessionRow({ row }: { row: AiDoctorSessionRow }) {
             {actionCount} suggested action{actionCount !== 1 ? "s" : ""}
           </Badge>
         ) : null}
+        {caution.show ? (
+          <Badge
+            variant="outline"
+            className="text-[11px] border-amber-500/50 text-amber-700 dark:text-amber-300 inline-flex items-center gap-1"
+            data-testid="tent-ai-doctor-session-caution-indicator"
+            title={caution.title}
+            aria-label={`${caution.label}. ${caution.title}`}
+          >
+            <ShieldAlert className="h-3 w-3" />
+            {caution.label}
+          </Badge>
+        ) : null}
+        {limitedContext ? (
+          <Badge
+            variant="outline"
+            className="text-[11px] text-muted-foreground inline-flex items-center gap-1"
+            data-testid="tent-ai-doctor-session-limited-context-indicator"
+            title={LIMITED_CONTEXT_TITLE}
+            aria-label={`${LIMITED_CONTEXT_LABEL}. ${LIMITED_CONTEXT_TITLE}`}
+          >
+            <Info className="h-3 w-3" />
+            {LIMITED_CONTEXT_LABEL}
+          </Badge>
+        ) : null}
       </div>
+
       {likelyIssue ? (
         <p className="font-medium leading-snug" data-testid="tent-ai-doctor-session-likely-issue">
           {likelyIssue}

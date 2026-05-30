@@ -5,7 +5,7 @@
  * Limited to the latest 5 sessions for the active grow.
  * No writes. No AI re-run. No queue actions.
  */
-import { Stethoscope } from "lucide-react";
+import { Stethoscope, ShieldAlert, Info } from "lucide-react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,12 @@ import {
   useGrowAiDoctorSessions,
   type AiDoctorSessionRow,
 } from "@/hooks/use-ai-doctor-sessions";
+import {
+  buildSessionRowCautionIndicator,
+  isSessionLimitedContext,
+  LIMITED_CONTEXT_LABEL,
+  LIMITED_CONTEXT_TITLE,
+} from "@/lib/aiDoctorSessionDetailViewModel";
 
 interface Props {
   growId: string | null | undefined;
@@ -37,6 +43,9 @@ function HistoryRow({ row }: { row: AiDoctorSessionRow }) {
   const d = row.diagnosis;
   const confidence = fmtConfidence(row.displayed_confidence ?? row.raw_confidence);
   const actionCount = Array.isArray(row.suggested_actions) ? row.suggested_actions.length : 0;
+  const caution = buildSessionRowCautionIndicator(row);
+  const limitedContext = isSessionLimitedContext(row);
+
 
   return (
     <li
@@ -80,7 +89,32 @@ function HistoryRow({ row }: { row: AiDoctorSessionRow }) {
             {actionCount} action{actionCount !== 1 ? "s" : ""}
           </Badge>
         ) : null}
+        {caution.show ? (
+          <Badge
+            variant="outline"
+            className="text-[11px] border-amber-500/50 text-amber-700 dark:text-amber-300 inline-flex items-center gap-1"
+            data-testid="coach-ai-doctor-history-caution-indicator"
+            title={caution.title}
+            aria-label={`${caution.label}. ${caution.title}`}
+          >
+            <ShieldAlert className="h-3 w-3" />
+            {caution.label}
+          </Badge>
+        ) : null}
+        {limitedContext ? (
+          <Badge
+            variant="outline"
+            className="text-[11px] text-muted-foreground inline-flex items-center gap-1"
+            data-testid="coach-ai-doctor-history-limited-context-indicator"
+            title={LIMITED_CONTEXT_TITLE}
+            aria-label={`${LIMITED_CONTEXT_LABEL}. ${LIMITED_CONTEXT_TITLE}`}
+          >
+            <Info className="h-3 w-3" />
+            {LIMITED_CONTEXT_LABEL}
+          </Badge>
+        ) : null}
       </div>
+
       {d?.likelyIssue ? (
         <p
           className="font-medium leading-snug"

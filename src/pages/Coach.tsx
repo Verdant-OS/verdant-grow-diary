@@ -313,6 +313,9 @@ export default function Coach() {
 
       <CoachContextSufficiencyPanel result={contextSufficiency} className="mb-4" />
 
+      <CoachAiDoctorHistoryPanel growId={activeGrowId ?? null} />
+
+
       <div className="glass rounded-2xl p-4 space-y-4">
         <button type="button" onClick={() => fileRef.current?.click()}
           className="relative aspect-video w-full rounded-xl border-2 border-dashed border-border/60 overflow-hidden bg-secondary/40 hover:border-primary/60 transition">

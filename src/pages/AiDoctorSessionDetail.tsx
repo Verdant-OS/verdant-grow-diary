@@ -20,6 +20,7 @@ import {
   type ReviewRiskTone,
   type ReviewSummaryViewModel,
 } from "@/lib/aiDoctorSessionDetailViewModel";
+import { plantDetailPath, tentDetailPath } from "@/lib/routes";
 
 async function copyPlainText(text: string): Promise<boolean> {
   try {

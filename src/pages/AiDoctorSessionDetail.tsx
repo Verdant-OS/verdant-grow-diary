@@ -16,6 +16,7 @@ import { useAiDoctorSession } from "@/hooks/use-ai-doctor-sessions";
 import {
   buildCautionNote,
   buildCautionReasonTokens,
+  buildCautionReviewChecklist,
   buildReviewSummaryViewModel,
   EMPTY_FALLBACKS,
   formatDoctorReviewSummaryText,

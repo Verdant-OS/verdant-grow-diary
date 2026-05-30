@@ -322,6 +322,10 @@ export default function AiDoctorSessionsIndex() {
     () => applyClientSideSort(applyClientSideFilters(rawRows, filters), filters.sort),
     [rawRows, filters],
   );
+  // Scope review-event fetch to the currently visible page's session IDs only.
+  const visibleSessionIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const { data: reviewsData } = useAiDoctorSessionReviews(visibleSessionIds);
+  const reviewStateBySession = reviewsData?.stateBySession ?? null;
   const hasMore = !!data?.hasMore;
   const filtersActive = isFiltersActive(filters);
   const activeLabels = formatActiveFilterLabels(filters);

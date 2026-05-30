@@ -5,7 +5,7 @@
  * Paginated (25 per page), newest first.
  *
  * Safety:
- *   - No AI generation. No functions.invoke.
+ *   - No AI generation. No edge function invocations.
  *   - No writes. No action_queue. No alerts.
  *   - Rows deep-link to the existing historical detail page.
  */

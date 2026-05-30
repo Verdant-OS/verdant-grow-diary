@@ -287,9 +287,29 @@ export default function AiDoctorSessionsIndex() {
     }
   };
 
-  const handleDeleteSavedView = (id: string) => {
-    setSavedViews((prev) => removeSavedView(prev, id));
-    if (selectedSavedViewId === id) setSelectedSavedViewId("");
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const pendingDeleteView = pendingDeleteId
+    ? findSavedView(savedViews, pendingDeleteId)
+    : null;
+  const requestDeleteSavedView = (id: string) => {
+    setPendingDeleteId(id);
+  };
+  const cancelDeleteSavedView = () => setPendingDeleteId(null);
+  const confirmDeleteSavedView = () => {
+    if (!pendingDeleteId) {
+      setPendingDeleteId(null);
+      return;
+    }
+    // Fail-safe: if the view is missing (e.g. removed in another tab),
+    // just refresh the in-memory list from storage and close the dialog.
+    if (!findSavedView(savedViews, pendingDeleteId)) {
+      setSavedViews(readSavedViews());
+      setPendingDeleteId(null);
+      return;
+    }
+    setSavedViews((prev) => removeSavedView(prev, pendingDeleteId));
+    if (selectedSavedViewId === pendingDeleteId) setSelectedSavedViewId("");
+    setPendingDeleteId(null);
   };
 
   // --- import / export ---

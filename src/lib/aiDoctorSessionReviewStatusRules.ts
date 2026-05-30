@@ -4,7 +4,7 @@
  *
  * Safety invariants:
  * - No I/O (no Supabase, no fetch, no React).
- * - No automation, no device control, no AI calls.
+ * - Read-only projection; no side effects of any kind.
  * - Deterministic: same input array → same output regardless of input order.
  * - Defensive: unknown event types and malformed/null inputs never throw.
  */

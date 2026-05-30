@@ -228,6 +228,7 @@ const MANAGED_KEYS = new Set<string>([
   FILTER_PARAM_KEYS.risk,
   FILTER_PARAM_KEYS.hasActions,
   FILTER_PARAM_KEYS.dateRange,
+  FILTER_PARAM_KEYS.needsReview,
   FILTER_PARAM_KEYS.page,
 ]);
 

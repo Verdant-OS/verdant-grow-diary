@@ -131,6 +131,13 @@ export default function CoachAiDoctorHistoryPanel({ growId }: Props) {
         >
           These are historical sessions. Opening one does not re-run AI or create actions.
         </p>
+        <Link
+          to="/doctor/sessions"
+          className="text-[11px] text-primary underline pt-0.5"
+          data-testid="coach-ai-doctor-history-view-all-link"
+        >
+          View all sessions
+        </Link>
       </CardHeader>
       <CardContent className="text-sm">
         {!enabled ? (

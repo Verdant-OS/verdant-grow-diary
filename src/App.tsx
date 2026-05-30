@@ -24,6 +24,7 @@ import GrowDetail from "./pages/GrowDetail";
 
 import Coach from "./pages/Coach";
 import AiDoctorSessionDetail from "./pages/AiDoctorSessionDetail";
+import AiDoctorSessionsIndex from "./pages/AiDoctorSessionsIndex";
 import Diagnostics from "./pages/Diagnostics";
 import ActionQueue from "./pages/ActionQueue";
 import ActionDetail from "./pages/ActionDetail";
@@ -73,6 +74,7 @@ const App = () => (
                 <Route path="/alerts" element={<Alerts />} />
                 <Route path="/alerts/:alertId" element={<AlertDetail />} />
                 <Route path="/doctor" element={<Coach />} />
+                <Route path="/doctor/sessions" element={<AiDoctorSessionsIndex />} />
                 <Route path="/doctor/sessions/:sessionId" element={<AiDoctorSessionDetail />} />
                 <Route path="/actions" element={<ActionQueue />} />
                 <Route path="/actions/:actionId" element={<ActionDetail />} />

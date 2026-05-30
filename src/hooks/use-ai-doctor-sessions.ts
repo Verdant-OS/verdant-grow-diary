@@ -16,6 +16,7 @@ import type { AiContextConfidenceCeiling } from "@/lib/aiContextSufficiencyRules
 
 export const AI_DOCTOR_SESSIONS_LIMIT = 10;
 export const AI_DOCTOR_SESSIONS_COACH_LIMIT = 5;
+export const AI_DOCTOR_SESSIONS_INDEX_PAGE_SIZE = 25;
 
 export interface AiDoctorSessionRow {
   id: string;
@@ -101,3 +102,38 @@ export function useGrowAiDoctorSessions(growId: string | null | undefined) {
     },
   });
 }
+
+export interface AiDoctorSessionsIndexPage {
+  rows: AiDoctorSessionRow[];
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}
+
+export function useAiDoctorSessionsIndex(page: number = 0) {
+  const pageSize = AI_DOCTOR_SESSIONS_INDEX_PAGE_SIZE;
+  const safePage = Number.isFinite(page) && page >= 0 ? Math.floor(page) : 0;
+  const from = safePage * pageSize;
+  // Fetch one extra row to detect "hasMore" without a count query.
+  const to = from + pageSize;
+  return useQuery({
+    queryKey: ["ai_doctor_sessions", "index", safePage, pageSize],
+    queryFn: async (): Promise<AiDoctorSessionsIndexPage> => {
+      const { data, error } = await supabase
+        .from("ai_doctor_sessions" as never)
+        .select(SESSION_SELECT)
+        .order("created_at", { ascending: false })
+        .range(from, to);
+      if (error) throw error;
+      const all = (data ?? []) as AiDoctorSessionRow[];
+      const hasMore = all.length > pageSize;
+      return {
+        rows: hasMore ? all.slice(0, pageSize) : all,
+        page: safePage,
+        pageSize,
+        hasMore,
+      };
+    },
+  });
+}
+

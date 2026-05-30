@@ -194,6 +194,7 @@ export function isFiltersActive(f: SessionsIndexFilters): boolean {
     f.caution !== "all" ||
     f.hasChecklist !== "all" ||
     f.confidence !== "all" ||
+    isReviewStatusFilterActive(f.reviewStatus) ||
     f.sort !== "newest"
   );
 }

@@ -19,6 +19,8 @@ import {
   buildCautionReviewChecklist,
   buildReviewSummaryViewModel,
   EMPTY_FALLBACKS,
+  formatCautionChecklistDescription,
+  formatCautionChecklistSummary,
   formatDoctorReviewSummaryText,
   formatSessionRowCautionReasonText,
   type CautionNote,

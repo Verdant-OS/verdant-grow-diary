@@ -27,6 +27,7 @@ import {
 import { ACTION_QUEUE_SOURCE_VALUES } from "@/lib/actionQueueProvenanceRules";
 import { persistAiDoctorSession } from "@/lib/aiDoctorSessionPersistence";
 import { harmonizeDiagnosisConfidence } from "@/lib/aiDoctorConfidenceRules";
+import { actionsPath } from "@/lib/routes";
 
 type Mode = "diagnose" | "next_steps";
 

@@ -110,18 +110,50 @@ export interface AiDoctorSessionsIndexPage {
   hasMore: boolean;
 }
 
-export function useAiDoctorSessionsIndex(page: number = 0) {
+import {
+  DEFAULT_FILTERS,
+  dateRangeSince,
+  type SessionsIndexFilters,
+} from "@/lib/aiDoctorSessionsIndexFilters";
+
+export function useAiDoctorSessionsIndex(
+  page: number = 0,
+  filters: SessionsIndexFilters = DEFAULT_FILTERS,
+) {
   const pageSize = AI_DOCTOR_SESSIONS_INDEX_PAGE_SIZE;
   const safePage = Number.isFinite(page) && page >= 0 ? Math.floor(page) : 0;
   const from = safePage * pageSize;
   // Fetch one extra row to detect "hasMore" without a count query.
   const to = from + pageSize;
   return useQuery({
-    queryKey: ["ai_doctor_sessions", "index", safePage, pageSize],
+    queryKey: [
+      "ai_doctor_sessions",
+      "index",
+      safePage,
+      pageSize,
+      filters.risk,
+      filters.hasActions,
+      filters.dateRange,
+    ],
     queryFn: async (): Promise<AiDoctorSessionsIndexPage> => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("ai_doctor_sessions" as never)
-        .select(SESSION_SELECT)
+        .select(SESSION_SELECT);
+
+      if (filters.risk !== "all") {
+        q = q.eq("diagnosis->>riskLevel", filters.risk);
+      }
+      if (filters.hasActions === "yes") {
+        q = q.not("suggested_actions", "eq", "[]");
+      } else if (filters.hasActions === "no") {
+        q = q.eq("suggested_actions", "[]");
+      }
+      const since = dateRangeSince(filters.dateRange);
+      if (since) {
+        q = q.gte("created_at", since.toISOString());
+      }
+
+      const { data, error } = await q
         .order("created_at", { ascending: false })
         .range(from, to);
       if (error) throw error;
@@ -136,4 +168,5 @@ export function useAiDoctorSessionsIndex(page: number = 0) {
     },
   });
 }
+
 

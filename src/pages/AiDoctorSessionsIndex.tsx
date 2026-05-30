@@ -20,6 +20,15 @@ import {
   useAiDoctorSessionsIndex,
   type AiDoctorSessionRow,
 } from "@/hooks/use-ai-doctor-sessions";
+import {
+  DEFAULT_FILTERS,
+  formatActiveFilterLabels,
+  isFiltersActive,
+  type DateRangeFilter,
+  type HasActionsFilter,
+  type RiskFilter,
+  type SessionsIndexFilters,
+} from "@/lib/aiDoctorSessionsIndexFilters";
 
 function fmtDate(ts: string | null): string {
   if (!ts) return "";
@@ -132,9 +141,25 @@ function IndexRow({ row }: { row: AiDoctorSessionRow }) {
 
 export default function AiDoctorSessionsIndex() {
   const [page, setPage] = useState(0);
-  const { data, isLoading, error } = useAiDoctorSessionsIndex(page);
+  const [filters, setFilters] = useState<SessionsIndexFilters>(DEFAULT_FILTERS);
+  const { data, isLoading, error } = useAiDoctorSessionsIndex(page, filters);
   const rows = data?.rows ?? [];
   const hasMore = !!data?.hasMore;
+  const filtersActive = isFiltersActive(filters);
+  const activeLabels = formatActiveFilterLabels(filters);
+
+  const updateFilter = <K extends keyof SessionsIndexFilters>(
+    key: K,
+    value: SessionsIndexFilters[K],
+  ) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+    setPage(0);
+  };
+
+  const clearFilters = () => {
+    setFilters(DEFAULT_FILTERS);
+    setPage(0);
+  };
 
   return (
     <div data-testid="ai-doctor-sessions-index-page" className="space-y-4">
@@ -154,6 +179,85 @@ export default function AiDoctorSessionsIndex() {
           </p>
         </CardHeader>
         <CardContent className="text-sm space-y-4">
+          <div
+            className="flex flex-wrap items-end gap-3"
+            data-testid="ai-doctor-sessions-index-filters"
+          >
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="text-muted-foreground">Risk</span>
+              <select
+                value={filters.risk}
+                onChange={(e) => updateFilter("risk", e.target.value as RiskFilter)}
+                data-testid="ai-doctor-sessions-index-filter-risk"
+                className="rounded border bg-background px-2 py-1 text-sm"
+              >
+                <option value="all">All</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="text-muted-foreground">Suggested actions</span>
+              <select
+                value={filters.hasActions}
+                onChange={(e) =>
+                  updateFilter("hasActions", e.target.value as HasActionsFilter)
+                }
+                data-testid="ai-doctor-sessions-index-filter-has-actions"
+                className="rounded border bg-background px-2 py-1 text-sm"
+              >
+                <option value="all">All</option>
+                <option value="yes">Has actions</option>
+                <option value="no">No actions</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="text-muted-foreground">Date range</span>
+              <select
+                value={filters.dateRange}
+                onChange={(e) =>
+                  updateFilter("dateRange", e.target.value as DateRangeFilter)
+                }
+                data-testid="ai-doctor-sessions-index-filter-date-range"
+                className="rounded border bg-background px-2 py-1 text-sm"
+              >
+                <option value="all">All time</option>
+                <option value="7d">Last 7 days</option>
+                <option value="30d">Last 30 days</option>
+              </select>
+            </label>
+            {filtersActive ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                data-testid="ai-doctor-sessions-index-clear-filters"
+              >
+                Clear filters
+              </Button>
+            ) : null}
+          </div>
+
+          {filtersActive ? (
+            <div
+              className="flex flex-wrap items-center gap-2"
+              data-testid="ai-doctor-sessions-index-active-filters"
+            >
+              {activeLabels.map((label) => (
+                <Badge
+                  key={label}
+                  variant="secondary"
+                  className="text-[11px]"
+                  data-testid="ai-doctor-sessions-index-active-filter-label"
+                >
+                  {label}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
+
           {isLoading ? (
             <p className="text-muted-foreground">Loading AI Doctor sessions…</p>
           ) : error ? (
@@ -164,12 +268,21 @@ export default function AiDoctorSessionsIndex() {
               Unable to load AI Doctor sessions.
             </p>
           ) : rows.length === 0 && page === 0 ? (
-            <p
-              className="text-muted-foreground"
-              data-testid="ai-doctor-sessions-index-empty"
-            >
-              No saved AI Doctor sessions yet.
-            </p>
+            filtersActive ? (
+              <p
+                className="text-muted-foreground"
+                data-testid="ai-doctor-sessions-index-empty-filtered"
+              >
+                No sessions match these filters.
+              </p>
+            ) : (
+              <p
+                className="text-muted-foreground"
+                data-testid="ai-doctor-sessions-index-empty"
+              >
+                No saved AI Doctor sessions yet.
+              </p>
+            )
           ) : (
             <>
               <ul
@@ -208,6 +321,7 @@ export default function AiDoctorSessionsIndex() {
           )}
         </CardContent>
       </Card>
+
     </div>
   );
 }

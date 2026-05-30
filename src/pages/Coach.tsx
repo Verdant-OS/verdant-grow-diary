@@ -17,6 +17,7 @@ import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import { evaluateAiContextSufficiency } from "@/lib/aiContextSufficiencyRules";
 import { adaptDiaryForAiContext } from "@/lib/coachContextAdapter";
 import CoachContextSufficiencyPanel from "@/components/CoachContextSufficiencyPanel";
+import CoachAiDoctorHistoryPanel from "@/components/CoachAiDoctorHistoryPanel";
 import StructuredDiagnosisCard from "@/components/StructuredDiagnosisCard";
 import {
   validateAndSanitizeDiagnosis,

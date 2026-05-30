@@ -220,7 +220,7 @@ export default function PlantDetail() {
               <Zap className="h-3.5 w-3.5" /> Quick Log
             </Button>
             <Button asChild variant="outline" size="sm">
-              <Link to="/logs">Open Logs</Link>
+              <Link to={logsPath()}>Open Logs</Link>
             </Button>
             <Button
               asChild

@@ -323,6 +323,14 @@ export default function AiDoctorSessionsIndex() {
     writeParams(DEFAULT_FILTERS, 0);
   };
 
+  const applyNeedsAttention = () => {
+    writeParams(applyNeedsAttentionPreset(filters), 0);
+  };
+
+  const clearNeedsAttention = () => {
+    writeParams(clearNeedsAttentionPreset(filters), 0);
+  };
+
   const goToPage = (nextPage: number) => {
     writeParams(filters, Math.max(0, nextPage));
   };

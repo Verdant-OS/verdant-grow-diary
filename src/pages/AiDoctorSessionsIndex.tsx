@@ -1065,7 +1065,11 @@ export default function AiDoctorSessionsIndex() {
                 data-testid="ai-doctor-sessions-index-list"
               >
                 {rows.map((r) => (
-                  <IndexRow key={r.id} row={r} />
+                  <IndexRow
+                    key={r.id}
+                    row={r}
+                    reviewState={reviewStateBySession?.get(r.id) ?? null}
+                  />
                 ))}
               </ul>
               <div

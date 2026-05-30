@@ -29,14 +29,13 @@ function fmtConfidence(val: number | null | undefined): string | null {
 
 export default function AiDoctorSessionDetail() {
   const { sessionId } = useParams();
+  const navigate = useNavigate();
   const { data, isLoading, error } = useAiDoctorSession(sessionId);
 
   return (
     <div data-testid="ai-doctor-session-detail-page" className="space-y-4">
-      <Button asChild variant="ghost" size="sm">
-        <Link to={-1 as unknown as string}>
-          <ArrowLeft className="h-4 w-4" /> Back
-        </Link>
+      <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+        <ArrowLeft className="h-4 w-4" /> Back
       </Button>
 
       <Card>

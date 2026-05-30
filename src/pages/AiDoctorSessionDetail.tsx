@@ -399,7 +399,12 @@ export default function AiDoctorSessionDetail() {
                 This is a saved diagnosis snapshot. It does not re-run AI or execute actions.
               </p>
             </div>
-            {sessionId ? <CopyLinkButton sessionId={sessionId} /> : null}
+            {sessionId ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <CopyLinkButton sessionId={sessionId} />
+                <OpenInNewTabLink sessionId={sessionId} />
+              </div>
+            ) : null}
           </div>
         </CardHeader>
         <CardContent className="text-sm space-y-4">

@@ -6,7 +6,8 @@
  * RLS scopes ownership via auth.uid().
  */
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Stethoscope } from "lucide-react";
+import { ArrowLeft, Stethoscope, Copy, Check, AlertCircle } from "lucide-react";
+import { useState } from "react";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,9 +16,73 @@ import { useAiDoctorSession } from "@/hooks/use-ai-doctor-sessions";
 import {
   buildReviewSummaryViewModel,
   EMPTY_FALLBACKS,
+  formatDoctorReviewSummaryText,
   type ReviewRiskTone,
   type ReviewSummaryViewModel,
 } from "@/lib/aiDoctorSessionDetailViewModel";
+
+async function copyPlainText(text: string): Promise<boolean> {
+  try {
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // fall through to execCommand fallback
+  }
+  try {
+    if (typeof document === "undefined") return false;
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+function CopyReviewSummaryButton({ vm }: { vm: ReviewSummaryViewModel }) {
+  const [state, setState] = useState<"idle" | "copied" | "error">("idle");
+  const onClick = async () => {
+    const text = formatDoctorReviewSummaryText(vm);
+    const ok = await copyPlainText(text);
+    setState(ok ? "copied" : "error");
+    setTimeout(() => setState("idle"), 2000);
+  };
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      onClick={onClick}
+      data-testid="ai-doctor-session-detail-copy-review-button"
+      aria-label="Copy review summary"
+    >
+      {state === "copied" ? (
+        <>
+          <Check className="h-4 w-4" />
+          <span data-testid="ai-doctor-session-detail-copy-review-success">Copied</span>
+        </>
+      ) : state === "error" ? (
+        <>
+          <AlertCircle className="h-4 w-4" />
+          <span data-testid="ai-doctor-session-detail-copy-review-error">Copy failed</span>
+        </>
+      ) : (
+        <>
+          <Copy className="h-4 w-4" />
+          <span>Copy review summary</span>
+        </>
+      )}
+    </Button>
+  );
+}
 
 const RISK_TONE_CLASSES: Record<ReviewRiskTone, string> = {
   neutral: "border-border bg-muted/30",
@@ -51,6 +116,9 @@ function ReviewSummarySection({ vm }: { vm: ReviewSummaryViewModel }) {
             Confidence: {vm.confidencePct}%
           </Badge>
         ) : null}
+        <div className="ml-auto">
+          <CopyReviewSummaryButton vm={vm} />
+        </div>
       </header>
 
       <ReviewBlock

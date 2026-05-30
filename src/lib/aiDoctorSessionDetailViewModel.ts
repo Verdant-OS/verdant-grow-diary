@@ -113,3 +113,66 @@ export const EMPTY_FALLBACKS = {
   suggestedActions: "No suggested actions saved.",
   followUp: "No follow-up guidance recorded.",
 } as const;
+
+/**
+ * Format a review summary view model as plain text suitable for clipboard.
+ * Deterministic. No IDs, tokens, or raw payloads — only grower-facing fields.
+ */
+export function formatDoctorReviewSummaryText(vm: ReviewSummaryViewModel): string {
+  const lines: string[] = [];
+  lines.push("AI Doctor — Review Summary");
+  lines.push(`Risk: ${vm.risk.level}`);
+  lines.push(
+    vm.confidencePct != null ? `Confidence: ${vm.confidencePct}%` : "Confidence: n/a",
+  );
+  lines.push("");
+
+  lines.push("Likely issue:");
+  lines.push(vm.likelyIssue ?? EMPTY_FALLBACKS.likelyIssue);
+  lines.push("");
+
+  lines.push("Summary:");
+  lines.push(vm.summary ?? EMPTY_FALLBACKS.summary);
+  lines.push("");
+
+  lines.push("Evidence:");
+  if (vm.evidence.length === 0) lines.push(EMPTY_FALLBACKS.evidence);
+  else for (const e of vm.evidence) lines.push(`- ${e}`);
+  lines.push("");
+
+  lines.push("Missing information:");
+  if (vm.missingInformation.length === 0) lines.push(EMPTY_FALLBACKS.missingInformation);
+  else for (const e of vm.missingInformation) lines.push(`- ${e}`);
+  lines.push("");
+
+  lines.push("Suggested actions:");
+  if (vm.suggestedActions.length === 0) lines.push(EMPTY_FALLBACKS.suggestedActions);
+  else
+    for (const a of vm.suggestedActions) {
+      lines.push(`- ${a.title}${a.detail ? ` — ${a.detail}` : ""}`);
+    }
+  lines.push("");
+
+  lines.push("What not to do:");
+  if (vm.whatNotToDo.length === 0) lines.push(EMPTY_FALLBACKS.whatNotToDo);
+  else for (const e of vm.whatNotToDo) lines.push(`- ${e}`);
+  lines.push("");
+
+  lines.push("Follow-up guidance:");
+  if (!vm.followUp24h && !vm.recoveryPlan3d) {
+    lines.push(EMPTY_FALLBACKS.followUp);
+  } else {
+    if (vm.followUp24h) {
+      lines.push("Next 24 hours:");
+      if (vm.followUp24h.summary) lines.push(vm.followUp24h.summary);
+      for (const c of vm.followUp24h.checklist) lines.push(`- ${c}`);
+    }
+    if (vm.recoveryPlan3d) {
+      lines.push("3-day recovery:");
+      if (vm.recoveryPlan3d.summary) lines.push(vm.recoveryPlan3d.summary);
+      for (const c of vm.recoveryPlan3d.checklist) lines.push(`- ${c}`);
+    }
+  }
+
+  return lines.join("\n").trimEnd();
+}

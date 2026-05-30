@@ -139,6 +139,12 @@ export function parseConfidence(value: unknown): ConfidenceFilter {
     : "all";
 }
 
+export function parseSort(value: unknown): SortOption {
+  return SORT_OPTIONS.includes(value as SortOption)
+    ? (value as SortOption)
+    : "newest";
+}
+
 export function parseFilters(input: Partial<Record<keyof SessionsIndexFilters, unknown>>): SessionsIndexFilters {
   return {
     risk: parseRisk(input.risk),
@@ -148,6 +154,7 @@ export function parseFilters(input: Partial<Record<keyof SessionsIndexFilters, u
     caution: parseCaution(input.caution),
     hasChecklist: parseHasChecklist(input.hasChecklist),
     confidence: parseConfidence(input.confidence),
+    sort: parseSort(input.sort),
   };
 }
 

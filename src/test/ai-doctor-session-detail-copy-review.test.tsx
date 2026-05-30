@@ -177,9 +177,8 @@ describe("AiDoctorSessionDetail — Copy review summary button", () => {
       configurable: true,
       value: undefined,
     });
-    const execSpy = vi
-      .spyOn(document, "execCommand")
-      .mockImplementation(() => true);
+    const execSpy = vi.fn().mockReturnValue(true);
+    (document as unknown as { execCommand: unknown }).execCommand = execSpy;
     renderRoute(<AiDoctorSessionDetail />);
     const btn = await screen.findByTestId("ai-doctor-session-detail-copy-review-button");
     fireEvent.click(btn);

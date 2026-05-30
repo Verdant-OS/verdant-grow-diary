@@ -148,7 +148,7 @@ describe("Plant Detail · Assigned Tent Environment static safety", () => {
 
   it("panel provides a View Tent link", () => {
     expect(PANEL).toContain("plant-tent-environment-view-tent");
-    expect(PANEL).toMatch(/\/tents\//);
+    expect(PANEL).toMatch(/tentDetailPath\(/);
   });
 
   it("hook only reads sensor_readings (no writes)", () => {

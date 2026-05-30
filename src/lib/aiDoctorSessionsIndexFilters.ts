@@ -93,6 +93,7 @@ export const DEFAULT_FILTERS: SessionsIndexFilters = {
   caution: "all",
   hasChecklist: "all",
   confidence: "all",
+  reviewStatus: "any",
   sort: "newest",
 };
 
@@ -108,6 +109,12 @@ export const CONFIDENCE_OPTIONS: ConfidenceFilter[] = [
   "medium",
   "high",
   "unknown",
+];
+export const REVIEW_STATUS_OPTIONS: AiDoctorSessionReviewStatusFilter[] = [
+  "any",
+  "not_reviewed",
+  "reviewed",
+  "needs_follow_up",
 ];
 
 export function parseRisk(value: unknown): RiskFilter {

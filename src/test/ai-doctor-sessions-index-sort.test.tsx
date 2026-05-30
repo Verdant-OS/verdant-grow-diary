@@ -287,8 +287,10 @@ describe("AiDoctorSessionsIndex — sort UI", () => {
       screen.getByTestId("ai-doctor-sessions-index-filter-sort"),
       { target: { value: "highest-risk" } },
     );
-    // Built-in keeps caution+checklist rows; highest-risk: high > medium.
-    expect(rowIds()).toEqual(["old-high", "new-uk"]);
+    // Built-in keeps caution+checklist rows (old-high, new-hr, new-uk);
+    // highest-risk: high(old-high, new-hr) > medium(new-uk). Within high,
+    // newest-first tie-break puts new-hr before old-high.
+    expect(rowIds()).toEqual(["new-hr", "old-high", "new-uk"]);
   });
 
   it("Clear filters resets sort back to newest", async () => {

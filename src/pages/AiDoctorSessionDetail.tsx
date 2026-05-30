@@ -294,6 +294,12 @@ function SessionDetailBody({
   const d = row.diagnosis;
   const confidence = fmtConfidence(row.displayed_confidence ?? row.raw_confidence);
   const actions = Array.isArray(row.suggested_actions) ? row.suggested_actions : [];
+  const reviewVm = buildReviewSummaryViewModel({
+    diagnosis: d,
+    rawConfidence: row.raw_confidence,
+    displayedConfidence: row.displayed_confidence,
+    suggestedActions: actions,
+  });
 
   return (
     <div className="space-y-4">

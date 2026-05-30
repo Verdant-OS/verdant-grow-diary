@@ -237,6 +237,15 @@ const SORT_LABEL: Record<Exclude<SortOption, "newest">, string> = {
   "review-priority": "Sort: Review priority",
 };
 
+const REVIEW_STATUS_LABEL: Record<
+  Exclude<AiDoctorSessionReviewStatusFilter, "any">,
+  string
+> = {
+  not_reviewed: "Review: Not reviewed",
+  reviewed: "Review: Reviewed",
+  needs_follow_up: "Review: Needs follow-up",
+};
+
 export function formatActiveFilterLabels(f: SessionsIndexFilters): string[] {
   const labels: string[] = [];
   if (f.risk !== "all") labels.push(RISK_LABEL[f.risk]);

@@ -32,6 +32,7 @@ import {
   LIMITED_CONTEXT_TITLE,
 } from "@/lib/aiDoctorSessionDetailViewModel";
 import {
+  applyClientSideFilters,
   DEFAULT_FILTERS,
   FILTER_PARAM_KEYS,
   formatActiveFilterLabels,
@@ -41,8 +42,11 @@ import {
   serializeFilters,
   serializePageParam,
   sessionNeedsReview,
+  type CautionFilter,
+  type ConfidenceFilter,
   type DateRangeFilter,
   type HasActionsFilter,
+  type HasChecklistFilter,
   type NeedsReviewFilter,
   type RiskFilter,
   type SessionsIndexFilters,

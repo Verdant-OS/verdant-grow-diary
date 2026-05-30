@@ -633,10 +633,37 @@ function SessionDetailBody({
         </Badge>
       </div>
 
-      <CautionBanner
-        note={buildCautionNote(reviewVm)}
-        description={formatSessionRowCautionReasonText(buildCautionReasonTokens(reviewVm))}
-      />
+      {(() => {
+        const cautionNote = buildCautionNote(reviewVm);
+        const tokens = buildCautionReasonTokens(reviewVm);
+        const description = formatSessionRowCautionReasonText(tokens);
+        const checklist = buildCautionReviewChecklist(tokens);
+        return (
+          <>
+            <CautionBanner note={cautionNote} description={description} />
+            {cautionNote.show && checklist.length > 0 ? (
+              <div
+                data-testid="ai-doctor-session-detail-caution-checklist"
+                className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm"
+              >
+                <p className="font-medium text-xs text-muted-foreground mb-1">
+                  Review checklist
+                </p>
+                <ul className="list-disc pl-5 text-sm space-y-0.5">
+                  {checklist.map((item, i) => (
+                    <li
+                      key={i}
+                      data-testid="ai-doctor-session-detail-caution-checklist-item"
+                    >
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </>
+        );
+      })()}
 
       <ReviewSummarySection vm={reviewVm} />
 

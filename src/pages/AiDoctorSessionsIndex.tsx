@@ -263,14 +263,14 @@ export default function AiDoctorSessionsIndex() {
       page,
       existing: savedViews,
     });
-    if (result.ok === false) {
+    if (result.ok) {
+      setSavedViews(result.views);
+      setSavingView(false);
+      setPendingLabel("");
+      setSaveError(null);
+    } else {
       setSaveError(result.error);
-      return;
     }
-    setSavedViews(result.views);
-    setSavingView(false);
-    setPendingLabel("");
-    setSaveError(null);
   };
 
   const handleDeleteSavedView = (id: string) => {

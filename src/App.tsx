@@ -73,6 +73,7 @@ const App = () => (
                 <Route path="/alerts" element={<Alerts />} />
                 <Route path="/alerts/:alertId" element={<AlertDetail />} />
                 <Route path="/doctor" element={<Coach />} />
+                <Route path="/doctor/sessions/:sessionId" element={<AiDoctorSessionDetail />} />
                 <Route path="/actions" element={<ActionQueue />} />
                 <Route path="/actions/:actionId" element={<ActionDetail />} />
                 {/* Legacy alias — canonical route is /actions. Keeps old

@@ -263,7 +263,7 @@ export default function AiDoctorSessionsIndex() {
       page,
       existing: savedViews,
     });
-    if (!result.ok) {
+    if (result.ok === false) {
       setSaveError(result.error);
       return;
     }

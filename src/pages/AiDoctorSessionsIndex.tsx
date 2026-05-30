@@ -757,6 +757,23 @@ export default function AiDoctorSessionsIndex() {
                 Built-in
               </Badge>
             ) : null}
+            {(() => {
+              if (!effectiveSelectedSavedViewId) return null;
+              const view = isBuiltInSavedViewId(effectiveSelectedSavedViewId)
+                ? findBuiltInSavedView(effectiveSelectedSavedViewId)
+                : findSavedView(savedViews, effectiveSelectedSavedViewId);
+              if (!view) return null;
+              const summary = formatSavedViewSummary(view.filters, view.page);
+              if (!summary) return null;
+              return (
+                <span
+                  className="text-[11px] text-muted-foreground"
+                  data-testid="ai-doctor-sessions-saved-views-summary-preview"
+                >
+                  {summary}
+                </span>
+              );
+            })()}
             {effectiveSelectedSavedViewId &&
             !isBuiltInSavedViewId(effectiveSelectedSavedViewId) ? (
               <Button

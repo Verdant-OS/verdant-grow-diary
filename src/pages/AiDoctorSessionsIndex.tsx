@@ -722,6 +722,7 @@ export default function AiDoctorSessionsIndex() {
                 <option value="needs_follow_up">Needs follow-up</option>
               </select>
             </label>
+            <label className="flex flex-col gap-1 text-xs">
               <span className="text-muted-foreground">Sort</span>
               <select
                 value={filters.sort}

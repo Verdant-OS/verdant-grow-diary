@@ -8,6 +8,11 @@ import {
   buildSessionRowCautionIndicator,
   type SessionRowLike,
 } from "@/lib/aiDoctorSessionDetailViewModel";
+import {
+  isReviewStatusFilterActive,
+  type AiDoctorSessionReviewState,
+  type AiDoctorSessionReviewStatusFilter,
+} from "@/lib/aiDoctorSessionReviewStatusRules";
 
 export type RiskFilter = "all" | "low" | "medium" | "high" | "critical";
 export type HasActionsFilter = "all" | "yes" | "no";

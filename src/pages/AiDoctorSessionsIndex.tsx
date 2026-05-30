@@ -281,6 +281,56 @@ export default function AiDoctorSessionsIndex() {
     if (selectedSavedViewId === id) setSelectedSavedViewId("");
   };
 
+  // --- import / export ---
+  const [exportStatus, setExportStatus] = useState<CopyLinkStatus>("idle");
+  const exportResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleExportViews = async () => {
+    if (savedViews.length === 0) {
+      setExportStatus("error");
+      if (exportResetRef.current) clearTimeout(exportResetRef.current);
+      exportResetRef.current = setTimeout(() => setExportStatus("idle"), 2000);
+      return;
+    }
+    const json = exportSavedViewsToJson(savedViews);
+    try {
+      await copyShareLink(json);
+      setExportStatus("success");
+    } catch {
+      setExportStatus("error");
+    } finally {
+      if (exportResetRef.current) clearTimeout(exportResetRef.current);
+      exportResetRef.current = setTimeout(() => setExportStatus("idle"), 2000);
+    }
+  };
+
+  const [importOpen, setImportOpen] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importError, setImportError] = useState<ImportError | null>(null);
+  const [importSummary, setImportSummary] = useState<{
+    added: number;
+    skipped: number;
+  } | null>(null);
+  const handleConfirmImport = () => {
+    const result = importSavedViewsFromJson({
+      raw: importText,
+      existing: savedViews,
+    });
+    if (!result.ok) {
+      setImportError((result as { error: ImportError }).error);
+      setImportSummary(null);
+      return;
+    }
+    setSavedViews(result.views ?? []);
+    setImportSummary({
+      added: result.added?.length ?? 0,
+      skipped: result.skipped?.length ?? 0,
+    });
+    setImportError(null);
+    setImportText("");
+  };
+
+
+
 
 
   return (

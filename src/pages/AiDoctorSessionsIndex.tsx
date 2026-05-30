@@ -562,6 +562,53 @@ export default function AiDoctorSessionsIndex() {
                 <option value="no">No review needed</option>
               </select>
             </label>
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="text-muted-foreground">Caution</span>
+              <select
+                value={filters.caution}
+                onChange={(e) =>
+                  updateFilter("caution", e.target.value as CautionFilter)
+                }
+                data-testid="ai-doctor-sessions-index-filter-caution"
+                className="rounded border bg-background px-2 py-1 text-sm"
+              >
+                <option value="all">All</option>
+                <option value="yes">Caution only</option>
+                <option value="no">No caution</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="text-muted-foreground">Review checklist</span>
+              <select
+                value={filters.hasChecklist}
+                onChange={(e) =>
+                  updateFilter("hasChecklist", e.target.value as HasChecklistFilter)
+                }
+                data-testid="ai-doctor-sessions-index-filter-has-checklist"
+                className="rounded border bg-background px-2 py-1 text-sm"
+              >
+                <option value="all">All</option>
+                <option value="yes">Has checklist</option>
+                <option value="no">No checklist</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="text-muted-foreground">Confidence</span>
+              <select
+                value={filters.confidence}
+                onChange={(e) =>
+                  updateFilter("confidence", e.target.value as ConfidenceFilter)
+                }
+                data-testid="ai-doctor-sessions-index-filter-confidence"
+                className="rounded border bg-background px-2 py-1 text-sm"
+              >
+                <option value="all">All</option>
+                <option value="low">Low (≤60%)</option>
+                <option value="medium">Medium (61–80%)</option>
+                <option value="high">High ({'>'}80%)</option>
+                <option value="unknown">Unknown</option>
+              </select>
+            </label>
             {filtersActive ? (
               <Button
                 variant="ghost"

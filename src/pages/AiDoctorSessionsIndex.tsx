@@ -690,27 +690,38 @@ export default function AiDoctorSessionsIndex() {
             <label className="flex flex-col gap-1 text-xs">
               <span className="text-muted-foreground">Saved views</span>
               <select
-                value={selectedSavedViewId}
+                value={effectiveSelectedSavedViewId}
                 onChange={(e) => applySavedView(e.target.value)}
                 data-testid="ai-doctor-sessions-saved-views-select"
                 className="rounded border bg-background px-2 py-1 text-sm"
-                disabled={savedViews.length === 0}
+                disabled={displaySavedViews.length === 0}
               >
                 <option value="">
-                  {savedViews.length === 0 ? "No saved views" : "Apply a saved view…"}
+                  {displaySavedViews.length === 0
+                    ? "No saved views"
+                    : "Apply a saved view…"}
                 </option>
-                {savedViews.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.label}
+                {displaySavedViews.map((v) => (
+                  <option
+                    key={v.id}
+                    value={v.id}
+                    data-testid={
+                      isBuiltInSavedViewId(v.id)
+                        ? "ai-doctor-sessions-saved-views-builtin-option"
+                        : undefined
+                    }
+                  >
+                    {isBuiltInSavedViewId(v.id) ? `★ ${v.label}` : v.label}
                   </option>
                 ))}
               </select>
             </label>
-            {selectedSavedViewId ? (
+            {effectiveSelectedSavedViewId &&
+            !isBuiltInSavedViewId(effectiveSelectedSavedViewId) ? (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => requestDeleteSavedView(selectedSavedViewId)}
+                onClick={() => requestDeleteSavedView(effectiveSelectedSavedViewId)}
                 data-testid="ai-doctor-sessions-saved-views-delete"
                 aria-label="Delete saved view"
               >

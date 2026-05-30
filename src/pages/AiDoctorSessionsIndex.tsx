@@ -89,6 +89,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useAiDoctorSessionReviews } from "@/hooks/useAiDoctorSessionReviews";
+import {
+  buildSessionReviewStatusIndicator,
+  type AiDoctorSessionReviewState,
+} from "@/lib/aiDoctorSessionReviewStatusRules";
 
 function fmtDate(ts: string | null): string {
   if (!ts) return "";

@@ -39,6 +39,16 @@ import {
   type RiskFilter,
   type SessionsIndexFilters,
 } from "@/lib/aiDoctorSessionsIndexFilters";
+import {
+  addSavedView,
+  findSavedView,
+  readSavedViews,
+  removeSavedView,
+  savedViewToSearchParams,
+  writeSavedViews,
+  type SavedView,
+  type SaveViewError,
+} from "@/lib/aiDoctorSessionsSavedViewsRules";
 
 function fmtDate(ts: string | null): string {
   if (!ts) return "";

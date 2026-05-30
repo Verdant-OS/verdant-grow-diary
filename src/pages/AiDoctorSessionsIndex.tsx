@@ -464,6 +464,21 @@ export default function AiDoctorSessionsIndex() {
                 <option value="30d">Last 30 days</option>
               </select>
             </label>
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="text-muted-foreground">Needs review</span>
+              <select
+                value={filters.needsReview}
+                onChange={(e) =>
+                  updateFilter("needsReview", e.target.value as NeedsReviewFilter)
+                }
+                data-testid="ai-doctor-sessions-index-filter-needs-review"
+                className="rounded border bg-background px-2 py-1 text-sm"
+              >
+                <option value="all">All</option>
+                <option value="yes">Needs review</option>
+                <option value="no">No review needed</option>
+              </select>
+            </label>
             {filtersActive ? (
               <Button
                 variant="ghost"

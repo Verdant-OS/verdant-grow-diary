@@ -535,6 +535,7 @@ function SessionDetailBody({
         </Badge>
       </div>
 
+      <CautionBanner note={buildCautionNote(reviewVm)} />
 
       <ReviewSummarySection vm={reviewVm} />
 
@@ -568,27 +569,10 @@ function SessionDetailBody({
         </div>
       ) : null}
 
-      {d?.evidence && d.evidence.length > 0 ? (
-        <div data-testid="ai-doctor-session-detail-evidence">
-          <h3 className="text-sm font-semibold">Evidence</h3>
-          <ul className="list-disc pl-5 text-muted-foreground space-y-0.5">
-            {d.evidence.map((e, i) => (
-              <li key={i}>{e}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      <EvidenceSection items={reviewVm.evidence} />
 
-      {d?.missingInformation && d.missingInformation.length > 0 ? (
-        <div data-testid="ai-doctor-session-detail-missing-info">
-          <h3 className="text-sm font-semibold">Missing information</h3>
-          <ul className="list-disc pl-5 text-muted-foreground space-y-0.5">
-            {d.missingInformation.map((e, i) => (
-              <li key={i}>{e}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      <MissingInformationSection items={reviewVm.missingInformation} />
+
 
       <div>
         <h3 className="text-sm font-semibold">

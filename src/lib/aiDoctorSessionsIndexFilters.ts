@@ -277,6 +277,7 @@ export const FILTER_PARAM_KEYS = {
   caution: "caution",
   hasChecklist: "hasChecklist",
   confidence: "confidence",
+  reviewStatus: "reviewStatus",
   sort: "sort",
   page: "page",
 } as const;
@@ -297,6 +298,8 @@ export function serializeFilters(f: SessionsIndexFilters): Record<string, string
     out[FILTER_PARAM_KEYS.hasChecklist] = f.hasChecklist;
   if (f.confidence !== DEFAULT_FILTERS.confidence)
     out[FILTER_PARAM_KEYS.confidence] = f.confidence;
+  if (f.reviewStatus !== DEFAULT_FILTERS.reviewStatus)
+    out[FILTER_PARAM_KEYS.reviewStatus] = f.reviewStatus;
   if (f.sort !== DEFAULT_FILTERS.sort) out[FILTER_PARAM_KEYS.sort] = f.sort;
   return out;
 }

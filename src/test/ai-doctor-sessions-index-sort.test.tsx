@@ -303,6 +303,7 @@ describe("AiDoctorSessionsIndex — sort UI", () => {
       "ai-doctor-sessions-index-filter-sort",
     )) as HTMLSelectElement;
     expect(sel.value).toBe("newest");
+    await screen.findByTestId("ai-doctor-sessions-index-list");
     expect(rowIds()).toEqual(["new-healthy", "old-healthy"]);
   });
 

@@ -288,7 +288,7 @@ export default function AiDoctorSessionsIndex() {
   // applied in the hook. Note: pagination reflects the raw query; rows hidden
   // by client-side filters do not regress hasMore for the next page.
   const rows = useMemo(
-    () => applyClientSideFilters(rawRows, filters),
+    () => applyClientSideSort(applyClientSideFilters(rawRows, filters), filters.sort),
     [rawRows, filters],
   );
   const hasMore = !!data?.hasMore;

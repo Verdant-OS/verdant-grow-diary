@@ -116,9 +116,9 @@ describe("preset helpers", () => {
     expect(countNeedsAttentionVisible(rows)).toBe(2);
     expect(countNeedsAttentionVisible([])).toBe(0);
   });
-  it("preset keys live inside saved-view managed keys", () => {
-    expect(MANAGED_KEYS).toContain("caution");
-    expect(MANAGED_KEYS).toContain("hasChecklist");
+  it("preset uses existing filter URL param keys (saved-view managed)", () => {
+    expect(FILTER_PARAM_KEYS.caution).toBe("caution");
+    expect(FILTER_PARAM_KEYS.hasChecklist).toBe("hasChecklist");
   });
 });
 

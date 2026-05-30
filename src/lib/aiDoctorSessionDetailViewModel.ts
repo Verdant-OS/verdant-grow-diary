@@ -339,6 +339,26 @@ export function buildCautionReviewChecklist(tokens: string[]): string[] {
   return CAUTION_CHECKLIST_ORDER.filter((item) => seen.has(item));
 }
 
+/**
+ * Compact row copy summarizing how many review checklist items apply.
+ * Returns null for zero items. Singular for one ("1 check"), plural otherwise.
+ */
+export function formatCautionChecklistSummary(count: number): string | null {
+  if (!Number.isFinite(count) || count <= 0) return null;
+  const n = Math.floor(count);
+  return `Review checklist: ${n} ${n === 1 ? "check" : "checks"}`;
+}
+
+/**
+ * Full checklist text for tooltip / aria-label. Returns null when empty.
+ */
+export function formatCautionChecklistDescription(
+  items: string[],
+): string | null {
+  if (!Array.isArray(items) || items.length === 0) return null;
+  return `Review checklist: ${items.join(" ")}`;
+}
+
 export function buildSessionRowCautionIndicator(
   row: SessionRowLike,
 ): SessionRowCautionIndicator {
@@ -351,11 +371,17 @@ export function buildSessionRowCautionIndicator(
   const note = buildCautionNote(vm);
   const tokens = buildCautionReasonTokens(vm);
   const description = formatSessionRowCautionReasonText(tokens);
+  const checklistItems = buildCautionReviewChecklist(tokens);
+  const checklistSummary = formatCautionChecklistSummary(checklistItems.length);
+  const checklistDescription = formatCautionChecklistDescription(checklistItems);
   return {
     show: note.show,
     label: ROW_CAUTION_LABEL,
     title: note.reasons.join(" ") || note.text,
     description,
+    checklistItems,
+    checklistSummary,
+    checklistDescription,
   };
 }
 

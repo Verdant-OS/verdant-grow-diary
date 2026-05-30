@@ -166,7 +166,8 @@ export function isFiltersActive(f: SessionsIndexFilters): boolean {
     f.needsReview !== "all" ||
     f.caution !== "all" ||
     f.hasChecklist !== "all" ||
-    f.confidence !== "all"
+    f.confidence !== "all" ||
+    f.sort !== "newest"
   );
 }
 

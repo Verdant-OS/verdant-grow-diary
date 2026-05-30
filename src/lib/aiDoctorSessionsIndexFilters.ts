@@ -338,3 +338,48 @@ export function applyClientSideFilters<T extends FilterableSessionRow>(
     return true;
   });
 }
+
+// ---------------- "Needs my attention" preset ----------------
+
+/**
+ * The "Needs my attention" preset is a one-click shortcut that applies the
+ * existing caution + hasChecklist filters together. It does NOT introduce a
+ * new data model — it just toggles two existing filter keys.
+ *
+ * Read-only. No writes. No automation.
+ */
+export const NEEDS_ATTENTION_PRESET_LABEL = "Needs my attention";
+
+export function isNeedsAttentionPresetActive(f: SessionsIndexFilters): boolean {
+  return f.caution === "yes" && f.hasChecklist === "yes";
+}
+
+/**
+ * Apply the preset over an existing filter state. Preserves all other filter
+ * keys (risk, hasActions, dateRange, needsReview, confidence) untouched.
+ */
+export function applyNeedsAttentionPreset(f: SessionsIndexFilters): SessionsIndexFilters {
+  return { ...f, caution: "yes", hasChecklist: "yes" };
+}
+
+/**
+ * Clear only the preset-specific filter keys, preserving the rest.
+ */
+export function clearNeedsAttentionPreset(f: SessionsIndexFilters): SessionsIndexFilters {
+  return { ...f, caution: "all", hasChecklist: "all" };
+}
+
+/**
+ * Count rows in the currently-loaded page that match the preset criteria.
+ * Pure. Does NOT query the database — caller passes already-loaded rows.
+ */
+export function countNeedsAttentionVisible<T extends FilterableSessionRow>(
+  rows: T[],
+): number {
+  if (!Array.isArray(rows)) return 0;
+  let n = 0;
+  for (const row of rows) {
+    if (rowHasCaution(row) && rowHasChecklist(row)) n += 1;
+  }
+  return n;
+}

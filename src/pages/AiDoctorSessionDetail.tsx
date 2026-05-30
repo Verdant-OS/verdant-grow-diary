@@ -84,6 +84,52 @@ function CopyReviewSummaryButton({ vm }: { vm: ReviewSummaryViewModel }) {
   );
 }
 
+export function buildSessionDetailCanonicalUrl(sessionId: string, origin?: string | null): string {
+  const path = `/doctor/sessions/${sessionId}`;
+  const o = (origin ?? "").trim();
+  if (!o) return path;
+  return `${o.replace(/\/+$/, "")}${path}`;
+}
+
+function CopyLinkButton({ sessionId }: { sessionId: string }) {
+  const [state, setState] = useState<"idle" | "copied" | "error">("idle");
+  const onClick = async () => {
+    const origin =
+      typeof window !== "undefined" && window.location?.origin ? window.location.origin : null;
+    const url = buildSessionDetailCanonicalUrl(sessionId, origin);
+    const ok = await copyPlainText(url);
+    setState(ok ? "copied" : "error");
+    setTimeout(() => setState("idle"), 2000);
+  };
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      onClick={onClick}
+      data-testid="ai-doctor-session-detail-copy-link-button"
+      aria-label="Copy link to this session"
+    >
+      {state === "copied" ? (
+        <>
+          <Check className="h-4 w-4" />
+          <span data-testid="ai-doctor-session-detail-copy-link-success">Link copied</span>
+        </>
+      ) : state === "error" ? (
+        <>
+          <AlertCircle className="h-4 w-4" />
+          <span data-testid="ai-doctor-session-detail-copy-link-error">Copy failed</span>
+        </>
+      ) : (
+        <>
+          <LinkIcon className="h-4 w-4" />
+          <span>Copy link</span>
+        </>
+      )}
+    </Button>
+  );
+}
+
 const RISK_TONE_CLASSES: Record<ReviewRiskTone, string> = {
   neutral: "border-border bg-muted/30",
   info: "border-border bg-muted/20",

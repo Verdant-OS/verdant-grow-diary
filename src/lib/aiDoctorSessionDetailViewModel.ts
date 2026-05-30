@@ -247,6 +247,18 @@ export interface SessionRowCautionIndicator {
    * Null when no caution applies.
    */
   description: string | null;
+  /** Full review checklist items derived from caution reason tokens. */
+  checklistItems: string[];
+  /**
+   * Compact row copy summarizing checklist size, e.g. "Review checklist: 2 checks".
+   * Null when there are no checklist items.
+   */
+  checklistSummary: string | null;
+  /**
+   * Full checklist text suitable for tooltip / aria-label, e.g.
+   * "Review checklist: Verify …; Review …; Confirm ….". Null when empty.
+   */
+  checklistDescription: string | null;
 }
 
 export const ROW_CAUTION_LABEL = "Review before acting";

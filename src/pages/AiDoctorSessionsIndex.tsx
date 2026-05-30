@@ -659,6 +659,24 @@ export default function AiDoctorSessionsIndex() {
                 <option value="unknown">Unknown</option>
               </select>
             </label>
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="text-muted-foreground">Sort</span>
+              <select
+                value={filters.sort}
+                onChange={(e) =>
+                  updateFilter("sort", e.target.value as SortOption)
+                }
+                data-testid="ai-doctor-sessions-index-filter-sort"
+                className="rounded border bg-background px-2 py-1 text-sm"
+                title="Sort applies to the currently loaded page"
+              >
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="highest-risk">Highest risk first</option>
+                <option value="lowest-confidence">Lowest confidence first</option>
+                <option value="review-priority">Review priority</option>
+              </select>
+            </label>
             <Button
               variant={needsAttentionActive ? "secondary" : "outline"}
               size="sm"

@@ -58,10 +58,15 @@ import {
 } from "@/lib/aiDoctorSessionsIndexFilters";
 import {
   addSavedView,
+  BUILTIN_SAVED_VIEWS,
   exportSavedViewsToJson,
+  findBuiltInSavedView,
   findSavedView,
   formatSavedViewSummary,
   importSavedViewsFromJson,
+  isBuiltInSavedViewId,
+  matchingBuiltInSavedViewId,
+  mergeBuiltInSavedViews,
   readSavedViews,
   removeSavedView,
   savedViewToSearchParams,

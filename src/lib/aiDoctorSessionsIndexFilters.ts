@@ -37,6 +37,24 @@ export type HasChecklistFilter = "all" | "yes" | "no";
  */
 export type ConfidenceFilter = "all" | "low" | "medium" | "high" | "unknown";
 
+/**
+ * Sort options for the AI Doctor sessions index. All sorting is performed
+ * client-side over the currently-loaded page of rows. Pure + deterministic.
+ *
+ *   newest:          created_at desc (default; matches existing server order)
+ *   oldest:          created_at asc
+ *   highest-risk:    critical > high > medium > low > unknown, then newest
+ *   lowest-conf:     unknown < low < medium < high, then newest
+ *   review-priority: caution sessions first, then checklist, then risk,
+ *                    then lower/unknown confidence, then newest
+ */
+export type SortOption =
+  | "newest"
+  | "oldest"
+  | "highest-risk"
+  | "lowest-confidence"
+  | "review-priority";
+
 export interface SessionsIndexFilters {
   risk: RiskFilter;
   hasActions: HasActionsFilter;
@@ -45,6 +63,7 @@ export interface SessionsIndexFilters {
   caution: CautionFilter;
   hasChecklist: HasChecklistFilter;
   confidence: ConfidenceFilter;
+  sort: SortOption;
 }
 
 export const DEFAULT_FILTERS: SessionsIndexFilters = {

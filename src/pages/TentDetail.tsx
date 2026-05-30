@@ -1,5 +1,6 @@
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
 import EnvironmentStabilityCard from "@/components/EnvironmentStabilityCard";
+import TentAiDoctorSessionsPanel from "@/components/TentAiDoctorSessionsPanel";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
 import { useParams, Link } from "react-router-dom";
 import { useState } from "react";

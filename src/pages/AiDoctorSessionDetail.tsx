@@ -367,18 +367,23 @@ export default function AiDoctorSessionDetail() {
 
       <Card>
         <CardHeader className="space-y-1">
-          <CardTitle
-            className="text-lg flex items-center gap-2"
-            data-testid="ai-doctor-session-detail-title"
-          >
-            <Stethoscope className="h-4 w-4" /> Historical AI Doctor Session
-          </CardTitle>
-          <p
-            className="text-xs text-muted-foreground"
-            data-testid="ai-doctor-session-detail-helper"
-          >
-            This is a saved diagnosis snapshot. It does not re-run AI or execute actions.
-          </p>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="space-y-1">
+              <CardTitle
+                className="text-lg flex items-center gap-2"
+                data-testid="ai-doctor-session-detail-title"
+              >
+                <Stethoscope className="h-4 w-4" /> Historical AI Doctor Session
+              </CardTitle>
+              <p
+                className="text-xs text-muted-foreground"
+                data-testid="ai-doctor-session-detail-helper"
+              >
+                This is a saved diagnosis snapshot. It does not re-run AI or execute actions.
+              </p>
+            </div>
+            {sessionId ? <CopyLinkButton sessionId={sessionId} /> : null}
+          </div>
         </CardHeader>
         <CardContent className="text-sm space-y-4">
           {isLoading ? (

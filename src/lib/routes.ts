@@ -28,3 +28,10 @@ export const actionDetailPath = (actionId: string): string =>
 
 export const alertDetailPath = (alertId: string): string =>
   `/alerts/${encodeURIComponent(alertId)}`;
+
+export const plantDetailPath = (plantId: string): string =>
+  `/plants/${encodeURIComponent(plantId)}`;
+
+export const tentDetailPath = (tentId: string): string =>
+  `/tents/${encodeURIComponent(tentId)}`;
+

@@ -20,6 +20,7 @@ import {
   type ReviewRiskTone,
   type ReviewSummaryViewModel,
 } from "@/lib/aiDoctorSessionDetailViewModel";
+import { plantDetailPath, tentDetailPath } from "@/lib/routes";
 
 async function copyPlainText(text: string): Promise<boolean> {
   try {
@@ -144,6 +145,45 @@ function OpenInNewTabLink({ sessionId }: { sessionId: string }) {
       <ExternalLink className="h-4 w-4" />
       <span>Open in new tab</span>
     </a>
+  );
+}
+
+function SessionQuickJumpLinks({
+  plantId,
+  tentId,
+}: {
+  plantId: string | null | undefined;
+  tentId: string | null | undefined;
+}) {
+  const hasPlant = typeof plantId === "string" && plantId.length > 0;
+  const hasTent = typeof tentId === "string" && tentId.length > 0;
+  if (!hasPlant && !hasTent) return null;
+  return (
+    <div
+      className="flex flex-wrap items-center gap-2"
+      data-testid="ai-doctor-session-detail-quick-jump"
+    >
+      {hasPlant ? (
+        <Link
+          to={plantDetailPath(plantId!)}
+          aria-label="View related plant"
+          data-testid="ai-doctor-session-detail-plant-link"
+          className="inline-flex items-center gap-2 h-9 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+        >
+          View plant
+        </Link>
+      ) : null}
+      {hasTent ? (
+        <Link
+          to={tentDetailPath(tentId!)}
+          aria-label="View related tent"
+          data-testid="ai-doctor-session-detail-tent-link"
+          className="inline-flex items-center gap-2 h-9 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+        >
+          View tent
+        </Link>
+      ) : null}
+    </div>
   );
 }
 
@@ -401,6 +441,10 @@ export default function AiDoctorSessionDetail() {
             </div>
             {sessionId ? (
               <div className="flex flex-wrap items-center gap-2">
+                <SessionQuickJumpLinks
+                  plantId={data?.plant_id ?? null}
+                  tentId={data?.tent_id ?? null}
+                />
                 <CopyLinkButton sessionId={sessionId} />
                 <OpenInNewTabLink sessionId={sessionId} />
               </div>
@@ -489,26 +533,6 @@ function SessionDetailBody({
         </Badge>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-        {row.plant_id ? (
-          <Link
-            to={`/plants/${row.plant_id}`}
-            className="underline"
-            data-testid="ai-doctor-session-detail-plant-link"
-          >
-            View plant
-          </Link>
-        ) : null}
-        {row.tent_id ? (
-          <Link
-            to={`/tents/${row.tent_id}`}
-            className="underline"
-            data-testid="ai-doctor-session-detail-tent-link"
-          >
-            View tent
-          </Link>
-        ) : null}
-      </div>
 
       <ReviewSummarySection vm={reviewVm} />
 

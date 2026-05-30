@@ -500,7 +500,7 @@ export default function AiDoctorSessionsIndex() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => handleDeleteSavedView(selectedSavedViewId)}
+                onClick={() => requestDeleteSavedView(selectedSavedViewId)}
                 data-testid="ai-doctor-sessions-saved-views-delete"
                 aria-label="Delete saved view"
               >

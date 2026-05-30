@@ -15,6 +15,7 @@ import type { DiagnosisSuggestedAction } from "@/lib/aiDoctorDiagnosisRules";
 import type { AiContextConfidenceCeiling } from "@/lib/aiContextSufficiencyRules";
 
 export const AI_DOCTOR_SESSIONS_LIMIT = 10;
+export const AI_DOCTOR_SESSIONS_COACH_LIMIT = 5;
 
 export interface AiDoctorSessionRow {
   id: string;

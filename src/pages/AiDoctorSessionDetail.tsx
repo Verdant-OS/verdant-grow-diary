@@ -407,9 +407,13 @@ function ReviewList({
 function CautionBanner({
   note,
   description,
+  checklistSummary,
+  checklistDescription,
 }: {
   note: CautionNote;
   description: string | null;
+  checklistSummary: string | null;
+  checklistDescription: string | null;
 }) {
   if (!note.show) return null;
   const ariaLabel = description ?? "Review before acting";
@@ -424,9 +428,21 @@ function CautionBanner({
       <div className="flex items-start gap-2">
         <AlertCircle className="h-4 w-4 mt-0.5 text-amber-600" />
         <div className="space-y-1">
-          <p className="font-medium" data-testid="ai-doctor-session-detail-caution-note-text">
-            {note.text}
-          </p>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <p className="font-medium" data-testid="ai-doctor-session-detail-caution-note-text">
+              {note.text}
+            </p>
+            {checklistSummary ? (
+              <span
+                className="text-xs text-muted-foreground"
+                data-testid="ai-doctor-session-detail-caution-checklist-summary"
+                title={checklistDescription ?? undefined}
+                aria-label={checklistDescription ?? checklistSummary}
+              >
+                {checklistSummary}
+              </span>
+            ) : null}
+          </div>
           {description ? (
             <p
               className="text-xs text-muted-foreground"

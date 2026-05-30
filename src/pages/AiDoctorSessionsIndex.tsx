@@ -269,7 +269,7 @@ export default function AiDoctorSessionsIndex() {
       setPendingLabel("");
       setSaveError(null);
     } else {
-      setSaveError(result.error);
+      setSaveError((result as { error: SaveViewError }).error);
     }
   };
 

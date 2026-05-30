@@ -24,12 +24,15 @@ import {
 // ---- Pure helper tests ----
 
 describe("aiDoctorSessionsIndexFilters — pure helpers", () => {
-  it("default filter state is all/all/all/all", () => {
+  it("default filter state is all across all fields", () => {
     expect(DEFAULT_FILTERS).toEqual({
       risk: "all",
       hasActions: "all",
       dateRange: "all",
       needsReview: "all",
+      caution: "all",
+      hasChecklist: "all",
+      confidence: "all",
     });
   });
 

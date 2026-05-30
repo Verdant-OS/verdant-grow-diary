@@ -376,14 +376,14 @@ describe("Review-status filter — UI integration", () => {
     )) as HTMLSelectElement;
     expect(select.value).toBe("any");
     expect(screen.getAllByTestId(ROW_TID)).toHaveLength(3);
-    await screen.findByTestId(CHIP_TID); // at least one chip rendered
+    await waitFor(() => expect(screen.getAllByTestId(CHIP_TID).length).toBeGreaterThan(0)); // at least one chip rendered
   });
 
   it("filtering to 'reviewed' shows only reviewed rows; chip still visible", async () => {
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
     // Wait for review state to settle before applying the filter.
-    await screen.findByTestId(CHIP_TID);
+    await waitFor(() => expect(screen.getAllByTestId(CHIP_TID).length).toBeGreaterThan(0));
     fireEvent.change(screen.getByTestId(SELECT_TID), {
       target: { value: "reviewed" },
     });
@@ -398,7 +398,7 @@ describe("Review-status filter — UI integration", () => {
   it("filtering to 'needs_follow_up' shows only those rows", async () => {
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    await screen.findByTestId(CHIP_TID);
+    await waitFor(() => expect(screen.getAllByTestId(CHIP_TID).length).toBeGreaterThan(0));
     fireEvent.change(screen.getByTestId(SELECT_TID), {
       target: { value: "needs_follow_up" },
     });
@@ -412,7 +412,7 @@ describe("Review-status filter — UI integration", () => {
   it("filtering to 'not_reviewed' includes rows with missing state", async () => {
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    await screen.findByTestId(CHIP_TID);
+    await waitFor(() => expect(screen.getAllByTestId(CHIP_TID).length).toBeGreaterThan(0));
     fireEvent.change(screen.getByTestId(SELECT_TID), {
       target: { value: "not_reviewed" },
     });
@@ -426,7 +426,7 @@ describe("Review-status filter — UI integration", () => {
   it("renders the active filter label", async () => {
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    await screen.findByTestId(CHIP_TID);
+    await waitFor(() => expect(screen.getAllByTestId(CHIP_TID).length).toBeGreaterThan(0));
     fireEvent.change(screen.getByTestId(SELECT_TID), {
       target: { value: "reviewed" },
     });
@@ -439,7 +439,7 @@ describe("Review-status filter — UI integration", () => {
   it("Clear filters resets review filter to 'any'", async () => {
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    await screen.findByTestId(CHIP_TID);
+    await waitFor(() => expect(screen.getAllByTestId(CHIP_TID).length).toBeGreaterThan(0));
     fireEvent.change(screen.getByTestId(SELECT_TID), {
       target: { value: "needs_follow_up" },
     });

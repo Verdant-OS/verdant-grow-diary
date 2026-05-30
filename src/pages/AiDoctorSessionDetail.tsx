@@ -15,9 +15,11 @@ import { Button } from "@/components/ui/button";
 import { useAiDoctorSession } from "@/hooks/use-ai-doctor-sessions";
 import {
   buildCautionNote,
+  buildCautionReasonTokens,
   buildReviewSummaryViewModel,
   EMPTY_FALLBACKS,
   formatDoctorReviewSummaryText,
+  formatSessionRowCautionReasonText,
   type CautionNote,
   type ReviewRiskTone,
   type ReviewSummaryViewModel,
@@ -399,12 +401,20 @@ function ReviewList({
   );
 }
 
-function CautionBanner({ note }: { note: CautionNote }) {
+function CautionBanner({
+  note,
+  description,
+}: {
+  note: CautionNote;
+  description: string | null;
+}) {
   if (!note.show) return null;
+  const ariaLabel = description ?? "Review before acting";
   return (
     <div
       role="note"
-      aria-label="Review before acting"
+      aria-label={ariaLabel}
+      title={description ?? undefined}
       data-testid="ai-doctor-session-detail-caution-note"
       className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-sm"
     >
@@ -414,6 +424,14 @@ function CautionBanner({ note }: { note: CautionNote }) {
           <p className="font-medium" data-testid="ai-doctor-session-detail-caution-note-text">
             {note.text}
           </p>
+          {description ? (
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="ai-doctor-session-detail-caution-reason"
+            >
+              {description}
+            </p>
+          ) : null}
           {note.reasons.length > 0 ? (
             <ul
               className="list-disc pl-5 text-xs text-muted-foreground space-y-0.5"
@@ -614,7 +632,10 @@ function SessionDetailBody({
         </Badge>
       </div>
 
-      <CautionBanner note={buildCautionNote(reviewVm)} />
+      <CautionBanner
+        note={buildCautionNote(reviewVm)}
+        description={formatSessionRowCautionReasonText(buildCautionReasonTokens(reviewVm))}
+      />
 
       <ReviewSummarySection vm={reviewVm} />
 

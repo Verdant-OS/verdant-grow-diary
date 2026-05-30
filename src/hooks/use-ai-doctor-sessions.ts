@@ -134,6 +134,7 @@ export function useAiDoctorSessionsIndex(
       filters.risk,
       filters.hasActions,
       filters.dateRange,
+      filters.needsReview,
     ],
     queryFn: async (): Promise<AiDoctorSessionsIndexPage> => {
       let q = supabase
@@ -151,6 +152,18 @@ export function useAiDoctorSessionsIndex(
       const since = dateRangeSince(filters.dateRange);
       if (since) {
         q = q.gte("created_at", since.toISOString());
+      }
+      // Needs-review = risk in (high, critical) OR suggested_actions != [].
+      // Mirrors `sessionNeedsReview` so server- and client-side agree.
+      if (filters.needsReview === "yes") {
+        q = q.or(
+          "diagnosis->>riskLevel.eq.high,diagnosis->>riskLevel.eq.critical,suggested_actions.neq.[]",
+        );
+      } else if (filters.needsReview === "no") {
+        q = q
+          .not("diagnosis->>riskLevel", "eq", "high")
+          .not("diagnosis->>riskLevel", "eq", "critical")
+          .eq("suggested_actions", "[]");
       }
 
       const { data, error } = await q

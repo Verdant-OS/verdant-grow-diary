@@ -20,6 +20,7 @@ const chain: any = {
   eq: vi.fn(function () { return chain; }),
   not: vi.fn(function () { return chain; }),
   gte: vi.fn(function () { return chain; }),
+  or: vi.fn(function () { return chain; }),
   order: orderSpy,
 };
 vi.mock("@/integrations/supabase/client", () => ({
@@ -160,8 +161,8 @@ describe("aiDoctorSessionsSavedViewsRules — pure helpers", () => {
   });
 
   it("viewSignature is stable and order-independent across filters object key order", () => {
-    const a = viewSignature({ risk: "high", hasActions: "yes", dateRange: "7d" }, 1);
-    const b = viewSignature({ dateRange: "7d", risk: "high", hasActions: "yes" }, 1);
+    const a = viewSignature({ risk: "high", hasActions: "yes", dateRange: "7d", needsReview: "all" }, 1);
+    const b = viewSignature({ dateRange: "7d", risk: "high", hasActions: "yes", needsReview: "all" }, 1);
     expect(a).toBe(b);
   });
 

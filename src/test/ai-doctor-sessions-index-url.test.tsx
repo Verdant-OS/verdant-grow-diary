@@ -30,10 +30,14 @@ const notSpy = vi.fn(function (this: unknown) {
 const eqSpy = vi.fn(function (this: unknown) {
   return chain;
 });
+const orSpy = vi.fn(function (this: unknown) {
+  return chain;
+});
 const chain: any = {
   eq: eqSpy,
   not: notSpy,
   gte: gteSpy,
+  or: orSpy,
   order: orderSpy,
 };
 const selectSpy = vi.fn(() => chain);
@@ -124,9 +128,9 @@ describe("serializeFilters", () => {
   it("round-trips through parseFilters for all valid values", () => {
     const cases: SessionsIndexFilters[] = [
       DEFAULT_FILTERS,
-      { risk: "low", hasActions: "all", dateRange: "all" },
-      { risk: "critical", hasActions: "yes", dateRange: "30d" },
-      { risk: "medium", hasActions: "no", dateRange: "7d" },
+      { risk: "low", hasActions: "all", dateRange: "all", needsReview: "all" },
+      { risk: "critical", hasActions: "yes", dateRange: "30d", needsReview: "yes" },
+      { risk: "medium", hasActions: "no", dateRange: "7d", needsReview: "no" },
     ];
     for (const f of cases) {
       const serialized = serializeFilters(f);
@@ -319,11 +323,12 @@ describe("URL persistence — static safety", () => {
       expect(lower).not.toContain(tok);
     }
   });
-  it("FILTER_PARAM_KEYS exposes risk/hasActions/dateRange/page", () => {
+  it("FILTER_PARAM_KEYS exposes risk/hasActions/dateRange/needsReview/page", () => {
     expect(FILTER_PARAM_KEYS).toEqual({
       risk: "risk",
       hasActions: "hasActions",
       dateRange: "dateRange",
+      needsReview: "needsReview",
       page: "page",
     });
   });

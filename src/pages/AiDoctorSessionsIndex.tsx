@@ -36,6 +36,7 @@ import {
   serializePageParam,
   type DateRangeFilter,
   type HasActionsFilter,
+  type NeedsReviewFilter,
   type RiskFilter,
   type SessionsIndexFilters,
 } from "@/lib/aiDoctorSessionsIndexFilters";
@@ -183,6 +184,7 @@ export default function AiDoctorSessionsIndex() {
         risk: searchParams.get(FILTER_PARAM_KEYS.risk) ?? undefined,
         hasActions: searchParams.get(FILTER_PARAM_KEYS.hasActions) ?? undefined,
         dateRange: searchParams.get(FILTER_PARAM_KEYS.dateRange) ?? undefined,
+        needsReview: searchParams.get(FILTER_PARAM_KEYS.needsReview) ?? undefined,
       }),
     [searchParams],
   );
@@ -205,6 +207,7 @@ export default function AiDoctorSessionsIndex() {
         key !== FILTER_PARAM_KEYS.risk &&
         key !== FILTER_PARAM_KEYS.hasActions &&
         key !== FILTER_PARAM_KEYS.dateRange &&
+        key !== FILTER_PARAM_KEYS.needsReview &&
         key !== FILTER_PARAM_KEYS.page
       ) {
         params.set(key, value);
@@ -459,6 +462,21 @@ export default function AiDoctorSessionsIndex() {
                 <option value="all">All time</option>
                 <option value="7d">Last 7 days</option>
                 <option value="30d">Last 30 days</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="text-muted-foreground">Needs review</span>
+              <select
+                value={filters.needsReview}
+                onChange={(e) =>
+                  updateFilter("needsReview", e.target.value as NeedsReviewFilter)
+                }
+                data-testid="ai-doctor-sessions-index-filter-needs-review"
+                className="rounded border bg-background px-2 py-1 text-sm"
+              >
+                <option value="all">All</option>
+                <option value="yes">Needs review</option>
+                <option value="no">No review needed</option>
               </select>
             </label>
             {filtersActive ? (

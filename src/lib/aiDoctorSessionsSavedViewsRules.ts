@@ -33,16 +33,15 @@ export type SaveViewError =
   | "duplicate-params"
   | "limit-reached";
 
-export interface SaveViewSuccess {
-  ok: true;
-  views: SavedView[];
-  view: SavedView;
+export interface SaveViewResult {
+  ok: boolean;
+  views?: SavedView[];
+  view?: SavedView;
+  error?: SaveViewError;
 }
-export interface SaveViewFailure {
-  ok: false;
-  error: SaveViewError;
-}
-export type SaveViewResult = SaveViewSuccess | SaveViewFailure;
+// Back-compat type aliases (unused at runtime).
+export type SaveViewSuccess = SaveViewResult;
+export type SaveViewFailure = SaveViewResult;
 
 /** Stable signature used for duplicate detection. */
 export function viewSignature(filters: SessionsIndexFilters, page: number): string {
@@ -225,3 +224,138 @@ export function savedViewToSearchParams(
 }
 
 export { parsePageParam };
+
+// ---------------- export / import ----------------
+
+export const SAVED_VIEWS_EXPORT_VERSION = 1;
+
+export interface SavedViewsExportPayload {
+  version: number;
+  exportedAt: string;
+  views: Array<Pick<SavedView, "label" | "filters" | "page" | "createdAt">>;
+}
+
+/**
+ * Serialize saved views into a portable JSON snippet. Strips internal `id`s
+ * (those are regenerated on import) and never includes user identifiers,
+ * tokens, or database row ids.
+ */
+export function exportSavedViewsToJson(
+  views: SavedView[],
+  now: Date = new Date(),
+): string {
+  const payload: SavedViewsExportPayload = {
+    version: SAVED_VIEWS_EXPORT_VERSION,
+    exportedAt: now.toISOString(),
+    views: views.map((v) => ({
+      label: v.label,
+      filters: v.filters,
+      page: v.page,
+      createdAt: v.createdAt,
+    })),
+  };
+  return JSON.stringify(payload, null, 2);
+}
+
+export type ImportError =
+  | "empty-input"
+  | "invalid-json"
+  | "wrong-shape"
+  | "no-valid-views";
+
+export interface ImportResult {
+  ok: boolean;
+  views?: SavedView[];
+  added?: SavedView[];
+  skipped?: Array<{ label: string; reason: "duplicate-label" | "duplicate-params" | "invalid" }>;
+  error?: ImportError;
+}
+export type ImportSuccess = ImportResult;
+export type ImportFailure = ImportResult;
+
+interface ImportInput {
+  raw: string;
+  existing: SavedView[];
+  now?: Date;
+}
+
+/**
+ * Parse a pasted JSON snippet, validate, dedupe, and merge into the existing
+ * saved-views list. Never throws. Never overwrites: a failure result returns
+ * an error and leaves `existing` untouched (callers should not persist).
+ *
+ * Accepts both the canonical `{ version, views }` payload shape and a bare
+ * array of view-shaped objects for flexibility.
+ */
+export function importSavedViewsFromJson(input: ImportInput): ImportResult {
+  const raw = (input.raw ?? "").trim();
+  if (raw.length === 0) return { ok: false, error: "empty-input" };
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ok: false, error: "invalid-json" };
+  }
+
+  let candidates: unknown[];
+  if (Array.isArray(parsed)) {
+    candidates = parsed;
+  } else if (
+    parsed &&
+    typeof parsed === "object" &&
+    Array.isArray((parsed as { views?: unknown }).views)
+  ) {
+    candidates = (parsed as { views: unknown[] }).views;
+  } else {
+    return { ok: false, error: "wrong-shape" };
+  }
+
+  const merged: SavedView[] = [...input.existing];
+  const added: SavedView[] = [];
+  const skipped: ImportSuccess["skipped"] = [];
+
+  for (const item of candidates) {
+    if (!item || typeof item !== "object") {
+      skipped.push({ label: "(unknown)", reason: "invalid" });
+      continue;
+    }
+    const it = item as Record<string, unknown>;
+    const label = typeof it.label === "string" ? it.label : "";
+    const filtersInput =
+      it.filters && typeof it.filters === "object"
+        ? (it.filters as Record<string, unknown>)
+        : {};
+    const filters = parseFilters(filtersInput);
+    const page =
+      typeof it.page === "number" && Number.isFinite(it.page) && it.page >= 0
+        ? Math.floor(it.page)
+        : 0;
+
+    const result = addSavedView({
+      label,
+      filters,
+      page,
+      existing: merged,
+      now: input.now,
+    });
+    if (result.ok && result.view) {
+      merged.push(result.view);
+      added.push(result.view);
+    } else {
+      if (result.error === "duplicate-label") {
+        skipped.push({ label, reason: "duplicate-label" });
+      } else if (result.error === "duplicate-params") {
+        skipped.push({ label, reason: "duplicate-params" });
+      } else {
+        skipped.push({ label: label || "(unknown)", reason: "invalid" });
+      }
+    }
+  }
+
+  if (added.length === 0) {
+    return { ok: false, error: "no-valid-views" };
+  }
+  return { ok: true, views: merged, added, skipped };
+}
+

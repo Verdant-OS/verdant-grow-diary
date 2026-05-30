@@ -435,7 +435,7 @@ export default function GrowRoomMode() {
                     {card.openAlertCount === 1 ? "" : "s"}
                   </Link>
                   <Link
-                    to="/actions"
+                    to={actionsPath()}
                     className="text-muted-foreground hover:text-foreground"
                   >
                     {card.pendingActionCount} pending action

@@ -6,7 +6,7 @@
  * RLS scopes ownership via auth.uid().
  */
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Stethoscope, Copy, Check, AlertCircle, Link as LinkIcon } from "lucide-react";
+import { ArrowLeft, Stethoscope, Copy, Check, AlertCircle, Link as LinkIcon, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -127,6 +127,23 @@ function CopyLinkButton({ sessionId }: { sessionId: string }) {
         </>
       )}
     </Button>
+  );
+}
+
+function OpenInNewTabLink({ sessionId }: { sessionId: string }) {
+  const href = buildSessionDetailCanonicalUrl(sessionId);
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      data-testid="ai-doctor-session-detail-open-new-tab-link"
+      aria-label="Open session in new tab"
+      className="inline-flex items-center gap-2 h-9 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+    >
+      <ExternalLink className="h-4 w-4" />
+      <span>Open in new tab</span>
+    </a>
   );
 }
 
@@ -382,7 +399,12 @@ export default function AiDoctorSessionDetail() {
                 This is a saved diagnosis snapshot. It does not re-run AI or execute actions.
               </p>
             </div>
-            {sessionId ? <CopyLinkButton sessionId={sessionId} /> : null}
+            {sessionId ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <CopyLinkButton sessionId={sessionId} />
+                <OpenInNewTabLink sessionId={sessionId} />
+              </div>
+            ) : null}
           </div>
         </CardHeader>
         <CardContent className="text-sm space-y-4">

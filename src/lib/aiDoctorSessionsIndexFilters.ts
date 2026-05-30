@@ -68,6 +68,12 @@ export interface SessionsIndexFilters {
   caution: CautionFilter;
   hasChecklist: HasChecklistFilter;
   confidence: ConfidenceFilter;
+  /**
+   * Durable review status from `ai_doctor_session_reviews`. "any" is the
+   * default and is not active. "not_reviewed" matches rows with no review
+   * events (missing state) and rows whose latest event is "cleared".
+   */
+  reviewStatus: AiDoctorSessionReviewStatusFilter;
   sort: SortOption;
 }
 

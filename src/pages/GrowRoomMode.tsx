@@ -428,7 +428,7 @@ export default function GrowRoomMode() {
 
                 <div className="flex items-center justify-between text-xs">
                   <Link
-                    to="/alerts"
+                    to={alertsPath()}
                     className="text-muted-foreground hover:text-foreground"
                   >
                     {card.openAlertCount} open alert

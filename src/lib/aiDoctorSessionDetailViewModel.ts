@@ -176,3 +176,43 @@ export function formatDoctorReviewSummaryText(vm: ReviewSummaryViewModel): strin
 
   return lines.join("\n").trimEnd();
 }
+
+/**
+ * Confidence (in percent) at or below which we surface a "review before acting" caution.
+ * Calibrated to bias growers toward double-checking before approving any action.
+ */
+export const LOW_CONFIDENCE_PCT_THRESHOLD = 60;
+
+export const CAUTION_NOTE_TEXT =
+  "Review before acting. Double-check plant, tent, sensor, and diary context before approving any action from this saved session.";
+
+export interface CautionNote {
+  show: boolean;
+  reasons: string[];
+  text: string;
+}
+
+/**
+ * Pure helper: decide whether to surface the "review before acting" caution note
+ * for a saved session view model, and explain why.
+ */
+export function buildCautionNote(vm: ReviewSummaryViewModel): CautionNote {
+  const reasons: string[] = [];
+  if (vm.isHighRisk) {
+    reasons.push(`Elevated risk level: ${vm.risk.level}.`);
+  }
+  if (vm.confidencePct == null) {
+    reasons.push("Confidence is not recorded for this session.");
+  } else if (vm.confidencePct <= LOW_CONFIDENCE_PCT_THRESHOLD) {
+    reasons.push(`Confidence is low (${vm.confidencePct}%).`);
+  }
+  if (vm.missingInformation.length > 0) {
+    reasons.push("Missing context was flagged for this diagnosis.");
+  }
+  return {
+    show: reasons.length > 0,
+    reasons,
+    text: CAUTION_NOTE_TEXT,
+  };
+}
+

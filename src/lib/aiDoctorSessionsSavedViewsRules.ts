@@ -341,7 +341,7 @@ export function importSavedViewsFromJson(input: ImportInput): ImportResult {
       existing: merged,
       now: input.now,
     });
-    if (result.ok) {
+    if (result.ok && result.view) {
       merged.push(result.view);
       added.push(result.view);
     } else {

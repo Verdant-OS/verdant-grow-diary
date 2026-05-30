@@ -207,17 +207,65 @@ export default function AiDoctorSessionsIndex() {
     writeParams(filters, Math.max(0, nextPage));
   };
 
+  const [copyStatus, setCopyStatus] = useState<CopyLinkStatus>("idle");
+  const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleCopyLink = async () => {
+    const url = readCurrentShareUrl();
+    if (!url) {
+      setCopyStatus("error");
+      return;
+    }
+    try {
+      await copyShareLink(url);
+      setCopyStatus("success");
+    } catch {
+      setCopyStatus("error");
+    } finally {
+      if (copyResetRef.current) clearTimeout(copyResetRef.current);
+      copyResetRef.current = setTimeout(() => setCopyStatus("idle"), 2000);
+    }
+  };
 
   return (
     <div data-testid="ai-doctor-sessions-index-page" className="space-y-4">
       <Card>
         <CardHeader className="space-y-1">
-          <CardTitle
-            className="text-lg flex items-center gap-2"
-            data-testid="ai-doctor-sessions-index-title"
-          >
-            <Stethoscope className="h-4 w-4" /> AI Doctor Sessions
-          </CardTitle>
+          <div className="flex items-start justify-between gap-2">
+            <CardTitle
+              className="text-lg flex items-center gap-2"
+              data-testid="ai-doctor-sessions-index-title"
+            >
+              <Stethoscope className="h-4 w-4" /> AI Doctor Sessions
+            </CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyLink}
+              data-testid="ai-doctor-sessions-index-copy-link"
+              aria-live="polite"
+            >
+              {copyStatus === "success" ? (
+                <>
+                  <Check className="h-3.5 w-3.5" />
+                  <span data-testid="ai-doctor-sessions-index-copy-link-success">
+                    Copied
+                  </span>
+                </>
+              ) : copyStatus === "error" ? (
+                <>
+                  <AlertCircle className="h-3.5 w-3.5" />
+                  <span data-testid="ai-doctor-sessions-index-copy-link-error">
+                    Copy failed
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Link2 className="h-3.5 w-3.5" />
+                  <span>Copy link</span>
+                </>
+              )}
+            </Button>
+          </div>
           <p
             className="text-xs text-muted-foreground"
             data-testid="ai-doctor-sessions-index-helper"

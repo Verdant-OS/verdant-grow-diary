@@ -83,7 +83,7 @@ import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingC
 import DashboardDailyGrowCheckPanel from "@/components/DashboardDailyGrowCheckPanel";
 
 import { Badge } from "@/components/ui/badge";
-import { actionDetailPath, actionsPath, alertDetailPath, dashboardPath, logsPath, tentDetailPath, tentsPath } from "@/lib/routes";
+import { actionDetailPath, actionsPath, alertDetailPath, alertsPath, dashboardPath, logsPath, tentDetailPath, tentsPath } from "@/lib/routes";
 import { formatDistanceToNow } from "date-fns";
 
 

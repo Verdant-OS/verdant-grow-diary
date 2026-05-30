@@ -43,6 +43,7 @@ import {
   addSavedView,
   exportSavedViewsToJson,
   findSavedView,
+  formatSavedViewSummary,
   importSavedViewsFromJson,
   readSavedViews,
   removeSavedView,
@@ -52,6 +53,16 @@ import {
   type SavedView,
   type SaveViewError,
 } from "@/lib/aiDoctorSessionsSavedViewsRules";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 function fmtDate(ts: string | null): string {
   if (!ts) return "";

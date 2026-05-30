@@ -39,7 +39,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTents } from "@/hooks/use-tents";
 import { usePlants } from "@/hooks/use-plants";
 import { useAlertsList } from "@/hooks/useAlertsList";
-import { tentDetailPath, tentsPath } from "@/lib/routes";
+import { actionsPath, alertsPath, tentDetailPath, tentsPath } from "@/lib/routes";
 
 import {
   EMPTY_SNAPSHOT,

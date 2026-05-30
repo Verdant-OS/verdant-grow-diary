@@ -9,8 +9,8 @@
  *   - No writes. No action_queue. No alerts.
  *   - Rows deep-link to the existing historical detail page.
  */
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useMemo } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { Stethoscope } from "lucide-react";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,8 +22,13 @@ import {
 } from "@/hooks/use-ai-doctor-sessions";
 import {
   DEFAULT_FILTERS,
+  FILTER_PARAM_KEYS,
   formatActiveFilterLabels,
   isFiltersActive,
+  parseFilters,
+  parsePageParam,
+  serializeFilters,
+  serializePageParam,
   type DateRangeFilter,
   type HasActionsFilter,
   type RiskFilter,

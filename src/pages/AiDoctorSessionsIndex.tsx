@@ -9,9 +9,9 @@
  *   - No writes. No action_queue. No alerts.
  *   - Rows deep-link to the existing historical detail page.
  */
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Stethoscope, Link2, Check, AlertCircle } from "lucide-react";
+import { Stethoscope, Link2, Check, AlertCircle, Bookmark, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +39,16 @@ import {
   type RiskFilter,
   type SessionsIndexFilters,
 } from "@/lib/aiDoctorSessionsIndexFilters";
+import {
+  addSavedView,
+  findSavedView,
+  readSavedViews,
+  removeSavedView,
+  savedViewToSearchParams,
+  writeSavedViews,
+  type SavedView,
+  type SaveViewError,
+} from "@/lib/aiDoctorSessionsSavedViewsRules";
 
 function fmtDate(ts: string | null): string {
   if (!ts) return "";
@@ -226,6 +236,50 @@ export default function AiDoctorSessionsIndex() {
     }
   };
 
+  // --- saved views (localStorage) ---
+  const [savedViews, setSavedViews] = useState<SavedView[]>(() => readSavedViews());
+  const [selectedSavedViewId, setSelectedSavedViewId] = useState<string>("");
+  const [savingView, setSavingView] = useState(false);
+  const [pendingLabel, setPendingLabel] = useState("");
+  const [saveError, setSaveError] = useState<SaveViewError | null>(null);
+
+  useEffect(() => {
+    writeSavedViews(savedViews);
+  }, [savedViews]);
+
+  const applySavedView = (id: string) => {
+    setSelectedSavedViewId(id);
+    if (!id) return;
+    const view = findSavedView(savedViews, id);
+    if (!view) return;
+    const next = savedViewToSearchParams(view, searchParams);
+    setSearchParams(next, { replace: true });
+  };
+
+  const handleSaveView = () => {
+    const result = addSavedView({
+      label: pendingLabel,
+      filters,
+      page,
+      existing: savedViews,
+    });
+    if (result.ok) {
+      setSavedViews(result.views);
+      setSavingView(false);
+      setPendingLabel("");
+      setSaveError(null);
+    } else {
+      setSaveError((result as { error: SaveViewError }).error);
+    }
+  };
+
+  const handleDeleteSavedView = (id: string) => {
+    setSavedViews((prev) => removeSavedView(prev, id));
+    if (selectedSavedViewId === id) setSelectedSavedViewId("");
+  };
+
+
+
   return (
     <div data-testid="ai-doctor-sessions-index-page" className="space-y-4">
       <Card>
@@ -334,6 +388,114 @@ export default function AiDoctorSessionsIndex() {
               </Button>
             ) : null}
           </div>
+
+          <div
+            className="flex flex-wrap items-end gap-2"
+            data-testid="ai-doctor-sessions-saved-views"
+          >
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="text-muted-foreground">Saved views</span>
+              <select
+                value={selectedSavedViewId}
+                onChange={(e) => applySavedView(e.target.value)}
+                data-testid="ai-doctor-sessions-saved-views-select"
+                className="rounded border bg-background px-2 py-1 text-sm"
+                disabled={savedViews.length === 0}
+              >
+                <option value="">
+                  {savedViews.length === 0 ? "No saved views" : "Apply a saved view…"}
+                </option>
+                {savedViews.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {selectedSavedViewId ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDeleteSavedView(selectedSavedViewId)}
+                data-testid="ai-doctor-sessions-saved-views-delete"
+                aria-label="Delete saved view"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete
+              </Button>
+            ) : null}
+            {savingView ? (
+              <div
+                className="flex items-end gap-2"
+                data-testid="ai-doctor-sessions-saved-views-form"
+              >
+                <label className="flex flex-col gap-1 text-xs">
+                  <span className="text-muted-foreground">Label</span>
+                  <input
+                    type="text"
+                    value={pendingLabel}
+                    onChange={(e) => {
+                      setPendingLabel(e.target.value);
+                      setSaveError(null);
+                    }}
+                    data-testid="ai-doctor-sessions-saved-views-label-input"
+                    className="rounded border bg-background px-2 py-1 text-sm"
+                    autoFocus
+                  />
+                </label>
+                <Button
+                  size="sm"
+                  onClick={handleSaveView}
+                  data-testid="ai-doctor-sessions-saved-views-confirm"
+                >
+                  Save
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSavingView(false);
+                    setPendingLabel("");
+                    setSaveError(null);
+                  }}
+                  data-testid="ai-doctor-sessions-saved-views-cancel"
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSavingView(true);
+                  setSaveError(null);
+                }}
+                data-testid="ai-doctor-sessions-saved-views-open"
+              >
+                <Bookmark className="h-3.5 w-3.5" />
+                Save view
+              </Button>
+            )}
+            {saveError ? (
+              <span
+                className="text-xs text-destructive"
+                data-testid="ai-doctor-sessions-saved-views-error"
+              >
+                {saveError === "empty-label"
+                  ? "Enter a label."
+                  : saveError === "label-too-long"
+                    ? "Label is too long."
+                    : saveError === "duplicate-label"
+                      ? "A saved view with that name already exists."
+                      : saveError === "duplicate-params"
+                        ? "These exact filters are already saved."
+                        : "Saved view limit reached."}
+              </span>
+            ) : null}
+          </div>
+
+
 
           {filtersActive ? (
             <div

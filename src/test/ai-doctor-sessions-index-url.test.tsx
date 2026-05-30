@@ -30,10 +30,14 @@ const notSpy = vi.fn(function (this: unknown) {
 const eqSpy = vi.fn(function (this: unknown) {
   return chain;
 });
+const orSpy = vi.fn(function (this: unknown) {
+  return chain;
+});
 const chain: any = {
   eq: eqSpy,
   not: notSpy,
   gte: gteSpy,
+  or: orSpy,
   order: orderSpy,
 };
 const selectSpy = vi.fn(() => chain);

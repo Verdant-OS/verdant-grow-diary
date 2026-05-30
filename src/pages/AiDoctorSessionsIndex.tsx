@@ -774,6 +774,55 @@ export default function AiDoctorSessionsIndex() {
         </CardContent>
       </Card>
 
+      <AlertDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => {
+          if (!open) cancelDeleteSavedView();
+        }}
+      >
+        <AlertDialogContent data-testid="ai-doctor-sessions-saved-views-delete-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete saved view?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDeleteView ? (
+                <>
+                  <span
+                    className="font-medium text-foreground"
+                    data-testid="ai-doctor-sessions-saved-views-delete-dialog-label"
+                  >
+                    {pendingDeleteView.label}
+                  </span>
+                  <br />
+                  <span data-testid="ai-doctor-sessions-saved-views-delete-dialog-summary">
+                    {formatSavedViewSummary(
+                      pendingDeleteView.filters,
+                      pendingDeleteView.page,
+                    )}
+                  </span>
+                </>
+              ) : (
+                <span data-testid="ai-doctor-sessions-saved-views-delete-dialog-missing">
+                  This saved view is no longer available.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              data-testid="ai-doctor-sessions-saved-views-delete-dialog-cancel"
+              onClick={cancelDeleteSavedView}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="ai-doctor-sessions-saved-views-delete-dialog-confirm"
+              onClick={confirmDeleteSavedView}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

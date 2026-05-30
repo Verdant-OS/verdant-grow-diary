@@ -113,8 +113,7 @@ describe("aiDoctorSessionsSavedViewsRules — pure helpers", () => {
       page: 0,
       existing,
     });
-    expect(res.ok).toBe(false);
-    if (res.ok) return;
+    if (res.ok) throw new Error("expected failure");
     expect(res.error).toBe("duplicate-label");
   });
 
@@ -135,8 +134,7 @@ describe("aiDoctorSessionsSavedViewsRules — pure helpers", () => {
       page: 2,
       existing,
     });
-    expect(res.ok).toBe(false);
-    if (res.ok) return;
+    if (res.ok) throw new Error("expected failure");
     expect(res.error).toBe("duplicate-params");
   });
 
@@ -147,8 +145,7 @@ describe("aiDoctorSessionsSavedViewsRules — pure helpers", () => {
       page: 0,
       existing: [],
     });
-    expect(res.ok).toBe(false);
-    if (res.ok) return;
+    if (res.ok) throw new Error("expected failure");
     expect(res.error).toBe("empty-label");
   });
 

@@ -418,7 +418,7 @@ export default function Dashboard() {
             >
               {persistedOpenCount > 0 ? (
                 <>
-                  <Link to="/alerts" className="text-primary hover:underline">
+                  <Link to={alertsPath()} className="text-primary hover:underline">
                     {persistedOpenCount} persisted open alert
                     {persistedOpenCount === 1 ? "" : "s"}
                   </Link>{" "}

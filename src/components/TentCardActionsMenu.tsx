@@ -29,6 +29,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import EditTentDialog from "@/components/EditTentDialog";
+import { tentDetailPath } from "@/lib/routes";
+
 import {
   buildArchiveTentPayload,
   evaluateTentDeleteGuard,
@@ -225,7 +227,7 @@ export default function TentCardActionsMenu({
         <DropdownMenuContent align="end" data-testid="tent-card-actions-menu">
           {!hideView && (
             <DropdownMenuItem asChild data-testid="tent-card-action-view">
-              <Link to={`/tents/${tent.id}`}>
+              <Link to={tentDetailPath(tent.id)}>
                 <ExternalLink className="h-4 w-4 mr-2" /> View Tent
               </Link>
             </DropdownMenuItem>

@@ -35,7 +35,7 @@ import {
   type AlertStatusRow,
 } from "@/lib/alerts";
 import { useAlertEvents } from "@/hooks/useAlertEvents";
-import { actionDetailPath, alertsPath, growDetailPath } from "@/lib/routes";
+import { actionDetailPath, alertsPath, growDetailPath, plantDetailPath, tentDetailPath } from "@/lib/routes";
 import { actionMatchesAlert, buildActionQueueDraftFromAlert } from "@/lib/alertToActionQueueRules";
 import {
   getActionQueueSourceLabel,
@@ -397,7 +397,7 @@ export default function AlertDetail() {
                   <dt className="uppercase tracking-wider text-muted-foreground">Tent</dt>
                   <dd className="font-medium">
                     <Link
-                      to={`/tents/${encodeURIComponent(alert.tent_id)}`}
+                      to={tentDetailPath(alert.tent_id)}
                       className="text-primary hover:underline"
                     >
                       {alert.tent_id}
@@ -410,7 +410,7 @@ export default function AlertDetail() {
                   <dt className="uppercase tracking-wider text-muted-foreground">Plant</dt>
                   <dd className="font-medium">
                     <Link
-                      to={`/plants/${encodeURIComponent(alert.plant_id)}`}
+                      to={plantDetailPath(alert.plant_id)}
                       className="text-primary hover:underline"
                     >
                       {alert.plant_id}

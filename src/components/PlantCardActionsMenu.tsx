@@ -33,6 +33,8 @@ import { toast } from "sonner";
 import EditPlantDialog from "@/components/EditPlantDialog";
 import AssignTentDialog from "@/components/AssignTentDialog";
 import PlantMergeDialog from "@/components/PlantMergeDialog";
+import { plantDetailPath } from "@/lib/routes";
+
 import {
   buildArchivePlantPayload,
   buildRemovePlantFromTentPayload,
@@ -263,7 +265,7 @@ export default function PlantCardActionsMenu({
         <DropdownMenuContent align="end" data-testid="plant-card-actions-menu">
           {!hideView && (
             <DropdownMenuItem asChild data-testid="plant-card-action-view">
-              <Link to={`/plants/${plant.id}`}>
+              <Link to={plantDetailPath(plant.id)}>
                 <ExternalLink className="h-4 w-4 mr-2" /> View Plant
               </Link>
             </DropdownMenuItem>

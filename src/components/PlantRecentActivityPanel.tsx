@@ -10,6 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
+import { tentDetailPath } from "@/lib/routes";
+
 import {
   buildPlantRecentActivity,
   type PlantRecentActivityRow,
@@ -94,7 +96,7 @@ function EntryRow({ row, plantName }: { row: PlantRecentActivityRow; plantName?:
         {plantName ? <span>{plantName}</span> : null}
         {row.tentId ? (
           <Link
-            to={`/tents/${row.tentId}`}
+            to={tentDetailPath(row.tentId)}
             className="underline hover:text-foreground"
             data-testid="plant-recent-activity-tent-link"
           >

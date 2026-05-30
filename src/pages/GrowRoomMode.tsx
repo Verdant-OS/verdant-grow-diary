@@ -39,6 +39,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTents } from "@/hooks/use-tents";
 import { usePlants } from "@/hooks/use-plants";
 import { useAlertsList } from "@/hooks/useAlertsList";
+import { tentDetailPath } from "@/lib/routes";
+
 import {
   EMPTY_SNAPSHOT,
   snapshotFromReadings,
@@ -468,7 +470,7 @@ export default function GrowRoomMode() {
                         className="h-9 w-full"
                         data-testid="grow-room-add-plant-cta"
                       >
-                        <Link to={`/tents/${card.tentId}`}>
+                        <Link to={tentDetailPath(card.tentId)}>
                           Add Plant to This Tent
                         </Link>
                       </Button>

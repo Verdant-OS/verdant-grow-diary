@@ -51,6 +51,8 @@ import {
 } from "@/lib/environmentStageTargetRules";
 import { cn } from "@/lib/utils";
 
+import { plantDetailPath } from "@/lib/routes";
+
 export default function TentDetail() {
   const { id } = useParams();
   const [showArchived, setShowArchived] = useState(false);
@@ -341,7 +343,7 @@ export default function TentDetail() {
                   data-archived={isInactive ? "true" : "false"}
                   data-archived-kind={archivedLabel.kind}
                 >
-                  <Link to={`/plants/${p.id}`} className="block">
+                  <Link to={plantDetailPath(p.id)} className="block">
                     <PlantPhoto src={p.photo} alt={p.name} className="aspect-video" caption="No plant photo yet" />
                     <div className="p-3">
                       <div className="flex items-center justify-between gap-2 pr-8">

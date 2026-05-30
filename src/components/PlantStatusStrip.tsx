@@ -22,6 +22,8 @@ import { buildPlantTentEnvironmentView } from "@/lib/plantTentEnvironmentRules";
 import { usePlantAssignedTentAlerts } from "@/hooks/usePlantAssignedTentAlerts";
 import { usePlantAssignedTentActions } from "@/hooks/usePlantAssignedTentActions";
 
+import { tentDetailPath } from "@/lib/routes";
+
 interface Props {
   tentId: string | null | undefined;
   tentName?: string | null;
@@ -69,7 +71,7 @@ export default function PlantStatusStrip({ tentId, tentName, growId }: Props) {
       {/* Tent */}
       {hasTent && tentId ? (
         <Link
-          to={`/tents/${tentId}`}
+          to={tentDetailPath(tentId)}
           className="rounded-lg border bg-card/40 p-2.5 hover:bg-card/70 transition"
           data-testid="plant-status-tent"
         >

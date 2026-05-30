@@ -389,6 +389,114 @@ export default function AiDoctorSessionsIndex() {
             ) : null}
           </div>
 
+          <div
+            className="flex flex-wrap items-end gap-2"
+            data-testid="ai-doctor-sessions-saved-views"
+          >
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="text-muted-foreground">Saved views</span>
+              <select
+                value={selectedSavedViewId}
+                onChange={(e) => applySavedView(e.target.value)}
+                data-testid="ai-doctor-sessions-saved-views-select"
+                className="rounded border bg-background px-2 py-1 text-sm"
+                disabled={savedViews.length === 0}
+              >
+                <option value="">
+                  {savedViews.length === 0 ? "No saved views" : "Apply a saved view…"}
+                </option>
+                {savedViews.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {selectedSavedViewId ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDeleteSavedView(selectedSavedViewId)}
+                data-testid="ai-doctor-sessions-saved-views-delete"
+                aria-label="Delete saved view"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete
+              </Button>
+            ) : null}
+            {savingView ? (
+              <div
+                className="flex items-end gap-2"
+                data-testid="ai-doctor-sessions-saved-views-form"
+              >
+                <label className="flex flex-col gap-1 text-xs">
+                  <span className="text-muted-foreground">Label</span>
+                  <input
+                    type="text"
+                    value={pendingLabel}
+                    onChange={(e) => {
+                      setPendingLabel(e.target.value);
+                      setSaveError(null);
+                    }}
+                    data-testid="ai-doctor-sessions-saved-views-label-input"
+                    className="rounded border bg-background px-2 py-1 text-sm"
+                    autoFocus
+                  />
+                </label>
+                <Button
+                  size="sm"
+                  onClick={handleSaveView}
+                  data-testid="ai-doctor-sessions-saved-views-confirm"
+                >
+                  Save
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSavingView(false);
+                    setPendingLabel("");
+                    setSaveError(null);
+                  }}
+                  data-testid="ai-doctor-sessions-saved-views-cancel"
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSavingView(true);
+                  setSaveError(null);
+                }}
+                data-testid="ai-doctor-sessions-saved-views-open"
+              >
+                <Bookmark className="h-3.5 w-3.5" />
+                Save view
+              </Button>
+            )}
+            {saveError ? (
+              <span
+                className="text-xs text-destructive"
+                data-testid="ai-doctor-sessions-saved-views-error"
+              >
+                {saveError === "empty-label"
+                  ? "Enter a label."
+                  : saveError === "label-too-long"
+                    ? "Label is too long."
+                    : saveError === "duplicate-label"
+                      ? "A saved view with that name already exists."
+                      : saveError === "duplicate-params"
+                        ? "These exact filters are already saved."
+                        : "Saved view limit reached."}
+              </span>
+            ) : null}
+          </div>
+
+
+
           {filtersActive ? (
             <div
               className="flex flex-wrap items-center gap-2"

@@ -89,6 +89,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useAiDoctorSessionReviews } from "@/hooks/useAiDoctorSessionReviews";
+import {
+  buildSessionReviewStatusIndicator,
+  type AiDoctorSessionReviewState,
+} from "@/lib/aiDoctorSessionReviewStatusRules";
 
 function fmtDate(ts: string | null): string {
   if (!ts) return "";
@@ -111,7 +116,13 @@ function summaryPreview(text: string | null | undefined): string | null {
   return `${trimmed.slice(0, 140)}…`;
 }
 
-function IndexRow({ row }: { row: AiDoctorSessionRow }) {
+function IndexRow({
+  row,
+  reviewState,
+}: {
+  row: AiDoctorSessionRow;
+  reviewState: AiDoctorSessionReviewState | null;
+}) {
   const d = row.diagnosis;
   const confidence = fmtConfidence(row.displayed_confidence ?? row.raw_confidence);
   const actionCount = Array.isArray(row.suggested_actions) ? row.suggested_actions.length : 0;
@@ -119,6 +130,7 @@ function IndexRow({ row }: { row: AiDoctorSessionRow }) {
   const needsReview = sessionNeedsReview(row);
   const caution = buildSessionRowCautionIndicator(row);
   const limitedContext = isSessionLimitedContext(row);
+  const reviewIndicator = buildSessionReviewStatusIndicator(reviewState);
 
   return (
     <li
@@ -215,6 +227,25 @@ function IndexRow({ row }: { row: AiDoctorSessionRow }) {
             {LIMITED_CONTEXT_LABEL}
           </Badge>
         ) : null}
+        {reviewIndicator.show ? (
+          <Badge
+            variant="outline"
+            className={
+              reviewIndicator.tone === "amber"
+                ? "text-[11px] border-amber-500/50 text-amber-700 dark:text-amber-300"
+                : "text-[11px] text-muted-foreground"
+            }
+            data-testid="ai-doctor-sessions-index-review-status-chip"
+            data-review-status={reviewIndicator.status}
+            data-review-tone={reviewIndicator.tone ?? ""}
+            data-latest-event-at={reviewIndicator.latestEventAt ?? ""}
+            data-latest-note={reviewIndicator.latestNote ?? ""}
+            title={reviewIndicator.title ?? undefined}
+            aria-label={reviewIndicator.title ?? reviewIndicator.label ?? undefined}
+          >
+            {reviewIndicator.label}
+          </Badge>
+        ) : null}
       </div>
 
 
@@ -291,6 +322,10 @@ export default function AiDoctorSessionsIndex() {
     () => applyClientSideSort(applyClientSideFilters(rawRows, filters), filters.sort),
     [rawRows, filters],
   );
+  // Scope review-event fetch to the currently visible page's session IDs only.
+  const visibleSessionIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const { data: reviewsData } = useAiDoctorSessionReviews(visibleSessionIds);
+  const reviewStateBySession = reviewsData?.stateBySession ?? null;
   const hasMore = !!data?.hasMore;
   const filtersActive = isFiltersActive(filters);
   const activeLabels = formatActiveFilterLabels(filters);
@@ -1030,7 +1065,11 @@ export default function AiDoctorSessionsIndex() {
                 data-testid="ai-doctor-sessions-index-list"
               >
                 {rows.map((r) => (
-                  <IndexRow key={r.id} row={r} />
+                  <IndexRow
+                    key={r.id}
+                    row={r}
+                    reviewState={reviewStateBySession?.get(r.id) ?? null}
+                  />
                 ))}
               </ul>
               <div

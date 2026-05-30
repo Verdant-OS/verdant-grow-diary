@@ -201,3 +201,80 @@ export function isReviewStatusFilterActive(
     filter === "needs_follow_up"
   );
 }
+
+/**
+ * Read-only display indicator for a session row's review status chip.
+ *
+ * Pure: deterministic from state alone. No I/O, no formatting beyond strings
+ * already on the state. Tone is a semantic label that the UI maps to styles —
+ * never embed Tailwind class strings here.
+ */
+export type AiDoctorSessionReviewIndicatorTone = "muted" | "amber";
+
+export interface AiDoctorSessionReviewIndicator {
+  /** Whether the UI should render the chip at all. */
+  show: boolean;
+  status: AiDoctorSessionReviewStatus;
+  /** Short chip text (only set when show=true). */
+  label: string | null;
+  /** Semantic tone for chip styling (only set when show=true). */
+  tone: AiDoctorSessionReviewIndicatorTone | null;
+  /** Tooltip/title text combining latest event time + optional note. */
+  title: string | null;
+  latestEventAt: string | null;
+  latestNote: string | null;
+}
+
+const HIDDEN_INDICATOR: AiDoctorSessionReviewIndicator = Object.freeze({
+  show: false,
+  status: "not_reviewed",
+  label: null,
+  tone: null,
+  title: null,
+  latestEventAt: null,
+  latestNote: null,
+});
+
+function buildTitle(
+  label: string,
+  latestEventAt: string | null,
+  latestNote: string | null,
+): string {
+  const parts: string[] = [label];
+  if (latestEventAt) parts.push(`Last update: ${latestEventAt}`);
+  if (latestNote && latestNote.trim().length > 0) {
+    parts.push(`Note: ${latestNote.trim()}`);
+  }
+  return parts.join(" · ");
+}
+
+export function buildSessionReviewStatusIndicator(
+  state: AiDoctorSessionReviewState | null | undefined,
+): AiDoctorSessionReviewIndicator {
+  if (!state) return { ...HIDDEN_INDICATOR };
+  if (state.status === "reviewed") {
+    const label = "Reviewed";
+    return {
+      show: true,
+      status: "reviewed",
+      label,
+      tone: "muted",
+      title: buildTitle(label, state.latestEventAt, state.latestNote),
+      latestEventAt: state.latestEventAt,
+      latestNote: state.latestNote,
+    };
+  }
+  if (state.status === "needs_follow_up") {
+    const label = "Needs follow-up";
+    return {
+      show: true,
+      status: "needs_follow_up",
+      label,
+      tone: "amber",
+      title: buildTitle(label, state.latestEventAt, state.latestNote),
+      latestEventAt: state.latestEventAt,
+      latestNote: state.latestNote,
+    };
+  }
+  return { ...HIDDEN_INDICATOR };
+}

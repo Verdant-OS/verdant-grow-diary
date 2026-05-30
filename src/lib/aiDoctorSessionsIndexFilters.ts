@@ -4,6 +4,10 @@
  * No side effects. No network. No data writes.
  * Used by the read-only /doctor/sessions index page and tests.
  */
+import {
+  buildSessionRowCautionIndicator,
+  type SessionRowLike,
+} from "@/lib/aiDoctorSessionDetailViewModel";
 
 export type RiskFilter = "all" | "low" | "medium" | "high" | "critical";
 export type HasActionsFilter = "all" | "yes" | "no";
@@ -17,12 +21,30 @@ export type DateRangeFilter = "all" | "7d" | "30d";
  * It is purely a read-only lens over existing fields.
  */
 export type NeedsReviewFilter = "all" | "yes" | "no";
+/**
+ * "Caution" is a derived filter: a session is "caution" when
+ * `buildSessionRowCautionIndicator(row).show` is true. Read-only.
+ */
+export type CautionFilter = "all" | "yes" | "no";
+/**
+ * "Has review checklist" is a derived filter: true when the row has one or
+ * more deterministic review-checklist items. Read-only.
+ */
+export type HasChecklistFilter = "all" | "yes" | "no";
+/**
+ * Confidence bucket filter, derived from displayed/raw/diagnosis confidence.
+ * "unknown" matches sessions with no recorded confidence.
+ */
+export type ConfidenceFilter = "all" | "low" | "medium" | "high" | "unknown";
 
 export interface SessionsIndexFilters {
   risk: RiskFilter;
   hasActions: HasActionsFilter;
   dateRange: DateRangeFilter;
   needsReview: NeedsReviewFilter;
+  caution: CautionFilter;
+  hasChecklist: HasChecklistFilter;
+  confidence: ConfidenceFilter;
 }
 
 export const DEFAULT_FILTERS: SessionsIndexFilters = {
@@ -30,12 +52,24 @@ export const DEFAULT_FILTERS: SessionsIndexFilters = {
   hasActions: "all",
   dateRange: "all",
   needsReview: "all",
+  caution: "all",
+  hasChecklist: "all",
+  confidence: "all",
 };
 
 export const RISK_OPTIONS: RiskFilter[] = ["all", "low", "medium", "high", "critical"];
 export const HAS_ACTIONS_OPTIONS: HasActionsFilter[] = ["all", "yes", "no"];
 export const DATE_RANGE_OPTIONS: DateRangeFilter[] = ["all", "7d", "30d"];
 export const NEEDS_REVIEW_OPTIONS: NeedsReviewFilter[] = ["all", "yes", "no"];
+export const CAUTION_OPTIONS: CautionFilter[] = ["all", "yes", "no"];
+export const HAS_CHECKLIST_OPTIONS: HasChecklistFilter[] = ["all", "yes", "no"];
+export const CONFIDENCE_OPTIONS: ConfidenceFilter[] = [
+  "all",
+  "low",
+  "medium",
+  "high",
+  "unknown",
+];
 
 export function parseRisk(value: unknown): RiskFilter {
   return RISK_OPTIONS.includes(value as RiskFilter) ? (value as RiskFilter) : "all";
@@ -59,12 +93,33 @@ export function parseNeedsReview(value: unknown): NeedsReviewFilter {
     : "all";
 }
 
+export function parseCaution(value: unknown): CautionFilter {
+  return CAUTION_OPTIONS.includes(value as CautionFilter)
+    ? (value as CautionFilter)
+    : "all";
+}
+
+export function parseHasChecklist(value: unknown): HasChecklistFilter {
+  return HAS_CHECKLIST_OPTIONS.includes(value as HasChecklistFilter)
+    ? (value as HasChecklistFilter)
+    : "all";
+}
+
+export function parseConfidence(value: unknown): ConfidenceFilter {
+  return CONFIDENCE_OPTIONS.includes(value as ConfidenceFilter)
+    ? (value as ConfidenceFilter)
+    : "all";
+}
+
 export function parseFilters(input: Partial<Record<keyof SessionsIndexFilters, unknown>>): SessionsIndexFilters {
   return {
     risk: parseRisk(input.risk),
     hasActions: parseHasActions(input.hasActions),
     dateRange: parseDateRange(input.dateRange),
     needsReview: parseNeedsReview(input.needsReview),
+    caution: parseCaution(input.caution),
+    hasChecklist: parseHasChecklist(input.hasChecklist),
+    confidence: parseConfidence(input.confidence),
   };
 }
 
@@ -73,7 +128,10 @@ export function isFiltersActive(f: SessionsIndexFilters): boolean {
     f.risk !== "all" ||
     f.hasActions !== "all" ||
     f.dateRange !== "all" ||
-    f.needsReview !== "all"
+    f.needsReview !== "all" ||
+    f.caution !== "all" ||
+    f.hasChecklist !== "all" ||
+    f.confidence !== "all"
   );
 }
 
@@ -101,6 +159,13 @@ const DATE_RANGE_LABEL: Record<Exclude<DateRangeFilter, "all">, string> = {
   "30d": "Last 30 days",
 };
 
+const CONFIDENCE_LABEL: Record<Exclude<ConfidenceFilter, "all">, string> = {
+  low: "Confidence: Low",
+  medium: "Confidence: Medium",
+  high: "Confidence: High",
+  unknown: "Confidence: Unknown",
+};
+
 export function formatActiveFilterLabels(f: SessionsIndexFilters): string[] {
   const labels: string[] = [];
   if (f.risk !== "all") labels.push(RISK_LABEL[f.risk]);
@@ -109,6 +174,11 @@ export function formatActiveFilterLabels(f: SessionsIndexFilters): string[] {
   if (f.dateRange !== "all") labels.push(DATE_RANGE_LABEL[f.dateRange]);
   if (f.needsReview === "yes") labels.push("Needs review");
   if (f.needsReview === "no") labels.push("No review needed");
+  if (f.caution === "yes") labels.push("Caution only");
+  if (f.caution === "no") labels.push("No caution");
+  if (f.hasChecklist === "yes") labels.push("Has review checklist");
+  if (f.hasChecklist === "no") labels.push("No review checklist");
+  if (f.confidence !== "all") labels.push(CONFIDENCE_LABEL[f.confidence]);
   return labels;
 }
 
@@ -121,6 +191,9 @@ export const FILTER_PARAM_KEYS = {
   hasActions: "hasActions",
   dateRange: "dateRange",
   needsReview: "needsReview",
+  caution: "caution",
+  hasChecklist: "hasChecklist",
+  confidence: "confidence",
   page: "page",
 } as const;
 
@@ -135,6 +208,11 @@ export function serializeFilters(f: SessionsIndexFilters): Record<string, string
   if (f.dateRange !== DEFAULT_FILTERS.dateRange) out[FILTER_PARAM_KEYS.dateRange] = f.dateRange;
   if (f.needsReview !== DEFAULT_FILTERS.needsReview)
     out[FILTER_PARAM_KEYS.needsReview] = f.needsReview;
+  if (f.caution !== DEFAULT_FILTERS.caution) out[FILTER_PARAM_KEYS.caution] = f.caution;
+  if (f.hasChecklist !== DEFAULT_FILTERS.hasChecklist)
+    out[FILTER_PARAM_KEYS.hasChecklist] = f.hasChecklist;
+  if (f.confidence !== DEFAULT_FILTERS.confidence)
+    out[FILTER_PARAM_KEYS.confidence] = f.confidence;
   return out;
 }
 
@@ -185,4 +263,78 @@ export function sessionNeedsReview(row: NeedsReviewInput | null | undefined): bo
   const actions = row.suggested_actions;
   if (Array.isArray(actions) && actions.length > 0) return true;
   return false;
+}
+
+// ---------------- caution / checklist / confidence derived rules ----------------
+
+/**
+ * Bucket a 0-100 confidence percent into low/medium/high. Returns "unknown"
+ * for null/invalid values. Pure.
+ *   low:    pct <= 60
+ *   medium: 61 <= pct <= 80
+ *   high:   pct >  80
+ */
+export function confidenceBucketFromPct(
+  pct: number | null | undefined,
+): Exclude<ConfidenceFilter, "all"> {
+  if (typeof pct !== "number" || !Number.isFinite(pct)) return "unknown";
+  if (pct <= 60) return "low";
+  if (pct <= 80) return "medium";
+  return "high";
+}
+
+function pctFromUnit(val: unknown): number | null {
+  if (typeof val !== "number" || !Number.isFinite(val)) return null;
+  const clamped = Math.max(0, Math.min(1, val));
+  return Math.round(clamped * 100);
+}
+
+/**
+ * Loose row shape for client-side filtering. Matches what the index hook
+ * returns. Kept loose so tests can pass minimal fixtures.
+ */
+export interface FilterableSessionRow extends SessionRowLike {
+  displayed_confidence?: number | null;
+  raw_confidence?: number | null;
+}
+
+export function rowHasCaution(row: FilterableSessionRow): boolean {
+  return buildSessionRowCautionIndicator(row).show;
+}
+
+export function rowHasChecklist(row: FilterableSessionRow): boolean {
+  return buildSessionRowCautionIndicator(row).checklistItems.length > 0;
+}
+
+export function rowConfidenceBucket(
+  row: FilterableSessionRow,
+): Exclude<ConfidenceFilter, "all"> {
+  const pct =
+    pctFromUnit(row.displayed_confidence) ??
+    pctFromUnit(row.raw_confidence) ??
+    pctFromUnit(row.diagnosis?.confidence as unknown);
+  return confidenceBucketFromPct(pct);
+}
+
+/**
+ * Apply client-side derived filters (caution, hasChecklist, confidence) to a
+ * page of session rows. Risk / hasActions / dateRange / needsReview are
+ * already applied server-side by `useAiDoctorSessionsIndex`.
+ *
+ * Pure. Deterministic. Order-preserving.
+ */
+export function applyClientSideFilters<T extends FilterableSessionRow>(
+  rows: T[],
+  f: SessionsIndexFilters,
+): T[] {
+  if (!Array.isArray(rows) || rows.length === 0) return [];
+  return rows.filter((row) => {
+    if (f.caution === "yes" && !rowHasCaution(row)) return false;
+    if (f.caution === "no" && rowHasCaution(row)) return false;
+    if (f.hasChecklist === "yes" && !rowHasChecklist(row)) return false;
+    if (f.hasChecklist === "no" && rowHasChecklist(row)) return false;
+    if (f.confidence !== "all" && rowConfidenceBucket(row) !== f.confidence)
+      return false;
+    return true;
+  });
 }

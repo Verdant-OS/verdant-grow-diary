@@ -148,6 +148,45 @@ function OpenInNewTabLink({ sessionId }: { sessionId: string }) {
   );
 }
 
+function SessionQuickJumpLinks({
+  plantId,
+  tentId,
+}: {
+  plantId: string | null | undefined;
+  tentId: string | null | undefined;
+}) {
+  const hasPlant = typeof plantId === "string" && plantId.length > 0;
+  const hasTent = typeof tentId === "string" && tentId.length > 0;
+  if (!hasPlant && !hasTent) return null;
+  return (
+    <div
+      className="flex flex-wrap items-center gap-2"
+      data-testid="ai-doctor-session-detail-quick-jump"
+    >
+      {hasPlant ? (
+        <Link
+          to={plantDetailPath(plantId!)}
+          aria-label="View related plant"
+          data-testid="ai-doctor-session-detail-plant-link"
+          className="inline-flex items-center gap-2 h-9 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+        >
+          View plant
+        </Link>
+      ) : null}
+      {hasTent ? (
+        <Link
+          to={tentDetailPath(tentId!)}
+          aria-label="View related tent"
+          data-testid="ai-doctor-session-detail-tent-link"
+          className="inline-flex items-center gap-2 h-9 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+        >
+          View tent
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
 const RISK_TONE_CLASSES: Record<ReviewRiskTone, string> = {
   neutral: "border-border bg-muted/30",
   info: "border-border bg-muted/20",

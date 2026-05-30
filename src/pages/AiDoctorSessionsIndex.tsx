@@ -370,10 +370,28 @@ export default function AiDoctorSessionsIndex() {
     writeSavedViews(savedViews);
   }, [savedViews]);
 
+  // Display list merges built-in (system) views in front of user views.
+  // Built-in views are never persisted — see write effect below.
+  const displaySavedViews = useMemo(
+    () => mergeBuiltInSavedViews(savedViews),
+    [savedViews],
+  );
+
+  // Auto-select the matching built-in view when current filters/page match it,
+  // so the saved-views select stays in sync with the preset button.
+  const autoSelectedBuiltInId = useMemo(
+    () => matchingBuiltInSavedViewId(filters, page),
+    [filters, page],
+  );
+  const effectiveSelectedSavedViewId =
+    selectedSavedViewId || autoSelectedBuiltInId || "";
+
   const applySavedView = (id: string) => {
     setSelectedSavedViewId(id);
     if (!id) return;
-    const view = findSavedView(savedViews, id);
+    const view = isBuiltInSavedViewId(id)
+      ? findBuiltInSavedView(id)
+      : findSavedView(savedViews, id);
     if (!view) return;
     const next = savedViewToSearchParams(view, searchParams);
     setSearchParams(next, { replace: true });

@@ -183,6 +183,7 @@ export default function AiDoctorSessionsIndex() {
         risk: searchParams.get(FILTER_PARAM_KEYS.risk) ?? undefined,
         hasActions: searchParams.get(FILTER_PARAM_KEYS.hasActions) ?? undefined,
         dateRange: searchParams.get(FILTER_PARAM_KEYS.dateRange) ?? undefined,
+        needsReview: searchParams.get(FILTER_PARAM_KEYS.needsReview) ?? undefined,
       }),
     [searchParams],
   );
@@ -205,6 +206,7 @@ export default function AiDoctorSessionsIndex() {
         key !== FILTER_PARAM_KEYS.risk &&
         key !== FILTER_PARAM_KEYS.hasActions &&
         key !== FILTER_PARAM_KEYS.dateRange &&
+        key !== FILTER_PARAM_KEYS.needsReview &&
         key !== FILTER_PARAM_KEYS.page
       ) {
         params.set(key, value);

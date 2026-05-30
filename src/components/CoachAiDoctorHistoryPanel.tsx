@@ -89,7 +89,32 @@ function HistoryRow({ row }: { row: AiDoctorSessionRow }) {
             {actionCount} action{actionCount !== 1 ? "s" : ""}
           </Badge>
         ) : null}
+        {caution.show ? (
+          <Badge
+            variant="outline"
+            className="text-[11px] border-amber-500/50 text-amber-700 dark:text-amber-300 inline-flex items-center gap-1"
+            data-testid="coach-ai-doctor-history-caution-indicator"
+            title={caution.title}
+            aria-label={`${caution.label}. ${caution.title}`}
+          >
+            <ShieldAlert className="h-3 w-3" />
+            {caution.label}
+          </Badge>
+        ) : null}
+        {limitedContext ? (
+          <Badge
+            variant="outline"
+            className="text-[11px] text-muted-foreground inline-flex items-center gap-1"
+            data-testid="coach-ai-doctor-history-limited-context-indicator"
+            title={LIMITED_CONTEXT_TITLE}
+            aria-label={`${LIMITED_CONTEXT_LABEL}. ${LIMITED_CONTEXT_TITLE}`}
+          >
+            <Info className="h-3 w-3" />
+            {LIMITED_CONTEXT_LABEL}
+          </Badge>
+        ) : null}
       </div>
+
       {d?.likelyIssue ? (
         <p
           className="font-medium leading-snug"

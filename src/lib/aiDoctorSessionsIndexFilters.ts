@@ -382,6 +382,7 @@ function pctFromUnit(val: unknown): number | null {
  * returns. Kept loose so tests can pass minimal fixtures.
  */
 export interface FilterableSessionRow extends SessionRowLike {
+  id?: string;
   displayed_confidence?: number | null;
   raw_confidence?: number | null;
 }
@@ -405,17 +406,37 @@ export function rowConfidenceBucket(
 }
 
 /**
- * Apply client-side derived filters (caution, hasChecklist, confidence) to a
- * page of session rows. Risk / hasActions / dateRange / needsReview are
- * already applied server-side by `useAiDoctorSessionsIndex`.
+ * Resolve a row's durable review status from the projected state map. Rows
+ * with no entry (or `cleared` events) project to `not_reviewed`. Pure.
+ */
+export function rowReviewStatus(
+  row: FilterableSessionRow,
+  stateBySession?: ReadonlyMap<string, AiDoctorSessionReviewState> | null,
+): "not_reviewed" | "reviewed" | "needs_follow_up" {
+  const id = typeof row?.id === "string" ? row.id : null;
+  if (!id || !stateBySession) return "not_reviewed";
+  const state = stateBySession.get(id);
+  return state?.status ?? "not_reviewed";
+}
+
+/**
+ * Apply client-side derived filters (caution, hasChecklist, confidence,
+ * reviewStatus) to a page of session rows. Risk / hasActions / dateRange /
+ * needsReview are already applied server-side by `useAiDoctorSessionsIndex`.
+ *
+ * `stateBySession` is the projected review-state map from
+ * `useAiDoctorSessionReviews`. If omitted, every row is treated as
+ * `not_reviewed` (missing state == not reviewed).
  *
  * Pure. Deterministic. Order-preserving.
  */
 export function applyClientSideFilters<T extends FilterableSessionRow>(
   rows: T[],
   f: SessionsIndexFilters,
+  stateBySession?: ReadonlyMap<string, AiDoctorSessionReviewState> | null,
 ): T[] {
   if (!Array.isArray(rows) || rows.length === 0) return [];
+  const reviewActive = isReviewStatusFilterActive(f.reviewStatus);
   return rows.filter((row) => {
     if (f.caution === "yes" && !rowHasCaution(row)) return false;
     if (f.caution === "no" && rowHasCaution(row)) return false;
@@ -423,6 +444,9 @@ export function applyClientSideFilters<T extends FilterableSessionRow>(
     if (f.hasChecklist === "no" && rowHasChecklist(row)) return false;
     if (f.confidence !== "all" && rowConfidenceBucket(row) !== f.confidence)
       return false;
+    if (reviewActive) {
+      if (rowReviewStatus(row, stateBySession) !== f.reviewStatus) return false;
+    }
     return true;
   });
 }

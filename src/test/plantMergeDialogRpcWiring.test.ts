@@ -178,7 +178,7 @@ describe("PlantMergeDialog static wiring", () => {
     expect(DIALOG).toContain("plant-merge-success-view-target");
     expect(DIALOG).toContain("plant-merge-success-back");
     expect(DIALOG).toMatch(/to=\{plantDetailPath\(target\.id\)\}/);
-    expect(DIALOG).toMatch(/to="\/plants"/);
+    expect(DIALOG).toMatch(/to=\{plantsPath\(\)\}/);
   });
 
   it("invalidates plant-related queries after merge", () => {

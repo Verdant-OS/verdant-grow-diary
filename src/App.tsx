@@ -24,6 +24,7 @@ import GrowDetail from "./pages/GrowDetail";
 
 import Coach from "./pages/Coach";
 import AiDoctorSessionDetail from "./pages/AiDoctorSessionDetail";
+import AiDoctorSessionsIndex from "./pages/AiDoctorSessionsIndex";
 import Diagnostics from "./pages/Diagnostics";
 import ActionQueue from "./pages/ActionQueue";
 import ActionDetail from "./pages/ActionDetail";

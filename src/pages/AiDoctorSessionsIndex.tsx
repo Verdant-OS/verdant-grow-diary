@@ -703,6 +703,25 @@ export default function AiDoctorSessionsIndex() {
               </select>
             </label>
             <label className="flex flex-col gap-1 text-xs">
+              <span className="text-muted-foreground">Review</span>
+              <select
+                value={filters.reviewStatus}
+                onChange={(e) =>
+                  updateFilter(
+                    "reviewStatus",
+                    e.target.value as AiDoctorSessionReviewStatusFilter,
+                  )
+                }
+                data-testid="ai-doctor-sessions-index-filter-review-status"
+                className="rounded border bg-background px-2 py-1 text-sm"
+                title="Filter by durable review status"
+              >
+                <option value="any">Any</option>
+                <option value="not_reviewed">Not reviewed</option>
+                <option value="reviewed">Reviewed</option>
+                <option value="needs_follow_up">Needs follow-up</option>
+              </select>
+            </label>
               <span className="text-muted-foreground">Sort</span>
               <select
                 value={filters.sort}

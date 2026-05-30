@@ -77,10 +77,10 @@ function makeRow(
 
 const oldHealthy = makeRow("old-healthy", "2026-01-01T00:00:00Z");
 const newHealthy = makeRow("new-healthy", "2026-05-01T00:00:00Z");
-const newCritical = makeRow(
-  "new-crit",
+const newHighRisk = makeRow(
+  "new-hr",
   "2026-05-02T00:00:00Z",
-  { riskLevel: "critical" },
+  { riskLevel: "high" },
 );
 const oldHighLowConf = makeRow(
   "old-high",

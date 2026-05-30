@@ -548,6 +548,117 @@ export default function AiDoctorSessionsIndex() {
             ) : null}
           </div>
 
+          <div
+            className="flex flex-wrap items-start gap-2"
+            data-testid="ai-doctor-sessions-saved-views-portability"
+          >
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportViews}
+              data-testid="ai-doctor-sessions-saved-views-export"
+              aria-live="polite"
+              disabled={savedViews.length === 0 && exportStatus === "idle"}
+            >
+              {exportStatus === "success" ? (
+                <span data-testid="ai-doctor-sessions-saved-views-export-success">
+                  Copied
+                </span>
+              ) : exportStatus === "error" ? (
+                <span data-testid="ai-doctor-sessions-saved-views-export-error">
+                  Export failed
+                </span>
+              ) : (
+                <span>Export views</span>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setImportOpen((v) => !v);
+                setImportError(null);
+                setImportSummary(null);
+              }}
+              data-testid="ai-doctor-sessions-saved-views-import-toggle"
+            >
+              {importOpen ? "Close import" : "Import views"}
+            </Button>
+          </div>
+
+          {importOpen ? (
+            <div
+              className="flex flex-col gap-2 rounded border bg-card/40 p-2"
+              data-testid="ai-doctor-sessions-saved-views-import-panel"
+            >
+              <label className="flex flex-col gap-1 text-xs">
+                <span className="text-muted-foreground">
+                  Paste exported saved views JSON
+                </span>
+                <textarea
+                  value={importText}
+                  onChange={(e) => {
+                    setImportText(e.target.value);
+                    setImportError(null);
+                  }}
+                  data-testid="ai-doctor-sessions-saved-views-import-textarea"
+                  className="rounded border bg-background px-2 py-1 text-xs font-mono min-h-[6rem]"
+                />
+              </label>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={handleConfirmImport}
+                  data-testid="ai-doctor-sessions-saved-views-import-confirm"
+                >
+                  Import
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setImportOpen(false);
+                    setImportText("");
+                    setImportError(null);
+                    setImportSummary(null);
+                  }}
+                  data-testid="ai-doctor-sessions-saved-views-import-cancel"
+                >
+                  Cancel
+                </Button>
+              </div>
+              {importError ? (
+                <span
+                  className="text-xs text-destructive"
+                  data-testid="ai-doctor-sessions-saved-views-import-error"
+                >
+                  {importError === "empty-input"
+                    ? "Paste JSON to import."
+                    : importError === "invalid-json"
+                      ? "That isn't valid JSON."
+                      : importError === "wrong-shape"
+                        ? "JSON shape isn't a saved-views export."
+                        : "No valid views to import."}
+                </span>
+              ) : null}
+              {importSummary ? (
+                <span
+                  className="text-xs text-muted-foreground"
+                  data-testid="ai-doctor-sessions-saved-views-import-success"
+                >
+                  Imported {importSummary.added} view
+                  {importSummary.added === 1 ? "" : "s"}
+                  {importSummary.skipped > 0
+                    ? ` · skipped ${importSummary.skipped}`
+                    : ""}
+                  .
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+
+
+
 
 
           {filtersActive ? (

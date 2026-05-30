@@ -91,7 +91,7 @@ export function parseSavedViews(raw: string | null | undefined): SavedView[] {
       id: item.id,
       label: item.label,
       // Re-normalize filters through parseFilters so unknown values reset.
-      filters: parseFilters(item.filters as Record<string, unknown>),
+      filters: parseFilters(item.filters as unknown as Record<string, unknown>),
       page: Math.floor(item.page),
       createdAt: item.createdAt,
     });

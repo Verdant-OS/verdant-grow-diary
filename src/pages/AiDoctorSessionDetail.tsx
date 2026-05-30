@@ -656,9 +656,16 @@ function SessionDetailBody({
         const tokens = buildCautionReasonTokens(reviewVm);
         const description = formatSessionRowCautionReasonText(tokens);
         const checklist = buildCautionReviewChecklist(tokens);
+        const checklistSummary = formatCautionChecklistSummary(checklist.length);
+        const checklistDescription = formatCautionChecklistDescription(checklist);
         return (
           <>
-            <CautionBanner note={cautionNote} description={description} />
+            <CautionBanner
+              note={cautionNote}
+              description={description}
+              checklistSummary={checklistSummary}
+              checklistDescription={checklistDescription}
+            />
             {cautionNote.show && checklist.length > 0 ? (
               <div
                 data-testid="ai-doctor-session-detail-caution-checklist"

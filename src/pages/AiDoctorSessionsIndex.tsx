@@ -627,6 +627,24 @@ export default function AiDoctorSessionsIndex() {
                 <option value="unknown">Unknown</option>
               </select>
             </label>
+            <Button
+              variant={needsAttentionActive ? "secondary" : "outline"}
+              size="sm"
+              onClick={needsAttentionActive ? clearNeedsAttention : applyNeedsAttention}
+              data-testid="ai-doctor-sessions-index-needs-attention-preset"
+              aria-pressed={needsAttentionActive}
+              title="Caution + review checklist"
+            >
+              {NEEDS_ATTENTION_PRESET_LABEL}
+              {needsAttentionVisible > 0 ? (
+                <span
+                  className="ml-1 text-[11px] text-muted-foreground"
+                  data-testid="ai-doctor-sessions-index-needs-attention-count"
+                >
+                  : {needsAttentionVisible} visible
+                </span>
+              ) : null}
+            </Button>
             {filtersActive ? (
               <Button
                 variant="ghost"

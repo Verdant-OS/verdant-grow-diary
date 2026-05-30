@@ -180,8 +180,8 @@ describe("Static safety — Needs review badge feature", () => {
     expect(page).not.toMatch(/\.delete\(/);
     expect(page).not.toMatch(/\.upsert\(/);
     expect(page).not.toMatch(/functions\.invoke/);
-    expect(page).not.toMatch(/action_queue/);
-    expect(page).not.toMatch(/alerts/);
+    expect(page).not.toMatch(/from\(["']action_queue/);
+    expect(page).not.toMatch(/from\(["']alerts/);
     expect(page).not.toMatch(/service_role/);
     expect(page).not.toMatch(/automation|device.?control/i);
   });

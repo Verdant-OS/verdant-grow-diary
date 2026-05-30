@@ -20,6 +20,15 @@ import {
   useAiDoctorSessionsIndex,
   type AiDoctorSessionRow,
 } from "@/hooks/use-ai-doctor-sessions";
+import {
+  DEFAULT_FILTERS,
+  formatActiveFilterLabels,
+  isFiltersActive,
+  type DateRangeFilter,
+  type HasActionsFilter,
+  type RiskFilter,
+  type SessionsIndexFilters,
+} from "@/lib/aiDoctorSessionsIndexFilters";
 
 function fmtDate(ts: string | null): string {
   if (!ts) return "";

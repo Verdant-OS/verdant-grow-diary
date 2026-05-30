@@ -15,9 +15,11 @@ import { Button } from "@/components/ui/button";
 import { useAiDoctorSession } from "@/hooks/use-ai-doctor-sessions";
 import {
   buildCautionNote,
+  buildCautionReasonTokens,
   buildReviewSummaryViewModel,
   EMPTY_FALLBACKS,
   formatDoctorReviewSummaryText,
+  formatSessionRowCautionReasonText,
   type CautionNote,
   type ReviewRiskTone,
   type ReviewSummaryViewModel,

@@ -90,10 +90,10 @@ describe("aiDoctorSessionsIndexFilters — pure helpers", () => {
 
   it("formatActiveFilterLabels returns visible labels", () => {
     expect(
-      formatActiveFilterLabels({ risk: "high", hasActions: "yes", dateRange: "7d", needsReview: "all" }),
+      formatActiveFilterLabels({ ...DEFAULT_FILTERS, risk: "high", hasActions: "yes", dateRange: "7d" }),
     ).toEqual(["Risk: High", "Has suggested actions", "Last 7 days"]);
     expect(
-      formatActiveFilterLabels({ risk: "all", hasActions: "no", dateRange: "30d", needsReview: "all" }),
+      formatActiveFilterLabels({ ...DEFAULT_FILTERS, hasActions: "no", dateRange: "30d" }),
     ).toEqual(["No suggested actions", "Last 30 days"]);
     expect(formatActiveFilterLabels(DEFAULT_FILTERS)).toEqual([]);
   });

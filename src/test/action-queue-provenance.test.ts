@@ -102,7 +102,6 @@ describe("ActionQueue UI — provenance presentation", () => {
     // construct ad-hoc regexes / matchers / splitters / indexOf / includes
     // against the `[alert:` or `[session:` literal in executable code —
     // including JSX attributes, event handlers, and callback bodies.
-    const { stripSourceComments } = require("./utils/stripSourceComments");
     const executable: string = stripSourceComments(QUEUE);
 
     // No raw provenance token literals anywhere in executable code.

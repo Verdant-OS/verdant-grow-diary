@@ -42,7 +42,11 @@ import { plantDetailPath, tentDetailPath } from "@/lib/routes";
 import { AiDoctorSessionActionQueueButton } from "@/components/AiDoctorSessionActionQueueButton";
 import type { AiDoctorSessionLike } from "@/lib/aiDoctorSessionToActionQueueRules";
 import { useAiDoctorSessionLinkedActionQueueItems } from "@/hooks/useAiDoctorSessionLinkedActionQueueItems";
-import type { LinkedActionsViewModel } from "@/lib/aiDoctorSessionLinkedActionsViewModel";
+import {
+  findLinkedActionForSuggestion,
+  type LinkedActionItem,
+  type LinkedActionsViewModel,
+} from "@/lib/aiDoctorSessionLinkedActionsViewModel";
 
 async function copyPlainText(text: string): Promise<boolean> {
   try {

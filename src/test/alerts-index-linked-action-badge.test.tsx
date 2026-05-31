@@ -10,7 +10,7 @@ import { resolve } from "node:path";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import Alerts from "@/pages/Alerts";
-import { actionDetailPath } from "@/lib/routes";
+import { actionDetailPath, actionQueueAlertContextPath } from "@/lib/routes";
 
 const ALERT_WITH_ONE = {
   id: "alert-one",

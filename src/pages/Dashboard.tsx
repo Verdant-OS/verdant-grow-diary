@@ -24,6 +24,9 @@ import DashboardDataSourceDisclosure from "@/components/DashboardDataSourceDiscl
 // honest empty states for Tasks and AI Insights until backed by real data.
 // See docs/qa/v0-demo-loop-checklist.md and docs/safety/static-safety-scans.md.
 import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
+import { useGrows } from "@/store/grows";
+import OnboardingChecklistCard from "@/components/OnboardingChecklistCard";
+import { buildOnboardingChecklistViewModel } from "@/lib/onboardingChecklistViewModel";
 import { useSensorReadings, useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useDashboardScopedData } from "@/hooks/useDashboardScopedData";
@@ -158,6 +161,21 @@ export default function Dashboard() {
   );
   const targetsState = useGrowTargets(scopedGrowId ?? null);
   const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);
+
+  // First-run onboarding checklist — derived from data the Dashboard
+  // already loads. No extra Supabase queries, no writes.
+  const { grows } = useGrows();
+  const diaryRecentCount =
+    recent.status === "ok"
+      ? recent.items.filter((i) => i.kind === "diary").length
+      : 0;
+  const onboardingVm = buildOnboardingChecklistViewModel({
+    growCount: grows.length,
+    tentCount: tents.length,
+    plantCount: plants.length,
+    diaryEntryCount: diaryRecentCount,
+    sensorReadingCount: rawReadings.length,
+  });
   // Real persisted alerts for this grow (open only). Read-only display so
   // growers can see the loop close: manual reading → derived alert → persisted.
   const persistedAlertsState = useAlertsList(
@@ -233,6 +251,12 @@ export default function Dashboard() {
           backHref={backHref}
         />
       )}
+
+      <div className="my-3">
+        <OnboardingChecklistCard vm={onboardingVm} />
+      </div>
+
+
 
       <DashboardDataSourceDisclosure
         scopedGrowId={scopedGrowId}

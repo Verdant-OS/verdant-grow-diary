@@ -204,29 +204,47 @@ export default function PlantRelativeTimelineSection({
               role="radiogroup"
               aria-label="Filter timeline by event type"
               data-testid="relative-timeline-filters"
-              className="flex flex-wrap gap-1.5"
+              className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 sm:flex-wrap sm:overflow-visible"
             >
-
-              {RELATIVE_TIMELINE_FILTERS.map((f) => {
-                const selected = filter === f.key;
+              {buildRelativeTimelineFilterChips(items, filter).map((chip) => {
+                const isDisabled = chip.disabled;
                 return (
                   <button
-                    key={f.key}
+                    key={chip.key}
                     type="button"
                     role="radio"
-                    aria-checked={selected}
-                    aria-label={`Filter timeline by ${f.label}`}
-                    data-testid={`relative-timeline-filter-${f.key}`}
-                    data-selected={selected ? "true" : "false"}
-                    onClick={() => setFilter(f.key)}
+                    aria-checked={chip.selected}
+                    aria-disabled={isDisabled || undefined}
+                    aria-label={`Filter timeline by ${chip.label} (${chip.count})`}
+                    data-testid={`relative-timeline-filter-${chip.key}`}
+                    data-selected={chip.selected ? "true" : "false"}
+                    data-disabled={isDisabled ? "true" : "false"}
+                    data-count={chip.count}
+                    disabled={isDisabled}
+                    onClick={() => {
+                      if (!isDisabled) setFilter(chip.key);
+                    }}
                     className={cn(
-                      "text-xs px-3 py-1 rounded-full border transition-colors min-h-[32px]",
-                      selected
+                      "shrink-0 inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border transition-colors min-h-[32px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                      chip.selected
                         ? "bg-primary text-primary-foreground border-primary"
+                        : isDisabled
+                        ? "bg-muted/30 text-muted-foreground/60 border-border/30 cursor-not-allowed"
                         : "bg-secondary/40 text-foreground border-border/40 hover:bg-secondary/60",
                     )}
                   >
-                    {f.label}
+                    <span>{chip.label}</span>
+                    <span
+                      data-testid={`relative-timeline-filter-${chip.key}-count`}
+                      className={cn(
+                        "tabular-nums rounded-full px-1.5 py-0 text-[10px] leading-4",
+                        chip.selected
+                          ? "bg-primary-foreground/20 text-primary-foreground"
+                          : "bg-background/60 text-muted-foreground",
+                      )}
+                    >
+                      {chip.count}
+                    </span>
                   </button>
                 );
               })}

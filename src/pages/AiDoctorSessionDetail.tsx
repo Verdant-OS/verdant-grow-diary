@@ -521,6 +521,90 @@ function MissingInformationSection({ items }: { items: string[] }) {
   );
 }
 
+const REVIEW_PANEL_TONE_CLASSES: Record<AiDoctorSessionReviewPanelTone, string> = {
+  neutral: "border-border bg-muted/20",
+  muted: "border-border bg-muted/30",
+  amber: "border-amber-500/40 bg-amber-500/5",
+};
+
+const REVIEW_PANEL_BADGE_CLASSES: Record<AiDoctorSessionReviewPanelTone, string> = {
+  neutral: "text-muted-foreground",
+  muted: "text-muted-foreground",
+  amber: "border-amber-500/40 text-amber-700 dark:text-amber-300",
+};
+
+function SessionReviewStatusPanel({
+  sessionId,
+  vm,
+}: {
+  sessionId: string;
+  vm: AiDoctorSessionReviewHistoryViewModel;
+}) {
+  const containerClass = REVIEW_PANEL_TONE_CLASSES[vm.statusTone];
+  const badgeClass = REVIEW_PANEL_BADGE_CLASSES[vm.statusTone];
+  return (
+    <div
+      data-testid="ai-doctor-session-detail-review-status-panel"
+      data-session-id={sessionId}
+      data-review-status={vm.status}
+      className={`rounded-lg border p-3 text-sm ${containerClass}`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold">Review status</h3>
+        <Badge
+          variant="outline"
+          className={`text-[11px] ${badgeClass}`}
+          data-testid="ai-doctor-session-detail-review-status-badge"
+        >
+          {vm.statusLabel}
+        </Badge>
+      </div>
+      <div
+        className="mt-2"
+        data-testid="ai-doctor-session-detail-review-status-history"
+      >
+        {vm.isEmpty ? (
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid="ai-doctor-session-detail-review-status-empty"
+          >
+            {vm.emptyText}
+          </p>
+        ) : (
+          <ul className="space-y-1.5">
+            {vm.items.map((item) => (
+              <li
+                key={item.id}
+                className="rounded border bg-card/40 px-2 py-1.5 text-xs"
+                data-testid="ai-doctor-session-detail-review-status-event"
+                data-event-type={item.eventType}
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-x-2">
+                  <span className="font-medium">{item.eventLabel}</span>
+                  <span
+                    className="text-muted-foreground"
+                    data-testid="ai-doctor-session-detail-review-status-event-time"
+                  >
+                    {fmtDate(item.createdAt)}
+                  </span>
+                </div>
+                {item.note ? (
+                  <p
+                    className="mt-0.5 text-muted-foreground"
+                    data-testid="ai-doctor-session-detail-review-status-event-note"
+                  >
+                    {item.note}
+                  </p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function fmtDate(ts: string | null): string {
   if (!ts) return "";
   try {

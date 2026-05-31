@@ -1665,13 +1665,23 @@ describe("buildRelativeTimelineEmptyState — pure rules", () => {
     expect(p.disabled).toBe(false);
   });
 
-  it("Upload photo CTA stays usable with just the generic photo event when no plant context", () => {
+  it("Upload photo CTA becomes disabled with an inline reason when plant context is missing", () => {
     const v = buildRelativeTimelineEmptyState({});
     const p = v.ctas.find((c) => c.key === "photo")!;
-    expect(p.disabled).toBe(false);
+    expect(p.disabled).toBe(true);
+    expect(p.disabledReason).toMatch(/open a plant/i);
     expect(p.eventDetail?.eventType).toBe("photo");
     expect(p.eventDetail?.plantId).toBeUndefined();
   });
+
+  it("Manual sensor snapshot CTA stays enabled with /sensors fallback and shows no disabled reason", () => {
+    const v = buildRelativeTimelineEmptyState({ tentId: null });
+    const s = v.ctas.find((c) => c.key === "manual-snapshot")!;
+    expect(s.disabled).toBe(false);
+    expect(s.disabledReason).toBeUndefined();
+    expect(s.route).toBe(SENSORS_FALLBACK_ROUTE);
+  });
+
 
   it("never includes user_id, tokens, raw payloads, or provenance markers in event detail", () => {
     const v = buildRelativeTimelineEmptyState({

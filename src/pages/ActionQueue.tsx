@@ -135,7 +135,7 @@ function AiDoctorSessionLink({
         className="text-primary hover:underline"
         data-testid="action-queue-row-ai-doctor-session-link-anchor"
       >
-        View AI Doctor session
+        View saved AI Doctor session
       </Link>
     </span>
   );

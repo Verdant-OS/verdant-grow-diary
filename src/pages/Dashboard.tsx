@@ -260,6 +260,8 @@ export default function Dashboard() {
         <OnboardingChecklistCard vm={onboardingVm} />
       </div>
 
+      {plants.length > 0 && <FirstPlantMemoryCta />}
+
 
 
       <DashboardDataSourceDisclosure

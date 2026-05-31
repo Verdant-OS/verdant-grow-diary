@@ -208,8 +208,8 @@ export function buildReportsReviewQueue(
           : "Latest sensor reading is more than 24 hours old.",
       helpText: REVIEW_ITEM_HELP_TEXT.stale_sensor,
       whyThisIsHere,
-      href: growDetailPath(growId),
-      hrefLabel: "Open grow detail",
+      href: sensorsPath(growId),
+      hrefLabel: "Open sensor context",
     });
   }
 

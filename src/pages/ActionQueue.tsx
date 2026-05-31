@@ -199,6 +199,13 @@ export default function ActionQueue() {
   const [searchParams, setSearchParams] = useSearchParams();
   const focusedActionId = searchParams.get("focus");
 
+  // Alert context chip: /actions?alert=<alert_id>. Presenter-only; never filters rows.
+  const rawAlertParam = searchParams.get("alert");
+  const alertContextId =
+    rawAlertParam && /^[A-Za-z0-9_-]+$/.test(rawAlertParam.trim())
+      ? rawAlertParam.trim()
+      : null;
+
   const clearFocus = useCallback(() => {
     // Remove ONLY the `focus` query param. Preserve every other param
     // (filters, search, status tabs, pagination, growId, etc.).
@@ -206,6 +213,15 @@ export default function ActionQueue() {
     next.delete("focus");
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
+
+  const clearAlertContext = useCallback(() => {
+    // Remove ONLY the `alert` query param. Preserve `focus`, filters,
+    // search, growId, pagination, etc.
+    const next = new URLSearchParams(searchParams);
+    next.delete("alert");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
 
 
 
@@ -513,6 +529,39 @@ export default function ActionQueue() {
           </Button>
         </div>
       )}
+
+      {alertContextId && (
+        <div
+          className="glass rounded-2xl p-3 mb-4 flex flex-wrap items-center gap-3"
+          data-testid="action-queue-alert-context-chip"
+          role="status"
+          aria-live="polite"
+        >
+          <Badge
+            variant="outline"
+            className="text-[10px] uppercase border-primary text-primary"
+          >
+            Filtered by alert
+          </Badge>
+          <Link
+            to={alertDetailPath(alertContextId)}
+            className="text-xs underline text-primary"
+            data-testid="action-queue-alert-context-back-link"
+          >
+            Back to alert
+          </Link>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={clearAlertContext}
+            className="ml-auto"
+            data-testid="action-queue-clear-alert-context"
+          >
+            Clear alert filter
+          </Button>
+        </div>
+      )}
+
 
 
 

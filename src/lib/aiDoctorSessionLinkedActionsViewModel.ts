@@ -39,6 +39,13 @@ export interface LinkedActionItem {
   /** Original `suggested_change` value (untokenized); used for suggestion matching. */
   suggestedChange: string;
   focusHref: string;
+  /**
+   * Safe alert id parsed from the original `[alert:<id>]` back-pointer, if
+   * present. Used by the session detail page to render a read-only
+   * "View linked alert" navigation chip. Never include the raw token in
+   * grower-visible copy.
+   */
+  linkedAlertId: string | null;
 }
 
 export interface LinkedActionsViewModel {
@@ -47,6 +54,8 @@ export interface LinkedActionsViewModel {
   /** Convenience: when exactly one linked action exists, link directly to it. */
   primaryFocusHref: string | null;
   hasMultiple: boolean;
+  /** Unique, order-preserving alert ids parsed from linked-action reasons. */
+  linkedAlertIds: string[];
 }
 
 /** Statuses considered "open" for back-link surfacing on the session page. */

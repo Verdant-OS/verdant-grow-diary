@@ -716,3 +716,88 @@ export function formatRelativeTimelineEntryDetail(
     hasContext: Boolean(plantName || tentName || growName),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Compact header (entry count + last-updated) — presentation-only view model
+// ---------------------------------------------------------------------------
+
+export interface RelativeTimelineHeaderView {
+  total: number;
+  /** "0 timeline entries" / "1 timeline entry" / "12 timeline entries" */
+  countLabel: string;
+  /**
+   * One of:
+   *  - "No updates yet"             (total === 0)
+   *  - "Last updated May 31, 2026"  (valid newest timestamp)
+   *  - "Last updated unknown"       (total > 0 but no parseable timestamp)
+   */
+  lastUpdatedLabel: string;
+  /** Newest valid timestamp ISO, or null. */
+  lastUpdatedAt: string | null;
+  lastUpdatedIsFallback: boolean;
+  /** Pre-joined compact one-liner: "<countLabel> · <lastUpdatedLabel>". */
+  compact: string;
+}
+
+const HEADER_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+function formatHeaderDate(iso: string | null): string | null {
+  if (!iso) return null;
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return null;
+  try {
+    return HEADER_DATE_FORMATTER.format(new Date(ms));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Build the compact timeline header view model. Pure and deterministic.
+ *
+ * - Never exposes IDs, tokens, raw payloads, user IDs, or provenance markers.
+ * - Uses safe fallback copy ("Last updated unknown") when timestamps are
+ *   missing or invalid for a non-empty timeline.
+ * - Zero-entry case returns "No updates yet" rather than a date string.
+ */
+export function formatRelativeTimelineHeader(
+  items: ReadonlyArray<RelativeTimelineItem> | null | undefined,
+): RelativeTimelineHeaderView {
+  const summary = summarizeRelativeTimelineItems(items);
+  const total = summary.total;
+  const countLabel =
+    total === 0
+      ? "0 timeline entries"
+      : total === 1
+      ? "1 timeline entry"
+      : `${total} timeline entries`;
+
+  let lastUpdatedLabel: string;
+  let lastUpdatedIsFallback = false;
+  if (total === 0) {
+    lastUpdatedLabel = "No updates yet";
+  } else {
+    const formatted = formatHeaderDate(summary.lastActivityAt);
+    if (formatted) {
+      lastUpdatedLabel = `Last updated ${formatted}`;
+    } else {
+      lastUpdatedLabel = "Last updated unknown";
+      lastUpdatedIsFallback = true;
+    }
+  }
+
+  return {
+    total,
+    countLabel,
+    lastUpdatedLabel,
+    lastUpdatedAt: summary.lastActivityAt,
+    lastUpdatedIsFallback,
+    compact: `${countLabel} · ${lastUpdatedLabel}`,
+  };
+}
+

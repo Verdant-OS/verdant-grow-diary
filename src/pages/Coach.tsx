@@ -361,6 +361,7 @@ export default function Coach() {
             disableQueueing={!activeGrowId}
             onAddToQueue={(action) => addDoctorSuggestionToQueue(action)}
             contextCeiling={contextSufficiency.confidenceCeiling}
+            aiDoctorSessionId={persistedSessionId ?? undefined}
             testId="coach-ai-doctor-diagnosis"
           />
         </div>

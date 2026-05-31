@@ -278,3 +278,98 @@ export function buildSessionReviewStatusIndicator(
   }
   return { ...HIDDEN_INDICATOR };
 }
+
+/**
+ * Display labels for the projected review status. Centralized here so UI
+ * components never embed status strings directly.
+ */
+export const REVIEW_STATUS_DISPLAY_LABEL: Record<
+  AiDoctorSessionReviewStatus,
+  string
+> = {
+  not_reviewed: "Not reviewed",
+  reviewed: "Reviewed",
+  needs_follow_up: "Needs follow-up",
+};
+
+export type AiDoctorSessionReviewPanelTone = "neutral" | "muted" | "amber";
+
+export const REVIEW_STATUS_PANEL_TONE: Record<
+  AiDoctorSessionReviewStatus,
+  AiDoctorSessionReviewPanelTone
+> = {
+  not_reviewed: "neutral",
+  reviewed: "muted",
+  needs_follow_up: "amber",
+};
+
+const EVENT_TYPE_DISPLAY_LABEL: Record<
+  AiDoctorSessionReviewEventType,
+  string
+> = {
+  marked_reviewed: "Marked reviewed",
+  needs_follow_up: "Flagged: needs follow-up",
+  cleared: "Cleared review status",
+};
+
+export interface AiDoctorSessionReviewHistoryItem {
+  id: string;
+  eventType: AiDoctorSessionReviewEventType;
+  eventLabel: string;
+  createdAt: string;
+  note: string | null;
+}
+
+export interface AiDoctorSessionReviewHistoryViewModel {
+  status: AiDoctorSessionReviewStatus;
+  statusLabel: string;
+  statusTone: AiDoctorSessionReviewPanelTone;
+  isEmpty: boolean;
+  emptyText: string;
+  /** Newest-first, deterministically ordered. */
+  items: AiDoctorSessionReviewHistoryItem[];
+}
+
+/**
+ * Build a read-only history view model for a single session's review events.
+ *
+ * - `state` overrides the projected status when supplied (lets callers pass a
+ *   precomputed map entry). Otherwise we recompute from `events`.
+ * - Items are sorted newest-first using the same total order as
+ *   `projectLatestReviewState` so the head matches the projected latest event.
+ */
+export function buildSessionReviewHistoryViewModel(
+  events: ReadonlyArray<unknown> | null | undefined,
+  state?: AiDoctorSessionReviewState | null,
+): AiDoctorSessionReviewHistoryViewModel {
+  const coerced: AiDoctorSessionReviewEvent[] = [];
+  if (Array.isArray(events)) {
+    for (const raw of events) {
+      const ev = coerceEvent(raw);
+      if (ev) coerced.push(ev);
+    }
+  }
+  coerced.sort(compareEvents); // ascending
+  const newestFirst = coerced.slice().reverse();
+
+  const projected =
+    state ?? projectLatestReviewState(coerced);
+
+  const items: AiDoctorSessionReviewHistoryItem[] = newestFirst.map((e) => ({
+    id: e.id,
+    eventType: e.event_type,
+    eventLabel: EVENT_TYPE_DISPLAY_LABEL[e.event_type],
+    createdAt: e.created_at,
+    note: e.note,
+  }));
+
+  return {
+    status: projected.status,
+    statusLabel: REVIEW_STATUS_DISPLAY_LABEL[projected.status],
+    statusTone: REVIEW_STATUS_PANEL_TONE[projected.status],
+    isEmpty: items.length === 0,
+    emptyText: "No review activity yet.",
+    items,
+  };
+}
+

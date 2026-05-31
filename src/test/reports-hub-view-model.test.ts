@@ -19,9 +19,12 @@ import {
 } from "@/lib/reportsHubViewModel";
 import { EMPTY_GROW_OUTCOME_SUMMARY } from "@/lib/growOutcomeRollupRules";
 import { EMPTY_LEARNING_REPORT } from "@/lib/actionOutcomeLearningRules";
+import { stripSourceComments } from "./utils/stripSourceComments";
 
 const ROOT = resolve(__dirname, "../..");
-const VM_SRC = readFileSync(resolve(ROOT, "src/lib/reportsHubViewModel.ts"), "utf8");
+const VM_SRC = stripSourceComments(
+  readFileSync(resolve(ROOT, "src/lib/reportsHubViewModel.ts"), "utf8"),
+);
 
 const baseInput: ReportsHubInput = {
   growId: "grow-1",

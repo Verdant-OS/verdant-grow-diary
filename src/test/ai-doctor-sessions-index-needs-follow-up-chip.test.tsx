@@ -271,7 +271,7 @@ describe("AiDoctorSessionsIndex — Needs follow-up visible chip", () => {
     const chip = await screen.findByTestId(CHIP_TID);
     expect(chip.getAttribute("aria-label")).toBe("Needs follow-up: 0 visible");
     expect((chip.getAttribute("title") ?? "").toLowerCase()).toContain(
-      "not a global total",
+      "visible count only",
     );
   });
 });

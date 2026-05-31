@@ -28,12 +28,15 @@ export interface LinkedActionInputRow {
   status?: string | null;
   source?: string | null;
   reason?: string | null;
+  suggested_change?: string | null;
 }
 
 export interface LinkedActionItem {
   id: string;
   status: string;
   reasonText: string;
+  /** Original `suggested_change` value (untokenized); used for suggestion matching. */
+  suggestedChange: string;
   focusHref: string;
 }
 

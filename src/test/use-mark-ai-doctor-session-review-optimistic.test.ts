@@ -130,6 +130,7 @@ function getCache(
 beforeEach(() => {
   insertCalls.length = 0;
   nextInsertError = null;
+  pendingInsert = null;
   Object.values(forbidden).forEach((fn) => fn.mockClear());
 });
 

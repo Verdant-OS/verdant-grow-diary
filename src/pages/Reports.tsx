@@ -27,6 +27,8 @@ import {
   REPORTS_HUB_SUBTITLE_COPY,
   type ReportsHubCard,
 } from "@/lib/reportsHubViewModel";
+import { buildReportsReviewQueue } from "@/lib/reportsHubReviewQueue";
+import ReportsReviewQueueSection from "@/components/ReportsReviewQueueSection";
 import { growDetailPath } from "@/lib/routes";
 
 export default function Reports() {
@@ -50,6 +52,22 @@ export default function Reports() {
         diaryEntriesTotal: data.diaryEntriesTotal,
       })
     : null;
+
+  const reviewQueue = grow
+    ? buildReportsReviewQueue({
+        growId: grow.id,
+        pendingOutcomeReviewCount: data.pendingOutcomeReviewCount,
+        firstPendingActionId: data.firstPendingActionId,
+        alertsOpen: data.alertsOpen,
+        firstOpenAlertId: data.firstOpenAlertId,
+        latestSensorCapturedAt: data.latestSensorCapturedAt,
+        recentSensorReadingCount: data.recentSensorReadingCount,
+        lowSampleLearningGroups: (data.outcomeLearning?.groups ?? []).filter(
+          (g) => g.needs_more_data,
+        ).length,
+      })
+    : { items: [], empty: true };
+
 
   const hasNoGrow = !growsLoading && grows.length === 0;
   const showEmptyState =
@@ -76,6 +94,10 @@ export default function Reports() {
             Open grow detail
           </Link>
         </div>
+      )}
+
+      {!showEmptyState && summary && !reviewQueue.empty && (
+        <ReportsReviewQueueSection items={reviewQueue.items} />
       )}
 
       {showEmptyState ? (

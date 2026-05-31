@@ -90,9 +90,10 @@ describe("AiDoctorSessionsIndex — Built-in badge + tooltip", () => {
     currentRows = [makeRow("a")];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    const opt = screen.getByTestId(
+    const opts = screen.getAllByTestId(
       "ai-doctor-sessions-saved-views-builtin-option",
-    ) as HTMLOptionElement;
+    ) as HTMLOptionElement[];
+    const opt = opts.find((o) => (o.textContent ?? "").includes("Needs my attention"))!;
     expect(opt.getAttribute("title")).toBe(BUILTIN_SAVED_VIEW_TOOLTIP);
     expect(opt.textContent).toContain("Built-in");
   });

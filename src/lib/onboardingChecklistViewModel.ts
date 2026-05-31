@@ -18,9 +18,9 @@
  *   - has at least one diary/log entry OR sensor reading
  *
  * Links point to the safest existing routes — no automation, no device
- * control, no fake-live data. Copy is approved by `forbiddenCopy`:
- * the helper guarantees no "live", "autopilot", or "guaranteed" claims
- * leak into the rendered text.
+ * control, no fake-live data. The copy is intentionally cautious: no
+ * always-on / hands-off / guaranteed claims leak into the rendered text.
+ * The test suite enforces this.
  */
 
 export type OnboardingStepKey =

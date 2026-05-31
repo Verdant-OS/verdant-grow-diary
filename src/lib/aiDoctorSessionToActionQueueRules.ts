@@ -237,7 +237,11 @@ export function sessionActionMatchesExisting(
   const reason = row.reason ?? "";
   if (reason.includes(sessionToken)) return true;
 
-  // Fallback: match on normalized title within same grow when token is missing.
+  // If the row already carries a *different* session token, it belongs to
+  // another session and must not match by title.
+  if (/\[session:[^\]]+\]/.test(reason)) return false;
+
+  // Fallback: match on normalized title within same grow when no token is set.
   const rowTitle = normalizeTitle(row.suggested_change ?? "");
   const actionTitle = normalizeTitle(action.title ?? "");
   if (!rowTitle || !actionTitle) return false;

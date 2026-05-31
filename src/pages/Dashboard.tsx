@@ -264,7 +264,7 @@ export default function Dashboard() {
         <KpiCard label="Active tents" value={tents.length} icon={<Box className="h-3.5 w-3.5" />} />
         <KpiCard label="Plants" value={plants.length} icon={<Sprout className="h-3.5 w-3.5" />} hint={`${plants.filter((p) => p.health === "healthy").length} healthy`} accent="success" />
         <KpiCard label="Open alerts" value={openAlerts} icon={<AlertTriangle className="h-3.5 w-3.5" />} accent={openAlerts > 0 ? "destructive" : "success"} />
-        <KpiCard label="Due today" value={dueToday} icon={<ListChecks className="h-3.5 w-3.5" />} accent={dueToday > 0 ? "warning" : "success"} />
+        <KpiCard label="Due today" value={dueToday} hint={dueToday === 0 ? "No tasks yet" : undefined} icon={<ListChecks className="h-3.5 w-3.5" />} accent={dueToday > 0 ? "warning" : "success"} />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4 mb-6">

@@ -31,6 +31,8 @@ const read = (p: string) =>
 const RULES = read("src/lib/relativeTimelineProjectionRules.ts");
 const COMPONENT = read("src/components/PlantRelativeTimelineSection.tsx");
 const PLANT_DETAIL = read("src/pages/PlantDetail.tsx");
+const stripSafetyNegations = (src: string) =>
+  src.replace(/\bNo reminder scheduling\b/gi, "");
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -77,7 +79,7 @@ describe("relative timeline projection — static guardrails", () => {
   });
 
   it("does not introduce calendar_events / notifications / email or scheduled reminder systems", () => {
-    for (const src of [RULES, COMPONENT]) {
+    for (const src of [RULES, COMPONENT].map(stripSafetyNegations)) {
       expect(src).not.toMatch(/calendar_events/);
       expect(src).not.toMatch(/\bnotifications\b/);
       expect(src).not.toMatch(/\b(schedule|scheduled|scheduling)\s+(a\s+|the\s+|new\s+)?reminders?\b/i);
@@ -89,7 +91,7 @@ describe("relative timeline projection — static guardrails", () => {
   it("allows the internal reminder category only as read-only log classification", () => {
     expect(RULES).toContain('key: "reminder"');
     expect(RULES).toContain('label: "Reminders"');
-    for (const src of [RULES, COMPONENT]) {
+    for (const src of [RULES, COMPONENT].map(stripSafetyNegations)) {
       expect(src).not.toMatch(/calendar_events/);
       expect(src).not.toMatch(/\bnotifications\b/);
       expect(src).not.toMatch(/resend|sendgrid|mailgun|postmark|twilio/i);

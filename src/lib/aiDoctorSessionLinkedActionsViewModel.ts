@@ -16,6 +16,7 @@
  */
 import {
   extractSourceAiDoctorSessionId,
+  extractSourceAlertId,
   isAiDoctorDerived,
   stripBackPointerTokens,
   type ActionQueueSource,

@@ -65,31 +65,17 @@ describe("buildSessionReviewActionsCopy", () => {
 const SESSION_ID = "11111111-1111-1111-1111-111111111111";
 const PLANT_ID = "22222222-2222-2222-2222-222222222222";
 
-const { hoisted } = vi.hoisted(() => ({
-  hoisted: {
-    SESSION_ID: "11111111-1111-1111-1111-111111111111",
-    PLANT_ID: "22222222-2222-2222-2222-222222222222",
-    insertCalls: [] as Array<{ table: string; payload: unknown }>,
-    reviewEvents: [] as Array<{
-      id: string;
-      user_id: string;
-      session_id: string;
-      event_type: "marked_reviewed" | "needs_follow_up" | "cleared";
-      note: string | null;
-      created_at: string;
-    }>,
-  },
+const mockState = vi.hoisted(() => ({
+  insertCalls: [] as Array<{ table: string; payload: unknown }>,
+  reviewEvents: [] as Array<{
+    id: string;
+    user_id: string;
+    session_id: string;
+    event_type: "marked_reviewed" | "needs_follow_up" | "cleared";
+    note: string | null;
+    created_at: string;
+  }>,
 }));
-
-const insertCalls: Array<{ table: string; payload: unknown }> = [];
-let reviewEvents: Array<{
-  id: string;
-  user_id: string;
-  session_id: string;
-  event_type: "marked_reviewed" | "needs_follow_up" | "cleared";
-  note: string | null;
-  created_at: string;
-}> = [];
 
 function setReviewEvents(
   evs: Array<{
@@ -99,7 +85,7 @@ function setReviewEvents(
     note?: string | null;
   }>,
 ) {
-  reviewEvents = evs.map((e) => ({
+  mockState.reviewEvents = evs.map((e) => ({
     id: e.id,
     user_id: "u1",
     session_id: SESSION_ID,
@@ -110,6 +96,8 @@ function setReviewEvents(
 }
 
 vi.mock("@/integrations/supabase/client", () => {
+  const SESSION_ID = "11111111-1111-1111-1111-111111111111";
+  const PLANT_ID = "22222222-2222-2222-2222-222222222222";
   const sessionRow = {
     id: SESSION_ID,
     plant_id: PLANT_ID,
@@ -153,13 +141,14 @@ vi.mock("@/integrations/supabase/client", () => {
     if (table === "ai_doctor_session_reviews") {
       return {
         insert: (payload: unknown) => {
-          insertCalls.push({ table, payload });
+          mockState.insertCalls.push({ table, payload });
           return Promise.resolve({ data: null, error: null });
         },
         select: () => ({
           in: () => ({
             order: () => ({
-              limit: () => Promise.resolve({ data: reviewEvents, error: null }),
+              limit: () =>
+                Promise.resolve({ data: mockState.reviewEvents, error: null }),
             }),
           }),
         }),

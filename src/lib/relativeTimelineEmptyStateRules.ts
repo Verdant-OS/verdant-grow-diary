@@ -69,6 +69,12 @@ export const RELATIVE_TIMELINE_EMPTY_COPY =
 /** Generic safe fallback route for the manual sensor snapshot CTA. */
 export const SENSORS_FALLBACK_ROUTE = "/sensors";
 
+/** Human-readable disabled reasons. Never leak IDs/tokens — copy only. */
+export const QUICKLOG_DISABLED_REASON =
+  "Open a plant to add a Quick Log to its timeline.";
+export const PHOTO_DISABLED_REASON =
+  "Open a plant to attach a photo to its timeline.";
+
 function prefillToDetail(
   p: PlantQuickLogPrefill | null,
 ): RelativeTimelineCtaEventDetail | null {
@@ -84,69 +90,99 @@ function prefillToDetail(
   };
 }
 
+function nonBlank(v: string | null | undefined): string | null {
+  return typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
+}
+
 /**
  * Build the first-log empty state. Pure and deterministic.
  *
  * Degrade rules:
- *   - QuickLog CTA is always usable. Without full context, the event
- *     opens QuickLog with no preselection (safe).
+ *   - QuickLog CTA requires a plantId; without it, the CTA is disabled
+ *     with an inline reason so users aren't sent into a broken flow.
  *   - Manual sensor snapshot routes to `/tents/:tentId` when tent context
- *     is known, otherwise to the generic `/sensors` route.
- *   - Photo CTA opens QuickLog with `eventType: "photo"` and any plant
- *     context that is available. Disables with a reason only when no
- *     plant context exists *and* the generic QuickLog path also cannot
- *     be reached — currently the generic path is always safe, so the
- *     photo CTA is always usable.
+ *     is known, otherwise to the generic `/sensors` route — always usable.
+ *   - Photo CTA opens QuickLog with `eventType: "photo"` and the plant
+ *     context. Disabled with an inline reason when no plantId exists.
  */
 export function buildRelativeTimelineEmptyState(
   input: RelativeTimelineEmptyStateInput | null | undefined,
 ): RelativeTimelineEmptyStateView {
   const i = input ?? {};
+  const plantId = nonBlank(i.plantId ?? null);
+  const tentId = nonBlank(i.tentId ?? null);
+  const growId = nonBlank(i.growId ?? null);
+  const plantName = nonBlank(i.plantName ?? null);
+  const tentName = nonBlank(i.tentName ?? null);
+
   const fullPrefill = buildPlantQuickLogPrefill({
-    plantId: i.plantId ?? null,
-    plantName: i.plantName ?? null,
-    growId: i.growId ?? null,
-    tentId: i.tentId ?? null,
-    tentName: i.tentName ?? null,
+    plantId,
+    plantName,
+    growId,
+    tentId,
+    tentName,
   });
 
-  const quicklog: RelativeTimelineCta = {
-    key: "quicklog",
-    label: "Add Quick Log",
-    mode: "event",
-    eventName: PLANT_QUICKLOG_PREFILL_EVENT,
-    eventDetail: prefillToDetail(fullPrefill),
-    disabled: false,
-  };
+  const quicklog: RelativeTimelineCta = plantId
+    ? {
+        key: "quicklog",
+        label: "Add Quick Log",
+        mode: "event",
+        eventName: PLANT_QUICKLOG_PREFILL_EVENT,
+        eventDetail: prefillToDetail(fullPrefill),
+        disabled: false,
+      }
+    : {
+        key: "quicklog",
+        label: "Add Quick Log",
+        mode: "event",
+        eventName: PLANT_QUICKLOG_PREFILL_EVENT,
+        eventDetail: null,
+        disabled: true,
+        disabledReason: QUICKLOG_DISABLED_REASON,
+      };
 
   const snapshot: RelativeTimelineCta = {
     key: "manual-snapshot",
     label: "Add manual sensor snapshot",
     mode: "route",
-    route: i.tentId ? `/tents/${i.tentId}` : SENSORS_FALLBACK_ROUTE,
+    route: tentId ? `/tents/${tentId}` : SENSORS_FALLBACK_ROUTE,
     disabled: false,
   };
 
-  const photoDetail: RelativeTimelineCtaEventDetail = {
-    eventType: "photo",
-  };
-  if (i.plantId) photoDetail.plantId = i.plantId;
-  if (i.growId) photoDetail.growId = i.growId;
-  if (i.tentId) photoDetail.tentId = i.tentId;
-  if (i.plantName) photoDetail.plantName = i.plantName;
-  if (i.tentName) photoDetail.tentName = i.tentName;
-
-  const photo: RelativeTimelineCta = {
-    key: "photo",
-    label: "Upload photo",
-    mode: "event",
-    eventName: PLANT_QUICKLOG_PREFILL_EVENT,
-    eventDetail: photoDetail,
-    disabled: false,
-  };
+  let photo: RelativeTimelineCta;
+  if (plantId) {
+    const photoDetail: RelativeTimelineCtaEventDetail = {
+      eventType: "photo",
+      plantId,
+    };
+    if (growId) photoDetail.growId = growId;
+    if (tentId) photoDetail.tentId = tentId;
+    if (plantName) photoDetail.plantName = plantName;
+    if (tentName) photoDetail.tentName = tentName;
+    photo = {
+      key: "photo",
+      label: "Upload photo",
+      mode: "event",
+      eventName: PLANT_QUICKLOG_PREFILL_EVENT,
+      eventDetail: photoDetail,
+      disabled: false,
+    };
+  } else {
+    photo = {
+      key: "photo",
+      label: "Upload photo",
+      mode: "event",
+      eventName: PLANT_QUICKLOG_PREFILL_EVENT,
+      eventDetail: { eventType: "photo" },
+      disabled: true,
+      disabledReason: PHOTO_DISABLED_REASON,
+    };
+  }
 
   return {
     copy: RELATIVE_TIMELINE_EMPTY_COPY,
     ctas: [quicklog, snapshot, photo],
   };
 }
+

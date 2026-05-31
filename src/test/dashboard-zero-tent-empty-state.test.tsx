@@ -58,8 +58,9 @@ describe("DashboardZeroTentEmptyState — render", () => {
       </MemoryRouter>,
     );
     expect(screen.queryByText(/Unknown/i)).toBeNull();
-    expect(screen.queryByText(/Demo data/i)).toBeNull();
+    // Numeric/sample sensor values must not leak into the empty state.
     expect(screen.queryByText(/Sample reading/i)).toBeNull();
+    expect(screen.queryByText(/°F|kPa|µmol/)).toBeNull();
   });
 });
 

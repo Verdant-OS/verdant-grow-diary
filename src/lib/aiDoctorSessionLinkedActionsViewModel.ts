@@ -16,6 +16,7 @@
  */
 import {
   extractSourceAiDoctorSessionId,
+  extractSourceAlertId,
   isAiDoctorDerived,
   stripBackPointerTokens,
   type ActionQueueSource,
@@ -38,6 +39,13 @@ export interface LinkedActionItem {
   /** Original `suggested_change` value (untokenized); used for suggestion matching. */
   suggestedChange: string;
   focusHref: string;
+  /**
+   * Safe alert id parsed from the original `[alert:<id>]` back-pointer, if
+   * present. Used by the session detail page to render a read-only
+   * "View linked alert" navigation chip. Never include the raw token in
+   * grower-visible copy.
+   */
+  linkedAlertId: string | null;
 }
 
 export interface LinkedActionsViewModel {
@@ -46,6 +54,8 @@ export interface LinkedActionsViewModel {
   /** Convenience: when exactly one linked action exists, link directly to it. */
   primaryFocusHref: string | null;
   hasMultiple: boolean;
+  /** Unique, order-preserving alert ids parsed from linked-action reasons. */
+  linkedAlertIds: string[];
 }
 
 /** Statuses considered "open" for back-link surfacing on the session page. */
@@ -81,11 +91,19 @@ export function buildAiDoctorSessionLinkedActionsViewModel(
 ): LinkedActionsViewModel {
   const sid = typeof sessionId === "string" ? sessionId.trim() : "";
   if (!sid || !Array.isArray(rows)) {
-    return { count: 0, items: [], primaryFocusHref: null, hasMultiple: false };
+    return {
+      count: 0,
+      items: [],
+      primaryFocusHref: null,
+      hasMultiple: false,
+      linkedAlertIds: [],
+    };
   }
 
   const seen = new Set<string>();
   const items: LinkedActionItem[] = [];
+  const alertSeen = new Set<string>();
+  const linkedAlertIds: string[] = [];
   for (const row of rows) {
     if (!row || typeof row.id !== "string" || !row.id) continue;
     if (seen.has(row.id)) continue;
@@ -96,12 +114,18 @@ export function buildAiDoctorSessionLinkedActionsViewModel(
     if (extractSourceAiDoctorSessionId(row.reason ?? null) !== sid) continue;
 
     seen.add(row.id);
+    const alertId = extractSourceAlertId(row.reason ?? null);
+    if (alertId && !alertSeen.has(alertId)) {
+      alertSeen.add(alertId);
+      linkedAlertIds.push(alertId);
+    }
     items.push({
       id: row.id,
       status: row.status as string,
       reasonText: stripBackPointerTokens(row.reason ?? null),
       suggestedChange: typeof row.suggested_change === "string" ? row.suggested_change : "",
       focusHref: buildFocusHref(row.id),
+      linkedAlertId: alertId,
     });
   }
 
@@ -110,6 +134,7 @@ export function buildAiDoctorSessionLinkedActionsViewModel(
     items,
     primaryFocusHref: items.length === 1 ? items[0].focusHref : null,
     hasMultiple: items.length > 1,
+    linkedAlertIds,
   };
 }
 

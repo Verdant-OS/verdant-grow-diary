@@ -38,7 +38,7 @@ import {
   REVIEW_NOTE_MAX_LENGTH,
   useMarkAiDoctorSessionReview,
 } from "@/hooks/useMarkAiDoctorSessionReview";
-import { plantDetailPath, tentDetailPath } from "@/lib/routes";
+import { alertDetailPath, plantDetailPath, tentDetailPath } from "@/lib/routes";
 import { AiDoctorSessionActionQueueButton } from "@/components/AiDoctorSessionActionQueueButton";
 import type { AiDoctorSessionLike } from "@/lib/aiDoctorSessionToActionQueueRules";
 import { useAiDoctorSessionLinkedActionQueueItems } from "@/hooks/useAiDoctorSessionLinkedActionQueueItems";
@@ -877,6 +877,50 @@ function LinkedActionQueueSection({ vm }: { vm: LinkedActionsViewModel }) {
   );
 }
 
+function LinkedAlertSection({ vm }: { vm: LinkedActionsViewModel }) {
+  const alertIds = vm.linkedAlertIds;
+  if (!alertIds || alertIds.length === 0) return null;
+  return (
+    <section
+      data-testid="ai-doctor-session-detail-linked-alert"
+      aria-label="Linked alert"
+      className="rounded-lg border border-border bg-muted/20 p-3 space-y-2"
+    >
+      <header className="flex flex-wrap items-center gap-2">
+        <Badge
+          variant="outline"
+          className="text-[11px]"
+          data-testid="ai-doctor-session-detail-linked-alert-chip"
+        >
+          Linked alert
+        </Badge>
+      </header>
+      <p
+        className="text-xs text-muted-foreground"
+        data-testid="ai-doctor-session-detail-linked-alert-helper"
+      >
+        This AI Doctor review is connected to an alert through an
+        approval-required Action Queue item.
+      </p>
+      <ul className="space-y-1" data-testid="ai-doctor-session-detail-linked-alert-list">
+        {alertIds.map((aid) => (
+          <li key={aid}>
+            <Link
+              to={alertDetailPath(aid)}
+              className="inline-flex items-center gap-1 text-xs underline text-primary"
+              data-testid="ai-doctor-session-detail-linked-alert-link"
+            >
+              View linked alert
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+
+
 
 function fmtConfidence(val: number | null | undefined): string | null {
   if (typeof val !== "number" || !Number.isFinite(val)) return null;
@@ -1055,6 +1099,8 @@ function SessionDetailBody({
       <SessionReviewStatusPanel sessionId={row.id} vm={reviewHistoryVm} />
 
       <LinkedActionQueueSection vm={linkedActions.vm} />
+
+      <LinkedAlertSection vm={linkedActions.vm} />
 
       <ReviewSummarySection
         vm={reviewVm}

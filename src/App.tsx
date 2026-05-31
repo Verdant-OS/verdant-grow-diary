@@ -87,6 +87,7 @@ const App = () => (
                 <Route path="/grow-lineage" element={<GrowLineageRepair />} />
                 <Route path="/grows" element={<Grows />} />
                 <Route path="/grows/:growId" element={<GrowDetail />} />
+                <Route path="/reports" element={<Reports />} />
 
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/diagnostics" element={<Diagnostics />} />

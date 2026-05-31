@@ -243,7 +243,10 @@ describe("ActionQueue focus deep-link — safety scan", () => {
     expect(PAGE).not.toMatch(/\.rpc\(/);
   });
 
-  it("does not render raw session tokens anywhere in source", () => {
-    expect(PAGE).not.toMatch(/\[session:/);
+  it("scrubs session back-pointer tokens before rendering reason", () => {
+    // The page must not render `row.reason` directly without the scrubber,
+    // otherwise [session:<id>] tokens would leak into grower-visible copy.
+    expect(PAGE).toMatch(/stripBackPointerTokens\(\s*row\.reason\s*\)/);
+    expect(PAGE).not.toMatch(/>\s*\{\s*row\.reason\s*\}\s*</);
   });
 });

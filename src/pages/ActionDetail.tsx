@@ -523,6 +523,14 @@ export default function ActionDetail() {
                 >
                   View AI Doctor session
                 </Link>
+                <Link
+                  to={aiDoctorSessionDetailPath(headerSessionId)}
+                  className="text-primary hover:underline"
+                  title="Open the saved review snapshot."
+                  data-testid="action-detail-ai-doctor-saved-session-link"
+                >
+                  View saved AI Doctor session
+                </Link>
               </p>
             );
           })()}

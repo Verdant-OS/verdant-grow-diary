@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/store/auth";
 import BrandLogo from "@/components/BrandLogo";
 import LeadCaptureForm from "@/components/LeadCaptureForm";
+import LandingAuthedOnboardingBridge from "@/components/LandingAuthedOnboardingBridge";
 
 /**
  * Public landing page for https://verdantgrowdiary.com.
@@ -76,6 +77,7 @@ export default function Landing() {
         <p className="mt-6 text-xs text-muted-foreground">
           No blind automation. No fake live data. The grower stays in control.
         </p>
+        {user && <LandingAuthedOnboardingBridge />}
       </section>
 
       {/* Dashboard teaser */}

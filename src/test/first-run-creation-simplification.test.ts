@@ -42,6 +42,8 @@ describe("CreateTentDialog — first-run simplification", () => {
   it("requires only the tent name (single HTML-required input)", () => {
     expect(countRequiredInputs(CREATE_TENT)).toBe(1);
     expect(CREATE_TENT).toMatch(/<Input\s+required[\s\S]*?placeholder="Tent #1"/);
+  });
+
 
   it("shows 'Enrich later' guidance copy", () => {
     expect(CREATE_TENT).toMatch(/Start simple\./);

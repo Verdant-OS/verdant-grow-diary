@@ -76,12 +76,26 @@ describe("relative timeline projection — static guardrails", () => {
     expect(RULES).not.toMatch(/\.(insert|update|delete|upsert)\s*\(/);
   });
 
-  it("does not introduce calendar_events / notifications / reminders / email", () => {
+  it("does not introduce calendar_events / notifications / email or scheduled reminder systems", () => {
     for (const src of [RULES, COMPONENT]) {
       expect(src).not.toMatch(/calendar_events/);
       expect(src).not.toMatch(/\bnotifications\b/);
-      expect(src).not.toMatch(/\breminders\b/);
+      expect(src).not.toMatch(/\b(schedule|scheduled|scheduling)\s+(a\s+|the\s+|new\s+)?reminders?\b/i);
+      expect(src).not.toMatch(/\breminders?\s+(schedule|scheduled|scheduling|system|engine|job|cron|notification|email)\b/i);
       expect(src).not.toMatch(/resend|sendgrid|mailgun|postmark|twilio/i);
+    }
+  });
+
+  it("allows the internal reminder category only as read-only log classification", () => {
+    expect(RULES).toContain('key: "reminder"');
+    expect(RULES).toContain('label: "Reminders"');
+    for (const src of [RULES, COMPONENT]) {
+      expect(src).not.toMatch(/calendar_events/);
+      expect(src).not.toMatch(/\bnotifications\b/);
+      expect(src).not.toMatch(/resend|sendgrid|mailgun|postmark|twilio/i);
+      expect(src).not.toMatch(/\b(schedule|scheduled|scheduling)\s+(a\s+|the\s+|new\s+)?reminders?\b/i);
+      expect(src).not.toMatch(/\breminders?\s+(schedule|scheduled|scheduling|system|engine|job|cron|notification|email)\b/i);
+      expect(src).not.toMatch(/\.(insert|update|delete|upsert)\s*\(/);
     }
   });
 

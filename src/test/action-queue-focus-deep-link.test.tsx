@@ -137,9 +137,11 @@ function renderAt(url: string) {
   return render(
     <MemoryRouter initialEntries={[url]}>
       <ActionQueue />
+      <LocationProbe />
     </MemoryRouter>,
   );
 }
+
 
 let scrollIntoViewSpy: ReturnType<typeof vi.fn>;
 

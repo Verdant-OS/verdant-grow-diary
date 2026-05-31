@@ -290,12 +290,43 @@ export default function PlantRelativeTimelineSection({
         </p>
       </CardHeader>
       <CardContent>
+        {!isLoading && (() => {
+          const header = formatRelativeTimelineHeader(items);
+          return (
+            <div
+              data-testid="relative-timeline-header"
+              data-total={header.total}
+              data-last-updated-fallback={header.lastUpdatedIsFallback ? "true" : "false"}
+              className="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs"
+            >
+              <span
+                data-testid="relative-timeline-header-count"
+                className="font-medium text-foreground"
+              >
+                {header.countLabel}
+              </span>
+              <span className="text-muted-foreground/60" aria-hidden>
+                ·
+              </span>
+              <span
+                data-testid="relative-timeline-header-last-updated"
+                className={cn(
+                  "text-muted-foreground",
+                  header.lastUpdatedIsFallback && "italic text-muted-foreground/70",
+                )}
+              >
+                {header.lastUpdatedLabel}
+              </span>
+            </div>
+          );
+        })()}
         {isLoading ? (
           <div
             className="h-16 rounded-md bg-muted/40 animate-pulse"
             data-testid="relative-timeline-loading"
           />
         ) : items.length === 0 ? (
+
           <div
             className="rounded-lg border border-dashed border-border/60 bg-muted/10 p-4 space-y-3"
             data-testid="relative-timeline-empty"

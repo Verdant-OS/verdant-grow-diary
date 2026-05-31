@@ -435,9 +435,9 @@ export default function Timeline() {
                                   stale: snapStale,
                                 });
                                 return (
-                                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                  <div className="mt-2 flex flex-wrap items-center gap-1.5" data-testid="timeline-manual-snapshot">
                                     <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
-                                      <Gauge className="h-3 w-3" />Snapshot
+                                      <Gauge className="h-3 w-3" />Manual snapshot
                                     </span>
                                     {sensor.temp != null && <SnapChip>{(sensor.temp * 9 / 5 + 32).toFixed(1)}°F</SnapChip>}
                                     {sensor.rh != null && <SnapChip>{sensor.rh}% RH</SnapChip>}

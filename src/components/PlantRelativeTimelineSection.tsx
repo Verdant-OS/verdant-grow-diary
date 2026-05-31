@@ -245,6 +245,8 @@ export default function PlantRelativeTimelineSection({
   plantName,
   tentName,
   growName,
+  growId,
+  tentId,
 }: Props) {
   const { data, isLoading } = usePlantRecentActivity(plantId);
   const [filter, setFilter] = useState<RelativeTimelineFilterKey>("all");
@@ -254,6 +256,13 @@ export default function PlantRelativeTimelineSection({
     growName: growName ?? null,
   };
 
+  const emptyState = buildRelativeTimelineEmptyState({
+    plantId: plantId ?? null,
+    plantName: plantName ?? null,
+    growId: growId ?? null,
+    tentId: tentId ?? null,
+    tentName: tentName ?? null,
+  });
 
   const items = buildRelativeTimelineProjection({
     rawEntries: data ?? [],
@@ -285,14 +294,26 @@ export default function PlantRelativeTimelineSection({
             data-testid="relative-timeline-loading"
           />
         ) : items.length === 0 ? (
-          <p
-            className="text-sm text-muted-foreground"
+          <div
+            className="rounded-lg border border-dashed border-border/60 bg-muted/10 p-4 space-y-3"
             data-testid="relative-timeline-empty"
           >
-            Your plant timeline starts with the first quick log, photo, or sensor
-            snapshot.
-          </p>
-        ) : (
+            <p
+              className="text-sm text-foreground/90"
+              data-testid="relative-timeline-empty-copy"
+            >
+              {emptyState.copy}
+            </p>
+            <div
+              className="flex flex-col sm:flex-row sm:flex-wrap gap-2"
+              data-testid="relative-timeline-empty-ctas"
+            >
+              {emptyState.ctas.map((cta) => (
+                <TimelineEmptyStateCta key={cta.key} cta={cta} />
+              ))}
+            </div>
+          </div>
+
           <div className="space-y-3">
             {(() => {
               const formatted = formatRelativeTimelineSummary(

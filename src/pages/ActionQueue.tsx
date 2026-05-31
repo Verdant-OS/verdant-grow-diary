@@ -634,6 +634,18 @@ export default function ActionQueue() {
         </Select>
       </div>
 
+      {alertContextId && !loading && filtered.length === 0 && (
+        <div
+          className="glass rounded-2xl p-4 mb-4 text-sm text-muted-foreground"
+          data-testid="action-queue-alert-context-empty"
+          role="status"
+        >
+          0 actions linked to this alert
+        </div>
+      )}
+
+
+
       <section className="glass rounded-2xl p-4 mb-4" aria-label="Needs Review">
         <h2 className="text-sm font-semibold mb-3 uppercase tracking-wider text-muted-foreground">
           Needs Review ({pending.length})

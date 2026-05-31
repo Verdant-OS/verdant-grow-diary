@@ -129,6 +129,16 @@ vi.mock("@/hooks/useScopedGrow", () => ({
     backHref: "/alerts",
   }),
 }));
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: { id: "u1", email: "u@example.com" } }),
+}));
+vi.mock("@/store/grows", () => ({
+  useGrows: () => ({
+    grows: [{ id: "g1", name: "G1" }],
+    activeGrowId: "g1",
+    activeGrow: { id: "g1", name: "G1" },
+  }),
+}));
 vi.mock("@/hooks/useAlertEvents", () => ({
   useAlertEvents: () => ({ status: "ok", events: [] }),
 }));

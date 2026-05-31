@@ -69,15 +69,15 @@ describe("GrowRoomQuickActionsCard · render", () => {
 
   it("href targets reflect the scoped grow id", () => {
     renderCard({ scopedGrowId: "grow-9" });
-    const sensors = screen
-      .getByTestId("grow-room-launcher-manual-sensor-snapshot")
-      .querySelector("a")!;
-    const alerts = screen
-      .getByTestId("grow-room-launcher-review-alerts")
-      .querySelector("a")!;
-    const outcome = screen
-      .getByTestId("grow-room-launcher-record-outcome")
-      .querySelector("a")!;
+    const sensors = screen.getByTestId(
+      "grow-room-launcher-manual-sensor-snapshot",
+    ) as HTMLAnchorElement;
+    const alerts = screen.getByTestId(
+      "grow-room-launcher-review-alerts",
+    ) as HTMLAnchorElement;
+    const outcome = screen.getByTestId(
+      "grow-room-launcher-record-outcome",
+    ) as HTMLAnchorElement;
     expect(sensors.getAttribute("href")).toBe("/sensors?growId=grow-9");
     expect(alerts.getAttribute("href")).toBe("/alerts?growId=grow-9");
     expect(outcome.getAttribute("href")).toBe("/dashboard?growId=grow-9");
@@ -85,9 +85,9 @@ describe("GrowRoomQuickActionsCard · render", () => {
 
   it("Ask Doctor links to /doctor regardless of scope", () => {
     renderCard({ scopedGrowId: "grow-9" });
-    const doctor = screen
-      .getByTestId("grow-room-launcher-ask-doctor")
-      .querySelector("a")!;
+    const doctor = screen.getByTestId(
+      "grow-room-launcher-ask-doctor",
+    ) as HTMLAnchorElement;
     expect(doctor.getAttribute("href")).toBe("/doctor");
   });
 

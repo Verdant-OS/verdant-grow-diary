@@ -22,6 +22,15 @@ export const tentsPath = (growId?: string | null): string => withGrowId("/tents"
 export const actionsPath = (growId?: string | null): string => withGrowId("/actions", growId);
 export const dashboardPath = (growId?: string | null): string => withGrowId("/dashboard", growId);
 export const alertsPath = (growId?: string | null): string => withGrowId("/alerts", growId);
+export const sensorsPath = (growId?: string | null): string => withGrowId("/sensors", growId);
+
+/** ActionDetail deep-linked to the outcome capture section. */
+export const actionDetailOutcomePath = (actionId: string): string =>
+  `${actionDetailPath(actionId)}#outcome-section`;
+
+/** GrowDetail deep-linked to the outcome/learning report section. */
+export const growDetailOutcomesPath = (growId: string): string =>
+  `${growDetailPath(growId)}#outcomes`;
 
 export const actionDetailPath = (actionId: string): string =>
   `/actions/${encodeURIComponent(actionId)}`;

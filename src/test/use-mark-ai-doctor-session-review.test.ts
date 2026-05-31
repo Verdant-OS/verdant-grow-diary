@@ -344,8 +344,16 @@ describe("useMarkAiDoctorSessionReview — safety scan", () => {
       expect(lower).not.toContain(tok);
     }
   });
-  it("does not send user_id from the client", () => {
-    // Defense in depth: source-level assertion against accidental regressions.
-    expect(HOOK_SRC).not.toMatch(/user_id\s*:/);
+  it("does not send user_id from the client (insert payload contract)", () => {
+    // The insert payload type must not include user_id — DB default + RLS own it.
+    const iface = HOOK_SRC.match(/interface ReviewInsertPayload \{[\s\S]*?\}/)?.[0];
+    expect(iface).toBeDefined();
+    expect(iface!).not.toContain("user_id");
+    // And the payload builder must not assign user_id either.
+    const builder = HOOK_SRC.match(
+      /export function buildReviewInsertPayload[\s\S]*?\n\}/,
+    )?.[0];
+    expect(builder).toBeDefined();
+    expect(builder!).not.toContain("user_id");
   });
 });

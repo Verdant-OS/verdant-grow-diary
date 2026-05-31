@@ -2033,3 +2033,87 @@ describe("relative timeline header — static safety", () => {
     expect(RULES).not.toMatch(/\.rpc\(/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Empty-state CTA disabled-reason polish
+// ---------------------------------------------------------------------------
+
+import {
+  QUICKLOG_DISABLED_REASON,
+  PHOTO_DISABLED_REASON,
+} from "@/lib/relativeTimelineEmptyStateRules";
+
+describe("empty-state CTA disabled reasons — render", () => {
+  it("renders inline disabled reason for QuickLog when plant context is missing", () => {
+    mockUse.mockReturnValue({ data: [], isLoading: false });
+    render(
+      <PlantRelativeTimelineSection
+        plantId={null as unknown as string}
+        plantStartedAt={PLANT_STARTED}
+      />,
+    );
+    const cta = screen.getByTestId("relative-timeline-empty-cta-quicklog");
+    expect(cta.getAttribute("data-disabled")).toBe("true");
+    expect(cta.hasAttribute("disabled")).toBe(true);
+    const reason = screen.getByTestId("relative-timeline-empty-cta-quicklog-reason");
+    expect(reason.textContent).toBe(QUICKLOG_DISABLED_REASON);
+  });
+
+  it("renders inline disabled reason for Upload photo when plant context is missing", () => {
+    mockUse.mockReturnValue({ data: [], isLoading: false });
+    render(
+      <PlantRelativeTimelineSection
+        plantId={null as unknown as string}
+        plantStartedAt={PLANT_STARTED}
+      />,
+    );
+    const reason = screen.getByTestId("relative-timeline-empty-cta-photo-reason");
+    expect(reason.textContent).toBe(PHOTO_DISABLED_REASON);
+  });
+
+  it("Manual sensor snapshot CTA stays enabled and shows no disabled reason in the safe-fallback case", () => {
+    mockUse.mockReturnValue({ data: [], isLoading: false });
+    render(
+      <PlantRelativeTimelineSection
+        plantId={null as unknown as string}
+        plantStartedAt={PLANT_STARTED}
+      />,
+    );
+    const cta = screen.getByTestId("relative-timeline-empty-cta-manual-snapshot");
+    expect(cta.hasAttribute("disabled")).toBe(false);
+    expect(
+      screen.queryByTestId("relative-timeline-empty-cta-manual-snapshot-reason"),
+    ).toBeNull();
+    expect(cta.getAttribute("data-route")).toBe("/sensors");
+  });
+
+  it("does not render any disabled reasons when full plant/tent/grow context is provided", () => {
+    mockUse.mockReturnValue({ data: [], isLoading: false });
+    render(
+      <PlantRelativeTimelineSection
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+        growId="grow-1"
+        tentId="tent-1"
+        plantName="Blueberry"
+        tentName="Tent A"
+      />,
+    );
+    expect(
+      screen.queryByTestId("relative-timeline-empty-cta-quicklog-reason"),
+    ).toBeNull();
+    expect(
+      screen.queryByTestId("relative-timeline-empty-cta-photo-reason"),
+    ).toBeNull();
+    expect(
+      screen.queryByTestId("relative-timeline-empty-cta-manual-snapshot-reason"),
+    ).toBeNull();
+  });
+
+  it("disabled-reason copy never exposes IDs, tokens, raw payloads, or provenance markers", () => {
+    for (const reason of [QUICKLOG_DISABLED_REASON, PHOTO_DISABLED_REASON]) {
+      expect(reason.toLowerCase()).not.toMatch(/uuid|token|raw_payload|provenance|user_id|service_role|bearer/);
+      expect(reason).toMatch(/[A-Za-z]/);
+    }
+  });
+});

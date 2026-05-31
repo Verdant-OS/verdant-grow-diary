@@ -1,0 +1,156 @@
+{
+  "$schema_ref": "docs/ai-doctor-output-contract.md",
+  "fixture_scope": "demo_ai_doctor_cases",
+  "is_fixture": true,
+  "notes": "AI Doctor fixture cases. Every expected_output includes all 8 required fields. No hardware diagnosis. No device control. No auto-execute language.",
+  "cases": [
+    {
+      "case_id": "ai_case_more_data_needed",
+      "description": "Thin context — only one observation, no recent snapshot.",
+      "inputs": {
+        "plant_id": "demo_plant_001",
+        "stage": "vegetation",
+        "recent_diary": [
+          { "id": "demo_de_001", "event_type": "observation", "note": "Healthy growth, no yellowing.", "source_state": "demo" }
+        ],
+        "recent_snapshots": [],
+        "recent_photos": []
+      },
+      "expected_output": {
+        "confidence": "low",
+        "evidence": [
+          "One observation entry on 2026-04-04 noting healthy growth (demo)"
+        ],
+        "missing_info": [
+          "No recent sensor snapshot",
+          "No recent photo",
+          "No watering or feeding entry in last 48 h"
+        ],
+        "immediate_action": "Take a top-down photo and log a manual sensor snapshot before next action.",
+        "do_not_do": [
+          "Do not change feeding strength based on a single observation",
+          "Do not defoliate"
+        ],
+        "check_24h": "Re-check after adding a photo and snapshot; look for color change or droop.",
+        "plan_3day": "Day 1: add photo + snapshot. Day 2: log watering with pH. Day 3: review trend before any change.",
+        "risk_level": "low"
+      }
+    },
+    {
+      "case_id": "ai_case_high_humidity_risk",
+      "description": "Overnight RH spike above target — demo case from demo-grow-one-tent.",
+      "inputs": {
+        "plant_id": "demo_plant_001",
+        "stage": "vegetation",
+        "recent_snapshots": [
+          { "id": "demo_reading_004", "metric": "rh_pct", "value": 71.8, "unit": "%", "source_state": "demo", "captured_at": "2026-04-06T03:00:00Z" }
+        ],
+        "tent_targets": { "rh_pct": { "min": 45, "max": 65 } }
+      },
+      "expected_output": {
+        "confidence": "medium",
+        "evidence": [
+          "RH 71.8% at 2026-04-06T03:00:00Z exceeds target max 65% (demo)",
+          "Stage is vegetation; elevated overnight RH increases mold risk (demo)"
+        ],
+        "missing_info": [
+          "No fresh temperature snapshot to compute VPD precisely",
+          "No air-movement context logged in diary"
+        ],
+        "immediate_action": "Observe canopy for moisture in the morning; log a manual RH snapshot after lights-on.",
+        "do_not_do": [
+          "Do not change feed strength",
+          "Do not heavy-defoliate to fix RH"
+        ],
+        "check_24h": "Compare tonight's overnight RH curve with last night.",
+        "plan_3day": "Day 1: log morning + evening snapshots. Day 2: note any leaf moisture or smell. Day 3: review trend before adjusting strategy.",
+        "risk_level": "medium"
+      }
+    },
+    {
+      "case_id": "ai_case_stale_sensor_context",
+      "description": "Latest temperature reading is stale.",
+      "inputs": {
+        "plant_id": "demo_plant_001",
+        "recent_snapshots": [
+          { "id": "bad_reading_stale_001", "metric": "temp_c", "value": 24.1, "unit": "C", "source_state": "stale", "captured_at": "2026-04-05T08:00:00Z" }
+        ]
+      },
+      "expected_output": {
+        "confidence": "low",
+        "evidence": [
+          "Most recent temperature reading is marked stale (>15 min old)"
+        ],
+        "missing_info": [
+          "Fresh temperature reading is needed before any environment decision",
+          "Sensor source health needs grower review"
+        ],
+        "immediate_action": "Log a manual temperature snapshot now to re-establish current state.",
+        "do_not_do": [
+          "Do not change environment based on stale data",
+          "Do not approve any environment-changing action until a fresh snapshot exists"
+        ],
+        "check_24h": "Confirm sensor source is producing fresh readings; if not, continue with manual snapshots.",
+        "plan_3day": "Day 1: re-establish fresh telemetry. Day 2: confirm trend. Day 3: review whether sensor source needs grower-side attention.",
+        "risk_level": "medium"
+      }
+    },
+    {
+      "case_id": "ai_case_invalid_telemetry",
+      "description": "Humidity reading is invalid (null/out-of-range).",
+      "inputs": {
+        "plant_id": "demo_plant_001",
+        "recent_snapshots": [
+          { "id": "bad_reading_oor_001", "metric": "rh_pct", "value": 142.5, "unit": "%", "source_state": "invalid", "captured_at": "2026-04-05T09:00:00Z" }
+        ]
+      },
+      "expected_output": {
+        "confidence": "low",
+        "evidence": [
+          "Most recent humidity reading is marked invalid (out of physical range)"
+        ],
+        "missing_info": [
+          "A valid humidity reading is required",
+          "Cross-check with a second source or a manual reading"
+        ],
+        "immediate_action": "Log a manual humidity snapshot to establish a trustworthy value.",
+        "do_not_do": [
+          "Do not classify the tent as healthy based on invalid telemetry",
+          "Do not change environment strategy from one invalid reading"
+        ],
+        "check_24h": "Confirm whether invalid readings persist or were a one-off.",
+        "plan_3day": "Day 1: manual snapshots only. Day 2: confirm pattern. Day 3: grower-side review of sensor source.",
+        "risk_level": "medium"
+      }
+    },
+    {
+      "case_id": "ai_case_low_confidence_missing_info",
+      "description": "Photo provided but no diary or snapshot context.",
+      "inputs": {
+        "plant_id": "demo_plant_002",
+        "recent_photos": [
+          { "id": "demo_photo_001", "captured_at": "2026-04-05T09:10:00Z", "source_state": "demo" }
+        ]
+      },
+      "expected_output": {
+        "confidence": "low",
+        "evidence": [
+          "One top-down photo on 2026-04-05 (demo)"
+        ],
+        "missing_info": [
+          "No recent sensor snapshot",
+          "No recent watering/feeding diary entry",
+          "No defined stage targets for current context"
+        ],
+        "immediate_action": "Add a manual sensor snapshot and a short observation note.",
+        "do_not_do": [
+          "Do not diagnose a deficiency from a single photo",
+          "Do not change feeding"
+        ],
+        "check_24h": "Re-check after adding snapshot + observation.",
+        "plan_3day": "Day 1: snapshot + note. Day 2: photo from same angle. Day 3: compare and decide whether more context is needed.",
+        "risk_level": "low"
+      }
+    }
+  ]
+}

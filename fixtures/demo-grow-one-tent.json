@@ -1,0 +1,192 @@
+{
+  "$schema_ref": "docs/fixture-schema-contract.md",
+  "fixture_scope": "one_tent_demo",
+  "is_fixture": true,
+  "notes": "Read-only demo fixture. Not a database seed. All readings are state='demo'. No live data. No executable payloads. No real customer data.",
+  "grow": {
+    "id": "demo_grow_001",
+    "name": "Demo Grow — One Tent",
+    "started_at": "2026-04-01T12:00:00Z",
+    "strategy": "soil, autoflower",
+    "is_demo": true
+  },
+  "tent": {
+    "id": "demo_tent_001",
+    "grow_id": "demo_grow_001",
+    "name": "Tent A",
+    "size": "60x60x140 cm",
+    "targets": {
+      "temp_c": { "min": 22, "max": 28 },
+      "rh_pct": { "min": 45, "max": 65 },
+      "vpd_kpa": { "min": 0.8, "max": 1.4 }
+    },
+    "sensor_source": {
+      "id": "demo_source_001",
+      "source_type": "demo_fixture",
+      "is_fixture": true
+    },
+    "is_demo": true
+  },
+  "plants": [
+    {
+      "id": "demo_plant_001",
+      "tent_id": "demo_tent_001",
+      "name": "Plant A1",
+      "strain": "Demo Auto #1",
+      "stage": "vegetation",
+      "started_at": "2026-04-01T12:00:00Z",
+      "is_demo": true
+    },
+    {
+      "id": "demo_plant_002",
+      "tent_id": "demo_tent_001",
+      "name": "Plant A2",
+      "strain": "Demo Auto #2",
+      "stage": "vegetation",
+      "started_at": "2026-04-01T12:00:00Z",
+      "is_demo": true
+    }
+  ],
+  "quick_log_entries": [
+    {
+      "id": "demo_qle_001",
+      "plant_id": "demo_plant_001",
+      "entry_at": "2026-04-05T09:00:00Z",
+      "event_type": "watering",
+      "note": "Watered ~250 ml, pH 6.2.",
+      "details": { "ph": 6.2, "watering_amount_ml": 250 },
+      "is_demo": true
+    },
+    {
+      "id": "demo_qle_002",
+      "plant_id": "demo_plant_001",
+      "entry_at": "2026-04-05T09:05:00Z",
+      "event_type": "manual_snapshot",
+      "note": "Manual snapshot before lights on.",
+      "details": { "snapshot_ref": "demo_reading_002" },
+      "is_demo": true
+    },
+    {
+      "id": "demo_qle_003",
+      "plant_id": "demo_plant_002",
+      "entry_at": "2026-04-05T09:10:00Z",
+      "event_type": "photo",
+      "note": "Top-down photo.",
+      "details": { "photo_ref": "demo_photo_001" },
+      "is_demo": true
+    },
+    {
+      "id": "demo_qle_004",
+      "plant_id": "demo_plant_001",
+      "entry_at": "2026-04-06T10:00:00Z",
+      "event_type": "feeding",
+      "note": "Light feed, EC 1.2.",
+      "details": { "ec": 1.2, "nutrients": [{ "name": "CalMag" }] },
+      "is_demo": true
+    }
+  ],
+  "diary_entries": [
+    {
+      "id": "demo_de_001",
+      "plant_id": "demo_plant_001",
+      "entry_at": "2026-04-04T08:30:00Z",
+      "event_type": "observation",
+      "note": "Healthy growth, no yellowing.",
+      "is_demo": true
+    }
+  ],
+  "photos": [
+    {
+      "id": "demo_photo_001",
+      "plant_id": "demo_plant_002",
+      "captured_at": "2026-04-05T09:10:00Z",
+      "metadata_only": true,
+      "filename": "demo_photo_001.jpg",
+      "note": "No real image file shipped with fixture.",
+      "is_demo": true
+    }
+  ],
+  "sensor_readings": [
+    {
+      "id": "demo_reading_001",
+      "metric": "temp_c",
+      "value": 24.4,
+      "unit": "C",
+      "captured_at": "2026-04-05T09:00:00Z",
+      "state": "demo",
+      "source_type": "demo_fixture",
+      "is_fixture": true,
+      "fixture_scope": "one_tent_demo",
+      "confidence": 0.95,
+      "raw_payload": { "sample": "demo_temp" }
+    },
+    {
+      "id": "demo_reading_002",
+      "metric": "rh_pct",
+      "value": 55.2,
+      "unit": "%",
+      "captured_at": "2026-04-05T09:00:00Z",
+      "state": "demo",
+      "source_type": "demo_fixture",
+      "is_fixture": true,
+      "fixture_scope": "one_tent_demo",
+      "confidence": 0.95,
+      "raw_payload": { "sample": "demo_rh" }
+    },
+    {
+      "id": "demo_reading_003",
+      "metric": "vpd_kpa",
+      "value": 1.05,
+      "unit": "kPa",
+      "captured_at": "2026-04-05T09:00:00Z",
+      "state": "demo",
+      "source_type": "demo_fixture",
+      "is_fixture": true,
+      "fixture_scope": "one_tent_demo",
+      "confidence": 0.9,
+      "raw_payload": { "derived_from": ["demo_reading_001", "demo_reading_002"] }
+    },
+    {
+      "id": "demo_reading_004",
+      "metric": "rh_pct",
+      "value": 71.8,
+      "unit": "%",
+      "captured_at": "2026-04-06T03:00:00Z",
+      "state": "demo",
+      "source_type": "demo_fixture",
+      "is_fixture": true,
+      "fixture_scope": "one_tent_demo",
+      "confidence": 0.92,
+      "raw_payload": { "sample": "demo_rh_night_spike" }
+    }
+  ],
+  "alerts": [
+    {
+      "id": "demo_alert_001",
+      "tent_id": "demo_tent_001",
+      "created_at": "2026-04-06T03:05:00Z",
+      "severity": "medium",
+      "metric": "rh_pct",
+      "title": "Humidity above target overnight",
+      "source_state": "demo",
+      "source_reading_id": "demo_reading_004",
+      "status": "open",
+      "is_demo": true
+    }
+  ],
+  "action_queue": [
+    {
+      "id": "demo_aq_001",
+      "created_at": "2026-04-06T03:06:00Z",
+      "source": { "type": "alert", "id": "demo_alert_001" },
+      "status": "suggested",
+      "approval_required": true,
+      "risk_level": "medium",
+      "review_text": "Overnight RH crossed 65% target. Consider increasing dehumidification or improving air movement after lights-off — grower decision.",
+      "reason": "Demo: rh_pct 71.8% at 2026-04-06T03:00:00Z exceeded target max 65%.",
+      "recommendation": "Grower to review night-cycle humidity strategy. No device command issued.",
+      "executable_payload": null,
+      "is_demo": true
+    }
+  ]
+}

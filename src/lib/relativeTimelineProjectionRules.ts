@@ -20,6 +20,10 @@ import {
   getRelativeStagePreset,
   type RelativeStagePreset,
 } from "@/lib/relativeStageTimelineRules";
+import {
+  classifyTimelineEntry,
+  type TimelineFilterCategory,
+} from "@/lib/timelineEntryClassification";
 
 export type RelativeTimelineItemSource = "note" | "photo" | "sensor";
 

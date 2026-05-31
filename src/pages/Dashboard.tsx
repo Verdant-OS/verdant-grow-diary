@@ -263,6 +263,8 @@ export default function Dashboard() {
 
       {plants.length > 0 && <FirstPlantMemoryCta />}
 
+      <DashboardPendingOutcomeReviewsCard scopedGrowId={scopedGrowId ?? null} />
+
 
 
       <DashboardDataSourceDisclosure

@@ -32,6 +32,7 @@ import GrowLineageRepair from "./pages/GrowLineageRepair";
 import GrowRoomMode from "./pages/GrowRoomMode";
 import DailyCheck from "./pages/DailyCheck";
 import Landing from "./pages/Landing";
+import Demo from "./pages/Demo";
 import HardwareIntegrations from "./pages/HardwareIntegrations";
 import Pricing from "./pages/Pricing";
 import BillingPlaceholder from "./pages/BillingPlaceholder";

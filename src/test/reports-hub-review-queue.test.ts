@@ -54,7 +54,7 @@ describe("buildReportsReviewQueue", () => {
     expect(result.empty).toBe(true);
   });
 
-  it("surfaces a missing-outcome card linking to ActionDetail", () => {
+  it("surfaces a missing-outcome card linking to ActionDetail outcome section", () => {
     const { items } = buildReportsReviewQueue({
       ...base,
       pendingOutcomeReviewCount: 2,
@@ -62,17 +62,17 @@ describe("buildReportsReviewQueue", () => {
     });
     const item = items.find((i) => i.id === "missing_outcome");
     expect(item).toBeDefined();
-    expect(item!.href).toBe("/actions/act-99");
+    expect(item!.href).toBe("/actions/act-99#outcome-section");
     expect(item!.description).toMatch(/2 completed actions/);
   });
 
-  it("missing-outcome falls back to GrowDetail when no action id is known", () => {
+  it("missing-outcome falls back to GrowDetail outcomes section when no action id is known", () => {
     const { items } = buildReportsReviewQueue({
       ...base,
       pendingOutcomeReviewCount: 1,
       firstPendingActionId: null,
     });
-    expect(items[0].href).toBe("/grows/grow-1");
+    expect(items[0].href).toBe("/grows/grow-1#outcomes");
   });
 
   it("links a single open alert to AlertDetail and many alerts to alerts list", () => {

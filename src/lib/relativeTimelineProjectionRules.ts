@@ -350,6 +350,42 @@ export function getRelativeTimelineFilterEmptyState(
   return def.emptyCopy;
 }
 
+/**
+ * Per-chip view model used by the filter strip. Built from the same
+ * `summarizeRelativeTimelineItems` totals that drive the summary strip,
+ * so the chip counts and the summary strip cannot drift apart.
+ *
+ * Zero-count category chips are returned with `disabled: true` so the
+ * UI can keep the chip row stable while making it obvious the bucket
+ * is empty. The "all" chip is never disabled.
+ */
+export interface RelativeTimelineFilterChip {
+  key: RelativeTimelineFilterKey;
+  label: string;
+  count: number;
+  disabled: boolean;
+  selected: boolean;
+  emptyCopy: string;
+}
+
+export function buildRelativeTimelineFilterChips(
+  items: ReadonlyArray<RelativeTimelineItem> | null | undefined,
+  selectedKey: RelativeTimelineFilterKey,
+): RelativeTimelineFilterChip[] {
+  const summary = summarizeRelativeTimelineItems(items);
+  return RELATIVE_TIMELINE_FILTERS.map((f) => {
+    const count = f.key === "all" ? summary.total : summary.counts[f.key];
+    return {
+      key: f.key,
+      label: f.label,
+      count,
+      disabled: f.key !== "all" && count === 0,
+      selected: selectedKey === f.key,
+      emptyCopy: f.emptyCopy,
+    };
+  });
+}
+
 
 // ---------------------------------------------------------------------------
 // Summary strip (read-only, derived from the FULL projected timeline)

@@ -614,7 +614,7 @@ export default function ActionDetail() {
                       to={aiDoctorSessionDetailPath(sessionId)}
                       data-testid="action-detail-ai-doctor-session-link"
                     >
-                      View AI Doctor session
+                      View saved AI Doctor session
                     </Link>
                   </Button>
                 )}

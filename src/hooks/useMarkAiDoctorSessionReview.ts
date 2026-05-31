@@ -143,15 +143,16 @@ export function useMarkAiDoctorSessionReview() {
       if (error) throw error;
     },
     onMutate: async (input) => {
-      // Halt any in-flight review fetches so they don't overwrite our optimistic state.
-      await queryClient.cancelQueries({ queryKey: ["ai_doctor_session_reviews"] });
-
       const optimisticEvent = buildOptimisticReviewEvent(input);
       const snapshots: OptimisticContext["snapshots"] = [];
 
       const entries = queryClient.getQueriesData<UseAiDoctorSessionReviewsResult>({
         queryKey: ["ai_doctor_session_reviews"],
       });
+      console.log("[onMutate] entries:", entries.length, entries.map(([k]) => JSON.stringify(k)));
+
+      // Halt any in-flight review fetches so they don't overwrite our optimistic state.
+      await queryClient.cancelQueries({ queryKey: ["ai_doctor_session_reviews"] });
 
       for (const [queryKey, previous] of entries) {
         const scope = Array.isArray(queryKey) ? queryKey[1] : undefined;

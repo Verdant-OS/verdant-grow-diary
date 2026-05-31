@@ -83,7 +83,8 @@ export function useAddAiDoctorSessionSuggestionToActionQueue() {
     mutationFn: async ({ session, action }) => {
       const draftResult = buildActionQueueDraftFromAiDoctorSession(session, action);
       if (!draftResult.ok) {
-        return { status: "ineligible", reason: draftResult.reason };
+        const r = (draftResult as { ok: false; reason: string }).reason;
+        return { status: "ineligible", reason: r };
       }
       const { draft } = draftResult;
 

@@ -50,6 +50,13 @@ export interface StructuredDiagnosisCardProps {
    * sufficiency surface allows.
    */
   contextCeiling?: AiContextConfidenceCeiling | null;
+  /**
+   * Optional AI Doctor session id. When provided, the card surfaces a
+   * read-only "Created from this session" chip beside any suggestion that
+   * already has a linked open Action Queue item. If absent, no chip is
+   * rendered (no fetch is issued).
+   */
+  aiDoctorSessionId?: string | null;
   testId?: string;
 }
 

@@ -496,6 +496,32 @@ export function countNeedsAttentionVisible<T extends FilterableSessionRow>(
   return n;
 }
 
+/**
+ * Count rows in the currently-loaded page whose projected review status is
+ * `needs_follow_up`. Pure. Does NOT query the database — caller passes
+ * already-loaded rows and the existing `stateBySession` projection.
+ */
+export function countNeedsFollowUpVisible<T extends FilterableSessionRow>(
+  rows: T[],
+  stateBySession?: ReadonlyMap<string, AiDoctorSessionReviewState> | null,
+): number {
+  if (!Array.isArray(rows)) return 0;
+  let n = 0;
+  for (const row of rows) {
+    if (rowReviewStatus(row, stateBySession) === "needs_follow_up") n += 1;
+  }
+  return n;
+}
+
+/**
+ * Human copy for the visible-only "Needs follow-up" count chip. Always
+ * reads "N visible" so growers cannot mistake this for a global total.
+ */
+export function formatNeedsFollowUpVisibleLabel(n: number): string {
+  const safe = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  return `Needs follow-up: ${safe} visible`;
+}
+
 // ---------------- client-side sort ----------------
 
 const RISK_RANK: Record<string, number> = {

@@ -4,10 +4,11 @@
  * Covers:
  *  - all 5 launcher entries render in deterministic order
  *  - QuickLog entry uses the existing `verdant:open-quicklog` event (no href)
+ *  - QuickLog payload includes scoped growId / plantId only when supplied
  *  - Sensor / Doctor / Alerts / Outcome entries route to the expected paths
  *  - scoped grow id is preserved in scoped routes (sensors, alerts, dashboard)
- *  - missing grow scope falls back to base routes (no broken URLs)
- *  - Record-outcome entry is omitted when surface is unavailable
+ *  - Record-outcome entry renders disabled with a lightweight reason when
+ *    surface is unavailable (kept visible, never silently removed)
  *  - Copy avoids autopilot / control / guaranteed / fixed language
  *  - Helper module is pure: no React, no Supabase, no fetch, no service_role,
  *    no device-control strings
@@ -45,7 +46,7 @@ const FORBIDDEN_COPY = [
 ];
 
 describe("buildGrowRoomLauncherEntries · ordering and completeness", () => {
-  it("returns the 5 expected kinds in deterministic order when outcome is available", () => {
+  it("returns the 5 expected kinds in deterministic order", () => {
     const kinds = buildGrowRoomLauncherEntries({ scopedGrowId: null }).map(
       (e) => e.kind,
     );
@@ -58,27 +59,56 @@ describe("buildGrowRoomLauncherEntries · ordering and completeness", () => {
     ] satisfies GrowRoomLauncherKind[]);
   });
 
-  it("omits record_outcome gracefully when surface is unavailable", () => {
-    const kinds = buildGrowRoomLauncherEntries({
+  it("keeps record_outcome visible but disabled when surface is unavailable", () => {
+    const entries = buildGrowRoomLauncherEntries({
       scopedGrowId: null,
       recordOutcomeAvailable: false,
-    }).map((e) => e.kind);
-    expect(kinds).not.toContain("record_outcome");
-    expect(kinds).toHaveLength(4);
+    });
+    const outcome = entries.find((e) => e.kind === "record_outcome")!;
+    expect(outcome).toBeDefined();
+    expect(outcome.disabled).toBe(true);
+    expect(outcome.href).toBeUndefined();
+    expect(outcome.disabledReason).toMatch(/no completed actions/i);
   });
 });
 
-describe("buildGrowRoomLauncherEntries · routing", () => {
-  it("QuickLog uses the existing open-quicklog event (no href)", () => {
+describe("buildGrowRoomLauncherEntries · QuickLog payload", () => {
+  it("emits null payload when no scoped context is available", () => {
     const ql = buildGrowRoomLauncherEntries({ scopedGrowId: null }).find(
       (e) => e.kind === "quicklog",
     )!;
     expect(ql.event).toBe("open-quicklog");
     expect(ql.href).toBeUndefined();
+    expect(ql.eventPayload).toBeNull();
     // Sanity: the event constant matches the global listener key.
     expect(PLANT_QUICKLOG_PREFILL_EVENT).toBe("verdant:open-quicklog");
   });
 
+  it("includes scoped growId when available, plantId still null", () => {
+    const ql = buildGrowRoomLauncherEntries({ scopedGrowId: "grow-7" }).find(
+      (e) => e.kind === "quicklog",
+    )!;
+    expect(ql.eventPayload).toEqual({ growId: "grow-7", plantId: null });
+  });
+
+  it("includes plantId only when already available from context", () => {
+    const ql = buildGrowRoomLauncherEntries({
+      scopedGrowId: "grow-7",
+      scopedPlantId: "plant-3",
+    }).find((e) => e.kind === "quicklog")!;
+    expect(ql.eventPayload).toEqual({ growId: "grow-7", plantId: "plant-3" });
+  });
+
+  it("never invents a plant id when none is supplied", () => {
+    const ql = buildGrowRoomLauncherEntries({
+      scopedGrowId: "grow-7",
+      scopedPlantId: null,
+    }).find((e) => e.kind === "quicklog")!;
+    expect(ql.eventPayload?.plantId).toBeNull();
+  });
+});
+
+describe("buildGrowRoomLauncherEntries · routing", () => {
   it("Ask Doctor routes to /doctor", () => {
     const ad = buildGrowRoomLauncherEntries({ scopedGrowId: null }).find(
       (e) => e.kind === "ask_doctor",
@@ -100,7 +130,6 @@ describe("buildGrowRoomLauncherEntries · routing", () => {
     expect(byKind.manual_sensor_snapshot.href).toBe("/sensors?growId=grow-1");
     expect(byKind.review_alerts.href).toBe("/alerts?growId=grow-1");
     expect(byKind.record_outcome.href).toBe("/dashboard?growId=grow-1");
-    // Doctor route is not grow-scoped today; must not invent a param.
     expect(byKind.ask_doctor.href).toBe("/doctor");
   });
 
@@ -172,7 +201,6 @@ describe("growRoomQuickActionLauncher.ts · static safety (helper is pure)", () 
 describe("GrowRoomQuickActionsCard · render integration", () => {
   it("imports the pure launcher helper (no duplicate routing in JSX)", () => {
     expect(CARD).toMatch(/buildGrowRoomLauncherEntries/);
-    // Card must not hand-roll the routes itself.
     expect(CARD).not.toMatch(/["']\/sensors\?growId=/);
     expect(CARD).not.toMatch(/["']\/alerts\?growId=/);
     expect(CARD).not.toMatch(/["']\/dashboard\?growId=/);
@@ -181,6 +209,10 @@ describe("GrowRoomQuickActionsCard · render integration", () => {
   it("dispatches the existing open-quicklog event constant", () => {
     expect(CARD).toMatch(/PLANT_QUICKLOG_PREFILL_EVENT/);
     expect(CARD).toMatch(/new CustomEvent\(\s*PLANT_QUICKLOG_PREFILL_EVENT/);
+  });
+
+  it("declares a visible focus-visible ring for keyboard/mobile users", () => {
+    expect(CARD).toMatch(/focus-visible:ring-2/);
   });
 
   it("performs no writes from the launcher", () => {

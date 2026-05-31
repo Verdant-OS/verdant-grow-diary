@@ -14,7 +14,11 @@
  *    handler kind) — never both.
  *  - "Record outcome" links to the Dashboard pending-outcome reviews flow,
  *    which is the existing surface for capturing action outcomes. When no
- *    such surface is available the entry is omitted (graceful fallback).
+ *    such surface is available the entry is rendered as disabled with a
+ *    lightweight reason rather than silently omitted.
+ *  - QuickLog dispatch carries an optional payload of already-known
+ *    context (scoped grow id + scoped plant id). The helper never invents
+ *    or looks up plant context — callers must pass what they already have.
  *  - Copy is observational and avoids control / certainty language.
  */
 import {
@@ -30,6 +34,14 @@ export type GrowRoomLauncherKind =
   | "review_alerts"
   | "record_outcome";
 
+/** Payload dispatched on the `verdant:open-quicklog` event. */
+export interface GrowRoomQuickLogEventPayload {
+  /** Already-known scoped grow id; null when no grow is in scope. */
+  growId: string | null;
+  /** Already-known scoped plant id; null when no plant is in scope. */
+  plantId: string | null;
+}
+
 export interface GrowRoomLauncherEntry {
   kind: GrowRoomLauncherKind;
   label: string;
@@ -38,17 +50,32 @@ export interface GrowRoomLauncherEntry {
   href?: string;
   /** Defined when the entry dispatches a global event instead of navigating. */
   event?: "open-quicklog";
+  /**
+   * Defined only for the `quicklog` event entry. The card forwards this
+   * payload as the CustomEvent `detail`. May be `null` when no scoped
+   * context is available — in that case the existing QuickLog modal opens
+   * with no prefill, matching prior behavior.
+   */
+  eventPayload?: GrowRoomQuickLogEventPayload | null;
   /** Stable testId for render/assertion. */
   testId: string;
+  /** True when required context is missing; the card renders a disabled button. */
+  disabled?: boolean;
+  /** Short observational reason shown alongside a disabled entry. */
+  disabledReason?: string;
 }
 
 export interface GrowRoomLauncherInput {
   /** Scoped grow id from `?growId=`; null when no grow is in scope. */
   scopedGrowId: string | null;
   /**
-   * When false, the Record-outcome entry is omitted. Pass false when the
-   * Dashboard pending-outcome surface is not reachable for this user.
-   * Defaults to true.
+   * Scoped plant id, if one is already known from existing route/context.
+   * The helper does NOT look up plants — pass null when unknown.
+   */
+  scopedPlantId?: string | null;
+  /**
+   * When false, the Record-outcome entry is rendered as disabled with a
+   * lightweight reason rather than removed. Defaults to true.
    */
   recordOutcomeAvailable?: boolean;
 }
@@ -84,13 +111,18 @@ export function buildGrowRoomLauncherEntries(
   input: GrowRoomLauncherInput,
 ): GrowRoomLauncherEntry[] {
   const growId = input.scopedGrowId ?? null;
+  const plantId = input.scopedPlantId ?? null;
   const recordOutcomeAvailable = input.recordOutcomeAvailable ?? true;
+
+  const quickLogPayload: GrowRoomQuickLogEventPayload | null =
+    growId || plantId ? { growId, plantId } : null;
 
   const entries: GrowRoomLauncherEntry[] = [
     {
       kind: "quicklog",
       ...LABELS.quicklog,
       event: "open-quicklog",
+      eventPayload: quickLogPayload,
       testId: "grow-room-launcher-quicklog",
     },
     {
@@ -111,16 +143,17 @@ export function buildGrowRoomLauncherEntries(
       href: alertsPath(growId),
       testId: "grow-room-launcher-review-alerts",
     },
-  ];
-
-  if (recordOutcomeAvailable) {
-    entries.push({
+    {
       kind: "record_outcome",
       ...LABELS.record_outcome,
-      href: dashboardPath(growId),
+      href: recordOutcomeAvailable ? dashboardPath(growId) : undefined,
       testId: "grow-room-launcher-record-outcome",
-    });
-  }
+      disabled: !recordOutcomeAvailable,
+      disabledReason: recordOutcomeAvailable
+        ? undefined
+        : "No completed actions awaiting outcome capture yet.",
+    },
+  ];
 
   return entries;
 }

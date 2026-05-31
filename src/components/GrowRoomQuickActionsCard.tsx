@@ -2,8 +2,9 @@
  * GrowRoomQuickActionsCard — mobile-first launcher for common grow-room
  * tasks. Pure presentational component: it renders entries produced by
  * `buildGrowRoomLauncherEntries` and either navigates (href) or dispatches
- * the existing `verdant:open-quicklog` event. It does NOT perform any
- * writes, device control, or automation.
+ * the existing `verdant:open-quicklog` event with already-known scoped
+ * context as the event detail. It does NOT perform any writes, device
+ * control, or automation, and never looks up additional context.
  */
 import { Link } from "react-router-dom";
 import {
@@ -22,6 +23,7 @@ import {
   buildGrowRoomLauncherEntries,
   type GrowRoomLauncherEntry,
   type GrowRoomLauncherKind,
+  type GrowRoomQuickLogEventPayload,
 } from "@/lib/growRoomQuickActionLauncher";
 
 const ICON: Record<GrowRoomLauncherKind, typeof NotebookPen> = {
@@ -34,27 +36,76 @@ const ICON: Record<GrowRoomLauncherKind, typeof NotebookPen> = {
 
 interface Props {
   scopedGrowId: string | null;
+  /**
+   * Already-known plant id from existing route/context (no new lookup).
+   * Forwarded as part of the QuickLog event payload.
+   */
+  scopedPlantId?: string | null;
   recordOutcomeAvailable?: boolean;
 }
 
-function dispatchQuickLog() {
+// Visible focus ring tuned for keyboard + mobile tap-and-hold.
+const FOCUS_CLASSES =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+function dispatchQuickLog(payload: GrowRoomQuickLogEventPayload | null) {
   if (typeof window === "undefined") return;
   window.dispatchEvent(
-    new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: null }),
+    new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: payload }),
   );
+}
+
+function ariaLabelFor(entry: GrowRoomLauncherEntry): string {
+  if (entry.disabled && entry.disabledReason) {
+    return `${entry.label} (unavailable: ${entry.disabledReason})`;
+  }
+  return entry.label;
 }
 
 function renderButton(entry: GrowRoomLauncherEntry) {
   const Icon = ICON[entry.kind];
+  const ariaLabel = ariaLabelFor(entry);
   const inner = (
     <>
       <Icon className="h-5 w-5" aria-hidden="true" />
       <span className="text-sm font-medium">{entry.label}</span>
-      {entry.href && (
+      {entry.href && !entry.disabled && (
         <ArrowRight className="h-3.5 w-3.5 ml-auto opacity-60" aria-hidden="true" />
       )}
     </>
   );
+
+  const baseClasses = `h-14 w-full justify-start gap-3 px-4 ${FOCUS_CLASSES}`;
+
+  if (entry.disabled) {
+    return (
+      <div
+        key={entry.kind}
+        data-testid={`${entry.testId}-disabled`}
+        className="space-y-1"
+      >
+        <Button
+          type="button"
+          variant="outline"
+          disabled
+          aria-disabled="true"
+          aria-label={ariaLabel}
+          data-testid={entry.testId}
+          className={`${baseClasses} opacity-60 cursor-not-allowed`}
+        >
+          {inner}
+        </Button>
+        {entry.disabledReason && (
+          <p
+            className="text-[11px] text-muted-foreground px-1"
+            data-testid={`${entry.testId}-reason`}
+          >
+            {entry.disabledReason}
+          </p>
+        )}
+      </div>
+    );
+  }
 
   if (entry.href) {
     return (
@@ -62,11 +113,12 @@ function renderButton(entry: GrowRoomLauncherEntry) {
         key={entry.kind}
         asChild
         variant="outline"
-        className="h-14 w-full justify-start gap-3 px-4"
+        className={baseClasses}
         data-testid={entry.testId}
-        aria-label={entry.label}
       >
-        <Link to={entry.href}>{inner}</Link>
+        <Link to={entry.href} aria-label={ariaLabel}>
+          {inner}
+        </Link>
       </Button>
     );
   }
@@ -76,10 +128,10 @@ function renderButton(entry: GrowRoomLauncherEntry) {
       key={entry.kind}
       type="button"
       variant="outline"
-      className="h-14 w-full justify-start gap-3 px-4"
+      className={baseClasses}
       data-testid={entry.testId}
-      aria-label={entry.label}
-      onClick={dispatchQuickLog}
+      aria-label={ariaLabel}
+      onClick={() => dispatchQuickLog(entry.eventPayload ?? null)}
     >
       {inner}
     </Button>
@@ -88,10 +140,12 @@ function renderButton(entry: GrowRoomLauncherEntry) {
 
 export default function GrowRoomQuickActionsCard({
   scopedGrowId,
+  scopedPlantId = null,
   recordOutcomeAvailable = true,
 }: Props) {
   const entries = buildGrowRoomLauncherEntries({
     scopedGrowId,
+    scopedPlantId,
     recordOutcomeAvailable,
   });
 

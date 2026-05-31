@@ -356,7 +356,7 @@ export default function PlantRelativeTimelineSection({
 
                     <ol className="space-y-2">
                       {group.items.map((item) => (
-                        <TimelineRow key={item.id} item={item} />
+                        <TimelineRow key={item.id} item={item} context={entryContext} />
                       ))}
                     </ol>
                   </section>

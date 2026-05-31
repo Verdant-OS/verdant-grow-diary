@@ -354,6 +354,7 @@ export function useGrowDetailData(): UseGrowDetailData {
           status: "unavailable",
           summary: EMPTY_GROW_OUTCOME_SUMMARY,
           recent: [],
+          learning: EMPTY_LEARNING_REPORT,
         });
       } else {
         const rows = (outcomeRows ?? []) as RawGrowOutcomeRow[];
@@ -361,6 +362,7 @@ export function useGrowDetailData(): UseGrowDetailData {
           status: "ready",
           summary: summarizeGrowOutcomes(rows),
           recent: pickRecentGrowOutcomes(rows, 5),
+          learning: buildActionOutcomeLearningReport(rows),
         });
       }
     } catch {
@@ -368,6 +370,7 @@ export function useGrowDetailData(): UseGrowDetailData {
         status: "unavailable",
         summary: EMPTY_GROW_OUTCOME_SUMMARY,
         recent: [],
+        learning: EMPTY_LEARNING_REPORT,
       });
     }
 

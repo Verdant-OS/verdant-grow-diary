@@ -289,12 +289,12 @@ describe("ActionDetail — AI Doctor provenance panel", () => {
     expect(panel.textContent ?? "").toMatch(/grower (review|approval)/i);
   });
 
-  it("renders a 'View AI Doctor session' link when a session id is parseable", async () => {
+  it("renders a 'View saved AI Doctor session' link when a session id is parseable", async () => {
     renderDetail();
     const link = (await screen.findByTestId(
       "action-detail-ai-doctor-session-link",
     )) as HTMLAnchorElement;
-    expect(link.textContent ?? "").toBe("View AI Doctor session");
+    expect(link.textContent ?? "").toBe("View saved AI Doctor session");
     expect(link.getAttribute("href")).toBe("/doctor/sessions/sess-abc");
   });
 

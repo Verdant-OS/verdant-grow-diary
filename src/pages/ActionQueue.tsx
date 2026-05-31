@@ -26,7 +26,7 @@ import { Loader2, Check, X, FlaskConical, ListChecks, History, CheckCircle2, Ban
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
-import { actionDetailPath, actionsPath } from "@/lib/routes";
+import { actionDetailPath, actionsPath, aiDoctorSessionDetailPath } from "@/lib/routes";
 import { toast } from "sonner";
 import {
   type ActionStatus,

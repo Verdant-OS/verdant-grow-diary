@@ -38,7 +38,7 @@ import {
   REVIEW_NOTE_MAX_LENGTH,
   useMarkAiDoctorSessionReview,
 } from "@/hooks/useMarkAiDoctorSessionReview";
-import { plantDetailPath, tentDetailPath } from "@/lib/routes";
+import { alertDetailPath, plantDetailPath, tentDetailPath } from "@/lib/routes";
 import { AiDoctorSessionActionQueueButton } from "@/components/AiDoctorSessionActionQueueButton";
 import type { AiDoctorSessionLike } from "@/lib/aiDoctorSessionToActionQueueRules";
 import { useAiDoctorSessionLinkedActionQueueItems } from "@/hooks/useAiDoctorSessionLinkedActionQueueItems";

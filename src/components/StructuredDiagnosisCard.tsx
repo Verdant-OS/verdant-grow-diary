@@ -144,13 +144,12 @@ export default function StructuredDiagnosisCard({
   const inFlightRef = useRef<Set<number>>(new Set());
   const queuedRef = useRef<Set<number>>(new Set());
 
-  // Read-only: when the parent knows the persisted AI Doctor session id, fetch
-  // open Action Queue items already linked back to that session so we can mark
-  // matching suggestions with a "Created from this session" chip. Disabled
-  // when no session id is available — no fetch, no chip, no crash.
-  const { vm: linkedActions } = useAiDoctorSessionLinkedActionQueueItems(
-    aiDoctorSessionId ?? null,
-  );
+  // Linked Action Queue items are fetched only when an AI Doctor session id
+  // is supplied — see `<LinkedActionChip />` below. This keeps the hook out
+  // of the render tree for the live Coach flow (which currently does not
+  // thread a session id back into state), so the card stays usable without
+  // a QueryClientProvider in that path.
+
 
   async function handleClick(action: DiagnosisSuggestedAction, idx: number) {
     if (!onAddToQueue) return;

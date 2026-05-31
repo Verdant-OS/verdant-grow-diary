@@ -374,3 +374,49 @@ export default function StructuredDiagnosisCard({
     </div>
   );
 }
+
+/**
+ * Read-only chip rendered beside an in-flight Coach suggestion that already
+ * has a linked open Action Queue item created from the same AI Doctor
+ * session. Mounted only when the parent supplies a session id, so the
+ * underlying query is never issued on the live (no-session-id) Coach path.
+ */
+function LinkedSuggestionChip({
+  sessionId,
+  action,
+  testId,
+  index,
+}: {
+  sessionId: string;
+  action: DiagnosisSuggestedAction;
+  testId: string;
+  index: number;
+}) {
+  const { vm } = useAiDoctorSessionLinkedActionQueueItems(sessionId);
+  const match = findLinkedActionForSuggestion(vm.items, action);
+  if (!match) return null;
+  return (
+    <div
+      className="flex flex-wrap items-center gap-2 pt-1"
+      data-testid={`${testId}-suggested-action-${index}-created-from-session`}
+      data-action-queue-id={match.id}
+    >
+      <Badge
+        variant="outline"
+        className="text-[10px]"
+        title="This suggestion already has an approval-required Action Queue item."
+        data-testid={`${testId}-suggested-action-${index}-created-from-session-chip`}
+      >
+        Created from this session
+      </Badge>
+      <Link
+        to={match.focusHref}
+        className="text-[11px] underline text-primary"
+        data-testid={`${testId}-suggested-action-${index}-created-from-session-link`}
+        data-action-queue-id={match.id}
+      >
+        View in Action Queue
+      </Link>
+    </div>
+  );
+}

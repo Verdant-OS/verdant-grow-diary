@@ -131,8 +131,11 @@ export default function Reports() {
         <ReportsHubOnboardingSection cards={onboarding.cards} />
       )}
 
-      {!showEmptyState && summary && !reviewQueue.empty && (
-        <ReportsReviewQueueSection items={reviewQueue.items} />
+      {!showEmptyState && summary && !showOnboarding && (
+        <ReportsReviewQueueSection
+          items={reviewQueue.items}
+          showEmptyState={reviewQueue.empty}
+        />
       )}
 
       {showEmptyState ? (

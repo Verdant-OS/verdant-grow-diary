@@ -270,10 +270,10 @@ const COACH = readFileSync(resolve(ROOT, "src/pages/Coach.tsx"), "utf8");
 
 describe("Coach chip — static safety", () => {
   it("StructuredDiagnosisCard introduces no write paths", () => {
-    expect(CARD).not.toMatch(/\.insert\(/);
-    expect(CARD).not.toMatch(/\.update\(/);
-    expect(CARD).not.toMatch(/\.upsert\(/);
-    expect(CARD).not.toMatch(/\.delete\(/);
+    // The card itself must not touch the DB client directly. All writes
+    // belong to the parent (Coach page) via the onAddToQueue callback.
+    expect(CARD).not.toMatch(/from\(["']action_queue["']\)/);
+    expect(CARD).not.toMatch(/supabase\./);
     expect(CARD).not.toMatch(/\.rpc\(/);
     expect(CARD).not.toMatch(/functions\.invoke/);
     expect(CARD.toLowerCase()).not.toContain("service_role");

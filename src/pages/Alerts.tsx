@@ -259,10 +259,11 @@ export default function Alerts() {
                         {a.reason}
                       </p>
                       <AlertWhyContext alert={a} variant="compact" />
-                      <LinkedActionBadge
+                      <LinkedActionCountBadge
                         alertId={a.id}
                         summary={linkedActionCounts.get(a.id)}
                         growId={a.grow_id}
+                        testIdPrefix="alert-row"
                       />
 
                       <div className="flex flex-wrap gap-2">

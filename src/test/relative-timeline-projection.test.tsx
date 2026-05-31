@@ -907,26 +907,24 @@ describe("PlantRelativeTimelineSection — chip counts + disabled state", () => 
     expect(watering.getAttribute("data-count")).toBe("2");
     expect(feeding.getAttribute("data-count")).toBe("0");
     expect(feeding.getAttribute("data-disabled")).toBe("true");
-    expect(feeding.getAttribute("aria-disabled")).toBe("true");
-    expect((feeding as HTMLButtonElement).disabled).toBe(true);
     expect(all.getAttribute("data-disabled")).toBe("false");
     expect(
       screen.getByTestId("relative-timeline-filter-watering-count").textContent,
     ).toBe("2");
   });
 
-  it("clicking a disabled zero-count chip does not change the filter", () => {
+  it("clicking a zero-count chip surfaces the filter-specific empty copy", () => {
     mockUse.mockReturnValue({
       data: [entry({ id: "n1", entry_type: "note" })],
       isLoading: false,
     });
     render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
     const feeding = screen.getByTestId("relative-timeline-filter-feeding");
+    expect(feeding.getAttribute("data-disabled")).toBe("true");
     fireEvent.click(feeding);
-    expect(
-      screen.getByTestId("relative-timeline-filter-all").getAttribute("aria-checked"),
-    ).toBe("true");
-    expect(screen.getAllByTestId("relative-timeline-item").length).toBe(1);
+    const empty = screen.getByTestId("relative-timeline-filter-empty");
+    expect(empty.getAttribute("data-filter-key")).toBe("feeding");
+    expect(empty.textContent?.toLowerCase()).toContain("feeding");
   });
 
   it("clearing the filter via the All chip restores all entries", () => {

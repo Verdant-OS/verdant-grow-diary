@@ -247,6 +247,18 @@ export default function TentDetail() {
 
 
 
+      {activeCount > 0 && id && (() => {
+        const primary = activePlants[0];
+        const prefill = buildPlantQuickLogPrefill({
+          plantId: primary?.id ?? null,
+          plantName: primary?.name ?? null,
+          growId: tent.growId ?? null,
+          tentId: id,
+          tentName: tent.name ?? null,
+        });
+        return <FirstPlantMemoryCta prefill={prefill} testId="tent-detail-first-plant-memory-cta" />;
+      })()}
+
       <div className="glass rounded-2xl p-4">
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <h2 className="font-display font-semibold">

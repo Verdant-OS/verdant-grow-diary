@@ -71,32 +71,41 @@ export default function CreateTentDialog({ trigger, defaultGrowId, onCreated }: 
         <DialogHeader>
           <DialogTitle className="font-display">New tent</DialogTitle>
         </DialogHeader>
+        <p className="text-xs text-muted-foreground -mt-1">
+          Start simple. You can add size, brand, and stage later. Verdant works best once your first plant memory exists.
+        </p>
         <form onSubmit={submit} className="grid gap-3">
           <div>
             <Label>Name</Label>
             <Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Tent #1" />
+            <p className="text-[11px] text-muted-foreground mt-1">Only a name is required to get started.</p>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <Label>Size (optional)</Label>
-              <Input value={form.size} onChange={(e) => setForm({ ...form, size: e.target.value })} placeholder="4x4" />
+          <details className="rounded-md border border-border/40 px-3 py-2">
+            <summary className="cursor-pointer text-xs text-muted-foreground select-none">Optional details (enrich later)</summary>
+            <div className="grid gap-3 pt-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label>Size (optional)</Label>
+                  <Input value={form.size} onChange={(e) => setForm({ ...form, size: e.target.value })} placeholder="4x4" />
+                </div>
+                <div>
+                  <Label>Brand (optional)</Label>
+                  <Input value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} placeholder="Gorilla" />
+                </div>
+              </div>
+              <div>
+                <Label>Stage (optional)</Label>
+                <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {STAGES.filter((s) => ["seedling", "veg", "flower", "flush", "harvest"].includes(s.value)).map((s) => (
+                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div>
-              <Label>Brand (optional)</Label>
-              <Input value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} placeholder="Gorilla" />
-            </div>
-          </div>
-          <div>
-            <Label>Stage</Label>
-            <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {STAGES.filter((s) => ["seedling", "veg", "flower", "flush", "harvest"].includes(s.value)).map((s) => (
-                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          </details>
           <Button disabled={busy} className="gradient-leaf text-primary-foreground">Create tent</Button>
         </form>
       </DialogContent>

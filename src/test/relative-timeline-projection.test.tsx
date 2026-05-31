@@ -1341,3 +1341,235 @@ describe("group summary — static safety", () => {
     expect(COMPONENT).toContain("formatRelativeTimelineGroupSummary");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Per-entry detail view model (formatRelativeTimelineEntryDetail)
+// ---------------------------------------------------------------------------
+
+import { formatRelativeTimelineEntryDetail } from "@/lib/relativeTimelineProjectionRules";
+
+describe("formatRelativeTimelineEntryDetail — pure rules", () => {
+  it("returns null for null/undefined input", () => {
+    expect(formatRelativeTimelineEntryDetail(null)).toBeNull();
+    expect(formatRelativeTimelineEntryDetail(undefined)).toBeNull();
+  });
+
+  it("maps eventType to human-readable category + source labels", () => {
+    const item = tItem({
+      id: "x1",
+      eventType: "watering",
+      title: "Watered 500ml",
+      source: "note",
+    });
+    const view = formatRelativeTimelineEntryDetail(item)!;
+    expect(view.categoryKey).toBe("watering");
+    expect(view.categoryLabel).toBe("Watering");
+    expect(view.sourceLabel).toBe("Quick log");
+    expect(view.summary).toBe("Watered 500ml");
+    expect(view.summaryIsFallback).toBe(false);
+  });
+
+  it("photo source resolves to the 'Photo' source label and 'Photos' category", () => {
+    const view = formatRelativeTimelineEntryDetail(
+      tItem({ id: "p1", eventType: "photo", source: "photo", title: "Day 14 canopy" }),
+    )!;
+    expect(view.categoryLabel).toBe("Photos");
+    expect(view.sourceLabel).toBe("Photo");
+  });
+
+  it("sensor source on this surface labels as 'Manual snapshot'", () => {
+    const view = formatRelativeTimelineEntryDetail(
+      tItem({ id: "s1", eventType: "sensor_snapshot", source: "sensor", title: "pH 6.1" }),
+    )!;
+    expect(view.sourceLabel).toBe("Manual snapshot");
+    expect(view.categoryLabel).toBe("Measurements");
+  });
+
+  it("uses safe fallback copy when the note is empty", () => {
+    const view = formatRelativeTimelineEntryDetail(
+      tItem({ id: "f1", eventType: "watering", title: "" }),
+    )!;
+    expect(view.summaryIsFallback).toBe(true);
+    expect(view.summary).toMatch(/no note recorded/i);
+  });
+
+  it("treats a title that is just the raw event type as a fallback (no note)", () => {
+    const view = formatRelativeTimelineEntryDetail(
+      tItem({ id: "f2", eventType: "training", title: "training" }),
+    )!;
+    expect(view.summaryIsFallback).toBe(true);
+  });
+
+  it("falls back when the timestamp label is blank", () => {
+    const view = formatRelativeTimelineEntryDetail(
+      tItem({ id: "t1", eventType: "note", occurredAtLabel: "" }),
+    )!;
+    expect(view.timestampIsFallback).toBe(true);
+    expect(view.timestampLabel).toMatch(/no timestamp recorded/i);
+  });
+
+  it("renders plant / tent / grow context only when names are provided", () => {
+    const item = tItem({ id: "c1", eventType: "note", title: "ok" });
+    const none = formatRelativeTimelineEntryDetail(item)!;
+    expect(none.plantContextLabel).toBeNull();
+    expect(none.tentContextLabel).toBeNull();
+    expect(none.growContextLabel).toBeNull();
+    expect(none.hasContext).toBe(false);
+
+    const full = formatRelativeTimelineEntryDetail(item, {
+      plantName: "Blueberry",
+      tentName: "Tent A",
+      growName: "Spring Run",
+    })!;
+    expect(full.plantContextLabel).toBe("Plant: Blueberry");
+    expect(full.tentContextLabel).toBe("Tent: Tent A");
+    expect(full.growContextLabel).toBe("Grow: Spring Run");
+    expect(full.hasContext).toBe(true);
+  });
+
+  it("ignores blank context strings", () => {
+    const view = formatRelativeTimelineEntryDetail(
+      tItem({ id: "c2", eventType: "note" }),
+      { plantName: "   ", tentName: "", growName: null },
+    )!;
+    expect(view.hasContext).toBe(false);
+  });
+
+  it("never includes raw IDs, tokens, or user identifiers in the view model", () => {
+    const item = tItem({
+      id: "uuid-secret-1234",
+      eventType: "watering",
+      title: "Watered",
+      plantId: "plant-uuid-xyz",
+      tentId: "tent-uuid-xyz",
+    });
+    const view = formatRelativeTimelineEntryDetail(item, {
+      plantName: "Pinky",
+      tentName: "Veg Tent",
+    })!;
+    const serialized = JSON.stringify(view);
+    expect(serialized).not.toContain("uuid-secret-1234");
+    expect(serialized).not.toContain("plant-uuid-xyz");
+    expect(serialized).not.toContain("tent-uuid-xyz");
+    expect(serialized.toLowerCase()).not.toContain("token");
+    expect(serialized.toLowerCase()).not.toContain("user_id");
+  });
+});
+
+describe("PlantRelativeTimelineSection — entry detail polish render", () => {
+  it("renders human-readable category, source, summary, and timestamp per card", () => {
+    mockUse.mockReturnValue({
+      data: [
+        entry({
+          id: "e1",
+          entry_at: "2026-04-05T08:00:00Z",
+          entry_type: "watering",
+          note: "Watered 500ml runoff clear",
+        }),
+      ],
+      isLoading: false,
+    });
+    render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
+    const row = screen.getByTestId("relative-timeline-item");
+    expect(row.getAttribute("data-category")).toBe("watering");
+    expect(screen.getByTestId("relative-timeline-event-type")).toHaveTextContent("Watering");
+    expect(screen.getByTestId("relative-timeline-source-badge")).toHaveTextContent("Quick log");
+    expect(screen.getByTestId("relative-timeline-title")).toHaveTextContent(
+      "Watered 500ml runoff clear",
+    );
+    expect(screen.getByTestId("relative-timeline-timestamp")).toBeTruthy();
+  });
+
+  it("uses muted fallback copy when the note is empty", () => {
+    mockUse.mockReturnValue({
+      data: [entry({ id: "f1", entry_type: "training", note: "" })],
+      isLoading: false,
+    });
+    render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
+    const title = screen.getByTestId("relative-timeline-title");
+    expect(title.getAttribute("data-summary-fallback")).toBe("true");
+    expect(title.textContent ?? "").toMatch(/no note recorded/i);
+  });
+
+  it("renders plant + tent context line when names are passed in", () => {
+    mockUse.mockReturnValue({
+      data: [entry({ id: "c1", note: "hello" })],
+      isLoading: false,
+    });
+    render(
+      <PlantRelativeTimelineSection
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+        plantName="Blueberry"
+        tentName="Tent A"
+      />,
+    );
+    expect(screen.getByTestId("relative-timeline-context-plant")).toHaveTextContent(
+      "Plant: Blueberry",
+    );
+    expect(screen.getByTestId("relative-timeline-context-tent")).toHaveTextContent(
+      "Tent: Tent A",
+    );
+  });
+
+  it("does not render a context line when no names are provided", () => {
+    mockUse.mockReturnValue({
+      data: [entry({ id: "c2", note: "hello" })],
+      isLoading: false,
+    });
+    render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
+    expect(screen.queryByTestId("relative-timeline-context")).toBeNull();
+  });
+
+  it("does not expose raw entry IDs, user IDs, tokens, or payloads in visible text", () => {
+    mockUse.mockReturnValue({
+      data: [
+        entry({
+          id: "uuid-secret-1234",
+          note: "Watered",
+          details: { raw_payload: "leaky", token: "tok_xyz" } as any,
+        }),
+      ],
+      isLoading: false,
+    });
+    const { container } = render(
+      <PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />,
+    );
+    const text = container.textContent ?? "";
+    expect(text).not.toContain("uuid-secret-1234");
+    expect(text.toLowerCase()).not.toContain("user_id");
+    expect(text.toLowerCase()).not.toContain("token");
+    expect(text.toLowerCase()).not.toContain("raw_payload");
+    expect(text.toLowerCase()).not.toContain("provenance");
+  });
+
+  it("preserves ascending timeline ordering across the polished cards", () => {
+    mockUse.mockReturnValue({
+      data: [
+        entry({ id: "older", entry_at: "2026-04-05T08:00:00Z", note: "first" }),
+        entry({ id: "newer", entry_at: "2026-04-10T08:00:00Z", note: "second" }),
+      ],
+      isLoading: false,
+    });
+    render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
+    const items = screen.getAllByTestId("relative-timeline-item");
+    expect(items[0].getAttribute("data-item-id")).toBe("older");
+    expect(items[1].getAttribute("data-item-id")).toBe("newer");
+  });
+});
+
+describe("entry detail — static safety", () => {
+  it("entry-detail additions stay free of writes / RPC / forbidden surfaces", () => {
+    for (const src of [RULES, COMPONENT].map(stripSafetyNegations)) {
+      expect(src).not.toMatch(/service_role/);
+      expect(src).not.toMatch(/functions\.invoke/);
+      expect(src).not.toMatch(/\.(insert|update|delete|upsert)\s*\(/);
+      expect(src).not.toMatch(/\.rpc\(/);
+      expect(src).not.toMatch(/calendar_events/);
+      expect(src).not.toMatch(/\bnotifications\b/);
+      expect(src).not.toMatch(/resend|sendgrid|mailgun|postmark|twilio/i);
+      expect(src).not.toMatch(/\b(schedule|scheduled|scheduling)\s+(a\s+|the\s+|new\s+)?reminders?\b/i);
+      expect(src).not.toMatch(/mqtt|home[\s_-]?assistant|relay|actuator|device_command|autopilot/i);
+    }
+  });
+});

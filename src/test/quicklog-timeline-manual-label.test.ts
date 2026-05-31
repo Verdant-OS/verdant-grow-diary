@@ -30,6 +30,10 @@ const DIARY_BADGES = readFileSync(
   resolve(ROOT, "src/components/DiaryEntryBadges.tsx"),
   "utf8",
 );
+const TIMELINE_RULES = readFileSync(
+  resolve(ROOT, "src/lib/relativeTimelineProjectionRules.ts"),
+  "utf8",
+);
 
 describe("Grow Timeline · sensor_snapshot wiring", () => {
   it("reads the canonical `sensor_snapshot` key QuickLog writes", () => {
@@ -49,10 +53,12 @@ describe("Grow Timeline · sensor_snapshot wiring", () => {
 });
 
 describe("Plant Relative Timeline · Manual sensor label", () => {
-  it("renders the sensor source as 'Manual', not 'Sensor' or 'Live'", () => {
-    expect(PLANT_TIMELINE).toMatch(/sensor:\s*"Manual"/);
-    expect(PLANT_TIMELINE).not.toMatch(/sensor:\s*"Sensor"/);
-    expect(PLANT_TIMELINE).not.toMatch(/sensor:\s*"Live"/);
+  it("labels the sensor source as 'Manual snapshot' in the shared rules helper, not 'Sensor' or 'Live'", () => {
+    expect(TIMELINE_RULES).toMatch(/sensor:\s*"Manual snapshot"/);
+    expect(TIMELINE_RULES).not.toMatch(/sensor:\s*"Sensor"/);
+    expect(TIMELINE_RULES).not.toMatch(/sensor:\s*"Live"/);
+    // The component must not re-introduce a local override.
+    expect(PLANT_TIMELINE).not.toMatch(/sensor:\s*"(Sensor|Live)"/);
   });
 });
 

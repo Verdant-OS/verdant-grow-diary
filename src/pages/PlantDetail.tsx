@@ -259,7 +259,10 @@ export default function PlantDetail() {
             plantId={plant.id}
             plantStartedAt={plant.startedAt}
             currentStage={plant.stage}
+            plantName={plant.name}
+            tentName={tent?.name ?? null}
           />
+
           <section
             aria-labelledby="plant-daily-grow-check-section-heading"
             data-testid="plant-daily-grow-check-section"

@@ -259,6 +259,11 @@ export default function Alerts() {
                         {a.reason}
                       </p>
                       <AlertWhyContext alert={a} variant="compact" />
+                      <LinkedActionBadge
+                        alertId={a.id}
+                        summary={linkedActionCounts.get(a.id)}
+                        growId={a.grow_id}
+                      />
 
                       <div className="flex flex-wrap gap-2">
                         {a.status !== "acknowledged" &&

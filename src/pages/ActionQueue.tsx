@@ -558,7 +558,18 @@ export default function ActionQueue() {
         ) : (
           <ul className="space-y-2 text-sm">
             {reviewed.slice(0, 50).map((row) => (
-              <li key={row.id} className="rounded-lg border border-border/40 bg-secondary/20 p-2">
+              <li
+                key={row.id}
+                data-testid="action-queue-row"
+                data-action-id={row.id}
+                data-focused={focusedActionId === row.id ? "true" : undefined}
+                aria-label={focusedActionId === row.id ? "Focused action" : undefined}
+                className={`rounded-lg border border-border/40 bg-secondary/20 p-2 ${
+                  focusedActionId === row.id
+                    ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                    : ""
+                }`}
+              >
                 <div className="flex items-center gap-3 flex-wrap">
                   <Badge variant="outline" className="text-[10px] uppercase">{row.status}</Badge>
                   <Badge variant="outline" className={`text-[10px] uppercase ${RISK_VARIANT[row.risk_level]}`}>

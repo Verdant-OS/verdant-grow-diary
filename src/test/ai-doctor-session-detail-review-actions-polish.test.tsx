@@ -141,7 +141,7 @@ vi.mock("@/integrations/supabase/client", () => {
     if (table === "ai_doctor_session_reviews") {
       return {
         insert: (payload: unknown) => {
-          mockState.mockState.insertCalls.push({ table, payload });
+          mockState.insertCalls.push({ table, payload });
           return Promise.resolve({ data: null, error: null });
         },
         select: () => ({

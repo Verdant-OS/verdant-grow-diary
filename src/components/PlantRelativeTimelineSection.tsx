@@ -42,14 +42,6 @@ interface Props {
   growName?: string | null;
 }
 
-// Sensor source entries on this surface always originate from QuickLog
-// manual snapshots — there is no live-stream rendering path here. Label
-// them "Manual" so they are never confused with a live sensor feed.
-const SOURCE_LABEL: Record<RelativeTimelineItem["source"], string> = {
-  note: "Note",
-  photo: "Photo",
-  sensor: "Manual",
-};
 
 function SourceIcon({ source }: { source: RelativeTimelineItem["source"] }) {
   if (source === "photo") return <Camera className="h-3.5 w-3.5" aria-hidden />;

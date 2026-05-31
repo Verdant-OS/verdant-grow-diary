@@ -301,6 +301,7 @@ describe("No unrelated routes were changed", () => {
         "/plants",
         "/plants/:id",
         "/pricing",
+        "/reports",
         "/sensors",
         "/settings",
         "/tasks",

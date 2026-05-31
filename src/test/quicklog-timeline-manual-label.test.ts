@@ -125,8 +125,7 @@ describe("classifyRelativeTimelineFilter · fallback contract", () => {
     expect(
       classifyRelativeTimelineFilter({
         ...base,
-        // @ts-expect-error — exercising defensive null path
-        eventType: null,
+        eventType: null as unknown as string,
         source: "note",
       }),
     ).toBe("notes");

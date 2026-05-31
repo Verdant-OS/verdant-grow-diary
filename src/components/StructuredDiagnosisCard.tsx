@@ -29,6 +29,7 @@ import {
 } from "@/lib/aiDoctorConfidenceRules";
 import { useAiDoctorSessionLinkedActionQueueItems } from "@/hooks/useAiDoctorSessionLinkedActionQueueItems";
 import { findLinkedActionForSuggestion } from "@/lib/aiDoctorSessionLinkedActionsViewModel";
+import { aiDoctorSessionDetailPath } from "@/lib/routes";
 
 export interface StructuredDiagnosisCardProps {
   diagnosis: Diagnosis;

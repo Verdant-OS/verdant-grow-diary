@@ -109,7 +109,9 @@ export function buildOptimisticReviewEvent(
     id: `${OPTIMISTIC_REVIEW_EVENT_ID_PREFIX}${now.getTime()}-${Math.random()
       .toString(36)
       .slice(2, 10)}`,
-    user_id: "", // placeholder — server assigns real user_id via auth.uid()
+    // Non-empty placeholder so the pure projector accepts the event. Server
+    // assigns the real user_id via auth.uid(); this value is never sent.
+    user_id: "__optimistic__",
     session_id: input.sessionId,
     event_type: input.eventType,
     note: normalizeReviewNote(input.note),

@@ -736,6 +736,10 @@ describe("filterRelativeTimelineItems — pure rules", () => {
       "feeding",
       "symptoms",
       "training",
+      "measurement",
+      "transplant",
+      "harvest",
+      "reminder",
       "notes",
     ]);
   });

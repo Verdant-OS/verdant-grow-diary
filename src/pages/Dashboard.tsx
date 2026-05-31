@@ -20,7 +20,9 @@ import SensorChart from "@/components/SensorChart";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import DashboardDataSourceDisclosure from "@/components/DashboardDataSourceDisclosure";
-import { useTasks, useAIInsights } from "@/hooks/useMockData";
+// Mock side-panel hooks intentionally removed — the Dashboard renders
+// honest empty states for Tasks and AI Insights until backed by real data.
+// See docs/qa/v0-demo-loop-checklist.md and docs/safety/static-safety-scans.md.
 import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import { useSensorReadings, useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import { useScopedGrow } from "@/hooks/useScopedGrow";

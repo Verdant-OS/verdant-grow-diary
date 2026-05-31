@@ -9,7 +9,7 @@
  *  - Caution checklist / review summary continue to render unchanged.
  *  - Static safety: no writes, no AI calls, no service_role, no action_queue.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, waitFor, within } from "@testing-library/react";

@@ -89,6 +89,10 @@ export default function Alerts() {
     };
   }, [alerts]);
 
+  // Read-only per-alert summary of open linked Action Queue items.
+  const visibleAlertIds = useMemo(() => alerts.map((a) => a.id), [alerts]);
+  const linkedActionCounts = useAlertsLinkedActionCounts(visibleAlertIds);
+
   /**
    * Status-change handler:
    *   1. Update alert status (single write).

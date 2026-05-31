@@ -70,8 +70,8 @@ const populatedData = {
   diaryEntriesLast7d: 3,
 } as const;
 
-const growA = { id: "grow-a", name: "Blue Dream" };
-const growB = { id: "grow-b", name: "OG Kush" };
+const growA = { id: "grow-a", name: "Blue Dream" } as unknown as never;
+const growB = { id: "grow-b", name: "OG Kush" } as unknown as never;
 
 beforeEach(() => {
   vi.mocked(useReportsHubData).mockReset();
@@ -97,8 +97,8 @@ describe("Reports / Grow Learning Hub", () => {
       backHref: undefined,
     });
     vi.mocked(useGrows).mockReturnValue({
-      grows: [growA],
-      activeGrow: growA,
+      grows: [growA] as never,
+      activeGrow: growA as never,
       activeGrowId: growA.id,
       setActiveGrowId: vi.fn(),
       refresh: vi.fn(),
@@ -119,8 +119,8 @@ describe("Reports / Grow Learning Hub", () => {
       backHref: undefined,
     });
     vi.mocked(useGrows).mockReturnValue({
-      grows: [],
-      activeGrow: null,
+      grows: [] as never,
+      activeGrow: null as never,
       activeGrowId: null,
       setActiveGrowId: vi.fn(),
       refresh: vi.fn(),
@@ -141,8 +141,8 @@ describe("Reports / Grow Learning Hub", () => {
       backHref: undefined,
     });
     vi.mocked(useGrows).mockReturnValue({
-      grows: [growA],
-      activeGrow: growA,
+      grows: [growA] as never,
+      activeGrow: growA as never,
       activeGrowId: growA.id,
       setActiveGrowId: vi.fn(),
       refresh: vi.fn(),
@@ -169,8 +169,8 @@ describe("Reports / Grow Learning Hub", () => {
       backHref: `/grows/${growB.id}`,
     });
     vi.mocked(useGrows).mockReturnValue({
-      grows: [growA, growB],
-      activeGrow: growA,
+      grows: [growA, growB] as never,
+      activeGrow: growA as never,
       activeGrowId: growA.id,
       setActiveGrowId: vi.fn(),
       refresh: vi.fn(),

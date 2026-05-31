@@ -373,3 +373,58 @@ export function buildSessionReviewHistoryViewModel(
   };
 }
 
+/**
+ * Pure copy + disabled-state model for the detail-page review action group.
+ *
+ * Centralized so the UI never embeds review-status strings, disabled-reason
+ * strings, or safety-note copy directly in JSX. Deterministic from the
+ * projected status alone — no I/O, no time-based logic.
+ */
+export interface AiDoctorSessionReviewActionsCopy {
+  /** Short button labels. */
+  markReviewedLabel: string;
+  needsFollowUpLabel: string;
+  clearLabel: string;
+  /** True when the corresponding button should be disabled by status alone. */
+  isMarkReviewedDisabledByStatus: boolean;
+  isNeedsFollowUpDisabledByStatus: boolean;
+  isClearDisabledByStatus: boolean;
+  /** Reason text used for title + aria-label when a button is status-disabled. */
+  markReviewedDisabledReason: string | null;
+  needsFollowUpDisabledReason: string | null;
+  clearDisabledReason: string | null;
+  /** Calm helper sentences shown beneath the action group. */
+  appendOnlyHelperText: string;
+  noSideEffectsHelperText: string;
+}
+
+export const REVIEW_ACTIONS_APPEND_ONLY_HELPER_TEXT =
+  "Review status is saved as an append-only event.";
+export const REVIEW_ACTIONS_NO_SIDE_EFFECTS_HELPER_TEXT =
+  "This does not change alerts, tasks, or action queue items.";
+
+export function buildSessionReviewActionsCopy(
+  status: AiDoctorSessionReviewStatus,
+): AiDoctorSessionReviewActionsCopy {
+  const isReviewed = status === "reviewed";
+  const isNeedsFollowUp = status === "needs_follow_up";
+  const isNotReviewed = status === "not_reviewed";
+  return {
+    markReviewedLabel: "Mark reviewed",
+    needsFollowUpLabel: "Needs follow-up",
+    clearLabel: "Clear review status",
+    isMarkReviewedDisabledByStatus: isReviewed,
+    isNeedsFollowUpDisabledByStatus: isNeedsFollowUp,
+    isClearDisabledByStatus: isNotReviewed,
+    markReviewedDisabledReason: isReviewed
+      ? "Already marked as reviewed."
+      : null,
+    needsFollowUpDisabledReason: isNeedsFollowUp
+      ? "Already marked as needs follow-up."
+      : null,
+    clearDisabledReason: isNotReviewed ? "No review status is set." : null,
+    appendOnlyHelperText: REVIEW_ACTIONS_APPEND_ONLY_HELPER_TEXT,
+    noSideEffectsHelperText: REVIEW_ACTIONS_NO_SIDE_EFFECTS_HELPER_TEXT,
+  };
+}
+

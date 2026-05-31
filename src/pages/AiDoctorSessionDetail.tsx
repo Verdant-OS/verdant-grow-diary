@@ -29,6 +29,7 @@ import {
 } from "@/lib/aiDoctorSessionDetailViewModel";
 import {
   buildSessionReviewHistoryViewModel,
+  buildSessionReviewActionsCopy,
   type AiDoctorSessionReviewHistoryViewModel,
   type AiDoctorSessionReviewPanelTone,
 } from "@/lib/aiDoctorSessionReviewStatusRules";
@@ -646,9 +647,11 @@ function SessionReviewActions({
     }
   };
 
-  const disableMarkReviewed = submitting || status === "reviewed";
-  const disableNeedsFollowUp = submitting || status === "needs_follow_up";
-  const disableClear = submitting || status === "not_reviewed";
+  const copy = buildSessionReviewActionsCopy(status);
+  const disableMarkReviewed = submitting || copy.isMarkReviewedDisabledByStatus;
+  const disableNeedsFollowUp =
+    submitting || copy.isNeedsFollowUpDisabledByStatus;
+  const disableClear = submitting || copy.isClearDisabledByStatus;
 
   return (
     <div
@@ -679,9 +682,15 @@ function SessionReviewActions({
           variant="outline"
           onClick={() => handle("marked_reviewed")}
           disabled={disableMarkReviewed}
+          title={copy.markReviewedDisabledReason ?? undefined}
+          aria-label={
+            copy.markReviewedDisabledReason
+              ? `${copy.markReviewedLabel} — ${copy.markReviewedDisabledReason}`
+              : copy.markReviewedLabel
+          }
           data-testid="ai-doctor-session-detail-review-mark-reviewed"
         >
-          Mark reviewed
+          {copy.markReviewedLabel}
         </Button>
         <Button
           type="button"
@@ -689,9 +698,15 @@ function SessionReviewActions({
           variant="outline"
           onClick={() => handle("needs_follow_up")}
           disabled={disableNeedsFollowUp}
+          title={copy.needsFollowUpDisabledReason ?? undefined}
+          aria-label={
+            copy.needsFollowUpDisabledReason
+              ? `${copy.needsFollowUpLabel} — ${copy.needsFollowUpDisabledReason}`
+              : copy.needsFollowUpLabel
+          }
           data-testid="ai-doctor-session-detail-review-needs-follow-up"
         >
-          Needs follow-up
+          {copy.needsFollowUpLabel}
         </Button>
         <Button
           type="button"
@@ -699,10 +714,27 @@ function SessionReviewActions({
           variant="ghost"
           onClick={() => handle("cleared")}
           disabled={disableClear}
+          title={copy.clearDisabledReason ?? undefined}
+          aria-label={
+            copy.clearDisabledReason
+              ? `${copy.clearLabel} — ${copy.clearDisabledReason}`
+              : copy.clearLabel
+          }
           data-testid="ai-doctor-session-detail-review-clear"
         >
-          Clear review status
+          {copy.clearLabel}
         </Button>
+      </div>
+      <div
+        className="space-y-0.5 text-[11px] leading-snug text-muted-foreground"
+        data-testid="ai-doctor-session-detail-review-helper"
+      >
+        <p data-testid="ai-doctor-session-detail-review-helper-append-only">
+          {copy.appendOnlyHelperText}
+        </p>
+        <p data-testid="ai-doctor-session-detail-review-helper-no-side-effects">
+          {copy.noSideEffectsHelperText}
+        </p>
       </div>
       {errorText ? (
         <p

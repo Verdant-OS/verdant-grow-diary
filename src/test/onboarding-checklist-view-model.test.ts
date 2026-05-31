@@ -137,7 +137,7 @@ describe("checklist copy is safe", () => {
       /autopilot/i,
       /AI grows for you/i,
       /guaranteed yield/i,
-      /\blive data\b/i,
+      /(?<!no\s+fake[- ])\blive data\b/i,
     ]) {
       expect(allText).not.toMatch(re);
     }

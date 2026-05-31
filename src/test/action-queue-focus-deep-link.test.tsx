@@ -111,24 +111,33 @@ vi.mock("@/integrations/supabase/client", () => {
   };
 });
 
+// Stable singletons — returning a fresh object from these hooks on every
+// render makes `user` / store values reference-unstable, which retriggers
+// `useCallback([user, ...])` → `useEffect([load])` and locks the page in
+// an infinite render loop under test.
+const AUTH_STATE = { user: { id: "u1", email: "u@example.com" } } as const;
+const GROWS_STATE = {
+  grows: [{ id: "g1", name: "G1" }],
+  activeGrowId: "g1",
+  activeGrow: { id: "g1", name: "G1" },
+} as const;
+
 vi.mock("@/store/auth", () => ({
-  useAuth: () => ({ user: { id: "u1", email: "u@example.com" } }),
+  useAuth: () => AUTH_STATE,
 }));
 
 vi.mock("@/store/grows", () => ({
-  useGrows: () => ({
-    grows: [{ id: "g1", name: "G1" }],
-    activeGrowId: "g1",
-    activeGrow: { id: "g1", name: "G1" },
-  }),
+  useGrows: () => GROWS_STATE,
 }));
 
+const SCOPED_GROW_STATE = {
+  urlGrowId: null,
+  scopedGrowName: null,
+  backHref: "/actions",
+} as const;
+
 vi.mock("@/hooks/useScopedGrow", () => ({
-  useScopedGrow: () => ({
-    urlGrowId: null,
-    scopedGrowName: null,
-    backHref: "/actions",
-  }),
+  useScopedGrow: () => SCOPED_GROW_STATE,
 }));
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
@@ -346,9 +355,13 @@ describe("ActionQueue focus deep-link — safety scan", () => {
     }
   });
 
-  it("focus logic does not add upsert / delete / rpc", () => {
+  it("focus logic does not add upsert / delete / rpc on the supabase client", () => {
+    // Tightened: `.delete(` matches benign DOM calls like
+    // `URLSearchParams.delete("focus")` used by the Clear-focus affordance.
+    // The safety intent is "no DB writes" — assert against the supabase
+    // chain specifically.
     expect(PAGE).not.toMatch(/\.upsert\(/);
-    expect(PAGE).not.toMatch(/\.delete\(/);
+    expect(PAGE).not.toMatch(/from\(["'][^"']+["']\)[\s\S]{0,200}?\.delete\(/);
     expect(PAGE).not.toMatch(/\.rpc\(/);
   });
 

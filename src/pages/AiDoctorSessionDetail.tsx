@@ -948,7 +948,16 @@ function SessionDetailBody({
 
       <SessionReviewStatusPanel sessionId={row.id} vm={reviewHistoryVm} />
 
-      <ReviewSummarySection vm={reviewVm} />
+      <ReviewSummarySection
+        vm={reviewVm}
+        session={{
+          id: row.id,
+          grow_id: row.grow_id,
+          tent_id: row.tent_id,
+          plant_id: row.plant_id,
+          diagnosis: d ? { riskLevel: d.riskLevel } : null,
+        }}
+      />
 
 
 

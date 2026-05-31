@@ -4,7 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import BrandLogo from "@/components/BrandLogo";
 import { useAuth } from "@/store/auth";
-import { ArrowRight, Bell, ClipboardList, FlaskConical, Leaf, Sparkles, Thermometer } from "lucide-react";
+import { ArrowRight, Bell, ClipboardList, FlaskConical, Leaf, Sparkles, Thermometer, CheckCircle2 } from "lucide-react";
+
+/** Contextual signup copy keyed by the demo write-action that was attempted. */
+const ACTION_PROMPTS: Record<string, string> = {
+  "Add log": "Create an account to save real diary entries.",
+  "Run AI Doctor": "Create an account to analyze your real grow context.",
+  "Add to Action Queue": "Create an account to manage real approval-required actions.",
+};
 
 /**
  * Public, unauthenticated Verdant demo dashboard.

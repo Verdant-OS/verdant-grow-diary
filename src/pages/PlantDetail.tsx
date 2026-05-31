@@ -15,6 +15,8 @@ import PlantRecentMoveCard from "@/components/PlantRecentMoveCard";
 import PlantAssignedTentAlertsPanel from "@/components/PlantAssignedTentAlertsPanel";
 import PlantAssignedTentActionsPanel from "@/components/PlantAssignedTentActionsPanel";
 import PlantStatusStrip from "@/components/PlantStatusStrip";
+import PlantQuickStatusStrip from "@/components/PlantQuickStatusStrip";
+
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
 import PlantAiDoctorSessionsPanel from "@/components/PlantAiDoctorSessionsPanel";
 import PlantPhoto from "@/components/PlantPhoto";
@@ -108,6 +110,14 @@ export default function PlantDetail() {
         metas={[plantMeta, tentMeta]}
         testId="plant-detail-data-source-disclosure"
       />
+      <PlantQuickStatusStrip
+        plantId={plant.id}
+        plantStartedAt={plant.startedAt}
+        stage={plant.stage}
+        tentId={plant.tentId ?? null}
+        growId={plant.growId ?? null}
+      />
+
       {!isActivePlant(plant) && (
         <ArchivedPlantBanner plantId={plant.id} lastNote={plant.lastNote} />
       )}

@@ -1,73 +1,59 @@
-# Verdant BuildOps Kit
+# Verdant
 
-**Version:** BuildOps Kit v0.1
+Verdant is a standalone Grow Room Operating System. It turns grow logs, plant photos, sensor readings, alerts, and AI-assisted analysis into safer grow decisions and better harvest outcomes.
 
-A documentation + fixtures + template package that keeps Verdant work scoped, safe, test-backed, and aligned with the One-Tent Loop.
+The current product priority is the V0 operating loop:
 
-This kit changes **no app behavior by itself**. It is read-context for humans and for tools like Lovable / Replit.
+Grow → Tent → Plant → Diary/Logs → Photo → Sensor Snapshot → AI Doctor → Alert/Recommendation → Approval-Required Action Queue
 
-## Purpose
+## Tech stack
 
-- Lock in canonical product context, data-labeling rules, and safety rules.
-- Provide reusable Lovable prompt scaffolds and a task template.
-- Provide demo and negative fixtures that follow a single contract.
-- Give every change a pass/fail QA regression checklist.
+- React + TypeScript + Vite
+- Tailwind CSS + shadcn/ui
+- Supabase (Auth, Database, Storage, Edge Functions) via Lovable Cloud
+- Vitest for tests
 
-## File map
+## Local setup
 
-- `/docs/glossary.md` — Canonical terms.
-- `/docs/data-labeling-spec.md` — The five states: demo, manual, live, stale, invalid.
-- `/docs/fixture-schema-contract.md` — Required fixture JSON shape.
-- `/docs/verdant-product-context.md` — Identity, mission, principles.
-- `/docs/one-tent-loop.md` — End-to-end operating loop.
-- `/docs/sensor-truth-rules.md` — How sensor readings must be treated.
-- `/docs/ai-doctor-output-contract.md` — 8 required AI Doctor output fields.
-- `/docs/action-queue-safety-rules.md` — Approval-required architecture.
-- `/docs/lovable-prompt-bank.md` — Reusable prompt scaffolds.
-- `/docs/qa-regression-checklist.md` — Pre-publish checklist.
-- `/fixtures/demo-grow-one-tent.json` — One-tent demo fixture.
-- `/fixtures/bad-sensor-data-examples.json` — Negative sensor examples.
-- `/fixtures/demo-ai-doctor-cases.json` — AI Doctor fixture cases.
-- `/templates/lovable-task-template.md` — Reusable task template.
-- `/README.md` — This file.
+```bash
+npm install
+npm run dev
+```
 
-## Read order
+The dev server runs Vite. Open the URL it prints.
 
-1. `/README.md`
-2. `/docs/glossary.md`
-3. `/docs/verdant-product-context.md`
-4. `/docs/one-tent-loop.md`
-5. `/docs/data-labeling-spec.md`
-6. `/docs/sensor-truth-rules.md`
-7. `/docs/ai-doctor-output-contract.md`
-8. `/docs/action-queue-safety-rules.md`
-9. `/docs/fixture-schema-contract.md`
-10. `/fixtures/demo-grow-one-tent.json`
-11. `/fixtures/bad-sensor-data-examples.json`
-12. `/fixtures/demo-ai-doctor-cases.json`
-13. `/docs/lovable-prompt-bank.md`
-14. `/docs/qa-regression-checklist.md`
-15. `/templates/lovable-task-template.md`
+## Environment variables
 
-## How Lovable / Replit should use this kit
+Lovable Cloud auto-manages the `.env` file. Do not edit it by hand. Variables provided:
 
-1. Start every new task by loading `/templates/lovable-task-template.md`.
-2. Fill the template using the relevant scaffold from `/docs/lovable-prompt-bank.md`.
-3. Always load `/docs/glossary.md`, `/docs/verdant-product-context.md`, and `/docs/data-labeling-spec.md` as base context.
-4. Before publishing, run `/docs/qa-regression-checklist.md` and return the result.
-5. Fixtures are read-only inputs to demos and tests. They are not seeds for live tables.
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+- `VITE_SUPABASE_PROJECT_ID`
 
-## Hard safety rules
+Additional secrets (API keys for edge functions, third-party services) are configured via Lovable Cloud secrets — never commit secrets to the repo.
 
-- No fake live data. Use the five states: demo, manual, live, stale, invalid.
+## Tests
+
+```bash
+npx vitest run         # full suite
+npx vitest             # watch mode
+```
+
+## Safety philosophy
+
+Verdant follows a read-only, no-write, no-control architecture for advisory surfaces:
+
+- No fake live data. Sensor readings are labeled `demo`, `manual`, `live`, `stale`, or `invalid`.
 - No blind automation. AI suggests; the grower approves.
-- No device control. Verdant runs a read-only, no-write, no-control architecture for advisory surfaces.
-- No Next Door Cannabis branding or references. Verdant is standalone.
-- No executable hardware commands, relay payloads, or auto-execute language.
-- No production data seeding from this kit.
-- No fixture data inserted into live app tables.
-- No secrets, tokens, API keys, or real customer data in any file.
+- No device control from advisory surfaces. The Action Queue is approval-required.
+- Ownership is enforced server-side via Supabase RLS — never trust client-provided `user_id`.
+- No `service_role` keys in client code.
 
-## Note
+See `docs/buildops-kit/README.md` for the full BuildOps Kit covering product context, data-labeling, fixture contracts, AI Doctor output rules, Action Queue safety, prompt scaffolds, and the QA regression checklist.
 
-This kit is documentation + fixtures only. It changes no app behavior. Any code, schema, or UI change must be its own scoped task using `/templates/lovable-task-template.md`.
+## Documentation
+
+- [BuildOps Kit](docs/buildops-kit/README.md) — product context, safety rules, fixtures, templates
+- [Glossary](docs/glossary.md)
+- [One-Tent Loop](docs/one-tent-loop.md)
+- [QA regression checklist](docs/qa-regression-checklist.md)

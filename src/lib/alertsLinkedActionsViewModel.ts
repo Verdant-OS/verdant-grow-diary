@@ -10,10 +10,7 @@
  *    receive only the parsed alert id and action id.
  *  - Deterministic, null-safe parsing via the shared provenance helper.
  */
-import {
-  extractSourceAlertId,
-  TERMINAL_STATUSES_LITERAL,
-} from "@/lib/actionQueueProvenanceRules";
+import { extractSourceAlertId } from "@/lib/actionQueueProvenanceRules";
 
 /** Mirrors the canonical TERMINAL_STATUSES list to avoid a circular import. */
 const TERMINAL_SET = new Set<string>(["completed", "rejected", "cancelled"]);

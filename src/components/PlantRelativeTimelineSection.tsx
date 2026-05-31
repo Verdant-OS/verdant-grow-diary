@@ -7,9 +7,11 @@
  * control. No reminder scheduling. No calendar event tables.
  */
 import { useState } from "react";
-import { Camera, Gauge, NotebookPen, Sprout } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Camera, Gauge, ImageUp, NotebookPen, Sprout } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import {
@@ -27,6 +29,10 @@ import {
   type RelativeTimelineFilterKey,
   type RelativeTimelineItem,
 } from "@/lib/relativeTimelineProjectionRules";
+import {
+  buildRelativeTimelineEmptyState,
+  type RelativeTimelineCta,
+} from "@/lib/relativeTimelineEmptyStateRules";
 
 
 
@@ -40,7 +46,82 @@ interface Props {
   plantName?: string | null;
   tentName?: string | null;
   growName?: string | null;
+  /** Optional IDs used by the empty-state CTAs to preserve context. */
+  growId?: string | null;
+  tentId?: string | null;
 }
+
+function CtaIcon({ kind }: { kind: RelativeTimelineCta["key"] }) {
+  if (kind === "manual-snapshot") return <Gauge className="h-4 w-4" aria-hidden />;
+  if (kind === "photo") return <ImageUp className="h-4 w-4" aria-hidden />;
+  return <NotebookPen className="h-4 w-4" aria-hidden />;
+}
+
+function TimelineEmptyStateCta({ cta }: { cta: RelativeTimelineCta }) {
+  const testId = `relative-timeline-empty-cta-${cta.key}`;
+  const baseClass =
+    "w-full sm:w-auto min-h-[40px] gap-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1";
+  if (cta.disabled) {
+    return (
+      <div className="flex flex-col gap-1 w-full sm:w-auto">
+        <Button
+          type="button"
+          variant="outline"
+          disabled
+          aria-disabled
+          data-testid={testId}
+          data-disabled="true"
+          className={baseClass}
+        >
+          <CtaIcon kind={cta.key} /> {cta.label}
+        </Button>
+        {cta.disabledReason && (
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid={`${testId}-reason`}
+          >
+            {cta.disabledReason}
+          </p>
+        )}
+      </div>
+    );
+  }
+  if (cta.mode === "route" && cta.route) {
+    return (
+      <Button
+        asChild
+        variant={cta.key === "quicklog" ? "default" : "outline"}
+        data-testid={testId}
+        data-mode="route"
+        data-route={cta.route}
+        className={baseClass}
+      >
+        <Link to={cta.route}>
+          <CtaIcon kind={cta.key} /> {cta.label}
+        </Link>
+      </Button>
+    );
+  }
+  return (
+    <Button
+      type="button"
+      variant={cta.key === "quicklog" ? "default" : "outline"}
+      onClick={() => {
+        if (cta.mode !== "event" || !cta.eventName) return;
+        window.dispatchEvent(
+          new CustomEvent(cta.eventName, { detail: cta.eventDetail ?? null }),
+        );
+      }}
+      data-testid={testId}
+      data-mode="event"
+      data-event-name={cta.eventName ?? ""}
+      className={baseClass}
+    >
+      <CtaIcon kind={cta.key} /> {cta.label}
+    </Button>
+  );
+}
+
 
 
 function SourceIcon({ source }: { source: RelativeTimelineItem["source"] }) {

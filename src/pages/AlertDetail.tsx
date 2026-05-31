@@ -241,6 +241,41 @@ export default function AlertDetail() {
     };
   }, [alert]);
 
+  // Read-only: find AI Doctor-derived Action Queue rows linked to this alert
+  // via the `[alert:<id>]` back-pointer, then extract safe AI Doctor session
+  // ids for grower-facing back-link navigation. No writes, no token leak.
+  useEffect(() => {
+    let cancelled = false;
+    setLinkedAiDoctorSessionIds([]);
+    if (!alert || !alert.grow_id) return;
+    (async () => {
+      const { data, error: linkErr } = await supabase
+        .from("action_queue")
+        .select("id,source,reason,status")
+        .eq("grow_id", alert.grow_id)
+        .eq("source", ACTION_QUEUE_SOURCE_VALUES.AI_DOCTOR)
+        .like("reason", `%[alert:${alert.id}]%`)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (cancelled || linkErr) return;
+      const rows = (data ?? []) as Array<{ source: string | null; reason: string | null }>;
+      const seen = new Set<string>();
+      const sessionIds: string[] = [];
+      for (const r of rows) {
+        if (!isAiDoctorDerived(r)) continue;
+        const sid = extractSourceAiDoctorSessionId(r.reason);
+        if (sid && !seen.has(sid)) {
+          seen.add(sid);
+          sessionIds.push(sid);
+        }
+      }
+      setLinkedAiDoctorSessionIds(sessionIds);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [alert]);
+
   // Read-only outcome rollup: grower-recorded action_outcome diary entries
   // tied to this alert via details.source_alert_id. RLS handles ownership.
   // No user_id in payloads. No inserts/updates/deletes.

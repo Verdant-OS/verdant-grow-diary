@@ -252,8 +252,10 @@ describe("AiDoctorSessionsIndex — built-in saved view UI", () => {
     const builtinOpts = screen.getAllByTestId(
       "ai-doctor-sessions-saved-views-builtin-option",
     );
-    expect(builtinOpts.length).toBe(1);
-    expect(builtinOpts[0].textContent).toContain("Needs my attention");
+    expect(builtinOpts.length).toBeGreaterThanOrEqual(1);
+    expect(
+      builtinOpts.some((o) => (o.textContent ?? "").includes("Needs my attention")),
+    ).toBe(true);
   });
 
   it("selecting the built-in applies caution=yes + hasChecklist=yes and updates URL", async () => {

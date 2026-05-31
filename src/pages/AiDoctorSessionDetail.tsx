@@ -693,6 +693,13 @@ function SessionDetailBody({
     displayedConfidence: row.displayed_confidence,
     suggestedActions: actions,
   });
+  const reviewsQuery = useAiDoctorSessionReviews([row.id]);
+  const reviewState = reviewsQuery.data?.stateBySession.get(row.id) ?? null;
+  const reviewHistoryVm = buildSessionReviewHistoryViewModel(
+    reviewsQuery.data?.events ?? [],
+    reviewState,
+  );
+
 
   return (
     <div className="space-y-4">

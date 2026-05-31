@@ -55,6 +55,7 @@ const App = () => (
             <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/welcome" element={<Landing />} />
+              <Route path="/demo" element={<Demo />} />
               <Route path="/hardware-integrations" element={<HardwareIntegrations />} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/billing/:plan" element={<BillingPlaceholder />} />

@@ -515,7 +515,7 @@ export default function ActionQueue() {
                       </span>
                     </div>
                     <p className="text-sm mt-1">{row.suggested_change}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{row.reason}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{stripBackPointerTokens(row.reason)}</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 mt-3">

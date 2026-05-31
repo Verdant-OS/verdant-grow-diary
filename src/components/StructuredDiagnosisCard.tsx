@@ -298,10 +298,14 @@ export default function StructuredDiagnosisCard({
             {diagnosis.suggestedActions.map((a, i) => {
               const isQueued = queuedIdx.has(i);
               const isBusy = busyIdx === i;
+              const linkedMatch = aiDoctorSessionId
+                ? findLinkedActionForSuggestion(linkedActions.items, a)
+                : null;
               return (
                 <li
                   key={i}
                   data-testid={`${testId}-suggested-action-${i}`}
+                  data-linked-action-queue-id={linkedMatch?.id ?? undefined}
                   className="rounded-lg border border-border/40 bg-secondary/10 p-2 space-y-1"
                 >
                   <div className="flex items-start gap-2">

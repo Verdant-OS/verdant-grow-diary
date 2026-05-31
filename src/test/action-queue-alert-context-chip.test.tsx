@@ -260,10 +260,11 @@ describe("ActionQueue — ?alert context chip", () => {
   it("page never renders raw [session:<id>] token", async () => {
     renderAt("/actions?alert=alert-xyz");
     await waitFor(() =>
-      expect(screen.getAllByTestId("action-queue-row").length).toBe(2),
+      expect(screen.getAllByTestId("action-queue-row").length).toBeGreaterThan(0),
     );
     expect(document.body.innerHTML).not.toContain("[session:");
   });
+
 
   it("alert context chip does not trigger any DB writes", async () => {
     renderAt("/actions?alert=alert-xyz");

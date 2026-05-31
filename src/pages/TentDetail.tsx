@@ -50,6 +50,8 @@ import {
   environmentMetricChipStatus,
 } from "@/lib/environmentStageTargetRules";
 import { cn } from "@/lib/utils";
+import FirstPlantMemoryCta from "@/components/FirstPlantMemoryCta";
+import { buildPlantQuickLogPrefill } from "@/lib/plantQuickLogPrefillRules";
 
 import { plantDetailPath, tentsPath } from "@/lib/routes";
 

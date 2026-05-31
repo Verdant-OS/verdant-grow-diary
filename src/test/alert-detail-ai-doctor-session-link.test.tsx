@@ -112,6 +112,18 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
 
+vi.mock("@/store/grows", () => ({
+  useGrows: () => ({
+    grows: [{ id: "g1", name: "G1" }],
+    activeGrowId: "g1",
+    activeGrow: { id: "g1", name: "G1" },
+  }),
+}));
+
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: { id: "u1", email: "u@example.com" } }),
+}));
+
 beforeEach(() => {
   actionQueueRows = [];
 });

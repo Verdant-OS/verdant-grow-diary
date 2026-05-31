@@ -235,7 +235,8 @@ export default function Dashboard() {
         description="Live status across every tent, plant, and sensor."
         icon={<Sparkles className="h-5 w-5" />}
         actions={
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <OnboardingProgressPill vm={onboardingVm} />
             <Button asChild variant="outline" data-testid="dashboard-daily-grow-check-entry">
               <Link to="/daily-check">Daily Grow Check</Link>
             </Button>

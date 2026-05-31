@@ -15,8 +15,7 @@
  *  - "Record outcome" links to the Dashboard pending-outcome reviews flow,
  *    which is the existing surface for capturing action outcomes. When no
  *    such surface is available the entry is omitted (graceful fallback).
- *  - Copy is observational: no autopilot / control / guaranteed / fixed
- *    language.
+ *  - Copy is observational and avoids control / certainty language.
  */
 import {
   alertsPath,

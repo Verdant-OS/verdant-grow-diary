@@ -35,10 +35,13 @@ interface Props {
   stageStartedAt?: string | number | Date | null;
 }
 
+// Sensor source entries on this surface always originate from QuickLog
+// manual snapshots — there is no live-stream rendering path here. Label
+// them "Manual" so they are never confused with a live sensor feed.
 const SOURCE_LABEL: Record<RelativeTimelineItem["source"], string> = {
   note: "Note",
   photo: "Photo",
-  sensor: "Sensor",
+  sensor: "Manual",
 };
 
 function SourceIcon({ source }: { source: RelativeTimelineItem["source"] }) {

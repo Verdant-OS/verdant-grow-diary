@@ -39,6 +39,8 @@ import {
   useMarkAiDoctorSessionReview,
 } from "@/hooks/useMarkAiDoctorSessionReview";
 import { plantDetailPath, tentDetailPath } from "@/lib/routes";
+import { AiDoctorSessionActionQueueButton } from "@/components/AiDoctorSessionActionQueueButton";
+import type { AiDoctorSessionLike } from "@/lib/aiDoctorSessionToActionQueueRules";
 
 async function copyPlainText(text: string): Promise<boolean> {
   try {

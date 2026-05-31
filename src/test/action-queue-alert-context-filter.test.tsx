@@ -276,12 +276,39 @@ describe("ActionQueue — client-side ?alert filter", () => {
     expect(screen.queryByTestId("action-queue-alert-context-chip")).toBeNull();
   });
 
-  it("renders '0 actions linked to this alert' empty state when no rows match", async () => {
+  it("renders 'No actions linked to this alert yet.' title when no rows match", async () => {
     renderAt("/actions?alert=unknown-alert");
-    const empty = await screen.findByTestId("action-queue-alert-context-empty");
-    expect(empty.textContent).toContain("0 actions linked to this alert");
+    const title = await screen.findByTestId(
+      "action-queue-alert-context-empty-title",
+    );
+    expect(title.textContent).toBe("No actions linked to this alert yet.");
     expect(visibleRowIds()).toEqual([]);
   });
+
+  it("renders helper text under the alert-filtered empty state", async () => {
+    renderAt("/actions?alert=unknown-alert");
+    const help = await screen.findByTestId(
+      "action-queue-alert-context-empty-help",
+    );
+    expect(help.textContent).toBe(
+      "Review the alert detail and add a suggested action when appropriate.",
+    );
+  });
+
+  it("alert-filtered empty state includes a 'Back to alert' link", async () => {
+    renderAt("/actions?alert=unknown-alert");
+    const back = await screen.findByTestId(
+      "action-queue-alert-context-empty-back-link",
+    );
+    expect(back.getAttribute("href")).toBe("/alerts/unknown-alert");
+  });
+
+  it("invalid/unsafe alert param does not show the alert-filtered empty state", async () => {
+    renderAt("/actions?alert=%5Balert%3Afoo%5D");
+    await waitFor(() => expect(visibleRowIds().length).toBe(4));
+    expect(screen.queryByTestId("action-queue-alert-context-empty")).toBeNull();
+  });
+
 
   it("does not render the alert-empty state when ?alert is absent", async () => {
     renderAt("/actions");

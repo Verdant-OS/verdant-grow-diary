@@ -112,3 +112,36 @@ export function buildAiDoctorSessionLinkedActionsViewModel(
     hasMultiple: items.length > 1,
   };
 }
+
+/**
+ * Pure suggestion ↔ linked-action matcher.
+ *
+ * Returns the first LinkedActionItem whose `suggested_change` or sanitized
+ * reason text contains the normalized suggestion title.
+ *
+ * Deterministic, null-safe, no I/O. Returns null when no usable title is
+ * present or no item matches.
+ */
+export interface SuggestionTitleLike {
+  title?: string | null;
+}
+
+function normalizeForMatch(value: string | null | undefined): string {
+  return (value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+export function findLinkedActionForSuggestion(
+  items: ReadonlyArray<LinkedActionItem> | null | undefined,
+  suggestion: SuggestionTitleLike | null | undefined,
+): LinkedActionItem | null {
+  if (!items || items.length === 0 || !suggestion) return null;
+  const title = normalizeForMatch(suggestion.title);
+  if (!title) return null;
+  for (const item of items) {
+    const change = normalizeForMatch(item.suggestedChange);
+    if (change && change.includes(title)) return item;
+    const reason = normalizeForMatch(item.reasonText);
+    if (reason && reason.includes(title)) return item;
+  }
+  return null;
+}

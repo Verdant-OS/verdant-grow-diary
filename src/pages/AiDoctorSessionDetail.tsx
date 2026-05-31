@@ -605,6 +605,108 @@ function SessionReviewStatusPanel({
           </ul>
         )}
       </div>
+      <SessionReviewActions sessionId={sessionId} status={vm.status} />
+    </div>
+  );
+}
+
+function SessionReviewActions({
+  sessionId,
+  status,
+}: {
+  sessionId: string;
+  status: AiDoctorSessionReviewHistoryViewModel["status"];
+}) {
+  const [note, setNote] = useState("");
+  const [errorText, setErrorText] = useState<string | null>(null);
+  const mutation = useMarkAiDoctorSessionReview();
+  const submitting = mutation.isPending;
+
+  const handle = async (
+    eventType: "marked_reviewed" | "needs_follow_up" | "cleared",
+  ) => {
+    setErrorText(null);
+    try {
+      await mutation.mutateAsync({
+        sessionId,
+        eventType,
+        note: note.length > 0 ? note : null,
+      });
+      setNote("");
+    } catch (e) {
+      const message =
+        e instanceof Error && e.message ? e.message : "Could not save review event.";
+      setErrorText(message);
+    }
+  };
+
+  const disableMarkReviewed = submitting || status === "reviewed";
+  const disableNeedsFollowUp = submitting || status === "needs_follow_up";
+  const disableClear = submitting || status === "not_reviewed";
+
+  return (
+    <div
+      className="mt-3 space-y-2 border-t pt-3"
+      data-testid="ai-doctor-session-detail-review-status-actions"
+    >
+      <label
+        className="block text-xs font-medium text-muted-foreground"
+        htmlFor={`review-note-${sessionId}`}
+      >
+        Note (optional)
+      </label>
+      <textarea
+        id={`review-note-${sessionId}`}
+        value={note}
+        onChange={(e) => setNote(e.target.value.slice(0, REVIEW_NOTE_MAX_LENGTH))}
+        rows={2}
+        maxLength={REVIEW_NOTE_MAX_LENGTH}
+        placeholder="Add context for this review event…"
+        className="w-full rounded-md border bg-background px-2 py-1.5 text-xs"
+        data-testid="ai-doctor-session-detail-review-status-note-input"
+        disabled={submitting}
+      />
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => handle("marked_reviewed")}
+          disabled={disableMarkReviewed}
+          data-testid="ai-doctor-session-detail-review-mark-reviewed"
+        >
+          Mark reviewed
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => handle("needs_follow_up")}
+          disabled={disableNeedsFollowUp}
+          data-testid="ai-doctor-session-detail-review-needs-follow-up"
+        >
+          Needs follow-up
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={() => handle("cleared")}
+          disabled={disableClear}
+          data-testid="ai-doctor-session-detail-review-clear"
+        >
+          Clear review status
+        </Button>
+      </div>
+      {errorText ? (
+        <p
+          className="text-xs text-destructive"
+          role="alert"
+          data-testid="ai-doctor-session-detail-review-error"
+        >
+          {errorText}
+        </p>
+      ) : null}
     </div>
   );
 }

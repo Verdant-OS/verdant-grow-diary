@@ -34,11 +34,16 @@ const base: ReportsReviewQueueInput = {
   growId: "grow-1",
   pendingOutcomeReviewCount: 0,
   firstPendingActionId: null,
+  oldestPendingCompletedAt: null,
   alertsOpen: 0,
   firstOpenAlertId: null,
+  firstOpenAlertSeverity: null,
+  firstOpenAlertCreatedAt: null,
   latestSensorCapturedAt: new Date(NOW - 60_000).toISOString(),
   recentSensorReadingCount: 5,
   lowSampleLearningGroups: 0,
+  lowSampleSmallestCount: null,
+  lowSampleThreshold: 3,
   now: NOW,
 };
 

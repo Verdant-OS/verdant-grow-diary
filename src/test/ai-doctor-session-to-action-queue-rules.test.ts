@@ -123,10 +123,10 @@ describe("aiDoctorSessionToActionQueueRules — buildActionQueueDraftFromAiDocto
   it("rejects empty title and empty detail", () => {
     const rTitle = buildActionQueueDraftFromAiDoctorSession(baseSession, { ...baseAction, title: " " });
     expect(rTitle.ok).toBe(false);
-    if (!rTitle.ok) expect(rTitle.reason).toBe("missing_title");
+    expect((rTitle as { ok: false; reason: string }).reason).toBe("missing_title");
     const rDetail = buildActionQueueDraftFromAiDoctorSession(baseSession, { ...baseAction, detail: "" });
     expect(rDetail.ok).toBe(false);
-    if (!rDetail.ok) expect(rDetail.reason).toBe("missing_detail");
+    expect((rDetail as { ok: false; reason: string }).reason).toBe("missing_detail");
   });
 
   it("rejects device-control language in any field", () => {
@@ -135,7 +135,7 @@ describe("aiDoctorSessionToActionQueueRules — buildActionQueueDraftFromAiDocto
       detail: "Switch off the exhaust fan at night.",
     });
     expect(rDetail.ok).toBe(false);
-    if (!rDetail.ok) expect(rDetail.reason).toBe("device_control_language");
+    expect((rDetail as { ok: false; reason: string }).reason).toBe("device_control_language");
 
     const rTitle = buildActionQueueDraftFromAiDoctorSession(baseSession, {
       ...baseAction,

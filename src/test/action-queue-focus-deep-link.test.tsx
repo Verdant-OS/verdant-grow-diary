@@ -355,9 +355,13 @@ describe("ActionQueue focus deep-link — safety scan", () => {
     }
   });
 
-  it("focus logic does not add upsert / delete / rpc", () => {
+  it("focus logic does not add upsert / delete / rpc on the supabase client", () => {
+    // Tightened: `.delete(` matches benign DOM calls like
+    // `URLSearchParams.delete("focus")` used by the Clear-focus affordance.
+    // The safety intent is "no DB writes" — assert against the supabase
+    // chain specifically.
     expect(PAGE).not.toMatch(/\.upsert\(/);
-    expect(PAGE).not.toMatch(/\.delete\(/);
+    expect(PAGE).not.toMatch(/from\(["'][^"']+["']\)[\s\S]{0,200}?\.delete\(/);
     expect(PAGE).not.toMatch(/\.rpc\(/);
   });
 

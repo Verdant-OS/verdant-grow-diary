@@ -39,6 +39,8 @@ import {
   useMarkAiDoctorSessionReview,
 } from "@/hooks/useMarkAiDoctorSessionReview";
 import { plantDetailPath, tentDetailPath } from "@/lib/routes";
+import { AiDoctorSessionActionQueueButton } from "@/components/AiDoctorSessionActionQueueButton";
+import type { AiDoctorSessionLike } from "@/lib/aiDoctorSessionToActionQueueRules";
 
 async function copyPlainText(text: string): Promise<boolean> {
   try {
@@ -212,7 +214,13 @@ const RISK_TONE_CLASSES: Record<ReviewRiskTone, string> = {
   danger: "border-destructive/50 bg-destructive/5",
 };
 
-function ReviewSummarySection({ vm }: { vm: ReviewSummaryViewModel }) {
+function ReviewSummarySection({
+  vm,
+  session,
+}: {
+  vm: ReviewSummaryViewModel;
+  session?: AiDoctorSessionLike;
+}) {
   return (
     <section
       data-testid="ai-doctor-session-detail-review-summary"
@@ -295,11 +303,18 @@ function ReviewSummarySection({ vm }: { vm: ReviewSummaryViewModel }) {
                 {a.detail ? (
                   <span className="text-muted-foreground"> — {a.detail}</span>
                 ) : null}
+                {session ? (
+                  <AiDoctorSessionActionQueueButton
+                    session={session}
+                    action={a}
+                  />
+                ) : null}
               </li>
             ))}
           </ul>
         )}
       </div>
+
 
       <ReviewList
         title="What not to do"
@@ -933,7 +948,16 @@ function SessionDetailBody({
 
       <SessionReviewStatusPanel sessionId={row.id} vm={reviewHistoryVm} />
 
-      <ReviewSummarySection vm={reviewVm} />
+      <ReviewSummarySection
+        vm={reviewVm}
+        session={{
+          id: row.id,
+          grow_id: row.grow_id,
+          tent_id: row.tent_id,
+          plant_id: row.plant_id,
+          diagnosis: d ? { riskLevel: d.riskLevel } : null,
+        }}
+      />
 
 
 

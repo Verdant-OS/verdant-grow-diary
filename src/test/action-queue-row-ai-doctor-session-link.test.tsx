@@ -171,7 +171,7 @@ describe("Action Queue row — Linked from AI Doctor affordance", () => {
     expect(chip.textContent ?? "").toMatch(/linked from ai doctor/i);
   });
 
-  it("renders 'View AI Doctor session' anchor with the route helper href", async () => {
+  it("renders 'View saved AI Doctor session' anchor with the route helper href", async () => {
     renderList();
     await waitFor(() =>
       expect(screen.getAllByTestId("action-queue-row").length).toBeGreaterThan(0),
@@ -181,8 +181,20 @@ describe("Action Queue row — Linked from AI Doctor affordance", () => {
       '[data-testid="action-queue-row-ai-doctor-session-link-anchor"]',
     ) as HTMLAnchorElement;
     expect(anchor).toBeTruthy();
-    expect(anchor.textContent ?? "").toBe("View AI Doctor session");
+    expect(anchor.textContent ?? "").toBe("View saved AI Doctor session");
     expect(anchor.getAttribute("href")).toBe(aiDoctorSessionDetailPath("sess-abc"));
+  });
+
+  it("no longer renders the legacy 'View AI Doctor session' label on the row", async () => {
+    renderList();
+    await waitFor(() =>
+      expect(screen.getAllByTestId("action-queue-row").length).toBeGreaterThan(0),
+    );
+    const row = document.querySelector('[data-action-id="aq-ai-1"]') as HTMLElement;
+    const anchor = row.querySelector(
+      '[data-testid="action-queue-row-ai-doctor-session-link-anchor"]',
+    ) as HTMLAnchorElement;
+    expect((anchor.textContent ?? "").trim()).not.toBe("View AI Doctor session");
   });
 
   it("does not render the affordance when AI Doctor row lacks a session id", async () => {

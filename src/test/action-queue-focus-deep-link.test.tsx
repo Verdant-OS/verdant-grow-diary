@@ -275,11 +275,12 @@ describe("ActionQueue — focus chip + Clear focus", () => {
     await waitFor(() =>
       expect(screen.queryByTestId("action-queue-focus-chip")).toBeNull(),
     );
-    const url = window.location.search;
+    const url = screen.getByTestId("loc-search").textContent ?? "";
     expect(url).not.toContain("focus=");
     expect(url).toContain("growId=g1");
     expect(url).toContain("page=2");
     expect(url).toContain("q=mold");
+
   });
 
   it("Clear focus works safely for an unknown focus id", async () => {

@@ -108,6 +108,7 @@ export default function AlertDetail() {
   const [relatedActions, setRelatedActions] = useState<RelatedActionRow[]>([]);
   const [relatedLoaded, setRelatedLoaded] = useState(false);
   const [outcomeRows, setOutcomeRows] = useState<RawOutcomeDiaryRow[]>([]);
+  const [linkedAiDoctorSessionIds, setLinkedAiDoctorSessionIds] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     if (!alertId) return;

@@ -65,6 +65,11 @@ export default function Coach() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [queuedIdx, setQueuedIdx] = useState<Set<number>>(new Set());
   const [queuingIdx, setQueuingIdx] = useState<number | null>(null);
+  // Persisted AI Doctor session id for the *currently rendered* diagnosis.
+  // Reset whenever a new ask() starts; only applied if the persistence
+  // result still belongs to the most recent diagnosis (race-safe).
+  const [persistedSessionId, setPersistedSessionId] = useState<string | null>(null);
+  const diagnosisSeqRef = useRef(0);
 
   // --- Real grow context for AI sufficiency evaluation (presenter only) ---
   const { data: ctxPlants = [] } = useGrowPlants(undefined, activeGrowId ?? undefined);

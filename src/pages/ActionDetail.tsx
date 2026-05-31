@@ -506,6 +506,26 @@ export default function ActionDetail() {
         </div>
         <h1 className="text-xl font-display font-bold">{row.suggested_change}</h1>
         <p className="text-sm text-muted-foreground mt-1">{stripBackPointerTokens(row.reason)}</p>
+        {isAiDoctorDerived(row) &&
+          (() => {
+            const headerSessionId = extractSourceAiDoctorSessionId(row.reason);
+            if (!headerSessionId) return null;
+            return (
+              <p
+                className="mt-2 inline-flex items-center gap-2 text-xs text-muted-foreground"
+                data-testid="action-detail-ai-doctor-session-header-link"
+              >
+                <span>Linked from AI Doctor</span>
+                <Link
+                  to={aiDoctorSessionDetailPath(headerSessionId)}
+                  className="text-primary hover:underline"
+                  data-testid="action-detail-ai-doctor-session-header-link-anchor"
+                >
+                  View AI Doctor session
+                </Link>
+              </p>
+            );
+          })()}
 
         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
           <IdField label="Grow" id={row.grow_id} to={growDetailPath(row.grow_id)} />

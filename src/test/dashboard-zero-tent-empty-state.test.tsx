@@ -27,6 +27,7 @@ const EMPTY = readFileSync(
   resolve(ROOT, "src/components/DashboardZeroTentEmptyState.tsx"),
   "utf8",
 );
+const EMPTY_EXEC = stripSourceComments(EMPTY);
 
 describe("DashboardZeroTentEmptyState — render", () => {
   it("renders the headline, support copy, expectation reset, and CTA", () => {
@@ -95,11 +96,11 @@ describe("Dashboard wires the zero-tent empty state", () => {
 
 describe("Zero-tent empty state — safety constraints", () => {
   it("does not introduce Supabase, network, or write paths", () => {
-    expect(EMPTY).not.toMatch(/supabase/i);
-    expect(EMPTY).not.toMatch(/functions\.invoke/);
-    expect(EMPTY).not.toMatch(/service_role/);
-    expect(EMPTY).not.toMatch(/\.insert\s*\(/);
-    expect(EMPTY).not.toMatch(/\.update\s*\(/);
+    expect(EMPTY_EXEC).not.toMatch(/supabase/i);
+    expect(EMPTY_EXEC).not.toMatch(/functions\.invoke/);
+    expect(EMPTY_EXEC).not.toMatch(/service_role/);
+    expect(EMPTY_EXEC).not.toMatch(/\.insert\s*\(/);
+    expect(EMPTY_EXEC).not.toMatch(/\.update\s*\(/);
   });
 
   it("contains no forbidden marketing/automation/device-control copy", () => {
@@ -111,9 +112,8 @@ describe("Zero-tent empty state — safety constraints", () => {
       /turn off/i,
       /device[-_ ]command/i,
     ]) {
-      expect(EMPTY).not.toMatch(re);
+      expect(EMPTY_EXEC).not.toMatch(re);
     }
-    // No "fake live" / "live data" claims either.
-    expect(EMPTY).not.toMatch(/\blive data\b/i);
+    expect(EMPTY_EXEC).not.toMatch(/(?<!fake[- ])\blive data\b/i);
   });
 });

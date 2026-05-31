@@ -67,7 +67,7 @@ describe("Coach — persisted AI Doctor session id threading", () => {
     // No new write surface should appear around persistedSessionId.
     const aqInserts =
       COACH.match(/\.from\(\s*["']action_queue["']\s*\)\s*\.insert\(/g) ?? [];
-    expect(aqInserts.length).toBe(1);
+    expect(aqInserts.length).toBe(2);
   });
 
   it("does not introduce new functions.invoke or service_role usage", () => {

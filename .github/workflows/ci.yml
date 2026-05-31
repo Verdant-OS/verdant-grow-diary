@@ -47,6 +47,11 @@ jobs:
       - name: Sensor safety tests (CSV + manual freshness/delta)
         run: bun run test:sensor-safety
 
+      # Stop-ship: Action Queue provenance + alert/session token leak
+      # static-safety scans must pass on every PR.
+      - name: Static safety scans (Action Queue provenance + chip)
+        run: bun run test:static-safety
+
       - name: Full test suite
         run: bunx vitest run
 

@@ -99,15 +99,13 @@ describe("aiDoctorSessionToActionQueueRules — buildActionQueueDraftFromAiDocto
 
   it("rejects null/empty grow_id", () => {
     const r = buildActionQueueDraftFromAiDoctorSession({ ...baseSession, grow_id: null }, baseAction);
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
+    if (r.ok) throw new Error("expected failure");
     expect(r.reason).toBe("missing_grow_id");
   });
 
   it("rejects missing session id", () => {
     const r = buildActionQueueDraftFromAiDoctorSession({ ...baseSession, id: "" }, baseAction);
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
+    if (r.ok) throw new Error("expected failure");
     expect(r.reason).toBe("missing_session_id");
   });
 

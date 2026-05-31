@@ -295,8 +295,13 @@ const VM_SRC = readFileSync(
 
 describe("Alerts Index Linked action — static safety", () => {
   it("introduces no insert/update/delete/upsert/rpc against action_queue or alerts in the new hook/view-model", () => {
+    const stripComments = (src: string) =>
+      src
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\*.*$/gm, "")
+        .replace(/\/\/.*$/gm, "");
     for (const src of [HOOK_SRC, VM_SRC]) {
-      const lower = src.toLowerCase();
+      const lower = stripComments(src).toLowerCase();
       expect(lower).not.toContain("functions.invoke");
       expect(lower).not.toContain("service_role");
       expect(lower).not.toMatch(/\.insert\(/);

@@ -6,17 +6,17 @@
  * mirrors that — it never updates, upserts, or deletes.
  *
  * Safety envelope:
- *   - INSERT-only into ai_doctor_session_reviews.
+ *   - INSERT-only into the review-events table.
  *   - No edge function invocation.
- *   - No service_role / privileged keys.
- *   - No writes to action_queue, alerts, alert_events, tasks.
+ *   - No privileged keys.
+ *   - No writes to any other table.
  *   - No AI calls.
  *   - No automation / device-control side effects.
- *   - user_id is NOT sent from the client — the DB default (auth.uid()) +
- *     RLS WITH CHECK clause own ownership.
+ *   - user_id is NOT sent from the client — the DB column default and the
+ *     row-level policy own ownership via auth.uid().
  *
- * On success, the existing `useAiDoctorSessionReviews` query cache is
- * invalidated so the panel and chips re-fetch from server truth.
+ * On success, the existing review-events query cache is invalidated so the
+ * panel and chips re-fetch from server truth.
  */
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";

@@ -648,6 +648,16 @@ export default function ActionQueue() {
                       {getActionQueueSourceLabel(row)}
                     </Badge>
                   )}
+                  {isAiDoctorDerived(row) && (
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] uppercase border-primary text-primary"
+                      data-testid="action-queue-row-ai-doctor-badge"
+                    >
+                      AI Doctor
+                    </Badge>
+                  )}
+
 
                   <span className="truncate flex-1">{row.suggested_change}</span>
                   <span className="text-xs text-muted-foreground">{row.action_type}</span>

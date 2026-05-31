@@ -50,13 +50,17 @@ import {
   nextStatusFor,
   normalizeNote,
 } from "@/lib/actionQueueTransitions";
-import { actionsPath, alertDetailPath, growDetailPath, logsPath, plantDetailPath, tentDetailPath } from "@/lib/routes";
+import { actionsPath, aiDoctorSessionDetailPath, alertDetailPath, growDetailPath, logsPath, plantDetailPath, tentDetailPath } from "@/lib/routes";
 import {
+  extractSourceAiDoctorSessionId,
   extractSourceAlertId,
   getActionQueueSourceLabel,
+  isAiDoctorDerived,
   isAlertDerived,
   shouldWarnPendingActionHasClosedSourceAlert,
+  stripBackPointerTokens,
 } from "@/lib/actionQueueProvenanceRules";
+
 import {
   ACTION_FOLLOWUP_EVENT_TYPE,
   buildActionFollowupDiaryDraft,

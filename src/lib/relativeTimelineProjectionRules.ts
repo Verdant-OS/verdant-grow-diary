@@ -242,14 +242,7 @@ export function groupRelativeTimelineByStage(
 // Filter chips (read-only UI filter — no writes, no schema)
 // ---------------------------------------------------------------------------
 
-export type RelativeTimelineFilterKey =
-  | "all"
-  | "photos"
-  | "watering"
-  | "feeding"
-  | "symptoms"
-  | "training"
-  | "notes";
+export type RelativeTimelineFilterKey = "all" | TimelineFilterCategory;
 
 export interface RelativeTimelineFilterDef {
   key: RelativeTimelineFilterKey;
@@ -291,34 +284,41 @@ export const RELATIVE_TIMELINE_FILTERS: readonly RelativeTimelineFilterDef[] = [
     emptyCopy: "No training events in this plant's timeline yet.",
   },
   {
+    key: "measurement",
+    label: "Measurements",
+    emptyCopy: "No manual measurements in this plant's timeline yet.",
+  },
+  {
+    key: "transplant",
+    label: "Transplant",
+    emptyCopy: "No transplant events in this plant's timeline yet.",
+  },
+  {
+    key: "harvest",
+    label: "Harvest",
+    emptyCopy: "No harvest, dry, or cure events in this plant's timeline yet.",
+  },
+  {
+    key: "reminder",
+    label: "Reminders",
+    emptyCopy: "No reminders or follow-ups in this plant's timeline yet.",
+  },
+  {
     key: "notes",
     label: "Notes",
     emptyCopy: "No notes or observations in this plant's timeline yet.",
   },
 ] as const;
 
-const SYMPTOM_EVENT_TYPES = new Set([
-  "symptoms",
-  "pest_disease",
-  "diagnosis",
-]);
-const TRAINING_EVENT_TYPES = new Set(["training", "defoliation"]);
-
 /**
  * Classify a projected timeline item to one filter category. Pure and
- * null-safe. Unknown / misc / sensor / null types fall back to "notes".
+ * null-safe. Delegates to the shared `classifyTimelineEntry` helper so
+ * the Grow Timeline and Plant Relative Timeline cannot drift apart.
  */
 export function classifyRelativeTimelineFilter(
   item: Pick<RelativeTimelineItem, "eventType" | "source"> | null | undefined,
 ): Exclude<RelativeTimelineFilterKey, "all"> {
-  if (!item) return "notes";
-  const type = typeof item.eventType === "string" ? item.eventType.toLowerCase() : "";
-  if (item.source === "photo" || type === "photo") return "photos";
-  if (type === "watering") return "watering";
-  if (type === "feeding") return "feeding";
-  if (SYMPTOM_EVENT_TYPES.has(type)) return "symptoms";
-  if (TRAINING_EVENT_TYPES.has(type)) return "training";
-  return "notes";
+  return classifyTimelineEntry(item ?? null);
 }
 
 /**

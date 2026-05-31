@@ -209,12 +209,6 @@ export default function Demo() {
         </Card>
       </section>
 
-      {/* Final CTA */}
-      <section className="px-6 pb-20 max-w-3xl mx-auto text-center">
-        <h2 className="font-display text-2xl md:text-3xl font-semibold">
-          Like what you see?
-        </h2>
-        <p className="mt-3 text-muted-foreground">
       {/* Make this your real grow — conversion panel */}
       <section className="px-6 pb-10 max-w-6xl mx-auto">
         <div className="rounded-2xl border border-primary/30 bg-primary/5 p-6 md:p-8">

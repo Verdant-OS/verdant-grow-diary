@@ -29,6 +29,7 @@ import {
 } from "@/lib/aiDoctorSessionDetailViewModel";
 import {
   buildSessionReviewHistoryViewModel,
+  buildSessionReviewActionsCopy,
   type AiDoctorSessionReviewHistoryViewModel,
   type AiDoctorSessionReviewPanelTone,
 } from "@/lib/aiDoctorSessionReviewStatusRules";

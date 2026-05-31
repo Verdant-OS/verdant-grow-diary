@@ -43,9 +43,15 @@ import { useReportsHubData } from "@/hooks/useReportsHubData";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useGrows } from "@/store/grows";
 
+import { stripSourceComments } from "./utils/stripSourceComments";
+
 const ROOT = resolve(__dirname, "../..");
-const PAGE_SRC = readFileSync(resolve(ROOT, "src/pages/Reports.tsx"), "utf8");
-const HOOK_SRC = readFileSync(resolve(ROOT, "src/hooks/useReportsHubData.ts"), "utf8");
+const PAGE_SRC = stripSourceComments(
+  readFileSync(resolve(ROOT, "src/pages/Reports.tsx"), "utf8"),
+);
+const HOOK_SRC = stripSourceComments(
+  readFileSync(resolve(ROOT, "src/hooks/useReportsHubData.ts"), "utf8"),
+);
 
 const emptyData = {
   status: "ready",

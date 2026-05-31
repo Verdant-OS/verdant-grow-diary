@@ -30,6 +30,10 @@ const DIARY_BADGES = readFileSync(
   resolve(ROOT, "src/components/DiaryEntryBadges.tsx"),
   "utf8",
 );
+const TIMELINE_RULES = readFileSync(
+  resolve(ROOT, "src/lib/relativeTimelineProjectionRules.ts"),
+  "utf8",
+);
 
 describe("Grow Timeline · sensor_snapshot wiring", () => {
   it("reads the canonical `sensor_snapshot` key QuickLog writes", () => {

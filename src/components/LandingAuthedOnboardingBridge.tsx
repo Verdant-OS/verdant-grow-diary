@@ -4,6 +4,9 @@ import { Button } from "@/components/ui/button";
 import OnboardingProgressPill from "@/components/OnboardingProgressPill";
 import { buildOnboardingChecklistViewModel } from "@/lib/onboardingChecklistViewModel";
 import { useGrows } from "@/store/grows";
+import { useGrowTents, useGrowPlants } from "@/hooks/useGrowData";
+import { useSensorReadings } from "@/hooks/use-sensor-readings";
+import { useDiaryEntries } from "@/hooks/use-diary-entries";
 
 /**
  * Compact onboarding bridge shown on `/welcome` for authenticated users
@@ -11,22 +14,32 @@ import { useGrows } from "@/store/grows";
  * cannot drift from the Dashboard checklist.
  *
  * Data policy:
- *  - Reads only `useGrows()` (already provided by the app-wide
- *    GrowsProvider — no new Supabase query is introduced).
- *  - Tent / plant / diary / sensor counts are intentionally omitted
- *    here. The full progress picture lives on the Dashboard checklist;
- *    this bridge is a neutral nudge, not a duplicate.
- *  - Never exposes private grow data details (no names, no IDs).
+ *  - Reads only via existing hooks already used by the app (Grows
+ *    context, useGrowTents, useGrowPlants, useSensorReadings,
+ *    useDiaryEntries). No new Supabase queries are introduced beyond
+ *    what the app would issue once the user opens the Dashboard.
+ *  - Never exposes private grow data details (no names, no IDs) — only
+ *    counts feed into the shared view model.
+ *  - No writes, no automation, no device control, no fake-live data.
  */
 export default function LandingAuthedOnboardingBridge() {
   const { grows } = useGrows();
+  const { data: tents = [] } = useGrowTents();
+  const { data: plants = [] } = useGrowPlants();
+  const { data: readings = [] } = useSensorReadings();
+  const { data: diary = [] } = useDiaryEntries();
+
   const vm = buildOnboardingChecklistViewModel({
     growCount: grows.length,
-    tentCount: 0,
-    plantCount: 0,
-    diaryEntryCount: 0,
-    sensorReadingCount: 0,
+    tentCount: tents.length,
+    plantCount: plants.length,
+    diaryEntryCount: diary.length,
+    sensorReadingCount: readings.length,
   });
+
+  const ctaLabel = vm.isFullyActivated
+    ? "Open Dashboard"
+    : "Continue setup in Dashboard";
 
   return (
     <div
@@ -37,7 +50,9 @@ export default function LandingAuthedOnboardingBridge() {
         <OnboardingProgressPill vm={vm} />
       </div>
       <p className="text-center text-sm md:text-base font-medium">
-        Ready to build your real grow memory?
+        {vm.isFullyActivated
+          ? "Your grow memory is active."
+          : "Ready to build your real grow memory?"}
       </p>
       <div className="mt-3 flex justify-center">
         <Link to="/">
@@ -46,7 +61,7 @@ export default function LandingAuthedOnboardingBridge() {
             data-testid="landing-authed-onboarding-bridge-cta"
             className="gradient-leaf text-primary-foreground"
           >
-            Continue setup in Dashboard
+            {ctaLabel}
             <ArrowRight className="h-3.5 w-3.5" />
           </Button>
         </Link>

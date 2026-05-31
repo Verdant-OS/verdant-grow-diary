@@ -99,7 +99,7 @@ describe("checklist links point to safe existing routes", () => {
     ["create_grow", "/grows"],
     ["add_tent", "/tents"],
     ["add_plant", "/plants"],
-    ["first_log", "/sensors"],
+    ["first_log", "/"],
   ] as const)("%s → %s", (key, expected) => {
     expect(vm.steps.find((s) => s.key === key)?.href).toBe(expected);
     expect(ONBOARDING_ROUTES[key]).toBe(expected);

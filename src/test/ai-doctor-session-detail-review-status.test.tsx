@@ -256,7 +256,12 @@ describe("AiDoctorSessionDetail — review status panel", () => {
       }),
     ];
     renderDetail();
-    await screen.findByTestId("ai-doctor-session-detail-review-status-panel");
+    await waitFor(() => {
+      const items = screen.queryAllByTestId(
+        "ai-doctor-session-detail-review-status-event",
+      );
+      expect(items.length).toBe(3);
+    });
     const items = screen.getAllByTestId(
       "ai-doctor-session-detail-review-status-event",
     );

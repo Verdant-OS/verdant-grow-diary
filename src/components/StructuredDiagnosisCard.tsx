@@ -12,6 +12,7 @@
  *     strips them before they ever reach this component.
  */
 import { useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, ShieldCheck, Sparkles } from "lucide-react";
@@ -26,6 +27,8 @@ import {
   harmonizeDiagnosisConfidence,
   isDisplayedConfidenceLow,
 } from "@/lib/aiDoctorConfidenceRules";
+import { useAiDoctorSessionLinkedActionQueueItems } from "@/hooks/useAiDoctorSessionLinkedActionQueueItems";
+import { findLinkedActionForSuggestion } from "@/lib/aiDoctorSessionLinkedActionsViewModel";
 
 export interface StructuredDiagnosisCardProps {
   diagnosis: Diagnosis;
@@ -47,6 +50,13 @@ export interface StructuredDiagnosisCardProps {
    * sufficiency surface allows.
    */
   contextCeiling?: AiContextConfidenceCeiling | null;
+  /**
+   * Optional AI Doctor session id. When provided, the card surfaces a
+   * read-only "Created from this session" chip beside any suggestion that
+   * already has a linked open Action Queue item. If absent, no chip is
+   * rendered (no fetch is issued).
+   */
+  aiDoctorSessionId?: string | null;
   testId?: string;
 }
 
@@ -124,6 +134,7 @@ export default function StructuredDiagnosisCard({
   onAddToQueue,
   disableQueueing,
   contextCeiling,
+  aiDoctorSessionId,
   testId = "ai-doctor-diagnosis",
 }: StructuredDiagnosisCardProps) {
   const [queuedIdx, setQueuedIdx] = useState<Set<number>>(new Set());
@@ -132,6 +143,13 @@ export default function StructuredDiagnosisCard({
   // the state update) cannot enqueue twice.
   const inFlightRef = useRef<Set<number>>(new Set());
   const queuedRef = useRef<Set<number>>(new Set());
+
+  // Linked Action Queue items are fetched only when an AI Doctor session id
+  // is supplied — see `<LinkedActionChip />` below. This keeps the hook out
+  // of the render tree for the live Coach flow (which currently does not
+  // thread a session id back into state), so the card stays usable without
+  // a QueryClientProvider in that path.
+
 
   async function handleClick(action: DiagnosisSuggestedAction, idx: number) {
     if (!onAddToQueue) return;
@@ -339,12 +357,66 @@ export default function StructuredDiagnosisCard({
                       Approval required
                     </Badge>
                   </div>
+                  {aiDoctorSessionId ? (
+                    <LinkedSuggestionChip
+                      sessionId={aiDoctorSessionId}
+                      action={a}
+                      testId={testId}
+                      index={i}
+                    />
+                  ) : null}
                 </li>
               );
             })}
           </ul>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Read-only chip rendered beside an in-flight Coach suggestion that already
+ * has a linked open Action Queue item created from the same AI Doctor
+ * session. Mounted only when the parent supplies a session id, so the
+ * underlying query is never issued on the live (no-session-id) Coach path.
+ */
+function LinkedSuggestionChip({
+  sessionId,
+  action,
+  testId,
+  index,
+}: {
+  sessionId: string;
+  action: DiagnosisSuggestedAction;
+  testId: string;
+  index: number;
+}) {
+  const { vm } = useAiDoctorSessionLinkedActionQueueItems(sessionId);
+  const match = findLinkedActionForSuggestion(vm.items, action);
+  if (!match) return null;
+  return (
+    <div
+      className="flex flex-wrap items-center gap-2 pt-1"
+      data-testid={`${testId}-suggested-action-${index}-created-from-session`}
+      data-action-queue-id={match.id}
+    >
+      <Badge
+        variant="outline"
+        className="text-[10px]"
+        title="This suggestion already has an approval-required Action Queue item."
+        data-testid={`${testId}-suggested-action-${index}-created-from-session-chip`}
+      >
+        Created from this session
+      </Badge>
+      <Link
+        to={match.focusHref}
+        className="text-[11px] underline text-primary"
+        data-testid={`${testId}-suggested-action-${index}-created-from-session-link`}
+        data-action-queue-id={match.id}
+      >
+        View in Action Queue
+      </Link>
     </div>
   );
 }

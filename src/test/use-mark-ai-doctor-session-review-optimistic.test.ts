@@ -148,7 +148,7 @@ describe("buildOptimisticReviewEvent", () => {
     expect(evt.event_type).toBe("marked_reviewed");
     expect(evt.note).toBeNull();
     expect(typeof evt.created_at).toBe("string");
-    expect(evt.user_id).toBe(""); // placeholder; never sent to server
+    expect(evt.user_id).toBe("__optimistic__"); // placeholder; never sent to server
   });
   it("normalizes notes the same way the insert payload does", () => {
     const evt = buildOptimisticReviewEvent({

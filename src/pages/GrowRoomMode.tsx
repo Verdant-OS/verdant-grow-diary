@@ -122,6 +122,7 @@ export default function GrowRoomMode() {
   const { data: tents } = useTents();
   const { data: plants = [] } = usePlants();
   const { alerts } = useAlertsList({});
+  const { urlGrowId } = useScopedGrow();
   const [quickLogPrefill, setQuickLogPrefill] = useState<QuickLogPrefill | null>(null);
   const [quickLogOpen, setQuickLogOpen] = useState(false);
 

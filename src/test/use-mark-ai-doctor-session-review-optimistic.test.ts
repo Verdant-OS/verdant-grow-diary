@@ -28,6 +28,10 @@ import {
 type Call = { table: string; payload: unknown };
 const insertCalls: Call[] = [];
 let nextInsertError: { message: string } | null = null;
+let pendingInsert: {
+  promise: Promise<{ data: null; error: { message: string } | null }>;
+  resolve: () => void;
+} | null = null;
 const forbidden = {
   update: vi.fn(),
   upsert: vi.fn(),
@@ -36,10 +40,23 @@ const forbidden = {
   functionsInvoke: vi.fn(),
 };
 
+function deferInsert() {
+  let resolveOuter!: () => void;
+  const promise = new Promise<{ data: null; error: { message: string } | null }>(
+    (res) => {
+      resolveOuter = () =>
+        res({ data: null, error: nextInsertError });
+    },
+  );
+  pendingInsert = { promise, resolve: resolveOuter };
+  return pendingInsert;
+}
+
 vi.mock("@/integrations/supabase/client", () => {
   const tableBuilder = (table: string) => ({
     insert: (payload: unknown) => {
       insertCalls.push({ table, payload });
+      if (pendingInsert) return pendingInsert.promise;
       return Promise.resolve({ data: null, error: nextInsertError });
     },
     update: (...args: unknown[]) => {

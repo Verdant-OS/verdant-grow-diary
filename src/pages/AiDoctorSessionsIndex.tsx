@@ -765,14 +765,16 @@ export default function AiDoctorSessionsIndex() {
                 </span>
               ) : null}
             </Button>
-            <span
-              className="inline-flex items-center rounded-full border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
+            <button
+              type="button"
+              className="inline-flex items-center rounded-full border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               data-testid="ai-doctor-sessions-index-needs-follow-up-visible-chip"
-              title="Count of currently loaded sessions marked Needs follow-up. Not a global total."
+              title="Show built-in Needs follow-up view · visible count only"
               aria-label={formatNeedsFollowUpVisibleLabel(needsFollowUpVisible)}
+              onClick={() => applySavedView(BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID)}
             >
               {formatNeedsFollowUpVisibleLabel(needsFollowUpVisible)}
-            </span>
+            </button>
             {filtersActive ? (
               <Button
                 variant="ghost"

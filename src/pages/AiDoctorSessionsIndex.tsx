@@ -37,6 +37,8 @@ import {
   applyNeedsAttentionPreset,
   clearNeedsAttentionPreset,
   countNeedsAttentionVisible,
+  countNeedsFollowUpVisible,
+  formatNeedsFollowUpVisibleLabel,
   DEFAULT_FILTERS,
   FILTER_PARAM_KEYS,
   formatActiveFilterLabels,

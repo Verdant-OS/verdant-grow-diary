@@ -17,7 +17,6 @@ import {
   alertDetailPath,
   alertsPath,
   growDetailOutcomesPath,
-  growDetailPath,
   sensorsPath,
 } from "@/lib/routes";
 

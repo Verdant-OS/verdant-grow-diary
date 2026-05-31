@@ -29,7 +29,7 @@ function outcomeRow(actionId: string) {
     details: {
       event_type: "action_outcome",
       action_queue_id: actionId,
-      outcome_kind: "post_action_observation",
+      outcome_kind: "24h_recheck",
     },
   };
 }

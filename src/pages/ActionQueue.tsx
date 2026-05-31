@@ -53,9 +53,9 @@ type Status = ActionStatus;
 type EventType = ActionEventType;
 
 /**
- * Strip internal back-pointer tokens (e.g. `[session:<id>]`, `[alert:<id>]`)
- * from a user-facing `reason` string. The tokens exist for audit/dedupe only
- * and should never leak into grower-visible copy.
+ * Strip internal back-pointer tokens from a user-facing reason string.
+ * Tokens (e.g. session back-pointers) exist for audit/dedupe only and must
+ * never leak into grower-visible copy.
  */
 function stripBackPointerTokens(reason: string | null | undefined): string {
   if (!reason) return "";

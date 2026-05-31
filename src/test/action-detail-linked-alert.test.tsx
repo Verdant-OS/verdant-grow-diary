@@ -205,15 +205,11 @@ describe("ActionDetail header — Linked alert link", () => {
     }
   });
 
-  it("preserves the existing 'Suggestion origin' panel", async () => {
-    renderDetail();
-    const panel = await screen.findByTestId("action-detail-ai-doctor-provenance").catch(() => null);
-    // For environment_alert rows there is a different 'Action source' aria-label; check that at minimum the suggested_change still renders.
-    await screen.findByText("Lower humidity to 55%");
-    // Panel may exist only for ai_doctor; for environment_alert rows the lower 'Action source' card should be present.
-    if (!panel) {
-      expect(document.querySelector('[aria-label="Action source"]')).not.toBeNull();
-    }
+  it("preserves the existing AI Doctor 'Suggestion origin' panel when applicable", async () => {
+    detailRow = AI_DOCTOR_ROW_WITH_ALERT;
+    renderDetail("aq-2");
+    const panel = await screen.findByTestId("action-detail-ai-doctor-provenance");
+    expect(panel.textContent ?? "").toContain("Suggestion origin");
   });
 });
 

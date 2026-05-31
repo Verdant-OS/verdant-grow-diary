@@ -190,6 +190,11 @@ export default function GrowDetail() {
       </section>
 
       <RecentOutcomesCard outcomes={outcomes} />
+
+      <ActionOutcomeLearningReport
+        report={outcomes.learning}
+        status={outcomes.status}
+      />
     </div>
   );
 }

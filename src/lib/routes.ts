@@ -24,6 +24,9 @@ export const dashboardPath = (growId?: string | null): string => withGrowId("/da
 export const alertsPath = (growId?: string | null): string => withGrowId("/alerts", growId);
 export const sensorsPath = (growId?: string | null): string => withGrowId("/sensors", growId);
 
+export const actionDetailPath = (actionId: string): string =>
+  `/actions/${encodeURIComponent(actionId)}`;
+
 /** ActionDetail deep-linked to the outcome capture section. */
 export const actionDetailOutcomePath = (actionId: string): string =>
   `${actionDetailPath(actionId)}#outcome-section`;
@@ -31,9 +34,6 @@ export const actionDetailOutcomePath = (actionId: string): string =>
 /** GrowDetail deep-linked to the outcome/learning report section. */
 export const growDetailOutcomesPath = (growId: string): string =>
   `${growDetailPath(growId)}#outcomes`;
-
-export const actionDetailPath = (actionId: string): string =>
-  `/actions/${encodeURIComponent(actionId)}`;
 
 /**
  * Action Queue scoped to a single alert's linked actions via the URL-driven

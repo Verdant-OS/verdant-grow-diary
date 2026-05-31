@@ -1836,3 +1836,188 @@ describe("empty-state CTAs — static safety", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Compact header (count + last-updated) — pure rules + render + safety
+// ---------------------------------------------------------------------------
+
+import { formatRelativeTimelineHeader } from "@/lib/relativeTimelineProjectionRules";
+
+describe("formatRelativeTimelineHeader — pure rules", () => {
+  it("returns zero-count copy with 'No updates yet' for empty input", () => {
+    const h = formatRelativeTimelineHeader([]);
+    expect(h.total).toBe(0);
+    expect(h.countLabel).toBe("0 timeline entries");
+    expect(h.lastUpdatedLabel).toBe("No updates yet");
+    expect(h.lastUpdatedAt).toBeNull();
+    expect(h.lastUpdatedIsFallback).toBe(false);
+    expect(h.compact).toBe("0 timeline entries · No updates yet");
+    expect(formatRelativeTimelineHeader(null).total).toBe(0);
+    expect(formatRelativeTimelineHeader(undefined).countLabel).toBe("0 timeline entries");
+  });
+
+  it("renders singular copy for exactly one entry", () => {
+    const h = formatRelativeTimelineHeader([
+      tItem({ id: "a", occurredAt: "2026-05-31T10:00:00Z" }),
+    ]);
+    expect(h.total).toBe(1);
+    expect(h.countLabel).toBe("1 timeline entry");
+    expect(h.lastUpdatedLabel).toBe("Last updated May 31, 2026");
+    expect(h.lastUpdatedIsFallback).toBe(false);
+    expect(h.compact).toBe("1 timeline entry · Last updated May 31, 2026");
+  });
+
+  it("renders plural copy and picks the newest valid timestamp", () => {
+    const h = formatRelativeTimelineHeader([
+      tItem({ id: "a", occurredAt: "2026-04-10T00:00:00Z" }),
+      tItem({ id: "b", occurredAt: "2026-05-31T00:00:00Z" }),
+      tItem({ id: "c", occurredAt: "2026-05-01T00:00:00Z" }),
+    ]);
+    expect(h.total).toBe(3);
+    expect(h.countLabel).toBe("3 timeline entries");
+    expect(h.lastUpdatedAt).toBe("2026-05-31T00:00:00Z");
+    expect(h.lastUpdatedLabel).toBe("Last updated May 31, 2026");
+  });
+
+  it("uses 'Last updated unknown' fallback when timestamps are missing or invalid", () => {
+    const h = formatRelativeTimelineHeader([
+      tItem({ id: "a", occurredAt: null }),
+      tItem({ id: "b", occurredAt: "not-a-date" }),
+    ]);
+    expect(h.total).toBe(2);
+    expect(h.countLabel).toBe("2 timeline entries");
+    expect(h.lastUpdatedLabel).toBe("Last updated unknown");
+    expect(h.lastUpdatedIsFallback).toBe(true);
+    expect(h.lastUpdatedAt).toBeNull();
+  });
+
+  it("never exposes IDs, tokens, raw payloads, user IDs, or provenance markers", () => {
+    const h = formatRelativeTimelineHeader([
+      tItem({
+        id: "secret-id-12345",
+        eventType: "watering",
+        title: "should not leak",
+        occurredAt: "2026-05-31T00:00:00Z",
+        tentId: "tent-uuid-abc",
+        plantId: "plant-uuid-xyz",
+      }),
+    ]);
+    const blob = JSON.stringify(h);
+    expect(blob).not.toMatch(/secret-id-12345/);
+    expect(blob).not.toMatch(/tent-uuid-abc/);
+    expect(blob).not.toMatch(/plant-uuid-xyz/);
+    expect(blob).not.toMatch(/should not leak/);
+    expect(blob).not.toMatch(/token|bearer|service_role|raw_payload|provenance/i);
+  });
+});
+
+describe("PlantRelativeTimelineSection — header render", () => {
+  it("renders zero-count copy when there are no entries (above empty state)", () => {
+    mockUse.mockReturnValue({ data: [], isLoading: false });
+    const { container } = render(
+      <PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />,
+    );
+    const header = screen.getByTestId("relative-timeline-header");
+    expect(header.getAttribute("data-total")).toBe("0");
+    expect(screen.getByTestId("relative-timeline-header-count")).toHaveTextContent(
+      "0 timeline entries",
+    );
+    expect(screen.getByTestId("relative-timeline-header-last-updated")).toHaveTextContent(
+      "No updates yet",
+    );
+    // Existing empty state still renders.
+    expect(screen.getByTestId("relative-timeline-empty")).toBeTruthy();
+    // DOM order: header before empty state.
+    const all = Array.from(container.querySelectorAll("[data-testid]"));
+    expect(all.indexOf(header)).toBeLessThan(
+      all.indexOf(screen.getByTestId("relative-timeline-empty")),
+    );
+  });
+
+  it("renders singular copy for one entry with newest-item date", () => {
+    mockUse.mockReturnValue({
+      data: [entry({ id: "e1", entry_at: "2026-05-31T08:00:00Z" })],
+      isLoading: false,
+    });
+    render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
+    expect(screen.getByTestId("relative-timeline-header-count")).toHaveTextContent(
+      "1 timeline entry",
+    );
+    expect(screen.getByTestId("relative-timeline-header-last-updated")).toHaveTextContent(
+      "Last updated May 31, 2026",
+    );
+  });
+
+  it("renders plural copy and existing filter chips + summary still render", () => {
+    mockUse.mockReturnValue({
+      data: [
+        entry({ id: "w", entry_at: "2026-04-05T00:00:00Z", entry_type: "watering" }),
+        entry({ id: "f", entry_at: "2026-04-06T00:00:00Z", entry_type: "feeding" }),
+        entry({ id: "n", entry_at: "2026-05-31T00:00:00Z", entry_type: "note" }),
+      ],
+      isLoading: false,
+    });
+    render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
+    expect(screen.getByTestId("relative-timeline-header-count")).toHaveTextContent(
+      "3 timeline entries",
+    );
+    expect(screen.getByTestId("relative-timeline-header-last-updated")).toHaveTextContent(
+      "Last updated May 31, 2026",
+    );
+    // Existing filter chips + summary strip + entry card detail still render.
+    expect(screen.getByTestId("relative-timeline-filters")).toBeTruthy();
+    expect(screen.getByTestId("relative-timeline-summary")).toBeTruthy();
+    expect(screen.getAllByTestId("relative-timeline-item").length).toBe(3);
+  });
+
+  it("header total reflects FULL timeline regardless of active filter", () => {
+    mockUse.mockReturnValue({
+      data: [
+        entry({ id: "w", entry_at: "2026-04-05T00:00:00Z", entry_type: "watering" }),
+        entry({ id: "n", entry_at: "2026-04-06T00:00:00Z", entry_type: "note" }),
+      ],
+      isLoading: false,
+    });
+    render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
+    const before = screen.getByTestId("relative-timeline-header-count").textContent;
+    fireEvent.click(screen.getByTestId("relative-timeline-filter-watering"));
+    const after = screen.getByTestId("relative-timeline-header-count").textContent;
+    expect(after).toBe(before);
+    expect(after).toContain("2 timeline entries");
+  });
+
+  it("uses unknown fallback when entries exist but timestamps are invalid/missing", () => {
+    mockUse.mockReturnValue({
+      data: [entry({ id: "e1", entry_at: null })],
+      isLoading: false,
+    });
+    render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
+    const last = screen.getByTestId("relative-timeline-header-last-updated");
+    expect(last).toHaveTextContent("Last updated unknown");
+    expect(
+      screen.getByTestId("relative-timeline-header").getAttribute("data-last-updated-fallback"),
+    ).toBe("true");
+  });
+});
+
+describe("relative timeline header — static safety", () => {
+  it("header additions stay free of writes / RPC / device / schedule strings", () => {
+    expect(RULES).toContain("formatRelativeTimelineHeader");
+    expect(COMPONENT).toContain("formatRelativeTimelineHeader");
+    for (const src of [RULES, COMPONENT].map(stripSafetyNegations)) {
+      expect(src).not.toMatch(/functions\.invoke/);
+      expect(src).not.toMatch(/service_role/);
+      expect(src).not.toMatch(/calendar_events/);
+      expect(src).not.toMatch(/\bnotifications\b/);
+      expect(src).not.toMatch(/resend|sendgrid|mailgun|postmark|twilio/i);
+      expect(src).not.toMatch(
+        /\b(schedule|scheduled|scheduling)\s+(a\s+|the\s+|new\s+)?reminders?\b/i,
+      );
+      expect(src).not.toMatch(
+        /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator|device_command|autopilot/i,
+      );
+    }
+    expect(RULES).not.toMatch(/\.(insert|update|delete|upsert)\s*\(/);
+    expect(RULES).not.toMatch(/\.rpc\(/);
+  });
+});

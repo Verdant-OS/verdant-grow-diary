@@ -40,12 +40,15 @@ export interface ReportsHubData {
   alertsCritical: number;
   alertsWarning: number;
   firstOpenAlertId: string | null;
+  firstOpenAlertSeverity: string | null;
+  firstOpenAlertCreatedAt: string | null;
   latestSensorCapturedAt: string | null;
   recentSensorReadingCount: number;
   diaryEntriesTotal: number;
   diaryEntriesLast7d: number;
   pendingOutcomeReviewCount: number;
   firstPendingActionId: string | null;
+  oldestPendingCompletedAt: string | null;
 }
 
 export const EMPTY_REPORTS_HUB_DATA: ReportsHubData = {
@@ -56,12 +59,15 @@ export const EMPTY_REPORTS_HUB_DATA: ReportsHubData = {
   alertsCritical: 0,
   alertsWarning: 0,
   firstOpenAlertId: null,
+  firstOpenAlertSeverity: null,
+  firstOpenAlertCreatedAt: null,
   latestSensorCapturedAt: null,
   recentSensorReadingCount: 0,
   diaryEntriesTotal: 0,
   diaryEntriesLast7d: 0,
   pendingOutcomeReviewCount: 0,
   firstPendingActionId: null,
+  oldestPendingCompletedAt: null,
 };
 
 

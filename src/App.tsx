@@ -21,6 +21,7 @@ import Settings from "./pages/Settings";
 import Timeline from "./pages/Timeline";
 import Grows from "./pages/Grows";
 import GrowDetail from "./pages/GrowDetail";
+import Reports from "./pages/Reports";
 
 import Coach from "./pages/Coach";
 import AiDoctorSessionDetail from "./pages/AiDoctorSessionDetail";
@@ -86,6 +87,7 @@ const App = () => (
                 <Route path="/grow-lineage" element={<GrowLineageRepair />} />
                 <Route path="/grows" element={<Grows />} />
                 <Route path="/grows/:growId" element={<GrowDetail />} />
+                <Route path="/reports" element={<Reports />} />
 
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/diagnostics" element={<Diagnostics />} />

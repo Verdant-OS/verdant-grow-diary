@@ -199,10 +199,12 @@ describe("AiDoctorSessionDetail — review status panel", () => {
       }),
     ];
     renderDetail();
-    const panel = await screen.findByTestId(
-      "ai-doctor-session-detail-review-status-panel",
-    );
-    expect(panel.getAttribute("data-review-status")).toBe("needs_follow_up");
+    await waitFor(() => {
+      const panel = screen.getByTestId(
+        "ai-doctor-session-detail-review-status-panel",
+      );
+      expect(panel.getAttribute("data-review-status")).toBe("needs_follow_up");
+    });
     expect(
       screen.getByTestId("ai-doctor-session-detail-review-status-badge")
         .textContent,

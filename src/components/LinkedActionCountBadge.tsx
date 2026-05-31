@@ -12,7 +12,7 @@
  */
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
-import { actionDetailPath, actionsPath } from "@/lib/routes";
+import { actionDetailPath, actionQueueAlertContextPath } from "@/lib/routes";
 import type { AlertLinkedActionsSummary } from "@/lib/alertsLinkedActionsViewModel";
 
 export interface LinkedActionCountBadgeProps {

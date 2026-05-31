@@ -96,6 +96,10 @@ export default function Reports() {
         </div>
       )}
 
+      {!showEmptyState && summary && !reviewQueue.empty && (
+        <ReportsReviewQueueSection items={reviewQueue.items} />
+      )}
+
       {showEmptyState ? (
         <EmptyState
           icon={<LineChart className="h-6 w-6" />}

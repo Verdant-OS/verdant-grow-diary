@@ -29,6 +29,7 @@ import {
 } from "@/lib/aiDoctorConfidenceRules";
 import { useAiDoctorSessionLinkedActionQueueItems } from "@/hooks/useAiDoctorSessionLinkedActionQueueItems";
 import { findLinkedActionForSuggestion } from "@/lib/aiDoctorSessionLinkedActionsViewModel";
+import { aiDoctorSessionDetailPath } from "@/lib/routes";
 
 export interface StructuredDiagnosisCardProps {
   diagnosis: Diagnosis;
@@ -214,6 +215,17 @@ export default function StructuredDiagnosisCard({
           Confidence: {confidencePct(harmonized.displayedConfidence)}
         </span>
       </div>
+
+      {aiDoctorSessionId ? (
+        <Link
+          to={aiDoctorSessionDetailPath(aiDoctorSessionId)}
+          className="text-[11px] underline text-primary"
+          title="Open the saved review snapshot."
+          data-testid={`${testId}-saved-session-link`}
+        >
+          View saved AI Doctor session
+        </Link>
+      ) : null}
 
       {harmonized.limitedCopy && (
         <p

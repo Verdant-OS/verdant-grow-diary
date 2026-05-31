@@ -53,6 +53,7 @@ export function LinkedActionCountBadge({
         <Link
           data-testid={anchorTestId}
           to={actionDetailPath(summary.singleActionId as string)}
+          aria-label="View linked action"
           className="text-[11px] text-primary hover:underline"
         >
           View linked action
@@ -61,11 +62,13 @@ export function LinkedActionCountBadge({
         <Link
           data-testid={anchorTestId}
           to={actionQueueAlertContextPath(alertId)}
+          aria-label={`View ${summary.count} actions linked to this alert`}
           className="text-[11px] text-primary hover:underline"
         >
           View linked actions
         </Link>
       )}
+
     </div>
   );
 }

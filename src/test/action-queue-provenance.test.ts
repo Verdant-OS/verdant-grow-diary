@@ -11,6 +11,7 @@ import {
   getActionQueueSourceLabel,
   isAlertDerived,
 } from "@/lib/actionQueueProvenanceRules";
+import { stripSourceComments } from "./utils/stripSourceComments";
 
 const ROOT = resolve(__dirname, "../..");
 const QUEUE = readFileSync(resolve(ROOT, "src/pages/ActionQueue.tsx"), "utf8");

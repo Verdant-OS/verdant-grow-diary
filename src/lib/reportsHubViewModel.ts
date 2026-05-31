@@ -187,8 +187,8 @@ export function buildReportsHubSummary(input: ReportsHubInput): ReportsHubSummar
     },
   ];
 
-  // actionsPath referenced to keep import valid for callers wiring CTAs.
-  void actionsPath;
+
+
 
   return {
     cards,

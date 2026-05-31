@@ -116,10 +116,10 @@ and never relabeled as healthy. See
 ### RLS / auth.uid() ownership
 
 RLS is the ownership boundary for every user-owned table. Policies are
-written against `auth.uid()` and evaluated server-side. Never trust
-client-provided `user_id` — the frontend must not send it as a trusted
-field, and any client-supplied value must be re-checked server-side. No
-`service_role` key may appear in client code.
+written against `auth.uid()` and evaluated server-side.
+Never trust client-provided `user_id` — the frontend must not send it as a
+trusted field, and any client-supplied value must be re-checked server-side.
+No `service_role` key may appear in client code.
 
 ## Pi-ingest deployed smoke test
 

@@ -845,6 +845,127 @@ describe("filter chip — static safety", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Filter chip — counts + disabled state (this task)
+// ---------------------------------------------------------------------------
+
+import { buildRelativeTimelineFilterChips } from "@/lib/relativeTimelineProjectionRules";
+
+describe("buildRelativeTimelineFilterChips — pure rules", () => {
+  it("returns one chip per filter key, with counts derived from items", () => {
+    const items: RelativeTimelineItem[] = [
+      tItem({ id: "w1", eventType: "watering" }),
+      tItem({ id: "w2", eventType: "watering" }),
+      tItem({ id: "n1", eventType: "note" }),
+      tItem({ id: "p1", eventType: "photo", source: "photo" }),
+    ];
+    const chips = buildRelativeTimelineFilterChips(items, "all");
+    expect(chips.map((c) => c.key)).toEqual(
+      RELATIVE_TIMELINE_FILTERS.map((f) => f.key),
+    );
+    const byKey = Object.fromEntries(chips.map((c) => [c.key, c]));
+    expect(byKey.all.count).toBe(4);
+    expect(byKey.watering.count).toBe(2);
+    expect(byKey.notes.count).toBe(1);
+    expect(byKey.photos.count).toBe(1);
+    expect(byKey.feeding.count).toBe(0);
+  });
+
+  it("marks zero-count category chips as disabled but never disables All", () => {
+    const items: RelativeTimelineItem[] = [tItem({ id: "n1", eventType: "note" })];
+    const chips = buildRelativeTimelineFilterChips(items, "all");
+    const all = chips.find((c) => c.key === "all")!;
+    const notes = chips.find((c) => c.key === "notes")!;
+    const feeding = chips.find((c) => c.key === "feeding")!;
+    expect(all.disabled).toBe(false);
+    expect(notes.disabled).toBe(false);
+    expect(feeding.disabled).toBe(true);
+  });
+
+  it("reflects the selected filter and never marks 'all' disabled on empty input", () => {
+    const chips = buildRelativeTimelineFilterChips([], "all");
+    expect(chips.find((c) => c.key === "all")!.disabled).toBe(false);
+    expect(chips.find((c) => c.key === "all")!.selected).toBe(true);
+    expect(chips.find((c) => c.key === "watering")!.disabled).toBe(true);
+  });
+});
+
+describe("PlantRelativeTimelineSection — chip counts + disabled state", () => {
+  it("renders a count badge for each chip and disables zero-count categories", () => {
+    mockUse.mockReturnValue({
+      data: [
+        entry({ id: "w1", entry_at: "2026-04-05T00:00:00Z", entry_type: "watering" }),
+        entry({ id: "w2", entry_at: "2026-04-06T00:00:00Z", entry_type: "watering" }),
+        entry({ id: "n1", entry_at: "2026-04-07T00:00:00Z", entry_type: "note" }),
+      ],
+      isLoading: false,
+    });
+    render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
+    const all = screen.getByTestId("relative-timeline-filter-all");
+    const watering = screen.getByTestId("relative-timeline-filter-watering");
+    const feeding = screen.getByTestId("relative-timeline-filter-feeding");
+    expect(all.getAttribute("data-count")).toBe("3");
+    expect(watering.getAttribute("data-count")).toBe("2");
+    expect(feeding.getAttribute("data-count")).toBe("0");
+    expect(feeding.getAttribute("data-disabled")).toBe("true");
+    expect(feeding.getAttribute("aria-disabled")).toBe("true");
+    expect((feeding as HTMLButtonElement).disabled).toBe(true);
+    expect(all.getAttribute("data-disabled")).toBe("false");
+    expect(
+      screen.getByTestId("relative-timeline-filter-watering-count").textContent,
+    ).toBe("2");
+  });
+
+  it("clicking a disabled zero-count chip does not change the filter", () => {
+    mockUse.mockReturnValue({
+      data: [entry({ id: "n1", entry_type: "note" })],
+      isLoading: false,
+    });
+    render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
+    const feeding = screen.getByTestId("relative-timeline-filter-feeding");
+    fireEvent.click(feeding);
+    expect(
+      screen.getByTestId("relative-timeline-filter-all").getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(screen.getAllByTestId("relative-timeline-item").length).toBe(1);
+  });
+
+  it("clearing the filter via the All chip restores all entries", () => {
+    mockUse.mockReturnValue({
+      data: [
+        entry({ id: "w", entry_at: "2026-04-05T00:00:00Z", entry_type: "watering" }),
+        entry({ id: "n", entry_at: "2026-04-06T00:00:00Z", entry_type: "note" }),
+      ],
+      isLoading: false,
+    });
+    render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
+    fireEvent.click(screen.getByTestId("relative-timeline-filter-watering"));
+    expect(screen.getAllByTestId("relative-timeline-item").length).toBe(1);
+    fireEvent.click(screen.getByTestId("relative-timeline-filter-all"));
+    expect(screen.getAllByTestId("relative-timeline-item").length).toBe(2);
+  });
+
+  it("reminder chip + empty copy never imply scheduling, notifications, or email", () => {
+    mockUse.mockReturnValue({
+      data: [entry({ id: "n", entry_type: "note" })],
+      isLoading: false,
+    });
+    render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
+    const reminder = screen.getByTestId("relative-timeline-filter-reminder");
+    expect(reminder.textContent ?? "").toMatch(/reminders/i);
+    const copy = getRelativeTimelineFilterEmptyState("reminder").toLowerCase();
+    expect(copy).not.toMatch(/schedul|notification|email|calendar|push/);
+  });
+
+  it("filter strip does not introduce writes / supabase / scheduling / notifications", () => {
+    const safe = stripSafetyNegations(COMPONENT);
+    expect(safe).not.toMatch(/functions\.invoke/);
+    expect(safe).not.toMatch(/supabase\.from\(/);
+    expect(safe).not.toMatch(/calendar_events|notifications|push_token|email_provider/i);
+    expect(safe).not.toMatch(/\bschedul\w*\b/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Summary strip — pure rules + render
 // ---------------------------------------------------------------------------
 

@@ -65,6 +65,11 @@ export default function Coach() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [queuedIdx, setQueuedIdx] = useState<Set<number>>(new Set());
   const [queuingIdx, setQueuingIdx] = useState<number | null>(null);
+  // Persisted AI Doctor session id for the *currently rendered* diagnosis.
+  // Reset whenever a new ask() starts; only applied if the persistence
+  // result still belongs to the most recent diagnosis (race-safe).
+  const [persistedSessionId, setPersistedSessionId] = useState<string | null>(null);
+  const diagnosisSeqRef = useRef(0);
 
   // --- Real grow context for AI sufficiency evaluation (presenter only) ---
   const { data: ctxPlants = [] } = useGrowPlants(undefined, activeGrowId ?? undefined);
@@ -232,7 +237,8 @@ export default function Coach() {
 
   async function ask(mode: Mode) {
     if (!user) return;
-    setBusy(true); setResult(null);
+    const seq = ++diagnosisSeqRef.current;
+    setBusy(true); setResult(null); setPersistedSessionId(null);
     try {
       let photoUrl: string | undefined;
       if (mode === "diagnose" && photoFile) {
@@ -284,7 +290,14 @@ export default function Coach() {
           contextConfidenceCeiling: contextSufficiency.confidenceCeiling ?? null,
           contextSufficiency,
         }).then((res) => {
-          if (!res.ok && "error" in res) {
+          if (res.ok) {
+            // Only apply the persisted id if this diagnosis is still the
+            // most recent one rendered. Prevents an older request's id
+            // from attaching to a newer diagnosis.
+            if (seq === diagnosisSeqRef.current && res.id) {
+              setPersistedSessionId(res.id);
+            }
+          } else if ("error" in res) {
             toast.warning("Couldn't save this AI Doctor session for later review.", {
               description: res.error,
             });
@@ -348,6 +361,7 @@ export default function Coach() {
             disableQueueing={!activeGrowId}
             onAddToQueue={(action) => addDoctorSuggestionToQueue(action)}
             contextCeiling={contextSufficiency.confidenceCeiling}
+            aiDoctorSessionId={persistedSessionId ?? undefined}
             testId="coach-ai-doctor-diagnosis"
           />
         </div>

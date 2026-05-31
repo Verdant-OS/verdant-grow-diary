@@ -55,5 +55,21 @@ describe("ReportsReviewQueueSection", () => {
     expect(
       screen.getByTestId("reports-review-link-open_alerts").getAttribute("href"),
     ).toBe("/alerts?growId=grow-1");
+    // Help tooltip + why-this-is-here line render per item.
+    expect(
+      screen
+        .getByTestId("reports-review-help-missing_outcome")
+        .getAttribute("title"),
+    ).toMatch(/older than 24 hours/i);
+    expect(
+      screen.getByTestId("reports-review-why-open_alerts").textContent,
+    ).toMatch(/latest severity warning/);
+  });
+
+  it("renders calm empty copy when showEmptyState is true and items are empty", () => {
+    renderWith([], true);
+    expect(screen.getByTestId("reports-review-empty").textContent).toMatch(
+      /no priority review items/i,
+    );
   });
 });

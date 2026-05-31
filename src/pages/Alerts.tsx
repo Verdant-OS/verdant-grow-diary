@@ -30,7 +30,7 @@ import {
   type AlertSeverityRow,
   type AlertStatusRow,
 } from "@/lib/alerts";
-import { actionDetailPath, actionsPath, alertDetailPath } from "@/lib/routes";
+import { actionDetailPath, actionsPath, alertDetailPath, alertsPath } from "@/lib/routes";
 import { formatDistanceToNow } from "date-fns";
 
 type StatusFilter = AlertStatusRow | "all";

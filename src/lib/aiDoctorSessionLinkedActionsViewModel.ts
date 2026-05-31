@@ -100,6 +100,7 @@ export function buildAiDoctorSessionLinkedActionsViewModel(
       id: row.id,
       status: row.status as string,
       reasonText: stripBackPointerTokens(row.reason ?? null),
+      suggestedChange: typeof row.suggested_change === "string" ? row.suggested_change : "",
       focusHref: buildFocusHref(row.id),
     });
   }

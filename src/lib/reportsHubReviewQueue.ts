@@ -136,8 +136,8 @@ export function buildReportsReviewQueue(
   if (pending > 0) {
     const href =
       typeof firstPendingActionId === "string" && firstPendingActionId
-        ? actionDetailPath(firstPendingActionId)
-        : growDetailPath(growId);
+        ? actionDetailOutcomePath(firstPendingActionId)
+        : growDetailOutcomesPath(growId);
     const oldestMs = parseTs(oldestPendingCompletedAt);
     const whyParts: string[] = [
       `${pending} pending review${pending === 1 ? "" : "s"}`,

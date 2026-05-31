@@ -12,7 +12,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import AiDoctorSessionDetail from "@/pages/AiDoctorSessionDetail";

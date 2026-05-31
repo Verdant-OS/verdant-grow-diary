@@ -746,8 +746,9 @@ export default function ActionQueue() {
                     View Details
                   </Link>
                 </div>
-                <div className="mt-1">
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                   <AiDoctorSessionLink row={row} />
+                  <LinkedAlertLink row={row} />
                 </div>
                 <EventHistory items={events[row.id]} />
               </li>

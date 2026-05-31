@@ -93,7 +93,7 @@ describe("buildReportsReviewQueue", () => {
     expect(manyItem.href).toBe("/alerts?growId=grow-1");
   });
 
-  it("surfaces a stale sensor card when latest reading is older than the threshold", () => {
+  it("surfaces a stale sensor card linking to the sensors route", () => {
     const { items } = buildReportsReviewQueue({
       ...base,
       latestSensorCapturedAt: new Date(
@@ -102,7 +102,7 @@ describe("buildReportsReviewQueue", () => {
     });
     const item = items.find((i) => i.id === "stale_sensor");
     expect(item).toBeDefined();
-    expect(item!.href).toBe("/grows/grow-1");
+    expect(item!.href).toBe("/sensors?growId=grow-1");
     expect(item!.description).toMatch(/24 hours/);
   });
 
@@ -112,17 +112,19 @@ describe("buildReportsReviewQueue", () => {
       latestSensorCapturedAt: null,
       recentSensorReadingCount: 0,
     });
-    expect(items.find((i) => i.id === "stale_sensor")).toBeDefined();
+    const item = items.find((i) => i.id === "stale_sensor")!;
+    expect(item).toBeDefined();
+    expect(item.href).toBe("/sensors?growId=grow-1");
   });
 
-  it("surfaces a low-sample learning card when at least one group needs more data", () => {
+  it("surfaces a low-sample learning card linking to GrowDetail outcomes section", () => {
     const { items } = buildReportsReviewQueue({
       ...base,
       lowSampleLearningGroups: 2,
     });
     const item = items.find((i) => i.id === "low_sample_learning");
     expect(item).toBeDefined();
-    expect(item!.href).toBe("/grows/grow-1");
+    expect(item!.href).toBe("/grows/grow-1#outcomes");
     expect(item!.description).toMatch(/2 outcome patterns/);
   });
 

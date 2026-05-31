@@ -110,6 +110,8 @@ npm run build
 
 All existing tests must continue to pass. New behavior ships with new tests.
 
+- Before publishing changes touching Action Queue, Alerts, AI Doctor actions, provenance parsing, query-param chips, or automation-adjacent safety copy, run `bun run test:static-safety`. See [`docs/safety/static-safety-scans.md`](./docs/safety/static-safety-scans.md).
+
 ---
 
 ## Security workflow

@@ -27,6 +27,12 @@ import {
   type ReviewRiskTone,
   type ReviewSummaryViewModel,
 } from "@/lib/aiDoctorSessionDetailViewModel";
+import {
+  buildSessionReviewHistoryViewModel,
+  type AiDoctorSessionReviewHistoryViewModel,
+  type AiDoctorSessionReviewPanelTone,
+} from "@/lib/aiDoctorSessionReviewStatusRules";
+import { useAiDoctorSessionReviews } from "@/hooks/useAiDoctorSessionReviews";
 import { plantDetailPath, tentDetailPath } from "@/lib/routes";
 
 async function copyPlainText(text: string): Promise<boolean> {

@@ -636,13 +636,34 @@ export default function ActionQueue() {
 
       {alertContextId && !loading && filtered.length === 0 && (
         <div
-          className="glass rounded-2xl p-4 mb-4 text-sm text-muted-foreground"
+          className="glass rounded-2xl p-4 mb-4"
           data-testid="action-queue-alert-context-empty"
           role="status"
         >
-          0 actions linked to this alert
+          <p
+            className="text-sm text-foreground"
+            data-testid="action-queue-alert-context-empty-title"
+          >
+            No actions linked to this alert yet.
+          </p>
+          <p
+            className="text-xs text-muted-foreground mt-1"
+            data-testid="action-queue-alert-context-empty-help"
+          >
+            Review the alert detail and add a suggested action when appropriate.
+          </p>
+          <div className="mt-3">
+            <Link
+              to={alertDetailPath(alertContextId)}
+              className="text-xs text-primary hover:underline"
+              data-testid="action-queue-alert-context-empty-back-link"
+            >
+              Back to alert
+            </Link>
+          </div>
         </div>
       )}
+
 
 
 

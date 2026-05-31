@@ -431,6 +431,36 @@ export default function ActionQueue() {
         />
       )}
 
+      {focusedActionId && (
+        <div
+          className="glass rounded-2xl p-3 mb-4 flex flex-wrap items-center gap-3"
+          data-testid="action-queue-focus-chip"
+          role="status"
+          aria-live="polite"
+        >
+          <Badge
+            variant="outline"
+            className="text-[10px] uppercase border-primary text-primary"
+          >
+            Focused action
+          </Badge>
+          <span className="text-xs text-muted-foreground">
+            Showing linked Action Queue item.
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={clearFocus}
+            className="ml-auto"
+            data-testid="action-queue-clear-focus"
+          >
+            Clear focus
+          </Button>
+        </div>
+      )}
+
+
+
       <div
         className="glass rounded-2xl p-3 mb-4 flex flex-wrap gap-2"
         aria-label="Action queue filters"

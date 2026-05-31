@@ -72,7 +72,11 @@ export const ONBOARDING_ROUTES = {
   create_grow: "/grows",
   add_tent: "/tents",
   add_plant: "/plants",
-  first_log: "/sensors",
+  // Routes to the Dashboard, which surfaces the QuickLog CTA once a
+  // plant exists. /sensors remains fully functional for direct manual
+  // sensor reading entry — it is just not the primary first-log path
+  // for note-style logging.
+  first_log: "/",
 } as const;
 
 export function buildOnboardingChecklistViewModel(

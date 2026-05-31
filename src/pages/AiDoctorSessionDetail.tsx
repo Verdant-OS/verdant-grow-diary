@@ -42,7 +42,11 @@ import { plantDetailPath, tentDetailPath } from "@/lib/routes";
 import { AiDoctorSessionActionQueueButton } from "@/components/AiDoctorSessionActionQueueButton";
 import type { AiDoctorSessionLike } from "@/lib/aiDoctorSessionToActionQueueRules";
 import { useAiDoctorSessionLinkedActionQueueItems } from "@/hooks/useAiDoctorSessionLinkedActionQueueItems";
-import type { LinkedActionsViewModel } from "@/lib/aiDoctorSessionLinkedActionsViewModel";
+import {
+  findLinkedActionForSuggestion,
+  type LinkedActionItem,
+  type LinkedActionsViewModel,
+} from "@/lib/aiDoctorSessionLinkedActionsViewModel";
 
 async function copyPlainText(text: string): Promise<boolean> {
   try {
@@ -219,9 +223,11 @@ const RISK_TONE_CLASSES: Record<ReviewRiskTone, string> = {
 function ReviewSummarySection({
   vm,
   session,
+  linkedActions,
 }: {
   vm: ReviewSummaryViewModel;
   session?: AiDoctorSessionLike;
+  linkedActions?: LinkedActionsViewModel;
 }) {
   return (
     <section
@@ -295,24 +301,54 @@ function ReviewSummarySection({
           </p>
         ) : (
           <ul className="space-y-1 mt-1 text-xs">
-            {vm.suggestedActions.map((a, i) => (
-              <li
-                key={i}
-                className="rounded border bg-card/40 px-2 py-1"
-                data-testid="ai-doctor-session-detail-review-action"
-              >
-                <span className="font-medium">{a.title}</span>
-                {a.detail ? (
-                  <span className="text-muted-foreground"> — {a.detail}</span>
-                ) : null}
-                {session ? (
-                  <AiDoctorSessionActionQueueButton
-                    session={session}
-                    action={a}
-                  />
-                ) : null}
-              </li>
-            ))}
+            {vm.suggestedActions.map((a, i) => {
+              const linkedMatch: LinkedActionItem | null = linkedActions
+                ? findLinkedActionForSuggestion(linkedActions.items, a)
+                : null;
+              return (
+                <li
+                  key={i}
+                  className="rounded border bg-card/40 px-2 py-1"
+                  data-testid="ai-doctor-session-detail-review-action"
+                  data-linked-action-queue-id={linkedMatch?.id ?? undefined}
+                >
+                  <span className="font-medium">{a.title}</span>
+                  {a.detail ? (
+                    <span className="text-muted-foreground"> — {a.detail}</span>
+                  ) : null}
+                  {linkedMatch ? (
+                    <div
+                      className="mt-1 flex flex-wrap items-center gap-2"
+                      data-testid="ai-doctor-session-detail-review-action-created-from-session"
+                      data-action-queue-id={linkedMatch.id}
+                    >
+                      <Badge
+                        variant="outline"
+                        className="text-[11px]"
+                        title="This suggestion already has an approval-required Action Queue item."
+                        data-testid="ai-doctor-session-detail-review-action-created-from-session-chip"
+                      >
+                        Created from this session
+                      </Badge>
+                      <Link
+                        to={linkedMatch.focusHref}
+                        className="text-xs underline text-primary"
+                        data-testid="ai-doctor-session-detail-review-action-created-from-session-link"
+                        data-action-queue-id={linkedMatch.id}
+                      >
+                        View in Action Queue
+                      </Link>
+                    </div>
+                  ) : null}
+                  {session ? (
+                    <AiDoctorSessionActionQueueButton
+                      session={session}
+                      action={a}
+                    />
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
@@ -1029,6 +1065,7 @@ function SessionDetailBody({
           plant_id: row.plant_id,
           diagnosis: d ? { riskLevel: d.riskLevel } : null,
         }}
+        linkedActions={linkedActions.vm}
       />
 
 

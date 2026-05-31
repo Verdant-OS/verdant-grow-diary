@@ -28,12 +28,15 @@ export interface LinkedActionInputRow {
   status?: string | null;
   source?: string | null;
   reason?: string | null;
+  suggested_change?: string | null;
 }
 
 export interface LinkedActionItem {
   id: string;
   status: string;
   reasonText: string;
+  /** Original `suggested_change` value (untokenized); used for suggestion matching. */
+  suggestedChange: string;
   focusHref: string;
 }
 
@@ -97,6 +100,7 @@ export function buildAiDoctorSessionLinkedActionsViewModel(
       id: row.id,
       status: row.status as string,
       reasonText: stripBackPointerTokens(row.reason ?? null),
+      suggestedChange: typeof row.suggested_change === "string" ? row.suggested_change : "",
       focusHref: buildFocusHref(row.id),
     });
   }
@@ -107,4 +111,37 @@ export function buildAiDoctorSessionLinkedActionsViewModel(
     primaryFocusHref: items.length === 1 ? items[0].focusHref : null,
     hasMultiple: items.length > 1,
   };
+}
+
+/**
+ * Pure suggestion ↔ linked-action matcher.
+ *
+ * Returns the first LinkedActionItem whose `suggested_change` or sanitized
+ * reason text contains the normalized suggestion title.
+ *
+ * Deterministic, null-safe, no I/O. Returns null when no usable title is
+ * present or no item matches.
+ */
+export interface SuggestionTitleLike {
+  title?: string | null;
+}
+
+function normalizeForMatch(value: string | null | undefined): string {
+  return (value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+export function findLinkedActionForSuggestion(
+  items: ReadonlyArray<LinkedActionItem> | null | undefined,
+  suggestion: SuggestionTitleLike | null | undefined,
+): LinkedActionItem | null {
+  if (!items || items.length === 0 || !suggestion) return null;
+  const title = normalizeForMatch(suggestion.title);
+  if (!title) return null;
+  for (const item of items) {
+    const change = normalizeForMatch(item.suggestedChange);
+    if (change && change.includes(title)) return item;
+    const reason = normalizeForMatch(item.reasonText);
+    if (reason && reason.includes(title)) return item;
+  }
+  return null;
 }

@@ -1,0 +1,176 @@
+{
+  "$schema_ref": "docs/fixture-schema-contract.md",
+  "fixture_scope": "bad_sensor_examples",
+  "is_fixture": true,
+  "notes": "Negative-example fixtures. Each case shows how the UI and AI Doctor must behave when telemetry is bad. No live readings. No executable payloads.",
+  "cases": [
+    {
+      "case_id": "bad_stale_temp",
+      "description": "Live reading older than 15 minutes is stale.",
+      "reading": {
+        "id": "bad_reading_stale_001",
+        "metric": "temp_c",
+        "value": 24.1,
+        "unit": "C",
+        "captured_at": "2026-04-05T08:00:00Z",
+        "state": "stale",
+        "source_type": "pi_bridge",
+        "is_fixture": true,
+        "fixture_scope": "bad_sensor_examples",
+        "confidence": 0.4,
+        "raw_payload": { "note": "captured_at >15 min before now" }
+      },
+      "expected_state": "stale",
+      "expected_ui_behavior": "Render value with 'Stale' badge and captured_at. Exclude from live KPIs.",
+      "expected_ai_behavior": "Cite as missing_info: 'temperature reading is stale'. Confidence cannot be high.",
+      "must_not_do": ["render as Live", "drive alerts as if fresh", "feed AI Doctor as a fresh signal"]
+    },
+    {
+      "case_id": "bad_null_humidity",
+      "description": "Null value reading is invalid.",
+      "reading": {
+        "id": "bad_reading_null_001",
+        "metric": "rh_pct",
+        "value": null,
+        "unit": "%",
+        "captured_at": "2026-04-05T09:00:00Z",
+        "state": "invalid",
+        "source_type": "pi_bridge",
+        "is_fixture": true,
+        "fixture_scope": "bad_sensor_examples",
+        "confidence": null,
+        "raw_payload": { "note": "sensor returned null" }
+      },
+      "expected_state": "invalid",
+      "expected_ui_behavior": "Show 'Invalid' badge. Do not display a numeric value.",
+      "expected_ai_behavior": "Treat as missing humidity. Populate missing_info.",
+      "must_not_do": ["display 0%", "interpolate", "treat as healthy"]
+    },
+    {
+      "case_id": "bad_nan_like_value",
+      "description": "NaN-like value represented safely as string.",
+      "reading": {
+        "id": "bad_reading_nan_001",
+        "metric": "vpd_kpa",
+        "value": "NaN",
+        "unit": "kPa",
+        "captured_at": "2026-04-05T09:00:00Z",
+        "state": "invalid",
+        "source_type": "home_assistant",
+        "is_fixture": true,
+        "fixture_scope": "bad_sensor_examples",
+        "confidence": null,
+        "raw_payload": { "note": "raw value was not a number" }
+      },
+      "expected_state": "invalid",
+      "expected_ui_behavior": "Show 'Invalid'. Do not coerce to 0 or display as a number.",
+      "expected_ai_behavior": "Exclude from analysis. Populate missing_info.",
+      "must_not_do": ["coerce to 0", "render as a chart point"]
+    },
+    {
+      "case_id": "bad_out_of_range_humidity",
+      "description": "Humidity outside physical 0–100% range.",
+      "reading": {
+        "id": "bad_reading_oor_001",
+        "metric": "rh_pct",
+        "value": 142.5,
+        "unit": "%",
+        "captured_at": "2026-04-05T09:00:00Z",
+        "state": "invalid",
+        "source_type": "manual_snapshot",
+        "is_fixture": true,
+        "fixture_scope": "bad_sensor_examples",
+        "confidence": null,
+        "raw_payload": { "note": "value out of physical range" }
+      },
+      "expected_state": "invalid",
+      "expected_ui_behavior": "Render 'Invalid' with raw value visible for grower review, never as healthy.",
+      "expected_ai_behavior": "Reject from diagnosis. Add to missing_info.",
+      "must_not_do": ["use in alerts as healthy", "classify tent as healthy"]
+    },
+    {
+      "case_id": "bad_unit_mismatch_celsius_fahrenheit",
+      "description": "Sensor reports F while target uses C — mismatch.",
+      "reading": {
+        "id": "bad_reading_unit_temp_001",
+        "metric": "temp_c",
+        "value": 76.5,
+        "unit": "F",
+        "captured_at": "2026-04-05T09:00:00Z",
+        "state": "invalid",
+        "source_type": "pi_bridge",
+        "is_fixture": true,
+        "fixture_scope": "bad_sensor_examples",
+        "confidence": null,
+        "raw_payload": { "note": "metric is temp_c but unit is F" }
+      },
+      "expected_state": "invalid",
+      "expected_ui_behavior": "Surface unit mismatch. Do not auto-convert silently.",
+      "expected_ai_behavior": "Flag mismatch in missing_info. No diagnosis until resolved.",
+      "must_not_do": ["silently convert", "render as in-range C value"]
+    },
+    {
+      "case_id": "bad_unit_mismatch_ec",
+      "description": "EC reported in µS/cm while system expects mS/cm.",
+      "reading": {
+        "id": "bad_reading_unit_ec_001",
+        "metric": "ec_mScm",
+        "value": 1200,
+        "unit": "uS/cm",
+        "captured_at": "2026-04-05T09:00:00Z",
+        "state": "invalid",
+        "source_type": "manual_snapshot",
+        "is_fixture": true,
+        "fixture_scope": "bad_sensor_examples",
+        "confidence": null,
+        "raw_payload": { "note": "unit mismatch ec" }
+      },
+      "expected_state": "invalid",
+      "expected_ui_behavior": "Show 'Invalid' with unit conflict explanation.",
+      "expected_ai_behavior": "Add to missing_info. No feeding recommendation.",
+      "must_not_do": ["compare to mS/cm targets", "recommend nutrient change"]
+    },
+    {
+      "case_id": "bad_future_timestamp",
+      "description": "captured_at is in the future.",
+      "reading": {
+        "id": "bad_reading_future_001",
+        "metric": "temp_c",
+        "value": 24.0,
+        "unit": "C",
+        "captured_at": "2099-01-01T00:00:00Z",
+        "state": "invalid",
+        "source_type": "pi_bridge",
+        "is_fixture": true,
+        "fixture_scope": "bad_sensor_examples",
+        "confidence": null,
+        "raw_payload": { "note": "future timestamp" }
+      },
+      "expected_state": "invalid",
+      "expected_ui_behavior": "Reject as invalid. Do not display in live KPIs.",
+      "expected_ai_behavior": "Exclude. Populate missing_info.",
+      "must_not_do": ["render as Live", "use as current state"]
+    },
+    {
+      "case_id": "bad_dead_feed_missing_captured_at",
+      "description": "Reading with no captured_at — dead/incomplete feed.",
+      "reading": {
+        "id": "bad_reading_dead_feed_001",
+        "metric": "rh_pct",
+        "value": 50.0,
+        "unit": "%",
+        "captured_at": null,
+        "state": "invalid",
+        "source_type": "pi_bridge",
+        "is_fixture": true,
+        "fixture_scope": "bad_sensor_examples",
+        "confidence": null,
+        "raw_payload": { "note": "missing captured_at" }
+      },
+      "expected_state": "invalid",
+      "expected_ui_behavior": "Render 'Invalid'. Surface 'no timestamp' explanation.",
+      "expected_ai_behavior": "Discard from analysis. Add to missing_info.",
+      "must_not_do": ["assume now()", "render as Live"]
+    }
+  ]
+}

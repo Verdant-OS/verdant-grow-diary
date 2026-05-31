@@ -145,13 +145,18 @@ describe("ActionDetail header — Linked from AI Doctor affordance", () => {
     expect(chip.textContent ?? "").toMatch(/linked from ai doctor/i);
   });
 
-  it("renders 'View AI Doctor session' anchor with route helper href", async () => {
+  it("renders a single 'View saved AI Doctor session' anchor with route helper href", async () => {
     renderDetail();
+    // After unification there is exactly ONE header session link.
     const anchor = (await screen.findByTestId(
-      "action-detail-ai-doctor-session-header-link-anchor",
+      "action-detail-ai-doctor-saved-session-link",
     )) as HTMLAnchorElement;
-    expect(anchor.textContent ?? "").toBe("View AI Doctor session");
+    expect(anchor.textContent ?? "").toBe("View saved AI Doctor session");
     expect(anchor.getAttribute("href")).toBe(aiDoctorSessionDetailPath("sess-abc"));
+    // The legacy header anchor testid is removed.
+    expect(
+      screen.queryByTestId("action-detail-ai-doctor-session-header-link-anchor"),
+    ).toBeNull();
   });
 
   it("does not render the affordance when AI Doctor row lacks a session id", async () => {
@@ -162,7 +167,7 @@ describe("ActionDetail header — Linked from AI Doctor affordance", () => {
       screen.queryByTestId("action-detail-ai-doctor-session-header-link"),
     ).toBeNull();
     expect(
-      screen.queryByTestId("action-detail-ai-doctor-session-header-link-anchor"),
+      screen.queryByTestId("action-detail-ai-doctor-saved-session-link"),
     ).toBeNull();
   });
 

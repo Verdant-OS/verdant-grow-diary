@@ -519,13 +519,6 @@ export default function ActionDetail() {
                 <Link
                   to={aiDoctorSessionDetailPath(headerSessionId)}
                   className="text-primary hover:underline"
-                  data-testid="action-detail-ai-doctor-session-header-link-anchor"
-                >
-                  View AI Doctor session
-                </Link>
-                <Link
-                  to={aiDoctorSessionDetailPath(headerSessionId)}
-                  className="text-primary hover:underline"
                   title="Open the saved review snapshot."
                   data-testid="action-detail-ai-doctor-saved-session-link"
                 >
@@ -621,7 +614,7 @@ export default function ActionDetail() {
                       to={aiDoctorSessionDetailPath(sessionId)}
                       data-testid="action-detail-ai-doctor-session-link"
                     >
-                      View AI Doctor session
+                      View saved AI Doctor session
                     </Link>
                   </Button>
                 )}

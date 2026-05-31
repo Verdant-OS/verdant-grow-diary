@@ -142,6 +142,37 @@ function AiDoctorSessionLink({
   );
 }
 
+/**
+ * Read-only originating-alert back-link affordance. Renders nothing when the
+ * row has no safe `[alert:<id>]` token. Never exposes raw tokens or device
+ * fields.
+ */
+function LinkedAlertLink({
+  row,
+}: {
+  row: Pick<ActionRow, "reason">;
+}) {
+  const alertId = extractSourceAlertId(row.reason);
+  if (!alertId) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-2 text-xs text-muted-foreground"
+      data-testid="action-queue-row-linked-alert"
+    >
+      <span>Linked alert</span>
+      <Link
+        to={alertDetailPath(alertId)}
+        className="text-primary hover:underline"
+        data-testid="action-queue-row-linked-alert-anchor"
+      >
+        View linked alert
+      </Link>
+    </span>
+  );
+}
+
+
+
 
 export default function ActionQueue() {
   const { user } = useAuth();

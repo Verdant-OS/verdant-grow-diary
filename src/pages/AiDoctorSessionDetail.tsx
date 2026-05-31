@@ -214,7 +214,13 @@ const RISK_TONE_CLASSES: Record<ReviewRiskTone, string> = {
   danger: "border-destructive/50 bg-destructive/5",
 };
 
-function ReviewSummarySection({ vm }: { vm: ReviewSummaryViewModel }) {
+function ReviewSummarySection({
+  vm,
+  session,
+}: {
+  vm: ReviewSummaryViewModel;
+  session?: AiDoctorSessionLike;
+}) {
   return (
     <section
       data-testid="ai-doctor-session-detail-review-summary"
@@ -297,11 +303,18 @@ function ReviewSummarySection({ vm }: { vm: ReviewSummaryViewModel }) {
                 {a.detail ? (
                   <span className="text-muted-foreground"> — {a.detail}</span>
                 ) : null}
+                {session ? (
+                  <AiDoctorSessionActionQueueButton
+                    session={session}
+                    action={a}
+                  />
+                ) : null}
               </li>
             ))}
           </ul>
         )}
       </div>
+
 
       <ReviewList
         title="What not to do"

@@ -225,16 +225,20 @@ describe("AiDoctorSessionDetail — review status panel", () => {
       }),
     ];
     renderDetail();
-    await waitFor(() => {
-      // After events load, the empty-state element is gone (cleared still has 2 events).
-      expect(
-        screen.queryByTestId("ai-doctor-session-detail-review-status-empty"),
-      ).toBeNull();
-    });
-    const panel = screen.getByTestId(
+    const panel = await screen.findByTestId(
       "ai-doctor-session-detail-review-status-panel",
     );
+    await waitFor(() => {
+      // After events load, two history items exist (one of them "cleared").
+      const items = screen.queryAllByTestId(
+        "ai-doctor-session-detail-review-status-event",
+      );
+      expect(items.length).toBe(2);
+    });
     expect(panel.getAttribute("data-review-status")).toBe("not_reviewed");
+    expect(
+      screen.queryByTestId("ai-doctor-session-detail-review-status-empty"),
+    ).toBeNull();
   });
 
   it("renders event history newest-first", async () => {

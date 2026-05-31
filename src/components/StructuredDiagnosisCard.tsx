@@ -12,6 +12,7 @@
  *     strips them before they ever reach this component.
  */
 import { useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, ShieldCheck, Sparkles } from "lucide-react";
@@ -26,6 +27,8 @@ import {
   harmonizeDiagnosisConfidence,
   isDisplayedConfidenceLow,
 } from "@/lib/aiDoctorConfidenceRules";
+import { useAiDoctorSessionLinkedActionQueueItems } from "@/hooks/useAiDoctorSessionLinkedActionQueueItems";
+import { findLinkedActionForSuggestion } from "@/lib/aiDoctorSessionLinkedActionsViewModel";
 
 export interface StructuredDiagnosisCardProps {
   diagnosis: Diagnosis;

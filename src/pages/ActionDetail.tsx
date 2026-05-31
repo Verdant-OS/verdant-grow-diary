@@ -505,7 +505,7 @@ export default function ActionDetail() {
           </Badge>
         </div>
         <h1 className="text-xl font-display font-bold">{row.suggested_change}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{row.reason}</p>
+        <p className="text-sm text-muted-foreground mt-1">{stripBackPointerTokens(row.reason)}</p>
 
         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
           <IdField label="Grow" id={row.grow_id} to={growDetailPath(row.grow_id)} />

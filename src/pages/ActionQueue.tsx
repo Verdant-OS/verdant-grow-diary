@@ -171,6 +171,26 @@ export default function ActionQueue() {
     load();
   }, [load]);
 
+  // Deep-link focus: after rows render, scroll the matching row into view.
+  // Best-effort; if the id is unknown or scrollIntoView is unavailable, we
+  // render normally without errors. Read-only — never changes status.
+  useEffect(() => {
+    if (!focusedActionId || loading) return;
+    if (typeof document === "undefined") return;
+    const escape =
+      typeof CSS !== "undefined" && typeof CSS.escape === "function"
+        ? CSS.escape
+        : (s: string) => s.replace(/"/g, '\\"');
+    const el = document.querySelector(
+      `[data-action-id="${escape(focusedActionId)}"]`,
+    ) as HTMLElement | null;
+    if (el && typeof el.scrollIntoView === "function") {
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+  }, [focusedActionId, loading, rows.length]);
+
+
+
   // SECURITY: never sends device commands. Inserts an audit row ONLY.
   // user_id is left to DB default auth.uid(). No privileged backend role.
   async function logEvent(

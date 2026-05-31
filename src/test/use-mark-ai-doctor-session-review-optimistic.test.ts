@@ -163,6 +163,7 @@ describe("useMarkAiDoctorSessionReview — optimistic cache", () => {
   it("prepends an optimistic reviewed event to a session-scoped cache", async () => {
     const { client, Wrapper } = makeClient();
     seedCache(client, ["s1"], []);
+    const deferred = deferInsert();
 
     const { result } = renderHook(() => useMarkAiDoctorSessionReview(), {
       wrapper: Wrapper,
@@ -172,7 +173,6 @@ describe("useMarkAiDoctorSessionReview — optimistic cache", () => {
       eventType: "marked_reviewed",
     });
 
-    // onMutate runs synchronously enough to see optimistic state before await.
     await waitFor(() => {
       const cache = getCache(client, ["s1"]);
       expect(cache?.events.length).toBe(1);
@@ -184,12 +184,14 @@ describe("useMarkAiDoctorSessionReview — optimistic cache", () => {
     );
     expect(cache.stateBySession.get("s1")?.status).toBe("reviewed");
 
+    deferred.resolve();
     await p;
   });
 
   it("prepends optimistic needs_follow_up with normalized note", async () => {
     const { client, Wrapper } = makeClient();
     seedCache(client, ["s1"], []);
+    const deferred = deferInsert();
 
     const { result } = renderHook(() => useMarkAiDoctorSessionReview(), {
       wrapper: Wrapper,
@@ -209,6 +211,7 @@ describe("useMarkAiDoctorSessionReview — optimistic cache", () => {
     expect(cache.events[0].note).toBe("watch overnight");
     expect(cache.stateBySession.get("s1")?.status).toBe("needs_follow_up");
 
+    deferred.resolve();
     await p;
   });
 
@@ -223,6 +226,7 @@ describe("useMarkAiDoctorSessionReview — optimistic cache", () => {
       created_at: "2025-01-01T00:00:00.000Z",
     };
     seedCache(client, ["s1"], [prior]);
+    const deferred = deferInsert();
 
     const { result } = renderHook(() => useMarkAiDoctorSessionReview(), {
       wrapper: Wrapper,
@@ -239,14 +243,16 @@ describe("useMarkAiDoctorSessionReview — optimistic cache", () => {
     expect(cache.events[0].event_type).toBe("cleared");
     expect(cache.stateBySession.get("s1")?.status).toBe("not_reviewed");
 
+    deferred.resolve();
     await p;
   });
 
   it("updates the broad (null-scope) cache and skips unrelated session scopes", async () => {
     const { client, Wrapper } = makeClient();
-    seedCache(client, null, []); // broad
-    seedCache(client, ["s1"], []); // matching narrow
-    seedCache(client, ["s2"], []); // unrelated narrow
+    seedCache(client, null, []);
+    seedCache(client, ["s1"], []);
+    seedCache(client, ["s2"], []);
+    const deferred = deferInsert();
 
     const { result } = renderHook(() => useMarkAiDoctorSessionReview(), {
       wrapper: Wrapper,
@@ -260,9 +266,9 @@ describe("useMarkAiDoctorSessionReview — optimistic cache", () => {
       expect(getCache(client, null)?.events.length).toBe(1);
     });
     expect(getCache(client, ["s1"])?.events.length).toBe(1);
-    // Unrelated scope must not be touched.
     expect(getCache(client, ["s2"])?.events.length).toBe(0);
 
+    deferred.resolve();
     await p;
   });
 

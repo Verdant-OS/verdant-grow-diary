@@ -25,6 +25,10 @@ import {
   EMPTY_LEARNING_REPORT,
   type ActionOutcomeLearningReport,
 } from "@/lib/actionOutcomeLearningRules";
+import {
+  findPendingOutcomeReviews,
+  PENDING_OUTCOME_REVIEW_THRESHOLD_MS,
+} from "@/lib/pendingOutcomeReviewRules";
 
 export type ReportsHubDataStatus = "idle" | "loading" | "ready" | "unavailable";
 
@@ -35,10 +39,13 @@ export interface ReportsHubData {
   alertsOpen: number;
   alertsCritical: number;
   alertsWarning: number;
+  firstOpenAlertId: string | null;
   latestSensorCapturedAt: string | null;
   recentSensorReadingCount: number;
   diaryEntriesTotal: number;
   diaryEntriesLast7d: number;
+  pendingOutcomeReviewCount: number;
+  firstPendingActionId: string | null;
 }
 
 export const EMPTY_REPORTS_HUB_DATA: ReportsHubData = {
@@ -48,11 +55,15 @@ export const EMPTY_REPORTS_HUB_DATA: ReportsHubData = {
   alertsOpen: 0,
   alertsCritical: 0,
   alertsWarning: 0,
+  firstOpenAlertId: null,
   latestSensorCapturedAt: null,
   recentSensorReadingCount: 0,
   diaryEntriesTotal: 0,
   diaryEntriesLast7d: 0,
+  pendingOutcomeReviewCount: 0,
+  firstPendingActionId: null,
 };
+
 
 export function useReportsHubData(growId: string | null | undefined): ReportsHubData {
   const { user } = useAuth();

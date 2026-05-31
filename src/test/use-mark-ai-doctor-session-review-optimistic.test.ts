@@ -98,7 +98,9 @@ vi.mock("@/integrations/supabase/client", () => {
 
 function makeClient() {
   const client = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    // gcTime must be > 0 so setQueryData entries with no observers persist
+    // long enough for assertions about optimistic state.
+    defaultOptions: { queries: { retry: false, gcTime: 60_000 } },
   });
   const Wrapper = ({ children }: { children: React.ReactNode }) =>
     React.createElement(QueryClientProvider, { client }, children);

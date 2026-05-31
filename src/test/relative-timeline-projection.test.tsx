@@ -31,6 +31,8 @@ const read = (p: string) =>
 const RULES = read("src/lib/relativeTimelineProjectionRules.ts");
 const COMPONENT = read("src/components/PlantRelativeTimelineSection.tsx");
 const PLANT_DETAIL = read("src/pages/PlantDetail.tsx");
+const stripSafetyNegations = (src: string) =>
+  src.replace(/\bNo reminder scheduling\b/gi, "");
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -76,12 +78,26 @@ describe("relative timeline projection — static guardrails", () => {
     expect(RULES).not.toMatch(/\.(insert|update|delete|upsert)\s*\(/);
   });
 
-  it("does not introduce calendar_events / notifications / reminders / email", () => {
-    for (const src of [RULES, COMPONENT]) {
+  it("does not introduce calendar_events / notifications / email or scheduled reminder systems", () => {
+    for (const src of [RULES, COMPONENT].map(stripSafetyNegations)) {
       expect(src).not.toMatch(/calendar_events/);
       expect(src).not.toMatch(/\bnotifications\b/);
-      expect(src).not.toMatch(/\breminders\b/);
+      expect(src).not.toMatch(/\b(schedule|scheduled|scheduling)\s+(a\s+|the\s+|new\s+)?reminders?\b/i);
+      expect(src).not.toMatch(/\breminders?\s+(schedule|scheduled|scheduling|system|engine|job|cron|notification|email)\b/i);
       expect(src).not.toMatch(/resend|sendgrid|mailgun|postmark|twilio/i);
+    }
+  });
+
+  it("allows the internal reminder category only as read-only log classification", () => {
+    expect(RULES).toContain('key: "reminder"');
+    expect(RULES).toContain('label: "Reminders"');
+    for (const src of [RULES, COMPONENT].map(stripSafetyNegations)) {
+      expect(src).not.toMatch(/calendar_events/);
+      expect(src).not.toMatch(/\bnotifications\b/);
+      expect(src).not.toMatch(/resend|sendgrid|mailgun|postmark|twilio/i);
+      expect(src).not.toMatch(/\b(schedule|scheduled|scheduling)\s+(a\s+|the\s+|new\s+)?reminders?\b/i);
+      expect(src).not.toMatch(/\breminders?\s+(schedule|scheduled|scheduling|system|engine|job|cron|notification|email)\b/i);
+      expect(src).not.toMatch(/\.(insert|update|delete|upsert)\s*\(/);
     }
   });
 
@@ -849,6 +865,10 @@ describe("summarizeRelativeTimelineItems — pure rules", () => {
       feeding: 0,
       symptoms: 0,
       training: 0,
+      measurement: 0,
+      transplant: 0,
+      harvest: 0,
+      reminder: 0,
       notes: 0,
     });
     expect(s.lastActivityAt).toBeNull();
@@ -865,16 +885,23 @@ describe("summarizeRelativeTimelineItems — pure rules", () => {
       tItem({ id: "s1", eventType: "pest_disease" }),
       tItem({ id: "t1", eventType: "training" }),
       tItem({ id: "t2", eventType: "defoliation" }),
+      tItem({ id: "m1", eventType: "measurement" }),
+      tItem({ id: "r1", eventType: "reminder" }),
+      tItem({ id: "tr1", eventType: "transplant" }),
       tItem({ id: "n1", eventType: "note" }),
     ];
     const s = summarizeRelativeTimelineItems(items, { now: NOW_MS });
-    expect(s.total).toBe(8);
+    expect(s.total).toBe(11);
     expect(s.counts).toEqual({
       photos: 1,
       watering: 2,
       feeding: 1,
       symptoms: 1,
       training: 2,
+      measurement: 1,
+      transplant: 1,
+      harvest: 0,
+      reminder: 1,
       notes: 1,
     });
   });

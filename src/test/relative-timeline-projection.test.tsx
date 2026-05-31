@@ -16,6 +16,14 @@ import { resolve } from "node:path";
 import React from "react";
 import { render, screen } from "@testing-library/react";
 
+// Stub react-router-dom so the empty-state CTA `<Link>` renders without
+// needing a real Router in every render() call. Keeps the test scope
+// presentation-only (no navigation is asserted via Router internals).
+vi.mock("react-router-dom", () => ({
+  Link: ({ to, children, ...rest }: { to: string; children: React.ReactNode; [k: string]: unknown }) =>
+    React.createElement("a", { href: typeof to === "string" ? to : "", ...rest }, children),
+}));
+
 import {
   buildRelativeTimelineProjection,
   groupRelativeTimelineByStage,
@@ -489,7 +497,7 @@ describe("PlantRelativeTimelineSection — render", () => {
     mockUse.mockReturnValue({ data: [], isLoading: false });
     render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
     expect(screen.getByTestId("relative-timeline-empty")).toHaveTextContent(
-      /first quick log, photo, or sensor snapshot/i,
+      /no timeline entries yet/i,
     );
   });
 
@@ -1570,6 +1578,261 @@ describe("entry detail — static safety", () => {
       expect(src).not.toMatch(/resend|sendgrid|mailgun|postmark|twilio/i);
       expect(src).not.toMatch(/\b(schedule|scheduled|scheduling)\s+(a\s+|the\s+|new\s+)?reminders?\b/i);
       expect(src).not.toMatch(/mqtt|home[\s_-]?assistant|relay|actuator|device_command|autopilot/i);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// First-log empty state CTAs (buildRelativeTimelineEmptyState)
+// ---------------------------------------------------------------------------
+
+import {
+  buildRelativeTimelineEmptyState,
+  RELATIVE_TIMELINE_EMPTY_COPY,
+  SENSORS_FALLBACK_ROUTE,
+} from "@/lib/relativeTimelineEmptyStateRules";
+import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
+
+const EMPTY_RULES = read("src/lib/relativeTimelineEmptyStateRules.ts");
+
+describe("buildRelativeTimelineEmptyState — pure rules", () => {
+  it("returns the canonical helper copy + 3 CTAs", () => {
+    const v = buildRelativeTimelineEmptyState(null);
+    expect(v.copy).toBe(RELATIVE_TIMELINE_EMPTY_COPY);
+    expect(v.copy).toMatch(/quick observation, manual sensor snapshot, or photo/i);
+    expect(v.ctas.map((c) => c.key)).toEqual(["quicklog", "manual-snapshot", "photo"]);
+    expect(v.ctas.map((c) => c.label)).toEqual([
+      "Add Quick Log",
+      "Add manual sensor snapshot",
+      "Upload photo",
+    ]);
+  });
+
+  it("QuickLog CTA dispatches the existing event with full prefill when context exists", () => {
+    const v = buildRelativeTimelineEmptyState({
+      plantId: "plant-1",
+      plantName: "Blueberry",
+      growId: "grow-1",
+      tentId: "tent-1",
+      tentName: "Tent A",
+    });
+    const q = v.ctas.find((c) => c.key === "quicklog")!;
+    expect(q.mode).toBe("event");
+    expect(q.eventName).toBe(PLANT_QUICKLOG_PREFILL_EVENT);
+    expect(q.eventDetail?.plantId).toBe("plant-1");
+    expect(q.eventDetail?.growId).toBe("grow-1");
+    expect(q.eventDetail?.tentId).toBe("tent-1");
+    expect(q.eventDetail?.eventType).toBe("observation");
+    expect(q.disabled).toBe(false);
+  });
+
+  it("QuickLog CTA degrades safely with null detail when context is missing", () => {
+    const v = buildRelativeTimelineEmptyState({ plantId: null });
+    const q = v.ctas.find((c) => c.key === "quicklog")!;
+    expect(q.disabled).toBe(false);
+    expect(q.eventDetail).toBeNull();
+  });
+
+  it("Manual sensor snapshot routes to /tents/:tentId when tent is known", () => {
+    const v = buildRelativeTimelineEmptyState({ tentId: "tent-1" });
+    const s = v.ctas.find((c) => c.key === "manual-snapshot")!;
+    expect(s.mode).toBe("route");
+    expect(s.route).toBe("/tents/tent-1");
+    expect(s.disabled).toBe(false);
+  });
+
+  it("Manual sensor snapshot degrades to the generic /sensors route when tent is missing", () => {
+    const v = buildRelativeTimelineEmptyState({ tentId: null });
+    const s = v.ctas.find((c) => c.key === "manual-snapshot")!;
+    expect(s.mode).toBe("route");
+    expect(s.route).toBe(SENSORS_FALLBACK_ROUTE);
+    expect(s.disabled).toBe(false);
+  });
+
+  it("Upload photo CTA dispatches QuickLog event with eventType=photo and available plant context", () => {
+    const v = buildRelativeTimelineEmptyState({
+      plantId: "plant-1",
+      growId: "grow-1",
+      tentId: "tent-1",
+    });
+    const p = v.ctas.find((c) => c.key === "photo")!;
+    expect(p.mode).toBe("event");
+    expect(p.eventName).toBe(PLANT_QUICKLOG_PREFILL_EVENT);
+    expect(p.eventDetail?.eventType).toBe("photo");
+    expect(p.eventDetail?.plantId).toBe("plant-1");
+    expect(p.disabled).toBe(false);
+  });
+
+  it("Upload photo CTA stays usable with just the generic photo event when no plant context", () => {
+    const v = buildRelativeTimelineEmptyState({});
+    const p = v.ctas.find((c) => c.key === "photo")!;
+    expect(p.disabled).toBe(false);
+    expect(p.eventDetail?.eventType).toBe("photo");
+    expect(p.eventDetail?.plantId).toBeUndefined();
+  });
+
+  it("never includes user_id, tokens, raw payloads, or provenance markers in event detail", () => {
+    const v = buildRelativeTimelineEmptyState({
+      plantId: "plant-uuid",
+      growId: "grow-uuid",
+      tentId: "tent-uuid",
+      plantName: "Pinky",
+      tentName: "Veg",
+    });
+    const serialized = JSON.stringify(v);
+    expect(serialized.toLowerCase()).not.toContain("user_id");
+    expect(serialized.toLowerCase()).not.toContain("token");
+    expect(serialized.toLowerCase()).not.toContain("raw_payload");
+    expect(serialized.toLowerCase()).not.toContain("provenance");
+    expect(serialized.toLowerCase()).not.toContain("service_role");
+  });
+});
+
+describe("PlantRelativeTimelineSection — first-log empty state render", () => {
+  it("renders the canonical helper copy when no entries exist", () => {
+    mockUse.mockReturnValue({ data: [], isLoading: false });
+    render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
+    expect(screen.getByTestId("relative-timeline-empty-copy")).toHaveTextContent(
+      /no timeline entries yet/i,
+    );
+    expect(screen.getByTestId("relative-timeline-empty-copy")).toHaveTextContent(
+      /quick observation, manual sensor snapshot, or photo/i,
+    );
+  });
+
+  it("renders all three CTA labels", () => {
+    mockUse.mockReturnValue({ data: [], isLoading: false });
+    render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
+    expect(screen.getByTestId("relative-timeline-empty-cta-quicklog")).toHaveTextContent(
+      "Add Quick Log",
+    );
+    expect(
+      screen.getByTestId("relative-timeline-empty-cta-manual-snapshot"),
+    ).toHaveTextContent("Add manual sensor snapshot");
+    expect(screen.getByTestId("relative-timeline-empty-cta-photo")).toHaveTextContent(
+      "Upload photo",
+    );
+  });
+
+  it("QuickLog CTA dispatches PLANT_QUICKLOG_PREFILL_EVENT with available context", () => {
+    mockUse.mockReturnValue({ data: [], isLoading: false });
+    render(
+      <PlantRelativeTimelineSection
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+        plantName="Blueberry"
+        growId="grow-1"
+        tentId="tent-1"
+        tentName="Tent A"
+      />,
+    );
+    const events: CustomEvent[] = [];
+    const listener = (e: Event) => events.push(e as CustomEvent);
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
+    fireEvent.click(screen.getByTestId("relative-timeline-empty-cta-quicklog"));
+    window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
+    expect(events).toHaveLength(1);
+    const detail = (events[0] as CustomEvent).detail;
+    expect(detail.plantId).toBe(PLANT);
+    expect(detail.growId).toBe("grow-1");
+    expect(detail.tentId).toBe("tent-1");
+    expect(detail.eventType).toBe("observation");
+  });
+
+  it("Manual sensor snapshot CTA routes to the existing tent page when tent is known", () => {
+    mockUse.mockReturnValue({ data: [], isLoading: false });
+    render(
+      <PlantRelativeTimelineSection
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+        tentId="tent-1"
+      />,
+    );
+    const link = screen.getByTestId("relative-timeline-empty-cta-manual-snapshot");
+    expect(link.getAttribute("data-route")).toBe("/tents/tent-1");
+    const anchor = link.tagName === "A" ? link : link.querySelector("a");
+    expect(anchor?.getAttribute("href")).toBe("/tents/tent-1");
+  });
+
+  it("Manual sensor snapshot CTA degrades to /sensors when tent context is missing", () => {
+    mockUse.mockReturnValue({ data: [], isLoading: false });
+    render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
+    const link = screen.getByTestId("relative-timeline-empty-cta-manual-snapshot");
+    expect(link.getAttribute("data-route")).toBe("/sensors");
+    const anchor = link.tagName === "A" ? link : link.querySelector("a");
+    expect(anchor?.getAttribute("href")).toBe("/sensors");
+  });
+
+  it("Upload photo CTA dispatches the existing QuickLog event with eventType=photo", () => {
+    mockUse.mockReturnValue({ data: [], isLoading: false });
+    render(
+      <PlantRelativeTimelineSection
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+        growId="grow-1"
+        tentId="tent-1"
+      />,
+    );
+    const events: CustomEvent[] = [];
+    const listener = (e: Event) => events.push(e as CustomEvent);
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
+    fireEvent.click(screen.getByTestId("relative-timeline-empty-cta-photo"));
+    window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
+    expect(events).toHaveLength(1);
+    const detail = (events[0] as CustomEvent).detail;
+    expect(detail.eventType).toBe("photo");
+    expect(detail.plantId).toBe(PLANT);
+  });
+
+  it("does not render the first-log empty state when entries exist", () => {
+    mockUse.mockReturnValue({
+      data: [entry({ id: "e1", note: "hello" })],
+      isLoading: false,
+    });
+    render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
+    expect(screen.queryByTestId("relative-timeline-empty")).toBeNull();
+    expect(screen.queryByTestId("relative-timeline-empty-cta-quicklog")).toBeNull();
+  });
+
+  it("does not expose raw IDs, user IDs, tokens, or provenance markers in visible text", () => {
+    mockUse.mockReturnValue({ data: [], isLoading: false });
+    const { container } = render(
+      <PlantRelativeTimelineSection
+        plantId="plant-uuid-1234"
+        plantStartedAt={PLANT_STARTED}
+        growId="grow-uuid-5678"
+        tentId="tent-uuid-9999"
+      />,
+    );
+    const text = container.textContent ?? "";
+    expect(text).not.toContain("plant-uuid-1234");
+    expect(text).not.toContain("grow-uuid-5678");
+    expect(text).not.toContain("tent-uuid-9999");
+    expect(text.toLowerCase()).not.toContain("user_id");
+    expect(text.toLowerCase()).not.toContain("token");
+    expect(text.toLowerCase()).not.toContain("raw_payload");
+    expect(text.toLowerCase()).not.toContain("provenance");
+  });
+});
+
+describe("empty-state CTAs — static safety", () => {
+  it("rules module performs no writes / RPC / functions.invoke / service_role", () => {
+    expect(EMPTY_RULES).not.toMatch(/service_role/);
+    expect(EMPTY_RULES).not.toMatch(/functions\.invoke/);
+    expect(EMPTY_RULES).not.toMatch(/\.(insert|update|delete|upsert)\s*\(/);
+    expect(EMPTY_RULES).not.toMatch(/\.rpc\(/);
+    expect(EMPTY_RULES).not.toMatch(/calendar_events/);
+    expect(EMPTY_RULES).not.toMatch(/\bnotifications\b/);
+    expect(EMPTY_RULES).not.toMatch(/resend|sendgrid|mailgun|postmark|twilio/i);
+    expect(EMPTY_RULES).not.toMatch(/\b(schedule|scheduled|scheduling)\s+(a\s+|the\s+|new\s+)?reminders?\b/i);
+    expect(EMPTY_RULES).not.toMatch(/mqtt|home[\s_-]?assistant|relay|actuator|device_command|autopilot/i);
+    expect(EMPTY_RULES).not.toMatch(/supabase/i);
+  });
+
+  it("component empty-state additions perform no direct writes", () => {
+    // CTAs are dispatch-only or <Link>-based; no Supabase calls.
+    for (const re of [/\.insert\(/, /\.update\(/, /\.delete\(/, /\.upsert\(/, /\.rpc\(/, /functions\.invoke/]) {
+      expect(COMPONENT).not.toMatch(re);
     }
   });
 });

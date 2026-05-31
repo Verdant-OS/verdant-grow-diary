@@ -64,6 +64,7 @@ import {
 import {
   addSavedView,
   BUILTIN_SAVED_VIEWS,
+  BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID,
   BUILTIN_SAVED_VIEW_TOOLTIP,
   exportSavedViewsToJson,
   findBuiltInSavedView,

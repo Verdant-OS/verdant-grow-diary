@@ -307,8 +307,8 @@ export default function Demo() {
           >
             <h3 className="font-display text-lg font-semibold">{promptOpen} is part of your real grow</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              Create a free account to use this with your real grow. Demo
-              actions are not saved.
+              {ACTION_PROMPTS[promptOpen] ?? "Create a free account to use this with your real grow."}
+              {" "}Demo actions are not saved.
             </p>
             <div className="mt-5 flex items-center gap-2 justify-end">
               <Button variant="ghost" size="sm" onClick={closePrompt}>Keep exploring</Button>

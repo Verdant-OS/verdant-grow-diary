@@ -141,8 +141,18 @@ export default function ActionQueue() {
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
 
   // Deep-link focus: /actions?focus=<action_id>. Presenter-only; never mutates rows.
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const focusedActionId = searchParams.get("focus");
+
+  const clearFocus = useCallback(() => {
+    // Remove ONLY the `focus` query param. Preserve every other param
+    // (filters, search, status tabs, pagination, growId, etc.).
+    const next = new URLSearchParams(searchParams);
+    next.delete("focus");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+
 
 
 

@@ -26,7 +26,7 @@ import { Loader2, Check, X, FlaskConical, ListChecks, History, CheckCircle2, Ban
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
-import { actionDetailPath, actionsPath, aiDoctorSessionDetailPath } from "@/lib/routes";
+import { actionDetailPath, actionsPath, aiDoctorSessionDetailPath, alertDetailPath } from "@/lib/routes";
 import { toast } from "sonner";
 import {
   type ActionStatus,
@@ -47,6 +47,7 @@ import {
   isAlertDerived,
   isAiDoctorDerived,
   extractSourceAiDoctorSessionId,
+  extractSourceAlertId,
   stripBackPointerTokens,
 } from "@/lib/actionQueueProvenanceRules";
 import { buildActionQueueGrowContextHint } from "@/lib/actionQueueGrowContextHintRules";
@@ -140,6 +141,37 @@ function AiDoctorSessionLink({
     </span>
   );
 }
+
+/**
+ * Read-only originating-alert back-link affordance. Renders nothing when the
+ * row has no safe `[alert:<id>]` token. Never exposes raw tokens or device
+ * fields.
+ */
+function LinkedAlertLink({
+  row,
+}: {
+  row: Pick<ActionRow, "reason">;
+}) {
+  const alertId = extractSourceAlertId(row.reason);
+  if (!alertId) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-2 text-xs text-muted-foreground"
+      data-testid="action-queue-row-linked-alert"
+    >
+      <span>Linked alert</span>
+      <Link
+        to={alertDetailPath(alertId)}
+        className="text-primary hover:underline"
+        data-testid="action-queue-row-linked-alert-anchor"
+      >
+        View linked alert
+      </Link>
+    </span>
+  );
+}
+
+
 
 
 export default function ActionQueue() {
@@ -613,8 +645,9 @@ export default function ActionQueue() {
                     </div>
                     <p className="text-sm mt-1">{row.suggested_change}</p>
                     <p className="text-xs text-muted-foreground mt-1">{stripBackPointerTokens(row.reason)}</p>
-                    <div className="mt-1">
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                       <AiDoctorSessionLink row={row} />
+                      <LinkedAlertLink row={row} />
                     </div>
                   </div>
                 </div>
@@ -713,8 +746,9 @@ export default function ActionQueue() {
                     View Details
                   </Link>
                 </div>
-                <div className="mt-1">
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                   <AiDoctorSessionLink row={row} />
+                  <LinkedAlertLink row={row} />
                 </div>
                 <EventHistory items={events[row.id]} />
               </li>

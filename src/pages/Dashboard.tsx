@@ -140,7 +140,7 @@ export default function Dashboard() {
   // out of a shared global cap. Read-only; no writes.
   const tentIds = tents.map((t) => t.id);
   const { byTent: readingsByTent } = useSensorReadingsByTents(tentIds);
-  const { data: insights = [] } = useAIInsights();
+  // AI Insights: no real-data hook yet — render an honest empty state below.
   const { recent, pending } = useDashboardScopedData(scopedGrowId ?? null);
   // Multi-tent selector for the Latest Environment card. Defaults to "all"
   // (matches prior behavior); when a specific tent is chosen the snapshot

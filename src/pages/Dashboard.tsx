@@ -28,6 +28,7 @@ import { useGrows } from "@/store/grows";
 import OnboardingChecklistCard from "@/components/OnboardingChecklistCard";
 import OnboardingProgressPill from "@/components/OnboardingProgressPill";
 import DashboardZeroTentEmptyState from "@/components/DashboardZeroTentEmptyState";
+import FirstPlantMemoryCta from "@/components/FirstPlantMemoryCta";
 import { buildOnboardingChecklistViewModel } from "@/lib/onboardingChecklistViewModel";
 import { useSensorReadings, useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import { useScopedGrow } from "@/hooks/useScopedGrow";

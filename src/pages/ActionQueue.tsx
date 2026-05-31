@@ -111,6 +111,37 @@ const RISK_RANK: Record<ActionRow["risk_level"], number> = {
   low: 1,
 };
 
+/**
+ * Read-only AI Doctor session back-link affordance. Renders nothing when
+ * the row is not AI Doctor-derived or when no safe session id can be parsed
+ * from the reason. Never exposes raw `[session:<id>]` tokens or device fields.
+ */
+function AiDoctorSessionLink({
+  row,
+}: {
+  row: Pick<ActionRow, "source" | "reason">;
+}) {
+  if (!isAiDoctorDerived(row)) return null;
+  const sessionId = extractSourceAiDoctorSessionId(row.reason);
+  if (!sessionId) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-2 text-xs text-muted-foreground"
+      data-testid="action-queue-row-ai-doctor-session-link"
+    >
+      <span>Linked from AI Doctor</span>
+      <Link
+        to={aiDoctorSessionDetailPath(sessionId)}
+        className="text-primary hover:underline"
+        data-testid="action-queue-row-ai-doctor-session-link-anchor"
+      >
+        View AI Doctor session
+      </Link>
+    </span>
+  );
+}
+
+
 export default function ActionQueue() {
   const { user } = useAuth();
   const { grows, activeGrowId, activeGrow } = useGrows();

@@ -424,7 +424,10 @@ export default function ActionQueue() {
       if (statusFilter === "pending") return s === "pending_approval";
       return s === statusFilter;
     };
-    const list = rows
+    // Alert context narrowing happens first so downstream filters/sorts
+    // compose with the already-narrowed list.
+    const scoped = filterActionsByAlertContext(rows, alertContextId);
+    const list = scoped
       .filter((r) => matchesStatus(r.status))
       .filter((r) => riskFilter === "all" || r.risk_level === riskFilter)
       .filter((r) => sourceFilter === "all" || (r.source ?? "") === sourceFilter);
@@ -435,7 +438,8 @@ export default function ActionQueue() {
       return sortOrder === "oldest" ? ta - tb : tb - ta;
     });
     return sorted;
-  }, [rows, statusFilter, riskFilter, sourceFilter, sortOrder]);
+  }, [rows, alertContextId, statusFilter, riskFilter, sourceFilter, sortOrder]);
+
 
   const pending = useMemo(
     () => filtered.filter((r) => r.status === "pending_approval"),

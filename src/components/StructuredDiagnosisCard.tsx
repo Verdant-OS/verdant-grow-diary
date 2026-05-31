@@ -362,6 +362,30 @@ export default function StructuredDiagnosisCard({
                       Approval required
                     </Badge>
                   </div>
+                  {linkedMatch ? (
+                    <div
+                      className="flex flex-wrap items-center gap-2 pt-1"
+                      data-testid={`${testId}-suggested-action-${i}-created-from-session`}
+                      data-action-queue-id={linkedMatch.id}
+                    >
+                      <Badge
+                        variant="outline"
+                        className="text-[10px]"
+                        title="This suggestion already has an approval-required Action Queue item."
+                        data-testid={`${testId}-suggested-action-${i}-created-from-session-chip`}
+                      >
+                        Created from this session
+                      </Badge>
+                      <Link
+                        to={linkedMatch.focusHref}
+                        className="text-[11px] underline text-primary"
+                        data-testid={`${testId}-suggested-action-${i}-created-from-session-link`}
+                        data-action-queue-id={linkedMatch.id}
+                      >
+                        View in Action Queue
+                      </Link>
+                    </div>
+                  ) : null}
                 </li>
               );
             })}

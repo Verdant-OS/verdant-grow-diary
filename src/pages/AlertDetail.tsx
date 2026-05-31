@@ -35,12 +35,22 @@ import {
   type AlertStatusRow,
 } from "@/lib/alerts";
 import { useAlertEvents } from "@/hooks/useAlertEvents";
-import { actionDetailPath, alertsPath, growDetailPath, plantDetailPath, tentDetailPath } from "@/lib/routes";
+import {
+  actionDetailPath,
+  aiDoctorSessionDetailPath,
+  alertsPath,
+  growDetailPath,
+  plantDetailPath,
+  tentDetailPath,
+} from "@/lib/routes";
 import { actionMatchesAlert, buildActionQueueDraftFromAlert } from "@/lib/alertToActionQueueRules";
 import {
+  ACTION_QUEUE_SOURCE_VALUES,
+  extractSourceAiDoctorSessionId,
   getActionQueueSourceLabel,
   hasPendingActionsForClosedAlert,
   isActionDerivedFromAlert,
+  isAiDoctorDerived,
 } from "@/lib/actionQueueProvenanceRules";
 import {
   pickLatestOutcomeForAction,

@@ -252,6 +252,12 @@ export default function Dashboard() {
         />
       )}
 
+      <div className="my-3">
+        <OnboardingChecklistCard vm={onboardingVm} />
+      </div>
+
+
+
       <DashboardDataSourceDisclosure
         scopedGrowId={scopedGrowId}
         hasAnyData={tents.length > 0 || plants.length > 0}

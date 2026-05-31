@@ -241,7 +241,7 @@ export function buildReportsReviewQueue(
           : `${lowSample} outcome patterns still have too few samples to read confidently.`,
       helpText: REVIEW_ITEM_HELP_TEXT.low_sample_learning,
       whyThisIsHere: whyParts.join(" · "),
-      href: growDetailPath(growId),
+      href: growDetailOutcomesPath(growId),
       hrefLabel: "Open learning report",
     });
   }

@@ -20,6 +20,7 @@ import {
   filterRelativeTimelineItems,
   formatRelativeTimelineEntryDetail,
   formatRelativeTimelineGroupSummary,
+  formatRelativeTimelineHeader,
   formatRelativeTimelineSummary,
   getRelativeTimelineFilterEmptyState,
   groupRelativeTimelineByStage,
@@ -29,6 +30,7 @@ import {
   type RelativeTimelineFilterKey,
   type RelativeTimelineItem,
 } from "@/lib/relativeTimelineProjectionRules";
+
 import {
   buildRelativeTimelineEmptyState,
   type RelativeTimelineCta,

@@ -613,3 +613,106 @@ export function formatRelativeTimelineGroupSummary(
     compact: parts.join(" · "),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Per-entry detail view model (presentation-only)
+// ---------------------------------------------------------------------------
+
+/**
+ * Optional human-readable context for a single timeline card. Callers
+ * pass in already-resolved names from their own scopes (Plant Detail
+ * knows the plant + tent). The view model never looks anything up —
+ * no IDs are rendered, only names that were explicitly provided.
+ */
+export interface RelativeTimelineEntryContext {
+  plantName?: string | null;
+  tentName?: string | null;
+  growName?: string | null;
+}
+
+export interface RelativeTimelineEntryDetailView {
+  categoryKey: Exclude<RelativeTimelineFilterKey, "all">;
+  /** Human-readable category label, e.g. "Watering", "Notes". */
+  categoryLabel: string;
+  /** Human-readable source label, e.g. "Quick log", "Photo", "Manual snapshot". */
+  sourceLabel: string;
+  /** Best-available timestamp copy, or a safe fallback string. */
+  timestampLabel: string;
+  timestampIsFallback: boolean;
+  /** "What happened" summary, or a safe fallback when the note is empty. */
+  summary: string;
+  summaryIsFallback: boolean;
+  /** Pre-formatted context labels; null when the name wasn't provided. */
+  plantContextLabel: string | null;
+  tentContextLabel: string | null;
+  growContextLabel: string | null;
+  hasContext: boolean;
+}
+
+const ENTRY_SOURCE_LABEL: Record<RelativeTimelineItemSource, string> = {
+  note: "Quick log",
+  photo: "Photo",
+  // Sensor-source rows on this surface come from manual QuickLog
+  // snapshots — there is no live-stream rendering path here.
+  sensor: "Manual snapshot",
+};
+
+const SUMMARY_FALLBACK_COPY = "No note recorded for this entry.";
+const TIMESTAMP_FALLBACK_COPY = "No timestamp recorded.";
+
+function nonBlankTrimmed(v: unknown): string | null {
+  return typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
+}
+
+/**
+ * Build the per-card detail view model. Pure and deterministic.
+ *
+ * - Never renders raw IDs, tokens, payloads, or provenance markers.
+ * - Uses muted fallback copy when fields are missing.
+ * - Category / source labels are human-readable.
+ */
+export function formatRelativeTimelineEntryDetail(
+  item: RelativeTimelineItem | null | undefined,
+  context?: RelativeTimelineEntryContext | null,
+): RelativeTimelineEntryDetailView | null {
+  if (!item) return null;
+  const categoryKey = classifyRelativeTimelineFilter(item);
+  const def = RELATIVE_TIMELINE_FILTERS.find((f) => f.key === categoryKey);
+  const categoryLabel = def?.label ?? "Notes";
+
+  const rawTitle = nonBlankTrimmed(item.title);
+  const rawEventType = nonBlankTrimmed(item.eventType);
+  // `deriveTitle` falls back to the eventType when no note exists; treat
+  // that case as "no note" so the card shows muted fallback copy instead
+  // of repeating the raw event type as a sentence.
+  const looksLikeEventTypeFallback =
+    !rawTitle ||
+    (rawEventType !== null &&
+      rawTitle.toLowerCase() === rawEventType.toLowerCase());
+  const summary = looksLikeEventTypeFallback
+    ? SUMMARY_FALLBACK_COPY
+    : (rawTitle as string);
+  const summaryIsFallback = looksLikeEventTypeFallback;
+
+  const rawTs = nonBlankTrimmed(item.occurredAtLabel);
+  const timestampLabel = rawTs ?? TIMESTAMP_FALLBACK_COPY;
+  const timestampIsFallback = rawTs === null;
+
+  const plantName = nonBlankTrimmed(context?.plantName);
+  const tentName = nonBlankTrimmed(context?.tentName);
+  const growName = nonBlankTrimmed(context?.growName);
+
+  return {
+    categoryKey,
+    categoryLabel,
+    sourceLabel: ENTRY_SOURCE_LABEL[item.source] ?? "Quick log",
+    timestampLabel,
+    timestampIsFallback,
+    summary,
+    summaryIsFallback,
+    plantContextLabel: plantName ? `Plant: ${plantName}` : null,
+    tentContextLabel: tentName ? `Tent: ${tentName}` : null,
+    growContextLabel: growName ? `Grow: ${growName}` : null,
+    hasContext: Boolean(plantName || tentName || growName),
+  };
+}

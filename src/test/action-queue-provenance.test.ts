@@ -93,8 +93,21 @@ describe("ActionQueue UI — provenance presentation", () => {
     expect((QUEUE.match(/isAlertDerived\(row\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
     expect(QUEUE).toMatch(/getActionQueueSourceLabel\(row\)/);
   });
-  it("does not regex-parse [alert:...] inline in JSX", () => {
-    expect(QUEUE).not.toMatch(/\[alert:/);
+  it("does not parse alert provenance tokens inline in ActionQueue executable code", () => {
+    // Strip block + line comments so harmless docstring mentions of the
+    // safe `[alert:<id>]` token don't trip this scan. The real intent:
+    // ActionQueue must delegate token parsing to the shared helper
+    // `extractSourceAlertId` and never construct ad-hoc regexes/matchers
+    // against the `[alert:` literal inside JSX or executable code.
+    const executable = QUEUE
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+    expect(executable).not.toContain("[alert:");
+    expect(executable).not.toMatch(/\.match\(\s*\/\\?\[alert:/);
+    expect(executable).not.toMatch(/\.exec\(\s*\/\\?\[alert:/);
+    expect(executable).not.toMatch(/new RegExp\(\s*["'`]\\?\[alert:/);
+    // Positive contract: parsing goes through the shared helper.
+    expect(QUEUE).toMatch(/extractSourceAlertId\(/);
   });
 });
 

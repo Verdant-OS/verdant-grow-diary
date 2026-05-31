@@ -313,8 +313,9 @@ export default function PlantRelativeTimelineSection({
               ))}
             </div>
           </div>
-
+        ) : (
           <div className="space-y-3">
+
             {(() => {
               const formatted = formatRelativeTimelineSummary(
                 summarizeRelativeTimelineItems(items),

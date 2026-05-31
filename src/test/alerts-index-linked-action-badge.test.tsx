@@ -225,6 +225,25 @@ describe("Alerts Index — Linked action badge", () => {
     expect(anchor.getAttribute("href")).toBe(actionDetailPath("act-one"));
   });
 
+  it("links multiple linked actions to /actions?alert=<alert_id>", async () => {
+    renderPage();
+    const li = await rowFor("alert-many");
+    const anchor = (await waitFor(() =>
+      within(li).getByTestId("alert-row-linked-action-anchor"),
+    )) as HTMLAnchorElement;
+    expect(anchor.getAttribute("href")).toBe(
+      actionQueueAlertContextPath("alert-many"),
+    );
+    expect(anchor.getAttribute("href")).toContain("alert=alert-many");
+  });
+
+  it("encodes the alert id safely in the multi-action query param", () => {
+    expect(actionQueueAlertContextPath("a b/c?d")).toBe(
+      "/actions?alert=a%20b%2Fc%3Fd",
+    );
+  });
+
+
   it("never renders raw [alert:<id>] tokens", async () => {
     const { container } = renderPage();
     await waitFor(() =>

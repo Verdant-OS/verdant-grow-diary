@@ -34,11 +34,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import EmptyState from "@/components/EmptyState";
 import DailyGrowCheckStatusCard from "@/components/DailyGrowCheckStatusCard";
+import GrowRoomQuickActionsCard from "@/components/GrowRoomQuickActionsCard";
 import QuickLog, { type QuickLogPrefill } from "@/components/QuickLog";
 import { supabase } from "@/integrations/supabase/client";
 import { useTents } from "@/hooks/use-tents";
 import { usePlants } from "@/hooks/use-plants";
 import { useAlertsList } from "@/hooks/useAlertsList";
+import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { actionsPath, alertsPath, tentDetailPath, tentsPath } from "@/lib/routes";
 
 import {
@@ -120,6 +122,7 @@ export default function GrowRoomMode() {
   const { data: tents } = useTents();
   const { data: plants = [] } = usePlants();
   const { alerts } = useAlertsList({});
+  const { urlGrowId } = useScopedGrow();
   const [quickLogPrefill, setQuickLogPrefill] = useState<QuickLogPrefill | null>(null);
   const [quickLogOpen, setQuickLogOpen] = useState(false);
 
@@ -271,6 +274,8 @@ export default function GrowRoomMode() {
           </Button>
         }
       />
+
+      <GrowRoomQuickActionsCard scopedGrowId={urlGrowId} />
 
       {!showEmpty && (
         <DailyGrowCheckStatusCard

@@ -33,6 +33,10 @@ import {
   type AiDoctorSessionReviewPanelTone,
 } from "@/lib/aiDoctorSessionReviewStatusRules";
 import { useAiDoctorSessionReviews } from "@/hooks/useAiDoctorSessionReviews";
+import {
+  REVIEW_NOTE_MAX_LENGTH,
+  useMarkAiDoctorSessionReview,
+} from "@/hooks/useMarkAiDoctorSessionReview";
 import { plantDetailPath, tentDetailPath } from "@/lib/routes";
 
 async function copyPlainText(text: string): Promise<boolean> {

@@ -93,7 +93,7 @@ vi.mock("@/integrations/supabase/client", () => {
       contains: () => chain,
       in: () => chain,
       like: () => chain,
-      order: () => Promise.resolve(result),
+      order: () => chain,
       limit: () => Promise.resolve(result),
       then: (resolve: (r: Result) => unknown) => resolve(result),
       insert: () => Promise.resolve({ data: null, error: null }),

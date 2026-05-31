@@ -61,10 +61,11 @@ export default function CreatePlantDialog({ trigger, defaultTentId, defaultGrowI
       return;
     }
     setBusy(true);
+    const trimmedStrain = form.strain.trim();
     const payload: Record<string, unknown> = {
       user_id: user.id,
       name: form.name.trim(),
-      strain: form.strain.trim(),
+      strain: trimmedStrain || null,
       stage: form.stage,
       health: form.health,
     };
@@ -108,14 +109,23 @@ export default function CreatePlantDialog({ trigger, defaultTentId, defaultGrowI
         <DialogHeader>
           <DialogTitle className="font-display">New plant</DialogTitle>
         </DialogHeader>
+        <p className="text-xs text-muted-foreground -mt-1">
+          Start simple. You can add genetics, medium, dates, and notes later. Verdant works best once your first plant memory exists.
+        </p>
         <form onSubmit={submit} className="grid gap-3">
           <div>
             <Label>Name</Label>
             <Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Plant A" />
+            <p className="text-[11px] text-muted-foreground mt-1">Only a name and stage are required to get started.</p>
           </div>
           <div>
-            <Label>Strain</Label>
-            <Input required value={form.strain} onChange={(e) => setForm({ ...form, strain: e.target.value })} placeholder="Blue Dream" />
+            <Label>Stage</Label>
+            <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {STAGES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <div className="flex items-center justify-between mb-1">
@@ -143,30 +153,28 @@ export default function CreatePlantDialog({ trigger, defaultTentId, defaultGrowI
               <p className="text-xs text-muted-foreground mt-1">No tents yet. Create a tent first.</p>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <Label>Stage</Label>
-              <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {STAGES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
+          <details className="rounded-md border border-border/40 px-3 py-2">
+            <summary className="cursor-pointer text-xs text-muted-foreground select-none">Optional details (enrich later)</summary>
+            <div className="grid gap-3 pt-3">
+              <div>
+                <Label>Strain (optional)</Label>
+                <Input value={form.strain} onChange={(e) => setForm({ ...form, strain: e.target.value })} placeholder="Blue Dream" />
+              </div>
+              <div>
+                <Label>Health</Label>
+                <Select value={form.health} onValueChange={(v) => setForm({ ...form, health: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {HEALTH.map((h) => <SelectItem key={h.value} value={h.value}>{h.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Started at (optional)</Label>
+                <Input type="date" value={form.started_at} onChange={(e) => setForm({ ...form, started_at: e.target.value })} />
+              </div>
             </div>
-            <div>
-              <Label>Health</Label>
-              <Select value={form.health} onValueChange={(v) => setForm({ ...form, health: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {HEALTH.map((h) => <SelectItem key={h.value} value={h.value}>{h.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div>
-            <Label>Started at (optional)</Label>
-            <Input type="date" value={form.started_at} onChange={(e) => setForm({ ...form, started_at: e.target.value })} />
-          </div>
+          </details>
           <Button disabled={busy} className="gradient-leaf text-primary-foreground">Create plant</Button>
         </form>
       </DialogContent>

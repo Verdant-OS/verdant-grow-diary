@@ -28,6 +28,7 @@ import { useGrows } from "@/store/grows";
 import OnboardingChecklistCard from "@/components/OnboardingChecklistCard";
 import OnboardingProgressPill from "@/components/OnboardingProgressPill";
 import DashboardZeroTentEmptyState from "@/components/DashboardZeroTentEmptyState";
+import FirstPlantMemoryCta from "@/components/FirstPlantMemoryCta";
 import { buildOnboardingChecklistViewModel } from "@/lib/onboardingChecklistViewModel";
 import { useSensorReadings, useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
@@ -258,6 +259,8 @@ export default function Dashboard() {
       <div className="my-3">
         <OnboardingChecklistCard vm={onboardingVm} />
       </div>
+
+      {plants.length > 0 && <FirstPlantMemoryCta />}
 
 
 

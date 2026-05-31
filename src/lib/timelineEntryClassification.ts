@@ -6,8 +6,7 @@
  * Strictly read-only:
  *  - Pure, deterministic, null-safe.
  *  - No I/O, no React, no side effects.
- *  - No writes, no automation, no device control, no admin credentials.
- *  - No coupling to sensor ingestion or webhooks.
+ *  - No writes, no automation, no admin credentials.
  *
  * Why this lives alone:
  *  - Two render surfaces (`src/pages/Timeline.tsx` and

@@ -161,9 +161,18 @@ export default function PlantRelativeTimelineSection({
   plantStartedAt,
   currentStage,
   stageStartedAt,
+  plantName,
+  tentName,
+  growName,
 }: Props) {
   const { data, isLoading } = usePlantRecentActivity(plantId);
   const [filter, setFilter] = useState<RelativeTimelineFilterKey>("all");
+  const entryContext: RelativeTimelineEntryContext = {
+    plantName: plantName ?? null,
+    tentName: tentName ?? null,
+    growName: growName ?? null,
+  };
+
 
   const items = buildRelativeTimelineProjection({
     rawEntries: data ?? [],

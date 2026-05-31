@@ -16,12 +16,14 @@ import {
   buildRelativeTimelineFilterChips,
   buildRelativeTimelineProjection,
   filterRelativeTimelineItems,
+  formatRelativeTimelineEntryDetail,
   formatRelativeTimelineGroupSummary,
   formatRelativeTimelineSummary,
   getRelativeTimelineFilterEmptyState,
   groupRelativeTimelineByStage,
   RELATIVE_TIMELINE_FILTERS,
   summarizeRelativeTimelineItems,
+  type RelativeTimelineEntryContext,
   type RelativeTimelineFilterKey,
   type RelativeTimelineItem,
 } from "@/lib/relativeTimelineProjectionRules";
@@ -34,6 +36,10 @@ interface Props {
   plantStartedAt: string | number | Date | null | undefined;
   currentStage?: string | null;
   stageStartedAt?: string | number | Date | null;
+  /** Optional human-readable context for each card. */
+  plantName?: string | null;
+  tentName?: string | null;
+  growName?: string | null;
 }
 
 // Sensor source entries on this surface always originate from QuickLog

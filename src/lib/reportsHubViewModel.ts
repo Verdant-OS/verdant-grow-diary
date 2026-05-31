@@ -12,12 +12,7 @@
  */
 import type { GrowOutcomeSummary } from "@/lib/growOutcomeRollupRules";
 import type { ActionOutcomeLearningReport } from "@/lib/actionOutcomeLearningRules";
-import {
-  actionsPath,
-  alertsPath,
-  growDetailPath,
-  logsPath,
-} from "@/lib/routes";
+import { alertsPath, growDetailPath, logsPath } from "@/lib/routes";
 
 export type ReportsHubCardId =
   | "action_outcome_learning"

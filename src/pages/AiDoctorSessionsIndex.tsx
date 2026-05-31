@@ -764,6 +764,14 @@ export default function AiDoctorSessionsIndex() {
                 </span>
               ) : null}
             </Button>
+            <span
+              className="inline-flex items-center rounded-full border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
+              data-testid="ai-doctor-sessions-index-needs-follow-up-visible-chip"
+              title="Count of currently loaded sessions marked Needs follow-up. Not a global total."
+              aria-label={formatNeedsFollowUpVisibleLabel(needsFollowUpVisible)}
+            >
+              {formatNeedsFollowUpVisibleLabel(needsFollowUpVisible)}
+            </span>
             {filtersActive ? (
               <Button
                 variant="ghost"

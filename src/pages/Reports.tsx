@@ -113,6 +113,10 @@ export default function Reports() {
         </div>
       )}
 
+      {showOnboarding && (
+        <ReportsHubOnboardingSection cards={onboarding.cards} />
+      )}
+
       {!showEmptyState && summary && !reviewQueue.empty && (
         <ReportsReviewQueueSection items={reviewQueue.items} />
       )}

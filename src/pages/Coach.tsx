@@ -237,7 +237,8 @@ export default function Coach() {
 
   async function ask(mode: Mode) {
     if (!user) return;
-    setBusy(true); setResult(null);
+    const seq = ++diagnosisSeqRef.current;
+    setBusy(true); setResult(null); setPersistedSessionId(null);
     try {
       let photoUrl: string | undefined;
       if (mode === "diagnose" && photoFile) {

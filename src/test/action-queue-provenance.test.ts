@@ -93,20 +93,35 @@ describe("ActionQueue UI — provenance presentation", () => {
     expect((QUEUE.match(/isAlertDerived\(row\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
     expect(QUEUE).toMatch(/getActionQueueSourceLabel\(row\)/);
   });
-  it("does not parse alert provenance tokens inline in ActionQueue executable code", () => {
-    // Strip block + line comments so harmless docstring mentions of the
-    // safe `[alert:<id>]` token don't trip this scan. The real intent:
-    // ActionQueue must delegate token parsing to the shared helper
-    // `extractSourceAlertId` and never construct ad-hoc regexes/matchers
-    // against the `[alert:` literal inside JSX or executable code.
-    const executable = QUEUE
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  it("does not parse alert or session provenance tokens inline in ActionQueue executable code", () => {
+    // Use the shared comment-stripper so harmless docstring mentions of
+    // `[alert:<id>]` / `[session:<id>]` don't trip this scan. The intent:
+    // ActionQueue must delegate token parsing to shared helpers
+    // (`extractSourceAlertId`, `extractSourceAiDoctorSessionId`) and never
+    // construct ad-hoc regexes / matchers / splitters / indexOf / includes
+    // against the `[alert:` or `[session:` literal in executable code —
+    // including JSX attributes, event handlers, and callback bodies.
+    const { stripSourceComments } = require("./utils/stripSourceComments");
+    const executable: string = stripSourceComments(QUEUE);
+
+    // No raw provenance token literals anywhere in executable code.
     expect(executable).not.toContain("[alert:");
-    expect(executable).not.toMatch(/\.match\(\s*\/\\?\[alert:/);
-    expect(executable).not.toMatch(/\.exec\(\s*\/\\?\[alert:/);
-    expect(executable).not.toMatch(/new RegExp\(\s*["'`]\\?\[alert:/);
-    // Positive contract: parsing goes through the shared helper.
+    expect(executable).not.toContain("[session:");
+
+    // No ad-hoc regex extraction.
+    for (const tok of ["alert", "session"]) {
+      const t = tok;
+      expect(executable).not.toMatch(new RegExp(`\\.match\\(\\s*\\/\\\\?\\[${t}:`));
+      expect(executable).not.toMatch(new RegExp(`\\.exec\\(\\s*\\/\\\\?\\[${t}:`));
+      expect(executable).not.toMatch(new RegExp(`new RegExp\\(\\s*["\`']\\\\?\\[${t}:`));
+      // No ad-hoc string-based extraction.
+      expect(executable).not.toMatch(new RegExp(`\\.indexOf\\(\\s*["\`']\\[${t}:`));
+      expect(executable).not.toMatch(new RegExp(`\\.includes\\(\\s*["\`']\\[${t}:`));
+      expect(executable).not.toMatch(new RegExp(`\\.split\\(\\s*["\`']\\[${t}:`));
+      expect(executable).not.toMatch(new RegExp(`\\.slice\\([^)]*["\`']\\[${t}:`));
+    }
+
+    // Positive contract: parsing goes through the shared helper(s).
     expect(QUEUE).toMatch(/extractSourceAlertId\(/);
   });
 });

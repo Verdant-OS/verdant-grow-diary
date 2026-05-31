@@ -10,10 +10,10 @@ import { MemoryRouter } from "react-router-dom";
 import ReportsReviewQueueSection from "@/components/ReportsReviewQueueSection";
 import type { ReportsReviewItem } from "@/lib/reportsHubReviewQueue";
 
-function renderWith(items: ReportsReviewItem[]) {
+function renderWith(items: ReportsReviewItem[], showEmptyState = false) {
   return render(
     <MemoryRouter>
-      <ReportsReviewQueueSection items={items} />
+      <ReportsReviewQueueSection items={items} showEmptyState={showEmptyState} />
     </MemoryRouter>,
   );
 }

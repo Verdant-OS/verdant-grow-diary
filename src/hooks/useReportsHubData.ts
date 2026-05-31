@@ -159,7 +159,7 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
           : Promise.resolve({ count: 0, error: null } as { count: number; error: null }),
         supabase
           .from("alerts")
-          .select("id")
+          .select("id,severity,created_at")
           .eq("grow_id", growId)
           .eq("status", "open")
           .order("created_at", { ascending: false })
@@ -180,6 +180,9 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
         outcomes: (outcomeRes.data ?? []) as never,
         now: Date.now(),
       });
+      const firstAlert = (firstOpenAlertRes.data?.[0] ?? null) as
+        | { id?: string; severity?: string; created_at?: string }
+        | null;
 
       setState({
         status: "ready",
@@ -188,8 +191,9 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
         alertsOpen: alertsOpenRes.count ?? 0,
         alertsCritical: alertsCritRes.count ?? 0,
         alertsWarning: alertsWarnRes.count ?? 0,
-        firstOpenAlertId:
-          (firstOpenAlertRes.data?.[0]?.id as string | undefined) ?? null,
+        firstOpenAlertId: firstAlert?.id ?? null,
+        firstOpenAlertSeverity: firstAlert?.severity ?? null,
+        firstOpenAlertCreatedAt: firstAlert?.created_at ?? null,
         latestSensorCapturedAt:
           (sensorLatestRes.data?.[0]?.ts as string | undefined) ?? null,
         recentSensorReadingCount: sensorRecentRes.count ?? 0,
@@ -197,7 +201,9 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
         diaryEntriesLast7d: diary7dRes.count ?? 0,
         pendingOutcomeReviewCount: pendingReviews.length,
         firstPendingActionId: pendingReviews[0]?.action_queue_id ?? null,
+        oldestPendingCompletedAt: pendingReviews[0]?.completed_at ?? null,
       });
+
 
     } catch {
       setState({ ...EMPTY_REPORTS_HUB_DATA, status: "unavailable" });

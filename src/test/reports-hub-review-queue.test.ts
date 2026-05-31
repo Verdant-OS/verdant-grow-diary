@@ -178,3 +178,79 @@ describe("buildReportsReviewQueue", () => {
     );
   });
 });
+
+describe("buildReportsReviewQueue — explanation copy", () => {
+  it("every emitted item carries help text and a why-this-is-here line", () => {
+    const { items } = buildReportsReviewQueue({
+      ...base,
+      pendingOutcomeReviewCount: 2,
+      firstPendingActionId: "act-1",
+      oldestPendingCompletedAt: new Date(NOW - 30 * 60 * 60 * 1000).toISOString(),
+      alertsOpen: 3,
+      firstOpenAlertId: "alert-1",
+      firstOpenAlertSeverity: "warning",
+      firstOpenAlertCreatedAt: new Date(NOW - 5 * 60 * 60 * 1000).toISOString(),
+      latestSensorCapturedAt: null,
+      recentSensorReadingCount: 0,
+      lowSampleLearningGroups: 1,
+      lowSampleSmallestCount: 2,
+      lowSampleThreshold: 3,
+    });
+    expect(items).toHaveLength(4);
+    for (const item of items) {
+      expect(item.helpText.length).toBeGreaterThan(0);
+      expect(item.whyThisIsHere.length).toBeGreaterThan(0);
+    }
+
+    const missing = items.find((i) => i.id === "missing_outcome")!;
+    expect(missing.whyThisIsHere).toMatch(/2 pending reviews/);
+    expect(missing.whyThisIsHere).toMatch(/oldest completed.*ago/);
+
+    const alerts = items.find((i) => i.id === "open_alerts")!;
+    expect(alerts.whyThisIsHere).toMatch(/3 open alerts/);
+    expect(alerts.whyThisIsHere).toMatch(/latest severity warning/);
+    expect(alerts.whyThisIsHere).toMatch(/opened.*ago/);
+
+    const sensor = items.find((i) => i.id === "stale_sensor")!;
+    expect(sensor.whyThisIsHere).toMatch(/No sensor readings recorded yet/);
+
+    const learning = items.find((i) => i.id === "low_sample_learning")!;
+    expect(learning.whyThisIsHere).toMatch(/below sample threshold/);
+    expect(learning.whyThisIsHere).toMatch(/2 of 3 needed/);
+  });
+
+  it("ignores unexpected severity strings rather than echoing raw payload", () => {
+    const { items } = buildReportsReviewQueue({
+      ...base,
+      alertsOpen: 1,
+      firstOpenAlertId: "alert-x",
+      firstOpenAlertSeverity: "<script>secret</script>",
+      firstOpenAlertCreatedAt: null,
+    });
+    const alerts = items.find((i) => i.id === "open_alerts")!;
+    expect(alerts.whyThisIsHere).not.toMatch(/script|secret/i);
+  });
+
+  it("renders calm empty copy that avoids forbidden claims", async () => {
+    const { REPORTS_REVIEW_QUEUE_EMPTY_COPY } = await import(
+      "@/lib/reportsHubReviewQueue"
+    );
+    expect(REPORTS_REVIEW_QUEUE_EMPTY_COPY).toMatch(/no priority review items/i);
+    const forbidden = /\b(fixed|guaranteed|healthy|caused|best|worst)\b/i;
+    expect(forbidden.test(REPORTS_REVIEW_QUEUE_EMPTY_COPY)).toBe(false);
+  });
+
+  it("help text exists for every known review item id", async () => {
+    const { REVIEW_ITEM_HELP_TEXT } = await import(
+      "@/lib/reportsHubReviewQueue"
+    );
+    for (const id of [
+      "missing_outcome",
+      "open_alerts",
+      "stale_sensor",
+      "low_sample_learning",
+    ] as const) {
+      expect(REVIEW_ITEM_HELP_TEXT[id].length).toBeGreaterThan(0);
+    }
+  });
+});

@@ -261,7 +261,10 @@ export default function PlantDetail() {
             currentStage={plant.stage}
             plantName={plant.name}
             tentName={tent?.name ?? null}
+            growId={plant.growId ?? null}
+            tentId={plant.tentId ?? null}
           />
+
 
           <section
             aria-labelledby="plant-daily-grow-check-section-heading"

@@ -115,6 +115,13 @@ export function isAlertDerived(
   return getActionQueueSourceKind(action) === "environment_alert";
 }
 
+export function isAiDoctorDerived(
+  action: SourceLabelInput | null | undefined,
+): boolean {
+  return getActionQueueSourceKind(action) === "ai_doctor";
+}
+
+
 /**
  * Deterministic check: was `action` created from the alert with `alertId`?
  * Requires the `environment_alert` source AND a matching `[alert:<id>]`

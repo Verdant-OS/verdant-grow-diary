@@ -645,8 +645,9 @@ export default function ActionQueue() {
                     </div>
                     <p className="text-sm mt-1">{row.suggested_change}</p>
                     <p className="text-xs text-muted-foreground mt-1">{stripBackPointerTokens(row.reason)}</p>
-                    <div className="mt-1">
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                       <AiDoctorSessionLink row={row} />
+                      <LinkedAlertLink row={row} />
                     </div>
                   </div>
                 </div>

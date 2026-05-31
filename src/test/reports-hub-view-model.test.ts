@@ -59,9 +59,9 @@ describe("buildReportsHubSummary", () => {
       outcomeLearning: {
         ...EMPTY_LEARNING_REPORT,
         groups: [
-          { ...({} as never) },
-          { ...({} as never) },
-        ] as never,
+          { metric: "ph", label: "pH", totals: { total: 3, improved: 2, unchanged: 1, worsened: 0, more_data_needed: 0, unknown: 0 }, needs_more_data: false },
+          { metric: "ec", label: "EC", totals: { total: 4, improved: 1, unchanged: 2, worsened: 1, more_data_needed: 0, unknown: 0 }, needs_more_data: false },
+        ],
       },
       alertsOpen: 3,
       alertsCritical: 1,

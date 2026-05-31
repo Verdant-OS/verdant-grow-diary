@@ -7,7 +7,7 @@
  *  - SSR/test-safe: tolerates missing `window` / `localStorage`.
  *  - If storage is unavailable, fails open (treats as "not dismissed") so
  *    the checklist remains visible — never strands the user.
- *  - No Supabase, no network, no database row. Local-only.
+ *  - No backend, no network, no database row. Local-only.
  *
  * Reactivity: a tiny pub/sub lets React components re-render after a
  * dismiss flip in the same tab via `useOnboardingChecklistDismissed`.

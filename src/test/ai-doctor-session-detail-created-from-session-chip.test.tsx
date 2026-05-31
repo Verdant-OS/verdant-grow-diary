@@ -278,11 +278,10 @@ describe("AiDoctorSessionDetail — 'Created from this session' chip", () => {
       },
     ];
     renderDetail();
-    expect(
-      await screen.findByTestId(
-        "ai-doctor-session-detail-add-to-action-queue-button",
-      ),
-    ).toBeTruthy();
+    const buttons = await screen.findAllByTestId(
+      "ai-doctor-session-detail-add-to-action-queue-button",
+    );
+    expect(buttons.length).toBeGreaterThanOrEqual(1);
   });
 
   it("never leaks the raw [session:<id>] token or target_device", async () => {

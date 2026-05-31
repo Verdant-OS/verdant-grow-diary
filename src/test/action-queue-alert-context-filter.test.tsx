@@ -303,6 +303,26 @@ describe("ActionQueue — client-side ?alert filter", () => {
     expect(back.getAttribute("href")).toBe("/alerts/unknown-alert");
   });
 
+  it("chip-area 'Back to alert' link also renders when no matching actions exist", async () => {
+    renderAt("/actions?alert=unknown-alert");
+    const back = await screen.findByTestId(
+      "action-queue-alert-context-back-link",
+    );
+    expect(back.getAttribute("href")).toBe("/alerts/unknown-alert");
+    expect(back.textContent).toContain("Back to alert");
+    // No raw token leakage in the chip-area back link.
+    expect(back.textContent ?? "").not.toContain("[alert:");
+    expect(back.getAttribute("aria-label") ?? "").not.toContain("[alert:");
+  });
+
+  it("invalid/unsafe alert param does not render the chip-area 'Back to alert' link", async () => {
+    renderAt("/actions?alert=%5Balert%3Afoo%5D");
+    await waitFor(() => expect(visibleRowIds().length).toBe(4));
+    expect(
+      screen.queryByTestId("action-queue-alert-context-back-link"),
+    ).toBeNull();
+  });
+
   it("invalid/unsafe alert param does not show the alert-filtered empty state", async () => {
     renderAt("/actions?alert=%5Balert%3Afoo%5D");
     await waitFor(() => expect(visibleRowIds().length).toBe(4));

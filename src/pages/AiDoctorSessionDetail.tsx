@@ -787,7 +787,10 @@ function SessionDetailBody({
         );
       })()}
 
+      <SessionReviewStatusPanel sessionId={row.id} vm={reviewHistoryVm} />
+
       <ReviewSummarySection vm={reviewVm} />
+
 
 
 

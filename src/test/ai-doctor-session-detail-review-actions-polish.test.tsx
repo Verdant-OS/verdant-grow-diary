@@ -66,7 +66,7 @@ const SESSION_ID = "11111111-1111-1111-1111-111111111111";
 const PLANT_ID = "22222222-2222-2222-2222-222222222222";
 
 const mockState = vi.hoisted(() => ({
-  insertCalls: [] as Array<{ table: string; payload: unknown }>,
+  mockState.insertCalls: [] as Array<{ table: string; payload: unknown }>,
   reviewEvents: [] as Array<{
     id: string;
     user_id: string;
@@ -141,7 +141,7 @@ vi.mock("@/integrations/supabase/client", () => {
     if (table === "ai_doctor_session_reviews") {
       return {
         insert: (payload: unknown) => {
-          mockState.insertCalls.push({ table, payload });
+          mockState.mockState.insertCalls.push({ table, payload });
           return Promise.resolve({ data: null, error: null });
         },
         select: () => ({
@@ -198,8 +198,8 @@ function renderPage() {
 }
 
 beforeEach(() => {
-  insertCalls.length = 0;
-  reviewEvents = [];
+  mockState.insertCalls.length = 0;
+  mockState.reviewEvents = [];
 });
 
 describe("AiDoctorSessionDetail — review action polish", () => {
@@ -267,13 +267,13 @@ describe("AiDoctorSessionDetail — review action polish", () => {
       "ai-doctor-session-detail-review-mark-reviewed",
     );
     fireEvent.click(btn);
-    await waitFor(() => expect(insertCalls.length).toBeGreaterThan(0));
-    expect(insertCalls[0].table).toBe("ai_doctor_session_reviews");
-    expect(insertCalls[0].payload).toMatchObject({
+    await waitFor(() => expect(mockState.insertCalls.length).toBeGreaterThan(0));
+    expect(mockState.insertCalls[0].table).toBe("ai_doctor_session_reviews");
+    expect(mockState.insertCalls[0].payload).toMatchObject({
       session_id: SESSION_ID,
       event_type: "marked_reviewed",
     });
-    const p = insertCalls[0].payload as Record<string, unknown>;
+    const p = mockState.insertCalls[0].payload as Record<string, unknown>;
     expect("user_id" in p).toBe(false);
   });
 });

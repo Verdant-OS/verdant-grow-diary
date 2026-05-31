@@ -126,10 +126,8 @@ describe("stripSourceComments — comment removal", () => {
 
   it("is null/empty safe and deterministic", () => {
     expect(stripSourceComments("")).toBe("");
-    // @ts-expect-error — defensive runtime guard
-    expect(stripSourceComments(null)).toBe("");
-    // @ts-expect-error — defensive runtime guard
-    expect(stripSourceComments(undefined)).toBe("");
+    expect(stripSourceComments(null as unknown as string)).toBe("");
+    expect(stripSourceComments(undefined as unknown as string)).toBe("");
     const src = `const a = 1; // [alert:x]`;
     expect(stripSourceComments(src)).toBe(stripSourceComments(src));
   });

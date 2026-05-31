@@ -111,16 +111,23 @@ vi.mock("@/integrations/supabase/client", () => {
   };
 });
 
+// Stable singletons — returning a fresh object from these hooks on every
+// render makes `user` / store values reference-unstable, which retriggers
+// `useCallback([user, ...])` → `useEffect([load])` and locks the page in
+// an infinite render loop under test.
+const AUTH_STATE = { user: { id: "u1", email: "u@example.com" } } as const;
+const GROWS_STATE = {
+  grows: [{ id: "g1", name: "G1" }],
+  activeGrowId: "g1",
+  activeGrow: { id: "g1", name: "G1" },
+} as const;
+
 vi.mock("@/store/auth", () => ({
-  useAuth: () => ({ user: { id: "u1", email: "u@example.com" } }),
+  useAuth: () => AUTH_STATE,
 }));
 
 vi.mock("@/store/grows", () => ({
-  useGrows: () => ({
-    grows: [{ id: "g1", name: "G1" }],
-    activeGrowId: "g1",
-    activeGrow: { id: "g1", name: "G1" },
-  }),
+  useGrows: () => GROWS_STATE,
 }));
 
 vi.mock("@/hooks/useScopedGrow", () => ({

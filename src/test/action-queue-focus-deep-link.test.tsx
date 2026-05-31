@@ -66,32 +66,40 @@ const ROWS = [
 const insertSpy = vi.fn();
 
 vi.mock("@/integrations/supabase/client", () => {
-  const actionQueueBuilder = () => {
+  const makeActionQueueChain = () => {
+    const result = { data: ROWS, error: null };
     const chain: Record<string, unknown> = {
       select: () => chain,
-      eq: () => chain,
+      order: () => chain,
+      limit: () => chain,
+      eq: () => Promise.resolve(result),
       in: () => chain,
-      order: () => Promise.resolve({ data: ROWS, error: null }),
+      then: (resolve: (r: typeof result) => unknown) => resolve(result),
     };
     return chain;
   };
-  const eventsBuilder = () => {
+  const makeEventsChain = () => {
+    const result = { data: [], error: null };
     const chain: Record<string, unknown> = {
       select: () => chain,
-      in: () => Promise.resolve({ data: [], error: null }),
+      in: () => chain,
+      order: () => Promise.resolve(result),
       insert: (...args: unknown[]) => {
         insertSpy(...args);
         return Promise.resolve({ data: null, error: null });
       },
+      then: (resolve: (r: typeof result) => unknown) => resolve(result),
     };
     return chain;
   };
   return {
     supabase: {
       from: (table: string) => {
-        if (table === "action_queue") return actionQueueBuilder();
-        if (table === "action_queue_events") return eventsBuilder();
-        return { select: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }) };
+        if (table === "action_queue") return makeActionQueueChain();
+        if (table === "action_queue_events") return makeEventsChain();
+        return {
+          select: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }),
+        };
       },
     },
   };

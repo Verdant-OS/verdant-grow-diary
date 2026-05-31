@@ -45,6 +45,8 @@ import {
   ACTION_QUEUE_SOURCE_VALUES,
   getActionQueueSourceLabel,
   isAlertDerived,
+  isAiDoctorDerived,
+  stripBackPointerTokens,
 } from "@/lib/actionQueueProvenanceRules";
 import { buildActionQueueGrowContextHint } from "@/lib/actionQueueGrowContextHintRules";
 
@@ -52,26 +54,15 @@ import { buildActionQueueGrowContextHint } from "@/lib/actionQueueGrowContextHin
 type Status = ActionStatus;
 type EventType = ActionEventType;
 
-/**
- * Strip internal back-pointer tokens from a user-facing reason string.
- * Tokens (e.g. session back-pointers) exist for audit/dedupe only and must
- * never leak into grower-visible copy.
- */
-function stripBackPointerTokens(reason: string | null | undefined): string {
-  if (!reason) return "";
-  return reason
-    .replace(/\s*\[session:[^\]]+\]\s*/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 type StatusFilter = "all" | "pending" | "simulated" | "approved" | "rejected" | "completed" | "cancelled";
 type RiskFilter = "all" | "low" | "medium" | "high" | "critical";
 type SourceFilter =
   | "all"
   | typeof ACTION_QUEUE_SOURCE_VALUES.ENVIRONMENT_ALERT
   | typeof ACTION_QUEUE_SOURCE_VALUES.AI_COACH
+  | typeof ACTION_QUEUE_SOURCE_VALUES.AI_DOCTOR
   | typeof ACTION_QUEUE_SOURCE_VALUES.MANUAL;
+
 
 type SortOrder = "newest" | "oldest" | "risk";
 
@@ -501,10 +492,12 @@ export default function ActionQueue() {
             <SelectItem value="all">All sources</SelectItem>
             <SelectItem value={ACTION_QUEUE_SOURCE_VALUES.ENVIRONMENT_ALERT}>Environment Alerts</SelectItem>
             <SelectItem value={ACTION_QUEUE_SOURCE_VALUES.AI_COACH}>AI Coach</SelectItem>
+            <SelectItem value={ACTION_QUEUE_SOURCE_VALUES.AI_DOCTOR}>AI Doctor</SelectItem>
             <SelectItem value={ACTION_QUEUE_SOURCE_VALUES.MANUAL}>Manual</SelectItem>
 
           </SelectContent>
         </Select>
+
 
 
 
@@ -562,6 +555,25 @@ export default function ActionQueue() {
                           {getActionQueueSourceLabel(row)}
                         </Badge>
                       )}
+                      {isAiDoctorDerived(row) && (
+                        <>
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] uppercase border-primary text-primary"
+                            data-testid="action-queue-row-ai-doctor-badge"
+                          >
+                            AI Doctor
+                          </Badge>
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] uppercase"
+                            data-testid="action-queue-row-review-required-badge"
+                          >
+                            Review required
+                          </Badge>
+                        </>
+                      )}
+
 
                       <span className="text-xs text-muted-foreground">
                         {row.target_metric ?? row.target_device}
@@ -636,6 +648,16 @@ export default function ActionQueue() {
                       {getActionQueueSourceLabel(row)}
                     </Badge>
                   )}
+                  {isAiDoctorDerived(row) && (
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] uppercase border-primary text-primary"
+                      data-testid="action-queue-row-ai-doctor-badge"
+                    >
+                      AI Doctor
+                    </Badge>
+                  )}
+
 
                   <span className="truncate flex-1">{row.suggested_change}</span>
                   <span className="text-xs text-muted-foreground">{row.action_type}</span>

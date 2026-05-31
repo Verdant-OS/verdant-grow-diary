@@ -50,13 +50,17 @@ import {
   nextStatusFor,
   normalizeNote,
 } from "@/lib/actionQueueTransitions";
-import { actionsPath, alertDetailPath, growDetailPath, logsPath, plantDetailPath, tentDetailPath } from "@/lib/routes";
+import { actionsPath, aiDoctorSessionDetailPath, alertDetailPath, growDetailPath, logsPath, plantDetailPath, tentDetailPath } from "@/lib/routes";
 import {
+  extractSourceAiDoctorSessionId,
   extractSourceAlertId,
   getActionQueueSourceLabel,
+  isAiDoctorDerived,
   isAlertDerived,
   shouldWarnPendingActionHasClosedSourceAlert,
+  stripBackPointerTokens,
 } from "@/lib/actionQueueProvenanceRules";
+
 import {
   ACTION_FOLLOWUP_EVENT_TYPE,
   buildActionFollowupDiaryDraft,
@@ -501,7 +505,7 @@ export default function ActionDetail() {
           </Badge>
         </div>
         <h1 className="text-xl font-display font-bold">{row.suggested_change}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{row.reason}</p>
+        <p className="text-sm text-muted-foreground mt-1">{stripBackPointerTokens(row.reason)}</p>
 
         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
           <IdField label="Grow" id={row.grow_id} to={growDetailPath(row.grow_id)} />
@@ -560,6 +564,44 @@ export default function ActionDetail() {
               </div>
             );
           })()}
+
+        {isAiDoctorDerived(row) &&
+          (() => {
+            const sessionId = extractSourceAiDoctorSessionId(row.reason);
+            return (
+              <div
+                className="mt-4 rounded-lg border border-border/40 bg-secondary/20 p-3"
+                aria-label="Suggestion origin"
+                data-testid="action-detail-ai-doctor-provenance"
+              >
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Suggestion origin
+                </p>
+                <p className="text-sm font-medium mt-0.5">
+                  Source: {getActionQueueSourceLabel(row)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Status: Grower review required
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  This action was suggested from an AI Doctor review and
+                  requires grower approval before anything is completed.
+                </p>
+                {sessionId && (
+                  <Button asChild size="sm" variant="outline" className="mt-3">
+                    <Link
+                      to={aiDoctorSessionDetailPath(sessionId)}
+                      data-testid="action-detail-ai-doctor-session-link"
+                    >
+                      View AI Doctor session
+                    </Link>
+                  </Button>
+                )}
+              </div>
+            );
+          })()}
+
+
 
         {!isTerminal(row.status) && (
           <div className="flex flex-wrap gap-2 mt-4">

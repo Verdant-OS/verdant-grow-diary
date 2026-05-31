@@ -13,8 +13,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useSearchParams } from "react-router-dom";
 import ActionQueue from "@/pages/ActionQueue";
+
+function LocationProbe() {
+  const [sp] = useSearchParams();
+  return <div data-testid="loc-search">{sp.toString()}</div>;
+}
+
 
 // --- Fixtures ---------------------------------------------------------------
 

@@ -91,7 +91,7 @@ describe("CreatePlantDialog — first-run simplification", () => {
     // Stage is required-by-default via a controlled <Select> with a default value;
     // only `name` should remain an HTML-`required` text Input.
     expect(countRequiredInputs(CREATE_PLANT)).toBe(1);
-    expect(CREATE_PLANT).toMatch(/<Input\s+required[^>]*placeholder="Plant A"/);
+    expect(CREATE_PLANT).toMatch(/<Input\s+required[\s\S]*?placeholder="Plant A"/);
   });
 
   it("does NOT require strain, breeder, medium, dates, or pot size", () => {

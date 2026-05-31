@@ -33,17 +33,24 @@ import {
   type PickedGrowOutcome,
   type RawGrowOutcomeRow,
 } from "@/lib/growOutcomeRollupRules";
+import {
+  buildActionOutcomeLearningReport,
+  EMPTY_LEARNING_REPORT,
+  type ActionOutcomeLearningReport,
+} from "@/lib/actionOutcomeLearningRules";
 
 export type GrowOutcomesState = {
   status: "loading" | "ready" | "unavailable";
   summary: GrowOutcomeSummary;
   recent: PickedGrowOutcome[];
+  learning: ActionOutcomeLearningReport;
 };
 
 export const EMPTY_GROW_OUTCOMES_STATE: GrowOutcomesState = {
   status: "loading",
   summary: EMPTY_GROW_OUTCOME_SUMMARY,
   recent: [],
+  learning: EMPTY_LEARNING_REPORT,
 };
 
 export interface GrowRow {
@@ -347,6 +354,7 @@ export function useGrowDetailData(): UseGrowDetailData {
           status: "unavailable",
           summary: EMPTY_GROW_OUTCOME_SUMMARY,
           recent: [],
+          learning: EMPTY_LEARNING_REPORT,
         });
       } else {
         const rows = (outcomeRows ?? []) as RawGrowOutcomeRow[];
@@ -354,6 +362,7 @@ export function useGrowDetailData(): UseGrowDetailData {
           status: "ready",
           summary: summarizeGrowOutcomes(rows),
           recent: pickRecentGrowOutcomes(rows, 5),
+          learning: buildActionOutcomeLearningReport(rows),
         });
       }
     } catch {
@@ -361,6 +370,7 @@ export function useGrowDetailData(): UseGrowDetailData {
         status: "unavailable",
         summary: EMPTY_GROW_OUTCOME_SUMMARY,
         recent: [],
+        learning: EMPTY_LEARNING_REPORT,
       });
     }
 

@@ -28,6 +28,7 @@ import {
   tentsPath,
 } from "@/lib/routes";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
+import ActionOutcomeLearningReport from "@/components/ActionOutcomeLearningReport";
 
 /**
  * Read-only grow detail hub. Presentational only — all data loading +
@@ -189,6 +190,11 @@ export default function GrowDetail() {
       </section>
 
       <RecentOutcomesCard outcomes={outcomes} />
+
+      <ActionOutcomeLearningReport
+        report={outcomes.learning}
+        status={outcomes.status}
+      />
     </div>
   );
 }

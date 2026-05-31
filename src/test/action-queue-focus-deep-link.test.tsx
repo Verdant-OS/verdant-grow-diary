@@ -12,9 +12,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { MemoryRouter, useSearchParams } from "react-router-dom";
 import ActionQueue from "@/pages/ActionQueue";
+
+function LocationProbe() {
+  const [sp] = useSearchParams();
+  return <div data-testid="loc-search">{sp.toString()}</div>;
+}
+
 
 // --- Fixtures ---------------------------------------------------------------
 
@@ -131,9 +137,11 @@ function renderAt(url: string) {
   return render(
     <MemoryRouter initialEntries={[url]}>
       <ActionQueue />
+      <LocationProbe />
     </MemoryRouter>,
   );
 }
+
 
 let scrollIntoViewSpy: ReturnType<typeof vi.fn>;
 
@@ -211,6 +219,107 @@ describe("ActionQueue — ?focus deep-link", () => {
     expect(html).not.toContain("[session:");
   });
 });
+
+describe("ActionQueue — focus chip + Clear focus", () => {
+  it("renders 'Focused action' chip when ?focus=<id> is present", async () => {
+    renderAt("/actions?focus=aq-1");
+    await waitFor(() =>
+      expect(screen.getByTestId("action-queue-focus-chip")).toBeTruthy(),
+    );
+    expect(screen.getByTestId("action-queue-focus-chip").textContent).toContain(
+      "Focused action",
+    );
+    expect(screen.getByTestId("action-queue-focus-chip").textContent).toContain(
+      "Showing linked Action Queue item.",
+    );
+  });
+
+  it("does NOT render the chip when no focus param is present", async () => {
+    renderAt("/actions");
+    await waitFor(() =>
+      expect(screen.getAllByTestId("action-queue-row").length).toBe(2),
+    );
+    expect(screen.queryByTestId("action-queue-focus-chip")).toBeNull();
+  });
+
+  it("Clear focus removes the focus param and the row highlight", async () => {
+    renderAt("/actions?focus=aq-1");
+    await waitFor(() =>
+      expect(screen.getByTestId("action-queue-focus-chip")).toBeTruthy(),
+    );
+    expect(
+      document.querySelector('[data-action-id="aq-1"]')?.getAttribute("data-focused"),
+    ).toBe("true");
+
+    fireEvent.click(screen.getByTestId("action-queue-clear-focus"));
+
+    await waitFor(() =>
+      expect(screen.queryByTestId("action-queue-focus-chip")).toBeNull(),
+    );
+    expect(
+      document.querySelector('[data-action-id="aq-1"]')?.getAttribute("data-focused"),
+    ).toBeNull();
+    expect(
+      document.querySelector('[data-action-id="aq-1"]')?.getAttribute("aria-label"),
+    ).toBeNull();
+  });
+
+  it("Clear focus preserves other query params (filters, growId, page)", async () => {
+    renderAt("/actions?focus=aq-1&growId=g1&page=2&q=mold");
+    await waitFor(() =>
+      expect(screen.getByTestId("action-queue-clear-focus")).toBeTruthy(),
+    );
+
+    fireEvent.click(screen.getByTestId("action-queue-clear-focus"));
+
+    await waitFor(() =>
+      expect(screen.queryByTestId("action-queue-focus-chip")).toBeNull(),
+    );
+    const url = screen.getByTestId("loc-search").textContent ?? "";
+    expect(url).not.toContain("focus=");
+    expect(url).toContain("growId=g1");
+    expect(url).toContain("page=2");
+    expect(url).toContain("q=mold");
+
+  });
+
+  it("Clear focus works safely for an unknown focus id", async () => {
+    renderAt("/actions?focus=does-not-exist");
+    await waitFor(() =>
+      expect(screen.getByTestId("action-queue-focus-chip")).toBeTruthy(),
+    );
+    expect(() =>
+      fireEvent.click(screen.getByTestId("action-queue-clear-focus")),
+    ).not.toThrow();
+    await waitFor(() =>
+      expect(screen.queryByTestId("action-queue-focus-chip")).toBeNull(),
+    );
+  });
+
+  it("chip never leaks an AI Doctor session token", async () => {
+    renderAt("/actions?focus=aq-1");
+    await waitFor(() =>
+      expect(screen.getByTestId("action-queue-focus-chip")).toBeTruthy(),
+    );
+    expect(
+      screen.getByTestId("action-queue-focus-chip").textContent ?? "",
+    ).not.toContain("session:");
+  });
+
+  it("Clear focus does not trigger any DB writes", async () => {
+    renderAt("/actions?focus=aq-1");
+    await waitFor(() =>
+      expect(screen.getByTestId("action-queue-clear-focus")).toBeTruthy(),
+    );
+    insertSpy.mockClear();
+    fireEvent.click(screen.getByTestId("action-queue-clear-focus"));
+    await waitFor(() =>
+      expect(screen.queryByTestId("action-queue-focus-chip")).toBeNull(),
+    );
+    expect(insertSpy).not.toHaveBeenCalled();
+  });
+});
+
 
 // --- Static safety scan ------------------------------------------------------
 const PAGE = readFileSync(

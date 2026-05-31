@@ -141,8 +141,18 @@ export default function ActionQueue() {
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
 
   // Deep-link focus: /actions?focus=<action_id>. Presenter-only; never mutates rows.
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const focusedActionId = searchParams.get("focus");
+
+  const clearFocus = useCallback(() => {
+    // Remove ONLY the `focus` query param. Preserve every other param
+    // (filters, search, status tabs, pagination, growId, etc.).
+    const next = new URLSearchParams(searchParams);
+    next.delete("focus");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+
 
 
 
@@ -420,6 +430,36 @@ export default function ActionQueue() {
           backHref={backHref}
         />
       )}
+
+      {focusedActionId && (
+        <div
+          className="glass rounded-2xl p-3 mb-4 flex flex-wrap items-center gap-3"
+          data-testid="action-queue-focus-chip"
+          role="status"
+          aria-live="polite"
+        >
+          <Badge
+            variant="outline"
+            className="text-[10px] uppercase border-primary text-primary"
+          >
+            Focused action
+          </Badge>
+          <span className="text-xs text-muted-foreground">
+            Showing linked Action Queue item.
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={clearFocus}
+            className="ml-auto"
+            data-testid="action-queue-clear-focus"
+          >
+            Clear focus
+          </Button>
+        </div>
+      )}
+
+
 
       <div
         className="glass rounded-2xl p-3 mb-4 flex flex-wrap gap-2"

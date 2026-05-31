@@ -52,6 +52,19 @@ import { buildActionQueueGrowContextHint } from "@/lib/actionQueueGrowContextHin
 type Status = ActionStatus;
 type EventType = ActionEventType;
 
+/**
+ * Strip internal back-pointer tokens (e.g. `[session:<id>]`, `[alert:<id>]`)
+ * from a user-facing `reason` string. The tokens exist for audit/dedupe only
+ * and should never leak into grower-visible copy.
+ */
+function stripBackPointerTokens(reason: string | null | undefined): string {
+  if (!reason) return "";
+  return reason
+    .replace(/\s*\[session:[^\]]+\]\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 type StatusFilter = "all" | "pending" | "simulated" | "approved" | "rejected" | "completed" | "cancelled";
 type RiskFilter = "all" | "low" | "medium" | "high" | "critical";
 type SourceFilter =

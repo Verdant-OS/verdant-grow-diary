@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
@@ -51,6 +51,19 @@ import { buildActionQueueGrowContextHint } from "@/lib/actionQueueGrowContextHin
 
 type Status = ActionStatus;
 type EventType = ActionEventType;
+
+/**
+ * Strip internal back-pointer tokens from a user-facing reason string.
+ * Tokens (e.g. session back-pointers) exist for audit/dedupe only and must
+ * never leak into grower-visible copy.
+ */
+function stripBackPointerTokens(reason: string | null | undefined): string {
+  if (!reason) return "";
+  return reason
+    .replace(/\s*\[session:[^\]]+\]\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 type StatusFilter = "all" | "pending" | "simulated" | "approved" | "rejected" | "completed" | "cancelled";
 type RiskFilter = "all" | "low" | "medium" | "high" | "critical";
@@ -127,6 +140,12 @@ export default function ActionQueue() {
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
 
+  // Deep-link focus: /actions?focus=<action_id>. Presenter-only; never mutates rows.
+  const [searchParams] = useSearchParams();
+  const focusedActionId = searchParams.get("focus");
+
+
+
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -164,6 +183,26 @@ export default function ActionQueue() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Deep-link focus: after rows render, scroll the matching row into view.
+  // Best-effort; if the id is unknown or scrollIntoView is unavailable, we
+  // render normally without errors. Read-only — never changes status.
+  useEffect(() => {
+    if (!focusedActionId || loading) return;
+    if (typeof document === "undefined") return;
+    const escape =
+      typeof CSS !== "undefined" && typeof CSS.escape === "function"
+        ? CSS.escape
+        : (s: string) => s.replace(/"/g, '\\"');
+    const el = document.querySelector(
+      `[data-action-id="${escape(focusedActionId)}"]`,
+    ) as HTMLElement | null;
+    if (el && typeof el.scrollIntoView === "function") {
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+  }, [focusedActionId, loading, rows.length]);
+
+
 
   // SECURITY: never sends device commands. Inserts an audit row ONLY.
   // user_id is left to DB default auth.uid(). No privileged backend role.
@@ -456,7 +495,18 @@ export default function ActionQueue() {
         ) : (
           <ul className="space-y-3">
             {pending.map((row) => (
-              <li key={row.id} className="rounded-xl border border-border/60 bg-secondary/30 p-3">
+              <li
+                key={row.id}
+                data-testid="action-queue-row"
+                data-action-id={row.id}
+                data-focused={focusedActionId === row.id ? "true" : undefined}
+                aria-label={focusedActionId === row.id ? "Focused action" : undefined}
+                className={`rounded-xl border border-border/60 bg-secondary/30 p-3 ${
+                  focusedActionId === row.id
+                    ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                    : ""
+                }`}
+              >
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -478,7 +528,7 @@ export default function ActionQueue() {
                       </span>
                     </div>
                     <p className="text-sm mt-1">{row.suggested_change}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{row.reason}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{stripBackPointerTokens(row.reason)}</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 mt-3">
@@ -521,7 +571,18 @@ export default function ActionQueue() {
         ) : (
           <ul className="space-y-2 text-sm">
             {reviewed.slice(0, 50).map((row) => (
-              <li key={row.id} className="rounded-lg border border-border/40 bg-secondary/20 p-2">
+              <li
+                key={row.id}
+                data-testid="action-queue-row"
+                data-action-id={row.id}
+                data-focused={focusedActionId === row.id ? "true" : undefined}
+                aria-label={focusedActionId === row.id ? "Focused action" : undefined}
+                className={`rounded-lg border border-border/40 bg-secondary/20 p-2 ${
+                  focusedActionId === row.id
+                    ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                    : ""
+                }`}
+              >
                 <div className="flex items-center gap-3 flex-wrap">
                   <Badge variant="outline" className="text-[10px] uppercase">{row.status}</Badge>
                   <Badge variant="outline" className={`text-[10px] uppercase ${RISK_VARIANT[row.risk_level]}`}>

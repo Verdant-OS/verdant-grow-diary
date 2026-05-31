@@ -294,7 +294,7 @@ describe("AiDoctorSessionDetail — Add to Action Queue button", () => {
       "ai-doctor-session-detail-add-to-action-queue-link",
     )) as HTMLAnchorElement;
     expect(link.getAttribute("data-action-queue-id")).toBe("aq-new-1");
-    expect(link.getAttribute("href")).toBe("/actions");
+    expect(link.getAttribute("href")).toBe("/actions?focus=aq-new-1");
   });
 
   it("shows 'Adding…' while the insert is in flight", async () => {

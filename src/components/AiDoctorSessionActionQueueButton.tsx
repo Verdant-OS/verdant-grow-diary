@@ -123,7 +123,7 @@ export function AiDoctorSessionActionQueueButton({
         </Button>
         {linkId ? (
           <Link
-            to={actionQueueHref}
+            to={`${actionQueueHref}?focus=${encodeURIComponent(linkId)}`}
             className="text-xs underline text-primary"
             data-testid="ai-doctor-session-detail-add-to-action-queue-link"
             data-action-queue-id={linkId}

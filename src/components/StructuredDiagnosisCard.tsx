@@ -297,14 +297,10 @@ export default function StructuredDiagnosisCard({
             {diagnosis.suggestedActions.map((a, i) => {
               const isQueued = queuedIdx.has(i);
               const isBusy = busyIdx === i;
-              const linkedMatch = aiDoctorSessionId
-                ? findLinkedActionForSuggestion(linkedActions.items, a)
-                : null;
               return (
                 <li
                   key={i}
                   data-testid={`${testId}-suggested-action-${i}`}
-                  data-linked-action-queue-id={linkedMatch?.id ?? undefined}
                   className="rounded-lg border border-border/40 bg-secondary/10 p-2 space-y-1"
                 >
                   <div className="flex items-start gap-2">
@@ -361,29 +357,13 @@ export default function StructuredDiagnosisCard({
                       Approval required
                     </Badge>
                   </div>
-                  {linkedMatch ? (
-                    <div
-                      className="flex flex-wrap items-center gap-2 pt-1"
-                      data-testid={`${testId}-suggested-action-${i}-created-from-session`}
-                      data-action-queue-id={linkedMatch.id}
-                    >
-                      <Badge
-                        variant="outline"
-                        className="text-[10px]"
-                        title="This suggestion already has an approval-required Action Queue item."
-                        data-testid={`${testId}-suggested-action-${i}-created-from-session-chip`}
-                      >
-                        Created from this session
-                      </Badge>
-                      <Link
-                        to={linkedMatch.focusHref}
-                        className="text-[11px] underline text-primary"
-                        data-testid={`${testId}-suggested-action-${i}-created-from-session-link`}
-                        data-action-queue-id={linkedMatch.id}
-                      >
-                        View in Action Queue
-                      </Link>
-                    </div>
+                  {aiDoctorSessionId ? (
+                    <LinkedSuggestionChip
+                      sessionId={aiDoctorSessionId}
+                      action={a}
+                      testId={testId}
+                      index={i}
+                    />
                   ) : null}
                 </li>
               );

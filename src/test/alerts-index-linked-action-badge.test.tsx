@@ -312,9 +312,9 @@ describe("Alerts Index Linked action — static safety", () => {
     }
   });
 
-  it("uses the pure extractor and route helper", () => {
+  it("uses the pure extractor and shared LinkedActionCountBadge", () => {
     expect(VM_SRC).toMatch(/extractSourceAlertId\(/);
-    expect(PAGE_SRC).toMatch(/actionDetailPath\(/);
+    expect(PAGE_SRC).toMatch(/LinkedActionCountBadge/);
   });
 
   it("does not render raw alert/session tokens as JSX literals", () => {

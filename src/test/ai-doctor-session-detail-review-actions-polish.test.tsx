@@ -65,6 +65,22 @@ describe("buildSessionReviewActionsCopy", () => {
 const SESSION_ID = "11111111-1111-1111-1111-111111111111";
 const PLANT_ID = "22222222-2222-2222-2222-222222222222";
 
+const { hoisted } = vi.hoisted(() => ({
+  hoisted: {
+    SESSION_ID: "11111111-1111-1111-1111-111111111111",
+    PLANT_ID: "22222222-2222-2222-2222-222222222222",
+    insertCalls: [] as Array<{ table: string; payload: unknown }>,
+    reviewEvents: [] as Array<{
+      id: string;
+      user_id: string;
+      session_id: string;
+      event_type: "marked_reviewed" | "needs_follow_up" | "cleared";
+      note: string | null;
+      created_at: string;
+    }>,
+  },
+}));
+
 const insertCalls: Array<{ table: string; payload: unknown }> = [];
 let reviewEvents: Array<{
   id: string;

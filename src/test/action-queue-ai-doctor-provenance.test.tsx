@@ -281,12 +281,9 @@ describe("ActionQueue list — AI Doctor provenance badges", () => {
 describe("ActionDetail — AI Doctor provenance panel", () => {
   it("shows 'Suggestion origin' panel for source=ai_doctor", async () => {
     renderDetail();
-    await waitFor(() =>
-      expect(
-        screen.getByTestId("action-detail-ai-doctor-provenance"),
-      ).toBeTruthy(),
+    const panel = await screen.findByTestId(
+      "action-detail-ai-doctor-provenance",
     );
-    const panel = screen.getByTestId("action-detail-ai-doctor-provenance");
     expect(panel.textContent ?? "").toContain("Suggestion origin");
     expect(panel.textContent ?? "").toContain("Source: AI Doctor");
     expect(panel.textContent ?? "").toMatch(/grower (review|approval)/i);
@@ -294,14 +291,9 @@ describe("ActionDetail — AI Doctor provenance panel", () => {
 
   it("renders a 'View AI Doctor session' link when a session id is parseable", async () => {
     renderDetail();
-    await waitFor(() =>
-      expect(
-        screen.getByTestId("action-detail-ai-doctor-session-link"),
-      ).toBeTruthy(),
-    );
-    const link = screen.getByTestId(
+    const link = (await screen.findByTestId(
       "action-detail-ai-doctor-session-link",
-    ) as HTMLAnchorElement;
+    )) as HTMLAnchorElement;
     expect(link.textContent ?? "").toBe("View AI Doctor session");
     expect(link.getAttribute("href")).toBe("/doctor/sessions/sess-abc");
   });
@@ -309,11 +301,7 @@ describe("ActionDetail — AI Doctor provenance panel", () => {
   it("does NOT render a session link when no session id is present", async () => {
     detailRow = AI_DOCTOR_ROW_NO_SESSION;
     renderDetail("aq-ai-2");
-    await waitFor(() =>
-      expect(
-        screen.getByTestId("action-detail-ai-doctor-provenance"),
-      ).toBeTruthy(),
-    );
+    await screen.findByTestId("action-detail-ai-doctor-provenance");
     expect(
       screen.queryByTestId("action-detail-ai-doctor-session-link"),
     ).toBeNull();
@@ -322,11 +310,7 @@ describe("ActionDetail — AI Doctor provenance panel", () => {
   it("does NOT render the panel for non-AI-Doctor sources", async () => {
     detailRow = COACH_ROW;
     renderDetail("aq-coach-1");
-    await waitFor(() =>
-      expect(
-        document.body.textContent ?? "",
-      ).toContain("Lower humidity to 55%"),
-    );
+    await screen.findByText("Lower humidity to 55%");
     expect(
       screen.queryByTestId("action-detail-ai-doctor-provenance"),
     ).toBeNull();
@@ -334,35 +318,24 @@ describe("ActionDetail — AI Doctor provenance panel", () => {
 
   it("never renders [session:<id>] token anywhere on the detail page", async () => {
     renderDetail();
-    await waitFor(() =>
-      expect(
-        screen.getByTestId("action-detail-ai-doctor-provenance"),
-      ).toBeTruthy(),
-    );
+    await screen.findByTestId("action-detail-ai-doctor-provenance");
     expect(document.body.innerHTML).not.toContain("[session:");
   });
 
   it("does not render target_device inside the provenance panel", async () => {
     renderDetail();
-    await waitFor(() =>
-      expect(
-        screen.getByTestId("action-detail-ai-doctor-provenance"),
-      ).toBeTruthy(),
+    const panel = await screen.findByTestId(
+      "action-detail-ai-doctor-provenance",
     );
-    const panel = screen.getByTestId("action-detail-ai-doctor-provenance");
     expect(panel.textContent ?? "").not.toContain("secret-device-name");
   });
 
   it("provenance copy does not imply execution/automation/device control", async () => {
     renderDetail();
-    await waitFor(() =>
-      expect(
-        screen.getByTestId("action-detail-ai-doctor-provenance"),
-      ).toBeTruthy(),
+    const panel = await screen.findByTestId(
+      "action-detail-ai-doctor-provenance",
     );
-    const txt = (
-      screen.getByTestId("action-detail-ai-doctor-provenance").textContent ?? ""
-    ).toLowerCase();
+    const txt = (panel.textContent ?? "").toLowerCase();
     for (const banned of [
       "auto-execute",
       "automatically",
@@ -377,6 +350,8 @@ describe("ActionDetail — AI Doctor provenance panel", () => {
     }
   });
 });
+
+
 
 // --- Static safety scans ----------------------------------------------------
 

@@ -528,6 +528,27 @@ export default function ActionDetail() {
             );
           })()}
 
+        {(() => {
+          const headerAlertId = extractSourceAlertId(row.reason);
+          if (!headerAlertId) return null;
+          return (
+            <p
+              className="mt-2 inline-flex items-center gap-2 text-xs text-muted-foreground"
+              data-testid="action-detail-linked-alert-header"
+            >
+              <span>Linked alert</span>
+              <Link
+                to={alertDetailPath(headerAlertId)}
+                className="text-primary hover:underline"
+                title="Open the originating alert."
+                data-testid="action-detail-linked-alert-link"
+              >
+                View linked alert
+              </Link>
+            </p>
+          );
+        })()}
+
         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
           <IdField label="Grow" id={row.grow_id} to={growDetailPath(row.grow_id)} />
           {row.tent_id && <IdField label="Tent" id={row.tent_id} to={tentDetailPath(row.tent_id)} />}

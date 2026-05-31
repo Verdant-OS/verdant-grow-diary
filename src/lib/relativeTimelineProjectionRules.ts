@@ -376,6 +376,10 @@ const CATEGORY_KEYS: readonly RelativeTimelineCategoryKey[] = [
   "feeding",
   "symptoms",
   "training",
+  "measurement",
+  "transplant",
+  "harvest",
+  "reminder",
   "notes",
 ];
 
@@ -385,6 +389,10 @@ const CATEGORY_SINGULAR: Record<RelativeTimelineCategoryKey, string> = {
   feeding: "feeding",
   symptoms: "symptom",
   training: "training event",
+  measurement: "measurement",
+  transplant: "transplant",
+  harvest: "harvest event",
+  reminder: "reminder",
   notes: "note",
 };
 
@@ -394,6 +402,10 @@ const CATEGORY_PLURAL: Record<RelativeTimelineCategoryKey, string> = {
   feeding: "feedings",
   symptoms: "symptoms",
   training: "training events",
+  measurement: "measurements",
+  transplant: "transplants",
+  harvest: "harvest events",
+  reminder: "reminders",
   notes: "notes",
 };
 
@@ -404,9 +416,14 @@ function emptyCounts(): Record<RelativeTimelineCategoryKey, number> {
     feeding: 0,
     symptoms: 0,
     training: 0,
+    measurement: 0,
+    transplant: 0,
+    harvest: 0,
+    reminder: 0,
     notes: 0,
   };
 }
+
 
 function relativeDaysCopy(eventMs: number, nowMs: number): string {
   const MS_PER_DAY = 86_400_000;

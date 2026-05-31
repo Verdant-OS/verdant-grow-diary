@@ -6,7 +6,7 @@
  * `plantQuickStatusRules`.
  *
  * Strictly presentation-only: no writes, no automation, no device control,
- * no calendar / notification / email / scheduling, no functions.invoke.
+ * no calendar / notification / email / scheduling, no edge function invokes.
  */
 import { AlertTriangle, Bell, Clock, ListTodo, Sprout } from "lucide-react";
 import { cn } from "@/lib/utils";

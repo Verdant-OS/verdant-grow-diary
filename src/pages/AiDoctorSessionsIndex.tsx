@@ -343,6 +343,10 @@ export default function AiDoctorSessionsIndex() {
     () => countNeedsAttentionVisible(rawRows),
     [rawRows],
   );
+  const needsFollowUpVisible = useMemo(
+    () => countNeedsFollowUpVisible(rawRows, reviewStateBySession),
+    [rawRows, reviewStateBySession],
+  );
 
   const writeParams = (next: SessionsIndexFilters, nextPage: number) => {
     const params = new URLSearchParams();

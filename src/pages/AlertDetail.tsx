@@ -35,12 +35,22 @@ import {
   type AlertStatusRow,
 } from "@/lib/alerts";
 import { useAlertEvents } from "@/hooks/useAlertEvents";
-import { actionDetailPath, alertsPath, growDetailPath, plantDetailPath, tentDetailPath } from "@/lib/routes";
+import {
+  actionDetailPath,
+  aiDoctorSessionDetailPath,
+  alertsPath,
+  growDetailPath,
+  plantDetailPath,
+  tentDetailPath,
+} from "@/lib/routes";
 import { actionMatchesAlert, buildActionQueueDraftFromAlert } from "@/lib/alertToActionQueueRules";
 import {
+  ACTION_QUEUE_SOURCE_VALUES,
+  extractSourceAiDoctorSessionId,
   getActionQueueSourceLabel,
   hasPendingActionsForClosedAlert,
   isActionDerivedFromAlert,
+  isAiDoctorDerived,
 } from "@/lib/actionQueueProvenanceRules";
 import {
   pickLatestOutcomeForAction,
@@ -98,6 +108,7 @@ export default function AlertDetail() {
   const [relatedActions, setRelatedActions] = useState<RelatedActionRow[]>([]);
   const [relatedLoaded, setRelatedLoaded] = useState(false);
   const [outcomeRows, setOutcomeRows] = useState<RawOutcomeDiaryRow[]>([]);
+  const [linkedAiDoctorSessionIds, setLinkedAiDoctorSessionIds] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     if (!alertId) return;
@@ -224,6 +235,41 @@ export default function AlertDetail() {
         });
       setRelatedActions(matched);
       setRelatedLoaded(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [alert]);
+
+  // Read-only: find AI Doctor-derived Action Queue rows linked to this alert
+  // via the `[alert:<id>]` back-pointer, then extract safe AI Doctor session
+  // ids for grower-facing back-link navigation. No writes, no token leak.
+  useEffect(() => {
+    let cancelled = false;
+    setLinkedAiDoctorSessionIds([]);
+    if (!alert || !alert.grow_id) return;
+    (async () => {
+      const { data, error: linkErr } = await supabase
+        .from("action_queue")
+        .select("id,source,reason,status")
+        .eq("grow_id", alert.grow_id)
+        .eq("source", ACTION_QUEUE_SOURCE_VALUES.AI_DOCTOR)
+        .like("reason", `%[alert:${alert.id}]%`)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (cancelled || linkErr) return;
+      const rows = (data ?? []) as Array<{ source: string | null; reason: string | null }>;
+      const seen = new Set<string>();
+      const sessionIds: string[] = [];
+      for (const r of rows) {
+        if (!isAiDoctorDerived(r)) continue;
+        const sid = extractSourceAiDoctorSessionId(r.reason);
+        if (sid && !seen.has(sid)) {
+          seen.add(sid);
+          sessionIds.push(sid);
+        }
+      }
+      setLinkedAiDoctorSessionIds(sessionIds);
     })();
     return () => {
       cancelled = true;
@@ -649,6 +695,43 @@ export default function AlertDetail() {
               </ul>
             )}
           </section>
+
+          {linkedAiDoctorSessionIds.length > 0 && (
+            <section
+              className="glass rounded-2xl p-4"
+              aria-label="Linked AI Doctor review"
+              data-testid="alert-detail-ai-doctor-review-section"
+            >
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <Badge
+                  variant="outline"
+                  className="text-[10px] uppercase border-primary text-primary"
+                  data-testid="alert-detail-ai-doctor-review-chip"
+                >
+                  Linked AI Doctor review
+                </Badge>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                This alert is connected to an approval-required action that came
+                from an AI Doctor review.
+              </p>
+              <ul className="mt-2 space-y-1">
+                {linkedAiDoctorSessionIds.map((sid) => (
+                  <li key={sid}>
+                    <Link
+                      to={aiDoctorSessionDetailPath(sid)}
+                      className="text-xs text-primary hover:underline"
+                      data-testid="alert-detail-ai-doctor-saved-session-link"
+                    >
+                      View saved AI Doctor session
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+
 
           <section className="glass rounded-2xl p-4" aria-label="Alert history">
             <div className="flex items-center gap-2 mb-2">

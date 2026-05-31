@@ -70,8 +70,9 @@ const populatedData = {
   diaryEntriesLast7d: 3,
 } as const;
 
-const growA = { id: "grow-a", name: "Blue Dream" } as unknown as never;
-const growB = { id: "grow-b", name: "OG Kush" } as unknown as never;
+type GrowLite = { id: string; name: string };
+const growA: GrowLite = { id: "grow-a", name: "Blue Dream" };
+const growB: GrowLite = { id: "grow-b", name: "OG Kush" };
 
 beforeEach(() => {
   vi.mocked(useReportsHubData).mockReset();

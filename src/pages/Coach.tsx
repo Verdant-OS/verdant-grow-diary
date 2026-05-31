@@ -290,7 +290,14 @@ export default function Coach() {
           contextConfidenceCeiling: contextSufficiency.confidenceCeiling ?? null,
           contextSufficiency,
         }).then((res) => {
-          if (!res.ok && "error" in res) {
+          if (res.ok) {
+            // Only apply the persisted id if this diagnosis is still the
+            // most recent one rendered. Prevents an older request's id
+            // from attaching to a newer diagnosis.
+            if (seq === diagnosisSeqRef.current && res.id) {
+              setPersistedSessionId(res.id);
+            }
+          } else if ("error" in res) {
             toast.warning("Couldn't save this AI Doctor session for later review.", {
               description: res.error,
             });

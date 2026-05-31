@@ -87,6 +87,10 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
       if (tentErr) throw tentErr;
       const tentIds = (tentRows ?? []).map((r) => r.id as string).filter(Boolean);
 
+      const completedCutoffIso = new Date(
+        Date.now() - PENDING_OUTCOME_REVIEW_THRESHOLD_MS,
+      ).toISOString();
+
       const [
         outcomeRes,
         alertsOpenRes,
@@ -96,6 +100,8 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
         diary7dRes,
         sensorLatestRes,
         sensorRecentRes,
+        firstOpenAlertRes,
+        completedActionsRes,
       ] = await Promise.all([
         supabase
           .from("diary_entries")
@@ -145,9 +151,29 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
               .in("tent_id", tentIds)
               .gte("ts", sevenDaysAgo)
           : Promise.resolve({ count: 0, error: null } as { count: number; error: null }),
+        supabase
+          .from("alerts")
+          .select("id")
+          .eq("grow_id", growId)
+          .eq("status", "open")
+          .order("created_at", { ascending: false })
+          .limit(1),
+        supabase
+          .from("action_queue")
+          .select("id,status,completed_at,suggested_change,grow_id")
+          .eq("grow_id", growId)
+          .eq("status", "completed")
+          .lte("completed_at", completedCutoffIso)
+          .order("completed_at", { ascending: true })
+          .limit(50),
       ]);
 
       const outcomeRows = (outcomeRes.data ?? []) as RawGrowOutcomeRow[];
+      const pendingReviews = findPendingOutcomeReviews({
+        completedActions: (completedActionsRes.data ?? []) as never,
+        outcomes: (outcomeRes.data ?? []) as never,
+        now: Date.now(),
+      });
 
       setState({
         status: "ready",
@@ -156,12 +182,17 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
         alertsOpen: alertsOpenRes.count ?? 0,
         alertsCritical: alertsCritRes.count ?? 0,
         alertsWarning: alertsWarnRes.count ?? 0,
+        firstOpenAlertId:
+          (firstOpenAlertRes.data?.[0]?.id as string | undefined) ?? null,
         latestSensorCapturedAt:
           (sensorLatestRes.data?.[0]?.ts as string | undefined) ?? null,
         recentSensorReadingCount: sensorRecentRes.count ?? 0,
         diaryEntriesTotal: diaryTotalRes.count ?? 0,
         diaryEntriesLast7d: diary7dRes.count ?? 0,
+        pendingOutcomeReviewCount: pendingReviews.length,
+        firstPendingActionId: pendingReviews[0]?.action_queue_id ?? null,
       });
+
     } catch {
       setState({ ...EMPTY_REPORTS_HUB_DATA, status: "unavailable" });
     }

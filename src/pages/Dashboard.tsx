@@ -131,7 +131,8 @@ export default function Dashboard() {
   const scopedGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
   const { data: tents = [] } = useGrowTents(scopedGrowId);
   const { data: plants = [] } = useGrowPlants(undefined, scopedGrowId);
-  const { data: tasks = [] } = useTasks();
+  // Tasks: no real-data hook yet — render an honest empty state below.
+  const tasks: { status: string }[] = [];
   const { data: rawReadings = [] } = useSensorReadings();
   const readings = groupReadings(rawReadings);
   // Per-tent sensor windows for the stability summary. Each tent gets its

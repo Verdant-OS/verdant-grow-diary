@@ -634,8 +634,14 @@ function SessionReviewActions({
       });
       setNote("");
     } catch (e) {
+      const raw =
+        typeof e === "object" && e !== null && "message" in e
+          ? (e as { message?: unknown }).message
+          : null;
       const message =
-        e instanceof Error && e.message ? e.message : "Could not save review event.";
+        typeof raw === "string" && raw.length > 0
+          ? raw
+          : "Could not save review event.";
       setErrorText(message);
     }
   };

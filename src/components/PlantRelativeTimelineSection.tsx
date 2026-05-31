@@ -57,25 +57,35 @@ function SourceIcon({ source }: { source: RelativeTimelineItem["source"] }) {
   return <NotebookPen className="h-3.5 w-3.5" aria-hidden />;
 }
 
-function TimelineRow({ item }: { item: RelativeTimelineItem }) {
+function TimelineRow({
+  item,
+  context,
+}: {
+  item: RelativeTimelineItem;
+  context: RelativeTimelineEntryContext;
+}) {
+  const detail = formatRelativeTimelineEntryDetail(item, context)!;
   return (
     <li
-      className="rounded-lg border bg-card/40 p-3 text-sm"
+      className="rounded-lg border bg-card/40 p-3 text-sm focus-within:ring-2 focus-within:ring-ring"
       data-testid="relative-timeline-item"
       data-item-id={item.id}
       data-event-type={item.eventType}
       data-source={item.source}
+      data-category={detail.categoryKey}
       data-plant-day={item.plantDay ?? ""}
       data-stage-day={item.stageDay ?? ""}
+      aria-label={`${detail.categoryLabel} entry — ${detail.summary}`}
     >
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           <Badge
             variant="secondary"
-            className="capitalize gap-1"
+            className="gap-1"
             data-testid="relative-timeline-source-badge"
+            data-source-label={detail.sourceLabel}
           >
-            <SourceIcon source={item.source} /> {SOURCE_LABEL[item.source]}
+            <SourceIcon source={item.source} /> {detail.sourceLabel}
           </Badge>
           {item.stagePreset && (
             <Badge
@@ -90,10 +100,10 @@ function TimelineRow({ item }: { item: RelativeTimelineItem }) {
           )}
           <Badge
             variant="outline"
-            className="capitalize"
             data-testid="relative-timeline-event-type"
+            data-category-key={detail.categoryKey}
           >
-            {item.eventType}
+            {detail.categoryLabel}
           </Badge>
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -107,17 +117,49 @@ function TimelineRow({ item }: { item: RelativeTimelineItem }) {
               Stage day {item.stageDay}
             </span>
           )}
-          <span data-testid="relative-timeline-timestamp">
-            {item.occurredAtLabel}
+          <span
+            data-testid="relative-timeline-timestamp"
+            data-fallback={detail.timestampIsFallback ? "true" : "false"}
+            className={cn(detail.timestampIsFallback && "italic text-muted-foreground/70")}
+          >
+            {detail.timestampLabel}
           </span>
         </div>
       </div>
       <p
-        className="mt-1.5 text-sm text-foreground/90 break-words"
+        className={cn(
+          "mt-1.5 text-sm break-words",
+          detail.summaryIsFallback
+            ? "italic text-muted-foreground"
+            : "text-foreground/90",
+        )}
         data-testid="relative-timeline-title"
+        data-summary-fallback={detail.summaryIsFallback ? "true" : "false"}
       >
-        {item.title}
+        {detail.summary}
       </p>
+      {detail.hasContext && (
+        <p
+          className="mt-1 text-xs text-muted-foreground flex flex-wrap gap-x-2 gap-y-0.5"
+          data-testid="relative-timeline-context"
+        >
+          {detail.plantContextLabel && (
+            <span data-testid="relative-timeline-context-plant">
+              {detail.plantContextLabel}
+            </span>
+          )}
+          {detail.tentContextLabel && (
+            <span data-testid="relative-timeline-context-tent">
+              {detail.tentContextLabel}
+            </span>
+          )}
+          {detail.growContextLabel && (
+            <span data-testid="relative-timeline-context-grow">
+              {detail.growContextLabel}
+            </span>
+          )}
+        </p>
+      )}
     </li>
   );
 }

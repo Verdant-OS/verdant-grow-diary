@@ -696,6 +696,43 @@ export default function AlertDetail() {
             )}
           </section>
 
+          {linkedAiDoctorSessionIds.length > 0 && (
+            <section
+              className="glass rounded-2xl p-4"
+              aria-label="Linked AI Doctor review"
+              data-testid="alert-detail-ai-doctor-review-section"
+            >
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <Badge
+                  variant="outline"
+                  className="text-[10px] uppercase border-primary text-primary"
+                  data-testid="alert-detail-ai-doctor-review-chip"
+                >
+                  Linked AI Doctor review
+                </Badge>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                This alert is connected to an approval-required action that came
+                from an AI Doctor review.
+              </p>
+              <ul className="mt-2 space-y-1">
+                {linkedAiDoctorSessionIds.map((sid) => (
+                  <li key={sid}>
+                    <Link
+                      to={aiDoctorSessionDetailPath(sid)}
+                      className="text-xs text-primary hover:underline"
+                      data-testid="alert-detail-ai-doctor-saved-session-link"
+                    >
+                      View saved AI Doctor session
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+
+
           <section className="glass rounded-2xl p-4" aria-label="Alert history">
             <div className="flex items-center gap-2 mb-2">
               <History className="h-4 w-4 text-muted-foreground" />

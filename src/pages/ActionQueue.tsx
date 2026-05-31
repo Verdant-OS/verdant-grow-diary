@@ -482,7 +482,18 @@ export default function ActionQueue() {
         ) : (
           <ul className="space-y-3">
             {pending.map((row) => (
-              <li key={row.id} className="rounded-xl border border-border/60 bg-secondary/30 p-3">
+              <li
+                key={row.id}
+                data-testid="action-queue-row"
+                data-action-id={row.id}
+                data-focused={focusedActionId === row.id ? "true" : undefined}
+                aria-label={focusedActionId === row.id ? "Focused action" : undefined}
+                className={`rounded-xl border border-border/60 bg-secondary/30 p-3 ${
+                  focusedActionId === row.id
+                    ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                    : ""
+                }`}
+              >
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">

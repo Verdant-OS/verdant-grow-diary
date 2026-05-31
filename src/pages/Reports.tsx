@@ -29,6 +29,8 @@ import {
 } from "@/lib/reportsHubViewModel";
 import { buildReportsReviewQueue } from "@/lib/reportsHubReviewQueue";
 import ReportsReviewQueueSection from "@/components/ReportsReviewQueueSection";
+import { buildReportsHubOnboarding } from "@/lib/reportsHubOnboarding";
+import ReportsHubOnboardingSection from "@/components/ReportsHubOnboardingSection";
 import { growDetailPath } from "@/lib/routes";
 
 export default function Reports() {

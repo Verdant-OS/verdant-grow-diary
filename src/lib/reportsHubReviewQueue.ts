@@ -13,10 +13,12 @@
  *  - Never embeds raw payloads, secrets, or user IDs in user-visible copy.
  */
 import {
-  actionDetailPath,
+  actionDetailOutcomePath,
   alertDetailPath,
   alertsPath,
+  growDetailOutcomesPath,
   growDetailPath,
+  sensorsPath,
 } from "@/lib/routes";
 
 export const STALE_SENSOR_THRESHOLD_MS = 24 * 60 * 60 * 1000;

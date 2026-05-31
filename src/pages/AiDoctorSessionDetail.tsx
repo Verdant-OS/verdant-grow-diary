@@ -775,6 +775,73 @@ function fmtDate(ts: string | null): string {
   }
 }
 
+function LinkedActionQueueSection({ vm }: { vm: LinkedActionsViewModel }) {
+  if (vm.count === 0) return null;
+  const countLabel = `${vm.count} open ${vm.count === 1 ? "item" : "items"}`;
+  return (
+    <section
+      data-testid="ai-doctor-session-detail-linked-action-queue"
+      aria-label="Linked Action Queue items"
+      className="rounded-lg border border-border bg-muted/20 p-3 space-y-2"
+    >
+      <header className="flex flex-wrap items-center gap-2">
+        <h3 className="text-sm font-semibold">Linked Action Queue items</h3>
+        <Badge
+          variant="outline"
+          className="text-[11px]"
+          data-testid="ai-doctor-session-detail-linked-action-queue-count"
+        >
+          {countLabel}
+        </Badge>
+      </header>
+      <p
+        className="text-xs text-muted-foreground"
+        data-testid="ai-doctor-session-detail-linked-action-queue-helper"
+      >
+        These approval-required items were created from this AI Doctor review.
+      </p>
+      {vm.primaryFocusHref ? (
+        <Link
+          to={vm.primaryFocusHref}
+          className="inline-flex items-center gap-1 text-xs underline text-primary"
+          data-testid="ai-doctor-session-detail-linked-action-queue-primary-link"
+          data-action-queue-id={vm.items[0].id}
+        >
+          View in Action Queue
+        </Link>
+      ) : (
+        <ul
+          className="space-y-1"
+          data-testid="ai-doctor-session-detail-linked-action-queue-list"
+        >
+          {vm.items.map((item) => (
+            <li
+              key={item.id}
+              className="rounded border bg-card/40 px-2 py-1 text-xs"
+              data-testid="ai-doctor-session-detail-linked-action-queue-item"
+              data-action-queue-id={item.id}
+            >
+              <Link
+                to={item.focusHref}
+                className="underline text-primary"
+                data-testid="ai-doctor-session-detail-linked-action-queue-item-link"
+              >
+                View in Action Queue
+              </Link>
+              {item.reasonText ? (
+                <span className="ml-2 text-muted-foreground">
+                  — {item.reasonText}
+                </span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+
 function fmtConfidence(val: number | null | undefined): string | null {
   if (typeof val !== "number" || !Number.isFinite(val)) return null;
   return `${Math.round(val * 100)}%`;

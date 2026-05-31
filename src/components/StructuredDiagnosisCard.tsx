@@ -216,6 +216,17 @@ export default function StructuredDiagnosisCard({
         </span>
       </div>
 
+      {aiDoctorSessionId ? (
+        <Link
+          to={aiDoctorSessionDetailPath(aiDoctorSessionId)}
+          className="text-[11px] underline text-primary"
+          title="Open the saved review snapshot."
+          data-testid={`${testId}-saved-session-link`}
+        >
+          View saved AI Doctor session
+        </Link>
+      ) : null}
+
       {harmonized.limitedCopy && (
         <p
           className="text-[11px] text-muted-foreground rounded-lg border border-border/40 bg-secondary/10 p-2"

@@ -202,7 +202,7 @@ export default function GrowDetail() {
 function RecentOutcomesCard({ outcomes }: { outcomes: GrowOutcomesState }) {
   const { status, summary, recent } = outcomes;
   return (
-    <section className="glass rounded-2xl p-4 mt-4" aria-label="Recent outcomes">
+    <section id="outcomes" className="glass rounded-2xl p-4 mt-4" aria-label="Recent outcomes">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           Recent Outcomes

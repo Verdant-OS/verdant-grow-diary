@@ -257,11 +257,15 @@ describe("ActionQueue — ?alert context chip", () => {
     ).not.toContain("[alert:");
   });
 
-  it("page never renders raw [session:<id>] token", async () => {
+  it("page never renders raw [session:<id>] or [alert:<id>] tokens in visible textContent", async () => {
     renderAt("/actions?alert=alert-xyz");
     await waitFor(() =>
       expect(screen.getAllByTestId("action-queue-row").length).toBeGreaterThan(0),
     );
+    const visible = document.body.textContent ?? "";
+    expect(visible).not.toContain("[session:");
+    expect(visible).not.toContain("[alert:");
+    // Defense in depth: also check raw HTML attribute surface.
     expect(document.body.innerHTML).not.toContain("[session:");
   });
 

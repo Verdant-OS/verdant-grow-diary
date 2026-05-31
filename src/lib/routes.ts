@@ -35,3 +35,7 @@ export const plantDetailPath = (plantId: string): string =>
 export const tentDetailPath = (tentId: string): string =>
   `/tents/${encodeURIComponent(tentId)}`;
 
+export const aiDoctorSessionDetailPath = (sessionId: string): string =>
+  `/doctor/sessions/${encodeURIComponent(sessionId)}`;
+
+

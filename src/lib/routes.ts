@@ -26,6 +26,15 @@ export const alertsPath = (growId?: string | null): string => withGrowId("/alert
 export const actionDetailPath = (actionId: string): string =>
   `/actions/${encodeURIComponent(actionId)}`;
 
+/**
+ * Action Queue scoped to a single alert's linked actions via the URL-driven
+ * "Filtered by alert" context chip. Presenter affordance — the page itself
+ * does not server-filter on this param yet, it only shows the context chip.
+ */
+export const actionQueueAlertContextPath = (alertId: string): string =>
+  `/actions?alert=${encodeURIComponent(alertId)}`;
+
+
 export const alertDetailPath = (alertId: string): string =>
   `/alerts/${encodeURIComponent(alertId)}`;
 

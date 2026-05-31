@@ -492,10 +492,12 @@ export default function ActionQueue() {
             <SelectItem value="all">All sources</SelectItem>
             <SelectItem value={ACTION_QUEUE_SOURCE_VALUES.ENVIRONMENT_ALERT}>Environment Alerts</SelectItem>
             <SelectItem value={ACTION_QUEUE_SOURCE_VALUES.AI_COACH}>AI Coach</SelectItem>
+            <SelectItem value={ACTION_QUEUE_SOURCE_VALUES.AI_DOCTOR}>AI Doctor</SelectItem>
             <SelectItem value={ACTION_QUEUE_SOURCE_VALUES.MANUAL}>Manual</SelectItem>
 
           </SelectContent>
         </Select>
+
 
 
 

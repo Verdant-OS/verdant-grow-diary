@@ -45,6 +45,8 @@ import {
   ACTION_QUEUE_SOURCE_VALUES,
   getActionQueueSourceLabel,
   isAlertDerived,
+  isAiDoctorDerived,
+  stripBackPointerTokens,
 } from "@/lib/actionQueueProvenanceRules";
 import { buildActionQueueGrowContextHint } from "@/lib/actionQueueGrowContextHintRules";
 
@@ -52,26 +54,15 @@ import { buildActionQueueGrowContextHint } from "@/lib/actionQueueGrowContextHin
 type Status = ActionStatus;
 type EventType = ActionEventType;
 
-/**
- * Strip internal back-pointer tokens from a user-facing reason string.
- * Tokens (e.g. session back-pointers) exist for audit/dedupe only and must
- * never leak into grower-visible copy.
- */
-function stripBackPointerTokens(reason: string | null | undefined): string {
-  if (!reason) return "";
-  return reason
-    .replace(/\s*\[session:[^\]]+\]\s*/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 type StatusFilter = "all" | "pending" | "simulated" | "approved" | "rejected" | "completed" | "cancelled";
 type RiskFilter = "all" | "low" | "medium" | "high" | "critical";
 type SourceFilter =
   | "all"
   | typeof ACTION_QUEUE_SOURCE_VALUES.ENVIRONMENT_ALERT
   | typeof ACTION_QUEUE_SOURCE_VALUES.AI_COACH
+  | typeof ACTION_QUEUE_SOURCE_VALUES.AI_DOCTOR
   | typeof ACTION_QUEUE_SOURCE_VALUES.MANUAL;
+
 
 type SortOrder = "newest" | "oldest" | "risk";
 

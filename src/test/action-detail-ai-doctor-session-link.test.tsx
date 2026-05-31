@@ -111,6 +111,13 @@ vi.mock("@/integrations/supabase/client", () => {
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: { id: "u1", email: "u@example.com" } }),
 }));
+vi.mock("@/store/grows", () => ({
+  useGrows: () => ({
+    grows: [{ id: "g1", name: "G1" }],
+    activeGrowId: "g1",
+    activeGrow: { id: "g1", name: "G1" },
+  }),
+}));
 vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn(), message: vi.fn() },
 }));

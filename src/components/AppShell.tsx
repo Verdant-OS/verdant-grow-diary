@@ -32,7 +32,7 @@ export default function AppShell() {
   }, []);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
-  if (!user) { nav("/auth", { replace: true }); return null; }
+  if (!user) { nav("/welcome", { replace: true }); return null; }
 
   const unread = openAlerts.filter((a) => a.status === "open").length;
 

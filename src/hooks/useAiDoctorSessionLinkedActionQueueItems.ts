@@ -36,7 +36,7 @@ export function useAiDoctorSessionLinkedActionQueueItems(
     queryFn: async (): Promise<LinkedActionInputRow[]> => {
       const { data, error } = await supabase
         .from("action_queue")
-        .select("id,status,source,reason")
+        .select("id,status,source,reason,suggested_change")
         .eq("source", "ai_doctor")
         .in("status", OPEN_LINKED_ACTION_STATUSES as unknown as string[])
         .like("reason", `%[session:${sid}]%`)

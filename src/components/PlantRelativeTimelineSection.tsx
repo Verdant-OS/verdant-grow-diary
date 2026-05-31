@@ -207,29 +207,25 @@ export default function PlantRelativeTimelineSection({
               className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 sm:flex-wrap sm:overflow-visible"
             >
               {buildRelativeTimelineFilterChips(items, filter).map((chip) => {
-                const isDisabled = chip.disabled;
+                const isMuted = chip.disabled;
                 return (
                   <button
                     key={chip.key}
                     type="button"
                     role="radio"
                     aria-checked={chip.selected}
-                    aria-disabled={isDisabled || undefined}
                     aria-label={`Filter timeline by ${chip.label} (${chip.count})`}
                     data-testid={`relative-timeline-filter-${chip.key}`}
                     data-selected={chip.selected ? "true" : "false"}
-                    data-disabled={isDisabled ? "true" : "false"}
+                    data-disabled={isMuted ? "true" : "false"}
                     data-count={chip.count}
-                    disabled={isDisabled}
-                    onClick={() => {
-                      if (!isDisabled) setFilter(chip.key);
-                    }}
+                    onClick={() => setFilter(chip.key)}
                     className={cn(
                       "shrink-0 inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border transition-colors min-h-[32px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
                       chip.selected
                         ? "bg-primary text-primary-foreground border-primary"
-                        : isDisabled
-                        ? "bg-muted/30 text-muted-foreground/60 border-border/30 cursor-not-allowed"
+                        : isMuted
+                        ? "bg-muted/30 text-muted-foreground/60 border-border/30 hover:bg-muted/40"
                         : "bg-secondary/40 text-foreground border-border/40 hover:bg-secondary/60",
                     )}
                   >

@@ -5,7 +5,7 @@
  * Safety envelope:
  *   - INSERT-only into `public.action_queue` (+ optional `action_queue_events`
  *     audit row, matching the existing AlertDetail pattern).
- *   - No update/upsert/delete/rpc/functions.invoke.
+ *   - No update / upsert / delete / rpc / edge-function invocations.
  *   - No edge functions, no AI calls, no automation, no device control.
  *   - No alerts/tasks writes.
  *   - Never sends `user_id` (DB default `auth.uid()` + RLS own ownership).

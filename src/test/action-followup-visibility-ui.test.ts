@@ -63,6 +63,23 @@ describe("ActionDetail — view follow-up link", () => {
     const linkSegment = ACTION_DETAIL.split('data-testid="followup-link"')[1] ?? "";
     expect(linkSegment.slice(0, 600)).not.toMatch(/\.insert\(/);
   });
+  it("link carries an explicit aria-label for screen-reader clarity", () => {
+    const linkSegment = ACTION_DETAIL.split('data-testid="followup-link"')[1] ?? "";
+    expect(linkSegment.slice(0, 600)).toMatch(/aria-label="View follow-up diary entry"/);
+  });
+  it("link visible copy and aria-label do not expose [action: or [alert: tokens", () => {
+    const linkSegment = ACTION_DETAIL.split('data-testid="followup-link"')[1] ?? "";
+    const segment = linkSegment.slice(0, 600);
+    expect(segment).not.toContain("[action:");
+    expect(segment).not.toContain("[alert:");
+  });
+  it("is gated outside rejected/cancelled/pending sections", () => {
+    // followup-link must only appear inside the completed-status block.
+    // Assert it is NOT inside any rejected/cancelled/pending branch.
+    expect(ACTION_DETAIL).not.toMatch(/row\.status === "rejected"[\s\S]{0,4000}followup-link/);
+    expect(ACTION_DETAIL).not.toMatch(/row\.status === "cancelled"[\s\S]{0,4000}followup-link/);
+    expect(ACTION_DETAIL).not.toMatch(/row\.status === "pending_approval"[\s\S]{0,4000}followup-link/);
+  });
 });
 
 describe("ActionDetail — duplicate completion idempotency contract", () => {

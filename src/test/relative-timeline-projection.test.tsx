@@ -16,6 +16,14 @@ import { resolve } from "node:path";
 import React from "react";
 import { render, screen } from "@testing-library/react";
 
+// Stub react-router-dom so the empty-state CTA `<Link>` renders without
+// needing a real Router in every render() call. Keeps the test scope
+// presentation-only (no navigation is asserted via Router internals).
+vi.mock("react-router-dom", () => ({
+  Link: ({ to, children, ...rest }: { to: string; children: React.ReactNode; [k: string]: unknown }) =>
+    React.createElement("a", { href: typeof to === "string" ? to : "", ...rest }, children),
+}));
+
 import {
   buildRelativeTimelineProjection,
   groupRelativeTimelineByStage,

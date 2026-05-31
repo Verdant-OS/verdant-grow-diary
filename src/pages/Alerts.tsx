@@ -21,6 +21,7 @@ import {
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import { useAlertEvents } from "@/hooks/useAlertEvents";
+import { useAlertsLinkedActionCounts } from "@/hooks/useAlertsLinkedActionCounts";
 import {
   acknowledgeAlert,
   dismissAlert,
@@ -29,7 +30,7 @@ import {
   type AlertSeverityRow,
   type AlertStatusRow,
 } from "@/lib/alerts";
-import { alertDetailPath, alertsPath } from "@/lib/routes";
+import { actionDetailPath, actionsPath, alertDetailPath } from "@/lib/routes";
 import { formatDistanceToNow } from "date-fns";
 
 type StatusFilter = AlertStatusRow | "all";

@@ -20,7 +20,7 @@ const TAG_LABELS: Record<string, string> = {
   training: "Training",
   observation: "Observation",
   photo: "Photo",
-  "sensor-snapshot": "Sensor",
+  "sensor-snapshot": "Manual snapshot",
   nutrient: "Nutrient",
   symptoms: "Symptoms",
   action_followup: "Follow-up",

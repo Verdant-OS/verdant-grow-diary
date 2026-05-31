@@ -390,9 +390,12 @@ export default function Timeline() {
                           const et = getEventType((e.details?.event_type as string | undefined) ?? null);
                           const Icon = et.icon;
                           const plantName = e.details?.plant_name as string | undefined;
-                          const sensor = e.details?.sensor as { ts?: string; temp?: number; rh?: number; vpd?: number; co2?: number; soil?: number } | undefined;
+                          // QuickLog writes `sensor_snapshot`; older entries may still use `sensor`.
+                          const sensor = (e.details?.sensor_snapshot ?? e.details?.sensor) as
+                            | { ts?: string; temp?: number; rh?: number; vpd?: number; co2?: number; soil?: number }
+                            | undefined;
                           const remindAt = e.details?.remind_at as string | undefined;
-                          const HIDDEN = ["event_type","plant_id","plant_name","tent_id","sensor","remind_at"];
+                          const HIDDEN = ["event_type","plant_id","plant_name","tent_id","sensor","sensor_snapshot","remind_at"];
                           const extra = Object.entries(e.details || {}).filter(([k]) => !HIDDEN.includes(k));
                           return (
                             <>
@@ -432,9 +435,9 @@ export default function Timeline() {
                                   stale: snapStale,
                                 });
                                 return (
-                                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                  <div className="mt-2 flex flex-wrap items-center gap-1.5" data-testid="timeline-manual-snapshot">
                                     <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
-                                      <Gauge className="h-3 w-3" />Snapshot
+                                      <Gauge className="h-3 w-3" />Manual snapshot
                                     </span>
                                     {sensor.temp != null && <SnapChip>{(sensor.temp * 9 / 5 + 32).toFixed(1)}°F</SnapChip>}
                                     {sensor.rh != null && <SnapChip>{sensor.rh}% RH</SnapChip>}

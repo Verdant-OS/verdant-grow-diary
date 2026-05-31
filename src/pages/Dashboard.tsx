@@ -24,6 +24,9 @@ import DashboardDataSourceDisclosure from "@/components/DashboardDataSourceDiscl
 // honest empty states for Tasks and AI Insights until backed by real data.
 // See docs/qa/v0-demo-loop-checklist.md and docs/safety/static-safety-scans.md.
 import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
+import { useGrows } from "@/store/grows";
+import OnboardingChecklistCard from "@/components/OnboardingChecklistCard";
+import { buildOnboardingChecklistViewModel } from "@/lib/onboardingChecklistViewModel";
 import { useSensorReadings, useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useDashboardScopedData } from "@/hooks/useDashboardScopedData";

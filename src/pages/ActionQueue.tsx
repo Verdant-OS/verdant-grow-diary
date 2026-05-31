@@ -127,6 +127,12 @@ export default function ActionQueue() {
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
 
+  // Deep-link focus: /actions?focus=<action_id>. Presenter-only; never mutates rows.
+  const [searchParams] = useSearchParams();
+  const focusedActionId = searchParams.get("focus");
+
+
+
 
   const load = useCallback(async () => {
     if (!user) return;

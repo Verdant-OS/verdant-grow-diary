@@ -4,7 +4,6 @@ import { useAuth } from "@/store/auth";
 import BrandLogo from "@/components/BrandLogo";
 import LeadCaptureForm from "@/components/LeadCaptureForm";
 
-
 /**
  * Public landing page for https://verdantgrowdiary.com.
  *
@@ -27,94 +26,204 @@ export default function Landing() {
     <main className="min-h-screen bg-background text-foreground">
       <header className="px-6 py-5 flex items-center justify-between max-w-6xl mx-auto">
         <BrandLogo size="md" showText />
-        {user ? (
-          <Link to="/">
-            <Button variant="outline" size="sm">Open dashboard</Button>
-          </Link>
-        ) : (
-          <Link to="/auth">
-            <Button variant="outline" size="sm">Sign in</Button>
-          </Link>
-        )}
-      </header>
-
-      <section className="px-6 pt-12 pb-20 max-w-4xl mx-auto text-center">
-        <div className="flex justify-center mb-8">
-          <BrandLogo size="hero" />
-        </div>
-        <h1 className="font-display text-4xl md:text-6xl font-bold tracking-tight">
-          Verdant Grow Diary
-        </h1>
-        <p className="mt-3 text-lg md:text-xl text-primary font-medium">
-          A diary-first Grow OS. The grower stays in control.
-        </p>
-        <p className="mt-6 text-base md:text-lg text-muted-foreground max-w-2xl mx-auto">
-          Verdant is a grow diary and cultivation command center. Capture grow
-          logs, track plants and tents, and turn sensor data into safer
-          insight — without handing control to a black box.
-        </p>
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+        <div className="flex items-center gap-2">
           {user ? (
             <Link to="/">
-              <Button size="lg">Open dashboard</Button>
+              <Button variant="outline" size="sm">Open dashboard</Button>
             </Link>
           ) : (
             <Link to="/auth">
-              <Button size="lg">Sign in</Button>
+              <Button variant="outline" size="sm">Sign in</Button>
             </Link>
           )}
-          <a href="#features">
-            <Button size="lg" variant="outline">Learn more</Button>
-          </a>
-          <Link to="/hardware-integrations">
-            <Button size="lg" variant="outline">Hardware integrations</Button>
-          </Link>
-          <Link to="/pricing">
-            <Button size="lg" variant="outline">Pricing</Button>
-          </Link>
-
         </div>
-      </section>
+      </header>
 
-
-      <section id="features" className="px-6 py-16 max-w-5xl mx-auto grid gap-6 md:grid-cols-2">
-        <FeatureCard
-          title="Grow logs"
-          body="A diary-first workflow. Every feeding, training session, and observation lives in a searchable timeline tied to the grow it belongs to."
-        />
-        <FeatureCard
-          title="Plant and tent tracking"
-          body="Organize plants by tent and grow. Lineage, stage, and history travel with each plant from clone to harvest."
-        />
-        <FeatureCard
-          title="Sensor-aware dashboard"
-          body="When environment sensors are connected, the dashboard summarizes the latest readings and data quality. Sensor data is used for safer insight, never for blind automation."
-        />
-        <FeatureCard
-          title="Environment alerts"
-          body="Read-only alerts surface drift from your targets — temperature, humidity, VPD — with an immutable audit trail when you acknowledge or resolve them."
-        />
-        <FeatureCard
-          title="AI Coach"
-          body="The AI Coach reads your grow context and suggests next steps. It is cautious, suggest-only, and never executes anything on its own."
-        />
-        <FeatureCard
-          title="Approval-required Action Queue"
-          body="AI suggestions become queued actions that you explicitly approve, edit, or dismiss. No blind automation — every meaningful change requires a human in the loop."
-        />
-      </section>
-
-      <section className="px-6 py-14 max-w-3xl mx-auto text-center">
-        <h2 className="font-display text-2xl md:text-3xl font-semibold">
-          Built for growers who want signal, not noise
-        </h2>
-        <p className="mt-4 text-muted-foreground">
-          Verdant treats sensor data as ground truth and AI as a careful
-          assistant. Every meaningful change requires a human in the loop.
-          The grower stays in control.
+      {/* Hero */}
+      <section className="px-6 pt-10 pb-16 max-w-5xl mx-auto text-center">
+        <div className="flex justify-center mb-6">
+          <BrandLogo size="hero" />
+        </div>
+        <p className="text-sm uppercase tracking-[0.2em] text-primary/80 font-medium">
+          Verdant Grow Diary · Grow OS
+        </p>
+        <h1 className="mt-4 font-display text-4xl md:text-6xl font-bold tracking-tight leading-tight">
+          Understand what changed in your grow —
+          <span className="block text-primary">before the next mistake repeats.</span>
+        </h1>
+        <p className="mt-6 text-base md:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+          Verdant turns grow logs, photos, sensor snapshots, alerts, and
+          cautious AI into one clear plant history. Explore the Grow OS
+          before creating an account.
+        </p>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <Link to="/demo">
+            <Button size="lg" className="font-semibold">Explore Demo</Button>
+          </Link>
+          {user ? (
+            <Link to="/">
+              <Button size="lg" variant="outline">Open dashboard</Button>
+            </Link>
+          ) : (
+            <Link to="/auth">
+              <Button size="lg" variant="outline">Create Free Account</Button>
+            </Link>
+          )}
+          <Link to="/auth">
+            <Button size="lg" variant="ghost">Sign in</Button>
+          </Link>
+        </div>
+        <p className="mt-6 text-xs text-muted-foreground">
+          No blind automation. No fake live data. The grower stays in control.
         </p>
       </section>
 
+      {/* Dashboard teaser */}
+      <section className="px-6 pb-16 max-w-5xl mx-auto">
+        <div className="relative rounded-2xl border border-border/50 bg-card/40 backdrop-blur p-6 md:p-8 overflow-hidden">
+          <div className="absolute top-4 right-4 text-[10px] uppercase tracking-wider px-2 py-1 rounded-md bg-primary/15 text-primary border border-primary/30 font-semibold">
+            Demo data
+          </div>
+          <h2 className="font-display text-xl md:text-2xl font-semibold mb-4">
+            A glance at your grow
+          </h2>
+          <div className="grid gap-3 md:grid-cols-3">
+            <TeaserCard label="Latest snapshot" value="Stable" hint="Temp · Humidity · VPD" />
+            <TeaserCard label="Open alert" value="Humidity drifting" hint="Tap to review" />
+            <TeaserCard label="Action Queue" value="1 awaiting approval" hint="Grower decides" />
+          </div>
+          <div className="mt-6 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+            <span className="inline-flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-primary" /> Sensor truth
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-accent" /> Plant memory
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-muted-foreground" /> Approval-required actions
+            </span>
+          </div>
+          <div className="mt-6">
+            <Link to="/demo">
+              <Button variant="secondary" size="sm">Open the demo dashboard →</Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* The Verdant loop */}
+      <section className="px-6 py-14 max-w-5xl mx-auto">
+        <h2 className="font-display text-2xl md:text-3xl font-semibold text-center">
+          The Verdant loop
+        </h2>
+        <p className="mt-3 text-center text-muted-foreground max-w-2xl mx-auto">
+          One trustworthy circle from observation to safer next step.
+        </p>
+        <ol className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            ["Grow", "Plant memory starts here"],
+            ["Plant + Log", "Every feeding, training, photo"],
+            ["Sensor snapshot", "Labeled live, manual, or demo"],
+            ["Alert", "Drift from your targets"],
+            ["Action Queue", "Approval-required, never auto"],
+            ["AI Doctor", "Cautious, contextual, evidence-based"],
+            ["Follow-up diary", "Closes the loop on the timeline"],
+            ["Learning", "Repeat what worked, avoid what didn't"],
+          ].map(([title, body]) => (
+            <li key={title} className="rounded-xl border border-border/40 bg-card/30 p-4">
+              <div className="font-display font-semibold">{title}</div>
+              <div className="text-sm text-muted-foreground mt-1">{body}</div>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      {/* Features */}
+      <section id="features" className="px-6 py-14 max-w-5xl mx-auto">
+        <h2 className="font-display text-2xl md:text-3xl font-semibold text-center mb-10">
+          Why growers use Verdant
+        </h2>
+        <div className="grid gap-6 md:grid-cols-2">
+          <FeatureCard
+            title="Grow logs"
+            body="A diary-first workflow. Every feeding, training session, and observation lives in a searchable timeline tied to the grow it belongs to."
+          />
+          <FeatureCard
+            title="Plant and tent tracking"
+            body="Organize plants by tent and grow. Lineage, stage, and history travel with each plant from clone to harvest."
+          />
+          <FeatureCard
+            title="Sensor-aware dashboard"
+            body="When environment sensors are connected, the dashboard summarizes the latest readings and data quality. Sensor data is used for safer insight, never for blind automation."
+          />
+          <FeatureCard
+            title="Environment alerts"
+            body="Read-only alerts surface drift from your targets — temperature, humidity, VPD — with an immutable audit trail when you acknowledge or resolve them."
+          />
+          <FeatureCard
+            title="AI Coach"
+            body="The AI Coach reads your grow context and suggests next steps. It is cautious, suggest-only, and never executes anything on its own."
+          />
+          <FeatureCard
+            title="Approval-required Action Queue"
+            body="AI suggestions become queued actions that you explicitly approve, edit, or dismiss. No blind automation — every meaningful change requires a human in the loop."
+          />
+        </div>
+      </section>
+
+      {/* Safety */}
+      <section className="px-6 py-14 max-w-3xl mx-auto">
+        <div className="rounded-2xl border border-primary/30 bg-primary/5 p-6 md:p-8">
+          <h2 className="font-display text-2xl md:text-3xl font-semibold">
+            Built safe by default
+          </h2>
+          <ul className="mt-5 space-y-3 text-sm md:text-base text-muted-foreground">
+            <li>· Verdant does not control equipment by default.</li>
+            <li>· AI suggestions require grower review.</li>
+            <li>· Demo data is clearly labeled.</li>
+            <li>· Private grow data requires an account.</li>
+            <li>· Hardware-neutral: bring your own sensors and bridges.</li>
+          </ul>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="px-6 py-16 max-w-3xl mx-auto text-center">
+        <h2 className="font-display text-2xl md:text-3xl font-semibold">
+          Try it before you commit
+        </h2>
+        <p className="mt-3 text-muted-foreground">
+          Open the demo, click around, and see how Verdant remembers your
+          grow. Create a free account when you're ready to track real plants.
+        </p>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <Link to="/demo">
+            <Button size="lg">Explore Demo</Button>
+          </Link>
+          {user ? (
+            <Link to="/">
+              <Button size="lg" variant="outline">Open dashboard</Button>
+            </Link>
+          ) : (
+            <Link to="/auth">
+              <Button size="lg" variant="outline">Create Free Account</Button>
+            </Link>
+          )}
+        </div>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <Link to="/hardware-integrations">
+            <Button size="sm" variant="ghost">Hardware integrations</Button>
+          </Link>
+          <Link to="/pricing">
+            <Button size="sm" variant="ghost">Pricing</Button>
+          </Link>
+          <a href="#features">
+            <Button size="sm" variant="ghost">Learn more</Button>
+          </a>
+        </div>
+      </section>
+
+      {/* Beta */}
       <section id="beta" className="px-6 py-16 max-w-3xl mx-auto">
         <div className="text-center mb-8">
           <h2 className="font-display text-2xl md:text-3xl font-semibold">
@@ -124,18 +233,17 @@ export default function Landing() {
             Hardware partner? Contact Verdant about read-only integrations.
           </p>
           <p className="mt-4 text-sm text-muted-foreground">
-            Verdant Grow Diary is currently in early build. Join the beta list
-            or reach out about read-only hardware integrations. Grower stays
-            in control. No blind automation.
+            Verdant Grow Diary is currently in early build. Join the beta
+            list or reach out about read-only hardware integrations. Grower
+            stays in control. No blind automation.
           </p>
         </div>
         <LeadCaptureForm />
       </section>
 
-
       <footer className="px-6 py-10 border-t border-border/40 text-sm text-muted-foreground text-center">
         <p>
-          Verdant Grow Diary · {" "}
+          Verdant Grow Diary ·{" "}
           <a className="hover:text-foreground" href="https://verdantgrowdiary.com">
             verdantgrowdiary.com
           </a>
@@ -150,6 +258,16 @@ function FeatureCard({ title, body }: { title: string; body: string }) {
     <div className="rounded-xl border border-border/50 bg-card/40 backdrop-blur p-6">
       <h3 className="font-display text-lg font-semibold">{title}</h3>
       <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{body}</p>
+    </div>
+  );
+}
+
+function TeaserCard({ label, value, hint }: { label: string; value: string; hint: string }) {
+  return (
+    <div className="rounded-xl border border-border/40 bg-background/60 p-4">
+      <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="mt-1 font-display text-lg font-semibold">{value}</div>
+      <div className="text-xs text-muted-foreground mt-1">{hint}</div>
     </div>
   );
 }

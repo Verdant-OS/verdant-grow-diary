@@ -1018,6 +1018,8 @@ function SessionDetailBody({
 
       <SessionReviewStatusPanel sessionId={row.id} vm={reviewHistoryVm} />
 
+      <LinkedActionQueueSection vm={linkedActions.vm} />
+
       <ReviewSummarySection
         vm={reviewVm}
         session={{

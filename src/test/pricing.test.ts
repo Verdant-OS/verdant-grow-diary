@@ -285,6 +285,7 @@ describe("No unrelated routes were changed", () => {
         "/auth",
         "/billing/:plan",
         "/daily-check",
+        "/demo",
         "/diagnostics",
         "/doctor",
         "/doctor/sessions",

@@ -356,18 +356,16 @@ export default function Dashboard() {
             <h2 className="font-display font-semibold">AI insights</h2>
             <Button asChild size="sm" variant="ghost"><Link to="/doctor">Open Doctor <ArrowRight className="h-3 w-3" /></Link></Button>
           </div>
-          <ul className="space-y-2">
-            {insights.slice(0, 3).map((i) => (
-              <li key={i.id} className="rounded-xl border border-border/40 p-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <Activity className="h-3.5 w-3.5 text-primary" />
-                  <span className="text-sm font-medium">{i.title}</span>
-                  <span className="ml-auto text-[10px] uppercase tracking-wider text-muted-foreground">{Math.round(i.confidence * 100)}% conf</span>
-                </div>
-                <p className="text-xs text-muted-foreground">{i.summary}</p>
-              </li>
-            ))}
-          </ul>
+          <div
+            className="rounded-xl border border-dashed border-border/50 p-4 text-center"
+            role="status"
+            aria-label="AI insights empty state"
+          >
+            <p className="text-sm font-medium">No AI insights yet.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              AI insights will appear after enough grow context is available.
+            </p>
+          </div>
         </div>
       </div>
       {scopedGrowId ? (

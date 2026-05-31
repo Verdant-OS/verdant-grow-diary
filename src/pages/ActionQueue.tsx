@@ -47,6 +47,7 @@ import {
   isAlertDerived,
   isAiDoctorDerived,
   extractSourceAiDoctorSessionId,
+  extractSourceAlertId,
   stripBackPointerTokens,
 } from "@/lib/actionQueueProvenanceRules";
 import { buildActionQueueGrowContextHint } from "@/lib/actionQueueGrowContextHintRules";

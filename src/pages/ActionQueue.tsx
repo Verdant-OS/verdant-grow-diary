@@ -26,7 +26,7 @@ import { Loader2, Check, X, FlaskConical, ListChecks, History, CheckCircle2, Ban
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
-import { actionDetailPath, actionsPath } from "@/lib/routes";
+import { actionDetailPath, actionsPath, aiDoctorSessionDetailPath } from "@/lib/routes";
 import { toast } from "sonner";
 import {
   type ActionStatus,
@@ -46,6 +46,7 @@ import {
   getActionQueueSourceLabel,
   isAlertDerived,
   isAiDoctorDerived,
+  extractSourceAiDoctorSessionId,
   stripBackPointerTokens,
 } from "@/lib/actionQueueProvenanceRules";
 import { buildActionQueueGrowContextHint } from "@/lib/actionQueueGrowContextHintRules";
@@ -109,6 +110,37 @@ const RISK_RANK: Record<ActionRow["risk_level"], number> = {
   medium: 2,
   low: 1,
 };
+
+/**
+ * Read-only AI Doctor session back-link affordance. Renders nothing when
+ * the row is not AI Doctor-derived or when no safe session id can be parsed
+ * from the reason. Never exposes raw `[session:<id>]` tokens or device fields.
+ */
+function AiDoctorSessionLink({
+  row,
+}: {
+  row: Pick<ActionRow, "source" | "reason">;
+}) {
+  if (!isAiDoctorDerived(row)) return null;
+  const sessionId = extractSourceAiDoctorSessionId(row.reason);
+  if (!sessionId) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-2 text-xs text-muted-foreground"
+      data-testid="action-queue-row-ai-doctor-session-link"
+    >
+      <span>Linked from AI Doctor</span>
+      <Link
+        to={aiDoctorSessionDetailPath(sessionId)}
+        className="text-primary hover:underline"
+        data-testid="action-queue-row-ai-doctor-session-link-anchor"
+      >
+        View AI Doctor session
+      </Link>
+    </span>
+  );
+}
+
 
 export default function ActionQueue() {
   const { user } = useAuth();
@@ -581,6 +613,9 @@ export default function ActionQueue() {
                     </div>
                     <p className="text-sm mt-1">{row.suggested_change}</p>
                     <p className="text-xs text-muted-foreground mt-1">{stripBackPointerTokens(row.reason)}</p>
+                    <div className="mt-1">
+                      <AiDoctorSessionLink row={row} />
+                    </div>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 mt-3">
@@ -677,6 +712,9 @@ export default function ActionQueue() {
                   >
                     View Details
                   </Link>
+                </div>
+                <div className="mt-1">
+                  <AiDoctorSessionLink row={row} />
                 </div>
                 <EventHistory items={events[row.id]} />
               </li>

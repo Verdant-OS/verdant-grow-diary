@@ -8,6 +8,7 @@ import EmptyState from "@/components/EmptyState";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { AlertWhyContext } from "@/components/AlertWhyContext";
+import { LinkedActionCountBadge } from "@/components/LinkedActionCountBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,7 +31,7 @@ import {
   type AlertSeverityRow,
   type AlertStatusRow,
 } from "@/lib/alerts";
-import { actionDetailPath, actionsPath, alertDetailPath, alertsPath } from "@/lib/routes";
+import { alertDetailPath, alertsPath } from "@/lib/routes";
 import { formatDistanceToNow } from "date-fns";
 
 type StatusFilter = AlertStatusRow | "all";
@@ -259,10 +260,11 @@ export default function Alerts() {
                         {a.reason}
                       </p>
                       <AlertWhyContext alert={a} variant="compact" />
-                      <LinkedActionBadge
+                      <LinkedActionCountBadge
                         alertId={a.id}
                         summary={linkedActionCounts.get(a.id)}
                         growId={a.grow_id}
+                        testIdPrefix="alert-row"
                       />
 
                       <div className="flex flex-wrap gap-2">
@@ -344,59 +346,5 @@ function AlertHistory({ alertId }: { alertId: string }) {
         ))}
       </ol>
     </details>
-  );
-}
-
-/**
- * Read-only "Linked action" badge for an alert row. Renders nothing when
- * there are no open linked Action Queue items. Never exposes raw back-pointer
- * tokens; counts only.
- */
-function LinkedActionBadge({
-  alertId,
-  summary,
-  growId,
-}: {
-  alertId: string;
-  summary: { count: number; singleActionId: string | null } | undefined;
-  growId: string | null | undefined;
-}) {
-  if (!summary || summary.count <= 0) return null;
-  const isSingle = summary.count === 1 && summary.singleActionId;
-  const label =
-    summary.count === 1 ? "Has linked action" : `${summary.count} linked actions`;
-  const href = isSingle
-    ? actionDetailPath(summary.singleActionId as string)
-    : `${actionsPath(growId ?? undefined)}${growId ? "&" : "?"}focus=alert:${encodeURIComponent(alertId)}`;
-  return (
-    <div
-      data-testid="alert-row-linked-action"
-      data-alert-id={alertId}
-      className="flex items-center gap-2 flex-wrap"
-    >
-      <Badge
-        variant="outline"
-        className="text-[10px] uppercase border-primary text-primary"
-      >
-        {label}
-      </Badge>
-      {isSingle ? (
-        <Link
-          data-testid="alert-row-linked-action-anchor"
-          to={href}
-          className="text-[11px] text-primary hover:underline"
-        >
-          View linked action
-        </Link>
-      ) : (
-        <Link
-          data-testid="alert-row-linked-action-anchor"
-          to={actionsPath(growId ?? undefined)}
-          className="text-[11px] text-primary hover:underline"
-        >
-          View linked actions
-        </Link>
-      )}
-    </div>
   );
 }

@@ -17,6 +17,8 @@ import { ArrowLeft, Bell, History, ListChecks } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { AlertWhyContext } from "@/components/AlertWhyContext";
+import { LinkedActionCountBadge } from "@/components/LinkedActionCountBadge";
+import { useAlertsLinkedActionCounts } from "@/hooks/useAlertsLinkedActionCounts";
 
 import PageHeader from "@/components/PageHeader";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
@@ -102,6 +104,11 @@ export default function AlertDetail() {
   const [status, setStatus] = useState<LoadStatus>("idle");
   const [alert, setAlert] = useState<AlertRow | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const linkedActionAlertIds = useMemo(
+    () => (alert ? [alert.id] : []),
+    [alert],
+  );
+  const linkedActionCounts = useAlertsLinkedActionCounts(linkedActionAlertIds);
   const [eventsKey, setEventsKey] = useState(0);
   const [existingActionId, setExistingActionId] = useState<string | null>(null);
   const [queuing, setQueuing] = useState(false);
@@ -427,6 +434,14 @@ export default function AlertDetail() {
             <p className="text-sm text-muted-foreground mt-1">{alert.reason}</p>
             <div className="mt-3">
               <AlertWhyContext alert={alert} variant="detailed" />
+            </div>
+            <div className="mt-3">
+              <LinkedActionCountBadge
+                alertId={alert.id}
+                summary={linkedActionCounts.get(alert.id)}
+                growId={alert.grow_id}
+                testIdPrefix="alert-detail"
+              />
             </div>
 
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs mt-4">

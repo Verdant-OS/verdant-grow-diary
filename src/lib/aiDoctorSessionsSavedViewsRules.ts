@@ -263,6 +263,7 @@ export { parsePageParam };
  * Read-only. No DB. No automation.
  */
 export const BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID = "builtin:needs-attention";
+export const BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID = "builtin:needs-follow-up";
 
 /** Tooltip/aria text shown next to any built-in saved view in the UI. */
 export const BUILTIN_SAVED_VIEW_TOOLTIP = "System view · always available";
@@ -275,6 +276,16 @@ export const BUILTIN_SAVED_VIEWS: ReadonlyArray<SavedView> = Object.freeze([
       ...DEFAULT_FILTERS,
       caution: "yes",
       hasChecklist: "yes",
+    }) as SessionsIndexFilters,
+    page: 0,
+    createdAt: "1970-01-01T00:00:00.000Z",
+  }) as SavedView,
+  Object.freeze({
+    id: BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID,
+    label: "Needs follow-up",
+    filters: Object.freeze({
+      ...DEFAULT_FILTERS,
+      reviewStatus: "needs_follow_up",
     }) as SessionsIndexFilters,
     page: 0,
     createdAt: "1970-01-01T00:00:00.000Z",

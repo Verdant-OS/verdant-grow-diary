@@ -12,7 +12,7 @@
  */
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
-import { actionDetailPath, actionsPath } from "@/lib/routes";
+import { actionDetailPath, actionQueueAlertContextPath } from "@/lib/routes";
 import type { AlertLinkedActionsSummary } from "@/lib/alertsLinkedActionsViewModel";
 
 export interface LinkedActionCountBadgeProps {
@@ -26,7 +26,7 @@ export interface LinkedActionCountBadgeProps {
 export function LinkedActionCountBadge({
   alertId,
   summary,
-  growId,
+  growId: _growId,
   testIdPrefix = "alert-row",
 }: LinkedActionCountBadgeProps) {
   if (!summary || summary.count <= 0) return null;
@@ -60,7 +60,7 @@ export function LinkedActionCountBadge({
       ) : (
         <Link
           data-testid={anchorTestId}
-          to={actionsPath(growId ?? undefined)}
+          to={actionQueueAlertContextPath(alertId)}
           className="text-[11px] text-primary hover:underline"
         >
           View linked actions
@@ -69,3 +69,4 @@ export function LinkedActionCountBadge({
     </div>
   );
 }
+

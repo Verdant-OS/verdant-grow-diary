@@ -11,7 +11,7 @@ import { resolve } from "node:path";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import AlertDetail from "@/pages/AlertDetail";
-import { actionDetailPath } from "@/lib/routes";
+import { actionDetailPath, actionQueueAlertContextPath } from "@/lib/routes";
 
 const ALERT = {
   id: "alert-1",
@@ -250,9 +250,14 @@ describe("AlertDetail — Linked action count badge", () => {
       "alert-detail-linked-action-anchor",
     )) as HTMLAnchorElement;
     expect(anchor.getAttribute("href") ?? "").toMatch(/^\/actions/);
+    expect(anchor.getAttribute("href") ?? "").toBe(
+      actionQueueAlertContextPath("alert-1"),
+    );
+    expect(anchor.getAttribute("href") ?? "").toContain("alert=alert-1");
     expect(anchor.getAttribute("href") ?? "").not.toContain("aq-open-1");
     expect(anchor.getAttribute("href") ?? "").not.toContain("aq-open-2");
   });
+
 
   it("never leaks raw [alert:<id>] / [session:<id>] tokens or target_device", async () => {
     actionQueueRows = [

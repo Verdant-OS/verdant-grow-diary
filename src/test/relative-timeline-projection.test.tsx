@@ -497,7 +497,7 @@ describe("PlantRelativeTimelineSection — render", () => {
     mockUse.mockReturnValue({ data: [], isLoading: false });
     render(<PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
     expect(screen.getByTestId("relative-timeline-empty")).toHaveTextContent(
-      /first quick log, photo, or sensor snapshot/i,
+      /no timeline entries yet/i,
     );
   });
 

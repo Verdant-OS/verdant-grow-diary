@@ -555,6 +555,25 @@ export default function ActionQueue() {
                           {getActionQueueSourceLabel(row)}
                         </Badge>
                       )}
+                      {isAiDoctorDerived(row) && (
+                        <>
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] uppercase border-primary text-primary"
+                            data-testid="action-queue-row-ai-doctor-badge"
+                          >
+                            AI Doctor
+                          </Badge>
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] uppercase"
+                            data-testid="action-queue-row-review-required-badge"
+                          >
+                            Review required
+                          </Badge>
+                        </>
+                      )}
+
 
                       <span className="text-xs text-muted-foreground">
                         {row.target_metric ?? row.target_device}

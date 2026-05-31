@@ -234,7 +234,7 @@ export default function Dashboard() {
       />
       <PageHeader
         title="Dashboard"
-        description="Live status across every tent, plant, and sensor."
+        description="Track your tents, plants, sensors, and grow activity in one place."
         icon={<Sparkles className="h-5 w-5" />}
         actions={
           <div className="flex items-center gap-2 flex-wrap">

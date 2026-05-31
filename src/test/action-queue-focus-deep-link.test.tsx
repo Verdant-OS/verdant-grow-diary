@@ -130,12 +130,14 @@ vi.mock("@/store/grows", () => ({
   useGrows: () => GROWS_STATE,
 }));
 
+const SCOPED_GROW_STATE = {
+  urlGrowId: null,
+  scopedGrowName: null,
+  backHref: "/actions",
+} as const;
+
 vi.mock("@/hooks/useScopedGrow", () => ({
-  useScopedGrow: () => ({
-    urlGrowId: null,
-    scopedGrowName: null,
-    backHref: "/actions",
-  }),
+  useScopedGrow: () => SCOPED_GROW_STATE,
 }));
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));

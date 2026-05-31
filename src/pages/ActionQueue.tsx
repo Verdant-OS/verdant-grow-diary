@@ -204,12 +204,11 @@ export default function ActionQueue() {
   const [searchParams, setSearchParams] = useSearchParams();
   const focusedActionId = searchParams.get("focus");
 
-  // Alert context chip: /actions?alert=<alert_id>. Presenter-only; never filters rows.
+  // Alert context chip + client-side filter: /actions?alert=<alert_id>.
+  // Presenter-only; never mutates rows or hits the DB.
   const rawAlertParam = searchParams.get("alert");
-  const alertContextId =
-    rawAlertParam && /^[A-Za-z0-9_-]+$/.test(rawAlertParam.trim())
-      ? rawAlertParam.trim()
-      : null;
+  const alertContextId = parseAlertContextParam(rawAlertParam);
+
 
   const clearFocus = useCallback(() => {
     // Remove ONLY the `focus` query param. Preserve every other param

@@ -1626,12 +1626,14 @@ describe("buildRelativeTimelineEmptyState — pure rules", () => {
     expect(q.disabled).toBe(false);
   });
 
-  it("QuickLog CTA degrades safely with null detail when context is missing", () => {
+  it("QuickLog CTA becomes disabled with an inline reason when plant context is missing", () => {
     const v = buildRelativeTimelineEmptyState({ plantId: null });
     const q = v.ctas.find((c) => c.key === "quicklog")!;
-    expect(q.disabled).toBe(false);
+    expect(q.disabled).toBe(true);
+    expect(q.disabledReason).toMatch(/open a plant/i);
     expect(q.eventDetail).toBeNull();
   });
+
 
   it("Manual sensor snapshot routes to /tents/:tentId when tent is known", () => {
     const v = buildRelativeTimelineEmptyState({ tentId: "tent-1" });

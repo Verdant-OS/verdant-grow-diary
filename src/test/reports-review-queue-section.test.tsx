@@ -10,10 +10,10 @@ import { MemoryRouter } from "react-router-dom";
 import ReportsReviewQueueSection from "@/components/ReportsReviewQueueSection";
 import type { ReportsReviewItem } from "@/lib/reportsHubReviewQueue";
 
-function renderWith(items: ReportsReviewItem[]) {
+function renderWith(items: ReportsReviewItem[], showEmptyState = false) {
   return render(
     <MemoryRouter>
-      <ReportsReviewQueueSection items={items} />
+      <ReportsReviewQueueSection items={items} showEmptyState={showEmptyState} />
     </MemoryRouter>,
   );
 }
@@ -30,6 +30,8 @@ describe("ReportsReviewQueueSection", () => {
         id: "missing_outcome",
         title: "Record outcomes",
         description: "1 completed action is waiting for an outcome note.",
+        helpText: "Completed action older than 24 hours with no recorded outcome.",
+        whyThisIsHere: "1 pending review · oldest completed 30h ago",
         href: "/actions/abc",
         hrefLabel: "Open action",
       },
@@ -37,6 +39,8 @@ describe("ReportsReviewQueueSection", () => {
         id: "open_alerts",
         title: "Review open alerts",
         description: "2 open environment alerts need a look.",
+        helpText: "Unresolved environment alert for this grow.",
+        whyThisIsHere: "2 open alerts · latest severity warning",
         href: "/alerts?growId=grow-1",
         hrefLabel: "Review alerts",
       },
@@ -51,5 +55,21 @@ describe("ReportsReviewQueueSection", () => {
     expect(
       screen.getByTestId("reports-review-link-open_alerts").getAttribute("href"),
     ).toBe("/alerts?growId=grow-1");
+    // Help tooltip + why-this-is-here line render per item.
+    expect(
+      screen
+        .getByTestId("reports-review-help-missing_outcome")
+        .getAttribute("title"),
+    ).toMatch(/older than 24 hours/i);
+    expect(
+      screen.getByTestId("reports-review-why-open_alerts").textContent,
+    ).toMatch(/latest severity warning/);
+  });
+
+  it("renders calm empty copy when showEmptyState is true and items are empty", () => {
+    renderWith([], true);
+    expect(screen.getByTestId("reports-review-empty").textContent).toMatch(
+      /no priority review items/i,
+    );
   });
 });

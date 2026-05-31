@@ -28,6 +28,7 @@ import {
   type ReportsHubCard,
 } from "@/lib/reportsHubViewModel";
 import { buildReportsReviewQueue } from "@/lib/reportsHubReviewQueue";
+import { LEARNING_GROUP_SAMPLE_THRESHOLD } from "@/lib/actionOutcomeLearningRules";
 import ReportsReviewQueueSection from "@/components/ReportsReviewQueueSection";
 import { buildReportsHubOnboarding } from "@/lib/reportsHubOnboarding";
 import ReportsHubOnboardingSection from "@/components/ReportsHubOnboardingSection";
@@ -55,20 +56,33 @@ export default function Reports() {
       })
     : null;
 
+  const learningGroups = data.outcomeLearning?.groups ?? [];
+  const lowSampleGroups = learningGroups.filter((g) => g.needs_more_data);
+  const lowSampleSmallestCount = lowSampleGroups.length
+    ? lowSampleGroups.reduce(
+        (min, g) => Math.min(min, g.totals?.total ?? Infinity),
+        Infinity,
+      )
+    : null;
   const reviewQueue = grow
     ? buildReportsReviewQueue({
         growId: grow.id,
         pendingOutcomeReviewCount: data.pendingOutcomeReviewCount,
         firstPendingActionId: data.firstPendingActionId,
+        oldestPendingCompletedAt: data.oldestPendingCompletedAt,
         alertsOpen: data.alertsOpen,
         firstOpenAlertId: data.firstOpenAlertId,
+        firstOpenAlertSeverity: data.firstOpenAlertSeverity,
+        firstOpenAlertCreatedAt: data.firstOpenAlertCreatedAt,
         latestSensorCapturedAt: data.latestSensorCapturedAt,
         recentSensorReadingCount: data.recentSensorReadingCount,
-        lowSampleLearningGroups: (data.outcomeLearning?.groups ?? []).filter(
-          (g) => g.needs_more_data,
-        ).length,
+        lowSampleLearningGroups: lowSampleGroups.length,
+        lowSampleSmallestCount:
+          lowSampleSmallestCount === Infinity ? null : lowSampleSmallestCount,
+        lowSampleThreshold: LEARNING_GROUP_SAMPLE_THRESHOLD,
       })
     : { items: [], empty: true };
+
 
 
   const onboarding = buildReportsHubOnboarding({
@@ -117,8 +131,11 @@ export default function Reports() {
         <ReportsHubOnboardingSection cards={onboarding.cards} />
       )}
 
-      {!showEmptyState && summary && !reviewQueue.empty && (
-        <ReportsReviewQueueSection items={reviewQueue.items} />
+      {!showEmptyState && summary && !showOnboarding && (
+        <ReportsReviewQueueSection
+          items={reviewQueue.items}
+          showEmptyState={reviewQueue.empty}
+        />
       )}
 
       {showEmptyState ? (

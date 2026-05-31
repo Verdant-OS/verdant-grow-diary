@@ -294,68 +294,72 @@ export default function Dashboard() {
         <KpiCard label="Due today" value={dueToday} hint={dueToday === 0 ? "No tasks yet" : undefined} icon={<ListChecks className="h-3.5 w-3.5" />} accent={dueToday > 0 ? "warning" : "success"} />
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4 mb-6">
-        <div className="lg:col-span-2 glass rounded-2xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h2 className="font-display font-semibold">Tent A · 7-day environment</h2>
-              <p className="text-xs text-muted-foreground">Temperature, humidity, VPD</p>
+      {tents.length === 0 ? (
+        <DashboardZeroTentEmptyState />
+      ) : (
+        <div className="grid lg:grid-cols-3 gap-4 mb-6">
+          <div className="lg:col-span-2 glass rounded-2xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="font-display font-semibold">Tent A · 7-day environment</h2>
+                <p className="text-xs text-muted-foreground">Temperature, humidity, VPD</p>
+              </div>
+              <Button asChild size="sm" variant="ghost"><Link to="/sensors">Sensor data <ArrowRight className="h-3 w-3" /></Link></Button>
             </div>
-            <Button asChild size="sm" variant="ghost"><Link to="/sensors">Sensor data <ArrowRight className="h-3 w-3" /></Link></Button>
+            <SensorChart data={readings.filter((r) => r.tentId === (tents[0]?.id ?? "")) as unknown as SensorReading[]} metric="temp" height={200} />
           </div>
-          <SensorChart data={readings.filter((r) => r.tentId === (tents[0]?.id ?? "")) as unknown as SensorReading[]} metric="temp" height={200} />
-        </div>
 
-        <div className="glass rounded-2xl p-4">
-          <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-            <h2 className="font-display font-semibold">Environment strip</h2>
-            {(() => {
-              const rollup = computeStabilityRollup(
-                latestPerTent.map((x) => x.stability),
-              );
-              return (
-                <div
-                  data-testid="dashboard-stability-rollup"
-                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${STABILITY_ROLLUP_TONE_CLASS[rollup.tone]}`}
-                >
-                  {rollup.copy}
-                </div>
-              );
-            })()}
-          </div>
-          <div className="space-y-2.5">
-            {latestPerTent.map(({ tent, last, stability }) => {
-              const stabilityView = formatStabilityChipView(stability);
-              return (
-                <Link key={tent.id} to={tentDetailPath(tent.id)} className="block rounded-xl border border-border/40 p-3 hover:bg-secondary/30 transition">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm">{tent.name}</span>
-                      <StageBadge stage={tent.stage as Stage} />
-                    </div>
-                    { /* alertCount removed — not available in Supabase schema */ }
+          <div className="glass rounded-2xl p-4">
+            <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+              <h2 className="font-display font-semibold">Environment strip</h2>
+              {(() => {
+                const rollup = computeStabilityRollup(
+                  latestPerTent.map((x) => x.stability),
+                );
+                return (
+                  <div
+                    data-testid="dashboard-stability-rollup"
+                    className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${STABILITY_ROLLUP_TONE_CLASS[rollup.tone]}`}
+                  >
+                    {rollup.copy}
                   </div>
-                  {last && (
-                    <div className="flex flex-wrap gap-1.5">
-                      <MetricChip label="T" value={last.temp != null ? (tempFFromC(last.temp) ?? 0).toFixed(1) : "—"} unit="°F" status={environmentMetricChipStatus(classifyTempAgainstStage(last.temp ?? null, { stage: tent.stage }))} />
-                      <MetricChip label="RH" value={last.rh ?? "—"} unit="%" status={environmentMetricChipStatus(classifyRhAgainstStage(last.rh ?? null, { stage: tent.stage }))} />
-                      <MetricChip label="VPD" value={last.vpd ?? "—"} unit=" kPa" status={vpdMetricChipStatus(classifyVpdAgainstStage({ value: last.vpd ?? null, stage: tent.stage }))} />
+                );
+              })()}
+            </div>
+            <div className="space-y-2.5">
+              {latestPerTent.map(({ tent, last, stability }) => {
+                const stabilityView = formatStabilityChipView(stability);
+                return (
+                  <Link key={tent.id} to={tentDetailPath(tent.id)} className="block rounded-xl border border-border/40 p-3 hover:bg-secondary/30 transition">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm">{tent.name}</span>
+                        <StageBadge stage={tent.stage as Stage} />
+                      </div>
+                      { /* alertCount removed — not available in Supabase schema */ }
                     </div>
-                  )}
-                  <div className="mt-1.5">
-                    <StabilityChipDrilldown
-                      tentId={tent.id}
-                      tentName={tent.name}
-                      stability={stability}
-                      view={stabilityView}
-                    />
-                  </div>
-                </Link>
-              );
-            })}
+                    {last && (
+                      <div className="flex flex-wrap gap-1.5">
+                        <MetricChip label="T" value={last.temp != null ? (tempFFromC(last.temp) ?? 0).toFixed(1) : "—"} unit="°F" status={environmentMetricChipStatus(classifyTempAgainstStage(last.temp ?? null, { stage: tent.stage }))} />
+                        <MetricChip label="RH" value={last.rh ?? "—"} unit="%" status={environmentMetricChipStatus(classifyRhAgainstStage(last.rh ?? null, { stage: tent.stage }))} />
+                        <MetricChip label="VPD" value={last.vpd ?? "—"} unit=" kPa" status={vpdMetricChipStatus(classifyVpdAgainstStage({ value: last.vpd ?? null, stage: tent.stage }))} />
+                      </div>
+                    )}
+                    <div className="mt-1.5">
+                      <StabilityChipDrilldown
+                        tentId={tent.id}
+                        tentName={tent.name}
+                        stability={stability}
+                        view={stabilityView}
+                      />
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <div className="grid lg:grid-cols-2 gap-4">
         <div className="glass rounded-2xl p-4">

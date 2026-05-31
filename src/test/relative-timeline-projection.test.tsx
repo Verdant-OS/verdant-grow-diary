@@ -863,6 +863,10 @@ describe("summarizeRelativeTimelineItems — pure rules", () => {
       feeding: 0,
       symptoms: 0,
       training: 0,
+      measurement: 0,
+      transplant: 0,
+      harvest: 0,
+      reminder: 0,
       notes: 0,
     });
     expect(s.lastActivityAt).toBeNull();
@@ -879,16 +883,23 @@ describe("summarizeRelativeTimelineItems — pure rules", () => {
       tItem({ id: "s1", eventType: "pest_disease" }),
       tItem({ id: "t1", eventType: "training" }),
       tItem({ id: "t2", eventType: "defoliation" }),
+      tItem({ id: "m1", eventType: "measurement" }),
+      tItem({ id: "r1", eventType: "reminder" }),
+      tItem({ id: "tr1", eventType: "transplant" }),
       tItem({ id: "n1", eventType: "note" }),
     ];
     const s = summarizeRelativeTimelineItems(items, { now: NOW_MS });
-    expect(s.total).toBe(8);
+    expect(s.total).toBe(11);
     expect(s.counts).toEqual({
       photos: 1,
       watering: 2,
       feeding: 1,
       symptoms: 1,
       training: 2,
+      measurement: 1,
+      transplant: 1,
+      harvest: 0,
+      reminder: 1,
       notes: 1,
     });
   });

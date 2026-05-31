@@ -89,17 +89,19 @@ describe("Bridge + Landing — safety constraints", () => {
     expect(BRIDGE).not.toMatch(/grows\.map\(/);
   });
 
-  it("no automation, device-control, or fake-live copy", () => {
+  it("no automation, device-control, or fake-live claims", () => {
     for (const re of [
       /\bautopilot\b/i,
       /AI grows for you/i,
       /guaranteed yield/i,
-      /\blive data\b/i,
       /device[-_ ]command/i,
       /turn on/i,
       /turn off/i,
     ]) {
       expect(ALL).not.toMatch(re);
     }
+    // Only forbid "live data" when it's NOT preceded by the "no fake"
+    // disclaimer phrasing already used on the landing page.
+    expect(ALL).not.toMatch(/(?<!no\s+fake[- ])\blive data\b/i);
   });
 });

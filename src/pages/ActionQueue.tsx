@@ -51,6 +51,11 @@ import {
   stripBackPointerTokens,
 } from "@/lib/actionQueueProvenanceRules";
 import { buildActionQueueGrowContextHint } from "@/lib/actionQueueGrowContextHintRules";
+import {
+  parseAlertContextParam,
+  filterActionsByAlertContext,
+} from "@/lib/actionQueueAlertContextFilter";
+
 
 
 type Status = ActionStatus;
@@ -199,12 +204,11 @@ export default function ActionQueue() {
   const [searchParams, setSearchParams] = useSearchParams();
   const focusedActionId = searchParams.get("focus");
 
-  // Alert context chip: /actions?alert=<alert_id>. Presenter-only; never filters rows.
+  // Alert context chip + client-side filter: /actions?alert=<alert_id>.
+  // Presenter-only; never mutates rows or hits the DB.
   const rawAlertParam = searchParams.get("alert");
-  const alertContextId =
-    rawAlertParam && /^[A-Za-z0-9_-]+$/.test(rawAlertParam.trim())
-      ? rawAlertParam.trim()
-      : null;
+  const alertContextId = parseAlertContextParam(rawAlertParam);
+
 
   const clearFocus = useCallback(() => {
     // Remove ONLY the `focus` query param. Preserve every other param
@@ -420,7 +424,10 @@ export default function ActionQueue() {
       if (statusFilter === "pending") return s === "pending_approval";
       return s === statusFilter;
     };
-    const list = rows
+    // Alert context narrowing happens first so downstream filters/sorts
+    // compose with the already-narrowed list.
+    const scoped = filterActionsByAlertContext(rows, alertContextId);
+    const list = scoped
       .filter((r) => matchesStatus(r.status))
       .filter((r) => riskFilter === "all" || r.risk_level === riskFilter)
       .filter((r) => sourceFilter === "all" || (r.source ?? "") === sourceFilter);
@@ -431,7 +438,8 @@ export default function ActionQueue() {
       return sortOrder === "oldest" ? ta - tb : tb - ta;
     });
     return sorted;
-  }, [rows, statusFilter, riskFilter, sourceFilter, sortOrder]);
+  }, [rows, alertContextId, statusFilter, riskFilter, sourceFilter, sortOrder]);
+
 
   const pending = useMemo(
     () => filtered.filter((r) => r.status === "pending_approval"),
@@ -625,6 +633,18 @@ export default function ActionQueue() {
           </SelectContent>
         </Select>
       </div>
+
+      {alertContextId && !loading && filtered.length === 0 && (
+        <div
+          className="glass rounded-2xl p-4 mb-4 text-sm text-muted-foreground"
+          data-testid="action-queue-alert-context-empty"
+          role="status"
+        >
+          0 actions linked to this alert
+        </div>
+      )}
+
+
 
       <section className="glass rounded-2xl p-4 mb-4" aria-label="Needs Review">
         <h2 className="text-sm font-semibold mb-3 uppercase tracking-wider text-muted-foreground">

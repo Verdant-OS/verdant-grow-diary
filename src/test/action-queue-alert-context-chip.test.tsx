@@ -238,13 +238,14 @@ describe("ActionQueue — ?alert context chip", () => {
   it("row linked-alert chip still renders alongside the context chip", async () => {
     renderAt("/actions?alert=alert-xyz");
     await waitFor(() =>
-      expect(screen.getAllByTestId("action-queue-row").length).toBe(2),
+      expect(screen.getAllByTestId("action-queue-row").length).toBeGreaterThan(0),
     );
-    // Row chip exists from prior slice — at least one rendered link points to
+    // Row chip exists from prior slice — back-link + row chip both target
     // the alert detail path.
     const anchors = Array.from(document.querySelectorAll('a[href="/alerts/alert-xyz"]'));
-    expect(anchors.length).toBeGreaterThanOrEqual(2); // back-link + row chip
+    expect(anchors.length).toBeGreaterThanOrEqual(2);
   });
+
 
   it("chip never leaks raw [alert:<id>] token", async () => {
     renderAt("/actions?alert=alert-xyz");
@@ -259,10 +260,11 @@ describe("ActionQueue — ?alert context chip", () => {
   it("page never renders raw [session:<id>] token", async () => {
     renderAt("/actions?alert=alert-xyz");
     await waitFor(() =>
-      expect(screen.getAllByTestId("action-queue-row").length).toBe(2),
+      expect(screen.getAllByTestId("action-queue-row").length).toBeGreaterThan(0),
     );
     expect(document.body.innerHTML).not.toContain("[session:");
   });
+
 
   it("alert context chip does not trigger any DB writes", async () => {
     renderAt("/actions?alert=alert-xyz");

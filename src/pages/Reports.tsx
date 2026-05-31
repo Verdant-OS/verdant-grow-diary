@@ -29,6 +29,8 @@ import {
 } from "@/lib/reportsHubViewModel";
 import { buildReportsReviewQueue } from "@/lib/reportsHubReviewQueue";
 import ReportsReviewQueueSection from "@/components/ReportsReviewQueueSection";
+import { buildReportsHubOnboarding } from "@/lib/reportsHubOnboarding";
+import ReportsHubOnboardingSection from "@/components/ReportsHubOnboardingSection";
 import { growDetailPath } from "@/lib/routes";
 
 export default function Reports() {
@@ -69,9 +71,24 @@ export default function Reports() {
     : { items: [], empty: true };
 
 
+  const onboarding = buildReportsHubOnboarding({
+    growId: grow?.id ?? null,
+    diaryEntriesTotal: data.diaryEntriesTotal,
+    recentSensorReadingCount: data.recentSensorReadingCount,
+    latestSensorCapturedAt: data.latestSensorCapturedAt,
+    outcomeTotal: data.outcomeSummary?.total ?? 0,
+    alertsOpen: data.alertsOpen,
+  });
+
   const hasNoGrow = !growsLoading && grows.length === 0;
+  const showOnboarding =
+    !hasNoGrow && grow !== null && data.status === "ready" && onboarding.visible;
   const showEmptyState =
-    hasNoGrow || (summary !== null && data.status === "ready" && summary.allEmpty);
+    hasNoGrow ||
+    (summary !== null &&
+      data.status === "ready" &&
+      summary.allEmpty &&
+      !showOnboarding);
 
   return (
     <div className="max-w-4xl mx-auto" data-testid="reports-page">
@@ -94,6 +111,10 @@ export default function Reports() {
             Open grow detail
           </Link>
         </div>
+      )}
+
+      {showOnboarding && (
+        <ReportsHubOnboardingSection cards={onboarding.cards} />
       )}
 
       {!showEmptyState && summary && !reviewQueue.empty && (

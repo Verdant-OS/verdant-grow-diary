@@ -275,6 +275,8 @@ export default function GrowRoomMode() {
         }
       />
 
+      <GrowRoomQuickActionsCard scopedGrowId={urlGrowId} />
+
       {!showEmpty && (
         <DailyGrowCheckStatusCard
           compact

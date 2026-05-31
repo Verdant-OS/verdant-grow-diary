@@ -9,7 +9,7 @@ import {
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { Activity, AlertTriangle, Box, Sprout, ListChecks, Sparkles, ArrowRight } from "lucide-react";
+import { AlertTriangle, Box, Sprout, ListChecks, Sparkles, ArrowRight } from "lucide-react";
 import type { Stage, SensorReading } from "@/mock";
 import PageHeader from "@/components/PageHeader";
 import KpiCard from "@/components/KpiCard";
@@ -20,7 +20,9 @@ import SensorChart from "@/components/SensorChart";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import DashboardDataSourceDisclosure from "@/components/DashboardDataSourceDisclosure";
-import { useTasks, useAIInsights } from "@/hooks/useMockData";
+// Mock side-panel hooks intentionally removed — the Dashboard renders
+// honest empty states for Tasks and AI Insights until backed by real data.
+// See docs/qa/v0-demo-loop-checklist.md and docs/safety/static-safety-scans.md.
 import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import { useSensorReadings, useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
@@ -129,7 +131,8 @@ export default function Dashboard() {
   const scopedGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
   const { data: tents = [] } = useGrowTents(scopedGrowId);
   const { data: plants = [] } = useGrowPlants(undefined, scopedGrowId);
-  const { data: tasks = [] } = useTasks();
+  // Tasks: no real-data hook yet — render an honest empty state below.
+  const tasks: { status: string }[] = [];
   const { data: rawReadings = [] } = useSensorReadings();
   const readings = groupReadings(rawReadings);
   // Per-tent sensor windows for the stability summary. Each tent gets its
@@ -137,7 +140,7 @@ export default function Dashboard() {
   // out of a shared global cap. Read-only; no writes.
   const tentIds = tents.map((t) => t.id);
   const { byTent: readingsByTent } = useSensorReadingsByTents(tentIds);
-  const { data: insights = [] } = useAIInsights();
+  // AI Insights: no real-data hook yet — render an honest empty state below.
   const { recent, pending } = useDashboardScopedData(scopedGrowId ?? null);
   // Multi-tent selector for the Latest Environment card. Defaults to "all"
   // (matches prior behavior); when a specific tent is chosen the snapshot
@@ -261,7 +264,7 @@ export default function Dashboard() {
         <KpiCard label="Active tents" value={tents.length} icon={<Box className="h-3.5 w-3.5" />} />
         <KpiCard label="Plants" value={plants.length} icon={<Sprout className="h-3.5 w-3.5" />} hint={`${plants.filter((p) => p.health === "healthy").length} healthy`} accent="success" />
         <KpiCard label="Open alerts" value={openAlerts} icon={<AlertTriangle className="h-3.5 w-3.5" />} accent={openAlerts > 0 ? "destructive" : "success"} />
-        <KpiCard label="Due today" value={dueToday} icon={<ListChecks className="h-3.5 w-3.5" />} accent={dueToday > 0 ? "warning" : "success"} />
+        <KpiCard label="Due today" value={dueToday} hint={dueToday === 0 ? "No tasks yet" : undefined} icon={<ListChecks className="h-3.5 w-3.5" />} accent={dueToday > 0 ? "warning" : "success"} />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4 mb-6">
@@ -353,18 +356,16 @@ export default function Dashboard() {
             <h2 className="font-display font-semibold">AI insights</h2>
             <Button asChild size="sm" variant="ghost"><Link to="/doctor">Open Doctor <ArrowRight className="h-3 w-3" /></Link></Button>
           </div>
-          <ul className="space-y-2">
-            {insights.slice(0, 3).map((i) => (
-              <li key={i.id} className="rounded-xl border border-border/40 p-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <Activity className="h-3.5 w-3.5 text-primary" />
-                  <span className="text-sm font-medium">{i.title}</span>
-                  <span className="ml-auto text-[10px] uppercase tracking-wider text-muted-foreground">{Math.round(i.confidence * 100)}% conf</span>
-                </div>
-                <p className="text-xs text-muted-foreground">{i.summary}</p>
-              </li>
-            ))}
-          </ul>
+          <div
+            className="rounded-xl border border-dashed border-border/50 p-4 text-center"
+            role="status"
+            aria-label="AI insights empty state"
+          >
+            <p className="text-sm font-medium">No AI insights yet.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              AI insights will appear after enough grow context is available.
+            </p>
+          </div>
         </div>
       </div>
       {scopedGrowId ? (

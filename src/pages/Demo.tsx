@@ -4,7 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import BrandLogo from "@/components/BrandLogo";
 import { useAuth } from "@/store/auth";
-import { ArrowRight, Bell, ClipboardList, FlaskConical, Leaf, Sparkles, Thermometer } from "lucide-react";
+import { ArrowRight, Bell, ClipboardList, FlaskConical, Leaf, Sparkles, Thermometer, CheckCircle2 } from "lucide-react";
+
+/** Contextual signup copy keyed by the demo write-action that was attempted. */
+const ACTION_PROMPTS: Record<string, string> = {
+  "Add log": "Create an account to save real diary entries.",
+  "Run AI Doctor": "Create an account to analyze your real grow context.",
+  "Add to Action Queue": "Create an account to manage real approval-required actions.",
+};
 
 /**
  * Public, unauthenticated Verdant demo dashboard.
@@ -202,6 +209,61 @@ export default function Demo() {
         </Card>
       </section>
 
+      {/* Make this your real grow — conversion panel */}
+      <section className="px-6 pb-10 max-w-6xl mx-auto">
+        <div className="rounded-2xl border border-primary/30 bg-primary/5 p-6 md:p-8">
+          <h2 className="font-display text-2xl md:text-3xl font-semibold">
+            Make this your real grow
+          </h2>
+          <ul className="mt-4 space-y-2 text-sm md:text-base text-muted-foreground">
+            <li>· Create a free account to replace demo data with your own grow, tent, plant, logs, and sensor readings.</li>
+            <li>· Your real dashboard stays private.</li>
+            <li>· Demo actions are previews only — nothing here is saved.</li>
+          </ul>
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            {user ? (
+              <Link to="/">
+                <Button size="lg">Open my dashboard <ArrowRight className="ml-1 h-4 w-4" /></Button>
+              </Link>
+            ) : (
+              <Link to="/auth">
+                <Button size="lg">Create Free Account</Button>
+              </Link>
+            )}
+            <Link to="/auth">
+              <Button size="lg" variant="outline">Sign In</Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* What happens after signup? */}
+      <section className="px-6 pb-12 max-w-6xl mx-auto">
+        <h2 className="font-display text-2xl md:text-3xl font-semibold text-center">
+          What happens after signup?
+        </h2>
+        <p className="mt-2 text-center text-muted-foreground">
+          Four small steps and Verdant starts remembering your grow.
+        </p>
+        <ol className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { n: "Step 1", title: "Create your grow", body: "Name your run and set basic targets." },
+            { n: "Step 2", title: "Add your tent and plant", body: "Track environment and lineage per plant." },
+            { n: "Step 3", title: "Log your first note or sensor reading", body: "Diary entry or manual sensor snapshot — your call." },
+            { n: "Step 4", title: "Let Verdant build your plant timeline", body: "Logs, photos, alerts, and approval-required actions, in one place." },
+          ].map((s) => (
+            <li key={s.n} className="rounded-xl border border-border/40 bg-card/30 p-4">
+              <div className="flex items-center gap-2 text-primary">
+                <CheckCircle2 className="h-4 w-4" />
+                <span className="text-xs uppercase tracking-wider font-semibold">{s.n}</span>
+              </div>
+              <div className="mt-1 font-display font-semibold">{s.title}</div>
+              <div className="text-sm text-muted-foreground mt-1">{s.body}</div>
+            </li>
+          ))}
+        </ol>
+      </section>
+
       {/* Final CTA */}
       <section className="px-6 pb-20 max-w-3xl mx-auto text-center">
         <h2 className="font-display text-2xl md:text-3xl font-semibold">
@@ -221,8 +283,11 @@ export default function Demo() {
               <Button size="lg">Create Free Account</Button>
             </Link>
           )}
+          <Link to="/auth">
+            <Button size="lg" variant="outline">Sign In</Button>
+          </Link>
           <Link to="/welcome">
-            <Button size="lg" variant="outline">Back to landing</Button>
+            <Button size="lg" variant="ghost">Back to landing</Button>
           </Link>
         </div>
       </section>
@@ -242,8 +307,8 @@ export default function Demo() {
           >
             <h3 className="font-display text-lg font-semibold">{promptOpen} is part of your real grow</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              Create a free account to use this with your real grow. Demo
-              actions are not saved.
+              {ACTION_PROMPTS[promptOpen] ?? "Create a free account to use this with your real grow."}
+              {" "}Demo actions are not saved.
             </p>
             <div className="mt-5 flex items-center gap-2 justify-end">
               <Button variant="ghost" size="sm" onClick={closePrompt}>Keep exploring</Button>

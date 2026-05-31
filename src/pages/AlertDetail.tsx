@@ -104,6 +104,11 @@ export default function AlertDetail() {
   const [status, setStatus] = useState<LoadStatus>("idle");
   const [alert, setAlert] = useState<AlertRow | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const linkedActionAlertIds = useMemo(
+    () => (alert ? [alert.id] : []),
+    [alert],
+  );
+  const linkedActionCounts = useAlertsLinkedActionCounts(linkedActionAlertIds);
   const [eventsKey, setEventsKey] = useState(0);
   const [existingActionId, setExistingActionId] = useState<string | null>(null);
   const [queuing, setQueuing] = useState(false);

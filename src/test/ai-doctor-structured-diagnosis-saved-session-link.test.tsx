@@ -181,7 +181,8 @@ describe("StructuredDiagnosisCard — static safety (saved session link)", () =>
     expect(CARD).not.toMatch(/\.from\(\s*["']/);
     expect(CARD).not.toMatch(/\.insert\(/);
     expect(CARD).not.toMatch(/\.update\(/);
-    expect(CARD).not.toMatch(/\.delete\(/);
+    // Match Supabase-style chained .delete() (no args), not Set#delete(x).
+    expect(CARD).not.toMatch(/\.delete\(\s*\)/);
     expect(CARD).not.toMatch(/\.upsert\(/);
     expect(CARD).not.toMatch(/\.rpc\(/);
     expect(CARD).not.toMatch(/functions\.invoke/);

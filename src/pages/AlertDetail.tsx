@@ -435,6 +435,14 @@ export default function AlertDetail() {
             <div className="mt-3">
               <AlertWhyContext alert={alert} variant="detailed" />
             </div>
+            <div className="mt-3">
+              <LinkedActionCountBadge
+                alertId={alert.id}
+                summary={linkedActionCounts.get(alert.id)}
+                growId={alert.grow_id}
+                testIdPrefix="alert-detail"
+              />
+            </div>
 
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs mt-4">
               <div className="rounded-lg border border-border/40 bg-secondary/20 p-2">

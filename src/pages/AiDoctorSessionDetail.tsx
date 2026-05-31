@@ -927,6 +927,7 @@ function SessionDetailBody({
     reviewsQuery.data?.events ?? [],
     reviewState,
   );
+  const linkedActions = useAiDoctorSessionLinkedActionQueueItems(row.id);
 
 
   return (

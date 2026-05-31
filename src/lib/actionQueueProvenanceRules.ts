@@ -30,6 +30,7 @@ export interface SourceLabelInput {
 
 
 const ALERT_TOKEN_RE = /\[alert:([A-Za-z0-9_-]{1,64})\]/;
+const SESSION_TOKEN_RE = /\[session:([A-Za-z0-9_-]{1,64})\]/;
 
 /**
  * Extracts the alert id embedded in an action's reason via `[alert:<id>]`.
@@ -45,6 +46,40 @@ export function extractSourceAlertId(
   if (!id || id.length < 1 || id.length > 64) return null;
   return id;
 }
+
+/**
+ * Extracts the AI Doctor session id embedded in an action's reason via
+ * `[session:<id>]`. Returns null when missing, malformed, or non-string.
+ * The token itself is internal and must never be rendered to growers — use
+ * `stripBackPointerTokens` for any grower-facing reason text.
+ */
+export function extractSourceAiDoctorSessionId(
+  reason: string | null | undefined,
+): string | null {
+  if (typeof reason !== "string") return null;
+  const m = reason.match(SESSION_TOKEN_RE);
+  if (!m) return null;
+  const id = m[1];
+  if (!id || id.length < 1 || id.length > 64) return null;
+  return id;
+}
+
+/**
+ * Strip internal back-pointer tokens (alert + session) from a user-facing
+ * reason string. These tokens exist for audit/dedupe only and must never
+ * leak into grower-visible copy.
+ */
+export function stripBackPointerTokens(
+  reason: string | null | undefined,
+): string {
+  if (typeof reason !== "string" || !reason) return "";
+  return reason
+    .replace(/\s*\[session:[^\]]+\]\s*/g, " ")
+    .replace(/\s*\[alert:[^\]]+\]\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 
 export function getActionQueueSourceKind(
   action: SourceLabelInput | null | undefined,

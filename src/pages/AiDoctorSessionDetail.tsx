@@ -1100,6 +1100,8 @@ function SessionDetailBody({
 
       <LinkedActionQueueSection vm={linkedActions.vm} />
 
+      <LinkedAlertSection vm={linkedActions.vm} />
+
       <ReviewSummarySection
         vm={reviewVm}
         session={{

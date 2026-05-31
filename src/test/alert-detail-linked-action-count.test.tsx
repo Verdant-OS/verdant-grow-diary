@@ -11,7 +11,7 @@ import { resolve } from "node:path";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import AlertDetail from "@/pages/AlertDetail";
-import { actionDetailPath } from "@/lib/routes";
+import { actionDetailPath, actionQueueAlertContextPath } from "@/lib/routes";
 
 const ALERT = {
   id: "alert-1",

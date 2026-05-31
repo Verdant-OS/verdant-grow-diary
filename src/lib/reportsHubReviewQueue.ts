@@ -13,10 +13,11 @@
  *  - Never embeds raw payloads, secrets, or user IDs in user-visible copy.
  */
 import {
-  actionDetailPath,
+  actionDetailOutcomePath,
   alertDetailPath,
   alertsPath,
-  growDetailPath,
+  growDetailOutcomesPath,
+  sensorsPath,
 } from "@/lib/routes";
 
 export const STALE_SENSOR_THRESHOLD_MS = 24 * 60 * 60 * 1000;
@@ -134,8 +135,8 @@ export function buildReportsReviewQueue(
   if (pending > 0) {
     const href =
       typeof firstPendingActionId === "string" && firstPendingActionId
-        ? actionDetailPath(firstPendingActionId)
-        : growDetailPath(growId);
+        ? actionDetailOutcomePath(firstPendingActionId)
+        : growDetailOutcomesPath(growId);
     const oldestMs = parseTs(oldestPendingCompletedAt);
     const whyParts: string[] = [
       `${pending} pending review${pending === 1 ? "" : "s"}`,
@@ -206,8 +207,8 @@ export function buildReportsReviewQueue(
           : "Latest sensor reading is more than 24 hours old.",
       helpText: REVIEW_ITEM_HELP_TEXT.stale_sensor,
       whyThisIsHere,
-      href: growDetailPath(growId),
-      hrefLabel: "Open grow detail",
+      href: sensorsPath(growId),
+      hrefLabel: "Open sensor context",
     });
   }
 
@@ -239,7 +240,7 @@ export function buildReportsReviewQueue(
           : `${lowSample} outcome patterns still have too few samples to read confidently.`,
       helpText: REVIEW_ITEM_HELP_TEXT.low_sample_learning,
       whyThisIsHere: whyParts.join(" · "),
-      href: growDetailPath(growId),
+      href: growDetailOutcomesPath(growId),
       hrefLabel: "Open learning report",
     });
   }

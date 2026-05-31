@@ -703,6 +703,7 @@ export default function ActionDetail() {
 
       {row.status === "completed" && (
         <section
+          id="outcome-section"
           className="glass rounded-2xl p-4 mb-4"
           aria-label="Record Outcome"
           data-testid="outcome-section"

@@ -66,8 +66,8 @@ export function useDashboardPendingOutcomeReviews(
         return;
       }
       const items = findPendingOutcomeReviews({
-        completedActions: actionsRes.data ?? [],
-        outcomes: outcomesRes.data ?? [],
+        completedActions: (actionsRes.data ?? []) as never,
+        outcomes: (outcomesRes.data ?? []) as never,
         now: Date.now(),
       });
       setState({ status: "ok", items });

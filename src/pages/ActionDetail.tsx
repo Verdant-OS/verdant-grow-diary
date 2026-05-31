@@ -736,6 +736,7 @@ export default function ActionDetail() {
               <Link
                 to={logsPath(row.grow_id)}
                 className="text-primary hover:underline"
+                aria-label="View follow-up diary entry"
               >
                 View follow-up diary entry →
               </Link>

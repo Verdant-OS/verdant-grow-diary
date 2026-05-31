@@ -223,9 +223,11 @@ const RISK_TONE_CLASSES: Record<ReviewRiskTone, string> = {
 function ReviewSummarySection({
   vm,
   session,
+  linkedActions,
 }: {
   vm: ReviewSummaryViewModel;
   session?: AiDoctorSessionLike;
+  linkedActions?: LinkedActionsViewModel;
 }) {
   return (
     <section

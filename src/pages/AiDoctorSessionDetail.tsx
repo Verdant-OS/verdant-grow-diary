@@ -1065,6 +1065,7 @@ function SessionDetailBody({
           plant_id: row.plant_id,
           diagnosis: d ? { riskLevel: d.riskLevel } : null,
         }}
+        linkedActions={linkedActions.vm}
       />
 
 

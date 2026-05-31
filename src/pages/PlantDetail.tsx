@@ -110,6 +110,14 @@ export default function PlantDetail() {
         metas={[plantMeta, tentMeta]}
         testId="plant-detail-data-source-disclosure"
       />
+      <PlantQuickStatusStrip
+        plantId={plant.id}
+        plantStartedAt={plant.startedAt}
+        stage={plant.stage}
+        tentId={plant.tentId ?? null}
+        growId={plant.growId ?? null}
+      />
+
       {!isActivePlant(plant) && (
         <ArchivedPlantBanner plantId={plant.id} lastNote={plant.lastNote} />
       )}

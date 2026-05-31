@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import {
+  buildRelativeTimelineFilterChips,
   buildRelativeTimelineProjection,
   filterRelativeTimelineItems,
   formatRelativeTimelineGroupSummary,

@@ -1189,7 +1189,13 @@ function SessionDetailBody({
 
       <SessionReviewStatusPanel sessionId={row.id} vm={reviewHistoryVm} />
 
-      <LinkedActionQueueSection vm={linkedActions.vm} />
+      {linkedActions.isLoading ? (
+        <LinkedActionQueueLoading />
+      ) : linkedActions.vm.count === 0 ? (
+        <LinkedActionQueueEmpty />
+      ) : (
+        <LinkedActionQueueSection vm={linkedActions.vm} />
+      )}
 
       <LinkedAlertSection vm={linkedActions.vm} />
 

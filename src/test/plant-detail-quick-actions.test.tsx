@@ -668,6 +668,153 @@ describe("PlantDetailQuickActions · keyboard and ARIA", () => {
   });
 });
 
+describe("PlantDetailQuickActions · hardened a11y coverage", () => {
+  const ALL_IDS = [
+    "plant-detail-quick-action-quicklog",
+    "plant-detail-quick-action-manual-sensor-snapshot",
+    "plant-detail-quick-action-upload-photo",
+    "plant-detail-quick-action-ask-doctor",
+    "plant-detail-quick-action-view-timeline",
+  ] as const;
+
+  const EXPECTED_NAMES: Record<(typeof ALL_IDS)[number], string> = {
+    "plant-detail-quick-action-quicklog": "Quick Log",
+    "plant-detail-quick-action-manual-sensor-snapshot": "Manual Sensor Snapshot",
+    "plant-detail-quick-action-upload-photo": "Upload Photo",
+    "plant-detail-quick-action-ask-doctor": "Ask Doctor",
+    "plant-detail-quick-action-view-timeline": "View Timeline",
+  };
+
+  function describedByOf(el: HTMLElement): string[] {
+    const direct = el.getAttribute("aria-describedby");
+    const inner = el.querySelector("a")?.getAttribute("aria-describedby");
+    return (direct ?? inner ?? "").split(/\s+/).filter(Boolean);
+  }
+
+  function accessibleNameOf(el: HTMLElement): string {
+    const inner = el.querySelector("a");
+    const label =
+      el.getAttribute("aria-label") ?? inner?.getAttribute("aria-label");
+    return (label ?? el.textContent ?? "").trim();
+  }
+
+  it("aria-describedby is applied consistently to both Link-asChild and disabled button actions", () => {
+    const { unmount } = render(
+      <PlantDetailQuickActions plantId="p1" growId="g1" />,
+    );
+    const askDoctor = screen.getByTestId("plant-detail-quick-action-ask-doctor");
+    const quickLog = screen.getByTestId("plant-detail-quick-action-quicklog");
+    expect(describedByOf(askDoctor)).toContain(
+      "plant-detail-quick-action-ask-doctor-description",
+    );
+    expect(describedByOf(quickLog)).toContain(
+      "plant-detail-quick-action-quicklog-description",
+    );
+    unmount();
+
+    render(<PlantDetailQuickActions plantId={null} />);
+    const disabledAskDoctor = screen.getByTestId(
+      "plant-detail-quick-action-ask-doctor",
+    );
+    expect(disabledAskDoctor.tagName.toLowerCase()).toBe("button");
+    const described = describedByOf(disabledAskDoctor);
+    expect(described).toContain(
+      "plant-detail-quick-action-ask-doctor-description",
+    );
+    expect(described).toContain("plant-detail-quick-action-ask-doctor-reason");
+  });
+
+  it("every enabled quick action exposes its expected accessible name", () => {
+    render(
+      <PlantDetailQuickActions
+        plantId="p1"
+        plantName="Plant 1"
+        growId="g1"
+        tentId="t1"
+        tentName="Tent A"
+      />,
+    );
+    for (const id of ALL_IDS) {
+      const el = screen.getByTestId(id);
+      const name = accessibleNameOf(el);
+      expect(name.toLowerCase()).toContain(EXPECTED_NAMES[id].toLowerCase());
+      expect(name.toLowerCase()).not.toContain("unavailable");
+    }
+  });
+
+  it("every disabled quick action's accessible name includes label and unavailable reason", () => {
+    render(<PlantDetailQuickActions plantId={null} hasTimelineSection={false} />);
+    const disabledIds = [
+      "plant-detail-quick-action-quicklog",
+      "plant-detail-quick-action-upload-photo",
+      "plant-detail-quick-action-ask-doctor",
+      "plant-detail-quick-action-view-timeline",
+    ] as const;
+    for (const id of disabledIds) {
+      const el = screen.getByTestId(id);
+      const name = accessibleNameOf(el);
+      expect(name).toContain(EXPECTED_NAMES[id]);
+      expect(name.toLowerCase()).toContain("unavailable");
+    }
+  });
+
+  it("enabled quick actions appear in expected DOM/tab order", () => {
+    const { container } = render(
+      <PlantDetailQuickActions plantId="p1" growId="g1" />,
+    );
+    const interactive = Array.from(
+      container.querySelectorAll<HTMLElement>("button, a"),
+    ).filter((el) => {
+      const tid = el.getAttribute("data-testid") ?? "";
+      return (
+        tid.startsWith("plant-detail-quick-action-") &&
+        !tid.endsWith("-description") &&
+        !tid.endsWith("-reason") &&
+        !el.hasAttribute("disabled")
+      );
+    });
+    const order = interactive.map((el) => el.getAttribute("data-testid"));
+    expect(order).toEqual([...ALL_IDS]);
+  });
+
+  it("disabled actions are not focusable and do not respond to clicks", () => {
+    const handler = vi.fn();
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+    render(<PlantDetailQuickActions plantId={null} hasTimelineSection={false} />);
+    for (const id of [
+      "plant-detail-quick-action-quicklog",
+      "plant-detail-quick-action-upload-photo",
+      "plant-detail-quick-action-ask-doctor",
+      "plant-detail-quick-action-view-timeline",
+    ]) {
+      const el = screen.getByTestId(id) as HTMLButtonElement;
+      expect(el).toBeDisabled();
+      el.focus();
+      expect(document.activeElement).not.toBe(el);
+      fireEvent.click(el);
+    }
+    expect(handler).not.toHaveBeenCalled();
+    window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+  });
+
+  it("focus-visible styling includes ring, ring-offset, and offset-background tokens", () => {
+    render(<PlantDetailQuickActions plantId="p1" growId="g1" />);
+    for (const id of ALL_IDS) {
+      const el = screen.getByTestId(id);
+      const cls = el.className + " " + (el.querySelector("a")?.className ?? "");
+      expect(cls, `${id} missing focus ring`).toMatch(/focus-visible:ring-2/);
+      expect(cls, `${id} missing ring-offset`).toMatch(
+        /focus-visible:ring-offset-2/,
+      );
+      expect(cls, `${id} missing offset-background`).toMatch(
+        /focus-visible:ring-offset-background/,
+      );
+    }
+  });
+});
+
+
+
 
 describe("PlantDetailQuickActions · static safety", () => {
   it("helper module contains no React, writes, RPC, fetch, or device control", () => {

@@ -1,6 +1,6 @@
 /**
- * plantDetailDoctorContextPreview — pure view-model for the Plant Detail
- * "Doctor context" preview card.
+ * plantDetailDoctorContextPreview — pure view-model for the Plant
+ * Detail "Doctor context" preview card.
  *
  * Deterministic. No React, no I/O, no fetch, no AI calls, no writes, no
  * RPC, no functions.invoke, no scheduling. Consumes already-loaded
@@ -8,9 +8,9 @@
  * optional alert/action counts) and projects a cautious read-only
  * preview of what context AI Doctor would have for this plant.
  *
- * Copy never promises diagnosis certainty and never implies automation
- * or device control. Internal IDs, raw payloads, storage paths,
- * tokens, secrets, and provenance markers are never emitted.
+ * Copy never promises diagnosis certainty and never implies any
+ * automation or hardware steering. Internal IDs, raw payloads, storage
+ * paths, tokens, secrets, and provenance markers are never emitted.
  */
 import type { PlantRecentActivityRow } from "@/lib/plantRecentActivityRules";
 import { classifyTimelineEntry } from "@/lib/timelineEntryClassification";

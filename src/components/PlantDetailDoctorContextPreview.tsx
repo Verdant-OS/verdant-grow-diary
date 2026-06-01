@@ -3,8 +3,8 @@
  * AI Doctor would have for this plant.
  *
  * Presentation-only. Does NOT call AI, does NOT write, does NOT trigger
- * automation or device control. Renders deterministic Available /
- * Missing / Stale chips from a pure view-model, plus a safe "Ask
+ * automation or any hardware steering. Renders deterministic Available
+ * / Missing / Stale chips from a pure view-model, plus a safe "Ask
  * Doctor" CTA that routes to the existing /doctor flow with plant
  * context as a query parameter.
  */

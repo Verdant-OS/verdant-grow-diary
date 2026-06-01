@@ -275,8 +275,7 @@ describe("<PlantDetailDoctorContextPreview />", () => {
   it("renders an Ask Doctor CTA routed to /doctor with plant context", () => {
     renderCard();
     const cta = screen.getByTestId("plant-detail-doctor-context-ask-cta");
-    const link = cta.querySelector("a");
-    expect(link?.getAttribute("href")).toBe("/doctor?plantId=p1");
+    expect(cta.getAttribute("href")).toBe("/doctor?plantId=p1");
   });
 
   it("renders nothing without a plantId", () => {

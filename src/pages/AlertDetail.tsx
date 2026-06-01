@@ -597,8 +597,14 @@ export default function AlertDetail() {
               <div
                 className="mt-4 rounded-lg border border-border/40 bg-secondary/10 p-3"
                 aria-label="Action queue handoff"
+                data-testid="alert-handoff-region"
               >
-                <div className="flex items-start gap-2">
+                <div
+                  className="flex items-start gap-2"
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
                   <ListChecks className="h-4 w-4 mt-0.5 text-muted-foreground" />
                   <div className="flex-1">
                     <p className="text-xs font-medium">Suggested action</p>
@@ -619,7 +625,10 @@ export default function AlertDetail() {
                       {existingActionId ? (
                         <>
                           <Button asChild size="sm" variant="secondary">
-                            <Link to={`/actions/${existingActionId}`}>
+                            <Link
+                              to={`/actions/${existingActionId}`}
+                              data-testid="alert-handoff-already-queued-link"
+                            >
                               ✓ Action already queued — view details
                             </Link>
                           </Button>
@@ -634,6 +643,8 @@ export default function AlertDetail() {
                           variant="outline"
                           disabled={!canQueue || queuing}
                           onClick={addAlertToActionQueue}
+                          data-testid="alert-handoff-add-button"
+                          aria-busy={queuing || undefined}
                         >
                           {queuing ? "Adding…" : "Add to Action Queue"}
                         </Button>

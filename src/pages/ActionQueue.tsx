@@ -25,7 +25,9 @@ import { Label } from "@/components/ui/label";
 import { Loader2, Check, X, FlaskConical, ListChecks, History, CheckCircle2, Ban } from "lucide-react";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
+import { buildActionRowAriaLabel } from "@/lib/actionQueueRowView";
 import { actionDetailPath, actionsPath, aiDoctorSessionDetailPath, alertDetailPath } from "@/lib/routes";
 import { toast } from "sonner";
 import {
@@ -184,8 +186,11 @@ export default function ActionQueue() {
   const { grows, activeGrowId, activeGrow } = useGrows();
   // Shared URL `?growId=` resolution against RLS-loaded grows. urlGrowId precedence
   // over activeGrowId is preserved exactly as before.
-  const { urlGrowId, scopedGrowName, backHref } = useScopedGrow();
+  const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
   const effectiveGrowId = urlGrowId ?? activeGrowId;
+  // URL provided a grow id, but it does not resolve to a grow the viewer
+  // owns. Showing every action would be misleading — render a calm prompt.
+  const hasInvalidScope = !!urlGrowId && !isValidScopedGrow;
   const [rows, setRows] = useState<ActionRow[]>([]);
   const [events, setEvents] = useState<Record<string, EventRow[]>>({});
   const [loading, setLoading] = useState(true);
@@ -667,44 +672,107 @@ export default function ActionQueue() {
 
 
 
+      {hasInvalidScope ? (
+        <div
+          role="status"
+          className="glass rounded-2xl p-6 text-center flex flex-col items-center gap-2"
+          data-testid="action-queue-missing-context"
+        >
+          <ListChecks className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
+          <p className="font-display font-semibold text-base">
+            Select a grow or tent to review pending actions.
+          </p>
+          <p className="text-sm text-muted-foreground max-w-sm">
+            Pending actions are scoped to a grow or tent so you only review
+            recommendations that match what you’re working on. Grower approval
+            is always required.
+          </p>
+        </div>
+      ) : (
+      <>
       <section className="glass rounded-2xl p-4 mb-4" aria-label="Needs Review">
         <h2 className="text-sm font-semibold mb-3 uppercase tracking-wider text-muted-foreground">
           Needs Review ({pending.length})
         </h2>
         {loading ? (
-          <div className="flex items-center justify-center py-8 text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
+          <div
+            role="status"
+            aria-busy="true"
+            aria-live="polite"
+            aria-label="Loading pending actions"
+            className="space-y-3"
+            data-testid="action-queue-loading-skeleton"
+          >
+            <span className="sr-only">Loading pending actions…</span>
+            <Loader2 className="sr-only h-4 w-4 animate-spin" aria-hidden="true" />
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="rounded-xl border border-border/60 bg-secondary/30 p-3 flex flex-col gap-2"
+                aria-hidden="true"
+              >
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-4 w-20" />
+                </div>
+                <Skeleton className="h-3 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            ))}
           </div>
         ) : pending.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4">
-            {filtersActive ? "No actions match these filters." : "No pending actions."}
-          </p>
+          <div className="py-4" data-testid="action-queue-empty-pending">
+            <p className="text-sm text-foreground">
+              {filtersActive ? "No actions match these filters." : "No pending actions."}
+            </p>
+            {!filtersActive && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Verdant will list grower-reviewed recommendations here when
+                they appear. Review before acting — grower approval is always
+                required.
+              </p>
+            )}
+          </div>
         ) : (
           <ul className="space-y-3">
-            {pending.map((row) => (
+            {pending.map((row) => {
+              const titleId = `aq-pending-title-${row.id}`;
+              const descId = `aq-pending-desc-${row.id}`;
+              const isFocused = focusedActionId === row.id;
+              return (
               <li
                 key={row.id}
                 data-testid="action-queue-row"
                 data-action-id={row.id}
-                data-focused={focusedActionId === row.id ? "true" : undefined}
-                aria-label={focusedActionId === row.id ? "Focused action" : undefined}
-                className={`rounded-xl border border-border/60 bg-secondary/30 p-3 ${
-                  focusedActionId === row.id
+                data-focused={isFocused ? "true" : undefined}
+                aria-label={isFocused ? "Focused action" : undefined}
+                aria-labelledby={isFocused ? undefined : titleId}
+                aria-describedby={isFocused ? undefined : descId}
+                className={`rounded-xl border border-border/60 bg-secondary/30 p-3 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background ${
+                  isFocused
                     ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
                     : ""
                 }`}
               >
+                <span id={descId} className="sr-only">
+                  {buildActionRowAriaLabel(row)}
+                </span>
+
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium">{row.action_type}</span>
-                      <Badge variant="outline" className={RISK_VARIANT[row.risk_level]}>
+                      <h3 id={titleId} className="font-medium text-sm m-0">
+                        {row.action_type}
+                      </h3>
+                      <Badge variant="outline" className={RISK_VARIANT[row.risk_level]} aria-label={`Risk: ${row.risk_level}`}>
                         {row.risk_level}
                       </Badge>
                       {isAlertDerived(row) && (
                         <Badge
                           variant="outline"
                           className="text-[10px] uppercase border-primary text-primary"
+                          aria-label={`Source: ${getActionQueueSourceLabel(row)}`}
                         >
                           {getActionQueueSourceLabel(row)}
                         </Badge>
@@ -715,6 +783,7 @@ export default function ActionQueue() {
                             variant="outline"
                             className="text-[10px] uppercase border-primary text-primary"
                             data-testid="action-queue-row-ai-doctor-badge"
+                            aria-label="Source: AI Doctor"
                           >
                             AI Doctor
                           </Badge>
@@ -758,14 +827,16 @@ export default function ActionQueue() {
                   )}
                   <Link
                     to={actionDetailPath(row.id)}
-                    className="ml-auto text-xs text-primary hover:underline self-center"
+                    className="ml-auto text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm self-center"
+                    aria-describedby={titleId}
                   >
                     View Details
                   </Link>
                 </div>
                 <EventHistory items={events[row.id]} />
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </section>
@@ -774,34 +845,59 @@ export default function ActionQueue() {
         <h2 className="text-sm font-semibold mb-3 uppercase tracking-wider text-muted-foreground">
           Already Reviewed ({reviewed.length})
         </h2>
-        {loading ? null : reviewed.length === 0 ? (
+        {loading ? (
+          <div
+            role="status"
+            aria-busy="true"
+            aria-live="polite"
+            aria-label="Loading reviewed actions"
+            className="space-y-2"
+            data-testid="action-queue-loading-skeleton-reviewed"
+          >
+            <span className="sr-only">Loading reviewed actions…</span>
+            {[0, 1].map((i) => (
+              <Skeleton key={i} className="h-8 w-full" aria-hidden="true" />
+            ))}
+          </div>
+        ) : reviewed.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4">
             {filtersActive ? "No actions match these filters." : "No reviewed actions."}
           </p>
         ) : (
           <ul className="space-y-2 text-sm">
-            {reviewed.slice(0, 50).map((row) => (
+            {reviewed.slice(0, 50).map((row) => {
+              const titleId = `aq-reviewed-title-${row.id}`;
+              const descId = `aq-reviewed-desc-${row.id}`;
+              const isFocused = focusedActionId === row.id;
+              return (
               <li
                 key={row.id}
                 data-testid="action-queue-row"
                 data-action-id={row.id}
-                data-focused={focusedActionId === row.id ? "true" : undefined}
-                aria-label={focusedActionId === row.id ? "Focused action" : undefined}
-                className={`rounded-lg border border-border/40 bg-secondary/20 p-2 ${
-                  focusedActionId === row.id
+                data-focused={isFocused ? "true" : undefined}
+                aria-label={isFocused ? "Focused action" : undefined}
+                aria-labelledby={isFocused ? undefined : titleId}
+                aria-describedby={isFocused ? undefined : descId}
+                className={`rounded-lg border border-border/40 bg-secondary/20 p-2 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background ${
+                  isFocused
                     ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
                     : ""
                 }`}
               >
+                <span id={descId} className="sr-only">
+                  {buildActionRowAriaLabel(row)}
+                </span>
                 <div className="flex items-center gap-3 flex-wrap">
-                  <Badge variant="outline" className="text-[10px] uppercase">{row.status}</Badge>
-                  <Badge variant="outline" className={`text-[10px] uppercase ${RISK_VARIANT[row.risk_level]}`}>
+
+                  <Badge variant="outline" className="text-[10px] uppercase" aria-label={`Status: ${row.status}`}>{row.status}</Badge>
+                  <Badge variant="outline" className={`text-[10px] uppercase ${RISK_VARIANT[row.risk_level]}`} aria-label={`Risk: ${row.risk_level}`}>
                     {row.risk_level}
                   </Badge>
                   {isAlertDerived(row) && (
                     <Badge
                       variant="outline"
                       className="text-[10px] uppercase border-primary text-primary"
+                      aria-label={`Source: ${getActionQueueSourceLabel(row)}`}
                     >
                       {getActionQueueSourceLabel(row)}
                     </Badge>
@@ -811,6 +907,7 @@ export default function ActionQueue() {
                       variant="outline"
                       className="text-[10px] uppercase border-primary text-primary"
                       data-testid="action-queue-row-ai-doctor-badge"
+                      aria-label="Source: AI Doctor"
                     >
                       AI Doctor
                     </Badge>
@@ -818,7 +915,7 @@ export default function ActionQueue() {
 
 
                   <span className="truncate flex-1">{row.suggested_change}</span>
-                  <span className="text-xs text-muted-foreground">{row.action_type}</span>
+                  <h3 id={titleId} className="text-xs text-muted-foreground m-0 font-normal">{row.action_type}</h3>
                   {canComplete(row.status) && (
                     <Button size="sm" variant="secondary" disabled={busyId === row.id} onClick={() => complete(row)}>
                       <CheckCircle2 className="h-3.5 w-3.5" /> Mark Complete
@@ -831,7 +928,8 @@ export default function ActionQueue() {
                   )}
                   <Link
                     to={actionDetailPath(row.id)}
-                    className="text-xs text-primary hover:underline"
+                    className="text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
+                    aria-describedby={titleId}
                   >
                     View Details
                   </Link>
@@ -842,10 +940,13 @@ export default function ActionQueue() {
                 </div>
                 <EventHistory items={events[row.id]} />
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </section>
+      </>
+      )}
 
       <Dialog
         open={noteDialog !== null}

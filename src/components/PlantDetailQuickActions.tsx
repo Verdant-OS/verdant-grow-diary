@@ -9,6 +9,7 @@
 import { Link } from "react-router-dom";
 import {
   Activity,
+  Camera,
   ListOrdered,
   MessageSquare,
   NotebookPen,
@@ -26,6 +27,7 @@ import {
 const ICON: Record<PlantDetailQuickActionKind, typeof NotebookPen> = {
   quicklog: NotebookPen,
   manual_sensor_snapshot: Activity,
+  upload_photo: Camera,
   ask_doctor: MessageSquare,
   view_timeline: ListOrdered,
 };

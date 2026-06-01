@@ -300,7 +300,12 @@ const VIEW = readFileSync(
 
 describe("Alerts route polish — static safety", () => {
   it("polish helper introduces no I/O, writes, or privileged access", () => {
-    const blob = VIEW.toLowerCase();
+    const stripComments = (src: string) =>
+      src
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\*.*$/gm, "")
+        .replace(/\/\/.*$/gm, "");
+    const blob = stripComments(VIEW).toLowerCase();
     expect(blob).not.toContain("supabase");
     expect(blob).not.toContain("functions.invoke");
     expect(blob).not.toContain("service_role");

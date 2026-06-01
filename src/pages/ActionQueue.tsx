@@ -841,34 +841,55 @@ export default function ActionQueue() {
         <h2 className="text-sm font-semibold mb-3 uppercase tracking-wider text-muted-foreground">
           Already Reviewed ({reviewed.length})
         </h2>
-        {loading ? null : reviewed.length === 0 ? (
+        {loading ? (
+          <div
+            role="status"
+            aria-busy="true"
+            aria-live="polite"
+            aria-label="Loading reviewed actions"
+            className="space-y-2"
+            data-testid="action-queue-loading-skeleton-reviewed"
+          >
+            <span className="sr-only">Loading reviewed actions…</span>
+            {[0, 1].map((i) => (
+              <Skeleton key={i} className="h-8 w-full" aria-hidden="true" />
+            ))}
+          </div>
+        ) : reviewed.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4">
             {filtersActive ? "No actions match these filters." : "No reviewed actions."}
           </p>
         ) : (
           <ul className="space-y-2 text-sm">
-            {reviewed.slice(0, 50).map((row) => (
+            {reviewed.slice(0, 50).map((row) => {
+              const titleId = `aq-reviewed-title-${row.id}`;
+              const rowAria =
+                focusedActionId === row.id
+                  ? "Focused action"
+                  : buildActionRowAriaLabel(row);
+              return (
               <li
                 key={row.id}
                 data-testid="action-queue-row"
                 data-action-id={row.id}
                 data-focused={focusedActionId === row.id ? "true" : undefined}
-                aria-label={focusedActionId === row.id ? "Focused action" : undefined}
-                className={`rounded-lg border border-border/40 bg-secondary/20 p-2 ${
+                aria-label={rowAria}
+                className={`rounded-lg border border-border/40 bg-secondary/20 p-2 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background ${
                   focusedActionId === row.id
                     ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
                     : ""
                 }`}
               >
                 <div className="flex items-center gap-3 flex-wrap">
-                  <Badge variant="outline" className="text-[10px] uppercase">{row.status}</Badge>
-                  <Badge variant="outline" className={`text-[10px] uppercase ${RISK_VARIANT[row.risk_level]}`}>
+                  <Badge variant="outline" className="text-[10px] uppercase" aria-label={`Status: ${row.status}`}>{row.status}</Badge>
+                  <Badge variant="outline" className={`text-[10px] uppercase ${RISK_VARIANT[row.risk_level]}`} aria-label={`Risk: ${row.risk_level}`}>
                     {row.risk_level}
                   </Badge>
                   {isAlertDerived(row) && (
                     <Badge
                       variant="outline"
                       className="text-[10px] uppercase border-primary text-primary"
+                      aria-label={`Source: ${getActionQueueSourceLabel(row)}`}
                     >
                       {getActionQueueSourceLabel(row)}
                     </Badge>
@@ -878,6 +899,7 @@ export default function ActionQueue() {
                       variant="outline"
                       className="text-[10px] uppercase border-primary text-primary"
                       data-testid="action-queue-row-ai-doctor-badge"
+                      aria-label="Source: AI Doctor"
                     >
                       AI Doctor
                     </Badge>
@@ -885,7 +907,7 @@ export default function ActionQueue() {
 
 
                   <span className="truncate flex-1">{row.suggested_change}</span>
-                  <span className="text-xs text-muted-foreground">{row.action_type}</span>
+                  <h3 id={titleId} className="text-xs text-muted-foreground m-0 font-normal">{row.action_type}</h3>
                   {canComplete(row.status) && (
                     <Button size="sm" variant="secondary" disabled={busyId === row.id} onClick={() => complete(row)}>
                       <CheckCircle2 className="h-3.5 w-3.5" /> Mark Complete
@@ -898,7 +920,8 @@ export default function ActionQueue() {
                   )}
                   <Link
                     to={actionDetailPath(row.id)}
-                    className="text-xs text-primary hover:underline"
+                    className="text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
+                    aria-describedby={titleId}
                   >
                     View Details
                   </Link>
@@ -909,10 +932,13 @@ export default function ActionQueue() {
                 </div>
                 <EventHistory items={events[row.id]} />
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </section>
+      </>
+      )}
 
       <Dialog
         open={noteDialog !== null}

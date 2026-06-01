@@ -194,18 +194,20 @@ describe("buildPlantQuickStatusView — pure rules", () => {
 
 function setupHooks({
   entries = [],
+  entriesLoading = false,
   alertRows = [],
   alertStatus = "ok",
   actionRows = [],
   actionsLoading = false,
 }: {
   entries?: unknown[];
+  entriesLoading?: boolean;
   alertRows?: unknown[];
   alertStatus?: string;
   actionRows?: unknown[];
   actionsLoading?: boolean;
 } = {}) {
-  mockEntries.mockReturnValue({ data: entries, isLoading: false });
+  mockEntries.mockReturnValue({ data: entries, isLoading: entriesLoading });
   mockAlerts.mockReturnValue({ rows: alertRows, status: alertStatus });
   mockActions.mockReturnValue({ rows: actionRows, isLoading: actionsLoading });
 }

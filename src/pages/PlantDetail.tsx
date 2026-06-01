@@ -109,12 +109,11 @@ export default function PlantDetail() {
           </div>
         }
       />
-      <GrowDataSourceDisclosure
-        resource="plant"
-        hasAnyData
+      <PlantDetailDataSourceDisclosure
         metas={[plantMeta, tentMeta]}
         testId="plant-detail-data-source-disclosure"
       />
+
       <PlantQuickStatusStrip
         plantId={plant.id}
         plantStartedAt={plant.startedAt}

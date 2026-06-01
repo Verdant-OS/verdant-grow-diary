@@ -2,15 +2,15 @@
  * plantPhotoPreviewStrip — pure view-model for the Plant Detail recent
  * photo preview strip.
  *
- * Deterministic. No React, no I/O, no Supabase, no fetch, no privileged
- * keys, no writes. Consumes already-normalized `PhotoHistoryRow`s from the
- * shared `photoHistoryRules` module and projects a compact, presentation-
- * safe view for the Plant Detail strip.
+ * Deterministic. No React, no I/O, no fetch, no privileged keys, no
+ * writes. Consumes already-normalized `PhotoHistoryRow`s from the shared
+ * `photoHistoryRules` module and projects a compact, presentation-safe
+ * view for the Plant Detail strip.
  *
- * Filtering is done by exact `plantId` match. Internal IDs, storage paths,
- * tokens, raw payloads, and provenance markers are NEVER exposed by this
- * view-model — only safe http(s) thumbnail URLs, formatted date labels,
- * optional category labels, and alt text.
+ * Filtering is done by exact `plantId` match. Internal ids, storage
+ * paths, tokens, raw payloads, and provenance markers are NEVER exposed
+ * by this view-model — only safe http(s) thumbnail URLs, formatted date
+ * labels, optional category labels, and alt text.
  */
 import type { PhotoHistoryRow } from "./photoHistoryRules";
 

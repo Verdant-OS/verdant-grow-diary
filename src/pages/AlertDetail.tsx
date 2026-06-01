@@ -539,11 +539,13 @@ export default function AlertDetail() {
               </div>
             </dl>
 
-            <div className="flex flex-wrap gap-2 mt-4">
+            <div className="flex flex-wrap gap-2 mt-4" role="group" aria-label={`Status actions for alert: ${alert.title}`}>
               {alert.status === "open" && (
                 <Button
                   size="sm"
                   variant="outline"
+                  aria-label={`Acknowledge alert: ${alert.title}`}
+                  data-testid="alert-detail-acknowledge"
                   onClick={() =>
                     runStatusChange("acknowledged", () => acknowledgeAlert(alert.id), "acknowledge")
                   }
@@ -555,6 +557,8 @@ export default function AlertDetail() {
                 <Button
                   size="sm"
                   variant="outline"
+                  aria-label={`Resolve alert: ${alert.title}`}
+                  data-testid="alert-detail-resolve"
                   onClick={() =>
                     runStatusChange("resolved", () => resolveAlert(alert.id), "resolve")
                   }
@@ -566,6 +570,8 @@ export default function AlertDetail() {
                 <Button
                   size="sm"
                   variant="ghost"
+                  aria-label={`Dismiss alert: ${alert.title}`}
+                  data-testid="alert-detail-dismiss"
                   onClick={() =>
                     runStatusChange("dismissed", () => dismissAlert(alert.id), "dismiss")
                   }
@@ -577,7 +583,10 @@ export default function AlertDetail() {
                 <Button
                   size="sm"
                   variant="outline"
+                  aria-label={`Reopen alert: ${alert.title}`}
+                  data-testid="alert-detail-reopen"
                   onClick={() => runStatusChange("reopened", () => reopenAlert(alert.id), "reopen")}
+
                 >
                   Reopen
                 </Button>

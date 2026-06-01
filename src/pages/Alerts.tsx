@@ -253,6 +253,7 @@ export default function Alerts() {
               <Skeleton className="h-3 w-1/2" />
             </div>
           ))}
+          </div>
         </div>
       ) : status === "unavailable" ? (
         <div

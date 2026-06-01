@@ -128,6 +128,13 @@ export default function PlantDetail() {
         tentId={plant.tentId ?? null}
         tentName={tent?.name ?? null}
       />
+      <PlantDetailSectionNav
+        hasAlertsSection
+        hasActionsSection
+        hasDoctorSection
+        hasAssignedTent={!!plant.tentId}
+      />
+
 
 
       {!isActivePlant(plant) && (

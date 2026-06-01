@@ -230,10 +230,13 @@ export default function Alerts() {
           aria-live="polite"
           aria-busy="true"
           aria-label="Loading alerts"
-          className="space-y-2"
+          className="space-y-3"
           data-testid="alerts-loading-skeleton"
         >
-          <span className="sr-only">Loading alerts…</span>
+          <p className="text-sm text-muted-foreground font-medium">
+            Loading alerts…
+          </p>
+          <div className="space-y-2">
           {[0, 1, 2].map((i) => (
             <div
               key={i}

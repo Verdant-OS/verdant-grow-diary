@@ -78,6 +78,15 @@ function renderEntry(entry: PlantDetailQuickActionEntry) {
   const ariaLabel = ariaLabelFor(entry);
   const baseClasses = `gap-1 ${FOCUS_CLASSES}`;
 
+  const descriptionNode = (
+    <p
+      className="text-[11px] text-muted-foreground px-1"
+      data-testid={`${entry.testId}-description`}
+    >
+      {entry.description}
+    </p>
+  );
+
   if (entry.disabled) {
     return (
       <div key={entry.kind} className="flex flex-col gap-1">
@@ -93,6 +102,7 @@ function renderEntry(entry: PlantDetailQuickActionEntry) {
         >
           {inner}
         </Button>
+        {descriptionNode}
         {entry.disabledReason && (
           <p
             className="text-[11px] text-muted-foreground px-1"
@@ -107,53 +117,59 @@ function renderEntry(entry: PlantDetailQuickActionEntry) {
 
   if (entry.href) {
     return (
-      <Button
-        key={entry.kind}
-        asChild
-        size="sm"
-        variant="outline"
-        className={baseClasses}
-        data-testid={entry.testId}
-      >
-        <Link to={entry.href} aria-label={ariaLabel}>
-          {inner}
-        </Link>
-      </Button>
+      <div key={entry.kind} className="flex flex-col gap-1">
+        <Button
+          asChild
+          size="sm"
+          variant="outline"
+          className={baseClasses}
+          data-testid={entry.testId}
+        >
+          <Link to={entry.href} aria-label={ariaLabel}>
+            {inner}
+          </Link>
+        </Button>
+        {descriptionNode}
+      </div>
     );
   }
 
   if (entry.event === "open-quicklog") {
     return (
-      <Button
-        key={entry.kind}
-        type="button"
-        size="sm"
-        variant="outline"
-        className={baseClasses}
-        data-testid={entry.testId}
-        aria-label={ariaLabel}
-        onClick={() => dispatchQuickLog(entry.eventPayload ?? null)}
-      >
-        {inner}
-      </Button>
+      <div key={entry.kind} className="flex flex-col gap-1">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className={baseClasses}
+          data-testid={entry.testId}
+          aria-label={ariaLabel}
+          onClick={() => dispatchQuickLog(entry.eventPayload ?? null)}
+        >
+          {inner}
+        </Button>
+        {descriptionNode}
+      </div>
     );
   }
 
   if (entry.scrollTargetId) {
     const target = entry.scrollTargetId;
     return (
-      <Button
-        key={entry.kind}
-        type="button"
-        size="sm"
-        variant="outline"
-        className={baseClasses}
-        data-testid={entry.testId}
-        aria-label={ariaLabel}
-        onClick={() => scrollToAnchor(target)}
-      >
-        {inner}
-      </Button>
+      <div key={entry.kind} className="flex flex-col gap-1">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className={baseClasses}
+          data-testid={entry.testId}
+          aria-label={ariaLabel}
+          onClick={() => scrollToAnchor(target)}
+        >
+          {inner}
+        </Button>
+        {descriptionNode}
+      </div>
     );
   }
 

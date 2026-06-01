@@ -94,6 +94,19 @@ describe("buildPlantDetailQuickActions · ordering and completeness", () => {
       "View Timeline",
     ]);
   });
+
+  it("descriptions match the documented helper copy", () => {
+    const descriptions = buildPlantDetailQuickActions({ plantId: "p1" }).map(
+      (e) => e.description,
+    );
+    expect(descriptions).toEqual([
+      "Record an observation or grow action.",
+      "Add current tent readings by hand.",
+      "Attach a plant photo to visual history.",
+      "Review this plant with existing context.",
+      "Jump to this plant's history.",
+    ]);
+  });
 });
 
 describe("buildPlantDetailQuickActions · payloads and routes", () => {
@@ -199,6 +212,30 @@ describe("PlantDetailQuickActions · render", () => {
     ).toBeInTheDocument();
   });
 
+  it("renders helper description for every quick action", () => {
+    render(
+      <PlantDetailQuickActions
+        plantId="p1"
+        plantName="Plant 1"
+        growId="g1"
+        tentId="t1"
+        tentName="Tent A"
+      />,
+    );
+    const expected = [
+      { testId: "plant-detail-quick-action-quicklog", text: /observation or grow action/i },
+      { testId: "plant-detail-quick-action-manual-sensor-snapshot", text: /readings by hand/i },
+      { testId: "plant-detail-quick-action-upload-photo", text: /visual history/i },
+      { testId: "plant-detail-quick-action-ask-doctor", text: /existing context/i },
+      { testId: "plant-detail-quick-action-view-timeline", text: /history/i },
+    ];
+    for (const { testId, text } of expected) {
+      const el = screen.getByTestId(`${testId}-description`);
+      expect(el).toBeInTheDocument();
+      expect(el.textContent).toMatch(text);
+    }
+  });
+
   it("Upload Photo click dispatches verdant:open-quicklog with plant context", () => {
     const handler = vi.fn();
     window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
@@ -228,6 +265,10 @@ describe("PlantDetailQuickActions · render", () => {
     render(<PlantDetailQuickActions plantId={null} />);
     const btn = screen.getByTestId("plant-detail-quick-action-upload-photo");
     expect(btn).toBeDisabled();
+    expect(
+      screen.getByTestId("plant-detail-quick-action-upload-photo-description")
+        .textContent,
+    ).toMatch(/visual history/i);
     expect(
       screen.getByTestId("plant-detail-quick-action-upload-photo-reason")
         .textContent,
@@ -310,6 +351,10 @@ describe("PlantDetailQuickActions · render", () => {
     expect(ql).toBeDisabled();
     expect(ql.getAttribute("aria-disabled")).toBe("true");
     expect(
+      screen.getByTestId("plant-detail-quick-action-quicklog-description")
+        .textContent,
+    ).toMatch(/observation or grow action/i);
+    expect(
       screen.getByTestId("plant-detail-quick-action-quicklog-reason")
         .textContent,
     ).toMatch(/plant context/i);
@@ -347,6 +392,32 @@ describe("PlantDetailQuickActions · static safety", () => {
     for (const text of labels) {
       expect(text).not.toMatch(/p1|g1|t1/);
       expect(text).not.toMatch(/token|secret|raw|provenance|user[_-]?id/i);
+    }
+  });
+
+  it("helper copy does not imply automatic writes", () => {
+    const descriptions = buildPlantDetailQuickActions({ plantId: "p1" }).map(
+      (e) => e.description,
+    );
+    for (const text of descriptions) {
+      expect(text).not.toMatch(/auto[-\s]?save/i);
+      expect(text).not.toMatch(/auto[-\s]?upload/i);
+      expect(text).not.toMatch(/synced automatically/i);
+    }
+  });
+
+  it("helper copy does not imply live sensor data, AI certainty, automation, or device control", () => {
+    const descriptions = buildPlantDetailQuickActions({ plantId: "p1" }).map(
+      (e) => e.description,
+    );
+    for (const text of descriptions) {
+      expect(text).not.toMatch(/live sensor/i);
+      expect(text).not.toMatch(/real[-\s]?time/i);
+      expect(text).not.toMatch(/diagnose/i);
+      expect(text).not.toMatch(/certain/i);
+      expect(text).not.toMatch(/autopilot/i);
+      expect(text).not.toMatch(/auto[-\s]?run/i);
+      expect(text).not.toMatch(/control/i);
     }
   });
 

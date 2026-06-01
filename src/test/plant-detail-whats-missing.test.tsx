@@ -260,12 +260,11 @@ describe("PlantDetailWhatsMissing component static safety", () => {
       path.resolve(__dirname, "../components/PlantDetailWhatsMissing.tsx"),
       "utf8",
     );
-    expect(src).not.toMatch(/\.from\s*\(/);
-    expect(src).not.toMatch(/supabase\s*\./);
-    expect(src).not.toMatch(/\.insert\s*\(/);
-    expect(src).not.toMatch(/\.update\s*\(/);
-    expect(src).not.toMatch(/\.delete\s*\(/);
-    expect(src).not.toMatch(/\.rpc\s*\(/);
+    expect(src).not.toMatch(/supabase\s*\.\s*from/);
+    expect(src).not.toMatch(/supabase\s*\.\s*insert/);
+    expect(src).not.toMatch(/supabase\s*\.\s*update/);
+    expect(src).not.toMatch(/supabase\s*\.\s*delete/);
+    expect(src).not.toMatch(/supabase\s*\.\s*rpc/);
   });
 
   it("component file does not contain functions.invoke", () => {

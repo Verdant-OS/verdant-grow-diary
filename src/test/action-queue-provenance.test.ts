@@ -164,3 +164,94 @@ describe("Static safety", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Hardening: forbidden device-command / automation-like copy in user-facing UI.
+// Comments and JSDoc are stripped so security disclaimers ("No device commands.")
+// don't trip the scan; only executable code + string literals are inspected.
+// ---------------------------------------------------------------------------
+describe("ActionQueue / ActionDetail — forbidden copy hardening", () => {
+  const QUEUE_EXEC = stripSourceComments(QUEUE).toLowerCase();
+  const DETAIL_EXEC = stripSourceComments(DETAIL).toLowerCase();
+
+  // Imperative / automation-like phrasing that must never appear as
+  // grower-facing copy. "device command" is intentionally NOT in this list:
+  // it legitimately appears in negative safety toasts ("no device command
+  // sent") and is already covered by the broader device-control scan above.
+  const FORBIDDEN_PHRASES = [
+    "execute device",
+    "send command",
+    "control equipment",
+    "turn on fan",
+    "turn off fan",
+    "start pump",
+    "stop pump",
+    "change setpoint automatically",
+    "autopilot",
+    "automate equipment",
+    "direct control",
+    "home assistant command",
+    "mqtt command",
+    "relay command",
+  ];
+
+  it("ActionQueue executable source contains no forbidden device-command/automation phrasing", () => {
+    for (const phrase of FORBIDDEN_PHRASES) {
+      expect(QUEUE_EXEC, `forbidden phrase leaked into ActionQueue: "${phrase}"`)
+        .not.toContain(phrase);
+    }
+  });
+
+  it("ActionDetail executable source contains no forbidden device-command/automation phrasing", () => {
+    for (const phrase of FORBIDDEN_PHRASES) {
+      expect(DETAIL_EXEC, `forbidden phrase leaked into ActionDetail: "${phrase}"`)
+        .not.toContain(phrase);
+    }
+  });
+
+  it("preserves safe review/approval vocabulary in user-facing copy", () => {
+    // Approval-required model is explicit and visible to growers.
+    const SAFE_VOCAB = ["review", "approval", "simulate"];
+    for (const tok of SAFE_VOCAB) {
+      expect(
+        QUEUE_EXEC.includes(tok) || DETAIL_EXEC.includes(tok),
+        `expected safe review/approval vocab present somewhere: "${tok}"`,
+      ).toBe(true);
+    }
+  });
+
+  it("ActionQueue and ActionDetail strip provenance tokens before rendering reason text", () => {
+    // Every row.reason rendering must pass through stripBackPointerTokens.
+    // Affirmative contract:
+    expect(QUEUE).toMatch(/stripBackPointerTokens\(\s*row\.reason\s*\)/);
+    expect(DETAIL).toMatch(/stripBackPointerTokens\(\s*row\.reason\s*\)/);
+    // Negative contract: no bare {row.reason} render in JSX (would leak `[alert:` / `[session:`).
+    expect(QUEUE).not.toMatch(/\{\s*row\.reason\s*\}/);
+    expect(DETAIL).not.toMatch(/\{\s*row\.reason\s*\}/);
+  });
+
+  it("never renders raw [alert:<id>] or [session:<id>] tokens as JSX literals", () => {
+    for (const src of [QUEUE, DETAIL]) {
+      expect(src).not.toMatch(/>\s*\[alert:/);
+      expect(src).not.toMatch(/>\s*\[session:/);
+    }
+  });
+
+  it("never includes raw id substrings in user-facing aria-label or title attributes", () => {
+    // aria-label / title values must use names/copy, not raw uuids or token literals.
+    for (const src of [QUEUE, DETAIL]) {
+      expect(src).not.toMatch(/aria-label=\{?["'`][^"'`}]*\[alert:/);
+      expect(src).not.toMatch(/aria-label=\{?["'`][^"'`}]*\[session:/);
+      expect(src).not.toMatch(/\btitle=\{?["'`][^"'`}]*\[alert:/);
+      expect(src).not.toMatch(/\btitle=\{?["'`][^"'`}]*\[session:/);
+    }
+  });
+
+  it("preserves approval-required status flow (no auto-approve/auto-reject)", () => {
+    for (const src of [QUEUE_EXEC, DETAIL_EXEC]) {
+      expect(src).not.toMatch(/auto[_-\s]?approve/);
+      expect(src).not.toMatch(/auto[_-\s]?reject/);
+      expect(src).not.toMatch(/auto[_-\s]?execute/);
+    }
+  });
+});

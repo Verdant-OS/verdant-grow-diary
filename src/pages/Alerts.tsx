@@ -198,13 +198,34 @@ export default function Alerts() {
       </div>
 
       {status === "loading" || status === "idle" ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : status === "unavailable" ? (
-        <p className="text-sm text-muted-foreground">
-          Alerts unavailable{error ? `: ${error}` : "."}
+        <p className="text-sm text-muted-foreground" role="status">
+          Loading alerts…
         </p>
+      ) : status === "unavailable" ? (
+        <div
+          role="alert"
+          className="glass rounded-2xl p-4 flex flex-col gap-2 text-sm"
+        >
+          <p className="font-medium">Alerts unavailable</p>
+          <p className="text-muted-foreground">
+            We couldn’t load alerts right now. Check your connection and try
+            again.
+          </p>
+          {error ? (
+            <p className="text-[11px] text-muted-foreground/80">{error}</p>
+          ) : null}
+          <div>
+            <Button size="sm" variant="outline" onClick={() => reload()}>
+              Retry
+            </Button>
+          </div>
+        </div>
       ) : alerts.length === 0 ? (
-        <EmptyState icon={<Bell className="h-6 w-6" />} title="No alerts" />
+        <EmptyState
+          icon={<Bell className="h-6 w-6" />}
+          title="No open alerts."
+          description="Verdant will show environment or grow warnings here when they appear. Nothing needs your attention right now."
+        />
       ) : (
         <div className="space-y-6">
           {(

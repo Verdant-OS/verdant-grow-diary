@@ -54,6 +54,20 @@ describe("Alerts route — quick link contract", () => {
     expect(ALERTS).toMatch(/<EmptyState/);
   });
 
+  it("empty state uses safety-pinned copy with calm helper text", () => {
+    expect(ALERTS).toMatch(/No open alerts\./);
+    expect(ALERTS).toMatch(
+      /Verdant will show environment or grow warnings here/,
+    );
+  });
+
+  it("error state surfaces calm retry guidance with a Retry control", () => {
+    expect(ALERTS).toMatch(/role="alert"/);
+    expect(ALERTS).toMatch(/Check your connection and try\s+again/);
+    expect(ALERTS).toMatch(/onClick=\{\(\) => reload\(\)\}/);
+    expect(ALERTS).toMatch(/>\s*Retry\s*</);
+  });
+
   it("alert rows surface severity, status, title, reason, and timestamp", () => {
     expect(ALERTS).toMatch(/\{a\.severity\}/);
     expect(ALERTS).toMatch(/\{a\.status\}/);
@@ -61,6 +75,14 @@ describe("Alerts route — quick link contract", () => {
     expect(ALERTS).toMatch(/\{a\.reason\}/);
     expect(ALERTS).toMatch(/formatDistanceToNow\(new Date\(a\.first_seen_at\)/);
   });
+
+  it("copy does not imply automation, notifications, email, or scheduled reminders", () => {
+    expect(ALERTS).not.toMatch(
+      /\b(notify|notification|email\s+you|we'?ll\s+email|reminder|remind\s+you|scheduled)\b/i,
+    );
+    expect(ALERTS).not.toMatch(/autopilot|auto[\s-]?execute|auto[\s-]?run/i);
+  });
+
 
   it("page scaffolding does not leak token/raw_payload/provenance/service_role copy", () => {
     const blob = ALERTS.toLowerCase();

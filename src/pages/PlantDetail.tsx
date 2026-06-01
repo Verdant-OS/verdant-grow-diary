@@ -22,6 +22,7 @@ import PlantDetailPhotoStrip from "@/components/PlantDetailPhotoStrip";
 import PlantDetailRecentActivityRecap from "@/components/PlantDetailRecentActivityRecap";
 import PlantDetailWhatsMissing from "@/components/PlantDetailWhatsMissing";
 import PlantDetailAiDoctorReadiness from "@/components/PlantDetailAiDoctorReadiness";
+import PlantDetailDoctorContextPreview from "@/components/PlantDetailDoctorContextPreview";
 import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
 import PlantDetailSectionNav from "@/components/PlantDetailSectionNav";
 import { PLANT_DETAIL_SECTION_ANCHORS } from "@/lib/plantDetailSectionAnchors";
@@ -149,6 +150,11 @@ export default function PlantDetail() {
       <PlantDetailAiDoctorReadiness
         plantId={plant.id}
         growId={plant.growId ?? null}
+        stage={plant.stage ?? null}
+        hasPlantPhoto={!!plant.photo}
+      />
+      <PlantDetailDoctorContextPreview
+        plantId={plant.id}
         stage={plant.stage ?? null}
         hasPlantPhoto={!!plant.photo}
       />

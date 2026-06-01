@@ -68,6 +68,14 @@ function ariaLabelFor(entry: PlantDetailQuickActionEntry): string {
   return entry.label;
 }
 
+function describedByFor(entry: PlantDetailQuickActionEntry): string {
+  const ids = [`${entry.testId}-description`];
+  if (entry.disabled && entry.disabledReason) {
+    ids.push(`${entry.testId}-reason`);
+  }
+  return ids.join(" ");
+}
+
 function renderEntry(entry: PlantDetailQuickActionEntry) {
   const Icon = ICON[entry.kind];
   const inner = (
@@ -77,10 +85,12 @@ function renderEntry(entry: PlantDetailQuickActionEntry) {
     </>
   );
   const ariaLabel = ariaLabelFor(entry);
+  const describedBy = describedByFor(entry);
   const baseClasses = `gap-1 ${FOCUS_CLASSES}`;
 
   const descriptionNode = (
     <p
+      id={`${entry.testId}-description`}
       className="text-[11px] text-muted-foreground px-1"
       data-testid={`${entry.testId}-description`}
     >
@@ -98,6 +108,7 @@ function renderEntry(entry: PlantDetailQuickActionEntry) {
           disabled
           aria-disabled="true"
           aria-label={ariaLabel}
+          aria-describedby={describedBy}
           data-testid={entry.testId}
           className={`${baseClasses} opacity-60 cursor-not-allowed`}
         >
@@ -106,8 +117,10 @@ function renderEntry(entry: PlantDetailQuickActionEntry) {
         {descriptionNode}
         {entry.disabledReason && (
           <p
+            id={`${entry.testId}-reason`}
             className="text-[11px] text-muted-foreground px-1"
             data-testid={`${entry.testId}-reason`}
+            role="note"
           >
             {entry.disabledReason}
           </p>
@@ -126,7 +139,7 @@ function renderEntry(entry: PlantDetailQuickActionEntry) {
           className={baseClasses}
           data-testid={entry.testId}
         >
-          <Link to={entry.href} aria-label={ariaLabel}>
+          <Link to={entry.href} aria-label={ariaLabel} aria-describedby={describedBy}>
             {inner}
           </Link>
         </Button>
@@ -145,6 +158,7 @@ function renderEntry(entry: PlantDetailQuickActionEntry) {
           className={baseClasses}
           data-testid={entry.testId}
           aria-label={ariaLabel}
+          aria-describedby={describedBy}
           onClick={() => dispatchQuickLog(entry.eventPayload ?? null)}
         >
           {inner}
@@ -165,6 +179,7 @@ function renderEntry(entry: PlantDetailQuickActionEntry) {
           className={baseClasses}
           data-testid={entry.testId}
           aria-label={ariaLabel}
+          aria-describedby={describedBy}
           onClick={() => scrollToAnchor(target)}
         >
           {inner}

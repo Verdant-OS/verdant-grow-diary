@@ -41,6 +41,7 @@ interface Props {
   growId?: string | null;
   tentId?: string | null;
   tentName?: string | null;
+  hasTimelineSection?: boolean;
 }
 
 function dispatchQuickLog(payload: PlantDetailQuickLogEventPayload | null) {

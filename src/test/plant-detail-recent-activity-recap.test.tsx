@@ -205,7 +205,7 @@ describe("PlantDetailRecentActivityRecap render", () => {
   it("renders heading", () => {
     useRecentMock.mockReturnValue({ data: [], isLoading: false });
     render(<PlantDetailRecentActivityRecap plantId="p1" />);
-    expect(screen.getByText(/Recent activity/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Recent activity/i })).toBeInTheDocument();
   });
 
   it("renders loading state", () => {

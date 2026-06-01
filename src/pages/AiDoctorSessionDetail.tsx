@@ -930,11 +930,16 @@ function fmtConfidence(val: number | null | undefined): string | null {
 export default function AiDoctorSessionDetail() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
-  const { data, isLoading, error } = useAiDoctorSession(sessionId);
+  const { data, isLoading, error, refetch, isFetching } = useAiDoctorSession(sessionId);
 
   return (
     <div data-testid="ai-doctor-session-detail-page" className="space-y-4">
-      <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => navigate(-1)}
+        className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
         <ArrowLeft className="h-4 w-4" /> Back
       </Button>
 
@@ -969,14 +974,40 @@ export default function AiDoctorSessionDetail() {
         </CardHeader>
         <CardContent className="text-sm space-y-4">
           {isLoading ? (
-            <p className="text-muted-foreground">Loading session…</p>
-          ) : error || !data ? (
+            <div
+              role="status"
+              aria-live="polite"
+              aria-busy="true"
+              data-testid="ai-doctor-session-detail-loading"
+              className="text-muted-foreground"
+            >
+              Loading AI Doctor session…
+            </div>
+          ) : error ? (
+            <div
+              role="alert"
+              aria-live="assertive"
+              data-testid="ai-doctor-session-detail-error"
+              className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground space-y-3"
+            >
+              <p>We couldn't load this AI Doctor session. Please try again.</p>
+              <Button
+                size="sm"
+                onClick={() => refetch()}
+                disabled={isFetching}
+                className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                aria-label="Retry loading AI Doctor session"
+              >
+                Retry
+              </Button>
+            </div>
+          ) : !data ? (
             <div
               className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground"
               data-testid="ai-doctor-session-detail-not-found"
             >
-              This AI Doctor session is unavailable. It may have been removed or is not accessible
-              to your account.
+              AI Doctor session not found. It may have been removed or is not accessible to your
+              account.
             </div>
           ) : (
             <SessionDetailBody row={data} />

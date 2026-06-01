@@ -16,6 +16,8 @@ import PlantAssignedTentAlertsPanel from "@/components/PlantAssignedTentAlertsPa
 import PlantAssignedTentActionsPanel from "@/components/PlantAssignedTentActionsPanel";
 import PlantStatusStrip from "@/components/PlantStatusStrip";
 import PlantQuickStatusStrip from "@/components/PlantQuickStatusStrip";
+import PlantDetailQuickActions from "@/components/PlantDetailQuickActions";
+import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
 
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
 import PlantAiDoctorSessionsPanel from "@/components/PlantAiDoctorSessionsPanel";
@@ -117,6 +119,14 @@ export default function PlantDetail() {
         tentId={plant.tentId ?? null}
         growId={plant.growId ?? null}
       />
+      <PlantDetailQuickActions
+        plantId={plant.id}
+        plantName={plant.name}
+        growId={plant.growId ?? null}
+        tentId={plant.tentId ?? null}
+        tentName={tent?.name ?? null}
+      />
+
 
       {!isActivePlant(plant) && (
         <ArchivedPlantBanner plantId={plant.id} lastNote={plant.lastNote} />
@@ -265,15 +275,23 @@ export default function PlantDetail() {
           />
 
           <PlantRecentActivityPanel plantId={plant.id} plantName={plant.name} />
-          <PlantRelativeTimelineSection
-            plantId={plant.id}
-            plantStartedAt={plant.startedAt}
-            currentStage={plant.stage}
-            plantName={plant.name}
-            tentName={tent?.name ?? null}
-            growId={plant.growId ?? null}
-            tentId={plant.tentId ?? null}
-          />
+          <div
+            id={PLANT_RELATIVE_TIMELINE_ANCHOR_ID}
+            tabIndex={-1}
+            aria-label="Plant Relative Timeline section"
+            className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+          >
+            <PlantRelativeTimelineSection
+              plantId={plant.id}
+              plantStartedAt={plant.startedAt}
+              currentStage={plant.stage}
+              plantName={plant.name}
+              tentName={tent?.name ?? null}
+              growId={plant.growId ?? null}
+              tentId={plant.tentId ?? null}
+            />
+          </div>
+
 
 
           <section

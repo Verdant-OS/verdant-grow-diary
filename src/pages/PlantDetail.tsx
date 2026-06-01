@@ -18,6 +18,8 @@ import PlantStatusStrip from "@/components/PlantStatusStrip";
 import PlantQuickStatusStrip from "@/components/PlantQuickStatusStrip";
 import PlantDetailQuickActions from "@/components/PlantDetailQuickActions";
 import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
+import PlantDetailSectionNav from "@/components/PlantDetailSectionNav";
+import { PLANT_DETAIL_SECTION_ANCHORS } from "@/lib/plantDetailSectionAnchors";
 
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
 import PlantAiDoctorSessionsPanel from "@/components/PlantAiDoctorSessionsPanel";

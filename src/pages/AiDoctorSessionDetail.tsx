@@ -811,9 +811,56 @@ function fmtDate(ts: string | null): string {
   }
 }
 
+function LinkedActionQueueLoading() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+      data-testid="ai-doctor-session-detail-linked-action-queue-loading"
+      className="rounded-lg border border-border bg-muted/20 p-3 text-sm text-muted-foreground"
+    >
+      <span className="sr-only">Loading linked Action Queue items…</span>
+      <div className="flex items-center gap-2">
+        <span aria-hidden="true">Loading linked Action Queue items…</span>
+      </div>
+      <div className="mt-2 space-y-1.5" aria-hidden="true">
+        <div className="h-3 w-2/3 rounded bg-muted animate-pulse" />
+        <div className="h-3 w-1/2 rounded bg-muted animate-pulse" />
+      </div>
+    </div>
+  );
+}
+
+function LinkedActionQueueEmpty() {
+  return (
+    <section
+      aria-label="Linked Action Queue items"
+      data-testid="ai-doctor-session-detail-linked-action-queue-empty"
+      className="rounded-lg border border-border bg-muted/20 p-3 space-y-1"
+    >
+      <h3 className="text-sm font-semibold">Linked Action Queue items</h3>
+      <p className="text-xs text-muted-foreground">
+        No approval-required action has been queued from this review yet. Review the
+        snapshot before adding one.
+      </p>
+    </section>
+  );
+}
+
+function describeLinkedAction(item: LinkedActionItem): string {
+  const reason = (item.reasonText ?? "").trim();
+  const change = (item.suggestedChange ?? "").trim();
+  const base = reason.length > 0 ? reason : change;
+  const safe = base.length > 0 ? base : "Linked Action Queue item";
+  const clipped = safe.length > 120 ? `${safe.slice(0, 120)}…` : safe;
+  return `Open linked action: ${clipped}`;
+}
+
 function LinkedActionQueueSection({ vm }: { vm: LinkedActionsViewModel }) {
   if (vm.count === 0) return null;
   const countLabel = `${vm.count} open ${vm.count === 1 ? "item" : "items"}`;
+  const primaryItem = vm.items[0] ?? null;
   return (
     <section
       data-testid="ai-doctor-session-detail-linked-action-queue"
@@ -836,12 +883,13 @@ function LinkedActionQueueSection({ vm }: { vm: LinkedActionsViewModel }) {
       >
         These approval-required items were created from this AI Doctor review.
       </p>
-      {vm.primaryFocusHref ? (
+      {vm.primaryFocusHref && primaryItem ? (
         <Link
           to={vm.primaryFocusHref}
-          className="inline-flex items-center gap-1 text-xs underline text-primary"
+          className="inline-flex items-center gap-1 text-xs underline text-primary rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           data-testid="ai-doctor-session-detail-linked-action-queue-primary-link"
-          data-action-queue-id={vm.items[0].id}
+          data-action-queue-id={primaryItem.id}
+          aria-label={describeLinkedAction(primaryItem)}
         >
           View in Action Queue
         </Link>
@@ -859,8 +907,9 @@ function LinkedActionQueueSection({ vm }: { vm: LinkedActionsViewModel }) {
             >
               <Link
                 to={item.focusHref}
-                className="underline text-primary"
+                className="underline text-primary rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 data-testid="ai-doctor-session-detail-linked-action-queue-item-link"
+                aria-label={describeLinkedAction(item)}
               >
                 View in Action Queue
               </Link>
@@ -876,6 +925,7 @@ function LinkedActionQueueSection({ vm }: { vm: LinkedActionsViewModel }) {
     </section>
   );
 }
+
 
 function LinkedAlertSection({ vm }: { vm: LinkedActionsViewModel }) {
   const alertIds = vm.linkedAlertIds;

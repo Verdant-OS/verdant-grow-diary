@@ -50,6 +50,10 @@ import {
   type DoctorContextItem,
   type DoctorContextItemState,
 } from "@/lib/plantDetailDoctorContextPreview";
+import {
+  buildPlantDetailDoctorAddContextRoute,
+  ADD_CONTEXT_HELPER_COPY,
+} from "@/lib/plantDetailDoctorAddContextRouter";
 
 interface Props {
   plantId: string | null | undefined;
@@ -57,6 +61,10 @@ interface Props {
   hasPlantPhoto?: boolean;
   openAlertsCount?: number | null;
   pendingActionsCount?: number | null;
+  growId?: string | null;
+  tentId?: string | null;
+  plantName?: string | null;
+  tentName?: string | null;
   /** Test seam: stable "now" timestamp. */
   now?: Date;
 }
@@ -119,6 +127,10 @@ export default function PlantDetailDoctorLaunchDialog({
   hasPlantPhoto,
   openAlertsCount,
   pendingActionsCount,
+  growId,
+  tentId,
+  plantName,
+  tentName,
   now,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -139,18 +151,34 @@ export default function PlantDetailDoctorLaunchDialog({
     });
   }, [rawRows, plantId, stage, hasPlantPhoto, openAlertsCount, pendingActionsCount, now]);
 
+  const addContextDecision = useMemo(() => {
+    const stateOf = (kind: DoctorContextItem["kind"]): DoctorContextItemState | null =>
+      preview.items.find((i) => i.kind === kind)?.state ?? null;
+    const present = (s: DoctorContextItemState | null) => s === "available";
+    return buildPlantDetailDoctorAddContextRoute({
+      plantId: plantId ?? null,
+      plantName: plantName ?? null,
+      growId: growId ?? null,
+      tentId: tentId ?? null,
+      tentName: tentName ?? null,
+      hasTimelineOrNote: present(stateOf("timeline")) || present(stateOf("watering_feeding")),
+      hasRecentSensorSnapshot: present(stateOf("sensor_snapshot")),
+      hasRecentPhoto: present(stateOf("photo")),
+    });
+  }, [preview.items, plantId, plantName, growId, tentId, tentName]);
+
   const handleAddContext = useCallback(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && addContextDecision.quickLogEvent) {
       window.dispatchEvent(
-        new CustomEvent("verdant:open-quicklog", {
+        new CustomEvent(addContextDecision.quickLogEvent.type, {
           bubbles: true,
           cancelable: true,
-          detail: {},
+          detail: addContextDecision.quickLogEvent.detail,
         }),
       );
     }
     setOpen(false);
-  }, []);
+  }, [addContextDecision]);
 
   if (!plantId) return null;
 
@@ -208,22 +236,49 @@ export default function PlantDetailDoctorLaunchDialog({
               <SummaryRow key={it.kind} item={it} />
             ))}
           </ul>
+          <p
+            className="text-xs text-muted-foreground leading-snug"
+            data-testid="plant-detail-doctor-launch-add-context-helper"
+          >
+            {ADD_CONTEXT_HELPER_COPY}
+          </p>
           <p className="text-xs text-muted-foreground leading-snug">
             {DOCTOR_LAUNCH_HELPER_LINES[1]}
           </p>
         </div>
 
         <DialogFooter className="gap-2 sm:gap-2 flex-col sm:flex-row">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleAddContext}
-            className="gap-1"
-            data-testid="plant-detail-doctor-launch-add-context"
-          >
-            <Plus className="h-3.5 w-3.5" /> Add context first
-          </Button>
+          {addContextDecision.kind !== "none" &&
+            (addContextDecision.to ? (
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="gap-1"
+                data-testid="plant-detail-doctor-launch-add-context"
+                data-route-kind={addContextDecision.kind}
+              >
+                <Link
+                  to={addContextDecision.to}
+                  onClick={() => setOpen(false)}
+                  aria-label={addContextDecision.label}
+                >
+                  <Plus className="h-3.5 w-3.5" /> {addContextDecision.label}
+                </Link>
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleAddContext}
+                className="gap-1"
+                data-testid="plant-detail-doctor-launch-add-context"
+                data-route-kind={addContextDecision.kind}
+              >
+                <Plus className="h-3.5 w-3.5" /> {addContextDecision.label}
+              </Button>
+            ))}
           <Button
             asChild
             size="sm"

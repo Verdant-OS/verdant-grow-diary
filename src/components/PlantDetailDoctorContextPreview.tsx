@@ -28,6 +28,10 @@ interface Props {
   hasPlantPhoto?: boolean;
   openAlertsCount?: number | null;
   pendingActionsCount?: number | null;
+  growId?: string | null;
+  tentId?: string | null;
+  plantName?: string | null;
+  tentName?: string | null;
   /** Test seam: stable "now" timestamp. */
   now?: Date;
 }
@@ -90,6 +94,10 @@ export default function PlantDetailDoctorContextPreview({
   hasPlantPhoto,
   openAlertsCount,
   pendingActionsCount,
+  growId,
+  tentId,
+  plantName,
+  tentName,
   now,
 }: Props) {
   const { data: rawRows, isLoading } = usePlantRecentActivity(plantId);
@@ -155,6 +163,10 @@ export default function PlantDetailDoctorContextPreview({
           hasPlantPhoto={hasPlantPhoto}
           openAlertsCount={openAlertsCount}
           pendingActionsCount={pendingActionsCount}
+          growId={growId}
+          tentId={tentId}
+          plantName={plantName}
+          tentName={tentName}
           now={now}
         />
       </div>

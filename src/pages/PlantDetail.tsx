@@ -157,6 +157,10 @@ export default function PlantDetail() {
         plantId={plant.id}
         stage={plant.stage ?? null}
         hasPlantPhoto={!!plant.photo}
+        growId={plant.growId ?? null}
+        tentId={plant.tentId ?? null}
+        plantName={plant.name}
+        tentName={tent?.name ?? null}
       />
 
 

@@ -63,7 +63,7 @@ describe("Alerts route — quick link contract", () => {
 
   it("error state surfaces calm retry guidance with a Retry control", () => {
     expect(ALERTS).toMatch(/role="alert"/);
-    expect(ALERTS).toMatch(/Check your connection and try again/);
+    expect(ALERTS).toMatch(/Check your connection and try\s+again/);
     expect(ALERTS).toMatch(/onClick=\{\(\) => reload\(\)\}/);
     expect(ALERTS).toMatch(/>\s*Retry\s*</);
   });

@@ -28,6 +28,10 @@ interface Props {
   hasPlantPhoto?: boolean;
   openAlertsCount?: number | null;
   pendingActionsCount?: number | null;
+  growId?: string | null;
+  tentId?: string | null;
+  plantName?: string | null;
+  tentName?: string | null;
   /** Test seam: stable "now" timestamp. */
   now?: Date;
 }

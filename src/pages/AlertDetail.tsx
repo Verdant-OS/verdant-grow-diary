@@ -422,31 +422,46 @@ export default function AlertDetail() {
 
       ) : alert ? (
         <div className="space-y-4">
-          <section className="glass rounded-2xl p-4">
-            <div className="flex items-center gap-2 flex-wrap mb-2">
+          <section className="glass rounded-2xl p-4" aria-labelledby="alert-detail-title">
+            <div
+              className="flex items-center gap-2 flex-wrap mb-2"
+              role="group"
+              aria-label={`Alert status: severity ${alert.severity}, status ${alert.status}${alert.metric ? `, metric ${alert.metric}` : ""}, source ${alert.source}`}
+            >
               <Badge
                 variant="outline"
+                aria-label={`Severity: ${alert.severity}`}
                 className={`text-[10px] uppercase ${SEVERITY_TONE[alert.severity]}`}
               >
                 {alert.severity}
               </Badge>
               <Badge
                 variant="outline"
+                aria-label={`Status: ${alert.status}`}
                 className={`text-[10px] uppercase ${STATUS_TONE[alert.status]}`}
               >
                 {alert.status}
               </Badge>
               {alert.metric && (
-                <Badge variant="outline" className="text-[10px] uppercase">
+                <Badge
+                  variant="outline"
+                  aria-label={`Metric: ${alert.metric}`}
+                  className="text-[10px] uppercase"
+                >
                   {alert.metric}
                 </Badge>
               )}
-              <Badge variant="outline" className="text-[10px] uppercase">
+              <Badge
+                variant="outline"
+                aria-label={`Source: ${alert.source}`}
+                className="text-[10px] uppercase"
+              >
                 {alert.source}
               </Badge>
             </div>
-            <h2 className="font-display font-semibold text-base">{alert.title}</h2>
+            <h2 id="alert-detail-title" className="font-display font-semibold text-base">{alert.title}</h2>
             <p className="text-sm text-muted-foreground mt-1">{alert.reason}</p>
+
             <div className="mt-3">
               <AlertWhyContext alert={alert} variant="detailed" />
             </div>

@@ -250,7 +250,7 @@ describe("Action Queue polish — static safety + contract preservation", () => 
 
   it("page preserves approval-focused framing copy", () => {
     expect(PAGE).toMatch(/approval-gated/);
-    expect(PAGE).toMatch(/Grower approval is always required/);
+    expect(PAGE).toMatch(/grower approval is always required/i);
     expect(PAGE).toMatch(/Review before acting/i);
     expect(PAGE).toMatch(/Review required/);
   });

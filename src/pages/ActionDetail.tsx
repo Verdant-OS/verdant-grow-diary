@@ -494,7 +494,7 @@ export default function ActionDetail() {
 
       <header className="glass rounded-2xl p-4 mb-4">
         <div className="flex items-center gap-2 flex-wrap mb-2">
-          <Badge variant="outline" className="uppercase text-[10px]">
+          <Badge variant="outline" className="uppercase text-[10px]" aria-label={buildStatusBadgeAriaLabel(row.status)}>
             {row.status}
           </Badge>
           <Badge variant="outline" className={RISK_VARIANT[row.risk_level]}>

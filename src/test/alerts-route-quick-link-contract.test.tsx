@@ -69,11 +69,11 @@ describe("Alerts route — quick link contract", () => {
   });
 
   it("alert rows surface severity, status, title, reason, and timestamp", () => {
-    expect(ALERTS).toMatch(/\{a\.severity\}/);
-    expect(ALERTS).toMatch(/\{a\.status\}/);
+    expect(ALERTS).toMatch(/severityLabel/);
+    expect(ALERTS).toMatch(/statusLabel/);
     expect(ALERTS).toMatch(/\{a\.title\}/);
     expect(ALERTS).toMatch(/\{a\.reason\}/);
-    expect(ALERTS).toMatch(/formatDistanceToNow\(new Date\(a\.first_seen_at\)/);
+    expect(ALERTS).toMatch(/formatAlertSeenLabel\(a\.first_seen_at\)/);
   });
 
   it("copy does not imply automation, notifications, email, or scheduled reminders", () => {

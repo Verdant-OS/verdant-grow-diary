@@ -3,7 +3,7 @@
  * Actions row.
  *
  * Deterministic. No React, no I/O, no Supabase, no fetch, no privileged
- * keys, no device control. Builds entries that either:
+ * keys, Builds entries that either:
  *   - dispatch the existing `verdant:open-quicklog` event with already-known
  *     plant/tent/grow context as the event detail (PLANT_QUICKLOG_PREFILL_EVENT),
  *   - link to an existing route (`/sensors`, `/doctor`), or

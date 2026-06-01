@@ -4,7 +4,7 @@
  * dispatches the existing `verdant:open-quicklog` event, links to an
  * existing route, or scrolls to the in-page Plant Relative Timeline
  * anchor. Read-only — no diary writes, no readings, no diagnoses, no
- * alerts, no device control.
+ * alerts, 
  */
 import { Link } from "react-router-dom";
 import {

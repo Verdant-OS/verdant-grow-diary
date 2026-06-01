@@ -59,6 +59,12 @@ export interface PlantDetailQuickActionsInput {
   growId?: string | null;
   tentId?: string | null;
   tentName?: string | null;
+  /**
+   * When false, the View Timeline entry surfaces as a disabled entry with a
+   * visible reason rather than scrolling to a target that does not exist.
+   * Defaults to true to preserve existing behavior.
+   */
+  hasTimelineSection?: boolean;
 }
 
 export const PLANT_RELATIVE_TIMELINE_ANCHOR_ID = "plant-relative-timeline" as const;
@@ -98,6 +104,7 @@ export function buildPlantDetailQuickActions(
   const growId = input.growId ?? null;
   const tentId = input.tentId ?? null;
   const tentName = input.tentName ?? null;
+  const hasTimelineSection = input.hasTimelineSection ?? true;
 
   const quickLogPayload: PlantDetailQuickLogEventPayload | null = plantId
     ? {
@@ -166,8 +173,14 @@ export function buildPlantDetailQuickActions(
     {
       kind: "view_timeline",
       ...LABELS.view_timeline,
-      scrollTargetId: PLANT_RELATIVE_TIMELINE_ANCHOR_ID,
+      scrollTargetId: hasTimelineSection
+        ? PLANT_RELATIVE_TIMELINE_ANCHOR_ID
+        : undefined,
       testId: "plant-detail-quick-action-view-timeline",
+      disabled: !hasTimelineSection,
+      disabledReason: hasTimelineSection
+        ? undefined
+        : "Timeline section is not available yet.",
     },
   ];
 }

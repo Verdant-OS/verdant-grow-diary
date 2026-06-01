@@ -41,6 +41,7 @@ interface Props {
   growId?: string | null;
   tentId?: string | null;
   tentName?: string | null;
+  hasTimelineSection?: boolean;
 }
 
 function dispatchQuickLog(payload: PlantDetailQuickLogEventPayload | null) {
@@ -182,6 +183,7 @@ export default function PlantDetailQuickActions({
   growId = null,
   tentId = null,
   tentName = null,
+  hasTimelineSection = true,
 }: Props) {
   const entries = buildPlantDetailQuickActions({
     plantId,
@@ -189,6 +191,7 @@ export default function PlantDetailQuickActions({
     growId,
     tentId,
     tentName,
+    hasTimelineSection,
   });
 
   return (

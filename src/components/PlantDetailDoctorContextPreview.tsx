@@ -163,6 +163,10 @@ export default function PlantDetailDoctorContextPreview({
           hasPlantPhoto={hasPlantPhoto}
           openAlertsCount={openAlertsCount}
           pendingActionsCount={pendingActionsCount}
+          growId={growId}
+          tentId={tentId}
+          plantName={plantName}
+          tentName={tentName}
           now={now}
         />
       </div>

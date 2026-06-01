@@ -454,6 +454,8 @@ function AlertCard({
               size="sm"
               variant="outline"
               onClick={() => onAcknowledge(a.id, a.grow_id, a.status)}
+              aria-label={`Acknowledge alert: ${a.title || "Untitled alert"}`}
+              data-testid="alert-row-acknowledge"
             >
               Acknowledge
             </Button>
@@ -463,6 +465,8 @@ function AlertCard({
               size="sm"
               variant="outline"
               onClick={() => onResolve(a.id, a.grow_id, a.status)}
+              aria-label={`Resolve alert: ${a.title || "Untitled alert"}`}
+              data-testid="alert-row-resolve"
             >
               Resolve
             </Button>
@@ -472,6 +476,8 @@ function AlertCard({
               size="sm"
               variant="ghost"
               onClick={() => onDismiss(a.id, a.grow_id, a.status)}
+              aria-label={`Dismiss alert: ${a.title || "Untitled alert"}`}
+              data-testid="alert-row-dismiss"
             >
               Dismiss
             </Button>

@@ -18,6 +18,7 @@ import { sensorsPath } from "@/lib/routes";
 export type PlantDetailQuickActionKind =
   | "quicklog"
   | "manual_sensor_snapshot"
+  | "upload_photo"
   | "ask_doctor"
   | "view_timeline";
 

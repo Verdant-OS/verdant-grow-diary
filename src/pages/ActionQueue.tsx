@@ -811,20 +811,29 @@ export default function ActionQueue() {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 mt-3">
-                  <Button size="sm" disabled={busyId === row.id} onClick={() => approve(row)} className="gradient-leaf text-primary-foreground">
-                    <Check className="h-4 w-4" /> Approve
-                  </Button>
-                  <Button size="sm" variant="secondary" disabled={busyId === row.id} onClick={() => simulate(row)}>
-                    <FlaskConical className="h-4 w-4" /> Simulate
-                  </Button>
-                  <Button size="sm" variant="ghost" disabled={busyId === row.id} onClick={() => reject(row)}>
-                    <X className="h-4 w-4" /> Reject
-                  </Button>
-                  {canCancel(row.status) && (
-                    <Button size="sm" variant="ghost" disabled={busyId === row.id} onClick={() => cancelAction(row)}>
-                      <Ban className="h-4 w-4" /> Cancel
-                    </Button>
-                  )}
+                  {(() => {
+                    const disabled = busyId === row.id;
+                    const disabledReason = disabled ? "Saving — please wait" : null;
+                    return (
+                      <>
+                        <Button size="sm" disabled={disabled} onClick={() => approve(row)} className="gradient-leaf text-primary-foreground" aria-label={buildActionButtonAriaLabel("approve", row, { disabledReason })} title={disabledReason ?? undefined}>
+                          <Check className="h-4 w-4" /> Approve
+                        </Button>
+                        <Button size="sm" variant="secondary" disabled={disabled} onClick={() => simulate(row)} aria-label={buildActionButtonAriaLabel("simulate", row, { disabledReason })} title={disabledReason ?? undefined}>
+                          <FlaskConical className="h-4 w-4" /> Simulate
+                        </Button>
+                        <Button size="sm" variant="ghost" disabled={disabled} onClick={() => reject(row)} aria-label={buildActionButtonAriaLabel("reject", row, { disabledReason })} title={disabledReason ?? undefined}>
+                          <X className="h-4 w-4" /> Reject
+                        </Button>
+                        {canCancel(row.status) && (
+                          <Button size="sm" variant="ghost" disabled={disabled} onClick={() => cancelAction(row)} aria-label={buildActionButtonAriaLabel("cancel", row, { disabledReason })} title={disabledReason ?? undefined}>
+                            <Ban className="h-4 w-4" /> Cancel
+                          </Button>
+                        )}
+                      </>
+                    );
+                  })()}
+
                   <Link
                     to={actionDetailPath(row.id)}
                     className="ml-auto text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm self-center"

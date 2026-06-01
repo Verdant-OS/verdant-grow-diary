@@ -402,36 +402,66 @@ export default function AlertDetail() {
           </Button>
         </div>
       ) : status === "error" ? (
-        <p className="text-sm text-muted-foreground">
-          Alert unavailable{error ? `: ${error}` : "."}
-        </p>
+        <div role="alert" className="glass rounded-2xl p-6">
+          <p className="text-sm font-medium">
+            Alert unavailable{error ? `: ${error}` : "."}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Check your connection and try again.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            className="mt-3"
+            onClick={load}
+            aria-label="Retry loading alert"
+          >
+            Retry
+          </Button>
+        </div>
+
       ) : alert ? (
         <div className="space-y-4">
-          <section className="glass rounded-2xl p-4">
-            <div className="flex items-center gap-2 flex-wrap mb-2">
+          <section className="glass rounded-2xl p-4" aria-labelledby="alert-detail-title">
+            <div
+              className="flex items-center gap-2 flex-wrap mb-2"
+              role="group"
+              aria-label={`Alert status: severity ${alert.severity}, status ${alert.status}${alert.metric ? `, metric ${alert.metric}` : ""}, source ${alert.source}`}
+            >
               <Badge
                 variant="outline"
+                aria-label={`Severity: ${alert.severity}`}
                 className={`text-[10px] uppercase ${SEVERITY_TONE[alert.severity]}`}
               >
                 {alert.severity}
               </Badge>
               <Badge
                 variant="outline"
+                aria-label={`Status: ${alert.status}`}
                 className={`text-[10px] uppercase ${STATUS_TONE[alert.status]}`}
               >
                 {alert.status}
               </Badge>
               {alert.metric && (
-                <Badge variant="outline" className="text-[10px] uppercase">
+                <Badge
+                  variant="outline"
+                  aria-label={`Metric: ${alert.metric}`}
+                  className="text-[10px] uppercase"
+                >
                   {alert.metric}
                 </Badge>
               )}
-              <Badge variant="outline" className="text-[10px] uppercase">
+              <Badge
+                variant="outline"
+                aria-label={`Source: ${alert.source}`}
+                className="text-[10px] uppercase"
+              >
                 {alert.source}
               </Badge>
             </div>
-            <h2 className="font-display font-semibold text-base">{alert.title}</h2>
+            <h2 id="alert-detail-title" className="font-display font-semibold text-base">{alert.title}</h2>
             <p className="text-sm text-muted-foreground mt-1">{alert.reason}</p>
+
             <div className="mt-3">
               <AlertWhyContext alert={alert} variant="detailed" />
             </div>
@@ -509,11 +539,13 @@ export default function AlertDetail() {
               </div>
             </dl>
 
-            <div className="flex flex-wrap gap-2 mt-4">
+            <div className="flex flex-wrap gap-2 mt-4" role="group" aria-label={`Status actions for alert: ${alert.title}`}>
               {alert.status === "open" && (
                 <Button
                   size="sm"
                   variant="outline"
+                  aria-label={`Acknowledge alert: ${alert.title}`}
+                  data-testid="alert-detail-acknowledge"
                   onClick={() =>
                     runStatusChange("acknowledged", () => acknowledgeAlert(alert.id), "acknowledge")
                   }
@@ -525,6 +557,8 @@ export default function AlertDetail() {
                 <Button
                   size="sm"
                   variant="outline"
+                  aria-label={`Resolve alert: ${alert.title}`}
+                  data-testid="alert-detail-resolve"
                   onClick={() =>
                     runStatusChange("resolved", () => resolveAlert(alert.id), "resolve")
                   }
@@ -536,6 +570,8 @@ export default function AlertDetail() {
                 <Button
                   size="sm"
                   variant="ghost"
+                  aria-label={`Dismiss alert: ${alert.title}`}
+                  data-testid="alert-detail-dismiss"
                   onClick={() =>
                     runStatusChange("dismissed", () => dismissAlert(alert.id), "dismiss")
                   }
@@ -547,7 +583,10 @@ export default function AlertDetail() {
                 <Button
                   size="sm"
                   variant="outline"
+                  aria-label={`Reopen alert: ${alert.title}`}
+                  data-testid="alert-detail-reopen"
                   onClick={() => runStatusChange("reopened", () => reopenAlert(alert.id), "reopen")}
+
                 >
                   Reopen
                 </Button>

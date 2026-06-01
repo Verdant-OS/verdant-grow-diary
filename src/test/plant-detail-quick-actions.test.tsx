@@ -219,30 +219,31 @@ describe("PlantDetailQuickActions · render", () => {
   });
 
   it("Manual Sensor Snapshot renders as a link to /sensors with growId", () => {
-    render(<PlantDetailQuickActions plantId="p1" growId="g1" />);
-    const link = screen.getByTestId(
-      "plant-detail-quick-action-manual-sensor-snapshot",
+    const { container } = render(
+      <PlantDetailQuickActions plantId="p1" growId="g1" />,
     );
-    expect(link.querySelector("a")?.getAttribute("href")).toBe(
-      "/sensors?growId=g1",
-    );
+    const link = container.querySelector(
+      'a[data-testid="plant-detail-quick-action-manual-sensor-snapshot"], [data-testid="plant-detail-quick-action-manual-sensor-snapshot"] a',
+    ) as HTMLAnchorElement | null;
+    expect(link?.getAttribute("href")).toBe("/sensors?growId=g1");
   });
 
   it("Manual Sensor Snapshot safely falls back to /sensors when growId missing", () => {
-    render(<PlantDetailQuickActions plantId="p1" />);
-    const link = screen.getByTestId(
-      "plant-detail-quick-action-manual-sensor-snapshot",
-    );
-    expect(link.querySelector("a")?.getAttribute("href")).toBe("/sensors");
+    const { container } = render(<PlantDetailQuickActions plantId="p1" />);
+    const link = container.querySelector(
+      'a[data-testid="plant-detail-quick-action-manual-sensor-snapshot"], [data-testid="plant-detail-quick-action-manual-sensor-snapshot"] a',
+    ) as HTMLAnchorElement | null;
+    expect(link?.getAttribute("href")).toBe("/sensors");
   });
 
   it("Ask Doctor links to /doctor with plantId hint", () => {
-    render(<PlantDetailQuickActions plantId="p1" />);
-    const el = screen.getByTestId("plant-detail-quick-action-ask-doctor");
-    expect(el.querySelector("a")?.getAttribute("href")).toBe(
-      "/doctor?plantId=p1",
-    );
+    const { container } = render(<PlantDetailQuickActions plantId="p1" />);
+    const link = container.querySelector(
+      'a[data-testid="plant-detail-quick-action-ask-doctor"], [data-testid="plant-detail-quick-action-ask-doctor"] a',
+    ) as HTMLAnchorElement | null;
+    expect(link?.getAttribute("href")).toBe("/doctor?plantId=p1");
   });
+
 
   it("View Timeline click scrolls to and focuses the timeline anchor", () => {
     // Set up a DOM anchor matching the helper's contract.

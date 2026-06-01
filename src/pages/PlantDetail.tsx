@@ -16,6 +16,8 @@ import PlantAssignedTentAlertsPanel from "@/components/PlantAssignedTentAlertsPa
 import PlantAssignedTentActionsPanel from "@/components/PlantAssignedTentActionsPanel";
 import PlantStatusStrip from "@/components/PlantStatusStrip";
 import PlantQuickStatusStrip from "@/components/PlantQuickStatusStrip";
+import PlantDetailQuickActions from "@/components/PlantDetailQuickActions";
+import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
 
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
 import PlantAiDoctorSessionsPanel from "@/components/PlantAiDoctorSessionsPanel";

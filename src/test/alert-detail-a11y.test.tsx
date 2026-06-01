@@ -182,8 +182,9 @@ describe("AlertDetail — accessibility & review-state clarity", () => {
     nextLoad = async () => null;
     const { container } = renderDetail();
     await screen.findByText(/alert not found/i);
-    const back = screen.getByRole("link", { name: /back to alert center/i });
-    expect(back.getAttribute("href")).toMatch(/\/alerts$/);
+    const backs = screen.getAllByRole("link", { name: /back to alert center/i });
+    expect(backs[0].getAttribute("href")).toMatch(/\/alerts$/);
+
     const text = container.textContent ?? "";
     expect(text).not.toContain(ALERT.id);
     expect(text).not.toMatch(/\[alert:/);

@@ -46,7 +46,7 @@ describe("Action Queue detail view", () => {
   it("guards transitions on terminal statuses via shared helper", () => {
     expect(DETAIL).toMatch(/from "@\/lib\/actionQueueTransitions"/);
     expect(DETAIL).toMatch(/isTerminalStatus/);
-    expect(DETAIL).toMatch(/!isTerminal\(row\.status\) && \(/);
+    expect(DETAIL).toMatch(/!isTerminalStatus\(row\.status\) && \(\(\) => \{/);
     expect(DETAIL).toMatch(/if \(!row \|\| isTerminal\(row\.status\)\) return;/);
   });
 

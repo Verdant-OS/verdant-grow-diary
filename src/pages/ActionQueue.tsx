@@ -27,7 +27,7 @@ import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
-import { buildActionRowAriaLabel } from "@/lib/actionQueueRowView";
+import { buildActionRowAriaLabel, buildActionButtonAriaLabel, buildStatusBadgeAriaLabel } from "@/lib/actionQueueRowView";
 import { actionDetailPath, actionsPath, aiDoctorSessionDetailPath, alertDetailPath } from "@/lib/routes";
 import { toast } from "sonner";
 import {
@@ -811,20 +811,29 @@ export default function ActionQueue() {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 mt-3">
-                  <Button size="sm" disabled={busyId === row.id} onClick={() => approve(row)} className="gradient-leaf text-primary-foreground">
-                    <Check className="h-4 w-4" /> Approve
-                  </Button>
-                  <Button size="sm" variant="secondary" disabled={busyId === row.id} onClick={() => simulate(row)}>
-                    <FlaskConical className="h-4 w-4" /> Simulate
-                  </Button>
-                  <Button size="sm" variant="ghost" disabled={busyId === row.id} onClick={() => reject(row)}>
-                    <X className="h-4 w-4" /> Reject
-                  </Button>
-                  {canCancel(row.status) && (
-                    <Button size="sm" variant="ghost" disabled={busyId === row.id} onClick={() => cancelAction(row)}>
-                      <Ban className="h-4 w-4" /> Cancel
-                    </Button>
-                  )}
+                  {(() => {
+                    const disabled = busyId === row.id;
+                    const disabledReason = disabled ? "Saving — please wait" : null;
+                    return (
+                      <>
+                        <Button size="sm" disabled={disabled} onClick={() => approve(row)} className="gradient-leaf text-primary-foreground" aria-label={buildActionButtonAriaLabel("approve", row, { disabledReason })} title={disabledReason ?? undefined}>
+                          <Check className="h-4 w-4" /> Approve
+                        </Button>
+                        <Button size="sm" variant="secondary" disabled={disabled} onClick={() => simulate(row)} aria-label={buildActionButtonAriaLabel("simulate", row, { disabledReason })} title={disabledReason ?? undefined}>
+                          <FlaskConical className="h-4 w-4" /> Simulate
+                        </Button>
+                        <Button size="sm" variant="ghost" disabled={disabled} onClick={() => reject(row)} aria-label={buildActionButtonAriaLabel("reject", row, { disabledReason })} title={disabledReason ?? undefined}>
+                          <X className="h-4 w-4" /> Reject
+                        </Button>
+                        {canCancel(row.status) && (
+                          <Button size="sm" variant="ghost" disabled={disabled} onClick={() => cancelAction(row)} aria-label={buildActionButtonAriaLabel("cancel", row, { disabledReason })} title={disabledReason ?? undefined}>
+                            <Ban className="h-4 w-4" /> Cancel
+                          </Button>
+                        )}
+                      </>
+                    );
+                  })()}
+
                   <Link
                     to={actionDetailPath(row.id)}
                     className="ml-auto text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm self-center"
@@ -889,7 +898,7 @@ export default function ActionQueue() {
                 </span>
                 <div className="flex items-center gap-3 flex-wrap">
 
-                  <Badge variant="outline" className="text-[10px] uppercase" aria-label={`Status: ${row.status}`}>{row.status}</Badge>
+                  <Badge variant="outline" className="text-[10px] uppercase" aria-label={buildStatusBadgeAriaLabel(row.status)}>{row.status}</Badge>
                   <Badge variant="outline" className={`text-[10px] uppercase ${RISK_VARIANT[row.risk_level]}`} aria-label={`Risk: ${row.risk_level}`}>
                     {row.risk_level}
                   </Badge>
@@ -916,16 +925,25 @@ export default function ActionQueue() {
 
                   <span className="truncate flex-1">{row.suggested_change}</span>
                   <h3 id={titleId} className="text-xs text-muted-foreground m-0 font-normal">{row.action_type}</h3>
-                  {canComplete(row.status) && (
-                    <Button size="sm" variant="secondary" disabled={busyId === row.id} onClick={() => complete(row)}>
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Mark Complete
-                    </Button>
-                  )}
-                  {canCancel(row.status) && (
-                    <Button size="sm" variant="ghost" disabled={busyId === row.id} onClick={() => cancelAction(row)}>
-                      <Ban className="h-3.5 w-3.5" /> Cancel
-                    </Button>
-                  )}
+                  {(() => {
+                    const disabled = busyId === row.id;
+                    const disabledReason = disabled ? "Saving — please wait" : null;
+                    return (
+                      <>
+                        {canComplete(row.status) && (
+                          <Button size="sm" variant="secondary" disabled={disabled} onClick={() => complete(row)} aria-label={buildActionButtonAriaLabel("complete", row, { disabledReason })} title={disabledReason ?? undefined}>
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Mark Complete
+                          </Button>
+                        )}
+                        {canCancel(row.status) && (
+                          <Button size="sm" variant="ghost" disabled={disabled} onClick={() => cancelAction(row)} aria-label={buildActionButtonAriaLabel("cancel", row, { disabledReason })} title={disabledReason ?? undefined}>
+                            <Ban className="h-3.5 w-3.5" /> Cancel
+                          </Button>
+                        )}
+                      </>
+                    );
+                  })()}
+
                   <Link
                     to={actionDetailPath(row.id)}
                     className="text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"

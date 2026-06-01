@@ -672,28 +672,84 @@ export default function ActionQueue() {
 
 
 
+      {hasInvalidScope ? (
+        <div
+          role="status"
+          className="glass rounded-2xl p-6 text-center flex flex-col items-center gap-2"
+          data-testid="action-queue-missing-context"
+        >
+          <ListChecks className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
+          <p className="font-display font-semibold text-base">
+            Select a grow or tent to review pending actions.
+          </p>
+          <p className="text-sm text-muted-foreground max-w-sm">
+            Pending actions are scoped to a grow or tent so you only review
+            recommendations that match what you’re working on. Grower approval
+            is always required.
+          </p>
+        </div>
+      ) : (
+      <>
       <section className="glass rounded-2xl p-4 mb-4" aria-label="Needs Review">
         <h2 className="text-sm font-semibold mb-3 uppercase tracking-wider text-muted-foreground">
           Needs Review ({pending.length})
         </h2>
         {loading ? (
-          <div className="flex items-center justify-center py-8 text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
+          <div
+            role="status"
+            aria-busy="true"
+            aria-live="polite"
+            aria-label="Loading pending actions"
+            className="space-y-3"
+            data-testid="action-queue-loading-skeleton"
+          >
+            <span className="sr-only">Loading pending actions…</span>
+            <Loader2 className="sr-only h-4 w-4 animate-spin" aria-hidden="true" />
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="rounded-xl border border-border/60 bg-secondary/30 p-3 flex flex-col gap-2"
+                aria-hidden="true"
+              >
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-4 w-20" />
+                </div>
+                <Skeleton className="h-3 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            ))}
           </div>
         ) : pending.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4">
-            {filtersActive ? "No actions match these filters." : "No pending actions."}
-          </p>
+          <div className="py-4" data-testid="action-queue-empty-pending">
+            <p className="text-sm text-foreground">
+              {filtersActive ? "No actions match these filters." : "No pending actions."}
+            </p>
+            {!filtersActive && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Verdant will list grower-reviewed recommendations here when
+                they appear. Review before acting — grower approval is always
+                required.
+              </p>
+            )}
+          </div>
         ) : (
           <ul className="space-y-3">
-            {pending.map((row) => (
+            {pending.map((row) => {
+              const titleId = `aq-pending-title-${row.id}`;
+              const rowAria =
+                focusedActionId === row.id
+                  ? "Focused action"
+                  : buildActionRowAriaLabel(row);
+              return (
               <li
                 key={row.id}
                 data-testid="action-queue-row"
                 data-action-id={row.id}
                 data-focused={focusedActionId === row.id ? "true" : undefined}
-                aria-label={focusedActionId === row.id ? "Focused action" : undefined}
-                className={`rounded-xl border border-border/60 bg-secondary/30 p-3 ${
+                aria-label={rowAria}
+                className={`rounded-xl border border-border/60 bg-secondary/30 p-3 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background ${
                   focusedActionId === row.id
                     ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
                     : ""
@@ -702,14 +758,17 @@ export default function ActionQueue() {
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium">{row.action_type}</span>
-                      <Badge variant="outline" className={RISK_VARIANT[row.risk_level]}>
+                      <h3 id={titleId} className="font-medium text-sm m-0">
+                        {row.action_type}
+                      </h3>
+                      <Badge variant="outline" className={RISK_VARIANT[row.risk_level]} aria-label={`Risk: ${row.risk_level}`}>
                         {row.risk_level}
                       </Badge>
                       {isAlertDerived(row) && (
                         <Badge
                           variant="outline"
                           className="text-[10px] uppercase border-primary text-primary"
+                          aria-label={`Source: ${getActionQueueSourceLabel(row)}`}
                         >
                           {getActionQueueSourceLabel(row)}
                         </Badge>
@@ -720,6 +779,7 @@ export default function ActionQueue() {
                             variant="outline"
                             className="text-[10px] uppercase border-primary text-primary"
                             data-testid="action-queue-row-ai-doctor-badge"
+                            aria-label="Source: AI Doctor"
                           >
                             AI Doctor
                           </Badge>
@@ -763,14 +823,16 @@ export default function ActionQueue() {
                   )}
                   <Link
                     to={actionDetailPath(row.id)}
-                    className="ml-auto text-xs text-primary hover:underline self-center"
+                    className="ml-auto text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm self-center"
+                    aria-describedby={titleId}
                   >
                     View Details
                   </Link>
                 </div>
                 <EventHistory items={events[row.id]} />
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </section>

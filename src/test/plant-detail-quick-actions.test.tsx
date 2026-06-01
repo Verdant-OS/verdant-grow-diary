@@ -169,7 +169,7 @@ describe("buildPlantDetailQuickActions · payloads and routes", () => {
 });
 
 describe("PlantDetailQuickActions · render", () => {
-  it("renders all four quick actions with accessible labels", () => {
+  it("renders all five quick actions with accessible labels", () => {
     render(
       <PlantDetailQuickActions
         plantId="p1"
@@ -186,6 +186,9 @@ describe("PlantDetailQuickActions · render", () => {
       screen.getByTestId("plant-detail-quick-action-manual-sensor-snapshot"),
     ).toBeInTheDocument();
     expect(
+      screen.getByTestId("plant-detail-quick-action-upload-photo"),
+    ).toBeInTheDocument();
+    expect(
       screen.getByTestId("plant-detail-quick-action-ask-doctor"),
     ).toBeInTheDocument();
     expect(
@@ -194,6 +197,41 @@ describe("PlantDetailQuickActions · render", () => {
     expect(
       screen.getByRole("navigation", { name: /plant quick actions/i }),
     ).toBeInTheDocument();
+  });
+
+  it("Upload Photo click dispatches verdant:open-quicklog with plant context", () => {
+    const handler = vi.fn();
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+    render(
+      <PlantDetailQuickActions
+        plantId="p1"
+        plantName="Plant 1"
+        growId="g1"
+        tentId="t1"
+        tentName="Tent A"
+      />,
+    );
+    fireEvent.click(
+      screen.getByTestId("plant-detail-quick-action-upload-photo"),
+    );
+    expect(handler).toHaveBeenCalledTimes(1);
+    const ev = handler.mock.calls[0][0] as CustomEvent;
+    expect(ev.detail).toMatchObject({
+      plantId: "p1",
+      growId: "g1",
+      tentId: "t1",
+    });
+    window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+  });
+
+  it("Upload Photo is disabled with reason when plantId is missing", () => {
+    render(<PlantDetailQuickActions plantId={null} />);
+    const btn = screen.getByTestId("plant-detail-quick-action-upload-photo");
+    expect(btn).toBeDisabled();
+    expect(
+      screen.getByTestId("plant-detail-quick-action-upload-photo-reason")
+        .textContent,
+    ).toMatch(/plant context/i);
   });
 
   it("Quick Log click dispatches verdant:open-quicklog with plant context", () => {

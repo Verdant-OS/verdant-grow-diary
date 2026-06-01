@@ -208,14 +208,53 @@ export default function Alerts() {
         </Select>
       </div>
 
-      {status === "loading" || status === "idle" ? (
-        <p className="text-sm text-muted-foreground" role="status">
-          Loading alerts…
-        </p>
+      {hasInvalidScope ? (
+        <div
+          role="status"
+          className="glass rounded-2xl p-6 text-center flex flex-col items-center gap-2"
+          data-testid="alerts-missing-context"
+        >
+          <Bell className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
+          <p className="font-display font-semibold text-base">
+            Select a grow or tent to review alerts.
+          </p>
+          <p className="text-sm text-muted-foreground max-w-sm">
+            Alerts are scoped to a grow or tent so you only see warnings that
+            match what you’re working on.
+          </p>
+        </div>
+      ) : status === "loading" || status === "idle" ? (
+        <div
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
+          aria-label="Loading alerts"
+          className="space-y-2"
+          data-testid="alerts-loading-skeleton"
+        >
+          <span className="sr-only">Loading alerts…</span>
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="glass rounded-2xl p-4 flex flex-col gap-2"
+              aria-hidden="true"
+            >
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="ml-auto h-3 w-20" />
+              </div>
+              <Skeleton className="h-3 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
+          ))}
+        </div>
       ) : status === "unavailable" ? (
         <div
           role="alert"
           className="glass rounded-2xl p-4 flex flex-col gap-2 text-sm"
+          data-testid="alerts-unavailable"
         >
           <p className="font-medium">Alerts unavailable</p>
           <p className="text-muted-foreground">
@@ -226,7 +265,12 @@ export default function Alerts() {
             <p className="text-[11px] text-muted-foreground/80">{error}</p>
           ) : null}
           <div>
-            <Button size="sm" variant="outline" onClick={() => reload()}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => reload()}
+              aria-label="Retry loading alerts"
+            >
               Retry
             </Button>
           </div>

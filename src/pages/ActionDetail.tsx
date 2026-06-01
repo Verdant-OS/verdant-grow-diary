@@ -173,6 +173,7 @@ export default function ActionDetail() {
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [dialog, setDialog] = useState<Kind | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
@@ -190,28 +191,44 @@ export default function ActionDetail() {
     if (!user || !actionId) return;
     setLoading(true);
     setNotFound(false);
-    const { data, error } = await supabase
-      .from("action_queue")
-      .select(
-        "id,grow_id,tent_id,plant_id,source,action_type,target_metric,target_device,suggested_change,reason,risk_level,status,approved_at,rejected_at,completed_at,created_at,updated_at",
-      )
-      .eq("id", actionId)
-      .maybeSingle();
-    if (error || !data) {
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase
+        .from("action_queue")
+        .select(
+          "id,grow_id,tent_id,plant_id,source,action_type,target_metric,target_device,suggested_change,reason,risk_level,status,approved_at,rejected_at,completed_at,created_at,updated_at",
+        )
+        .eq("id", actionId)
+        .maybeSingle();
+      if (error) {
+        // Surface a sanitized error — never leak raw provider messages or IDs.
+        setRow(null);
+        setEvents([]);
+        setLoadError("We couldn't load this action. Please try again.");
+        setLoading(false);
+        return;
+      }
+      if (!data) {
+        setRow(null);
+        setEvents([]);
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
+      setRow(data as ActionRow);
+      const { data: evs } = await supabase
+        .from("action_queue_events")
+        .select("id,action_queue_id,event_type,previous_status,new_status,note,created_at")
+        .eq("action_queue_id", actionId)
+        .order("created_at", { ascending: false });
+      setEvents((evs ?? []) as EventRow[]);
+      setLoading(false);
+    } catch {
       setRow(null);
       setEvents([]);
-      setNotFound(true);
+      setLoadError("We couldn't load this action. Please try again.");
       setLoading(false);
-      return;
     }
-    setRow(data as ActionRow);
-    const { data: evs } = await supabase
-      .from("action_queue_events")
-      .select("id,action_queue_id,event_type,previous_status,new_status,note,created_at")
-      .eq("action_queue_id", actionId)
-      .order("created_at", { ascending: false });
-    setEvents((evs ?? []) as EventRow[]);
-    setLoading(false);
   }, [user, actionId]);
 
   useEffect(() => {

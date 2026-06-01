@@ -79,6 +79,9 @@ export default function Alerts() {
   const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } =
     useScopedGrow();
   const scopedGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
+  // A grow id was passed in the URL but doesn't map to a grow the viewer
+  // owns. Showing every alert would be misleading — render a calm prompt.
+  const hasInvalidScope = !!urlGrowId && !isValidScopedGrow;
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");

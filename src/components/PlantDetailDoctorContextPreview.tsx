@@ -9,13 +9,12 @@
  * context as a query parameter.
  */
 import { useMemo } from "react";
-import { Link } from "react-router-dom";
-import { Stethoscope, CheckCircle2, MinusCircle, Clock, ArrowRight } from "lucide-react";
+import { Stethoscope, CheckCircle2, MinusCircle, Clock } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
+import PlantDetailDoctorLaunchDialog from "@/components/PlantDetailDoctorLaunchDialog";
 import {
   buildPlantDetailDoctorContextPreview,
   DOCTOR_CONTEXT_HELPER_COPY,

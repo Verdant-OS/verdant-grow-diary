@@ -646,7 +646,9 @@ export default function ActionDetail() {
 
 
 
-        {!isTerminal(row.status) && (
+        {!isTerminalStatus(row.status) && (() => {
+          const disabledReason = busy ? "Saving — please wait" : null;
+          return (
           <div className="flex flex-wrap gap-2 mt-4">
             {canApprove(row.status) && (
               <Button
@@ -654,6 +656,8 @@ export default function ActionDetail() {
                 disabled={busy}
                 onClick={() => openDialog("approve")}
                 className="gradient-leaf text-primary-foreground"
+                aria-label={buildActionButtonAriaLabel("approve", row, { disabledReason })}
+                title={disabledReason ?? undefined}
               >
                 <Check className="h-4 w-4" /> Approve
               </Button>
@@ -664,6 +668,8 @@ export default function ActionDetail() {
                 variant="secondary"
                 disabled={busy}
                 onClick={() => openDialog("simulate")}
+                aria-label={buildActionButtonAriaLabel("simulate", row, { disabledReason })}
+                title={disabledReason ?? undefined}
               >
                 <FlaskConical className="h-4 w-4" /> Simulate
               </Button>
@@ -674,6 +680,8 @@ export default function ActionDetail() {
                 variant="secondary"
                 disabled={busy}
                 onClick={() => openDialog("complete")}
+                aria-label={buildActionButtonAriaLabel("complete", row, { disabledReason })}
+                title={disabledReason ?? undefined}
               >
                 <CheckCircle2 className="h-4 w-4" /> Mark Complete
               </Button>
@@ -684,6 +692,8 @@ export default function ActionDetail() {
                 variant="ghost"
                 disabled={busy}
                 onClick={() => openDialog("reject")}
+                aria-label={buildActionButtonAriaLabel("reject", row, { disabledReason })}
+                title={disabledReason ?? undefined}
               >
                 <X className="h-4 w-4" /> Reject
               </Button>
@@ -694,12 +704,16 @@ export default function ActionDetail() {
                 variant="ghost"
                 disabled={busy}
                 onClick={() => openDialog("cancel")}
+                aria-label={buildActionButtonAriaLabel("cancel", row, { disabledReason })}
+                title={disabledReason ?? undefined}
               >
                 <Ban className="h-4 w-4" /> Cancel
               </Button>
             )}
           </div>
-        )}
+          );
+        })()}
+
       </header>
 
       {row.status === "completed" && (

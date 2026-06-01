@@ -345,17 +345,39 @@ export default function PlantDetail() {
               hideHeaderCta
             />
           </section>
-          <PlantAssignedTentAlertsPanel
-            tentId={plant.tentId ?? null}
-            tentName={tent?.name ?? null}
-            growId={plant.growId ?? null}
-          />
-          <PlantAssignedTentActionsPanel
-            tentId={plant.tentId ?? null}
-            tentName={tent?.name ?? null}
-            growId={plant.growId ?? null}
-          />
-          <PlantAiDoctorSessionsPanel plantId={plant.id} />
+          <div
+            id={PLANT_DETAIL_SECTION_ANCHORS.alerts}
+            tabIndex={-1}
+            aria-label="Plant alerts section"
+            className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+          >
+            <PlantAssignedTentAlertsPanel
+              tentId={plant.tentId ?? null}
+              tentName={tent?.name ?? null}
+              growId={plant.growId ?? null}
+            />
+          </div>
+          <div
+            id={PLANT_DETAIL_SECTION_ANCHORS.actions}
+            tabIndex={-1}
+            aria-label="Plant actions section"
+            className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+          >
+            <PlantAssignedTentActionsPanel
+              tentId={plant.tentId ?? null}
+              tentName={tent?.name ?? null}
+              growId={plant.growId ?? null}
+            />
+          </div>
+          <div
+            id={PLANT_DETAIL_SECTION_ANCHORS.doctor}
+            tabIndex={-1}
+            aria-label="Plant Doctor sessions section"
+            className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+          >
+            <PlantAiDoctorSessionsPanel plantId={plant.id} />
+          </div>
+
         </div>
       </div>
     </div>

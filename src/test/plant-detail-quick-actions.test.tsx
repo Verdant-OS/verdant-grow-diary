@@ -266,6 +266,10 @@ describe("PlantDetailQuickActions · render", () => {
     const btn = screen.getByTestId("plant-detail-quick-action-upload-photo");
     expect(btn).toBeDisabled();
     expect(
+      screen.getByTestId("plant-detail-quick-action-upload-photo-description")
+        .textContent,
+    ).toMatch(/visual history/i);
+    expect(
       screen.getByTestId("plant-detail-quick-action-upload-photo-reason")
         .textContent,
     ).toMatch(/plant context/i);
@@ -346,6 +350,10 @@ describe("PlantDetailQuickActions · render", () => {
     const ql = screen.getByTestId("plant-detail-quick-action-quicklog");
     expect(ql).toBeDisabled();
     expect(ql.getAttribute("aria-disabled")).toBe("true");
+    expect(
+      screen.getByTestId("plant-detail-quick-action-quicklog-description")
+        .textContent,
+    ).toMatch(/observation or grow action/i);
     expect(
       screen.getByTestId("plant-detail-quick-action-quicklog-reason")
         .textContent,

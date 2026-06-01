@@ -25,7 +25,9 @@ import { Label } from "@/components/ui/label";
 import { Loader2, Check, X, FlaskConical, ListChecks, History, CheckCircle2, Ban } from "lucide-react";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
+import { buildActionRowAriaLabel } from "@/lib/actionQueueRowView";
 import { actionDetailPath, actionsPath, aiDoctorSessionDetailPath, alertDetailPath } from "@/lib/routes";
 import { toast } from "sonner";
 import {

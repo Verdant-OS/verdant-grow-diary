@@ -275,15 +275,23 @@ export default function PlantDetail() {
           />
 
           <PlantRecentActivityPanel plantId={plant.id} plantName={plant.name} />
-          <PlantRelativeTimelineSection
-            plantId={plant.id}
-            plantStartedAt={plant.startedAt}
-            currentStage={plant.stage}
-            plantName={plant.name}
-            tentName={tent?.name ?? null}
-            growId={plant.growId ?? null}
-            tentId={plant.tentId ?? null}
-          />
+          <div
+            id={PLANT_RELATIVE_TIMELINE_ANCHOR_ID}
+            tabIndex={-1}
+            aria-label="Plant Relative Timeline section"
+            className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+          >
+            <PlantRelativeTimelineSection
+              plantId={plant.id}
+              plantStartedAt={plant.startedAt}
+              currentStage={plant.stage}
+              plantName={plant.name}
+              tentName={tent?.name ?? null}
+              growId={plant.growId ?? null}
+              tentId={plant.tentId ?? null}
+            />
+          </div>
+
 
 
           <section

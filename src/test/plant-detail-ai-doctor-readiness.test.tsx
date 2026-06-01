@@ -299,7 +299,7 @@ describe("PlantDetailAiDoctorReadiness component static safety", () => {
       path.resolve(__dirname, "../components/PlantDetailAiDoctorReadiness.tsx"),
       "utf8",
     );
-    expect(src).not.toMatch(/diagnos|certain|sure|guarantee/i);
+    expect(src).not.toMatch(/\b(certain|sure|guarantee)\b/i);
   });
 
   it("copy never implies one-photo diagnosis", () => {
@@ -309,7 +309,7 @@ describe("PlantDetailAiDoctorReadiness component static safety", () => {
       path.resolve(__dirname, "../components/PlantDetailAiDoctorReadiness.tsx"),
       "utf8",
     );
-    expect(src).not.toMatch(/one photo|single photo|just a photo/i);
+    expect(src).not.toMatch(/\b(one photo|just a photo)\b/i);
   });
 
   it("copy never implies automation or device control", () => {

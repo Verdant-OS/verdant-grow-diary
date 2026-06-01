@@ -119,6 +119,14 @@ export default function PlantDetail() {
         tentId={plant.tentId ?? null}
         growId={plant.growId ?? null}
       />
+      <PlantDetailQuickActions
+        plantId={plant.id}
+        plantName={plant.name}
+        growId={plant.growId ?? null}
+        tentId={plant.tentId ?? null}
+        tentName={tent?.name ?? null}
+      />
+
 
       {!isActivePlant(plant) && (
         <ArchivedPlantBanner plantId={plant.id} lastNote={plant.lastNote} />

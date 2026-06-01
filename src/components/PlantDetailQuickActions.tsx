@@ -183,6 +183,7 @@ export default function PlantDetailQuickActions({
   growId = null,
   tentId = null,
   tentName = null,
+  hasTimelineSection = true,
 }: Props) {
   const entries = buildPlantDetailQuickActions({
     plantId,
@@ -190,6 +191,7 @@ export default function PlantDetailQuickActions({
     growId,
     tentId,
     tentName,
+    hasTimelineSection,
   });
 
   return (

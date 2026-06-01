@@ -2,7 +2,7 @@
  * plantDetailSectionAnchors — pure view-model for the Plant Detail
  * section jump-link nav.
  *
- * Deterministic. No React, no I/O, no Supabase, no fetch, no privileged
+ * Deterministic. No React, no I/O, no fetch, no privileged keys, no
  * keys. Produces a stable list of in-page jump targets keyed by safe
  * static DOM anchor ids — NEVER database ids. The Plant Detail page
  * mounts the matching anchor elements so the buttons can scroll/focus

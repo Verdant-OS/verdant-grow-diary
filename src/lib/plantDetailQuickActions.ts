@@ -59,6 +59,12 @@ export interface PlantDetailQuickActionsInput {
   growId?: string | null;
   tentId?: string | null;
   tentName?: string | null;
+  /**
+   * When false, the View Timeline entry surfaces as a disabled entry with a
+   * visible reason rather than scrolling to a target that does not exist.
+   * Defaults to true to preserve existing behavior.
+   */
+  hasTimelineSection?: boolean;
 }
 
 export const PLANT_RELATIVE_TIMELINE_ANCHOR_ID = "plant-relative-timeline" as const;

@@ -182,10 +182,10 @@ describe("AlertDetail — Add to Action Queue (render-level)", () => {
   });
 
   it("clicking creates exactly one action_queue insert with a safe payload", async () => {
-    const user = userEvent.setup();
+    
     renderDetail();
     const btn = await screen.findByTestId("alert-handoff-add-button");
-    await user.click(btn);
+    fireEvent.click(btn);
 
     await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
     const aqInserts = actionQueueInserts();
@@ -217,9 +217,9 @@ describe("AlertDetail — Add to Action Queue (render-level)", () => {
   });
 
   it("also writes an audit event row (action_queue_events) without client user_id", async () => {
-    const user = userEvent.setup();
+    
     renderDetail();
-    await user.click(await screen.findByTestId("alert-handoff-add-button"));
+    fireEvent.click(await screen.findByTestId("alert-handoff-add-button"));
     await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
 
     const auditInserts = inserts.filter((i) => i.table === "action_queue_events");
@@ -253,10 +253,10 @@ describe("AlertDetail — Add to Action Queue (render-level)", () => {
       data: null,
       error: { code: "42501", message: "new row violates row-level security policy" },
     };
-    const user = userEvent.setup();
+    
     renderDetail();
     const btn = await screen.findByTestId("alert-handoff-add-button");
-    await user.click(btn);
+    fireEvent.click(btn);
 
     await waitFor(() => expect(toastError).toHaveBeenCalled());
     expect(toastSuccess).not.toHaveBeenCalled();

@@ -286,6 +286,74 @@ describe("Alerts route — alert row accessibility", () => {
     expect(within(article).getByText("Sensor system")).toBeTruthy();
     expect(within(article).getByText("Time unknown")).toBeTruthy();
   });
+
+  it("status-change action buttons have descriptive accessible names that include the alert title", async () => {
+    listAlertsMock.mockResolvedValue([ALERT]);
+    renderAt("/alerts");
+    const article = await waitFor(() => {
+      const a = document.querySelector("article[aria-labelledby]");
+      expect(a).toBeTruthy();
+      return a as HTMLElement;
+    });
+    const ack = within(article).getByRole("button", {
+      name: /acknowledge alert: humidity rising/i,
+    });
+    const res = within(article).getByRole("button", {
+      name: /resolve alert: humidity rising/i,
+    });
+    const dis = within(article).getByRole("button", {
+      name: /dismiss alert: humidity rising/i,
+    });
+    expect(ack).toBeTruthy();
+    expect(res).toBeTruthy();
+    expect(dis).toBeTruthy();
+  });
+
+  it("action buttons and title link expose visible focus styling via classes", async () => {
+    listAlertsMock.mockResolvedValue([ALERT]);
+    renderAt("/alerts");
+    const article = await waitFor(() => {
+      const a = document.querySelector("article[aria-labelledby]");
+      expect(a).toBeTruthy();
+      return a as HTMLElement;
+    });
+    expect(article.className).toMatch(/focus-within:ring-2/);
+    expect(article.className).toMatch(/focus-within:ring-offset-2/);
+    const titleLink = within(article).getByRole("link", {
+      name: /humidity rising/i,
+    });
+    expect(titleLink.className).toMatch(/focus-visible:ring-2/);
+    expect(titleLink.className).toMatch(/focus-visible:ring-offset-2/);
+    for (const tid of [
+      "alert-row-acknowledge",
+      "alert-row-resolve",
+      "alert-row-dismiss",
+    ]) {
+      const btn = within(article).getByTestId(tid);
+      // shadcn Button default ships focus-visible ring styling
+      expect(btn.className).toMatch(/focus-visible:/);
+    }
+  });
+
+  it("action button aria-labels and card aria-label do not leak internal ids", async () => {
+    listAlertsMock.mockResolvedValue([ALERT]);
+    renderAt("/alerts");
+    const article = await waitFor(() => {
+      const a = document.querySelector("article[aria-labelledby]");
+      expect(a).toBeTruthy();
+      return a as HTMLElement;
+    });
+    const ariaLabels: string[] = [
+      article.getAttribute("aria-label") ?? "",
+      ...Array.from(article.querySelectorAll("[aria-label]")).map(
+        (el) => el.getAttribute("aria-label") ?? "",
+      ),
+    ];
+    for (const label of ariaLabels) {
+      expect(label).not.toContain(ALERT.id);
+      expect(label).not.toContain(ALERT.grow_id);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -811,9 +811,172 @@ function fmtDate(ts: string | null): string {
   }
 }
 
+function SessionSummaryPanel({
+  createdAt,
+  riskLevel,
+  confidenceLabel,
+  contextCeiling,
+  suggestedActionCount,
+  summary,
+  hasPlantContext,
+  hasTentContext,
+  hasGrowContext,
+}: {
+  createdAt: string | null;
+  riskLevel: string | null;
+  confidenceLabel: string | null;
+  contextCeiling: string | null;
+  suggestedActionCount: number;
+  summary: string | null;
+  hasPlantContext: boolean;
+  hasTentContext: boolean;
+  hasGrowContext: boolean;
+}) {
+  const items: Array<{ label: string; value: string; testid: string }> = [];
+  if (createdAt) {
+    items.push({
+      label: "Created",
+      value: fmtDate(createdAt) || "—",
+      testid: "ai-doctor-session-summary-created",
+    });
+  }
+  if (riskLevel) {
+    items.push({
+      label: "Risk",
+      value: riskLevel,
+      testid: "ai-doctor-session-summary-risk",
+    });
+  }
+  if (confidenceLabel) {
+    items.push({
+      label: "Confidence",
+      value: confidenceLabel,
+      testid: "ai-doctor-session-summary-confidence",
+    });
+  }
+  if (contextCeiling) {
+    items.push({
+      label: "Context ceiling",
+      value: contextCeiling,
+      testid: "ai-doctor-session-summary-context-ceiling",
+    });
+  }
+  items.push({
+    label: "Suggested actions",
+    value: `${suggestedActionCount}`,
+    testid: "ai-doctor-session-summary-action-count",
+  });
+  const contextLabels: string[] = [];
+  if (hasPlantContext) contextLabels.push("Plant");
+  if (hasTentContext) contextLabels.push("Tent");
+  if (hasGrowContext) contextLabels.push("Grow");
+  if (contextLabels.length > 0) {
+    items.push({
+      label: "Context",
+      value: contextLabels.join(" · "),
+      testid: "ai-doctor-session-summary-context",
+    });
+  }
+
+  return (
+    <section
+      data-testid="ai-doctor-session-detail-session-summary"
+      aria-label="Session summary"
+      className="rounded-lg border border-border bg-muted/20 p-3 space-y-2"
+    >
+      <header className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold">Session summary</h3>
+      </header>
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs sm:grid-cols-3">
+        {items.map((it) => (
+          <div key={it.testid} className="space-y-0.5">
+            <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              {it.label}
+            </dt>
+            <dd
+              className="text-sm capitalize"
+              data-testid={it.testid}
+            >
+              {it.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {summary ? (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="ai-doctor-session-summary-diagnosis"
+        >
+          {summary}
+        </p>
+      ) : (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="ai-doctor-session-summary-diagnosis-empty"
+        >
+          No diagnosis summary saved for this session.
+        </p>
+      )}
+      <p
+        className="text-[11px] text-muted-foreground"
+        data-testid="ai-doctor-session-summary-review-note"
+      >
+        Review this snapshot before acting on any suggestion. Verdant does not execute actions automatically.
+      </p>
+    </section>
+  );
+}
+
+function LinkedActionQueueLoading() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+      data-testid="ai-doctor-session-detail-linked-action-queue-loading"
+      className="rounded-lg border border-border bg-muted/20 p-3 text-sm text-muted-foreground"
+    >
+      <span className="sr-only">Loading linked Action Queue items…</span>
+      <div className="flex items-center gap-2">
+        <span aria-hidden="true">Loading linked Action Queue items…</span>
+      </div>
+      <div className="mt-2 space-y-1.5" aria-hidden="true">
+        <div className="h-3 w-2/3 rounded bg-muted animate-pulse" />
+        <div className="h-3 w-1/2 rounded bg-muted animate-pulse" />
+      </div>
+    </div>
+  );
+}
+
+function LinkedActionQueueEmpty() {
+  return (
+    <section
+      aria-label="Linked Action Queue items"
+      data-testid="ai-doctor-session-detail-linked-action-queue-empty"
+      className="rounded-lg border border-border bg-muted/20 p-3 space-y-1"
+    >
+      <h3 className="text-sm font-semibold">Linked Action Queue items</h3>
+      <p className="text-xs text-muted-foreground">
+        No approval-required action has been queued from this review yet. Review the
+        snapshot before adding one.
+      </p>
+    </section>
+  );
+}
+
+function describeLinkedAction(item: LinkedActionItem): string {
+  const reason = (item.reasonText ?? "").trim();
+  const change = (item.suggestedChange ?? "").trim();
+  const base = reason.length > 0 ? reason : change;
+  const safe = base.length > 0 ? base : "Linked Action Queue item";
+  const clipped = safe.length > 120 ? `${safe.slice(0, 120)}…` : safe;
+  return `Open linked action: ${clipped}`;
+}
+
 function LinkedActionQueueSection({ vm }: { vm: LinkedActionsViewModel }) {
   if (vm.count === 0) return null;
   const countLabel = `${vm.count} open ${vm.count === 1 ? "item" : "items"}`;
+  const primaryItem = vm.items[0] ?? null;
   return (
     <section
       data-testid="ai-doctor-session-detail-linked-action-queue"
@@ -836,12 +999,13 @@ function LinkedActionQueueSection({ vm }: { vm: LinkedActionsViewModel }) {
       >
         These approval-required items were created from this AI Doctor review.
       </p>
-      {vm.primaryFocusHref ? (
+      {vm.primaryFocusHref && primaryItem ? (
         <Link
           to={vm.primaryFocusHref}
-          className="inline-flex items-center gap-1 text-xs underline text-primary"
+          className="inline-flex items-center gap-1 text-xs underline text-primary rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           data-testid="ai-doctor-session-detail-linked-action-queue-primary-link"
-          data-action-queue-id={vm.items[0].id}
+          data-action-queue-id={primaryItem.id}
+          aria-label={describeLinkedAction(primaryItem)}
         >
           View in Action Queue
         </Link>
@@ -859,8 +1023,9 @@ function LinkedActionQueueSection({ vm }: { vm: LinkedActionsViewModel }) {
             >
               <Link
                 to={item.focusHref}
-                className="underline text-primary"
+                className="underline text-primary rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 data-testid="ai-doctor-session-detail-linked-action-queue-item-link"
+                aria-label={describeLinkedAction(item)}
               >
                 View in Action Queue
               </Link>
@@ -876,6 +1041,7 @@ function LinkedActionQueueSection({ vm }: { vm: LinkedActionsViewModel }) {
     </section>
   );
 }
+
 
 function LinkedAlertSection({ vm }: { vm: LinkedActionsViewModel }) {
   const alertIds = vm.linkedAlertIds;
@@ -979,9 +1145,19 @@ export default function AiDoctorSessionDetail() {
               aria-live="polite"
               aria-busy="true"
               data-testid="ai-doctor-session-detail-loading"
-              className="text-muted-foreground"
+              className="space-y-3"
             >
-              Loading AI Doctor session…
+              <p className="text-sm text-muted-foreground">Loading AI Doctor session…</p>
+              <div
+                className="space-y-2"
+                aria-hidden="true"
+                data-testid="ai-doctor-session-detail-loading-skeleton"
+              >
+                <div className="h-4 w-1/3 rounded bg-muted animate-pulse" />
+                <div className="h-20 w-full rounded-lg bg-muted animate-pulse" />
+                <div className="h-16 w-full rounded-lg bg-muted animate-pulse" />
+                <div className="h-24 w-full rounded-lg bg-muted animate-pulse" />
+              </div>
             </div>
           ) : error ? (
             <div
@@ -1088,6 +1264,18 @@ function SessionDetailBody({
         </Badge>
       </div>
 
+      <SessionSummaryPanel
+        createdAt={row.created_at}
+        riskLevel={d?.riskLevel ?? null}
+        confidenceLabel={confidence}
+        contextCeiling={row.context_confidence_ceiling ?? null}
+        suggestedActionCount={actions.length}
+        summary={d?.summary ?? null}
+        hasPlantContext={!!row.plant_id}
+        hasTentContext={!!row.tent_id}
+        hasGrowContext={!!row.grow_id}
+      />
+
       {(() => {
         const cautionNote = buildCautionNote(reviewVm);
         const tokens = buildCautionReasonTokens(reviewVm);
@@ -1129,7 +1317,13 @@ function SessionDetailBody({
 
       <SessionReviewStatusPanel sessionId={row.id} vm={reviewHistoryVm} />
 
-      <LinkedActionQueueSection vm={linkedActions.vm} />
+      {linkedActions.isLoading ? (
+        <LinkedActionQueueLoading />
+      ) : linkedActions.vm.count === 0 ? (
+        <LinkedActionQueueEmpty />
+      ) : (
+        <LinkedActionQueueSection vm={linkedActions.vm} />
+      )}
 
       <LinkedAlertSection vm={linkedActions.vm} />
 

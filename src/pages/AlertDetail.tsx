@@ -402,9 +402,24 @@ export default function AlertDetail() {
           </Button>
         </div>
       ) : status === "error" ? (
-        <p className="text-sm text-muted-foreground">
-          Alert unavailable{error ? `: ${error}` : "."}
-        </p>
+        <div role="alert" className="glass rounded-2xl p-6">
+          <p className="text-sm font-medium">
+            Alert unavailable{error ? `: ${error}` : "."}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Check your connection and try again.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            className="mt-3"
+            onClick={load}
+            aria-label="Retry loading alert"
+          >
+            Retry
+          </Button>
+        </div>
+
       ) : alert ? (
         <div className="space-y-4">
           <section className="glass rounded-2xl p-4">

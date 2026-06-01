@@ -69,23 +69,23 @@ const LABELS: Record<
 > = {
   quicklog: {
     label: "Quick Log",
-    description: "Open the diary entry sheet for this plant.",
+    description: "Record an observation or grow action.",
   },
   manual_sensor_snapshot: {
     label: "Manual Sensor Snapshot",
-    description: "Open sensors to record a manual reading.",
+    description: "Add current tent readings by hand.",
   },
   upload_photo: {
     label: "Upload Photo",
-    description: "Open the diary entry sheet to attach a photo.",
+    description: "Attach a plant photo to visual history.",
   },
   ask_doctor: {
     label: "Ask Doctor",
-    description: "Open the AI Doctor with plant context.",
+    description: "Review this plant with existing context.",
   },
   view_timeline: {
     label: "View Timeline",
-    description: "Jump to the Plant Relative Timeline section.",
+    description: "Jump to this plant's history.",
   },
 };
 

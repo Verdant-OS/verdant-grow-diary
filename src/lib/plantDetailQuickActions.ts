@@ -75,6 +75,10 @@ const LABELS: Record<
     label: "Manual Sensor Snapshot",
     description: "Open sensors to record a manual reading.",
   },
+  upload_photo: {
+    label: "Upload Photo",
+    description: "Open the diary entry sheet to attach a photo.",
+  },
   ask_doctor: {
     label: "Ask Doctor",
     description: "Open the AI Doctor with plant context.",

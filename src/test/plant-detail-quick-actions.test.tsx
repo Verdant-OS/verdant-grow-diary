@@ -376,6 +376,106 @@ describe("PlantDetailQuickActions · render", () => {
     const btn = screen.getByTestId("plant-detail-quick-action-quicklog");
     expect(btn.className).toMatch(/focus-visible:ring-2/);
   });
+
+  it("disabled Quick Log click does not dispatch the open-quicklog event", () => {
+    const handler = vi.fn();
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+    render(<PlantDetailQuickActions plantId={null} />);
+    const btn = screen.getByTestId("plant-detail-quick-action-quicklog");
+    expect(btn).toBeDisabled();
+    fireEvent.click(btn);
+    expect(handler).not.toHaveBeenCalled();
+    window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+  });
+
+  it("disabled Upload Photo click does not dispatch the open-quicklog event", () => {
+    const handler = vi.fn();
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+    render(<PlantDetailQuickActions plantId={null} />);
+    const btn = screen.getByTestId("plant-detail-quick-action-upload-photo");
+    expect(btn).toBeDisabled();
+    fireEvent.click(btn);
+    expect(handler).not.toHaveBeenCalled();
+    window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+  });
+
+  it("disabled Ask Doctor renders as a non-link button with reason", () => {
+    const { container } = render(<PlantDetailQuickActions plantId={null} />);
+    const btn = screen.getByTestId("plant-detail-quick-action-ask-doctor");
+    expect(btn.tagName.toLowerCase()).toBe("button");
+    expect(btn).toBeDisabled();
+    expect(btn.getAttribute("aria-disabled")).toBe("true");
+    // No anchor rendered for the disabled entry.
+    const link = container.querySelector(
+      'a[data-testid="plant-detail-quick-action-ask-doctor"]',
+    );
+    expect(link).toBeNull();
+    expect(
+      screen.getByTestId("plant-detail-quick-action-ask-doctor-reason")
+        .textContent,
+    ).toMatch(/plant context/i);
+  });
+
+  it("Manual Sensor Snapshot stays enabled when plant context is missing", () => {
+    const { container } = render(<PlantDetailQuickActions plantId={null} />);
+    const btn = screen.getByTestId(
+      "plant-detail-quick-action-manual-sensor-snapshot",
+    );
+    expect(btn).not.toBeDisabled();
+    const link = container.querySelector(
+      'a[data-testid="plant-detail-quick-action-manual-sensor-snapshot"]',
+    ) as HTMLAnchorElement | null;
+    expect(link?.getAttribute("href")).toBe("/sensors");
+  });
+
+  it("disabled View Timeline does not scroll when hasTimelineSection is false", () => {
+    const anchor = document.createElement("div");
+    anchor.id = PLANT_RELATIVE_TIMELINE_ANCHOR_ID;
+    document.body.appendChild(anchor);
+    const scrollSpy = vi.fn();
+    anchor.scrollIntoView = scrollSpy as unknown as Element["scrollIntoView"];
+
+    render(
+      <PlantDetailQuickActions plantId="p1" hasTimelineSection={false} />,
+    );
+    const btn = screen.getByTestId("plant-detail-quick-action-view-timeline");
+    expect(btn).toBeDisabled();
+    expect(btn.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(btn);
+    expect(scrollSpy).not.toHaveBeenCalled();
+    expect(
+      screen.getByTestId("plant-detail-quick-action-view-timeline-reason")
+        .textContent,
+    ).toMatch(/timeline section/i);
+
+    document.body.removeChild(anchor);
+  });
+
+  it("aria-label on disabled entries includes the unavailable reason", () => {
+    render(<PlantDetailQuickActions plantId={null} />);
+    const ql = screen.getByTestId("plant-detail-quick-action-quicklog");
+    expect(ql.getAttribute("aria-label")).toMatch(/unavailable/i);
+    expect(ql.getAttribute("aria-label")).toMatch(/plant context/i);
+  });
+
+  it("disabled reason copy does not imply automation, live data, AI certainty, reminders, or email", () => {
+    const entries = buildPlantDetailQuickActions({
+      plantId: null,
+      hasTimelineSection: false,
+    });
+    const reasons = entries
+      .map((e) => e.disabledReason)
+      .filter((r): r is string => Boolean(r));
+    expect(reasons.length).toBeGreaterThan(0);
+    for (const text of reasons) {
+      expect(text).not.toMatch(/live/i);
+      expect(text).not.toMatch(/real[-\s]?time/i);
+      expect(text).not.toMatch(/diagnose|certain/i);
+      expect(text).not.toMatch(/autopilot|auto[-\s]?run|control/i);
+      expect(text).not.toMatch(/schedul|reminder|notification|email/i);
+      expect(text).not.toMatch(/token|secret|raw|provenance|user[_-]?id/i);
+    }
+  });
 });
 
 describe("PlantDetailQuickActions · static safety", () => {

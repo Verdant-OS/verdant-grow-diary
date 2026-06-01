@@ -330,8 +330,8 @@ describe("PlantDetailPhotoStrip render", () => {
         entry_at: "2026-05-30T10:00:00.000Z",
         entry_type: "photo",
         user_id: "user-uuid-5678",
+        photo_url: "https://example.com/safe.jpg",
         details: {
-          photo_url: "https://example.com/safe.jpg",
           storage_path: "private/buckets/secret.jpg",
           token: "tok_secret",
         },

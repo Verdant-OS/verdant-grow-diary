@@ -112,8 +112,6 @@ export default function PlantDetailDoctorContextPreview({
 
   if (!plantId) return null;
 
-  const doctorHref = `/doctor?plantId=${encodeURIComponent(plantId)}`;
-
   return (
     <section
       aria-labelledby={HEADING_ID}
@@ -148,16 +146,23 @@ export default function PlantDetailDoctorContextPreview({
           ))}
         </ul>
       )}
-      <div className="flex items-center justify-end pt-1">
-        <Button
-          asChild
-          size="sm"
-          variant="outline"
-          className="gap-1"
-          data-testid="plant-detail-doctor-context-ask-cta"
-        >
-          <Link to={doctorHref} aria-label="Ask Doctor about this plant">
-            Ask Doctor <ArrowRight className="h-3.5 w-3.5" />
+      <div
+        className="flex items-center justify-end pt-1"
+        data-testid="plant-detail-doctor-context-ask-cta"
+      >
+        <PlantDetailDoctorLaunchDialog
+          plantId={plantId}
+          stage={stage}
+          hasPlantPhoto={hasPlantPhoto}
+          openAlertsCount={openAlertsCount}
+          pendingActionsCount={pendingActionsCount}
+          now={now}
+        />
+      </div>
+    </section>
+  );
+}
+
           </Link>
         </Button>
       </div>

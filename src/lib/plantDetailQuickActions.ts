@@ -18,6 +18,7 @@ import { sensorsPath } from "@/lib/routes";
 export type PlantDetailQuickActionKind =
   | "quicklog"
   | "manual_sensor_snapshot"
+  | "upload_photo"
   | "ask_doctor"
   | "view_timeline";
 
@@ -73,6 +74,10 @@ const LABELS: Record<
   manual_sensor_snapshot: {
     label: "Manual Sensor Snapshot",
     description: "Open sensors to record a manual reading.",
+  },
+  upload_photo: {
+    label: "Upload Photo",
+    description: "Open the diary entry sheet to attach a photo.",
   },
   ask_doctor: {
     label: "Ask Doctor",
@@ -132,6 +137,21 @@ export function buildPlantDetailQuickActions(
       // known, otherwise plain `/sensors`.
       href: sensorsPath(growId),
       testId: "plant-detail-quick-action-manual-sensor-snapshot",
+    },
+    {
+      kind: "upload_photo",
+      ...LABELS.upload_photo,
+      // Photo upload lives inside the existing QuickLog dialog (file picker
+      // is available there). Opening QuickLog with plant/tent/grow context
+      // is the safest existing entry point — no new upload route, no direct
+      // storage writes from here.
+      event: "open-quicklog",
+      eventPayload: quickLogPayload,
+      testId: "plant-detail-quick-action-upload-photo",
+      disabled: !plantId,
+      disabledReason: plantId
+        ? undefined
+        : "Plant context is not loaded yet.",
     },
     {
       kind: "ask_doctor",

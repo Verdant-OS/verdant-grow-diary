@@ -1,7 +1,15 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bell } from "lucide-react";
 import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  SEVERITY_LABEL,
+  STATUS_LABEL,
+  buildAlertRowAriaLabel,
+  formatAlertSeenLabel,
+  formatAlertSourceLabel,
+} from "@/lib/alertsRouteView";
 
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
@@ -28,6 +36,7 @@ import {
   dismissAlert,
   logAlertEvent,
   resolveAlert,
+  type AlertRow,
   type AlertSeverityRow,
   type AlertStatusRow,
 } from "@/lib/alerts";
@@ -71,6 +80,9 @@ export default function Alerts() {
   const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } =
     useScopedGrow();
   const scopedGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
+  // A grow id was passed in the URL but doesn't map to a grow the viewer
+  // owns. Showing every alert would be misleading — render a calm prompt.
+  const hasInvalidScope = !!urlGrowId && !isValidScopedGrow;
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
@@ -197,14 +209,53 @@ export default function Alerts() {
         </Select>
       </div>
 
-      {status === "loading" || status === "idle" ? (
-        <p className="text-sm text-muted-foreground" role="status">
-          Loading alerts…
-        </p>
+      {hasInvalidScope ? (
+        <div
+          role="status"
+          className="glass rounded-2xl p-6 text-center flex flex-col items-center gap-2"
+          data-testid="alerts-missing-context"
+        >
+          <Bell className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
+          <p className="font-display font-semibold text-base">
+            Select a grow or tent to review alerts.
+          </p>
+          <p className="text-sm text-muted-foreground max-w-sm">
+            Alerts are scoped to a grow or tent so you only see warnings that
+            match what you’re working on.
+          </p>
+        </div>
+      ) : status === "loading" || status === "idle" ? (
+        <div
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
+          aria-label="Loading alerts"
+          className="space-y-2"
+          data-testid="alerts-loading-skeleton"
+        >
+          <span className="sr-only">Loading alerts…</span>
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="glass rounded-2xl p-4 flex flex-col gap-2"
+              aria-hidden="true"
+            >
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="ml-auto h-3 w-20" />
+              </div>
+              <Skeleton className="h-3 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
+          ))}
+        </div>
       ) : status === "unavailable" ? (
         <div
           role="alert"
           className="glass rounded-2xl p-4 flex flex-col gap-2 text-sm"
+          data-testid="alerts-unavailable"
         >
           <p className="font-medium">Alerts unavailable</p>
           <p className="text-muted-foreground">
@@ -215,7 +266,12 @@ export default function Alerts() {
             <p className="text-[11px] text-muted-foreground/80">{error}</p>
           ) : null}
           <div>
-            <Button size="sm" variant="outline" onClick={() => reload()}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => reload()}
+              aria-label="Retry loading alerts"
+            >
               Retry
             </Button>
           </div>
@@ -248,85 +304,14 @@ export default function Alerts() {
                 </h2>
                 <ul className="space-y-2">
                   {items.map((a) => (
-                    <li
+                    <AlertCard
                       key={a.id}
-                      className="glass rounded-2xl p-4 flex flex-col gap-2"
-                    >
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] uppercase ${SEVERITY_TONE[a.severity]}`}
-                        >
-                          {a.severity}
-                        </Badge>
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] uppercase ${STATUS_TONE[a.status]}`}
-                        >
-                          {a.status}
-                        </Badge>
-                        <Link
-                          to={alertDetailPath(a.id)}
-                          className="text-sm font-medium hover:underline"
-                        >
-                          {a.title}
-                        </Link>
-                        <span className="ml-auto text-[11px] text-muted-foreground">
-                          {formatDistanceToNow(new Date(a.first_seen_at), {
-                            addSuffix: true,
-                          })}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {a.reason}
-                      </p>
-                      <AlertWhyContext alert={a} variant="compact" />
-                      <LinkedActionCountBadge
-                        alertId={a.id}
-                        summary={linkedActionCounts.get(a.id)}
-                        growId={a.grow_id}
-                        testIdPrefix="alert-row"
-                      />
-
-                      <div className="flex flex-wrap gap-2">
-                        {a.status !== "acknowledged" &&
-                          a.status !== "resolved" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                handleAcknowledge(a.id, a.grow_id, a.status)
-                              }
-                            >
-                              Acknowledge
-                            </Button>
-                          )}
-                        {a.status !== "resolved" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              handleResolve(a.id, a.grow_id, a.status)
-                            }
-                          >
-                            Resolve
-                          </Button>
-                        )}
-                        {a.status !== "dismissed" &&
-                          a.status !== "resolved" && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() =>
-                                handleDismiss(a.id, a.grow_id, a.status)
-                              }
-                            >
-                              Dismiss
-                            </Button>
-                          )}
-                      </div>
-                      <AlertHistory alertId={a.id} />
-                    </li>
+                      alert={a}
+                      linkedSummary={linkedActionCounts.get(a.id)}
+                      onAcknowledge={handleAcknowledge}
+                      onResolve={handleResolve}
+                      onDismiss={handleDismiss}
+                    />
                   ))}
                 </ul>
               </section>
@@ -367,5 +352,133 @@ function AlertHistory({ alertId }: { alertId: string }) {
         ))}
       </ol>
     </details>
+  );
+}
+
+type AlertActionHandler = (
+  id: string,
+  growId: string,
+  prev: AlertStatusRow,
+) => void;
+
+interface AlertCardProps {
+  alert: AlertRow;
+  linkedSummary: ReturnType<
+    ReturnType<typeof useAlertsLinkedActionCounts>["get"]
+  >;
+  onAcknowledge: AlertActionHandler;
+  onResolve: AlertActionHandler;
+  onDismiss: AlertActionHandler;
+}
+
+function AlertCard({
+  alert: a,
+  linkedSummary,
+  onAcknowledge,
+  onResolve,
+  onDismiss,
+}: AlertCardProps) {
+  const titleId = useId();
+  const seenLabel = formatAlertSeenLabel(a.first_seen_at);
+  const sourceLabel = formatAlertSourceLabel(a.source);
+  const severityLabel = SEVERITY_LABEL[a.severity] ?? "Info";
+  const statusLabel = STATUS_LABEL[a.status] ?? "Open";
+  const ariaLabel = buildAlertRowAriaLabel({
+    severity: a.severity,
+    status: a.status,
+    title: a.title,
+    source: a.source,
+    firstSeenAt: a.first_seen_at,
+  });
+  const seenIso =
+    a.first_seen_at && Number.isFinite(Date.parse(a.first_seen_at))
+      ? a.first_seen_at
+      : undefined;
+  return (
+    <li>
+      <article
+        aria-labelledby={titleId}
+        aria-label={ariaLabel}
+        className="glass rounded-2xl p-4 flex flex-col gap-2 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background"
+      >
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge
+            variant="outline"
+            className={`text-[10px] uppercase ${SEVERITY_TONE[a.severity]}`}
+            aria-label={`Severity: ${severityLabel}`}
+          >
+            {severityLabel}
+          </Badge>
+          <Badge
+            variant="outline"
+            className={`text-[10px] uppercase ${STATUS_TONE[a.status]}`}
+            aria-label={`Status: ${statusLabel}`}
+          >
+            {statusLabel}
+          </Badge>
+          <h3 id={titleId} className="text-sm font-medium m-0">
+            <Link
+              to={alertDetailPath(a.id)}
+              className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
+            >
+              {a.title}
+            </Link>
+          </h3>
+          <span
+            className="text-[11px] text-muted-foreground"
+            aria-label={`Source: ${sourceLabel}`}
+            data-testid="alert-row-source"
+          >
+            {sourceLabel}
+          </span>
+          <time
+            className="ml-auto text-[11px] text-muted-foreground"
+            dateTime={seenIso}
+            aria-label={`First seen ${seenLabel}`}
+          >
+            {seenLabel}
+          </time>
+        </div>
+        <p className="text-xs text-muted-foreground">{a.reason}</p>
+        <AlertWhyContext alert={a} variant="compact" />
+        <LinkedActionCountBadge
+          alertId={a.id}
+          summary={linkedSummary}
+          growId={a.grow_id}
+          testIdPrefix="alert-row"
+        />
+
+        <div className="flex flex-wrap gap-2">
+          {a.status !== "acknowledged" && a.status !== "resolved" && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onAcknowledge(a.id, a.grow_id, a.status)}
+            >
+              Acknowledge
+            </Button>
+          )}
+          {a.status !== "resolved" && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onResolve(a.id, a.grow_id, a.status)}
+            >
+              Resolve
+            </Button>
+          )}
+          {a.status !== "dismissed" && a.status !== "resolved" && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => onDismiss(a.id, a.grow_id, a.status)}
+            >
+              Dismiss
+            </Button>
+          )}
+        </div>
+        <AlertHistory alertId={a.id} />
+      </article>
+    </li>
   );
 }

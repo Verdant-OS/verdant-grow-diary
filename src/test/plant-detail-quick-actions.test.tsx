@@ -476,6 +476,42 @@ describe("PlantDetailQuickActions · render", () => {
       expect(text).not.toMatch(/token|secret|raw|provenance|user[_-]?id/i);
     }
   });
+
+  it("uses a responsive grid container for mobile layout", () => {
+    const { container } = render(<PlantDetailQuickActions plantId="p1" />);
+    const nav = container.querySelector("nav");
+    expect(nav?.className).toMatch(/grid-cols-2/);
+    expect(nav?.className).toMatch(/sm:flex/);
+  });
+
+  it("buttons span full width on mobile and collapse to auto on desktop", () => {
+    render(<PlantDetailQuickActions plantId="p1" growId="g1" />);
+    const ids = [
+      "plant-detail-quick-action-quicklog",
+      "plant-detail-quick-action-manual-sensor-snapshot",
+      "plant-detail-quick-action-upload-photo",
+      "plant-detail-quick-action-ask-doctor",
+      "plant-detail-quick-action-view-timeline",
+    ];
+    for (const id of ids) {
+      const el = screen.getByTestId(id);
+      const cls =
+        el.className + " " + (el.querySelector("a")?.className ?? "");
+      expect(cls).toMatch(/w-full/);
+      expect(cls).toMatch(/sm:w-auto/);
+    }
+  });
+
+  it("action wrapper prevents grid blowout with min-w-0", () => {
+    const { container } = render(<PlantDetailQuickActions plantId="p1" />);
+    const wrappers = container.querySelectorAll(
+      '[data-testid="plant-detail-quick-actions"] > div',
+    );
+    expect(wrappers.length).toBe(5);
+    for (const w of wrappers) {
+      expect(w.className).toMatch(/min-w-0/);
+    }
+  });
 });
 
 describe("PlantDetailQuickActions · keyboard and ARIA", () => {

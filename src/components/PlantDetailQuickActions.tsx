@@ -80,18 +80,18 @@ function renderEntry(entry: PlantDetailQuickActionEntry) {
   const Icon = ICON[entry.kind];
   const inner = (
     <>
-      <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-      <span>{entry.label}</span>
+      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+      <span className="truncate">{entry.label}</span>
     </>
   );
   const ariaLabel = ariaLabelFor(entry);
   const describedBy = describedByFor(entry);
-  const baseClasses = `gap-1 ${FOCUS_CLASSES}`;
+  const baseClasses = `gap-1.5 w-full justify-start sm:w-auto ${FOCUS_CLASSES}`;
 
   const descriptionNode = (
     <p
       id={`${entry.testId}-description`}
-      className="text-[11px] text-muted-foreground px-1"
+      className="text-xs leading-snug text-muted-foreground px-1"
       data-testid={`${entry.testId}-description`}
     >
       {entry.description}
@@ -100,7 +100,7 @@ function renderEntry(entry: PlantDetailQuickActionEntry) {
 
   if (entry.disabled) {
     return (
-      <div key={entry.kind} className="flex flex-col gap-1">
+      <div key={entry.kind} className="flex flex-col gap-1.5 min-w-0">
         <Button
           type="button"
           size="sm"
@@ -118,7 +118,7 @@ function renderEntry(entry: PlantDetailQuickActionEntry) {
         {entry.disabledReason && (
           <p
             id={`${entry.testId}-reason`}
-            className="text-[11px] text-muted-foreground px-1"
+            className="text-xs leading-snug text-muted-foreground px-1"
             data-testid={`${entry.testId}-reason`}
             role="note"
           >
@@ -131,7 +131,7 @@ function renderEntry(entry: PlantDetailQuickActionEntry) {
 
   if (entry.href) {
     return (
-      <div key={entry.kind} className="flex flex-col gap-1">
+      <div key={entry.kind} className="flex flex-col gap-1.5 min-w-0">
         <Button
           asChild
           size="sm"
@@ -150,7 +150,7 @@ function renderEntry(entry: PlantDetailQuickActionEntry) {
 
   if (entry.event === "open-quicklog") {
     return (
-      <div key={entry.kind} className="flex flex-col gap-1">
+      <div key={entry.kind} className="flex flex-col gap-1.5 min-w-0">
         <Button
           type="button"
           size="sm"
@@ -171,7 +171,7 @@ function renderEntry(entry: PlantDetailQuickActionEntry) {
   if (entry.scrollTargetId) {
     const target = entry.scrollTargetId;
     return (
-      <div key={entry.kind} className="flex flex-col gap-1">
+      <div key={entry.kind} className="flex flex-col gap-1.5 min-w-0">
         <Button
           type="button"
           size="sm"
@@ -213,7 +213,7 @@ export default function PlantDetailQuickActions({
     <nav
       aria-label="Plant quick actions"
       data-testid="plant-detail-quick-actions"
-      className="my-3 flex flex-wrap items-start gap-2"
+      className="my-4 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-start sm:gap-2"
     >
       {entries.map(renderEntry)}
     </nav>

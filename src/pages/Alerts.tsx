@@ -354,3 +354,131 @@ function AlertHistory({ alertId }: { alertId: string }) {
     </details>
   );
 }
+
+type AlertActionHandler = (
+  id: string,
+  growId: string,
+  prev: AlertStatusRow,
+) => void;
+
+interface AlertCardProps {
+  alert: AlertRow;
+  linkedSummary: ReturnType<
+    ReturnType<typeof useAlertsLinkedActionCounts>["get"]
+  >;
+  onAcknowledge: AlertActionHandler;
+  onResolve: AlertActionHandler;
+  onDismiss: AlertActionHandler;
+}
+
+function AlertCard({
+  alert: a,
+  linkedSummary,
+  onAcknowledge,
+  onResolve,
+  onDismiss,
+}: AlertCardProps) {
+  const titleId = useId();
+  const seenLabel = formatAlertSeenLabel(a.first_seen_at);
+  const sourceLabel = formatAlertSourceLabel(a.source);
+  const severityLabel = SEVERITY_LABEL[a.severity] ?? "Info";
+  const statusLabel = STATUS_LABEL[a.status] ?? "Open";
+  const ariaLabel = buildAlertRowAriaLabel({
+    severity: a.severity,
+    status: a.status,
+    title: a.title,
+    source: a.source,
+    firstSeenAt: a.first_seen_at,
+  });
+  const seenIso =
+    a.first_seen_at && Number.isFinite(Date.parse(a.first_seen_at))
+      ? a.first_seen_at
+      : undefined;
+  return (
+    <li>
+      <article
+        aria-labelledby={titleId}
+        aria-label={ariaLabel}
+        className="glass rounded-2xl p-4 flex flex-col gap-2 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background"
+      >
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge
+            variant="outline"
+            className={`text-[10px] uppercase ${SEVERITY_TONE[a.severity]}`}
+            aria-label={`Severity: ${severityLabel}`}
+          >
+            {severityLabel}
+          </Badge>
+          <Badge
+            variant="outline"
+            className={`text-[10px] uppercase ${STATUS_TONE[a.status]}`}
+            aria-label={`Status: ${statusLabel}`}
+          >
+            {statusLabel}
+          </Badge>
+          <h3 id={titleId} className="text-sm font-medium m-0">
+            <Link
+              to={alertDetailPath(a.id)}
+              className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
+            >
+              {a.title}
+            </Link>
+          </h3>
+          <span
+            className="text-[11px] text-muted-foreground"
+            aria-label={`Source: ${sourceLabel}`}
+            data-testid="alert-row-source"
+          >
+            {sourceLabel}
+          </span>
+          <time
+            className="ml-auto text-[11px] text-muted-foreground"
+            dateTime={seenIso}
+            aria-label={`First seen ${seenLabel}`}
+          >
+            {seenLabel}
+          </time>
+        </div>
+        <p className="text-xs text-muted-foreground">{a.reason}</p>
+        <AlertWhyContext alert={a} variant="compact" />
+        <LinkedActionCountBadge
+          alertId={a.id}
+          summary={linkedSummary}
+          growId={a.grow_id}
+          testIdPrefix="alert-row"
+        />
+
+        <div className="flex flex-wrap gap-2">
+          {a.status !== "acknowledged" && a.status !== "resolved" && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onAcknowledge(a.id, a.grow_id, a.status)}
+            >
+              Acknowledge
+            </Button>
+          )}
+          {a.status !== "resolved" && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onResolve(a.id, a.grow_id, a.status)}
+            >
+              Resolve
+            </Button>
+          )}
+          {a.status !== "dismissed" && a.status !== "resolved" && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => onDismiss(a.id, a.grow_id, a.status)}
+            >
+              Dismiss
+            </Button>
+          )}
+        </div>
+        <AlertHistory alertId={a.id} />
+      </article>
+    </li>
+  );
+}

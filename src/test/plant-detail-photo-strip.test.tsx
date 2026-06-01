@@ -207,10 +207,9 @@ describe("buildPlantPhotoStripItems", () => {
 });
 
 describe("PlantDetailPhotoStrip render", () => {
-  beforeEach();
-  function beforeEach() {
+  beforeEach(() => {
     useDiaryEntriesMock.mockReset();
-  }
+  });
 
   it("renders heading", () => {
     useDiaryEntriesMock.mockReturnValue({

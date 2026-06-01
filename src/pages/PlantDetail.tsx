@@ -158,7 +158,12 @@ export default function PlantDetail() {
           hideView
         />
       </div>
-      <div className="grid lg:grid-cols-3 gap-4">
+      <div
+        id={PLANT_DETAIL_SECTION_ANCHORS.overview}
+        tabIndex={-1}
+        aria-label="Plant overview section"
+        className="grid lg:grid-cols-3 gap-4 scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+      >
         <div className="lg:col-span-1 glass rounded-2xl overflow-hidden">
           <PlantPhoto
             src={plant.photo}

@@ -20,6 +20,7 @@ import PlantQuickStatusStrip from "@/components/PlantQuickStatusStrip";
 import PlantDetailQuickActions from "@/components/PlantDetailQuickActions";
 import PlantDetailPhotoStrip from "@/components/PlantDetailPhotoStrip";
 import PlantDetailRecentActivityRecap from "@/components/PlantDetailRecentActivityRecap";
+import PlantDetailWhatsMissing from "@/components/PlantDetailWhatsMissing";
 import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
 import PlantDetailSectionNav from "@/components/PlantDetailSectionNav";
 import { PLANT_DETAIL_SECTION_ANCHORS } from "@/lib/plantDetailSectionAnchors";
@@ -137,6 +138,12 @@ export default function PlantDetail() {
         hasAssignedTent={!!plant.tentId}
       />
       <PlantDetailPhotoStrip plantId={plant.id} growId={plant.growId ?? null} />
+      <PlantDetailWhatsMissing
+        plantId={plant.id}
+        growId={plant.growId ?? null}
+        stage={plant.stage ?? null}
+        hasPlantPhoto={!!plant.photo}
+      />
       <PlantDetailRecentActivityRecap plantId={plant.id} />
 
 

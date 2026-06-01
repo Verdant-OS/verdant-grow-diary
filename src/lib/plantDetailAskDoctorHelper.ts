@@ -5,7 +5,7 @@
  * Deterministic. No React, no I/O, no fetch, no AI calls, no writes.
  * Consumes already-loaded Plant Detail signals and selects cautious
  * helper copy that never promises diagnosis certainty or implies
- * automation / device control.
+ * automation or hardware steering.
  */
 
 export type AskDoctorHelperLevel = "has_context" | "partial" | "none";

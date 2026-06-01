@@ -94,6 +94,19 @@ describe("buildPlantDetailQuickActions · ordering and completeness", () => {
       "View Timeline",
     ]);
   });
+
+  it("descriptions match the documented helper copy", () => {
+    const descriptions = buildPlantDetailQuickActions({ plantId: "p1" }).map(
+      (e) => e.description,
+    );
+    expect(descriptions).toEqual([
+      "Record an observation or grow action.",
+      "Add current tent readings by hand.",
+      "Attach a plant photo to visual history.",
+      "Review this plant with existing context.",
+      "Jump to this plant's history.",
+    ]);
+  });
 });
 
 describe("buildPlantDetailQuickActions · payloads and routes", () => {
@@ -197,6 +210,30 @@ describe("PlantDetailQuickActions · render", () => {
     expect(
       screen.getByRole("navigation", { name: /plant quick actions/i }),
     ).toBeInTheDocument();
+  });
+
+  it("renders helper description for every quick action", () => {
+    render(
+      <PlantDetailQuickActions
+        plantId="p1"
+        plantName="Plant 1"
+        growId="g1"
+        tentId="t1"
+        tentName="Tent A"
+      />,
+    );
+    const expected = [
+      { testId: "plant-detail-quick-action-quicklog", text: /observation or grow action/i },
+      { testId: "plant-detail-quick-action-manual-sensor-snapshot", text: /readings by hand/i },
+      { testId: "plant-detail-quick-action-upload-photo", text: /visual history/i },
+      { testId: "plant-detail-quick-action-ask-doctor", text: /existing context/i },
+      { testId: "plant-detail-quick-action-view-timeline", text: /history/i },
+    ];
+    for (const { testId, text } of expected) {
+      const el = screen.getByTestId(`${testId}-description`);
+      expect(el).toBeInTheDocument();
+      expect(el.textContent).toMatch(text);
+    }
   });
 
   it("Upload Photo click dispatches verdant:open-quicklog with plant context", () => {

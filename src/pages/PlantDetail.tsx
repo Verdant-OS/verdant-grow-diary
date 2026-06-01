@@ -134,6 +134,11 @@ export default function PlantDetail() {
         tentId={plant.tentId ?? null}
         tentName={tent?.name ?? null}
       />
+      <PlantDetailAskDoctorHelper
+        plantId={plant.id}
+        stage={plant.stage ?? null}
+        hasPlantPhoto={!!plant.photo}
+      />
       <PlantDetailSectionNav
         hasAlertsSection
         hasActionsSection

@@ -268,7 +268,7 @@ describe("PlantDetailPhotoStrip render", () => {
       plant_id: "p1",
       entry_at: `2026-05-${String(20 + i).padStart(2, "0")}T10:00:00.000Z`,
       entry_type: "photo",
-      details: { photo_url: `https://example.com/${i}.jpg` },
+      photo_url: `https://example.com/${i}.jpg`,
       note: "",
     }));
     // Different plant — must be filtered out
@@ -277,7 +277,7 @@ describe("PlantDetailPhotoStrip render", () => {
       plant_id: "p2",
       entry_at: "2026-06-01T10:00:00.000Z",
       entry_type: "photo",
-      details: { photo_url: "https://example.com/other.jpg" },
+      photo_url: "https://example.com/other.jpg",
       note: "",
     });
     useDiaryEntriesMock.mockReturnValue({

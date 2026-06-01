@@ -102,6 +102,9 @@ export const VIEW_LATEST_DISABLED_REASON =
   "Add a quick log, photo, or sensor snapshot to start the timeline.";
 export const ALERTS_LINK_LABEL = "View alerts";
 export const ACTIONS_LINK_LABEL = "View pending actions";
+export const ALERTS_LINK_ARIA_LABEL = "View open alerts for this plant";
+export const ACTIONS_LINK_ARIA_LABEL = "View pending actions for this plant";
+export const VIEW_LATEST_ARIA_LABEL = "View latest timeline entry";
 export const ALERTS_LINK_DISABLED_REASON =
   "Connect this plant to a grow to view alerts.";
 export const ACTIONS_LINK_DISABLED_REASON =

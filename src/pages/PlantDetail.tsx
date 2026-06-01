@@ -135,6 +135,8 @@ export default function PlantDetail() {
         hasDoctorSection
         hasAssignedTent={!!plant.tentId}
       />
+      <PlantDetailPhotoStrip plantId={plant.id} growId={plant.growId ?? null} />
+
 
 
 

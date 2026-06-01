@@ -151,15 +151,17 @@ describe("buildPlantQuickStatusView — pure rules", () => {
     expect(v.compact).not.toMatch(/alert|action/i);
   });
 
-  it("treats zero counts as known (0 open alerts / 0 pending actions)", () => {
+  it("treats zero counts as known and uses 'No open alerts' / 'No pending actions' copy", () => {
     const v = buildPlantQuickStatusView({
       stage: "vegetation",
       timelineItems: [],
       alertCount: 0,
       actionCount: 0,
     });
-    expect(v.alertLabel).toBe("0 open alerts");
-    expect(v.actionLabel).toBe("0 pending actions");
+    expect(v.alertLabel).toBe("No open alerts");
+    expect(v.actionLabel).toBe("No pending actions");
+    expect(v.hasAlertCount).toBe(true);
+    expect(v.hasActionCount).toBe(true);
   });
 
   it("never exposes IDs, user_ids, tokens, raw payloads, or provenance markers", () => {

@@ -175,11 +175,14 @@ describe("Alerts route — missing grow/tent context", () => {
     listAlertsMock.mockResolvedValue([]);
     renderAt("/alerts?growId=does-not-exist");
     const fallback = await screen.findByTestId("alerts-missing-context");
+    expect(fallback.getAttribute("role")).toBe("status");
     expect(fallback.textContent).toMatch(
       /Select a grow or tent to review alerts\./,
     );
     expect(fallback.textContent).toMatch(/scoped to a grow or tent/i);
     expect(screen.queryByTestId("alerts-loading-skeleton")).toBeNull();
+    expect(fallback.textContent).not.toContain("g1");
+    expect(fallback.textContent).not.toContain("alert-row-1");
   });
 });
 
@@ -225,6 +228,8 @@ describe("Alerts route — empty + error + retry", () => {
     expect(visible).not.toContain("service_role");
     expect(visible).not.toContain("raw_payload");
     expect(visible).not.toContain("provenance");
+    expect(visible).not.toContain("g1");
+    expect(visible).not.toContain("alert-row-1");
   });
 });
 

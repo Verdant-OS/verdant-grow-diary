@@ -42,6 +42,8 @@ export type QuickStatusLoadState = "ready" | "loading" | "unavailable";
 
 export interface PlantQuickStatusLink {
   label: string;
+  /** Accessible name spoken to assistive tech (clearer than the visible label). */
+  ariaLabel: string;
   href: string | null;
   disabled: boolean;
   disabledReason: string | null;
@@ -49,6 +51,8 @@ export interface PlantQuickStatusLink {
 
 export interface PlantQuickStatusViewLatest {
   label: string;
+  /** Accessible name for the scroll affordance. */
+  ariaLabel: string;
   /** Newest timeline item's id, used for the scroll target. Never rendered visibly. */
   targetItemId: string | null;
   disabled: boolean;

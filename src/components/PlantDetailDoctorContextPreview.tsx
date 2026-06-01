@@ -94,6 +94,10 @@ export default function PlantDetailDoctorContextPreview({
   hasPlantPhoto,
   openAlertsCount,
   pendingActionsCount,
+  growId,
+  tentId,
+  plantName,
+  tentName,
   now,
 }: Props) {
   const { data: rawRows, isLoading } = usePlantRecentActivity(plantId);

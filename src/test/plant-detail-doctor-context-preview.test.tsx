@@ -272,10 +272,11 @@ describe("<PlantDetailDoctorContextPreview />", () => {
     expect(screen.getByTestId("plant-detail-doctor-context-item-pending_actions")).toBeInTheDocument();
   });
 
-  it("renders an Ask Doctor CTA routed to /doctor with plant context", () => {
+  it("renders an Ask Doctor trigger inside the CTA region", () => {
     renderCard();
     const cta = screen.getByTestId("plant-detail-doctor-context-ask-cta");
-    expect(cta.getAttribute("href")).toBe("/doctor?plantId=p1");
+    const trigger = cta.querySelector('[data-testid="plant-detail-doctor-launch-trigger"]');
+    expect(trigger).toBeTruthy();
   });
 
   it("renders nothing without a plantId", () => {

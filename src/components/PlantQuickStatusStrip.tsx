@@ -96,6 +96,10 @@ export default function PlantQuickStatusStrip({
     } catch {
       el.scrollIntoView();
     }
+    // Make the target programmatically focusable without disturbing tab order.
+    if (!el.hasAttribute("tabindex")) {
+      el.setAttribute("tabindex", "-1");
+    }
     if (typeof el.focus === "function") {
       try {
         el.focus({ preventScroll: true });
@@ -104,6 +108,7 @@ export default function PlantQuickStatusStrip({
       }
     }
   }, [view.viewLatestEntry.targetItemId]);
+
 
   return (
     <div

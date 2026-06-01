@@ -178,6 +178,17 @@ describe("buildPlantDetailQuickActions · payloads and routes", () => {
     expect(e.scrollTargetId).toBe(PLANT_RELATIVE_TIMELINE_ANCHOR_ID);
     expect(e.href).toBeUndefined();
     expect(e.event).toBeUndefined();
+    expect(e.disabled).toBeFalsy();
+  });
+
+  it("View Timeline is disabled with reason when hasTimelineSection is false", () => {
+    const e = buildPlantDetailQuickActions({
+      plantId: "p1",
+      hasTimelineSection: false,
+    }).find((e) => e.kind === "view_timeline")!;
+    expect(e.disabled).toBe(true);
+    expect(e.scrollTargetId).toBeUndefined();
+    expect(e.disabledReason).toMatch(/timeline section/i);
   });
 });
 

@@ -104,6 +104,7 @@ export function buildPlantDetailQuickActions(
   const growId = input.growId ?? null;
   const tentId = input.tentId ?? null;
   const tentName = input.tentName ?? null;
+  const hasTimelineSection = input.hasTimelineSection ?? true;
 
   const quickLogPayload: PlantDetailQuickLogEventPayload | null = plantId
     ? {

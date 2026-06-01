@@ -1029,9 +1029,19 @@ export default function AiDoctorSessionDetail() {
               aria-live="polite"
               aria-busy="true"
               data-testid="ai-doctor-session-detail-loading"
-              className="text-muted-foreground"
+              className="space-y-3"
             >
-              Loading AI Doctor session…
+              <p className="text-sm text-muted-foreground">Loading AI Doctor session…</p>
+              <div
+                className="space-y-2"
+                aria-hidden="true"
+                data-testid="ai-doctor-session-detail-loading-skeleton"
+              >
+                <div className="h-4 w-1/3 rounded bg-muted animate-pulse" />
+                <div className="h-20 w-full rounded-lg bg-muted animate-pulse" />
+                <div className="h-16 w-full rounded-lg bg-muted animate-pulse" />
+                <div className="h-24 w-full rounded-lg bg-muted animate-pulse" />
+              </div>
             </div>
           ) : error ? (
             <div

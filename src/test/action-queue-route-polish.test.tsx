@@ -78,6 +78,37 @@ let resolveLoad: (() => void) | null = null;
 
 vi.mock("@/integrations/supabase/client", () => {
   const makeChain = (table: string) => {
+    const resolveActionQuery = () => {
+      if (table !== "action_queue") {
+        return Promise.resolve({ data: [], error: null });
+      }
+      if (resolveLoad) {
+        return new Promise((res) => {
+          resolveLoad = () => {
+            res({ data: actionRowsMock, error: actionRowsError });
+          };
+        });
+      }
+      return Promise.resolve({ data: actionRowsMock, error: actionRowsError });
+    };
+    // A thenable result that still supports follow-on filters like `.eq()`.
+    // Page code does: `.order().limit(100)` then either `await q` or
+    // `await q.eq("grow_id", ...)`. The same result must satisfy both.
+    const makeThenableResult = () => {
+      const result: Record<string, unknown> = {
+        eq: () => makeThenableResult(),
+        in: () => makeThenableResult(),
+        order: () => makeThenableResult(),
+        limit: () => makeThenableResult(),
+        then: (
+          onFulfilled: (r: { data: unknown; error: unknown }) => unknown,
+          onRejected?: (e: unknown) => unknown,
+        ) => resolveActionQuery().then(onFulfilled, onRejected),
+        catch: (onRejected: (e: unknown) => unknown) =>
+          resolveActionQuery().catch(onRejected),
+      };
+      return result;
+    };
     const chain: Record<string, unknown> = {
       select: () => chain,
       eq: () => chain,
@@ -85,19 +116,7 @@ vi.mock("@/integrations/supabase/client", () => {
       order: () => chain,
       insert: () => Promise.resolve({ data: null, error: null }),
       update: () => ({ eq: () => Promise.resolve({ data: null, error: null }) }),
-      limit: () => {
-        if (table !== "action_queue") {
-          return Promise.resolve({ data: [], error: null });
-        }
-        if (resolveLoad) {
-          return new Promise((res) => {
-            resolveLoad = () => {
-              res({ data: actionRowsMock, error: actionRowsError });
-            };
-          });
-        }
-        return Promise.resolve({ data: actionRowsMock, error: actionRowsError });
-      },
+      limit: () => makeThenableResult(),
       then: (cb: (r: { data: unknown; error: unknown }) => unknown) =>
         cb({ data: actionRowsMock, error: actionRowsError }),
     };

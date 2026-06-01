@@ -811,6 +811,122 @@ function fmtDate(ts: string | null): string {
   }
 }
 
+function SessionSummaryPanel({
+  createdAt,
+  riskLevel,
+  confidenceLabel,
+  contextCeiling,
+  suggestedActionCount,
+  summary,
+  hasPlantContext,
+  hasTentContext,
+  hasGrowContext,
+}: {
+  createdAt: string | null;
+  riskLevel: string | null;
+  confidenceLabel: string | null;
+  contextCeiling: string | null;
+  suggestedActionCount: number;
+  summary: string | null;
+  hasPlantContext: boolean;
+  hasTentContext: boolean;
+  hasGrowContext: boolean;
+}) {
+  const items: Array<{ label: string; value: string; testid: string }> = [];
+  if (createdAt) {
+    items.push({
+      label: "Created",
+      value: fmtDate(createdAt) || "—",
+      testid: "ai-doctor-session-summary-created",
+    });
+  }
+  if (riskLevel) {
+    items.push({
+      label: "Risk",
+      value: riskLevel,
+      testid: "ai-doctor-session-summary-risk",
+    });
+  }
+  if (confidenceLabel) {
+    items.push({
+      label: "Confidence",
+      value: confidenceLabel,
+      testid: "ai-doctor-session-summary-confidence",
+    });
+  }
+  if (contextCeiling) {
+    items.push({
+      label: "Context ceiling",
+      value: contextCeiling,
+      testid: "ai-doctor-session-summary-context-ceiling",
+    });
+  }
+  items.push({
+    label: "Suggested actions",
+    value: `${suggestedActionCount}`,
+    testid: "ai-doctor-session-summary-action-count",
+  });
+  const contextLabels: string[] = [];
+  if (hasPlantContext) contextLabels.push("Plant");
+  if (hasTentContext) contextLabels.push("Tent");
+  if (hasGrowContext) contextLabels.push("Grow");
+  if (contextLabels.length > 0) {
+    items.push({
+      label: "Context",
+      value: contextLabels.join(" · "),
+      testid: "ai-doctor-session-summary-context",
+    });
+  }
+
+  return (
+    <section
+      data-testid="ai-doctor-session-detail-session-summary"
+      aria-label="Session summary"
+      className="rounded-lg border border-border bg-muted/20 p-3 space-y-2"
+    >
+      <header className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold">Session summary</h3>
+      </header>
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs sm:grid-cols-3">
+        {items.map((it) => (
+          <div key={it.testid} className="space-y-0.5">
+            <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              {it.label}
+            </dt>
+            <dd
+              className="text-sm capitalize"
+              data-testid={it.testid}
+            >
+              {it.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {summary ? (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="ai-doctor-session-summary-diagnosis"
+        >
+          {summary}
+        </p>
+      ) : (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="ai-doctor-session-summary-diagnosis-empty"
+        >
+          No diagnosis summary saved for this session.
+        </p>
+      )}
+      <p
+        className="text-[11px] text-muted-foreground"
+        data-testid="ai-doctor-session-summary-review-note"
+      >
+        Review this snapshot before acting on any suggestion. Verdant does not execute actions automatically.
+      </p>
+    </section>
+  );
+}
+
 function LinkedActionQueueLoading() {
   return (
     <div

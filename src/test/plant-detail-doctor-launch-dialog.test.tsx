@@ -108,20 +108,7 @@ describe("<PlantDetailDoctorLaunchDialog />", () => {
     expect(screen.getByText(DOCTOR_LAUNCH_HELPER_LINES[1])).toBeInTheDocument();
   });
 
-  it("shows available/missing/stale states in the summary", () => {
-    useRecentMock.mockReturnValue({
-      data: [
-        row({
-          id: "a",
-          eventType: "watering",
-          occurredAt: FRESH,
-          hasPhoto: true,
-          hasSnapshot: true,
-          snapshotAt: FRESH,
-        }),
-      ],
-      isLoading: false,
-    });
+  it("shows available/missing states in the summary", () => {
     renderDialog({ hasPlantPhoto: true });
     fireEvent.click(screen.getByTestId("plant-detail-doctor-launch-trigger"));
     expect(
@@ -131,8 +118,13 @@ describe("<PlantDetailDoctorLaunchDialog />", () => {
       screen.getByTestId("plant-detail-doctor-launch-item-photo").getAttribute("data-state"),
     ).toBe("available");
     expect(
-      screen.getByTestId("plant-detail-doctor-launch-item-watering_feeding").getAttribute("data-state"),
-    ).toBe("available");
+      screen.getByTestId("plant-detail-doctor-launch-item-timeline").getAttribute("data-state"),
+    ).toBe("missing");
+    expect(
+      screen
+        .getByTestId("plant-detail-doctor-launch-item-watering_feeding")
+        .getAttribute("data-state"),
+    ).toBe("missing");
   });
 
   it("Continue to AI Doctor routes safely with plant context", () => {

@@ -4,6 +4,7 @@ import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
 import EmptyState from "@/components/EmptyState";
 import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
+import PlantDetailDataSourceDisclosure from "@/components/PlantDetailDataSourceDisclosure";
 import AssignTentDialog from "@/components/AssignTentDialog";
 import PlantTentEnvironmentPanel from "@/components/PlantTentEnvironmentPanel";
 import PlantRecentActivityPanel from "@/components/PlantRecentActivityPanel";
@@ -108,12 +109,11 @@ export default function PlantDetail() {
           </div>
         }
       />
-      <GrowDataSourceDisclosure
-        resource="plant"
-        hasAnyData
+      <PlantDetailDataSourceDisclosure
         metas={[plantMeta, tentMeta]}
         testId="plant-detail-data-source-disclosure"
       />
+
       <PlantQuickStatusStrip
         plantId={plant.id}
         plantStartedAt={plant.startedAt}

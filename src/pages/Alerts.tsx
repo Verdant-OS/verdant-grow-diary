@@ -36,6 +36,7 @@ import {
   dismissAlert,
   logAlertEvent,
   resolveAlert,
+  type AlertRow,
   type AlertSeverityRow,
   type AlertStatusRow,
 } from "@/lib/alerts";

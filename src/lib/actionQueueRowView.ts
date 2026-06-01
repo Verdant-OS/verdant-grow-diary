@@ -68,3 +68,58 @@ export function buildActionRowAriaLabel(input: ActionRowAriaInput): string {
   const source = getActionQueueSourceLabel({ source: input.source ?? "" });
   return `${risk}: ${action}. ${status}. Source: ${source}. Grower approval required.`;
 }
+
+/**
+ * Transition kinds for status-control buttons. Mirrors
+ * `TransitionKind` in actionQueueTransitions.ts but kept local so this
+ * pure presentation helper has zero domain coupling.
+ */
+export type StatusControlKind =
+  | "approve"
+  | "reject"
+  | "simulate"
+  | "complete"
+  | "cancel";
+
+const STATUS_CONTROL_VERB: Record<StatusControlKind, string> = {
+  approve: "Approve action",
+  reject: "Reject action",
+  simulate: "Simulate action",
+  complete: "Mark action complete",
+  cancel: "Cancel action",
+};
+
+export interface StatusControlAriaInput {
+  action_type: string | null | undefined;
+}
+
+/**
+ * Accessible name for a status-control button (Approve / Reject /
+ * Simulate / Mark Complete / Cancel).
+ *
+ * Format: "<Verb>: <Action label>[. <Disabled reason>.]"
+ *
+ * NEVER includes: internal action/grow/tent/plant ids, raw
+ * `[alert:<id>]` / `[session:<id>]` back-pointer tokens, free-text
+ * `reason` content, or device-control fields. The safe summary is
+ * built from `action_type` only via the shared formatter.
+ */
+export function buildActionButtonAriaLabel(
+  kind: StatusControlKind,
+  row: StatusControlAriaInput,
+  opts?: { disabledReason?: string | null },
+): string {
+  const verb = STATUS_CONTROL_VERB[kind];
+  const summary = formatActionTypeLabel(row.action_type);
+  const base = `${verb}: ${summary}`;
+  const reason = opts?.disabledReason?.trim();
+  return reason ? `${base}. ${reason}` : base;
+}
+
+/**
+ * Accessible name for the current-status badge on an action row /
+ * action detail header. Format: "Current status: <Status label>".
+ */
+export function buildStatusBadgeAriaLabel(status: string | null | undefined): string {
+  return `Current status: ${formatStatusLabel(status)}`;
+}

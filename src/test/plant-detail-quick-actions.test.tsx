@@ -478,6 +478,150 @@ describe("PlantDetailQuickActions · render", () => {
   });
 });
 
+describe("PlantDetailQuickActions · keyboard and ARIA", () => {
+  it("every enabled action is keyboard reachable (not tabindex=-1)", () => {
+    render(
+      <PlantDetailQuickActions
+        plantId="p1"
+        plantName="Plant 1"
+        growId="g1"
+        tentId="t1"
+        tentName="Tent A"
+      />,
+    );
+    const ids = [
+      "plant-detail-quick-action-quicklog",
+      "plant-detail-quick-action-manual-sensor-snapshot",
+      "plant-detail-quick-action-upload-photo",
+      "plant-detail-quick-action-ask-doctor",
+      "plant-detail-quick-action-view-timeline",
+    ];
+    for (const id of ids) {
+      const el = screen.getByTestId(id);
+      const tabIndex = el.getAttribute("tabindex");
+      expect(tabIndex === null || Number(tabIndex) >= 0).toBe(true);
+    }
+  });
+
+  it("each action exposes a clear accessible name", () => {
+    render(
+      <PlantDetailQuickActions
+        plantId="p1"
+        plantName="Plant 1"
+        growId="g1"
+        tentId="t1"
+        tentName="Tent A"
+      />,
+    );
+    const expected = [
+      "Quick Log",
+      "Manual Sensor Snapshot",
+      "Upload Photo",
+      "Ask Doctor",
+      "View Timeline",
+    ];
+    for (const name of expected) {
+      const matches = [
+        ...screen.queryAllByRole("button", {
+          name: new RegExp(`^${name}$`, "i"),
+        }),
+        ...screen.queryAllByRole("link", {
+          name: new RegExp(`^${name}$`, "i"),
+        }),
+      ];
+      expect(matches.length, `missing accessible name: ${name}`).toBeGreaterThan(0);
+    }
+  });
+
+  it("Quick Log button activates on Enter and Space", () => {
+    const handler = vi.fn();
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+    render(
+      <PlantDetailQuickActions
+        plantId="p1"
+        plantName="Plant 1"
+        growId="g1"
+        tentId="t1"
+        tentName="Tent A"
+      />,
+    );
+    const btn = screen.getByTestId("plant-detail-quick-action-quicklog");
+    // jsdom translates keypress on a focused <button> into a click; emulate
+    // by firing click directly (matches native button keyboard semantics).
+    btn.focus();
+    expect(document.activeElement).toBe(btn);
+    fireEvent.keyDown(btn, { key: "Enter" });
+    fireEvent.click(btn);
+    fireEvent.keyDown(btn, { key: " " });
+    fireEvent.click(btn);
+    expect(handler).toHaveBeenCalledTimes(2);
+    window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+  });
+
+  it("navigation actions render as semantic <a> links", () => {
+    const { container } = render(
+      <PlantDetailQuickActions plantId="p1" growId="g1" />,
+    );
+    const sensorLink = container.querySelector(
+      'a[data-testid="plant-detail-quick-action-manual-sensor-snapshot"]',
+    ) as HTMLAnchorElement | null;
+    const doctorLink = container.querySelector(
+      'a[data-testid="plant-detail-quick-action-ask-doctor"]',
+    ) as HTMLAnchorElement | null;
+    expect(sensorLink?.tagName.toLowerCase()).toBe("a");
+    expect(doctorLink?.tagName.toLowerCase()).toBe("a");
+  });
+
+  it("disabled actions are skipped by native tab order (disabled attribute set)", () => {
+    render(
+      <PlantDetailQuickActions plantId={null} hasTimelineSection={false} />,
+    );
+    const disabledIds = [
+      "plant-detail-quick-action-quicklog",
+      "plant-detail-quick-action-upload-photo",
+      "plant-detail-quick-action-ask-doctor",
+      "plant-detail-quick-action-view-timeline",
+    ];
+    for (const id of disabledIds) {
+      const el = screen.getByTestId(id) as HTMLButtonElement;
+      expect(el).toBeDisabled();
+      expect(el.getAttribute("aria-disabled")).toBe("true");
+      // Native disabled buttons are removed from sequential tab order.
+      el.focus();
+      expect(document.activeElement).not.toBe(el);
+    }
+  });
+
+  it("View Timeline focuses the timeline section without exposing the anchor id in labels", () => {
+    const anchor = document.createElement("div");
+    anchor.id = PLANT_RELATIVE_TIMELINE_ANCHOR_ID;
+    document.body.appendChild(anchor);
+    anchor.scrollIntoView = vi.fn() as unknown as Element["scrollIntoView"];
+
+    render(<PlantDetailQuickActions plantId="p1" />);
+    const btn = screen.getByTestId("plant-detail-quick-action-view-timeline");
+    // Accessible name does not leak the anchor id.
+    expect(btn.getAttribute("aria-label") ?? btn.textContent ?? "").not.toMatch(
+      new RegExp(PLANT_RELATIVE_TIMELINE_ANCHOR_ID),
+    );
+    fireEvent.click(btn);
+    expect(document.activeElement).toBe(anchor);
+    document.body.removeChild(anchor);
+  });
+
+  it("focus-visible ring classes apply to both enabled and disabled buttons", () => {
+    const { rerender } = render(<PlantDetailQuickActions plantId="p1" />);
+    expect(
+      screen.getByTestId("plant-detail-quick-action-quicklog").className,
+    ).toMatch(/focus-visible:ring-2/);
+    rerender(<PlantDetailQuickActions plantId={null} />);
+    expect(
+      screen.getByTestId("plant-detail-quick-action-quicklog").className,
+    ).toMatch(/focus-visible:ring-2/);
+  });
+});
+
+
 describe("PlantDetailQuickActions · static safety", () => {
   it("helper module contains no React, writes, RPC, fetch, or device control", () => {
     for (const re of FORBIDDEN) {

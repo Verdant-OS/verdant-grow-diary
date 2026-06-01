@@ -395,6 +395,32 @@ describe("PlantDetailQuickActions · static safety", () => {
     }
   });
 
+  it("helper copy does not imply automatic writes", () => {
+    const descriptions = buildPlantDetailQuickActions({ plantId: "p1" }).map(
+      (e) => e.description,
+    );
+    for (const text of descriptions) {
+      expect(text).not.toMatch(/auto[-\s]?save/i);
+      expect(text).not.toMatch(/auto[-\s]?upload/i);
+      expect(text).not.toMatch(/synced automatically/i);
+    }
+  });
+
+  it("helper copy does not imply live sensor data, AI certainty, automation, or device control", () => {
+    const descriptions = buildPlantDetailQuickActions({ plantId: "p1" }).map(
+      (e) => e.description,
+    );
+    for (const text of descriptions) {
+      expect(text).not.toMatch(/live sensor/i);
+      expect(text).not.toMatch(/real[-\s]?time/i);
+      expect(text).not.toMatch(/diagnose/i);
+      expect(text).not.toMatch(/certain/i);
+      expect(text).not.toMatch(/autopilot/i);
+      expect(text).not.toMatch(/auto[-\s]?run/i);
+      expect(text).not.toMatch(/control/i);
+    }
+  });
+
   it("Plant Detail page mounts the quick actions row near the top", () => {
     expect(PAGE).toMatch(
       /import\s+PlantDetailQuickActions\s+from\s+"@\/components\/PlantDetailQuickActions"/,

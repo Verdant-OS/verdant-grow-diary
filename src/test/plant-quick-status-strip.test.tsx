@@ -137,7 +137,7 @@ describe("buildPlantQuickStatusView — pure rules", () => {
     expect(v.compact).toContain("1 pending action");
   });
 
-  it("omits alert/action labels when counts are null / undefined", () => {
+  it("omits alert/action labels when counts are null / undefined (status copy still present)", () => {
     const v = buildPlantQuickStatusView({
       stage: "vegetation",
       timelineItems: [],
@@ -148,21 +148,24 @@ describe("buildPlantQuickStatusView — pure rules", () => {
     expect(v.alertLabel).toBeNull();
     expect(v.hasActionCount).toBe(false);
     expect(v.actionLabel).toBeNull();
-    expect(v.compact).not.toMatch(/alert|action/i);
+    // Compact line never invents a numeric count when none is available.
+    expect(v.compact).not.toMatch(/\d+\s+(open\s+alerts?|pending\s+actions?)/i);
   });
 
-  it("treats zero counts as known (0 open alerts / 0 pending actions)", () => {
+  it("treats zero counts as known and uses 'No open alerts' / 'No pending actions' copy", () => {
     const v = buildPlantQuickStatusView({
       stage: "vegetation",
       timelineItems: [],
       alertCount: 0,
       actionCount: 0,
     });
-    expect(v.alertLabel).toBe("0 open alerts");
-    expect(v.actionLabel).toBe("0 pending actions");
+    expect(v.alertLabel).toBe("No open alerts");
+    expect(v.actionLabel).toBe("No pending actions");
+    expect(v.hasAlertCount).toBe(true);
+    expect(v.hasActionCount).toBe(true);
   });
 
-  it("never exposes IDs, user_ids, tokens, raw payloads, or provenance markers", () => {
+  it("never exposes IDs, user_ids, tokens, raw payloads, or provenance markers in visible labels", () => {
     const v = buildPlantQuickStatusView({
       stage: "vegetation",
       timelineItems: [
@@ -177,14 +180,23 @@ describe("buildPlantQuickStatusView — pure rules", () => {
       alertCount: 1,
       actionCount: 2,
     });
-    const blob = JSON.stringify(v);
+    // Internal scroll target id is intentionally surfaced on the view-model
+    // (the strip wires it to a data-* attribute only — never visible text).
+    // The safety check excludes it so we still guard every visible field.
+    const { viewLatestEntry, ...visible } = v;
+    expect(viewLatestEntry.targetItemId).toBe("secret-id-12345");
+    const blob = JSON.stringify(visible);
     expect(blob).not.toMatch(/secret-id-12345/);
     expect(blob).not.toMatch(/plant-uuid-xyz/);
     expect(blob).not.toMatch(/tent-uuid-abc/);
     expect(blob).not.toMatch(/should not leak/);
-    expect(blob.toLowerCase()).not.toMatch(/user_id|token|bearer|raw_payload|provenance|service_role/);
+    expect(blob.toLowerCase()).not.toMatch(
+      /user_id|token|bearer|raw_payload|provenance|service_role/,
+    );
   });
 });
+
+
 
 // ---------------------------------------------------------------------------
 // Render
@@ -192,18 +204,20 @@ describe("buildPlantQuickStatusView — pure rules", () => {
 
 function setupHooks({
   entries = [],
+  entriesLoading = false,
   alertRows = [],
   alertStatus = "ok",
   actionRows = [],
   actionsLoading = false,
 }: {
   entries?: unknown[];
+  entriesLoading?: boolean;
   alertRows?: unknown[];
   alertStatus?: string;
   actionRows?: unknown[];
   actionsLoading?: boolean;
 } = {}) {
-  mockEntries.mockReturnValue({ data: entries, isLoading: false });
+  mockEntries.mockReturnValue({ data: entries, isLoading: entriesLoading });
   mockAlerts.mockReturnValue({ rows: alertRows, status: alertStatus });
   mockActions.mockReturnValue({ rows: actionRows, isLoading: actionsLoading });
 }
@@ -366,8 +380,269 @@ describe("PlantQuickStatusStrip — render", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Static safety
+// Loading + missing-state + quick links + view-latest
 // ---------------------------------------------------------------------------
+
+describe("buildPlantQuickStatusView — loading / links / view-latest", () => {
+  it("flags alerts/actions/timeline loading and surfaces 'Checking…' status labels", () => {
+    const v = buildPlantQuickStatusView({
+      stage: "vegetation",
+      timelineItems: [],
+      timelineLoading: true,
+      alertsLoading: true,
+      actionsLoading: true,
+      growId: "g1",
+      tentId: "t1",
+    });
+    expect(v.timelineLoading).toBe(true);
+    expect(v.alertsState).toBe("loading");
+    expect(v.actionsState).toBe("loading");
+    expect(v.alertsStatusLabel).toBe("Checking alerts…");
+    expect(v.actionsStatusLabel).toBe("Checking actions…");
+    expect(v.hasAlertCount).toBe(false);
+    expect(v.hasActionCount).toBe(false);
+  });
+
+  it("marks alerts/actions unavailable with safe copy when no count is provided", () => {
+    const v = buildPlantQuickStatusView({
+      stage: "vegetation",
+      timelineItems: [],
+      alertCount: null,
+      actionCount: null,
+    });
+    expect(v.alertsState).toBe("unavailable");
+    expect(v.actionsState).toBe("unavailable");
+    expect(v.alertsStatusLabel).toBe("Alerts unavailable");
+    expect(v.actionsStatusLabel).toBe("Pending actions unavailable");
+  });
+
+  it("builds safe Alerts/Pending Actions quick links when grow context exists", () => {
+    const v = buildPlantQuickStatusView({
+      stage: "vegetation",
+      timelineItems: [],
+      growId: "grow-1",
+    });
+    expect(v.alertsLink.disabled).toBe(false);
+    expect(v.alertsLink.href).toBe("/alerts?growId=grow-1");
+    expect(v.actionsLink.disabled).toBe(false);
+    expect(v.actionsLink.href).toBe("/actions?growId=grow-1");
+  });
+
+  it("disables quick links with an inline reason when grow context is missing", () => {
+    const v = buildPlantQuickStatusView({
+      stage: "vegetation",
+      timelineItems: [],
+      growId: null,
+    });
+    expect(v.alertsLink.disabled).toBe(true);
+    expect(v.alertsLink.href).toBeNull();
+    expect(v.alertsLink.disabledReason).toMatch(/grow/i);
+    expect(v.actionsLink.disabled).toBe(true);
+    expect(v.actionsLink.href).toBeNull();
+    expect(v.actionsLink.disabledReason).toMatch(/grow/i);
+  });
+
+  it("picks the newest timeline item id as the view-latest scroll target", () => {
+    const v = buildPlantQuickStatusView({
+      stage: "vegetation",
+      timelineItems: [
+        tItem({ id: "old", occurredAt: "2026-04-10T00:00:00Z" }),
+        tItem({ id: "newest", occurredAt: "2026-05-31T00:00:00Z" }),
+        tItem({ id: "mid", occurredAt: "2026-04-20T00:00:00Z" }),
+      ],
+    });
+    expect(v.viewLatestEntry.disabled).toBe(false);
+    expect(v.viewLatestEntry.targetItemId).toBe("newest");
+    expect(v.viewLatestEntry.label).toBe("View latest entry");
+  });
+
+  it("disables 'View latest entry' with helpful copy when there are no items", () => {
+    const v = buildPlantQuickStatusView({
+      stage: "vegetation",
+      timelineItems: [],
+    });
+    expect(v.viewLatestEntry.disabled).toBe(true);
+    expect(v.viewLatestEntry.targetItemId).toBeNull();
+    expect(v.viewLatestEntry.disabledReason).toMatch(/quick log|photo|snapshot/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Render — loading / links / view-latest
+// ---------------------------------------------------------------------------
+
+describe("PlantQuickStatusStrip — loading / links / view-latest render", () => {
+  it("renders loading skeleton/copy for timeline, alerts, and actions while loading", () => {
+    setupHooks({
+      entries: [],
+      entriesLoading: true,
+      alertRows: [],
+      alertStatus: "pending",
+      actionRows: [],
+      actionsLoading: true,
+    });
+    render(
+      <PlantQuickStatusStrip
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+        stage="vegetation"
+        tentId="tent-1"
+        growId="grow-1"
+      />,
+    );
+    expect(screen.getByTestId("plant-quick-status-last-update-loading")).toBeTruthy();
+    expect(screen.getByTestId("plant-quick-status-alerts-loading")).toHaveTextContent(
+      "Checking alerts…",
+    );
+    expect(screen.getByTestId("plant-quick-status-actions-loading")).toHaveTextContent(
+      "Checking actions…",
+    );
+  });
+
+  it("renders unavailable copy when no tent context is assigned", () => {
+    setupHooks({ entries: [] });
+    render(
+      <PlantQuickStatusStrip
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+        stage="vegetation"
+        tentId={null}
+        growId={null}
+      />,
+    );
+    expect(screen.getByTestId("plant-quick-status-alerts-unavailable")).toHaveTextContent(
+      "Alerts unavailable",
+    );
+    expect(screen.getByTestId("plant-quick-status-actions-unavailable")).toHaveTextContent(
+      "Pending actions unavailable",
+    );
+  });
+
+  it("renders 'No open alerts' / 'No pending actions' when counts are zero", () => {
+    setupHooks({
+      entries: [NOTE_ENTRY("e1", "2026-05-31T08:00:00Z")],
+      alertRows: [],
+      alertStatus: "ok",
+      actionRows: [],
+      actionsLoading: false,
+    });
+    render(
+      <PlantQuickStatusStrip
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+        stage="vegetation"
+        tentId="tent-1"
+        growId="grow-1"
+      />,
+    );
+    expect(screen.getByTestId("plant-quick-status-alerts")).toHaveTextContent(
+      "No open alerts",
+    );
+    expect(screen.getByTestId("plant-quick-status-actions")).toHaveTextContent(
+      "No pending actions",
+    );
+  });
+
+  it("renders Alerts + Pending Actions quick links pointing at the existing routes", () => {
+    setupHooks({
+      entries: [NOTE_ENTRY("e1", "2026-05-31T08:00:00Z")],
+      alertRows: [],
+      actionRows: [],
+    });
+    render(
+      <PlantQuickStatusStrip
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+        stage="vegetation"
+        tentId="tent-1"
+        growId="grow-1"
+      />,
+    );
+    const alertsLink = screen.getByTestId("plant-quick-status-alerts-link");
+    expect(alertsLink.getAttribute("href")).toBe("/alerts?growId=grow-1");
+    expect(alertsLink.getAttribute("data-disabled")).toBeNull();
+    const actionsLink = screen.getByTestId("plant-quick-status-actions-link");
+    expect(actionsLink.getAttribute("href")).toBe("/actions?growId=grow-1");
+    expect(actionsLink.getAttribute("data-disabled")).toBeNull();
+  });
+
+  it("disables quick links with inline reason when grow context is missing", () => {
+    setupHooks({ entries: [] });
+    render(
+      <PlantQuickStatusStrip
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+        stage="vegetation"
+        tentId={null}
+        growId={null}
+      />,
+    );
+    const alertsLink = screen.getByTestId("plant-quick-status-alerts-link");
+    expect(alertsLink.getAttribute("data-disabled")).toBe("true");
+    expect(alertsLink.getAttribute("aria-disabled")).toBe("true");
+    expect(
+      screen.getByTestId("plant-quick-status-alerts-link-reason").textContent,
+    ).toMatch(/grow/i);
+    const actionsLink = screen.getByTestId("plant-quick-status-actions-link");
+    expect(actionsLink.getAttribute("data-disabled")).toBe("true");
+    expect(
+      screen.getByTestId("plant-quick-status-actions-link-reason").textContent,
+    ).toMatch(/grow/i);
+  });
+
+  it("'View latest entry' is disabled with helpful copy when timeline is empty", () => {
+    setupHooks({ entries: [] });
+    render(
+      <PlantQuickStatusStrip
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+        stage="vegetation"
+      />,
+    );
+    const vl = screen.getByTestId("plant-quick-status-view-latest");
+    expect(vl.getAttribute("data-disabled")).toBe("true");
+    expect(
+      screen.getByTestId("plant-quick-status-view-latest-reason").textContent,
+    ).toMatch(/quick log|photo|snapshot/i);
+  });
+
+  it("'View latest entry' click scrolls the newest timeline item into view", () => {
+    const NEWEST = "newest-entry";
+    setupHooks({
+      entries: [
+        NOTE_ENTRY("older", "2026-04-01T00:00:00Z"),
+        NOTE_ENTRY(NEWEST, "2026-05-31T00:00:00Z"),
+      ],
+      alertRows: [],
+      actionRows: [],
+    });
+
+    // Mount a fake timeline target so the scroll handler can locate it.
+    const target = document.createElement("div");
+    target.setAttribute("data-item-id", NEWEST);
+    const scrollSpy = vi.fn();
+    target.scrollIntoView = scrollSpy as unknown as Element["scrollIntoView"];
+    document.body.appendChild(target);
+
+    render(
+      <PlantQuickStatusStrip
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+        stage="vegetation"
+        tentId="tent-1"
+        growId="grow-1"
+      />,
+    );
+    const btn = screen.getByTestId("plant-quick-status-view-latest");
+    expect(btn.getAttribute("data-disabled")).toBeNull();
+    (btn as HTMLButtonElement).click();
+    expect(scrollSpy).toHaveBeenCalled();
+
+    document.body.removeChild(target);
+  });
+});
+
+
 
 describe("plant-quick-status — static safety", () => {
   it("rules module is pure (no Supabase / RPC / writes / scheduling / device)", () => {

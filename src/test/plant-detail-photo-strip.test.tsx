@@ -5,7 +5,7 @@
  * device control, calendar/notification/email/reminder scheduling,
  * service_role, functions.invoke, or fake-live sensor data.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import React from "react";

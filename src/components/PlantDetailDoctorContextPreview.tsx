@@ -162,10 +162,3 @@ export default function PlantDetailDoctorContextPreview({
     </section>
   );
 }
-
-          </Link>
-        </Button>
-      </div>
-    </section>
-  );
-}

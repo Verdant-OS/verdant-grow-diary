@@ -236,22 +236,49 @@ export default function PlantDetailDoctorLaunchDialog({
               <SummaryRow key={it.kind} item={it} />
             ))}
           </ul>
+          <p
+            className="text-xs text-muted-foreground leading-snug"
+            data-testid="plant-detail-doctor-launch-add-context-helper"
+          >
+            {ADD_CONTEXT_HELPER_COPY}
+          </p>
           <p className="text-xs text-muted-foreground leading-snug">
             {DOCTOR_LAUNCH_HELPER_LINES[1]}
           </p>
         </div>
 
         <DialogFooter className="gap-2 sm:gap-2 flex-col sm:flex-row">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleAddContext}
-            className="gap-1"
-            data-testid="plant-detail-doctor-launch-add-context"
-          >
-            <Plus className="h-3.5 w-3.5" /> Add context first
-          </Button>
+          {addContextDecision.kind !== "none" &&
+            (addContextDecision.to ? (
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="gap-1"
+                data-testid="plant-detail-doctor-launch-add-context"
+                data-route-kind={addContextDecision.kind}
+              >
+                <Link
+                  to={addContextDecision.to}
+                  onClick={() => setOpen(false)}
+                  aria-label={addContextDecision.label}
+                >
+                  <Plus className="h-3.5 w-3.5" /> {addContextDecision.label}
+                </Link>
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleAddContext}
+                className="gap-1"
+                data-testid="plant-detail-doctor-launch-add-context"
+                data-route-kind={addContextDecision.kind}
+              >
+                <Plus className="h-3.5 w-3.5" /> {addContextDecision.label}
+              </Button>
+            ))}
           <Button
             asChild
             size="sm"

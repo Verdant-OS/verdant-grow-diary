@@ -50,6 +50,10 @@ import {
   type DoctorContextItem,
   type DoctorContextItemState,
 } from "@/lib/plantDetailDoctorContextPreview";
+import {
+  buildPlantDetailDoctorAddContextRoute,
+  ADD_CONTEXT_HELPER_COPY,
+} from "@/lib/plantDetailDoctorAddContextRouter";
 
 interface Props {
   plantId: string | null | undefined;
@@ -57,6 +61,10 @@ interface Props {
   hasPlantPhoto?: boolean;
   openAlertsCount?: number | null;
   pendingActionsCount?: number | null;
+  growId?: string | null;
+  tentId?: string | null;
+  plantName?: string | null;
+  tentName?: string | null;
   /** Test seam: stable "now" timestamp. */
   now?: Date;
 }

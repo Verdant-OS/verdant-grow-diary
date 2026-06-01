@@ -642,6 +642,200 @@ describe("PlantQuickStatusStrip — loading / links / view-latest render", () =>
   });
 });
 
+// ---------------------------------------------------------------------------
+// Accessibility — quick links + view latest entry
+// ---------------------------------------------------------------------------
+
+describe("PlantQuickStatusStrip — accessibility", () => {
+  it("Alerts quick link exposes a clear accessible name", () => {
+    setupHooks({ entries: [], alertRows: [], actionRows: [] });
+    render(
+      <PlantQuickStatusStrip
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+        stage="vegetation"
+        tentId="tent-1"
+        growId="grow-1"
+      />,
+    );
+    const link = screen.getByTestId("plant-quick-status-alerts-link");
+    expect(link.getAttribute("aria-label")).toBe("View open alerts for this plant");
+    expect(link.tagName).toBe("A");
+  });
+
+  it("Pending Actions quick link exposes a clear accessible name", () => {
+    setupHooks({ entries: [], alertRows: [], actionRows: [] });
+    render(
+      <PlantQuickStatusStrip
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+        stage="vegetation"
+        tentId="tent-1"
+        growId="grow-1"
+      />,
+    );
+    const link = screen.getByTestId("plant-quick-status-actions-link");
+    expect(link.getAttribute("aria-label")).toBe(
+      "View pending actions for this plant",
+    );
+    expect(link.tagName).toBe("A");
+  });
+
+  it("disabled quick links render a visible reason and are not focus traps", () => {
+    setupHooks({ entries: [] });
+    render(
+      <PlantQuickStatusStrip
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+        stage="vegetation"
+        tentId={null}
+        growId={null}
+      />,
+    );
+    const alerts = screen.getByTestId("plant-quick-status-alerts-link");
+    expect(alerts.getAttribute("aria-disabled")).toBe("true");
+    expect(alerts.getAttribute("role")).toBe("link");
+    // Disabled state must NOT be tabbable (would be a focus dead-end).
+    expect(alerts.getAttribute("tabindex")).not.toBe("0");
+    expect(alerts.tagName).toBe("SPAN");
+    const reason = screen.getByTestId("plant-quick-status-alerts-link-reason");
+    // Reason is visible (not sr-only).
+    expect(reason.className).not.toMatch(/sr-only/);
+    expect(reason.textContent ?? "").toMatch(/grow/i);
+    // Accessible name communicates the unavailable state.
+    expect(alerts.getAttribute("aria-label") ?? "").toMatch(/unavailable/i);
+
+    const actions = screen.getByTestId("plant-quick-status-actions-link");
+    expect(actions.getAttribute("aria-disabled")).toBe("true");
+    expect(actions.tagName).toBe("SPAN");
+    expect(actions.getAttribute("tabindex")).not.toBe("0");
+    const aReason = screen.getByTestId("plant-quick-status-actions-link-reason");
+    expect(aReason.className).not.toMatch(/sr-only/);
+    expect(aReason.textContent ?? "").toMatch(/grow/i);
+  });
+
+  it("View latest entry is a real <button> (Enter and Space activate natively)", () => {
+    const NEWEST = "newest-a11y";
+    setupHooks({
+      entries: [NOTE_ENTRY(NEWEST, "2026-05-31T00:00:00Z")],
+      alertRows: [],
+      actionRows: [],
+    });
+    render(
+      <PlantQuickStatusStrip
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+        stage="vegetation"
+      />,
+    );
+    const btn = screen.getByTestId("plant-quick-status-view-latest");
+    // Native <button type="button"> handles Enter/Space per HTML spec.
+    expect(btn.tagName).toBe("BUTTON");
+    expect((btn as HTMLButtonElement).type).toBe("button");
+    // Keyboard reachable (default tab order, not removed).
+    expect(btn.getAttribute("tabindex")).not.toBe("-1");
+    expect(btn.getAttribute("aria-label")).toBe("View latest timeline entry");
+    expect(btn.getAttribute("aria-disabled")).not.toBe("true");
+  });
+
+  it("View latest entry: Enter and Space trigger the scroll affordance", () => {
+    const NEWEST = "newest-keys";
+    setupHooks({
+      entries: [NOTE_ENTRY(NEWEST, "2026-05-31T00:00:00Z")],
+      alertRows: [],
+      actionRows: [],
+    });
+
+    const target = document.createElement("div");
+    target.setAttribute("data-item-id", NEWEST);
+    const scrollSpy = vi.fn();
+    target.scrollIntoView = scrollSpy as unknown as Element["scrollIntoView"];
+    document.body.appendChild(target);
+
+    render(
+      <PlantQuickStatusStrip
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+        stage="vegetation"
+      />,
+    );
+    const btn = screen.getByTestId("plant-quick-status-view-latest") as HTMLButtonElement;
+
+    // Simulate Enter — native button click follows.
+    btn.focus();
+    btn.click();
+    expect(scrollSpy).toHaveBeenCalledTimes(1);
+
+    // Simulate Space — same native behavior.
+    btn.click();
+    expect(scrollSpy).toHaveBeenCalledTimes(2);
+
+    // Newest item became programmatically focusable without changing tab order.
+    expect(target.getAttribute("tabindex")).toBe("-1");
+
+    document.body.removeChild(target);
+  });
+
+  it("disabled View latest entry renders a visible reason and is not focusable", () => {
+    setupHooks({ entries: [] });
+    render(
+      <PlantQuickStatusStrip
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+        stage="vegetation"
+      />,
+    );
+    const vl = screen.getByTestId("plant-quick-status-view-latest");
+    expect(vl.tagName).toBe("SPAN");
+    expect(vl.getAttribute("aria-disabled")).toBe("true");
+    expect(vl.getAttribute("tabindex")).not.toBe("0");
+    const reason = screen.getByTestId("plant-quick-status-view-latest-reason");
+    expect(reason.className).not.toMatch(/sr-only/);
+    expect(reason.textContent ?? "").toMatch(/quick log|photo|snapshot/i);
+  });
+
+  it("no internal IDs / tokens / provenance markers in visible accessibility names", () => {
+    setupHooks({
+      entries: [NOTE_ENTRY("entry-uuid-leak", "2026-05-31T00:00:00Z")],
+      alertRows: [],
+      actionRows: [],
+    });
+    const { container } = render(
+      <PlantQuickStatusStrip
+        plantId="plant-uuid-leak"
+        plantStartedAt={PLANT_STARTED}
+        stage="vegetation"
+        tentId="tent-uuid-leak"
+        growId="grow-uuid-leak"
+      />,
+    );
+    const ariaBlob = Array.from(container.querySelectorAll("[aria-label]"))
+      .map((el) => el.getAttribute("aria-label") ?? "")
+      .join(" | ");
+    expect(ariaBlob).not.toMatch(/uuid-leak/);
+    expect(ariaBlob.toLowerCase()).not.toMatch(
+      /user_id|token|bearer|raw_payload|provenance|service_role/,
+    );
+  });
+});
+
+describe("plant-quick-status — accessibility safety scan", () => {
+  it("component does not introduce routes, writes, or device strings via a11y polish", () => {
+    expect(COMPONENT).not.toMatch(/createBrowserRouter|<Route\s/);
+    expect(COMPONENT).not.toMatch(/supabase\.from\(/);
+    expect(COMPONENT).not.toMatch(/\.rpc\(/);
+    expect(COMPONENT).not.toMatch(/functions\.invoke/);
+    expect(COMPONENT).not.toMatch(/service_role/);
+    expect(COMPONENT).not.toMatch(/calendar_events/);
+    expect(COMPONENT).not.toMatch(/\bnotifications\b/);
+    expect(COMPONENT).not.toMatch(/resend|sendgrid|mailgun|postmark|twilio/i);
+    expect(COMPONENT).not.toMatch(
+      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator|device_command|autopilot/i,
+    );
+  });
+});
+
+
 
 
 describe("plant-quick-status — static safety", () => {

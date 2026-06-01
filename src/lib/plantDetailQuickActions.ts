@@ -2,9 +2,8 @@
  * plantDetailQuickActions — pure view-model for the Plant Detail Quick
  * Actions row.
  *
- * Deterministic. No React, no I/O, no Supabase, no fetch, no service_role,
- * no device control, no automation, no calendar/notification/email/reminder
- * scheduling. Builds entries that either:
+ * Deterministic. No React, no I/O, no Supabase, no fetch, no privileged
+ * keys, no device control. Builds entries that either:
  *   - dispatch the existing `verdant:open-quicklog` event with already-known
  *     plant/tent/grow context as the event detail (PLANT_QUICKLOG_PREFILL_EVENT),
  *   - link to an existing route (`/sensors`, `/doctor`), or

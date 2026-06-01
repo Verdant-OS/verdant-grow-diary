@@ -92,7 +92,7 @@ describe("ActionDetail — error state", () => {
   });
 
   it("includes a clear, accessible Retry button wired to load()", () => {
-    expect(ERROR_BLOCK).toMatch(/>Retry</);
+    expect(ERROR_BLOCK).toMatch(/>\s*Retry\s*</);
     expect(ERROR_BLOCK).toMatch(/onClick=\{\(\)\s*=>\s*load\(\)\}/);
   });
 

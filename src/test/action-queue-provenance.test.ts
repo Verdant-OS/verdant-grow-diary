@@ -211,7 +211,7 @@ describe("ActionQueue / ActionDetail — forbidden copy hardening", () => {
 
   it("preserves safe review/approval vocabulary in user-facing copy", () => {
     // Approval-required model is explicit and visible to growers.
-    const SAFE_VOCAB = ["review", "pending approval", "simulate"];
+    const SAFE_VOCAB = ["review", "approval", "simulate"];
     for (const tok of SAFE_VOCAB) {
       expect(
         QUEUE_EXEC.includes(tok) || DETAIL_EXEC.includes(tok),

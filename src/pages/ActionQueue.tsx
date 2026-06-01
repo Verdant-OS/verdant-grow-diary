@@ -867,24 +867,28 @@ export default function ActionQueue() {
           <ul className="space-y-2 text-sm">
             {reviewed.slice(0, 50).map((row) => {
               const titleId = `aq-reviewed-title-${row.id}`;
-              const rowAria =
-                focusedActionId === row.id
-                  ? "Focused action"
-                  : buildActionRowAriaLabel(row);
+              const descId = `aq-reviewed-desc-${row.id}`;
+              const isFocused = focusedActionId === row.id;
               return (
               <li
                 key={row.id}
                 data-testid="action-queue-row"
                 data-action-id={row.id}
-                data-focused={focusedActionId === row.id ? "true" : undefined}
-                aria-label={rowAria}
+                data-focused={isFocused ? "true" : undefined}
+                aria-label={isFocused ? "Focused action" : undefined}
+                aria-labelledby={isFocused ? undefined : titleId}
+                aria-describedby={isFocused ? undefined : descId}
                 className={`rounded-lg border border-border/40 bg-secondary/20 p-2 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background ${
-                  focusedActionId === row.id
+                  isFocused
                     ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
                     : ""
                 }`}
               >
+                <span id={descId} className="sr-only">
+                  {buildActionRowAriaLabel(row)}
+                </span>
                 <div className="flex items-center gap-3 flex-wrap">
+
                   <Badge variant="outline" className="text-[10px] uppercase" aria-label={`Status: ${row.status}`}>{row.status}</Badge>
                   <Badge variant="outline" className={`text-[10px] uppercase ${RISK_VARIANT[row.risk_level]}`} aria-label={`Risk: ${row.risk_level}`}>
                     {row.risk_level}

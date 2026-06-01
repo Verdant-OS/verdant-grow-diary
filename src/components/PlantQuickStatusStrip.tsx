@@ -96,6 +96,10 @@ export default function PlantQuickStatusStrip({
     } catch {
       el.scrollIntoView();
     }
+    // Make the target programmatically focusable without disturbing tab order.
+    if (!el.hasAttribute("tabindex")) {
+      el.setAttribute("tabindex", "-1");
+    }
     if (typeof el.focus === "function") {
       try {
         el.focus({ preventScroll: true });
@@ -104,6 +108,7 @@ export default function PlantQuickStatusStrip({
       }
     }
   }, [view.viewLatestEntry.targetItemId]);
+
 
   return (
     <div
@@ -244,27 +249,30 @@ export default function PlantQuickStatusStrip({
       </span>
 
       {/* Quick links + scroll affordance */}
-      <span className="inline-flex items-center gap-2">
+      <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
         {view.alertsLink.disabled ? (
           <span
             data-testid="plant-quick-status-alerts-link"
             data-disabled="true"
             aria-disabled="true"
+            role="link"
+            aria-label={view.alertsLink.ariaLabel}
             title={view.alertsLink.disabledReason ?? undefined}
             className="inline-flex cursor-not-allowed items-center gap-1 italic text-muted-foreground/70"
           >
-            {view.alertsLink.label}
+            <span>{view.alertsLink.label}</span>
             <span
               data-testid="plant-quick-status-alerts-link-reason"
-              className="sr-only"
+              className="text-muted-foreground/60 not-italic text-[11px]"
             >
-              {view.alertsLink.disabledReason}
+              ({view.alertsLink.disabledReason})
             </span>
           </span>
         ) : (
           <Link
             data-testid="plant-quick-status-alerts-link"
             to={view.alertsLink.href ?? "#"}
+            aria-label={view.alertsLink.ariaLabel}
             className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
           >
             {view.alertsLink.label}
@@ -276,21 +284,24 @@ export default function PlantQuickStatusStrip({
             data-testid="plant-quick-status-actions-link"
             data-disabled="true"
             aria-disabled="true"
+            role="link"
+            aria-label={view.actionsLink.ariaLabel}
             title={view.actionsLink.disabledReason ?? undefined}
             className="inline-flex cursor-not-allowed items-center gap-1 italic text-muted-foreground/70"
           >
-            {view.actionsLink.label}
+            <span>{view.actionsLink.label}</span>
             <span
               data-testid="plant-quick-status-actions-link-reason"
-              className="sr-only"
+              className="text-muted-foreground/60 not-italic text-[11px]"
             >
-              {view.actionsLink.disabledReason}
+              ({view.actionsLink.disabledReason})
             </span>
           </span>
         ) : (
           <Link
             data-testid="plant-quick-status-actions-link"
             to={view.actionsLink.href ?? "#"}
+            aria-label={view.actionsLink.ariaLabel}
             className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
           >
             {view.actionsLink.label}
@@ -302,22 +313,25 @@ export default function PlantQuickStatusStrip({
             data-testid="plant-quick-status-view-latest"
             data-disabled="true"
             aria-disabled="true"
+            role="button"
+            aria-label={view.viewLatestEntry.ariaLabel}
             title={view.viewLatestEntry.disabledReason ?? undefined}
             className="inline-flex cursor-not-allowed items-center gap-1 italic text-muted-foreground/70"
           >
             <ArrowDownToLine className="h-3.5 w-3.5" aria-hidden />
-            {view.viewLatestEntry.label}
+            <span>{view.viewLatestEntry.label}</span>
             <span
               data-testid="plant-quick-status-view-latest-reason"
-              className="sr-only"
+              className="text-muted-foreground/60 not-italic text-[11px]"
             >
-              {view.viewLatestEntry.disabledReason}
+              ({view.viewLatestEntry.disabledReason})
             </span>
           </span>
         ) : (
           <button
             type="button"
             data-testid="plant-quick-status-view-latest"
+            aria-label={view.viewLatestEntry.ariaLabel}
             onClick={handleViewLatest}
             className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
           >
@@ -326,6 +340,7 @@ export default function PlantQuickStatusStrip({
           </button>
         )}
       </span>
+
     </div>
   );
 }

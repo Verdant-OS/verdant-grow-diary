@@ -42,6 +42,8 @@ export type QuickStatusLoadState = "ready" | "loading" | "unavailable";
 
 export interface PlantQuickStatusLink {
   label: string;
+  /** Accessible name spoken to assistive tech (clearer than the visible label). */
+  ariaLabel: string;
   href: string | null;
   disabled: boolean;
   disabledReason: string | null;
@@ -49,6 +51,8 @@ export interface PlantQuickStatusLink {
 
 export interface PlantQuickStatusViewLatest {
   label: string;
+  /** Accessible name for the scroll affordance. */
+  ariaLabel: string;
   /** Newest timeline item's id, used for the scroll target. Never rendered visibly. */
   targetItemId: string | null;
   disabled: boolean;
@@ -98,6 +102,9 @@ export const VIEW_LATEST_DISABLED_REASON =
   "Add a quick log, photo, or sensor snapshot to start the timeline.";
 export const ALERTS_LINK_LABEL = "View alerts";
 export const ACTIONS_LINK_LABEL = "View pending actions";
+export const ALERTS_LINK_ARIA_LABEL = "View open alerts for this plant";
+export const ACTIONS_LINK_ARIA_LABEL = "View pending actions for this plant";
+export const VIEW_LATEST_ARIA_LABEL = "View latest timeline entry";
 export const ALERTS_LINK_DISABLED_REASON =
   "Connect this plant to a grow to view alerts.";
 export const ACTIONS_LINK_DISABLED_REASON =
@@ -223,12 +230,14 @@ export function buildPlantQuickStatusView(
   const alertsLink: PlantQuickStatusLink = growId
     ? {
         label: ALERTS_LINK_LABEL,
+        ariaLabel: ALERTS_LINK_ARIA_LABEL,
         href: alertsPath(growId),
         disabled: false,
         disabledReason: null,
       }
     : {
         label: ALERTS_LINK_LABEL,
+        ariaLabel: `${ALERTS_LINK_ARIA_LABEL} (unavailable: ${ALERTS_LINK_DISABLED_REASON})`,
         href: null,
         disabled: true,
         disabledReason: ALERTS_LINK_DISABLED_REASON,
@@ -236,12 +245,14 @@ export function buildPlantQuickStatusView(
   const actionsLink: PlantQuickStatusLink = growId
     ? {
         label: ACTIONS_LINK_LABEL,
+        ariaLabel: ACTIONS_LINK_ARIA_LABEL,
         href: actionsPath(growId),
         disabled: false,
         disabledReason: null,
       }
     : {
         label: ACTIONS_LINK_LABEL,
+        ariaLabel: `${ACTIONS_LINK_ARIA_LABEL} (unavailable: ${ACTIONS_LINK_DISABLED_REASON})`,
         href: null,
         disabled: true,
         disabledReason: ACTIONS_LINK_DISABLED_REASON,
@@ -251,16 +262,19 @@ export function buildPlantQuickStatusView(
   const viewLatestEntry: PlantQuickStatusViewLatest = latestId
     ? {
         label: VIEW_LATEST_LABEL,
+        ariaLabel: VIEW_LATEST_ARIA_LABEL,
         targetItemId: latestId,
         disabled: false,
         disabledReason: null,
       }
     : {
         label: VIEW_LATEST_LABEL,
+        ariaLabel: `${VIEW_LATEST_ARIA_LABEL} (unavailable: ${VIEW_LATEST_DISABLED_REASON})`,
         targetItemId: null,
         disabled: true,
         disabledReason: VIEW_LATEST_DISABLED_REASON,
       };
+
 
   const parts: string[] = [
     `Stage: ${stage.label}`,

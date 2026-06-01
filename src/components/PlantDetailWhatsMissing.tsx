@@ -3,7 +3,7 @@
  * growers which plant-memory inputs are missing or stale.
  *
  * Read-only. Uses existing page data signals only. No writes, RPC,
- * scheduling, or autonomous actions.
+ * timed runs, or autonomous actions.
  */
 import { useMemo } from "react";
 import { HelpCircle, Plus, Upload, Activity } from "lucide-react";

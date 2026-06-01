@@ -173,8 +173,14 @@ export function buildPlantDetailQuickActions(
     {
       kind: "view_timeline",
       ...LABELS.view_timeline,
-      scrollTargetId: PLANT_RELATIVE_TIMELINE_ANCHOR_ID,
+      scrollTargetId: hasTimelineSection
+        ? PLANT_RELATIVE_TIMELINE_ANCHOR_ID
+        : undefined,
       testId: "plant-detail-quick-action-view-timeline",
+      disabled: !hasTimelineSection,
+      disabledReason: hasTimelineSection
+        ? undefined
+        : "Timeline section is not available yet.",
     },
   ];
 }

@@ -1148,6 +1148,18 @@ function SessionDetailBody({
         </Badge>
       </div>
 
+      <SessionSummaryPanel
+        createdAt={row.created_at}
+        riskLevel={d?.riskLevel ?? null}
+        confidenceLabel={confidence}
+        contextCeiling={row.context_confidence_ceiling ?? null}
+        suggestedActionCount={actions.length}
+        summary={d?.summary ?? null}
+        hasPlantContext={!!row.plant_id}
+        hasTentContext={!!row.tent_id}
+        hasGrowContext={!!row.grow_id}
+      />
+
       {(() => {
         const cautionNote = buildCautionNote(reviewVm);
         const tokens = buildCautionReasonTokens(reviewVm);

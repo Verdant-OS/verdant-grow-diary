@@ -230,12 +230,14 @@ export function buildPlantQuickStatusView(
   const alertsLink: PlantQuickStatusLink = growId
     ? {
         label: ALERTS_LINK_LABEL,
+        ariaLabel: ALERTS_LINK_ARIA_LABEL,
         href: alertsPath(growId),
         disabled: false,
         disabledReason: null,
       }
     : {
         label: ALERTS_LINK_LABEL,
+        ariaLabel: `${ALERTS_LINK_ARIA_LABEL} (unavailable: ${ALERTS_LINK_DISABLED_REASON})`,
         href: null,
         disabled: true,
         disabledReason: ALERTS_LINK_DISABLED_REASON,
@@ -243,12 +245,14 @@ export function buildPlantQuickStatusView(
   const actionsLink: PlantQuickStatusLink = growId
     ? {
         label: ACTIONS_LINK_LABEL,
+        ariaLabel: ACTIONS_LINK_ARIA_LABEL,
         href: actionsPath(growId),
         disabled: false,
         disabledReason: null,
       }
     : {
         label: ACTIONS_LINK_LABEL,
+        ariaLabel: `${ACTIONS_LINK_ARIA_LABEL} (unavailable: ${ACTIONS_LINK_DISABLED_REASON})`,
         href: null,
         disabled: true,
         disabledReason: ACTIONS_LINK_DISABLED_REASON,
@@ -258,16 +262,19 @@ export function buildPlantQuickStatusView(
   const viewLatestEntry: PlantQuickStatusViewLatest = latestId
     ? {
         label: VIEW_LATEST_LABEL,
+        ariaLabel: VIEW_LATEST_ARIA_LABEL,
         targetItemId: latestId,
         disabled: false,
         disabledReason: null,
       }
     : {
         label: VIEW_LATEST_LABEL,
+        ariaLabel: `${VIEW_LATEST_ARIA_LABEL} (unavailable: ${VIEW_LATEST_DISABLED_REASON})`,
         targetItemId: null,
         disabled: true,
         disabledReason: VIEW_LATEST_DISABLED_REASON,
       };
+
 
   const parts: string[] = [
     `Stage: ${stage.label}`,

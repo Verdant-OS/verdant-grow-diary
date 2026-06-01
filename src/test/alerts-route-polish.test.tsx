@@ -153,7 +153,7 @@ beforeEach(() => {
 });
 
 describe("Alerts route — loading skeleton", () => {
-  it("renders a skeleton while fetching", async () => {
+  it("renders a skeleton while fetching and does not show empty copy", async () => {
     let resolveFetch: (v: unknown[]) => void = () => {};
     listAlertsMock.mockImplementation(
       () => new Promise((r) => (resolveFetch = r as (v: unknown[]) => void)),
@@ -161,9 +161,11 @@ describe("Alerts route — loading skeleton", () => {
     renderAt("/alerts");
     const skel = await screen.findByTestId("alerts-loading-skeleton");
     expect(skel).toBeTruthy();
+    expect(skel.getAttribute("role")).toBe("status");
     expect(skel.getAttribute("aria-busy")).toBe("true");
     expect(skel.getAttribute("aria-label")).toBe("Loading alerts");
     expect(within(skel).getByText(/loading alerts/i)).toBeTruthy();
+    expect(screen.queryByText("No open alerts.")).toBeNull();
     resolveFetch([]);
   });
 });
@@ -173,11 +175,14 @@ describe("Alerts route — missing grow/tent context", () => {
     listAlertsMock.mockResolvedValue([]);
     renderAt("/alerts?growId=does-not-exist");
     const fallback = await screen.findByTestId("alerts-missing-context");
+    expect(fallback.getAttribute("role")).toBe("status");
     expect(fallback.textContent).toMatch(
       /Select a grow or tent to review alerts\./,
     );
     expect(fallback.textContent).toMatch(/scoped to a grow or tent/i);
     expect(screen.queryByTestId("alerts-loading-skeleton")).toBeNull();
+    expect(fallback.textContent).not.toContain("g1");
+    expect(fallback.textContent).not.toContain("alert-row-1");
   });
 });
 
@@ -223,6 +228,8 @@ describe("Alerts route — empty + error + retry", () => {
     expect(visible).not.toContain("service_role");
     expect(visible).not.toContain("raw_payload");
     expect(visible).not.toContain("provenance");
+    expect(visible).not.toContain("g1");
+    expect(visible).not.toContain("alert-row-1");
   });
 });
 

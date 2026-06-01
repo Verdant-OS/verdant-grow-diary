@@ -303,85 +303,14 @@ export default function Alerts() {
                 </h2>
                 <ul className="space-y-2">
                   {items.map((a) => (
-                    <li
+                    <AlertCard
                       key={a.id}
-                      className="glass rounded-2xl p-4 flex flex-col gap-2"
-                    >
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] uppercase ${SEVERITY_TONE[a.severity]}`}
-                        >
-                          {a.severity}
-                        </Badge>
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] uppercase ${STATUS_TONE[a.status]}`}
-                        >
-                          {a.status}
-                        </Badge>
-                        <Link
-                          to={alertDetailPath(a.id)}
-                          className="text-sm font-medium hover:underline"
-                        >
-                          {a.title}
-                        </Link>
-                        <span className="ml-auto text-[11px] text-muted-foreground">
-                          {formatDistanceToNow(new Date(a.first_seen_at), {
-                            addSuffix: true,
-                          })}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {a.reason}
-                      </p>
-                      <AlertWhyContext alert={a} variant="compact" />
-                      <LinkedActionCountBadge
-                        alertId={a.id}
-                        summary={linkedActionCounts.get(a.id)}
-                        growId={a.grow_id}
-                        testIdPrefix="alert-row"
-                      />
-
-                      <div className="flex flex-wrap gap-2">
-                        {a.status !== "acknowledged" &&
-                          a.status !== "resolved" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                handleAcknowledge(a.id, a.grow_id, a.status)
-                              }
-                            >
-                              Acknowledge
-                            </Button>
-                          )}
-                        {a.status !== "resolved" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              handleResolve(a.id, a.grow_id, a.status)
-                            }
-                          >
-                            Resolve
-                          </Button>
-                        )}
-                        {a.status !== "dismissed" &&
-                          a.status !== "resolved" && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() =>
-                                handleDismiss(a.id, a.grow_id, a.status)
-                              }
-                            >
-                              Dismiss
-                            </Button>
-                          )}
-                      </div>
-                      <AlertHistory alertId={a.id} />
-                    </li>
+                      alert={a}
+                      linkedSummary={linkedActionCounts.get(a.id)}
+                      onAcknowledge={handleAcknowledge}
+                      onResolve={handleResolve}
+                      onDismiss={handleDismiss}
+                    />
                   ))}
                 </ul>
               </section>

@@ -69,13 +69,14 @@ const FORBIDDEN = [
 ];
 
 describe("buildPlantDetailQuickActions · ordering and completeness", () => {
-  it("returns the 4 expected kinds in deterministic order", () => {
+  it("returns the 5 expected kinds in deterministic order", () => {
     const kinds = buildPlantDetailQuickActions({ plantId: "p1" }).map(
       (e) => e.kind,
     );
     expect(kinds).toEqual([
       "quicklog",
       "manual_sensor_snapshot",
+      "upload_photo",
       "ask_doctor",
       "view_timeline",
     ]);
@@ -88,6 +89,7 @@ describe("buildPlantDetailQuickActions · ordering and completeness", () => {
     expect(labels).toEqual([
       "Quick Log",
       "Manual Sensor Snapshot",
+      "Upload Photo",
       "Ask Doctor",
       "View Timeline",
     ]);

@@ -619,6 +619,53 @@ describe("PlantDetailQuickActions · keyboard and ARIA", () => {
       screen.getByTestId("plant-detail-quick-action-quicklog").className,
     ).toMatch(/focus-visible:ring-2/);
   });
+
+  it("each enabled action's aria-describedby points to its description element id", () => {
+    render(
+      <PlantDetailQuickActions
+        plantId="p1"
+        plantName="Plant 1"
+        growId="g1"
+        tentId="t1"
+        tentName="Tent A"
+      />,
+    );
+    const ids = [
+      "plant-detail-quick-action-quicklog",
+      "plant-detail-quick-action-manual-sensor-snapshot",
+      "plant-detail-quick-action-upload-photo",
+      "plant-detail-quick-action-ask-doctor",
+      "plant-detail-quick-action-view-timeline",
+    ];
+    for (const id of ids) {
+      const el = screen.getByTestId(id);
+      const described =
+        el.getAttribute("aria-describedby") ??
+        el.querySelector("a")?.getAttribute("aria-describedby") ??
+        "";
+      expect(described.split(/\s+/)).toContain(`${id}-description`);
+      const desc = document.getElementById(`${id}-description`);
+      expect(desc).not.toBeNull();
+      expect((desc?.textContent ?? "").length).toBeGreaterThan(0);
+    }
+  });
+
+  it("disabled action's aria-describedby includes both description and reason ids", () => {
+    render(<PlantDetailQuickActions plantId={null} hasTimelineSection={false} />);
+    const ids = [
+      "plant-detail-quick-action-quicklog",
+      "plant-detail-quick-action-upload-photo",
+      "plant-detail-quick-action-ask-doctor",
+      "plant-detail-quick-action-view-timeline",
+    ];
+    for (const id of ids) {
+      const el = screen.getByTestId(id);
+      const described = (el.getAttribute("aria-describedby") ?? "").split(/\s+/);
+      expect(described).toContain(`${id}-description`);
+      expect(described).toContain(`${id}-reason`);
+      expect(document.getElementById(`${id}-reason`)).not.toBeNull();
+    }
+  });
 });
 
 

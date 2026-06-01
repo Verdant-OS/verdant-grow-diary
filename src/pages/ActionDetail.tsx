@@ -173,6 +173,7 @@ export default function ActionDetail() {
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [dialog, setDialog] = useState<Kind | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
@@ -190,28 +191,44 @@ export default function ActionDetail() {
     if (!user || !actionId) return;
     setLoading(true);
     setNotFound(false);
-    const { data, error } = await supabase
-      .from("action_queue")
-      .select(
-        "id,grow_id,tent_id,plant_id,source,action_type,target_metric,target_device,suggested_change,reason,risk_level,status,approved_at,rejected_at,completed_at,created_at,updated_at",
-      )
-      .eq("id", actionId)
-      .maybeSingle();
-    if (error || !data) {
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase
+        .from("action_queue")
+        .select(
+          "id,grow_id,tent_id,plant_id,source,action_type,target_metric,target_device,suggested_change,reason,risk_level,status,approved_at,rejected_at,completed_at,created_at,updated_at",
+        )
+        .eq("id", actionId)
+        .maybeSingle();
+      if (error) {
+        // Surface a sanitized error — never leak raw provider messages or IDs.
+        setRow(null);
+        setEvents([]);
+        setLoadError("We couldn't load this action. Please try again.");
+        setLoading(false);
+        return;
+      }
+      if (!data) {
+        setRow(null);
+        setEvents([]);
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
+      setRow(data as ActionRow);
+      const { data: evs } = await supabase
+        .from("action_queue_events")
+        .select("id,action_queue_id,event_type,previous_status,new_status,note,created_at")
+        .eq("action_queue_id", actionId)
+        .order("created_at", { ascending: false });
+      setEvents((evs ?? []) as EventRow[]);
+      setLoading(false);
+    } catch {
       setRow(null);
       setEvents([]);
-      setNotFound(true);
+      setLoadError("We couldn't load this action. Please try again.");
       setLoading(false);
-      return;
     }
-    setRow(data as ActionRow);
-    const { data: evs } = await supabase
-      .from("action_queue_events")
-      .select("id,action_queue_id,event_type,previous_status,new_status,note,created_at")
-      .eq("action_queue_id", actionId)
-      .order("created_at", { ascending: false });
-    setEvents((evs ?? []) as EventRow[]);
-    setLoading(false);
   }, [user, actionId]);
 
   useEffect(() => {
@@ -460,8 +477,36 @@ export default function ActionDetail() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin" />
+      <div
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+        className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground"
+      >
+        <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+        <p className="text-sm">Loading action…</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="max-w-xl mx-auto">
+        <BackLink />
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="glass rounded-2xl p-6 text-center"
+        >
+          <h1 className="text-lg font-semibold mb-2">We couldn't load this action</h1>
+          <p className="text-sm text-muted-foreground mb-4">{loadError}</p>
+          <Button
+            onClick={() => load()}
+            className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            Retry
+          </Button>
+        </div>
       </div>
     );
   }
@@ -906,7 +951,7 @@ function BackLink() {
   return (
     <Link
       to={actionsPath()}
-      className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3"
+      className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       <ArrowLeft className="h-4 w-4" /> Back to Action Queue
     </Link>

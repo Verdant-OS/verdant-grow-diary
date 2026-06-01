@@ -477,8 +477,36 @@ export default function ActionDetail() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin" />
+      <div
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+        className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground"
+      >
+        <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+        <p className="text-sm">Loading action…</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="max-w-xl mx-auto">
+        <BackLink />
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="glass rounded-2xl p-6 text-center"
+        >
+          <h1 className="text-lg font-semibold mb-2">We couldn't load this action</h1>
+          <p className="text-sm text-muted-foreground mb-4">{loadError}</p>
+          <Button
+            onClick={() => load()}
+            className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            Retry
+          </Button>
+        </div>
       </div>
     );
   }

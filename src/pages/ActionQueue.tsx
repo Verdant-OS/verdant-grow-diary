@@ -738,23 +738,27 @@ export default function ActionQueue() {
           <ul className="space-y-3">
             {pending.map((row) => {
               const titleId = `aq-pending-title-${row.id}`;
-              const rowAria =
-                focusedActionId === row.id
-                  ? "Focused action"
-                  : buildActionRowAriaLabel(row);
+              const descId = `aq-pending-desc-${row.id}`;
+              const isFocused = focusedActionId === row.id;
               return (
               <li
                 key={row.id}
                 data-testid="action-queue-row"
                 data-action-id={row.id}
-                data-focused={focusedActionId === row.id ? "true" : undefined}
-                aria-label={rowAria}
+                data-focused={isFocused ? "true" : undefined}
+                aria-label={isFocused ? "Focused action" : undefined}
+                aria-labelledby={isFocused ? undefined : titleId}
+                aria-describedby={isFocused ? undefined : descId}
                 className={`rounded-xl border border-border/60 bg-secondary/30 p-3 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background ${
-                  focusedActionId === row.id
+                  isFocused
                     ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
                     : ""
                 }`}
               >
+                <span id={descId} className="sr-only">
+                  {buildActionRowAriaLabel(row)}
+                </span>
+
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">

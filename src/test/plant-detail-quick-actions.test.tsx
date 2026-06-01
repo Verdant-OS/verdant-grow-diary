@@ -521,12 +521,15 @@ describe("PlantDetailQuickActions · keyboard and ARIA", () => {
       "View Timeline",
     ];
     for (const name of expected) {
-      expect(
-        screen.getByRole(/Manual Sensor|Quick Log|Upload Photo|Ask Doctor|View Timeline/.test(name) ? "button" : "button", {
+      const matches = [
+        ...screen.queryAllByRole("button", {
           name: new RegExp(`^${name}$`, "i"),
-        }) ||
-          screen.getByRole("link", { name: new RegExp(`^${name}$`, "i") }),
-      ).toBeTruthy();
+        }),
+        ...screen.queryAllByRole("link", {
+          name: new RegExp(`^${name}$`, "i"),
+        }),
+      ];
+      expect(matches.length, `missing accessible name: ${name}`).toBeGreaterThan(0);
     }
   });
 

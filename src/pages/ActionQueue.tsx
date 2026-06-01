@@ -186,8 +186,11 @@ export default function ActionQueue() {
   const { grows, activeGrowId, activeGrow } = useGrows();
   // Shared URL `?growId=` resolution against RLS-loaded grows. urlGrowId precedence
   // over activeGrowId is preserved exactly as before.
-  const { urlGrowId, scopedGrowName, backHref } = useScopedGrow();
+  const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
   const effectiveGrowId = urlGrowId ?? activeGrowId;
+  // URL provided a grow id, but it does not resolve to a grow the viewer
+  // owns. Showing every action would be misleading — render a calm prompt.
+  const hasInvalidScope = !!urlGrowId && !isValidScopedGrow;
   const [rows, setRows] = useState<ActionRow[]>([]);
   const [events, setEvents] = useState<Record<string, EventRow[]>>({});
   const [loading, setLoading] = useState(true);

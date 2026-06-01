@@ -4,9 +4,8 @@
  *
  * Read-only. Uses the existing `useDiaryEntries` read hook and the pure
  * `photoHistoryRules` + `plantPhotoPreviewStrip` view-models to render up
- * to 5 latest photos for the current plant. No uploads, writes, RPC,
- * functions.invoke, service_role, automation, device control, or
- * scheduling. Mobile-friendly horizontal strip.
+ * to 5 latest photos for the current plant. Mobile-friendly horizontal
+ * strip. No uploads or writes.
  */
 import { Link } from "react-router-dom";
 import { Image as ImageIcon, Upload, AlertCircle } from "lucide-react";

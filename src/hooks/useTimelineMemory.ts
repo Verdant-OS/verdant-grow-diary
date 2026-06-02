@@ -22,10 +22,12 @@ import {
   type ManualSnapshotTimelineCard,
 } from "@/lib/manualSensorSnapshotViewModel";
 import type {
+  TimelineAiDoctorEvidenceItem,
   TimelineDiaryItem,
   TimelineManualSnapshotItem,
   TimelineMemoryItem,
 } from "@/lib/timelineFilterRules";
+import { deriveSensorEvidenceMode } from "@/lib/aiDoctorSessionPersistence";
 
 export const TIMELINE_MEMORY_DEFAULT_LIMIT = 100;
 

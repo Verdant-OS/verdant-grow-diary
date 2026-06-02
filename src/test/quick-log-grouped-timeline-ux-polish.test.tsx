@@ -181,7 +181,7 @@ describe("QuickLogGroupedTimelineSection — filter chips", () => {
     await waitFor(() =>
       screen.getByTestId("quick-log-grouped-timeline-list"),
     );
-    await userEvent.click(
+    fireEvent.click(
       screen.getByTestId("quick-log-grouped-timeline-filter-water"),
     );
     const cards = screen.getAllByTestId("quick-log-grouped-card");
@@ -199,7 +199,7 @@ describe("QuickLogGroupedTimelineSection — filter chips", () => {
     await waitFor(() =>
       screen.getByTestId("quick-log-grouped-timeline-list"),
     );
-    await userEvent.click(
+    fireEvent.click(
       screen.getByTestId("quick-log-grouped-timeline-filter-note"),
     );
     const cards = screen.getAllByTestId("quick-log-grouped-card");
@@ -221,7 +221,7 @@ describe("QuickLogGroupedTimelineSection — filter chips", () => {
     await waitFor(() =>
       screen.getByTestId("quick-log-grouped-timeline-list"),
     );
-    await userEvent.click(
+    fireEvent.click(
       screen.getByTestId("quick-log-grouped-timeline-filter-environment"),
     );
     const cards = screen.getAllByTestId("quick-log-grouped-card");
@@ -263,7 +263,7 @@ describe("QuickLogGroupedTimelineSection — empty states", () => {
     await waitFor(() =>
       screen.getByTestId("quick-log-grouped-timeline-empty"),
     );
-    await userEvent.click(
+    fireEvent.click(
       screen.getByTestId("quick-log-grouped-timeline-create-button"),
     );
     // Sheet uses role="dialog" via Radix; just confirm something dialog-like surfaced.
@@ -281,7 +281,7 @@ describe("QuickLogGroupedTimelineSection — empty states", () => {
     await waitFor(() =>
       screen.getByTestId("quick-log-grouped-timeline-list"),
     );
-    await userEvent.click(
+    fireEvent.click(
       screen.getByTestId("quick-log-grouped-timeline-filter-note"),
     );
     const msg = await screen.findByTestId(
@@ -351,7 +351,7 @@ describe("QuickLogGroupedTimelineSection — source labels", () => {
     await waitFor(() =>
       screen.getByTestId("quick-log-grouped-timeline-list"),
     );
-    await userEvent.click(
+    fireEvent.click(
       screen.getByTestId("quick-log-grouped-timeline-filter-water"),
     );
     const cards = screen.getAllByTestId("quick-log-grouped-card");

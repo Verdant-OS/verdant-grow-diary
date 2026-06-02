@@ -66,6 +66,56 @@ function DiaryItemRow({ item }: { item: Extract<TimelineMemoryItem, { kind: "dia
   );
 }
 
+export const AI_DOCTOR_EVIDENCE_AUDIT_TITLE =
+  "AI Doctor evaluated sensor evidence";
+
+export const AI_DOCTOR_EVIDENCE_AUDIT_COPY: Record<
+  Extract<TimelineMemoryItem, { kind: "ai_doctor_sensor_evidence_audit" }>["status"],
+  string
+> = {
+  usable: "AI Doctor used this as healthy sensor evidence.",
+  stale: "AI Doctor treated this as stale cautionary context.",
+  invalid: "AI Doctor rejected this sensor evidence as invalid.",
+  needs_review: "AI Doctor flagged this sensor evidence for review.",
+  no_data: "AI Doctor had no usable sensor evidence.",
+};
+
+function AiDoctorEvidenceAuditRow({
+  item,
+}: {
+  item: Extract<TimelineMemoryItem, { kind: "ai_doctor_sensor_evidence_audit" }>;
+}) {
+  return (
+    <div
+      data-testid="timeline-memory-ai-doctor-evidence-audit"
+      data-item-key={item.key}
+      data-status={item.status}
+      data-reason-code={item.reasonCode ?? ""}
+      data-counts-as-healthy={item.countsAsHealthyEvidence ? "yes" : "no"}
+      data-mode={item.mode}
+      className="rounded-lg border border-border/40 bg-card/40 p-3 text-sm"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <Badge variant="outline" className="text-[10px]">
+          AI Doctor
+        </Badge>
+        <span className="text-xs text-muted-foreground">{item.occurredAt}</span>
+      </div>
+      <p className="mt-1.5 text-sm font-medium text-foreground/90">
+        {AI_DOCTOR_EVIDENCE_AUDIT_TITLE}
+      </p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Status: {item.status}
+        {item.reasonCode ? ` · Reason: ${item.reasonCode}` : ""} · Healthy
+        evidence: {item.countsAsHealthyEvidence ? "yes" : "no"}
+      </p>
+      <p className="mt-1 text-xs text-foreground/80">
+        {AI_DOCTOR_EVIDENCE_AUDIT_COPY[item.status]}
+      </p>
+    </div>
+  );
+}
+
 export default function TimelineMemorySection(props: Props) {
   const scope = toScope(props);
   const { items, isLoading, isError } = useTimelineMemory(scope);

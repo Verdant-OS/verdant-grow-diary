@@ -14,8 +14,10 @@ import SensorSourceBadge from "@/components/SensorSourceBadge";
 afterEach(() => cleanup());
 
 function renderBadge(props: React.ComponentProps<typeof SensorSourceBadge>) {
-  const { getByTestId } = render(<SensorSourceBadge {...props} />);
-  const root = getByTestId(props.testId ?? "sensor-source-badge");
+  const { container } = render(<SensorSourceBadge {...props} />);
+  const root = container.querySelector(
+    `[data-testid="${props.testId ?? "sensor-source-badge"}"]`,
+  ) as HTMLElement;
   return {
     severity: root.getAttribute("data-severity"),
     source: root.getAttribute("data-source"),

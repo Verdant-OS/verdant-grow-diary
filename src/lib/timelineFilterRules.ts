@@ -76,7 +76,30 @@ export interface TimelineManualSnapshotItem {
   card: ManualSnapshotTimelineCard;
 }
 
-export type TimelineMemoryItem = TimelineDiaryItem | TimelineManualSnapshotItem;
+/**
+ * Frozen AI Doctor sensor-evidence audit row, projected from
+ * `ai_doctor_sessions`. Values are immutable snapshots from the moment of
+ * the explicit run — later sensor updates never rewrite them.
+ */
+export interface TimelineAiDoctorEvidenceItem {
+  kind: "ai_doctor_sensor_evidence_audit";
+  key: string;
+  occurredAt: string;
+  status:
+    | "usable"
+    | "stale"
+    | "invalid"
+    | "needs_review"
+    | "no_data";
+  reasonCode: string | null;
+  countsAsHealthyEvidence: boolean;
+  mode: "healthy" | "cautionary" | "unsafe" | "missing";
+}
+
+export type TimelineMemoryItem =
+  | TimelineDiaryItem
+  | TimelineManualSnapshotItem
+  | TimelineAiDoctorEvidenceItem;
 
 /**
  * Map an item to the buckets it matches. An item can match multiple
@@ -92,6 +115,16 @@ export function classifyTimelineMemoryItem(
   if (item.kind === "manual_sensor_snapshot") {
     buckets.add("manual_sensor_snapshot");
     if (item.card.severity === "warning" || item.card.severity === "invalid") {
+      buckets.add("warnings");
+    }
+    return buckets;
+  }
+
+  if (item.kind === "ai_doctor_sensor_evidence_audit") {
+    // Always appears under "all"; non-healthy modes also surface under
+    // "warnings" so growers can scan past evaluations that lacked
+    // healthy sensor evidence.
+    if (item.mode === "unsafe" || item.mode === "cautionary") {
       buckets.add("warnings");
     }
     return buckets;

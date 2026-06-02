@@ -60,9 +60,17 @@ export interface PlantDetailAiDoctorReadinessInput {
   /** True when at least one recent activity entry is watering or feeding. */
   hasRecentWateringOrFeed: boolean;
   /**
-   * Optional shared-contract classification of the most recent sensor
-   * snapshot. When provided, it overrides `hasSensorSnapshot` for the
-   * healthy-evidence count and drives the cautionary/unsafe surface.
+   * Shared-contract classification of the most recent sensor snapshot.
+   *
+   * This is the SOLE input that can grant healthy sensor evidence. The
+   * `hasSensorSnapshot` boolean above is a presence hint only and never
+   * grants healthy evidence on its own. When this field is null/undefined,
+   * the evidence row defaults to `no_data` and the sensor signal is NOT
+   * counted as healthy — regardless of `hasSensorSnapshot`.
+   *
+   * Live classified sensor feeds MUST supply this field. The boolean
+   * fallback exists strictly for back-compat with the legacy timeline-
+   * derived presence flag and cannot mask a known unsafe/unknown state.
    */
   sensorSnapshot?: import("@/lib/sensorSnapshotStatusContract").Classification | null;
 }

@@ -287,6 +287,34 @@ export function evaluateSensorSnapshotEvidence(
   };
 }
 
+/**
+ * Map a back-compat `SensorSnapshotStatusResult` (produced by
+ * `classifySensorSnapshotStatus` / the bridge health view-model) into a
+ * canonical `Classification`. Centralizes the reasonCode → reason
+ * translation so callers never duplicate it.
+ */
+const REASON_CODE_TO_REASON: Record<SensorSnapshotReasonCode, SnapshotReason> = {
+  fresh_accept: "fresh_accepted",
+  stale_timestamp: "outside_stale_window",
+  partial_accept: "partial_accept",
+  none_accepted: "none_inserted",
+  none_received: "no_rows",
+  malformed_payload: "malformed_reading",
+  missing_timestamp: "unknown",
+};
+
+export function classificationFromStatusResult(
+  result: SensorSnapshotStatusResult | null | undefined,
+): Classification {
+  if (!result) return buildClassification("no_data", "no_rows");
+  const reason: SnapshotReason = result.reasonCode
+    ? REASON_CODE_TO_REASON[result.reasonCode]
+    : result.status === "usable"
+      ? "fresh_accepted"
+      : "unknown";
+  return buildClassification(result.status, reason);
+}
+
 export type SensorSnapshotSeverity =
   | "ok"
   | "warning"

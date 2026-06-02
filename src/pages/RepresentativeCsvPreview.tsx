@@ -1,8 +1,16 @@
 import { useMemo, useRef, useState } from "react";
 import {
+  defaultMappingFromHeaders,
+  emptyRepresentativeMapping,
   previewRepresentativeCsv,
+  parseCsv,
+  REPRESENTATIVE_MAPPING_FIELDS,
+  type EcUnit,
+  type RepresentativeColumnMapping,
   type RepresentativeDraftReading,
+  type RepresentativeMappingField,
   type RepresentativePreviewResult,
+  type TempUnit,
 } from "@/lib/representativeCsvSensorPreviewRules";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,36 +26,118 @@ import {
 /**
  * RepresentativeCsvPreview — DEMO/SAMPLE ONLY.
  *
- * Lets a grower pick a local .csv file matching the synthetic representative
- * partner-data shape (AROYA-style columns). Parses in memory, renders the
- * normalized preview table, and labels everything as CSV + Representative
- * sample + Not live data.
+ * Lets a grower pick a local .csv file with arbitrary headers, map those
+ * headers to Verdant canonical sensor fields with explicit units, and
+ * preview the normalized result. Parses in memory only.
  *
  * Hard constraints:
  *  - No DB writes, no Supabase calls, no functions.invoke.
  *  - No alerts, no action_queue, no AI Doctor calls.
  *  - No file persistence and no Storage upload.
- *  - Tent/grow mapping is required for any future insert and is NOT inferred
- *    from the CSV Room/Zone columns.
+ *  - Mapping is explicit; Facility/Room/Zone are NEVER inferred as Verdant
+ *    grow_id / tent_id / plant_id.
  */
+
+interface FieldDescriptor {
+  field: RepresentativeMappingField;
+  label: string;
+  helper: string;
+  units?: ReadonlyArray<string>;
+}
+
+const FIELD_DESCRIPTORS: ReadonlyArray<FieldDescriptor> = [
+  { field: "timestamp", label: "Timestamp", helper: "Required. ISO-8601 or 'YYYY-MM-DD HH:MM:SS'." },
+  { field: "sensor", label: "Sensor ID", helper: "Identifier for the probe/device." },
+  { field: "facility", label: "Facility (optional)", helper: "Preserved as context. Not a Verdant ID." },
+  { field: "room", label: "Room (optional)", helper: "Preserved as context. Not a Verdant ID." },
+  { field: "zone", label: "Zone (optional)", helper: "Preserved as context. Not a Verdant ID." },
+  { field: "air_temp", label: "Air temperature", helper: "Pick the source unit.", units: ["C", "F"] },
+  { field: "substrate_temp", label: "Substrate temperature", helper: "Pick the source unit.", units: ["C", "F"] },
+  { field: "humidity", label: "Humidity (%)", helper: "Relative humidity 0–100." },
+  { field: "vpd", label: "VPD (kPa)", helper: "Vapor pressure deficit." },
+  { field: "co2", label: "CO₂ (ppm)", helper: "Parts per million." },
+  { field: "ppfd", label: "PPFD (µmol)", helper: "Photosynthetic photon flux density." },
+  { field: "vwc", label: "Substrate VWC (%)", helper: "Volumetric water content 0–100." },
+  { field: "substrate_ec", label: "Substrate EC", helper: "Pick the source unit.", units: ["mS/cm", "uS/cm"] },
+];
+
+const UNMAPPED = "__unmapped__";
+
 export default function RepresentativeCsvPreview() {
-  const [result, setResult] = useState<RepresentativePreviewResult | null>(null);
+  const [headers, setHeaders] = useState<string[] | null>(null);
+  const [text, setText] = useState<string | null>(null);
+  const [mapping, setMapping] = useState<RepresentativeColumnMapping>(emptyRepresentativeMapping());
   const [fileName, setFileName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const onFile = async (file: File) => {
     setError(null);
-    setResult(null);
     setFileName(file.name);
     try {
-      const text = await file.text();
-      const parsed = previewRepresentativeCsv(text);
-      setResult(parsed);
+      const fileText = await file.text();
+      const parsed = parseCsv(fileText);
+      setText(fileText);
+      setHeaders([...parsed.headers]);
+      setMapping(defaultMappingFromHeaders(parsed.headers));
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to parse CSV";
       setError(message);
+      setHeaders(null);
+      setText(null);
     }
+  };
+
+  const result: RepresentativePreviewResult | null = useMemo(() => {
+    if (!text || !headers) return null;
+    try {
+      return previewRepresentativeCsv(text, { mapping });
+    } catch {
+      return null;
+    }
+  }, [text, headers, mapping]);
+
+  const updateColumn = (field: RepresentativeMappingField, value: string) => {
+    const column = value === UNMAPPED ? null : value;
+    setMapping((prev) => {
+      const next = { ...prev };
+      const current = prev[field];
+      if (typeof current === "string" || current === null) {
+        (next as Record<string, unknown>)[field] = column;
+      } else if ("unit" in current) {
+        (next as Record<string, unknown>)[field] = { ...current, column };
+      } else {
+        (next as Record<string, unknown>)[field] = { column };
+      }
+      return next;
+    });
+  };
+
+  const updateUnit = (field: RepresentativeMappingField, unit: string) => {
+    setMapping((prev) => {
+      const current = prev[field];
+      if (typeof current === "string" || current === null || !("unit" in current)) return prev;
+      const next = { ...prev };
+      if (field === "substrate_ec") {
+        (next as Record<string, unknown>)[field] = { ...current, unit: unit as EcUnit };
+      } else {
+        (next as Record<string, unknown>)[field] = { ...current, unit: unit as TempUnit };
+      }
+      return next;
+    });
+  };
+
+  const mappingColumn = (field: RepresentativeMappingField): string | null => {
+    const v = mapping[field];
+    if (v === null) return null;
+    if (typeof v === "string") return v;
+    return v.column;
+  };
+
+  const mappingUnit = (field: RepresentativeMappingField): string | null => {
+    const v = mapping[field];
+    if (v === null || typeof v === "string") return null;
+    return "unit" in v ? v.unit : null;
   };
 
   return (
@@ -60,10 +150,11 @@ export default function RepresentativeCsvPreview() {
         </div>
         <h1 className="text-2xl font-semibold">Representative CSV preview</h1>
         <p className="text-sm text-muted-foreground">
-          Preview a representative partner-data CSV sample. This is a synthetic
-          shape used to test Verdant&rsquo;s intake workflow. Nothing is written
-          to your grow, no readings are stored, and no file is uploaded. Mapping
-          to a Verdant tent and grow would be required before any future import.
+          Preview only. Nothing is saved. Map your CSV headers to Verdant fields
+          and pick units. This is a synthetic shape used to test Verdant&rsquo;s
+          intake workflow — not a confirmed AROYA importer. Facility, Room, and
+          Zone are preserved as context and are never used as Verdant tent or
+          grow IDs.
         </p>
       </header>
 
@@ -96,6 +187,63 @@ export default function RepresentativeCsvPreview() {
           </p>
         )}
       </section>
+
+      {headers && (
+        <section
+          aria-label="Map CSV columns to Verdant fields"
+          className="space-y-3 rounded-lg border p-4"
+        >
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold">Map columns</h2>
+            <p className="text-xs text-muted-foreground">
+              Detected headers: {headers.join(", ") || "—"}
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {FIELD_DESCRIPTORS.map((desc) => (
+              <div key={desc.field} className="rounded-md border p-3">
+                <label
+                  className="block text-sm font-medium"
+                  htmlFor={`map-${desc.field}`}
+                >
+                  {desc.label}
+                </label>
+                <p className="mb-2 text-xs text-muted-foreground">{desc.helper}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    id={`map-${desc.field}`}
+                    aria-label={`Map ${desc.label}`}
+                    className="h-9 flex-1 rounded-md border bg-background px-2 text-sm"
+                    value={mappingColumn(desc.field) ?? UNMAPPED}
+                    onChange={(e) => updateColumn(desc.field, e.target.value)}
+                  >
+                    <option value={UNMAPPED}>— Not mapped —</option>
+                    {headers.map((h) => (
+                      <option key={h} value={h}>
+                        {h}
+                      </option>
+                    ))}
+                  </select>
+                  {desc.units && (
+                    <select
+                      aria-label={`${desc.label} unit`}
+                      className="h-9 rounded-md border bg-background px-2 text-sm"
+                      value={mappingUnit(desc.field) ?? desc.units[0]}
+                      onChange={(e) => updateUnit(desc.field, e.target.value)}
+                    >
+                      {desc.units.map((u) => (
+                        <option key={u} value={u}>
+                          {u}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {result && <PreviewSummaryStrip result={result} />}
       {result && <PreviewTable result={result} />}

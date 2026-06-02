@@ -456,7 +456,13 @@ function SummaryCell({ label, value }: { label: string; value: number }) {
   );
 }
 
-function PreviewTable({ result }: { result: RepresentativePreviewResult }) {
+function PreviewTable({
+  result,
+  mapping,
+}: {
+  result: RepresentativePreviewResult;
+  mapping: RepresentativeColumnMapping;
+}) {
   const rows = useMemo(() => result.rows, [result]);
   return (
     <section aria-label="Normalized representative CSV rows" className="overflow-auto">
@@ -476,12 +482,12 @@ function PreviewTable({ result }: { result: RepresentativePreviewResult }) {
             <TableHead>VWC %</TableHead>
             <TableHead>EC mS/cm</TableHead>
             <TableHead>Sub °C</TableHead>
-            <TableHead>Notes</TableHead>
+            <TableHead>Validation</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {rows.map((row) => (
-            <PreviewRow key={row.rowIndex} row={row} />
+            <PreviewRow key={row.rowIndex} row={row} mapping={mapping} />
           ))}
         </TableBody>
       </Table>
@@ -500,12 +506,31 @@ function fmt(n: number | null, digits = 2): string {
   return n.toFixed(digits);
 }
 
-function PreviewRow({ row }: { row: RepresentativeDraftReading }) {
+function hintVariant(severity: CsvRowValidationHint["severity"]) {
+  return severity === "block" ? ("destructive" as const) : ("secondary" as const);
+}
+
+function PreviewRow({
+  row,
+  mapping,
+}: {
+  row: RepresentativeDraftReading;
+  mapping: RepresentativeColumnMapping;
+}) {
+  const outcome = useMemo(
+    () => deriveCsvRowValidationHints({ row, mapping }),
+    [row, mapping],
+  );
   return (
-    <TableRow>
+    <TableRow data-row-canonical-previewable={outcome.canonicalPreviewable}>
       <TableCell>{row.rowIndex + 1}</TableCell>
       <TableCell>
         <Badge variant={stateVariant(row.state)}>{row.state}</Badge>
+        {!outcome.canonicalPreviewable && (
+          <div className="mt-1 text-[10px] uppercase text-destructive">
+            Blocked from canonical preview
+          </div>
+        )}
       </TableCell>
       <TableCell>{row.captured_at ?? "—"}</TableCell>
       <TableCell>{row.sensor ?? "—"}</TableCell>
@@ -520,8 +545,19 @@ function PreviewRow({ row }: { row: RepresentativeDraftReading }) {
       <TableCell>{fmt(row.vwc_pct, 1)}</TableCell>
       <TableCell>{fmt(row.substrate_ec_mscm, 2)}</TableCell>
       <TableCell>{fmt(row.substrate_temp_c, 1)}</TableCell>
-      <TableCell className="text-xs text-muted-foreground">
-        {row.reasons.length > 0 ? row.reasons.join(", ") : ""}
+      <TableCell className="space-y-1 text-xs">
+        {outcome.hints.length === 0 ? (
+          <span className="text-muted-foreground">—</span>
+        ) : (
+          <ul className="space-y-1">
+            {outcome.hints.map((h) => (
+              <li key={`${h.code}-${h.field ?? "row"}`} className="flex flex-wrap items-center gap-1">
+                <Badge variant={hintVariant(h.severity)}>{h.severity}</Badge>
+                <span className="text-muted-foreground">{h.message}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </TableCell>
     </TableRow>
   );

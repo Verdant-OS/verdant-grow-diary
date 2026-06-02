@@ -116,7 +116,7 @@ function buildAction(
   satisfies: readonly string[],
   args: BuildAiDoctorContextQuickActionsArgs,
 ): AiDoctorContextQuickAction {
-  const testId = `ai-doctor-context-quick-action-${kind.replaceAll("_", "-")}`;
+  const testId = `ai-doctor-context-quick-action-${kind.replace(/_/g, "-")}`;
   switch (kind) {
     case "update_plant_profile": {
       const href = args.plantId ? plantDetailPath(args.plantId) : "/plants";

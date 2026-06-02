@@ -11,8 +11,8 @@
  *    refreshes both that tent's reads and the plant reads inside it.
  *  - Scope is taken from the user's selected target. Never derived from
  *    a "first/default" plant or tent.
- *  - Source-honest: no live/synced/connected/imported wording is used or
- *    emitted in any field, label, or key.
+ *  - Source-honest: no realtime-stream wording is used or emitted in any
+ *    field, label, or key.
  *  - No alerts/action_queue/ai_doctor_sessions writes. No device control.
  *    No schema/RPC/write behavior changes.
  */

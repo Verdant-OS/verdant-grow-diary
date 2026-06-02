@@ -6,7 +6,7 @@
  * compatible with `sensorBridgeIntakeRules`.
  *
  * Boundaries (stop-ship if violated):
- *  - Pure function: no fetch, no Supabase, no localStorage, no timers, no
+ *  - Pure function: no fetch, no DB client, no localStorage, no timers, no
  *    wall-clock reads unless an explicit `serverReceivedAt` is injected.
  *  - Never performs auth checks, never trusts caller-supplied user_id, never
  *    trusts a submitted source label as "live", never marks readings as live.

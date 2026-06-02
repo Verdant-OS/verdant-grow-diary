@@ -22,7 +22,7 @@ describe("buildSensorBridgeHealthViewModel", () => {
     expect(vm.controlDisclosure).toBe(SENSOR_BRIDGE_CONTROL_DISCLOSURE);
     expect(vm.latestAcceptedAtIso).toBeNull();
     expect(vm.latestRejectedAtIso).toBeNull();
-    expect(vm.latestReasonCode).toBeNull();
+    expect(vm.latestReasonCode).toBe("fresh_accept");
   });
 
   it("returns accepted state for a recent fully-inserted row", () => {
@@ -39,7 +39,7 @@ describe("buildSensorBridgeHealthViewModel", () => {
     expect(vm.message).toBe("Latest bridge reading accepted.");
     expect(vm.latestAcceptedAtIso).toBe(minutesAgo(10));
     expect(vm.latestRejectedAtIso).toBeNull();
-    expect(vm.latestReasonCode).toBeNull();
+    expect(vm.latestReasonCode).toBe("fresh_accept");
     expect(vm.sourceLabel).toBe("pi_bridge");
   });
 
@@ -85,7 +85,7 @@ describe("buildSensorBridgeHealthViewModel", () => {
     ];
     const vm = buildSensorBridgeHealthViewModel({ rows, now: NOW });
     expect(vm.state).toBe("needs_review");
-    expect(vm.latestReasonCode).toBe("none_inserted");
+    expect(vm.latestReasonCode).toBe("none_accepted");
   });
 
   it("classifies a zero/zero unknown row as no_data, never healthy", () => {

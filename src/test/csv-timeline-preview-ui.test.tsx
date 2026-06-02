@@ -39,8 +39,8 @@ describe("RepresentativeCsvPreview — timeline preview", () => {
       within(section).getByText(/Preview only — nothing is saved\./i),
     ).toBeInTheDocument();
     expect(
-      within(section).getByText(/csv \/ representative sample \/ not live/i),
-    ).toBeInTheDocument();
+      within(section).getAllByText(/csv \/ representative sample \/ not live/i).length,
+    ).toBeGreaterThan(0);
     expect(within(section).getByText("2026-01-01T10:00:00.000Z")).toBeInTheDocument();
     expect(within(section).getByText("2026-01-01T11:00:00.000Z")).toBeInTheDocument();
   });

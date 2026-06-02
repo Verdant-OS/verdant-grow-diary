@@ -235,6 +235,8 @@ export default function TentDetail() {
 
       <TentManualSnapshotHistoryList tentId={id ?? null} readings={readings} />
 
+      <ManualSnapshotTimelineSection scope="tent" tentId={id ?? null} />
+
       {id && (
         <TentCsvImportCard tentId={id} growId={tent.growId ?? null} />
       )}

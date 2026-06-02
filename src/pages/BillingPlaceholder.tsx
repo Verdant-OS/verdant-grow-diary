@@ -185,7 +185,7 @@ export default function BillingPlaceholder() {
           snapshots, exports, backups, and cautious AI decision support.
           Verdant does not sell cannabis, seeds, nutrients, or any consumable
           or regulated product. Verdant does not control grow-room equipment
-          and never grows for you on autopilot.
+          and never makes grow-room changes without your approval.
         </p>
       </section>
     </main>

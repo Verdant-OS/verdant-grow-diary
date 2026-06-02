@@ -32,6 +32,8 @@ import {
   filterQuickLogPlantOptions,
   quickLogPlantHelperText,
 } from "@/lib/quickLogPlantOptionRules";
+import { classifyQuickLogSnapshotSource } from "@/lib/quickLogSensorSnapshotRules";
+
 import { AlertTriangle, Info } from "lucide-react";
 import { toast } from "sonner";
 

@@ -26,6 +26,7 @@ import PlantDetailWhatsMissing from "@/components/PlantDetailWhatsMissing";
 import PlantDetailAiDoctorReadiness from "@/components/PlantDetailAiDoctorReadiness";
 import PlantDetailDoctorContextPreview from "@/components/PlantDetailDoctorContextPreview";
 import PlantDetailAiDoctorContextPanel from "@/components/PlantDetailAiDoctorContextPanel";
+import PlantDetailAiDoctorReadinessGate from "@/components/PlantDetailAiDoctorReadinessGate";
 import PlantDetailAskDoctorHelper from "@/components/PlantDetailAskDoctorHelper";
 import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
 import PlantDetailSectionNav from "@/components/PlantDetailSectionNav";
@@ -171,10 +172,17 @@ export default function PlantDetail() {
         plantName={plant.name}
         tentName={tent?.name ?? null}
       />
-      <PlantDetailAiDoctorContextPanel
+      <PlantDetailAiDoctorReadinessGate
         plantId={plant.id}
         plant={plant}
+        hasSafeAiDoctorFlow
       />
+      <div id="plant-ai-doctor-context-panel" tabIndex={-1} className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">
+        <PlantDetailAiDoctorContextPanel
+          plantId={plant.id}
+          plant={plant}
+        />
+      </div>
 
 
 

@@ -119,16 +119,12 @@ function renderBilling(plan: string) {
 }
 
 describe("BillingPlaceholder rendering", () => {
-  const realEnv = { ...(import.meta as any).env };
-
   beforeEach(() => {
-    for (const k of Object.keys(SANDBOX_ENV)) {
-      (import.meta as any).env[k] = "";
-    }
+    _paddleTestEnv = {};
   });
 
   afterEach(() => {
-    (import.meta as any).env = realEnv;
+    _paddleTestEnv = null;
     vi.restoreAllMocks();
   });
 
@@ -140,16 +136,14 @@ describe("BillingPlaceholder rendering", () => {
   });
 
   it("refuses to render checkout when env is live", () => {
-    Object.assign((import.meta as any).env, SANDBOX_ENV, {
-      VITE_PADDLE_ENVIRONMENT: "live",
-    });
+    _paddleTestEnv = { ...SANDBOX_ENV, VITE_PADDLE_ENVIRONMENT: "live" };
     renderBilling("pro-monthly");
     expect(screen.getByTestId("paddle-unavailable")).toBeInTheDocument();
     expect(screen.queryByTestId("paddle-sandbox-checkout-button")).toBeNull();
   });
 
   it("renders the sandbox checkout button when sandbox config is present", () => {
-    Object.assign((import.meta as any).env, SANDBOX_ENV);
+    _paddleTestEnv = { ...SANDBOX_ENV };
     renderBilling("pro-monthly");
     expect(screen.getByTestId("paddle-sandbox-ready")).toBeInTheDocument();
     const btn = screen.getByTestId("paddle-sandbox-checkout-button");

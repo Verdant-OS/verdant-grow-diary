@@ -105,23 +105,23 @@ function isStageKnown(stage: string | null | undefined): boolean {
   return s !== "" && s !== "unknown";
 }
 
+import { countsAsHealthyEvidence as contractCountsAsHealthyEvidence } from "@/lib/sensorSnapshotStatusContract";
+
+/**
+ * Healthy sensor evidence is gated EXCLUSIVELY through the Sensor
+ * Snapshot Status Contract v1. A raw `hasSensorSnapshot: true` boolean
+ * NEVER counts as healthy on its own — callers must supply a
+ * `Classification` from the contract. Without one, the snapshot is
+ * treated as `no_data` and excluded from healthy evidence.
+ */
 function evaluateSensorEvidence(
   input: PlantDetailAiDoctorReadinessInput,
 ): AiDoctorSensorEvidence {
   const snap = input.sensorSnapshot ?? null;
   if (!snap) {
-    if (input.hasSensorSnapshot) {
-      return {
-        mode: "unknown",
-        status: null,
-        reason: null,
-        countsAsHealthyEvidence: true,
-        isCautionary: false,
-        isUnsafe: false,
-        isMissing: false,
-        label: "Sensor snapshot present",
-      };
-    }
+    // No structured Classification → never healthy, regardless of the
+    // legacy boolean. The boolean is preserved only as a UI hint for the
+    // missing-bullet copy via the gated input in build*.
     return {
       mode: "missing",
       status: "no_data",
@@ -130,10 +130,11 @@ function evaluateSensorEvidence(
       isCautionary: false,
       isUnsafe: false,
       isMissing: true,
-      label: "No sensor snapshot",
+      label: "No sensor snapshot.",
     };
   }
-  const healthy = snap.status === "usable";
+  // Single source of truth for the healthy gate: the contract.
+  const healthy = contractCountsAsHealthyEvidence(snap);
   const cautionary = snap.status === "stale";
   const unsafe = snap.status === "invalid" || snap.status === "needs_review";
   const missing = snap.status === "no_data";

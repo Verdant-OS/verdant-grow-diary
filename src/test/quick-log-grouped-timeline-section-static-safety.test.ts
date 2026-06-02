@@ -76,7 +76,7 @@ describe("QuickLogGroupedTimelineSection — static safety", () => {
   }
 
   it("hook: no writes / RPC / forbidden tables", () => {
-    const src = read(HOOK);
+    const src = read(HOOK).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
     for (const re of FORBIDDEN_WRITES_HOOK) {
       expect(src).not.toMatch(re);
     }

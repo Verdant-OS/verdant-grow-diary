@@ -29,6 +29,7 @@ import {
 } from "@/lib/csvMappingPresetStorage";
 import {
   deriveCsvRowValidationHints,
+  detectMappingCollisions,
   type CsvRowValidationHint,
 } from "@/lib/csvRowValidationRules";
 import { Badge } from "@/components/ui/badge";

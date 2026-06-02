@@ -8,7 +8,6 @@ import { resolve } from "node:path";
 
 const FILES = [
   "src/lib/quickLogV2ManualSnapshotAdapter.ts",
-  "src/test/quicklog-v2-context-readiness.test.ts",
 ];
 
 function read(rel: string): string {

@@ -85,6 +85,60 @@ async function fetchRows(
   return (data ?? []) as RawRow[];
 }
 
+interface AiDoctorAuditRow {
+  id: string;
+  created_at: string;
+  sensor_snapshot_status:
+    | "usable" | "stale" | "invalid" | "needs_review" | "no_data"
+    | null;
+  sensor_snapshot_reason_code: string | null;
+  counts_as_healthy_evidence: boolean | null;
+  sensor_evidence_mode:
+    | "healthy" | "cautionary" | "unsafe" | "missing" | null;
+  sensor_evidence_evaluated_at: string | null;
+}
+
+async function fetchAiDoctorAuditRows(
+  scope: TimelineMemoryScope,
+  limit: number,
+): Promise<AiDoctorAuditRow[]> {
+  try {
+    let q = supabase
+      .from("ai_doctor_sessions" as never)
+      .select(
+        "id,created_at,sensor_snapshot_status,sensor_snapshot_reason_code,counts_as_healthy_evidence,sensor_evidence_mode,sensor_evidence_evaluated_at",
+      );
+    q = scope.kind === "plant"
+      ? q.eq("plant_id", scope.plantId)
+      : q.eq("tent_id", scope.tentId);
+    q = q.not("sensor_snapshot_status", "is", null);
+    const { data, error } = await q
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (error) return [];
+    return (data ?? []) as unknown as AiDoctorAuditRow[];
+  } catch {
+    return [];
+  }
+}
+
+function auditRowToTimelineItem(
+  row: AiDoctorAuditRow,
+): TimelineAiDoctorEvidenceItem | null {
+  const status = row.sensor_snapshot_status;
+  if (!status) return null;
+  const mode = row.sensor_evidence_mode ?? deriveSensorEvidenceMode(status);
+  return {
+    kind: "ai_doctor_sensor_evidence_audit",
+    key: row.id,
+    occurredAt: row.sensor_evidence_evaluated_at ?? row.created_at,
+    status,
+    reasonCode: row.sensor_snapshot_reason_code,
+    countsAsHealthyEvidence: row.counts_as_healthy_evidence === true,
+    mode,
+  };
+}
+
 export interface UseTimelineMemoryResult {
   items: TimelineMemoryItem[];
   isLoading: boolean;
@@ -107,18 +161,23 @@ export function useTimelineMemory(
     enabled: scope !== null,
     queryFn: async (): Promise<TimelineMemoryItem[]> => {
       if (!scope) return [];
-      const rows = await fetchRows(scope, limit);
+      const [rows, auditRows] = await Promise.all([
+        fetchRows(scope, limit),
+        fetchAiDoctorAuditRows(scope, limit),
+      ]);
 
       const out: TimelineMemoryItem[] = [];
       for (const row of rows) {
-        // For tent scope, also include tent-level (plant_id null) rows.
-        // Plant scope is already filtered server-side by plant_id.
         const snap = rowToManualSnapshotItem(row);
         if (snap) {
           out.push(snap);
         } else {
           out.push(diaryRowToDiaryItem(row));
         }
+      }
+      for (const row of auditRows) {
+        const item = auditRowToTimelineItem(row);
+        if (item) out.push(item);
       }
       // Deterministic occurredAt desc, then by key for ties.
       out.sort((a, b) => {

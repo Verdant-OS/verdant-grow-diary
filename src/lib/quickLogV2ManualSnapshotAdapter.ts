@@ -44,7 +44,7 @@ export interface QuickLogV2EnvironmentRow {
 }
 
 export type QuickLogV2SnapshotScope =
-  | { kind: "plant"; plantId: string }
+  | { kind: "plant"; plantId: string; tentId?: string | null }
   | { kind: "tent"; tentId: string };
 
 function finiteOrNull(v: unknown): number | null {
@@ -67,7 +67,16 @@ function isEligible(row: QuickLogV2EnvironmentRow): boolean {
   return true;
 }
 
-/** Filter rows to a single plant/tent scope. Pure & deterministic. */
+/**
+ * Filter rows to a single plant/tent scope. Pure & deterministic.
+ *
+ * Plant scope predicate (per readiness contract):
+ *   r.plant_id === plantId
+ *   OR (r.plant_id == null AND tentId is provided AND r.tent_id === tentId)
+ *
+ * Tent scope predicate:
+ *   r.tent_id === tentId (any plant_id, including null and other plants).
+ */
 export function filterQuickLogV2EnvironmentRowsByScope(
   rows: ReadonlyArray<QuickLogV2EnvironmentRow>,
   scope: QuickLogV2SnapshotScope,
@@ -75,7 +84,18 @@ export function filterQuickLogV2EnvironmentRowsByScope(
   if (!Array.isArray(rows)) return [];
   return rows.filter((r) => {
     if (!isEligible(r)) return false;
-    if (scope.kind === "plant") return r.plant_id === scope.plantId;
+    if (scope.kind === "plant") {
+      if (r.plant_id === scope.plantId) return true;
+      if (
+        r.plant_id == null &&
+        typeof scope.tentId === "string" &&
+        scope.tentId.length > 0 &&
+        r.tent_id === scope.tentId
+      ) {
+        return true;
+      }
+      return false;
+    }
     return r.tent_id === scope.tentId;
   });
 }

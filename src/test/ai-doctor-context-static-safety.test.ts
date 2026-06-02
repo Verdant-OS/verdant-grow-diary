@@ -99,10 +99,10 @@ describe("ai doctor context panel — static safety", () => {
     for (const ui of panels) {
       expect(ui).not.toMatch(/MISSING_CODE_TO_ACTION\s*=/);
       // Quick-action labels live in the view-model, not in JSX.
-      expect(ui).not.toMatch(/"Update plant profile"/);
-      expect(ui).not.toMatch(/"Add recent log"/);
-      expect(ui).not.toMatch(/"Add manual sensor snapshot"/);
-      expect(ui).not.toMatch(/"Add plant photo"/);
+      expect(ui).not.toMatch(/"Edit plant details"/);
+      expect(ui).not.toMatch(/"Add note"/);
+      expect(ui).not.toMatch(/"Add sensor snapshot"/);
+      expect(ui).not.toMatch(/"Add photo"/);
     }
   });
 });

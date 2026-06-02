@@ -19,7 +19,7 @@ describe("buildAiDoctorContextQuickActions", () => {
     });
     expect(actions).toHaveLength(1);
     expect(actions[0].kind).toBe("update_plant_profile");
-    expect(actions[0].label).toBe("Update plant profile");
+    expect(actions[0].label).toBe("Edit plant details");
     expect(actions[0].target).toMatchObject({ kind: "link" });
     expect(actions[0].satisfies).toEqual(["strain", "stage", "medium"]);
   });
@@ -31,7 +31,7 @@ describe("buildAiDoctorContextQuickActions", () => {
     });
     const log = actions.find((a) => a.kind === "add_recent_log");
     expect(log).toBeDefined();
-    expect(log!.label).toBe("Add recent log");
+    expect(log!.label).toBe("Add note");
     expect(log!.target.kind).toBe("event");
     if (log!.target.kind === "event") {
       expect(log!.target.eventName).toBe(PLANT_QUICKLOG_PREFILL_EVENT);
@@ -46,7 +46,7 @@ describe("buildAiDoctorContextQuickActions", () => {
     });
     const snap = actions.find((a) => a.kind === "add_manual_sensor_snapshot");
     expect(snap).toBeDefined();
-    expect(snap!.label).toBe("Add manual sensor snapshot");
+    expect(snap!.label).toBe("Add sensor snapshot");
     expect(snap!.target).toMatchObject({ kind: "link" });
     if (snap!.target.kind === "link") {
       expect(snap!.target.href).toContain("/sensors");
@@ -61,7 +61,7 @@ describe("buildAiDoctorContextQuickActions", () => {
     });
     expect(actions).toHaveLength(1);
     expect(actions[0].kind).toBe("add_plant_photo");
-    expect(actions[0].label).toBe("Add plant photo");
+    expect(actions[0].label).toBe("Add photo");
     expect(actions[0].target.kind).toBe("event");
   });
 

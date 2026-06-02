@@ -3,32 +3,40 @@
  *
  * Input: rows from `sensor_ingest_audit_log` (and optional bridge name).
  *
- * Scope (intentionally narrow):
- *  - Derives a deterministic, UI-ready status from already-stored audit rows.
+ * Refactored to consume the shared Sensor Snapshot Status Contract v1
+ * (`@/lib/sensorSnapshotStatusContract`). Classification lives in the
+ * contract; this file only maps audit rows into contract inputs and
+ * produces UI copy. The card renders the result — it does not classify.
+ *
+ * Safety:
  *  - Never writes. Never alerts. Never queues actions. Never controls devices.
  *  - Never reads or exposes sensitive intake material.
  *  - Never classifies unknown telemetry as healthy.
- *  - Does not duplicate validation tables from sensorBridgeIntakeRules; this
- *    only maps post-validation audit rows into operator-visible labels.
  */
 
-export const SENSOR_BRIDGE_HEALTH_STALE_MS = 24 * 60 * 60 * 1000;
+import {
+  classifySensorSnapshotStatus,
+  evaluateSensorSnapshotEvidence,
+  resolveSensorSnapshotStaleWindowMs,
+  type SensorSnapshotReasonCode,
+  type SensorSnapshotStatus,
+  type SensorSnapshotStatusResult,
+} from "@/lib/sensorSnapshotStatusContract";
+
+/** Re-exported for back-compat — prefer the contract module. */
+export const SENSOR_BRIDGE_HEALTH_STALE_MS =
+  resolveSensorSnapshotStaleWindowMs();
 
 export const SENSOR_BRIDGE_CONTROL_DISCLOSURE = "No device control.";
 
-export type SensorBridgeHealthState =
-  | "no_data"
-  | "accepted"
-  | "stale"
-  | "needs_review";
+/** Canonical contract status. */
+export type SensorBridgeHealthState = SensorSnapshotStatus;
 
 /**
- * Safe, internal reason codes derived from audit-log counts.
- * Snake_case, no SQL keywords, no UUIDs, no PII.
+ * Bridge-card-facing reason code. Sourced from the shared contract; the
+ * UI may surface it verbatim (snake_case, no PII).
  */
-export type SensorBridgeHealthReasonCode =
-  | "partial_accept"
-  | "none_inserted";
+export type SensorBridgeHealthReasonCode = SensorSnapshotReasonCode;
 
 export interface SensorBridgeAuditRowLike {
   source?: string | null;
@@ -41,6 +49,7 @@ export interface SensorBridgeAuditRowLike {
 
 export interface SensorBridgeHealthViewModel {
   state: SensorBridgeHealthState;
+  status: SensorSnapshotStatus;
   headline: string;
   message: string;
   controlDisclosure: string;
@@ -49,6 +58,7 @@ export interface SensorBridgeHealthViewModel {
   latestReasonCode: SensorBridgeHealthReasonCode | null;
   sourceLabel: string | null;
   bridgeName: string | null;
+  countsAsHealthyEvidence: boolean;
 }
 
 export interface SensorBridgeHealthInput {
@@ -69,47 +79,53 @@ function rowTimestamp(r: SensorBridgeAuditRowLike): Date | null {
   return toDate(r.created_at) ?? toDate(r.captured_at);
 }
 
-function isAccepted(r: SensorBridgeAuditRowLike): boolean {
-  const received = Number(r.rows_received ?? 0);
-  const inserted = Number(r.rows_inserted ?? 0);
-  return inserted > 0 && inserted >= received;
-}
-
-function isRejectedOrPartial(r: SensorBridgeAuditRowLike): boolean {
-  const received = Number(r.rows_received ?? 0);
-  const inserted = Number(r.rows_inserted ?? 0);
-  return received > 0 && inserted < received;
-}
-
-function reasonForRejection(
+function classifyRow(
   r: SensorBridgeAuditRowLike,
-): SensorBridgeHealthReasonCode | null {
-  const received = Number(r.rows_received ?? 0);
-  const inserted = Number(r.rows_inserted ?? 0);
-  if (received <= 0) return null;
-  if (inserted <= 0) return "none_inserted";
-  if (inserted < received) return "partial_accept";
-  return null;
+  now: Date,
+  staleMs?: number,
+): SensorSnapshotStatusResult {
+  return classifySensorSnapshotStatus({
+    rowsReceived: Number(r.rows_received ?? 0),
+    rowsAccepted: Number(r.rows_inserted ?? 0),
+    capturedAt: rowTimestamp(r),
+    source: r.source ?? null,
+    now,
+    staleWindowMs: staleMs,
+  });
 }
+
+const MESSAGE_FOR_STATUS: Record<SensorSnapshotStatus, string> = {
+  usable: "Latest bridge reading accepted.",
+  stale: "Latest bridge reading is stale.",
+  needs_review: "Latest bridge reading needs review.",
+  invalid: "Latest bridge reading is invalid.",
+  no_data: "No bridge readings received yet.",
+};
 
 export function buildSensorBridgeHealthViewModel(
   input: SensorBridgeHealthInput,
 ): SensorBridgeHealthViewModel {
   const now = input.now ?? new Date();
-  const staleMs = input.staleMs ?? SENSOR_BRIDGE_HEALTH_STALE_MS;
   const rows = (input.rows ?? []).slice();
+  const bridgeName = input.bridgeName ?? null;
 
   if (rows.length === 0) {
+    const evidence = evaluateSensorSnapshotEvidence({
+      status: "no_data",
+      reasonCode: "none_received",
+    });
     return {
       state: "no_data",
+      status: "no_data",
       headline: "Sensor bridge status",
-      message: "No bridge readings received yet.",
+      message: MESSAGE_FOR_STATUS.no_data,
       controlDisclosure: SENSOR_BRIDGE_CONTROL_DISCLOSURE,
       latestAcceptedAtIso: null,
       latestRejectedAtIso: null,
       latestReasonCode: null,
       sourceLabel: null,
-      bridgeName: input.bridgeName ?? null,
+      bridgeName,
+      countsAsHealthyEvidence: evidence.countsAsHealthyEvidence,
     };
   }
 
@@ -118,52 +134,45 @@ export function buildSensorBridgeHealthViewModel(
     .filter((x): x is { row: SensorBridgeAuditRowLike; at: Date } => x.at !== null)
     .sort((a, b) => b.at.getTime() - a.at.getTime());
 
-  const latestAccepted = sorted.find((x) => isAccepted(x.row)) ?? null;
-  const latestRejected = sorted.find((x) => isRejectedOrPartial(x.row)) ?? null;
   const latest = sorted[0] ?? null;
 
-  const latestAcceptedAtIso = latestAccepted?.at.toISOString() ?? null;
-  const latestRejectedAtIso = latestRejected?.at.toISOString() ?? null;
+  // Latest accepted / rejected are derived independently to drive the
+  // timestamp fields shown on the card.
+  const isFullyAccepted = (r: SensorBridgeAuditRowLike) => {
+    const received = Number(r.rows_received ?? 0);
+    const inserted = Number(r.rows_inserted ?? 0);
+    return received > 0 && inserted >= received;
+  };
+  const isRejectedOrPartial = (r: SensorBridgeAuditRowLike) => {
+    const received = Number(r.rows_received ?? 0);
+    const inserted = Number(r.rows_inserted ?? 0);
+    return received > 0 && inserted < received;
+  };
 
-  // Determine state from the most recent row to be honest about current health.
-  let state: SensorBridgeHealthState = "no_data";
-  let message = "No bridge readings received yet.";
-  let reason: SensorBridgeHealthReasonCode | null = null;
+  const latestAccepted = sorted.find((x) => isFullyAccepted(x.row)) ?? null;
+  const latestRejected = sorted.find((x) => isRejectedOrPartial(x.row)) ?? null;
 
-  if (latest) {
-    const ageMs = now.getTime() - latest.at.getTime();
-    const stale = ageMs > staleMs;
+  const classification = latest
+    ? classifyRow(latest.row, now, input.staleMs)
+    : { status: "no_data" as const, reasonCode: "none_received" as const };
 
-    if (isRejectedOrPartial(latest.row)) {
-      state = "needs_review";
-      message = "Latest bridge reading needs review.";
-      reason = reasonForRejection(latest.row);
-    } else if (stale) {
-      state = "stale";
-      message = "Latest bridge reading is stale.";
-    } else if (isAccepted(latest.row)) {
-      state = "accepted";
-      message = "Latest bridge reading accepted.";
-    } else {
-      // Unknown — do not classify as healthy.
-      state = "needs_review";
-      message = "Latest bridge reading needs review.";
-    }
-  }
+  const evidence = evaluateSensorSnapshotEvidence(classification);
 
   const sourceRaw = latest?.row.source ?? null;
   const sourceLabel =
     typeof sourceRaw === "string" && sourceRaw.length > 0 ? sourceRaw : null;
 
   return {
-    state,
+    state: classification.status,
+    status: classification.status,
     headline: "Sensor bridge status",
-    message,
+    message: MESSAGE_FOR_STATUS[classification.status],
     controlDisclosure: SENSOR_BRIDGE_CONTROL_DISCLOSURE,
-    latestAcceptedAtIso,
-    latestRejectedAtIso,
-    latestReasonCode: reason,
+    latestAcceptedAtIso: latestAccepted?.at.toISOString() ?? null,
+    latestRejectedAtIso: latestRejected?.at.toISOString() ?? null,
+    latestReasonCode: classification.reasonCode,
     sourceLabel,
-    bridgeName: input.bridgeName ?? null,
+    bridgeName,
+    countsAsHealthyEvidence: evidence.countsAsHealthyEvidence,
   };
 }

@@ -146,6 +146,10 @@ function EntryItem({ entry, demoVariant }: EntryItemProps) {
     "data-demo-variant": demoVariant ?? "",
   } as const;
 
+  // Audit toggle: local UI state, only on grouped entries.
+  const [auditExpanded, setAuditExpanded] = useState(false);
+  const auditable = isAuditableQuickLogEntry(entry);
+
   if (entry.kind === "grouped") {
     return (
       <Card
@@ -153,14 +157,67 @@ function EntryItem({ entry, demoVariant }: EntryItemProps) {
         data-entry-kind="grouped"
         data-action-id={entry.action.id}
         data-environment-id={entry.environment.id}
+        data-audit-expanded={auditExpanded ? "true" : "false"}
       >
         <CardContent className="space-y-3 p-3">
-          <ActionDetails
-            action={entry.action}
-            sourceLabel={sourceLabel}
-            sourceTestId={sourceTestId}
-          />
-          <ManualSnapshotTimelineCard card={entry.environmentCard} />
+          {auditExpanded ? (
+            <div
+              className="space-y-3"
+              data-testid="quick-log-grouped-audit-expanded"
+            >
+              <div
+                className="rounded-md border border-border/60 p-3 space-y-1"
+                data-testid="quick-log-grouped-audit-action-subcard"
+              >
+                <p
+                  className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                  data-testid="quick-log-grouped-audit-action-subcard-title"
+                >
+                  {QUICK_LOG_AUDIT_ACTION_SUBCARD_TITLE}
+                </p>
+                <ActionDetails
+                  action={entry.action}
+                  sourceLabel={sourceLabel}
+                  sourceTestId={sourceTestId}
+                />
+              </div>
+              <div
+                className="rounded-md border border-border/60 p-3 space-y-2"
+                data-testid="quick-log-grouped-audit-environment-subcard"
+              >
+                <p
+                  className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                  data-testid="quick-log-grouped-audit-environment-subcard-title"
+                >
+                  {QUICK_LOG_AUDIT_ENVIRONMENT_SUBCARD_TITLE}
+                </p>
+                <ManualSnapshotTimelineCard card={entry.environmentCard} />
+              </div>
+            </div>
+          ) : (
+            <>
+              <ActionDetails
+                action={entry.action}
+                sourceLabel={sourceLabel}
+                sourceTestId={sourceTestId}
+              />
+              <ManualSnapshotTimelineCard card={entry.environmentCard} />
+            </>
+          )}
+          {auditable && (
+            <div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setAuditExpanded((v) => !v)}
+                aria-expanded={auditExpanded}
+                data-testid="quick-log-grouped-audit-toggle"
+              >
+                {auditToggleLabel(auditExpanded)}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     );

@@ -76,9 +76,10 @@ describe("buildCsvTimelinePreview — happy path", () => {
     const out = buildCsvTimelinePreview({ rows, mapping });
     const label = out.events[0].source_label;
     expect(label).toBe("csv / representative sample / not live");
-    expect(label).not.toMatch(/\b(?:live|synced|imported|persisted|connected)\b/i);
-    // negation form is explicitly allowed ("not live").
+    expect(label).not.toMatch(/\b(?:synced|imported|persisted|connected)\b/i);
+    // "live" only appears as part of the explicit negation "not live".
     expect(label).toMatch(/not live/);
+    expect(label.replace(/not live/g, "")).not.toMatch(/\blive\b/i);
   });
 });
 

@@ -15,7 +15,7 @@
  *  - Telemetry is run through the existing validator. Invalid/malformed
  *    readings keep severity "invalid" — never "healthy".
  *  - Never invents readings: missing metric fields stay missing.
- *  - No "live", "synced", "connected", or "imported" language.
+ *  - Source-honest wording only: no telemetry-state marketing language.
  */
 
 import {

@@ -13,6 +13,7 @@ import EmptyState from "@/components/EmptyState";
 import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import QuickLogV2Fab from "@/components/QuickLogV2Fab";
 import { ArrowLeft, Box, Lightbulb, Plus, Archive, GitMerge } from "lucide-react";
 import CreatePlantDialog from "@/components/CreatePlantDialog";
 import AddExistingPlantDialog from "@/components/AddExistingPlantDialog";
@@ -100,6 +101,7 @@ export default function TentDetail() {
 
   return (
     <div>
+      <QuickLogV2Fab defaultTargetKey={tent?.id ? `tent:${tent.id}` : null} />
       <Button asChild variant="ghost" size="sm" className="mb-3"><Link to={tentsPath()}><ArrowLeft className="h-4 w-4" /> Tents</Link></Button>
       <PageHeader
         title={tent.name}

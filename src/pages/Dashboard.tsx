@@ -13,6 +13,7 @@ import { AlertTriangle, Box, Sprout, ListChecks, Sparkles, ArrowRight } from "lu
 import type { Stage, SensorReading } from "@/mock";
 import PageHeader from "@/components/PageHeader";
 import KpiCard from "@/components/KpiCard";
+import QuickLogV2Fab from "@/components/QuickLogV2Fab";
 import MetricChip from "@/components/MetricChip";
 import SeverityBadge from "@/components/SeverityBadge";
 import StageBadge from "@/components/StageBadge";
@@ -227,6 +228,7 @@ export default function Dashboard() {
 
   return (
     <div>
+      <QuickLogV2Fab />
       <GrowBreadcrumbs
         growId={urlGrowId}
         growName={scopedGrowName}

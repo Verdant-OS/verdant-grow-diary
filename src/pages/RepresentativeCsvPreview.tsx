@@ -242,6 +242,11 @@ export default function RepresentativeCsvPreview() {
             aria-label="Mapping actions"
             className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-3"
           >
+            {headers && hasSavedPreset && !presetNotice && (
+              <p className="w-full text-xs text-muted-foreground">
+                Saved preset available — apply?
+              </p>
+            )}
             <label className="text-xs font-medium" htmlFor="csv-template">
               Apply template
             </label>

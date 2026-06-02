@@ -14,12 +14,15 @@ import {
 } from "@/lib/representativeCsvSensorPreviewRules";
 import {
   applyCsvMappingTemplate,
-  buildMappingDownloadPayload,
-  csvMappingDownloadFileName,
   CSV_MAPPING_TEMPLATES,
   getCsvMappingTemplate,
   type CsvMappingTemplateId,
 } from "@/lib/csvMappingTemplates";
+import {
+  buildCsvMappingConfig,
+  csvMappingConfigFileName,
+  type CsvMappingConfigWarning,
+} from "@/lib/csvMappingConfig";
 import {
   applyCsvMappingPreset,
   buildCsvMappingPreset,

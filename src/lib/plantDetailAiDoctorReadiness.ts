@@ -47,10 +47,44 @@ export interface PlantDetailAiDoctorReadinessInput {
   hasTimelineEntries: boolean;
   /** True when a recent photo exists for this plant. */
   hasRecentPhoto: boolean;
-  /** True when at least one recent activity entry includes a sensor snapshot. */
+  /**
+   * True when a recent activity includes a sensor snapshot. NOTE: when
+   * `sensorSnapshot` is provided, the shared contract gates this flag —
+   * only `usable` counts as healthy evidence. Stale / invalid /
+   * needs_review / no_data do NOT count.
+   */
   hasSensorSnapshot: boolean;
   /** True when at least one recent activity entry is watering or feeding. */
   hasRecentWateringOrFeed: boolean;
+  /**
+   * Optional shared-contract classification of the most recent sensor
+   * snapshot. When provided, it overrides `hasSensorSnapshot` for the
+   * healthy-evidence count and drives the cautionary/unsafe surface.
+   */
+  sensorSnapshot?: import("@/lib/sensorSnapshotStatusContract").Classification | null;
+}
+
+export type AiDoctorSensorEvidenceMode =
+  | "healthy"
+  | "cautionary"
+  | "unsafe"
+  | "missing"
+  | "unknown";
+
+export interface AiDoctorSensorEvidence {
+  mode: AiDoctorSensorEvidenceMode;
+  status: import("@/lib/sensorSnapshotStatusContract").SnapshotStatus | null;
+  reason: import("@/lib/sensorSnapshotStatusContract").SnapshotReason | null;
+  /** True only when `status === "usable"`. */
+  countsAsHealthyEvidence: boolean;
+  /** True when status === "stale" — show as cautionary context only. */
+  isCautionary: boolean;
+  /** True when status is invalid or needs_review — never use for recommendations. */
+  isUnsafe: boolean;
+  /** True when status is no_data or no classification provided. */
+  isMissing: boolean;
+  /** Short, presenter-safe label. */
+  label: string;
 }
 
 const TOTAL_SIGNALS = 5;

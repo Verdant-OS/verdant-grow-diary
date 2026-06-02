@@ -17,6 +17,7 @@ import {
   type PlantDetailAiDoctorReadinessInput,
   type AiDoctorReadinessLevel,
 } from "@/lib/plantDetailAiDoctorReadiness";
+import type { Classification } from "@/lib/sensorSnapshotStatusContract";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
 import { classifyTimelineEntry } from "@/lib/timelineEntryClassification";

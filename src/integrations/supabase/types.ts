@@ -182,6 +182,7 @@ export type Database = {
           analysis: Json | null
           context_confidence_ceiling: string | null
           context_sufficiency: Json | null
+          counts_as_healthy_evidence: boolean | null
           created_at: string
           diagnosis: Json | null
           displayed_confidence: number | null
@@ -190,6 +191,10 @@ export type Database = {
           plant_id: string | null
           question: string | null
           raw_confidence: number | null
+          sensor_evidence_evaluated_at: string | null
+          sensor_evidence_mode: string | null
+          sensor_snapshot_reason_code: string | null
+          sensor_snapshot_status: string | null
           suggested_actions: Json
           tent_id: string | null
           user_id: string
@@ -198,6 +203,7 @@ export type Database = {
           analysis?: Json | null
           context_confidence_ceiling?: string | null
           context_sufficiency?: Json | null
+          counts_as_healthy_evidence?: boolean | null
           created_at?: string
           diagnosis?: Json | null
           displayed_confidence?: number | null
@@ -206,6 +212,10 @@ export type Database = {
           plant_id?: string | null
           question?: string | null
           raw_confidence?: number | null
+          sensor_evidence_evaluated_at?: string | null
+          sensor_evidence_mode?: string | null
+          sensor_snapshot_reason_code?: string | null
+          sensor_snapshot_status?: string | null
           suggested_actions?: Json
           tent_id?: string | null
           user_id?: string
@@ -214,6 +224,7 @@ export type Database = {
           analysis?: Json | null
           context_confidence_ceiling?: string | null
           context_sufficiency?: Json | null
+          counts_as_healthy_evidence?: boolean | null
           created_at?: string
           diagnosis?: Json | null
           displayed_confidence?: number | null
@@ -222,6 +233,10 @@ export type Database = {
           plant_id?: string | null
           question?: string | null
           raw_confidence?: number | null
+          sensor_evidence_evaluated_at?: string | null
+          sensor_evidence_mode?: string | null
+          sensor_snapshot_reason_code?: string | null
+          sensor_snapshot_status?: string | null
           suggested_actions?: Json
           tent_id?: string | null
           user_id?: string

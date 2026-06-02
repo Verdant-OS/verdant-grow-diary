@@ -11,7 +11,11 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import RepresentativeCsvPreview from "@/pages/RepresentativeCsvPreview";
 
 function fileFromText(text: string, name = "sample.csv"): File {
-  return new File([text], name, { type: "text/csv" });
+  const f = new File([text], name, { type: "text/csv" });
+  if (typeof (f as unknown as { text?: () => Promise<string> }).text !== "function") {
+    Object.defineProperty(f, "text", { value: () => Promise.resolve(text) });
+  }
+  return f;
 }
 
 async function uploadCsv(text: string) {

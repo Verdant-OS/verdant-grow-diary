@@ -80,8 +80,9 @@ describe("QuickLogGroupedTimelineSection — updating indicator", () => {
     ).not.toBeInTheDocument();
 
     // Invalidate the grouped timeline → triggers refetch which we hold pending.
-    await act(async () => {
-      await client.invalidateQueries({
+    // Do NOT await: invalidateQueries resolves only after refetch settles.
+    act(() => {
+      void client.invalidateQueries({
         queryKey: ["quick_log_grouped_timeline"],
       });
     });

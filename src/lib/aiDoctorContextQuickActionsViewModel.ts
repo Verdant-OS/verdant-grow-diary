@@ -65,10 +65,10 @@ export interface BuildAiDoctorContextQuickActionsArgs {
 }
 
 const QUICK_ACTION_LABELS: Record<AiDoctorContextQuickActionKind, string> = {
-  update_plant_profile: "Update plant profile",
-  add_recent_log: "Add recent log",
-  add_manual_sensor_snapshot: "Add manual sensor snapshot",
-  add_plant_photo: "Add plant photo",
+  update_plant_profile: "Edit plant details",
+  add_recent_log: "Add note",
+  add_manual_sensor_snapshot: "Add sensor snapshot",
+  add_plant_photo: "Add photo",
 };
 
 /**

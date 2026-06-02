@@ -1,6 +1,10 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
-import CoachAiDoctorContextPanel from "@/components/CoachAiDoctorContextPanel";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import CoachAiDoctorContextPanel, {
+  COACH_AI_DOCTOR_CONTEXT_AMBIGUOUS_COPY,
+} from "@/components/CoachAiDoctorContextPanel";
+import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 
 const insertSpy = vi.fn();
 vi.mock("@/integrations/supabase/client", () => ({
@@ -16,73 +20,130 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
-const NOW_ISO = new Date().toISOString();
 const HOUR = 3600 * 1000;
 const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
 
-describe("CoachAiDoctorContextPanel", () => {
-  it("renders readiness, evidence, missing and safe-next-step", () => {
-    render(
-      <CoachAiDoctorContextPanel
-        plant={{
-          id: "p1",
-          strain: "NL",
-          stage: "veg",
-          medium: "Coco",
-          photo: "https://x/y.jpg",
-        }}
-        diaryEntries={[
-          { entry_type: "watering", entry_at: ago(HOUR) },
-          { entry_type: "note", entry_at: ago(2 * HOUR) },
-          {
-            entry_type: "manual_sensor_snapshot",
-            entry_at: ago(HOUR),
-            details: { source: "manual" },
-          },
-        ]}
-      />,
-    );
-    expect(screen.getByTestId("coach-ai-doctor-context-panel")).toBeTruthy();
-    expect(screen.getByTestId("coach-ai-doctor-context-readiness").textContent)
-      .toMatch(/Strong context/);
-    expect(screen.getByTestId("coach-ai-doctor-context-safe-next-step")).toBeTruthy();
-    expect(screen.queryByTestId("coach-ai-doctor-context-notice")).toBeNull();
+const renderPanel = (props: React.ComponentProps<typeof CoachAiDoctorContextPanel>) =>
+  render(
+    <MemoryRouter>
+      <CoachAiDoctorContextPanel {...props} />
+    </MemoryRouter>,
+  );
+
+beforeEach(() => {
+  insertSpy.mockReset();
+});
+
+describe("CoachAiDoctorContextPanel — plant selection ambiguity", () => {
+  it("uses the explicitly selected plant when provided", () => {
+    renderPanel({
+      plants: [
+        { id: "p1", name: "Alpha", strain: "NL", stage: "veg" },
+        { id: "p2", name: "Beta", strain: "AK", stage: "flower" },
+      ],
+      selectedPlantId: "p2",
+      diaryEntries: [{ entry_type: "watering", entry_at: ago(HOUR) }],
+      growId: "g1",
+    });
+    expect(screen.queryByTestId("coach-ai-doctor-context-ambiguous-notice")).toBeNull();
+    expect(screen.getByTestId("coach-ai-doctor-context-panel").getAttribute("data-ambiguous")).toBeNull();
   });
 
-  it("shows calm 'More context would improve confidence' copy when partial/insufficient", () => {
-    render(
-      <CoachAiDoctorContextPanel
-        plant={null}
-        diaryEntries={[]}
-      />,
-    );
-    const notice = screen.getByTestId("coach-ai-doctor-context-notice");
-    expect(notice.textContent).toMatch(/More context would improve confidence/);
-    expect(screen.getByTestId("coach-ai-doctor-context-readiness").textContent)
-      .toMatch(/Insufficient context/);
+  it("uses the single plant when only one is available", () => {
+    renderPanel({
+      plants: [{ id: "p1", name: "Alpha", strain: "NL", stage: "veg" }],
+      selectedPlantId: null,
+      diaryEntries: [{ entry_type: "watering", entry_at: ago(HOUR) }],
+      growId: "g1",
+    });
+    expect(screen.queryByTestId("coach-ai-doctor-context-ambiguous-notice")).toBeNull();
+    expect(screen.getByTestId("coach-ai-doctor-context-readiness")).toBeTruthy();
   });
 
-  it("exposes tooltip help text on rendered readiness items", () => {
-    const { container } = render(
-      <CoachAiDoctorContextPanel
-        plant={{ id: "p1", strain: "NL", stage: "veg", medium: "Coco" }}
-        diaryEntries={[{ entry_type: "watering", entry_at: NOW_ISO }]}
-      />,
-    );
-    const items = container.querySelectorAll("li[data-code]");
-    expect(items.length).toBeGreaterThan(0);
-    for (const li of Array.from(items)) {
-      expect((li as HTMLElement).getAttribute("title")?.length ?? 0).toBeGreaterThan(0);
+  it("shows ambiguous fallback when multiple plants and no selection — does not use plants[0]", () => {
+    renderPanel({
+      plants: [
+        { id: "p1", name: "Alpha", strain: "NL", stage: "veg" },
+        { id: "p2", name: "Beta", strain: "AK", stage: "flower" },
+      ],
+      selectedPlantId: null,
+      diaryEntries: [{ entry_type: "watering", entry_at: ago(HOUR) }],
+      growId: "g1",
+    });
+    const notice = screen.getByTestId("coach-ai-doctor-context-ambiguous-notice");
+    expect(notice.textContent).toContain(COACH_AI_DOCTOR_CONTEXT_AMBIGUOUS_COPY);
+    expect(screen.queryByTestId("coach-ai-doctor-context-readiness")).toBeNull();
+  });
+});
+
+describe("CoachAiDoctorContextPanel — quick actions", () => {
+  it("renders Add recent log quick action that dispatches the existing quicklog event", () => {
+    renderPanel({
+      plants: [{ id: "p1", name: "Alpha", strain: "NL", stage: "veg", medium: "Coco", photo: "x" }],
+      selectedPlantId: null,
+      diaryEntries: [],
+      growId: "g1",
+    });
+    const btn = screen.getByTestId("ai-doctor-context-quick-action-add-recent-log");
+    const spy = vi.fn();
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, spy as EventListener);
+    fireEvent.click(btn);
+    expect(spy).toHaveBeenCalledTimes(1);
+    window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, spy as EventListener);
+  });
+
+  it("renders Add manual sensor snapshot quick action that links to the existing sensors route", () => {
+    renderPanel({
+      plants: [{ id: "p1", name: "Alpha", strain: "NL", stage: "veg", medium: "Coco", photo: "x" }],
+      selectedPlantId: null,
+      diaryEntries: [
+        { entry_type: "watering", entry_at: ago(HOUR) },
+        { entry_type: "note", entry_at: ago(2 * HOUR) },
+      ],
+      growId: "g1",
+    });
+    const btn = screen.getByTestId("ai-doctor-context-quick-action-add-manual-sensor-snapshot");
+    expect(btn).toBeTruthy();
+    const href = btn.getAttribute("href") ?? btn.querySelector("a")?.getAttribute("href") ?? "";
+    expect(href).toMatch(/\/sensors/);
+  });
+
+  it("renders Update plant profile when strain/stage/medium are missing", () => {
+    renderPanel({
+      plants: [{ id: "p1", name: "Alpha", strain: null, stage: null, medium: null }],
+      selectedPlantId: null,
+      diaryEntries: [{ entry_type: "watering", entry_at: ago(HOUR) }],
+      growId: "g1",
+    });
+    expect(screen.getByTestId("ai-doctor-context-quick-action-update-plant-profile")).toBeTruthy();
+  });
+
+  it("shows no-warning calm copy when no warnings — and does not produce a misleading action", () => {
+    renderPanel({
+      plants: [{ id: "p1", name: "Alpha", strain: "NL", stage: "veg", medium: "Coco", photo: "x" }],
+      selectedPlantId: null,
+      diaryEntries: [{ entry_type: "watering", entry_at: ago(HOUR) }],
+      growId: "g1",
+    });
+    expect(screen.getByTestId("coach-ai-doctor-context-no-warning").textContent)
+      .toContain("No warning context found.");
+    expect(screen.queryByText(/warning/i)).toBeTruthy();
+    // No quick-action button is labeled around warnings.
+    const buttons = Array.from(document.querySelectorAll("[data-testid^=\"ai-doctor-context-quick-action-\"]"));
+    for (const b of buttons) {
+      expect((b as HTMLElement).getAttribute("data-testid")).not.toMatch(/warning/);
     }
   });
 
-  it("does not create AI Doctor sessions, alerts, or action queue items just by rendering", () => {
-    render(
-      <CoachAiDoctorContextPanel
-        plant={{ id: "p1", strain: "NL", stage: "veg" }}
-        diaryEntries={[{ entry_type: "watering", entry_at: NOW_ISO }]}
-      />,
-    );
+  it("does not write to Supabase on render or click", () => {
+    renderPanel({
+      plants: [{ id: "p1", name: "Alpha", strain: "NL", stage: "veg" }],
+      selectedPlantId: null,
+      diaryEntries: [],
+      growId: "g1",
+    });
+    const btn = screen.queryByTestId("ai-doctor-context-quick-action-add-recent-log");
+    if (btn) fireEvent.click(btn);
     expect(insertSpy).not.toHaveBeenCalled();
   });
 });

@@ -329,21 +329,24 @@ export default function Coach() {
       <CoachContextSufficiencyPanel result={contextSufficiency} className="mb-4" />
 
       <CoachAiDoctorContextPanel
-        plant={
-          ctxPlants[0]
-            ? {
-                id: ctxPlants[0].id,
-                strain: ctxPlants[0].strain ?? null,
-                stage: ctxPlants[0].stage ?? null,
-                medium:
-                  (ctxPlants[0] as { medium?: string | null }).medium ?? null,
-                photo: (ctxPlants[0] as { photo?: string | null }).photo ?? null,
-              }
-            : null
-        }
+        plants={ctxPlants.map((p) => ({
+          id: p.id,
+          name: p.name ?? null,
+          strain: p.strain ?? null,
+          stage: p.stage ?? null,
+          medium: (p as { medium?: string | null }).medium ?? null,
+          photo: (p as { photo?: string | null }).photo ?? null,
+        }))}
+        // Coach has no explicit plant selector yet, so we deliberately
+        // pass null and let the panel resolve the single-plant case or
+        // show a calm "Select a plant" fallback when multiple plants
+        // exist. Do not silently use ctxPlants[0].
+        selectedPlantId={null}
+        growId={activeGrowId ?? null}
         diaryEntries={ctxDiary as unknown as readonly { entry_type?: string | null; entry_at?: string | null; created_at?: string | null; details?: unknown }[]}
         className="mb-4"
       />
+
 
       <CoachAiDoctorHistoryPanel growId={activeGrowId ?? null} />
 

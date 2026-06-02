@@ -22,10 +22,22 @@ import {
   AI_DOCTOR_INSUFFICIENT_NOTICE,
   type AiDoctorContextReadiness,
 } from "@/lib/aiDoctorContextRules";
+import {
+  buildAiDoctorContextQuickActions,
+  AI_DOCTOR_NO_WARNING_CONTEXT_COPY,
+} from "@/lib/aiDoctorContextQuickActionsViewModel";
+import AiDoctorContextQuickActions from "@/components/AiDoctorContextQuickActions";
 
 export interface PlantDetailAiDoctorContextPanelProps {
   plantId: string;
-  plant: AiDoctorContextPlantSource | null;
+  plant:
+    | (AiDoctorContextPlantSource & {
+        id?: string | null;
+        name?: string | null;
+        growId?: string | null;
+        tentId?: string | null;
+      })
+    | null;
 }
 
 const READINESS_STYLES: Record<
@@ -70,6 +82,18 @@ export default function PlantDetailAiDoctorContextPanel({
         addSuffix: true,
       })
     : null;
+  const quickActions = useMemo(
+    () =>
+      buildAiDoctorContextQuickActions({
+        missing: result.missing,
+        plantId,
+        plantName: plant?.name ?? null,
+        growId: plant?.growId ?? null,
+        tentId: plant?.tentId ?? null,
+      }),
+    [result.missing, plantId, plant?.name, plant?.growId, plant?.tentId],
+  );
+  const noWarningContext = result.counts.recentWarnings === 0;
 
   return (
     <section
@@ -185,6 +209,22 @@ export default function PlantDetailAiDoctorContextPanel({
           )}
         </div>
       </div>
+
+      {quickActions.length > 0 ? (
+        <AiDoctorContextQuickActions
+          actions={quickActions}
+          testIdPrefix="plant-ai-doctor-context"
+        />
+      ) : null}
+
+      {noWarningContext ? (
+        <p
+          className="text-[11px] text-muted-foreground"
+          data-testid="plant-ai-doctor-context-no-warning"
+        >
+          {AI_DOCTOR_NO_WARNING_CONTEXT_COPY}
+        </p>
+      ) : null}
 
       <p
         className="text-xs"

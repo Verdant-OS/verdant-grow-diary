@@ -29,6 +29,14 @@ const TARGETS = [
     name: "aiDoctorContextReadiness",
     path: "src/constants/aiDoctorContextReadiness.ts",
   },
+  {
+    name: "aiDoctorContextQuickActionsViewModel",
+    path: "src/lib/aiDoctorContextQuickActionsViewModel.ts",
+  },
+  {
+    name: "AiDoctorContextQuickActions",
+    path: "src/components/AiDoctorContextQuickActions.tsx",
+  },
 ];
 
 describe("ai doctor context panel — static safety", () => {
@@ -72,12 +80,29 @@ describe("ai doctor context panel — static safety", () => {
     const panels = [
       read("src/components/PlantDetailAiDoctorContextPanel.tsx"),
       read("src/components/CoachAiDoctorContextPanel.tsx"),
+      read("src/components/AiDoctorContextQuickActions.tsx"),
     ];
     for (const ui of panels) {
       expect(ui).not.toMatch(/AI_DOCTOR_RECENT_WINDOW_MS\s*=/);
       expect(ui).not.toMatch(/AI_DOCTOR_SNAPSHOT_FRESH_MS\s*=/);
       expect(ui).not.toMatch(/AI_DOCTOR_CONTEXT_TOOLTIPS\s*=/);
       expect(ui).not.toMatch(/AI_DOCTOR_CONTEXT_READINESS_CONFIG\s*=/);
+    }
+  });
+
+  it("UI does not duplicate the missing-context → quick-action mapping table", () => {
+    const panels = [
+      read("src/components/PlantDetailAiDoctorContextPanel.tsx"),
+      read("src/components/CoachAiDoctorContextPanel.tsx"),
+      read("src/components/AiDoctorContextQuickActions.tsx"),
+    ];
+    for (const ui of panels) {
+      expect(ui).not.toMatch(/MISSING_CODE_TO_ACTION\s*=/);
+      // Quick-action labels live in the view-model, not in JSX.
+      expect(ui).not.toMatch(/"Update plant profile"/);
+      expect(ui).not.toMatch(/"Add recent log"/);
+      expect(ui).not.toMatch(/"Add manual sensor snapshot"/);
+      expect(ui).not.toMatch(/"Add plant photo"/);
     }
   });
 });

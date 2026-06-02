@@ -11,10 +11,10 @@
  *    refreshes both that tent's reads and the plant reads inside it.
  *  - Scope is taken from the user's selected target. Never derived from
  *    a "first/default" plant or tent.
- *  - Source-honest: no live/synced/connected/imported wording is used or
- *    emitted in any field, label, or key.
- *  - No alerts/action_queue/ai_doctor_sessions writes. No device control.
- *    No schema/RPC/write behavior changes.
+ *  - Source-honest: no realtime-stream wording is used or emitted in any
+ *    field, label, or key.
+ *  - Display-only: never performs writes of any kind, and never touches
+ *    queues, automation, sessions, or hardware.
  */
 
 export type QuickLogV2RefreshTargetType = "plant" | "tent";
@@ -49,6 +49,11 @@ const ALWAYS_KEYS: ReadonlyArray<QuickLogV2RefreshKey> = [
   ["diary_entries"],
   ["grow_events"],
   ["timeline"],
+  // Dashboard recent activity / memory surfaces. Prefix-invalidation is a
+  // no-op when no such query is mounted, so this safely refreshes the
+  // dashboard if it exists without inventing a new system here.
+  ["dashboard_recent_activity"],
+  ["dashboard_memory"],
 ];
 
 /**
@@ -76,6 +81,22 @@ export function buildQuickLogV2RefreshQueryKeys(
     keys.push(["plant_recent_activity", scope.targetId]);
     keys.push(["plant_manual_sensor_history", scope.targetId]);
     keys.push(["plant_manual_sensor_logs", scope.targetId]);
+    // AI Doctor readiness/context for this plant depends on timeline +
+    // manual snapshot data. Invalidate explicitly so the readiness gate
+    // re-evaluates after the save without a page reload. If the queries
+    // are not mounted, react-query treats this as a safe no-op.
+    keys.push(["ai_doctor_readiness", scope.targetId]);
+    keys.push(["ai_doctor_context", scope.targetId]);
+    // Plant-in-tent save: also nudge tent-scoped grouped timeline reads
+    // so a TentDetail screen open in another route refreshes.
+    if (typeof scope.tentId === "string" && scope.tentId.length > 0) {
+      keys.push(["quick_log_grouped_timeline", scope.tentId]);
+      keys.push(["tent_recent_activity", scope.tentId]);
+    }
+  } else {
+    // Tent target: scope grouped timeline + recent activity to the tent.
+    keys.push(["quick_log_grouped_timeline", scope.targetId]);
+    keys.push(["tent_recent_activity", scope.targetId]);
   }
 
   return keys;

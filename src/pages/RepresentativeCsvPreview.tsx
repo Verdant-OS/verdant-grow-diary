@@ -14,12 +14,15 @@ import {
 } from "@/lib/representativeCsvSensorPreviewRules";
 import {
   applyCsvMappingTemplate,
-  buildMappingDownloadPayload,
-  csvMappingDownloadFileName,
   CSV_MAPPING_TEMPLATES,
   getCsvMappingTemplate,
   type CsvMappingTemplateId,
 } from "@/lib/csvMappingTemplates";
+import {
+  buildCsvMappingConfig,
+  csvMappingConfigFileName,
+  type CsvMappingConfigWarning,
+} from "@/lib/csvMappingConfig";
 import {
   applyCsvMappingPreset,
   buildCsvMappingPreset,
@@ -256,8 +259,17 @@ export default function RepresentativeCsvPreview() {
                 const tpl = getCsvMappingTemplate(id);
                 if (!tpl) return;
                 const applied = applyCsvMappingTemplate(tpl, headers);
+                if (applied.blocked) {
+                  setTemplateId(null);
+                  setTemplateNotice(applied.blockReason);
+                  return;
+                }
                 setMapping(applied.mapping);
-                const parts: string[] = [`Template "${tpl.name}" applied.`];
+                const parts: string[] = [
+                  tpl.isReset
+                    ? "Mapping cleared."
+                    : `Template "${tpl.name}" applied.`,
+                ];
                 if (applied.ambiguousFields.length > 0) {
                   parts.push(
                     `Multiple headers matched — review: ${applied.ambiguousFields.join(", ")}.`,
@@ -283,13 +295,26 @@ export default function RepresentativeCsvPreview() {
               type="button"
               variant="outline"
               onClick={() => {
-                const payload = buildMappingDownloadPayload({
+                const warnings: CsvMappingConfigWarning[] = [];
+                for (const field of (Object.keys(mapping) as Array<keyof RepresentativeColumnMapping>)) {
+                  const v = mapping[field];
+                  const col = v === null ? null : typeof v === "string" ? v : v.column;
+                  if (col === null) {
+                    warnings.push({
+                      code: "unmapped_required_field",
+                      field: field as string,
+                      message: `${field} is unmapped`,
+                    });
+                  }
+                }
+                const payload = buildCsvMappingConfig({
                   mapping,
                   headers,
                   templateId,
                   templateName: templateId
                     ? getCsvMappingTemplate(templateId)?.name ?? null
                     : null,
+                  warnings,
                 });
                 const blob = new Blob([JSON.stringify(payload, null, 2)], {
                   type: "application/json",
@@ -297,7 +322,7 @@ export default function RepresentativeCsvPreview() {
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement("a");
                 a.href = url;
-                a.download = csvMappingDownloadFileName();
+                a.download = csvMappingConfigFileName();
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
@@ -306,6 +331,7 @@ export default function RepresentativeCsvPreview() {
             >
               Download mapping JSON
             </Button>
+
 
             <Button
               type="button"

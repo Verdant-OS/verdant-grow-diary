@@ -14,6 +14,7 @@ const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 const TARGETS: Array<{ name: string; path: string }> = [
   { name: "csvMappingTemplates", path: "src/lib/csvMappingTemplates.ts" },
   { name: "csvMappingPresetStorage", path: "src/lib/csvMappingPresetStorage.ts" },
+  { name: "csvMappingConfig", path: "src/lib/csvMappingConfig.ts" },
   { name: "csvRowValidationRules", path: "src/lib/csvRowValidationRules.ts" },
   { name: "RepresentativeCsvPreview", path: "src/pages/RepresentativeCsvPreview.tsx" },
 ];

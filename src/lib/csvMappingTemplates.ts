@@ -30,7 +30,9 @@ export const CSV_MAPPING_PRESET_SOURCE = "representative_csv" as const;
 export type CsvMappingTemplateId =
   | "generic_env"
   | "ac_infinity"
-  | "generic_sensor_logger";
+  | "generic_sensor_logger"
+  | "aroya_representative"
+  | "blank_reset";
 
 interface TemplateSynonyms {
   /** lowercase, whitespace-collapsed header strings to match exactly. */
@@ -39,6 +41,10 @@ interface TemplateSynonyms {
 }
 
 export interface CsvMappingTemplate {
+  /** Canonical fields that MUST resolve to a header in the source CSV. */
+  readonly requiredFields?: ReadonlyArray<RepresentativeMappingField>;
+  /** When true, applying this template clears the mapping and skips matching. */
+  readonly isReset?: boolean;
   readonly id: CsvMappingTemplateId;
   readonly name: string;
   readonly description: string;
@@ -90,6 +96,41 @@ export const CSV_MAPPING_TEMPLATES: ReadonlyArray<CsvMappingTemplate> = [
       vwc: { synonyms: ["soil_moisture", "vwc", "wc"] },
     },
   },
+  {
+    id: "aroya_representative",
+    name: "AROYA-shaped (representative guess)",
+    description:
+      "Representative shape inspired by AROYA-style exports. Not a confirmed AROYA importer — review every column.",
+    requiredFields: ["timestamp"],
+    fields: {
+      timestamp: {
+        synonyms: ["timestamp", "captured_at", "date time", "date_time", "time"],
+      },
+      air_temp: {
+        synonyms: ["air_temp", "room_temp", "climate_temp"],
+        unit: "C",
+      },
+      humidity: { synonyms: ["humidity", "rh", "room_rh"] },
+      vpd: { synonyms: ["vpd", "room_vpd"] },
+      substrate_ec: {
+        synonyms: ["substrate_ec", "rootzone_ec", "ec"],
+        unit: "mS/cm",
+      },
+      vwc: { synonyms: ["vwc", "water_content", "substrate_vwc"] },
+      substrate_temp: {
+        synonyms: ["substrate_temp", "rootzone_temp"],
+        unit: "C",
+      },
+    },
+  },
+  {
+    id: "blank_reset",
+    name: "Blank (clear mapping)",
+    description:
+      "Clears all selected headers without changing source labeling. Useful to start over.",
+    isReset: true,
+    fields: {},
+  },
 ];
 
 export function getCsvMappingTemplate(
@@ -108,18 +149,43 @@ export interface ApplyTemplateResult {
   ambiguousFields: RepresentativeMappingField[];
   /** Fields listed in the template that found no header at all. */
   unmatchedFields: RepresentativeMappingField[];
+  /** Required template fields whose headers were not found in the CSV. */
+  missingRequiredHeaders: RepresentativeMappingField[];
+  /** When true, the template did not apply because required headers were missing. */
+  blocked: boolean;
+  /** Human-readable block reason when blocked is true. */
+  blockReason: string | null;
 }
 
 /**
  * Apply a template against the provided CSV headers. Returns a fresh
  * mapping plus the fields the user still needs to review. Never mutates
- * inputs. If two headers match the same canonical field, the field is left
- * unmapped (ambiguous) — templates must never silently choose.
+ * inputs. If two headers match the same canonical field, the field is
+ * left unmapped (ambiguous) — templates must never silently choose.
+ *
+ * When the template lists `requiredFields` and any required header is
+ * missing from the CSV, the result is `blocked: true` with the original
+ * (empty) mapping returned. The UI must surface `blockReason` and skip
+ * applying it.
+ *
+ * Reset templates (`isReset: true`) return the empty mapping without
+ * matching, and never block.
  */
 export function applyCsvMappingTemplate(
   template: CsvMappingTemplate,
   headers: ReadonlyArray<string>,
 ): ApplyTemplateResult {
+  if (template.isReset) {
+    return {
+      mapping: emptyRepresentativeMapping(),
+      ambiguousFields: [],
+      unmatchedFields: [],
+      missingRequiredHeaders: [],
+      blocked: false,
+      blockReason: null,
+    };
+  }
+
   const mapping = emptyRepresentativeMapping();
   const ambiguous: RepresentativeMappingField[] = [];
   const unmatched: RepresentativeMappingField[] = [];
@@ -154,7 +220,27 @@ export function applyCsvMappingTemplate(
     }
   }
 
-  return { mapping, ambiguousFields: ambiguous, unmatchedFields: unmatched };
+  const required = template.requiredFields ?? [];
+  const missingRequiredHeaders = required.filter((f) => unmatched.includes(f));
+  if (missingRequiredHeaders.length > 0) {
+    return {
+      mapping: emptyRepresentativeMapping(),
+      ambiguousFields: [],
+      unmatchedFields: unmatched,
+      missingRequiredHeaders,
+      blocked: true,
+      blockReason: `This template does not match this file. Missing headers: ${missingRequiredHeaders.join(", ")}`,
+    };
+  }
+
+  return {
+    mapping,
+    ambiguousFields: ambiguous,
+    unmatchedFields: unmatched,
+    missingRequiredHeaders: [],
+    blocked: false,
+    blockReason: null,
+  };
 }
 
 // ---------- Mapping JSON download payload ----------

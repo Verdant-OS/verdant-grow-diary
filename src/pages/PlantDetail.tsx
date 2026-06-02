@@ -342,6 +342,8 @@ export default function PlantDetail() {
             />
           </div>
 
+          <ManualSnapshotTimelineSection scope="plant" plantId={plant.id} />
+
 
 
           <section

@@ -52,6 +52,11 @@ jobs:
       - name: Static safety scans (Action Queue provenance + chip)
         run: bun run test:static-safety
 
+      # Stop-ship: QuickLog v2 RPC ownership / reason-code / mixed-boundary
+      # regression. See docs/quicklog-rpc-safety.md.
+      - name: QuickLog v2 RPC ownership + security
+        run: bun run test:quicklog-rpc-ownership
+
       - name: Full test suite
         run: bunx vitest run
 

@@ -398,6 +398,47 @@ export default function RepresentativeCsvPreview() {
             >
               Clear saved preset
             </Button>
+
+            <input
+              ref={importInputRef}
+              type="file"
+              accept="application/json,.json"
+              className="sr-only"
+              aria-label="Import mapping JSON file"
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (!f || !headers) return;
+                setImportNotice(null);
+                const fileText = await f.text();
+                const result = importCsvMappingConfig({ input: fileText, headers });
+                if (result.status === "blocked") {
+                  setImportNotice({ kind: "blocked", message: `Import blocked: ${result.message}` });
+                  return;
+                }
+                setMapping(result.mapping);
+                setTemplateId(null);
+                const parts: string[] = ["Mapping JSON imported."];
+                if (result.missingHeaders.length > 0) {
+                  parts.push(
+                    `Headers not found in this CSV: ${result.missingHeaders
+                      .map((m) => `${m.field}=${m.header}`)
+                      .join(", ")}. Fields left unmapped — no guesses.`,
+                  );
+                }
+                if (result.ignoredKeys.length > 0) {
+                  parts.push(`Ignored unexpected keys: ${result.ignoredKeys.join(", ")}.`);
+                }
+                setImportNotice({ kind: "success", message: parts.join(" ") });
+              }}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => importInputRef.current?.click()}
+            >
+              Import mapping JSON
+            </Button>
           </div>
 
           {templateNotice && (
@@ -408,6 +449,18 @@ export default function RepresentativeCsvPreview() {
           {presetNotice && (
             <p role="status" className="text-xs text-muted-foreground">
               {presetNotice}
+            </p>
+          )}
+          {importNotice && (
+            <p
+              role={importNotice.kind === "blocked" ? "alert" : "status"}
+              className={
+                importNotice.kind === "blocked"
+                  ? "text-xs text-destructive"
+                  : "text-xs text-muted-foreground"
+              }
+            >
+              {importNotice.message}
             </p>
           )}
 

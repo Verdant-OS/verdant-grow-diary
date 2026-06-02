@@ -36,6 +36,7 @@ import {
   classifyQuickLogSnapshotSource,
   shouldEmbedSnapshot,
 } from "@/lib/quickLogSensorSnapshotRules";
+import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
 
 import { AlertTriangle, Info } from "lucide-react";
 import { toast } from "sonner";
@@ -645,6 +646,11 @@ export default function QuickLog({
               </div>
             );
           })()}
+
+          <QuickLogSensorSnapshotStrip
+            growId={activeGrowId}
+            tentId={selectedPlant?.tent_id ?? null}
+          />
 
           <Button type="submit" disabled={busy} className="gradient-leaf text-primary-foreground">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save entry"}

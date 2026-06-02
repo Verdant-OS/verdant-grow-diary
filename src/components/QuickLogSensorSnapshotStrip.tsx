@@ -89,8 +89,8 @@ export default function QuickLogSensorSnapshotStrip({ growId, tentId }: Props) {
       )}
 
       {view.action.kind !== "none" && (
-        <Link
-          to={view.action.href}
+        <a
+          href={view.action.href}
           data-testid="quicklog-sensor-snapshot-action"
           data-action-kind={view.action.kind}
           className="inline-flex items-center text-[12px] font-medium text-primary hover:underline"

@@ -15,17 +15,18 @@ import type {
 
 const STATE_LABEL: Record<SensorBridgeHealthState, string> = {
   no_data: "no data",
-  accepted: "accepted",
+  usable: "usable",
   stale: "stale",
   needs_review: "needs review",
+  invalid: "invalid",
 };
 
 function badgeVariant(
   s: SensorBridgeHealthState,
 ): "default" | "secondary" | "outline" | "destructive" {
-  if (s === "accepted") return "default";
+  if (s === "usable") return "default";
   if (s === "stale") return "secondary";
-  if (s === "needs_review") return "destructive";
+  if (s === "needs_review" || s === "invalid") return "destructive";
   return "outline";
 }
 

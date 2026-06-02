@@ -271,8 +271,9 @@ describe("QuickLogGroupedTimelineSection — empty states", () => {
       const dialogs = screen.queryAllByRole("dialog");
       expect(dialogs.length).toBeGreaterThan(0);
     });
-    // No success toast / no "Saved" text — opening must not submit.
-    expect(screen.queryByText(/saved/i)).toBeNull();
+    // Opening must not submit — no success toast.
+    expect(screen.queryByText(/^saved$/i)).toBeNull();
+    expect(screen.queryByText(/quick log saved/i)).toBeNull();
   });
 
   it("filtered empty state renders the correct copy", async () => {

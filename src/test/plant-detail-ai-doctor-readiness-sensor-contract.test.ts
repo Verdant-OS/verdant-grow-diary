@@ -105,14 +105,84 @@ describe("AI Doctor readiness × sensor snapshot contract", () => {
     ).toBeDefined();
   });
 
-  it("preserves prior behavior when no sensorSnapshot classification is supplied", () => {
+  it("null/undefined classification → NOT healthy, regardless of raw hasSensorSnapshot boolean", () => {
+    const r = buildPlantDetailAiDoctorReadiness({
+      ...baseInput,
+      hasSensorSnapshot: true, // legacy boolean — must NOT bypass the contract
+    });
+    expect(r.sensorEvidence.countsAsHealthyEvidence).toBe(false);
+    expect(r.sensorEvidence.status).toBe("no_data");
+    expect(r.sensorEvidence.isMissing).toBe(true);
+    // 4 of 5 because the sensor signal is not healthy.
+    expect(r.presentCount).toBe(4);
+    // Missing bullet re-appears because the boolean was gated away.
+    expect(
+      r.missing.find((m) => m.kind === "no_sensor_snapshot"),
+    ).toBeDefined();
+  });
+
+  it("explicit null classification → NOT healthy", () => {
     const r = buildPlantDetailAiDoctorReadiness({
       ...baseInput,
       hasSensorSnapshot: true,
+      sensorSnapshot: null,
     });
-    // No classification → fallback to legacy boolean; healthy mode is "unknown".
-    expect(r.sensorEvidence.mode).toBe("unknown");
-    expect(r.sensorEvidence.countsAsHealthyEvidence).toBe(true);
-    expect(r.presentCount).toBe(5);
+    expect(r.sensorEvidence.countsAsHealthyEvidence).toBe(false);
+    expect(r.presentCount).toBe(4);
+  });
+
+  describe("regressions — no bypass paths", () => {
+    const states = ["stale", "invalid", "needs_review", "no_data"] as const;
+    for (const status of states) {
+      it(`status="${status}" never counts as healthy evidence`, () => {
+        const r = buildPlantDetailAiDoctorReadiness({
+          ...baseInput,
+          sensorSnapshot: {
+            status,
+            reason: "unknown",
+            isHealthyEvidence: false,
+            label: `status ${status}`,
+          },
+        });
+        expect(r.sensorEvidence.countsAsHealthyEvidence).toBe(false);
+      });
+    }
+
+    it("only status='usable' grants healthy evidence", () => {
+      const r = buildPlantDetailAiDoctorReadiness({
+        ...baseInput,
+        sensorSnapshot: {
+          status: "usable",
+          reason: "fresh_accepted",
+          isHealthyEvidence: true,
+          label: "ok",
+        },
+      });
+      expect(r.sensorEvidence.countsAsHealthyEvidence).toBe(true);
+    });
+  });
+
+  describe("static safety — no raw-boolean bypass in readiness module", () => {
+    const fs = require("fs");
+    const path = require("path");
+    const src: string = fs.readFileSync(
+      path.resolve(__dirname, "../lib/plantDetailAiDoctorReadiness.ts"),
+      "utf8",
+    );
+
+    it("imports the contract's healthy-evidence gate", () => {
+      expect(src).toMatch(
+        /from\s+["']@\/lib\/sensorSnapshotStatusContract["']/,
+      );
+      expect(src).toMatch(/countsAsHealthyEvidence/);
+    });
+
+    it("does not grant healthy evidence from the legacy boolean", () => {
+      // The old bypass shape was: `if (input.hasSensorSnapshot) { ... countsAsHealthyEvidence: true ... }`
+      // Assert that pattern is gone.
+      expect(src).not.toMatch(
+        /if\s*\(\s*input\.hasSensorSnapshot\s*\)\s*\{[\s\S]{0,400}countsAsHealthyEvidence\s*:\s*true/,
+      );
+    });
   });
 });

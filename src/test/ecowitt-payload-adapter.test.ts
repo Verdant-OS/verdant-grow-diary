@@ -24,7 +24,7 @@ import {
   adaptEcoWittPayloadToBridgeInput,
   type EcoWittAdapterResult,
 } from "@/lib/ecowittPayloadAdapter";
-import { evaluateBridgeIntake } from "@/lib/sensorBridgeIntakeRules";
+import { validateAndResolveBridgeIntake } from "@/lib/sensorBridgeIntakeRules";
 
 const NOW = new Date("2026-05-23T12:00:00Z");
 const minutesAgo = (m: number) =>
@@ -276,7 +276,7 @@ describe("EcoWitt adapter — handoff to sensorBridgeIntakeRules", () => {
       temp1f: 70,
       humidity1: 150, // impossible
     });
-    const result = evaluateBridgeIntake(r.input, { now: NOW });
+    const result = validateAndResolveBridgeIntake(r.input, { now: NOW });
     expect(result.ok).toBe(false);
     expect(result.reasons).toContain("humidity_out_of_range");
   });
@@ -287,7 +287,7 @@ describe("EcoWitt adapter — handoff to sensorBridgeIntakeRules", () => {
       temp1f: 70,
       humidity1: 50,
     });
-    const result = evaluateBridgeIntake(r.input, { now: NOW });
+    const result = validateAndResolveBridgeIntake(r.input, { now: NOW });
     expect(result.resolved_source).not.toBe("live");
   });
 
@@ -296,7 +296,7 @@ describe("EcoWitt adapter — handoff to sensorBridgeIntakeRules", () => {
       dateutc: minutesAgoEcoWitt(1),
       humidity1: 100,
     });
-    const result = evaluateBridgeIntake(r.input, { now: NOW });
+    const result = validateAndResolveBridgeIntake(r.input, { now: NOW });
     expect(result.suspicions).toContain("humidity_stuck_extreme");
   });
 
@@ -305,21 +305,21 @@ describe("EcoWitt adapter — handoff to sensorBridgeIntakeRules", () => {
       dateutc: minutesAgoEcoWitt(1),
       soilmoisture1: 0,
     });
-    const result = evaluateBridgeIntake(r.input, { now: NOW });
+    const result = validateAndResolveBridgeIntake(r.input, { now: NOW });
     expect(result.suspicions).toContain("soil_moisture_stuck_extreme");
   });
 
   it("intake never classifies unknown/empty readings as healthy", () => {
     const r = adapt({ dateutc: minutesAgoEcoWitt(1) });
     expect(r.ok).toBe(false);
-    const result = evaluateBridgeIntake(r.input, { now: NOW });
+    const result = validateAndResolveBridgeIntake(r.input, { now: NOW });
     expect(result.ok).toBe(false);
     expect(result.resolved_source).not.toBe("live");
   });
 
   it("intake catches missing timestamp", () => {
     const r = adapt({ temp1f: 70, humidity1: 50 });
-    const result = evaluateBridgeIntake(r.input, { now: NOW });
+    const result = validateAndResolveBridgeIntake(r.input, { now: NOW });
     expect(result.reasons).toContain("captured_at_missing");
     expect(result.ok).toBe(false);
   });

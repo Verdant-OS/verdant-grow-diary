@@ -113,6 +113,9 @@ export function mapPlantRow(row: PlantRow): Plant {
  * for fetch results — a single row alone reports only one metric.
  */
 export function mapSensorReadingRow(row: SensorReadingRow): SensorReading {
+  const source = coerceSource((row as { source?: string | null }).source);
+  const capturedAt =
+    (row as { captured_at?: string | null }).captured_at ?? row.ts;
   const reading: SensorReading = {
     ts: row.ts,
     tentId: row.tent_id,
@@ -121,6 +124,9 @@ export function mapSensorReadingRow(row: SensorReadingRow): SensorReading {
     vpd: 0,
     co2: 0,
     soil: 0,
+    source,
+    status: deriveReadingStatus(capturedAt, source),
+    capturedAt,
   };
   applyMetric(reading, row.metric, row.value);
   return reading;
@@ -143,6 +149,11 @@ function applyMetric(reading: SensorReading, metric: string, rawValue: number | 
  * mock-shaped SensorReading objects. Missing metrics default to 0. Sorted by
  * ts descending (newest first); rows with the same ts keep insertion order
  * across distinct tents.
+ *
+ * Provenance is inherited from the FIRST row encountered per (tent, ts)
+ * group; in practice all per-metric rows from one ingest share source/
+ * captured_at, so this matches grower expectations. Status is derived
+ * once from the contract — never inline-classified.
  */
 export function groupSensorReadingRows(rows: SensorReadingRow[]): SensorReading[] {
   const byKey = new Map<string, SensorReading>();
@@ -150,7 +161,21 @@ export function groupSensorReadingRows(rows: SensorReadingRow[]): SensorReading[
     const key = `${row.tent_id}|${row.ts}`;
     let reading = byKey.get(key);
     if (!reading) {
-      reading = { ts: row.ts, tentId: row.tent_id, temp: 0, rh: 0, vpd: 0, co2: 0, soil: 0 };
+      const source = coerceSource((row as { source?: string | null }).source);
+      const capturedAt =
+        (row as { captured_at?: string | null }).captured_at ?? row.ts;
+      reading = {
+        ts: row.ts,
+        tentId: row.tent_id,
+        temp: 0,
+        rh: 0,
+        vpd: 0,
+        co2: 0,
+        soil: 0,
+        source,
+        status: deriveReadingStatus(capturedAt, source),
+        capturedAt,
+      };
       byKey.set(key, reading);
     }
     applyMetric(reading, row.metric, row.value);

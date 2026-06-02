@@ -8,7 +8,7 @@
  */
 import { AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { GrowDiaryTimelineItem } from "@/lib/growDiaryTimelineRules";
+import type { GrowDiaryTimelineItem, SensorSnapshotBadge } from "@/lib/growDiaryTimelineRules";
 import { sensorSnapshotBadge } from "@/lib/growDiaryTimelineRules";
 import {
   FOLLOWUP_SAFE_CAPTION,

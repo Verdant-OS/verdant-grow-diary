@@ -161,15 +161,15 @@ export function applyCsvMappingPreset(
     }
     const current = mapping[f];
     if (current === null || typeof current === "string") {
-      (mapping as Record<string, unknown>)[f] = savedHeader;
+      (mapping as unknown as Record<string, unknown>)[f] = savedHeader;
     } else if ("unit" in current) {
       let unit: TempUnit | EcUnit = current.unit;
       if (f === "air_temp") unit = preset.units.air_temp;
       else if (f === "substrate_temp") unit = preset.units.substrate_temp;
       else if (f === "substrate_ec") unit = preset.units.substrate_ec;
-      (mapping as Record<string, unknown>)[f] = { column: savedHeader, unit };
+      (mapping as unknown as Record<string, unknown>)[f] = { column: savedHeader, unit };
     } else {
-      (mapping as Record<string, unknown>)[f] = { column: savedHeader };
+      (mapping as unknown as Record<string, unknown>)[f] = { column: savedHeader };
     }
   }
 

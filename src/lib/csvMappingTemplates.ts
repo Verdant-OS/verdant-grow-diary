@@ -145,12 +145,12 @@ export function applyCsvMappingTemplate(
     const header = matchedHeaders[0];
     const current = mapping[field];
     if (current === null || typeof current === "string") {
-      (mapping as Record<string, unknown>)[field] = header;
+      (mapping as unknown as Record<string, unknown>)[field] = header;
     } else if ("unit" in current) {
       const unit = (spec.unit ?? current.unit) as TempUnit & EcUnit;
-      (mapping as Record<string, unknown>)[field] = { ...current, column: header, unit };
+      (mapping as unknown as Record<string, unknown>)[field] = { ...current, column: header, unit };
     } else {
-      (mapping as Record<string, unknown>)[field] = { column: header };
+      (mapping as unknown as Record<string, unknown>)[field] = { column: header };
     }
   }
 

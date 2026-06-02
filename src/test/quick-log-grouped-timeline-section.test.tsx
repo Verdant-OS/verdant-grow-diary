@@ -203,11 +203,11 @@ describe("QuickLogGroupedTimelineSection — plant scope", () => {
     expect(cards[0].getAttribute("data-entry-kind")).toBe("action");
   });
 
-  it("preserves warning telemetry severity inside grouped card", async () => {
+  it("preserves invalid telemetry severity inside grouped card", async () => {
     nextRows = [
       water("w1", "2026-02-07T10:00:00.000Z"),
-      // Temperature_c is given in °C field but value 75 (out-of-range C) → invalid
-      env("e1", "2026-02-07T10:00:01.000Z", { temperature_c: 75, humidity_pct: 55 }),
+      // Humidity 150% is outside 0..100 → validator marks the snapshot invalid.
+      env("e1", "2026-02-07T10:00:01.000Z", { humidity_pct: 150 }),
     ];
     renderSection({ scope: "plant", plantId: PLANT, tentId: TENT });
     await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));

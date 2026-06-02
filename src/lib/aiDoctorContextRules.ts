@@ -125,6 +125,16 @@ export function evaluateAiDoctorContext(
     typeof safe.now === "number" && Number.isFinite(safe.now)
       ? safe.now
       : Date.now();
+  const recentWindowMs =
+    typeof safe.config?.recentEventWindowMs === "number" &&
+    Number.isFinite(safe.config.recentEventWindowMs)
+      ? safe.config.recentEventWindowMs
+      : AI_DOCTOR_RECENT_WINDOW_MS;
+  const snapshotFreshMs =
+    typeof safe.config?.snapshotFreshMs === "number" &&
+    Number.isFinite(safe.config.snapshotFreshMs)
+      ? safe.config.snapshotFreshMs
+      : AI_DOCTOR_SNAPSHOT_FRESH_MS;
 
   const events = Array.isArray(safe.recentEvents) ? safe.recentEvents : [];
   const snaps = Array.isArray(safe.recentManualSnapshots)

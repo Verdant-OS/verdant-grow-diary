@@ -75,7 +75,7 @@ const BANNED_WORDS = [
 const BANNED_WORDS_RE = new RegExp(`\\b(${BANNED_WORDS.join("|")})\\b`, "i");
 
 const DEVICE_CONTROL_RE =
-  /\b(turn (on|off)|switch (on|off)|enable|disable|activate|deactivate|toggle|start|stop|run|trigger|set|change|adjust|raise|lower|increase|decrease)\b.{0,40}\b(fan|fans|light|lights|pump|pumps|heater|heaters|humidifier|dehumidifier|valve|relay|actuator|outlet|socket|switch|controller|hvac|exhaust|intake|dosing|injector|irrigation|sprinkler)\b/i;
+  /\b(turn|switch|enable|disable|activate|deactivate|toggle|trigger|power)\b(?:\s+(?:on|off|the|a|an|your|all|every|this|that))*\s+\b(fan|fans|light|lights|pump|pumps|heater|heaters|humidifier|dehumidifier|valve|valves|relay|actuator|outlet|socket|controller|hvac|exhaust|intake|dosing|injector|irrigation|sprinkler)\b/i;
 
 const SENSITIVE_KEY_RE =
   /(^|_)(raw_payload|secret|secrets|token|tokens|api_key|apikey|service_role|password|credential|credentials|bearer|jwt)(_|$)|^(raw_payload|secret|secrets|token|tokens|api_key|apikey|service_role|password|credential|credentials|bearer|jwt)$/i;

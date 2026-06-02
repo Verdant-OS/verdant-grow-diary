@@ -67,6 +67,30 @@ export interface BuildGrowDiaryTimelineInput {
 
 const DEFAULT_NOTE_PREVIEW_MAX = 160;
 
+const VALID_SENSOR_STATES = new Set(["live", "manual", "stale", "invalid"]);
+
+export interface SensorSnapshotBadge {
+  label: string;
+  variant: "neutral" | "positive" | "warning" | "error";
+}
+
+export function sensorSnapshotBadge(state: string | null | undefined): SensorSnapshotBadge | null {
+  const s = (state ?? "").trim().toLowerCase();
+  if (!s || !VALID_SENSOR_STATES.has(s)) return null;
+  switch (s) {
+    case "live":
+      return { label: "Live", variant: "positive" };
+    case "manual":
+      return { label: "Manual", variant: "neutral" };
+    case "stale":
+      return { label: "Stale", variant: "warning" };
+    case "invalid":
+      return { label: "Invalid", variant: "error" };
+    default:
+      return null;
+  }
+}
+
 const EVENT_TYPE_TITLES: Record<string, string> = {
   watering: "Watering",
   water: "Watering",

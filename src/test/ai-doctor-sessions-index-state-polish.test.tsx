@@ -77,7 +77,11 @@ describe("AiDoctorSessionsIndex — empty state", () => {
 describe("AiDoctorSessionsIndex — filtered-empty state", () => {
   it("renders distinct filtered-empty copy with a working Clear filters action", async () => {
     mockRangeImpl = () => Promise.resolve({ data: [], error: null });
-    renderWithProviders(<AiDoctorSessionsIndex />, ["/?risk=high"]);
+    renderWithProviders(<AiDoctorSessionsIndex />);
+    await screen.findByTestId("ai-doctor-sessions-index-page");
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-index-filter-risk"), {
+      target: { value: "high" },
+    });
     const filteredEmpty = await screen.findByTestId(
       "ai-doctor-sessions-index-empty-filtered",
     );

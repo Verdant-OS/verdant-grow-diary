@@ -3,15 +3,28 @@ import {
   buildPlantDetailAiDoctorReadiness,
   type PlantDetailAiDoctorReadinessInput,
 } from "@/lib/plantDetailAiDoctorReadiness";
+import type { Classification } from "@/lib/sensorSnapshotStatusContract";
+
+const USABLE: Classification = {
+  status: "usable",
+  reason: "fresh_accepted",
+  isHealthyEvidence: true,
+  label: "Latest bridge reading accepted.",
+};
 
 function makeInput(
   overrides: Partial<PlantDetailAiDoctorReadinessInput> = {},
 ): PlantDetailAiDoctorReadinessInput {
+  const has =
+    overrides.hasSensorSnapshot !== undefined ? overrides.hasSensorSnapshot : true;
   return {
     stage: "veg",
     hasTimelineEntries: true,
     hasRecentPhoto: true,
-    hasSensorSnapshot: true,
+    hasSensorSnapshot: has,
+    // Default: when the legacy boolean is true, supply a usable
+    // Classification so healthy evidence is gated through the contract.
+    sensorSnapshot: has ? USABLE : null,
     hasRecentWateringOrFeed: true,
     ...overrides,
   };

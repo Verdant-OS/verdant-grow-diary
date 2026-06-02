@@ -507,7 +507,7 @@ function fmt(n: number | null, digits = 2): string {
 }
 
 function hintVariant(severity: CsvRowValidationHint["severity"]) {
-  return severity === "block" ? ("destructive" as const) : ("secondary" as const);
+  return severity === "invalid" ? ("destructive" as const) : ("secondary" as const);
 }
 
 function PreviewRow({

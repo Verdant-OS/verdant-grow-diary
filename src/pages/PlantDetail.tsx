@@ -25,6 +25,7 @@ import PlantDetailRecentActivityRecap from "@/components/PlantDetailRecentActivi
 import PlantDetailWhatsMissing from "@/components/PlantDetailWhatsMissing";
 import PlantDetailAiDoctorReadiness from "@/components/PlantDetailAiDoctorReadiness";
 import PlantDetailDoctorContextPreview from "@/components/PlantDetailDoctorContextPreview";
+import PlantDetailAiDoctorContextPanel from "@/components/PlantDetailAiDoctorContextPanel";
 import PlantDetailAskDoctorHelper from "@/components/PlantDetailAskDoctorHelper";
 import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
 import PlantDetailSectionNav from "@/components/PlantDetailSectionNav";
@@ -170,6 +171,11 @@ export default function PlantDetail() {
         plantName={plant.name}
         tentName={tent?.name ?? null}
       />
+      <PlantDetailAiDoctorContextPanel
+        plantId={plant.id}
+        plant={plant}
+      />
+
 
 
 

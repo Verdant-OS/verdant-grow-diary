@@ -26,13 +26,13 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 import AiDoctorSessionsIndex from "@/pages/AiDoctorSessionsIndex";
 
-function renderWithProviders(ui: ReactElement) {
+function renderWithProviders(ui: ReactElement, initialEntries: string[] = ["/"]) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={initialEntries}>{ui}</MemoryRouter>
     </QueryClientProvider>,
   );
 }

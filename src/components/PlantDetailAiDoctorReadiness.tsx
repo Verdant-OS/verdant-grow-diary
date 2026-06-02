@@ -7,18 +7,40 @@
  * writes, RPC, scheduling, or autonomous actions. Copy stays cautious:
  * never promises diagnosis certainty and never implies a single photo
  * is sufficient.
+ *
+ * Sensor evidence is sourced from the REAL intake classification via
+ * `useSensorBridgeHealth()` → `classificationFromStatusResult()` and
+ * passed to the readiness builder. The legacy timeline presence boolean
+ * is NOT promoted into a synthesized `usable` Classification — only the
+ * real contract classifier can grant healthy evidence.
  */
 import { useMemo } from "react";
-import { Stethoscope, AlertCircle, CheckCircle2, MinusCircle, ArrowRight } from "lucide-react";
+import {
+  Stethoscope,
+  AlertCircle,
+  CheckCircle2,
+  MinusCircle,
+  ArrowRight,
+  ShieldAlert,
+  Clock,
+  HelpCircle,
+  Plus,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 
 import {
   buildPlantDetailAiDoctorReadiness,
   type PlantDetailAiDoctorReadinessInput,
   type AiDoctorReadinessLevel,
+  type AiDoctorSensorEvidenceMode,
 } from "@/lib/plantDetailAiDoctorReadiness";
-import type { Classification } from "@/lib/sensorSnapshotStatusContract";
+import {
+  classificationFromStatusResult,
+  type Classification,
+  type SnapshotStatus,
+} from "@/lib/sensorSnapshotStatusContract";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
+import { useSensorBridgeHealth } from "@/hooks/useSensorBridgeHealth";
 import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
 import { classifyTimelineEntry } from "@/lib/timelineEntryClassification";
 import { Button } from "@/components/ui/button";
@@ -70,17 +92,6 @@ function levelIcon(level: AiDoctorReadinessLevel) {
   }
 }
 
-function levelBadgeVariant(level: AiDoctorReadinessLevel) {
-  switch (level) {
-    case "ready":
-      return "outline" as const;
-    case "partial":
-      return "outline" as const;
-    case "empty":
-      return "outline" as const;
-  }
-}
-
 function levelBadgeClass(level: AiDoctorReadinessLevel): string {
   switch (level) {
     case "ready":
@@ -103,6 +114,57 @@ function levelBadgeLabel(level: AiDoctorReadinessLevel): string {
   }
 }
 
+function modeBadgeClass(mode: AiDoctorSensorEvidenceMode): string {
+  switch (mode) {
+    case "healthy":
+      return "border-emerald-400/50 text-emerald-400";
+    case "cautionary":
+      return "border-[hsl(var(--warning))]/50 text-[hsl(var(--warning))]";
+    case "unsafe":
+      return "border-destructive/50 text-destructive";
+    case "missing":
+      return "border-muted-foreground/40 text-muted-foreground";
+    default:
+      return "border-muted-foreground/40 text-muted-foreground";
+  }
+}
+
+function modeIcon(mode: AiDoctorSensorEvidenceMode) {
+  switch (mode) {
+    case "healthy":
+      return <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />;
+    case "cautionary":
+      return <Clock className="h-3.5 w-3.5" aria-hidden="true" />;
+    case "unsafe":
+      return <ShieldAlert className="h-3.5 w-3.5" aria-hidden="true" />;
+    case "missing":
+      return <Plus className="h-3.5 w-3.5" aria-hidden="true" />;
+    default:
+      return <HelpCircle className="h-3.5 w-3.5" aria-hidden="true" />;
+  }
+}
+
+interface NextAction {
+  label: string;
+  to: string;
+}
+
+function nextActionForStatus(status: SnapshotStatus | null): NextAction | null {
+  switch (status) {
+    case "stale":
+      return { label: "Add fresh sensor snapshot", to: "/sensors" };
+    case "invalid":
+      return { label: "Review sensor intake", to: "/pi-ingest-status" };
+    case "needs_review":
+      return { label: "Review snapshot issue", to: "/pi-ingest-status" };
+    case "no_data":
+      return { label: "Add sensor snapshot", to: "/sensors" };
+    case "usable":
+    default:
+      return null;
+  }
+}
+
 export default function PlantDetailAiDoctorReadiness({
   plantId,
   growId,
@@ -110,24 +172,24 @@ export default function PlantDetailAiDoctorReadiness({
   hasPlantPhoto = false,
 }: PlantDetailAiDoctorReadinessProps) {
   const { data: rawRows, isLoading } = usePlantRecentActivity(plantId ?? null);
+  const { data: bridgeHealth } = useSensorBridgeHealth();
 
   const signals = useMemo(() => {
     return deriveSignals(plantId, hasPlantPhoto, rawRows ?? []);
   }, [plantId, hasPlantPhoto, rawRows]);
 
-  // Route the legacy timeline-derived snapshot boolean through the shared
-  // contract by constructing an explicit Classification at the boundary.
-  // The contract decides whether this counts as healthy evidence — the
-  // component never bypasses it.
+  // Source the REAL intake classification from the bridge health view-model.
+  // Presence in the timeline NEVER produces a `usable` Classification — only
+  // the shared contract classifier can. When no bridge data is available,
+  // we pass null and the readiness builder treats sensor evidence as
+  // `no_data`.
   const sensorSnapshot = useMemo<Classification | null>(() => {
-    if (!signals.hasSensorSnapshot) return null;
-    return {
-      status: "usable",
-      reason: "fresh_accepted",
-      isHealthyEvidence: true,
-      label: "Latest bridge reading accepted.",
-    };
-  }, [signals.hasSensorSnapshot]);
+    if (!bridgeHealth) return null;
+    return classificationFromStatusResult({
+      status: bridgeHealth.status,
+      reasonCode: bridgeHealth.latestReasonCode,
+    });
+  }, [bridgeHealth]);
 
   const result = useMemo(() => {
     return buildPlantDetailAiDoctorReadiness({
@@ -140,6 +202,9 @@ export default function PlantDetailAiDoctorReadiness({
   const doctorHref = plantId
     ? `/doctor?plantId=${encodeURIComponent(plantId)}`
     : "/doctor";
+
+  const sensor = result.sensorEvidence;
+  const nextAction = nextActionForStatus(sensor.status);
 
   return (
     <section
@@ -157,7 +222,7 @@ export default function PlantDetailAiDoctorReadiness({
         </h2>
         {!isLoading && (
           <Badge
-            variant={levelBadgeVariant(result.level)}
+            variant="outline"
             className={`text-[10px] uppercase tracking-wide ${levelBadgeClass(result.level)}`}
             data-testid="plant-detail-ai-doctor-readiness-badge"
             data-level={result.level}
@@ -215,6 +280,66 @@ export default function PlantDetailAiDoctorReadiness({
               ))}
             </ul>
           )}
+
+          {/* Sensor evidence panel — real intake classification. */}
+          <div
+            data-testid="plant-detail-ai-doctor-sensor-evidence-panel"
+            data-status={sensor.status ?? "unknown"}
+            data-reason={sensor.reason ?? "unknown"}
+            data-mode={sensor.mode}
+            data-counts-as-healthy={sensor.countsAsHealthyEvidence ? "true" : "false"}
+            className="mt-2 rounded-lg border border-border/40 bg-secondary/20 p-2 space-y-1"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Sensor evidence
+              </span>
+              <Badge
+                variant="outline"
+                className={`inline-flex items-center gap-1 text-[10px] uppercase tracking-wide ${modeBadgeClass(sensor.mode)}`}
+                data-testid="plant-detail-ai-doctor-sensor-evidence-mode-badge"
+              >
+                {modeIcon(sensor.mode)}
+                {sensor.mode}
+              </Badge>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+              <span data-testid="plant-detail-ai-doctor-sensor-evidence-status">
+                status: <span className="font-mono text-foreground/80">{sensor.status ?? "unknown"}</span>
+              </span>
+              <span data-testid="plant-detail-ai-doctor-sensor-evidence-reason">
+                reason: <span className="font-mono text-foreground/80">{sensor.reason ?? "unknown"}</span>
+              </span>
+              <span data-testid="plant-detail-ai-doctor-sensor-evidence-healthy">
+                healthy evidence:{" "}
+                <span className="font-mono text-foreground/80">
+                  {sensor.countsAsHealthyEvidence ? "yes" : "no"}
+                </span>
+              </span>
+            </div>
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="plant-detail-ai-doctor-sensor-evidence-explanation"
+            >
+              {sensor.label}
+            </p>
+            {nextAction && (
+              <div className="pt-1">
+                <Button
+                  asChild
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1"
+                  data-testid={`plant-detail-ai-doctor-sensor-evidence-next-action-${sensor.status}`}
+                  data-next-action-status={sensor.status ?? "unknown"}
+                >
+                  <Link to={nextAction.to}>
+                    {nextAction.label} <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </Button>
+              </div>
+            )}
+          </div>
 
           <div className="pt-1">
             {plantId ? (

@@ -81,7 +81,7 @@ export default function TimelineMemorySection(props: Props) {
           <History className="h-4 w-4" aria-hidden /> Timeline memory
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Diary entries and grower-recorded snapshots. Not live, not synced, not imported.
+          Diary entries and grower-recorded snapshots in this scope.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">

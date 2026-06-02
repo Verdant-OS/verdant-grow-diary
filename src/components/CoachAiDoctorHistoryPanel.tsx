@@ -152,8 +152,9 @@ function HistoryRow({ row }: { row: AiDoctorSessionRow }) {
         ) : null}
         <Link
           to={`/doctor/sessions/${row.id}`}
-          className="text-primary underline"
+          className="text-primary underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           data-testid="coach-ai-doctor-history-view-link"
+          aria-label={`Open AI Doctor session${d?.likelyIssue ? `: ${d.likelyIssue}` : row.created_at ? ` from ${fmtDate(row.created_at)}` : ""}`}
         >
           View session
         </Link>

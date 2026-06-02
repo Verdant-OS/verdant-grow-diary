@@ -133,6 +133,10 @@ export default function TimelineMemorySection(props: Props) {
                     <li key={`snap:${item.key}`}>
                       <ManualSnapshotTimelineCard card={item.card} />
                     </li>
+                  ) : item.kind === "ai_doctor_sensor_evidence_audit" ? (
+                    <li key={`aiaudit:${item.key}`}>
+                      <AiDoctorEvidenceAuditRow item={item} />
+                    </li>
                   ) : (
                     <li key={`diary:${item.key}`}>
                       <DiaryItemRow item={item} />

@@ -140,6 +140,7 @@ describe("DiaryEntryBadges presenter", () => {
           notePreview: "",
           hasPhoto: false,
           hasSensorSnapshot: false,
+          sensorSnapshotState: null,
           tags: [],
           warnings: [],
           isUsefulForAiContext: true,

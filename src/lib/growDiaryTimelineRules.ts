@@ -29,6 +29,8 @@ export interface GrowDiaryTimelineItem {
   notePreview: string;
   hasPhoto: boolean;
   hasSensorSnapshot: boolean;
+  /** "live" | "manual" | "stale" | "invalid" | null when missing/legacy. */
+  sensorSnapshotState: string | null;
   tags: string[];
   warnings: string[];
   isUsefulForAiContext: boolean;
@@ -64,6 +66,30 @@ export interface BuildGrowDiaryTimelineInput {
 // ---------------------------------------------------------------------------
 
 const DEFAULT_NOTE_PREVIEW_MAX = 160;
+
+const VALID_SENSOR_STATES = new Set(["live", "manual", "stale", "invalid"]);
+
+export interface SensorSnapshotBadge {
+  label: string;
+  variant: "neutral" | "positive" | "warning" | "error";
+}
+
+export function sensorSnapshotBadge(state: string | null | undefined): SensorSnapshotBadge | null {
+  const s = (state ?? "").trim().toLowerCase();
+  if (!s || !VALID_SENSOR_STATES.has(s)) return null;
+  switch (s) {
+    case "live":
+      return { label: "Live", variant: "positive" };
+    case "manual":
+      return { label: "Manual", variant: "neutral" };
+    case "stale":
+      return { label: "Stale", variant: "warning" };
+    case "invalid":
+      return { label: "Invalid", variant: "error" };
+    default:
+      return null;
+  }
+}
 
 const EVENT_TYPE_TITLES: Record<string, string> = {
   watering: "Watering",
@@ -220,6 +246,7 @@ export function toTimelineItem(
     notePreview: clipNotePreview(entry.note, maxLen),
     hasPhoto: !!entry.photoUrl,
     hasSensorSnapshot: !!entry.details.sensorSnapshot,
+    sensorSnapshotState: entry.details.sensorSnapshot?.state ?? null,
     tags: buildTags(entry),
     warnings: entry.warnings.slice(),
     isUsefulForAiContext: entry.isValidForAiContext,

@@ -9,6 +9,7 @@
  * - No raw IDs or provenance tokens leak into visible text/aria
  */
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
 import { render, screen } from "@testing-library/react";
 import { sensorSnapshotBadge, toTimelineItem } from "@/lib/growDiaryTimelineRules";
 import { normalizeDiaryEntry } from "@/lib/diaryEntryRules";

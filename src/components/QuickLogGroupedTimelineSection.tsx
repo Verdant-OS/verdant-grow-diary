@@ -387,9 +387,13 @@ function defaultTargetKeyFor(props: Props): string | null {
   return props.tentId ? `tent:${props.tentId}` : null;
 }
 
+export const QUICK_LOG_GROUPED_TIMELINE_UPDATING_LABEL =
+  "Updating QuickLog timeline…";
+
 export default function QuickLogGroupedTimelineSection(props: Props) {
   const scope = toScope(props);
-  const { entries, isLoading, isError } = useQuickLogGroupedTimeline(scope);
+  const { entries, isLoading, isFetching, isError } =
+    useQuickLogGroupedTimeline(scope);
   const [filter, setFilter] = useState<QuickLogGroupedTimelineFilter>("all");
   const [quickLogOpen, setQuickLogOpen] = useState(false);
 

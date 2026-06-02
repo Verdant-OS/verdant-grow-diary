@@ -1,22 +1,19 @@
 /**
- * Sensor Snapshot Status Contract v1 — tests.
+ * Sensor Snapshot Status Contract v1 — pure contract tests (Step 1).
  *
- * Covers:
- *  - canonical status classification (usable / stale / invalid /
- *    needs_review / no_data)
- *  - reason codes kept separate from status
- *  - stale-window config (default + per-source override)
- *  - AI Doctor sensor-evidence gating
- *  - timeline/manual severity adapter does not flatten unsafe state
+ * Covers only the new canonical API:
+ *   classifyAuditRow, resolveStaleWindowMs, countsAsHealthyEvidence,
+ *   DEFAULT_STALE_WINDOW_MS, PER_SOURCE_STALE_WINDOW_MS.
  */
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
-  DEFAULT_SENSOR_SNAPSHOT_STALE_WINDOW_MS,
-  classifySensorSnapshotStatus,
-  evaluateSensorSnapshotEvidence,
-  mapSensorSnapshotStatusToSeverity,
-  resolveSensorSnapshotStaleWindowMs,
-  type SensorSnapshotStatus,
+  classifyAuditRow,
+  countsAsHealthyEvidence,
+  DEFAULT_STALE_WINDOW_MS,
+  PER_SOURCE_STALE_WINDOW_MS,
+  resolveStaleWindowMs,
+  type AuditRowLike,
+  type SnapshotStatus,
 } from "@/lib/sensorSnapshotStatusContract";
 
 const NOW = new Date("2026-05-23T12:00:00Z");
@@ -24,200 +21,174 @@ const minutesAgo = (m: number) =>
   new Date(NOW.getTime() - m * 60_000).toISOString();
 const hoursAgo = (h: number) => minutesAgo(h * 60);
 
-describe("classifySensorSnapshotStatus", () => {
-  it("1. fresh accepted snapshot returns usable", () => {
-    const r = classifySensorSnapshotStatus({
-      rowsReceived: 3,
-      rowsAccepted: 3,
-      capturedAt: minutesAgo(5),
-      now: NOW,
-    });
-    expect(r.status).toBe("usable");
-    expect(r.reasonCode).toBe("fresh_accept");
+afterEach(() => {
+  // Tests may temporarily set per-source overrides; always clean up.
+  for (const k of Object.keys(PER_SOURCE_STALE_WINDOW_MS)) {
+    delete PER_SOURCE_STALE_WINDOW_MS[k];
+  }
+});
+
+describe("classifyAuditRow", () => {
+  it("fresh accepted (5/5, recent ts) → usable + fresh_accepted", () => {
+    const row: AuditRowLike = {
+      rowsReceived: 5,
+      rowsAccepted: 5,
+      capturedAt: minutesAgo(10),
+    };
+    const c = classifyAuditRow(row, { now: NOW });
+    expect(c.status).toBe("usable");
+    expect(c.reason).toBe("fresh_accepted");
+    expect(c.isHealthyEvidence).toBe(true);
+    expect(c.label).toBe("Latest bridge reading accepted.");
   });
 
-  it("2. old accepted snapshot returns stale", () => {
-    const r = classifySensorSnapshotStatus({
-      rowsReceived: 3,
-      rowsAccepted: 3,
+  it("old accepted (5/5, ts past window) → stale + outside_stale_window", () => {
+    const row: AuditRowLike = {
+      rowsReceived: 5,
+      rowsAccepted: 5,
       capturedAt: hoursAgo(48),
-      now: NOW,
-    });
-    expect(r.status).toBe("stale");
-    expect(r.reasonCode).toBe("stale_timestamp");
+    };
+    const c = classifyAuditRow(row, { now: NOW });
+    expect(c.status).toBe("stale");
+    expect(c.reason).toBe("outside_stale_window");
+    expect(c.isHealthyEvidence).toBe(false);
   });
 
-  it("3. malformed snapshot returns invalid", () => {
-    const r = classifySensorSnapshotStatus({
-      malformed: true,
-      rowsReceived: 1,
-      rowsAccepted: 1,
+  it("validity.isValid === false → invalid (uses validity.reason or malformed_reading)", () => {
+    const row: AuditRowLike = {
+      rowsReceived: 5,
+      rowsAccepted: 5,
       capturedAt: minutesAgo(1),
+    };
+    const c1 = classifyAuditRow(row, {
       now: NOW,
+      validity: { isValid: false, reason: "out_of_range" },
     });
-    expect(r.status).toBe("invalid");
-    expect(r.reasonCode).toBe("malformed_payload");
+    expect(c1.status).toBe("invalid");
+    expect(c1.reason).toBe("out_of_range");
+    expect(c1.isHealthyEvidence).toBe(false);
+
+    const c2 = classifyAuditRow(row, {
+      now: NOW,
+      validity: { isValid: false },
+    });
+    expect(c2.status).toBe("invalid");
+    expect(c2.reason).toBe("malformed_reading");
   });
 
-  it("4. missing snapshot returns no_data when nothing was received", () => {
-    const r = classifySensorSnapshotStatus({ now: NOW });
-    expect(r.status).toBe("no_data");
-    expect(r.reasonCode).toBe("none_received");
+  it("null/missing row → no_data + no_rows", () => {
+    const c1 = classifyAuditRow(null, { now: NOW });
+    const c2 = classifyAuditRow(undefined, { now: NOW });
+    for (const c of [c1, c2]) {
+      expect(c.status).toBe("no_data");
+      expect(c.reason).toBe("no_rows");
+      expect(c.isHealthyEvidence).toBe(false);
+    }
   });
 
-  it("5. rows_received: 0, rows_accepted: 0 returns no_data", () => {
-    const r = classifySensorSnapshotStatus({
+  it("0/0 → no_data + no_rows (counts-first precedence)", () => {
+    const row: AuditRowLike = {
       rowsReceived: 0,
       rowsAccepted: 0,
       capturedAt: minutesAgo(1),
-      now: NOW,
-    });
-    expect(r.status).toBe("no_data");
+    };
+    const c = classifyAuditRow(row, { now: NOW });
+    expect(c.status).toBe("no_data");
+    expect(c.reason).toBe("no_rows");
+    expect(c.isHealthyEvidence).toBe(false);
   });
 
-  it("6. rows_received: 5, rows_accepted: 0 returns needs_review", () => {
-    const r = classifySensorSnapshotStatus({
+  it("5/0 → needs_review + none_inserted + exact label", () => {
+    const row: AuditRowLike = {
       rowsReceived: 5,
       rowsAccepted: 0,
       capturedAt: minutesAgo(1),
-      now: NOW,
-    });
-    expect(r.status).toBe("needs_review");
-    expect(r.reasonCode).toBe("none_accepted");
+    };
+    const c = classifyAuditRow(row, { now: NOW });
+    expect(c.status).toBe("needs_review");
+    expect(c.reason).toBe("none_inserted");
+    expect(c.label).toBe("Latest bridge reading needs review.");
+    expect(c.isHealthyEvidence).toBe(false);
   });
 
-  it("6b. partial accept (5/2) returns needs_review", () => {
-    const r = classifySensorSnapshotStatus({
+  it("5/3 → needs_review + partial_accept (derived from received - accepted)", () => {
+    const row: AuditRowLike = {
       rowsReceived: 5,
-      rowsAccepted: 2,
+      rowsAccepted: 3,
       capturedAt: minutesAgo(1),
-      now: NOW,
-    });
-    expect(r.status).toBe("needs_review");
-    expect(r.reasonCode).toBe("partial_accept");
+    };
+    const c = classifyAuditRow(row, { now: NOW });
+    expect(c.status).toBe("needs_review");
+    expect(c.reason).toBe("partial_accept");
   });
 
-  it("7. reason codes are separate from status (status enum excludes reason codes)", () => {
-    const allStatuses: SensorSnapshotStatus[] = [
+  it("status and reason are separate fields (different values, both present)", () => {
+    const row: AuditRowLike = {
+      rowsReceived: 5,
+      rowsAccepted: 0,
+      capturedAt: minutesAgo(1),
+    };
+    const c = classifyAuditRow(row, { now: NOW });
+    expect(c.status).toBeDefined();
+    expect(c.reason).toBeDefined();
+    expect(c.status).not.toBe(c.reason);
+    // Reason codes are not status variants.
+    const statuses: SnapshotStatus[] = [
       "usable",
       "stale",
       "invalid",
       "needs_review",
       "no_data",
     ];
-    const reasonsThatLookLikeStatuses = [
-      "stale_manual",
-      "invalid_source",
-      "stale_partial",
-      "invalid_payload",
-    ] as const;
-    for (const r of reasonsThatLookLikeStatuses) {
-      expect(allStatuses).not.toContain(r as unknown as SensorSnapshotStatus);
-    }
+    expect(statuses).not.toContain(
+      c.reason as unknown as SnapshotStatus,
+    );
   });
 });
 
-describe("stale window config", () => {
-  it("8. stale window comes from shared config helper, not JSX", () => {
-    expect(typeof resolveSensorSnapshotStaleWindowMs).toBe("function");
-    expect(DEFAULT_SENSOR_SNAPSHOT_STALE_WINDOW_MS).toBe(24 * 60 * 60 * 1000);
-    expect(resolveSensorSnapshotStaleWindowMs()).toBe(
-      DEFAULT_SENSOR_SNAPSHOT_STALE_WINDOW_MS,
-    );
+describe("resolveStaleWindowMs", () => {
+  it("resolveStaleWindowMs(undefined) === DEFAULT_STALE_WINDOW_MS", () => {
+    expect(resolveStaleWindowMs(undefined)).toBe(DEFAULT_STALE_WINDOW_MS);
+    expect(resolveStaleWindowMs(null)).toBe(DEFAULT_STALE_WINDOW_MS);
+    expect(DEFAULT_STALE_WINDOW_MS).toBe(24 * 60 * 60 * 1000);
   });
 
-  it("9. per-source stale-window override works", () => {
-    const overrides = { ecowitt: 60 * 60 * 1000 } as const;
-    const ms = resolveSensorSnapshotStaleWindowMs({
-      source: "ecowitt",
-      overrides,
-    });
-    expect(ms).toBe(60 * 60 * 1000);
+  it("per-source override resolves to the override value; removing it falls back to default", () => {
+    PER_SOURCE_STALE_WINDOW_MS.ecowitt = 60 * 60 * 1000;
+    expect(resolveStaleWindowMs("ecowitt")).toBe(60 * 60 * 1000);
 
-    // Classifier respects the override.
-    const r = classifySensorSnapshotStatus({
+    // Classifier honors the override.
+    const row: AuditRowLike = {
       rowsReceived: 1,
       rowsAccepted: 1,
       capturedAt: new Date(NOW.getTime() - 2 * 60 * 60 * 1000).toISOString(),
       source: "ecowitt",
-      now: NOW,
-      staleWindowMs: ms,
-    });
-    expect(r.status).toBe("stale");
-  });
+    };
+    expect(classifyAuditRow(row, { now: NOW }).status).toBe("stale");
 
-  it("10. default stale-window fallback works for unknown source", () => {
-    const ms = resolveSensorSnapshotStaleWindowMs({ source: "unknown_source" });
-    expect(ms).toBe(DEFAULT_SENSOR_SNAPSHOT_STALE_WINDOW_MS);
+    delete PER_SOURCE_STALE_WINDOW_MS.ecowitt;
+    expect(resolveStaleWindowMs("ecowitt")).toBe(DEFAULT_STALE_WINDOW_MS);
   });
 });
 
-describe("AI Doctor sensor-evidence gating", () => {
-  it("11. usable sensor status counts as healthy evidence", () => {
-    const e = evaluateSensorSnapshotEvidence({
-      status: "usable",
-      reasonCode: "fresh_accept",
-    });
-    expect(e.countsAsHealthyEvidence).toBe(true);
-  });
-
-  it("12. stale does not count as healthy evidence", () => {
-    const e = evaluateSensorSnapshotEvidence({
-      status: "stale",
-      reasonCode: "stale_timestamp",
-    });
-    expect(e.countsAsHealthyEvidence).toBe(false);
-    expect(e.status).toBe("stale");
-    expect(e.reasonCode).toBe("stale_timestamp");
-  });
-
-  it("13. invalid does not count as healthy evidence", () => {
-    const e = evaluateSensorSnapshotEvidence({
-      status: "invalid",
-      reasonCode: "malformed_payload",
-    });
-    expect(e.countsAsHealthyEvidence).toBe(false);
-  });
-
-  it("14. needs_review and no_data do not count as healthy evidence", () => {
-    expect(
-      evaluateSensorSnapshotEvidence({
-        status: "needs_review",
-        reasonCode: "none_accepted",
-      }).countsAsHealthyEvidence,
-    ).toBe(false);
-    expect(
-      evaluateSensorSnapshotEvidence({
-        status: "no_data",
-        reasonCode: "none_received",
-      }).countsAsHealthyEvidence,
-    ).toBe(false);
-    // Null/undefined input collapses to no_data, never healthy.
-    expect(evaluateSensorSnapshotEvidence(null).countsAsHealthyEvidence).toBe(
-      false,
-    );
-    expect(
-      evaluateSensorSnapshotEvidence(undefined).countsAsHealthyEvidence,
-    ).toBe(false);
-  });
-});
-
-describe("Timeline/manual snapshot severity adapter", () => {
-  it("15. preserves severity/status and never relabels unsafe/unknown as healthy", () => {
-    expect(mapSensorSnapshotStatusToSeverity("usable")).toBe("ok");
-    expect(mapSensorSnapshotStatusToSeverity("stale")).toBe("warning");
-    expect(mapSensorSnapshotStatusToSeverity("needs_review")).toBe("warning");
-    expect(mapSensorSnapshotStatusToSeverity("invalid")).toBe("danger");
-    expect(mapSensorSnapshotStatusToSeverity("no_data")).toBe("empty");
-
-    // Hard guarantee: no unsafe/unknown status maps to "ok".
+describe("countsAsHealthyEvidence", () => {
+  it("true for usable, false for stale/invalid/needs_review/no_data", () => {
+    expect(countsAsHealthyEvidence("usable")).toBe(true);
     for (const s of [
       "stale",
-      "needs_review",
       "invalid",
+      "needs_review",
       "no_data",
-    ] as SensorSnapshotStatus[]) {
-      expect(mapSensorSnapshotStatusToSeverity(s)).not.toBe("ok");
+    ] as SnapshotStatus[]) {
+      expect(countsAsHealthyEvidence(s)).toBe(false);
     }
+    // Also works against a full Classification.
+    const usable = classifyAuditRow(
+      { rowsReceived: 1, rowsAccepted: 1, capturedAt: minutesAgo(1) },
+      { now: NOW },
+    );
+    expect(countsAsHealthyEvidence(usable)).toBe(true);
+    expect(countsAsHealthyEvidence(null)).toBe(false);
+    expect(countsAsHealthyEvidence(undefined)).toBe(false);
   });
 });

@@ -22,6 +22,11 @@ import {
 import { buildAiDoctorReviewRequestPacket } from "@/lib/aiDoctorReviewRequestPacket";
 import { useAiDoctorLiveReview } from "@/hooks/useAiDoctorLiveReview";
 import AiDoctorReviewResultPreview from "@/components/AiDoctorReviewResultPreview";
+import { useSensorBridgeHealth } from "@/hooks/useSensorBridgeHealth";
+import {
+  classificationFromStatusResult,
+  type Classification,
+} from "@/lib/sensorSnapshotStatusContract";
 
 export const AI_DOCTOR_LIVE_REVIEW_LOADING_COPY =
   "Preparing cautious AI Doctor review…";
@@ -40,19 +45,31 @@ export const AI_DOCTOR_LIVE_REVIEW_RETRY_LABEL = "Try once more";
 export interface PlantDetailAiDoctorLiveReviewProps {
   plantId: string;
   plant: (AiDoctorContextPlantSource & { potSize?: string | null }) | null;
+  /** Scope IDs used to write the AI Doctor sensor evidence audit row. */
+  growId?: string | null;
+  tentId?: string | null;
   /** Test seam: override edge invoke. */
   invoke?: Parameters<typeof useAiDoctorLiveReview>[0]["invoke"];
+  /** Test seam: override audit persist. */
+  persist?: Parameters<typeof useAiDoctorLiveReview>[0]["persist"];
+  /** Test seam: pre-resolved sensor classification (otherwise read live). */
+  sensorClassificationOverride?: Classification | null;
 }
 
 export default function PlantDetailAiDoctorLiveReview({
   plantId,
   plant,
+  growId,
+  tentId,
   invoke,
+  persist,
+  sensorClassificationOverride,
 }: PlantDetailAiDoctorLiveReviewProps) {
   const { items } = useTimelineMemory(
     { kind: "plant", plantId },
     TIMELINE_MEMORY_DEFAULT_LIMIT,
   );
+  const { data: bridgeHealth } = useSensorBridgeHealth();
 
   const context = useMemo(
     () =>
@@ -78,10 +95,27 @@ export default function PlantDetailAiDoctorLiveReview({
     [allowed, plant, items, context],
   );
 
+  // Real intake classification — never synthesized from presence.
+  const sensorClassification = useMemo<Classification | null>(() => {
+    if (sensorClassificationOverride !== undefined) {
+      return sensorClassificationOverride;
+    }
+    if (!bridgeHealth) return null;
+    return classificationFromStatusResult({
+      status: bridgeHealth.status,
+      reasonCode: bridgeHealth.latestReasonCode,
+    });
+  }, [bridgeHealth, sensorClassificationOverride]);
+
   const review = useAiDoctorLiveReview({
     enabled: allowed,
     packet,
     invoke,
+    growId: growId ?? null,
+    tentId: tentId ?? null,
+    plantId,
+    sensorClassification,
+    persist,
   });
 
   if (!allowed) return null;

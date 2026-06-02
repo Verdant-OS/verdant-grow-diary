@@ -111,8 +111,14 @@ export default function QuickLogV2Sheet({
       return;
     }
     toast.success("Log saved");
-    queryClient.invalidateQueries({ queryKey: ["grow_events"] });
-    queryClient.invalidateQueries({ queryKey: ["timeline"] });
+    const refreshKeys = buildQuickLogV2RefreshQueryKeys({
+      targetType: resolved.targetType as "plant" | "tent",
+      targetId: resolved.targetId as string,
+      tentId: resolved.tentId ?? null,
+    });
+    for (const queryKey of refreshKeys) {
+      queryClient.invalidateQueries({ queryKey: queryKey as readonly unknown[] });
+    }
     onOpenChange(false);
   };
 

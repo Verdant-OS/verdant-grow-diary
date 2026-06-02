@@ -72,7 +72,13 @@ describe("csv mapping templates — apply", () => {
 
   it("CSV_MAPPING_TEMPLATES exposes the documented set", () => {
     const ids = CSV_MAPPING_TEMPLATES.map((t) => t.id).sort();
-    expect(ids).toEqual(["ac_infinity", "generic_env", "generic_sensor_logger"]);
+    expect(ids).toEqual([
+      "ac_infinity",
+      "aroya_representative",
+      "blank_reset",
+      "generic_env",
+      "generic_sensor_logger",
+    ]);
   });
 });
 

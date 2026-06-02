@@ -18,6 +18,7 @@ import { evaluateAiContextSufficiency } from "@/lib/aiContextSufficiencyRules";
 import { adaptDiaryForAiContext } from "@/lib/coachContextAdapter";
 import CoachContextSufficiencyPanel from "@/components/CoachContextSufficiencyPanel";
 import CoachAiDoctorHistoryPanel from "@/components/CoachAiDoctorHistoryPanel";
+import CoachAiDoctorContextPanel from "@/components/CoachAiDoctorContextPanel";
 import StructuredDiagnosisCard from "@/components/StructuredDiagnosisCard";
 import {
   validateAndSanitizeDiagnosis,
@@ -326,6 +327,23 @@ export default function Coach() {
       </div>
 
       <CoachContextSufficiencyPanel result={contextSufficiency} className="mb-4" />
+
+      <CoachAiDoctorContextPanel
+        plant={
+          ctxPlants[0]
+            ? {
+                id: ctxPlants[0].id,
+                strain: ctxPlants[0].strain ?? null,
+                stage: ctxPlants[0].stage ?? null,
+                medium:
+                  (ctxPlants[0] as { medium?: string | null }).medium ?? null,
+                photo: (ctxPlants[0] as { photo?: string | null }).photo ?? null,
+              }
+            : null
+        }
+        diaryEntries={ctxDiary as unknown as readonly { entry_type?: string | null; entry_at?: string | null; created_at?: string | null; details?: unknown }[]}
+        className="mb-4"
+      />
 
       <CoachAiDoctorHistoryPanel growId={activeGrowId ?? null} />
 

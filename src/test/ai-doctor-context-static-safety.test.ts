@@ -21,6 +21,14 @@ const TARGETS = [
     name: "PlantDetailAiDoctorContextPanel",
     path: "src/components/PlantDetailAiDoctorContextPanel.tsx",
   },
+  {
+    name: "CoachAiDoctorContextPanel",
+    path: "src/components/CoachAiDoctorContextPanel.tsx",
+  },
+  {
+    name: "aiDoctorContextReadiness",
+    path: "src/constants/aiDoctorContextReadiness.ts",
+  },
 ];
 
 describe("ai doctor context panel — static safety", () => {
@@ -60,10 +68,16 @@ describe("ai doctor context panel — static safety", () => {
     });
   }
 
-  it("UI does not duplicate readiness rules", () => {
-    const ui = read("src/components/PlantDetailAiDoctorContextPanel.tsx");
-    // No private constants for the windows; relies on the lib.
-    expect(ui).not.toMatch(/AI_DOCTOR_RECENT_WINDOW_MS\s*=/);
-    expect(ui).not.toMatch(/AI_DOCTOR_SNAPSHOT_FRESH_MS\s*=/);
+  it("UI does not duplicate readiness rules or tooltip table", () => {
+    const panels = [
+      read("src/components/PlantDetailAiDoctorContextPanel.tsx"),
+      read("src/components/CoachAiDoctorContextPanel.tsx"),
+    ];
+    for (const ui of panels) {
+      expect(ui).not.toMatch(/AI_DOCTOR_RECENT_WINDOW_MS\s*=/);
+      expect(ui).not.toMatch(/AI_DOCTOR_SNAPSHOT_FRESH_MS\s*=/);
+      expect(ui).not.toMatch(/AI_DOCTOR_CONTEXT_TOOLTIPS\s*=/);
+      expect(ui).not.toMatch(/AI_DOCTOR_CONTEXT_READINESS_CONFIG\s*=/);
+    }
   });
 });

@@ -1,31 +1,44 @@
 /**
- * PlantDetailAiDoctorContextPanel — read-only AI Doctor Context readiness
- * panel. Presenter only. No live AI calls, no session creation, no writes.
+ * CoachAiDoctorContextPanel — read-only AI Doctor context readiness panel
+ * for the AI Doctor screen (Coach). Presenter only. No AI calls, no
+ * session creation, no Supabase writes, no alerts, no action queue.
+ *
+ * Reuses the deterministic `evaluateAiDoctorContext` rules and the
+ * `aiDoctorContextViewModel` tooltip helpers so vocabulary is not
+ * duplicated inside JSX.
  */
 import { useMemo } from "react";
 import { CheckCircle2, AlertTriangle, Info } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
 import {
-  useTimelineMemory,
-  TIMELINE_MEMORY_DEFAULT_LIMIT,
-} from "@/hooks/useTimelineMemory";
+  evaluateAiDoctorContext,
+  AI_DOCTOR_INSUFFICIENT_NOTICE,
+  type AiDoctorContextEventInput,
+  type AiDoctorContextManualSnapshotInput,
+  type AiDoctorContextReadiness,
+} from "@/lib/aiDoctorContextRules";
 import {
-  evaluateAiDoctorContextFromSources,
   AI_DOCTOR_READINESS_LABELS,
   labelEvidence,
   labelMissing,
   tooltipForEvidence,
   tooltipForMissing,
+  plantToAiDoctorContextPlant,
   type AiDoctorContextPlantSource,
 } from "@/lib/aiDoctorContextViewModel";
-import {
-  AI_DOCTOR_INSUFFICIENT_NOTICE,
-  type AiDoctorContextReadiness,
-} from "@/lib/aiDoctorContextRules";
 
-export interface PlantDetailAiDoctorContextPanelProps {
-  plantId: string;
+export interface CoachDiaryEntryLike {
+  entry_type?: string | null;
+  entry_at?: string | number | Date | null;
+  created_at?: string | number | Date | null;
+  details?: unknown;
+}
+
+export interface CoachAiDoctorContextPanelProps {
   plant: AiDoctorContextPlantSource | null;
+  diaryEntries?: readonly CoachDiaryEntryLike[];
+  /** Optional pre-computed manual snapshot list; defaults to deriving from diary. */
+  manualSnapshots?: readonly AiDoctorContextManualSnapshotInput[];
+  className?: string;
 }
 
 const READINESS_STYLES: Record<
@@ -46,54 +59,74 @@ const READINESS_STYLES: Record<
   },
 };
 
-export default function PlantDetailAiDoctorContextPanel({
-  plantId,
-  plant,
-}: PlantDetailAiDoctorContextPanelProps) {
-  const { items, isLoading } = useTimelineMemory(
-    { kind: "plant", plantId },
-    TIMELINE_MEMORY_DEFAULT_LIMIT,
-  );
+function classifyEntry(
+  entryType: string | null | undefined,
+): AiDoctorContextEventInput["category"] {
+  const t = (entryType ?? "").toLowerCase();
+  if (t === "watering") return "watering";
+  if (t === "feeding") return "feeding";
+  if (t === "photo") return "photos";
+  if (t === "note") return "notes";
+  if (t === "manual_sensor_snapshot" || t === "sensor_snapshot")
+    return "manual_sensor_snapshot";
+  return "other";
+}
 
-  const result = useMemo(
-    () =>
-      evaluateAiDoctorContextFromSources({
-        plant,
-        timelineItems: items,
-      }),
-    [plant, items],
-  );
+function isManualSnapshotEntry(e: CoachDiaryEntryLike): boolean {
+  const d = e.details as { source?: unknown } | null | undefined;
+  return !!d && typeof d === "object" && (d as { source?: unknown }).source === "manual";
+}
+
+export default function CoachAiDoctorContextPanel({
+  plant,
+  diaryEntries,
+  manualSnapshots,
+  className,
+}: CoachAiDoctorContextPanelProps) {
+  const result = useMemo(() => {
+    const events: AiDoctorContextEventInput[] = [];
+    const derivedSnaps: AiDoctorContextManualSnapshotInput[] = [];
+    const entries = Array.isArray(diaryEntries) ? diaryEntries : [];
+    for (const e of entries) {
+      const at = e.entry_at ?? e.created_at ?? null;
+      events.push({ at, category: classifyEntry(e.entry_type) });
+      if (isManualSnapshotEntry(e)) {
+        derivedSnaps.push({ at, severity: "ok" });
+      }
+    }
+    return evaluateAiDoctorContext({
+      plant: plantToAiDoctorContextPlant(plant),
+      recentEvents: events,
+      recentManualSnapshots: manualSnapshots ?? derivedSnaps,
+    });
+  }, [plant, diaryEntries, manualSnapshots]);
 
   const style = READINESS_STYLES[result.readiness];
-  const latestSnap = result.latest.manualSnapshotAt
-    ? formatDistanceToNow(new Date(result.latest.manualSnapshotAt), {
-        addSuffix: true,
-      })
-    : null;
 
   return (
     <section
-      aria-labelledby="plant-ai-doctor-context-heading"
-      data-testid="plant-ai-doctor-context-panel"
+      aria-labelledby="coach-ai-doctor-context-heading"
+      data-testid="coach-ai-doctor-context-panel"
       data-readiness={result.readiness}
-      className="glass rounded-2xl p-4 my-3 space-y-3"
+      className={`glass rounded-2xl p-4 space-y-3 ${className ?? ""}`}
     >
       <header className="flex items-start justify-between gap-2 flex-wrap">
         <div>
           <h2
-            id="plant-ai-doctor-context-heading"
+            id="coach-ai-doctor-context-heading"
             className="text-base font-semibold tracking-tight"
           >
             AI Doctor Context
           </h2>
           <p className="text-xs text-muted-foreground">
-            A read-only summary of the context Verdant has available. This panel
-            does not run AI or claim a diagnosis.
+            A read-only summary of the context Verdant has available before
+            you ask for guidance. This panel does not run AI or claim a
+            diagnosis.
           </p>
         </div>
         <span
           className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs ${style.badge}`}
-          data-testid="plant-ai-doctor-context-readiness"
+          data-testid="coach-ai-doctor-context-readiness"
         >
           {style.icon}
           {AI_DOCTOR_READINESS_LABELS[result.readiness]}
@@ -103,36 +136,14 @@ export default function PlantDetailAiDoctorContextPanel({
       {result.readiness !== "strong" ? (
         <p
           className="text-xs text-muted-foreground"
-          data-testid="plant-ai-doctor-context-notice"
+          data-testid="coach-ai-doctor-context-notice"
         >
-          {AI_DOCTOR_INSUFFICIENT_NOTICE}
-        </p>
-      ) : null}
-
-      <div className="grid grid-cols-2 gap-2 text-xs">
-        <Stat label="Recent events (7d)" value={result.counts.recentEvents} />
-        <Stat
-          label="Recent watering/feeding"
-          value={result.counts.recentWateringOrFeeding}
-        />
-        <Stat
-          label="Manual snapshots (7d)"
-          value={result.counts.recentManualSnapshots}
-        />
-        <Stat label="Warnings (7d)" value={result.counts.recentWarnings} />
-      </div>
-
-      {latestSnap ? (
-        <p
-          className="text-xs text-muted-foreground"
-          data-testid="plant-ai-doctor-context-latest-snapshot"
-        >
-          Latest manual sensor snapshot: {latestSnap}
+          More context would improve confidence. {AI_DOCTOR_INSUFFICIENT_NOTICE}
         </p>
       ) : null}
 
       <div className="grid sm:grid-cols-2 gap-3">
-        <div data-testid="plant-ai-doctor-context-evidence">
+        <div data-testid="coach-ai-doctor-context-evidence">
           <div className="text-xs font-medium mb-1">Evidence available</div>
           {result.evidence.length === 0 ? (
             <p className="text-xs text-muted-foreground">
@@ -158,7 +169,7 @@ export default function PlantDetailAiDoctorContextPanel({
             </ul>
           )}
         </div>
-        <div data-testid="plant-ai-doctor-context-missing">
+        <div data-testid="coach-ai-doctor-context-missing">
           <div className="text-xs font-medium mb-1">Missing information</div>
           {result.missing.length === 0 ? (
             <p className="text-xs text-muted-foreground">
@@ -188,28 +199,11 @@ export default function PlantDetailAiDoctorContextPanel({
 
       <p
         className="text-xs"
-        data-testid="plant-ai-doctor-context-safe-next-step"
+        data-testid="coach-ai-doctor-context-safe-next-step"
       >
         <span className="font-medium">Safe next step: </span>
         <span className="text-muted-foreground">{result.safeNextStep}</span>
       </p>
-
-      {isLoading ? (
-        <p className="text-[11px] text-muted-foreground" aria-live="polite">
-          Loading recent context…
-        </p>
-      ) : null}
     </section>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-md border border-border/40 bg-background/30 px-2 py-1.5">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-        {label}
-      </div>
-      <div className="text-sm font-medium tabular-nums">{value}</div>
-    </div>
   );
 }

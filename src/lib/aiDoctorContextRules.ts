@@ -54,6 +54,8 @@ export interface AiDoctorContextInput {
   recentManualSnapshots?: readonly AiDoctorContextManualSnapshotInput[];
   /** Optional now injection for deterministic tests. */
   now?: number;
+  /** Optional readiness threshold override (testing / future tuning). */
+  config?: Partial<AiDoctorContextReadinessConfig>;
 }
 
 export interface AiDoctorContextCounts {
@@ -80,8 +82,16 @@ export interface AiDoctorContextResult {
   diagnosisClaimed: false;
 }
 
-export const AI_DOCTOR_RECENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // 7d
-export const AI_DOCTOR_SNAPSHOT_FRESH_MS = 48 * 60 * 60 * 1000; // 48h
+import {
+  AI_DOCTOR_CONTEXT_READINESS_CONFIG,
+  type AiDoctorContextReadinessConfig,
+} from "@/constants/aiDoctorContextReadiness";
+
+/** Re-exported for back-compat. Source of truth lives in constants/. */
+export const AI_DOCTOR_RECENT_WINDOW_MS =
+  AI_DOCTOR_CONTEXT_READINESS_CONFIG.recentEventWindowMs;
+export const AI_DOCTOR_SNAPSHOT_FRESH_MS =
+  AI_DOCTOR_CONTEXT_READINESS_CONFIG.snapshotFreshMs;
 
 const SAFE_NEXT_STEPS: Record<AiDoctorContextReadiness, string> = {
   insufficient: "Add a recent note, photo, and manual sensor snapshot.",
@@ -115,6 +125,16 @@ export function evaluateAiDoctorContext(
     typeof safe.now === "number" && Number.isFinite(safe.now)
       ? safe.now
       : Date.now();
+  const recentWindowMs =
+    typeof safe.config?.recentEventWindowMs === "number" &&
+    Number.isFinite(safe.config.recentEventWindowMs)
+      ? safe.config.recentEventWindowMs
+      : AI_DOCTOR_RECENT_WINDOW_MS;
+  const snapshotFreshMs =
+    typeof safe.config?.snapshotFreshMs === "number" &&
+    Number.isFinite(safe.config.snapshotFreshMs)
+      ? safe.config.snapshotFreshMs
+      : AI_DOCTOR_SNAPSHOT_FRESH_MS;
 
   const events = Array.isArray(safe.recentEvents) ? safe.recentEvents : [];
   const snaps = Array.isArray(safe.recentManualSnapshots)
@@ -124,7 +144,7 @@ export function evaluateAiDoctorContext(
   // --- Recent events within the 7d window -------------------------------
   const recent = events.filter((e) => {
     const t = toEpoch(e?.at);
-    return t != null && now - t <= AI_DOCTOR_RECENT_WINDOW_MS;
+    return t != null && now - t <= recentWindowMs;
   });
   const recentWaterFeed = recent.filter(
     (e) => e.category === "watering" || e.category === "feeding",
@@ -139,7 +159,7 @@ export function evaluateAiDoctorContext(
   for (const s of snaps) {
     const t = toEpoch(s?.at);
     if (t == null) continue;
-    if (now - t <= AI_DOCTOR_RECENT_WINDOW_MS) {
+    if (now - t <= recentWindowMs) {
       recentSnaps += 1;
       if (s.severity === "warning" || s.severity === "invalid") {
         snapWarnings += 1;
@@ -192,7 +212,7 @@ export function evaluateAiDoctorContext(
   // --- Sensor snapshots -------------------------------------------------
   if (recentSnaps > 0) {
     evidence.push("recent-manual-sensor-snapshot");
-    if (latestSnapAt != null && now - latestSnapAt <= AI_DOCTOR_SNAPSHOT_FRESH_MS) {
+    if (latestSnapAt != null && now - latestSnapAt <= snapshotFreshMs) {
       evidence.push("fresh-manual-sensor-snapshot");
     }
   } else {
@@ -207,7 +227,7 @@ export function evaluateAiDoctorContext(
   const hasRecentActivity = recent.length >= 2;
   const hasRecentSnap = recentSnaps > 0;
   const freshSnap =
-    latestSnapAt != null && now - latestSnapAt <= AI_DOCTOR_SNAPSHOT_FRESH_MS;
+    latestSnapAt != null && now - latestSnapAt <= snapshotFreshMs;
   const hasPhotoOrWaterFeed =
     (plant?.hasPlantPhoto ?? false) || recentWaterFeed > 0;
 

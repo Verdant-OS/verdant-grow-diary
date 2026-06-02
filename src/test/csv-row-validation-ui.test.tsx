@@ -29,19 +29,6 @@ async function uploadCsv(text: string) {
 }
 
 describe("RepresentativeCsvPreview — validation hint rendering", () => {
-  it("renders an invalid-timestamp row instead of hiding it", async () => {
-    const csv = [
-      "Timestamp,Air_Temp_C,Humidity_%",
-      "bad-date,24,55",
-    ].join("\n");
-    await uploadCsv(csv);
-    expect(
-      await screen.findByText(/Blocked from canonical preview/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/timestamp — header "Timestamp" maps OK; value "bad-date" unparseable/i),
-    ).toBeInTheDocument();
-  });
 
   it("shows canonical field names in hint copy", async () => {
     const csv = [

@@ -22,7 +22,7 @@ describe("buildSensorBridgeHealthViewModel", () => {
     expect(vm.controlDisclosure).toBe(SENSOR_BRIDGE_CONTROL_DISCLOSURE);
     expect(vm.latestAcceptedAtIso).toBeNull();
     expect(vm.latestRejectedAtIso).toBeNull();
-    expect(vm.latestReasonCode).toBe("fresh_accept");
+    expect(vm.latestReasonCode).toBeNull();
   });
 
   it("returns accepted state for a recent fully-inserted row", () => {

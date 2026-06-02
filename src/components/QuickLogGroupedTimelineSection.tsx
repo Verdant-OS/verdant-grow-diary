@@ -465,7 +465,7 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
           <p
             className="text-xs text-muted-foreground"
             data-testid="quick-log-grouped-timeline-updating"
-            aria-live="polite"
+            role="status"
           >
             {QUICK_LOG_GROUPED_TIMELINE_UPDATING_LABEL}
           </p>

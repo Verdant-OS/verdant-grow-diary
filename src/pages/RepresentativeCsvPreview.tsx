@@ -24,8 +24,7 @@ import {
   type CsvMappingConfigWarning,
 } from "@/lib/csvMappingConfig";
 import {
-  applyCsvMappingPreset,
-  buildCsvMappingPreset,
+  applySavedCsvMappingPreset,
   clearCsvMappingPreset,
   loadCsvMappingPreset,
   saveCsvMappingPreset,

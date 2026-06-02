@@ -28,7 +28,7 @@ import {
   type QuickLogV2Action,
 } from "@/lib/quickLogV2Rules";
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
-import { buildQuickLogV2RefreshQueryKeys } from "@/lib/quickLogV2RefreshRules";
+import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 
 interface Props {
   open: boolean;
@@ -111,14 +111,11 @@ export default function QuickLogV2Sheet({
       return;
     }
     toast.success("Log saved");
-    const refreshKeys = buildQuickLogV2RefreshQueryKeys({
+    applyQuickLogV2Refresh(queryClient, {
       targetType: resolved.targetType as "plant" | "tent",
       targetId: resolved.targetId as string,
       tentId: resolved.tentId ?? null,
     });
-    for (const queryKey of refreshKeys) {
-      queryClient.invalidateQueries({ queryKey: queryKey as readonly unknown[] });
-    }
     onOpenChange(false);
   };
 

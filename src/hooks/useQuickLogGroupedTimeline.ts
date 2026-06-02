@@ -67,6 +67,7 @@ async function fetchRows(
 export interface UseQuickLogGroupedTimelineResult {
   entries: QuickLogTimelineEntry[];
   isLoading: boolean;
+  isFetching: boolean;
   isError: boolean;
   error: unknown;
 }
@@ -107,7 +108,9 @@ export function useQuickLogGroupedTimeline(
   return {
     entries: query.data ?? [],
     isLoading: query.isLoading,
+    isFetching: query.isFetching,
     isError: query.isError,
     error: query.error,
   };
 }
+

@@ -13,15 +13,29 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 
-// --- Configurable supabase mock ---
+// --- Configurable supabase mock (fluent chainable) ---
 let mockRangeImpl: () => Promise<{ data: unknown[] | null; error: unknown }> = () =>
   Promise.resolve({ data: [], error: null });
-const rangeSpy = vi.fn(() => mockRangeImpl());
-const orderSpy = vi.fn(() => ({ range: rangeSpy }));
-const selectSpy = vi.fn(() => ({ order: orderSpy }));
+
+function makeBuilder() {
+  const builder: Record<string, unknown> = {};
+  const chain = () => builder;
+  builder.select = chain;
+  builder.eq = chain;
+  builder.neq = chain;
+  builder.not = chain;
+  builder.or = chain;
+  builder.gte = chain;
+  builder.lte = chain;
+  builder.in = chain;
+  builder.limit = chain;
+  builder.order = chain;
+  builder.range = vi.fn(() => mockRangeImpl());
+  return builder;
+}
 
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { from: () => ({ select: selectSpy }) },
+  supabase: { from: () => makeBuilder() },
 }));
 
 import AiDoctorSessionsIndex from "@/pages/AiDoctorSessionsIndex";

@@ -24,12 +24,23 @@ vi.mock("@/hooks/useLatestSensorSnapshot", () => ({
   useLatestSensorSnapshot: (...args: unknown[]) => mockUseLatestSensorSnapshot(...args),
 }));
 
-function mockState(partial: Partial<SnapshotState>): SnapshotState {
-  return {
+function mockState(partial: Partial<SnapshotState> & { status: SnapshotState["status"] }): SnapshotState {
+  const base: Record<string, unknown> = {
     snapshot: null,
-    status: "success",
     ...partial,
-  } as SnapshotState;
+  };
+  switch (partial.status) {
+    case "idle":
+      return { status: "idle", snapshot: base.snapshot as SensorSnapshot };
+    case "loading":
+      return { status: "loading", snapshot: base.snapshot as SensorSnapshot };
+    case "ok":
+      return { status: "ok", snapshot: base.snapshot as SensorSnapshot };
+    case "unavailable":
+      return { status: "unavailable", snapshot: base.snapshot as SensorSnapshot };
+    default:
+      throw new Error(`unexpected status: ${partial.status}`);
+  }
 }
 
 function fullSnapshot(partial: Partial<SensorSnapshot> = {}): SensorSnapshot {

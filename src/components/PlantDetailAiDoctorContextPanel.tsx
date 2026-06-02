@@ -14,6 +14,8 @@ import {
   AI_DOCTOR_READINESS_LABELS,
   labelEvidence,
   labelMissing,
+  tooltipForEvidence,
+  tooltipForMissing,
   type AiDoctorContextPlantSource,
 } from "@/lib/aiDoctorContextViewModel";
 import {

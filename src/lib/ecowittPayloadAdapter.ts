@@ -7,11 +7,12 @@
  *
  * Boundaries (stop-ship if violated):
  *  - Pure function: no fetch, no Supabase, no localStorage, no timers, no
- *    Date.now unless an explicit `serverReceivedAt` is injected by caller.
+ *    wall-clock reads unless an explicit `serverReceivedAt` is injected.
  *  - Never performs auth checks, never trusts caller-supplied user_id, never
  *    trusts a submitted source label as "live", never marks readings as live.
- *  - Never persists, never alerts, never queues actions, never calls AI
- *    Doctor, never controls devices, never produces device-control output.
+ *  - Never persists, never raises notifications, never queues workflow
+ *    items, never calls diagnostic assistants, never controls devices, never
+ *    produces device-control output.
  *  - Never returns vendor passkeys, MAC addresses, or other identifying
  *    secrets in user-visible output. Final validation, source classification,
  *    and suspicion checks remain delegated to `sensorBridgeIntakeRules`.

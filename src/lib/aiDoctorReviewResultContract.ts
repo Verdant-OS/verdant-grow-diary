@@ -101,10 +101,11 @@ function containsBanned(text: string): boolean {
 }
 
 // Detect device-control language scoped to imperative position. Splits on
-// sentence/clause boundaries so that advisory phrasing ("Do not toggle
-// fans…") does not trip the imperative detector.
+// sentence/clause boundaries — including commas and dashes — so a single
+// run-on sentence cannot smuggle an imperative past a leading "Do not".
+// Example to reject: "Do not wait, turn on the humidifier."
 function containsDeviceControl(text: string): boolean {
-  const clauses = text.split(/[.!?;\n]+/);
+  const clauses = text.split(/[.!?;\n,]+|[\u2014\u2013]|\s-\s/);
   for (const raw of clauses) {
     const clause = raw.trim();
     if (!clause) continue;

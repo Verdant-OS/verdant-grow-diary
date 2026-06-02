@@ -80,7 +80,7 @@ describe("PlantDetailAiDoctorReadinessGate — render", () => {
       "ai-doctor-readiness-gate-primary-add-context",
     );
     expect(primary.textContent).toBe("Add missing context");
-    expect(primary.getAttribute("data-action-kind")).toBe("focus_anchow".replace("w", "r"));
+    expect(primary.getAttribute("data-action-kind")).toBe("focus_anchor");
     expect(primary.getAttribute("data-anchor-id")).toBe(
       "plant-ai-doctor-context-panel",
     );

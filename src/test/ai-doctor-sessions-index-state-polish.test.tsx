@@ -133,13 +133,3 @@ describe("AiDoctorSessionsIndex — accessibility & safety (static)", () => {
   });
 });
 
-// --- helpers ---
-function MemoryRouterRouteWrapper({
-  initialEntries,
-  children,
-}: {
-  initialEntries: string[];
-  children: ReactElement;
-}) {
-  return <MemoryRouter initialEntries={initialEntries}>{children}</MemoryRouter>;
-}

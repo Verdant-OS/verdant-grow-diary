@@ -161,7 +161,7 @@ describe("BillingPlaceholder rendering", () => {
   });
 
   it("does not grant Pro entitlement from clicking the sandbox button", () => {
-    Object.assign((import.meta as any).env, SANDBOX_ENV);
+    _paddleTestEnv = { ...SANDBOX_ENV };
     renderBilling("pro-monthly");
     const btn = screen.getByTestId("paddle-sandbox-checkout-button");
     btn.click();

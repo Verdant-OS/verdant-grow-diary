@@ -212,6 +212,12 @@ describe("BillingPlaceholder source safety", () => {
           expect(src).not.toMatch(positive);
           continue;
         }
+        if (p.source.includes("sell cannabis")) {
+          // Special-case: allow "does not sell cannabis" / "never sell cannabis".
+          const positive = /(?<!does not )(?<!never )sell cannabis/i;
+          expect(src).not.toMatch(positive);
+          continue;
+        }
         expect(src).not.toMatch(p);
       }
     }

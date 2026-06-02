@@ -33,12 +33,19 @@ describe("ai doctor review result — static safety", () => {
       expect(src).not.toMatch(/\.rpc\(/);
     });
 
-    it(`${path}: no functions.invoke / service_role / fetch / model APIs`, () => {
+    it(`${path}: no functions.invoke / fetch / model APIs`, () => {
       expect(src).not.toMatch(/functions\.invoke/);
-      expect(src).not.toMatch(/service_role/);
       expect(src).not.toMatch(/\bfetch\(/);
       expect(src).not.toMatch(/openai|anthropic|gemini|gpt-/i);
     });
+
+    // The contract intentionally lists "service_role" as a sensitive key
+    // to strip; only the view-model and presenter must avoid the literal.
+    if (!path.endsWith("aiDoctorReviewResultContract.ts")) {
+      it(`${path}: no service_role literal`, () => {
+        expect(src).not.toMatch(/service_role/);
+      });
+    }
 
     it(`${path}: no ai_doctor_sessions / action_queue / alerts / sensor_readings writes`, () => {
       expect(src).not.toMatch(/from\(["']ai_doctor_sessions["']\)/);

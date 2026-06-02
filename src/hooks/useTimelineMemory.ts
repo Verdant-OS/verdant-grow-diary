@@ -76,12 +76,9 @@ async function fetchRows(
 ): Promise<RawRow[]> {
   let q = supabase
     .from("diary_entries")
-    .select("id, plant_id, tent_id, entry_at, note, photo_url, details")
-    .order("entry_at", { ascending: false })
-    .limit(limit);
-  if (scope.kind === "plant") q = q.eq("plant_id", scope.plantId);
-  else q = q.eq("tent_id", scope.tentId);
-  const { data, error } = await q;
+    .select("id, plant_id, tent_id, entry_at, note, photo_url, details");
+  q = scope.kind === "plant" ? q.eq("plant_id", scope.plantId) : q.eq("tent_id", scope.tentId);
+  const { data, error } = await q.order("entry_at", { ascending: false }).limit(limit);
   if (error) throw error;
   return (data ?? []) as RawRow[];
 }

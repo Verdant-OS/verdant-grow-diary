@@ -106,6 +106,10 @@ export function quickLogV2EnvironmentRowToManualSnapshotRecord(
 ): ManualSnapshotRecord | null {
   if (!isEligible(row)) return null;
   const input = toValidatorInput(row.environment);
+  // No usable telemetry → skip, do not invent a card.
+  if (input.airTemp == null && input.humidityPct == null && input.vpdKpa == null) {
+    return null;
+  }
   const validation = validateManualSnapshot(input);
   if (validation.metrics.length === 0 && validation.errors.length === 0) {
     return null;

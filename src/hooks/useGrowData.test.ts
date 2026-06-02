@@ -91,7 +91,18 @@ describe("useGrowSensorReadings", () => {
 
   it("returns live data when repo returns non-empty", async () => {
     const live = [
-      { ts: "2026-01-01T00:00:00Z", tentId: "t1", temp: 22, rh: 50, vpd: 1, co2: 800, soil: 40 },
+      {
+        ts: "2026-01-01T00:00:00Z",
+        tentId: "t1",
+        temp: 22,
+        rh: 50,
+        vpd: 1,
+        co2: 800,
+        soil: 40,
+        source: "live" as const,
+        status: "usable" as const,
+        capturedAt: "2026-01-01T00:00:00Z",
+      },
     ];
     vi.mocked(repo.fetchSensorReadings).mockResolvedValue(live);
     const { result } = renderHook(() => useGrowSensorReadings("t1"), { wrapper: wrapper() });

@@ -212,7 +212,10 @@ describe("groupSensorReadingRows", () => {
       row("t1", ts, "soil_moisture_pct", 40),
     ]);
     expect(out).toHaveLength(1);
-    expect(out[0]).toEqual({ ts, tentId: "t1", temp: 24, rh: 55, vpd: 1.2, co2: 800, soil: 40 });
+    expect(out[0]).toMatchObject({ ts, tentId: "t1", temp: 24, rh: 55, vpd: 1.2, co2: 800, soil: 40 });
+    expect(out[0].source).toBe("manual");
+    expect(out[0].capturedAt).toBeDefined();
+    expect(out[0].status).toBeDefined();
   });
 
   it("produces two readings for two timestamps, newest first", () => {

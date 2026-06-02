@@ -93,6 +93,7 @@ import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingC
 import DashboardDailyGrowCheckPanel from "@/components/DashboardDailyGrowCheckPanel";
 
 import { Badge } from "@/components/ui/badge";
+import SensorSourceBadge from "@/components/SensorSourceBadge";
 import { actionDetailPath, actionsPath, alertDetailPath, alertsPath, dashboardPath, logsPath, tentDetailPath, tentsPath } from "@/lib/routes";
 import { formatDistanceToNow } from "date-fns";
 
@@ -307,10 +308,25 @@ export default function Dashboard() {
       ) : (
         <div className="grid lg:grid-cols-3 gap-4 mb-6">
           <div className="lg:col-span-2 glass rounded-2xl p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h2 className="font-display font-semibold">Tent A · 7-day environment</h2>
-                <p className="text-xs text-muted-foreground">Temperature, humidity, VPD</p>
+            <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div>
+                  <h2 className="font-display font-semibold">Tent A · 7-day environment</h2>
+                  <p className="text-xs text-muted-foreground">Temperature, humidity, VPD</p>
+                </div>
+                {(() => {
+                  const latest = (readings as unknown as SensorReading[])
+                    .filter((r) => r.tentId === (tents[0]?.id ?? ""))
+                    .slice(-1)[0];
+                  if (!latest) return null;
+                  return (
+                    <SensorSourceBadge
+                      source={latest.source}
+                      status={latest.status}
+                      testId="dashboard-tent-chart-source-badge"
+                    />
+                  );
+                })()}
               </div>
               <Button asChild size="sm" variant="ghost"><Link to="/sensors">Sensor data <ArrowRight className="h-3 w-3" /></Link></Button>
             </div>
@@ -319,7 +335,20 @@ export default function Dashboard() {
 
           <div className="glass rounded-2xl p-4">
             <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-              <h2 className="font-display font-semibold">Environment strip</h2>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="font-display font-semibold">Environment strip</h2>
+                {(() => {
+                  const latest = (readings as unknown as SensorReading[]).slice(-1)[0];
+                  if (!latest) return null;
+                  return (
+                    <SensorSourceBadge
+                      source={latest.source}
+                      status={latest.status}
+                      testId="dashboard-env-strip-source-badge"
+                    />
+                  );
+                })()}
+              </div>
               {(() => {
                 const rollup = computeStabilityRollup(
                   latestPerTent.map((x) => x.stability),
@@ -334,6 +363,7 @@ export default function Dashboard() {
                 );
               })()}
             </div>
+
             <div className="space-y-2.5">
               {latestPerTent.map(({ tent, last, stability }) => {
                 const stabilityView = formatStabilityChipView(stability);

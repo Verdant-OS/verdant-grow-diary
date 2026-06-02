@@ -29,6 +29,36 @@ export interface Plant {
   isArchived?: boolean;
 }
 
+/**
+ * Provenance of a sensor reading as displayed to the grower. Distinct
+ * from {@link SensorReadingHealthStatus} (which is the contract status).
+ *
+ * - "live"    real-time bridge / device telemetry
+ * - "manual"  grower-entered snapshot
+ * - "csv"     bulk imported from a CSV
+ * - "demo"    synthetic mock data — MUST be visibly labeled
+ * - "stale"   provenance known but outside freshness window
+ * - "invalid" provenance known but the payload failed validation
+ */
+export type SensorReadingSource =
+  | "live"
+  | "manual"
+  | "csv"
+  | "demo"
+  | "stale"
+  | "invalid";
+
+/**
+ * Re-exported canonical SnapshotStatus so consumers don't reach into the
+ * contract module for the type — keeps duplication out of JSX.
+ */
+export type SensorReadingHealthStatus =
+  | "usable"
+  | "stale"
+  | "invalid"
+  | "needs_review"
+  | "no_data";
+
 export interface SensorReading {
   ts: string;
   tentId: string;
@@ -37,6 +67,18 @@ export interface SensorReading {
   vpd: number;
   co2: number;
   soil: number;
+  /** Provenance label. Demo data must always carry "demo". */
+  source: SensorReadingSource;
+  /**
+   * Canonical Sensor Snapshot Status Contract v1 status for this reading.
+   * Never default to "usable" for unknown/synthetic data — use
+   * "needs_review" or "no_data" instead.
+   */
+  status: SensorReadingHealthStatus;
+  /** ISO timestamp the reading was actually captured at the source. */
+  capturedAt: string;
+  /** Optional confidence in the value (0..1). */
+  confidence?: number;
 }
 
 export interface Camera {
@@ -114,7 +156,21 @@ function genReadings(): SensorReading[] {
       const vpd = +Math.max(0.4, ((1 - rh / 100) * (0.6108 * Math.exp((17.27 * temp) / (temp + 237.3))))).toFixed(2);
       const co2 = Math.round(700 + Math.sin(phase) * 150 + (Math.random() - 0.5) * 40);
       const soil = +(38 + Math.sin(phase / 3) * 10 + (Math.random() - 0.5) * 4).toFixed(1);
-      out.push({ ts, tentId: t.id, temp, rh, vpd, co2, soil });
+      out.push({
+        ts,
+        tentId: t.id,
+        temp,
+        rh,
+        vpd,
+        co2,
+        soil,
+        // Mock fixtures are NEVER live data. They are tagged demo and
+        // explicitly classified as needs_review so the contract gate in
+        // countsAsHealthyEvidence() cannot ever treat them as healthy.
+        source: "demo",
+        status: "needs_review",
+        capturedAt: ts,
+      });
     }
   }
   return out;

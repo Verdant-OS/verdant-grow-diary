@@ -113,4 +113,17 @@ describe("ai doctor context panel — static safety", () => {
       expect(ui).not.toMatch(/"Add photo"/);
     }
   });
+
+  it("Readiness Gate JSX: no duplicated copy or banned certainty/connection words", () => {
+    const gate = read("src/components/PlantDetailAiDoctorReadinessGate.tsx");
+    // Gate copy lives in the view-model — must not be inlined in JSX.
+    expect(gate).not.toMatch(/More context needed before AI Doctor/);
+    expect(gate).not.toMatch(/AI Doctor can review this/);
+    expect(gate).not.toMatch(/Ready for a cautious AI Doctor review/);
+    // Banned words
+    expect(gate).not.toMatch(/\b(confirmed|certain|cured|guaranteed)\b/i);
+    expect(gate).not.toMatch(/['"](live|synced|connected|imported)['"]/);
+    // No primary-action mapping table inlined in JSX.
+    expect(gate).not.toMatch(/AI_DOCTOR_READINESS_GATE_COPY\s*=/);
+  });
 });

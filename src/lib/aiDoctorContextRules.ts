@@ -144,7 +144,7 @@ export function evaluateAiDoctorContext(
   // --- Recent events within the 7d window -------------------------------
   const recent = events.filter((e) => {
     const t = toEpoch(e?.at);
-    return t != null && now - t <= AI_DOCTOR_RECENT_WINDOW_MS;
+    return t != null && now - t <= recentWindowMs;
   });
   const recentWaterFeed = recent.filter(
     (e) => e.category === "watering" || e.category === "feeding",
@@ -159,7 +159,7 @@ export function evaluateAiDoctorContext(
   for (const s of snaps) {
     const t = toEpoch(s?.at);
     if (t == null) continue;
-    if (now - t <= AI_DOCTOR_RECENT_WINDOW_MS) {
+    if (now - t <= recentWindowMs) {
       recentSnaps += 1;
       if (s.severity === "warning" || s.severity === "invalid") {
         snapWarnings += 1;
@@ -212,7 +212,7 @@ export function evaluateAiDoctorContext(
   // --- Sensor snapshots -------------------------------------------------
   if (recentSnaps > 0) {
     evidence.push("recent-manual-sensor-snapshot");
-    if (latestSnapAt != null && now - latestSnapAt <= AI_DOCTOR_SNAPSHOT_FRESH_MS) {
+    if (latestSnapAt != null && now - latestSnapAt <= snapshotFreshMs) {
       evidence.push("fresh-manual-sensor-snapshot");
     }
   } else {
@@ -227,7 +227,7 @@ export function evaluateAiDoctorContext(
   const hasRecentActivity = recent.length >= 2;
   const hasRecentSnap = recentSnaps > 0;
   const freshSnap =
-    latestSnapAt != null && now - latestSnapAt <= AI_DOCTOR_SNAPSHOT_FRESH_MS;
+    latestSnapAt != null && now - latestSnapAt <= snapshotFreshMs;
   const hasPhotoOrWaterFeed =
     (plant?.hasPlantPhoto ?? false) || recentWaterFeed > 0;
 

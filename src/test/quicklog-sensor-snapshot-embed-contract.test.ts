@@ -19,7 +19,7 @@ const SRC = readFileSync(
 describe("QuickLog sensor_snapshot labeling integration", () => {
   it("imports the pure labeling helper", () => {
     expect(SRC).toMatch(
-      /import\s*{\s*classifyQuickLogSnapshotSource\s*}\s*from\s*["']@\/lib\/quickLogSensorSnapshotRules["']/,
+      /import\s*{\s*classifyQuickLogSnapshotSource\s*,\s*shouldEmbedSnapshot\s*}\s*from\s*["']@\/lib\/quickLogSensorSnapshotRules["']/,
     );
   });
 
@@ -32,7 +32,6 @@ describe("QuickLog sensor_snapshot labeling integration", () => {
   });
 
   it("attaches source and state fields to the embedded snapshot", () => {
-    // Inspect the object literal assigned to cleanDetails.sensor_snapshot.
     const embedStart = SRC.indexOf("cleanDetails.sensor_snapshot");
     expect(embedStart).toBeGreaterThan(-1);
     const slice = SRC.slice(embedStart, embedStart + 800);
@@ -48,13 +47,15 @@ describe("QuickLog sensor_snapshot labeling integration", () => {
     }
   });
 
-  it("does not add reject/drop logic in this slice", () => {
-    // The slice is additive labeling only — embed must still happen for
-    // every snapshot path. No early-return that skips assignment based
-    // on the new state.
-    const embedStart = SRC.indexOf("cleanDetails.sensor_snapshot");
-    const sliceBefore = SRC.slice(Math.max(0, embedStart - 600), embedStart);
-    expect(sliceBefore).not.toMatch(/state\s*===\s*["']invalid["']\s*\)\s*{[^}]*return/);
-    expect(sliceBefore).not.toMatch(/state\s*===\s*["']stale["']\s*\)\s*{[^}]*return/);
+  it("uses shouldEmbedSnapshot to gate the embed", () => {
+    expect(SRC).toContain("shouldEmbedSnapshot(snapshotState)");
+  });
+
+  it("shows a toast when stale snapshot is dropped", () => {
+    expect(SRC).toContain("Sensor reading too old to attach");
+  });
+
+  it("shows a toast when invalid snapshot is dropped", () => {
+    expect(SRC).toContain("Sensor reading unreadable");
   });
 });

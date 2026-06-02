@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   classifyQuickLogSnapshotSource,
+  shouldEmbedSnapshot,
   type QuickLogSensorRowLike,
 } from "@/lib/quickLogSensorSnapshotRules";
 import { snapshotFromDiary } from "@/lib/sensorSnapshot";
@@ -123,11 +124,57 @@ describe("classifyQuickLogSnapshotSource", () => {
   });
 
   it("missing value (undefined) is tolerated when ts + source are valid", () => {
-    // QuickLog passes a representative row whose `value` may not be the
-    // metric being embedded. Absent `value` must not force invalid.
     expect(
       classifyQuickLogSnapshotSource({ source: "live", ts: FRESH_TS }, NOW),
     ).toEqual({ source: "live", state: "live" });
+  });
+});
+
+describe("shouldEmbedSnapshot", () => {
+  it("returns true for live", () => {
+    expect(shouldEmbedSnapshot("live")).toBe(true);
+  });
+
+  it("returns true for manual", () => {
+    expect(shouldEmbedSnapshot("manual")).toBe(true);
+  });
+
+  it("returns true for Manual (case-insensitive)", () => {
+    expect(shouldEmbedSnapshot("Manual")).toBe(true);
+  });
+
+  it("returns true for LIVE (case-insensitive)", () => {
+    expect(shouldEmbedSnapshot("LIVE")).toBe(true);
+  });
+
+  it("returns false for stale", () => {
+    expect(shouldEmbedSnapshot("stale")).toBe(false);
+  });
+
+  it("returns false for invalid", () => {
+    expect(shouldEmbedSnapshot("invalid")).toBe(false);
+  });
+
+  it("returns false for null", () => {
+    expect(shouldEmbedSnapshot(null)).toBe(false);
+  });
+
+  it("returns false for undefined", () => {
+    expect(shouldEmbedSnapshot(undefined)).toBe(false);
+  });
+
+  it("returns false for empty string", () => {
+    expect(shouldEmbedSnapshot("")).toBe(false);
+  });
+
+  it("returns false for unknown states", () => {
+    expect(shouldEmbedSnapshot("demo")).toBe(false);
+    expect(shouldEmbedSnapshot("unknown")).toBe(false);
+  });
+
+  it("is deterministic for same input", () => {
+    expect(shouldEmbedSnapshot("live")).toBe(shouldEmbedSnapshot("live"));
+    expect(shouldEmbedSnapshot("stale")).toBe(shouldEmbedSnapshot("stale"));
   });
 });
 
@@ -144,7 +191,6 @@ describe("snapshotFromDiary tolerance with new fields", () => {
       state: "live",
     });
     expect(snap).not.toBeNull();
-    // snapshotFromDiary always brands as "diary" — extra fields don't promote it.
     expect(snap!.source).toBe("diary");
     expect(snap!.temp).toBe(24);
   });

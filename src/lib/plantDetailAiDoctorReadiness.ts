@@ -38,6 +38,8 @@ export interface AiDoctorReadinessResult {
   presentCount: number;
   /** Total number of evaluated signals (always 5). */
   totalSignals: number;
+  /** Sensor evidence breakdown from the shared contract. */
+  sensorEvidence: AiDoctorSensorEvidence;
 }
 
 export interface PlantDetailAiDoctorReadinessInput {

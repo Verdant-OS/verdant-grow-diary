@@ -5,25 +5,66 @@
  *
  * Hard constraints:
  *  - Presenter-only. All grouping/pairing logic lives in
- *    `quickLogTimelineGroupingViewModel`. No grouping is duplicated here.
+ *    `quickLogTimelineGroupingViewModel`. All filter logic lives in
+ *    `quickLogGroupedTimelineFilterViewModel`. No business rules here.
  *  - Reuses `<ManualSnapshotTimelineCard>` for environment rendering.
- *  - Source label is always "Manual" — never live/synced/connected/imported.
+ *  - Real source label is always "Manual" — never live/synced/connected/imported.
+ *  - Demo/sample entries (never produced by the live hook) render with an
+ *    explicit "Demo data" or "Sample timeline entry" label so they can
+ *    never be mistaken for real plant memory.
  *  - No writes, no automation, no device control.
- *  - A grouped environment event never also renders as a standalone card —
- *    the view-model guarantees mutual exclusion at the entry boundary.
+ *  - The "Create Quick Log" button opens the existing QuickLogV2Sheet
+ *    flow without prefilling or submitting anything.
  */
-import { Droplets, NotebookPen, History } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Droplets, NotebookPen, History, PlusCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import ManualSnapshotTimelineCard from "@/components/ManualSnapshotTimelineCard";
+import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 import { useQuickLogGroupedTimeline } from "@/hooks/useQuickLogGroupedTimeline";
-import type { QuickLogActionEvent, QuickLogTimelineEntry } from "@/lib/quickLogTimelineGroupingViewModel";
+import type {
+  QuickLogActionEvent,
+  QuickLogTimelineEntry,
+} from "@/lib/quickLogTimelineGroupingViewModel";
+import {
+  QUICK_LOG_GROUPED_TIMELINE_FILTERS,
+  QUICK_LOG_GROUPED_TIMELINE_FILTER_LABELS,
+  QUICK_LOG_GROUPED_TIMELINE_EMPTY_OVERALL_TEXT,
+  QUICK_LOG_GROUPED_TIMELINE_EMPTY_FILTERED_TEXT,
+  QUICK_LOG_GROUPED_TIMELINE_CREATE_BUTTON_LABEL,
+  QUICK_LOG_MANUAL_SOURCE_LABEL,
+  QUICK_LOG_DEMO_SOURCE_LABEL,
+  QUICK_LOG_SAMPLE_SOURCE_LABEL,
+  filterQuickLogGroupedTimelineEntries,
+  type QuickLogGroupedTimelineFilter,
+} from "@/lib/quickLogGroupedTimelineFilterViewModel";
 
-const ACTION_SOURCE_LABEL = "Manual";
+/**
+ * A demo/sample timeline entry. Never produced by the live hook — used
+ * only by explicit demo surfaces or fixtures. Must always render with an
+ * explicit demo/sample label, never "Manual".
+ */
+export interface DemoQuickLogTimelineEntry {
+  entry: QuickLogTimelineEntry;
+  /** "demo" → "Demo data" badge. "sample" → "Sample timeline entry" badge. */
+  variant: "demo" | "sample";
+}
 
 type Props =
-  | { scope: "plant"; plantId: string | null | undefined; tentId: string | null | undefined }
-  | { scope: "tent"; tentId: string | null | undefined };
+  | {
+      scope: "plant";
+      plantId: string | null | undefined;
+      tentId: string | null | undefined;
+      demoEntries?: ReadonlyArray<DemoQuickLogTimelineEntry>;
+    }
+  | {
+      scope: "tent";
+      tentId: string | null | undefined;
+      demoEntries?: ReadonlyArray<DemoQuickLogTimelineEntry>;
+    };
 
 function actionTitle(a: QuickLogActionEvent): string {
   return a.kind === "water" ? "Watering" : "Note";
@@ -37,7 +78,15 @@ function actionIcon(a: QuickLogActionEvent) {
   );
 }
 
-function ActionDetails({ action }: { action: QuickLogActionEvent }) {
+function ActionDetails({
+  action,
+  sourceLabel,
+  sourceTestId,
+}: {
+  action: QuickLogActionEvent;
+  sourceLabel: string;
+  sourceTestId: string;
+}) {
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -47,8 +96,8 @@ function ActionDetails({ action }: { action: QuickLogActionEvent }) {
             {actionTitle(action)}
           </span>
         </div>
-        <Badge variant="secondary" data-testid="quick-log-grouped-action-source">
-          {ACTION_SOURCE_LABEL}
+        <Badge variant="secondary" data-testid={sourceTestId}>
+          {sourceLabel}
         </Badge>
       </div>
       <p
@@ -63,7 +112,10 @@ function ActionDetails({ action }: { action: QuickLogActionEvent }) {
         </p>
       )}
       {action.noteText && (
-        <p className="text-sm text-foreground/90 break-words" data-testid="quick-log-grouped-action-note">
+        <p
+          className="text-sm text-foreground/90 break-words"
+          data-testid="quick-log-grouped-action-note"
+        >
           {action.noteText}
         </p>
       )}
@@ -71,18 +123,43 @@ function ActionDetails({ action }: { action: QuickLogActionEvent }) {
   );
 }
 
-function EntryItem({ entry }: { entry: QuickLogTimelineEntry }) {
+interface EntryItemProps {
+  entry: QuickLogTimelineEntry;
+  demoVariant?: "demo" | "sample";
+}
+
+function EntryItem({ entry, demoVariant }: EntryItemProps) {
+  const isDemo = !!demoVariant;
+  const sourceLabel = isDemo
+    ? demoVariant === "demo"
+      ? QUICK_LOG_DEMO_SOURCE_LABEL
+      : QUICK_LOG_SAMPLE_SOURCE_LABEL
+    : QUICK_LOG_MANUAL_SOURCE_LABEL;
+  const sourceTestId = isDemo
+    ? "quick-log-grouped-action-demo-source"
+    : "quick-log-grouped-action-source";
+
+  const commonDataAttrs = {
+    "data-testid": "quick-log-grouped-card",
+    "data-occurred-at": entry.occurredAt,
+    "data-demo": isDemo ? "true" : "false",
+    "data-demo-variant": demoVariant ?? "",
+  } as const;
+
   if (entry.kind === "grouped") {
     return (
       <Card
-        data-testid="quick-log-grouped-card"
+        {...commonDataAttrs}
         data-entry-kind="grouped"
         data-action-id={entry.action.id}
         data-environment-id={entry.environment.id}
-        data-occurred-at={entry.occurredAt}
       >
         <CardContent className="space-y-3 p-3">
-          <ActionDetails action={entry.action} />
+          <ActionDetails
+            action={entry.action}
+            sourceLabel={sourceLabel}
+            sourceTestId={sourceTestId}
+          />
           <ManualSnapshotTimelineCard card={entry.environmentCard} />
         </CardContent>
       </Card>
@@ -91,24 +168,33 @@ function EntryItem({ entry }: { entry: QuickLogTimelineEntry }) {
   if (entry.kind === "action") {
     return (
       <Card
-        data-testid="quick-log-grouped-card"
+        {...commonDataAttrs}
         data-entry-kind="action"
         data-action-id={entry.action.id}
-        data-occurred-at={entry.occurredAt}
       >
         <CardContent className="p-3">
-          <ActionDetails action={entry.action} />
+          <ActionDetails
+            action={entry.action}
+            sourceLabel={sourceLabel}
+            sourceTestId={sourceTestId}
+          />
         </CardContent>
       </Card>
     );
   }
   return (
     <div
-      data-testid="quick-log-grouped-card"
+      {...commonDataAttrs}
       data-entry-kind="environment"
       data-environment-id={entry.environment.id}
-      data-occurred-at={entry.occurredAt}
     >
+      {isDemo && (
+        <div className="mb-1">
+          <Badge variant="secondary" data-testid="quick-log-grouped-env-demo-source">
+            {sourceLabel}
+          </Badge>
+        </div>
+      )}
       <ManualSnapshotTimelineCard card={entry.environmentCard} />
     </div>
   );
@@ -127,9 +213,41 @@ function toScope(props: Props) {
   return { kind: "tent" as const, tentId: props.tentId };
 }
 
+function defaultTargetKeyFor(props: Props): string | null {
+  if (props.scope === "plant") {
+    return props.plantId ? `plant:${props.plantId}` : null;
+  }
+  return props.tentId ? `tent:${props.tentId}` : null;
+}
+
 export default function QuickLogGroupedTimelineSection(props: Props) {
   const scope = toScope(props);
   const { entries, isLoading, isError } = useQuickLogGroupedTimeline(scope);
+  const [filter, setFilter] = useState<QuickLogGroupedTimelineFilter>("all");
+  const [quickLogOpen, setQuickLogOpen] = useState(false);
+
+  // Combine real entries with explicit demo/sample fixtures. Demo entries
+  // keep their variant so the badge stays honest. Real entries always
+  // render with "Manual".
+  type Wrapped = { entry: QuickLogTimelineEntry; demoVariant?: "demo" | "sample" };
+  const wrapped: Wrapped[] = useMemo(() => {
+    const real: Wrapped[] = entries.map((e) => ({ entry: e }));
+    const demo: Wrapped[] = (props.demoEntries ?? []).map((d) => ({
+      entry: d.entry,
+      demoVariant: d.variant,
+    }));
+    return [...real, ...demo];
+  }, [entries, props.demoEntries]);
+
+  const filteredWrapped = useMemo(
+    () =>
+      wrapped.filter((w) =>
+        filterQuickLogGroupedTimelineEntries([w.entry], filter).length > 0,
+      ),
+    [wrapped, filter],
+  );
+
+  const hasAnyEntries = wrapped.length > 0;
 
   return (
     <Card
@@ -143,6 +261,33 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
         <p className="text-xs text-muted-foreground">
           Recent Water and Note logs, grouped with the sensor snapshot saved at the same time.
         </p>
+        <div
+          className="flex flex-wrap gap-2 pt-2"
+          role="group"
+          aria-label="QuickLog timeline filter"
+          data-testid="quick-log-grouped-timeline-filters"
+        >
+          {QUICK_LOG_GROUPED_TIMELINE_FILTERS.map((f) => {
+            const active = filter === f;
+            return (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setFilter(f)}
+                aria-pressed={active}
+                data-testid={`quick-log-grouped-timeline-filter-${f}`}
+                className={cn(
+                  "rounded-full border px-3 py-1 text-xs transition-colors",
+                  active
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background text-foreground hover:bg-muted",
+                )}
+              >
+                {QUICK_LOG_GROUPED_TIMELINE_FILTER_LABELS[f]}
+              </button>
+            );
+          })}
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         {scope === null ? (
@@ -164,32 +309,56 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
           >
             Couldn't load QuickLog memory right now.
           </p>
-        ) : entries.length === 0 ? (
-          <p
-            className="text-sm text-muted-foreground"
+        ) : !hasAnyEntries ? (
+          <div
+            className="space-y-3"
             data-testid="quick-log-grouped-timeline-empty"
           >
-            No QuickLog entries yet.
+            <p className="text-sm text-muted-foreground">
+              {QUICK_LOG_GROUPED_TIMELINE_EMPTY_OVERALL_TEXT}
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => setQuickLogOpen(true)}
+              data-testid="quick-log-grouped-timeline-create-button"
+            >
+              <PlusCircle className="mr-2 h-4 w-4" aria-hidden />
+              {QUICK_LOG_GROUPED_TIMELINE_CREATE_BUTTON_LABEL}
+            </Button>
+          </div>
+        ) : filteredWrapped.length === 0 ? (
+          <p
+            className="text-sm text-muted-foreground"
+            data-testid="quick-log-grouped-timeline-empty-filtered"
+          >
+            {QUICK_LOG_GROUPED_TIMELINE_EMPTY_FILTERED_TEXT}
           </p>
         ) : (
           <ul
             className="space-y-3"
             data-testid="quick-log-grouped-timeline-list"
           >
-            {entries.map((entry, i) => {
+            {filteredWrapped.map((w, i) => {
+              const entry = w.entry;
               const key =
                 entry.kind === "environment"
-                  ? `env:${entry.environment.id}`
+                  ? `env:${entry.environment.id}:${i}`
                   : `act:${entry.action.id}:${i}`;
               return (
                 <li key={key}>
-                  <EntryItem entry={entry} />
+                  <EntryItem entry={entry} demoVariant={w.demoVariant} />
                 </li>
               );
             })}
           </ul>
         )}
       </CardContent>
+      <QuickLogV2Sheet
+        open={quickLogOpen}
+        onOpenChange={setQuickLogOpen}
+        defaultTargetKey={defaultTargetKeyFor(props)}
+      />
     </Card>
   );
 }

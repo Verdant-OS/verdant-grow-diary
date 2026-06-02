@@ -193,10 +193,13 @@ describe("importCsvMappingConfig — security: never trust the import", () => {
       headers: HEADERS,
     });
     if (r.status !== "applied") throw new Error("expected applied");
+    // Sensitive *values* must not appear, but the key name may be listed
+    // in ignoredKeys to surface what was stripped.
+    expect(r.mapping).not.toHaveProperty("rows");
+    expect(r.mapping).not.toHaveProperty("raw_payload");
     const s = JSON.stringify(r);
-    expect(s).not.toMatch(/raw_payload/);
-    expect(s).not.toMatch(/"rows"/);
     expect(s).not.toMatch(/"foo"/);
+    expect(s).not.toMatch(/"bar"/);
     expect(r.ignoredKeys).toContain("rows");
     expect(r.ignoredKeys).toContain("raw_payload");
   });

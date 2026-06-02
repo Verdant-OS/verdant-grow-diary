@@ -166,8 +166,9 @@ function SessionRow({ row }: { row: AiDoctorSessionRow }) {
       <div className="pt-1">
         <Link
           to={`/doctor/sessions/${row.id}`}
-          className="text-xs text-primary underline"
+          className="text-xs text-primary underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           data-testid="tent-ai-doctor-session-view-link"
+          aria-label={`Open AI Doctor session${likelyIssue ? `: ${likelyIssue}` : row.created_at ? ` from ${fmtDate(row.created_at)}` : ""}`}
         >
           View session
         </Link>

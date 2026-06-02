@@ -54,6 +54,8 @@ export interface AiDoctorContextInput {
   recentManualSnapshots?: readonly AiDoctorContextManualSnapshotInput[];
   /** Optional now injection for deterministic tests. */
   now?: number;
+  /** Optional readiness threshold override (testing / future tuning). */
+  config?: Partial<AiDoctorContextReadinessConfig>;
 }
 
 export interface AiDoctorContextCounts {

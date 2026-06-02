@@ -8,12 +8,13 @@
  * Mocks useLatestSensorSnapshot so these tests are fast, deterministic,
  * and independent of backend state.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
 import type { SnapshotState } from "@/hooks/useLatestSensorSnapshot";
 
+const NOW = new Date("2026-06-02T12:00:00Z");
 const FIVE_MIN_AGO = "2026-06-02T11:55:00Z";
 const TWO_DAYS_AGO = "2026-05-31T12:00:00Z";
 
@@ -49,7 +50,13 @@ function fullSnapshot(partial: Partial<SensorSnapshot> = {}): SensorSnapshot {
 
 describe("QuickLogSensorSnapshotStrip render — exact copy, labels, and navigation", () => {
   beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+    vi.setSystemTime(NOW);
     mockUseLatestSensorSnapshot.mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("usable — renders exact title, pill, description, age, metrics, and no action link", () => {

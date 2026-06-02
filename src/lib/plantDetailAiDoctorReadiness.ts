@@ -242,9 +242,15 @@ function subheadForLevel(level: AiDoctorReadinessLevel, presentCount: number): s
 export function buildPlantDetailAiDoctorReadiness(
   input: PlantDetailAiDoctorReadinessInput,
 ): AiDoctorReadinessResult {
-  const presentCount = countPresent(input);
+  const sensorEvidence = evaluateSensorEvidence(input);
+  // Mirror the gated sensor signal into hasSensorSnapshot for buildMissing.
+  const gatedInput: PlantDetailAiDoctorReadinessInput = {
+    ...input,
+    hasSensorSnapshot: sensorEvidence.countsAsHealthyEvidence,
+  };
+  const presentCount = countPresent(gatedInput, sensorEvidence);
   const level = levelFromCount(presentCount);
-  const missing = buildMissing(input);
+  const missing = buildMissing(gatedInput);
 
   return {
     level,
@@ -253,5 +259,6 @@ export function buildPlantDetailAiDoctorReadiness(
     missing,
     presentCount,
     totalSignals: TOTAL_SIGNALS,
+    sensorEvidence,
   };
 }

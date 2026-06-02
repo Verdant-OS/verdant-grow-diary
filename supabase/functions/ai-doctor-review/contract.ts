@@ -1,26 +1,12 @@
-/**
- * aiDoctorReviewResultContract — pure schema + validator for AI Doctor
- * review results.
- *
- * Hard constraints:
- *  - Pure: no React, no Supabase, no I/O, no model/API calls.
- *  - Never accepts/emits banned wording: confirmed, certain, cured,
- *    guaranteed, live, synced, connected, imported.
- *  - Strips unknown / sensitive keys silently (raw_payload, secrets,
- *    tokens, service_role, anything outside the contract).
- *  - Rejects (returns invalid) on enum violations, empty required fields,
- *    array cap overflow, device-control language, banned wording.
- */
+// Deno-friendly copy of validateAiDoctorReviewResult. Source of truth lives
+// in src/lib/aiDoctorReviewResultContract.ts; mirror here is intentional
+// because edge functions cannot import from the Vite alias tree.
+// Must stay in sync with the frontend contract.
 
 export type AiDoctorReviewConfidence = "low" | "medium" | "high";
 export type AiDoctorReviewRiskLevel = "low" | "watch" | "elevated" | "high";
 
 export const AI_DOCTOR_REVIEW_ARRAY_CAP = 12;
-
-export const AI_DOCTOR_REVIEW_CONFIDENCE_VALUES: readonly AiDoctorReviewConfidence[] =
-  Object.freeze(["low", "medium", "high"]);
-export const AI_DOCTOR_REVIEW_RISK_VALUES: readonly AiDoctorReviewRiskLevel[] =
-  Object.freeze(["low", "watch", "elevated", "high"]);
 
 export interface AiDoctorReviewActionQueueSuggestion {
   title: string;
@@ -45,6 +31,14 @@ export interface AiDoctorReviewResult {
 export type AiDoctorReviewValidation =
   | { ok: true; result: AiDoctorReviewResult }
   | { ok: false; reason: string };
+
+const CONFIDENCE_VALUES: AiDoctorReviewConfidence[] = ["low", "medium", "high"];
+const RISK_VALUES: AiDoctorReviewRiskLevel[] = [
+  "low",
+  "watch",
+  "elevated",
+  "high",
+];
 
 const REQUIRED_STRING_FIELDS = [
   "summary",
@@ -71,39 +65,26 @@ const BANNED_WORDS = [
   "connected",
   "imported",
 ];
-
 const BANNED_WORDS_RE = new RegExp(`\\b(${BANNED_WORDS.join("|")})\\b`, "i");
 
 const DEVICE_CONTROL_RE =
   /\b(turn|switch|enable|disable|activate|deactivate|toggle|trigger|power)\b(?:\s+(?:on|off|the|a|an|your|all|every|this|that))*\s+\b(fan|fans|light|lights|pump|pumps|heater|heaters|humidifier|humidifiers|dehumidifier|dehumidifiers|valve|valves|relay|actuator|outlet|socket|controller|hvac|exhaust|intake|dosing|injector|irrigation|sprinkler)\b/i;
-
-// Advisory / negated phrasing that scopes device verbs to "do not do this"
-// guidance instead of an imperative command. When such phrasing is in the
-// same sentence/clause as a device-control match, treat it as safe copy.
 const NEGATION_RE =
-  /\b(do\s+not|do\s*n['’]t|don['’]t|never|avoid|without|should\s*not|shouldn['’]t|no\s+need\s+to|refrain\s+from|cannot|can['’]t|must\s+not|mustn['’]t)\b/i;
-
+  /\b(do\s+not|do\s*n['\u2019]t|don['\u2019]t|never|avoid|without|should\s*not|shouldn['\u2019]t|no\s+need\s+to|refrain\s+from|cannot|can['\u2019]t|must\s+not|mustn['\u2019]t)\b/i;
 const SENSITIVE_KEY_RE =
   /(^|_)(raw_payload|secret|secrets|token|tokens|api_key|apikey|service_role|password|credential|credentials|bearer|jwt)(_|$)|^(raw_payload|secret|secrets|token|tokens|api_key|apikey|service_role|password|credential|credentials|bearer|jwt)$/i;
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
-
 function cleanString(v: unknown): string | null {
   if (typeof v !== "string") return null;
   const t = v.trim();
   return t.length > 0 ? t : null;
 }
-
 function containsBanned(text: string): boolean {
   return BANNED_WORDS_RE.test(text);
 }
-
-// Detect device-control language scoped to imperative position. Splits on
-// sentence/clause boundaries — including commas and dashes — so a single
-// run-on sentence cannot smuggle an imperative past a leading "Do not".
-// Example to reject: "Do not wait, turn on the humidifier."
 function containsDeviceControl(text: string): boolean {
   const clauses = text.split(/[.!?;\n,]+|[\u2014\u2013]|\s-\s/);
   for (const raw of clauses) {
@@ -115,7 +96,6 @@ function containsDeviceControl(text: string): boolean {
   }
   return false;
 }
-
 function sanitizeStringArray(
   v: unknown,
 ): { ok: true; value: string[] } | { ok: false; reason: string } {
@@ -134,7 +114,6 @@ function sanitizeStringArray(
   }
   return { ok: true, value: out };
 }
-
 function sanitizeActionQueueSuggestion(
   v: unknown,
 ):
@@ -144,36 +123,23 @@ function sanitizeActionQueueSuggestion(
   if (!isPlainObject(v)) return { ok: false, reason: "suggestion_shape" };
   const title = cleanString(v.title);
   const rationale = cleanString(v.rationale);
-  if (!title || !rationale) {
-    return { ok: false, reason: "suggestion_empty_field" };
-  }
+  if (!title || !rationale) return { ok: false, reason: "suggestion_empty_field" };
   for (const t of [title, rationale]) {
     if (containsBanned(t)) return { ok: false, reason: "banned_word" };
-    if (containsDeviceControl(t)) {
-      return { ok: false, reason: "device_control" };
-    }
+    if (containsDeviceControl(t)) return { ok: false, reason: "device_control" };
   }
   return { ok: true, value: { title, rationale } };
 }
 
-/**
- * Validate + sanitize an unknown payload into an `AiDoctorReviewResult`.
- *
- * Strips unknown / sensitive keys silently. Rejects on enum/required/cap
- * violations, banned wording, or device-control instructions.
- */
 export function validateAiDoctorReviewResult(
   input: unknown,
 ): AiDoctorReviewValidation {
   if (!isPlainObject(input)) return { ok: false, reason: "shape" };
-
-  // Drop sensitive keys silently — keep validation working on a copy.
   const safe: Record<string, unknown> = {};
   for (const [k, val] of Object.entries(input)) {
     if (SENSITIVE_KEY_RE.test(k)) continue;
     safe[k] = val;
   }
-
   const required: Record<string, string> = {};
   for (const field of REQUIRED_STRING_FIELDS) {
     const s = cleanString(safe[field]);
@@ -184,25 +150,21 @@ export function validateAiDoctorReviewResult(
     }
     required[field] = s;
   }
-
   const confidence = safe.confidence;
   if (
     typeof confidence !== "string" ||
-    !AI_DOCTOR_REVIEW_CONFIDENCE_VALUES.includes(
-      confidence as AiDoctorReviewConfidence,
-    )
+    !CONFIDENCE_VALUES.includes(confidence as AiDoctorReviewConfidence)
   ) {
     return { ok: false, reason: "confidence_enum" };
   }
   const risk = safe.risk_level;
   if (
     typeof risk !== "string" ||
-    !AI_DOCTOR_REVIEW_RISK_VALUES.includes(risk as AiDoctorReviewRiskLevel)
+    !RISK_VALUES.includes(risk as AiDoctorReviewRiskLevel)
   ) {
     return { ok: false, reason: "risk_enum" };
   }
-
-  const arrays: Record<(typeof CAPPED_ARRAY_FIELDS)[number], string[]> = {
+  const arrays: Record<string, string[]> = {
     evidence: [],
     missing_information: [],
     possible_causes: [],
@@ -212,23 +174,24 @@ export function validateAiDoctorReviewResult(
     if (r.ok === false) return { ok: false, reason: `${r.reason}:${field}` };
     arrays[field] = r.value;
   }
-
   const sug = sanitizeActionQueueSuggestion(safe.action_queue_suggestion);
   if (sug.ok === false) return { ok: false, reason: sug.reason };
 
-  const result: AiDoctorReviewResult = {
-    summary: required.summary,
-    likely_issue: required.likely_issue,
-    confidence: confidence as AiDoctorReviewConfidence,
-    evidence: arrays.evidence,
-    missing_information: arrays.missing_information,
-    possible_causes: arrays.possible_causes,
-    immediate_action: required.immediate_action,
-    what_not_to_do: required.what_not_to_do,
-    twenty_four_hour_follow_up: required.twenty_four_hour_follow_up,
-    three_day_recovery_plan: required.three_day_recovery_plan,
-    risk_level: risk as AiDoctorReviewRiskLevel,
-    ...(sug.value ? { action_queue_suggestion: sug.value } : {}),
+  return {
+    ok: true,
+    result: {
+      summary: required.summary,
+      likely_issue: required.likely_issue,
+      confidence: confidence as AiDoctorReviewConfidence,
+      evidence: arrays.evidence,
+      missing_information: arrays.missing_information,
+      possible_causes: arrays.possible_causes,
+      immediate_action: required.immediate_action,
+      what_not_to_do: required.what_not_to_do,
+      twenty_four_hour_follow_up: required.twenty_four_hour_follow_up,
+      three_day_recovery_plan: required.three_day_recovery_plan,
+      risk_level: risk as AiDoctorReviewRiskLevel,
+      ...(sug.value ? { action_queue_suggestion: sug.value } : {}),
+    },
   };
-  return { ok: true, result };
 }

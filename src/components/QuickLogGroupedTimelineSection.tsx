@@ -41,6 +41,12 @@ import {
   filterQuickLogGroupedTimelineEntries,
   type QuickLogGroupedTimelineFilter,
 } from "@/lib/quickLogGroupedTimelineFilterViewModel";
+import {
+  QUICK_LOG_AUDIT_ACTION_SUBCARD_TITLE,
+  QUICK_LOG_AUDIT_ENVIRONMENT_SUBCARD_TITLE,
+  auditToggleLabel,
+  isAuditableQuickLogEntry,
+} from "@/lib/quickLogTimelineAuditViewModel";
 
 /**
  * A demo/sample timeline entry. Never produced by the live hook — used

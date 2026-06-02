@@ -96,7 +96,7 @@ export default function QuickLogSensorSnapshotStrip({ growId, tentId }: Props) {
           className="inline-flex items-center text-[12px] font-medium text-primary hover:underline"
         >
           {view.action.label}
-        </Link>
+        </a>
       )}
     </section>
   );

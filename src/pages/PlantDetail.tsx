@@ -372,6 +372,11 @@ export default function PlantDetail() {
           </div>
 
           <ManualSnapshotTimelineSection scope="plant" plantId={plant.id} />
+          <QuickLogGroupedTimelineSection
+            scope="plant"
+            plantId={plant.id}
+            tentId={plant.tentId ?? null}
+          />
           <TimelineMemorySection scope="plant" plantId={plant.id} />
 
 

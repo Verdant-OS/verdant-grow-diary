@@ -14,7 +14,6 @@ import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStri
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
 import type { SnapshotState } from "@/hooks/useLatestSensorSnapshot";
 
-const NOW_ISO = "2026-06-02T12:00:00Z";
 const FIVE_MIN_AGO = "2026-06-02T11:55:00Z";
 const TWO_DAYS_AGO = "2026-05-31T12:00:00Z";
 
@@ -24,23 +23,11 @@ vi.mock("@/hooks/useLatestSensorSnapshot", () => ({
   useLatestSensorSnapshot: (...args: unknown[]) => mockUseLatestSensorSnapshot(...args),
 }));
 
-function mockState(partial: Partial<SnapshotState> & { status: SnapshotState["status"] }): SnapshotState {
-  const base: Record<string, unknown> = {
-    snapshot: null,
-    ...partial,
-  };
-  switch (partial.status) {
-    case "idle":
-      return { status: "idle", snapshot: base.snapshot as SensorSnapshot };
-    case "loading":
-      return { status: "loading", snapshot: base.snapshot as SensorSnapshot };
-    case "ok":
-      return { status: "ok", snapshot: base.snapshot as SensorSnapshot };
-    case "unavailable":
-      return { status: "unavailable", snapshot: base.snapshot as SensorSnapshot };
-    default:
-      throw new Error(`unexpected status: ${partial.status}`);
-  }
+function mockOk(snapshot: SensorSnapshot): SnapshotState {
+  return { status: "ok", snapshot };
+}
+function mockLoading(): SnapshotState {
+  return { status: "loading", snapshot: { source: "unavailable", ts: null, temp: null, rh: null, vpd: null, co2: null, soil: null, soil_ec: null, soil_temp: null, ppfd: null, device_id: null } };
 }
 
 function fullSnapshot(partial: Partial<SensorSnapshot> = {}): SensorSnapshot {
@@ -66,9 +53,7 @@ describe("QuickLogSensorSnapshotStrip render — exact copy, labels, and navigat
   });
 
   it("usable — renders exact title, pill, description, age, metrics, and no action link", () => {
-    mockUseLatestSensorSnapshot.mockReturnValue(
-      mockState({ snapshot: fullSnapshot(), status: "success" }),
-    );
+    mockUseLatestSensorSnapshot.mockReturnValue(mockOk(fullSnapshot()));
     render(<QuickLogSensorSnapshotStrip growId="g1" tentId="t1" />);
 
     const strip = screen.getByTestId("quicklog-sensor-snapshot-strip");
@@ -87,12 +72,7 @@ describe("QuickLogSensorSnapshotStrip render — exact copy, labels, and navigat
   });
 
   it("stale — renders exact title, pill, description, age, metrics, and refresh action", () => {
-    mockUseLatestSensorSnapshot.mockReturnValue(
-      mockState({
-        snapshot: fullSnapshot({ ts: TWO_DAYS_AGO }),
-        status: "success",
-      }),
-    );
+    mockUseLatestSensorSnapshot.mockReturnValue(mockOk(fullSnapshot({ ts: TWO_DAYS_AGO })));
     render(<QuickLogSensorSnapshotStrip growId="g1" tentId="t1" />);
 
     const strip = screen.getByTestId("quicklog-sensor-snapshot-strip");
@@ -110,12 +90,7 @@ describe("QuickLogSensorSnapshotStrip render — exact copy, labels, and navigat
   });
 
   it("invalid — renders exact title, pill, description, age, and review action", () => {
-    mockUseLatestSensorSnapshot.mockReturnValue(
-      mockState({
-        snapshot: fullSnapshot({ source: "sim" }),
-        status: "success",
-      }),
-    );
+    mockUseLatestSensorSnapshot.mockReturnValue(mockOk(fullSnapshot({ source: "sim" })));
     render(<QuickLogSensorSnapshotStrip growId="g1" tentId="t1" />);
 
     const strip = screen.getByTestId("quicklog-sensor-snapshot-strip");
@@ -133,9 +108,7 @@ describe("QuickLogSensorSnapshotStrip render — exact copy, labels, and navigat
   });
 
   it("no_data — renders exact title, pill, description, and add action when loading", () => {
-    mockUseLatestSensorSnapshot.mockReturnValue(
-      mockState({ snapshot: null, status: "loading" }),
-    );
+    mockUseLatestSensorSnapshot.mockReturnValue(mockLoading());
     render(<QuickLogSensorSnapshotStrip growId="g1" tentId="t1" />);
 
     const strip = screen.getByTestId("quicklog-sensor-snapshot-strip");
@@ -155,7 +128,7 @@ describe("QuickLogSensorSnapshotStrip render — exact copy, labels, and navigat
 
   it("no_data — renders exact copy when there is no tent", () => {
     mockUseLatestSensorSnapshot.mockReturnValue(
-      mockState({ snapshot: null, status: "success" }),
+      ({ status: "idle", snapshot: { source: "unavailable", ts: null, temp: null, rh: null, vpd: null, co2: null, soil: null, soil_ec: null, soil_temp: null, ppfd: null, device_id: null } }) as SnapshotState,
     );
     render(<QuickLogSensorSnapshotStrip growId="g1" tentId={null} />);
 
@@ -170,29 +143,30 @@ describe("QuickLogSensorSnapshotStrip render — exact copy, labels, and navigat
   });
 
   it("all non-none actions use href /sensors — never automation endpoints", () => {
-    const actionCases = [
+    const actionCases: Array<{
+      state: SnapshotState;
+      expectedKind: string;
+      expectedLabel: string;
+    }> = [
       {
-        snapshot: fullSnapshot({ ts: TWO_DAYS_AGO }),
-        status: "success" as const,
+        state: mockOk(fullSnapshot({ ts: TWO_DAYS_AGO })),
         expectedKind: "refresh",
         expectedLabel: "Refresh snapshot",
       },
       {
-        snapshot: fullSnapshot({ source: "sim" }),
-        status: "success" as const,
+        state: mockOk(fullSnapshot({ source: "sim" })),
         expectedKind: "review",
         expectedLabel: "Review sensor intake",
       },
       {
-        snapshot: null,
-        status: "loading" as const,
+        state: mockLoading(),
         expectedKind: "add",
         expectedLabel: "Add snapshot",
       },
     ];
 
-    for (const { snapshot, status, expectedKind, expectedLabel } of actionCases) {
-      mockUseLatestSensorSnapshot.mockReturnValue(mockState({ snapshot, status }));
+    for (const { state, expectedKind, expectedLabel } of actionCases) {
+      mockUseLatestSensorSnapshot.mockReturnValue(state);
       const { unmount } = render(<QuickLogSensorSnapshotStrip growId="g1" tentId="t1" />);
 
       const action = screen.getByTestId("quicklog-sensor-snapshot-action");
@@ -204,12 +178,7 @@ describe("QuickLogSensorSnapshotStrip render — exact copy, labels, and navigat
   });
 
   it("usable with partial metrics omits null metrics from the DOM", () => {
-    mockUseLatestSensorSnapshot.mockReturnValue(
-      mockState({
-        snapshot: fullSnapshot({ temp: null, vpd: null }),
-        status: "success",
-      }),
-    );
+    mockUseLatestSensorSnapshot.mockReturnValue(mockOk(fullSnapshot({ temp: null, vpd: null })));
     render(<QuickLogSensorSnapshotStrip growId="g1" tentId="t1" />);
 
     expect(screen.getByTestId("quicklog-sensor-snapshot-metric-rh")).toHaveTextContent("RH 55%");

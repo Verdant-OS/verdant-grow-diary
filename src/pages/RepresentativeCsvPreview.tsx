@@ -4,7 +4,7 @@ import {
   emptyRepresentativeMapping,
   previewRepresentativeCsv,
   parseCsv,
-  REPRESENTATIVE_MAPPING_FIELDS,
+  
   type EcUnit,
   type RepresentativeColumnMapping,
   type RepresentativeDraftReading,

@@ -165,6 +165,9 @@ export default function Sensors() {
           <ManualSensorReadingCard tents={manualTents} defaultTentId={defaultManualTentId} />
         </div>
       )}
+      <div className="mt-4 max-w-xl">
+        <SensorBridgeHealthCard />
+      </div>
     </div>
   );
 }

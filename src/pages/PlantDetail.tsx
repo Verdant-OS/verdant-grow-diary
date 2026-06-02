@@ -27,6 +27,7 @@ import PlantDetailAiDoctorReadiness from "@/components/PlantDetailAiDoctorReadin
 import PlantDetailDoctorContextPreview from "@/components/PlantDetailDoctorContextPreview";
 import PlantDetailAiDoctorContextPanel from "@/components/PlantDetailAiDoctorContextPanel";
 import PlantDetailAiDoctorReadinessGate from "@/components/PlantDetailAiDoctorReadinessGate";
+import PlantDetailAiDoctorSafeReviewStart from "@/components/PlantDetailAiDoctorSafeReviewStart";
 import PlantDetailAskDoctorHelper from "@/components/PlantDetailAskDoctorHelper";
 import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
 import PlantDetailSectionNav from "@/components/PlantDetailSectionNav";

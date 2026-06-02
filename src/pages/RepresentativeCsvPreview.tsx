@@ -30,6 +30,7 @@ import {
   loadCsvMappingPreset,
   saveCsvMappingPreset,
 } from "@/lib/csvMappingPresetStorage";
+import { importCsvMappingConfig } from "@/lib/csvMappingConfigImport";
 import {
   deriveCsvRowValidationHints,
   detectMappingCollisions,

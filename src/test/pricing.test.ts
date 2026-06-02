@@ -303,6 +303,7 @@ describe("No unrelated routes were changed", () => {
         "/grows",
         "/grows/:growId",
         "/hardware-integrations",
+        "/imports/representative-csv",
         "/leads",
         "/logs",
         "/pi-ingest-status",

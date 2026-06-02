@@ -75,7 +75,13 @@ const BANNED_WORDS = [
 const BANNED_WORDS_RE = new RegExp(`\\b(${BANNED_WORDS.join("|")})\\b`, "i");
 
 const DEVICE_CONTROL_RE =
-  /\b(turn|switch|enable|disable|activate|deactivate|toggle|trigger|power)\b(?:\s+(?:on|off|the|a|an|your|all|every|this|that))*\s+\b(fan|fans|light|lights|pump|pumps|heater|heaters|humidifier|dehumidifier|valve|valves|relay|actuator|outlet|socket|controller|hvac|exhaust|intake|dosing|injector|irrigation|sprinkler)\b/i;
+  /\b(turn|switch|enable|disable|activate|deactivate|toggle|trigger|power)\b(?:\s+(?:on|off|the|a|an|your|all|every|this|that))*\s+\b(fan|fans|light|lights|pump|pumps|heater|heaters|humidifier|humidifiers|dehumidifier|dehumidifiers|valve|valves|relay|actuator|outlet|socket|controller|hvac|exhaust|intake|dosing|injector|irrigation|sprinkler)\b/i;
+
+// Advisory / negated phrasing that scopes device verbs to "do not do this"
+// guidance instead of an imperative command. When such phrasing is in the
+// same sentence/clause as a device-control match, treat it as safe copy.
+const NEGATION_RE =
+  /\b(do\s+not|do\s*n['’]t|don['’]t|never|avoid|without|should\s*not|shouldn['’]t|no\s+need\s+to|refrain\s+from|cannot|can['’]t|must\s+not|mustn['’]t)\b/i;
 
 const SENSITIVE_KEY_RE =
   /(^|_)(raw_payload|secret|secrets|token|tokens|api_key|apikey|service_role|password|credential|credentials|bearer|jwt)(_|$)|^(raw_payload|secret|secrets|token|tokens|api_key|apikey|service_role|password|credential|credentials|bearer|jwt)$/i;
@@ -94,8 +100,19 @@ function containsBanned(text: string): boolean {
   return BANNED_WORDS_RE.test(text);
 }
 
+// Detect device-control language scoped to imperative position. Splits on
+// sentence/clause boundaries so that advisory phrasing ("Do not toggle
+// fans…") does not trip the imperative detector.
 function containsDeviceControl(text: string): boolean {
-  return DEVICE_CONTROL_RE.test(text);
+  const clauses = text.split(/[.!?;\n]+/);
+  for (const raw of clauses) {
+    const clause = raw.trim();
+    if (!clause) continue;
+    if (!DEVICE_CONTROL_RE.test(clause)) continue;
+    if (NEGATION_RE.test(clause)) continue;
+    return true;
+  }
+  return false;
 }
 
 function sanitizeStringArray(

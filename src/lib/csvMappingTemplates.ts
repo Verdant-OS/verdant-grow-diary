@@ -149,18 +149,43 @@ export interface ApplyTemplateResult {
   ambiguousFields: RepresentativeMappingField[];
   /** Fields listed in the template that found no header at all. */
   unmatchedFields: RepresentativeMappingField[];
+  /** Required template fields whose headers were not found in the CSV. */
+  missingRequiredHeaders: RepresentativeMappingField[];
+  /** When true, the template did not apply because required headers were missing. */
+  blocked: boolean;
+  /** Human-readable block reason when blocked is true. */
+  blockReason: string | null;
 }
 
 /**
  * Apply a template against the provided CSV headers. Returns a fresh
  * mapping plus the fields the user still needs to review. Never mutates
- * inputs. If two headers match the same canonical field, the field is left
- * unmapped (ambiguous) — templates must never silently choose.
+ * inputs. If two headers match the same canonical field, the field is
+ * left unmapped (ambiguous) — templates must never silently choose.
+ *
+ * When the template lists `requiredFields` and any required header is
+ * missing from the CSV, the result is `blocked: true` with the original
+ * (empty) mapping returned. The UI must surface `blockReason` and skip
+ * applying it.
+ *
+ * Reset templates (`isReset: true`) return the empty mapping without
+ * matching, and never block.
  */
 export function applyCsvMappingTemplate(
   template: CsvMappingTemplate,
   headers: ReadonlyArray<string>,
 ): ApplyTemplateResult {
+  if (template.isReset) {
+    return {
+      mapping: emptyRepresentativeMapping(),
+      ambiguousFields: [],
+      unmatchedFields: [],
+      missingRequiredHeaders: [],
+      blocked: false,
+      blockReason: null,
+    };
+  }
+
   const mapping = emptyRepresentativeMapping();
   const ambiguous: RepresentativeMappingField[] = [];
   const unmatched: RepresentativeMappingField[] = [];
@@ -195,7 +220,27 @@ export function applyCsvMappingTemplate(
     }
   }
 
-  return { mapping, ambiguousFields: ambiguous, unmatchedFields: unmatched };
+  const required = template.requiredFields ?? [];
+  const missingRequiredHeaders = required.filter((f) => unmatched.includes(f));
+  if (missingRequiredHeaders.length > 0) {
+    return {
+      mapping: emptyRepresentativeMapping(),
+      ambiguousFields: [],
+      unmatchedFields: unmatched,
+      missingRequiredHeaders,
+      blocked: true,
+      blockReason: `This template does not match this file. Missing headers: ${missingRequiredHeaders.join(", ")}`,
+    };
+  }
+
+  return {
+    mapping,
+    ambiguousFields: ambiguous,
+    unmatchedFields: unmatched,
+    missingRequiredHeaders: [],
+    blocked: false,
+    blockReason: null,
+  };
 }
 
 // ---------- Mapping JSON download payload ----------

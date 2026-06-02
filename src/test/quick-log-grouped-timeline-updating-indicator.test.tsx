@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 /**
  * QuickLogGroupedTimelineSection — post-save updating indicator.
  *

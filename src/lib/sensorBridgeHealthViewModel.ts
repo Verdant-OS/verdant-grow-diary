@@ -6,7 +6,7 @@
  * Scope (intentionally narrow):
  *  - Derives a deterministic, UI-ready status from already-stored audit rows.
  *  - Never writes. Never alerts. Never queues actions. Never controls devices.
- *  - Never reads or exposes bridge tokens, secrets, or raw_payload.
+ *  - Never reads or exposes sensitive intake material.
  *  - Never classifies unknown telemetry as healthy.
  *  - Does not duplicate validation tables from sensorBridgeIntakeRules; this
  *    only maps post-validation audit rows into operator-visible labels.
@@ -53,7 +53,7 @@ export interface SensorBridgeHealthViewModel {
 
 export interface SensorBridgeHealthInput {
   rows: ReadonlyArray<SensorBridgeAuditRowLike>;
-  /** Optional human-safe bridge identity (e.g. a tent name). Never a token. */
+  /** Optional human-safe bridge identity (e.g. a tent name). Never a credential. */
   bridgeName?: string | null;
   now?: Date;
   staleMs?: number;

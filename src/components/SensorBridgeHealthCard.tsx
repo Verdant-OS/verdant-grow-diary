@@ -8,7 +8,7 @@ import type {
 
 /**
  * Read-only presenter for sensor bridge intake health. Source-honest:
- *  - Never renders raw_payload, bridge tokens, secrets, or service_role values.
+ *  - Never renders payload bodies, bridge credentials, or privileged values.
  *  - Never implies device control or automation.
  *  - Never classifies unknown telemetry as healthy.
  */

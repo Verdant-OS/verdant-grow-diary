@@ -690,3 +690,131 @@ function PreviewRow({
     </TableRow>
   );
 }
+
+// ----- Timeline preview (read-only, preview-only) -----
+
+function TimelinePreviewSection({
+  result,
+  mapping,
+}: {
+  result: RepresentativePreviewResult;
+  mapping: RepresentativeColumnMapping;
+}) {
+  const timeline: TimelinePreviewResult = useMemo(
+    () => buildCsvTimelinePreview({ rows: result.rows, mapping }),
+    [result.rows, mapping],
+  );
+  return (
+    <section
+      aria-label="Timeline preview"
+      className="space-y-3 rounded-lg border p-4"
+    >
+      <header className="space-y-1">
+        <h2 className="text-lg font-semibold">Timeline preview</h2>
+        <p className="text-xs text-muted-foreground">
+          Preview only — nothing is saved. Source: {TIMELINE_PREVIEW_SOURCE_LABEL}.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Showing {timeline.summary.previewed} of {timeline.summary.timelineReady} timeline-ready
+          rows ({timeline.summary.needsReview} need review).
+        </p>
+      </header>
+
+      {timeline.events.length === 0 ? (
+        <div
+          role="status"
+          className="rounded-md border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground"
+        >
+          No timeline-ready rows yet. Review required mappings and units.
+        </div>
+      ) : (
+        <ul className="grid gap-3 sm:grid-cols-2">
+          {timeline.events.map((ev) => (
+            <TimelineEventCard key={ev.rowIndex} event={ev} />
+          ))}
+        </ul>
+      )}
+
+      {timeline.reviewRows.length > 0 && (
+        <TimelineReviewSummary reviewRows={timeline.reviewRows} />
+      )}
+    </section>
+  );
+}
+
+function timelineSeverityVariant(severity: TimelinePreviewEvent["severity"]) {
+  return severity === "warning" ? ("secondary" as const) : ("outline" as const);
+}
+
+function TimelineEventCard({ event }: { event: TimelinePreviewEvent }) {
+  return (
+    <li
+      data-row-index={event.rowIndex}
+      className="space-y-2 rounded-md border bg-card p-3 shadow-sm"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs font-medium text-muted-foreground">
+          Row #{event.rowIndex + 1}
+        </span>
+        <Badge variant={timelineSeverityVariant(event.severity)}>
+          {event.severity}
+        </Badge>
+      </div>
+      <div className="text-sm font-semibold">{event.captured_at}</div>
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+        {event.source_label}
+      </div>
+      {event.metrics.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No mapped metrics in this row.</p>
+      ) : (
+        <ul className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+          {event.metrics.map((m) => (
+            <li key={m.field} className="flex items-baseline justify-between gap-2">
+              <span className="text-muted-foreground">{m.field}</span>
+              <span className="font-medium">
+                {Number.isInteger(m.value) ? m.value : m.value.toFixed(2)} {m.unit}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {(event.missingFields.length > 0 || event.ignoredFields.length > 0) && (
+        <div className="space-y-1 border-t pt-2 text-[11px] text-muted-foreground">
+          {event.missingFields.length > 0 && (
+            <div>Missing: {event.missingFields.join(", ")}</div>
+          )}
+          {event.ignoredFields.length > 0 && (
+            <div>Ignored (unparseable): {event.ignoredFields.join(", ")}</div>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
+
+function TimelineReviewSummary({
+  reviewRows,
+}: {
+  reviewRows: ReadonlyArray<TimelineReviewRow>;
+}) {
+  return (
+    <div
+      aria-label="Rows needing review"
+      className="space-y-2 rounded-md border border-destructive/40 bg-destructive/5 p-3"
+    >
+      <h3 className="text-sm font-semibold">Rows needing review ({reviewRows.length})</h3>
+      <ul className="space-y-1 text-xs text-muted-foreground">
+        {reviewRows.slice(0, 10).map((r) => (
+          <li key={r.rowIndex}>
+            Row #{r.rowIndex + 1}
+            {r.captured_at ? ` · ${r.captured_at}` : " · (no valid timestamp)"} —{" "}
+            {r.reasons.join("; ")}
+          </li>
+        ))}
+        {reviewRows.length > 10 && (
+          <li>…and {reviewRows.length - 10} more.</li>
+        )}
+      </ul>
+    </div>
+  );
+}

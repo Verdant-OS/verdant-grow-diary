@@ -187,6 +187,8 @@ export default function PlantDetail() {
       <AiDoctorReviewResultPreview
         testIdPrefix="plant-detail"
       />
+      <PlantDetailAiDoctorLiveReview plantId={plant.id} plant={plant} />
+
       <div id="plant-ai-doctor-context-panel" tabIndex={-1} className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">
         <PlantDetailAiDoctorContextPanel
           plantId={plant.id}

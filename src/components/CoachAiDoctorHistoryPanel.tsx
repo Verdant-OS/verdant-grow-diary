@@ -165,7 +165,7 @@ function HistoryRow({ row }: { row: AiDoctorSessionRow }) {
 
 export default function CoachAiDoctorHistoryPanel({ growId }: Props) {
   const enabled = !!growId;
-  const { data, isLoading } = useGrowAiDoctorSessions(growId);
+  const { data, isLoading, error, refetch, isRefetching } = useGrowAiDoctorSessions(growId);
   const rows: AiDoctorSessionRow[] = enabled ? (data ?? []) : [];
 
   return (
@@ -188,7 +188,7 @@ export default function CoachAiDoctorHistoryPanel({ growId }: Props) {
         </p>
         <Link
           to="/doctor/sessions"
-          className="text-[11px] text-primary underline pt-0.5"
+          className="text-[11px] text-primary underline pt-0.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           data-testid="coach-ai-doctor-history-view-all-link"
         >
           View all sessions
@@ -203,11 +203,48 @@ export default function CoachAiDoctorHistoryPanel({ growId }: Props) {
             Pick a grow to see saved AI Doctor sessions.
           </p>
         ) : isLoading ? (
-          <p className="text-muted-foreground">Loading AI Doctor history…</p>
+          <div
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+            data-testid="coach-ai-doctor-history-loading"
+            className="space-y-2"
+          >
+            <p className="text-muted-foreground">Loading AI Doctor sessions…</p>
+            <div className="h-12 rounded-lg border bg-muted/30 animate-pulse" aria-hidden="true" />
+          </div>
+        ) : error ? (
+          <div
+            role="alert"
+            data-testid="coach-ai-doctor-history-error"
+            className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm space-y-2"
+          >
+            <p className="font-medium text-foreground">Unable to load AI Doctor sessions.</p>
+            <p className="text-xs text-muted-foreground">
+              Check your connection and try again. No changes were made.
+            </p>
+            <button
+              type="button"
+              onClick={() => { void refetch(); }}
+              disabled={isRefetching}
+              data-testid="coach-ai-doctor-history-error-retry"
+              className="inline-flex items-center rounded border bg-background px-2 py-1 text-xs hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+            >
+              {isRefetching ? "Retrying…" : "Retry"}
+            </button>
+          </div>
         ) : rows.length === 0 ? (
-          <p className="text-muted-foreground" data-testid="coach-ai-doctor-history-empty">
-            No saved AI Doctor sessions yet.
-          </p>
+          <div
+            className="rounded-lg border bg-muted/20 p-3 text-sm space-y-1"
+            data-testid="coach-ai-doctor-history-empty"
+          >
+            <p className="font-medium text-foreground">
+              No AI Doctor sessions yet.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Saved diagnosis snapshots will appear here for you to review before acting.
+            </p>
+          </div>
         ) : (
           <ul className="space-y-2" data-testid="coach-ai-doctor-history-list">
             {rows.map((r) => (

@@ -18,6 +18,7 @@ import PlantRecentMoveCard from "@/components/PlantRecentMoveCard";
 import PlantAssignedTentAlertsPanel from "@/components/PlantAssignedTentAlertsPanel";
 import PlantAssignedTentActionsPanel from "@/components/PlantAssignedTentActionsPanel";
 import PlantStatusStrip from "@/components/PlantStatusStrip";
+import QuickLogV2Fab from "@/components/QuickLogV2Fab";
 import PlantQuickStatusStrip from "@/components/PlantQuickStatusStrip";
 import PlantDetailQuickActions from "@/components/PlantDetailQuickActions";
 import PlantDetailPhotoStrip from "@/components/PlantDetailPhotoStrip";
@@ -92,6 +93,7 @@ export default function PlantDetail() {
   const ageDays = Math.floor((Date.now() - new Date(plant.startedAt).getTime()) / 86400000);
   return (
     <div>
+      <QuickLogV2Fab defaultTargetKey={`plant:${plant.id}`} />
       <Button asChild variant="ghost" size="sm" className="mb-3">
         <Link to={plantsPath()}>
           <ArrowLeft className="h-4 w-4" /> Plants

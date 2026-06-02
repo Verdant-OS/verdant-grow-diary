@@ -166,8 +166,9 @@ function SessionRow({ row }: { row: AiDoctorSessionRow }) {
       <div className="pt-1">
         <Link
           to={`/doctor/sessions/${row.id}`}
-          className="text-xs text-primary underline"
+          className="text-xs text-primary underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           data-testid="ai-doctor-session-view-link"
+          aria-label={`Open AI Doctor session${likelyIssue ? `: ${likelyIssue}` : row.created_at ? ` from ${fmtDate(row.created_at)}` : ""}`}
         >
           View session
         </Link>
@@ -178,7 +179,7 @@ function SessionRow({ row }: { row: AiDoctorSessionRow }) {
 
 export default function PlantAiDoctorSessionsPanel({ plantId }: Props) {
   const enabled = !!plantId;
-  const { data, isLoading } = useAiDoctorSessions(plantId);
+  const { data, isLoading, error, refetch, isRefetching } = useAiDoctorSessions(plantId);
   const rows: AiDoctorSessionRow[] = enabled ? (data ?? []) : [];
 
   return (
@@ -203,11 +204,48 @@ export default function PlantAiDoctorSessionsPanel({ plantId }: Props) {
             No plant selected.
           </p>
         ) : isLoading ? (
-          <p className="text-muted-foreground">Loading AI Doctor history…</p>
+          <div
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+            data-testid="plant-ai-doctor-sessions-loading"
+            className="space-y-2"
+          >
+            <p className="text-muted-foreground">Loading AI Doctor sessions…</p>
+            <div className="h-12 rounded-lg border bg-muted/30 animate-pulse" aria-hidden="true" />
+          </div>
+        ) : error ? (
+          <div
+            role="alert"
+            data-testid="plant-ai-doctor-sessions-error"
+            className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm space-y-2"
+          >
+            <p className="font-medium text-foreground">Unable to load AI Doctor sessions.</p>
+            <p className="text-xs text-muted-foreground">
+              Check your connection and try again. No changes were made.
+            </p>
+            <button
+              type="button"
+              onClick={() => { void refetch(); }}
+              disabled={isRefetching}
+              data-testid="plant-ai-doctor-sessions-error-retry"
+              className="inline-flex items-center rounded border bg-background px-2 py-1 text-xs hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+            >
+              {isRefetching ? "Retrying…" : "Retry"}
+            </button>
+          </div>
         ) : rows.length === 0 ? (
-          <p className="text-muted-foreground" data-testid="plant-ai-doctor-sessions-empty">
-            No AI Doctor sessions saved for this plant yet.
-          </p>
+          <div
+            className="rounded-lg border bg-muted/20 p-3 text-sm space-y-1"
+            data-testid="plant-ai-doctor-sessions-empty"
+          >
+            <p className="font-medium text-foreground">
+              No AI Doctor sessions for this plant yet.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Saved diagnosis snapshots will appear here for you to review before acting.
+            </p>
+          </div>
         ) : (
           <ul className="space-y-2" data-testid="plant-ai-doctor-sessions-list">
             {rows.map((r) => (

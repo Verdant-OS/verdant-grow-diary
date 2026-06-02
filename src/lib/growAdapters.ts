@@ -1,7 +1,61 @@
 // Pure adapter functions: Supabase row -> app domain shape (matches @/mock types).
 // No side effects. No I/O. Safe to unit-test in isolation.
 import type { TentRow, PlantRow, SensorReadingRow } from "@/lib/db";
-import type { Tent, Plant, SensorReading, Stage } from "@/mock";
+import type {
+  Tent,
+  Plant,
+  SensorReading,
+  SensorReadingSource,
+  SensorReadingHealthStatus,
+  Stage,
+} from "@/mock";
+import {
+  classifySensorSnapshotStatus,
+  type SensorSnapshotStatus,
+} from "@/lib/sensorSnapshotStatusContract";
+
+const VALID_SOURCES: readonly SensorReadingSource[] = [
+  "live",
+  "manual",
+  "csv",
+  "demo",
+  "stale",
+  "invalid",
+];
+
+/**
+ * Coerce a free-text `sensor_readings.source` column to the canonical
+ * SensorReadingSource union. Unknown / empty values become "live" — the
+ * row came from the DB ingest path, so the *provenance* is live; the
+ * status field separately captures whether the value is usable.
+ */
+function coerceSource(v: string | null | undefined): SensorReadingSource {
+  const s = (v ?? "").toLowerCase();
+  return (VALID_SOURCES as readonly string[]).includes(s)
+    ? (s as SensorReadingSource)
+    : "live";
+}
+
+/**
+ * Derive a canonical SnapshotStatus for a single DB-backed reading. The
+ * contract is the single source of truth — never inline classify in JSX.
+ * A reading with no parseable capturedAt is "needs_review", never
+ * defaulted to "usable".
+ */
+function deriveReadingStatus(
+  capturedAt: string | null | undefined,
+  source: SensorReadingSource,
+  now: Date = new Date(),
+): SensorReadingHealthStatus {
+  const result = classifySensorSnapshotStatus({
+    rowsReceived: 1,
+    rowsAccepted: 1,
+    capturedAt: capturedAt ?? null,
+    source,
+    now,
+  });
+  return result.status as SensorSnapshotStatus;
+}
 
 const VALID_STAGES: readonly Stage[] = ["seedling", "veg", "flower", "flush", "harvest", "cure"];
 const VALID_HEALTH = ["healthy", "watch", "issue"] as const;

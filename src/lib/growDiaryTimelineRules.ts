@@ -222,6 +222,7 @@ export function toTimelineItem(
     notePreview: clipNotePreview(entry.note, maxLen),
     hasPhoto: !!entry.photoUrl,
     hasSensorSnapshot: !!entry.details.sensorSnapshot,
+    sensorSnapshotState: entry.details.sensorSnapshot?.state ?? null,
     tags: buildTags(entry),
     warnings: entry.warnings.slice(),
     isUsefulForAiContext: entry.isValidForAiContext,

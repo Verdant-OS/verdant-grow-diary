@@ -45,6 +45,14 @@ const TARGETS = [
     name: "PlantDetailAiDoctorReadinessGate",
     path: "src/components/PlantDetailAiDoctorReadinessGate.tsx",
   },
+  {
+    name: "aiDoctorSafeReviewStartViewModel",
+    path: "src/lib/aiDoctorSafeReviewStartViewModel.ts",
+  },
+  {
+    name: "PlantDetailAiDoctorSafeReviewStart",
+    path: "src/components/PlantDetailAiDoctorSafeReviewStart.tsx",
+  },
 ];
 
 describe("ai doctor context panel — static safety", () => {

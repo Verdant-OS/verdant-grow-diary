@@ -141,7 +141,13 @@ export default function PlantDetailAiDoctorContextPanel({
           ) : (
             <ul className="space-y-0.5 text-xs">
               {result.evidence.map((code) => (
-                <li key={code} className="flex items-start gap-1.5">
+                <li
+                  key={code}
+                  className="flex items-start gap-1.5"
+                  title={tooltipForEvidence(code)}
+                  data-tooltip={tooltipForEvidence(code)}
+                  data-code={code}
+                >
                   <CheckCircle2
                     className="h-3.5 w-3.5 mt-0.5 text-emerald-400 shrink-0"
                     aria-hidden="true"
@@ -161,7 +167,13 @@ export default function PlantDetailAiDoctorContextPanel({
           ) : (
             <ul className="space-y-0.5 text-xs">
               {result.missing.map((code) => (
-                <li key={code} className="flex items-start gap-1.5">
+                <li
+                  key={code}
+                  className="flex items-start gap-1.5"
+                  title={tooltipForMissing(code)}
+                  data-tooltip={tooltipForMissing(code)}
+                  data-code={code}
+                >
                   <AlertTriangle
                     className="h-3.5 w-3.5 mt-0.5 text-amber-400 shrink-0"
                     aria-hidden="true"

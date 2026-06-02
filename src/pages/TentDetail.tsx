@@ -24,6 +24,7 @@ import TentManualSnapshotChangeContext from "@/components/TentManualSnapshotChan
 import TentManualSnapshotHistoryList from "@/components/TentManualSnapshotHistoryList";
 import ManualSnapshotTimelineSection from "@/components/ManualSnapshotTimelineSection";
 import TimelineMemorySection from "@/components/TimelineMemorySection";
+import QuickLogGroupedTimelineSection from "@/components/QuickLogGroupedTimelineSection";
 import TentCsvImportCard from "@/components/TentCsvImportCard";
 import TentSensorWebhookSettingsCard from "@/components/TentSensorWebhookSettingsCard";
 import TentBridgeTokensCard from "@/components/TentBridgeTokensCard";

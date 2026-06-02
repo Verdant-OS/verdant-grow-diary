@@ -231,6 +231,156 @@ export default function RepresentativeCsvPreview() {
               Detected headers: {headers.join(", ") || "—"}
             </p>
           </div>
+
+          <div
+            aria-label="Mapping actions"
+            className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-3"
+          >
+            <label className="text-xs font-medium" htmlFor="csv-template">
+              Apply template
+            </label>
+            <select
+              id="csv-template"
+              aria-label="Apply mapping template"
+              className="h-9 rounded-md border bg-background px-2 text-sm"
+              value={templateId ?? ""}
+              onChange={(e) => {
+                const id = (e.target.value || null) as CsvMappingTemplateId | null;
+                setTemplateId(id);
+                setPresetNotice(null);
+                if (!id || !headers) {
+                  setTemplateNotice(null);
+                  return;
+                }
+                const tpl = getCsvMappingTemplate(id);
+                if (!tpl) return;
+                const applied = applyCsvMappingTemplate(tpl, headers);
+                setMapping(applied.mapping);
+                const parts: string[] = [`Template "${tpl.name}" applied.`];
+                if (applied.ambiguousFields.length > 0) {
+                  parts.push(
+                    `Multiple headers matched — review: ${applied.ambiguousFields.join(", ")}.`,
+                  );
+                }
+                if (applied.unmatchedFields.length > 0) {
+                  parts.push(
+                    `No header found for: ${applied.unmatchedFields.join(", ")}.`,
+                  );
+                }
+                setTemplateNotice(parts.join(" "));
+              }}
+            >
+              <option value="">— Choose template —</option>
+              {CSV_MAPPING_TEMPLATES.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                const payload = buildMappingDownloadPayload({
+                  mapping,
+                  headers,
+                  templateId,
+                  templateName: templateId
+                    ? getCsvMappingTemplate(templateId)?.name ?? null
+                    : null,
+                });
+                const blob = new Blob([JSON.stringify(payload, null, 2)], {
+                  type: "application/json",
+                });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = csvMappingDownloadFileName();
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+              }}
+            >
+              Download mapping JSON
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                const preset = buildCsvMappingPreset({
+                  mapping,
+                  templateId,
+                  templateName: templateId
+                    ? getCsvMappingTemplate(templateId)?.name ?? null
+                    : null,
+                });
+                const ok = saveCsvMappingPreset(preset);
+                setHasSavedPreset(ok);
+                setPresetNotice(
+                  ok
+                    ? "Preset saved in this browser."
+                    : "Could not save preset in this browser.",
+                );
+              }}
+            >
+              Save preset in this browser
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!hasSavedPreset}
+              onClick={() => {
+                const preset = loadCsvMappingPreset();
+                if (!preset || !headers) {
+                  setPresetNotice("No saved preset found in this browser.");
+                  return;
+                }
+                const applied = applyCsvMappingPreset(preset, headers);
+                setMapping(applied.mapping);
+                setTemplateId(preset.template_id);
+                const parts: string[] = ["Saved preset applied."];
+                if (applied.missingHeaders.length > 0) {
+                  parts.push(
+                    `Saved headers not found in this CSV: ${applied.missingHeaders
+                      .map((m) => `${m.field}=${m.header}`)
+                      .join(", ")}. Fields left unmapped — no guesses.`,
+                  );
+                }
+                setPresetNotice(parts.join(" "));
+              }}
+            >
+              Apply saved preset
+            </Button>
+
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={!hasSavedPreset}
+              onClick={() => {
+                clearCsvMappingPreset();
+                setHasSavedPreset(false);
+                setPresetNotice("Saved preset cleared from this browser.");
+              }}
+            >
+              Clear saved preset
+            </Button>
+          </div>
+
+          {templateNotice && (
+            <p role="status" className="text-xs text-muted-foreground">
+              {templateNotice}
+            </p>
+          )}
+          {presetNotice && (
+            <p role="status" className="text-xs text-muted-foreground">
+              {presetNotice}
+            </p>
+          )}
+
           <div className="grid gap-3 sm:grid-cols-2">
             {FIELD_DESCRIPTORS.map((desc) => (
               <div key={desc.field} className="rounded-md border p-3">
@@ -278,7 +428,7 @@ export default function RepresentativeCsvPreview() {
       )}
 
       {result && <PreviewSummaryStrip result={result} />}
-      {result && <PreviewTable result={result} />}
+      {result && <PreviewTable result={result} mapping={mapping} />}
     </main>
   );
 }

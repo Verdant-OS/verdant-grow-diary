@@ -156,7 +156,21 @@ function genReadings(): SensorReading[] {
       const vpd = +Math.max(0.4, ((1 - rh / 100) * (0.6108 * Math.exp((17.27 * temp) / (temp + 237.3))))).toFixed(2);
       const co2 = Math.round(700 + Math.sin(phase) * 150 + (Math.random() - 0.5) * 40);
       const soil = +(38 + Math.sin(phase / 3) * 10 + (Math.random() - 0.5) * 4).toFixed(1);
-      out.push({ ts, tentId: t.id, temp, rh, vpd, co2, soil });
+      out.push({
+        ts,
+        tentId: t.id,
+        temp,
+        rh,
+        vpd,
+        co2,
+        soil,
+        // Mock fixtures are NEVER live data. They are tagged demo and
+        // explicitly classified as needs_review so the contract gate in
+        // countsAsHealthyEvidence() cannot ever treat them as healthy.
+        source: "demo",
+        status: "needs_review",
+        capturedAt: ts,
+      });
     }
   }
   return out;

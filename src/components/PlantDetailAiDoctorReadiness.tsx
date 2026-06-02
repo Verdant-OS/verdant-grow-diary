@@ -115,12 +115,27 @@ export default function PlantDetailAiDoctorReadiness({
     return deriveSignals(plantId, hasPlantPhoto, rawRows ?? []);
   }, [plantId, hasPlantPhoto, rawRows]);
 
+  // Route the legacy timeline-derived snapshot boolean through the shared
+  // contract by constructing an explicit Classification at the boundary.
+  // The contract decides whether this counts as healthy evidence — the
+  // component never bypasses it.
+  const sensorSnapshot = useMemo<Classification | null>(() => {
+    if (!signals.hasSensorSnapshot) return null;
+    return {
+      status: "usable",
+      reason: "fresh_accepted",
+      isHealthyEvidence: true,
+      label: "Latest bridge reading accepted.",
+    };
+  }, [signals.hasSensorSnapshot]);
+
   const result = useMemo(() => {
     return buildPlantDetailAiDoctorReadiness({
       stage,
       ...signals,
+      sensorSnapshot,
     });
-  }, [stage, signals]);
+  }, [stage, signals, sensorSnapshot]);
 
   const doctorHref = plantId
     ? `/doctor?plantId=${encodeURIComponent(plantId)}`

@@ -210,6 +210,22 @@ export default function PlantDetailAiDoctorContextPanel({
         </div>
       </div>
 
+      {quickActions.length > 0 ? (
+        <AiDoctorContextQuickActions
+          actions={quickActions}
+          testIdPrefix="plant-ai-doctor-context"
+        />
+      ) : null}
+
+      {noWarningContext ? (
+        <p
+          className="text-[11px] text-muted-foreground"
+          data-testid="plant-ai-doctor-context-no-warning"
+        >
+          {AI_DOCTOR_NO_WARNING_CONTEXT_COPY}
+        </p>
+      ) : null}
+
       <p
         className="text-xs"
         data-testid="plant-ai-doctor-context-safe-next-step"

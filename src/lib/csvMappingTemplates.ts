@@ -30,7 +30,9 @@ export const CSV_MAPPING_PRESET_SOURCE = "representative_csv" as const;
 export type CsvMappingTemplateId =
   | "generic_env"
   | "ac_infinity"
-  | "generic_sensor_logger";
+  | "generic_sensor_logger"
+  | "aroya_representative"
+  | "blank_reset";
 
 interface TemplateSynonyms {
   /** lowercase, whitespace-collapsed header strings to match exactly. */
@@ -39,6 +41,10 @@ interface TemplateSynonyms {
 }
 
 export interface CsvMappingTemplate {
+  /** Canonical fields that MUST resolve to a header in the source CSV. */
+  readonly requiredFields?: ReadonlyArray<RepresentativeMappingField>;
+  /** When true, applying this template clears the mapping and skips matching. */
+  readonly isReset?: boolean;
   readonly id: CsvMappingTemplateId;
   readonly name: string;
   readonly description: string;

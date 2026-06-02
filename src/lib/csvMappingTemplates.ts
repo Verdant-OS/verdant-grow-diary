@@ -96,6 +96,41 @@ export const CSV_MAPPING_TEMPLATES: ReadonlyArray<CsvMappingTemplate> = [
       vwc: { synonyms: ["soil_moisture", "vwc", "wc"] },
     },
   },
+  {
+    id: "aroya_representative",
+    name: "AROYA-shaped (representative guess)",
+    description:
+      "Representative shape inspired by AROYA-style exports. Not a confirmed AROYA importer — review every column.",
+    requiredFields: ["timestamp"],
+    fields: {
+      timestamp: {
+        synonyms: ["timestamp", "captured_at", "date time", "date_time", "time"],
+      },
+      air_temp: {
+        synonyms: ["air_temp", "room_temp", "climate_temp"],
+        unit: "C",
+      },
+      humidity: { synonyms: ["humidity", "rh", "room_rh"] },
+      vpd: { synonyms: ["vpd", "room_vpd"] },
+      substrate_ec: {
+        synonyms: ["substrate_ec", "rootzone_ec", "ec"],
+        unit: "mS/cm",
+      },
+      vwc: { synonyms: ["vwc", "water_content", "substrate_vwc"] },
+      substrate_temp: {
+        synonyms: ["substrate_temp", "rootzone_temp"],
+        unit: "C",
+      },
+    },
+  },
+  {
+    id: "blank_reset",
+    name: "Blank (clear mapping)",
+    description:
+      "Clears all selected headers without changing source labeling. Useful to start over.",
+    isReset: true,
+    fields: {},
+  },
 ];
 
 export function getCsvMappingTemplate(

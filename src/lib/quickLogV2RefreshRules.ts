@@ -13,8 +13,8 @@
  *    a "first/default" plant or tent.
  *  - Source-honest: no realtime-stream wording is used or emitted in any
  *    field, label, or key.
- *  - No alerts/action_queue/ai_doctor_sessions writes. No device control.
- *    No schema/RPC/write behavior changes.
+ *  - Display-only: never performs writes of any kind, and never touches
+ *    queues, automation, sessions, or hardware.
  */
 
 export type QuickLogV2RefreshTargetType = "plant" | "tent";

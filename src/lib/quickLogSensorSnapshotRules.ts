@@ -113,3 +113,15 @@ export function classifyQuickLogSnapshotSource(
   return { source: source ?? "live", state: "live" };
 }
 
+/**
+ * Return true only when the snapshot state is safe to embed into a diary entry.
+ * "live" and "manual" pass through; "stale" and "invalid" are dropped.
+ */
+export function shouldEmbedSnapshot(
+  state: QuickLogSnapshotState | string | null | undefined,
+): boolean {
+  const s = (state ?? "").trim().toLowerCase();
+  return s === "live" || s === "manual";
+}
+
+

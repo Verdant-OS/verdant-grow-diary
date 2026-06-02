@@ -339,14 +339,16 @@ export default function RepresentativeCsvPreview() {
               type="button"
               variant="outline"
               onClick={() => {
-                const preset = buildCsvMappingPreset({
+                if (!headers) return;
+                const config = buildCsvMappingConfig({
                   mapping,
+                  headers,
                   templateId,
                   templateName: templateId
                     ? getCsvMappingTemplate(templateId)?.name ?? null
                     : null,
                 });
-                const ok = saveCsvMappingPreset(preset);
+                const ok = saveCsvMappingPreset(config);
                 setHasSavedPreset(ok);
                 setPresetNotice(
                   ok

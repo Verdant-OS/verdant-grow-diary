@@ -283,8 +283,9 @@ function IndexRow({
         ) : null}
         <Link
           to={`/doctor/sessions/${row.id}`}
-          className="text-primary underline"
+          className="text-primary underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           data-testid="ai-doctor-sessions-index-view-link"
+          aria-label={`View AI Doctor session${d?.likelyIssue ? `: ${d.likelyIssue}` : row.created_at ? ` from ${fmtDate(row.created_at)}` : ""}`}
         >
           View session
         </Link>
@@ -317,7 +318,7 @@ export default function AiDoctorSessionsIndex() {
     [searchParams],
   );
 
-  const { data, isLoading, error } = useAiDoctorSessionsIndex(page, filters);
+  const { data, isLoading, error, refetch, isRefetching } = useAiDoctorSessionsIndex(page, filters);
   const rawRows = data?.rows ?? [];
   // Scope review-event fetch to the raw (server-paginated) IDs so the review
   // filter has data available even when its filter narrows the row set.
@@ -1079,29 +1080,80 @@ export default function AiDoctorSessionsIndex() {
           ) : null}
 
           {isLoading ? (
-            <p className="text-muted-foreground">Loading AI Doctor sessions…</p>
+            <div
+              role="status"
+              aria-live="polite"
+              aria-busy="true"
+              className="space-y-2"
+              data-testid="ai-doctor-sessions-index-loading"
+            >
+              <p className="text-muted-foreground">Loading AI Doctor sessions…</p>
+              <div className="space-y-2" aria-hidden="true">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="h-16 rounded-lg border bg-muted/30 animate-pulse"
+                  />
+                ))}
+              </div>
+            </div>
           ) : error ? (
-            <p
-              className="text-muted-foreground"
+            <div
+              role="alert"
+              className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm space-y-2"
               data-testid="ai-doctor-sessions-index-error"
             >
-              Unable to load AI Doctor sessions.
-            </p>
+              <p className="font-medium text-foreground">
+                Unable to load AI Doctor sessions.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Check your connection and try again. No changes were made.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { void refetch(); }}
+                disabled={isRefetching}
+                data-testid="ai-doctor-sessions-index-error-retry"
+                className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              >
+                {isRefetching ? "Retrying…" : "Retry"}
+              </Button>
+            </div>
           ) : rows.length === 0 && page === 0 ? (
             filtersActive ? (
-              <p
-                className="text-muted-foreground"
+              <div
+                className="rounded-lg border bg-muted/20 p-4 text-sm space-y-2"
                 data-testid="ai-doctor-sessions-index-empty-filtered"
               >
-                No sessions match these filters.
-              </p>
+                <p className="font-medium text-foreground">
+                  No sessions match these filters.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Try adjusting or clearing your filters to review more sessions.
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearFilters}
+                  data-testid="ai-doctor-sessions-index-empty-filtered-clear"
+                  className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                  Clear filters
+                </Button>
+              </div>
             ) : (
-              <p
-                className="text-muted-foreground"
+              <div
+                className="rounded-lg border bg-muted/20 p-4 text-sm space-y-1"
                 data-testid="ai-doctor-sessions-index-empty"
               >
-                No saved AI Doctor sessions yet.
-              </p>
+                <p className="font-medium text-foreground">
+                  No AI Doctor sessions yet.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Saved diagnosis snapshots will appear here for you to review. Opening a session never re-runs AI or creates actions.
+                </p>
+              </div>
             )
           ) : (
             <>

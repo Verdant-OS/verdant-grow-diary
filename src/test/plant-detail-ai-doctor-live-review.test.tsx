@@ -3,9 +3,20 @@
  * No real Supabase calls; useTimelineMemory + invoke are stubbed.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import { render as rtlRender, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement } from "react";
 import type { TimelineMemoryItem } from "@/lib/timelineFilterRules";
 import type { ManualSnapshotTimelineCard } from "@/lib/manualSensorSnapshotViewModel";
+
+function render(ui: ReactElement) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return rtlRender(
+    <QueryClientProvider client={client}>{ui}</QueryClientProvider>,
+  );
+}
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {

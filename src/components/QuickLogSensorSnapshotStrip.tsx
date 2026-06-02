@@ -10,7 +10,7 @@
  * No classification rules live in this file. No writes. No automation.
  * Action buttons are navigation-only and point at /sensors.
  */
-import { Link } from "react-router-dom";
+
 import { Gauge } from "lucide-react";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import {

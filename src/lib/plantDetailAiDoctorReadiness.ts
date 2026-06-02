@@ -105,12 +105,76 @@ function isStageKnown(stage: string | null | undefined): boolean {
   return s !== "" && s !== "unknown";
 }
 
-function countPresent(input: PlantDetailAiDoctorReadinessInput): number {
+function evaluateSensorEvidence(
+  input: PlantDetailAiDoctorReadinessInput,
+): AiDoctorSensorEvidence {
+  const snap = input.sensorSnapshot ?? null;
+  if (!snap) {
+    if (input.hasSensorSnapshot) {
+      return {
+        mode: "unknown",
+        status: null,
+        reason: null,
+        countsAsHealthyEvidence: true,
+        isCautionary: false,
+        isUnsafe: false,
+        isMissing: false,
+        label: "Sensor snapshot present",
+      };
+    }
+    return {
+      mode: "missing",
+      status: "no_data",
+      reason: "no_rows",
+      countsAsHealthyEvidence: false,
+      isCautionary: false,
+      isUnsafe: false,
+      isMissing: true,
+      label: "No sensor snapshot",
+    };
+  }
+  const healthy = snap.status === "usable";
+  const cautionary = snap.status === "stale";
+  const unsafe = snap.status === "invalid" || snap.status === "needs_review";
+  const missing = snap.status === "no_data";
+  let mode: AiDoctorSensorEvidenceMode = "unknown";
+  let label = snap.label;
+  if (healthy) mode = "healthy";
+  else if (cautionary) {
+    mode = "cautionary";
+    label = "Sensor snapshot is outside the stale window — cautionary context only.";
+  } else if (unsafe) {
+    mode = "unsafe";
+    label =
+      snap.status === "invalid"
+        ? "Sensor snapshot rejected as invalid — not used for recommendations."
+        : "Sensor snapshot needs review — not used for recommendations.";
+  } else if (missing) {
+    mode = "missing";
+    label = "No sensor snapshot.";
+  }
+  return {
+    mode,
+    status: snap.status,
+    reason: snap.reason,
+    countsAsHealthyEvidence: healthy,
+    isCautionary: cautionary,
+    isUnsafe: unsafe,
+    isMissing: missing,
+    label,
+  };
+}
+
+function countPresent(
+  input: PlantDetailAiDoctorReadinessInput,
+  sensorEvidence: AiDoctorSensorEvidence,
+): number {
   let count = 0;
   if (isStageKnown(input.stage)) count++;
   if (input.hasTimelineEntries) count++;
   if (input.hasRecentPhoto) count++;
-  if (input.hasSensorSnapshot) count++;
+  // Sensor signal is gated by the shared contract: only `usable` counts.
+  if (sensorEvidence.countsAsHealthyEvidence) count++;
   if (input.hasRecentWateringOrFeed) count++;
   return count;
 }

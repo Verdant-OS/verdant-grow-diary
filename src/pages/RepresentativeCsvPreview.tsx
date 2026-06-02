@@ -96,8 +96,10 @@ export default function RepresentativeCsvPreview() {
   const [templateId, setTemplateId] = useState<CsvMappingTemplateId | null>(null);
   const [templateNotice, setTemplateNotice] = useState<string | null>(null);
   const [presetNotice, setPresetNotice] = useState<string | null>(null);
+  const [importNotice, setImportNotice] = useState<{ kind: "success" | "blocked"; message: string } | null>(null);
   const [hasSavedPreset, setHasSavedPreset] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setHasSavedPreset(loadCsvMappingPreset() !== null);

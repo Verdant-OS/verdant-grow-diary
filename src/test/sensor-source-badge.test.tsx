@@ -7,9 +7,11 @@
  *  - usable + non-demo source is the ONLY combination that resolves to `ok`
  *  - stale / invalid / needs_review render distinctly from usable
  */
-import { describe, it, expect } from "vitest";
-import { render } from "@testing-library/react";
+import { describe, it, expect, afterEach } from "vitest";
+import { render, cleanup } from "@testing-library/react";
 import SensorSourceBadge from "@/components/SensorSourceBadge";
+
+afterEach(() => cleanup());
 
 function renderBadge(props: React.ComponentProps<typeof SensorSourceBadge>) {
   const { getByTestId } = render(<SensorSourceBadge {...props} />);

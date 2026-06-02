@@ -226,9 +226,9 @@ describe("representativeCsvSensorPreviewRules — static safety scan", () => {
   }
 
   it("page visibly labels CSV import + representative sample + not live", () => {
-    expect(page).toMatch(/CSV import/);
-    expect(page).toMatch(/Representative sample/);
-    expect(page).toMatch(/Not live data/);
+    expect(pageRaw).toMatch(/CSV import/);
+    expect(pageRaw).toMatch(/Representative sample/);
+    expect(pageRaw).toMatch(/Not live data/);
   });
 
   it("page does not auto-infer tent_id from CSV Room/Zone", () => {

@@ -29,6 +29,14 @@ const TARGETS = [
     name: "aiDoctorContextReadiness",
     path: "src/constants/aiDoctorContextReadiness.ts",
   },
+  {
+    name: "aiDoctorContextQuickActionsViewModel",
+    path: "src/lib/aiDoctorContextQuickActionsViewModel.ts",
+  },
+  {
+    name: "AiDoctorContextQuickActions",
+    path: "src/components/AiDoctorContextQuickActions.tsx",
+  },
 ];
 
 describe("ai doctor context panel — static safety", () => {

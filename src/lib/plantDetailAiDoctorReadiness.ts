@@ -38,6 +38,8 @@ export interface AiDoctorReadinessResult {
   presentCount: number;
   /** Total number of evaluated signals (always 5). */
   totalSignals: number;
+  /** Sensor evidence breakdown from the shared contract. */
+  sensorEvidence: AiDoctorSensorEvidence;
 }
 
 export interface PlantDetailAiDoctorReadinessInput {
@@ -47,10 +49,44 @@ export interface PlantDetailAiDoctorReadinessInput {
   hasTimelineEntries: boolean;
   /** True when a recent photo exists for this plant. */
   hasRecentPhoto: boolean;
-  /** True when at least one recent activity entry includes a sensor snapshot. */
+  /**
+   * True when a recent activity includes a sensor snapshot. NOTE: when
+   * `sensorSnapshot` is provided, the shared contract gates this flag —
+   * only `usable` counts as healthy evidence. Stale / invalid /
+   * needs_review / no_data do NOT count.
+   */
   hasSensorSnapshot: boolean;
   /** True when at least one recent activity entry is watering or feeding. */
   hasRecentWateringOrFeed: boolean;
+  /**
+   * Optional shared-contract classification of the most recent sensor
+   * snapshot. When provided, it overrides `hasSensorSnapshot` for the
+   * healthy-evidence count and drives the cautionary/unsafe surface.
+   */
+  sensorSnapshot?: import("@/lib/sensorSnapshotStatusContract").Classification | null;
+}
+
+export type AiDoctorSensorEvidenceMode =
+  | "healthy"
+  | "cautionary"
+  | "unsafe"
+  | "missing"
+  | "unknown";
+
+export interface AiDoctorSensorEvidence {
+  mode: AiDoctorSensorEvidenceMode;
+  status: import("@/lib/sensorSnapshotStatusContract").SnapshotStatus | null;
+  reason: import("@/lib/sensorSnapshotStatusContract").SnapshotReason | null;
+  /** True only when `status === "usable"`. */
+  countsAsHealthyEvidence: boolean;
+  /** True when status === "stale" — show as cautionary context only. */
+  isCautionary: boolean;
+  /** True when status is invalid or needs_review — never use for recommendations. */
+  isUnsafe: boolean;
+  /** True when status is no_data or no classification provided. */
+  isMissing: boolean;
+  /** Short, presenter-safe label. */
+  label: string;
 }
 
 const TOTAL_SIGNALS = 5;
@@ -69,12 +105,76 @@ function isStageKnown(stage: string | null | undefined): boolean {
   return s !== "" && s !== "unknown";
 }
 
-function countPresent(input: PlantDetailAiDoctorReadinessInput): number {
+function evaluateSensorEvidence(
+  input: PlantDetailAiDoctorReadinessInput,
+): AiDoctorSensorEvidence {
+  const snap = input.sensorSnapshot ?? null;
+  if (!snap) {
+    if (input.hasSensorSnapshot) {
+      return {
+        mode: "unknown",
+        status: null,
+        reason: null,
+        countsAsHealthyEvidence: true,
+        isCautionary: false,
+        isUnsafe: false,
+        isMissing: false,
+        label: "Sensor snapshot present",
+      };
+    }
+    return {
+      mode: "missing",
+      status: "no_data",
+      reason: "no_rows",
+      countsAsHealthyEvidence: false,
+      isCautionary: false,
+      isUnsafe: false,
+      isMissing: true,
+      label: "No sensor snapshot",
+    };
+  }
+  const healthy = snap.status === "usable";
+  const cautionary = snap.status === "stale";
+  const unsafe = snap.status === "invalid" || snap.status === "needs_review";
+  const missing = snap.status === "no_data";
+  let mode: AiDoctorSensorEvidenceMode = "unknown";
+  let label = snap.label;
+  if (healthy) mode = "healthy";
+  else if (cautionary) {
+    mode = "cautionary";
+    label = "Sensor snapshot is outside the stale window — cautionary context only.";
+  } else if (unsafe) {
+    mode = "unsafe";
+    label =
+      snap.status === "invalid"
+        ? "Sensor snapshot rejected as invalid — not used for recommendations."
+        : "Sensor snapshot needs review — not used for recommendations.";
+  } else if (missing) {
+    mode = "missing";
+    label = "No sensor snapshot.";
+  }
+  return {
+    mode,
+    status: snap.status,
+    reason: snap.reason,
+    countsAsHealthyEvidence: healthy,
+    isCautionary: cautionary,
+    isUnsafe: unsafe,
+    isMissing: missing,
+    label,
+  };
+}
+
+function countPresent(
+  input: PlantDetailAiDoctorReadinessInput,
+  sensorEvidence: AiDoctorSensorEvidence,
+): number {
   let count = 0;
   if (isStageKnown(input.stage)) count++;
   if (input.hasTimelineEntries) count++;
   if (input.hasRecentPhoto) count++;
-  if (input.hasSensorSnapshot) count++;
+  // Sensor signal is gated by the shared contract: only `usable` counts.
+  if (sensorEvidence.countsAsHealthyEvidence) count++;
   if (input.hasRecentWateringOrFeed) count++;
   return count;
 }
@@ -142,9 +242,15 @@ function subheadForLevel(level: AiDoctorReadinessLevel, presentCount: number): s
 export function buildPlantDetailAiDoctorReadiness(
   input: PlantDetailAiDoctorReadinessInput,
 ): AiDoctorReadinessResult {
-  const presentCount = countPresent(input);
+  const sensorEvidence = evaluateSensorEvidence(input);
+  // Mirror the gated sensor signal into hasSensorSnapshot for buildMissing.
+  const gatedInput: PlantDetailAiDoctorReadinessInput = {
+    ...input,
+    hasSensorSnapshot: sensorEvidence.countsAsHealthyEvidence,
+  };
+  const presentCount = countPresent(gatedInput, sensorEvidence);
   const level = levelFromCount(presentCount);
-  const missing = buildMissing(input);
+  const missing = buildMissing(gatedInput);
 
   return {
     level,
@@ -153,5 +259,6 @@ export function buildPlantDetailAiDoctorReadiness(
     missing,
     presentCount,
     totalSignals: TOTAL_SIGNALS,
+    sensorEvidence,
   };
 }

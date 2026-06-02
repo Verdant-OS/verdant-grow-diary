@@ -35,11 +35,11 @@ describe("RepresentativeCsvPreview — validation hint rendering", () => {
       "bad-date,24,55",
     ].join("\n");
     await uploadCsv(csv);
-    // The row is still rendered (row #1 cell present), and the blocked
-    // notice is shown.
-    expect(await screen.findByText("1")).toBeInTheDocument();
     expect(
-      screen.getByText(/Blocked from canonical preview/i),
+      await screen.findByText(/Blocked from canonical preview/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/timestamp — header "Timestamp" maps OK; value "bad-date" unparseable/i),
     ).toBeInTheDocument();
   });
 

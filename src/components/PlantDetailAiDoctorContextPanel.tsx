@@ -22,10 +22,22 @@ import {
   AI_DOCTOR_INSUFFICIENT_NOTICE,
   type AiDoctorContextReadiness,
 } from "@/lib/aiDoctorContextRules";
+import {
+  buildAiDoctorContextQuickActions,
+  AI_DOCTOR_NO_WARNING_CONTEXT_COPY,
+} from "@/lib/aiDoctorContextQuickActionsViewModel";
+import AiDoctorContextQuickActions from "@/components/AiDoctorContextQuickActions";
 
 export interface PlantDetailAiDoctorContextPanelProps {
   plantId: string;
-  plant: AiDoctorContextPlantSource | null;
+  plant:
+    | (AiDoctorContextPlantSource & {
+        id?: string | null;
+        name?: string | null;
+        growId?: string | null;
+        tentId?: string | null;
+      })
+    | null;
 }
 
 const READINESS_STYLES: Record<

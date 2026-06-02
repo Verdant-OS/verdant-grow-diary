@@ -50,10 +50,11 @@ export interface PlantDetailAiDoctorReadinessInput {
   /** True when a recent photo exists for this plant. */
   hasRecentPhoto: boolean;
   /**
-   * True when a recent activity includes a sensor snapshot. NOTE: when
-   * `sensorSnapshot` is provided, the shared contract gates this flag —
-   * only `usable` counts as healthy evidence. Stale / invalid /
-   * needs_review / no_data do NOT count.
+   * Legacy presence hint — TRUE if any timeline row carried a snapshot.
+   * This boolean alone NEVER counts as healthy sensor evidence. The
+   * healthy gate is `sensorSnapshot` (a contract `Classification`).
+   * Used only for the "No sensor snapshot" missing bullet when no
+   * structured Classification is supplied.
    */
   hasSensorSnapshot: boolean;
   /** True when at least one recent activity entry is watering or feeding. */

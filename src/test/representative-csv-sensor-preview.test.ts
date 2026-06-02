@@ -194,8 +194,9 @@ describe("representativeCsvSensorPreviewRules — normalization", () => {
 });
 
 describe("representativeCsvSensorPreviewRules — static safety scan", () => {
-  const helper = read("src/lib/representativeCsvSensorPreviewRules.ts");
-  const page = read("src/pages/RepresentativeCsvPreview.tsx");
+  const helper = stripSourceComments(read("src/lib/representativeCsvSensorPreviewRules.ts"));
+  const page = stripSourceComments(read("src/pages/RepresentativeCsvPreview.tsx"));
+  const pageRaw = read("src/pages/RepresentativeCsvPreview.tsx");
 
   for (const [name, src] of [["helper", helper], ["page", page]] as const) {
     it(`${name}: no DB writes / functions.invoke / service_role`, () => {

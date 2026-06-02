@@ -149,11 +149,22 @@ function parseTimestamp(raw: string | null): string | null {
 
 // ----- Per-row normalization -----
 
+/** Unit selectors applied AFTER explicit mapping. */
+export type TempUnit = "C" | "F";
+export type EcUnit = "mS/cm" | "uS/cm";
+
+export interface NormalizeRowUnits {
+  airTempUnit?: TempUnit;
+  substrateTempUnit?: TempUnit;
+  ecUnit?: EcUnit;
+}
+
 export interface NormalizeRowArgs {
   cells: ReadonlyArray<string>;
   headers: ReadonlyArray<string>;
   plan: RepresentativeColumnPlan;
   rowIndex: number;
+  units?: NormalizeRowUnits;
 }
 
 function buildRawPayload(
@@ -167,6 +178,14 @@ function buildRawPayload(
   return payload;
 }
 
+function fToC(f: number): number {
+  return (f - 32) * (5 / 9);
+}
+
+function usToMs(us: number): number {
+  return us / 1000;
+}
+
 /**
  * Normalize a single parsed CSV row into a draft reading. Pure and
  * deterministic. Never mutates inputs.
@@ -174,7 +193,11 @@ function buildRawPayload(
 export function normalizeRepresentativeRow(
   args: NormalizeRowArgs,
 ): RepresentativeDraftReading {
-  const { cells, headers, plan, rowIndex } = args;
+  const { cells, headers, plan, rowIndex, units } = args;
+  const airTempUnit: TempUnit = units?.airTempUnit ?? "C";
+  const subTempUnit: TempUnit = units?.substrateTempUnit ?? "C";
+  const ecUnit: EcUnit = units?.ecUnit ?? "mS/cm";
+
   const raw_payload = buildRawPayload(headers, cells);
   const reasons: string[] = [];
 
@@ -184,33 +207,38 @@ export function normalizeRepresentativeRow(
   if (!tsCell) reasons.push("missing_timestamp");
   else if (!captured_at) reasons.push("invalid_timestamp");
 
-  const air_temp_c = parseFiniteNumber(pickCell(cells, plan.air_temp_c ?? null));
-  const substrate_temp_c = parseFiniteNumber(
+  const rawAirTempNum = parseFiniteNumber(pickCell(cells, plan.air_temp_c ?? null));
+  const rawSubTempNum = parseFiniteNumber(
     pickCell(cells, plan.substrate_temp_c ?? null),
   );
+  const rawEcNum = parseFiniteNumber(pickCell(cells, plan.substrate_ec_mscm ?? null));
+
+  const air_temp_c =
+    rawAirTempNum === null ? null : airTempUnit === "F" ? fToC(rawAirTempNum) : rawAirTempNum;
+  const substrate_temp_c =
+    rawSubTempNum === null ? null : subTempUnit === "F" ? fToC(rawSubTempNum) : rawSubTempNum;
+  const substrate_ec_mscm =
+    rawEcNum === null ? null : ecUnit === "uS/cm" ? usToMs(rawEcNum) : rawEcNum;
+
   const humidity_pct = parseFiniteNumber(pickCell(cells, plan.humidity_pct ?? null));
   const vpd_kpa = parseFiniteNumber(pickCell(cells, plan.vpd_kpa ?? null));
   const co2_ppm = parseFiniteNumber(pickCell(cells, plan.co2_ppm ?? null));
   const ppfd = parseFiniteNumber(pickCell(cells, plan.ppfd ?? null));
   const vwc_pct = parseFiniteNumber(pickCell(cells, plan.vwc_pct ?? null));
-  const substrate_ec_mscm = parseFiniteNumber(
-    pickCell(cells, plan.substrate_ec_mscm ?? null),
-  );
 
-  // Raw-cell sanity: if a humidity/vwc/ec/temp column had a present cell
-  // that did NOT parse to a finite number, flag it. Empty cells are OK.
+  // Raw-cell sanity: present-but-unparseable values flag the row.
   const rawHumidity = pickCell(cells, plan.humidity_pct ?? null);
   if (rawHumidity !== null && humidity_pct === null) reasons.push("humidity_non_finite");
   const rawVwc = pickCell(cells, plan.vwc_pct ?? null);
   if (rawVwc !== null && vwc_pct === null) reasons.push("vwc_non_finite");
-  const rawEc = pickCell(cells, plan.substrate_ec_mscm ?? null);
-  if (rawEc !== null && substrate_ec_mscm === null) reasons.push("ec_non_finite");
-  const rawAirTemp = pickCell(cells, plan.air_temp_c ?? null);
-  if (rawAirTemp !== null && air_temp_c === null) reasons.push("air_temp_non_finite");
-  const rawSubTemp = pickCell(cells, plan.substrate_temp_c ?? null);
-  if (rawSubTemp !== null && substrate_temp_c === null) reasons.push("substrate_temp_non_finite");
+  const rawEcCell = pickCell(cells, plan.substrate_ec_mscm ?? null);
+  if (rawEcCell !== null && substrate_ec_mscm === null) reasons.push("ec_non_finite");
+  const rawAirTempCell = pickCell(cells, plan.air_temp_c ?? null);
+  if (rawAirTempCell !== null && air_temp_c === null) reasons.push("air_temp_non_finite");
+  const rawSubTempCell = pickCell(cells, plan.substrate_temp_c ?? null);
+  if (rawSubTempCell !== null && substrate_temp_c === null) reasons.push("substrate_temp_non_finite");
 
-  // Range checks.
+  // Range checks (post unit conversion, canonical units).
   if (humidity_pct !== null && (humidity_pct < 0 || humidity_pct > 100)) {
     reasons.push("humidity_out_of_range");
   }
@@ -228,7 +256,6 @@ export function normalizeRepresentativeRow(
     reasons.push("substrate_temp_impossible");
   }
 
-  // State derivation.
   const invalidReasons = new Set([
     "missing_timestamp",
     "invalid_timestamp",
@@ -274,6 +301,141 @@ export function normalizeRepresentativeRow(
   };
 }
 
+// ----- Explicit column + unit mapping (preview-only) -----
+
+/**
+ * Logical canonical fields a user can map CSV headers to. The mapping is
+ * EXPLICIT and never inferred into Verdant grow_id / tent_id / plant_id.
+ * Facility/Room/Zone are preserved as identifying context only.
+ */
+export interface RepresentativeColumnMapping {
+  timestamp: string | null;
+  sensor: string | null;
+  facility: string | null;
+  room: string | null;
+  zone: string | null;
+  air_temp: { column: string | null; unit: TempUnit };
+  substrate_temp: { column: string | null; unit: TempUnit };
+  humidity: { column: string | null };
+  vpd: { column: string | null };
+  co2: { column: string | null };
+  ppfd: { column: string | null };
+  vwc: { column: string | null };
+  substrate_ec: { column: string | null; unit: EcUnit };
+}
+
+/** Canonical field keys exposed to the UI for building mapping controls. */
+export const REPRESENTATIVE_MAPPING_FIELDS = [
+  "timestamp",
+  "sensor",
+  "facility",
+  "room",
+  "zone",
+  "air_temp",
+  "substrate_temp",
+  "humidity",
+  "vpd",
+  "co2",
+  "ppfd",
+  "vwc",
+  "substrate_ec",
+] as const;
+
+export type RepresentativeMappingField = (typeof REPRESENTATIVE_MAPPING_FIELDS)[number];
+
+/** Default empty mapping with canonical units. */
+export function emptyRepresentativeMapping(): RepresentativeColumnMapping {
+  return {
+    timestamp: null,
+    sensor: null,
+    facility: null,
+    room: null,
+    zone: null,
+    air_temp: { column: null, unit: "C" },
+    substrate_temp: { column: null, unit: "C" },
+    humidity: { column: null },
+    vpd: { column: null },
+    co2: { column: null },
+    ppfd: { column: null },
+    vwc: { column: null },
+    substrate_ec: { column: null, unit: "mS/cm" },
+  };
+}
+
+const MAPPING_TO_PLAN_KEY: Record<RepresentativeMappingField, keyof RepresentativeColumnPlan> = {
+  timestamp: "timestamp",
+  sensor: "sensor",
+  facility: "facility",
+  room: "room",
+  zone: "zone",
+  air_temp: "air_temp_c",
+  substrate_temp: "substrate_temp_c",
+  humidity: "humidity_pct",
+  vpd: "vpd_kpa",
+  co2: "co2_ppm",
+  ppfd: "ppfd",
+  vwc: "vwc_pct",
+  substrate_ec: "substrate_ec_mscm",
+};
+
+function indexOfHeader(headers: ReadonlyArray<string>, name: string | null): number | null {
+  if (!name) return null;
+  const target = normalizeHeader(name);
+  const idx = headers.map(normalizeHeader).indexOf(target);
+  return idx >= 0 ? idx : null;
+}
+
+/**
+ * Build a default mapping by running the existing synonym detector against
+ * the parsed headers. The result is pure and safe to feed back to the UI.
+ */
+export function defaultMappingFromHeaders(
+  headers: ReadonlyArray<string>,
+): RepresentativeColumnMapping {
+  const plan = planRepresentativeColumns(headers);
+  const mapping = emptyRepresentativeMapping();
+  for (const field of REPRESENTATIVE_MAPPING_FIELDS) {
+    const planKey = MAPPING_TO_PLAN_KEY[field];
+    const idx = plan[planKey];
+    const header = idx !== null && idx !== undefined ? headers[idx] ?? null : null;
+    if (header === null) continue;
+    if (field === "air_temp" || field === "substrate_temp") {
+      mapping[field] = { column: header, unit: "C" };
+    } else if (field === "substrate_ec") {
+      mapping[field] = { column: header, unit: "mS/cm" };
+    } else if (
+      field === "humidity" ||
+      field === "vpd" ||
+      field === "co2" ||
+      field === "ppfd" ||
+      field === "vwc"
+    ) {
+      mapping[field] = { column: header };
+    } else {
+      mapping[field] = header;
+    }
+  }
+  return mapping;
+}
+
+/** Convert an explicit user mapping into the index-based column plan. */
+export function planFromMapping(
+  headers: ReadonlyArray<string>,
+  mapping: RepresentativeColumnMapping,
+): RepresentativeColumnPlan {
+  const plan: RepresentativeColumnPlan = {};
+  for (const field of REPRESENTATIVE_MAPPING_FIELDS) {
+    const planKey = MAPPING_TO_PLAN_KEY[field];
+    const value = mapping[field];
+    const column =
+      typeof value === "string" || value === null
+        ? (value as string | null)
+        : value.column;
+    plan[planKey] = indexOfHeader(headers, column);
+  }
+  return plan;
+}
+
 export interface PreviewSummary {
   total: number;
   valid: number;
@@ -284,24 +446,43 @@ export interface PreviewSummary {
 export interface RepresentativePreviewResult {
   headers: string[];
   plan: RepresentativeColumnPlan;
+  mapping: RepresentativeColumnMapping;
   rows: RepresentativeDraftReading[];
   summary: PreviewSummary;
 }
 
+export interface PreviewOptions {
+  /** Explicit user-chosen mapping. When omitted, synonym auto-detect runs. */
+  mapping?: RepresentativeColumnMapping;
+}
+
 /**
- * End-to-end preview: parse CSV text → plan columns → normalize every
- * row. Duplicate timestamps across different sensors are preserved as
- * distinct rows (no collapsing).
+ * End-to-end preview: parse CSV text → resolve mapping → plan columns →
+ * normalize every row. Duplicate timestamps across different sensors are
+ * preserved as distinct rows (no collapsing).
+ *
+ * Accepts an optional explicit mapping; when omitted, falls back to the
+ * synonym-based default for backward compatibility.
  */
-export function previewRepresentativeCsv(text: string): RepresentativePreviewResult {
+export function previewRepresentativeCsv(
+  text: string,
+  options?: PreviewOptions,
+): RepresentativePreviewResult {
   const parsed = parseCsv(text);
-  const plan = planRepresentativeColumns(parsed.headers);
+  const mapping = options?.mapping ?? defaultMappingFromHeaders(parsed.headers);
+  const plan = planFromMapping(parsed.headers, mapping);
+  const units: NormalizeRowUnits = {
+    airTempUnit: mapping.air_temp.unit,
+    substrateTempUnit: mapping.substrate_temp.unit,
+    ecUnit: mapping.substrate_ec.unit,
+  };
   const rows = parsed.rows.map((cells, idx) =>
     normalizeRepresentativeRow({
       cells,
       headers: parsed.headers,
       plan,
       rowIndex: idx,
+      units,
     }),
   );
   const summary: PreviewSummary = {
@@ -310,7 +491,7 @@ export function previewRepresentativeCsv(text: string): RepresentativePreviewRes
     warning: rows.filter((r) => r.state === "warning").length,
     invalid: rows.filter((r) => r.state === "invalid").length,
   };
-  return { headers: [...parsed.headers], plan, rows, summary };
+  return { headers: [...parsed.headers], plan, mapping, rows, summary };
 }
 
 /** Presenter-only helper. Pure. Never call from the normalizer. */
@@ -318,3 +499,4 @@ export function cToF(c: number | null): number | null {
   if (c === null || !Number.isFinite(c)) return null;
   return c * (9 / 5) + 32;
 }
+

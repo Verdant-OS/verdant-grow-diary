@@ -171,6 +171,11 @@ export default function PlantDetail() {
         plantName={plant.name}
         tentName={tent?.name ?? null}
       />
+      <PlantDetailAiDoctorContextPanel
+        plantId={plant.id}
+        plant={plant}
+      />
+
 
 
 

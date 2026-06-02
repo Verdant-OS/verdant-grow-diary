@@ -41,7 +41,7 @@ describe("adaptAiDoctorReviewResponse", () => {
   it("passes through server-provided ok=false reason", () => {
     const out = adaptAiDoctorReviewResponse({ ok: false, reason: "config" });
     expect(out.ok).toBe(false);
-    if (!out.ok) expect(out.reason).toBe("config");
+    if (out.ok === false) expect(out.reason).toBe("config");
   });
 
   it("rejects raw imperative device-control content as invalid", () => {
@@ -50,6 +50,6 @@ describe("adaptAiDoctorReviewResponse", () => {
       immediate_action: "Turn on the humidifier.",
     });
     expect(out.ok).toBe(false);
-    if (!out.ok) expect(out.reason).toBe("invalid");
+    if (out.ok === false) expect(out.reason).toBe("invalid");
   });
 });

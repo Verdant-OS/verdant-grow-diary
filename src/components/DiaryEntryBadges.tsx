@@ -49,8 +49,20 @@ export interface DiaryEntryBadgesProps {
 export default function DiaryEntryBadges({ item, className }: DiaryEntryBadgesProps) {
   const tagsToShow = PRIMARY_TAGS.filter((t) => item.tags.includes(t));
   const hasWarnings = item.warnings.length > 0;
+  const sensorBadge = sensorSnapshotBadge(item.sensorSnapshotState);
 
-  if (tagsToShow.length === 0 && !hasWarnings) return null;
+  if (tagsToShow.length === 0 && !hasWarnings && !sensorBadge) return null;
+
+  const variantClasses: Record<SensorSnapshotBadge["variant"], string> = {
+    positive:
+      "bg-emerald-500/10 border-emerald-500/30 text-emerald-300",
+    neutral:
+      "bg-secondary/60 border-border/40 text-muted-foreground",
+    warning:
+      "bg-amber-500/10 border-amber-500/30 text-amber-300",
+    error:
+      "bg-red-500/10 border-red-500/30 text-red-300",
+  };
 
   return (
     <div
@@ -68,6 +80,17 @@ export default function DiaryEntryBadges({ item, className }: DiaryEntryBadgesPr
           {TAG_LABELS[t] ?? t}
         </span>
       ))}
+      {sensorBadge && (
+        <span
+          data-testid={`diary-entry-sensor-badge-${sensorBadge.variant}`}
+          className={cn(
+            "inline-flex items-center text-[11px] px-2 py-0.5 rounded-full border",
+            variantClasses[sensorBadge.variant],
+          )}
+        >
+          {sensorBadge.label}
+        </span>
+      )}
       {hasWarnings && (
         <span
           data-testid="diary-entry-warning"

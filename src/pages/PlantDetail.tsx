@@ -11,6 +11,7 @@ import PlantRecentActivityPanel from "@/components/PlantRecentActivityPanel";
 import PlantRelativeTimelineSection from "@/components/PlantRelativeTimelineSection";
 import ManualSnapshotTimelineSection from "@/components/ManualSnapshotTimelineSection";
 import TimelineMemorySection from "@/components/TimelineMemorySection";
+import QuickLogGroupedTimelineSection from "@/components/QuickLogGroupedTimelineSection";
 import PlantDailyGrowCheckHistoryCard from "@/components/PlantDailyGrowCheckHistoryCard";
 import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingCard";
 import PlantDailyGrowCheckConsistencyCard from "@/components/PlantDailyGrowCheckConsistencyCard";
@@ -372,6 +373,11 @@ export default function PlantDetail() {
           </div>
 
           <ManualSnapshotTimelineSection scope="plant" plantId={plant.id} />
+          <QuickLogGroupedTimelineSection
+            scope="plant"
+            plantId={plant.id}
+            tentId={plant.tentId ?? null}
+          />
           <TimelineMemorySection scope="plant" plantId={plant.id} />
 
 

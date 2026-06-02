@@ -461,6 +461,15 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
+        {isFetching && !isLoading && scope !== null && (
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid="quick-log-grouped-timeline-updating"
+            aria-live="polite"
+          >
+            {QUICK_LOG_GROUPED_TIMELINE_UPDATING_LABEL}
+          </p>
+        )}
         {scope === null ? (
           <p
             className="text-sm text-muted-foreground"

@@ -17,6 +17,7 @@ const TARGETS: Array<{ name: string; path: string }> = [
   { name: "csvMappingConfig", path: "src/lib/csvMappingConfig.ts" },
   { name: "csvMappingConfigImport", path: "src/lib/csvMappingConfigImport.ts" },
   { name: "csvRowValidationRules", path: "src/lib/csvRowValidationRules.ts" },
+  { name: "csvTimelinePreview", path: "src/lib/csvTimelinePreview.ts" },
   { name: "RepresentativeCsvPreview", path: "src/pages/RepresentativeCsvPreview.tsx" },
 ];
 

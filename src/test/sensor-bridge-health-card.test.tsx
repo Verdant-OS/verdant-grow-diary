@@ -46,7 +46,7 @@ describe("SensorBridgeHealthCard", () => {
     renderCard(vm);
     expect(screen.getByTestId("sensor-bridge-health-accepted-at")).toBeInTheDocument();
     expect(screen.getByTestId("sensor-bridge-health-state").getAttribute("data-state")).toBe(
-      "accepted",
+      "usable",
     );
   });
 
@@ -124,7 +124,7 @@ describe("SensorBridgeHealthCard", () => {
     const vm = buildSensorBridgeHealthViewModel({ rows, now: NOW });
     renderCard(vm);
     expect(screen.getByTestId("sensor-bridge-health-state").getAttribute("data-state")).not.toBe(
-      "accepted",
+      "usable",
     );
   });
 });

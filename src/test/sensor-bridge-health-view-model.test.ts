@@ -35,7 +35,7 @@ describe("buildSensorBridgeHealthViewModel", () => {
       },
     ];
     const vm = buildSensorBridgeHealthViewModel({ rows, now: NOW });
-    expect(vm.state).toBe("accepted");
+    expect(vm.state).toBe("usable");
     expect(vm.message).toBe("Latest bridge reading accepted.");
     expect(vm.latestAcceptedAtIso).toBe(minutesAgo(10));
     expect(vm.latestRejectedAtIso).toBeNull();
@@ -98,7 +98,7 @@ describe("buildSensorBridgeHealthViewModel", () => {
       },
     ];
     const vm = buildSensorBridgeHealthViewModel({ rows, now: NOW });
-    expect(vm.state).not.toBe("accepted");
+    expect(vm.state).not.toBe("usable");
     expect(vm.state).toBe("needs_review");
   });
 

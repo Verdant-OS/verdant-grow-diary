@@ -115,7 +115,7 @@ describe("QuickLog v2 environment row → AI Doctor context readiness", () => {
       timelineItems: timelineWithActivity([snap]),
       now: NOW,
     });
-    const actions = buildAiDoctorContextQuickActions({ context: ctx });
+    const actions = buildAiDoctorContextQuickActions({ missing: ctx.missing, plantId: PLANT_ID });
     const kinds = actions.map((a) => a.kind);
     expect(kinds).not.toContain("add_manual_sensor_snapshot");
   });

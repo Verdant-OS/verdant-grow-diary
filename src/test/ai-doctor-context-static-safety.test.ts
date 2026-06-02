@@ -45,6 +45,14 @@ const TARGETS = [
     name: "PlantDetailAiDoctorReadinessGate",
     path: "src/components/PlantDetailAiDoctorReadinessGate.tsx",
   },
+  {
+    name: "aiDoctorSafeReviewStartViewModel",
+    path: "src/lib/aiDoctorSafeReviewStartViewModel.ts",
+  },
+  {
+    name: "PlantDetailAiDoctorSafeReviewStart",
+    path: "src/components/PlantDetailAiDoctorSafeReviewStart.tsx",
+  },
 ];
 
 describe("ai doctor context panel — static safety", () => {
@@ -125,5 +133,22 @@ describe("ai doctor context panel — static safety", () => {
     expect(gate).not.toMatch(/['"](live|synced|connected|imported)['"]/);
     // No primary-action mapping table inlined in JSX.
     expect(gate).not.toMatch(/AI_DOCTOR_READINESS_GATE_COPY\s*=/);
+  });
+
+  it("Safe Review Start: no model/API calls, no banned wording, no inlined copy table", () => {
+    const vm = read("src/lib/aiDoctorSafeReviewStartViewModel.ts");
+    const ui = read("src/components/PlantDetailAiDoctorSafeReviewStart.tsx");
+    for (const src of [vm, ui]) {
+      // No model/API calls
+      expect(src).not.toMatch(/fetch\(/);
+      expect(src).not.toMatch(/functions\.invoke/);
+      expect(src).not.toMatch(/openai|anthropic|gemini|gpt-/i);
+      // No banned certainty wording
+      expect(src).not.toMatch(/\b(diagnosis|diagnosed|confirmed|certain|cured|guaranteed)\b/i);
+      expect(src).not.toMatch(/['"](live|synced|connected|imported)['"]/);
+    }
+    // Variant/notice tables live in the view-model — not inlined in JSX.
+    expect(ui).not.toMatch(/AI_DOCTOR_SAFE_REVIEW_PARTIAL_NOTICE\s*=/);
+    expect(ui).not.toMatch(/AI_DOCTOR_SAFE_REVIEW_STRONG_NOTICE\s*=/);
   });
 });

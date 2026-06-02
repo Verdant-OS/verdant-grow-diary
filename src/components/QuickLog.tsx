@@ -32,7 +32,10 @@ import {
   filterQuickLogPlantOptions,
   quickLogPlantHelperText,
 } from "@/lib/quickLogPlantOptionRules";
-import { classifyQuickLogSnapshotSource } from "@/lib/quickLogSensorSnapshotRules";
+import {
+  classifyQuickLogSnapshotSource,
+  shouldEmbedSnapshot,
+} from "@/lib/quickLogSensorSnapshotRules";
 
 import { AlertTriangle, Info } from "lucide-react";
 import { toast } from "sonner";
@@ -212,18 +215,27 @@ export default function QuickLog({
           const repRow = latestRows[0] ?? null;
           const { source: snapshotSource, state: snapshotState } =
             classifyQuickLogSnapshotSource(repRow);
-          cleanDetails.sensor_snapshot = {
-            ts: latestTs,
-            tent_id: selectedPlant.tent_id,
-            temp: getValue("temperature_c"),
-            rh: getValue("humidity_pct"),
-            vpd: getValue("vpd_kpa"),
-            co2: getValue("co2_ppm"),
-            soil: getValue("soil_moisture_pct"),
-            available_metrics: availableMetrics,
-            source: snapshotSource,
-            state: snapshotState,
-          };
+
+          if (!shouldEmbedSnapshot(snapshotState)) {
+            const message =
+              snapshotState === "stale"
+                ? "Sensor reading too old to attach — log saved without it."
+                : "Sensor reading unreadable — log saved without it.";
+            toast.message(message);
+          } else {
+            cleanDetails.sensor_snapshot = {
+              ts: latestTs,
+              tent_id: selectedPlant.tent_id,
+              temp: getValue("temperature_c"),
+              rh: getValue("humidity_pct"),
+              vpd: getValue("vpd_kpa"),
+              co2: getValue("co2_ppm"),
+              soil: getValue("soil_moisture_pct"),
+              available_metrics: availableMetrics,
+              source: snapshotSource,
+              state: snapshotState,
+            };
+          }
 
         }
       }

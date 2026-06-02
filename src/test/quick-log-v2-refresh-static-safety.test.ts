@@ -83,7 +83,7 @@ describe("QuickLog v2 refresh — static safety", () => {
 
   it("sheet wiring uses the pure rule, not inlined query keys", () => {
     const src = read(SHEET);
-    expect(src).toMatch(/buildQuickLogV2RefreshQueryKeys/);
+    expect(src).toMatch(/applyQuickLogV2Refresh|buildQuickLogV2RefreshQueryKeys/);
   });
 
   it("sheet does not introduce new writes beyond the existing RPC save", () => {

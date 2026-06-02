@@ -65,7 +65,7 @@ export interface BuildAiDoctorReadinessGateArgs {
 }
 
 const DEFAULT_QUICK_ACTIONS_ANCHOR = "plant-ai-doctor-context-panel";
-const DEFAULT_AI_DOCTOR_ANCHOR = "plant-ai-doctor-sessions";
+const DEFAULT_AI_DOCTOR_ANCHOR = "plant-doctor";
 
 export function buildAiDoctorReadinessGate(
   args: BuildAiDoctorReadinessGateArgs,

@@ -41,17 +41,8 @@ export interface QuickLogSensorRowLike {
 }
 
 const MANUAL_SOURCES = new Set(["manual", "manual_snapshot", "csv", "imported", "import"]);
-const LIVE_SOURCES = new Set([
-  "live",
-  "pi_bridge",
-  "home_assistant",
-  "mqtt",
-  "api",
-  "ingest",
-  "webhook",
-  "shelly_ht",
-]);
 const UNTRUSTED_SOURCES = new Set(["demo", "sim", "fixture", "demo_fixture", "mock"]);
+
 
 function normalizeSource(raw: unknown): string | null {
   if (raw === null || raw === undefined) return null;

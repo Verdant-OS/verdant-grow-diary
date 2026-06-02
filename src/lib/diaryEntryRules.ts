@@ -37,6 +37,10 @@ export interface NormalizedDiaryDetails {
     co2?: number;
     ph?: number;
     ec?: number;
+    /** Declared source string from the sensor-reading row (e.g. "live", "manual"). */
+    source?: string;
+    /** Narrowed state: "live" | "manual" | "stale" | "invalid". */
+    state?: string;
   };
   remindAt?: string;
   /** Unknown but preserved keys (sanitized — no functions, no class instances). */
@@ -323,6 +327,8 @@ function normalizeSensorSnapshot(
     co2: num("co2"),
     ph: num("ph"),
     ec: num("ec"),
+    source: nonBlankString(r.source) ?? undefined,
+    state: nonBlankString(r.state) ?? undefined,
   };
   const anyDefined = Object.values(out).some((v) => v !== undefined);
   return anyDefined ? out : undefined;

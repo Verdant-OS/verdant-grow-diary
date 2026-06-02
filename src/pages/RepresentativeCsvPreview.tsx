@@ -1,10 +1,10 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   defaultMappingFromHeaders,
   emptyRepresentativeMapping,
   previewRepresentativeCsv,
   parseCsv,
-  
+
   type EcUnit,
   type RepresentativeColumnMapping,
   type RepresentativeDraftReading,
@@ -12,6 +12,25 @@ import {
   type RepresentativePreviewResult,
   type TempUnit,
 } from "@/lib/representativeCsvSensorPreviewRules";
+import {
+  applyCsvMappingTemplate,
+  buildMappingDownloadPayload,
+  csvMappingDownloadFileName,
+  CSV_MAPPING_TEMPLATES,
+  getCsvMappingTemplate,
+  type CsvMappingTemplateId,
+} from "@/lib/csvMappingTemplates";
+import {
+  applyCsvMappingPreset,
+  buildCsvMappingPreset,
+  clearCsvMappingPreset,
+  loadCsvMappingPreset,
+  saveCsvMappingPreset,
+} from "@/lib/csvMappingPresetStorage";
+import {
+  deriveCsvRowValidationHints,
+  type CsvRowValidationHint,
+} from "@/lib/csvRowValidationRules";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {

@@ -191,12 +191,12 @@ export function validateAiDoctorReviewResult(
   };
   for (const field of CAPPED_ARRAY_FIELDS) {
     const r = sanitizeStringArray(safe[field]);
-    if (!r.ok) return { ok: false, reason: `${r.reason}:${field}` };
+    if (r.ok === false) return { ok: false, reason: `${r.reason}:${field}` };
     arrays[field] = r.value;
   }
 
   const sug = sanitizeActionQueueSuggestion(safe.action_queue_suggestion);
-  if (!sug.ok) return { ok: false, reason: sug.reason };
+  if (sug.ok === false) return { ok: false, reason: sug.reason };
 
   const result: AiDoctorReviewResult = {
     summary: required.summary,

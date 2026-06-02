@@ -209,6 +209,9 @@ export default function QuickLog({
             const v = row ? Number(row.value) : NaN;
             return Number.isFinite(v) ? v : null;
           };
+          const repRow = latestRows[0] ?? null;
+          const { source: snapshotSource, state: snapshotState } =
+            classifyQuickLogSnapshotSource(repRow);
           cleanDetails.sensor_snapshot = {
             ts: latestTs,
             tent_id: selectedPlant.tent_id,
@@ -218,7 +221,10 @@ export default function QuickLog({
             co2: getValue("co2_ppm"),
             soil: getValue("soil_moisture_pct"),
             available_metrics: availableMetrics,
+            source: snapshotSource,
+            state: snapshotState,
           };
+
         }
       }
       if (eventType === "reminder" && remindAt) cleanDetails.remind_at = remindAt;

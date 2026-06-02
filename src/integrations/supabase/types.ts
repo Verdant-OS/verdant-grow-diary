@@ -1529,6 +1529,20 @@ export type Database = {
           rejected: number
         }[]
       }
+      quicklog_save_manual: {
+        Args: {
+          p_action: string
+          p_humidity_pct?: number
+          p_note?: string
+          p_occurred_at?: string
+          p_target_id: string
+          p_target_type: string
+          p_temperature_c?: number
+          p_volume_ml?: number
+          p_vpd_kpa?: number
+        }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "operator" | "customer"

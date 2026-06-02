@@ -88,7 +88,7 @@ describe("buildSensorBridgeHealthViewModel", () => {
     expect(vm.latestReasonCode).toBe("none_inserted");
   });
 
-  it("does not classify a zero/zero unknown row as healthy", () => {
+  it("classifies a zero/zero unknown row as no_data, never healthy", () => {
     const rows: SensorBridgeAuditRowLike[] = [
       {
         source: "pi_bridge",
@@ -99,7 +99,7 @@ describe("buildSensorBridgeHealthViewModel", () => {
     ];
     const vm = buildSensorBridgeHealthViewModel({ rows, now: NOW });
     expect(vm.state).not.toBe("usable");
-    expect(vm.state).toBe("needs_review");
+    expect(vm.state).toBe("no_data");
   });
 
   it("computes latestAccepted and latestRejected independently across rows", () => {

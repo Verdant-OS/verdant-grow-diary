@@ -28,7 +28,7 @@ import {
   type QuickLogV2Action,
 } from "@/lib/quickLogV2Rules";
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
-import { buildQuickLogV2RefreshQueryKeys } from "@/lib/quickLogV2RefreshRules";
+import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 
 interface Props {
   open: boolean;

@@ -904,6 +904,36 @@ export type Database = {
           },
         ]
       }
+      paddle_events: {
+        Row: {
+          environment: string
+          event_id: string
+          event_type: string
+          id: string
+          payload: Json
+          received_at: string
+          signature_verified: boolean
+        }
+        Insert: {
+          environment: string
+          event_id: string
+          event_type: string
+          id?: string
+          payload: Json
+          received_at?: string
+          signature_verified?: boolean
+        }
+        Update: {
+          environment?: string
+          event_id?: string
+          event_type?: string
+          id?: string
+          payload?: Json
+          received_at?: string
+          signature_verified?: boolean
+        }
+        Relationships: []
+      }
       photo_events: {
         Row: {
           caption: string | null

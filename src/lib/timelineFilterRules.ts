@@ -120,6 +120,16 @@ export function classifyTimelineMemoryItem(
     return buckets;
   }
 
+  if (item.kind === "ai_doctor_sensor_evidence_audit") {
+    // Always appears under "all"; non-healthy modes also surface under
+    // "warnings" so growers can scan past evaluations that lacked
+    // healthy sensor evidence.
+    if (item.mode === "unsafe" || item.mode === "cautionary") {
+      buckets.add("warnings");
+    }
+    return buckets;
+  }
+
   // Diary item — delegate to the shared classifier.
   const cat: TimelineFilterCategory = classifyTimelineEntry({
     eventType: item.eventType,

@@ -82,6 +82,18 @@ export default function PlantDetailAiDoctorContextPanel({
         addSuffix: true,
       })
     : null;
+  const quickActions = useMemo(
+    () =>
+      buildAiDoctorContextQuickActions({
+        missing: result.missing,
+        plantId,
+        plantName: plant?.name ?? null,
+        growId: plant?.growId ?? null,
+        tentId: plant?.tentId ?? null,
+      }),
+    [result.missing, plantId, plant?.name, plant?.growId, plant?.tentId],
+  );
+  const noWarningContext = result.counts.recentWarnings === 0;
 
   return (
     <section

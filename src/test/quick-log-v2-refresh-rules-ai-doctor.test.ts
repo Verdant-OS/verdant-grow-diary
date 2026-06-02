@@ -70,10 +70,10 @@ describe("buildQuickLogV2RefreshQueryKeys — AI Doctor + tent scoping", () => {
       JSON.stringify(["quick_log_grouped_timeline", "tent-77"]),
     );
     expect(out).toContain(JSON.stringify(["tent_recent_activity", "tent-77"]));
-    // No AI Doctor readiness/context for a tent target (tent-level readiness
-    // is not derived from a single plant id).
-    expect(out.some((s) => s.startsWith('["ai_doctor_readiness"'))).toBe(false);
-    expect(out.some((s) => s.startsWith('["ai_doctor_context"'))).toBe(false);
+    // Tent-scoped readiness/context are emitted; conditional apply layer
+    // skips them if no tent-scoped readiness query is mounted.
+    expect(out).toContain(JSON.stringify(["ai_doctor_readiness", "tent-77"]));
+    expect(out).toContain(JSON.stringify(["ai_doctor_context", "tent-77"]));
   });
 
   it("always includes dashboard recent activity / memory prefixes", () => {

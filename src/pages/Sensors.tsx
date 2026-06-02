@@ -7,6 +7,7 @@ import PageHeader from "@/components/PageHeader";
 import SensorChart from "@/components/SensorChart";
 import GrowDataSourceBadge from "@/components/GrowDataSourceBadge";
 import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
+import SensorBridgeHealthCard from "@/components/SensorBridgeHealthCard";
 import { useGrowTents, useGrowSensorReadings } from "@/hooks/useGrowData";
 import { useTents as useTentRows } from "@/hooks/use-tents";
 import { classifyGrowDataSource } from "@/lib/growDataSourceLabelRules";
@@ -164,6 +165,9 @@ export default function Sensors() {
           <ManualSensorReadingCard tents={manualTents} defaultTentId={defaultManualTentId} />
         </div>
       )}
+      <div className="mt-4 max-w-xl">
+        <SensorBridgeHealthCard />
+      </div>
     </div>
   );
 }

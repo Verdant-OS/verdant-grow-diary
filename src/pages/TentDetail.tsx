@@ -21,6 +21,7 @@ import TentCardActionsMenu from "@/components/TentCardActionsMenu";
 import PlantPhoto from "@/components/PlantPhoto";
 import TentManualSnapshotChangeContext from "@/components/TentManualSnapshotChangeContext";
 import TentManualSnapshotHistoryList from "@/components/TentManualSnapshotHistoryList";
+import ManualSnapshotTimelineSection from "@/components/ManualSnapshotTimelineSection";
 import TentCsvImportCard from "@/components/TentCsvImportCard";
 import TentSensorWebhookSettingsCard from "@/components/TentSensorWebhookSettingsCard";
 import TentBridgeTokensCard from "@/components/TentBridgeTokensCard";
@@ -233,6 +234,8 @@ export default function TentDetail() {
       </div>
 
       <TentManualSnapshotHistoryList tentId={id ?? null} readings={readings} />
+
+      <ManualSnapshotTimelineSection scope="tent" tentId={id ?? null} />
 
       {id && (
         <TentCsvImportCard tentId={id} growId={tent.growId ?? null} />

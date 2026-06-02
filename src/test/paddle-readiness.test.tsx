@@ -25,6 +25,21 @@ import {
   PADDLE_SANDBOX_ENV,
 } from "@/lib/paddleConfig";
 
+// Module-level env override for render tests. import.meta.env does not cross
+// ESM module boundaries, so we proxy the no-args call from BillingPlaceholder.
+let _paddleTestEnv: Record<string, string> | null = null;
+
+vi.mock("@/lib/paddleConfig", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("@/lib/paddleConfig")>();
+  return {
+    ...mod,
+    resolvePaddleConfig: (source?: any) => {
+      if (source) return mod.resolvePaddleConfig(source);
+      return mod.resolvePaddleConfig(_paddleTestEnv ?? {});
+    },
+  };
+});
+
 const SANDBOX_ENV = {
   VITE_PADDLE_ENVIRONMENT: "sandbox",
   VITE_PADDLE_CLIENT_TOKEN: "test_token_abc",

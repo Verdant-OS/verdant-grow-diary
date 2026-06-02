@@ -317,7 +317,7 @@ export default function AiDoctorSessionsIndex() {
     [searchParams],
   );
 
-  const { data, isLoading, error } = useAiDoctorSessionsIndex(page, filters);
+  const { data, isLoading, error, refetch, isRefetching } = useAiDoctorSessionsIndex(page, filters);
   const rawRows = data?.rows ?? [];
   // Scope review-event fetch to the raw (server-paginated) IDs so the review
   // filter has data available even when its filter narrows the row set.

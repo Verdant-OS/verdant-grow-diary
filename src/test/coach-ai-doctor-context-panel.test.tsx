@@ -104,8 +104,8 @@ describe("CoachAiDoctorContextPanel — quick actions", () => {
     });
     const btn = screen.getByTestId("ai-doctor-context-quick-action-add-manual-sensor-snapshot");
     expect(btn).toBeTruthy();
-    const link = btn.querySelector("a");
-    expect(link?.getAttribute("href")).toMatch(/\/sensors/);
+    const href = btn.getAttribute("href") ?? btn.querySelector("a")?.getAttribute("href") ?? "";
+    expect(href).toMatch(/\/sensors/);
   });
 
   it("renders Update plant profile when strain/stage/medium are missing", () => {

@@ -1,10 +1,10 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   defaultMappingFromHeaders,
   emptyRepresentativeMapping,
   previewRepresentativeCsv,
   parseCsv,
-  
+
   type EcUnit,
   type RepresentativeColumnMapping,
   type RepresentativeDraftReading,
@@ -12,6 +12,25 @@ import {
   type RepresentativePreviewResult,
   type TempUnit,
 } from "@/lib/representativeCsvSensorPreviewRules";
+import {
+  applyCsvMappingTemplate,
+  buildMappingDownloadPayload,
+  csvMappingDownloadFileName,
+  CSV_MAPPING_TEMPLATES,
+  getCsvMappingTemplate,
+  type CsvMappingTemplateId,
+} from "@/lib/csvMappingTemplates";
+import {
+  applyCsvMappingPreset,
+  buildCsvMappingPreset,
+  clearCsvMappingPreset,
+  loadCsvMappingPreset,
+  saveCsvMappingPreset,
+} from "@/lib/csvMappingPresetStorage";
+import {
+  deriveCsvRowValidationHints,
+  type CsvRowValidationHint,
+} from "@/lib/csvRowValidationRules";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -69,10 +88,21 @@ export default function RepresentativeCsvPreview() {
   const [mapping, setMapping] = useState<RepresentativeColumnMapping>(emptyRepresentativeMapping());
   const [fileName, setFileName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [templateId, setTemplateId] = useState<CsvMappingTemplateId | null>(null);
+  const [templateNotice, setTemplateNotice] = useState<string | null>(null);
+  const [presetNotice, setPresetNotice] = useState<string | null>(null);
+  const [hasSavedPreset, setHasSavedPreset] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    setHasSavedPreset(loadCsvMappingPreset() !== null);
+  }, []);
 
   const onFile = async (file: File) => {
     setError(null);
+    setTemplateNotice(null);
+    setPresetNotice(null);
+    setTemplateId(null);
     setFileName(file.name);
     try {
       const fileText = await file.text();
@@ -150,11 +180,13 @@ export default function RepresentativeCsvPreview() {
         </div>
         <h1 className="text-2xl font-semibold">Representative CSV preview</h1>
         <p className="text-sm text-muted-foreground">
-          Preview only. Nothing is saved. Map your CSV headers to Verdant fields
-          and pick units. This is a synthetic shape used to test Verdant&rsquo;s
-          intake workflow — not a confirmed AROYA importer. Facility, Room, and
-          Zone are preserved as context and are never used as Verdant tent or
-          grow IDs.
+          Preview only. Nothing is saved. No data has been saved. CSV source, not live data.
+          Review units before trusting values. Rows with invalid timestamps
+          are blocked from canonical preview. Map your CSV headers to
+          Verdant fields and pick units. This is a synthetic shape used to
+          test Verdant&rsquo;s intake workflow — not a confirmed AROYA
+          importer. Facility, Room, and Zone are preserved as context and
+          are never used as Verdant tent or grow IDs.
         </p>
       </header>
 
@@ -199,6 +231,156 @@ export default function RepresentativeCsvPreview() {
               Detected headers: {headers.join(", ") || "—"}
             </p>
           </div>
+
+          <div
+            aria-label="Mapping actions"
+            className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-3"
+          >
+            <label className="text-xs font-medium" htmlFor="csv-template">
+              Apply template
+            </label>
+            <select
+              id="csv-template"
+              aria-label="Apply mapping template"
+              className="h-9 rounded-md border bg-background px-2 text-sm"
+              value={templateId ?? ""}
+              onChange={(e) => {
+                const id = (e.target.value || null) as CsvMappingTemplateId | null;
+                setTemplateId(id);
+                setPresetNotice(null);
+                if (!id || !headers) {
+                  setTemplateNotice(null);
+                  return;
+                }
+                const tpl = getCsvMappingTemplate(id);
+                if (!tpl) return;
+                const applied = applyCsvMappingTemplate(tpl, headers);
+                setMapping(applied.mapping);
+                const parts: string[] = [`Template "${tpl.name}" applied.`];
+                if (applied.ambiguousFields.length > 0) {
+                  parts.push(
+                    `Multiple headers matched — review: ${applied.ambiguousFields.join(", ")}.`,
+                  );
+                }
+                if (applied.unmatchedFields.length > 0) {
+                  parts.push(
+                    `No header found for: ${applied.unmatchedFields.join(", ")}.`,
+                  );
+                }
+                setTemplateNotice(parts.join(" "));
+              }}
+            >
+              <option value="">— Choose template —</option>
+              {CSV_MAPPING_TEMPLATES.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                const payload = buildMappingDownloadPayload({
+                  mapping,
+                  headers,
+                  templateId,
+                  templateName: templateId
+                    ? getCsvMappingTemplate(templateId)?.name ?? null
+                    : null,
+                });
+                const blob = new Blob([JSON.stringify(payload, null, 2)], {
+                  type: "application/json",
+                });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = csvMappingDownloadFileName();
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+              }}
+            >
+              Download mapping JSON
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                const preset = buildCsvMappingPreset({
+                  mapping,
+                  templateId,
+                  templateName: templateId
+                    ? getCsvMappingTemplate(templateId)?.name ?? null
+                    : null,
+                });
+                const ok = saveCsvMappingPreset(preset);
+                setHasSavedPreset(ok);
+                setPresetNotice(
+                  ok
+                    ? "Preset saved in this browser."
+                    : "Could not save preset in this browser.",
+                );
+              }}
+            >
+              Save preset in this browser
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!hasSavedPreset}
+              onClick={() => {
+                const preset = loadCsvMappingPreset();
+                if (!preset || !headers) {
+                  setPresetNotice("No saved preset found in this browser.");
+                  return;
+                }
+                const applied = applyCsvMappingPreset(preset, headers);
+                setMapping(applied.mapping);
+                setTemplateId(preset.template_id);
+                const parts: string[] = ["Saved preset applied."];
+                if (applied.missingHeaders.length > 0) {
+                  parts.push(
+                    `Saved headers not found in this CSV: ${applied.missingHeaders
+                      .map((m) => `${m.field}=${m.header}`)
+                      .join(", ")}. Fields left unmapped — no guesses.`,
+                  );
+                }
+                setPresetNotice(parts.join(" "));
+              }}
+            >
+              Apply saved preset
+            </Button>
+
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={!hasSavedPreset}
+              onClick={() => {
+                clearCsvMappingPreset();
+                setHasSavedPreset(false);
+                setPresetNotice("Saved preset cleared from this browser.");
+              }}
+            >
+              Clear saved preset
+            </Button>
+          </div>
+
+          {templateNotice && (
+            <p role="status" className="text-xs text-muted-foreground">
+              {templateNotice}
+            </p>
+          )}
+          {presetNotice && (
+            <p role="status" className="text-xs text-muted-foreground">
+              {presetNotice}
+            </p>
+          )}
+
           <div className="grid gap-3 sm:grid-cols-2">
             {FIELD_DESCRIPTORS.map((desc) => (
               <div key={desc.field} className="rounded-md border p-3">
@@ -246,7 +428,7 @@ export default function RepresentativeCsvPreview() {
       )}
 
       {result && <PreviewSummaryStrip result={result} />}
-      {result && <PreviewTable result={result} />}
+      {result && <PreviewTable result={result} mapping={mapping} />}
     </main>
   );
 }
@@ -274,7 +456,13 @@ function SummaryCell({ label, value }: { label: string; value: number }) {
   );
 }
 
-function PreviewTable({ result }: { result: RepresentativePreviewResult }) {
+function PreviewTable({
+  result,
+  mapping,
+}: {
+  result: RepresentativePreviewResult;
+  mapping: RepresentativeColumnMapping;
+}) {
   const rows = useMemo(() => result.rows, [result]);
   return (
     <section aria-label="Normalized representative CSV rows" className="overflow-auto">
@@ -294,12 +482,12 @@ function PreviewTable({ result }: { result: RepresentativePreviewResult }) {
             <TableHead>VWC %</TableHead>
             <TableHead>EC mS/cm</TableHead>
             <TableHead>Sub °C</TableHead>
-            <TableHead>Notes</TableHead>
+            <TableHead>Validation</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {rows.map((row) => (
-            <PreviewRow key={row.rowIndex} row={row} />
+            <PreviewRow key={row.rowIndex} row={row} mapping={mapping} />
           ))}
         </TableBody>
       </Table>
@@ -318,12 +506,31 @@ function fmt(n: number | null, digits = 2): string {
   return n.toFixed(digits);
 }
 
-function PreviewRow({ row }: { row: RepresentativeDraftReading }) {
+function hintVariant(severity: CsvRowValidationHint["severity"]) {
+  return severity === "block" ? ("destructive" as const) : ("secondary" as const);
+}
+
+function PreviewRow({
+  row,
+  mapping,
+}: {
+  row: RepresentativeDraftReading;
+  mapping: RepresentativeColumnMapping;
+}) {
+  const outcome = useMemo(
+    () => deriveCsvRowValidationHints({ row, mapping }),
+    [row, mapping],
+  );
   return (
-    <TableRow>
+    <TableRow data-row-canonical-previewable={outcome.canonicalPreviewable}>
       <TableCell>{row.rowIndex + 1}</TableCell>
       <TableCell>
         <Badge variant={stateVariant(row.state)}>{row.state}</Badge>
+        {!outcome.canonicalPreviewable && (
+          <div className="mt-1 text-[10px] uppercase text-destructive">
+            Blocked from canonical preview
+          </div>
+        )}
       </TableCell>
       <TableCell>{row.captured_at ?? "—"}</TableCell>
       <TableCell>{row.sensor ?? "—"}</TableCell>
@@ -338,8 +545,19 @@ function PreviewRow({ row }: { row: RepresentativeDraftReading }) {
       <TableCell>{fmt(row.vwc_pct, 1)}</TableCell>
       <TableCell>{fmt(row.substrate_ec_mscm, 2)}</TableCell>
       <TableCell>{fmt(row.substrate_temp_c, 1)}</TableCell>
-      <TableCell className="text-xs text-muted-foreground">
-        {row.reasons.length > 0 ? row.reasons.join(", ") : ""}
+      <TableCell className="space-y-1 text-xs">
+        {outcome.hints.length === 0 ? (
+          <span className="text-muted-foreground">—</span>
+        ) : (
+          <ul className="space-y-1">
+            {outcome.hints.map((h) => (
+              <li key={`${h.code}-${h.field ?? "row"}`} className="flex flex-wrap items-center gap-1">
+                <Badge variant={hintVariant(h.severity)}>{h.severity}</Badge>
+                <span className="text-muted-foreground">{h.message}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </TableCell>
     </TableRow>
   );

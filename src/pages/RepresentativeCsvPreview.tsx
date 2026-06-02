@@ -180,7 +180,7 @@ export default function RepresentativeCsvPreview() {
         </div>
         <h1 className="text-2xl font-semibold">Representative CSV preview</h1>
         <p className="text-sm text-muted-foreground">
-          Preview only. No data has been saved. CSV source, not live data.
+          Preview only. Nothing is saved. No data has been saved. CSV source, not live data.
           Review units before trusting values. Rows with invalid timestamps
           are blocked from canonical preview. Map your CSV headers to
           Verdant fields and pick units. This is a synthetic shape used to

@@ -111,14 +111,11 @@ export default function QuickLogV2Sheet({
       return;
     }
     toast.success("Log saved");
-    const refreshKeys = buildQuickLogV2RefreshQueryKeys({
+    applyQuickLogV2Refresh(queryClient, {
       targetType: resolved.targetType as "plant" | "tent",
       targetId: resolved.targetId as string,
       tentId: resolved.tentId ?? null,
     });
-    for (const queryKey of refreshKeys) {
-      queryClient.invalidateQueries({ queryKey: queryKey as readonly unknown[] });
-    }
     onOpenChange(false);
   };
 

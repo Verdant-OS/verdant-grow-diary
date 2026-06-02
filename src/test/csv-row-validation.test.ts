@@ -227,24 +227,29 @@ describe("row severity", () => {
   });
 
   it("severity follows invalid > warning > ok", () => {
-    const mapping = makeMapping();
-    const okRow = buildRow(["2026-05-01T10:00:00Z", "55", "2.5", "6.2", "24", "900"], mapping);
-    const warnRow = buildRow(["2026-05-01T10:00:00Z", "100", "2.5", "6.2", "24", "900"], mapping);
-    const badRow = buildRow(["bad", "100", "2.5", "6.2", "24", "900"], mapping);
-    expect(deriveCsvRowValidationHints({ row: okRow, mapping }).severity).toBe("ok");
-    expect(deriveCsvRowValidationHints({ row: warnRow, mapping }).severity).toBe("warning");
-    expect(deriveCsvRowValidationHints({ row: badRow, mapping }).severity).toBe("invalid");
+    const fullMapping = makeMapping({
+      substrate_temp: { column: "Temp", unit: "C" },
+      vpd: { column: "RH" },
+      ppfd: { column: "CO2" },
+      vwc: { column: "RH" },
+    });
+    const okRow = buildRow(["2026-05-01T10:00:00Z", "55", "2.5", "6.2", "24", "900"], fullMapping);
+    const warnRow = buildRow(["2026-05-01T10:00:00Z", "100", "2.5", "6.2", "24", "900"], fullMapping);
+    const badRow = buildRow(["bad", "100", "2.5", "6.2", "24", "900"], fullMapping);
+    expect(deriveCsvRowValidationHints({ row: okRow, mapping: fullMapping }).severity).toBe("ok");
+    expect(deriveCsvRowValidationHints({ row: warnRow, mapping: fullMapping }).severity).toBe("warning");
+    expect(deriveCsvRowValidationHints({ row: badRow, mapping: fullMapping }).severity).toBe("invalid");
   });
 
   it("fully clean row with everything mapped + in-range returns ok", () => {
-    const mapping = makeMapping();
-    const row = buildRow(["2026-05-01T10:00:00Z", "55", "2.5", "6.2", "24", "900"], mapping);
-    // Map every optional field so no not_mapped warnings remain.
-    mapping.substrate_temp = { column: "Temp", unit: "C" };
-    mapping.vpd = { column: "RH" }; // map to something parseable
-    mapping.ppfd = { column: "CO2" };
-    mapping.vwc = { column: "RH" };
-    const out = deriveCsvRowValidationHints({ row, mapping });
+    const fullMapping = makeMapping({
+      substrate_temp: { column: "Temp", unit: "C" },
+      vpd: { column: "RH" },
+      ppfd: { column: "CO2" },
+      vwc: { column: "RH" },
+    });
+    const row = buildRow(["2026-05-01T10:00:00Z", "55", "2.5", "6.2", "24", "900"], fullMapping);
+    const out = deriveCsvRowValidationHints({ row, mapping: fullMapping });
     expect(out.severity).toBe("ok");
     expect(out.hints).toEqual([]);
   });

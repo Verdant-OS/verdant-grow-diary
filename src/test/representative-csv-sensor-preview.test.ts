@@ -19,6 +19,7 @@ import {
   normalizeRepresentativeRow,
   parseCsv,
 } from "@/lib/representativeCsvSensorPreviewRules";
+import { stripSourceComments } from "@/test/utils/stripSourceComments";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");

@@ -88,10 +88,21 @@ export default function RepresentativeCsvPreview() {
   const [mapping, setMapping] = useState<RepresentativeColumnMapping>(emptyRepresentativeMapping());
   const [fileName, setFileName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [templateId, setTemplateId] = useState<CsvMappingTemplateId | null>(null);
+  const [templateNotice, setTemplateNotice] = useState<string | null>(null);
+  const [presetNotice, setPresetNotice] = useState<string | null>(null);
+  const [hasSavedPreset, setHasSavedPreset] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    setHasSavedPreset(loadCsvMappingPreset() !== null);
+  }, []);
 
   const onFile = async (file: File) => {
     setError(null);
+    setTemplateNotice(null);
+    setPresetNotice(null);
+    setTemplateId(null);
     setFileName(file.name);
     try {
       const fileText = await file.text();

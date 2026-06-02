@@ -77,21 +77,14 @@ describe("AiDoctorSessionsIndex — empty state", () => {
 describe("AiDoctorSessionsIndex — filtered-empty state", () => {
   it("renders distinct filtered-empty copy with a working Clear filters action", async () => {
     mockRangeImpl = () => Promise.resolve({ data: [], error: null });
-    renderWithProviders(
-      <MemoryRouterRouteWrapper initialEntries={["/?risk=high"]}>
-        <AiDoctorSessionsIndex />
-      </MemoryRouterRouteWrapper>,
-    );
+    renderWithProviders(<AiDoctorSessionsIndex />, ["/?risk=high"]);
     const filteredEmpty = await screen.findByTestId(
       "ai-doctor-sessions-index-empty-filtered",
     );
     expect(filteredEmpty.textContent).toMatch(/no sessions match these filters/i);
     expect(screen.queryByTestId("ai-doctor-sessions-index-empty")).toBeNull();
-    // Inline reset control
     const clear = screen.getByTestId("ai-doctor-sessions-index-empty-filtered-clear");
-    expect(clear).toBeTruthy();
     fireEvent.click(clear);
-    // Filters state cleared → plain empty appears
     const empty = await screen.findByTestId("ai-doctor-sessions-index-empty");
     expect(empty).toBeTruthy();
   });

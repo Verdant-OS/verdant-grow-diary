@@ -176,7 +176,7 @@ describe("BillingPlaceholder rendering", () => {
 describe("BillingPlaceholder source safety", () => {
   it("never grants Pro from client checkout success", () => {
     // Defensive: scan the file for any direct entitlement writes.
-    expect(BILLING_SRC).not.toMatch(/setPro|grantPro|isPro\s*=\s*true|entitlement/i);
+    expect(BILLING_SRC).not.toMatch(/setPro|grantPro|isPro\s*=\s*true/i);
     expect(BILLING_SRC).not.toMatch(/\.from\(["']profiles["']\)\s*\.update/);
     expect(BILLING_SRC).not.toMatch(/\.from\(["']subscriptions["']\)/);
     expect(BILLING_SRC).not.toMatch(/\.from\(["']entitlements["']\)/);

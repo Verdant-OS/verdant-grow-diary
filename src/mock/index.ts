@@ -29,6 +29,36 @@ export interface Plant {
   isArchived?: boolean;
 }
 
+/**
+ * Provenance of a sensor reading as displayed to the grower. Distinct
+ * from {@link SensorReadingHealthStatus} (which is the contract status).
+ *
+ * - "live"    real-time bridge / device telemetry
+ * - "manual"  grower-entered snapshot
+ * - "csv"     bulk imported from a CSV
+ * - "demo"    synthetic mock data — MUST be visibly labeled
+ * - "stale"   provenance known but outside freshness window
+ * - "invalid" provenance known but the payload failed validation
+ */
+export type SensorReadingSource =
+  | "live"
+  | "manual"
+  | "csv"
+  | "demo"
+  | "stale"
+  | "invalid";
+
+/**
+ * Re-exported canonical SnapshotStatus so consumers don't reach into the
+ * contract module for the type — keeps duplication out of JSX.
+ */
+export type SensorReadingHealthStatus =
+  | "usable"
+  | "stale"
+  | "invalid"
+  | "needs_review"
+  | "no_data";
+
 export interface SensorReading {
   ts: string;
   tentId: string;
@@ -37,6 +67,18 @@ export interface SensorReading {
   vpd: number;
   co2: number;
   soil: number;
+  /** Provenance label. Demo data must always carry "demo". */
+  source: SensorReadingSource;
+  /**
+   * Canonical Sensor Snapshot Status Contract v1 status for this reading.
+   * Never default to "usable" for unknown/synthetic data — use
+   * "needs_review" or "no_data" instead.
+   */
+  status: SensorReadingHealthStatus;
+  /** ISO timestamp the reading was actually captured at the source. */
+  capturedAt: string;
+  /** Optional confidence in the value (0..1). */
+  confidence?: number;
 }
 
 export interface Camera {

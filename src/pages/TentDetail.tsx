@@ -241,6 +241,8 @@ export default function TentDetail() {
 
       <ManualSnapshotTimelineSection scope="tent" tentId={id ?? null} />
 
+      <QuickLogGroupedTimelineSection scope="tent" tentId={id ?? null} />
+
       <TimelineMemorySection scope="tent" tentId={id ?? null} />
 
       {id && (

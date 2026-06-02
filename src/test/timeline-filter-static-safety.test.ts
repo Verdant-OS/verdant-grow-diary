@@ -35,10 +35,24 @@ describe("timeline filter — static safety", () => {
       expect(src).not.toMatch(/service_role/);
     });
 
-    it(`${t.name}: no action_queue / alerts / ai_doctor writes`, () => {
+    it(`${t.name}: no action_queue / alerts / ai_doctor_sessions writes (reads to ai_doctor_sessions allowed for frozen timeline audit projection)`, () => {
+      // action_queue and alerts: any reference / write forbidden in timeline surface.
       expect(src).not.toMatch(/\baction_queue\b/);
       expect(src).not.toMatch(/from\(["']alerts["']\)/);
-      expect(src).not.toMatch(/ai_doctor_sessions/);
+
+      // ai_doctor_sessions: writes forbidden, reads (select/eq/not/order/limit) allowed.
+      // Block every write-shape that could target ai_doctor_sessions.
+      const aiDoctorWriteShapes = [
+        /ai_doctor_sessions[^)]*\)\s*\.\s*insert\(/,
+        /ai_doctor_sessions[^)]*\)\s*\.\s*upsert\(/,
+        /ai_doctor_sessions[^)]*\)\s*\.\s*update\(/,
+        /ai_doctor_sessions[^)]*\)\s*\.\s*delete\(/,
+        /\.rpc\([^)]*ai_doctor_sessions/,
+        /functions\.invoke\([^)]*ai_doctor_sessions/,
+      ];
+      for (const re of aiDoctorWriteShapes) {
+        expect(src).not.toMatch(re);
+      }
     });
 
     it(`${t.name}: no live/synced/connected/imported labeling`, () => {

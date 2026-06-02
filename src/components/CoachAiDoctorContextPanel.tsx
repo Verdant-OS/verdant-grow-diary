@@ -6,6 +6,13 @@
  * Reuses the deterministic `evaluateAiDoctorContext` rules and the
  * `aiDoctorContextViewModel` tooltip helpers so vocabulary is not
  * duplicated inside JSX.
+ *
+ * Plant selection rules (avoid silently using `plants[0]`):
+ *   - If `selectedPlantId` matches a plant in `plants`, use that plant.
+ *   - Else if `plants.length === 1`, use that single plant.
+ *   - Else if a legacy `plant` prop is supplied (back-compat for callers
+ *     that have already resolved their own active plant), use it.
+ *   - Else render the calm "Select a plant" fallback.
  */
 import { useMemo } from "react";
 import { CheckCircle2, AlertTriangle, Info } from "lucide-react";
@@ -25,6 +32,11 @@ import {
   plantToAiDoctorContextPlant,
   type AiDoctorContextPlantSource,
 } from "@/lib/aiDoctorContextViewModel";
+import {
+  buildAiDoctorContextQuickActions,
+  AI_DOCTOR_NO_WARNING_CONTEXT_COPY,
+} from "@/lib/aiDoctorContextQuickActionsViewModel";
+import AiDoctorContextQuickActions from "@/components/AiDoctorContextQuickActions";
 
 export interface CoachDiaryEntryLike {
   entry_type?: string | null;
@@ -34,10 +46,17 @@ export interface CoachDiaryEntryLike {
 }
 
 export interface CoachAiDoctorContextPanelProps {
-  plant: AiDoctorContextPlantSource | null;
+  /** Legacy single-plant prop. New callers should prefer `plants`+`selectedPlantId`. */
+  plant?: AiDoctorContextPlantSource | null;
+  /** Full plant list available in the current grow/tent context. */
+  plants?: readonly AiDoctorContextPlantSource[];
+  /** Explicit selected plant id from route/search/UI selection. */
+  selectedPlantId?: string | null;
   diaryEntries?: readonly CoachDiaryEntryLike[];
   /** Optional pre-computed manual snapshot list; defaults to deriving from diary. */
   manualSnapshots?: readonly AiDoctorContextManualSnapshotInput[];
+  /** Optional grow id used to build sensor/snapshot quick-action targets. */
+  growId?: string | null;
   className?: string;
 }
 
@@ -77,12 +96,45 @@ function isManualSnapshotEntry(e: CoachDiaryEntryLike): boolean {
   return !!d && typeof d === "object" && (d as { source?: unknown }).source === "manual";
 }
 
+/**
+ * Resolve the plant the panel should describe without silently
+ * defaulting to the first item in a multi-plant list.
+ */
+function resolveActivePlant(
+  plants: readonly AiDoctorContextPlantSource[] | undefined,
+  selectedPlantId: string | null | undefined,
+  legacyPlant: AiDoctorContextPlantSource | null | undefined,
+): { plant: AiDoctorContextPlantSource | null; ambiguous: boolean } {
+  const list = Array.isArray(plants) ? plants : [];
+  if (selectedPlantId) {
+    const match = list.find(
+      (p) => p && typeof p.id === "string" && p.id === selectedPlantId,
+    );
+    if (match) return { plant: match, ambiguous: false };
+  }
+  if (list.length === 1) return { plant: list[0] ?? null, ambiguous: false };
+  if (legacyPlant) return { plant: legacyPlant, ambiguous: false };
+  if (list.length > 1) return { plant: null, ambiguous: true };
+  return { plant: null, ambiguous: false };
+}
+
+export const COACH_AI_DOCTOR_CONTEXT_AMBIGUOUS_COPY =
+  "Select a plant to review AI Doctor context.";
+
 export default function CoachAiDoctorContextPanel({
   plant,
+  plants,
+  selectedPlantId,
   diaryEntries,
   manualSnapshots,
+  growId,
   className,
 }: CoachAiDoctorContextPanelProps) {
+  const { plant: activePlant, ambiguous } = useMemo(
+    () => resolveActivePlant(plants, selectedPlantId, plant),
+    [plants, selectedPlantId, plant],
+  );
+
   const result = useMemo(() => {
     const events: AiDoctorContextEventInput[] = [];
     const derivedSnaps: AiDoctorContextManualSnapshotInput[] = [];
@@ -95,13 +147,49 @@ export default function CoachAiDoctorContextPanel({
       }
     }
     return evaluateAiDoctorContext({
-      plant: plantToAiDoctorContextPlant(plant),
+      plant: plantToAiDoctorContextPlant(activePlant),
       recentEvents: events,
       recentManualSnapshots: manualSnapshots ?? derivedSnaps,
     });
-  }, [plant, diaryEntries, manualSnapshots]);
+  }, [activePlant, diaryEntries, manualSnapshots]);
+
+  const quickActions = useMemo(
+    () =>
+      buildAiDoctorContextQuickActions({
+        missing: result.missing,
+        plantId: activePlant?.id ?? null,
+        plantName: activePlant?.name ?? null,
+        growId: growId ?? null,
+      }),
+    [result.missing, activePlant, growId],
+  );
+
+  if (ambiguous) {
+    return (
+      <section
+        aria-labelledby="coach-ai-doctor-context-heading"
+        data-testid="coach-ai-doctor-context-panel"
+        data-ambiguous="true"
+        className={`glass rounded-2xl p-4 space-y-2 ${className ?? ""}`}
+      >
+        <h2
+          id="coach-ai-doctor-context-heading"
+          className="text-base font-semibold tracking-tight"
+        >
+          AI Doctor Context
+        </h2>
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="coach-ai-doctor-context-ambiguous-notice"
+        >
+          {COACH_AI_DOCTOR_CONTEXT_AMBIGUOUS_COPY}
+        </p>
+      </section>
+    );
+  }
 
   const style = READINESS_STYLES[result.readiness];
+  const noWarningContext = result.counts.recentWarnings === 0;
 
   return (
     <section
@@ -196,6 +284,22 @@ export default function CoachAiDoctorContextPanel({
           )}
         </div>
       </div>
+
+      {quickActions.length > 0 ? (
+        <AiDoctorContextQuickActions
+          actions={quickActions}
+          testIdPrefix="coach-ai-doctor-context"
+        />
+      ) : null}
+
+      {noWarningContext ? (
+        <p
+          className="text-[11px] text-muted-foreground"
+          data-testid="coach-ai-doctor-context-no-warning"
+        >
+          {AI_DOCTOR_NO_WARNING_CONTEXT_COPY}
+        </p>
+      ) : null}
 
       <p
         className="text-xs"

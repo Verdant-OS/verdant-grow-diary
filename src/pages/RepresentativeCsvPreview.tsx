@@ -24,8 +24,7 @@ import {
   type CsvMappingConfigWarning,
 } from "@/lib/csvMappingConfig";
 import {
-  applyCsvMappingPreset,
-  buildCsvMappingPreset,
+  applySavedCsvMappingPreset,
   clearCsvMappingPreset,
   loadCsvMappingPreset,
   saveCsvMappingPreset,
@@ -243,6 +242,11 @@ export default function RepresentativeCsvPreview() {
             aria-label="Mapping actions"
             className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-3"
           >
+            {headers && hasSavedPreset && !presetNotice && (
+              <p className="w-full text-xs text-muted-foreground">
+                Saved preset available — apply?
+              </p>
+            )}
             <label className="text-xs font-medium" htmlFor="csv-template">
               Apply template
             </label>
@@ -340,14 +344,16 @@ export default function RepresentativeCsvPreview() {
               type="button"
               variant="outline"
               onClick={() => {
-                const preset = buildCsvMappingPreset({
+                if (!headers) return;
+                const config = buildCsvMappingConfig({
                   mapping,
+                  headers,
                   templateId,
                   templateName: templateId
                     ? getCsvMappingTemplate(templateId)?.name ?? null
                     : null,
                 });
-                const ok = saveCsvMappingPreset(preset);
+                const ok = saveCsvMappingPreset(config);
                 setHasSavedPreset(ok);
                 setPresetNotice(
                   ok
@@ -364,20 +370,32 @@ export default function RepresentativeCsvPreview() {
               variant="outline"
               disabled={!hasSavedPreset}
               onClick={() => {
-                const preset = loadCsvMappingPreset();
-                if (!preset || !headers) {
+                if (!headers) {
+                  setPresetNotice("No CSV loaded.");
+                  return;
+                }
+                const result = applySavedCsvMappingPreset(headers);
+                if (result === null) {
                   setPresetNotice("No saved preset found in this browser.");
                   return;
                 }
-                const applied = applyCsvMappingPreset(preset, headers);
-                setMapping(applied.mapping);
-                setTemplateId(preset.template_id);
+                if (result.status === "blocked") {
+                  setPresetNotice(`Preset blocked: ${result.message}`);
+                  return;
+                }
+                setMapping(result.mapping);
+                setTemplateId(null);
                 const parts: string[] = ["Saved preset applied."];
-                if (applied.missingHeaders.length > 0) {
+                if (result.missingHeaders.length > 0) {
                   parts.push(
-                    `Saved headers not found in this CSV: ${applied.missingHeaders
+                    `Saved headers not found in this CSV: ${result.missingHeaders
                       .map((m) => `${m.field}=${m.header}`)
                       .join(", ")}. Fields left unmapped — no guesses.`,
+                  );
+                }
+                if (result.ignoredKeys.length > 0) {
+                  parts.push(
+                    `Ignored unexpected keys: ${result.ignoredKeys.join(", ")}.`,
                   );
                 }
                 setPresetNotice(parts.join(" "));

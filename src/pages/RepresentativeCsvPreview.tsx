@@ -29,6 +29,7 @@ import {
 } from "@/lib/csvMappingPresetStorage";
 import {
   deriveCsvRowValidationHints,
+  detectMappingCollisions,
   type CsvRowValidationHint,
 } from "@/lib/csvRowValidationRules";
 import { Badge } from "@/components/ui/badge";
@@ -427,9 +428,28 @@ export default function RepresentativeCsvPreview() {
         </section>
       )}
 
+      {result && <MappingCollisionNotices mapping={mapping} />}
       {result && <PreviewSummaryStrip result={result} />}
       {result && <PreviewTable result={result} mapping={mapping} />}
     </main>
+  );
+}
+
+function MappingCollisionNotices({ mapping }: { mapping: RepresentativeColumnMapping }) {
+  const collisions = useMemo(() => detectMappingCollisions(mapping), [mapping]);
+  if (collisions.length === 0) return null;
+  return (
+    <section
+      aria-label="Mapping collision warnings"
+      className="space-y-1 rounded-md border border-destructive/40 bg-destructive/5 p-3"
+    >
+      <h3 className="text-sm font-semibold">Duplicate canonical mapping</h3>
+      <ul className="space-y-1 text-xs text-muted-foreground">
+        {collisions.map((c) => (
+          <li key={c.code + c.field}>{c.message}</li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -507,7 +527,7 @@ function fmt(n: number | null, digits = 2): string {
 }
 
 function hintVariant(severity: CsvRowValidationHint["severity"]) {
-  return severity === "block" ? ("destructive" as const) : ("secondary" as const);
+  return severity === "invalid" ? ("destructive" as const) : ("secondary" as const);
 }
 
 function PreviewRow({

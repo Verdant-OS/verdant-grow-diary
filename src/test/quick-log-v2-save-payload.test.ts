@@ -54,7 +54,7 @@ describe("quickLogV2SavePayload", () => {
   it("blocks photo action", () => {
     const r = buildQuickLogV2SavePayload(base({ action: "photo" as any }));
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error("expected fail");
+    if (r.ok === true) throw new Error("expected fail");
     expect(r.reason).toBe("photo_saving_not_enabled");
   });
 

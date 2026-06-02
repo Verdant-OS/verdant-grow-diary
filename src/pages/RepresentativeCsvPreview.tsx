@@ -259,8 +259,17 @@ export default function RepresentativeCsvPreview() {
                 const tpl = getCsvMappingTemplate(id);
                 if (!tpl) return;
                 const applied = applyCsvMappingTemplate(tpl, headers);
+                if (applied.blocked) {
+                  setTemplateId(null);
+                  setTemplateNotice(applied.blockReason);
+                  return;
+                }
                 setMapping(applied.mapping);
-                const parts: string[] = [`Template "${tpl.name}" applied.`];
+                const parts: string[] = [
+                  tpl.isReset
+                    ? "Mapping cleared."
+                    : `Template "${tpl.name}" applied.`,
+                ];
                 if (applied.ambiguousFields.length > 0) {
                   parts.push(
                     `Multiple headers matched — review: ${applied.ambiguousFields.join(", ")}.`,

@@ -35,7 +35,7 @@ describe("buildQuickLogSnapshotStrip", () => {
     expect(v.ageLabel).toBeNull();
     expect(v.capturedAt).toBeNull();
     expect(v.classification.status).toBe("no_data");
-    expect(v.classification.reason).toBe("none_inserted");
+    expect(v.classification.reason).toBe("no_rows");
     expect(v.classification.isHealthyEvidence).toBe(false);
   });
 

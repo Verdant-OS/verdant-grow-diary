@@ -100,7 +100,7 @@ export default function QuickLogV2Sheet({
       humidityPct: form.humidityPct,
       vpdKpa: form.vpdKpa,
     });
-    if (!built.ok) {
+    if (built.ok !== true) {
       setLocalError(reasonToMessage(built.reason));
       return;
     }

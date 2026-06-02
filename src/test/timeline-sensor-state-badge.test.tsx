@@ -71,8 +71,9 @@ describe("sensorSnapshotBadge pure helper", () => {
   it("unknown state → no badge", () => {
     expect(sensorSnapshotBadge("demo")).toBeNull();
     expect(sensorSnapshotBadge("unknown")).toBeNull();
-    expect(sensorSnapshotBadge("Live")).toBeNull(); // case-sensitive in helper, trimmed but lowercased
-    expect(sensorSnapshotBadge(" LIVE ")).toEqual({ label: "Live", variant: "positive" }); // trimmed+lowered ok
+    expect(sensorSnapshotBadge("Live")).toEqual({ label: "Live", variant: "positive" }); // helper trims+lowercases
+    expect(sensorSnapshotBadge(" LIVE ")).toEqual({ label: "Live", variant: "positive" });
+    expect(sensorSnapshotBadge("  STALE  ")).toEqual({ label: "Stale", variant: "warning" });
   });
 });
 

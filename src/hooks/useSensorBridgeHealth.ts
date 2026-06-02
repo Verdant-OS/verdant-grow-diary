@@ -1,9 +1,9 @@
 /**
  * Read-only hook for the Sensor Bridge Health surface.
  *
- * Queries `sensor_ingest_audit_log` (RLS-scoped to auth.uid()). Never reads
- * bridge tokens, secrets, encrypted columns, raw payloads, or any
- * service-role data. Never writes.
+ * Queries `sensor_ingest_audit_log` (RLS-scoped to auth.uid()) using a
+ * narrow column allowlist of audit counts and timestamps only. Never
+ * writes.
  */
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";

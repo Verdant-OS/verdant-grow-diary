@@ -155,3 +155,56 @@ export function labelMissing(code: string): string {
 export function labelEvidence(code: string): string {
   return AI_DOCTOR_EVIDENCE_LABELS[code] ?? code;
 }
+
+// ---------------------------------------------------------------------------
+// Tooltip / help copy (sourced from shared config, not duplicated in JSX)
+// ---------------------------------------------------------------------------
+
+import {
+  AI_DOCTOR_CONTEXT_TOOLTIPS,
+  AI_DOCTOR_CONTEXT_MISSING_TOOLTIPS,
+} from "@/constants/aiDoctorContextReadiness";
+
+/** Tooltip / help text for an evidence (present) item. */
+export function tooltipForEvidence(code: string): string {
+  return AI_DOCTOR_CONTEXT_TOOLTIPS[code] ?? "";
+}
+
+/** Tooltip / help text for a missing item. */
+export function tooltipForMissing(code: string): string {
+  return (
+    AI_DOCTOR_CONTEXT_MISSING_TOOLTIPS[code] ??
+    AI_DOCTOR_CONTEXT_TOOLTIPS[code] ??
+    ""
+  );
+}
+
+/**
+ * Readiness items the panel can display with tooltips. Keeping this list
+ * outside JSX prevents UI files from duplicating the readiness vocabulary.
+ */
+export const AI_DOCTOR_READINESS_ITEM_CODES = [
+  "stage",
+  "strain",
+  "medium",
+  "plant-photo",
+  "recent-warnings",
+] as const;
+
+export type AiDoctorReadinessItemCode =
+  (typeof AI_DOCTOR_READINESS_ITEM_CODES)[number];
+
+export interface AiDoctorReadinessItemHelp {
+  code: AiDoctorReadinessItemCode;
+  label: string;
+  tooltip: string;
+}
+
+export function getAiDoctorReadinessItemHelp(): AiDoctorReadinessItemHelp[] {
+  return AI_DOCTOR_READINESS_ITEM_CODES.map((code) => ({
+    code,
+    label: labelEvidence(code),
+    tooltip: tooltipForEvidence(code),
+  }));
+}
+

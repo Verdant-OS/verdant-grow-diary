@@ -47,6 +47,14 @@ import {
   auditToggleLabel,
   isAuditableQuickLogEntry,
 } from "@/lib/quickLogTimelineAuditViewModel";
+import {
+  QUICK_LOG_REVIEW_ACTION_SECTION_TITLE,
+  QUICK_LOG_REVIEW_ENVIRONMENT_SECTION_TITLE,
+  QUICK_LOG_REVIEW_PANEL_TITLE,
+  buildQuickLogReviewActionSection,
+  isReviewableQuickLogEntry,
+  reviewTriggerLabel,
+} from "@/lib/quickLogGroupedReviewViewModel";
 
 /**
  * A demo/sample timeline entry. Never produced by the live hook — used
@@ -154,7 +162,15 @@ function EntryItem({ entry, demoVariant }: EntryItemProps) {
 
   // Audit toggle: local UI state, only on grouped entries.
   const [auditExpanded, setAuditExpanded] = useState(false);
+  // In-place Review Panel: independent local UI state, only on grouped entries.
+  const [reviewOpen, setReviewOpen] = useState(false);
   const auditable = isAuditableQuickLogEntry(entry);
+  const reviewable =
+    entry.kind === "grouped" && isReviewableQuickLogEntry(entry);
+  const reviewActionSection =
+    entry.kind === "grouped"
+      ? buildQuickLogReviewActionSection(entry)
+      : null;
 
   if (entry.kind === "grouped") {
     return (
@@ -164,6 +180,7 @@ function EntryItem({ entry, demoVariant }: EntryItemProps) {
         data-action-id={entry.action.id}
         data-environment-id={entry.environment.id}
         data-audit-expanded={auditExpanded ? "true" : "false"}
+        data-review-open={reviewOpen ? "true" : "false"}
       >
         <CardContent className="space-y-3 p-3">
           {auditExpanded ? (
@@ -210,8 +227,8 @@ function EntryItem({ entry, demoVariant }: EntryItemProps) {
               <ManualSnapshotTimelineCard card={entry.environmentCard} />
             </>
           )}
-          {auditable && (
-            <div>
+          <div className="flex flex-wrap gap-2">
+            {auditable && (
               <Button
                 type="button"
                 variant="ghost"
@@ -222,7 +239,94 @@ function EntryItem({ entry, demoVariant }: EntryItemProps) {
               >
                 {auditToggleLabel(auditExpanded)}
               </Button>
-            </div>
+            )}
+            {reviewable && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setReviewOpen((v) => !v)}
+                aria-expanded={reviewOpen}
+                data-testid="quick-log-grouped-review-trigger"
+              >
+                {reviewTriggerLabel(reviewOpen)}
+              </Button>
+            )}
+          </div>
+          {reviewOpen && reviewActionSection && (
+            <section
+              className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-3"
+              aria-label={QUICK_LOG_REVIEW_PANEL_TITLE}
+              data-testid="quick-log-grouped-review-panel"
+            >
+              <header className="flex items-center justify-between gap-2">
+                <h4
+                  className="text-sm font-semibold"
+                  data-testid="quick-log-grouped-review-panel-title"
+                >
+                  {QUICK_LOG_REVIEW_PANEL_TITLE}
+                </h4>
+              </header>
+              <div
+                className="rounded-md border border-border/40 bg-background p-3 space-y-1"
+                data-testid="quick-log-grouped-review-action-section"
+              >
+                <p
+                  className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                  data-testid="quick-log-grouped-review-action-section-title"
+                >
+                  {QUICK_LOG_REVIEW_ACTION_SECTION_TITLE}
+                </p>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span
+                    className="text-sm font-medium"
+                    data-testid="quick-log-grouped-review-action-kind"
+                  >
+                    {reviewActionSection.kindLabel}
+                  </span>
+                  <Badge
+                    variant="secondary"
+                    data-testid="quick-log-grouped-review-action-source"
+                  >
+                    {reviewActionSection.sourceLabel}
+                  </Badge>
+                </div>
+                <p
+                  className="text-xs text-muted-foreground"
+                  data-testid="quick-log-grouped-review-action-occurred-at"
+                >
+                  {reviewActionSection.occurredAt}
+                </p>
+                {reviewActionSection.volumeMl != null && (
+                  <p
+                    className="text-xs"
+                    data-testid="quick-log-grouped-review-action-volume"
+                  >
+                    {reviewActionSection.volumeMl} ml
+                  </p>
+                )}
+                {reviewActionSection.noteText && (
+                  <p
+                    className="text-sm text-foreground/90 break-words"
+                    data-testid="quick-log-grouped-review-action-note"
+                  >
+                    {reviewActionSection.noteText}
+                  </p>
+                )}
+              </div>
+              <div
+                className="rounded-md border border-border/40 bg-background p-3 space-y-2"
+                data-testid="quick-log-grouped-review-environment-section"
+              >
+                <p
+                  className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                  data-testid="quick-log-grouped-review-environment-section-title"
+                >
+                  {QUICK_LOG_REVIEW_ENVIRONMENT_SECTION_TITLE}
+                </p>
+                <ManualSnapshotTimelineCard card={entry.environmentCard} />
+              </div>
+            </section>
           )}
         </CardContent>
       </Card>

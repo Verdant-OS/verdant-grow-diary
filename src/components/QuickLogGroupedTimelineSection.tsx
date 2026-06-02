@@ -47,6 +47,14 @@ import {
   auditToggleLabel,
   isAuditableQuickLogEntry,
 } from "@/lib/quickLogTimelineAuditViewModel";
+import {
+  QUICK_LOG_REVIEW_ACTION_SECTION_TITLE,
+  QUICK_LOG_REVIEW_ENVIRONMENT_SECTION_TITLE,
+  QUICK_LOG_REVIEW_PANEL_TITLE,
+  buildQuickLogReviewActionSection,
+  isReviewableQuickLogEntry,
+  reviewTriggerLabel,
+} from "@/lib/quickLogGroupedReviewViewModel";
 
 /**
  * A demo/sample timeline entry. Never produced by the live hook — used

@@ -29,6 +29,8 @@ export interface GrowDiaryTimelineItem {
   notePreview: string;
   hasPhoto: boolean;
   hasSensorSnapshot: boolean;
+  /** "live" | "manual" | "stale" | "invalid" | null when missing/legacy. */
+  sensorSnapshotState: string | null;
   tags: string[];
   warnings: string[];
   isUsefulForAiContext: boolean;

@@ -80,8 +80,16 @@ export interface AiDoctorContextResult {
   diagnosisClaimed: false;
 }
 
-export const AI_DOCTOR_RECENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // 7d
-export const AI_DOCTOR_SNAPSHOT_FRESH_MS = 48 * 60 * 60 * 1000; // 48h
+import {
+  AI_DOCTOR_CONTEXT_READINESS_CONFIG,
+  type AiDoctorContextReadinessConfig,
+} from "@/constants/aiDoctorContextReadiness";
+
+/** Re-exported for back-compat. Source of truth lives in constants/. */
+export const AI_DOCTOR_RECENT_WINDOW_MS =
+  AI_DOCTOR_CONTEXT_READINESS_CONFIG.recentEventWindowMs;
+export const AI_DOCTOR_SNAPSHOT_FRESH_MS =
+  AI_DOCTOR_CONTEXT_READINESS_CONFIG.snapshotFreshMs;
 
 const SAFE_NEXT_STEPS: Record<AiDoctorContextReadiness, string> = {
   insufficient: "Add a recent note, photo, and manual sensor snapshot.",

@@ -18,35 +18,12 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
+import BillingPlaceholder from "@/pages/BillingPlaceholder";
 import {
+  resolvePaddleConfig,
   unavailableMessage,
   PADDLE_SANDBOX_ENV,
-  type PaddleConfig,
 } from "@/lib/paddleConfig";
-
-// Hoisted mock state used by the resolvePaddleConfig mock below.
-const mockState: { current: PaddleConfig } = {
-  current: { available: false, reason: "missing_environment", environment: null },
-};
-
-vi.mock("@/lib/paddleConfig", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/paddleConfig")>();
-  return {
-    ...actual,
-    resolvePaddleConfig: () => mockState.current,
-  };
-});
-
-// Re-import the real resolver (unmocked) for unit testing.
-const { resolvePaddleConfig } = await vi.importActual<
-  typeof import("@/lib/paddleConfig")
->("@/lib/paddleConfig");
-
-// Import AFTER vi.mock so the page uses the mocked resolvePaddleConfig.
-const { default: BillingPlaceholder } = await import("@/pages/BillingPlaceholder");
-
-
-
 
 const SANDBOX_ENV = {
   VITE_PADDLE_ENVIRONMENT: "sandbox",
@@ -127,35 +104,18 @@ function renderBilling(plan: string) {
 }
 
 describe("BillingPlaceholder rendering", () => {
+  const realEnv = { ...(import.meta as any).env };
+
   beforeEach(() => {
-    mockState.current = { available: false, reason: "missing_environment", environment: null };
+    for (const k of Object.keys(SANDBOX_ENV)) {
+      (import.meta as any).env[k] = "";
+    }
   });
 
   afterEach(() => {
-    mockState.current = { available: false, reason: "missing_environment", environment: null };
+    (import.meta as any).env = realEnv;
     vi.restoreAllMocks();
   });
-
-  const applySandbox = (overrides: Partial<Record<string, string>> = {}) => {
-    const merged = { ...SANDBOX_ENV, ...overrides };
-    if (merged.VITE_PADDLE_ENVIRONMENT === "live" || merged.VITE_PADDLE_ENVIRONMENT === "production") {
-      mockState.current = { available: false, reason: "live_not_allowed", environment: merged.VITE_PADDLE_ENVIRONMENT };
-      return;
-    }
-    mockState.current = {
-      available: true,
-      environment: "sandbox",
-      clientToken: merged.VITE_PADDLE_CLIENT_TOKEN!,
-      priceIds: {
-        "pro-monthly": merged.VITE_PADDLE_PRICE_PRO_MONTHLY!,
-        "pro-annual": merged.VITE_PADDLE_PRICE_PRO_ANNUAL!,
-        "founder-lifetime": merged.VITE_PADDLE_PRICE_FOUNDER_LIFETIME!,
-      },
-    };
-  };
-
-
-
 
   it("renders the unavailable state when sandbox config is missing", () => {
     renderBilling("pro-monthly");
@@ -165,17 +125,20 @@ describe("BillingPlaceholder rendering", () => {
   });
 
   it("refuses to render checkout when env is live", () => {
-    applySandbox({ VITE_PADDLE_ENVIRONMENT: "live" });
+    Object.assign((import.meta as any).env, SANDBOX_ENV, {
+      VITE_PADDLE_ENVIRONMENT: "live",
+    });
     renderBilling("pro-monthly");
     expect(screen.getByTestId("paddle-unavailable")).toBeInTheDocument();
     expect(screen.queryByTestId("paddle-sandbox-checkout-button")).toBeNull();
   });
 
   it("renders the sandbox checkout button when sandbox config is present", () => {
-    applySandbox();
+    Object.assign((import.meta as any).env, SANDBOX_ENV);
     renderBilling("pro-monthly");
     expect(screen.getByTestId("paddle-sandbox-ready")).toBeInTheDocument();
-    expect(screen.getByTestId("paddle-sandbox-checkout-button")).toBeInTheDocument();
+    const btn = screen.getByTestId("paddle-sandbox-checkout-button");
+    expect(btn).toBeInTheDocument();
     expect(screen.getByText(/Sandbox \/ test mode/i)).toBeInTheDocument();
     expect(screen.getByText(/Pro access is/i)).toBeInTheDocument();
   });
@@ -189,10 +152,11 @@ describe("BillingPlaceholder rendering", () => {
   });
 
   it("does not grant Pro entitlement from clicking the sandbox button", () => {
-    applySandbox();
+    Object.assign((import.meta as any).env, SANDBOX_ENV);
     renderBilling("pro-monthly");
     const btn = screen.getByTestId("paddle-sandbox-checkout-button");
     btn.click();
+    // No flag is set in localStorage / sessionStorage by the click handler.
     const ls = JSON.stringify({ ...localStorage });
     const ss = JSON.stringify({ ...sessionStorage });
     expect(ls).not.toMatch(/pro|entitlement|subscriber/i);
@@ -200,11 +164,10 @@ describe("BillingPlaceholder rendering", () => {
   });
 });
 
-
 describe("BillingPlaceholder source safety", () => {
   it("never grants Pro from client checkout success", () => {
-    // The page must not write any entitlement-shaped value from the client.
-    expect(BILLING_SRC).not.toMatch(/setPro\b|grantPro\b|isPro\s*=\s*true/);
+    // Defensive: scan the file for any direct entitlement writes.
+    expect(BILLING_SRC).not.toMatch(/setPro|grantPro|isPro\s*=\s*true|entitlement/i);
     expect(BILLING_SRC).not.toMatch(/\.from\(["']profiles["']\)\s*\.update/);
     expect(BILLING_SRC).not.toMatch(/\.from\(["']subscriptions["']\)/);
     expect(BILLING_SRC).not.toMatch(/\.from\(["']entitlements["']\)/);
@@ -219,30 +182,24 @@ describe("BillingPlaceholder source safety", () => {
     expect(CONFIG_SRC).not.toMatch(/service_role/i);
   });
 
-  it("contains no marketing claims for autopilot, guaranteed yield, cannabis sales, or equipment control", () => {
-    // These patterns target positive marketing claims, not refutations
-    // (e.g. "never grows for you on autopilot" must be allowed).
-    const sources = [BILLING_SRC, CONFIG_SRC];
+  it("contains no autopilot / guaranteed yield / cannabis sales / equipment control copy", () => {
+    const sources = [BILLING_SRC, CONFIG_SRC, BILLING_DOC];
     const forbidden: RegExp[] = [
-      /\bon autopilot\b(?! )/i, // any positive "on autopilot" claim
+      /autopilot(?! )/i,
       /guaranteed yield/i,
       /buy weed/i,
-      /\bwe sell cannabis\b/i,
-      /\bsell (cannabis|weed|flower|seeds?)\b(?! )/i,
+      /sell cannabis/i,
       /\bwe control your (fans|lights|pumps|heaters|dehumidifiers|equipment)\b/i,
       /we will grow for you/i,
     ];
     for (const src of sources) {
       for (const p of forbidden) {
-        // Allow "never ... on autopilot" refutation.
+        // Allow the words to appear only inside an explicit *refutation*
+        // (e.g. "never grows for you on autopilot"). The patterns above
+        // are written to match marketing claims, not refutations.
         if (p.source.includes("autopilot")) {
-          const positive = /(?<!never (grows for you )?)on autopilot/i;
-          expect(src).not.toMatch(positive);
-          continue;
-        }
-        // Allow "does not sell cannabis" refutation in compliance copy.
-        if (p.source.includes("sell")) {
-          const positive = /(?<!not )(?<!does not )sell (cannabis|weed|flower|seeds?)/i;
+          // Special-case: allow "on autopilot" only when preceded by "never".
+          const positive = /(?<!never (grows for you )?on )autopilot/i;
           expect(src).not.toMatch(positive);
           continue;
         }
@@ -251,8 +208,6 @@ describe("BillingPlaceholder source safety", () => {
     }
   });
 });
-
-
 
 describe("Paddle webhook scaffolding", () => {
   it("reads the raw body before parsing JSON", () => {

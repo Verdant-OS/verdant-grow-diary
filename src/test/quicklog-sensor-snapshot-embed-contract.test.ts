@@ -19,7 +19,7 @@ const SRC = readFileSync(
 describe("QuickLog sensor_snapshot labeling integration", () => {
   it("imports the pure labeling helper", () => {
     expect(SRC).toMatch(
-      /import\s*{\s*classifyQuickLogSnapshotSource\s*,\s*shouldEmbedSnapshot\s*}\s*from\s*["']@\/lib\/quickLogSensorSnapshotRules["']/,
+      /import\s*{\s*classifyQuickLogSnapshotSource\s*,\s*shouldEmbedSnapshot\s*,?\s*}\s*from\s*["']@\/lib\/quickLogSensorSnapshotRules["']/,
     );
   });
 

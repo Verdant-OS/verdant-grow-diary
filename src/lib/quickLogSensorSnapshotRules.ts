@@ -106,13 +106,10 @@ export function classifyQuickLogSnapshotSource(
   if (stale) {
     return { source, state: "stale" };
   }
-  // Unknown sources that pass timestamp + value validity are still
-  // labeled "live" here — this matches `classifySource` behavior, which
-  // returns the declared source when known. We intentionally don't
-  // upgrade them; downstream surfaces continue to render the raw
-  // `source` string as the badge.
-  if (source && !LIVE_SOURCES.has(source)) {
-    return { source, state: "live" };
-  }
+  // Anything not classified as manual/untrusted/stale/invalid is "live".
+  // Unknown declared sources fall through here — we preserve the raw
+  // `source` string so downstream surfaces can render it as the badge
+  // without us silently upgrading or downgrading it.
   return { source: source ?? "live", state: "live" };
 }
+

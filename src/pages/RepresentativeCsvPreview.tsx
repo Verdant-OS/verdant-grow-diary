@@ -538,6 +538,7 @@ export default function RepresentativeCsvPreview() {
       {result && <MappingCollisionNotices mapping={mapping} />}
       {result && <PreviewSummaryStrip result={result} />}
       {result && <PreviewTable result={result} mapping={mapping} />}
+      {result && <TimelinePreviewSection result={result} mapping={mapping} />}
     </main>
   );
 }

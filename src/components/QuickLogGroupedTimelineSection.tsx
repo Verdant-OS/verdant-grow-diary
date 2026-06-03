@@ -86,10 +86,6 @@ type Props =
       demoEntries?: ReadonlyArray<DemoQuickLogTimelineEntry>;
     };
 
-function actionTitle(a: QuickLogActionEvent): string {
-  return a.kind === "water" ? "Watering" : "Note";
-}
-
 function actionIcon(a: QuickLogActionEvent) {
   return a.kind === "water" ? (
     <Droplets className="h-4 w-4" aria-hidden />
@@ -107,24 +103,30 @@ function ActionDetails({
   sourceLabel: string;
   sourceTestId: string;
 }) {
+  const occurredAtDisplay = formatQuickLogOccurredAt(action.occurredAt);
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2 text-sm font-medium">
           {actionIcon(action)}
           <span data-testid="quick-log-grouped-action-title">
-            {actionTitle(action)}
+            {quickLogActionLabel(action.kind)}
           </span>
         </div>
-        <Badge variant="secondary" data-testid={sourceTestId}>
+        <Badge
+          variant="secondary"
+          data-testid={sourceTestId}
+          aria-label={quickLogSourceAccessibleLabel(sourceLabel)}
+        >
           {sourceLabel}
         </Badge>
       </div>
       <p
         className="text-xs text-muted-foreground"
         data-testid="quick-log-grouped-action-occurred-at"
+        aria-label={quickLogOccurredAtAccessibleLabel(occurredAtDisplay)}
       >
-        {action.occurredAt}
+        {occurredAtDisplay}
       </p>
       {action.kind === "water" && action.volumeMl != null && (
         <p className="text-xs" data-testid="quick-log-grouped-action-volume">

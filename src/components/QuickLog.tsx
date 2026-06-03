@@ -179,7 +179,7 @@ export default function QuickLog({
     setSnapshot(false);
     snapshotUserTouchedRef.current = false;
     setRemindAt("");
-    setDetails({ ph: "", ec: "", runoff: "", nutrients: "", training: "", watering: "" });
+    setDetails({ ec: "", ecUnit: "mS/cm", nutrients: "", training: "", watering: "" });
     setHardware({
       inputPh: "",
       inputEc: "",

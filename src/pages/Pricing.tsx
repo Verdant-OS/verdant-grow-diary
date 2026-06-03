@@ -155,16 +155,16 @@ export default function Pricing() {
           }
         />
 
-        {/* Founder Lifetime */}
+        {/* Founder Lifetime Offer */}
         <TierCard
-          name="Founder Lifetime"
+          name="Founder Lifetime Offer"
           price={`$${FOUNDER_LIFETIME_PRICE_USD}`}
           cadence="one-time"
           founder
           badge={`First ${FOUNDER_LIFETIME_LIMIT} growers`}
-          description="One payment. Pro features for the life of the product. Limited to the first 75 founders."
+          description="A limited early-supporter offer. Pay once and get full Pro access for the life of the product."
           bullets={[
-            "Everything in Pro, forever",
+            "Includes full Pro access — no monthly fee",
             "Lock in Pro at today's price",
             "Founder badge on your profile",
             "Direct line to the founder for feedback",
@@ -183,7 +183,7 @@ export default function Pricing() {
               </Button>
             </Link>
           }
-          footnote={`Limited to the first ${FOUNDER_LIFETIME_LIMIT} buyers. When they're claimed, this offer ends.`}
+          footnote={`Limited to the first ${FOUNDER_LIFETIME_LIMIT} early supporters. When they're claimed, this offer ends.`}
         />
       </section>
 

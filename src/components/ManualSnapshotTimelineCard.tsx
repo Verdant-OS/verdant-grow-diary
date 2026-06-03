@@ -19,6 +19,9 @@ import {
   MANUAL_SNAPSHOT_SOURCE_LABEL,
   type ManualSnapshotTimelineCard as ManualSnapshotTimelineCardModel,
 } from "@/lib/manualSensorSnapshotViewModel";
+import { formatSensorFieldLabel } from "@/constants/sensorFields";
+import { DERIVED_LABEL, formatSensorValue } from "@/lib/sensorFormat";
+import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 
 interface Props {
   card: ManualSnapshotTimelineCardModel;
@@ -65,7 +68,7 @@ export default function ManualSnapshotTimelineCard({ card }: Props) {
           className="text-xs text-muted-foreground"
           data-testid="manual-snapshot-timeline-card-captured-at"
         >
-          {card.capturedAt}
+          {formatSnapshotTimestamp(card.capturedAt)}
         </p>
       </CardHeader>
       <CardContent className="space-y-2 pt-0">
@@ -82,10 +85,20 @@ export default function ManualSnapshotTimelineCard({ card }: Props) {
                 data-derived={r.derived ? "true" : "false"}
                 className="flex items-center justify-between gap-2 rounded-md border border-border/40 px-2 py-1 bg-secondary/20"
               >
-                <span className="font-medium">{r.field}</span>
-                <span className="tabular-nums text-muted-foreground">
-                  {r.value} {r.unit}
-                  {r.derived ? " ·derived" : ""}
+                <span className="font-medium">{formatSensorFieldLabel(r.field)}</span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="tabular-nums text-muted-foreground">
+                    {formatSensorValue(r.field, r.value)}
+                  </span>
+                  {r.derived && (
+                    <Badge
+                      variant="outline"
+                      className="h-4 px-1 text-[10px] uppercase tracking-wide"
+                      data-testid="manual-snapshot-timeline-card-derived-badge"
+                    >
+                      {DERIVED_LABEL}
+                    </Badge>
+                  )}
                 </span>
               </li>
             ))}

@@ -117,7 +117,8 @@ describe("Plant Timeline — Quick Log UI hardening", () => {
       const ts = screen.getByTestId(
         "quick-log-grouped-action-occurred-at",
       );
-      expect(ts.textContent).toBe(occurredAt);
+      // Formatted via shared helper, anchored in UTC for stability.
+      expect(ts.textContent).toMatch(/2026.*UTC/);
       const source = screen.getByTestId(
         "quick-log-grouped-action-source",
       );

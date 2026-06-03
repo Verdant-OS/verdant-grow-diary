@@ -77,19 +77,16 @@ export default function Landing() {
         {user && <LandingAuthedOnboardingBridge />}
       </section>
 
-      {/* Dashboard teaser */}
+      {/* Product preview — illustrative copy only, no synthetic dashboard route. */}
       <section className="px-6 pb-16 max-w-5xl mx-auto">
         <div className="relative rounded-2xl border border-border/50 bg-card/40 backdrop-blur p-6 md:p-8 overflow-hidden">
-          <div className="absolute top-4 right-4 text-[10px] uppercase tracking-wider px-2 py-1 rounded-md bg-primary/15 text-primary border border-primary/30 font-semibold">
-            Demo data
-          </div>
           <h2 className="font-display text-xl md:text-2xl font-semibold mb-4">
             A glance at your grow
           </h2>
           <div className="grid gap-3 md:grid-cols-3">
-            <TeaserCard label="Latest snapshot" value="Stable" hint="Temp · Humidity · VPD" />
-            <TeaserCard label="Open alert" value="Humidity drifting" hint="Tap to review" />
-            <TeaserCard label="Action Queue" value="1 awaiting approval" hint="Grower decides" />
+            <TeaserCard label="Latest snapshot" value="Sensor truth" hint="Temp · Humidity · VPD" />
+            <TeaserCard label="Alerts" value="Reviewed by you" hint="No blind automation" />
+            <TeaserCard label="Action Queue" value="Approval-required" hint="Grower decides" />
           </div>
           <div className="mt-6 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
             <span className="inline-flex items-center gap-2">
@@ -101,11 +98,6 @@ export default function Landing() {
             <span className="inline-flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-muted-foreground" /> Approval-required actions
             </span>
-          </div>
-          <div className="mt-6">
-            <Link to="/demo">
-              <Button variant="secondary" size="sm">Open the demo dashboard →</Button>
-            </Link>
           </div>
         </div>
       </section>

@@ -69,7 +69,7 @@ describe("Pricing tiers", () => {
     expect(PAGE).toMatch(/FOUNDER_LIFETIME_PRICE_USD\s*=\s*129/);
     expect(PAGE).toMatch(/FOUNDER_LIFETIME_LIMIT\s*=\s*75/);
     expect(PAGE).toMatch(/one-time/);
-    expect(PAGE).toMatch(/first 75/i);
+    expect(PAGE).toMatch(/First \$\{FOUNDER_LIFETIME_LIMIT\}/);
   });
 
   it("describes Founder Lifetime as a limited early-supporter offer", () => {

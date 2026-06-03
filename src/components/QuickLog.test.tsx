@@ -1,3 +1,15 @@
+/**
+ * Legacy QuickLog component contract tests — post-unification.
+ *
+ * The legacy QuickLog no longer:
+ *   - uploads photos
+ *   - inserts into diary_entries
+ *   - embeds sensor snapshots into a persistence payload
+ *
+ * Supported actions (watering / observation / note) route through
+ * useQuickLogV2Save → quicklog_save_manual. Unsupported actions
+ * (including photo) are surfaced as "Coming soon".
+ */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -11,12 +23,28 @@ function renderWithClient(ui: ReactElement) {
   return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
 }
 
+const saveMock = vi.fn();
+vi.mock("@/hooks/useQuickLogV2Save", () => ({
+  useQuickLogV2Save: () => ({
+    save: (...a: unknown[]) => saveMock(...a),
+    saving: false,
+    error: null,
+  }),
+}));
+
 const insertMock = vi.fn();
 const uploadMock = vi.fn();
-
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    from: () => ({ insert: insertMock, update: () => ({ eq: vi.fn() }) }),
+    from: () => ({
+      insert: insertMock,
+      update: () => ({ eq: vi.fn() }),
+      select: () => ({
+        eq: () => ({
+          order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+        }),
+      }),
+    }),
     storage: { from: () => ({ upload: uploadMock, remove: vi.fn() }) },
   },
 }));
@@ -34,88 +62,97 @@ vi.mock("@/store/grows", () => ({
   }),
 }));
 
+vi.mock("@/hooks/use-plants", () => ({
+  usePlants: () => ({
+    data: [{ id: "plant-1", name: "Test Plant", tent_id: "tent-1", grow_id: "grow-1" }],
+  }),
+}));
+
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
-vi.mock("sonner", () => ({ toast: { error: (...a: unknown[]) => toastError(...a), success: (...a: unknown[]) => toastSuccess(...a) } }));
+const toastMessage = vi.fn();
+vi.mock("sonner", () => ({
+  toast: {
+    error: (...a: unknown[]) => toastError(...a),
+    success: (...a: unknown[]) => toastSuccess(...a),
+    message: (...a: unknown[]) => toastMessage(...a),
+  },
+}));
 
 beforeEach(() => {
+  saveMock.mockReset();
+  saveMock.mockResolvedValue({ ok: true });
   insertMock.mockReset();
   uploadMock.mockReset();
   toastError.mockReset();
   toastSuccess.mockReset();
-  // Stub object URL APIs used by preview
-  (URL as unknown as { createObjectURL: () => string }).createObjectURL = vi.fn(() => "blob:mock");
-  (URL as unknown as { revokeObjectURL: () => void }).revokeObjectURL = vi.fn();
+  toastMessage.mockReset();
 });
 
-describe("QuickLog photo Remove button", () => {
-  it("clears the preview and does not submit the form", () => {
-    const onOpenChange = vi.fn();
-    renderWithClient(<QuickLog open={true} onOpenChange={onOpenChange} />);
-
+describe("QuickLog photo attach — disabled (Coming soon)", () => {
+  it("renders the photo placeholder as a 'Coming soon' disabled area, with no file input", () => {
+    renderWithClient(<QuickLog open={true} onOpenChange={vi.fn()} />);
     const dialog = screen.getByRole("dialog");
-    // File input is hidden; grab it via the dialog
-    const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
-    expect(fileInput).toBeTruthy();
 
-    const file = new File(["x"], "leaf.jpg", { type: "image/jpeg" });
-    fireEvent.change(fileInput, { target: { files: [file] } });
+    const placeholder = within(dialog).getByTestId("quicklog-photo-coming-soon");
+    expect(placeholder).toBeInTheDocument();
+    expect(placeholder.textContent).toMatch(/coming soon/i);
 
-    // Preview image is rendered
-    const img = dialog.querySelector("img");
-    expect(img).toBeTruthy();
-
-    // Remove button appears
-    const removeBtn = within(dialog).getByLabelText("Remove photo");
-    expect(removeBtn).toHaveAttribute("type", "button");
-
-    fireEvent.click(removeBtn);
-
-    // Preview gone, Remove button gone, placeholder back
+    // Legacy photo affordances are gone.
+    expect(dialog.querySelector('input[type="file"]')).toBeNull();
     expect(dialog.querySelector("img")).toBeNull();
     expect(within(dialog).queryByLabelText("Remove photo")).toBeNull();
-    expect(within(dialog).getByText(/Tap to add photo/i)).toBeInTheDocument();
-
-    // Form was not submitted
-    expect(uploadMock).not.toHaveBeenCalled();
-    expect(insertMock).not.toHaveBeenCalled();
-    expect(onOpenChange).not.toHaveBeenCalled();
   });
 
-  it("uploads the selected photo and inserts the entry with the uploaded path as photo_url", async () => {
-    uploadMock.mockResolvedValue({ error: null });
-    insertMock.mockResolvedValue({ error: null });
-
-    const onOpenChange = vi.fn();
-    const onCreated = vi.fn();
-    renderWithClient(<QuickLog open={true} onOpenChange={onOpenChange} onCreated={onCreated} />);
-
+  it("never uploads to storage or inserts into diary_entries during save", async () => {
+    renderWithClient(
+      <QuickLog
+        open={true}
+        onOpenChange={vi.fn()}
+        prefill={{ plantId: "plant-1", growId: "grow-1" }}
+      />,
+    );
     const dialog = screen.getByRole("dialog");
-    const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
-    const file = new File(["x"], "leaf.jpg", { type: "image/jpeg" });
-    fireEvent.change(fileInput, { target: { files: [file] } });
-
-    const note = dialog.querySelector("textarea") as HTMLTextAreaElement;
-    fireEvent.change(note, { target: { value: "Watered today" } });
-
+    fireEvent.change(dialog.querySelector("textarea") as HTMLTextAreaElement, {
+      target: { value: "Looking good" },
+    });
     fireEvent.click(within(dialog).getByRole("button", { name: /save entry/i }));
 
-    await waitFor(() => expect(uploadMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    expect(uploadMock).not.toHaveBeenCalled();
+    expect(insertMock).not.toHaveBeenCalled();
+  });
+});
 
-    // upload(path, file, opts)
-    const [uploadedPath, uploadedFile, uploadOpts] = uploadMock.mock.calls[0];
-    expect(uploadedFile).toBe(file);
-    expect(uploadOpts).toMatchObject({ contentType: "image/jpeg", upsert: false });
-    expect(uploadedPath).toMatch(/^user-1\/grow-1\/\d+\.jpg$/);
+describe("QuickLog supported save · routes through quicklog_save_manual RPC", () => {
+  it("submits an observation with a note as p_action='note' and closes the dialog", async () => {
+    const onOpenChange = vi.fn();
+    const onCreated = vi.fn();
+    renderWithClient(
+      <QuickLog
+        open={true}
+        onOpenChange={onOpenChange}
+        onCreated={onCreated}
+        prefill={{ plantId: "plant-1", growId: "grow-1" }}
+      />,
+    );
 
-    await waitFor(() => expect(insertMock).toHaveBeenCalledTimes(1));
-    const insertArg = insertMock.mock.calls[0][0];
-    expect(insertArg.photo_url).toBe(uploadedPath);
-    expect(insertArg).toMatchObject({
-      user_id: "user-1",
-      grow_id: "grow-1",
-      note: "Watered today",
+    const dialog = screen.getByRole("dialog");
+    fireEvent.change(dialog.querySelector("textarea") as HTMLTextAreaElement, {
+      target: { value: "Topped plant" },
     });
+    fireEvent.click(within(dialog).getByRole("button", { name: /save entry/i }));
+
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    const payload = saveMock.mock.calls[0][0];
+    expect(payload).toMatchObject({
+      p_action: "note",
+      p_target_type: "plant",
+      p_target_id: "plant-1",
+      p_note: "Topped plant",
+    });
+    expect(uploadMock).not.toHaveBeenCalled();
+    expect(insertMock).not.toHaveBeenCalled();
 
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
     expect(onCreated).toHaveBeenCalled();
@@ -123,45 +160,23 @@ describe("QuickLog photo Remove button", () => {
     expect(toastError).not.toHaveBeenCalled();
   });
 
-  it("shows the storage error and does not insert when upload fails", async () => {
-    uploadMock.mockResolvedValue({ error: { message: "bucket not found" } });
-
+  it("blocks submit with empty note for observation, showing the validation toast", async () => {
     const onOpenChange = vi.fn();
     const onCreated = vi.fn();
-    renderWithClient(<QuickLog open={true} onOpenChange={onOpenChange} onCreated={onCreated} />);
-
-    const dialog = screen.getByRole("dialog");
-    const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
-    fireEvent.change(fileInput, { target: { files: [new File(["x"], "leaf.jpg", { type: "image/jpeg" })] } });
-    fireEvent.change(dialog.querySelector("textarea") as HTMLTextAreaElement, { target: { value: "Note" } });
-
-    fireEvent.click(within(dialog).getByRole("button", { name: /save entry/i }));
-
-    await waitFor(() => expect(uploadMock).toHaveBeenCalledTimes(1));
-    await waitFor(() =>
-      expect(toastError).toHaveBeenCalledWith("Photo upload failed: bucket not found"),
+    renderWithClient(
+      <QuickLog
+        open={true}
+        onOpenChange={onOpenChange}
+        onCreated={onCreated}
+        prefill={{ plantId: "plant-1", growId: "grow-1" }}
+      />,
     );
 
-    expect(insertMock).not.toHaveBeenCalled();
-    expect(onOpenChange).not.toHaveBeenCalled();
-    expect(onCreated).not.toHaveBeenCalled();
-    expect(toastSuccess).not.toHaveBeenCalled();
-    // Preview is preserved so the user can retry without re-picking the file
-    expect(dialog.querySelector("img")).toBeTruthy();
-  });
-
-  it("blocks submit with no photo and empty note, showing the validation toast", async () => {
-    const onOpenChange = vi.fn();
-    const onCreated = vi.fn();
-    renderWithClient(<QuickLog open={true} onOpenChange={onOpenChange} onCreated={onCreated} />);
-
     const dialog = screen.getByRole("dialog");
-    expect(dialog.querySelector("img")).toBeNull();
-
     fireEvent.click(within(dialog).getByRole("button", { name: /save entry/i }));
 
     await waitFor(() => expect(toastError).toHaveBeenCalledWith("Add a quick note"));
-
+    expect(saveMock).not.toHaveBeenCalled();
     expect(uploadMock).not.toHaveBeenCalled();
     expect(insertMock).not.toHaveBeenCalled();
     expect(toastSuccess).not.toHaveBeenCalled();
@@ -169,34 +184,33 @@ describe("QuickLog photo Remove button", () => {
     expect(onCreated).not.toHaveBeenCalled();
   });
 
-  it("submits with a note and no photo, logging without uploading", async () => {
-    insertMock.mockResolvedValue({ error: null });
-
+  it("surfaces RPC errors without closing the dialog", async () => {
+    saveMock.mockResolvedValueOnce({ ok: false, reason: "save_failed" });
     const onOpenChange = vi.fn();
     const onCreated = vi.fn();
-    renderWithClient(<QuickLog open={true} onOpenChange={onOpenChange} onCreated={onCreated} />);
+    renderWithClient(
+      <QuickLog
+        open={true}
+        onOpenChange={onOpenChange}
+        onCreated={onCreated}
+        prefill={{ plantId: "plant-1", growId: "grow-1" }}
+      />,
+    );
 
     const dialog = screen.getByRole("dialog");
-    expect(dialog.querySelector("img")).toBeNull();
-
-    const note = dialog.querySelector("textarea") as HTMLTextAreaElement;
-    fireEvent.change(note, { target: { value: "Topped plant" } });
-
+    fireEvent.change(dialog.querySelector("textarea") as HTMLTextAreaElement, {
+      target: { value: "Note" },
+    });
     fireEvent.click(within(dialog).getByRole("button", { name: /save entry/i }));
 
-    await waitFor(() => expect(insertMock).toHaveBeenCalledTimes(1));
-    expect(insertMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user_id: "user-1",
-        grow_id: "grow-1",
-        note: "Topped plant",
-        photo_url: null,
-      }),
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(
+        expect.stringMatching(/save_failed/),
+      ),
     );
-    expect(uploadMock).not.toHaveBeenCalled();
-    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
-    expect(onCreated).toHaveBeenCalled();
-    expect(toastSuccess).toHaveBeenCalledWith("Logged 🌱");
-    expect(toastError).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    expect(onCreated).not.toHaveBeenCalled();
+    expect(toastSuccess).not.toHaveBeenCalled();
   });
 });

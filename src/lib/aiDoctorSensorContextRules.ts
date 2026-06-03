@@ -241,13 +241,23 @@ function buildSafetyNotes(
     notes.push("CO₂ is context-only: do not base aggressive recommendations on CO₂ alone.");
   }
 
-  // Environment alone cannot recommend nutrients
+  // Environment alone cannot recommend nutrients (PPFD is also an
+  // environment metric — light intensity is canopy environment, not
+  // tissue nutrition).
   const hasOnlyEnvMetrics = usableMetrics.every((m) =>
-    ["temperature_c", "humidity_pct", "vpd_kpa", "co2_ppm"].includes(m),
+    ["temperature_c", "humidity_pct", "vpd_kpa", "co2_ppm", "ppfd_umol_m2s"].includes(m),
   );
   if (usableMetrics.length > 0 && hasOnlyEnvMetrics) {
     notes.push(
       "Environment readings only: do not recommend nutrient changes from sensor data alone.",
+    );
+  }
+
+  // PPFD present: context-only — single light reading must not drive
+  // strong readiness or aggressive light/equipment recommendations.
+  if (usableMetrics.includes("ppfd_umol_m2s")) {
+    notes.push(
+      "PPFD is context-only: a single light reading cannot confirm canopy health or readiness.",
     );
   }
 

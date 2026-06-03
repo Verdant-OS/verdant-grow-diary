@@ -23,10 +23,10 @@ export interface QuickLogHardwareReadings {
 export const HARDWARE_READINGS_HEADER = "Hardware readings (manual handheld):";
 
 const FIELD_ORDER: Array<{ key: keyof QuickLogHardwareReadings; label: string }> = [
-  { key: "inputPh", label: "Input pH" },
-  { key: "inputEc", label: "Input EC/PPM" },
+  { key: "inputPh", label: "Feed/Input pH" },
+  { key: "inputEc", label: "Feed/Input EC (mS/cm)" },
   { key: "runoffPh", label: "Runoff pH" },
-  { key: "runoffEc", label: "Runoff EC/PPM" },
+  { key: "runoffEc", label: "Runoff EC (mS/cm)" },
   { key: "ppfdCanopy", label: "PPFD canopy" },
   { key: "lightDistance", label: "Light distance" },
 ];

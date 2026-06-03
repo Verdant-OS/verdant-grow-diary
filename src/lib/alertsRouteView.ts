@@ -39,7 +39,7 @@ export function formatAlertSourceLabel(
       return "AI Doctor";
     case "manual":
       return "Manual entry";
-    default:
+    default: {
       // Tokenize unknown machine slugs into a readable Title Case label.
       const cleaned = source.replace(/[_-]+/g, " ").trim();
       if (!cleaned) return "Sensor system";
@@ -47,6 +47,7 @@ export function formatAlertSourceLabel(
         .split(/\s+/)
         .map((w) => w[0]?.toUpperCase() + w.slice(1).toLowerCase())
         .join(" ");
+    }
   }
 }
 

@@ -8,7 +8,7 @@
  * Designed to be conservative:
  *   - String literals (single, double, backtick) are preserved verbatim so a
  *     `// ...` sequence inside a URL string is not eaten.
- *   - Block comments (including JSDoc `/** ... *​/`) are removed entirely.
+ *   - Block comments (including JSDoc-style block comments) are removed entirely.
  *   - Line comments are removed from `//` to end-of-line.
  *   - Pure pattern-based, no AST. Good enough for grep-style safety scans.
  *

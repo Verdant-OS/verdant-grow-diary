@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import fs from "fs";
+import path from "path";
 import {
   buildPlantDetailAiDoctorReadiness,
   type PlantDetailAiDoctorReadinessInput,
@@ -240,8 +242,6 @@ describe("buildPlantDetailAiDoctorReadiness", () => {
 
 describe("PlantDetailAiDoctorReadiness component static safety", () => {
   it("component file does not contain service_role", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailAiDoctorReadiness.tsx"),
       "utf8",
@@ -250,8 +250,6 @@ describe("PlantDetailAiDoctorReadiness component static safety", () => {
   });
 
   it("component file does not contain action_queue", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailAiDoctorReadiness.tsx"),
       "utf8",
@@ -260,8 +258,6 @@ describe("PlantDetailAiDoctorReadiness component static safety", () => {
   });
 
   it("component file does not contain supabase writes", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailAiDoctorReadiness.tsx"),
       "utf8",
@@ -274,8 +270,6 @@ describe("PlantDetailAiDoctorReadiness component static safety", () => {
   });
 
   it("component file does not contain functions.invoke", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailAiDoctorReadiness.tsx"),
       "utf8",
@@ -284,8 +278,6 @@ describe("PlantDetailAiDoctorReadiness component static safety", () => {
   });
 
   it("component file does not contain automation/device-control language", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailAiDoctorReadiness.tsx"),
       "utf8",
@@ -294,8 +286,6 @@ describe("PlantDetailAiDoctorReadiness component static safety", () => {
   });
 
   it("component file does not contain calendar/notification/email language", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailAiDoctorReadiness.tsx"),
       "utf8",
@@ -306,8 +296,6 @@ describe("PlantDetailAiDoctorReadiness component static safety", () => {
   });
 
   it("copy never promises diagnosis certainty", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailAiDoctorReadiness.tsx"),
       "utf8",
@@ -316,8 +304,6 @@ describe("PlantDetailAiDoctorReadiness component static safety", () => {
   });
 
   it("copy never implies one-photo diagnosis", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailAiDoctorReadiness.tsx"),
       "utf8",
@@ -326,8 +312,6 @@ describe("PlantDetailAiDoctorReadiness component static safety", () => {
   });
 
   it("copy never implies automation or device control", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailAiDoctorReadiness.tsx"),
       "utf8",

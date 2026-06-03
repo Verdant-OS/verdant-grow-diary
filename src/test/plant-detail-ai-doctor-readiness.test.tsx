@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import {
   buildPlantDetailAiDoctorReadiness,
   type PlantDetailAiDoctorReadinessInput,
@@ -15,8 +17,7 @@ const USABLE: Classification = {
 function makeInput(
   overrides: Partial<PlantDetailAiDoctorReadinessInput> = {},
 ): PlantDetailAiDoctorReadinessInput {
-  const has =
-    overrides.hasSensorSnapshot !== undefined ? overrides.hasSensorSnapshot : true;
+  const has = overrides.hasSensorSnapshot !== undefined ? overrides.hasSensorSnapshot : true;
   return {
     stage: "veg",
     hasTimelineEntries: true,
@@ -41,9 +42,7 @@ describe("buildPlantDetailAiDoctorReadiness", () => {
   });
 
   it("returns Ready for check-in with 4 of 5 signals", () => {
-    const result = buildPlantDetailAiDoctorReadiness(
-      makeInput({ hasRecentWateringOrFeed: false }),
-    );
+    const result = buildPlantDetailAiDoctorReadiness(makeInput({ hasRecentWateringOrFeed: false }));
     expect(result.level).toBe("ready");
     expect(result.presentCount).toBe(4);
   });
@@ -137,11 +136,7 @@ describe("buildPlantDetailAiDoctorReadiness", () => {
         hasRecentWateringOrFeed: false,
       }),
     );
-    expect(result.missing.map((m) => m.kind)).toEqual([
-      "stage_unknown",
-      "no_timeline",
-      "no_photo",
-    ]);
+    expect(result.missing.map((m) => m.kind)).toEqual(["stage_unknown", "no_timeline", "no_photo"]);
   });
 
   it("shows lower priority missing bullets when higher ones are satisfied", () => {
@@ -192,9 +187,7 @@ describe("buildPlantDetailAiDoctorReadiness", () => {
   });
 
   it("does not expose internal IDs in visible fields", () => {
-    const result = buildPlantDetailAiDoctorReadiness(
-      makeInput({ stage: "secret-stage-id" }),
-    );
+    const result = buildPlantDetailAiDoctorReadiness(makeInput({ stage: "secret-stage-id" }));
     expect(result.headline).not.toMatch(/secret/);
     expect(result.subhead).not.toMatch(/secret/);
     for (const m of result.missing) {
@@ -203,9 +196,7 @@ describe("buildPlantDetailAiDoctorReadiness", () => {
   });
 
   it("does not expose storage paths or tokens", () => {
-    const result = buildPlantDetailAiDoctorReadiness(
-      makeInput({ hasRecentPhoto: false }),
-    );
+    const result = buildPlantDetailAiDoctorReadiness(makeInput({ hasRecentPhoto: false }));
     for (const m of result.missing) {
       expect(m.label).not.toMatch(/storage|bucket|path|token|key/i);
     }
@@ -240,8 +231,6 @@ describe("buildPlantDetailAiDoctorReadiness", () => {
 
 describe("PlantDetailAiDoctorReadiness component static safety", () => {
   it("component file does not contain service_role", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailAiDoctorReadiness.tsx"),
       "utf8",
@@ -250,8 +239,6 @@ describe("PlantDetailAiDoctorReadiness component static safety", () => {
   });
 
   it("component file does not contain action_queue", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailAiDoctorReadiness.tsx"),
       "utf8",
@@ -260,8 +247,6 @@ describe("PlantDetailAiDoctorReadiness component static safety", () => {
   });
 
   it("component file does not contain supabase writes", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailAiDoctorReadiness.tsx"),
       "utf8",
@@ -274,8 +259,6 @@ describe("PlantDetailAiDoctorReadiness component static safety", () => {
   });
 
   it("component file does not contain functions.invoke", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailAiDoctorReadiness.tsx"),
       "utf8",
@@ -284,8 +267,6 @@ describe("PlantDetailAiDoctorReadiness component static safety", () => {
   });
 
   it("component file does not contain automation/device-control language", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailAiDoctorReadiness.tsx"),
       "utf8",
@@ -294,20 +275,14 @@ describe("PlantDetailAiDoctorReadiness component static safety", () => {
   });
 
   it("component file does not contain calendar/notification/email language", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailAiDoctorReadiness.tsx"),
       "utf8",
     );
-    expect(src).not.toMatch(
-      /calendar_events|notification|email|reminder|mail/i,
-    );
+    expect(src).not.toMatch(/calendar_events|notification|email|reminder|mail/i);
   });
 
   it("copy never promises diagnosis certainty", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailAiDoctorReadiness.tsx"),
       "utf8",
@@ -316,8 +291,6 @@ describe("PlantDetailAiDoctorReadiness component static safety", () => {
   });
 
   it("copy never implies one-photo diagnosis", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailAiDoctorReadiness.tsx"),
       "utf8",
@@ -326,8 +299,6 @@ describe("PlantDetailAiDoctorReadiness component static safety", () => {
   });
 
   it("copy never implies automation or device control", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailAiDoctorReadiness.tsx"),
       "utf8",

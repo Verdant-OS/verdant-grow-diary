@@ -7,12 +7,13 @@
  * blocked.
  */
 import { describe, it, expect } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import { buildPlantDetailAiDoctorReadiness } from "@/lib/plantDetailAiDoctorReadiness";
 import { classifyAuditRow } from "@/lib/sensorSnapshotStatusContract";
 
 const NOW = new Date("2026-05-23T12:00:00Z");
-const minutesAgo = (m: number) =>
-  new Date(NOW.getTime() - m * 60_000).toISOString();
+const minutesAgo = (m: number) => new Date(NOW.getTime() - m * 60_000).toISOString();
 const hoursAgo = (h: number) => minutesAgo(h * 60);
 
 const baseInput = {
@@ -88,10 +89,7 @@ describe("AI Doctor readiness × sensor snapshot contract", () => {
   });
 
   it("no_data is blocked as evidence (missing)", () => {
-    const classification = classifyAuditRow(
-      { rowsReceived: 0, rowsAccepted: 0 },
-      { now: NOW },
-    );
+    const classification = classifyAuditRow({ rowsReceived: 0, rowsAccepted: 0 }, { now: NOW });
     const r = buildPlantDetailAiDoctorReadiness({
       ...baseInput,
       sensorSnapshot: classification,
@@ -100,9 +98,7 @@ describe("AI Doctor readiness × sensor snapshot contract", () => {
     expect(r.sensorEvidence.isMissing).toBe(true);
     expect(r.sensorEvidence.countsAsHealthyEvidence).toBe(false);
     // The no_sensor_snapshot missing bullet should re-appear.
-    expect(
-      r.missing.find((m) => m.kind === "no_sensor_snapshot"),
-    ).toBeDefined();
+    expect(r.missing.find((m) => m.kind === "no_sensor_snapshot")).toBeDefined();
   });
 
   it("null/undefined classification → NOT healthy, regardless of raw hasSensorSnapshot boolean", () => {
@@ -116,9 +112,7 @@ describe("AI Doctor readiness × sensor snapshot contract", () => {
     // 4 of 5 because the sensor signal is not healthy.
     expect(r.presentCount).toBe(4);
     // Missing bullet re-appears because the boolean was gated away.
-    expect(
-      r.missing.find((m) => m.kind === "no_sensor_snapshot"),
-    ).toBeDefined();
+    expect(r.missing.find((m) => m.kind === "no_sensor_snapshot")).toBeDefined();
   });
 
   it("explicit null classification → NOT healthy", () => {
@@ -163,17 +157,13 @@ describe("AI Doctor readiness × sensor snapshot contract", () => {
   });
 
   describe("static safety — no raw-boolean bypass in readiness module", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src: string = fs.readFileSync(
       path.resolve(__dirname, "../lib/plantDetailAiDoctorReadiness.ts"),
       "utf8",
     );
 
     it("imports the contract's healthy-evidence gate", () => {
-      expect(src).toMatch(
-        /from\s+["']@\/lib\/sensorSnapshotStatusContract["']/,
-      );
+      expect(src).toMatch(/from\s+["']@\/lib\/sensorSnapshotStatusContract["']/);
       expect(src).toMatch(/countsAsHealthyEvidence/);
     });
 

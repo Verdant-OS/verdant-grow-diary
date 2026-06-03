@@ -107,7 +107,7 @@ function parseFiniteNumber(raw: string | null): number | null {
 
 // ---------- Timestamp policy ----------
 
-const ISO_WITH_TZ_RE = /T[\d:.\-+Z]+(?:Z|[+\-]\d{2}:?\d{2})$/;
+const ISO_WITH_TZ_RE = /T[\d:.+Z-]+(?:Z|[+-]\d{2}:?\d{2})$/;
 const YEAR_ONLY_RE = /^\d{4}$/;
 const HAS_TIME_COMPONENT_RE = /\d{1,2}:\d{2}/;
 
@@ -342,9 +342,7 @@ const CANONICAL_NAME: Record<string, string> = {
   substrate_ec: "soil_ec",
 };
 
-export function deriveCsvRowValidationHints(
-  args: DeriveHintsArgs,
-): RowValidationOutcome {
+export function deriveCsvRowValidationHints(args: DeriveHintsArgs): RowValidationOutcome {
   const { row, mapping, ambiguousMappings } = args;
   const hints: CsvRowValidationHint[] = [];
   const fieldStates: Record<string, CsvFieldState> = {};
@@ -369,16 +367,40 @@ export function deriveCsvRowValidationHints(
 
   // ----- Numeric fields -----
   const numericSpecs: NumericFieldSpec[] = [
-    { canonical: CANONICAL_NAME.air_temp, mappingField: "air_temp", parsedValue: row.air_temp_c, range: CSV_VALIDATION_RANGES.airTempC },
-    { canonical: CANONICAL_NAME.substrate_temp, mappingField: "substrate_temp", parsedValue: row.substrate_temp_c, range: CSV_VALIDATION_RANGES.substrateTempC },
-    { canonical: CANONICAL_NAME.humidity, mappingField: "humidity", parsedValue: row.humidity_pct, range: CSV_VALIDATION_RANGES.humidity },
-    { canonical: CANONICAL_NAME.vwc, mappingField: "vwc", parsedValue: row.vwc_pct, range: CSV_VALIDATION_RANGES.vwc },
+    {
+      canonical: CANONICAL_NAME.air_temp,
+      mappingField: "air_temp",
+      parsedValue: row.air_temp_c,
+      range: CSV_VALIDATION_RANGES.airTempC,
+    },
+    {
+      canonical: CANONICAL_NAME.substrate_temp,
+      mappingField: "substrate_temp",
+      parsedValue: row.substrate_temp_c,
+      range: CSV_VALIDATION_RANGES.substrateTempC,
+    },
+    {
+      canonical: CANONICAL_NAME.humidity,
+      mappingField: "humidity",
+      parsedValue: row.humidity_pct,
+      range: CSV_VALIDATION_RANGES.humidity,
+    },
+    {
+      canonical: CANONICAL_NAME.vwc,
+      mappingField: "vwc",
+      parsedValue: row.vwc_pct,
+      range: CSV_VALIDATION_RANGES.vwc,
+    },
     // CO2 / VPD / PPFD — parse-only this slice (no range).
     { canonical: CANONICAL_NAME.co2, mappingField: "co2", parsedValue: row.co2_ppm },
     { canonical: CANONICAL_NAME.vpd, mappingField: "vpd", parsedValue: row.vpd_kpa },
     { canonical: CANONICAL_NAME.ppfd, mappingField: "ppfd", parsedValue: row.ppfd },
     // EC has no range check — unit suspicion handled separately below.
-    { canonical: CANONICAL_NAME.substrate_ec, mappingField: "substrate_ec", parsedValue: row.substrate_ec_mscm },
+    {
+      canonical: CANONICAL_NAME.substrate_ec,
+      mappingField: "substrate_ec",
+      parsedValue: row.substrate_ec_mscm,
+    },
   ];
 
   for (const spec of numericSpecs) {
@@ -403,7 +425,11 @@ export function deriveCsvRowValidationHints(
 
   // ----- pH range check -----
   const ph = findPhCell(row);
-  if (ph && ph.value !== null && (ph.value < PH_REALISTIC_RANGE.min || ph.value > PH_REALISTIC_RANGE.max)) {
+  if (
+    ph &&
+    ph.value !== null &&
+    (ph.value < PH_REALISTIC_RANGE.min || ph.value > PH_REALISTIC_RANGE.max)
+  ) {
     hints.push({
       field: "ph",
       header: ph.header,
@@ -419,11 +445,7 @@ export function deriveCsvRowValidationHints(
   const ecInfo = mapInfo(mapping, "substrate_ec");
   const ecRaw = rawCell(row, ecInfo.header);
   const ecRawNum = parseFiniteNumber(ecRaw);
-  if (
-    ecRawNum !== null &&
-    ecInfo.unit === "mS/cm" &&
-    ecRawNum > EC_SUSPICIOUS_MSCM_MAX
-  ) {
+  if (ecRawNum !== null && ecInfo.unit === "mS/cm" && ecRawNum > EC_SUSPICIOUS_MSCM_MAX) {
     hints.push({
       field: CANONICAL_NAME.substrate_ec,
       header: ecInfo.header,

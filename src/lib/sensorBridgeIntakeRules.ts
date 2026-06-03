@@ -38,21 +38,10 @@ import {
  * This is the data-labeling state the UI/AI may surface for this intake.
  * Mirrors docs/sensor-truth-rules.md `state`.
  */
-export type BridgeIntakeResolvedSource =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid";
+export type BridgeIntakeResolvedSource = "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
 
 /** Submitted source claim from the bridge payload — never blindly trusted. */
-export type BridgeIntakeSubmittedSource =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "unknown";
+export type BridgeIntakeSubmittedSource = "live" | "manual" | "csv" | "demo" | "unknown";
 
 export type BridgeMetricKey =
   | "temperature_c"
@@ -142,8 +131,7 @@ export const BRIDGE_LIVE_FRESH_MS = 15 * 60 * 1000;
 export const BRIDGE_MANUAL_FRESH_MS = 24 * 60 * 60 * 1000;
 export const BRIDGE_FUTURE_TOLERANCE_MS = 5 * 60 * 1000;
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const SUBMITTED_SOURCES: readonly BridgeIntakeSubmittedSource[] = [
   "live",
@@ -221,10 +209,7 @@ function evaluateReading(input: unknown): ReadingEval {
   }
   const r = input as Record<string, unknown>;
   const metric = r.metric;
-  if (
-    !isNonEmptyString(metric) ||
-    !(ALLOWED_METRICS as readonly string[]).includes(metric)
-  ) {
+  if (!isNonEmptyString(metric) || !(ALLOWED_METRICS as readonly string[]).includes(metric)) {
     return { reading: null, reasons: ["reading_value_invalid"] };
   }
   const numeric = coerceFinite(r.value);
@@ -234,7 +219,7 @@ function evaluateReading(input: unknown): ReadingEval {
   const unit = isNonEmptyString(r.unit) ? r.unit : null;
 
   const suspicions: BridgeIntakeSuspicionCode[] = [];
-  let value = numeric;
+  const value = numeric;
 
   switch (metric as BridgeMetricKey) {
     case "humidity_pct": {
@@ -328,15 +313,12 @@ export function validateAndResolveBridgeIntake(
   }
 
   // tent_id ----------------------------------------------------------------
-  const tentId = isNonEmptyString(input.tent_id) && UUID_RE.test(input.tent_id)
-    ? input.tent_id
-    : null;
+  const tentId =
+    isNonEmptyString(input.tent_id) && UUID_RE.test(input.tent_id) ? input.tent_id : null;
   if (!tentId) reasons.push("tent_id_missing");
 
   const plantId =
-    isNonEmptyString(input.plant_id) && UUID_RE.test(input.plant_id)
-      ? input.plant_id
-      : null;
+    isNonEmptyString(input.plant_id) && UUID_RE.test(input.plant_id) ? input.plant_id : null;
 
   // captured_at ------------------------------------------------------------
   let capturedAtIso: string | null = null;

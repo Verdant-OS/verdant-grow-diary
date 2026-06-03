@@ -98,6 +98,10 @@ export default function QuickLog({
   });
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Tracks whether the grower has manually changed the attach toggle in
+  // this session. Until they do, we may auto-default it based on whether
+  // the latest snapshot classifies as `usable` (Gate 1 trust rule).
+  const snapshotUserTouchedRef = useRef(false);
 
   // Apply prefill when the dialog opens. Does NOT submit — grower still
   // chooses to save the entry.

@@ -24,25 +24,29 @@ const FOUNDER_LIFETIME_PRICE_USD = 129;
 const PRO_MONTHLY_PRICE_USD = 12;
 const PRO_ANNUAL_PRICE_USD = 115;
 
-type Row = { label: string; free: boolean | string; pro: boolean | string };
+type Cell = boolean | string;
+type Row = { label: string; free: Cell; pro: Cell; founder: Cell };
 
 const COMPARISON_ROWS: Row[] = [
-  { label: "Plant profiles", free: true, pro: true },
-  { label: "Basic grow diary", free: true, pro: true },
-  { label: "Photo logs", free: true, pro: true },
-  { label: "Manual notes", free: true, pro: true },
-  { label: "Basic timeline", free: true, pro: true },
-  { label: "Manual sensor entries", free: true, pro: true },
-  { label: "Exports", free: "Limited", pro: "Advanced" },
-  { label: "Cloud sync", free: false, pro: true },
-  { label: "Automatic backups", free: false, pro: true },
-  { label: "Multi-tent support", free: false, pro: true },
-  { label: "Sensor snapshot history", free: false, pro: true },
-  { label: "Longer grow history", free: false, pro: true },
-  { label: "Better timeline filtering", free: false, pro: true },
-  { label: "Priority support", free: false, pro: true },
-  { label: "Early access to advanced grow reports", free: false, pro: true },
-  { label: "Future Pro AI features as they stabilize", free: false, pro: true },
+  {
+    label: "Best for",
+    free: "Starting a grow diary",
+    pro: "Active growers who want sync, history & exports",
+    founder: "Early supporters who want lifetime Pro access",
+  },
+  { label: "Price", free: "$0", pro: "$12 / month", founder: "$129 one-time" },
+  { label: "Plant profiles & grow diary", free: true, pro: true, founder: true },
+  { label: "Photo logs", free: true, pro: true, founder: true },
+  { label: "Manual sensor snapshots", free: true, pro: true, founder: true },
+  { label: "Timeline history", free: "Basic", pro: "Extended", founder: "Extended" },
+  { label: "Cloud sync & automatic backups", free: false, pro: true, founder: true },
+  { label: "Multi-tent support", free: false, pro: true, founder: true },
+  { label: "Exports", free: "Limited", pro: "Advanced", founder: "Advanced" },
+  { label: "Sensor snapshot history", free: false, pro: true, founder: true },
+  { label: "Better timeline filtering", free: false, pro: true, founder: true },
+  { label: "Priority support", free: false, pro: true, founder: true },
+  { label: "Future Pro features as they stabilize", free: false, pro: true, founder: true },
+  { label: "Founder badge / early-supporter access", free: false, pro: false, founder: true },
 ];
 
 export default function Pricing() {

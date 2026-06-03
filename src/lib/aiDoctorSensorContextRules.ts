@@ -25,6 +25,7 @@ import {
   isVpdValid,
   isCo2Valid,
   isSoilMoistureValid,
+  isPpfdReadingValid,
 } from "./sensorReadingNormalizationRules";
 
 // ---------------------------------------------------------------------------
@@ -36,7 +37,8 @@ export type MetricName =
   | "humidity_pct"
   | "vpd_kpa"
   | "co2_ppm"
-  | "soil_moisture_pct";
+  | "soil_moisture_pct"
+  | "ppfd_umol_m2s";
 
 /** Critical metrics whose invalidity blocks healthy/normal summaries. */
 const CRITICAL_METRICS: readonly MetricName[] = ["temperature_c", "humidity_pct", "vpd_kpa"];
@@ -78,6 +80,7 @@ const METRIC_KEYS: readonly MetricName[] = [
   "vpd_kpa",
   "co2_ppm",
   "soil_moisture_pct",
+  "ppfd_umol_m2s",
 ];
 
 const METRIC_VALIDATORS: Record<MetricName, (v: number | null) => boolean> = {
@@ -86,6 +89,7 @@ const METRIC_VALIDATORS: Record<MetricName, (v: number | null) => boolean> = {
   vpd_kpa: isVpdValid,
   co2_ppm: isCo2Valid,
   soil_moisture_pct: isSoilMoistureValid,
+  ppfd_umol_m2s: isPpfdReadingValid,
 };
 
 function classifyMetrics(reading: NormalizedSensorReading): {

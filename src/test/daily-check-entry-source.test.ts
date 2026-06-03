@@ -115,9 +115,9 @@ describe("QuickLog success event carries createdAt", () => {
     expect(QUICKLOG).toMatch(/verdant:entry-created/);
     // The dispatch wraps detail with createdAt.
     expect(QUICKLOG).toMatch(/createdAt:/);
-    // Event detail is built only after a successful insert path.
-    // (`insErr` early-returns above the dispatch site.)
-    expect(QUICKLOG).toMatch(/if\s*\(\s*insErr\s*\)/);
+    // Event detail is built only after a successful RPC save path
+    // (the `!result.ok` branch early-returns above the dispatch site).
+    expect(QUICKLOG).toMatch(/if\s*\(\s*!result\.ok\s*\)/);
   });
 
   it("DailyCheck reads createdAt from event detail when forming Logged-at", () => {

@@ -7,6 +7,8 @@
  * blocked.
  */
 import { describe, it, expect } from "vitest";
+import fs from "fs";
+import path from "path";
 import { buildPlantDetailAiDoctorReadiness } from "@/lib/plantDetailAiDoctorReadiness";
 import { classifyAuditRow } from "@/lib/sensorSnapshotStatusContract";
 
@@ -163,8 +165,6 @@ describe("AI Doctor readiness × sensor snapshot contract", () => {
   });
 
   describe("static safety — no raw-boolean bypass in readiness module", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src: string = fs.readFileSync(
       path.resolve(__dirname, "../lib/plantDetailAiDoctorReadiness.ts"),
       "utf8",

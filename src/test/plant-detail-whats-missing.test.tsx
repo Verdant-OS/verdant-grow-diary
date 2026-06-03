@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import fs from "fs";
+import path from "path";
 import {
   buildPlantDetailWhatsMissing,
   type PlantDetailWhatsMissingInput,
@@ -234,8 +236,6 @@ describe("buildPlantDetailWhatsMissing", () => {
 
 describe("PlantDetailWhatsMissing component static safety", () => {
   it("component file does not contain service_role", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailWhatsMissing.tsx"),
       "utf8",
@@ -244,8 +244,6 @@ describe("PlantDetailWhatsMissing component static safety", () => {
   });
 
   it("component file does not contain action_queue", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailWhatsMissing.tsx"),
       "utf8",
@@ -254,8 +252,6 @@ describe("PlantDetailWhatsMissing component static safety", () => {
   });
 
   it("component file does not contain supabase writes", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailWhatsMissing.tsx"),
       "utf8",
@@ -268,8 +264,6 @@ describe("PlantDetailWhatsMissing component static safety", () => {
   });
 
   it("component file does not contain functions.invoke", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailWhatsMissing.tsx"),
       "utf8",
@@ -278,8 +272,6 @@ describe("PlantDetailWhatsMissing component static safety", () => {
   });
 
   it("component file does not contain automation/device-control language", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailWhatsMissing.tsx"),
       "utf8",
@@ -288,8 +280,6 @@ describe("PlantDetailWhatsMissing component static safety", () => {
   });
 
   it("component file does not contain calendar/notification/email language", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailWhatsMissing.tsx"),
       "utf8",

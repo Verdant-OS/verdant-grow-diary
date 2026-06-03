@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import type { LegacyUnifiedBuildResult } from "@/lib/legacyQuickLogUnifiedSave";
 import {
   buildLegacyQuickLogUnifiedPayload,
   isSupportedLegacyEventType,
@@ -16,20 +17,24 @@ const baseInput = {
   details: { ph: "", ec: "", runoff: "", nutrients: "", training: "", watering: "" },
 };
 
+function assertFail(
+  r: LegacyUnifiedBuildResult,
+): { ok: false; reason: string; message: string } {
+  expect(r.ok).toBe(false);
+  return r as { ok: false; reason: string; message: string };
+}
+
 describe("legacyQuickLogUnifiedSave", () => {
   it("rejects unsupported event types with coming-soon copy", () => {
     const r = buildLegacyQuickLogUnifiedPayload({ ...baseInput, eventType: "photo" });
-    expect(r.ok).toBe(false);
-    if (!r.ok) {
-      expect(r.reason).toBe("unsupported_event_type");
-      expect(r.message).toMatch(/coming soon/i);
-    }
+    const err = assertFail(r);
+    expect(err.reason).toBe("unsupported_event_type");
+    expect(err.message).toMatch(/coming soon/i);
   });
 
   it("rejects when no plant is selected", () => {
     const r = buildLegacyQuickLogUnifiedPayload({ ...baseInput, plantId: null });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe("plant_required");
+    expect(assertFail(r).reason).toBe("plant_required");
   });
 
   it("maps watering to RPC water action with volume_ml", () => {
@@ -58,8 +63,7 @@ describe("legacyQuickLogUnifiedSave", () => {
         eventType: "watering",
         details: { ...baseInput.details, watering: v },
       });
-      expect(r.ok).toBe(false);
-      if (!r.ok) expect(r.reason).toBe("invalid_volume");
+      expect(assertFail(r).reason).toBe("invalid_volume");
     }
   });
 
@@ -75,8 +79,7 @@ describe("legacyQuickLogUnifiedSave", () => {
 
   it("requires a note for the note action", () => {
     const r = buildLegacyQuickLogUnifiedPayload({ ...baseInput, noteWithHardware: "   " });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe("note_required");
+    expect(assertFail(r).reason).toBe("note_required");
   });
 
   it("folds free-text detail fields into the note", () => {

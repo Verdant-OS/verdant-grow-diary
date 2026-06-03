@@ -234,7 +234,7 @@ function evaluateReading(input: unknown): ReadingEval {
   const unit = isNonEmptyString(r.unit) ? r.unit : null;
 
   const suspicions: BridgeIntakeSuspicionCode[] = [];
-  let value = numeric;
+  const value = numeric;
 
   switch (metric as BridgeMetricKey) {
     case "humidity_pct": {

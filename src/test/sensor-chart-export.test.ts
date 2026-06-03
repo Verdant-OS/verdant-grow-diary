@@ -76,13 +76,12 @@ describe("downloadTextFile", () => {
     const createElementSpy = vi.spyOn(document, "createElement");
     const appendChildSpy = vi.spyOn(document.body, "appendChild");
     const removeChildSpy = vi.spyOn(document.body, "removeChild");
-    const clickSpy = vi.fn();
     const revokeSpy = vi.fn();
 
+    const realAnchor = document.createElement("a");
+    const clickSpy = vi.spyOn(realAnchor, "click");
     createElementSpy.mockImplementation((tag: string) => {
-      if (tag === "a") {
-        return { click: clickSpy, href: "", download: "" } as unknown as HTMLAnchorElement;
-      }
+      if (tag === "a") return realAnchor;
       return document.createElement(tag);
     });
 

@@ -180,6 +180,7 @@ export default function QuickLog({
     setEventType("observation");
     setPlantId("");
     setSnapshot(false);
+    snapshotUserTouchedRef.current = false;
     setRemindAt("");
     setDetails({ ph: "", ec: "", runoff: "", nutrients: "", training: "", watering: "" });
     setHardware({

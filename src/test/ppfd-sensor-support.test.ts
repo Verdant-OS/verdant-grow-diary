@@ -325,11 +325,11 @@ describe("PPFD support — static safety", () => {
     }
   });
 
-  it("does not estimate PPFD from brightness / lux / watts / device state", () => {
-    const src = readSrc("lib/ppfdRules.ts").toLowerCase();
-    // Helper must not contain any "derive from..." mapping for those.
-    for (const banned of ["lux", "watt", "brightness", "device_state"]) {
-      expect(src.includes(banned)).toBe(false);
+  it("never derives PPFD from lux / wattage / brightness — classifier only", () => {
+    // Behavioural check (not text search): the classifier must not promote
+    // any non-numeric "brightness-like" descriptor to a valid PPFD.
+    for (const probe of ["bright", "very bright", "100%", "300W", "30000 lux"]) {
+      expect(isPpfdValid(probe)).toBe(false);
     }
   });
 

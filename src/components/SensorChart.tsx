@@ -24,6 +24,8 @@ interface Props {
   variant?: "area" | "line";
   /** Hide the built-in 7d/30d/90d/All selector (default: shown). */
   hideRangeSelector?: boolean;
+  /** Hide the CSV export button (default: shown). */
+  hideExportButton?: boolean;
   /** Initial selected range. Default "all" preserves prior behavior. */
   defaultRange?: SensorChartTimeRange;
 }

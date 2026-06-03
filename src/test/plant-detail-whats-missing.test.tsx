@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { describe, it, expect } from "vitest";
 import {
   buildPlantDetailWhatsMissing,
@@ -25,9 +27,7 @@ describe("buildPlantDetailWhatsMissing", () => {
   });
 
   it("shows no timeline prompt when hasTimelineEntries is false", () => {
-    const result = buildPlantDetailWhatsMissing(
-      makeInput({ hasTimelineEntries: false }),
-    );
+    const result = buildPlantDetailWhatsMissing(makeInput({ hasTimelineEntries: false }));
     expect(result.length).toBeGreaterThanOrEqual(1);
     expect(result[0].kind).toBe("no_timeline");
     expect(result[0].title).toBe("No timeline entries yet");
@@ -50,9 +50,7 @@ describe("buildPlantDetailWhatsMissing", () => {
   });
 
   it("shows stage unknown prompt when stage is empty string", () => {
-    const result = buildPlantDetailWhatsMissing(
-      makeInput({ stage: "", hasTimelineEntries: true }),
-    );
+    const result = buildPlantDetailWhatsMissing(makeInput({ stage: "", hasTimelineEntries: true }));
     expect(result.map((r) => r.kind)).toContain("stage_unknown");
   });
 
@@ -64,9 +62,7 @@ describe("buildPlantDetailWhatsMissing", () => {
   });
 
   it("shows no recent photo prompt when hasRecentPhoto is false", () => {
-    const result = buildPlantDetailWhatsMissing(
-      makeInput({ hasRecentPhoto: false }),
-    );
+    const result = buildPlantDetailWhatsMissing(makeInput({ hasRecentPhoto: false }));
     expect(result.map((r) => r.kind)).toContain("no_recent_photo");
     const prompt = result.find((r) => r.kind === "no_recent_photo")!;
     expect(prompt.title).toBe("No recent photo");
@@ -85,9 +81,7 @@ describe("buildPlantDetailWhatsMissing", () => {
   });
 
   it("shows no sensor snapshot prompt when hasSensorSnapshot is false", () => {
-    const result = buildPlantDetailWhatsMissing(
-      makeInput({ hasSensorSnapshot: false }),
-    );
+    const result = buildPlantDetailWhatsMissing(makeInput({ hasSensorSnapshot: false }));
     expect(result.map((r) => r.kind)).toContain("no_sensor_snapshot");
     const prompt = result.find((r) => r.kind === "no_sensor_snapshot")!;
     expect(prompt.title).toBe("No sensor snapshot");
@@ -105,13 +99,9 @@ describe("buildPlantDetailWhatsMissing", () => {
   });
 
   it("shows no recent watering/feed prompt when hasRecentWateringOrFeed is false", () => {
-    const result = buildPlantDetailWhatsMissing(
-      makeInput({ hasRecentWateringOrFeed: false }),
-    );
+    const result = buildPlantDetailWhatsMissing(makeInput({ hasRecentWateringOrFeed: false }));
     expect(result.map((r) => r.kind)).toContain("no_recent_watering_or_feed");
-    const prompt = result.find(
-      (r) => r.kind === "no_recent_watering_or_feed",
-    )!;
+    const prompt = result.find((r) => r.kind === "no_recent_watering_or_feed")!;
     expect(prompt.title).toBe("No recent watering or feed note");
     expect(prompt.description).toMatch(/Watering and feeding logs/);
     expect(prompt.cta?.kind).toBe("quicklog");
@@ -144,11 +134,7 @@ describe("buildPlantDetailWhatsMissing", () => {
         hasRecentWateringOrFeed: false,
       }),
     );
-    expect(result.map((r) => r.kind)).toEqual([
-      "no_timeline",
-      "stage_unknown",
-      "no_recent_photo",
-    ]);
+    expect(result.map((r) => r.kind)).toEqual(["no_timeline", "stage_unknown", "no_recent_photo"]);
   });
 
   it("falls back to lower priority when higher ones are satisfied", () => {
@@ -203,9 +189,7 @@ describe("buildPlantDetailWhatsMissing", () => {
   });
 
   it("does not expose storage paths or tokens", () => {
-    const result = buildPlantDetailWhatsMissing(
-      makeInput({ hasRecentPhoto: false }),
-    );
+    const result = buildPlantDetailWhatsMissing(makeInput({ hasRecentPhoto: false }));
     for (const r of result) {
       expect(r.description).not.toMatch(/storage|bucket|path|token|key/i);
     }
@@ -234,8 +218,6 @@ describe("buildPlantDetailWhatsMissing", () => {
 
 describe("PlantDetailWhatsMissing component static safety", () => {
   it("component file does not contain service_role", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailWhatsMissing.tsx"),
       "utf8",
@@ -244,8 +226,6 @@ describe("PlantDetailWhatsMissing component static safety", () => {
   });
 
   it("component file does not contain action_queue", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailWhatsMissing.tsx"),
       "utf8",
@@ -254,8 +234,6 @@ describe("PlantDetailWhatsMissing component static safety", () => {
   });
 
   it("component file does not contain supabase writes", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailWhatsMissing.tsx"),
       "utf8",
@@ -268,8 +246,6 @@ describe("PlantDetailWhatsMissing component static safety", () => {
   });
 
   it("component file does not contain functions.invoke", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailWhatsMissing.tsx"),
       "utf8",
@@ -278,8 +254,6 @@ describe("PlantDetailWhatsMissing component static safety", () => {
   });
 
   it("component file does not contain automation/device-control language", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailWhatsMissing.tsx"),
       "utf8",
@@ -288,14 +262,10 @@ describe("PlantDetailWhatsMissing component static safety", () => {
   });
 
   it("component file does not contain calendar/notification/email language", () => {
-    const fs = require("fs");
-    const path = require("path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/PlantDetailWhatsMissing.tsx"),
       "utf8",
     );
-    expect(src).not.toMatch(
-      /calendar_events|notification|email|reminder|mail/i,
-    );
+    expect(src).not.toMatch(/calendar_events|notification|email|reminder|mail/i);
   });
 });

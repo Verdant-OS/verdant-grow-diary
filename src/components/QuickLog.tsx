@@ -522,7 +522,7 @@ export default function QuickLog({
             </p>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <Label className="text-xs">Input pH</Label>
+                <Label className="text-xs">Feed/Input pH</Label>
                 <Input
                   inputMode="decimal"
                   value={hardware.inputPh ?? ""}
@@ -531,7 +531,7 @@ export default function QuickLog({
                 />
               </div>
               <div>
-                <Label className="text-xs">Input EC/PPM</Label>
+                <Label className="text-xs">Feed/Input EC (mS/cm)</Label>
                 <Input
                   inputMode="decimal"
                   value={hardware.inputEc ?? ""}
@@ -549,7 +549,7 @@ export default function QuickLog({
                 />
               </div>
               <div>
-                <Label className="text-xs">Runoff EC/PPM</Label>
+                <Label className="text-xs">Runoff EC (mS/cm)</Label>
                 <Input
                   inputMode="decimal"
                   value={hardware.runoffEc ?? ""}

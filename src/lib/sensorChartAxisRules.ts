@@ -80,7 +80,7 @@ export function formatSensorChartYTick(
   const unit = tickUnitOf(m);
   // Compound units (kPa / ppm / µmol) read better with a hair of
   // separation; attached unit symbols (°F / %) stay flush.
-  const sep = /^[a-z]/i.test(unit) ? " " : "";
+  const sep = /^[A-Za-zµ]/.test(unit) ? " " : "";
   return `${rounded}${sep}${unit}`;
 }
 

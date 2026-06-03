@@ -208,6 +208,14 @@ describe("FAQ + trust/data ownership copy", () => {
     expect(PAGE).toMatch(/control my equipment or grow for me/);
     expect(PAGE).toMatch(/Can I cancel anytime/);
   });
+
+  it("FAQ explicitly states Verdant does not control equipment", () => {
+    expect(PAGE).toMatch(/does not control fans, lights, pumps/i);
+  });
+
+  it("FAQ explicitly states actions remain grower-approved", () => {
+    expect(PAGE).toMatch(/grower-approved/i);
+  });
 });
 
 describe("Forbidden claims", () => {

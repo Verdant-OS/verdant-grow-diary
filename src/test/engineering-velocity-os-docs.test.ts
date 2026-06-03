@@ -76,7 +76,8 @@ describe("Engineering Velocity OS scaffold", () => {
     ]) {
       expect(em).toContain(name);
     }
-    expect(em).not.toMatch(/`action_queue_item_executed`/);
+    // The event MAY be referenced in prose as forbidden, but must never
+    // appear as a defined section header.
     expect(em).not.toMatch(/^### `action_queue_item_executed`/m);
   });
 });

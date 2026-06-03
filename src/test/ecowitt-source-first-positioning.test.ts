@@ -48,7 +48,7 @@ describe("Ecowitt source — captured_at + raw payload truth", () => {
       { tentId: TENT },
     );
     expect(r.input.captured_at).not.toBeNull();
-    expect(Number.isFinite(new Date(r.input.captured_at!).getTime())).toBe(true);
+    expect(Number.isFinite(new Date(String(r.input.captured_at)).getTime())).toBe(true);
   });
 
   it("never invents captured_at from server time without explicit opt-in", () => {

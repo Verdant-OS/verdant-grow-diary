@@ -29,7 +29,6 @@ import {
   FRESHNESS_FRESH_MAX_HOURS,
 } from "@/lib/manualSensorFreshnessRules";
 
-void _unused;
 
 const NOW = new Date("2026-06-03T12:00:00.000Z");
 const HOUR = 60 * 60 * 1000;

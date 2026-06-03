@@ -58,8 +58,9 @@ export default function SensorChart({
 
   const chartData = useMemo(() => {
     return filteredData.map((r) => {
-      const raw = r[metric];
-      const v = metric === "temp" && typeof raw === "number" ? raw * 9 / 5 + 32 : raw;
+      const raw = r[metric as keyof SensorReading] as number | null | undefined;
+      const v =
+        metric === "temp" && typeof raw === "number" ? (raw * 9) / 5 + 32 : raw;
       return { ts: r.ts, value: v };
     });
   }, [filteredData, metric]);

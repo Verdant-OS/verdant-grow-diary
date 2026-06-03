@@ -87,21 +87,17 @@ describe("Pricing tiers", () => {
   });
 });
 
-describe("Free vs Pro comparison", () => {
+describe("Free vs Pro vs Founder Lifetime comparison", () => {
   const freeBasics = [
-    "Plant profiles",
-    "Basic grow diary",
+    "Plant profiles & grow diary",
     "Photo logs",
-    "Manual notes",
-    "Basic timeline",
-    "Manual sensor entries",
+    "Manual sensor snapshots",
   ];
 
-  it("Free tier includes the basic diary features (no paid lockout)", () => {
+  it("Free tier includes the basic diary features in the comparison table", () => {
     for (const item of freeBasics) {
-      // Each free feature appears in the comparison rows as free: true.
       const pattern = new RegExp(
-        `label:\\s*["']${item.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["'],\\s*free:\\s*true`,
+        `label:\\s*["']${item.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["'][^}]*free:\\s*true`,
       );
       expect(PAGE).toMatch(pattern);
     }
@@ -120,6 +116,53 @@ describe("Free vs Pro comparison", () => {
     ]) {
       expect(PAGE).toContain(item);
     }
+  });
+
+  it("comparison table renders all three columns (Free / Pro / Founder Lifetime)", () => {
+    expect(PAGE).toMatch(/data-testid="pricing-comparison-table"/);
+    expect(PAGE).toMatch(/>Free<\/th>/);
+    expect(PAGE).toMatch(/>Pro<\/th>/);
+    expect(PAGE).toMatch(/Founder Lifetime\s*<\/th>/);
+  });
+
+  it("comparison rows expose a founder column", () => {
+    expect(PAGE).toMatch(/founder:\s*(true|false|"|')/);
+    expect(PAGE).toMatch(/row\.founder/);
+  });
+
+  it("includes Best for and Price rows for at-a-glance comparison", () => {
+    expect(PAGE).toMatch(/label:\s*["']Best for["']/);
+    expect(PAGE).toMatch(/label:\s*["']Price["']/);
+  });
+});
+
+describe("Mobile-first pricing layout", () => {
+  it("tier card grid uses extra vertical spacing on mobile", () => {
+    expect(PAGE).toMatch(/grid\s+gap-8\s+md:gap-6\s+md:grid-cols-3/);
+  });
+
+  it("comparison table is horizontally scrollable on small screens", () => {
+    expect(PAGE).toMatch(/overflow-x-auto/);
+    expect(PAGE).toMatch(/min-w-\[640px\]/);
+  });
+
+  it("CTA buttons use size=\"lg\" for comfortable tap targets", () => {
+    // Every Start Free / Upgrade to Pro / Claim Founder Lifetime button
+    // should use the large size variant.
+    const ctaButtons = PAGE.match(/<Button[\s\S]*?<\/Button>/g) ?? [];
+    expect(ctaButtons.length).toBeGreaterThan(0);
+    const ctaText = /(Start Free|Upgrade to Pro|Claim Founder Lifetime)/;
+    for (const b of ctaButtons) {
+      if (ctaText.test(b)) {
+        expect(b).toMatch(/size="lg"/);
+      }
+    }
+  });
+});
+
+describe("Forbidden tier/offer language", () => {
+  it("does not render a hardware bundle tier", () => {
+    expect(PAGE).not.toMatch(/hardware bundle/i);
   });
 });
 

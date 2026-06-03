@@ -40,6 +40,10 @@ import {
   QUICK_LOG_MANUAL_SOURCE_LABEL,
   QUICK_LOG_DEMO_SOURCE_LABEL,
   QUICK_LOG_SAMPLE_SOURCE_LABEL,
+  quickLogActionLabel,
+  formatQuickLogOccurredAt,
+  quickLogSourceAccessibleLabel,
+  quickLogOccurredAtAccessibleLabel,
   filterQuickLogGroupedTimelineEntries,
   type QuickLogGroupedTimelineFilter,
 } from "@/lib/quickLogGroupedTimelineFilterViewModel";

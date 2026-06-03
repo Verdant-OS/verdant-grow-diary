@@ -146,7 +146,7 @@ describe("FAQ + trust/data ownership copy", () => {
   });
 
   it("FAQ covers founder lifetime, hardware, AI safety, and cancellation", () => {
-    expect(PAGE).toMatch(/Founder Lifetime Deal work/);
+    expect(PAGE).toMatch(/Founder Lifetime Offer work/);
     expect(PAGE).toMatch(/Do I need specific hardware/);
     expect(PAGE).toMatch(/control my equipment or grow for me/);
     expect(PAGE).toMatch(/Can I cancel anytime/);

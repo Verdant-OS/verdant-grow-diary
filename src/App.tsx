@@ -66,7 +66,9 @@ const App = () => (
               <Route path="/features" element={<Navigate to="/welcome" replace />} />
 
               <Route path="/welcome" element={<Landing />} />
-              <Route path="/demo" element={<Demo />} />
+              {/* /demo route removed — Verdant tracks real grow data only.
+                  Old bookmarks redirect to the landing page. */}
+              <Route path="/demo" element={<Navigate to="/welcome" replace />} />
               <Route path="/hardware-integrations" element={<HardwareIntegrations />} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/billing/:plan" element={<BillingPlaceholder />} />

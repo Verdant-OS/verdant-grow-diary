@@ -256,7 +256,6 @@ describe("Plant Timeline — pure grouping VM determinism", () => {
         {
           id: "u-1",
           kind: "note",
-          // @ts-expect-error — exercising unknown source defensively
           source: "unknown",
           plantId: PLANT,
           tentId: TENT,
@@ -266,8 +265,7 @@ describe("Plant Timeline — pure grouping VM determinism", () => {
         {
           id: "n-1",
           kind: "note",
-          // @ts-expect-error — exercising null source defensively
-          source: null,
+          source: null as unknown as string,
           plantId: PLANT,
           tentId: TENT,
           occurredAt: "2026-05-12T10:00:00.000Z",

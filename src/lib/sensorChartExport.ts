@@ -9,7 +9,7 @@ import type { SensorReading } from "@/mock";
 import { format } from "date-fns";
 
 const CSV_HEADER =
-  "Timestamp,Temperature (°C),Humidity (%),VPD (kPa),CO₂ (ppm),Soil Moisture (%),Source,Status,Captured At";
+  "Timestamp,Temperature (°C),Humidity (%),VPD (kPa),CO₂ (ppm),Soil Moisture (%),PPFD (µmol/m²/s),Source,Status,Captured At";
 
 /**
  * Escape a field for CSV inclusion. Wraps in quotes and escapes inner
@@ -21,6 +21,13 @@ function csvEscape(value: string | number | null | undefined): string {
     return `"${s.replace(/"/g, '"' + '"')}"`;
   }
   return s;
+}
+
+/** Render a PPFD cell — empty for missing / non-finite, value otherwise. */
+function ppfdCell(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value !== "number" || !Number.isFinite(value)) return "";
+  return String(value);
 }
 
 /**
@@ -36,6 +43,7 @@ export function buildSensorReadingsCsv(readings: ReadonlyArray<SensorReading>): 
       r.vpd,
       r.co2,
       r.soil,
+      ppfdCell(r.ppfd),
       r.source,
       r.status,
       r.capturedAt ? format(new Date(r.capturedAt), "yyyy-MM-dd HH:mm:ss") : "",

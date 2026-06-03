@@ -17,6 +17,8 @@ import { useGrowTents, getGrowDataMeta } from "@/hooks/useGrowData";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { tentDetailPath, tentsPath } from "@/lib/routes";
 import { tempFFromC } from "@/lib/temperatureUnits";
+import { formatTentLightStatus } from "@/lib/lightScheduleFormat";
+import { deriveTentHealthChip } from "@/lib/tentHealthChip";
 import {
   classifyVpdAgainstStage,
   normalizeVpdStage,
@@ -106,14 +108,34 @@ export default function Tents() {
                   )}
 
 
-                  <div className="mt-auto flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/40">
-                    <span>{plantCount} plants</span>
-                    <span className="inline-flex items-center gap-1">
-                      <Lightbulb className={`h-3 w-3 ${t.light.on ? "text-[hsl(var(--warning))]" : "text-muted-foreground"}`} />
-                      {t.light.on ? `On · ${t.light.schedule}` : "Off"}
-                    </span>
-                    {t.alertCount > 0 ? <span className="text-destructive">● {t.alertCount} alert{t.alertCount > 1 ? "s" : ""}</span> : <span className="text-[hsl(var(--success))]">● healthy</span>}
-                  </div>
+                  {(() => {
+                    const health = deriveTentHealthChip({
+                      plantCount,
+                      alertCount: t.alertCount,
+                    });
+                    const healthCls =
+                      health.variant === "alerts"
+                        ? "text-destructive"
+                        : health.variant === "healthy"
+                          ? "text-[hsl(var(--success))]"
+                          : "text-muted-foreground";
+                    return (
+                      <div className="mt-auto flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/40">
+                        <span>{plantCount} plants</span>
+                        <span className="inline-flex items-center gap-1">
+                          <Lightbulb className={`h-3 w-3 ${t.light.on ? "text-[hsl(var(--warning))]" : "text-muted-foreground"}`} />
+                          {formatTentLightStatus({ on: t.light.on, schedule: t.light.schedule })}
+                        </span>
+                        <span
+                          className={healthCls}
+                          data-testid="tent-card-health-chip"
+                          data-variant={health.variant}
+                        >
+                          {health.copy}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </Link>
                 <div className="absolute top-3 right-3 z-10">
                   <TentCardActionsMenu

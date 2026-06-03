@@ -268,15 +268,19 @@ describe("Quick Log → Plant Timeline round-trip", () => {
 
 describe("static safety: Quick Log + Timeline write/read paths", () => {
   const root = process.cwd();
+  // Strip JS block + line comments before scanning so safety contracts
+  // documented inside docstrings (e.g. "no .rpc / no service_role") do
+  // not get mistaken for actual call sites.
+  const stripComments = (s: string): string =>
+    s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  const load = (rel: string): string =>
+    stripComments(readFileSync(join(root, rel), "utf8"));
   const files: Record<string, string> = {
-    save: readFileSync(join(root, "src/hooks/useQuickLogV2Save.ts"), "utf8"),
-    payload: readFileSync(join(root, "src/lib/quickLogV2SavePayload.ts"), "utf8"),
-    hook: readFileSync(join(root, "src/hooks/useQuickLogGroupedTimeline.ts"), "utf8"),
-    vm: readFileSync(join(root, "src/lib/quickLogTimelineGroupingViewModel.ts"), "utf8"),
-    adapter: readFileSync(
-      join(root, "src/lib/quickLogGroupedTimelineRowAdapter.ts"),
-      "utf8",
-    ),
+    save: load("src/hooks/useQuickLogV2Save.ts"),
+    payload: load("src/lib/quickLogV2SavePayload.ts"),
+    hook: load("src/hooks/useQuickLogGroupedTimeline.ts"),
+    vm: load("src/lib/quickLogTimelineGroupingViewModel.ts"),
+    adapter: load("src/lib/quickLogGroupedTimelineRowAdapter.ts"),
   };
 
   it("never references service_role / SUPABASE_SERVICE_ROLE in client code", () => {

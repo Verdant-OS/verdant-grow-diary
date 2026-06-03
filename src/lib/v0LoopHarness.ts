@@ -10,7 +10,7 @@
  *
  * Hard constraints (mirror the Verdant master prompt + Sentinel Codex):
  *   - No I/O. No Supabase. No React. No hooks.
- *   - No automation. No device control. No autopilot.
+ *   - No automation. No direct device actuation. No unattended control.
  *   - No elevated service credentials.
  *   - No fake live data. Demo/stale/invalid never reported as healthy.
  *   - All Action Queue drafts are approval-required and contain advisory

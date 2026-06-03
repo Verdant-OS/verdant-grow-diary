@@ -36,6 +36,7 @@ import {
   buildTentSensorHeaderView,
 } from "@/lib/tentSensorChartRules";
 import { tempFFromC } from "@/lib/temperatureUnits";
+import { formatSensorValue } from "@/lib/sensorFormat";
 import {
   filterVisiblePlants,
   getActivePlantCount,

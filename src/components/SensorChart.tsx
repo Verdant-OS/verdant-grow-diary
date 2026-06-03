@@ -20,7 +20,7 @@ import { buildSensorReadingsCsv, downloadTextFile } from "@/lib/sensorChartExpor
 
 interface Props {
   data: SensorReading[];
-  metric: "temp" | "rh" | "vpd" | "co2" | "soil";
+  metric: "temp" | "rh" | "vpd" | "co2" | "soil" | "ppfd";
   height?: number;
   variant?: "area" | "line";
   /** Hide the built-in 7d/30d/90d/All selector (default: shown). */

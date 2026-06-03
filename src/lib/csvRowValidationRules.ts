@@ -107,7 +107,7 @@ function parseFiniteNumber(raw: string | null): number | null {
 
 // ---------- Timestamp policy ----------
 
-const ISO_WITH_TZ_RE = /T[\d:.+Z-]+(?:Z|[+-]\d{2}:?\d{2})$/;
+const ISO_WITH_TZ_RE = /T[-\d:.+Z]+(?:Z|[+-]\d{2}:?\d{2})$/;
 const YEAR_ONLY_RE = /^\d{4}$/;
 const HAS_TIME_COMPONENT_RE = /\d{1,2}:\d{2}/;
 

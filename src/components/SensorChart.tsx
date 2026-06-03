@@ -7,6 +7,7 @@ import {
   formatSensorChartYTick,
   formatSensorChartTooltipValue,
 } from "@/lib/sensorChartAxisRules";
+import { sortTimeSeriesAscending } from "@/lib/sortTimeSeriesAscending";
 
 interface Props {
   data: SensorReading[];
@@ -30,7 +31,11 @@ export default function SensorChart({ data, metric, height = 220, variant = "are
   const m = meta[metric];
   const axisMeta = SENSOR_CHART_METRIC_META[metric];
   // Temperature is stored in Celsius; render Fahrenheit per Verdant convention.
-  const chartData = data.map((r) => {
+  // Sort ascending by timestamp so the line always flows left-to-right
+  // (oldest → newest). Defense-in-depth against callers that pass DESC data.
+  // See src/lib/sortTimeSeriesAscending.ts.
+  const ordered = sortTimeSeriesAscending(data, (r) => r.ts);
+  const chartData = ordered.map((r) => {
     const raw = r[metric];
     const v = metric === "temp" && typeof raw === "number" ? raw * 9 / 5 + 32 : raw;
     return { ts: r.ts, value: v };

@@ -63,7 +63,7 @@ describe("Engineering Velocity OS scaffold", () => {
     expect(all).toMatch(/\bPR\b/);
   });
 
-  it("event map defines the seven V0 events without an executed event", () => {
+  it("event map defines the nine V0 events without an executed event", () => {
     const em = read(FILES.eventMap);
     for (const name of [
       "quick_log_created",
@@ -73,11 +73,31 @@ describe("Engineering Velocity OS scaffold", () => {
       "alert_viewed",
       "action_queue_item_created",
       "action_queue_item_completed",
+      "ai_doctor_result_created",
+      "action_follow_up_logged",
     ]) {
       expect(em).toContain(name);
     }
     // The event MAY be referenced in prose as forbidden, but must never
     // appear as a defined section header.
     expect(em).not.toMatch(/^### `action_queue_item_executed`/m);
+    expect(em).not.toMatch(/^### `device_command_executed`/m);
+    expect(em).not.toMatch(/^### `automation_executed`/m);
+  });
+
+  it("event map explicitly forbids any *_executed event naming", () => {
+    const em = read(FILES.eventMap);
+    // No section header defining an executed event
+    expect(em).not.toMatch(/^### `.*_executed`/m);
+    // The doc must explicitly call out the ban
+    expect(em).toMatch(/\*_executed/);
+    expect(em).toMatch(/explicitly forbidden/);
+  });
+
+  it("event map explains action_follow_up_logged as the plant-response bridge", () => {
+    const em = read(FILES.eventMap);
+    expect(em).toContain("action_follow_up_logged");
+    expect(em).toMatch(/plant response/i);
+    expect(em).toMatch(/repeat \/ avoid next run/);
   });
 });

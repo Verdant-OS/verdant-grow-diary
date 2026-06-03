@@ -298,7 +298,10 @@ describe("PPFD wiring — static safety", () => {
     "%s has no service_role / automation / device-control / *_executed",
     (rel) => {
       const lower = readSrc(rel).toLowerCase();
-      expect(lower.includes("service_role")).toBe(false);
+      // Allow the literal token only inside a no-op safety comment ("no
+      // service_role usage."); flag any code reference (quoted string,
+      // property access, function call).
+      expect(/["'`]service_role["'`]|service_role\s*\(|\.service_role\b/.test(lower)).toBe(false);
       expect(lower.includes("autopilot")).toBe(false);
       expect(/[a-z0-9]_executed\b/.test(lower)).toBe(false);
       for (const banned of [

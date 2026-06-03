@@ -29,7 +29,7 @@ import { useGrows } from "@/store/grows";
 import OnboardingChecklistCard from "@/components/OnboardingChecklistCard";
 import OnboardingProgressPill from "@/components/OnboardingProgressPill";
 import DashboardZeroTentEmptyState from "@/components/DashboardZeroTentEmptyState";
-import FirstPlantMemoryCta from "@/components/FirstPlantMemoryCta";
+
 import DashboardPendingOutcomeReviewsCard from "@/components/DashboardPendingOutcomeReviewsCard";
 import { buildOnboardingChecklistViewModel } from "@/lib/onboardingChecklistViewModel";
 import { useSensorReadings, useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
@@ -264,7 +264,9 @@ export default function Dashboard() {
         <OnboardingChecklistCard vm={onboardingVm} />
       </div>
 
-      {plants.length > 0 && <FirstPlantMemoryCta />}
+      {/* Dashboard intentionally has a single Quick Log entry point (QuickLogV2Fab).
+          The "Log your first plant memory" CTA was a duplicate entry point and was removed.
+          The same CTA remains on TentDetail where it is contextually unique. */}
 
       <DashboardPendingOutcomeReviewsCard scopedGrowId={scopedGrowId ?? null} />
 

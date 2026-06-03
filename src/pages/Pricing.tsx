@@ -310,9 +310,9 @@ export default function Pricing() {
           </AccordionItem>
 
           <AccordionItem value="founder-lifetime">
-            <AccordionTrigger>How does the Founder Lifetime Deal work?</AccordionTrigger>
+            <AccordionTrigger>How does the Founder Lifetime Offer work?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              ${FOUNDER_LIFETIME_PRICE_USD} once. Pro features for the life of the product. Limited to the first {FOUNDER_LIFETIME_LIMIT} buyers. When the first {FOUNDER_LIFETIME_LIMIT} are claimed, the offer ends. No fake countdowns and no expiring timers beyond that real limit.
+              ${FOUNDER_LIFETIME_PRICE_USD} once. You get full Pro access for the life of the product. This is a limited early-supporter offer, not a separate recurring plan. Limited to the first {FOUNDER_LIFETIME_LIMIT} buyers. When the first {FOUNDER_LIFETIME_LIMIT} are claimed, the offer ends. No fake countdowns and no expiring timers beyond that real limit.
             </AccordionContent>
           </AccordionItem>
 

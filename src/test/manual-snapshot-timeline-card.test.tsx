@@ -49,9 +49,13 @@ describe("ManualSnapshotTimelineCard", () => {
 
   it("shows captured_at and readings", () => {
     render(<ManualSnapshotTimelineCard card={mkCard()} />);
-    expect(
-      screen.getByTestId("manual-snapshot-timeline-card-captured-at"),
-    ).toHaveTextContent("2026-01-01T10:00:00.000Z");
+    const capturedAt = screen.getByTestId(
+      "manual-snapshot-timeline-card-captured-at",
+    );
+    // Formatter renders a localized human string — never raw ISO.
+    expect(capturedAt.textContent ?? "").toMatch(/2026/);
+    expect(capturedAt.textContent ?? "").not.toMatch(/T\d{2}:\d{2}/);
+    expect(capturedAt.textContent ?? "").not.toMatch(/\.\d{3,}/);
     expect(
       screen.getAllByTestId("manual-snapshot-timeline-card-reading").length,
     ).toBeGreaterThan(0);

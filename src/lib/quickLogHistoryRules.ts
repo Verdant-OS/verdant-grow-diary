@@ -71,6 +71,7 @@ export interface ManualHandheldReadings {
 }
 
 const LABEL_TO_KEY: Record<string, keyof ManualHandheldReadings> = {
+  // Pre-patch writer labels (backward compatibility — never remove).
   "input ph": "inputPh",
   "input ec/ppm": "inputEc",
   "input ec": "inputEc",
@@ -78,13 +79,34 @@ const LABEL_TO_KEY: Record<string, keyof ManualHandheldReadings> = {
   "runoff ec/ppm": "runoffEc",
   "runoff ec": "runoffEc",
   "ppfd canopy": "ppfdCanopy",
-  "ppfd canopy (µmol)": "ppfdCanopy",
   "light distance": "lightDistance",
+  // Post-patch (#13) writer labels (unit-disambiguated form).
+  "feed/input ph": "inputPh",
+  "feed/input ec": "inputEc",
 };
+
+/**
+ * Strip trailing display-unit suffixes like "(mS/cm)", "(µmol)", "(ppm)"
+ * from a label before LABEL_TO_KEY lookup. Keeps the parser robust to
+ * future unit-string drift on the writer side without needing a new map
+ * entry per unit variation. Pure: no I/O.
+ */
+function normalizeHandheldLabel(label: string): string {
+  return label
+    .toLowerCase()
+    .replace(/\s*\([^)]*\)\s*$/u, "")
+    .trim();
+}
 
 /**
  * Parse the deterministic "Hardware readings (manual handheld):" block
  * out of a note string. Returns null when no block is present.
+ *
+ * Recognizes both pre-patch labels (`Input pH`, `Input EC/PPM`) and the
+ * post-patch unit-disambiguated form (`Feed/Input pH`,
+ * `Feed/Input EC (mS/cm)`). Display-unit suffixes in parens are stripped
+ * before lookup so writers can evolve unit copy without breaking
+ * round-trip. Unknown labels still flow through to `other[]`.
  */
 export function parseManualHandheldReadings(
   note: string | null | undefined,
@@ -100,7 +122,8 @@ export function parseManualHandheldReadings(
     const label = cleaned.slice(0, idx).trim();
     const value = cleaned.slice(idx + 1).trim();
     if (!label || !value) continue;
-    const key = LABEL_TO_KEY[label.toLowerCase()];
+    const normalized = normalizeHandheldLabel(label);
+    const key = LABEL_TO_KEY[normalized] ?? LABEL_TO_KEY[label.toLowerCase()];
     if (key && key !== "other") {
       (out as Record<string, string>)[key] = value;
     } else {

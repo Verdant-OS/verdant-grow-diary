@@ -13,7 +13,7 @@ import { sortTimeSeriesAscending } from "@/lib/sortTimeSeriesAscending";
 import { buildTentSensorChartSeries } from "@/lib/tentSensorChartRules";
 
 describe("sortTimeSeriesAscending", () => {
-  const ts = (p: { ts: string }) => p.ts;
+  
 
   it("returns [] for null/empty input", () => {
     expect(sortTimeSeriesAscending(null, ts)).toEqual([]);

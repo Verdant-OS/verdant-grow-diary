@@ -63,6 +63,8 @@ const App = () => (
               <Route path="/signup" element={<Navigate to="/auth" replace />} />
               <Route path="/register" element={<Navigate to="/auth" replace />} />
 
+              <Route path="/features" element={<Navigate to="/welcome" replace />} />
+
               <Route path="/welcome" element={<Landing />} />
               <Route path="/demo" element={<Demo />} />
               <Route path="/hardware-integrations" element={<HardwareIntegrations />} />

@@ -21,6 +21,10 @@ describe("Deprecated auth route redirects", () => {
   it("/auth route still exists directly (regression guard)", () => {
     expect(APP).toMatch(/path="\/auth"\s+element=\{<Auth\s*\/>\}/);
   });
+
+  it("/features redirects to /welcome", () => {
+    expect(APP).toMatch(/path="\/features"\s+element=\{<Navigate\s+to="\/welcome"/);
+  });
 });
 
 describe("Auth route redirects — static safety", () => {

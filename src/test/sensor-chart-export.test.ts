@@ -46,14 +46,14 @@ describe("buildSensorReadingsCsv", () => {
   });
 
   it("escapes commas in fields", () => {
-    const r: SensorReading = { ...baseReading, source: "live, manual" };
+    const r: SensorReading = { ...baseReading, source: "live, manual" as unknown as SensorReading["source"] };
     const csv = buildSensorReadingsCsv([r]);
     const line = csv.split("\n")[1];
     expect(line).toContain('"live, manual"');
   });
 
   it("escapes double quotes in fields", () => {
-    const r: SensorReading = { ...baseReading, status: 'needs_"review' };
+    const r: SensorReading = { ...baseReading, status: "needs_\"review" as unknown as SensorReading["status"] };
     const csv = buildSensorReadingsCsv([r]);
     const line = csv.split("\n")[1];
     expect(line).toContain('"needs_""review"');

@@ -16,9 +16,9 @@ describe("sortTimeSeriesAscending", () => {
   
 
   it("returns [] for null/empty input", () => {
-    expect(sortTimeSeriesAscending(null, (p) => p.ts)).toEqual([]);
-    expect(sortTimeSeriesAscending(undefined, (p) => p.ts)).toEqual([]);
-    expect(sortTimeSeriesAscending([], (p) => p.ts)).toEqual([]);
+    expect(sortTimeSeriesAscending<{ ts: string }>(null, (p) => p.ts)).toEqual([]);
+    expect(sortTimeSeriesAscending<{ ts: string }>(undefined, (p) => p.ts)).toEqual([]);
+    expect(sortTimeSeriesAscending<{ ts: string }>([], (p) => p.ts)).toEqual([]);
   });
 
   it("sorts reversed (DESC) input into ascending order", () => {

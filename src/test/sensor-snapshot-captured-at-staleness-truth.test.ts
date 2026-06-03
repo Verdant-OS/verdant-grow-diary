@@ -51,7 +51,7 @@ describe("captured_at vs occurred_at separation", () => {
   });
 
   it("uses captured_at (not occurred_at) when ts is absent", () => {
-    const captured_at = new Date(NOW.getTime() - 2 * HOUR).toISOString();
+    const captured_at = new Date(NOW.getTime() - 5 * 60 * 1000).toISOString();
     const label = classifyQuickLogSnapshotSource(
       { source: "live", captured_at, value: 1 },
       NOW.getTime(),

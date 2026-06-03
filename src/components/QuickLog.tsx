@@ -37,6 +37,8 @@ import {
   shouldEmbedSnapshot,
 } from "@/lib/quickLogSensorSnapshotRules";
 import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
+import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
+import { buildQuickLogSnapshotStrip } from "@/lib/quickLogSnapshotStripAdapter";
 
 import { AlertTriangle, Info } from "lucide-react";
 import { toast } from "sonner";

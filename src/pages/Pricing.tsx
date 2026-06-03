@@ -335,7 +335,7 @@ export default function Pricing() {
           <AccordionItem value="hardware">
             <AccordionTrigger>Do I need specific hardware?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              No. Verdant is hardware-neutral. You can log everything manually, import CSVs, or connect sensors over webhook, MQTT, ESP32, or a Raspberry Pi bridge. Bring the gear you already own — Verdant does not sell a hardware bundle.
+              No. Verdant is hardware-neutral. You can log everything manually, import CSVs, or connect sensors over webhook, MQTT, ESP32, or a Raspberry Pi bridge. Bring the gear you already own — Verdant does not sell or require any specific gear.
             </AccordionContent>
           </AccordionItem>
 

@@ -84,7 +84,7 @@ export default function Pricing() {
           name="Free"
           price="$0"
           cadence="/ month"
-          description="Everything you need to start a serious grow diary."
+          description="Start free. Build your grow diary and see if Verdant fits your workflow."
           bullets={[
             "Plant profiles",
             "Basic grow diary",
@@ -115,7 +115,7 @@ export default function Pricing() {
           cadence="/ month"
           highlighted
           badge="Most popular"
-          description="Cloud sync, multi-tent support, deeper history, and priority support."
+          description="Upgrade when Verdant becomes your real grow memory system."
           bullets={[
             "Everything in Free",
             "Cloud sync",

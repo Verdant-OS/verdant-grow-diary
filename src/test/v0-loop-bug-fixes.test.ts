@@ -39,12 +39,14 @@ describe("Bug 1 · QuickLog invalidates Recent Plant Activity caches", () => {
     );
   });
 
-  it("still writes only to diary_entries (no new write surface)", () => {
+  it("routes saves through quicklog_save_manual RPC (no direct table inserts)", () => {
+    // Post-unification: QuickLog has no `.from("X").insert(...)` writes.
+    // It saves through useQuickLogV2Save → supabase.rpc("quicklog_save_manual").
     const inserts = [...QUICKLOG.matchAll(/\.from\(["'](\w+)["']\)\s*\.insert/g)];
-    expect(inserts.length).toBeGreaterThan(0);
-    for (const m of inserts) {
-      expect(m[1]).toBe("diary_entries");
-    }
+    expect(inserts.length).toBe(0);
+    expect(QUICKLOG).toMatch(/useQuickLogV2Save/);
+    // Stage change on grows is still allowed as a separate UPDATE (not an insert).
+    expect(QUICKLOG).toMatch(/\.from\(["']grows["']\)\.update/);
   });
 
   it("does not add automation / device-control / service_role surface", () => {

@@ -8,6 +8,10 @@
  *   - never be classified as live sensor data
  *   - be optional (Quick Log submission must not be blocked)
  *   - append deterministic formatted text to the note field
+ *
+ * Post-unification: legacy diary_entries insert is gone — saves go through
+ * useQuickLogV2Save → quicklog_save_manual RPC, so the note is asserted
+ * via the RPC payload's `p_note` field.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
@@ -40,22 +44,26 @@ function renderWithClient(ui: ReactElement) {
   return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
 }
 
-const insertMock = vi.fn();
+const saveMock = vi.fn();
+vi.mock("@/hooks/useQuickLogV2Save", () => ({
+  useQuickLogV2Save: () => ({
+    save: (...a: unknown[]) => saveMock(...a),
+    saving: false,
+    error: null,
+  }),
+}));
+
 const updateEqMock = vi.fn();
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    from: (table: string) => {
-      // Track which tables get written to via the chain
-      return {
-        insert: (payload: unknown) => insertMock(table, payload),
-        update: () => ({ eq: updateEqMock }),
-        select: () => ({
-          eq: () => ({
-            order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
-          }),
+    from: () => ({
+      update: () => ({ eq: updateEqMock }),
+      select: () => ({
+        eq: () => ({
+          order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
         }),
-      };
-    },
+      }),
+    }),
     storage: { from: () => ({ upload: vi.fn(), remove: vi.fn() }) },
   },
 }));
@@ -71,6 +79,11 @@ vi.mock("@/store/grows", () => ({
     setActiveGrowId: vi.fn(),
   }),
 }));
+vi.mock("@/hooks/use-plants", () => ({
+  usePlants: () => ({
+    data: [{ id: "plant-1", name: "Test Plant", tent_id: "tent-1", grow_id: "grow-1" }],
+  }),
+}));
 
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
@@ -83,8 +96,8 @@ vi.mock("sonner", () => ({
 }));
 
 beforeEach(() => {
-  insertMock.mockReset();
-  insertMock.mockResolvedValue({ error: null });
+  saveMock.mockReset();
+  saveMock.mockResolvedValue({ ok: true });
   updateEqMock.mockReset();
   updateEqMock.mockResolvedValue({ error: null });
   toastError.mockReset();
@@ -159,7 +172,6 @@ describe("QuickLog hardware readings UI", () => {
     const helper = screen.getByTestId("quicklog-hardware-helper");
     expect(helper.textContent).toMatch(/manual handheld/i);
     expect(helper.textContent).toMatch(/not live sensor data/i);
-    // Each required field is present
     expect(within(section).getByText("Input pH")).toBeInTheDocument();
     expect(within(section).getByText("Input EC/PPM")).toBeInTheDocument();
     expect(within(section).getByText("Runoff pH")).toBeInTheDocument();
@@ -168,40 +180,52 @@ describe("QuickLog hardware readings UI", () => {
     expect(within(section).getByText(/Light distance/)).toBeInTheDocument();
   });
 
-  it("submits without hardware readings (fields are optional)", async () => {
-    renderWithClient(<QuickLog open={true} onOpenChange={vi.fn()} />);
+  it("submits an observation through the RPC adapter (no hardware readings)", async () => {
+    renderWithClient(
+      <QuickLog
+        open={true}
+        onOpenChange={vi.fn()}
+        prefill={{ plantId: "plant-1", growId: "grow-1" }}
+      />,
+    );
     const dialog = screen.getByRole("dialog");
     fireEvent.change(dialog.querySelector("textarea") as HTMLTextAreaElement, {
-      target: { value: "Watered today" },
+      target: { value: "Looking healthy today" },
     });
     fireEvent.click(within(dialog).getByRole("button", { name: /save entry/i }));
 
-    await waitFor(() => expect(insertMock).toHaveBeenCalledTimes(1));
-    const [table, payload] = insertMock.mock.calls[0];
-    expect(table).toBe("diary_entries");
-    expect(payload.note).toBe("Watered today");
-    expect(payload.grow_id).toBe("grow-1");
-    expect(payload.user_id).toBe("user-1"); // server-side ownership comes from RLS; field is allowed
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    const payload = saveMock.mock.calls[0][0];
+    expect(payload.p_action).toBe("note");
+    expect(payload.p_target_type).toBe("plant");
+    expect(payload.p_target_id).toBe("plant-1");
+    expect(payload.p_note).toBe("Looking healthy today");
     expect(toastError).not.toHaveBeenCalled();
   });
 
-  it("appends deterministic hardware-readings block to the note when filled", async () => {
-    renderWithClient(<QuickLog open={true} onOpenChange={vi.fn()} />);
+  it("appends deterministic hardware-readings block to RPC p_note when filled", async () => {
+    renderWithClient(
+      <QuickLog
+        open={true}
+        onOpenChange={vi.fn()}
+        prefill={{ plantId: "plant-1", growId: "grow-1" }}
+      />,
+    );
     const dialog = screen.getByRole("dialog");
     fireEvent.change(dialog.querySelector("textarea") as HTMLTextAreaElement, {
       target: { value: "Watered today" },
     });
     const section = screen.getByTestId("quicklog-hardware-readings");
     const inputs = section.querySelectorAll("input");
-    // Order in DOM matches field order in the rules helper
-    fireEvent.change(inputs[0], { target: { value: "6.2" } }); // inputPh
-    fireEvent.change(inputs[1], { target: { value: "1.4" } }); // inputEc
-    fireEvent.change(inputs[4], { target: { value: "650" } }); // ppfdCanopy
+    fireEvent.change(inputs[0], { target: { value: "6.2" } });
+    fireEvent.change(inputs[1], { target: { value: "1.4" } });
+    fireEvent.change(inputs[4], { target: { value: "650" } });
 
     fireEvent.click(within(dialog).getByRole("button", { name: /save entry/i }));
-    await waitFor(() => expect(insertMock).toHaveBeenCalledTimes(1));
-    const [, payload] = insertMock.mock.calls[0];
-    expect(payload.note).toBe(
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    const payload = saveMock.mock.calls[0][0];
+    expect(payload.p_action).toBe("note");
+    expect(payload.p_note).toBe(
       [
         "Watered today",
         "",
@@ -213,8 +237,14 @@ describe("QuickLog hardware readings UI", () => {
     );
   });
 
-  it("never writes hardware readings to sensor_readings or action_queue", async () => {
-    renderWithClient(<QuickLog open={true} onOpenChange={vi.fn()} />);
+  it("never writes hardware readings to sensor_readings / action_queue / alerts (RPC-only save path)", async () => {
+    renderWithClient(
+      <QuickLog
+        open={true}
+        onOpenChange={vi.fn()}
+        prefill={{ plantId: "plant-1", growId: "grow-1" }}
+      />,
+    );
     const dialog = screen.getByRole("dialog");
     fireEvent.change(dialog.querySelector("textarea") as HTMLTextAreaElement, {
       target: { value: "Reading" },
@@ -223,13 +253,11 @@ describe("QuickLog hardware readings UI", () => {
     const inputs = section.querySelectorAll("input");
     fireEvent.change(inputs[0], { target: { value: "6.2" } });
     fireEvent.click(within(dialog).getByRole("button", { name: /save entry/i }));
-    await waitFor(() => expect(insertMock).toHaveBeenCalled());
-    for (const call of insertMock.mock.calls) {
-      const [table] = call;
-      expect(table).not.toBe("sensor_readings");
-      expect(table).not.toBe("action_queue");
-      expect(table).not.toBe("alerts");
-    }
+    await waitFor(() => expect(saveMock).toHaveBeenCalled());
+    // Static guarantee: no `.from("sensor_readings"|"action_queue"|"alerts").insert` exists in QuickLog source.
+    expect(QUICKLOG_SRC).not.toMatch(
+      /\.from\(\s*["'](sensor_readings|action_queue|alerts)["']\s*\)\s*\.insert/,
+    );
   });
 });
 
@@ -254,15 +282,15 @@ describe("QuickLog static safety scan", () => {
     expect(RULES_SRC).not.toMatch(/from\s+["']react["']/);
   });
 
-  it("QuickLog payload still includes grow_id from activeGrowId", () => {
-    expect(QUICKLOG_SRC).toMatch(/grow_id:\s*activeGrowId/);
+  it("QuickLog still uses activeGrowId for workspace scoping", () => {
+    expect(QUICKLOG_SRC).toMatch(/activeGrowId/);
   });
 
-  it("QuickLog does not insert into sensor_readings, action_queue, or alerts", () => {
-    expect(QUICKLOG_SRC).not.toMatch(
-      /\.from\(\s*["']sensor_readings["']\s*\)\s*\.insert/,
-    );
-    expect(QUICKLOG_SRC).not.toMatch(/\.from\(\s*["']action_queue["']\s*\)/);
-    expect(QUICKLOG_SRC).not.toMatch(/\.from\(\s*["']alerts["']\s*\)/);
+  it("QuickLog does not insert into diary_entries, sensor_readings, action_queue, or alerts", () => {
+    for (const t of ["diary_entries", "sensor_readings", "action_queue", "alerts"]) {
+      expect(QUICKLOG_SRC).not.toMatch(
+        new RegExp(`\\.from\\(\\s*["']${t}["']\\s*\\)\\s*\\.insert`),
+      );
+    }
   });
 });

@@ -195,9 +195,12 @@ describe("Plant Detail · tent context wiring after a move", () => {
 });
 
 describe("QuickLog · defaults to the plant's current tent", () => {
-  it("scopes diary_entries inserts to selectedPlant?.tent_id", () => {
-    expect(QUICK_LOG).toMatch(/tent_id:\s*selectedPlant\?\.tent_id/);
-    expect(QUICK_LOG).toMatch(/grow_id:\s*activeGrowId/);
+  it("scopes RPC saves to selectedPlant (target type 'plant') and uses activeGrowId", () => {
+    // Legacy diary_entries insert removed; unified save now targets plants via RPC.
+    expect(QUICK_LOG).not.toMatch(/\.from\(["']diary_entries["']\)\.insert/);
+    expect(QUICK_LOG).toMatch(/selectedPlant\.id/);
+    expect(QUICK_LOG).toMatch(/activeGrowId/);
+    expect(QUICK_LOG).toMatch(/buildLegacyQuickLogUnifiedPayload/);
   });
 });
 

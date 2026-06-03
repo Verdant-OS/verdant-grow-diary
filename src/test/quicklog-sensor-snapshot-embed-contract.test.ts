@@ -1,11 +1,11 @@
 /**
- * Static contract test: QuickLog.tsx embeds the new labeling fields
- * (source + state) on its `details.sensor_snapshot` payload via the
- * pure helper, and does not regress to an unlabeled embed.
+ * Static contract test: post-unification, QuickLog does NOT embed a
+ * `sensor_snapshot` into any save payload. The sensor strip is
+ * presenter-only (renders QuickLogSensorSnapshotStrip) and snapshot
+ * values are not persisted via the RPC in this slice.
  *
- * This avoids spinning up the heavy QuickLog dialog while still pinning
- * the integration point. Behavior of the helper itself is covered in
- * quicklog-sensor-snapshot-labeling.test.ts.
+ * Replaces the legacy embed-labeling contract — the embed surface was
+ * removed when the legacy diary_entries write path was retired.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -16,46 +16,30 @@ const SRC = readFileSync(
   "utf8",
 );
 
-describe("QuickLog sensor_snapshot labeling integration", () => {
-  it("imports the pure labeling helper", () => {
+describe("QuickLog sensor snapshot · presenter-only contract", () => {
+  it("renders the QuickLogSensorSnapshotStrip presenter component", () => {
+    expect(SRC).toMatch(/<QuickLogSensorSnapshotStrip\b/);
     expect(SRC).toMatch(
-      /import\s*{\s*classifyQuickLogSnapshotSource\s*,\s*shouldEmbedSnapshot\s*,?\s*}\s*from\s*["']@\/lib\/quickLogSensorSnapshotRules["']/,
+      /from\s+["']@\/components\/QuickLogSensorSnapshotStrip["']/,
     );
   });
 
-  it("invokes classifyQuickLogSnapshotSource before embedding", () => {
-    const idxClassify = SRC.indexOf("classifyQuickLogSnapshotSource(");
-    const idxEmbed = SRC.indexOf("cleanDetails.sensor_snapshot");
-    expect(idxClassify).toBeGreaterThan(-1);
-    expect(idxEmbed).toBeGreaterThan(-1);
-    expect(idxClassify).toBeLessThan(idxEmbed);
+  it("does NOT embed sensor_snapshot into any payload", () => {
+    // Legacy embed path (cleanDetails.sensor_snapshot = …) is removed.
+    expect(SRC).not.toMatch(/cleanDetails\.sensor_snapshot/);
+    expect(SRC).not.toMatch(/sensor_snapshot\s*:/);
   });
 
-  it("attaches source and state fields to the embedded snapshot", () => {
-    const embedStart = SRC.indexOf("cleanDetails.sensor_snapshot");
-    expect(embedStart).toBeGreaterThan(-1);
-    const slice = SRC.slice(embedStart, embedStart + 800);
-    expect(slice).toMatch(/source:\s*snapshotSource/);
-    expect(slice).toMatch(/state:\s*snapshotState/);
+  it("does NOT classify/label snapshot for persistence", () => {
+    // The persistence-side labeling helper is no longer used by QuickLog.
+    expect(SRC).not.toMatch(/classifyQuickLogSnapshotSource\s*\(/);
+    expect(SRC).not.toMatch(/shouldEmbedSnapshot\s*\(/);
   });
 
-  it("keeps existing snapshot fields intact (no regression)", () => {
-    const embedStart = SRC.indexOf("cleanDetails.sensor_snapshot");
-    const slice = SRC.slice(embedStart, embedStart + 800);
-    for (const field of ["ts:", "tent_id:", "temp:", "rh:", "vpd:", "co2:", "soil:", "available_metrics:"]) {
-      expect(slice, `missing field ${field}`).toContain(field);
-    }
-  });
-
-  it("uses shouldEmbedSnapshot to gate the embed", () => {
-    expect(SRC).toContain("shouldEmbedSnapshot(snapshotState)");
-  });
-
-  it("shows a toast when stale snapshot is dropped", () => {
-    expect(SRC).toContain("Sensor reading too old to attach");
-  });
-
-  it("shows a toast when invalid snapshot is dropped", () => {
-    expect(SRC).toContain("Sensor reading unreadable");
+  it("does NOT introduce any new write/persistence for snapshot values", () => {
+    expect(SRC).not.toMatch(
+      /\.from\(\s*["']sensor_readings["']\s*\)\s*\.insert/,
+    );
+    expect(SRC).not.toMatch(/\.from\(\s*["']diary_entries["']\s*\)\.insert/);
   });
 });

@@ -29,9 +29,11 @@ describe("Copy renames are applied", () => {
     expect(QUICKLOG).not.toMatch(/<Label[^>]*>Strain<\/Label>/);
   });
 
-  it("QuickLog preserves activeGrowId scoping (grow_id stays under the hood)", () => {
+  it("QuickLog preserves activeGrowId scoping (grow scope stays under the hood)", () => {
     expect(QUICKLOG).toMatch(/!activeGrowId/);
-    expect(QUICKLOG).toMatch(/grow_id:\s*activeGrowId/);
+    // activeGrowId still drives the active workspace; RPC writes go through
+    // useQuickLogV2Save (no diary_entries.insert with grow_id field anymore).
+    expect(QUICKLOG).toMatch(/useQuickLogV2Save/);
   });
 
   it("Tent environment panel title is 'Current Environment'", () => {

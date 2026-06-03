@@ -75,8 +75,19 @@ export default function SensorChart({
   const id = `grad-${metric}`;
   return (
     <div className="w-full">
-      {(!hideRangeSelector || !hideExportButton) && (
-        <div className="mb-2 flex items-center justify-between gap-2">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span
+            data-testid="sensor-chart-legend"
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
+          >
+            <span
+              aria-hidden="true"
+              className="inline-block h-2 w-2 rounded-full"
+              style={{ background: axisMeta.color }}
+            />
+            {legendLabel}
+          </span>
           {!hideExportButton && (
             <button
               type="button"
@@ -89,37 +100,37 @@ export default function SensorChart({
               Export CSV
             </button>
           )}
-          {!hideRangeSelector && (
-            <div
-              role="radiogroup"
-              aria-label="Chart time range"
-              data-testid="sensor-chart-range-selector"
-              className="flex gap-1"
-            >
-              {SENSOR_CHART_TIME_RANGES.map((r) => {
-                const selected = r.value === range;
-                return (
-                  <button
-                    key={r.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => setRange(r.value)}
-                    className={
-                      "rounded-md border px-2 py-1 text-xs transition-colors " +
-                      (selected
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border bg-background text-muted-foreground hover:text-foreground")
-                    }
-                  >
-                    {r.label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
         </div>
-      )}
+        {!hideRangeSelector && (
+          <div
+            role="radiogroup"
+            aria-label="Chart time range"
+            data-testid="sensor-chart-range-selector"
+            className="flex gap-1"
+          >
+            {SENSOR_CHART_TIME_RANGES.map((r) => {
+              const selected = r.value === range;
+              return (
+                <button
+                  key={r.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() => setRange(r.value)}
+                  className={
+                    "rounded-md border px-2 py-1 text-xs transition-colors " +
+                    (selected
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-background text-muted-foreground hover:text-foreground")
+                  }
+                >
+                  {r.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
       <ResponsiveContainer width="100%" height={height}>
         <Comp data={chartData} margin={{ top: 8, right: 12, left: SENSOR_CHART_LEFT_MARGIN, bottom: 0 }}>
           {variant === "area" && (

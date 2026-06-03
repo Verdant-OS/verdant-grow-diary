@@ -53,7 +53,7 @@ describe("mapSensorReadingToAiDoctorContext", () => {
         "co2_ppm",
         "soil_moisture_pct",
       ]);
-      expect(ctx.missingMetrics).toEqual([]);
+      expect(ctx.missingMetrics).toEqual(["ppfd_umol_m2s"]);
       expect(ctx.invalidMetrics).toEqual([]);
       expect(ctx.confidenceImpact).toBe("none");
       expect(ctx.contextSummary).toContain("Live sensor reading");

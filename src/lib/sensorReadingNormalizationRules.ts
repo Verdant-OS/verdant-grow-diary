@@ -224,8 +224,16 @@ export interface RawSensorInput {
   co2_ppm?: number | null;
   /** Soil moisture 0–100% */
   soil_moisture_pct?: number | null;
+  /** PPFD in µmol/m²/s (only when a real PAR/PPFD measurement exists) */
+  ppfd_umol_m2s?: number | null;
   /** Original payload to preserve */
   raw_payload?: unknown;
+}
+
+/** Returns true if PPFD is within plausible canopy range 0..2500 µmol/m²/s. */
+export function isPpfdReadingValid(v: number | null | undefined): boolean {
+  if (v === null || v === undefined) return true; // missing PPFD is not a risk
+  return Number.isFinite(v) && v >= 0 && v <= 2500;
 }
 
 /**
@@ -262,6 +270,7 @@ export function normalizeSensorReading(
     captured_at: input.captured_at,
     source,
     ...metrics,
+    ppfd_umol_m2s: input.ppfd_umol_m2s ?? null,
     raw_payload: input.raw_payload ?? null,
   };
 }

@@ -307,7 +307,7 @@ export default function Pricing() {
           <AccordionItem value="data-ownership">
             <AccordionTrigger>Who owns the grow data I put into Verdant?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              You do. Your grow logs, photos, and sensor snapshots are yours. Verdant does not sell your data. Pro includes advanced exports so you can take your full grow history with you whenever you want.
+              You do. Your grow logs, photos, and sensor snapshots are yours. Verdant does not sell your data and does not share it with advertisers. Pro includes advanced exports so you can take your full grow history with you whenever you want.
             </AccordionContent>
           </AccordionItem>
 
@@ -321,7 +321,7 @@ export default function Pricing() {
           <AccordionItem value="pro-what">
             <AccordionTrigger>What do I actually get with Pro?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              Cloud sync, automatic backups, multi-tent support, advanced exports, sensor snapshot history, longer grow history, better timeline filtering, priority support, and early access to advanced grow reports. Pro AI features ship over time, only as they stabilize.
+              Cloud sync, automatic backups, multi-tent support, advanced exports, sensor snapshot history, longer grow history, better timeline filtering, priority support, and early access to advanced grow reports. Pro features ship over time, only as they stabilize.
             </AccordionContent>
           </AccordionItem>
 
@@ -335,14 +335,14 @@ export default function Pricing() {
           <AccordionItem value="hardware">
             <AccordionTrigger>Do I need specific hardware?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              No. Verdant is hardware-neutral. You can log everything manually, import CSVs, or connect sensors over webhook, MQTT, ESP32, or a Raspberry Pi bridge. Bring the gear you already own.
+              No. Verdant is hardware-neutral. You can log everything manually, import CSVs, or connect sensors over webhook, MQTT, ESP32, or a Raspberry Pi bridge. Bring the gear you already own — Verdant does not sell a hardware bundle.
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="ai-safety">
             <AccordionTrigger>Does Verdant control my equipment or grow for me?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              No. Verdant does not control fans, lights, pumps, heaters, dehumidifiers, or any other equipment. AI-assisted insights are suggestions only — you approve or dismiss them. The grower stays in control.
+              No. Verdant does not control fans, lights, pumps, heaters, dehumidifiers, or any other equipment. AI-assisted insights are suggestions only, and every action in the Action Queue is grower-approved before anything happens. The grower stays in control.
             </AccordionContent>
           </AccordionItem>
 

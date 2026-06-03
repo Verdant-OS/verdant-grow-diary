@@ -298,6 +298,7 @@ describe("No unrelated routes were changed", () => {
         "/doctor",
         "/doctor/sessions",
         "/doctor/sessions/:sessionId",
+        "/features",
         "/grow-lineage",
         "/grow-room",
         "/grows",

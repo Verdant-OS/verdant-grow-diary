@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Download } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { SensorReading } from "@/mock";
 import { format } from "date-fns";
@@ -14,6 +15,7 @@ import {
   formatChartTooltipTimestamp,
   type SensorChartTimeRange,
 } from "@/lib/sensorChartTimeRange";
+import { buildSensorReadingsCsv, downloadTextFile } from "@/lib/sensorChartExport";
 
 interface Props {
   data: SensorReading[];

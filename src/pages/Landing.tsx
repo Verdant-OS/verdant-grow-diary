@@ -171,7 +171,7 @@ export default function Landing() {
           <ul className="mt-5 space-y-3 text-sm md:text-base text-muted-foreground">
             <li>· Verdant does not control equipment by default.</li>
             <li>· AI suggestions require grower review.</li>
-            <li>· Demo data is clearly labeled.</li>
+            <li>· Sensor source (Ecowitt, manual, CSV) is always labeled honestly.</li>
             <li>· Private grow data requires an account.</li>
             <li>· Hardware-neutral: bring your own sensors and bridges.</li>
           </ul>

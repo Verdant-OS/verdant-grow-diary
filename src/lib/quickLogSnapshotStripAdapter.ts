@@ -118,13 +118,27 @@ export interface BuildQuickLogStripArgs {
   loading?: boolean;
   /** Selected plant has a tent assignment. False ⇒ no_data. */
   hasTent?: boolean;
+  /**
+   * Whether the grower currently has "Attach sensor snapshot" toggled on.
+   * Defaults to true to preserve existing presenter callers (tests).
+   * When false AND status would be `usable`, copy reflects "available but
+   * not attached" so the strip never falsely claims the log will include
+   * sensor context.
+   */
+  attached?: boolean;
   now?: Date;
 }
 
 export function buildQuickLogSnapshotStrip(
   args: BuildQuickLogStripArgs,
 ): QuickLogSnapshotStripViewModel {
-  const { snapshot, loading = false, hasTent = true, now = new Date() } = args;
+  const {
+    snapshot,
+    loading = false,
+    hasTent = true,
+    attached = true,
+    now = new Date(),
+  } = args;
 
   // No tent selected or loader still in flight or empty snapshot ⇒ no_data.
   const isEmpty =
@@ -169,14 +183,29 @@ export function buildQuickLogSnapshotStrip(
     ? formatAge(capturedMs, now.getTime())
     : null;
 
+  // Resolve title/description/action with the attach-toggle override:
+  // when a snapshot is technically usable but the grower has toggled
+  // "Attach sensor snapshot" OFF, the strip must not claim the log
+  // will include sensor context.
+  const usableButDetached = status === "usable" && !attached;
+  const title = usableButDetached ? "Sensor snapshot available" : TITLES[status];
+  const description = usableButDetached
+    ? "Toggle “Attach sensor snapshot” to include it in this log."
+    : DESCRIPTIONS[status];
+  const action = usableButDetached ? actionFor("no_data" as const) : actionFor(status);
+  // Detached usable still surfaces no nav button (toggle is the action).
+  const finalAction: QuickLogSnapshotStripAction = usableButDetached
+    ? { kind: "none" }
+    : action;
+
   return {
     status,
-    title: TITLES[status],
-    description: DESCRIPTIONS[status],
+    title,
+    description,
     capturedAt: snapshot.ts,
     ageLabel,
     metrics: buildMetrics(snapshot),
-    action: actionFor(status),
+    action: finalAction,
     classification,
   };
 }

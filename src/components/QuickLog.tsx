@@ -37,6 +37,8 @@ import {
   shouldEmbedSnapshot,
 } from "@/lib/quickLogSensorSnapshotRules";
 import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
+import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
+import { buildQuickLogSnapshotStrip } from "@/lib/quickLogSnapshotStripAdapter";
 
 import { AlertTriangle, Info } from "lucide-react";
 import { toast } from "sonner";
@@ -96,6 +98,10 @@ export default function QuickLog({
   });
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Tracks whether the grower has manually changed the attach toggle in
+  // this session. Until they do, we may auto-default it based on whether
+  // the latest snapshot classifies as `usable` (Gate 1 trust rule).
+  const snapshotUserTouchedRef = useRef(false);
 
   // Apply prefill when the dialog opens. Does NOT submit — grower still
   // chooses to save the entry.
@@ -131,6 +137,36 @@ export default function QuickLog({
     [plantId, scopedPlants],
   );
 
+  // Drive the sensor snapshot strip + auto-attach default from the same
+  // contract-derived status the strip uses. We call the loader here so the
+  // parent can react to status transitions without duplicating any
+  // classification logic in this .tsx.
+  const sensorTentIds = selectedPlant?.tent_id ? [selectedPlant.tent_id] : [];
+  const sensorState = useLatestSensorSnapshot(activeGrowId, sensorTentIds);
+  const stripView = useMemo(
+    () =>
+      buildQuickLogSnapshotStrip({
+        snapshot: sensorState.snapshot,
+        loading: sensorState.status === "loading",
+        hasTent: !!selectedPlant?.tent_id,
+        attached: snapshot,
+      }),
+    [sensorState.snapshot, sensorState.status, selectedPlant?.tent_id, snapshot],
+  );
+
+  // When the snapshot becomes `usable` and the grower has NOT manually
+  // toggled the attach switch in this session, default it to ON so the
+  // strip's "this log will include current sensor context" copy matches
+  // what the save payload will actually include.
+  useEffect(() => {
+    if (!open) return;
+    if (snapshotUserTouchedRef.current) return;
+    if (!selectedPlant?.tent_id) return;
+    if (stripView.status === "usable" && !snapshot) {
+      setSnapshot(true);
+    }
+  }, [open, stripView.status, selectedPlant?.tent_id, snapshot]);
+
   function handleFile(f: File | null) {
     setPhotoFile(f);
     setPreview(f ? URL.createObjectURL(f) : null);
@@ -144,6 +180,7 @@ export default function QuickLog({
     setEventType("observation");
     setPlantId("");
     setSnapshot(false);
+    snapshotUserTouchedRef.current = false;
     setRemindAt("");
     setDetails({ ph: "", ec: "", runoff: "", nutrients: "", training: "", watering: "" });
     setHardware({
@@ -464,7 +501,10 @@ export default function QuickLog({
             </span>
             <Switch
               checked={snapshot && !!selectedPlant}
-              onCheckedChange={setSnapshot}
+              onCheckedChange={(v) => {
+                snapshotUserTouchedRef.current = true;
+                setSnapshot(v);
+              }}
               disabled={!selectedPlant}
             />
           </label>
@@ -650,6 +690,7 @@ export default function QuickLog({
           <QuickLogSensorSnapshotStrip
             growId={activeGrowId}
             tentId={selectedPlant?.tent_id ?? null}
+            attached={snapshot && !!selectedPlant}
           />
 
           <Button type="submit" disabled={busy} className="gradient-leaf text-primary-foreground">

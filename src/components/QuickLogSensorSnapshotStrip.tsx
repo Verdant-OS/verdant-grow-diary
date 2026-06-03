@@ -21,6 +21,11 @@ import {
 interface Props {
   growId: string | null | undefined;
   tentId: string | null | undefined;
+  /**
+   * Whether the grower's "Attach sensor snapshot" toggle is on. When
+   * omitted, defaults to true so legacy callers/tests keep their behavior.
+   */
+  attached?: boolean;
 }
 
 const TONE: Record<QuickLogSnapshotStripStatus, string> = {
@@ -44,13 +49,14 @@ const PILL_LABEL: Record<QuickLogSnapshotStripStatus, string> = {
   no_data: "No data",
 };
 
-export default function QuickLogSensorSnapshotStrip({ growId, tentId }: Props) {
+export default function QuickLogSensorSnapshotStrip({ growId, tentId, attached = true }: Props) {
   const tentIds = tentId ? [tentId] : [];
   const state = useLatestSensorSnapshot(growId ?? null, tentIds);
   const view = buildQuickLogSnapshotStrip({
     snapshot: state.snapshot,
     loading: state.status === "loading",
     hasTent: !!tentId,
+    attached,
   });
 
   return (

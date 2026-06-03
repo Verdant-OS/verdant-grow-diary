@@ -137,6 +137,36 @@ export default function QuickLog({
     [plantId, scopedPlants],
   );
 
+  // Drive the sensor snapshot strip + auto-attach default from the same
+  // contract-derived status the strip uses. We call the loader here so the
+  // parent can react to status transitions without duplicating any
+  // classification logic in this .tsx.
+  const sensorTentIds = selectedPlant?.tent_id ? [selectedPlant.tent_id] : [];
+  const sensorState = useLatestSensorSnapshot(activeGrowId, sensorTentIds);
+  const stripView = useMemo(
+    () =>
+      buildQuickLogSnapshotStrip({
+        snapshot: sensorState.snapshot,
+        loading: sensorState.status === "loading",
+        hasTent: !!selectedPlant?.tent_id,
+        attached: snapshot,
+      }),
+    [sensorState.snapshot, sensorState.status, selectedPlant?.tent_id, snapshot],
+  );
+
+  // When the snapshot becomes `usable` and the grower has NOT manually
+  // toggled the attach switch in this session, default it to ON so the
+  // strip's "this log will include current sensor context" copy matches
+  // what the save payload will actually include.
+  useEffect(() => {
+    if (!open) return;
+    if (snapshotUserTouchedRef.current) return;
+    if (!selectedPlant?.tent_id) return;
+    if (stripView.status === "usable" && !snapshot) {
+      setSnapshot(true);
+    }
+  }, [open, stripView.status, selectedPlant?.tent_id, snapshot]);
+
   function handleFile(f: File | null) {
     setPhotoFile(f);
     setPreview(f ? URL.createObjectURL(f) : null);

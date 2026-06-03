@@ -496,7 +496,19 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
             className="space-y-3"
             data-testid="quick-log-grouped-timeline-empty"
           >
-            <p className="text-sm text-muted-foreground">
+            <p
+              className="text-sm font-medium text-foreground"
+              data-testid="quick-log-grouped-timeline-empty-title"
+            >
+              {QUICK_LOG_GROUPED_TIMELINE_EMPTY_TITLE_TEXT}
+            </p>
+            <p
+              className="text-sm text-muted-foreground"
+              data-testid="quick-log-grouped-timeline-empty-hint"
+            >
+              {QUICK_LOG_GROUPED_TIMELINE_EMPTY_HINT_TEXT}
+            </p>
+            <p className="text-xs text-muted-foreground">
               {QUICK_LOG_GROUPED_TIMELINE_EMPTY_OVERALL_TEXT}
             </p>
             <Button

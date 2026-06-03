@@ -36,6 +36,7 @@ import {
   buildTentSensorHeaderView,
 } from "@/lib/tentSensorChartRules";
 import { tempFFromC } from "@/lib/temperatureUnits";
+import { formatSensorValue } from "@/lib/sensorFormat";
 import {
   filterVisiblePlants,
   getActivePlantCount,
@@ -147,10 +148,12 @@ export default function TentDetail() {
             stage: tent.stage,
             stale: header.stale,
           });
+          // #21: route VPD chip through the canonical sensor formatter so
+          // header precision matches Recent manual snapshots (2-decimal cap).
           return (
             <MetricChip
               label="VPD"
-              value={snap.vpd}
+              value={formatSensorValue("vpd_kpa", snap.vpd).replace(/\s*kPa$/, "")}
               unit=" kPa"
               status={vpdMetricChipStatus(vpd)}
             />

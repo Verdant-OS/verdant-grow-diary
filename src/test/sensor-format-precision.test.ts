@@ -17,9 +17,14 @@ describe("sensorFormat precision", () => {
     expect(formatSensorValue("soil_ec_mscm", 1.8523)).not.toMatch(/\.\d{3,}/);
   });
 
-  it("formats temperature and RH with 1 decimal", () => {
-    expect(formatSensorValue("air_temp_c", 24.345)).toBe("24.3 °C");
+  it("formats temperature in °F (app-wide unit policy) with 1 decimal", () => {
+    // Stored °C → user-facing °F conversion at the display boundary.
+    // 24.345 °C → 75.821 °F → "75.8 °F".
+    expect(formatSensorValue("air_temp_c", 24.345)).toBe("75.8 °F");
+    expect(formatSensorValue("soil_temp_c", 20)).toBe("68.0 °F");
     expect(formatSensorValue("humidity_pct", 55)).toBe("55.0 %");
+    // Never returns °C — would clash with the rest of the UI.
+    expect(formatSensorValue("air_temp_c", 24.345)).not.toMatch(/°C/);
   });
 
   it("returns a long-dash for null/invalid input", () => {

@@ -11,16 +11,26 @@
  *    returned as a separate label callers may render as a chip.
  *
  * Null-safe. No I/O. No React.
+ *
+ * Temperature unit policy (#15):
+ *  - Verdant's user-facing temperature unit is **Fahrenheit** everywhere
+ *    (Tents page, Tent detail header, Recent manual snapshots, snapshot
+ *    cards). Storage stays in °C — see `temperatureUnits.ts`.
+ *  - `air_temp_c` / `soil_temp_c` values are converted to °F at this
+ *    presenter boundary so every surface that consumes
+ *    `formatSensorValue` is consistent with the rest of the app and
+ *    never shows °F and °C together on the same screen.
  */
 import type { SensorFieldKey } from "@/constants/sensorFields";
+import { celsiusToFahrenheit } from "@/lib/temperatureUnits";
 
 const UNIT_BY_FIELD: Record<SensorFieldKey, string> = {
-  air_temp_c: "°C",
+  air_temp_c: "°F",
   humidity_pct: "%",
   vpd_kpa: "kPa",
   co2_ppm: "ppm",
   soil_moisture_pct: "%",
-  soil_temp_c: "°C",
+  soil_temp_c: "°F",
   soil_ec_mscm: "mS/cm",
   reservoir_ph: "pH",
   reservoir_ec_mscm: "mS/cm",
@@ -40,6 +50,8 @@ const DECIMALS_BY_FIELD: Record<SensorFieldKey, number> = {
   ppfd: 0,
 };
 
+const TEMPERATURE_FIELDS = new Set<SensorFieldKey>(["air_temp_c", "soil_temp_c"]);
+
 export const DERIVED_LABEL = "Derived" as const;
 
 export function sensorFieldUnit(field: SensorFieldKey | string): string {
@@ -54,6 +66,9 @@ export function sensorFieldDecimals(field: SensorFieldKey | string): number {
 /**
  * Format a sensor value with field-aware precision. Returns "—" for
  * null/undefined/non-finite. Never appends a "derived" marker.
+ *
+ * Temperature fields (`air_temp_c`, `soil_temp_c`) are converted from
+ * the stored Celsius value to user-facing Fahrenheit before formatting.
  */
 export function formatSensorValue(
   field: SensorFieldKey | string,
@@ -64,7 +79,10 @@ export function formatSensorValue(
   }
   const digits = sensorFieldDecimals(field);
   const unit = sensorFieldUnit(field);
-  const num = (value as number).toFixed(digits);
+  const display = TEMPERATURE_FIELDS.has(field as SensorFieldKey)
+    ? celsiusToFahrenheit(value as number)
+    : (value as number);
+  const num = display.toFixed(digits);
   return unit ? `${num} ${unit}` : num;
 }
 

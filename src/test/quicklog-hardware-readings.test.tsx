@@ -172,10 +172,10 @@ describe("QuickLog hardware readings UI", () => {
     const helper = screen.getByTestId("quicklog-hardware-helper");
     expect(helper.textContent).toMatch(/manual handheld/i);
     expect(helper.textContent).toMatch(/not live sensor data/i);
-    expect(within(section).getByText("Input pH")).toBeInTheDocument();
-    expect(within(section).getByText("Input EC/PPM")).toBeInTheDocument();
+    expect(within(section).getByText("Feed/Input pH")).toBeInTheDocument();
+    expect(within(section).getByText("Feed/Input EC (mS/cm)")).toBeInTheDocument();
     expect(within(section).getByText("Runoff pH")).toBeInTheDocument();
-    expect(within(section).getByText("Runoff EC/PPM")).toBeInTheDocument();
+    expect(within(section).getByText("Runoff EC (mS/cm)")).toBeInTheDocument();
     expect(within(section).getByText(/PPFD canopy/)).toBeInTheDocument();
     expect(within(section).getByText(/Light distance/)).toBeInTheDocument();
   });
@@ -230,8 +230,8 @@ describe("QuickLog hardware readings UI", () => {
         "Watered today",
         "",
         HARDWARE_READINGS_HEADER,
-        "- Input pH: 6.2",
-        "- Input EC/PPM: 1.4",
+        "- Feed/Input pH: 6.2",
+        "- Feed/Input EC (mS/cm): 1.4",
         "- PPFD canopy: 650",
       ].join("\n"),
     );

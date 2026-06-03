@@ -264,7 +264,9 @@ export default function Dashboard() {
         <OnboardingChecklistCard vm={onboardingVm} />
       </div>
 
-      {plants.length > 0 && <FirstPlantMemoryCta />}
+      {/* Dashboard intentionally has a single Quick Log entry point (QuickLogV2Fab).
+          The "Log your first plant memory" CTA was a duplicate entry point and was removed.
+          The same CTA remains on TentDetail where it is contextually unique. */}
 
       <DashboardPendingOutcomeReviewsCard scopedGrowId={scopedGrowId ?? null} />
 

@@ -69,6 +69,13 @@ export interface NormalizedSensorReading {
   co2_ppm: number | null;
   /** Soil moisture 0–100% (nullable) */
   soil_moisture_pct: number | null;
+  /**
+   * PPFD in µmol/m²/s (nullable). Optional on construction so legacy
+   * inputs without a PAR sensor still type-check. Never derived from
+   * lux, wattage, or device state — only set when a real measurement
+   * exists.
+   */
+  ppfd_umol_m2s?: number | null;
   /** Original unmodified payload from the source device/input */
   raw_payload: unknown;
 }

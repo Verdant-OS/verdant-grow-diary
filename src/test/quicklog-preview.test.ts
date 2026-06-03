@@ -126,12 +126,13 @@ describe("QuickLog component wiring", () => {
     expect(QUICKLOG).not.toMatch(/disabled=\{[^}]*hasIssues[^}]*\}/);
   });
 
-  it("does not change the diary_entries.details payload shape", () => {
-    // Still inserts cleanDetails and still attaches event_type the same way.
-    expect(QUICKLOG).toMatch(/cleanDetails\.event_type\s*=\s*eventType/);
-    expect(QUICKLOG).toMatch(
-      /supabase\.from\("diary_entries"\)\.insert\(/,
-    );
+  it("routes saves through the unified RPC adapter (no diary_entries insert)", () => {
+    // Post-unification: QuickLog no longer writes directly to diary_entries.
+    // It builds an RPC payload via buildLegacyQuickLogUnifiedPayload and
+    // submits through useQuickLogV2Save (quicklog_save_manual).
+    expect(QUICKLOG).not.toMatch(/supabase\.from\(["']diary_entries["']\)\.insert/);
+    expect(QUICKLOG).toMatch(/buildLegacyQuickLogUnifiedPayload/);
+    expect(QUICKLOG).toMatch(/useQuickLogV2Save/);
   });
 
   it("does not introduce service_role or device-control surfaces", () => {

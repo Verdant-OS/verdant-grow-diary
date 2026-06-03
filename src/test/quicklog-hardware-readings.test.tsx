@@ -126,10 +126,10 @@ describe("formatHardwareReadingsBlock (pure)", () => {
     expect(block).toBe(
       [
         HARDWARE_READINGS_HEADER,
-        "- Input pH: 6.2",
-        "- Input EC/PPM: 1.4",
+        "- Feed/Input pH: 6.2",
+        "- Feed/Input EC (mS/cm): 1.4",
         "- Runoff pH: 6.0",
-        "- Runoff EC/PPM: 1.6",
+        "- Runoff EC (mS/cm): 1.6",
         "- PPFD canopy: 650",
         "- Light distance: 45",
       ].join("\n"),
@@ -142,7 +142,7 @@ describe("formatHardwareReadingsBlock (pure)", () => {
       ppfdCanopy: "700",
     });
     expect(block).toBe(
-      [HARDWARE_READINGS_HEADER, "- Input pH: 6.1", "- PPFD canopy: 700"].join("\n"),
+      [HARDWARE_READINGS_HEADER, "- Feed/Input pH: 6.1", "- PPFD canopy: 700"].join("\n"),
     );
   });
 

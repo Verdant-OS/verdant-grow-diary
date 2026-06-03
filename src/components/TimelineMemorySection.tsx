@@ -30,6 +30,7 @@ import {
   TIMELINE_FILTER_EMPTY_STATE_COPY,
   TIMELINE_FILTER_RESET_KEY,
 } from "@/lib/timelineFilterViewModel";
+import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 
 type Props =
   | { scope: "plant"; plantId: string | null | undefined }
@@ -54,7 +55,13 @@ function DiaryItemRow({ item }: { item: Extract<TimelineMemoryItem, { kind: "dia
         <Badge variant="outline" className="text-[10px]">
           {item.eventType ?? "note"}
         </Badge>
-        <span className="text-xs text-muted-foreground">{item.occurredAt}</span>
+        <time
+          dateTime={item.occurredAt}
+          className="text-xs text-muted-foreground"
+          data-testid="timeline-memory-diary-item-ts"
+        >
+          {formatSnapshotTimestamp(item.occurredAt)}
+        </time>
       </div>
       {item.note && (
         <p className="mt-1.5 text-sm text-foreground/90 break-words">{item.note}</p>
@@ -99,7 +106,13 @@ function AiDoctorEvidenceAuditRow({
         <Badge variant="outline" className="text-[10px]">
           AI Doctor
         </Badge>
-        <span className="text-xs text-muted-foreground">{item.occurredAt}</span>
+        <time
+          dateTime={item.occurredAt}
+          className="text-xs text-muted-foreground"
+          data-testid="timeline-memory-ai-doctor-evidence-audit-ts"
+        >
+          {formatSnapshotTimestamp(item.occurredAt)}
+        </time>
       </div>
       <p className="mt-1.5 text-sm font-medium text-foreground/90">
         {AI_DOCTOR_EVIDENCE_AUDIT_TITLE}

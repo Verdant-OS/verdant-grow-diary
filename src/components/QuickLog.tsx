@@ -21,7 +21,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { STAGES } from "@/lib/grow";
 import { EVENT_TYPES } from "@/lib/diary";
 import { usePlants } from "@/hooks/use-plants";
-import type { SensorReadingRow } from "@/lib/db";
 import { evaluateQuickLogPreview } from "@/lib/quickLogPreviewRules";
 import {
   appendHardwareReadingsToNote,
@@ -32,13 +31,15 @@ import {
   filterQuickLogPlantOptions,
   quickLogPlantHelperText,
 } from "@/lib/quickLogPlantOptionRules";
-import {
-  classifyQuickLogSnapshotSource,
-  shouldEmbedSnapshot,
-} from "@/lib/quickLogSensorSnapshotRules";
 import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { buildQuickLogSnapshotStrip } from "@/lib/quickLogSnapshotStripAdapter";
+import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
+import {
+  buildLegacyQuickLogUnifiedPayload,
+  isSupportedLegacyEventType,
+  UNSUPPORTED_EVENT_TYPE_COPY,
+} from "@/lib/legacyQuickLogUnifiedSave";
 
 import { AlertTriangle, Info } from "lucide-react";
 import { toast } from "sonner";
@@ -70,9 +71,10 @@ export default function QuickLog({
   const { grows, activeGrow, activeGrowId, setActiveGrowId } = useGrows();
   const { data: plants = [] } = usePlants();
   const queryClient = useQueryClient();
+  const { save: saveViaRpc } = useQuickLogV2Save();
 
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  // Photo attach is disabled in the unified Quick Log slice; placeholder
+  // state retained for layout only.
   const [note, setNote] = useState("");
   const [stage, setStage] = useState(activeGrow?.stage || "veg");
   const [eventType, setEventType] = useState<string>("observation");
@@ -97,7 +99,7 @@ export default function QuickLog({
     lightDistance: "",
   });
   const [busy, setBusy] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  
   // Tracks whether the grower has manually changed the attach toggle in
   // this session. Until they do, we may auto-default it based on whether
   // the latest snapshot classifies as `usable` (Gate 1 trust rule).
@@ -123,10 +125,6 @@ export default function QuickLog({
     prefill?.suggestSnapshot,
   ]);
 
-  // Auto-pick a sensible event type when adding a photo
-  useEffect(() => {
-    if (photoFile && eventType === "observation") setEventType("photo");
-  }, [eventType, photoFile]);
 
   const scopedPlants = useMemo(
     () => filterQuickLogPlantOptions(plants, activeGrowId),
@@ -167,14 +165,7 @@ export default function QuickLog({
     }
   }, [open, stripView.status, selectedPlant?.tent_id, snapshot]);
 
-  function handleFile(f: File | null) {
-    setPhotoFile(f);
-    setPreview(f ? URL.createObjectURL(f) : null);
-  }
-
   function reset() {
-    setPhotoFile(null);
-    setPreview(null);
     setNote("");
     setShowMore(false);
     setEventType("observation");
@@ -199,106 +190,38 @@ export default function QuickLog({
       toast.error("Pick a workspace first");
       return;
     }
-    if (!note.trim()) {
+    if (!isSupportedLegacyEventType(eventType)) {
+      toast.message(UNSUPPORTED_EVENT_TYPE_COPY);
+      return;
+    }
+    if (!selectedPlant) {
+      toast.error("Pick a plant to save this entry");
+      return;
+    }
+    if (!note.trim() && eventType !== "watering") {
       toast.error("Add a quick note");
       return;
     }
+
     setBusy(true);
-    let uploadedPath: string | null = null;
     try {
-      if (photoFile) {
-        const ext = (photoFile.name.split(".").pop() || "jpg").toLowerCase();
-        const path = `${user.id}/${activeGrowId}/${Date.now()}.${ext}`;
-        const { error: upErr } = await supabase.storage
-          .from("diary-photos")
-          .upload(path, photoFile, { contentType: photoFile.type, upsert: false });
-        if (upErr) {
-          toast.error(`Photo upload failed: ${upErr.message}`);
-          console.error("[QuickLog] storage upload error", upErr);
-          return;
-        }
-        uploadedPath = path;
-      }
-
-      const cleanDetails: Record<string, unknown> = Object.fromEntries(
-        Object.entries(details).filter(([, v]) => v && v.toString().trim()),
-      );
-      cleanDetails.event_type = eventType;
-      if (selectedPlant) {
-        cleanDetails.plant_id = selectedPlant.id;
-        cleanDetails.plant_name = selectedPlant.name;
-        if (selectedPlant.tent_id) cleanDetails.tent_id = selectedPlant.tent_id;
-      }
-      if (snapshot && selectedPlant?.tent_id) {
-        const { data: readingRows, error: readErr } = await supabase
-          .from("sensor_readings")
-          .select("*")
-          .eq("tent_id", selectedPlant.tent_id)
-          .order("ts", { ascending: false })
-          .limit(50);
-        if (readErr) {
-          console.warn("[QuickLog] sensor snapshot fetch failed", readErr);
-          toast.message("No sensor snapshot attached", { description: readErr.message });
-        } else if (!readingRows || readingRows.length === 0) {
-          toast.message("No recent sensor readings for this tent");
-        } else {
-          const latestTs = readingRows[0].ts;
-          const latestRows = (readingRows as SensorReadingRow[]).filter((r) => r.ts === latestTs);
-          const availableMetrics = latestRows.map((r) => r.metric);
-          const getValue = (metric: string): number | null => {
-            const row = latestRows.find((r) => r.metric === metric);
-            const v = row ? Number(row.value) : NaN;
-            return Number.isFinite(v) ? v : null;
-          };
-          const repRow = latestRows[0] ?? null;
-          const { source: snapshotSource, state: snapshotState } =
-            classifyQuickLogSnapshotSource(repRow);
-
-          if (!shouldEmbedSnapshot(snapshotState)) {
-            const message =
-              snapshotState === "stale"
-                ? "Sensor reading too old to attach — log saved without it."
-                : "Sensor reading unreadable — log saved without it.";
-            toast.message(message);
-          } else {
-            cleanDetails.sensor_snapshot = {
-              ts: latestTs,
-              tent_id: selectedPlant.tent_id,
-              temp: getValue("temperature_c"),
-              rh: getValue("humidity_pct"),
-              vpd: getValue("vpd_kpa"),
-              co2: getValue("co2_ppm"),
-              soil: getValue("soil_moisture_pct"),
-              available_metrics: availableMetrics,
-              source: snapshotSource,
-              state: snapshotState,
-            };
-          }
-
-        }
-      }
-      if (eventType === "reminder" && remindAt) cleanDetails.remind_at = remindAt;
-
-      const finalNote = appendHardwareReadingsToNote(note, hardware);
-      const { error: insErr } = await supabase.from("diary_entries").insert({
-        user_id: user.id,
-        grow_id: activeGrowId,
-        photo_url: uploadedPath,
-        note: finalNote,
-        stage,
-        details: cleanDetails as Record<string, never>,
-        plant_id: selectedPlant?.id ?? null,
-        tent_id: selectedPlant?.tent_id ?? null,
+      const noteWithHardware = appendHardwareReadingsToNote(note, hardware);
+      const built = buildLegacyQuickLogUnifiedPayload({
+        eventType,
+        noteWithHardware,
+        plantId: selectedPlant.id,
+        plantTentId: selectedPlant.tent_id ?? null,
+        details,
       });
-      if (insErr) {
-        if (uploadedPath) {
-          await supabase.storage
-            .from("diary-photos")
-            .remove([uploadedPath])
-            .catch(() => {});
-        }
-        toast.error(`Couldn't save entry: ${insErr.message}`);
-        console.error("[QuickLog] insert error", insErr);
+      if (built.ok !== true) {
+        toast.error(built.message);
+        return;
+      }
+
+      const result = await saveViaRpc(built.payload);
+      if (!result.ok) {
+        toast.error(`Couldn't save entry: ${result.reason ?? "save_failed"}`);
+        console.error("[QuickLog] RPC save error", result);
         return;
       }
 
@@ -310,22 +233,17 @@ export default function QuickLog({
       reset();
       onOpenChange(false);
       onCreated?.();
-      // Refresh diary-backed views (Recent Plant Activity, Timeline, etc.)
-      // so the just-saved entry appears without a hard refresh.
+      // Refresh both legacy and unified timeline readers so the just-saved
+      // entry appears without a hard refresh.
       queryClient.invalidateQueries({ queryKey: ["plant_recent_activity"] });
       queryClient.invalidateQueries({ queryKey: ["diary_entries"] });
+      queryClient.invalidateQueries({ queryKey: ["grow_events"] });
       window.dispatchEvent(
         new CustomEvent("verdant:entry-created", {
           detail: { createdAt: new Date().toISOString() },
         }),
       );
     } catch (err: unknown) {
-      if (uploadedPath) {
-        await supabase.storage
-          .from("diary-photos")
-          .remove([uploadedPath])
-          .catch(() => {});
-      }
       toast.error(err instanceof Error ? err.message : "Failed to save");
       console.error("[QuickLog] unexpected error", err);
     } finally {
@@ -349,45 +267,21 @@ export default function QuickLog({
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-4">
-          {/* Photo */}
-          <div className="relative aspect-square w-full rounded-xl border-2 border-dashed border-border/60 overflow-hidden bg-secondary/40 hover:border-primary/60 transition">
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="absolute inset-0 h-full w-full"
-            >
-              {preview ? (
-                <img src={preview} className="h-full w-full object-cover" alt="" />
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
-                  <Camera className="h-10 w-10" />
-                  <span className="text-sm">Tap to add photo (optional)</span>
-                </div>
-              )}
-            </button>
-            {preview && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleFile(null);
-                  if (fileRef.current) fileRef.current.value = "";
-                }}
-                aria-label="Remove photo"
-                className="absolute top-2 right-2 z-10 rounded-full bg-background/80 backdrop-blur px-2 py-1 text-xs font-medium border border-border/60 hover:bg-background"
-              >
-                Remove
-              </button>
-            )}
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
-            />
+          {/* Photo — disabled in unified Quick Log slice. Photo attach
+              will return when grow_events gains a photo writer path. */}
+          <div
+            data-testid="quicklog-photo-coming-soon"
+            className="relative aspect-square w-full rounded-xl border-2 border-dashed border-border/40 overflow-hidden bg-secondary/20"
+          >
+            <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2 px-4 text-center">
+              <Camera className="h-10 w-10 opacity-50" />
+              <span className="text-sm font-medium">Photo attach — coming soon</span>
+              <span className="text-[11px] leading-snug">
+                Photo logs will return after the unified grow_events writer is expanded.
+              </span>
+            </div>
           </div>
+
 
           {/* Event type + Stage */}
           <div className="grid grid-cols-2 gap-2">
@@ -398,14 +292,22 @@ export default function QuickLog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {EVENT_TYPES.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>
-                      <span className="inline-flex items-center gap-2">
-                        <t.icon className="h-3.5 w-3.5" />
-                        {t.label}
-                      </span>
-                    </SelectItem>
-                  ))}
+                  {EVENT_TYPES.map((t) => {
+                    const supported = isSupportedLegacyEventType(t.value);
+                    return (
+                      <SelectItem key={t.value} value={t.value} disabled={!supported}>
+                        <span className="inline-flex items-center gap-2">
+                          <t.icon className="h-3.5 w-3.5" />
+                          {t.label}
+                          {!supported && (
+                            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                              Coming soon
+                            </span>
+                          )}
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>

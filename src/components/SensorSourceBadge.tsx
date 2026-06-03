@@ -17,25 +17,24 @@ import {
   mapSensorSnapshotStatusToSeverity,
   type SnapshotStatus,
 } from "@/lib/sensorSnapshotStatusContract";
+import { resolveSensorSourceLabel } from "@/lib/sensorSourceLabelRules";
 import type { SensorReadingSource } from "@/mock";
 
 export interface SensorSourceBadgeProps {
   source: SensorReadingSource;
   /** Pass the canonical status from the contract. Missing → needs_review. */
   status?: SnapshotStatus | null;
+  /**
+   * Optional hardware vendor lineage (e.g. `metadata.vendor === "ecowitt"`).
+   * When provided AND `source === "live"`, the badge renders the vendor
+   * label (e.g. "Ecowitt") instead of generic "Live." Stale / invalid /
+   * manual / csv / demo readings always keep their canonical label.
+   */
+  vendor?: string | null;
   className?: string;
   /** Optional override testid (default: "sensor-source-badge"). */
   testId?: string;
 }
-
-const SOURCE_LABEL: Record<SensorReadingSource, string> = {
-  live: "Live",
-  manual: "Manual",
-  csv: "CSV",
-  demo: "Demo",
-  stale: "Stale",
-  invalid: "Invalid",
-};
 
 const STATUS_LABEL: Record<SnapshotStatus, string> = {
   usable: "Usable",

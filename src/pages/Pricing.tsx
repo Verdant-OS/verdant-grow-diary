@@ -223,36 +223,48 @@ export default function Pricing() {
       {/* Comparison table */}
       <section className="px-6 py-12 max-w-5xl mx-auto">
         <h2 className="font-display text-2xl md:text-3xl font-semibold text-center">
-          Free vs Pro
+          Compare Free, Pro, and Founder Lifetime
         </h2>
         <p className="mt-3 text-sm text-muted-foreground text-center max-w-2xl mx-auto">
-          The free tier is genuinely useful on its own. Pro is for growers who want cloud sync, deeper history, and more tents.
+          Free is genuinely useful for starting a grow diary. Pro adds cloud sync, deeper history, and multi-tent support. Founder Lifetime is a limited early-supporter offer that includes full Pro access.
         </p>
 
-        <div className="mt-8 overflow-hidden rounded-xl border border-border/60">
-          <table className="w-full text-sm">
+        <div className="mt-8 overflow-x-auto rounded-xl border border-border/60">
+          <table
+            className="w-full min-w-[640px] text-sm"
+            data-testid="pricing-comparison-table"
+          >
             <thead className="bg-secondary/40 text-muted-foreground">
               <tr>
                 <th className="text-left font-medium px-4 py-3">Feature</th>
                 <th className="text-center font-medium px-4 py-3">Free</th>
                 <th className="text-center font-medium px-4 py-3 text-primary">Pro</th>
+                <th className="text-center font-medium px-4 py-3 text-primary">
+                  Founder Lifetime
+                </th>
               </tr>
             </thead>
             <tbody>
               {COMPARISON_ROWS.map((row) => (
                 <tr key={row.label} className="border-t border-border/40">
-                  <td className="px-4 py-3">{row.label}</td>
+                  <td className="px-4 py-3 font-medium">{row.label}</td>
                   <td className="px-4 py-3 text-center">
                     <CellValue value={row.free} />
                   </td>
                   <td className="px-4 py-3 text-center">
                     <CellValue value={row.pro} accent />
                   </td>
+                  <td className="px-4 py-3 text-center">
+                    <CellValue value={row.founder} accent />
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        <p className="mt-3 text-xs text-muted-foreground text-center sm:hidden">
+          Swipe to compare all three plans →
+        </p>
       </section>
 
       {/* Trust / data ownership */}

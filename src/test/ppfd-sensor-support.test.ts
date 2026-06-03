@@ -214,7 +214,7 @@ describe("Quick Log hardware readings — PPFD canopy", () => {
     const src = readSrc("lib/quickLogHardwareReadingsRules.ts");
     expect(src).toMatch(/MANUAL HANDHELD/);
     expect(src).toMatch(/never be classified as live/i);
-    expect(src).toMatch(/never.*sensor_readings/i);
+    expect(/never[\s\S]*sensor_readings/i.test(src)).toBe(true);
   });
 });
 

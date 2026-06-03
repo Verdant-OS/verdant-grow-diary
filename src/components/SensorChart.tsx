@@ -8,6 +8,7 @@ import {
   SENSOR_CHART_LEFT_MARGIN,
   formatSensorChartYTick,
   formatSensorChartTooltipValue,
+  sensorChartLegendLabel,
 } from "@/lib/sensorChartAxisRules";
 import {
   SENSOR_CHART_TIME_RANGES,

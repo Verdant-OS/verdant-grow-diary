@@ -8,6 +8,7 @@ import {
   SENSOR_CHART_LEFT_MARGIN,
   formatSensorChartYTick,
   formatSensorChartTooltipValue,
+  sensorChartLegendLabel,
 } from "@/lib/sensorChartAxisRules";
 import {
   SENSOR_CHART_TIME_RANGES,
@@ -30,16 +31,9 @@ interface Props {
   defaultRange?: SensorChartTimeRange;
 }
 
-// Legacy metric meta — kept inline so unit/color stay close to the chart
-// markup. Tick widths and tick formatting are sourced from
-// sensorChartAxisRules so AUD-006 fixes stay in one place.
-const meta = {
-  temp: { label: "Temperature", unit: "°F", color: "hsl(var(--warning))" },
-  rh:   { label: "Humidity",    unit: "%",  color: "hsl(var(--info))" },
-  vpd:  { label: "VPD",         unit: " kPa", color: "hsl(var(--primary))" },
-  co2:  { label: "CO₂",         unit: " ppm", color: "hsl(var(--leaf-glow))" },
-  soil: { label: "Soil",        unit: "%",  color: "hsl(var(--accent))" },
-};
+// Metric label / color / unit / axis width are sourced exclusively from
+// SENSOR_CHART_METRIC_META in src/lib/sensorChartAxisRules.ts so the
+// legend, tooltip, Y-axis, and CSV context can never drift apart.
 
 export default function SensorChart({
   data,
@@ -50,8 +44,8 @@ export default function SensorChart({
   hideExportButton = false,
   defaultRange = "all",
 }: Props) {
-  const m = meta[metric];
   const axisMeta = SENSOR_CHART_METRIC_META[metric];
+  const legendLabel = sensorChartLegendLabel(metric);
   const [range, setRange] = useState<SensorChartTimeRange>(defaultRange);
 
   // Filter + sort ascending (oldest → newest) via shared helpers so the
@@ -81,8 +75,19 @@ export default function SensorChart({
   const id = `grad-${metric}`;
   return (
     <div className="w-full">
-      {(!hideRangeSelector || !hideExportButton) && (
-        <div className="mb-2 flex items-center justify-between gap-2">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span
+            data-testid="sensor-chart-legend"
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
+          >
+            <span
+              aria-hidden="true"
+              className="inline-block h-2 w-2 rounded-full"
+              style={{ background: axisMeta.color }}
+            />
+            {legendLabel}
+          </span>
           {!hideExportButton && (
             <button
               type="button"
@@ -95,44 +100,44 @@ export default function SensorChart({
               Export CSV
             </button>
           )}
-          {!hideRangeSelector && (
-            <div
-              role="radiogroup"
-              aria-label="Chart time range"
-              data-testid="sensor-chart-range-selector"
-              className="flex gap-1"
-            >
-              {SENSOR_CHART_TIME_RANGES.map((r) => {
-                const selected = r.value === range;
-                return (
-                  <button
-                    key={r.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => setRange(r.value)}
-                    className={
-                      "rounded-md border px-2 py-1 text-xs transition-colors " +
-                      (selected
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border bg-background text-muted-foreground hover:text-foreground")
-                    }
-                  >
-                    {r.label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
         </div>
-      )}
+        {!hideRangeSelector && (
+          <div
+            role="radiogroup"
+            aria-label="Chart time range"
+            data-testid="sensor-chart-range-selector"
+            className="flex gap-1"
+          >
+            {SENSOR_CHART_TIME_RANGES.map((r) => {
+              const selected = r.value === range;
+              return (
+                <button
+                  key={r.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() => setRange(r.value)}
+                  className={
+                    "rounded-md border px-2 py-1 text-xs transition-colors " +
+                    (selected
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-background text-muted-foreground hover:text-foreground")
+                  }
+                >
+                  {r.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
       <ResponsiveContainer width="100%" height={height}>
         <Comp data={chartData} margin={{ top: 8, right: 12, left: SENSOR_CHART_LEFT_MARGIN, bottom: 0 }}>
           {variant === "area" && (
             <defs>
               <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={m.color} stopOpacity={0.4} />
-                <stop offset="100%" stopColor={m.color} stopOpacity={0} />
+                <stop offset="0%" stopColor={axisMeta.color} stopOpacity={0.4} />
+                <stop offset="100%" stopColor={axisMeta.color} stopOpacity={0} />
               </linearGradient>
             </defs>
           )}
@@ -148,9 +153,9 @@ export default function SensorChart({
           <Tooltip
             contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
             labelFormatter={(v) => formatChartTooltipTimestamp(v as string)}
-            formatter={(v: number) => [formatSensorChartTooltipValue(v, metric), m.label]}
+            formatter={(v: number) => [formatSensorChartTooltipValue(v, metric), legendLabel]}
           />
-          <Series type="monotone" dataKey="value" stroke={m.color} strokeWidth={2} fill={`url(#${id})`} dot={false} />
+          <Series type="monotone" dataKey="value" stroke={axisMeta.color} strokeWidth={2} fill={`url(#${id})`} dot={false} />
         </Comp>
       </ResponsiveContainer>
     </div>

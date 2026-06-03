@@ -67,3 +67,21 @@ export function formatSensorChartTooltipValue(
   const sep = /^[a-z]/i.test(m.unit) ? " " : "";
   return `${value}${sep}${m.unit}`;
 }
+
+/**
+ * Canonical unit string for a metric. Single source of truth used by
+ * both the legend label and the tooltip value formatter so the unit can
+ * never drift between surfaces.
+ */
+export function sensorChartUnit(metric: SensorChartMetricKey): string {
+  return SENSOR_CHART_METRIC_META[metric].unit;
+}
+
+/**
+ * Human-readable legend label for a metric, e.g. "Temperature (°F)" or
+ * "VPD (kPa)". Metrics without a unit string render as the plain label.
+ */
+export function sensorChartLegendLabel(metric: SensorChartMetricKey): string {
+  const m = SENSOR_CHART_METRIC_META[metric];
+  return m.unit ? `${m.label} (${m.unit})` : m.label;
+}

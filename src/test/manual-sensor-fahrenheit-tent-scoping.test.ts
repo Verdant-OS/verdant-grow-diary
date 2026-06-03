@@ -99,8 +99,13 @@ describe("UI surfaces render stored Celsius as user-facing Fahrenheit", () => {
     const panelRules = read("src/lib/plantTentEnvironmentRules.ts");
     expect(panelRules).toMatch(/"°F"/);
     expect(panelRules).toMatch(/tempFFromC/);
+    // Metric unit table moved to the shared axis-rules helper so the
+    // legend, tooltip, and axis can never drift apart. SensorChart must
+    // still source °F from it.
+    const axisRules = read("src/lib/sensorChartAxisRules.ts");
+    expect(axisRules).toMatch(/unit:\s*"°F"/);
     const chart = read("src/components/SensorChart.tsx");
-    expect(chart).toMatch(/unit:\s*"°F"/);
+    expect(chart).toMatch(/sensorChartAxisRules/);
   });
 
   it("temperatureUnits helpers are reversible and honest about missing data", () => {

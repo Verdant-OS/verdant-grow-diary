@@ -81,33 +81,49 @@ export default function SensorChart({
   const id = `grad-${metric}`;
   return (
     <div className="w-full">
-      {!hideRangeSelector && (
-        <div
-          role="radiogroup"
-          aria-label="Chart time range"
-          data-testid="sensor-chart-range-selector"
-          className="mb-2 flex justify-end gap-1"
-        >
-          {SENSOR_CHART_TIME_RANGES.map((r) => {
-            const selected = r.value === range;
-            return (
-              <button
-                key={r.value}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                onClick={() => setRange(r.value)}
-                className={
-                  "rounded-md border px-2 py-1 text-xs transition-colors " +
-                  (selected
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-background text-muted-foreground hover:text-foreground")
-                }
-              >
-                {r.label}
-              </button>
-            );
-          })}
+      {(!hideRangeSelector || !hideExportButton) && (
+        <div className="mb-2 flex items-center justify-between gap-2">
+          {!hideExportButton && (
+            <button
+              type="button"
+              onClick={handleExport}
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+              title="Download CSV for current range"
+              data-testid="sensor-chart-export-btn"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Export CSV
+            </button>
+          )}
+          {!hideRangeSelector && (
+            <div
+              role="radiogroup"
+              aria-label="Chart time range"
+              data-testid="sensor-chart-range-selector"
+              className="flex gap-1"
+            >
+              {SENSOR_CHART_TIME_RANGES.map((r) => {
+                const selected = r.value === range;
+                return (
+                  <button
+                    key={r.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => setRange(r.value)}
+                    className={
+                      "rounded-md border px-2 py-1 text-xs transition-colors " +
+                      (selected
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background text-muted-foreground hover:text-foreground")
+                    }
+                  >
+                    {r.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
       <ResponsiveContainer width="100%" height={height}>

@@ -24,25 +24,29 @@ const FOUNDER_LIFETIME_PRICE_USD = 129;
 const PRO_MONTHLY_PRICE_USD = 12;
 const PRO_ANNUAL_PRICE_USD = 115;
 
-type Row = { label: string; free: boolean | string; pro: boolean | string };
+type Cell = boolean | string;
+type Row = { label: string; free: Cell; pro: Cell; founder: Cell };
 
 const COMPARISON_ROWS: Row[] = [
-  { label: "Plant profiles", free: true, pro: true },
-  { label: "Basic grow diary", free: true, pro: true },
-  { label: "Photo logs", free: true, pro: true },
-  { label: "Manual notes", free: true, pro: true },
-  { label: "Basic timeline", free: true, pro: true },
-  { label: "Manual sensor entries", free: true, pro: true },
-  { label: "Exports", free: "Limited", pro: "Advanced" },
-  { label: "Cloud sync", free: false, pro: true },
-  { label: "Automatic backups", free: false, pro: true },
-  { label: "Multi-tent support", free: false, pro: true },
-  { label: "Sensor snapshot history", free: false, pro: true },
-  { label: "Longer grow history", free: false, pro: true },
-  { label: "Better timeline filtering", free: false, pro: true },
-  { label: "Priority support", free: false, pro: true },
-  { label: "Early access to advanced grow reports", free: false, pro: true },
-  { label: "Future Pro AI features as they stabilize", free: false, pro: true },
+  {
+    label: "Best for",
+    free: "Starting a grow diary",
+    pro: "Active growers who want sync, history & exports",
+    founder: "Early supporters who want lifetime Pro access",
+  },
+  { label: "Price", free: "$0", pro: "$12 / month", founder: "$129 one-time" },
+  { label: "Plant profiles & grow diary", free: true, pro: true, founder: true },
+  { label: "Photo logs", free: true, pro: true, founder: true },
+  { label: "Manual sensor snapshots", free: true, pro: true, founder: true },
+  { label: "Timeline history", free: "Basic", pro: "Extended", founder: "Extended" },
+  { label: "Cloud sync & automatic backups", free: false, pro: true, founder: true },
+  { label: "Multi-tent support", free: false, pro: true, founder: true },
+  { label: "Exports", free: "Limited", pro: "Advanced", founder: "Advanced" },
+  { label: "Sensor snapshot history", free: false, pro: true, founder: true },
+  { label: "Better timeline filtering", free: false, pro: true, founder: true },
+  { label: "Priority support", free: false, pro: true, founder: true },
+  { label: "Future Pro features as they stabilize", free: false, pro: true, founder: true },
+  { label: "Founder badge / early-supporter access", free: false, pro: false, founder: true },
 ];
 
 export default function Pricing() {
@@ -78,7 +82,7 @@ export default function Pricing() {
       </section>
 
       {/* Pricing tier cards */}
-      <section className="px-6 pb-10 max-w-6xl mx-auto grid gap-6 md:grid-cols-3">
+      <section className="px-6 pb-10 max-w-6xl mx-auto grid gap-8 md:gap-6 md:grid-cols-3">
         {/* Free */}
         <TierCard
           name="Free"
@@ -219,36 +223,48 @@ export default function Pricing() {
       {/* Comparison table */}
       <section className="px-6 py-12 max-w-5xl mx-auto">
         <h2 className="font-display text-2xl md:text-3xl font-semibold text-center">
-          Free vs Pro
+          Compare Free, Pro, and Founder Lifetime
         </h2>
         <p className="mt-3 text-sm text-muted-foreground text-center max-w-2xl mx-auto">
-          The free tier is genuinely useful on its own. Pro is for growers who want cloud sync, deeper history, and more tents.
+          Free is genuinely useful for starting a grow diary. Pro adds cloud sync, deeper history, and multi-tent support. Founder Lifetime is a limited early-supporter offer that includes full Pro access.
         </p>
 
-        <div className="mt-8 overflow-hidden rounded-xl border border-border/60">
-          <table className="w-full text-sm">
+        <div className="mt-8 overflow-x-auto rounded-xl border border-border/60">
+          <table
+            className="w-full min-w-[640px] text-sm"
+            data-testid="pricing-comparison-table"
+          >
             <thead className="bg-secondary/40 text-muted-foreground">
               <tr>
                 <th className="text-left font-medium px-4 py-3">Feature</th>
                 <th className="text-center font-medium px-4 py-3">Free</th>
                 <th className="text-center font-medium px-4 py-3 text-primary">Pro</th>
+                <th className="text-center font-medium px-4 py-3 text-primary">
+                  Founder Lifetime
+                </th>
               </tr>
             </thead>
             <tbody>
               {COMPARISON_ROWS.map((row) => (
                 <tr key={row.label} className="border-t border-border/40">
-                  <td className="px-4 py-3">{row.label}</td>
+                  <td className="px-4 py-3 font-medium">{row.label}</td>
                   <td className="px-4 py-3 text-center">
                     <CellValue value={row.free} />
                   </td>
                   <td className="px-4 py-3 text-center">
                     <CellValue value={row.pro} accent />
                   </td>
+                  <td className="px-4 py-3 text-center">
+                    <CellValue value={row.founder} accent />
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        <p className="mt-3 text-xs text-muted-foreground text-center sm:hidden">
+          Swipe to compare all three plans →
+        </p>
       </section>
 
       {/* Trust / data ownership */}
@@ -291,7 +307,7 @@ export default function Pricing() {
           <AccordionItem value="data-ownership">
             <AccordionTrigger>Who owns the grow data I put into Verdant?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              You do. Your grow logs, photos, and sensor snapshots are yours. Verdant does not sell your data. Pro includes advanced exports so you can take your full grow history with you whenever you want.
+              You do. Your grow logs, photos, and sensor snapshots are yours. Verdant does not sell your data and does not share it with advertisers. Pro includes advanced exports so you can take your full grow history with you whenever you want.
             </AccordionContent>
           </AccordionItem>
 
@@ -305,7 +321,7 @@ export default function Pricing() {
           <AccordionItem value="pro-what">
             <AccordionTrigger>What do I actually get with Pro?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              Cloud sync, automatic backups, multi-tent support, advanced exports, sensor snapshot history, longer grow history, better timeline filtering, priority support, and early access to advanced grow reports. Pro AI features ship over time, only as they stabilize.
+              Cloud sync, automatic backups, multi-tent support, advanced exports, sensor snapshot history, longer grow history, better timeline filtering, priority support, and early access to advanced grow reports. Pro features ship over time, only as they stabilize.
             </AccordionContent>
           </AccordionItem>
 
@@ -319,14 +335,14 @@ export default function Pricing() {
           <AccordionItem value="hardware">
             <AccordionTrigger>Do I need specific hardware?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              No. Verdant is hardware-neutral. You can log everything manually, import CSVs, or connect sensors over webhook, MQTT, ESP32, or a Raspberry Pi bridge. Bring the gear you already own.
+              No. Verdant is hardware-neutral. You can log everything manually, import CSVs, or connect sensors over webhook, MQTT, ESP32, or a Raspberry Pi bridge. Bring the gear you already own — Verdant does not sell or require any specific gear.
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="ai-safety">
             <AccordionTrigger>Does Verdant control my equipment or grow for me?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              No. Verdant does not control fans, lights, pumps, heaters, dehumidifiers, or any other equipment. AI-assisted insights are suggestions only — you approve or dismiss them. The grower stays in control.
+              No. Verdant does not control fans, lights, pumps, heaters, dehumidifiers, or any other equipment. AI-assisted insights are suggestions only, and every action in the Action Queue is grower-approved before anything happens. The grower stays in control.
             </AccordionContent>
           </AccordionItem>
 

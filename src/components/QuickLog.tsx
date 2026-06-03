@@ -386,6 +386,10 @@ export default function QuickLog({
               onChange={(e) => setNote(e.target.value)}
               placeholder="Watered, looking healthy, slight yellowing on a fan leaf…"
               rows={3}
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="sentences"
+              spellCheck={true}
             />
           </div>
 

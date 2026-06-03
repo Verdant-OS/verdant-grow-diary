@@ -102,7 +102,8 @@ function classifyMetrics(reading: NormalizedSensorReading): {
   const invalid: MetricName[] = [];
 
   for (const key of METRIC_KEYS) {
-    const value = reading[key];
+    const raw = reading[key];
+    const value = raw === undefined ? null : raw;
     if (value === null) {
       missing.push(key);
     } else if (!METRIC_VALIDATORS[key](value)) {

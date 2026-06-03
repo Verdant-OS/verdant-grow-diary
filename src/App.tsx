@@ -56,6 +56,13 @@ const App = () => (
           <GrowsProvider>
             <Routes>
               <Route path="/auth" element={<Auth />} />
+              {/* Deprecated auth entry points — redirect to canonical /auth to
+                  prevent funnel leaks from old bookmarks, emails, ads, and
+                  creator posts that still point to /login /signup /register. */}
+              <Route path="/login" element={<Navigate to="/auth" replace />} />
+              <Route path="/signup" element={<Navigate to="/auth" replace />} />
+              <Route path="/register" element={<Navigate to="/auth" replace />} />
+
               <Route path="/welcome" element={<Landing />} />
               <Route path="/demo" element={<Demo />} />
               <Route path="/hardware-integrations" element={<HardwareIntegrations />} />

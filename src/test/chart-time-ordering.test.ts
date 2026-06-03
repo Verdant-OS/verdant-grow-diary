@@ -16,9 +16,9 @@ describe("sortTimeSeriesAscending", () => {
   
 
   it("returns [] for null/empty input", () => {
-    expect(sortTimeSeriesAscending(null, (p) => p.ts)).toEqual([]);
-    expect(sortTimeSeriesAscending(undefined, (p) => p.ts)).toEqual([]);
-    expect(sortTimeSeriesAscending([], (p) => p.ts)).toEqual([]);
+    expect(sortTimeSeriesAscending<{ ts: string }>(null, (p) => p.ts)).toEqual([]);
+    expect(sortTimeSeriesAscending<{ ts: string }>(undefined, (p) => p.ts)).toEqual([]);
+    expect(sortTimeSeriesAscending<{ ts: string }>([], (p) => p.ts)).toEqual([]);
   });
 
   it("sorts reversed (DESC) input into ascending order", () => {
@@ -82,9 +82,15 @@ describe("SensorChart wires the ascending sort helper", () => {
     resolve(__dirname, "..", "components", "SensorChart.tsx"),
     "utf8",
   );
-  it("imports and uses sortTimeSeriesAscending before mapping data", () => {
-    expect(SRC).toMatch(/from\s+["']@\/lib\/sortTimeSeriesAscending["']/);
-    expect(SRC).toMatch(/sortTimeSeriesAscending\(data/);
+  it("routes chart data through a shared ascending-sort helper before rendering", () => {
+    // SensorChart now wraps sortTimeSeriesAscending inside
+    // filterTimeSeriesByRange so the same call site handles both
+    // sorting and 7d/30d/90d/All filtering. Either import path
+    // satisfies the ordering guardrail.
+    expect(SRC).toMatch(
+      /from\s+["']@\/lib\/(sortTimeSeriesAscending|sensorChartTimeRange)["']/,
+    );
+    expect(SRC).toMatch(/(sortTimeSeriesAscending|filterTimeSeriesByRange)\(/);
   });
 });
 

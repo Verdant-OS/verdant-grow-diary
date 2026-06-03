@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { ResponsiveContainer, AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { SensorReading } from "@/mock";
 import { format } from "date-fns";
@@ -7,13 +8,22 @@ import {
   formatSensorChartYTick,
   formatSensorChartTooltipValue,
 } from "@/lib/sensorChartAxisRules";
-import { sortTimeSeriesAscending } from "@/lib/sortTimeSeriesAscending";
+import {
+  SENSOR_CHART_TIME_RANGES,
+  filterTimeSeriesByRange,
+  formatChartTooltipTimestamp,
+  type SensorChartTimeRange,
+} from "@/lib/sensorChartTimeRange";
 
 interface Props {
   data: SensorReading[];
   metric: "temp" | "rh" | "vpd" | "co2" | "soil";
   height?: number;
   variant?: "area" | "line";
+  /** Hide the built-in 7d/30d/90d/All selector (default: shown). */
+  hideRangeSelector?: boolean;
+  /** Initial selected range. Default "all" preserves prior behavior. */
+  defaultRange?: SensorChartTimeRange;
 }
 
 // Legacy metric meta — kept inline so unit/color stay close to the chart
@@ -27,49 +37,91 @@ const meta = {
   soil: { label: "Soil",        unit: "%",  color: "hsl(var(--accent))" },
 };
 
-export default function SensorChart({ data, metric, height = 220, variant = "area" }: Props) {
+export default function SensorChart({
+  data,
+  metric,
+  height = 220,
+  variant = "area",
+  hideRangeSelector = false,
+  defaultRange = "all",
+}: Props) {
   const m = meta[metric];
   const axisMeta = SENSOR_CHART_METRIC_META[metric];
-  // Temperature is stored in Celsius; render Fahrenheit per Verdant convention.
-  // Sort ascending by timestamp so the line always flows left-to-right
-  // (oldest → newest). Defense-in-depth against callers that pass DESC data.
-  // See src/lib/sortTimeSeriesAscending.ts.
-  const ordered = sortTimeSeriesAscending(data, (r) => r.ts);
-  const chartData = ordered.map((r) => {
-    const raw = r[metric];
-    const v = metric === "temp" && typeof raw === "number" ? raw * 9 / 5 + 32 : raw;
-    return { ts: r.ts, value: v };
-  });
+  const [range, setRange] = useState<SensorChartTimeRange>(defaultRange);
+
+  // Filter + sort ascending (oldest → newest) via shared helpers so the
+  // line always flows left-to-right regardless of caller order or DB
+  // query direction. See src/lib/sensorChartTimeRange.ts.
+  const chartData = useMemo(() => {
+    const ordered = filterTimeSeriesByRange(data, range, (r) => r.ts);
+    return ordered.map((r) => {
+      const raw = r[metric];
+      const v = metric === "temp" && typeof raw === "number" ? raw * 9 / 5 + 32 : raw;
+      return { ts: r.ts, value: v };
+    });
+  }, [data, range, metric]);
+
   const Comp = (variant === "area" ? AreaChart : LineChart) as React.ComponentType<React.ComponentProps<typeof AreaChart>>;
   const Series = (variant === "area" ? Area : Line) as React.ComponentType<React.ComponentProps<typeof Area>>;
   const id = `grad-${metric}`;
   return (
-    <ResponsiveContainer width="100%" height={height}>
-      <Comp data={chartData} margin={{ top: 8, right: 12, left: SENSOR_CHART_LEFT_MARGIN, bottom: 0 }}>
-        {variant === "area" && (
-          <defs>
-            <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={m.color} stopOpacity={0.4} />
-              <stop offset="100%" stopColor={m.color} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-        )}
-        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} vertical={false} />
-        <XAxis dataKey="ts" tickFormatter={(v) => format(new Date(v), "MMM d")} stroke="hsl(var(--muted-foreground))" fontSize={11} tickMargin={6} minTickGap={32} />
-        <YAxis
-          stroke="hsl(var(--muted-foreground))"
-          fontSize={11}
-          width={axisMeta.yAxisWidth}
-          tickMargin={4}
-          tickFormatter={(v: number) => formatSensorChartYTick(v, metric)}
-        />
-        <Tooltip
-          contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
-          labelFormatter={(v) => format(new Date(v as string), "PPpp")}
-          formatter={(v: number) => [formatSensorChartTooltipValue(v, metric), m.label]}
-        />
-        <Series type="monotone" dataKey="value" stroke={m.color} strokeWidth={2} fill={`url(#${id})`} dot={false} />
-      </Comp>
-    </ResponsiveContainer>
+    <div className="w-full">
+      {!hideRangeSelector && (
+        <div
+          role="radiogroup"
+          aria-label="Chart time range"
+          data-testid="sensor-chart-range-selector"
+          className="mb-2 flex justify-end gap-1"
+        >
+          {SENSOR_CHART_TIME_RANGES.map((r) => {
+            const selected = r.value === range;
+            return (
+              <button
+                key={r.value}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => setRange(r.value)}
+                className={
+                  "rounded-md border px-2 py-1 text-xs transition-colors " +
+                  (selected
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background text-muted-foreground hover:text-foreground")
+                }
+              >
+                {r.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <ResponsiveContainer width="100%" height={height}>
+        <Comp data={chartData} margin={{ top: 8, right: 12, left: SENSOR_CHART_LEFT_MARGIN, bottom: 0 }}>
+          {variant === "area" && (
+            <defs>
+              <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={m.color} stopOpacity={0.4} />
+                <stop offset="100%" stopColor={m.color} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+          )}
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} vertical={false} />
+          <XAxis dataKey="ts" tickFormatter={(v) => format(new Date(v), "MMM d")} stroke="hsl(var(--muted-foreground))" fontSize={11} tickMargin={6} minTickGap={32} />
+          <YAxis
+            stroke="hsl(var(--muted-foreground))"
+            fontSize={11}
+            width={axisMeta.yAxisWidth}
+            tickMargin={4}
+            tickFormatter={(v: number) => formatSensorChartYTick(v, metric)}
+          />
+          <Tooltip
+            contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+            labelFormatter={(v) => formatChartTooltipTimestamp(v as string)}
+            formatter={(v: number) => [formatSensorChartTooltipValue(v, metric), m.label]}
+          />
+          <Series type="monotone" dataKey="value" stroke={m.color} strokeWidth={2} fill={`url(#${id})`} dot={false} />
+        </Comp>
+      </ResponsiveContainer>
+    </div>
   );
 }

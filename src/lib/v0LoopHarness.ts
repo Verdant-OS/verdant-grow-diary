@@ -390,7 +390,8 @@ function buildActionDraft(
 
   const result = buildActionQueueDraftFromAlert(alertLike);
   if (!result.ok) {
-    return { draft: null, note: `No action draft: ${result.reason}.` };
+    const r = (result as { ok: false; reason: string }).reason;
+    return { draft: null, note: `No action draft: ${r}.` };
   }
 
   // Defense-in-depth: never allow executable command text to slip through.

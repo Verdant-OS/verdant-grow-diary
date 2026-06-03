@@ -429,34 +429,44 @@ export default function QuickLog({
 
           {showMore && (
             <div className="grid grid-cols-2 gap-2">
+              {/* pH/Runoff pH have been consolidated into the Hardware
+                  readings section below to remove duplicate inputs. */}
               <div>
-                <Label className="text-xs">pH</Label>
+                <Label className="text-xs">EC value</Label>
                 <Input
-                  value={details.ph}
-                  onChange={(e) => setDetails({ ...details, ph: e.target.value })}
-                  placeholder="6.2"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">EC / PPM</Label>
-                <Input
+                  inputMode="decimal"
                   value={details.ec}
                   onChange={(e) => setDetails({ ...details, ec: e.target.value })}
                   placeholder="1.4"
+                  data-testid="quicklog-details-ec-value"
                 />
+              </div>
+              <div>
+                <Label className="text-xs">EC unit</Label>
+                <Select
+                  value={details.ecUnit}
+                  onValueChange={(v) =>
+                    setDetails({ ...details, ecUnit: v as EcUnit })
+                  }
+                >
+                  <SelectTrigger data-testid="quicklog-details-ec-unit">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EC_UNITS.map((u) => (
+                      <SelectItem key={u} value={u}>
+                        {u}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label className="text-xs">Watering (ml)</Label>
                 <Input
+                  inputMode="decimal"
                   value={details.watering}
                   onChange={(e) => setDetails({ ...details, watering: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Runoff</Label>
-                <Input
-                  value={details.runoff}
-                  onChange={(e) => setDetails({ ...details, runoff: e.target.value })}
                 />
               </div>
               <div className="col-span-2">
@@ -464,6 +474,10 @@ export default function QuickLog({
                 <Input
                   value={details.nutrients}
                   onChange={(e) => setDetails({ ...details, nutrients: e.target.value })}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
                 />
               </div>
               <div className="col-span-2">
@@ -472,6 +486,10 @@ export default function QuickLog({
                   value={details.training}
                   onChange={(e) => setDetails({ ...details, training: e.target.value })}
                   placeholder="LST, defoliation…"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
                 />
               </div>
             </div>

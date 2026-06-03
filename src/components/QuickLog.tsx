@@ -500,7 +500,10 @@ export default function QuickLog({
             </span>
             <Switch
               checked={snapshot && !!selectedPlant}
-              onCheckedChange={setSnapshot}
+              onCheckedChange={(v) => {
+                snapshotUserTouchedRef.current = true;
+                setSnapshot(v);
+              }}
               disabled={!selectedPlant}
             />
           </label>

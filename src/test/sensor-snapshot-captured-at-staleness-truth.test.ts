@@ -15,7 +15,6 @@ import { describe, it, expect } from "vitest";
 
 import {
   classifyAuditRow,
-  adaptSnapshotClassificationToTimelineSeverity as _unused, // type check below
   countsAsHealthyEvidence,
   DEFAULT_STALE_WINDOW_MS,
   resolveStaleWindowMs,

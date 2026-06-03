@@ -71,7 +71,8 @@ export interface ManualHandheldReadings {
 }
 
 const LABEL_TO_KEY: Record<string, keyof ManualHandheldReadings> = {
-  // Pre-patch writer labels (backward compatibility — never remove).
+  // Regression guard (#13): these labels are stored inside historical note text,
+  // so parser compatibility must outlive any future writer display-label changes.
   "input ph": "inputPh",
   "input ec/ppm": "inputEc",
   "input ec": "inputEc",
@@ -86,15 +87,18 @@ const LABEL_TO_KEY: Record<string, keyof ManualHandheldReadings> = {
 };
 
 /**
- * Strip trailing display-unit suffixes like "(mS/cm)", "(µmol)", "(ppm)"
- * from a label before LABEL_TO_KEY lookup. Keeps the parser robust to
- * future unit-string drift on the writer side without needing a new map
- * entry per unit variation. Pure: no I/O.
+ * Normalize harmless label drift before LABEL_TO_KEY lookup: case, whitespace,
+ * spacing around slashes, micro-symbol variants, and trailing unit suffixes like
+ * "(mS/cm)", "(µmol)", or "(ppm)". Unknown labels still remain unknown after
+ * normalization and flow to `other[]`.
  */
-function normalizeHandheldLabel(label: string): string {
+function normalizeHardwareReadingLabel(label: string): string {
   return label
     .toLowerCase()
+    .replace(/[µμ]/gu, "u")
     .replace(/\s*\([^)]*\)\s*$/u, "")
+    .replace(/\s*\/\s*/gu, "/")
+    .replace(/\s+/gu, " ")
     .trim();
 }
 
@@ -122,7 +126,7 @@ export function parseManualHandheldReadings(
     const label = cleaned.slice(0, idx).trim();
     const value = cleaned.slice(idx + 1).trim();
     if (!label || !value) continue;
-    const normalized = normalizeHandheldLabel(label);
+    const normalized = normalizeHardwareReadingLabel(label);
     const key = LABEL_TO_KEY[normalized] ?? LABEL_TO_KEY[label.toLowerCase()];
     if (key && key !== "other") {
       (out as Record<string, string>)[key] = value;

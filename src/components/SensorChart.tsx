@@ -136,8 +136,8 @@ export default function SensorChart({
           {variant === "area" && (
             <defs>
               <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={m.color} stopOpacity={0.4} />
-                <stop offset="100%" stopColor={m.color} stopOpacity={0} />
+                <stop offset="0%" stopColor={axisMeta.color} stopOpacity={0.4} />
+                <stop offset="100%" stopColor={axisMeta.color} stopOpacity={0} />
               </linearGradient>
             </defs>
           )}
@@ -153,9 +153,9 @@ export default function SensorChart({
           <Tooltip
             contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
             labelFormatter={(v) => formatChartTooltipTimestamp(v as string)}
-            formatter={(v: number) => [formatSensorChartTooltipValue(v, metric), m.label]}
+            formatter={(v: number) => [formatSensorChartTooltipValue(v, metric), legendLabel]}
           />
-          <Series type="monotone" dataKey="value" stroke={m.color} strokeWidth={2} fill={`url(#${id})`} dot={false} />
+          <Series type="monotone" dataKey="value" stroke={axisMeta.color} strokeWidth={2} fill={`url(#${id})`} dot={false} />
         </Comp>
       </ResponsiveContainer>
     </div>

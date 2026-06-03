@@ -148,7 +148,7 @@ describe("formatHardwareReadingsBlock (pure)", () => {
 
   it("appendHardwareReadingsToNote appends with blank-line separator", () => {
     expect(appendHardwareReadingsToNote("Watered today", { inputPh: "6.2" })).toBe(
-      `Watered today\n\n${HARDWARE_READINGS_HEADER}\n- Input pH: 6.2`,
+      `Watered today\n\n${HARDWARE_READINGS_HEADER}\n- Feed/Input pH: 6.2`,
     );
   });
 

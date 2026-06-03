@@ -101,3 +101,61 @@ export const QUICK_LOG_GROUPED_TIMELINE_EMPTY_HINT_TEXT =
 export const QUICK_LOG_MANUAL_SOURCE_LABEL = "Manual";
 export const QUICK_LOG_DEMO_SOURCE_LABEL = "Demo data";
 export const QUICK_LOG_SAMPLE_SOURCE_LABEL = "Sample timeline entry";
+
+/**
+ * Canonical user-facing labels for QuickLog v2 action kinds. The grouped
+ * timeline only supports "water" and "note"; other event types are
+ * handled by the diary timeline rules (see `growDiaryTimelineRules`).
+ * Keeping this map in the view-model prevents JSX from duplicating it.
+ */
+export const QUICK_LOG_ACTION_LABELS = {
+  water: "Watering",
+  note: "Note",
+} as const;
+
+export function quickLogActionLabel(kind: "water" | "note"): string {
+  return QUICK_LOG_ACTION_LABELS[kind];
+}
+
+/**
+ * Deterministic, locale-stable display formatting for an ISO occurred_at
+ * timestamp. Uses UTC so server-rendered text matches test snapshots
+ * across machines/timezones. Returns the input unchanged when it is not
+ * a parseable ISO string (no invented dates).
+ */
+export function formatQuickLogOccurredAt(
+  iso: string | null | undefined,
+): string {
+  if (typeof iso !== "string" || iso.length === 0) return "";
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return iso;
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "UTC",
+    }).format(new Date(ms)) + " UTC";
+  } catch {
+    return iso;
+  }
+}
+
+/** Screen-reader label for a source badge, e.g. "Source: Manual". */
+export function quickLogSourceAccessibleLabel(sourceLabel: string): string {
+  return `Source: ${sourceLabel}`;
+}
+
+/**
+ * Screen-reader label for the occurred_at line, e.g.
+ * "Occurred at Mar 15, 2026 09:00 UTC".
+ */
+export function quickLogOccurredAtAccessibleLabel(
+  formattedOccurredAt: string,
+): string {
+  return `Occurred at ${formattedOccurredAt}`;
+}
+

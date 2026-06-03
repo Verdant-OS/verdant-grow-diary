@@ -103,20 +103,28 @@ describe("FirstPlantMemoryCta — safety", () => {
   });
 });
 
-describe("Dashboard wires FirstPlantMemoryCta", () => {
-  it("imports the component", () => {
-    expect(DASH).toMatch(
+describe("Dashboard no longer renders FirstPlantMemoryCta (single Quick Log entry point)", () => {
+  it("does not import the component", () => {
+    expect(DASH).not.toMatch(
       /from\s+["']@\/components\/FirstPlantMemoryCta["']/,
     );
   });
-  it("gates the CTA on plants.length > 0", () => {
-    expect(DASH).toMatch(/plants\.length\s*>\s*0\s*&&\s*<FirstPlantMemoryCta/);
+  it("does not render <FirstPlantMemoryCta /> in any branch", () => {
+    expect(DASH).not.toMatch(/<FirstPlantMemoryCta\b/);
   });
-  it("does not render the CTA when there are no plants (gate has no fallback CTA)", () => {
-    // No `plants.length === 0 ? <FirstPlantMemoryCta` pattern.
-    expect(DASH).not.toMatch(
-      /plants\.length\s*===\s*0\s*\?\s*<FirstPlantMemoryCta/,
-    );
+  it("does not contain the duplicated 'Log your first plant memory' copy", () => {
+    expect(DASH).not.toMatch(/Log your first plant memory/i);
+  });
+  it("retains the single Quick Log FAB entry point", () => {
+    expect(DASH).toMatch(/<QuickLogV2Fab\b/);
+    // Only one Quick Log primary entry point on the page.
+    const fabMatches = DASH.match(/<QuickLogV2Fab\b/g) ?? [];
+    expect(fabMatches.length).toBe(1);
+  });
+  it("does not introduce a new Quick Log launch mechanism or write path", () => {
+    expect(DASH).not.toMatch(/service_role/);
+    expect(DASH).not.toMatch(/autopilot/i);
+    expect(DASH).not.toMatch(/_executed\b/);
   });
 });
 

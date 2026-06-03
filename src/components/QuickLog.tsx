@@ -689,6 +689,7 @@ export default function QuickLog({
           <QuickLogSensorSnapshotStrip
             growId={activeGrowId}
             tentId={selectedPlant?.tent_id ?? null}
+            attached={snapshot && !!selectedPlant}
           />
 
           <Button type="submit" disabled={busy} className="gradient-leaf text-primary-foreground">

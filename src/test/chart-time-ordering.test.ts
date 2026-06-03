@@ -16,9 +16,9 @@ describe("sortTimeSeriesAscending", () => {
   
 
   it("returns [] for null/empty input", () => {
-    expect(sortTimeSeriesAscending(null, ts)).toEqual([]);
-    expect(sortTimeSeriesAscending(undefined, ts)).toEqual([]);
-    expect(sortTimeSeriesAscending([], ts)).toEqual([]);
+    expect(sortTimeSeriesAscending(null, (p) => p.ts)).toEqual([]);
+    expect(sortTimeSeriesAscending(undefined, (p) => p.ts)).toEqual([]);
+    expect(sortTimeSeriesAscending([], (p) => p.ts)).toEqual([]);
   });
 
   it("sorts reversed (DESC) input into ascending order", () => {
@@ -27,7 +27,7 @@ describe("sortTimeSeriesAscending", () => {
       { ts: "2025-01-02T00:00:00Z", v: 2 },
       { ts: "2025-01-01T00:00:00Z", v: 1 },
     ];
-    expect(sortTimeSeriesAscending(desc, ts).map((p) => p.v)).toEqual([1, 2, 3]);
+    expect(sortTimeSeriesAscending(desc, (p) => p.ts).map((p) => p.v)).toEqual([1, 2, 3]);
   });
 
   it("does not mutate the input array", () => {
@@ -36,7 +36,7 @@ describe("sortTimeSeriesAscending", () => {
       { ts: "2025-01-01T00:00:00Z", v: 1 },
     ];
     const snapshot = [...input];
-    sortTimeSeriesAscending(input, ts);
+    sortTimeSeriesAscending(input, (p) => p.ts);
     expect(input).toEqual(snapshot);
   });
 
@@ -46,7 +46,7 @@ describe("sortTimeSeriesAscending", () => {
       { ts: "2025-01-01T00:00:00Z", id: "b" },
       { ts: "2025-01-01T00:00:00Z", id: "c" },
     ];
-    expect(sortTimeSeriesAscending(equal, ts).map((p) => p.id)).toEqual([
+    expect(sortTimeSeriesAscending(equal, (p) => p.ts).map((p) => p.id)).toEqual([
       "a",
       "b",
       "c",
@@ -60,7 +60,7 @@ describe("sortTimeSeriesAscending", () => {
       { ts: null as unknown as string, id: "null" },
       { ts: "2025-01-01T00:00:00Z", id: "older" },
     ];
-    const out = sortTimeSeriesAscending(mixed, ts).map((p) => p.id);
+    const out = sortTimeSeriesAscending(mixed, (p) => p.ts).map((p) => p.id);
     expect(out.slice(0, 2)).toEqual(["older", "newer"]);
     expect(out.slice(2).sort()).toEqual(["bad", "null"]);
   });

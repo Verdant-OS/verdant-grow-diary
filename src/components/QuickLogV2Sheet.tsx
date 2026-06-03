@@ -29,6 +29,7 @@ import {
 } from "@/lib/quickLogV2Rules";
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
+import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
 
 interface Props {
   open: boolean;
@@ -36,11 +37,7 @@ interface Props {
   defaultTargetKey?: string | null;
 }
 
-export default function QuickLogV2Sheet({
-  open,
-  onOpenChange,
-  defaultTargetKey,
-}: Props) {
+export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }: Props) {
   const { data: plants = [] } = usePlants();
   const { data: tents = [] } = useTents();
   const queryClient = useQueryClient();
@@ -49,10 +46,15 @@ export default function QuickLogV2Sheet({
   const [form, setForm] = useState<QuickLogV2FormState>(EMPTY_QUICKLOG_V2_FORM);
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const options = useMemo(
-    () => buildQuickLogV2TargetOptions(tents, plants),
-    [tents, plants],
-  );
+  const options = useMemo(() => buildQuickLogV2TargetOptions(tents, plants), [tents, plants]);
+
+  const selectedOption = useMemo(() => {
+    if (!form.selectedKey) return null;
+    return options.find((o) => `${o.type}:${o.id}` === form.selectedKey) ?? null;
+  }, [options, form.selectedKey]);
+
+  const activeGrowId = selectedOption?.growId ?? null;
+  const activeTentId = selectedOption?.tentId ?? null;
 
   useEffect(() => {
     if (open) {
@@ -64,10 +66,8 @@ export default function QuickLogV2Sheet({
     }
   }, [open, defaultTargetKey]);
 
-  const setField = <K extends keyof QuickLogV2FormState>(
-    k: K,
-    v: QuickLogV2FormState[K],
-  ) => setForm((prev) => ({ ...prev, [k]: v }));
+  const setField = <K extends keyof QuickLogV2FormState>(k: K, v: QuickLogV2FormState[K]) =>
+    setForm((prev) => ({ ...prev, [k]: v }));
 
   const handleAction = (a: QuickLogV2Action) => {
     setField("action", a);
@@ -196,9 +196,7 @@ export default function QuickLogV2Sheet({
                 onChange={handlePhotoPick}
                 aria-label="Photo picker"
               />
-              <p className="mt-2 text-muted-foreground">
-                Photo saving is not enabled yet.
-              </p>
+              <p className="mt-2 text-muted-foreground">Photo saving is not enabled yet.</p>
             </div>
           )}
 
@@ -259,6 +257,8 @@ export default function QuickLogV2Sheet({
             </div>
           )}
 
+          <QuickLogSensorSnapshotStrip growId={activeGrowId} tentId={activeTentId} />
+
           <div className="flex gap-2 pt-2">
             <Button
               variant="outline"
@@ -268,11 +268,7 @@ export default function QuickLogV2Sheet({
             >
               Cancel
             </Button>
-            <Button
-              className="flex-1"
-              onClick={handleSave}
-              disabled={saving}
-            >
+            <Button className="flex-1" onClick={handleSave} disabled={saving}>
               {saving ? "Saving…" : "Save"}
             </Button>
           </div>

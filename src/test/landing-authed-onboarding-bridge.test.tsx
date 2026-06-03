@@ -131,8 +131,8 @@ describe("Landing wires the bridge for authenticated users only", () => {
   it("does not render the full OnboardingChecklistCard on /welcome", () => {
     expect(LANDING).not.toMatch(/OnboardingChecklistCard/);
   });
-  it("still exposes public CTAs (Explore Demo / Create Free Account / Sign in)", () => {
-    expect(LANDING).toMatch(/Explore Demo/);
+  it("still exposes public CTAs (Create Free Account / Sign in)", () => {
+    expect(LANDING).not.toMatch(/Explore Demo/);
     expect(LANDING).toMatch(/Create Free Account/);
     expect(LANDING).toMatch(/Sign in/);
   });

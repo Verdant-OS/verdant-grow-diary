@@ -21,6 +21,9 @@ without re-litigating taxonomy.
   be tagged as such and never reported as `live`.
 - Action Queue events MUST preserve the **approval-required** semantic:
   there is no `action_queue_item_executed` event in V0.
+- **No `*_executed` event naming for V0.** Events may describe creation,
+  completion, or logging, but must never imply automated execution,
+  device command dispatch, or unapproved automation.
 
 ## Events
 

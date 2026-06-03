@@ -91,7 +91,7 @@ export function formatSensorChartTooltipValue(
 ): string {
   if (!Number.isFinite(value)) return "";
   const m = SENSOR_CHART_METRIC_META[metric];
-  const sep = /^[a-z]/i.test(m.unit) ? " " : "";
+  const sep = /^[A-Za-zµ]/.test(m.unit) ? " " : "";
   return `${value}${sep}${m.unit}`;
 }
 

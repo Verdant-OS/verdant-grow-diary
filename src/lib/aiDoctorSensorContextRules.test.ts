@@ -186,7 +186,7 @@ describe("mapSensorReadingToAiDoctorContext", () => {
       const ctx = mapSensorReadingToAiDoctorContext(reading);
 
       expect(ctx.usableMetrics).toEqual(["temperature_c"]);
-      expect(ctx.missingMetrics).toHaveLength(4);
+      expect(ctx.missingMetrics).toHaveLength(5);
       expect(ctx.contextSummary).toContain("1 usable metric(s)");
       expect(ctx.contextSummary).not.toMatch(/risk|danger/i);
     });

@@ -70,6 +70,7 @@ function resolveStatus(
 export default function SensorSourceBadge({
   source,
   status,
+  vendor,
   className,
   testId = "sensor-source-badge",
 }: SensorSourceBadgeProps) {
@@ -80,7 +81,8 @@ export default function SensorSourceBadge({
     source === "demo"
       ? "warning"
       : mapSensorSnapshotStatusToSeverity(resolvedStatus);
-  const sourceLabel = SOURCE_LABEL[source];
+  const resolved = resolveSensorSourceLabel({ source, vendor });
+  const sourceLabel = resolved.label;
   const statusLabel = STATUS_LABEL[resolvedStatus];
   const demo = source === "demo";
 
@@ -88,6 +90,8 @@ export default function SensorSourceBadge({
     <span
       data-testid={testId}
       data-source={source}
+      data-vendor={resolved.vendor ?? ""}
+      data-vendor-promoted={resolved.vendorPromoted ? "true" : "false"}
       data-status={resolvedStatus}
       data-severity={severity}
       data-demo={demo ? "true" : "false"}

@@ -342,7 +342,7 @@ export default function Pricing() {
       {/* Final CTA */}
       <section className="px-6 py-14 max-w-3xl mx-auto text-center">
         <h2 className="font-display text-2xl md:text-3xl font-semibold">
-          Start free. Upgrade when it earns it.
+          Start free. Upgrade when Verdant becomes your real grow memory system.
         </h2>
         <p className="mt-3 text-muted-foreground">
           The free tier is built to be genuinely useful. Pro is for growers who want their full grow history backed up, synced, and easy to revisit.

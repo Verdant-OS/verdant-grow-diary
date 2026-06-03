@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Download } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { SensorReading } from "@/mock";
 import { format } from "date-fns";
@@ -14,6 +15,7 @@ import {
   formatChartTooltipTimestamp,
   type SensorChartTimeRange,
 } from "@/lib/sensorChartTimeRange";
+import { buildSensorReadingsCsv, downloadTextFile } from "@/lib/sensorChartExport";
 
 interface Props {
   data: SensorReading[];
@@ -22,6 +24,8 @@ interface Props {
   variant?: "area" | "line";
   /** Hide the built-in 7d/30d/90d/All selector (default: shown). */
   hideRangeSelector?: boolean;
+  /** Hide the CSV export button (default: shown). */
+  hideExportButton?: boolean;
   /** Initial selected range. Default "all" preserves prior behavior. */
   defaultRange?: SensorChartTimeRange;
 }
@@ -43,6 +47,7 @@ export default function SensorChart({
   height = 220,
   variant = "area",
   hideRangeSelector = false,
+  hideExportButton = false,
   defaultRange = "all",
 }: Props) {
   const m = meta[metric];
@@ -52,47 +57,73 @@ export default function SensorChart({
   // Filter + sort ascending (oldest → newest) via shared helpers so the
   // line always flows left-to-right regardless of caller order or DB
   // query direction. See src/lib/sensorChartTimeRange.ts.
+  const filteredData = useMemo(
+    () => filterTimeSeriesByRange(data, range, (r) => r.ts),
+    [data, range],
+  );
+
   const chartData = useMemo(() => {
-    const ordered = filterTimeSeriesByRange(data, range, (r) => r.ts);
-    return ordered.map((r) => {
+    return filteredData.map((r) => {
       const raw = r[metric];
       const v = metric === "temp" && typeof raw === "number" ? raw * 9 / 5 + 32 : raw;
       return { ts: r.ts, value: v };
     });
-  }, [data, range, metric]);
+  }, [filteredData, metric]);
+
+  const handleExport = () => {
+    const csv = buildSensorReadingsCsv(filteredData);
+    const filename = `sensor-readings-${metric}-${range}-${new Date().toISOString().slice(0, 10)}.csv`;
+    downloadTextFile(csv, filename);
+  };
 
   const Comp = (variant === "area" ? AreaChart : LineChart) as React.ComponentType<React.ComponentProps<typeof AreaChart>>;
   const Series = (variant === "area" ? Area : Line) as React.ComponentType<React.ComponentProps<typeof Area>>;
   const id = `grad-${metric}`;
   return (
     <div className="w-full">
-      {!hideRangeSelector && (
-        <div
-          role="radiogroup"
-          aria-label="Chart time range"
-          data-testid="sensor-chart-range-selector"
-          className="mb-2 flex justify-end gap-1"
-        >
-          {SENSOR_CHART_TIME_RANGES.map((r) => {
-            const selected = r.value === range;
-            return (
-              <button
-                key={r.value}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                onClick={() => setRange(r.value)}
-                className={
-                  "rounded-md border px-2 py-1 text-xs transition-colors " +
-                  (selected
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-background text-muted-foreground hover:text-foreground")
-                }
-              >
-                {r.label}
-              </button>
-            );
-          })}
+      {(!hideRangeSelector || !hideExportButton) && (
+        <div className="mb-2 flex items-center justify-between gap-2">
+          {!hideExportButton && (
+            <button
+              type="button"
+              onClick={handleExport}
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+              title="Download CSV for current range"
+              data-testid="sensor-chart-export-btn"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Export CSV
+            </button>
+          )}
+          {!hideRangeSelector && (
+            <div
+              role="radiogroup"
+              aria-label="Chart time range"
+              data-testid="sensor-chart-range-selector"
+              className="flex gap-1"
+            >
+              {SENSOR_CHART_TIME_RANGES.map((r) => {
+                const selected = r.value === range;
+                return (
+                  <button
+                    key={r.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => setRange(r.value)}
+                    className={
+                      "rounded-md border px-2 py-1 text-xs transition-colors " +
+                      (selected
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background text-muted-foreground hover:text-foreground")
+                    }
+                  >
+                    {r.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
       <ResponsiveContainer width="100%" height={height}>

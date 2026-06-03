@@ -54,20 +54,17 @@ export default function Landing() {
         </h1>
         <p className="mt-6 text-base md:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
           Verdant turns grow logs, photos, sensor snapshots, alerts, and
-          cautious AI into one clear plant history. Explore the Grow OS
-          before creating an account.
+          cautious AI into one clear plant history. Real grow data only —
+          no synthetic preview.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <Link to="/demo">
-            <Button size="lg" className="font-semibold">Explore Demo</Button>
-          </Link>
           {user ? (
             <Link to="/">
-              <Button size="lg" variant="outline">Open dashboard</Button>
+              <Button size="lg" className="font-semibold">Open dashboard</Button>
             </Link>
           ) : (
             <Link to="/auth">
-              <Button size="lg" variant="outline">Create Free Account</Button>
+              <Button size="lg" className="font-semibold">Create Free Account</Button>
             </Link>
           )}
           <Link to="/auth">
@@ -80,19 +77,16 @@ export default function Landing() {
         {user && <LandingAuthedOnboardingBridge />}
       </section>
 
-      {/* Dashboard teaser */}
+      {/* Product preview — illustrative copy only, no synthetic dashboard route. */}
       <section className="px-6 pb-16 max-w-5xl mx-auto">
         <div className="relative rounded-2xl border border-border/50 bg-card/40 backdrop-blur p-6 md:p-8 overflow-hidden">
-          <div className="absolute top-4 right-4 text-[10px] uppercase tracking-wider px-2 py-1 rounded-md bg-primary/15 text-primary border border-primary/30 font-semibold">
-            Demo data
-          </div>
           <h2 className="font-display text-xl md:text-2xl font-semibold mb-4">
             A glance at your grow
           </h2>
           <div className="grid gap-3 md:grid-cols-3">
-            <TeaserCard label="Latest snapshot" value="Stable" hint="Temp · Humidity · VPD" />
-            <TeaserCard label="Open alert" value="Humidity drifting" hint="Tap to review" />
-            <TeaserCard label="Action Queue" value="1 awaiting approval" hint="Grower decides" />
+            <TeaserCard label="Latest snapshot" value="Sensor truth" hint="Temp · Humidity · VPD" />
+            <TeaserCard label="Alerts" value="Reviewed by you" hint="No blind automation" />
+            <TeaserCard label="Action Queue" value="Approval-required" hint="Grower decides" />
           </div>
           <div className="mt-6 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
             <span className="inline-flex items-center gap-2">
@@ -104,11 +98,6 @@ export default function Landing() {
             <span className="inline-flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-muted-foreground" /> Approval-required actions
             </span>
-          </div>
-          <div className="mt-6">
-            <Link to="/demo">
-              <Button variant="secondary" size="sm">Open the demo dashboard →</Button>
-            </Link>
           </div>
         </div>
       </section>
@@ -182,7 +171,7 @@ export default function Landing() {
           <ul className="mt-5 space-y-3 text-sm md:text-base text-muted-foreground">
             <li>· Verdant does not control equipment by default.</li>
             <li>· AI suggestions require grower review.</li>
-            <li>· Demo data is clearly labeled.</li>
+            <li>· Sensor source (Ecowitt, manual, CSV) is always labeled honestly.</li>
             <li>· Private grow data requires an account.</li>
             <li>· Hardware-neutral: bring your own sensors and bridges.</li>
           </ul>
@@ -192,25 +181,26 @@ export default function Landing() {
       {/* Final CTA */}
       <section className="px-6 py-16 max-w-3xl mx-auto text-center">
         <h2 className="font-display text-2xl md:text-3xl font-semibold">
-          Try it before you commit
+          Start with your real grow
         </h2>
         <p className="mt-3 text-muted-foreground">
-          Open the demo, click around, and see how Verdant remembers your
-          grow. Create a free account when you're ready to track real plants.
+          Create a free account to begin logging your tents, plants, and
+          sensor readings. Verdant tracks real grow data — there is no
+          synthetic preview mode.
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-          <Link to="/demo">
-            <Button size="lg">Explore Demo</Button>
-          </Link>
           {user ? (
             <Link to="/">
-              <Button size="lg" variant="outline">Open dashboard</Button>
+              <Button size="lg">Open dashboard</Button>
             </Link>
           ) : (
             <Link to="/auth">
-              <Button size="lg" variant="outline">Create Free Account</Button>
+              <Button size="lg">Create Free Account</Button>
             </Link>
           )}
+          <Link to="/auth">
+            <Button size="lg" variant="outline">Sign in</Button>
+          </Link>
         </div>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Link to="/hardware-integrations">

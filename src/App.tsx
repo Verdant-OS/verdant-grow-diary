@@ -33,7 +33,7 @@ import GrowLineageRepair from "./pages/GrowLineageRepair";
 import GrowRoomMode from "./pages/GrowRoomMode";
 import DailyCheck from "./pages/DailyCheck";
 import Landing from "./pages/Landing";
-import Demo from "./pages/Demo";
+// Demo page removed — Verdant is positioned around real grow data only.
 import HardwareIntegrations from "./pages/HardwareIntegrations";
 import Pricing from "./pages/Pricing";
 import BillingPlaceholder from "./pages/BillingPlaceholder";
@@ -66,7 +66,9 @@ const App = () => (
               <Route path="/features" element={<Navigate to="/welcome" replace />} />
 
               <Route path="/welcome" element={<Landing />} />
-              <Route path="/demo" element={<Demo />} />
+              {/* /demo route removed — Verdant tracks real grow data only.
+                  Old bookmarks redirect to the landing page. */}
+              <Route path="/demo" element={<Navigate to="/welcome" replace />} />
               <Route path="/hardware-integrations" element={<HardwareIntegrations />} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/billing/:plan" element={<BillingPlaceholder />} />

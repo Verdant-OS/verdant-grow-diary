@@ -71,6 +71,20 @@ describe("Pricing tiers", () => {
     expect(PAGE).toMatch(/one-time/);
     expect(PAGE).toMatch(/first 75/i);
   });
+
+  it("describes Founder Lifetime as a limited early-supporter offer", () => {
+    expect(PAGE).toMatch(/limited early-supporter offer/i);
+    expect(PAGE).toMatch(/not a separate recurring plan/i);
+  });
+
+  it("does not render Premium tier or language", () => {
+    expect(PAGE).not.toMatch(/\bPremium\b/);
+  });
+
+  it("does not render free trial language", () => {
+    expect(PAGE).not.toMatch(/free trial/i);
+    expect(PAGE).not.toMatch(/trial period/i);
+  });
 });
 
 describe("Free vs Pro comparison", () => {

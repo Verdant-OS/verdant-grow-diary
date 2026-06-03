@@ -8,14 +8,28 @@
  */
 
 import { normalizeDiaryEntry } from "./diaryEntryRules";
+import {
+  validateEcWithUnit,
+  validateHumidity,
+  validatePh,
+  validateTempC,
+} from "./sensorValidation";
+import { type EcUnit } from "@/constants/units";
 
 export interface QuickLogDraftDetails {
   ph?: string;
   ec?: string;
+  /** Optional unit selector. When provided, EC plausibility uses it. */
+  ecUnit?: EcUnit;
   runoff?: string;
+  runoffEc?: string;
+  runoffEcUnit?: EcUnit;
   watering?: string;
   nutrients?: string;
   training?: string;
+  /** Optional temp/RH for plausibility — Celsius for temp. */
+  tempC?: string;
+  humidityPct?: string;
 }
 
 export interface QuickLogDraft {
@@ -75,6 +89,10 @@ export function evaluateQuickLogPreview(
     const n = num(d.ph);
     if (n == null) push("ph:invalid", "pH is not a number.");
     else if (n < 0 || n > 14) push("ph:out-of-range", "pH must be between 0 and 14.");
+    else {
+      const issue = validatePh(d.ph);
+      if (issue) push(issue.code, issue.message, issue.severity);
+    }
   }
 
   if (!isBlank(d.ec)) {
@@ -83,12 +101,32 @@ export function evaluateQuickLogPreview(
       push("ec:invalid", "EC / PPM is not a number.");
     } else if (n < 0) {
       push("ec:out-of-range", "EC / PPM must be positive.");
+    } else if (d.ecUnit) {
+      const issue = validateEcWithUnit(d.ec, d.ecUnit);
+      if (issue) push(issue.code, issue.message, issue.severity);
     } else if (n > 10 && n <= 10000) {
-      // Value looks like PPM/TDS rather than EC — informational only.
+      // No unit selected — legacy heuristic: looks like PPM/TDS.
       push("ec:looks-like-tds", "Value looks like PPM/TDS, not EC.", "info");
     } else if (n > 10000) {
       push("ec:out-of-range", "EC / PPM value is too high.");
     }
+  }
+
+  if (!isBlank(d.runoffEc)) {
+    if (d.runoffEcUnit) {
+      const issue = validateEcWithUnit(d.runoffEc, d.runoffEcUnit);
+      if (issue) push(issue.code, issue.message, issue.severity);
+    }
+  }
+
+  if (!isBlank(d.tempC)) {
+    const issue = validateTempC(d.tempC);
+    if (issue) push(issue.code, issue.message, issue.severity);
+  }
+
+  if (!isBlank(d.humidityPct)) {
+    const issue = validateHumidity(d.humidityPct);
+    if (issue) push(issue.code, issue.message, issue.severity);
   }
 
   if (!isBlank(d.watering)) {

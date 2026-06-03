@@ -20,6 +20,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { STAGES } from "@/lib/grow";
 import { EVENT_TYPES } from "@/lib/diary";
+import { EC_UNITS, type EcUnit } from "@/constants/units";
 import { usePlants } from "@/hooks/use-plants";
 import { evaluateQuickLogPreview } from "@/lib/quickLogPreviewRules";
 import {
@@ -82,10 +83,15 @@ export default function QuickLog({
   const [snapshot, setSnapshot] = useState(false);
   const [remindAt, setRemindAt] = useState<string>("");
   const [showMore, setShowMore] = useState(false);
-  const [details, setDetails] = useState({
-    ph: "",
+  const [details, setDetails] = useState<{
+    ec: string;
+    ecUnit: EcUnit;
+    nutrients: string;
+    training: string;
+    watering: string;
+  }>({
     ec: "",
-    runoff: "",
+    ecUnit: "mS/cm",
     nutrients: "",
     training: "",
     watering: "",
@@ -173,7 +179,7 @@ export default function QuickLog({
     setSnapshot(false);
     snapshotUserTouchedRef.current = false;
     setRemindAt("");
-    setDetails({ ph: "", ec: "", runoff: "", nutrients: "", training: "", watering: "" });
+    setDetails({ ec: "", ecUnit: "mS/cm", nutrients: "", training: "", watering: "" });
     setHardware({
       inputPh: "",
       inputEc: "",
@@ -380,6 +386,10 @@ export default function QuickLog({
               onChange={(e) => setNote(e.target.value)}
               placeholder="Watered, looking healthy, slight yellowing on a fan leaf…"
               rows={3}
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="sentences"
+              spellCheck={true}
             />
           </div>
 
@@ -423,34 +433,44 @@ export default function QuickLog({
 
           {showMore && (
             <div className="grid grid-cols-2 gap-2">
+              {/* pH/Runoff pH have been consolidated into the Hardware
+                  readings section below to remove duplicate inputs. */}
               <div>
-                <Label className="text-xs">pH</Label>
+                <Label className="text-xs">EC value</Label>
                 <Input
-                  value={details.ph}
-                  onChange={(e) => setDetails({ ...details, ph: e.target.value })}
-                  placeholder="6.2"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">EC / PPM</Label>
-                <Input
+                  inputMode="decimal"
                   value={details.ec}
                   onChange={(e) => setDetails({ ...details, ec: e.target.value })}
                   placeholder="1.4"
+                  data-testid="quicklog-details-ec-value"
                 />
+              </div>
+              <div>
+                <Label className="text-xs">EC unit</Label>
+                <Select
+                  value={details.ecUnit}
+                  onValueChange={(v) =>
+                    setDetails({ ...details, ecUnit: v as EcUnit })
+                  }
+                >
+                  <SelectTrigger data-testid="quicklog-details-ec-unit">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EC_UNITS.map((u) => (
+                      <SelectItem key={u} value={u}>
+                        {u}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label className="text-xs">Watering (ml)</Label>
                 <Input
+                  inputMode="decimal"
                   value={details.watering}
                   onChange={(e) => setDetails({ ...details, watering: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Runoff</Label>
-                <Input
-                  value={details.runoff}
-                  onChange={(e) => setDetails({ ...details, runoff: e.target.value })}
                 />
               </div>
               <div className="col-span-2">
@@ -458,6 +478,10 @@ export default function QuickLog({
                 <Input
                   value={details.nutrients}
                   onChange={(e) => setDetails({ ...details, nutrients: e.target.value })}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
                 />
               </div>
               <div className="col-span-2">
@@ -466,6 +490,10 @@ export default function QuickLog({
                   value={details.training}
                   onChange={(e) => setDetails({ ...details, training: e.target.value })}
                   placeholder="LST, defoliation…"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
                 />
               </div>
             </div>
@@ -494,7 +522,7 @@ export default function QuickLog({
             </p>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <Label className="text-xs">Input pH</Label>
+                <Label className="text-xs">Feed/Input pH</Label>
                 <Input
                   inputMode="decimal"
                   value={hardware.inputPh ?? ""}
@@ -503,7 +531,7 @@ export default function QuickLog({
                 />
               </div>
               <div>
-                <Label className="text-xs">Input EC/PPM</Label>
+                <Label className="text-xs">Feed/Input EC (mS/cm)</Label>
                 <Input
                   inputMode="decimal"
                   value={hardware.inputEc ?? ""}
@@ -521,7 +549,7 @@ export default function QuickLog({
                 />
               </div>
               <div>
-                <Label className="text-xs">Runoff EC/PPM</Label>
+                <Label className="text-xs">Runoff EC (mS/cm)</Label>
                 <Input
                   inputMode="decimal"
                   value={hardware.runoffEc ?? ""}

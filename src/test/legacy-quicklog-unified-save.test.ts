@@ -86,14 +86,33 @@ describe("legacyQuickLogUnifiedSave", () => {
     const r = buildLegacyQuickLogUnifiedPayload({
       ...baseInput,
       noteWithHardware: "Daily check",
-      details: { ...baseInput.details, ph: "6.2", ec: "1.4", nutrients: "CalMag" },
+      details: {
+        ...baseInput.details,
+        ph: "6.2",
+        ec: "1.4",
+        ecUnit: "mS/cm",
+        nutrients: "CalMag",
+      },
     });
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.payload.p_note).toContain("Daily check");
       expect(r.payload.p_note).toContain("pH: 6.2");
-      expect(r.payload.p_note).toContain("EC/PPM: 1.4");
+      // EC is never persisted without its unit.
+      expect(r.payload.p_note).toContain("EC: 1.4 mS/cm");
       expect(r.payload.p_note).toContain("Nutrients: CalMag");
+    }
+  });
+
+  it("marks EC as 'unit unspecified' when no ecUnit is supplied", () => {
+    const r = buildLegacyQuickLogUnifiedPayload({
+      ...baseInput,
+      noteWithHardware: "",
+      details: { ...baseInput.details, ec: "1.4" },
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.payload.p_note).toContain("EC: 1.4 (unit unspecified)");
     }
   });
 

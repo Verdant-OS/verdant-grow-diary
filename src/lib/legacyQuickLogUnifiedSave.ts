@@ -39,9 +39,13 @@ export function isSupportedLegacyEventType(value: string): value is SupportedLeg
 export const UNSUPPORTED_EVENT_TYPE_COPY =
   "Coming soon in the new Quick Log path. Use Water or Observation for now.";
 
+import { type EcUnit } from "@/constants/units";
+
 export interface LegacyQuickLogDetails {
   ph?: string;
   ec?: string;
+  /** Optional EC unit selector. Never persisted without its unit. */
+  ecUnit?: EcUnit;
   runoff?: string;
   nutrients?: string;
   training?: string;
@@ -71,7 +75,12 @@ export function appendLegacyDetailsToNote(
 ): string {
   const parts: string[] = [];
   if (trimStr(details.ph)) parts.push(`pH: ${trimStr(details.ph)}`);
-  if (trimStr(details.ec)) parts.push(`EC/PPM: ${trimStr(details.ec)}`);
+  if (trimStr(details.ec)) {
+    // Never persist an EC/PPM number without its unit. Default to "EC"
+    // (unit unspecified) only when the form did not supply a unit.
+    const unitLabel = details.ecUnit ? ` ${details.ecUnit}` : " (unit unspecified)";
+    parts.push(`EC: ${trimStr(details.ec)}${unitLabel}`);
+  }
   if (trimStr(details.runoff)) parts.push(`Runoff: ${trimStr(details.runoff)}`);
   if (trimStr(details.nutrients)) parts.push(`Nutrients: ${trimStr(details.nutrients)}`);
   if (trimStr(details.training)) parts.push(`Training: ${trimStr(details.training)}`);

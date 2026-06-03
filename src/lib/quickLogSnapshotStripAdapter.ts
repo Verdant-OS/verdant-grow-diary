@@ -20,11 +20,7 @@ import {
 } from "@/lib/sensorSnapshotStatusContract";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
 
-export type QuickLogSnapshotStripStatus =
-  | "usable"
-  | "stale"
-  | "invalid"
-  | "no_data";
+export type QuickLogSnapshotStripStatus = "usable" | "stale" | "invalid" | "no_data";
 
 export type QuickLogSnapshotStripAction =
   | { kind: "none" }
@@ -91,9 +87,7 @@ function formatAge(capturedMs: number, nowMs: number): string {
   return day === 1 ? "1 day ago" : `${day} days ago`;
 }
 
-function buildMetrics(
-  snapshot: SensorSnapshot,
-): ReadonlyArray<{ label: string; value: string }> {
+function buildMetrics(snapshot: SensorSnapshot): ReadonlyArray<{ label: string; value: string }> {
   const out: { label: string; value: string }[] = [];
   if (snapshot.temp !== null) out.push({ label: "Temp", value: `${snapshot.temp.toFixed(1)}°C` });
   if (snapshot.rh !== null) out.push({ label: "RH", value: `${snapshot.rh.toFixed(0)}%` });
@@ -119,20 +113,23 @@ export interface BuildQuickLogStripArgs {
   /** Selected plant has a tent assignment. False ⇒ no_data. */
   hasTent?: boolean;
   now?: Date;
+  /**
+   * Whether the grower has the "Attach sensor snapshot" toggle on.
+   * Defaults to true. When false and status is usable, copy switches from
+   * "This log will include…" to "Sensor snapshot available — use the
+   * Attach sensor snapshot toggle to include it."
+   */
+  attached?: boolean;
 }
 
 export function buildQuickLogSnapshotStrip(
   args: BuildQuickLogStripArgs,
 ): QuickLogSnapshotStripViewModel {
-  const { snapshot, loading = false, hasTent = true, now = new Date() } = args;
+  const { snapshot, loading = false, hasTent = true, now = new Date(), attached = true } = args;
 
   // No tent selected or loader still in flight or empty snapshot ⇒ no_data.
   const isEmpty =
-    !snapshot ||
-    !hasTent ||
-    loading ||
-    snapshot.source === "unavailable" ||
-    !snapshot.ts;
+    !snapshot || !hasTent || loading || snapshot.source === "unavailable" || !snapshot.ts;
 
   if (isEmpty) {
     const classification = classifyAuditRow(null, { now });
@@ -165,14 +162,20 @@ export function buildQuickLogSnapshotStrip(
 
   const status = narrowStatus(classification.status);
   const capturedMs = new Date(snapshot.ts).getTime();
-  const ageLabel = Number.isFinite(capturedMs)
-    ? formatAge(capturedMs, now.getTime())
-    : null;
+  const ageLabel = Number.isFinite(capturedMs) ? formatAge(capturedMs, now.getTime()) : null;
+
+  // When the grower has the attach toggle off, the usable copy changes:
+  // the snapshot is present but will not be embedded in the saved entry.
+  const title = status === "usable" && !attached ? "Sensor snapshot available" : TITLES[status];
+  const description =
+    status === "usable" && !attached
+      ? "Enable the Attach sensor snapshot toggle to include it."
+      : DESCRIPTIONS[status];
 
   return {
     status,
-    title: TITLES[status],
-    description: DESCRIPTIONS[status],
+    title,
+    description,
     capturedAt: snapshot.ts,
     ageLabel,
     metrics: buildMetrics(snapshot),

@@ -36,6 +36,8 @@ import {
   classifyQuickLogSnapshotSource,
   shouldEmbedSnapshot,
 } from "@/lib/quickLogSensorSnapshotRules";
+import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
+import { buildQuickLogSnapshotStrip } from "@/lib/quickLogSnapshotStripAdapter";
 import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
 
 import { AlertTriangle, Info } from "lucide-react";
@@ -96,6 +98,9 @@ export default function QuickLog({
   });
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Tracks whether we have already auto-enabled the attach toggle this session.
+  // Reset when the dialog closes so each new open defaults fresh.
+  const snapshotAutoEnabledRef = useRef(false);
 
   // Apply prefill when the dialog opens. Does NOT submit — grower still
   // chooses to save the entry.
@@ -117,6 +122,11 @@ export default function QuickLog({
     prefill?.suggestSnapshot,
   ]);
 
+  // Reset the auto-enable guard when the dialog closes.
+  useEffect(() => {
+    if (!open) snapshotAutoEnabledRef.current = false;
+  }, [open]);
+
   // Auto-pick a sensible event type when adding a photo
   useEffect(() => {
     if (photoFile && eventType === "observation") setEventType("photo");
@@ -130,6 +140,26 @@ export default function QuickLog({
     () => scopedPlants.find((p) => p.id === plantId) ?? null,
     [plantId, scopedPlants],
   );
+
+  // Read the latest sensor snapshot to power the strip and the auto-enable logic.
+  // React Query deduplicates the request — no extra network calls vs. the strip.
+  const tentIds = selectedPlant?.tent_id ? [selectedPlant.tent_id] : [];
+  const sensorState = useLatestSensorSnapshot(activeGrowId ?? null, tentIds);
+  const snapshotStripView = buildQuickLogSnapshotStrip({
+    snapshot: sensorState.snapshot,
+    loading: sensorState.status === "loading",
+    hasTent: !!selectedPlant?.tent_id,
+    attached: snapshot,
+  });
+
+  // Auto-enable "Attach sensor snapshot" the first time a usable snapshot
+  // becomes available.  The grower may turn it off; we will not re-enable.
+  useEffect(() => {
+    if (snapshotStripView.status === "usable" && !snapshotAutoEnabledRef.current) {
+      snapshotAutoEnabledRef.current = true;
+      setSnapshot(true);
+    }
+  }, [snapshotStripView.status]);
 
   function handleFile(f: File | null) {
     setPhotoFile(f);
@@ -237,7 +267,6 @@ export default function QuickLog({
               state: snapshotState,
             };
           }
-
         }
       }
       if (eventType === "reminder" && remindAt) cleanDetails.remind_at = remindAt;
@@ -650,6 +679,7 @@ export default function QuickLog({
           <QuickLogSensorSnapshotStrip
             growId={activeGrowId}
             tentId={selectedPlant?.tent_id ?? null}
+            attached={snapshot}
           />
 
           <Button type="submit" disabled={busy} className="gradient-leaf text-primary-foreground">

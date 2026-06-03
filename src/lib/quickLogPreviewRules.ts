@@ -57,14 +57,13 @@ export function evaluateQuickLogPreview(
 ): QuickLogPreviewResult {
   const warnings: QuickLogPreviewWarning[] = [];
   const d: QuickLogDraftDetails = draft?.details ?? {};
-  const push = (
-    code: string,
-    message: string,
-    severity: QuickLogPreviewSeverity = "warning",
-  ) => warnings.push({ code, message, severity });
+  const push = (code: string, message: string, severity: QuickLogPreviewSeverity = "warning") =>
+    warnings.push({ code, message, severity });
 
   if (isBlank(draft?.note)) {
     push("note:missing", "Add a quick note before saving.", "info");
+  } else {
+    push("note:captured", "Note captured.", "info");
   }
 
   if (!isBlank(d.ph)) {

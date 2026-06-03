@@ -21,6 +21,8 @@ import {
 interface Props {
   growId: string | null | undefined;
   tentId: string | null | undefined;
+  /** Whether the grower has the attach toggle on. Defaults to true. */
+  attached?: boolean;
 }
 
 const TONE: Record<QuickLogSnapshotStripStatus, string> = {
@@ -44,13 +46,14 @@ const PILL_LABEL: Record<QuickLogSnapshotStripStatus, string> = {
   no_data: "No data",
 };
 
-export default function QuickLogSensorSnapshotStrip({ growId, tentId }: Props) {
+export default function QuickLogSensorSnapshotStrip({ growId, tentId, attached }: Props) {
   const tentIds = tentId ? [tentId] : [];
   const state = useLatestSensorSnapshot(growId ?? null, tentIds);
   const view = buildQuickLogSnapshotStrip({
     snapshot: state.snapshot,
     loading: state.status === "loading",
     hasTent: !!tentId,
+    attached,
   });
 
   return (
@@ -80,7 +83,10 @@ export default function QuickLogSensorSnapshotStrip({ growId, tentId }: Props) {
             <span data-testid="quicklog-sensor-snapshot-age">Captured {view.ageLabel}</span>
           )}
           {view.metrics.map((m) => (
-            <span key={m.label} data-testid={`quicklog-sensor-snapshot-metric-${m.label.toLowerCase()}`}>
+            <span
+              key={m.label}
+              data-testid={`quicklog-sensor-snapshot-metric-${m.label.toLowerCase()}`}
+            >
               <span className="text-muted-foreground/70">{m.label}</span>{" "}
               <span className="text-foreground">{m.value}</span>
             </span>

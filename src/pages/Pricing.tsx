@@ -195,10 +195,10 @@ export default function Pricing() {
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="font-display text-xl md:text-2xl font-semibold">
-              Founder Lifetime Deal — ${FOUNDER_LIFETIME_PRICE_USD} once, Pro forever
+              Founder Lifetime Offer — ${FOUNDER_LIFETIME_PRICE_USD} once, full Pro forever
             </h2>
             <p className="mt-2 text-sm md:text-base text-muted-foreground">
-              Verdant is founder-built. The Founder Lifetime Deal is our thank-you to the first {FOUNDER_LIFETIME_LIMIT} growers who back the product early. Pay once, keep Pro features for the life of the product, and help shape what ships next. No hype, no countdown gimmicks — when the first {FOUNDER_LIFETIME_LIMIT} are claimed, the offer ends.
+              Verdant is founder-built. This is a limited early-supporter offer for the first {FOUNDER_LIFETIME_LIMIT} growers who back the product early. Pay once, get full Pro access for the life of the product, and help shape what ships next. No hype, no countdown gimmicks — when the first {FOUNDER_LIFETIME_LIMIT} are claimed, the offer ends.
             </p>
           </div>
           <Link to="/billing/founder-lifetime" className="shrink-0">

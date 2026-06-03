@@ -87,6 +87,25 @@ describe("#13 parseManualHandheldReadings — post-patch label compatibility", (
     expect(parsed!.other).toBeUndefined();
   });
 
+  it("tolerates harmless label drift without treating known readings as unknown", () => {
+    const driftedNote = [
+      "Reading copied from a handheld meter.",
+      "",
+      HEADER,
+      "-   FEED / INPUT   pH  : 6.1",
+      "- Feed / Input EC (ppm): 1.4",
+      "- Runoff EC (MS/CM): 1.6",
+      "- PPFD canopy (umol): 665",
+    ].join("\n");
+    const parsed = parseManualHandheldReadings(driftedNote);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.inputPh).toBe("6.1");
+    expect(parsed!.inputEc).toBe("1.4");
+    expect(parsed!.runoffEc).toBe("1.6");
+    expect(parsed!.ppfdCanopy).toBe("665");
+    expect(parsed!.other).toBeUndefined();
+  });
+
   it("buildPestDiseaseHistory populates manualHandheld for new-format notes", () => {
     const entries = normalizeDiaryEntries({
       rawEntries: [rawEntry("pest_disease", newNote)],

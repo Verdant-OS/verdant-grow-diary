@@ -98,6 +98,21 @@ Doctor suggestion). The item is **suggested**; nothing executes.
 | `requires_approval` | const | `true` — invariant in V0. |
 | `loop_step` | const | `"action_queue"` |
 
+### `ai_doctor_result_created`
+A grower generated an AI Doctor result (analysis, recommendation, or
+risk assessment) for a plant or tent.
+
+| Property | Type | Notes |
+|---|---|---|
+| `tent_id` | string | Internal only. |
+| `plant_id` | string \| null | Internal only. |
+| `context_completeness` | enum | `complete` \| `partial` \| `insufficient` |
+| `has_recent_photo` | boolean | |
+| `has_recent_sensor_snapshot` | boolean | |
+| `recommendation_count` | number | How many follow-up actions were suggested. |
+| `risk_level` | enum | `low` \| `medium` \| `high` |
+| `loop_step` | const | `"ai_doctor"` |
+
 ### `action_queue_item_completed`
 A grower **approved and completed** an Action Queue item. There is no
 implicit execution path; completion is an explicit grower act.
@@ -109,11 +124,47 @@ implicit execution path; completion is an explicit grower act.
 | `time_to_completion_seconds` | number | Created → completed. |
 | `loop_step` | const | `"action_queue"` |
 
+### `action_follow_up_logged`
+A grower logged the **plant response** to a completed action.
+This event connects the closed loop:
+
+**action taken → plant response → improved / declined → repeat / avoid next run.**
+
+It is the bridge from the Action Queue back into plant memory and
+post-grow learning.
+
+| Property | Type | Notes |
+|---|---|---|
+| `plant_id` | string | Internal only. |
+| `tent_id` | string | Internal only. |
+| `action_queue_item_id` | string | Links to the original action. |
+| `response` | enum | `improved` \| `declined` \| `no_change` \| `too_soon` |
+| `follow_up_type` | enum | `repeat` \| `avoid` \| `adjust` \| `monitor` |
+| `has_photo` | boolean | Did the grower attach a visual reference? |
+| `loop_step` | const | `"action_queue"` |
+
+## Required context properties on downstream V0 events
+
+Grow, Tent, and Plant are **required context properties**, not necessarily
+separate V0 events yet. Every downstream V0 event that touches a plant,
+tent, or grow MUST include:
+
+- `grow_id` (string) — the top-level grow context.
+- `tent_id` (string) — the tent environment context.
+- `plant_id` (string \| null) — the specific plant, or null for tent-level scope.
+
+This ensures funnel analysis can trace: **Grow → Tent → Plant → Loop Step**
+without needing discrete `grow_created`, `tent_created`, or `plant_created`
+events in V0.
+
 ---
 
 ## What this map intentionally does NOT include
 
 - No `*_executed` events. V0 has no automated execution.
+- `action_queue_item_executed` is explicitly forbidden.
+- `device_command_executed` is explicitly forbidden.
+- `automation_executed` is explicitly forbidden.
 - No device-control events. V0 does not control hardware.
 - No event that exposes raw grower notes or photo content.
 - No event that fabricates a `live` source from demo data.

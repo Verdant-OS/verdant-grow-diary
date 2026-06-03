@@ -202,7 +202,7 @@ describe("mapSensorReadingToAiDoctorContext", () => {
       const ctx = mapSensorReadingToAiDoctorContext(reading);
 
       expect(ctx.usableMetrics).toEqual([]);
-      expect(ctx.missingMetrics).toHaveLength(5);
+      expect(ctx.missingMetrics).toHaveLength(6);
       expect(ctx.contextSummary).toContain("no usable metric values");
     });
   });

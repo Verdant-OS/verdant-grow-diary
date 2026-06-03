@@ -67,6 +67,12 @@ export interface SensorReading {
   vpd: number;
   co2: number;
   soil: number;
+  /**
+   * PPFD in µmol/m²/s. Optional — only present when a real PAR/PPFD
+   * measurement exists for this reading. Never derived from lux,
+   * wattage, or device state.
+   */
+  ppfd?: number | null;
   /** Provenance label. Demo data must always carry "demo". */
   source: SensorReadingSource;
   /**

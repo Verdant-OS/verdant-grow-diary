@@ -54,20 +54,17 @@ export default function Landing() {
         </h1>
         <p className="mt-6 text-base md:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
           Verdant turns grow logs, photos, sensor snapshots, alerts, and
-          cautious AI into one clear plant history. Explore the Grow OS
-          before creating an account.
+          cautious AI into one clear plant history. Real grow data only —
+          no synthetic preview.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <Link to="/demo">
-            <Button size="lg" className="font-semibold">Explore Demo</Button>
-          </Link>
           {user ? (
             <Link to="/">
-              <Button size="lg" variant="outline">Open dashboard</Button>
+              <Button size="lg" className="font-semibold">Open dashboard</Button>
             </Link>
           ) : (
             <Link to="/auth">
-              <Button size="lg" variant="outline">Create Free Account</Button>
+              <Button size="lg" className="font-semibold">Create Free Account</Button>
             </Link>
           )}
           <Link to="/auth">

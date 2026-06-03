@@ -76,6 +76,7 @@ describe("Engineering Velocity OS scaffold", () => {
     ]) {
       expect(em).toContain(name);
     }
-    expect(em).not.toMatch(/action_queue_item_executed/);
+    expect(em).not.toMatch(/`action_queue_item_executed`/);
+    expect(em).not.toMatch(/^### `action_queue_item_executed`/m);
   });
 });

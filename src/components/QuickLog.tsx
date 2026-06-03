@@ -20,6 +20,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { STAGES } from "@/lib/grow";
 import { EVENT_TYPES } from "@/lib/diary";
+import { EC_UNITS, type EcUnit } from "@/constants/units";
 import { usePlants } from "@/hooks/use-plants";
 import { evaluateQuickLogPreview } from "@/lib/quickLogPreviewRules";
 import {
@@ -82,10 +83,15 @@ export default function QuickLog({
   const [snapshot, setSnapshot] = useState(false);
   const [remindAt, setRemindAt] = useState<string>("");
   const [showMore, setShowMore] = useState(false);
-  const [details, setDetails] = useState({
-    ph: "",
+  const [details, setDetails] = useState<{
+    ec: string;
+    ecUnit: EcUnit;
+    nutrients: string;
+    training: string;
+    watering: string;
+  }>({
     ec: "",
-    runoff: "",
+    ecUnit: "mS/cm",
     nutrients: "",
     training: "",
     watering: "",

@@ -47,6 +47,7 @@ export default function SensorChart({
   height = 220,
   variant = "area",
   hideRangeSelector = false,
+  hideExportButton = false,
   defaultRange = "all",
 }: Props) {
   const m = meta[metric];
@@ -56,14 +57,24 @@ export default function SensorChart({
   // Filter + sort ascending (oldest → newest) via shared helpers so the
   // line always flows left-to-right regardless of caller order or DB
   // query direction. See src/lib/sensorChartTimeRange.ts.
+  const filteredData = useMemo(
+    () => filterTimeSeriesByRange(data, range, (r) => r.ts),
+    [data, range],
+  );
+
   const chartData = useMemo(() => {
-    const ordered = filterTimeSeriesByRange(data, range, (r) => r.ts);
-    return ordered.map((r) => {
+    return filteredData.map((r) => {
       const raw = r[metric];
       const v = metric === "temp" && typeof raw === "number" ? raw * 9 / 5 + 32 : raw;
       return { ts: r.ts, value: v };
     });
-  }, [data, range, metric]);
+  }, [filteredData, metric]);
+
+  const handleExport = () => {
+    const csv = buildSensorReadingsCsv(filteredData);
+    const filename = `sensor-readings-${metric}-${range}-${new Date().toISOString().slice(0, 10)}.csv`;
+    downloadTextFile(csv, filename);
+  };
 
   const Comp = (variant === "area" ? AreaChart : LineChart) as React.ComponentType<React.ComponentProps<typeof AreaChart>>;
   const Series = (variant === "area" ? Area : Line) as React.ComponentType<React.ComponentProps<typeof Area>>;

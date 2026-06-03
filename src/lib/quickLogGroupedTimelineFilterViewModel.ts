@@ -83,6 +83,15 @@ export const QUICK_LOG_GROUPED_TIMELINE_EMPTY_FILTERED_TEXT =
   "No QuickLog entries match this filter.";
 export const QUICK_LOG_GROUPED_TIMELINE_CREATE_BUTTON_LABEL =
   "Create Quick Log";
+/**
+ * Plant Timeline empty-state copy. Surfaced alongside the existing
+ * QuickLog memory empty text so a grower lands on a clear, honest,
+ * non-automated next step: log something manually.
+ */
+export const QUICK_LOG_GROUPED_TIMELINE_EMPTY_TITLE_TEXT =
+  "No timeline entries yet.";
+export const QUICK_LOG_GROUPED_TIMELINE_EMPTY_HINT_TEXT =
+  "Add a Quick Log to start this plant's history.";
 
 /**
  * Source labels are kept honest. Real entries are always "Manual".

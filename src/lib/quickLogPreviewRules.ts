@@ -65,6 +65,10 @@ export function evaluateQuickLogPreview(
 
   if (isBlank(draft?.note)) {
     push("note:missing", "Add a quick note before saving.", "info");
+  } else {
+    // Affirmative info so the preview reflects the current form state and
+    // never appears to ignore note text the grower already typed.
+    push("note:ok", "Note captured.", "info");
   }
 
   if (!isBlank(d.ph)) {

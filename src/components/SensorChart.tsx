@@ -31,16 +31,9 @@ interface Props {
   defaultRange?: SensorChartTimeRange;
 }
 
-// Legacy metric meta — kept inline so unit/color stay close to the chart
-// markup. Tick widths and tick formatting are sourced from
-// sensorChartAxisRules so AUD-006 fixes stay in one place.
-const meta = {
-  temp: { label: "Temperature", unit: "°F", color: "hsl(var(--warning))" },
-  rh:   { label: "Humidity",    unit: "%",  color: "hsl(var(--info))" },
-  vpd:  { label: "VPD",         unit: " kPa", color: "hsl(var(--primary))" },
-  co2:  { label: "CO₂",         unit: " ppm", color: "hsl(var(--leaf-glow))" },
-  soil: { label: "Soil",        unit: "%",  color: "hsl(var(--accent))" },
-};
+// Metric label / color / unit / axis width are sourced exclusively from
+// SENSOR_CHART_METRIC_META in src/lib/sensorChartAxisRules.ts so the
+// legend, tooltip, Y-axis, and CSV context can never drift apart.
 
 export default function SensorChart({
   data,
@@ -51,8 +44,8 @@ export default function SensorChart({
   hideExportButton = false,
   defaultRange = "all",
 }: Props) {
-  const m = meta[metric];
   const axisMeta = SENSOR_CHART_METRIC_META[metric];
+  const legendLabel = sensorChartLegendLabel(metric);
   const [range, setRange] = useState<SensorChartTimeRange>(defaultRange);
 
   // Filter + sort ascending (oldest → newest) via shared helpers so the

@@ -181,25 +181,26 @@ export default function Landing() {
       {/* Final CTA */}
       <section className="px-6 py-16 max-w-3xl mx-auto text-center">
         <h2 className="font-display text-2xl md:text-3xl font-semibold">
-          Try it before you commit
+          Start with your real grow
         </h2>
         <p className="mt-3 text-muted-foreground">
-          Open the demo, click around, and see how Verdant remembers your
-          grow. Create a free account when you're ready to track real plants.
+          Create a free account to begin logging your tents, plants, and
+          sensor readings. Verdant tracks real grow data — there is no
+          synthetic preview mode.
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-          <Link to="/demo">
-            <Button size="lg">Explore Demo</Button>
-          </Link>
           {user ? (
             <Link to="/">
-              <Button size="lg" variant="outline">Open dashboard</Button>
+              <Button size="lg">Open dashboard</Button>
             </Link>
           ) : (
             <Link to="/auth">
-              <Button size="lg" variant="outline">Create Free Account</Button>
+              <Button size="lg">Create Free Account</Button>
             </Link>
           )}
+          <Link to="/auth">
+            <Button size="lg" variant="outline">Sign in</Button>
+          </Link>
         </div>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Link to="/hardware-integrations">

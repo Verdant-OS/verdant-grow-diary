@@ -69,7 +69,21 @@ describe("Pricing tiers", () => {
     expect(PAGE).toMatch(/FOUNDER_LIFETIME_PRICE_USD\s*=\s*129/);
     expect(PAGE).toMatch(/FOUNDER_LIFETIME_LIMIT\s*=\s*75/);
     expect(PAGE).toMatch(/one-time/);
-    expect(PAGE).toMatch(/first 75/i);
+    expect(PAGE).toMatch(/First \$\{FOUNDER_LIFETIME_LIMIT\}/);
+  });
+
+  it("describes Founder Lifetime as a limited early-supporter offer", () => {
+    expect(PAGE).toMatch(/limited early-supporter offer/i);
+    expect(PAGE).toMatch(/not a separate recurring plan/i);
+  });
+
+  it("does not render Premium tier or language", () => {
+    expect(PAGE).not.toMatch(/\bPremium\b/);
+  });
+
+  it("does not render free trial language", () => {
+    expect(PAGE).not.toMatch(/free trial/i);
+    expect(PAGE).not.toMatch(/trial period/i);
   });
 });
 
@@ -146,7 +160,7 @@ describe("FAQ + trust/data ownership copy", () => {
   });
 
   it("FAQ covers founder lifetime, hardware, AI safety, and cancellation", () => {
-    expect(PAGE).toMatch(/Founder Lifetime Deal work/);
+    expect(PAGE).toMatch(/Founder Lifetime Offer work/);
     expect(PAGE).toMatch(/Do I need specific hardware/);
     expect(PAGE).toMatch(/control my equipment or grow for me/);
     expect(PAGE).toMatch(/Can I cancel anytime/);

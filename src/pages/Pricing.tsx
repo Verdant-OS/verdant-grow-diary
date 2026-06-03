@@ -84,7 +84,7 @@ export default function Pricing() {
           name="Free"
           price="$0"
           cadence="/ month"
-          description="Everything you need to start a serious grow diary."
+          description="Start free. Build your grow diary and see if Verdant fits your workflow."
           bullets={[
             "Plant profiles",
             "Basic grow diary",
@@ -115,7 +115,7 @@ export default function Pricing() {
           cadence="/ month"
           highlighted
           badge="Most popular"
-          description="Cloud sync, multi-tent support, deeper history, and priority support."
+          description="Upgrade when Verdant becomes your real grow memory system."
           bullets={[
             "Everything in Free",
             "Cloud sync",
@@ -155,16 +155,16 @@ export default function Pricing() {
           }
         />
 
-        {/* Founder Lifetime */}
+        {/* Founder Lifetime Offer */}
         <TierCard
-          name="Founder Lifetime"
+          name="Founder Lifetime Offer"
           price={`$${FOUNDER_LIFETIME_PRICE_USD}`}
           cadence="one-time"
           founder
           badge={`First ${FOUNDER_LIFETIME_LIMIT} growers`}
-          description="One payment. Pro features for the life of the product. Limited to the first 75 founders."
+          description="A limited early-supporter offer. Pay once and get full Pro access for the life of the product."
           bullets={[
-            "Everything in Pro, forever",
+            "Includes full Pro access — no monthly fee",
             "Lock in Pro at today's price",
             "Founder badge on your profile",
             "Direct line to the founder for feedback",
@@ -183,7 +183,7 @@ export default function Pricing() {
               </Button>
             </Link>
           }
-          footnote={`Limited to the first ${FOUNDER_LIFETIME_LIMIT} buyers. When they're claimed, this offer ends.`}
+          footnote={`Limited to the first ${FOUNDER_LIFETIME_LIMIT} early supporters. When they're claimed, this offer ends.`}
         />
       </section>
 
@@ -195,10 +195,10 @@ export default function Pricing() {
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="font-display text-xl md:text-2xl font-semibold">
-              Founder Lifetime Deal — ${FOUNDER_LIFETIME_PRICE_USD} once, Pro forever
+              Founder Lifetime Offer — ${FOUNDER_LIFETIME_PRICE_USD} once, full Pro forever
             </h2>
             <p className="mt-2 text-sm md:text-base text-muted-foreground">
-              Verdant is founder-built. The Founder Lifetime Deal is our thank-you to the first {FOUNDER_LIFETIME_LIMIT} growers who back the product early. Pay once, keep Pro features for the life of the product, and help shape what ships next. No hype, no countdown gimmicks — when the first {FOUNDER_LIFETIME_LIMIT} are claimed, the offer ends.
+              Verdant is founder-built. This is a limited early-supporter offer for the first {FOUNDER_LIFETIME_LIMIT} growers who back the product early. Pay once, get full Pro access for the life of the product, and help shape what ships next. No hype, no countdown gimmicks — when the first {FOUNDER_LIFETIME_LIMIT} are claimed, the offer ends.
             </p>
           </div>
           <Link to="/billing/founder-lifetime" className="shrink-0">
@@ -310,9 +310,9 @@ export default function Pricing() {
           </AccordionItem>
 
           <AccordionItem value="founder-lifetime">
-            <AccordionTrigger>How does the Founder Lifetime Deal work?</AccordionTrigger>
+            <AccordionTrigger>How does the Founder Lifetime Offer work?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              ${FOUNDER_LIFETIME_PRICE_USD} once. Pro features for the life of the product. Limited to the first {FOUNDER_LIFETIME_LIMIT} buyers. When the first {FOUNDER_LIFETIME_LIMIT} are claimed, the offer ends. No fake countdowns and no expiring timers beyond that real limit.
+              ${FOUNDER_LIFETIME_PRICE_USD} once. You get full Pro access for the life of the product. This is a limited early-supporter offer, not a separate recurring plan. Limited to the first {FOUNDER_LIFETIME_LIMIT} buyers. When the first {FOUNDER_LIFETIME_LIMIT} are claimed, the offer ends. No fake countdowns and no expiring timers beyond that real limit.
             </AccordionContent>
           </AccordionItem>
 
@@ -342,7 +342,7 @@ export default function Pricing() {
       {/* Final CTA */}
       <section className="px-6 py-14 max-w-3xl mx-auto text-center">
         <h2 className="font-display text-2xl md:text-3xl font-semibold">
-          Start free. Upgrade when it earns it.
+          Start free. Upgrade when Verdant becomes your real grow memory system.
         </h2>
         <p className="mt-3 text-muted-foreground">
           The free tier is built to be genuinely useful. Pro is for growers who want their full grow history backed up, synced, and easy to revisit.

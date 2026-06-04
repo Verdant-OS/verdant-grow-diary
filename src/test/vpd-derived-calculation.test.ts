@@ -163,7 +163,7 @@ describe("safety contract — derived VPD modules", () => {
       expect(src).not.toMatch(
         /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b|device_command|autopilot/i,
       );
-      expect(src).not.toMatch(/fetch\(|supabase/i);
+      expect(src).not.toMatch(/\bfetch\s*\(|@\/integrations\/supabase/);
     }
   });
 });

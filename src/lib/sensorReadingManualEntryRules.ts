@@ -181,7 +181,7 @@ export interface ManualReadingPayload {
   quality: "ok";
   /**
    * Optional `manual:<note>` device id capturing where the grower took
-   * the reading (e.g. SwitchBot CO2 Monitor). Omitted when absent so
+   * the reading (e.g. EcoWitt WH45 CO2/THP Monitor). Omitted when absent so
    * the column stays null. Never makes the reading appear live.
    */
   device_id?: string;
@@ -196,7 +196,7 @@ export function buildManualReadingPayloads(args: {
   tentId: string;
   metrics: ManualReadingMetric[];
   ts?: string;
-  /** Optional grower-entered device/source note (e.g. "SwitchBot CO2 Monitor"). */
+  /** Optional grower-entered device/source note (e.g. "EcoWitt WH45 CO2/THP Monitor"). */
   deviceNote?: string | null;
 }): ManualReadingPayload[] {
   const ts = args.ts ?? new Date().toISOString();

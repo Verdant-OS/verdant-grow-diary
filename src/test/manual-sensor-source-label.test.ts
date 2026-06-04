@@ -30,8 +30,8 @@ describe("normalizeManualSourceNote", () => {
     expect(normalizeManualSourceNote("   ")).toBeNull();
     expect(normalizeManualSourceNote(null)).toBeNull();
     expect(normalizeManualSourceNote(undefined)).toBeNull();
-    expect(normalizeManualSourceNote("  SwitchBot   CO2  Monitor ")).toBe(
-      "SwitchBot CO2 Monitor",
+    expect(normalizeManualSourceNote("  EcoWitt   WH45  Monitor ")).toBe(
+      "EcoWitt WH45 Monitor",
     );
   });
 
@@ -56,9 +56,9 @@ describe("normalizeManualSourceNote", () => {
 
 describe("buildManualDeviceId / extractManualDeviceNote", () => {
   it("round-trips a safe note through the manual: prefix", () => {
-    const id = buildManualDeviceId("SwitchBot CO2 Monitor");
-    expect(id).toBe(`${MANUAL_DEVICE_ID_PREFIX}SwitchBot CO2 Monitor`);
-    expect(extractManualDeviceNote(id)).toBe("SwitchBot CO2 Monitor");
+    const id = buildManualDeviceId("EcoWitt WH45 CO2/THP Monitor");
+    expect(id).toBe(`${MANUAL_DEVICE_ID_PREFIX}EcoWitt WH45 CO2/THP Monitor`);
+    expect(extractManualDeviceNote(id)).toBe("EcoWitt WH45 CO2/THP Monitor");
   });
 
   it("returns null for empty/bad input", () => {
@@ -79,8 +79,8 @@ describe("formatSensorSourceLabel", () => {
 
   it("formats manual with a safe note as 'Manual reading · <note>'", () => {
     expect(
-      formatSensorSourceLabel({ source: "manual", deviceNote: "SwitchBot CO2 Monitor" }),
-    ).toBe("Manual reading · SwitchBot CO2 Monitor");
+      formatSensorSourceLabel({ source: "manual", deviceNote: "EcoWitt WH45 CO2/THP Monitor" }),
+    ).toBe("Manual reading · EcoWitt WH45 CO2/THP Monitor");
     expect(
       formatSensorSourceLabel({
         source: "manual",
@@ -113,7 +113,7 @@ describe("formatSensorSourceLabel", () => {
   it("device options are non-empty and stable", () => {
     const opts = getManualSensorDeviceOptions();
     expect(opts.length).toBeGreaterThan(3);
-    expect(opts.find((o) => /switchbot/i.test(o.label))).toBeTruthy();
+    expect(opts.find((o) => /ecowitt/i.test(o.label))).toBeTruthy();
   });
 });
 
@@ -130,10 +130,10 @@ describe("buildManualReadingPayloads · deviceNote integration", () => {
     const [row] = buildManualReadingPayloads({
       tentId: "t1",
       metrics,
-      deviceNote: "SwitchBot CO2 Monitor",
+      deviceNote: "EcoWitt WH45 CO2/THP Monitor",
     });
     expect(row.source).toBe("manual");
-    expect(row.device_id).toBe(`${MANUAL_DEVICE_ID_PREFIX}SwitchBot CO2 Monitor`);
+    expect(row.device_id).toBe(`${MANUAL_DEVICE_ID_PREFIX}EcoWitt WH45 CO2/THP Monitor`);
   });
 
   it("normalizes unsafe / overlong notes before attaching", () => {

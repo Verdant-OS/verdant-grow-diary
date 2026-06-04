@@ -4,8 +4,8 @@
  * Augments — never duplicates — the `SOURCE_LABEL` map in
  * `sensorSnapshot.ts`. UI surfaces call `formatSensorDeviceDetail`
  * to attach a device-detail badge next to the canonical source label
- * (e.g. "Live sensor" + "Shelly H&T Gen4", or "Manual" + "SwitchBot
- * CO2 Monitor").
+ * (e.g. "Live sensor" + "Shelly H&T Gen4", or "Manual" + "EcoWitt
+ * WH45 CO2/THP Monitor").
  *
  * Pure. No I/O. No React. No Supabase.
  *

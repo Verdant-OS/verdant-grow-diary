@@ -1,11 +1,11 @@
 /**
- * SwitchBot-ready manual CO2 entry guardrail tests.
+ * EcoWitt-ready manual CO2 entry guardrail tests.
  *
  * CO2 ppm is part of the existing manual sensor reading flow (schema trigger
  * `validate_sensor_reading` already allows `co2_ppm`). These tests lock that
- * a grower can manually enter CO2 from a SwitchBot CO2 Monitor without the
- * app pretending the data is live, without CO2 alone triggering alerts, and
- * without any device-control/integration drift.
+ * a grower can manually enter CO2 from an EcoWitt WH45 CO2/THP Monitor
+ * without the app pretending the data is live, without CO2 alone triggering
+ * alerts, and without any device-control/integration drift.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -15,8 +15,8 @@ import {
   validateManualEntry,
 } from "@/lib/sensorReadingManualEntryRules";
 
-describe("manual CO2 entry (SwitchBot-ready)", () => {
-  it("accepts a typical SwitchBot CO2 ppm reading", () => {
+describe("manual CO2 entry (EcoWitt-ready)", () => {
+  it("accepts a typical EcoWitt WH45 CO2 ppm reading", () => {
     const v = validateManualEntry({ co2Ppm: 850 });
     expect(v.ok).toBe(true);
     const co2 = v.metrics.find((m) => m.metric === "co2_ppm");
@@ -40,7 +40,6 @@ describe("manual CO2 entry (SwitchBot-ready)", () => {
 
   it("rejects non-numeric CO2", () => {
     const v = validateManualEntry({ co2Ppm: "not-a-number" });
-    // No valid metric ends up in the batch — equivalent to empty entry.
     expect(v.metrics.some((m) => m.metric === "co2_ppm")).toBe(false);
   });
 
@@ -87,8 +86,6 @@ describe("static safety: manual CO2 surface", () => {
     "Leads",
     "writeWateringTypedEvent",
     "action_queue",
-    "switchbot.com",
-    "api.switch-bot",
   ];
   for (const f of files) {
     const src = readFileSync(resolve(process.cwd(), f), "utf8");

@@ -230,9 +230,10 @@ export function normalizeWebhookIngestPayload(
 
   // source -----------------------------------------------------------------
   const source = input.source;
-  if (!isNonEmptyString(source)) {
+  const canonicalSource = normalizeWebhookSource(source);
+  if (!isNonEmptyString(source) || source.trim().length === 0) {
     errors.push("source required");
-  } else if (!isWebhookSource(source)) {
+  } else if (!canonicalSource) {
     errors.push(`invalid source: ${source}`);
   }
 

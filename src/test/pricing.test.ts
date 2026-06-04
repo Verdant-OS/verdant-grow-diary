@@ -134,13 +134,13 @@ describe("Free vs Pro vs Founder Lifetime comparison", () => {
   });
 
   it("comparison rows expose a founder column", () => {
-    expect(PAGE).toMatch(/founder:\\s*(true|false|"|')/);
+    expect(PAGE).toMatch(/founder:\s*(true|false|"|')/);
     expect(PAGE).toMatch(/row\.founder/);
   });
 
   it("includes Best for and Price rows for at-a-glance comparison", () => {
-    expect(PAGE).toMatch(/label:\\s*["']Best for["']/);
-    expect(PAGE).toMatch(/label:\\s*["']Price["']/);
+    expect(PAGE).toMatch(/label:\s*["']Best for["']/);
+    expect(PAGE).toMatch(/label:\s*["']Price["']/);
   });
 });
 

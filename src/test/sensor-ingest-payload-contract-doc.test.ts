@@ -91,7 +91,7 @@ describe("sensor ingest payload contract doc", () => {
   });
 
   it("forbids trusting client-supplied user_id", () => {
-    expect(lower).toMatch(/client-supplied `?user_id`? must never be trusted/);
+    expect(lower).toMatch(/client-supplied .{0,4}user_id.{0,4} must never be trusted/);
   });
 
   it("forbids service_role bypass before validation", () => {

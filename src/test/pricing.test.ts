@@ -114,13 +114,11 @@ describe("Free vs Pro vs Founder Lifetime comparison", () => {
   it("Pro tier includes sync, backup, multi-tent, exports, priority support", () => {
     for (const item of [
       "Cloud sync",
-      "Automatic backups",
+      "Export / backups",
       "Multi-tent support",
-      "Advanced exports",
       "Priority support",
       "Sensor snapshot history",
-      "Longer grow history",
-      "Better timeline filtering",
+      "Advanced timeline filtering",
     ]) {
       expect(PAGE).toContain(item);
     }

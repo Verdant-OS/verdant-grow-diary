@@ -309,7 +309,7 @@ export function normalizeWebhookIngestPayload(
         tent_id: tentId as string,
         metric: rule.canonical,
         value: converted,
-        source: source as WebhookSource,
+        source: canonicalSource as WebhookSource,
         captured_at: capturedAtIso!,
         ts: capturedAtIso!,
         quality: "ok",

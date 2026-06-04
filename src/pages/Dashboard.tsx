@@ -348,8 +348,36 @@ export default function Dashboard() {
                   No sensor snapshot yet
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Add a manual reading or connect Ecowitt to see your environment here.
+                  Add a manual reading or{" "}
+                  <Link
+                    to="/sensors"
+                    data-testid="dashboard-environment-snapshot-empty-sensors-link"
+                    className="underline text-primary hover:opacity-80"
+                  >
+                    connect Ecowitt
+                  </Link>{" "}
+                  to see your environment here.
                 </p>
+                <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
+                  <Button asChild size="sm" className="gradient-leaf text-primary-foreground">
+                    <Link
+                      to="/sensors#manual-reading"
+                      data-testid="dashboard-environment-snapshot-add-manual-reading"
+                      aria-label="Add manual sensor reading"
+                    >
+                      Add manual reading
+                    </Link>
+                  </Button>
+                  <Button asChild size="sm" variant="outline">
+                    <Link
+                      to="/sensors"
+                      data-testid="dashboard-environment-snapshot-go-to-sensors"
+                      aria-label="Go to Sensors page"
+                    >
+                      Go to Sensors
+                    </Link>
+                  </Button>
+                </div>
               </div>
             );
           }

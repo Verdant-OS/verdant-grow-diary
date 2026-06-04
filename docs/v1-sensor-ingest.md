@@ -225,6 +225,38 @@ rest_command:
 
 Trigger from an HA automation on a 60-second interval.
 
+## 7b. Example: Home Assistant via generic `webhook` source + vendor lineage
+
+Same endpoint, but using the contract-aligned generic `source: "webhook"`
+with `vendor: "home_assistant"` so the row records HA lineage without
+trusting it for auth or routing:
+
+```yaml
+rest_command:
+  verdant_ingest_webhook:
+    url: https://<project>.functions.supabase.co/sensor-ingest-webhook
+    method: post
+    headers:
+      Authorization: !secret verdant_jwt
+      Content-Type: application/json
+    payload: >-
+      {
+        "tent_id": "{{ tent_id }}",
+        "source": "webhook",
+        "vendor": "home_assistant",
+        "captured_at": "{{ now().isoformat() }}",
+        "metrics": {
+          "temp_c": {{ states('sensor.tent_temp') | float }},
+          "humidity_pct": {{ states('sensor.tent_humidity') | float }}
+        },
+        "metadata": { "device_id": "ha-{{ tent_id }}" }
+      }
+```
+
+The row's `source` column is `webhook`; `raw_payload.vendor` is
+`"home_assistant"`. Vendor is lineage only — it never grants permissions
+and never alters `user_id` or `tent_id`.
+
 ## 8. MQTT pattern (recommended)
 
 Verdant does **not** run a hosted MQTT subscriber in V1. Instead, use a
@@ -246,6 +278,35 @@ sensor-ingest-webhook (this endpoint)
 The bridge handles MQTT locally and forwards the normalized payload —
 exactly the same body documented in §1 — to the webhook. A persistent
 hosted MQTT service is intentionally deferred.
+
+### 8a. Example: EcoWitt-over-MQTT bridge payload
+
+When an EcoWitt gateway publishes to an MQTT broker and a local bridge
+forwards it to the webhook, set `source: "mqtt"` (the transport) and
+`vendor: "ecowitt"` (the device lineage):
+
+```json
+POST /sensor-ingest-webhook
+Authorization: Bearer <jwt-or-vbt-token>
+Content-Type: application/json
+
+{
+  "tent_id": "11111111-1111-1111-1111-111111111111",
+  "source": "mqtt",
+  "vendor": "ecowitt",
+  "captured_at": "2026-05-26T20:00:00Z",
+  "metrics": {
+    "temp_c": 24.6,
+    "humidity_pct": 58
+  },
+  "metadata": { "device_id": "ecowitt-gw-1" }
+}
+```
+
+The persisted row has `source = "mqtt"` and `raw_payload.vendor =
+"ecowitt"`. Authorization is decided entirely by the bearer token; vendor
+is never consulted for ownership or routing.
+
 
 ---
 

@@ -227,10 +227,21 @@ export function groupBlockedRowsByReason(
 // ---------------------------------------------------------------------------
 
 export interface BuildCsvImportPlanReportOptions {
-  generatedAt: string;
+  /** Either a fixed ISO string, a Date, or a clock function returning Date. */
+  generatedAt?: string | Date | (() => Date);
+  /** Alias for generatedAt as a clock function. Either works. */
+  now?: Date | (() => Date);
   sensorSampleLimit?: number;
   blockedSamplePerReasonLimit?: number;
   blockedRowContext?: ReadonlyMap<number, BlockedRowContext>;
+}
+
+function resolveGeneratedAt(opts: BuildCsvImportPlanReportOptions | undefined): string {
+  const src = opts?.generatedAt ?? opts?.now;
+  if (typeof src === "string") return src;
+  if (src instanceof Date) return src.toISOString();
+  if (typeof src === "function") return src().toISOString();
+  return new Date().toISOString();
 }
 
 export interface CsvImportPlanReport {

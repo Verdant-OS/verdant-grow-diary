@@ -41,6 +41,8 @@ export interface NormalizedDiaryDetails {
     source?: string;
     /** Narrowed state: "live" | "manual" | "stale" | "invalid". */
     state?: string;
+    /** Optional vendor lineage (lineage only — never auth/ownership). */
+    vendor?: string;
   };
   remindAt?: string;
   /** Unknown but preserved keys (sanitized — no functions, no class instances). */

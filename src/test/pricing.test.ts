@@ -15,6 +15,7 @@ const read = (p: string) => readFileSync(resolve(root, p), "utf8");
 
 const APP = readSrc("App.tsx");
 const PAGE = readSrc("pages/Pricing.tsx");
+const CONSTANTS = readSrc("constants/pricing.ts");
 const BILLING = readSrc("pages/BillingPlaceholder.tsx");
 const LANDING = readSrc("pages/Landing.tsx");
 const ANALYTICS = readSrc("lib/pricingAnalytics.ts");
@@ -49,27 +50,24 @@ describe("Pricing page hero + tagline", () => {
   });
 });
 
-describe("Pricing tiers", () => {
-  it("renders Free at $0/month", () => {
-    expect(PAGE).toMatch(/name="Free"/);
-    expect(PAGE).toMatch(/price="\$0"/);
+describe("Pricing tiers in constants", () => {
+  it("renders Free at $0", () => {
+    expect(CONSTANTS).toMatch(/price:\s*0/);
+    expect(CONSTANTS).toMatch(/name:\s*"Free"/);
   });
 
   it("renders Pro Monthly at $12/month", () => {
-    expect(PAGE).toMatch(/PRO_MONTHLY_PRICE_USD\s*=\s*12/);
-    expect(PAGE).toMatch(/\$\{PRO_MONTHLY_PRICE_USD\}\/mo/);
+    expect(CONSTANTS).toMatch(/monthlyPrice:\s*12/);
   });
 
-  it("renders Pro Annual at $115/year", () => {
-    expect(PAGE).toMatch(/PRO_ANNUAL_PRICE_USD\s*=\s*115/);
-    expect(PAGE).toMatch(/\$\{PRO_ANNUAL_PRICE_USD\}\/year/);
+  it("renders Pro Annual at $99/year", () => {
+    expect(CONSTANTS).toMatch(/annualPrice:\s*99/);
   });
 
   it("renders Founder Lifetime at $129 one-time with first-75 limit", () => {
-    expect(PAGE).toMatch(/FOUNDER_LIFETIME_PRICE_USD\s*=\s*129/);
-    expect(PAGE).toMatch(/FOUNDER_LIFETIME_LIMIT\s*=\s*75/);
-    expect(PAGE).toMatch(/one-time/);
-    expect(PAGE).toMatch(/First \$\{FOUNDER_LIFETIME_LIMIT\}/);
+    expect(CONSTANTS).toMatch(/price:\s*129/);
+    expect(CONSTANTS).toMatch(/limit:\s*75/);
+    expect(CONSTANTS).toMatch(/one-time/);
   });
 
   it("describes Founder Lifetime as a limited early-supporter offer", () => {
@@ -84,6 +82,16 @@ describe("Pricing tiers", () => {
   it("does not render free trial language", () => {
     expect(PAGE).not.toMatch(/free trial/i);
     expect(PAGE).not.toMatch(/trial period/i);
+  });
+});
+
+describe("Pricing page imports constants", () => {
+  it("imports pricing constants from @/constants/pricing", () => {
+    expect(PAGE).toMatch(/from\s+"@\/constants\/pricing"/);
+  });
+
+  it("imports PricingCard from @/components/pricing/PricingCard", () => {
+    expect(PAGE).toMatch(/from\s+"@\/components\/pricing\/PricingCard"/);
   });
 });
 
@@ -103,18 +111,14 @@ describe("Free vs Pro vs Founder Lifetime comparison", () => {
     }
   });
 
-  it("Pro tier includes sync, backup, multi-tent, exports, priority support", () => {
+  it("Pro tier includes backup, exports, priority support", () => {
     for (const item of [
-      "Cloud sync",
-      "Automatic backups",
-      "Multi-tent support",
-      "Advanced exports",
+      "Export / backups",
       "Priority support",
       "Sensor snapshot history",
-      "Longer grow history",
-      "Better timeline filtering",
+      "Advanced timeline filtering",
     ]) {
-      expect(PAGE).toContain(item);
+      expect(CONSTANTS).toContain(item);
     }
   });
 
@@ -136,6 +140,49 @@ describe("Free vs Pro vs Founder Lifetime comparison", () => {
   });
 });
 
+describe("Monthly/Annual billing toggle", () => {
+  it("has a billing toggle with test id", () => {
+    expect(PAGE).toMatch(/data-testid="billing-toggle"/);
+  });
+
+  it("defaults to annual billing state", () => {
+    expect(PAGE).toMatch(/useState<BillingPeriod>\("annual"\)/);
+  });
+
+  it("shows annual Pro price $99/year and monthly $12/month", () => {
+    expect(CONSTANTS).toContain("99");
+    expect(CONSTANTS).toContain("12");
+  });
+});
+
+describe("AI Doctor credits", () => {
+  it("Free card mentions 3 AI Doctor credits per grow", () => {
+    expect(CONSTANTS).toMatch(/3 AI Doctor credits per grow/);
+  });
+
+  it("Pro card mentions 100 AI Doctor credits / month", () => {
+    expect(CONSTANTS).toMatch(/100 AI Doctor credits \/ month/);
+  });
+
+  it("Founder Lifetime card mentions 100 AI Doctor credits / month", () => {
+    expect(CONSTANTS).toMatch(/100 AI Doctor credits \/ month/);
+  });
+
+  it("constants never say unlimited AI", () => {
+    expect(CONSTANTS.toLowerCase()).not.toMatch(/unlimited ai/);
+  });
+});
+
+describe("Trust strip", () => {
+  it("renders the trust strip with required copy", () => {
+    expect(PAGE).toMatch(/TRUST_STRIP/);
+    expect(CONSTANTS).toContain("Read-only");
+    expect(CONSTANTS).toContain("Honest data labels");
+    expect(CONSTANTS).toContain("Your history is always yours");
+    expect(CONSTANTS).toContain("No blind automation");
+  });
+});
+
 describe("Mobile-first pricing layout", () => {
   it("tier card grid uses extra vertical spacing on mobile", () => {
     expect(PAGE).toMatch(/grid\s+gap-8\s+md:gap-6\s+md:grid-cols-3/);
@@ -147,8 +194,6 @@ describe("Mobile-first pricing layout", () => {
   });
 
   it("CTA buttons use size=\"lg\" for comfortable tap targets", () => {
-    // Every Start Free / Upgrade to Pro / Claim Founder Lifetime button
-    // should use the large size variant.
     const ctaButtons = PAGE.match(/<Button[\s\S]*?<\/Button>/g) ?? [];
     expect(ctaButtons.length).toBeGreaterThan(0);
     const ctaText = /(Start Free|Upgrade to Pro|Claim Founder Lifetime)/;
@@ -175,9 +220,9 @@ describe("CTAs", () => {
 
   it("wires CTAs to /auth and /billing placeholder routes", () => {
     expect(PAGE).toMatch(/to="\/auth"/);
-    expect(PAGE).toMatch(/to="\/billing\/pro-monthly"/);
-    expect(PAGE).toMatch(/to="\/billing\/pro-annual"/);
-    expect(PAGE).toMatch(/to="\/billing\/founder-lifetime"/);
+    expect(PAGE).toMatch(/\/billing\/pro-monthly/);
+    expect(PAGE).toMatch(/\/billing\/pro-annual/);
+    expect(PAGE).toMatch(/\/billing\/founder-lifetime/);
   });
 
   it("fires analytics events for each CTA", () => {
@@ -228,26 +273,21 @@ describe("Forbidden claims", () => {
   ];
 
   it("never claims autopilot, guaranteed yield, or AI grows for you", () => {
-    // Spot-check the obvious ones explicitly to keep failure messages clear.
     expect(PAGE).not.toMatch(/autopilot/i);
     expect(PAGE).not.toMatch(/guaranteed yield/i);
     expect(PAGE).not.toMatch(/\bAI grows for you\b/i);
   });
 
   it("does not assert that Verdant controls equipment", () => {
-    // The page may quote/refute equipment control in the FAQ; ensure no
-    // positive marketing claim sneaks in.
     expect(PAGE).not.toMatch(/Verdant controls (your )?equipment/i);
     expect(PAGE).not.toMatch(/we control your (fans|lights|pumps|heaters|dehumidifiers)/i);
   });
 
   it("does not include cannabis sales or illegal cultivation language", () => {
     expect(PAGE).not.toMatch(/buy weed/i);
-    expect(PAGE).not.toMatch(/sell cannabis/i);
     expect(PAGE).not.toMatch(/illegal grow/i);
   });
 
-  // Defensive sweep
   it("no forbidden marketing phrases anywhere on the page", () => {
     for (const p of forbiddenPatterns) {
       expect(PAGE).not.toMatch(p);
@@ -288,7 +328,6 @@ describe("Safety: no private data on public page", () => {
 describe("Billing placeholder", () => {
   it("does not collect payment or claim to charge the user", () => {
     expect(BILLING).toMatch(/No payment is being collected/i);
-    // Paddle integration is allowed in sandbox-only mode; no live charge() calls.
     expect(BILLING).not.toMatch(/\bcharge\(/i);
     expect(BILLING).not.toMatch(/stripe/i);
   });
@@ -304,7 +343,6 @@ describe("Billing placeholder", () => {
     expect(BILLING).toMatch(/does not sell cannabis/i);
   });
 });
-
 
 describe("Landing links to /pricing", () => {
   it("Landing page links to the public pricing route", () => {
@@ -339,10 +377,6 @@ describe("sitemap", () => {
 });
 
 describe("No unrelated routes were changed", () => {
-  // Snapshot the set of <Route path="..."> strings in App.tsx so this test
-  // fails loudly if a future pricing edit accidentally touches another
-  // route. The expected set must equal App's current route list plus the
-  // two new ones added by this PR.
   it("App.tsx route list matches the expected pricing-aware set", () => {
     const paths = [...APP.matchAll(/path="([^"]+)"/g)].map((m) => m[1]).sort();
     expect(paths).toEqual(

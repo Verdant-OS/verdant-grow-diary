@@ -24,6 +24,12 @@ export interface PendingAction {
   suggested_change: string;
   reason: string;
   created_at: string;
+  /** Optional related entity IDs (used for display chips on the Dashboard). */
+  tent_id: string | null;
+  plant_id: string | null;
+  /** Lineage label for the source (e.g. 'ai_doctor', 'alert', 'manual'). */
+  source: string | null;
+  status: string;
 }
 
 export type RecentState =

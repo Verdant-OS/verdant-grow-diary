@@ -370,6 +370,7 @@ describe("No unrelated routes were changed", () => {
         "/grows/:growId",
         "/hardware-integrations",
         "/imports/representative-csv",
+        "/ingest-inspector",
         "/leads",
         "/login",
         "/logs",

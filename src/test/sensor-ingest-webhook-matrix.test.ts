@@ -460,12 +460,14 @@ describe("ingest matrix — static safety guards on edge function source", () =>
   });
 
   it("authenticates BEFORE parsing body and inserting", () => {
-    // authenticateBearer must appear before any sensor_readings insert.
+    // authenticateBearer must appear before any sensor_readings write
+    // (insert or atomic upsert).
     const authIdx = SRC.indexOf("authenticateBearer(");
-    const insertIdx = SRC.indexOf('from("sensor_readings").insert');
+    const writeMatch = SRC.match(/from\(["']sensor_readings["']\)\s*\.\s*(insert|upsert)/);
+    const writeIdx = writeMatch ? SRC.indexOf(writeMatch[0]) : -1;
     expect(authIdx).toBeGreaterThan(-1);
-    expect(insertIdx).toBeGreaterThan(-1);
-    expect(authIdx).toBeLessThan(insertIdx);
+    expect(writeIdx).toBeGreaterThan(-1);
+    expect(authIdx).toBeLessThan(writeIdx);
   });
 
   it("stamps server-resolved user_id on every insert row", () => {

@@ -114,6 +114,8 @@ export function useGrowDetailData(): UseGrowDetailData {
   const [grow, setGrow] = useState<GrowRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [error, setError] = useState(false);
+
   const [counts, setCounts] = useState<GrowCounts>(EMPTY_COUNTS);
   const [recent, setRecent] = useState<RecentState>({ status: "loading" });
   const [outcomes, setOutcomes] = useState<GrowOutcomesState>(EMPTY_GROW_OUTCOMES_STATE);

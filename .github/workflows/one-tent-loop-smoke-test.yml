@@ -43,3 +43,6 @@ jobs:
 
       - name: Sensor Intelligence safety scanner
         run: bun run test:sensor-intelligence-safety
+
+      - name: VPD stage mapping ownership scanner
+        run: bun run test:vpd-stage-normalization-ownership

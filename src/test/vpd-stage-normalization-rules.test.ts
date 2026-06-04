@@ -49,13 +49,13 @@ describe("normalizeToCanonicalVpdTargetStage — legacy mappings", () => {
     });
   }
 
-  it("accepts case/whitespace/dash variants", () => {
-    expect(normalizeToCanonicalVpdTargetStage("  Late-Flower ").canonical).toBe(
-      "mid_late_flower",
-    );
-    expect(normalizeToCanonicalVpdTargetStage("PREFLOWER").canonical).toBe(
-      "early_flower",
-    );
+  it("rejects case / whitespace / dash variants (strict)", () => {
+    // Strict parsing: only exact lowercase canonical/legacy IDs are valid.
+    expect(normalizeToCanonicalVpdTargetStage("  Late-Flower ").known).toBe(false);
+    expect(normalizeToCanonicalVpdTargetStage("PREFLOWER").known).toBe(false);
+    expect(normalizeToCanonicalVpdTargetStage("Veg").known).toBe(false);
+    expect(normalizeToCanonicalVpdTargetStage(" veg ").known).toBe(false);
+    expect(normalizeToCanonicalVpdTargetStage("late-flower").known).toBe(false);
   });
 });
 
@@ -87,9 +87,27 @@ describe("normalizeToCanonicalVpdTargetStage — unknown / missing", () => {
     expect(normalizeToCanonicalVpdTargetStage("").known).toBe(false);
     expect(normalizeToCanonicalVpdTargetStage("   ").known).toBe(false);
   });
-  it("returns unknown for unrecognized strings", () => {
-    for (const v of ["mystery", "harvest", "drying", "bloomtime", "fruiting"]) {
+  it("returns unknown for unrecognized strings (incl. post-harvest, drying, cure)", () => {
+    for (const v of [
+      "mystery",
+      "harvest",
+      "drying",
+      "dry",
+      "cure",
+      "bloomtime",
+      "fruiting",
+      "post-harvest",
+      "post_harvest",
+    ]) {
       expect(normalizeToCanonicalVpdTargetStage(v).known).toBe(false);
+    }
+  });
+
+  it("returns unknown for non-string inputs", () => {
+    // Defensive: callers may pass arbitrary runtime values.
+    for (const v of [0, 1, true, false, {}, [], NaN]) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(normalizeToCanonicalVpdTargetStage(v as any).known).toBe(false);
     }
   });
 
@@ -255,6 +273,10 @@ describe("static guard — no source file outside the helper duplicates the mapp
       [/"veg"/, /"late_veg"/],
     ];
     for (const f of files) {
+      // Tests legitimately exercise both legacy and canonical names; the
+      // guard's intent is to prevent runtime/source duplication, not
+      // ban references inside .tsx tests.
+      if (f.includes(`${resolve(ROOT, "src/test")}/`)) continue;
       const src = readFileSync(f, "utf8");
       const hit = PAIRS.some(([a, b]) => a.test(src) && b.test(src));
       if (hit) violators.push(f);

@@ -30,7 +30,7 @@ Action Queue, follow-up diary, or grow targets. See
 - [ ] No `service_role` in client code
 - [ ] No new `functions.invoke` in scanned surfaces
 - [ ] No automatic device-control paths introduced
-- [ ] EcoWitt-only sensor direction preserved (no SwitchBot references)
+- [ ] EcoWitt-only sensor direction preserved (no non-EcoWitt vendor references)
 - [ ] VPD targets remain derived; never labeled "Live"
 
 ## Scope guardrails for this PR

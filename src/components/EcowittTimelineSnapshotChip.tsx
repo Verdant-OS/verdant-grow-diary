@@ -5,7 +5,7 @@
  * Hard constraints:
  *  - Presenter only. No business logic. No fetches. No writes.
  *  - Derived VPD is always labelled via `ECOWITT_DERIVED_VPD_LABEL`.
- *    Never renders "Live VPD" or "VPD Live".
+ *    Never relabels derived VPD as anything else.
  *  - Renders nothing when no snapshot was matched — callers should not
  *    wrap in a container that implies a value when there isn't one.
  */

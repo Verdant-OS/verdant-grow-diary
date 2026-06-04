@@ -24,6 +24,8 @@ const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 const APP = read("src/App.tsx");
 const ALERTS = read("src/pages/Alerts.tsx");
 
+vi.mock("@/components/AlertsAutoPersistForGrow", () => ({ default: () => null }));
+
 describe("Alerts route — quick link contract", () => {
   it("Plant Detail quick-status Alerts link target matches alertsPath helper", () => {
     const v = buildPlantQuickStatusView({
@@ -57,7 +59,7 @@ describe("Alerts route — quick link contract", () => {
   it("empty state uses safety-pinned copy with calm helper text", () => {
     expect(ALERTS).toMatch(/No open alerts\./);
     expect(ALERTS).toMatch(
-      /Verdant will show environment or grow warnings here/,
+      /Alerts will appear when real or manual readings breach your grow targets/,
     );
   });
 

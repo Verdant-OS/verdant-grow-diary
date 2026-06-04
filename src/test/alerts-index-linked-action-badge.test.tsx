@@ -170,6 +170,8 @@ async function rowFor(alertId: string): Promise<HTMLElement> {
   });
 }
 
+vi.mock("@/components/AlertsAutoPersistForGrow", () => ({ default: () => null }));
+
 describe("Alerts Index — Linked action badge", () => {
   it("renders 'Has linked action' on alert with exactly one open linked action", async () => {
     renderPage();

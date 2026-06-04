@@ -17,6 +17,7 @@ import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { AlertWhyContext } from "@/components/AlertWhyContext";
 import { LinkedActionCountBadge } from "@/components/LinkedActionCountBadge";
+import AlertsAutoPersistForGrow from "@/components/AlertsAutoPersistForGrow";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,6 +29,7 @@ import {
 } from "@/components/ui/select";
 
 import { useScopedGrow } from "@/hooks/useScopedGrow";
+import { useGrows } from "@/store/grows";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import { useAlertEvents } from "@/hooks/useAlertEvents";
 import { useAlertsLinkedActionCounts } from "@/hooks/useAlertsLinkedActionCounts";
@@ -83,6 +85,21 @@ export default function Alerts() {
   // A grow id was passed in the URL but doesn't map to a grow the viewer
   // owns. Showing every alert would be misleading — render a calm prompt.
   const hasInvalidScope = !!urlGrowId && !isValidScopedGrow;
+
+  // Trigger coverage fix: ensure simply viewing the Alerts page closes the
+  // loop (real/manual reading → derived breach → persisted alert) without
+  // requiring the grower to first visit the Dashboard with `?growId=`.
+  // When unscoped, fall back to all of the user's grows so any active grow
+  // with a fresh breaching snapshot still persists.
+  const { grows, activeGrowId } = useGrows();
+  const persistGrowIds: string[] = scopedGrowId
+    ? [scopedGrowId]
+    : activeGrowId
+      ? [activeGrowId]
+      : grows.map((g) => g.id);
+  const stageByGrow = new Map<string, string | null>(
+    grows.map((g) => [g.id, (g as { stage?: string | null }).stage ?? null]),
+  );
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
@@ -155,6 +172,15 @@ export default function Alerts() {
 
   return (
     <div>
+      {/* Side-effect only: evaluate latest valid snapshot vs grow targets
+          and persist breaches into public.alerts. Renders nothing. */}
+      {persistGrowIds.map((gid) => (
+        <AlertsAutoPersistForGrow
+          key={gid}
+          growId={gid}
+          stage={stageByGrow.get(gid) ?? null}
+        />
+      ))}
       <GrowBreadcrumbs
         growId={urlGrowId}
         growName={scopedGrowName}
@@ -284,7 +310,7 @@ export default function Alerts() {
         <EmptyState
           icon={<Bell className="h-6 w-6" />}
           title="No open alerts."
-          description="Verdant will show environment or grow warnings here when they appear. Nothing needs your attention right now."
+          description="Alerts will appear when real or manual readings breach your grow targets."
         />
       ) : (
         <div className="space-y-6">

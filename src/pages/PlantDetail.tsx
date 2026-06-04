@@ -60,12 +60,51 @@ import { logsPath, plantDetailPath, plantsPath, tentDetailPath } from "@/lib/rou
 export default function PlantDetail() {
   const [quickLogOpen, setQuickLogOpen] = useState(false);
   const { id } = useParams();
-  const { data: plant, isLoading } = useGrowPlant(id);
+  const { data: plant, isLoading, isError, refetch } = useGrowPlant(id);
   const { data: tent } = useGrowTent(plant?.tentId);
   const plantMeta = getGrowDataMeta(["grow", "plant", id ?? null]);
   const tentMeta = getGrowDataMeta(["grow", "tent", plant?.tentId ?? null]);
 
-  if (isLoading) return <div className="glass rounded-2xl h-64 animate-pulse" />;
+  if (isLoading) {
+    return (
+      <div
+        role="status"
+        aria-label="Loading plant"
+        aria-busy="true"
+        data-testid="plant-detail-loading"
+        className="glass rounded-2xl h-64 animate-pulse"
+      />
+    );
+  }
+  if (isError) {
+    return (
+      <div data-testid="plant-detail-error">
+        <EmptyState
+          icon={<AlertTriangle className="h-6 w-6" />}
+          title="Couldn't load this plant"
+          description="Something went wrong while loading plant details. Check your connection and retry."
+          action={
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => refetch()}
+                data-testid="plant-detail-error-retry"
+                className="min-h-11"
+              >
+                Retry
+              </Button>
+              <Button asChild variant="ghost" className="min-h-11">
+                <Link to={plantsPath()}>
+                  <ArrowLeft className="h-4 w-4" /> Back to plants
+                </Link>
+              </Button>
+            </div>
+          }
+        />
+      </div>
+    );
+  }
   if (!plant) {
     return (
       <div>
@@ -80,9 +119,9 @@ export default function PlantDetail() {
           title="Plant not found"
           description="This plant isn't in your tracked plants yet."
           action={
-            <Button asChild variant="outline">
+            <Button asChild variant="outline" className="min-h-11">
               <Link to={plantsPath()}>
-                <ArrowLeft className="h-4 w-4" /> Back
+                <ArrowLeft className="h-4 w-4" /> Back to plants
               </Link>
             </Button>
           }

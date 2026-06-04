@@ -41,7 +41,7 @@ describe("Pricing Page UI", () => {
   });
 
   it("default billing state is Annual", () => {
-    render(<Pricing />);
+    renderPricing();
     const proPrice = screen.getByTestId("pricing-card-pro-price");
     expect(proPrice.textContent).toContain("$99");
     expect(proPrice.textContent).toContain("/ year");

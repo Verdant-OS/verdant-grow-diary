@@ -43,7 +43,7 @@ export interface ManualEntryInput {
    * Blank is treated as unknown (NOT zero). Never estimated from
    * lux, wattage, or light percentage. Validated via ppfdRules.
    */
-  ppfdUmol?: string | number | null;
+  ppfd?: string | number | null;
 }
 
 export interface ManualReadingMetric {

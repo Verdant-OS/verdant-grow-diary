@@ -22,6 +22,7 @@ function makeDiaryItem(opts: {
   note?: string | null;
   stage?: string | null;
   hasPhoto?: boolean;
+  photoUrl?: string | null;
   sensorSnapshot?: unknown;
 }): TimelineMemoryItem {
   return {
@@ -32,6 +33,7 @@ function makeDiaryItem(opts: {
     hasPhoto: opts.hasPhoto ?? false,
     note: opts.note ?? null,
     stage: opts.stage ?? null,
+    photoUrl: opts.photoUrl ?? null,
     sensorSnapshot: opts.sensorSnapshot,
   };
 }

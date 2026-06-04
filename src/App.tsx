@@ -75,7 +75,10 @@ const App = () => (
 
               <Route element={<AppShell />}>
                 <Route path="/" element={<Dashboard />} />
-                <Route path="/grow-room" element={<GrowRoomMode />} />
+                {/* Legacy Live Dashboard route — consolidated into the
+                    main Dashboard. Redirect preserves old bookmarks. */}
+                <Route path="/grow-room" element={<Navigate to="/" replace />} />
+
                 <Route path="/daily-check" element={<DailyCheck />} />
                 <Route path="/tents" element={<Tents />} />
                 <Route path="/tents/:id" element={<TentDetail />} />

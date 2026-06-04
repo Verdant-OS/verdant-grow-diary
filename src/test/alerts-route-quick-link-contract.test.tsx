@@ -59,7 +59,7 @@ describe("Alerts route — quick link contract", () => {
   it("empty state uses safety-pinned copy with calm helper text", () => {
     expect(ALERTS).toMatch(/No open alerts\./);
     expect(ALERTS).toMatch(
-      /Verdant will show environment or grow warnings here/,
+      /Alerts will appear when real or manual readings breach your grow targets/,
     );
   });
 

@@ -267,7 +267,7 @@ export function normalizeWebhookIngestPayload(
 
   // Fail fast on structural errors before walking metrics.
   const tentIdInvalid = !isNonEmptyString(tentId) || !UUID_RE.test(tentId);
-  if (errors.length > 0 && (tentIdInvalid || !capturedAtIso || !isWebhookSource(source))) {
+  if (errors.length > 0 && (tentIdInvalid || !capturedAtIso || !canonicalSource)) {
     return { ok: false, rows: [], errors, skipped, fingerprint: null };
   }
 

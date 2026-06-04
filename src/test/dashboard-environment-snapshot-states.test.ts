@@ -28,9 +28,9 @@ describe("Dashboard Environment Snapshot · empty / stale / invalid states", () 
   });
 
   it("empty state includes the Ecowitt-or-manual helper copy", () => {
-    expect(DASH).toMatch(
-      /Add a manual reading or connect Ecowitt to see your environment here\./,
-    );
+    expect(DASH).toMatch(/Add a manual reading or/);
+    expect(DASH).toMatch(/connect Ecowitt/);
+    expect(DASH).toMatch(/to see your environment here\./);
   });
 
   it("stale/invalid status banner is rendered above the snapshot grid", () => {

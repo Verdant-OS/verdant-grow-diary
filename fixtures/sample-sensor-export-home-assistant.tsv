@@ -1,42 +1,32 @@
-# Sample Home Assistant-style sensor export for Verdant CSV Preview partner demo.
-# This file contains DEMO / SAMPLE data only. No real user data, no secrets, no tokens.
-# Format: TSV (tab-separated). Verdant auto-detects tabs and labels source = tsv.
-# Includes multiple suspicious value examples to trigger flagging:
-#   - lux column (unmapped, flagged as lux_not_ppfd)
-#   - humidity stuck at 100 (flagged as humidity_stuck)
-#   - pH = 22.5 (flagged as ph_out_of_range)
-#   - EC values look like µS/cm but header says mS/cm (flagged as ec_unit_ambiguous)
 captured_at	temperature_c	humidity_pct	vpd_kpa	co2_ppm	soil_vwc_pct	ec_ms_cm	ph	lux	light_pct	source	notes
-2026-06-01T08:00:00Z	23.2	63	1.08	840	43	1.7	6.1	12000	65	tsv	demo_row_1
-2026-06-01T08:05:00Z	23.3	62	1.11	843	42	1.7	6.1	12200	66	tsv	demo_row_2
-2026-06-01T08:10:00Z	23.5	62	1.13	846	42	1.8	6.1	12400	67	tsv	demo_row_3
-2026-06-01T08:15:00Z	23.6	61	1.16	849	41	1.8	6.2	12600	68	tsv	demo_row_4
-2026-06-01T08:20:00Z	23.8	60	1.19	852	41	1.8	6.2	12800	69	tsv	demo_row_5
-2026-06-01T08:25:00Z	23.9	60	1.20	855	40	1.8	6.2	13000	70	tsv	demo_row_6
-2026-06-01T08:30:00Z	24.0	59	1.23	858	40	1.9	6.2	13200	71	tsv	demo_row_7
-2026-06-01T08:35:00Z	24.1	59	1.24	861	39	1.9	6.3	13400	72	tsv	demo_row_8
-2026-06-01T08:40:00Z	24.3	58	1.27	864	39	1.9	6.3	13600	73	tsv	demo_row_9
-2026-06-01T08:45:00Z	24.4	58	1.28	867	38	1.9	6.3	13800	74	tsv	demo_row_10
-2026-06-01T08:50:00Z	24.5	57	1.31	870	38	2.0	6.3	14000	75	tsv	demo_row_11
-2026-06-01T08:55:00Z	24.6	57	1.32	873	37	2.0	6.4	14200	76	tsv	demo_row_12
-2026-06-01T09:00:00Z	24.8	56	1.35	876	37	2.0	6.4	14400	77	tsv	demo_row_13
-2026-06-01T09:05:00Z	24.9	56	1.36	879	36	2.0	6.4	14600	78	tsv	demo_row_14
-2026-06-01T09:10:00Z	25.0	55	1.39	882	36	2.1	6.4	14800	79	tsv	demo_row_15
-2026-06-01T09:15:00Z	25.1	55	1.40	885	35	2.1	6.5	15000	80	tsv	demo_row_16
-2026-06-01T09:20:00Z	25.2	54	1.43	888	35	2.1	6.5	15200	81	tsv	demo_row_17
-2026-06-01T09:25:00Z	25.4	54	1.44	891	34	2.1	6.5	15400	82	tsv	demo_row_18
-2026-06-01T09:30:00Z	25.5	53	1.47	894	34	2.2	6.5	15600	83	tsv	demo_row_19
-2026-06-01T09:35:00Z	25.6	53	1.48	897	33	2.2	6.6	15800	84	tsv	demo_row_20
-2026-06-01T09:40:00Z	25.7	52	1.51	900	33	2.2	6.6	16000	85	tsv	demo_row_21
-2026-06-01T09:45:00Z	25.8	52	1.52	903	32	2.2	6.6	16200	86	tsv	demo_row_22
-2026-06-01T09:50:00Z	25.9	51	1.55	906	32	2.3	6.6	16400	87	tsv	demo_row_23
-2026-06-01T09:55:00Z	26.0	51	1.56	909	31	2.3	6.7	16600	88	tsv	demo_row_24
-2026-06-01T10:00:00Z	26.1	50	1.59	912	31	2.3	6.7	16800	89	tsv	demo_row_25
-# Suspicious value block — triggers multiple flags
-2026-06-01T10:05:00Z	26.2	100	0.00	915	30	2450	6.7	17000	90	tsv	stuck_humidity
-2026-06-01T10:10:00Z	26.3	100	0.00	918	30	2480	6.7	17200	91	tsv	stuck_humidity
-2026-06-01T10:15:00Z	26.4	100	0.00	920	30	2510	6.8	17400	92	tsv	stuck_humidity
-# pH out of range — triggers ph_out_of_range
-2026-06-01T10:20:00Z	26.5	49	1.62	922	29	2540	22.5	17600	93	tsv	impossible_ph
-2026-06-01T10:25:00Z	26.6	49	1.63	925	29	2570	6.8	17800	94	tsv	demo_row_30
-2026-06-01T10:30:00Z	26.7	48	1.66	928	28	2600	6.8	18000	95	tsv	demo_row_31
+2026-06-01T08:00:00Z	23.2	63	1.08	840	43	1.7	6.1	12000	65	tsv	demo_row_clean
+2026-06-01T08:05:00Z	23.3	62	1.11	843	42	1.7	6.1	12200	66	tsv	demo_row_clean
+2026-06-01T08:10:00Z	23.5	62	1.13	846	42	1.8	6.1	12400	67	tsv	demo_row_clean
+2026-06-01T08:15:00Z	23.6	61	1.16	849	41	1.8	6.2	12600	68	tsv	demo_row_clean
+2026-06-01T08:20:00Z	23.8	60	1.19	852	41	1.8	6.2	12800	69	tsv	demo_row_clean
+2026-06-01T08:25:00Z	23.9	60	1.20	855	40	1.8	6.2	13000	70	tsv	demo_row_clean
+2026-06-01T08:30:00Z	24.0	59	1.23	858	40	1.9	6.2	13200	71	tsv	demo_row_clean
+2026-06-01T08:35:00Z	24.1	59	1.24	861	39	1.9	6.3	13400	72	tsv	demo_row_clean
+2026-06-01T08:40:00Z	24.3	58	1.27	864	39	1.9	6.3	13600	73	tsv	demo_row_clean
+2026-06-01T08:45:00Z	24.4	58	1.28	867	38	1.9	6.3	13800	74	tsv	demo_row_clean
+2026-06-01T08:50:00Z	24.5	57	1.31	870	38	2.0	6.3	14000	75	tsv	demo_row_clean
+2026-06-01T08:55:00Z	24.6	57	1.32	873	37	2.0	6.4	14200	76	tsv	demo_row_clean
+2026-06-01T09:00:00Z	24.8	56	1.35	876	37	2.0	6.4	14400	77	tsv	demo_row_clean
+2026-06-01T09:05:00Z	24.9	56	1.36	879	36	2.0	6.4	14600	78	tsv	demo_row_clean
+2026-06-01T09:10:00Z	25.0	55	1.39	882	36	2.1	6.4	14800	79	tsv	demo_row_clean
+2026-06-01T09:15:00Z	25.1	55	1.40	885	35	2.1	6.5	15000	80	tsv	demo_row_clean
+2026-06-01T09:20:00Z	25.2	54	1.43	888	35	2.1	6.5	15200	81	tsv	demo_row_clean
+2026-06-01T09:25:00Z	25.4	54	1.44	891	34	2.1	6.5	15400	82	tsv	demo_row_clean
+2026-06-01T09:30:00Z	25.5	53	1.47	894	34	2.2	6.5	15600	83	tsv	demo_row_clean
+2026-06-01T09:35:00Z	25.6	53	1.48	897	33	2.2	6.6	15800	84	tsv	demo_row_clean
+2026-06-01T09:40:00Z	25.7	52	1.51	900	33	2.2	6.6	16000	85	tsv	demo_row_clean
+2026-06-01T09:45:00Z	25.8	52	1.52	903	32	2.2	6.6	16200	86	tsv	demo_row_clean
+2026-06-01T09:50:00Z	25.9	51	1.55	906	32	2.3	6.6	16400	87	tsv	demo_row_clean
+2026-06-01T09:55:00Z	26.0	51	1.56	909	31	2.3	6.7	16600	88	tsv	demo_row_clean
+2026-06-01T10:00:00Z	26.1	50	1.59	912	31	2.3	6.7	16800	89	tsv	demo_row_clean
+2026-06-01T10:05:00Z	26.2	100	0.00	915	30	2450	6.7	17000	90	tsv	SUSPICIOUS_humidity_stuck_and_ec_unit_mismatch
+2026-06-01T10:10:00Z	26.3	100	0.00	918	30	2480	6.7	17200	91	tsv	SUSPICIOUS_humidity_stuck_and_ec_unit_mismatch
+2026-06-01T10:15:00Z	26.4	100	0.00	920	30	2510	6.8	17400	92	tsv	SUSPICIOUS_humidity_stuck_and_ec_unit_mismatch
+2026-06-01T10:20:00Z	26.5	49	1.62	922	29	2540	22.5	17600	93	tsv	SUSPICIOUS_ph_out_of_range
+2026-06-01T10:25:00Z	26.6	49	1.63	925	29	2570	6.8	17800	94	tsv	demo_row_clean
+2026-06-01T10:30:00Z	26.7	48	1.66	928	28	2600	6.8	18000	95	tsv	demo_row_clean

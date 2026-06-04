@@ -270,13 +270,30 @@ export default function ManualSensorReadingCard({
           />
         </Section>
 
+        <Section title="Light" testId="manual-reading-section-light">
+          <Field
+            id="m-ppfd"
+            label="PPFD"
+            unit="µmol/m²/s"
+            value={form.ppfd as string}
+            onChange={(v) => update("ppfd", v)}
+            placeholder="e.g. 650"
+          />
+        </Section>
+        <p
+          className="text-[11px] text-muted-foreground"
+          data-testid="manual-reading-ppfd-hint"
+        >
+          Enter PPFD from a PAR/quantum meter. Do not estimate from light percentage or watts.
+        </p>
+
         <p
           className="text-[11px] text-muted-foreground"
           data-testid="manual-reading-out-of-scope-hint"
         >
-          pH, EC/TDS, water temp, and PPFD/DLI from pens like the Spider Farmer pH/EC combo or PAR
-          meter aren't stored as sensor metrics yet — log them as a Quick Log feeding or observation
-          note for now.
+          pH, EC/TDS, water temp, and DLI from pens like the Spider Farmer pH/EC combo aren't
+          stored as sensor metrics yet — log them as a Quick Log feeding or observation note for
+          now.
         </p>
 
         {advisor.derivedVpdKpa !== null && (

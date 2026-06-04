@@ -32,7 +32,7 @@ describe("sensor-intelligence safety scanner — synthetic violations", () => {
   it("rejects service_role used in frontend code", () => {
     const v = scanContent(
       "src/lib/unsafe.ts",
-      `import { createClient } from "@supabase/supabase-js";\nconst k = process.env.service_role;\n`,
+      `import { createClient } from "@supabase/supabase-js";\nconst k = process.env.SUPABASE_SERVICE_ROLE_KEY;\n`,
     );
     expect(v.some((x) => x.rule === "frontend-private-term")).toBe(true);
   });

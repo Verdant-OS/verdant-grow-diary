@@ -188,6 +188,26 @@ WHERE source = 'ecowitt'
 GROUP BY 1,2,3,4,5
 HAVING COUNT(*) > 1;
 -- EXPECT: 0 rows.
+
+-- 4f. No EcoWitt row may have NULL captured_at (the partial unique index
+--     would not apply, so duplicate protection would silently fail).
+SELECT COUNT(*) AS null_captured_at
+FROM public.sensor_readings
+WHERE source = 'ecowitt'
+  AND captured_at IS NULL;
+-- EXPECT: 0.
+
+-- 4g. Provenance of the most recent canary rows.
+SELECT captured_at,
+       metric,
+       raw_payload->>'timestamp_source' AS timestamp_source,
+       raw_payload->>'calculated'      AS calculated
+FROM public.sensor_readings
+WHERE source = 'ecowitt'
+ORDER BY captured_at DESC
+LIMIT 12;
+-- EXPECT: every row from the main canary shows
+--   timestamp_source = 'ecowitt_dateutc'.
 ```
 
 ---
@@ -203,6 +223,8 @@ Before promoting from canary → live:
 - [ ] Unmapped channel (`temp9f`/`humidity9`/`soilmoisture9`) produced **0 rows**.
 - [ ] Malformed `temp1f` produced **no `temperature_c`** and **no `vpd_kpa`** row.
 - [ ] `vpd_kpa` rows carry `raw_payload.calculated === true`, `raw_payload.derived_from === ["temp1f","humidity1"]`, and `raw_payload.mapping_type === "air"`.
+- [ ] Every main-canary row carries `raw_payload.timestamp_source = "ecowitt_dateutc"`. **If you see `server_received_at`, pause** — duplicate protection is weaker.
+- [ ] SQL 4f returns `null_captured_at = 0`.
 - [ ] Duplicate POST of the main canary returns `inserted: 0` and SQL 4e returns 0 rows.
 - [ ] Leak scan (4b) returns **0 rows**.
 - [ ] Known test-secret value scan (4c) returns **0 rows**.
@@ -211,6 +233,60 @@ Before promoting from canary → live:
 - [ ] No outbound HTTP to non-Supabase hosts in the function logs.
 
 If any item is unchecked, **do not** point the live gateway. File a blocker against `ecowitt-ingest` and re-run after a fix.
+
+---
+
+## 6. Canary tent setup (prerequisite)
+
+The edge function only routes a payload when at least one tent the caller owns has a matching `hardware_config.ecowitt` block. Confirmed shape consumed by the deployed code (`parseEligibleTents` in `supabase/functions/ecowitt-ingest/index.ts`):
+
+```json
+{
+  "ecowitt": {
+    "passkey_fingerprint": "ewfp_REDACTED_TEST_FINGERPRINT",
+    "air_channels": [1],
+    "soil_channels": [1]
+  }
+}
+```
+
+Notes — these are non-negotiable; the deployed code rejects anything else:
+
+- `passkey_fingerprint` is a **string** in the `ewfp_<24 hex>` format produced by `computeEcoWittPasskeyFingerprint(rawPasskey)`. The raw `PASSKEY` is **never** stored on the tent. (If you ever see `hardware_config.ecowitt.passkey` storing the raw value, stop — that's a safety regression.)
+- `air_channels` / `soil_channels` are arrays of **JSON numbers** in `[1..8]`. Strings like `"1"` are silently dropped by the router's type filter.
+- The bridge token used in the `Authorization` header must be scoped to (or its user must own) this tent.
+
+### How to compute the fingerprint locally (do not paste real values into git/chat)
+
+```bash
+node -e '
+const v = process.env.PASSKEY ?? "";
+require("node:crypto").webcrypto.subtle
+  .digest("SHA-256", new TextEncoder().encode(v.trim()))
+  .then(b => {
+    const h = [...new Uint8Array(b)].map(x => x.toString(16).padStart(2,"0")).join("");
+    console.log("ewfp_" + h.slice(0, 24));
+  });
+'
+PASSKEY="<your test passkey>" node -e '…'   # paste at the shell, never commit
+```
+
+Cross-check by running the canary POST and looking at the function response: `summary.matched_fingerprint` (echoed via `per_tent` accounting) should be the same `ewfp_…` string you stored.
+
+### Verifying the tent before POSTing
+
+```sql
+SELECT id,
+       hardware_config->'ecowitt'->>'passkey_fingerprint' AS fingerprint,
+       hardware_config->'ecowitt'->'air_channels'         AS air,
+       hardware_config->'ecowitt'->'soil_channels'        AS soil
+FROM public.tents
+WHERE hardware_config ? 'ecowitt'
+  AND is_archived = false;
+```
+
+Expect at least one row whose `fingerprint` starts with `ewfp_` and whose `air`/`soil` are JSON arrays of integers.
+
 
 ---
 

@@ -46,8 +46,6 @@ const CONFIRM_COPY =
   "I confirm this is my data and understand this import is not live data.";
 const FUTURE_FLOW_COPY =
   "Import requires review and will be enabled in a separate approval-required flow.";
-const EXISTING_DIARY_DISABLED_COPY =
-  "Existing diary entry selection will be enabled with the reviewed import flow.";
 const SAMPLE_ONLY_COPY = "Sample only. Nothing has been saved.";
 
 interface BuiltPlan {

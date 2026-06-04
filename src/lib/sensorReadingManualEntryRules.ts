@@ -16,6 +16,7 @@
  */
 
 import { buildManualDeviceId } from "@/lib/manualSensorSourceLabel";
+import { classifyPpfd, PPFD_MAX } from "@/lib/ppfdRules";
 
 
 export type ManualMetric =
@@ -23,7 +24,8 @@ export type ManualMetric =
   | "humidity_pct"
   | "vpd_kpa"
   | "co2_ppm"
-  | "soil_moisture_pct";
+  | "soil_moisture_pct"
+  | "ppfd";
 
 export interface ManualEntryInput {
   /** Air temperature in °F (UI convenience). Converted to °C on save. */
@@ -36,6 +38,12 @@ export interface ManualEntryInput {
   co2Ppm?: string | number | null;
   /** Soil water content %. */
   soilMoisturePct?: string | number | null;
+  /**
+   * PPFD µmol/m²/s from a real PAR/quantum meter. Optional.
+   * Blank is treated as unknown (NOT zero). Never estimated from
+   * lux, wattage, or light percentage. Validated via ppfdRules.
+   */
+  ppfdUmol?: string | number | null;
 }
 
 export interface ManualReadingMetric {

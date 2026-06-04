@@ -83,17 +83,31 @@ export default function PlantDetailPhotoStrip({
           Recent photos
         </h2>
         {hasPlantContext ? (
-          <Button
-            asChild
-            size="sm"
-            variant="outline"
-            className="h-7 gap-1"
-            data-testid="plant-detail-photo-strip-upload"
-          >
-            <Link to={uploadHref} aria-label="Upload photo">
-              <Upload className="h-3.5 w-3.5" /> Upload photo
-            </Link>
-          </Button>
+          onUploadPhoto ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1"
+              onClick={onUploadPhoto}
+              data-testid="plant-detail-photo-strip-upload"
+              aria-label="Add photo log for this plant"
+            >
+              <Upload className="h-3.5 w-3.5" /> Add photo log
+            </Button>
+          ) : (
+            <Button
+              asChild
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1"
+              data-testid="plant-detail-photo-strip-upload"
+            >
+              <Link to={uploadHref} aria-label="Add photo log for this plant">
+                <Upload className="h-3.5 w-3.5" /> Add photo log
+              </Link>
+            </Button>
+          )
         ) : (
           <Button
             type="button"
@@ -105,7 +119,7 @@ export default function PlantDetailPhotoStrip({
             data-testid="plant-detail-photo-strip-upload-disabled"
             title="Plant context is not loaded yet."
           >
-            <Upload className="h-3.5 w-3.5" /> Upload photo
+            <Upload className="h-3.5 w-3.5" /> Add photo log
           </Button>
         )}
       </header>

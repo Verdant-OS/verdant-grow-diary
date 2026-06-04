@@ -138,14 +138,14 @@ export function scanContent(relPath, content) {
 
   if (isThisScanner) return violations;
 
-  // 1. Frontend private terms — check only non-comment code.
+  // 1. Frontend private/server-only credentials — check only non-comment code.
   if (isFrontend && !isTestFile) {
-    for (const term of FRONTEND_PRIVATE_TERMS) {
-      if (codeOnly.includes(term)) {
+    for (const { name, re } of FRONTEND_PRIVATE_PATTERNS) {
+      if (re.test(codeOnly)) {
         violations.push({
           rule: "frontend-private-term",
-          term,
-          message: `Frontend file ${relPath} references private/server-only term \`${term}\`.`,
+          term: name,
+          message: `Frontend file ${relPath} references private/server-only term \`${name}\`.`,
         });
       }
     }

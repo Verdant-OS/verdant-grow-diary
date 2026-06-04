@@ -57,11 +57,21 @@ export const DEVICE_CONTROL_TERMS = [
   "fan_control",
 ];
 
-const FRONTEND_PRIVATE_TERMS = [
-  "service_role",
-  "SUPABASE_SERVICE_ROLE_KEY",
-  "SUPABASE_DB_URL",
-  "BRIDGE_TOKEN_SECRET",
+/**
+ * Patterns that indicate REAL usage of private/server-only credentials
+ * in frontend code. Plain mentions inside defensive denylists (e.g.
+ * `/secret|service_role|token/` regexes) are intentionally NOT flagged
+ * because they exist to PROTECT against leaks, not cause them.
+ */
+const FRONTEND_PRIVATE_PATTERNS = [
+  { name: "SUPABASE_SERVICE_ROLE_KEY", re: /\bSUPABASE_SERVICE_ROLE_KEY\b/ },
+  { name: "SUPABASE_DB_URL", re: /\bSUPABASE_DB_URL\b/ },
+  { name: "BRIDGE_TOKEN_SECRET", re: /\bBRIDGE_TOKEN_SECRET\b/ },
+  // Real service_role usage: env access, header injection, createClient option.
+  { name: "service_role", re: /service_role[^a-zA-Z0-9_]{0,4}(?:key|Key|KEY)\b/ },
+  { name: "service_role", re: /process\.env\.[A-Z_]*SERVICE_ROLE/ },
+  { name: "service_role", re: /import\.meta\.env\.[A-Z_]*SERVICE_ROLE/ },
+  { name: "service_role", re: /createClient\([^)]*service_role/i },
 ];
 
 const SCHEDULED_STATUS_PATTERNS = [

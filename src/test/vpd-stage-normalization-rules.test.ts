@@ -38,7 +38,14 @@ describe("normalizeToCanonicalVpdTargetStage — legacy mappings", () => {
   ][]) {
     it(`legacy "${legacy}" maps to canonical "${canonical}"`, () => {
       const r = normalizeToCanonicalVpdTargetStage(legacy);
-      expect(r).toEqual({ known: true, canonical, source: "legacy" });
+      expect(r.known).toBe(true);
+      expect(r.canonical).toBe(canonical);
+      // seedling exists in both vocabularies → canonical wins.
+      if (legacy === "seedling") {
+        expect(r.source).toBe("canonical");
+      } else {
+        expect(r.source).toBe("legacy");
+      }
     });
   }
 

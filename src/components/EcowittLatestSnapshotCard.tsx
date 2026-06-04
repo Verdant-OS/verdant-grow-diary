@@ -18,6 +18,8 @@ import {
   type UseEcowittLatestSnapshotInput,
 } from "@/hooks/useEcowittLatestSnapshot";
 import { ECOWITT_DERIVED_VPD_LABEL } from "@/lib/ecowittReadingViewModel";
+import { Link } from "react-router-dom";
+
 
 export interface EcowittLatestSnapshotCardProps
   extends UseEcowittLatestSnapshotInput {

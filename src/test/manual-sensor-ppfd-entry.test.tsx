@@ -111,7 +111,7 @@ describe("buildManualReadingPayloads — PPFD save shape", () => {
     expect(ppfd?.value).toBe(420);
     expect(ppfd?.source).toBe("manual");
     expect(ppfd?.ts).toBe(ts);
-    expect((ppfd as Record<string, unknown>).user_id).toBeUndefined();
+    expect((ppfd as unknown as Record<string, unknown>).user_id).toBeUndefined();
   });
 });
 

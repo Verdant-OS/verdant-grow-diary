@@ -173,6 +173,63 @@ describe("(2) timestamp / dateutc handling — gateway-trusted UTC with safe fal
       expect(r.raw_payload.timestamp_source).toBe("server_received_at");
     }
   });
+
+  it("rejects out-of-range dateutc: epoch-zero RTC and far-future clocks", async () => {
+    const { parseEcoWittDateUtc } = await import("@/lib/ecowittRoutedRowBuilder");
+    const now = new Date("2026-06-04T21:00:00.000Z");
+    // 1970 unset-RTC value: parses & round-trips but is before the sane
+    // lower bound (2020-01-01).
+    expect(parseEcoWittDateUtc("1970-01-01 00:00:00", now)).toBeNull();
+    // Far-future garbage (years ahead of `now`).
+    expect(parseEcoWittDateUtc("2099-01-01 00:00:00", now)).toBeNull();
+    // Just past `now + 24h` is rejected.
+    expect(parseEcoWittDateUtc("2026-06-06 21:00:01", now)).toBeNull();
+    // Inside the window: accepted.
+    expect(parseEcoWittDateUtc("2026-06-04 21:00:00", now)).toBe(
+      "2026-06-04T21:00:00.000Z",
+    );
+    // Just within +24h skew: accepted.
+    expect(parseEcoWittDateUtc("2026-06-05 21:00:00", now)).toBe(
+      "2026-06-05T21:00:00.000Z",
+    );
+    // Lower-bound boundary: 2020-01-01T00:00:00Z accepted.
+    expect(parseEcoWittDateUtc("2020-01-01 00:00:00", now)).toBe(
+      "2020-01-01T00:00:00.000Z",
+    );
+    // 1s before the lower bound: rejected.
+    expect(parseEcoWittDateUtc("2019-12-31 23:59:59", now)).toBeNull();
+  });
+
+  it("documents negative dedupe: payloads without valid dateutc may NOT dedupe", () => {
+    // When dateutc is missing/malformed/out-of-range, the edge function
+    // falls back to `new Date().toISOString()` at receive time. Two
+    // retries received at different instants will produce different
+    // captured_at values and therefore will NOT collide on the
+    // (user_id, tent_id, source, metric, captured_at) partial unique
+    // index. Duplicate protection is strongest only when the gateway
+    // sends a valid in-range `dateutc`.
+    const payload = { temp1f: "77", humidity1: "50" };
+    const a = buildEcoWittRoutedRows({
+      userId: USER,
+      payload,
+      payloadPasskeyFingerprint: FP_A,
+      eligibleTents: [tent],
+      capturedAt: "2026-06-04T21:00:00.000Z",
+      timestampSource: "server_received_at",
+    });
+    const b = buildEcoWittRoutedRows({
+      userId: USER,
+      payload,
+      payloadPasskeyFingerprint: FP_A,
+      eligibleTents: [tent],
+      capturedAt: "2026-06-04T21:00:05.000Z",
+      timestampSource: "server_received_at",
+    });
+    expect(a.rows[0].captured_at).not.toBe(b.rows[0].captured_at);
+    for (const r of [...a.rows, ...b.rows]) {
+      expect(r.raw_payload.timestamp_source).toBe("server_received_at");
+    }
+  });
 });
 
 describe("(3) duplicate behavior — pins onConflict against dedupe unique index", () => {

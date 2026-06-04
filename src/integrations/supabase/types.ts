@@ -1279,6 +1279,7 @@ export type Database = {
           brand: string | null
           created_at: string
           grow_id: string | null
+          hardware_config: Json | null
           id: string
           is_archived: boolean
           light_on: boolean
@@ -1295,6 +1296,7 @@ export type Database = {
           brand?: string | null
           created_at?: string
           grow_id?: string | null
+          hardware_config?: Json | null
           id?: string
           is_archived?: boolean
           light_on?: boolean
@@ -1311,6 +1313,7 @@ export type Database = {
           brand?: string | null
           created_at?: string
           grow_id?: string | null
+          hardware_config?: Json | null
           id?: string
           is_archived?: boolean
           light_on?: boolean

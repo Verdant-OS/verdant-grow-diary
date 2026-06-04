@@ -94,9 +94,9 @@ export default function GlobalFastAddButton({
         aria-haspopup="menu"
         aria-expanded={open}
         data-testid="global-fast-add-trigger"
-        className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-secondary/40 px-3 h-9 text-sm font-medium hover:bg-secondary/70 transition"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-secondary/40 px-4 min-h-11 min-w-11 text-sm font-medium hover:bg-secondary/70 active:bg-secondary/80 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background touch-manipulation"
       >
-        <Plus className="h-4 w-4" aria-hidden="true" />
+        <Plus className="h-5 w-5" aria-hidden="true" />
         Fast Add
       </button>
 
@@ -105,9 +105,9 @@ export default function GlobalFastAddButton({
           role="menu"
           aria-label="Fast Add actions"
           data-testid="global-fast-add-menu"
-          className="absolute right-0 mt-2 w-56 rounded-xl border border-border/60 bg-popover shadow-elevated p-1 z-50"
+          className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-1rem)] rounded-xl border border-border/60 bg-popover shadow-elevated p-1.5 z-50"
         >
-          <ul className="space-y-0.5">
+          <ul className="space-y-1">
             {FAST_ADD_ACTIONS.map((a) => (
               <li key={a.id}>
                 <button
@@ -116,7 +116,7 @@ export default function GlobalFastAddButton({
                   onClick={() => handle(a.id)}
                   data-testid={`global-fast-add-action-${a.id}`}
                   data-action-id={a.id}
-                  className="w-full text-left px-3 py-2 rounded-md text-sm hover:bg-secondary/60"
+                  className="w-full text-left px-3 min-h-11 flex items-center rounded-md text-sm hover:bg-secondary/60 active:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation"
                 >
                   {a.label}
                 </button>
@@ -127,17 +127,17 @@ export default function GlobalFastAddButton({
           {notice ? (
             <div
               data-testid="global-fast-add-needs-context-wrap"
-              className="px-3 py-2 mt-1 border-t border-border/40 space-y-2"
+              className="px-3 py-3 mt-1 border-t border-border/40 space-y-3"
             >
               <p
                 role="status"
                 aria-live="polite"
                 data-testid="global-fast-add-needs-context"
-                className="text-xs text-amber-200"
+                className="text-sm text-amber-200 leading-snug"
               >
                 {notice}
               </p>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {[
                   { id: "choose_plant", label: "Choose plant", to: "/plants" },
                   { id: "choose_tent", label: "Choose tent", to: "/tents" },
@@ -152,7 +152,7 @@ export default function GlobalFastAddButton({
                       setOpen(false);
                       setNotice(null);
                     }}
-                    className="text-xs px-2 py-1 rounded-md border border-border/60 hover:bg-secondary/60"
+                    className="text-sm px-3 min-h-11 inline-flex items-center rounded-md border border-border/60 hover:bg-secondary/60 active:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation"
                   >
                     {cta.label}
                   </button>

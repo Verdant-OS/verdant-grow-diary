@@ -20,29 +20,29 @@ const tentSoil: EcoWittRouterEligibleTent = {
   soil_channels: [3, 4],
 };
 
-const FORBIDDEN_RAW_KEYS = [
-  "passkey",
-  "PASSKEY",
-  "mac",
-  "MAC",
-  "api_key",
-  "application_key",
-  "token",
-  "auth",
-  "service_role",
+const FORBIDDEN_RAW_VALUES = [
+  "AAAA-SECRET",
+  "AA:BB:CC:DD:EE:FF",
+  "client-supplied-uid",
 ];
 
 function assertRowSafety(rows: ReturnType<typeof buildEcoWittRoutedRows>["rows"]) {
   for (const r of rows) {
     const s = JSON.stringify(r);
-    for (const k of FORBIDDEN_RAW_KEYS) {
-      expect(s).not.toContain(k);
+    for (const v of FORBIDDEN_RAW_VALUES) {
+      expect(s).not.toContain(v);
+    }
+    // raw_payload must not contain any credential-bearing key. The ONLY
+    // passkey-related field permitted is the safe one-way fingerprint.
+    const rpKeys = Object.keys(r.raw_payload);
+    for (const k of rpKeys) {
+      expect(k).not.toMatch(/^(passkey|mac|api_key|application_key|token|auth|service_role)$/i);
     }
     expect(r.raw_payload).toMatchObject({
       provider: "ecowitt",
       passkey_fingerprint: expect.stringMatching(/^ewfp_[0-9a-f]{24}$/),
     });
-    expect(Object.keys(r.raw_payload).sort()).toEqual(
+    expect(rpKeys.sort()).toEqual(
       expect.arrayContaining(["channel", "mapping_type", "passkey_fingerprint", "provider", "raw_key", "raw_value"]),
     );
   }

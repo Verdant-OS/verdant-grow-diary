@@ -71,14 +71,9 @@ function manualSnap(over: Partial<{ temp: number; rh: number; vpd: number; ts: s
 }
 
 const targets = {
-  temp_min: 20,
-  temp_max: 28,
-  rh_min: 40,
-  rh_max: 55,
-  vpd_min: 0.8,
-  vpd_max: 1.5,
-  ppfd_min: null,
-  ppfd_max: null,
+  temp: { min: 20, max: 28 },
+  rh: { min: 40, max: 55 },
+  vpd: { min: 0.8, max: 1.5 },
 };
 
 // ---------------------------------------------------------------------------

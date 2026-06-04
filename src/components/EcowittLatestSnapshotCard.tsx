@@ -176,18 +176,18 @@ export function EcowittLatestSnapshotCard(
               ))}
             </ul>
           ) : null}
-
-          <div className="mt-2 text-xs">
-            <Link
-              to="/sensors/ecowitt-audit"
-              data-testid="ecowitt-audit-link"
-              className="text-primary hover:underline"
-            >
-              View EcoWitt ingest audit
-            </Link>
-          </div>
         </div>
       ) : null}
+
+      <div className="mt-2 text-xs">
+        <Link
+          to="/sensors/ecowitt-audit"
+          data-testid="ecowitt-audit-link"
+          className="text-primary hover:underline"
+        >
+          View EcoWitt ingest audit
+        </Link>
+      </div>
     </section>
   );
 }

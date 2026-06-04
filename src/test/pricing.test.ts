@@ -111,10 +111,9 @@ describe("Free vs Pro vs Founder Lifetime comparison", () => {
     }
   });
 
-  it("Pro tier includes backup, multi-tent, exports, priority support", () => {
+  it("Pro tier includes backup, exports, priority support", () => {
     for (const item of [
       "Export / backups",
-      "Multi-tent support",
       "Priority support",
       "Sensor snapshot history",
       "Advanced timeline filtering",

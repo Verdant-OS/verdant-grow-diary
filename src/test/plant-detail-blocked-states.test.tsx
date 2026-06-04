@@ -22,7 +22,6 @@ vi.mock("@/hooks/useGrowData", async (importOriginal) => {
     ...actual,
     useGrowPlant: () => ({ ...mockState, refetch }),
     useGrowTent: () => ({ data: null }),
-    getGrowDataMeta: () => ({}),
   };
 });
 

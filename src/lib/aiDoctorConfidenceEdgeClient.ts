@@ -3,7 +3,7 @@
  *
  * Pure, read-only client for the approved `calculate-confidence` Edge
  * Function. Engine-only: no Supabase writes, no alerts, no Action Queue,
- * no device control, no service_role, no bridge tokens.
+ * no device control, no privileged service keys, no bridge credentials.
  *
  * Failure mode is always a conservative Low fallback. The caller never
  * sees an exception from this module.

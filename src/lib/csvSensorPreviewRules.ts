@@ -83,7 +83,11 @@ export interface CsvPreviewParseResult {
   sourceLabel: typeof CSV_PREVIEW_SOURCE_LABEL;
   /** Always the read-only status copy. */
   statusLabel: typeof CSV_PREVIEW_STATUS_LABEL;
-  /** Human-friendly error if the CSV could not be parsed. */
+  /** Detected delimiter: "," for CSV, "\t" for TSV. */
+  delimiter: "," | "\t";
+  /** "csv" | "tsv" — never "live". */
+  sourceLabel: DelimitedSourceLabel;
+  /** Human-friendly error if the file could not be parsed. */
   error: string | null;
 }
 

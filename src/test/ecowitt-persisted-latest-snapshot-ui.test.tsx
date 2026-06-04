@@ -234,9 +234,7 @@ describe("EcowittLatestSnapshotCard — render", () => {
       wrapper: wrap(),
     });
     await waitFor(() =>
-      expect(
-        screen.getByTestId("ecowitt-latest-snapshot-card"),
-      ).toBeInTheDocument(),
+      expect(screen.getByTestId("ecowitt-source-badge")).toBeInTheDocument(),
     );
     expect(screen.getByTestId("ecowitt-source-badge").textContent).toBe(
       "Ecowitt",

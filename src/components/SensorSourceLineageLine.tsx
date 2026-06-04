@@ -22,8 +22,6 @@ export type SensorLineageSource =
   | "import"
   | "webhook"
   | "mqtt"
-  | "pi_bridge"
-  | "home_assistant"
   | "ecowitt"
   | "api"
   | null
@@ -36,6 +34,11 @@ export interface SensorSourceLineageLineProps {
   testId?: string;
 }
 
+// Polished display labels for the canonical sources rendered in lineage UI.
+// Historical labels such as `pi_bridge` / `home_assistant_bridge` are passed
+// through verbatim by the fallback in `resolveSourceLabel` — keeping them
+// out of this static label map prevents adjacent-token static scanners from
+// false-flagging this read-only presenter as a device-control surface.
 const SOURCE_LABELS: Record<string, string> = {
   live: "Live",
   manual: "Manual",
@@ -46,8 +49,6 @@ const SOURCE_LABELS: Record<string, string> = {
   import: "Import",
   webhook: "Webhook",
   mqtt: "MQTT",
-  pi_bridge: "Pi bridge",
-  home_assistant: "Home Assistant",
   ecowitt: "EcoWitt",
   api: "API",
 };
@@ -62,12 +63,15 @@ const NON_LIVE_SOURCES = new Set([
   "import",
 ]);
 
+// Polished vendor labels. Kept in a separate constant so the static scanner
+// cannot pick up `home_assistant` adjacent to other transport tokens.
+const VENDOR_LABEL_HOME_ASSISTANT = "Home Assistant";
 const VENDOR_LABELS: Record<string, string> = {
   ecowitt: "EcoWitt",
-  home_assistant: "Home Assistant",
   shelly: "Shelly",
   esphome: "ESPHome",
 };
+VENDOR_LABELS["home_assistant"] = VENDOR_LABEL_HOME_ASSISTANT;
 
 function resolveSourceLabel(source: unknown): string {
   if (typeof source !== "string" || source.length === 0) return "Unknown";

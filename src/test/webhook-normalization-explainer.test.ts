@@ -93,7 +93,6 @@ describe("explainWebhookNormalizationPayload — auth-like safety", () => {
       vendor: "ecowitt",
       captured_at: "2026-06-04T12:00:00Z",
       metrics: { temp_c: 24 },
-      // @ts-expect-error — caller mistake we want to surface
       user_id: "evil-uid",
     });
     expect(res.warnings.some((w) => w.includes("user_id"))).toBe(true);
@@ -107,13 +106,9 @@ describe("explainWebhookNormalizationPayload — auth-like safety", () => {
       vendor: "ecowitt",
       captured_at: "2026-06-04T12:00:00Z",
       metrics: { temp_c: 24 },
-      // @ts-expect-error — caller mistake we want to surface
       authorization: "Bearer vbt_xxx",
-      // @ts-expect-error — caller mistake we want to surface
       api_key: "abc",
-      // @ts-expect-error — caller mistake we want to surface
       password: "hunter2",
-      // @ts-expect-error — caller mistake we want to surface
       service_role: "x",
     });
     const joined = res.warnings.join("\n").toLowerCase();

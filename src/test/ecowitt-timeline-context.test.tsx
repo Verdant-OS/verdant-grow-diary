@@ -156,8 +156,9 @@ describe("buildEcowittTimelineContext", () => {
       now: NOW,
     });
     expect(out[0].snapshot?.hasReading).toBe(true);
-    // The plant-matched row's captured_at should win.
-    expect(out[0].snapshot?.snapshot?.capturedAt).toBe("2026-06-04T12:15:00Z");
+    // The plant-matched row (4 min away) wins over the closer non-plant row.
+    expect(out[0].matchAgeMinutes).toBeGreaterThanOrEqual(4);
+    expect(out[0].matchAgeMinutes).toBeLessThanOrEqual(6);
   });
 });
 

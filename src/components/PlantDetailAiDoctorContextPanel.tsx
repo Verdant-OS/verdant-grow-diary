@@ -27,6 +27,8 @@ import {
   AI_DOCTOR_NO_WARNING_CONTEXT_COPY,
 } from "@/lib/aiDoctorContextQuickActionsViewModel";
 import AiDoctorContextQuickActions from "@/components/AiDoctorContextQuickActions";
+import AiDoctorVpdDriftSection from "@/components/AiDoctorVpdDriftSection";
+import type { AiDoctorVpdDriftContext } from "@/lib/vpdDriftRules";
 
 export interface PlantDetailAiDoctorContextPanelProps {
   plantId: string;
@@ -38,6 +40,12 @@ export interface PlantDetailAiDoctorContextPanelProps {
         tentId?: string | null;
       })
     | null;
+  /**
+   * Optional VPD drift context, sourced from
+   * `aiDoctorSensorContextRules.mapSensorReadingToAiDoctorContext`. When
+   * absent, the drift section is hidden. Display only — no automation.
+   */
+  vpdDrift?: AiDoctorVpdDriftContext | null;
 }
 
 const READINESS_STYLES: Record<

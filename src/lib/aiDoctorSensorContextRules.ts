@@ -27,6 +27,11 @@ import {
   isSoilMoistureValid,
   isPpfdReadingValid,
 } from "./sensorReadingNormalizationRules";
+import {
+  buildVpdDriftAiContext,
+  type AiDoctorVpdDriftContext,
+  type VpdDriftResult,
+} from "./vpdDriftRules";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -68,6 +73,13 @@ export interface AiDoctorSensorContext {
   contextSummary: string;
   /** Safety notes that must accompany AI Doctor output. */
   safetyNotes: string[];
+  /**
+   * Optional VPD drift context (EWMA against the effective stage band).
+   * Present only when the caller supplies a drift evaluation. AI Doctor
+   * may surface a review suggestion when `suggestReview` is true, but
+   * NEVER creates Action Queue items from this signal alone.
+   */
+  vpdDrift?: AiDoctorVpdDriftContext;
 }
 
 // ---------------------------------------------------------------------------

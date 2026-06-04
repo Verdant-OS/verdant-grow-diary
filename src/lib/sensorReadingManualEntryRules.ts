@@ -156,6 +156,9 @@ export function validateManualEntry(input: ManualEntryInput): ManualEntryValidat
       derived: true,
     });
   }
+  if (ppfdClass.kind === "valid") {
+    metrics.push({ metric: "ppfd", value: ppfdClass.value });
+  }
 
   if (metrics.length === 0 && errors.length === 0) {
     errors.push("Enter at least one reading.");

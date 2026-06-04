@@ -43,7 +43,7 @@ describe("ecowittReadingViewModel.buildEcowittSnapshotViewModel", () => {
       { now: NOW },
     );
     expect(vm.hasReading).toBe(true);
-    expect(vm.snapshot?.capturedAt).toBe(FRESH_AT);
+    expect(Date.parse(vm.snapshot?.capturedAt ?? "")).toBe(Date.parse(FRESH_AT));
     expect(vm.metrics.humidity_pct).toBe(55);
     expect(vm.source).toBe("live");
     expect(vm.sourceLabel?.label).toBe("Ecowitt");

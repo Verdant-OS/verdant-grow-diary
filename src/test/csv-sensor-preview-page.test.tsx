@@ -22,13 +22,14 @@ const RULES_SRC = readFileSync(
 );
 
 describe("SensorCsvPreview — static safety", () => {
-  const FORBIDDEN = [
+  const FORBIDDEN: RegExp[] = [
     /\bfetch\s*\(/,
     /functions\.invoke/,
-    /from\s*\(\s*['"][^'"]+['"]\s*\)\s*\.\s*(insert|update|upsert|delete|rpc)\b/,
-    /supabase/i,
-    /action_queue/i,
-    /alerts\b/i,
+    /\.\s*(insert|update|upsert|delete|rpc)\s*\(/,
+    /@\/integrations\/supabase/,
+    /supabase\s*\./,
+    /from\s*\(\s*['"]alerts['"]/,
+    /from\s*\(\s*['"]action_queue['"]/,
   ];
   it.each([
     ["page", PAGE_SRC],

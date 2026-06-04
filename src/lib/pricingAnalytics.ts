@@ -12,6 +12,7 @@ export const PRICING_ANALYTICS_EVENT = "verdant:analytics" as const;
 
 export type PricingAnalyticsName =
   | "pricing_page_view"
+  | "pricing_billing_toggle"
   | "pricing_cta_free_clicked"
   | "pricing_cta_pro_monthly_clicked"
   | "pricing_cta_pro_annual_clicked"

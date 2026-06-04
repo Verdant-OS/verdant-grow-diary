@@ -4,9 +4,9 @@
  *
  *  1. VPD provenance — derived rows distinguishable from measured rows,
  *     and never computed from a dropped/invalid temperature.
- *  2. Timestamp handling — pins the edge function's server-time fallback
- *     for `dateutc` (the current canonical behavior — `dateutc` is NOT
- *     parsed; `captured_at` is stamped from server time at ingest).
+ *  2. Timestamp handling — pins the edge function's strict parse of
+ *     `dateutc` as UTC with safe `server_received_at` fallback, and the
+ *     honest `timestamp_source` stamp on every row.
  *  3. Duplicate behavior — pins the edge function's reliance on the
  *     `sensor_readings_dedupe_uidx` unique index via `ignoreDuplicates`.
  *  4. Secret/log safety — function source never echoes raw PASSKEY/MAC/

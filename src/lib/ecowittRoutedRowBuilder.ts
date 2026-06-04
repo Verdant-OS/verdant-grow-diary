@@ -119,16 +119,35 @@ function safeRawValue(v: unknown): string {
   return s.length > 64 ? s.slice(0, 64) : s;
 }
 
+/** Lower bound for a "sane" EcoWitt gateway clock. Anything earlier (e.g.
+ *  the classic `1970-01-01 00:00:00` unset-RTC value) is rejected. */
+export const ECOWITT_DATEUTC_MIN_ISO = "2020-01-01T00:00:00.000Z";
+
+/** How far into the future a gateway clock may drift before we refuse to
+ *  trust its timestamp. 24h covers worst-case timezone misconfiguration
+ *  while still rejecting obvious "2099" garbage. */
+export const ECOWITT_DATEUTC_FUTURE_SKEW_MS = 24 * 60 * 60 * 1000;
+
 /**
  * Parse an EcoWitt `dateutc` field (gateway custom-upload format:
  * `YYYY-MM-DD HH:MM:SS`, treated as UTC) into a canonical ISO-8601 UTC
- * string. Returns `null` when the value is missing, the wrong type, or
- * does not match the strict format / does not round-trip to a valid date.
+ * string.
+ *
+ * Returns `null` when the value is missing, the wrong type, does not match
+ * the strict format, does not round-trip to a valid calendar date, or
+ * falls outside the sane clock window:
+ *
+ *   [ECOWITT_DATEUTC_MIN_ISO, now + ECOWITT_DATEUTC_FUTURE_SKEW_MS]
  *
  * Never parses with local timezone semantics. Never accepts arbitrary
  * Date-parseable strings — only the documented EcoWitt format.
+ *
+ * `now` is injectable for deterministic tests.
  */
-export function parseEcoWittDateUtc(raw: unknown): string | null {
+export function parseEcoWittDateUtc(
+  raw: unknown,
+  now: Date = new Date(),
+): string | null {
   if (typeof raw !== "string") return null;
   const trimmed = raw.trim();
   const m = trimmed.match(
@@ -142,6 +161,12 @@ export function parseEcoWittDateUtc(raw: unknown): string | null {
   // Round-trip check rejects calendar-invalid inputs like 2026-02-30.
   const rt = new Date(t).toISOString();
   if (rt !== iso) return null;
+  // Clock sanity: reject obviously-unset RTCs (e.g. 1970 epoch) and
+  // gateways stamping far-future timestamps.
+  const minMs = Date.parse(ECOWITT_DATEUTC_MIN_ISO);
+  const maxMs = now.getTime() + ECOWITT_DATEUTC_FUTURE_SKEW_MS;
+  if (t < minMs) return null;
+  if (t > maxMs) return null;
   return iso;
 }
 

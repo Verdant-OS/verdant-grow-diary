@@ -106,6 +106,15 @@ export function validateManualEntry(input: ManualEntryInput): ManualEntryValidat
   if (vpd !== null && vpd < 0) {
     errors.push("VPD cannot be negative.");
   }
+  if (ppfdClass.kind === "invalid") {
+    if (ppfdClass.reason === "negative") {
+      errors.push("PPFD cannot be negative.");
+    } else if (ppfdClass.reason === "implausible_high") {
+      errors.push(`PPFD must be between 0 and ${PPFD_MAX} µmol/m²/s.`);
+    } else {
+      errors.push("PPFD must be a finite number.");
+    }
+  }
 
   // Suspicious-but-allowed warnings
   if (airTempF !== null) {

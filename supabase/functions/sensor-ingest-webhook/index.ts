@@ -43,6 +43,16 @@ Deno.serve(async (req) => {
   if (!authHeader?.startsWith("Bearer ")) return json({ error: "unauthorized" }, 401);
   const rawToken = authHeader.replace("Bearer ", "");
 
+  // Optional client-supplied idempotency key (recommended for bridge clients:
+  // MQTT, Ecowitt, Home Assistant). The real dedupe guarantee comes from the
+  // partial unique index `sensor_readings_dedupe_uidx`; this header is kept
+  // for traceability in raw_payload. Capped to avoid abuse.
+  const rawIdemHeader = req.headers.get("Idempotency-Key");
+  const idempotencyKey =
+    typeof rawIdemHeader === "string" && rawIdemHeader.length > 0
+      ? rawIdemHeader.slice(0, 128)
+      : null;
+
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");

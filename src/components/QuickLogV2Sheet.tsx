@@ -41,8 +41,20 @@ export default function QuickLogV2Sheet({
   onOpenChange,
   defaultTargetKey,
 }: Props) {
-  const { data: plants = [] } = usePlants();
-  const { data: tents = [] } = useTents();
+  const plantsQ = usePlants() as {
+    data?: unknown[];
+    isLoading?: boolean;
+    isError?: boolean;
+    refetch?: () => void;
+  };
+  const tentsQ = useTents() as {
+    data?: unknown[];
+    isLoading?: boolean;
+    isError?: boolean;
+    refetch?: () => void;
+  };
+  const plants = (plantsQ.data as Parameters<typeof buildQuickLogV2TargetOptions>[1]) ?? [];
+  const tents = (tentsQ.data as Parameters<typeof buildQuickLogV2TargetOptions>[0]) ?? [];
   const queryClient = useQueryClient();
   const { save, saving } = useQuickLogV2Save();
 
@@ -53,6 +65,12 @@ export default function QuickLogV2Sheet({
     () => buildQuickLogV2TargetOptions(tents, plants),
     [tents, plants],
   );
+
+  const isLoadingContext = Boolean(plantsQ.isLoading || tentsQ.isLoading);
+  const hasFetchError = Boolean(plantsQ.isError || tentsQ.isError);
+  const hasNoTargets =
+    !isLoadingContext && !hasFetchError && options.length === 0;
+  const contextBlocked = isLoadingContext || hasFetchError || hasNoTargets;
 
   useEffect(() => {
     if (open) {

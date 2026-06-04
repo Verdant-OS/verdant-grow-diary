@@ -20,6 +20,16 @@
  *   Both vocabularies remain valid. This helper documents and enforces the
  *   one-way mapping legacy → canonical so future callers do not guess.
  *
+ * Strict parsing contract (intentional):
+ *   - Stage IDs are strict machine values, not display labels.
+ *   - Inputs are accepted **only** as the exact lowercase canonical or
+ *     legacy identifiers below. No trimming, no case folding, no dash /
+ *     space substitution.
+ *   - `""`, `"   "`, `"VEG"`, `"Veg"`, `" veg "`, `null`, `undefined`,
+ *     and every non-string input return `{ known: false }`.
+ *   - Callers that own user-facing labels must normalize to a strict ID
+ *     (see `src/constants/growStages.ts`) before calling this helper.
+ *
  * See: docs/vpd-stage-vocabulary.md
  */
 
@@ -46,17 +56,8 @@ export type VpdStageNormalizationResult =
 
 /**
  * Legacy → canonical mapping. Documented in docs/vpd-stage-vocabulary.md.
- *
- * Notes:
- *   - "veg" is broad. We default to `late_veg` because legacy veg bands
- *     (0.8–1.2 kPa) align with the canonical late_veg band (0.9–1.2 kPa).
- *     Callers that distinguish early vs late veg should pass the canonical
- *     name directly.
- *   - "flower" defaults to `mid_late_flower` because its legacy band
- *     (1.0–1.5 kPa) fully contains the canonical mid_late_flower band.
- *   - "late_flower" maps to `mid_late_flower` (exact band match 1.1–1.5).
- *     `ripening` (1.2–1.6) is a stricter end-stage and is not auto-applied
- *     from the legacy "late_flower" label.
+ * THIS TABLE MUST NOT BE DUPLICATED OUTSIDE THIS FILE, its dedicated tests,
+ * the vocabulary doc, and the static ownership scanner.
  */
 const LEGACY_TO_CANONICAL: Record<LegacyVpdStage, CanonicalVpdTargetStage> = {
   seedling: "seedling",
@@ -86,23 +87,27 @@ const LEGACY_STAGES: readonly LegacyVpdStage[] = [
 export const CANONICAL_VPD_TARGET_STAGES = CANONICAL_STAGES;
 export const LEGACY_VPD_STAGES = LEGACY_STAGES;
 
-function tidy(input: string | null | undefined): string | null {
-  if (input == null) return null;
-  const s = String(input).trim().toLowerCase().replace(/[\s-]+/g, "_");
-  return s.length > 0 ? s : null;
+/**
+ * Strict acceptance: only an exact lowercase string that is one of the
+ * documented canonical or legacy IDs is accepted. Anything else (wrong
+ * case, surrounding whitespace, dashes, non-string, empty, nullish) is
+ * unknown by design.
+ */
+function strictMatch(input: unknown): string | null {
+  if (typeof input !== "string") return null;
+  if (input.length === 0) return null;
+  return input;
 }
 
 export function isCanonicalVpdTargetStage(
-  input: string | null | undefined,
+  input: unknown,
 ): input is CanonicalVpdTargetStage {
-  const s = tidy(input);
+  const s = strictMatch(input);
   return s !== null && (CANONICAL_STAGES as readonly string[]).includes(s);
 }
 
-export function isLegacyVpdStage(
-  input: string | null | undefined,
-): input is LegacyVpdStage {
-  const s = tidy(input);
+export function isLegacyVpdStage(input: unknown): input is LegacyVpdStage {
+  const s = strictMatch(input);
   return s !== null && (LEGACY_STAGES as readonly string[]).includes(s);
 }
 
@@ -113,11 +118,14 @@ export function isLegacyVpdStage(
  * - Legacy stages map per the documented table above.
  * - Anything else returns `{ known: false }` — callers MUST treat this as
  *   "stage unknown" and must NOT classify the reading as healthy.
+ *
+ * Strict: see file header. Trimmed / cased / dashed / non-string inputs
+ * all return unknown.
  */
 export function normalizeToCanonicalVpdTargetStage(
   input: string | null | undefined,
 ): VpdStageNormalizationResult {
-  const s = tidy(input);
+  const s = strictMatch(input);
   if (s === null) return { known: false, canonical: null, source: "unknown" };
   if ((CANONICAL_STAGES as readonly string[]).includes(s)) {
     return {

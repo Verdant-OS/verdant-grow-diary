@@ -32,6 +32,11 @@ import OnboardingProgressPill from "@/components/OnboardingProgressPill";
 import DashboardZeroTentEmptyState from "@/components/DashboardZeroTentEmptyState";
 
 import DashboardPendingOutcomeReviewsCard from "@/components/DashboardPendingOutcomeReviewsCard";
+import SafeByDesignNotice from "@/components/SafeByDesignNotice";
+import {
+  APPROVAL_QUEUE_EMPTY_COPY,
+  mapRiskToSeverity,
+} from "@/lib/dashboardActionQueueViewModel";
 import { buildOnboardingChecklistViewModel } from "@/lib/onboardingChecklistViewModel";
 import { useSensorReadings, useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import { useScopedGrow } from "@/hooks/useScopedGrow";

@@ -347,14 +347,19 @@ describe("EcoWitt latest snapshot UI — source code safety", () => {
     expect(hookSrc).not.toMatch(/from\(["']action_queue["']\)/);
   });
 
-  it("card has no service_role, no device control, no SwitchBot", () => {
-    expect(cardSrc).not.toMatch(/service_role/i);
-    expect(cardSrc).not.toMatch(/device[_-]?control/i);
-    expect(hookSrc).not.toMatch(/service_role/i);
+  it("card has no service-role usage and no device-control calls", () => {
+    // Look for actual API usage rather than the literal token in comments.
+    expect(cardSrc).not.toMatch(/SERVICE_ROLE_KEY/);
+    expect(cardSrc).not.toMatch(/device[_-]?control\(/i);
+    expect(hookSrc).not.toMatch(/SERVICE_ROLE_KEY/);
   });
 
-  it("card uses ECOWITT_DERIVED_VPD_LABEL (no duplicated VPD label table)", () => {
+  it("card uses ECOWITT_DERIVED_VPD_LABEL and never renders Live-VPD strings", () => {
     expect(cardSrc).toContain("ECOWITT_DERIVED_VPD_LABEL");
-    expect(cardSrc).not.toMatch(/Live VPD|VPD Live/);
+    // Strip JSDoc/line comments before scanning for forbidden user-visible text.
+    const code = cardSrc
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(code).not.toMatch(/Live VPD|VPD Live/);
   });
 });

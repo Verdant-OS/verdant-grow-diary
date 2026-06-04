@@ -70,8 +70,8 @@ describe("ingest matrix — auth", () => {
   it("rejects empty bearer as unauthorized via JWT path (no sub)", async () => {
     const r = await authenticateBearer("not-a-real-jwt", deps);
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error("expected failure");
-    expect(r.error).toBe("unauthorized");
+    expect(r.ok).toBe(false);
+    expect((r as { error?: string }).error).toBe("unauthorized");
   });
 
   it("rejects bridge token when service role is unavailable", async () => {
@@ -80,22 +80,22 @@ describe("ingest matrix — auth", () => {
       serviceKeyAvailable: false,
     });
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error("expected failure");
-    expect(r.error).toBe("server_misconfigured");
+    expect(r.ok).toBe(false);
+    expect((r as { error?: string }).error).toBe("server_misconfigured");
   });
 
   it("rejects too-short bridge tokens", async () => {
     const r = await authenticateBearer("vbt_short", deps);
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error("expected failure");
-    expect(r.error).toBe("unauthorized");
+    expect(r.ok).toBe(false);
+    expect((r as { error?: string }).error).toBe("unauthorized");
   });
 
   it("rejects unknown bridge token hash", async () => {
     const r = await authenticateBearer("vbt_" + "b".repeat(40), deps);
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error("expected failure");
-    expect(r.error).toBe("unauthorized");
+    expect(r.ok).toBe(false);
+    expect((r as { error?: string }).error).toBe("unauthorized");
   });
 
   it("rejects revoked bridge token", async () => {
@@ -117,8 +117,8 @@ describe("ingest matrix — auth", () => {
       },
     });
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error("expected failure");
-    expect(r.error).toBe("token_revoked");
+    expect(r.ok).toBe(false);
+    expect((r as { error?: string }).error).toBe("token_revoked");
   });
 
   it("rejects expired bridge token", async () => {
@@ -136,8 +136,8 @@ describe("ingest matrix — auth", () => {
       }),
     });
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error("expected failure");
-    expect(r.error).toBe("token_expired");
+    expect(r.ok).toBe(false);
+    expect((r as { error?: string }).error).toBe("token_expired");
   });
 
   it("accepts valid JWT with sub claim", async () => {

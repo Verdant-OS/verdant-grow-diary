@@ -161,7 +161,11 @@ describe("(4) secret + log safety — source scan of the edge function", () => {
     // PostgREST error object.
     expect(EDGE_SRC).toMatch(/reason:\s*"tent_lookup_failed"/);
     expect(EDGE_SRC).toMatch(/error:\s*"insert_failed"/);
-    expect(EDGE_SRC).not.toMatch(/error:\s*tentErr|error:\s*insErr/);
+    // Response bodies use string literals only — never a PostgREST error
+    // object directly. (Destructuring assignments like
+    // `{ error: tentErr } = await ...` are not response payloads.)
+    expect(EDGE_SRC).not.toMatch(/json\(\{[^}]*error:\s*tentErr/);
+    expect(EDGE_SRC).not.toMatch(/json\(\{[^}]*error:\s*insErr/);
   });
 
   it("never persists raw PASSKEY/MAC/api_key/token/auth/service_role/user_id keys in raw_payload", async () => {

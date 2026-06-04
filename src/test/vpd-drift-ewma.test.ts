@@ -27,6 +27,7 @@ const baseReading = {
   co2_ppm: null,
   soil_moisture_pct: null,
   ppfd_umol_m2s: null,
+  raw_payload: {},
 };
 
 function makeReadings(values: number[]) {

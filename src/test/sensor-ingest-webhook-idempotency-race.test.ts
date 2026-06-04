@@ -217,7 +217,9 @@ describe("idempotency-race — pure logic", () => {
   });
 
   it("upsert mock is called with the exact contract options every time", async () => {
-    const upsertSpy = vi.fn(async () => ({ data: [{ id: "x" }], error: null }));
+    const upsertSpy = vi.fn<(rows: Row[], opts: { onConflict: string; ignoreDuplicates: boolean }) => Promise<{ data: { id: string }[]; error: null }>>(
+      async () => ({ data: [{ id: "x" }], error: null }),
+    );
     await upsertSpy([baseRow()], {
       onConflict: "user_id,tent_id,source,metric,captured_at",
       ignoreDuplicates: true,

@@ -37,7 +37,7 @@ describe("ecowittSuspiciousReadingRules.evaluateEcowittSuspicion", () => {
 
   it("flags Celsius-looking Fahrenheit as suspicious", () => {
     const r = evaluateEcowittSuspicion({ temperatureC: 5, rawTempF: 25 });
-    expect(r.worst).toBe("invalid"); // temp 5C is fine but rawTempF 25 -> looks like C
+    expect(r.worst).toBe("suspicious");
     expect(r.flags.some((f) => f.code === "celsius_looking_fahrenheit")).toBe(true);
   });
 

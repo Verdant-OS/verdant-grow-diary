@@ -327,7 +327,10 @@ export function CsvPreviewReviewGate({
           <div data-testid="csv-import-plan-blocked-reasons">
             <div className="font-semibold mb-1">Blocked rows by reason</div>
             {Object.keys(blockedReasonCounts).length === 0 ? (
-              <div className="text-muted-foreground">No blocked rows.</div>
+              <div className="text-muted-foreground space-y-0.5" data-testid="csv-import-plan-blocked-empty">
+                <div>No blocked rows detected.</div>
+                <div>Verdant still requires review before any future import.</div>
+              </div>
             ) : (
               <ul className="flex flex-wrap gap-1">
                 {Object.entries(blockedReasonCounts).map(([reason, n]) => (
@@ -339,44 +342,62 @@ export function CsvPreviewReviewGate({
             )}
           </div>
 
-          {/* Why rows were blocked: explanations + capped samples */}
+          {/* Why rows were blocked: explanations + per-group expand/collapse */}
           {blockedGroups.length > 0 && (
             <div data-testid="csv-import-plan-blocked-explanations" className="space-y-2">
               <div className="font-semibold">Why rows were blocked</div>
-              {blockedGroups.map((g) => (
-                <div
-                  key={g.reason}
-                  data-testid={`csv-import-plan-blocked-group-${g.reason}`}
-                  className="rounded border border-border/60 bg-muted/20 p-2 space-y-1"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{g.title}</span>
-                    <Badge variant="outline" data-testid={`csv-import-plan-blocked-count-${g.reason}`}>{g.count}</Badge>
+              {blockedGroups.map((g) => {
+                const expanded = !!expandedBlockedReasons[g.reason];
+                return (
+                  <div
+                    key={g.reason}
+                    data-testid={`csv-import-plan-blocked-group-${g.reason}`}
+                    data-expanded={expanded ? "true" : "false"}
+                    className="rounded border border-border/60 bg-muted/20 p-2 space-y-1"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{g.title}</span>
+                        <Badge variant="outline" data-testid={`csv-import-plan-blocked-count-${g.reason}`}>{g.count}</Badge>
+                      </div>
+                      {g.samples.length > 0 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          data-testid={`csv-import-plan-blocked-toggle-${g.reason}`}
+                          onClick={() => toggleBlockedReason(g.reason)}
+                        >
+                          {expanded ? "Hide sample rows" : "Show sample rows"}
+                        </Button>
+                      )}
+                    </div>
+                    <div className="text-muted-foreground">{g.explanation}</div>
+                    <div data-testid={`csv-import-plan-blocked-fix-${g.reason}`}>
+                      <span className="font-medium">Fix: </span>{g.fix}
+                    </div>
+                    {expanded && g.samples.length > 0 && (
+                      <ul
+                        data-testid={`csv-import-plan-blocked-samples-${g.reason}`}
+                        data-sample-count={Math.min(g.samples.length, BLOCKED_SAMPLE_PER_REASON_MAX)}
+                        className="list-disc pl-5"
+                      >
+                        {g.samples.slice(0, BLOCKED_SAMPLE_PER_REASON_MAX).map((s, i) => (
+                          <li key={i}>
+                            row {s.rowIndex + 1}
+                            {s.header ? ` · column "${s.header}"` : ""}
+                            {s.attemptedMetric ? ` · ${s.attemptedMetric}` : ""}
+                            {s.rawValue !== undefined ? ` · raw=${String(s.rawValue).slice(0, 40)}` : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
-                  <div className="text-muted-foreground">{g.explanation}</div>
-                  <div data-testid={`csv-import-plan-blocked-fix-${g.reason}`}>
-                    <span className="font-medium">Fix: </span>{g.fix}
-                  </div>
-                  {g.samples.length > 0 && (
-                    <ul
-                      data-testid={`csv-import-plan-blocked-samples-${g.reason}`}
-                      data-sample-count={g.samples.length}
-                      className="list-disc pl-5"
-                    >
-                      {g.samples.slice(0, BLOCKED_SAMPLE_PER_REASON_MAX).map((s, i) => (
-                        <li key={i}>
-                          row {s.rowIndex + 1}
-                          {s.header ? ` · column "${s.header}"` : ""}
-                          {s.attemptedMetric ? ` · ${s.attemptedMetric}` : ""}
-                          {s.rawValue !== undefined ? ` · raw=${String(s.rawValue).slice(0, 40)}` : ""}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
+
 
           {/* Diary summary draft target controls */}
           <div data-testid="csv-import-plan-diary-summary" className="space-y-2">

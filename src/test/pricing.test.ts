@@ -23,12 +23,12 @@ const SITEMAP = read("public/sitemap.xml");
 
 describe("/pricing route", () => {
   it("is registered as a public route", () => {
-    expect(APP).toMatch(/import\s+Pricing\s+from\s+"\.\.\/pages\/Pricing"/);
+    expect(APP).toMatch(/import\s+Pricing\s+from\s+"\.\/pages\/Pricing"/);
     expect(APP).toMatch(/path="\/pricing"\s+element=\{<Pricing\s*\/>\}/);
   });
 
   it("registers a /billing/:plan placeholder route", () => {
-    expect(APP).toMatch(/import\s+BillingPlaceholder\s+from\s+"\.\.\/pages\/BillingPlaceholder"/);
+    expect(APP).toMatch(/import\s+BillingPlaceholder\s+from\s+"\.\/pages\/BillingPlaceholder"/);
     expect(APP).toMatch(/path="\/billing\/:plan"\s+element=\{<BillingPlaceholder\s*\/>\}/);
   });
 });

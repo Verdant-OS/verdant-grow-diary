@@ -492,7 +492,13 @@ export function CsvPreviewReviewGate({
                 {showSensorSample ? "Hide sample sensor write drafts" : "Show sample sensor write drafts"}
               </Button>
             </div>
-            {!showSensorSample ? (
+            {sensorSample.length === 0 ? (
+              <div className="text-muted-foreground space-y-0.5" data-testid="csv-gate-sensor-sample-empty">
+                <div>No accepted sensor write drafts to preview.</div>
+                <div>Fix mappings or blocked rows first, then this section will show a capped sample.</div>
+                <div>Nothing has been saved.</div>
+              </div>
+            ) : !showSensorSample ? (
               <div className="text-muted-foreground" data-testid="csv-gate-sensor-sample-collapsed">
                 {plan.acceptedWrites.length} draft{plan.acceptedWrites.length === 1 ? "" : "s"} would be created. Grouped counts shown above.
               </div>

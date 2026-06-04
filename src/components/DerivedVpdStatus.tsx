@@ -51,7 +51,8 @@ export default function DerivedVpdStatus({
         )}
         <span
           title={vm.helpCopy}
-          aria-label={vm.helpCopy}
+          role="img"
+          aria-label="Derived VPD help"
           className="inline-flex"
         >
           <Info className="h-3 w-3 opacity-60" />

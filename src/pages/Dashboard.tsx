@@ -728,6 +728,37 @@ export default function Dashboard() {
             </div>
           )}
         </section>
+
+        <section
+          className="glass rounded-2xl p-4 mt-4"
+          aria-label="Latest EcoWitt Snapshot"
+          data-testid="dashboard-ecowitt-section"
+        >
+          <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
+            <div>
+              <h2 className="font-display font-semibold">
+                Latest EcoWitt Snapshot
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Most recent EcoWitt reading for the selected tent. Not live
+                device control.
+              </p>
+            </div>
+          </div>
+          {tentSelection === "all" ? (
+            <p
+              data-testid="dashboard-ecowitt-select-tent"
+              className="text-sm text-muted-foreground"
+            >
+              Select a tent to view EcoWitt readings.
+            </p>
+          ) : (
+            <EcowittLatestSnapshotCard
+              tentId={tentSelection}
+              title="Latest EcoWitt Snapshot"
+            />
+          )}
+        </section>
         {sensorState.status === "ok" && (
           <section
             className="glass rounded-2xl p-4 mt-4"

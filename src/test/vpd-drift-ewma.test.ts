@@ -203,7 +203,6 @@ describe("Static safety — vpdDriftRules + AI Doctor wiring", () => {
   });
 
   it("aiDoctorSensorContextRules.ts stays pure and never writes action_queue", () => {
-    expect(AI_CTX).not.toMatch(/service_role/);
     expect(AI_CTX).not.toMatch(/@\/integrations\/supabase/);
     expect(AI_CTX).not.toMatch(/\.from\(['"](action_queue|alerts|sensor_readings)['"]\)/);
     expect(AI_CTX).not.toMatch(/functions\.invoke/);

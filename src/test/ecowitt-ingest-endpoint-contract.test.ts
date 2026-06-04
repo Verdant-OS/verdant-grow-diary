@@ -162,22 +162,31 @@ describe("EcoWitt ingest endpoint: source code safety scan", () => {
     expect(authIdx).toBeLessThan(parseIdx);
   });
 
-  it("rejects requests with no tent_id (server-resolved or query/header)", () => {
-    expect(src).toContain('"tent_id_required"');
-    expect(src).toContain('"forbidden_tent"');
+  it("validates a hinted tent_id when present (no tent_id is OK — JWT scans owned tents)", () => {
+    // Option C wiring: bridge auth scopes to the bridge tent_id; JWT auth
+    // either accepts a hinted ?tent_id=… (validated as UUID) or scans all
+    // owned tents with hardware_config set. The old "tent_id_required"
+    // hard-block was removed because Option C fans channels across the
+    // caller's tents.
+    expect(src).toContain('"tent_id_invalid"');
+    expect(src).not.toContain('"tent_id_required"');
+    expect(src).not.toContain('"forbidden_tent"');
   });
 
   it("never writes to alerts or action_queue and never calls device control", () => {
     expect(src).not.toMatch(/from\(["']alerts["']\)/);
     expect(src).not.toMatch(/from\(["']action_queue["']\)/);
-    // Deliberately avoid the literal "switch" + "bot" string; the EcoWitt-only
-    // scanner forbids it project-wide. We assert the absence indirectly via
-    // the static scanner test (ecowitt-only-sensor-direction.test.ts).
     expect(src).not.toMatch(/device[_-]?control/i);
   });
 
-  it("tags all readings with source='ecowitt'", () => {
-    expect(src).toContain('source: "ecowitt"');
+  it("tags all readings with source='ecowitt' via the routed-row builder", () => {
+    // The literal `source: "ecowitt"` lives in src/lib/ecowittRoutedRowBuilder.ts
+    // now. The edge function just forwards those rows. Assert the wiring
+    // import + that no other source label is introduced.
+    expect(src).toContain('buildEcoWittRoutedRows');
+    expect(src).toContain('ecowittRoutedRowBuilder');
+    expect(src).not.toMatch(/source:\s*"ecowitt_live"/);
+    expect(src).not.toMatch(/source:\s*"ecowitt_(?!$)/); // no ecowitt_*
   });
 
   it("dedupes on (user_id, tent_id, source, metric, captured_at)", () => {

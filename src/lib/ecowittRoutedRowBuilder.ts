@@ -38,6 +38,10 @@ export type EcoWittRoutedMetric =
   | "soil_moisture_pct"
   | "vpd_kpa";
 
+export type EcoWittTimestampSource =
+  | "ecowitt_dateutc"
+  | "server_received_at";
+
 export interface EcoWittRoutedRawPayload {
   provider: "ecowitt";
   channel: number;
@@ -55,6 +59,14 @@ export interface EcoWittRoutedRawPayload {
    * was computed from. Pure metadata in raw_payload — no schema change.
    */
   derived_from?: string[];
+  /**
+   * Origin of `captured_at`:
+   *   - "ecowitt_dateutc"    → parsed from a valid gateway-provided dateutc
+   *   - "server_received_at" → server wall clock at ingest (dateutc missing
+   *                            or malformed). Never claims server time came
+   *                            from EcoWitt.
+   */
+  timestamp_source?: EcoWittTimestampSource;
 }
 
 export interface EcoWittRoutedRow {

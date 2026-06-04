@@ -24,6 +24,14 @@ import { useMemo } from "react";
 interface PlantDetailPhotoStripProps {
   plantId: string | null | undefined;
   growId?: string | null;
+  /**
+   * Optional handler invoked when the grower taps "Add photo log".
+   * When provided, the CTA stays on Plant Detail and opens the
+   * plant-scoped Quick Log (which owns the actual photo upload).
+   * When omitted, the CTA falls back to the generic logs route as
+   * a last resort (preserves the selected grow context).
+   */
+  onUploadPhoto?: () => void;
 }
 
 const HEADING_ID = "plant-detail-photo-strip-heading";

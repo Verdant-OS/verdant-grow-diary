@@ -163,10 +163,10 @@ Deno.serve(async (req) => {
 
 
   // Bump last_used_at, first_used_at, and ingest_count atomically (server-only RPC).
-  if (auth.kind === "bridge" && admin) {
+  if (auth.kind === "bridge" && admin && insertedCount > 0) {
     await admin.rpc("bump_bridge_token_usage", {
       p_id: auth.tokenId,
-      p_inserted: toInsert.length,
+      p_inserted: insertedCount,
     });
   }
 
@@ -181,7 +181,7 @@ Deno.serve(async (req) => {
       source,
       capturedAt: capturedAt,
       rowsReceived: normalized.rows.length,
-      rowsInserted: toInsert.length,
+      rowsInserted: insertedCount,
     });
     if (auditRow) {
       await admin.from("sensor_ingest_audit_log").insert(auditRow);
@@ -191,11 +191,12 @@ Deno.serve(async (req) => {
 
   return json({
     ok: true,
-    inserted: toInsert.length,
-    skipped_duplicate: normalized.rows.length - toInsert.length,
+    inserted: insertedCount,
+    skipped_duplicate: skippedDuplicate,
     rejected: normalized.errors,
     fingerprint: normalized.fingerprint,
     auth: auth.kind,
+    idempotency_key: idempotencyKey,
   }, 200);
 });
 

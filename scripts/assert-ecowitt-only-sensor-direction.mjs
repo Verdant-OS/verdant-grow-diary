@@ -46,11 +46,14 @@ const SCAN_EXTS = new Set([
   ".sh",
 ]);
 
-// Allow-list: these files document the removal and must mention the term.
+// Allow-list: these files document or enforce the removal and must mention
+// the term verbatim.
 const ALLOWED = new Set([
   "scripts/assert-ecowitt-only-sensor-direction.mjs",
   "docs/ecowitt-only-removal-report.md",
   "docs/ecowitt-only-sensor-direction.md",
+  "src/test/ecowitt-only-sensor-direction.test.ts",
+  ".github/workflows/ecowitt-only-safety-scan.yml",
 ]);
 
 // Pattern hits SwitchBot, switchbot, switch_bot, switch-bot, "switch bot".

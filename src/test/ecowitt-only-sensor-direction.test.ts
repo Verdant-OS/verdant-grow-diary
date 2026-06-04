@@ -44,8 +44,8 @@ const ALLOWED = new Set([
   "scripts/assert-ecowitt-only-sensor-direction.mjs",
   "docs/ecowitt-only-removal-report.md",
   "docs/ecowitt-only-sensor-direction.md",
-  // This test file itself must contain the pattern literally to enforce it.
   "src/test/ecowitt-only-sensor-direction.test.ts",
+  ".github/workflows/ecowitt-only-safety-scan.yml",
 ]);
 
 const PATTERN = /switch[\s_-]?bot/i;

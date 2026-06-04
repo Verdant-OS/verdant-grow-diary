@@ -50,8 +50,18 @@ export default function DiaryEntryBadges({ item, className }: DiaryEntryBadgesPr
   const tagsToShow = PRIMARY_TAGS.filter((t) => item.tags.includes(t));
   const hasWarnings = item.warnings.length > 0;
   const sensorBadge = sensorSnapshotBadge(item.sensorSnapshotState);
+  const sourceLabel = item.hasSensorSnapshot ? item.sensorSourceLabel ?? null : null;
+  const vendorLabel = item.hasSensorSnapshot ? item.sensorVendorLabel ?? null : null;
 
-  if (tagsToShow.length === 0 && !hasWarnings && !sensorBadge) return null;
+  if (
+    tagsToShow.length === 0 &&
+    !hasWarnings &&
+    !sensorBadge &&
+    !sourceLabel &&
+    !vendorLabel
+  ) {
+    return null;
+  }
 
   const variantClasses: Record<SensorSnapshotBadge["variant"], string> = {
     positive:
@@ -89,6 +99,25 @@ export default function DiaryEntryBadges({ item, className }: DiaryEntryBadgesPr
           )}
         >
           {sensorBadge.label}
+        </span>
+      )}
+      {sourceLabel && (
+        <span
+          data-testid="diary-entry-sensor-source-badge"
+          data-sensor-source={sourceLabel}
+          className="text-[11px] px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40 text-muted-foreground"
+        >
+          Source: {sourceLabel}
+        </span>
+      )}
+      {vendorLabel && (
+        <span
+          data-testid="diary-entry-sensor-vendor-badge"
+          data-sensor-vendor={vendorLabel}
+          title="Vendor lineage only — not used for authorization"
+          className="text-[11px] px-2 py-0.5 rounded-full bg-secondary/40 border border-border/30 text-muted-foreground"
+        >
+          Vendor: {vendorLabel}
         </span>
       )}
       {hasWarnings && (

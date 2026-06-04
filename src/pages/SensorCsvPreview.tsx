@@ -1,4 +1,6 @@
 import CsvSensorPreviewPanel from "@/components/CsvSensorPreviewPanel";
+import CsvPreviewHelpPanel from "@/components/CsvPreviewHelpPanel";
+import CsvPreviewRecordingGuide from "@/components/CsvPreviewRecordingGuide";
 
 /**
  * SensorCsvPreview — read-only CSV preview page.
@@ -19,6 +21,8 @@ export default function SensorCsvPreview() {
           plant memory — without saving anything.
         </p>
       </header>
+      <CsvPreviewHelpPanel />
+      <CsvPreviewRecordingGuide />
       <CsvSensorPreviewPanel />
     </main>
   );

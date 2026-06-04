@@ -45,6 +45,7 @@ import IngestInspector from "./pages/IngestInspector";
 import NotFound from "./pages/NotFound";
 import RepresentativeCsvPreview from "./pages/RepresentativeCsvPreview";
 import SensorCsvPreview from "./pages/SensorCsvPreview";
+import PartnerCsvPreviewLanding from "./pages/PartnerCsvPreviewLanding";
 
 
 
@@ -76,6 +77,7 @@ const App = () => (
               <Route path="/hardware-integrations" element={<HardwareIntegrations />} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/billing/:plan" element={<BillingPlaceholder />} />
+              <Route path="/partners/csv-preview" element={<PartnerCsvPreviewLanding />} />
 
               <Route element={<AppShell />}>
                 <Route path="/" element={<Dashboard />} />

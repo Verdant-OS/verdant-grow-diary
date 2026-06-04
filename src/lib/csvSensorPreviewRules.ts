@@ -15,6 +15,7 @@
 export const CSV_PREVIEW_SOURCE_LABEL = "csv" as const;
 export const TSV_PREVIEW_SOURCE_LABEL = "tsv" as const;
 export const CSV_PREVIEW_STATUS_LABEL = "Preview only — not saved" as const;
+export const CSV_PREVIEW_REPORT_VERSION = "csv_preview_v1" as const;
 export const CSV_PREVIEW_MAX_SAMPLE_ROWS = 25;
 
 export type DelimitedSourceLabel = "csv" | "tsv";

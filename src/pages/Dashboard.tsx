@@ -421,7 +421,9 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+        </section>
       )}
+
 
       <div className="grid lg:grid-cols-2 gap-4">
         <div className="glass rounded-2xl p-4">

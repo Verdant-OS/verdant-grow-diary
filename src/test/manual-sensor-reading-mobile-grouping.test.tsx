@@ -98,7 +98,8 @@ describe("static safety: manual sensor card", () => {
   }
   it("does not introduce unsupported schema fields as form metrics", () => {
     // These metrics are NOT in the validate_sensor_reading trigger allowlist.
-    // They must not appear as ManualEntryInput keys here.
-    expect(src).not.toMatch(/phPh\b|ecMsCm|ppfd:|dliMolM2|waterTempC|soilTempC|soilEc/);
+    // They must not appear as ManualEntryInput keys here. PPFD IS in the
+    // allowlist as of the PPFD slice, so it is intentionally permitted.
+    expect(src).not.toMatch(/phPh\b|ecMsCm|dliMolM2|waterTempC|soilTempC|soilEc/);
   });
 });

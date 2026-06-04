@@ -30,7 +30,7 @@ import Diagnostics from "./pages/Diagnostics";
 import ActionQueue from "./pages/ActionQueue";
 import ActionDetail from "./pages/ActionDetail";
 import GrowLineageRepair from "./pages/GrowLineageRepair";
-import GrowRoomMode from "./pages/GrowRoomMode";
+// GrowRoomMode (legacy Live Dashboard) consolidated into Dashboard; /grow-room redirects.
 import DailyCheck from "./pages/DailyCheck";
 import Landing from "./pages/Landing";
 // Demo page removed — Verdant is positioned around real grow data only.

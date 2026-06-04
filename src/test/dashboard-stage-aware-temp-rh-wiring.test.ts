@@ -13,6 +13,8 @@ const HELPER = readFileSync(
 );
 
 const DASH_AND_VM = DASH + "\n" + VM;
+const FORBIDDEN =
+  /saveAlert\(|logAlertEvent\(|action_queue|service_role|insertAlert\(|device\.control|\bsetAutomation\b|\bautomate\(/i;
 
 describe("Dashboard env strip — stage-aware Temp/RH wiring", () => {
   it("imports the stage-aware Temp/RH helpers", () => {

@@ -9,6 +9,7 @@ import AppSidebar from "./AppSidebar";
 import MobileNav from "./MobileNav";
 import QuickLog, { type QuickLogPrefill } from "./QuickLog";
 import BrandLogo from "./BrandLogo";
+import GlobalFastAddButton from "./GlobalFastAddButton";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 
 

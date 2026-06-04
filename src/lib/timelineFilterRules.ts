@@ -79,6 +79,8 @@ export interface TimelineDiaryItem {
   photos?: unknown;
   /** Optional plant display name, used to compose accessible alt text. */
   plantName?: string | null;
+  /** Optional stage from `details.stage` — surfaced but never invented. */
+  stage?: string | null;
 }
 
 export interface TimelineManualSnapshotItem {

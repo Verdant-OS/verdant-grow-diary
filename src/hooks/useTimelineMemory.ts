@@ -41,6 +41,12 @@ function readEventType(details: unknown): string | null {
   return typeof v === "string" ? v : null;
 }
 
+function readStage(details: unknown): string | null {
+  if (!details || typeof details !== "object") return null;
+  const v = (details as { stage?: unknown }).stage;
+  return typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
+}
+
 function readSensorSnapshot(details: unknown): unknown {
   if (!details || typeof details !== "object") return undefined;
   const d = details as Record<string, unknown>;
@@ -71,6 +77,7 @@ function diaryRowToDiaryItem(
     sensorSnapshot: readSensorSnapshot(row.details),
     photoUrl: row.photo_url ?? null,
     photos: readPhotosArray(row.details),
+    stage: readStage(row.details),
   };
 }
 

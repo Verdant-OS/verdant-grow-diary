@@ -31,10 +31,11 @@ describe("Dashboard + Live Dashboard consolidation · navigation", () => {
     expect(SIDEBAR).not.toMatch(/\/grow-room/);
   });
 
-  it("Legacy /grow-room route is preserved for back-compat", () => {
-    expect(APP).toMatch(/path=["']\/grow-room["']/);
-    expect(APP).toMatch(/<GrowRoomMode\s*\/?>/);
+  it("Legacy /grow-room route redirects to the main Dashboard", () => {
+    expect(APP).toMatch(/path=["']\/grow-room["']\s+element=\{<Navigate\s+to=["']\/["']\s+replace\s*\/>\}/);
+    expect(APP).not.toMatch(/<GrowRoomMode\s*\/?>/);
   });
+
 
   it("Existing Alerts / Tasks / Sensors nav links remain", () => {
     expect(SIDEBAR).toMatch(/\/alerts/);

@@ -322,14 +322,52 @@ export default function Dashboard() {
                 Environment Snapshot
               </h2>
               <p className="text-xs text-muted-foreground">
-                Latest reading per tent with honest source labels. Add a manual reading or connect Ecowitt to see your environment here.
+                Latest reading per tent with honest source labels.
               </p>
             </div>
             <Button asChild size="sm" variant="ghost">
               <Link to="/sensors">Open sensors <ArrowRight className="h-3 w-3" /></Link>
             </Button>
           </div>
+        {(() => {
+          const anyReading = latestPerTent.some((x) => !!x.last);
+          const snapshotQuality = sensorState.status === "ok"
+            ? evaluateSensorQuality(sensorState.snapshot)
+            : null;
+          const isStaleSnap = sensorState.status === "ok"
+            && !!sensorState.snapshot.ts
+            && isStale(sensorState.snapshot.ts);
+          const isInvalidSnap = !!snapshotQuality && snapshotQuality.suspiciousFields.length > 0;
+          if (!anyReading) {
+            return (
+              <div
+                data-testid="dashboard-environment-snapshot-empty"
+                className="glass rounded-2xl p-6 text-center"
+              >
+                <h3 className="font-display font-semibold text-base mb-1">
+                  No sensor snapshot yet
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Add a manual reading or connect Ecowitt to see your environment here.
+                </p>
+              </div>
+            );
+          }
+          return (
+            <>
+              {(isStaleSnap || isInvalidSnap) && (
+                <div
+                  data-testid="dashboard-environment-snapshot-status-banner"
+                  data-state={isInvalidSnap ? "invalid" : "stale"}
+                  className="mb-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200"
+                >
+                  {isInvalidSnap
+                    ? "Latest reading looks invalid — not shown as current. Check the sensor source on the Sensors page."
+                    : "Latest reading is stale (older than 30 minutes) — not shown as current."}
+                </div>
+              )}
         <div className="grid lg:grid-cols-3 gap-4">
+
 
           <div className="lg:col-span-2 glass rounded-2xl p-4">
             <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
@@ -421,8 +459,12 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+            </>
+          );
+        })()}
         </section>
       )}
+
 
 
       <div className="grid lg:grid-cols-2 gap-4">

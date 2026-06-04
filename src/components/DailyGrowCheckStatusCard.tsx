@@ -22,7 +22,7 @@ import {
 } from "@/lib/dailyGrowCheckStatusRules";
 
 interface Props {
-  /** Compact strip variant (used inside Live Dashboard). */
+  /** Compact strip variant (used inside the legacy operator view). */
   compact?: boolean;
   /** Optional scope filter; when set, only activity for this tent counts. */
   tentIds?: string[] | null;

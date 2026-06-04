@@ -97,11 +97,32 @@ export async function parseEnvironmentCSV(
 
   let text: string;
   try {
-    text = await file.text();
+    text = await readFileAsText(file);
   } catch {
     return withError(empty, "damaged_file", "This CSV looks empty or damaged.");
   }
   return parseEnvironmentCSVText(text);
+}
+
+async function readFileAsText(file: File): Promise<string> {
+  if (typeof (file as { text?: unknown }).text === "function") {
+    try {
+      const t = await file.text();
+      if (typeof t === "string") return t;
+    } catch {
+      /* fall through */
+    }
+  }
+  if (typeof (file as { arrayBuffer?: unknown }).arrayBuffer === "function") {
+    const buf = await file.arrayBuffer();
+    return new TextDecoder("utf-8").decode(buf);
+  }
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file);
+  });
 }
 
 export function parseEnvironmentCSVText(

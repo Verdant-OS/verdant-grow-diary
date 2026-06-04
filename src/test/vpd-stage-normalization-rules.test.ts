@@ -213,6 +213,9 @@ describe("static guard — no source file outside the helper duplicates the mapp
   const ALLOWLIST = new Set<string>([
     resolve(ROOT, "src/lib/vpdStageNormalizationRules.ts"),
     resolve(ROOT, "src/test/vpd-stage-normalization-rules.test.ts"),
+    // Band table holds both vocabularies for back-compat band lookup;
+    // it does NOT implement the legacy→canonical mapping.
+    resolve(ROOT, "src/constants/vpdTargets.ts"),
   ]);
 
   it("no other .ts/.tsx file co-locates the legacy→canonical pairs", () => {

@@ -13,8 +13,11 @@
  */
 
 export const CSV_PREVIEW_SOURCE_LABEL = "csv" as const;
+export const TSV_PREVIEW_SOURCE_LABEL = "tsv" as const;
 export const CSV_PREVIEW_STATUS_LABEL = "Preview only — not saved" as const;
 export const CSV_PREVIEW_MAX_SAMPLE_ROWS = 25;
+
+export type DelimitedSourceLabel = "csv" | "tsv";
 
 export type CanonicalField =
   | "captured_at"
@@ -24,8 +27,22 @@ export type CanonicalField =
   | "co2"
   | "vwc"
   | "ec"
+  | "substrate_temperature"
   | "ph"
   | "ppfd";
+
+export const CANONICAL_FIELDS: readonly CanonicalField[] = [
+  "captured_at",
+  "temperature",
+  "humidity",
+  "vpd",
+  "co2",
+  "vwc",
+  "ec",
+  "substrate_temperature",
+  "ph",
+  "ppfd",
+] as const;
 
 export interface FieldMapping {
   /** Original CSV header text. */
@@ -62,11 +79,13 @@ export interface CsvPreviewParseResult {
   mappings: FieldMapping[];
   unmapped: string[];
   flags: SuspiciousFlag[];
-  /** Always `csv`. */
-  sourceLabel: typeof CSV_PREVIEW_SOURCE_LABEL;
   /** Always the read-only status copy. */
   statusLabel: typeof CSV_PREVIEW_STATUS_LABEL;
-  /** Human-friendly error if the CSV could not be parsed. */
+  /** Detected delimiter: "," for CSV, "\t" for TSV. */
+  delimiter: "," | "\t";
+  /** "csv" | "tsv" — never "live". */
+  sourceLabel: DelimitedSourceLabel;
+  /** Human-friendly error if the file could not be parsed. */
   error: string | null;
 }
 
@@ -356,14 +375,59 @@ export function detectFlags(
 }
 
 // ---------------------------------------------------------------------------
-// Top-level builder
+// Delimiter detection (CSV vs TSV)
 // ---------------------------------------------------------------------------
 
-export function buildCsvPreview(
+export interface DelimiterDetection {
+  delimiter: "," | "\t";
+  sourceLabel: DelimitedSourceLabel;
+}
+
+export function detectDelimitedSensorFile(input: string): DelimiterDetection {
+  const text = (input ?? "").replace(/^\uFEFF/, "");
+  const firstLine = text.split(/\r?\n/).find((l) => l.trim().length > 0) ?? "";
+  const commas = (firstLine.match(/,/g) ?? []).length;
+  const tabs = (firstLine.match(/\t/g) ?? []).length;
+  if (tabs > commas) return { delimiter: "\t", sourceLabel: "tsv" };
+  return { delimiter: ",", sourceLabel: "csv" };
+}
+
+// ---------------------------------------------------------------------------
+// Generic delimited parsing (CSV or TSV)
+// ---------------------------------------------------------------------------
+
+function splitDelimitedLine(line: string, delimiter: "," | "\t"): string[] {
+  if (delimiter === "\t") {
+    return line.split("\t").map((s) => s.trim());
+  }
+  return splitCsvLine(line);
+}
+
+export function parseDelimitedText(
   text: string,
-  fileName: string | null = null,
+  delimiter: "," | "\t",
+): { headers: string[]; rows: string[][] } {
+  const cleaned = (text ?? "").replace(/^\uFEFF/, "");
+  const lines = cleaned.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (lines.length === 0) return { headers: [], rows: [] };
+  const headers = splitDelimitedLine(lines[0], delimiter);
+  const rows: string[][] = [];
+  for (let i = 1; i < lines.length; i++) {
+    rows.push(splitDelimitedLine(lines[i], delimiter));
+  }
+  return { headers, rows };
+}
+
+// ---------------------------------------------------------------------------
+// Top-level builder (delimiter-aware)
+// ---------------------------------------------------------------------------
+
+function emptyResult(
+  fileName: string | null,
+  delimiter: "," | "\t",
+  sourceLabel: DelimitedSourceLabel,
 ): CsvPreviewParseResult {
-  const base: CsvPreviewParseResult = {
+  return {
     ok: false,
     fileName,
     headers: [],
@@ -373,20 +437,38 @@ export function buildCsvPreview(
     mappings: [],
     unmapped: [],
     flags: [],
-    sourceLabel: CSV_PREVIEW_SOURCE_LABEL,
+    delimiter,
+    sourceLabel,
     statusLabel: CSV_PREVIEW_STATUS_LABEL,
     error: null,
   };
+}
+
+export interface ParseDelimitedPreviewOptions {
+  fileName?: string | null;
+  /** Override auto-detection. */
+  delimiter?: "," | "\t";
+}
+
+export function parseDelimitedSensorPreview(
+  text: string,
+  options: ParseDelimitedPreviewOptions = {},
+): CsvPreviewParseResult {
+  const detected = detectDelimitedSensorFile(text);
+  const delimiter = options.delimiter ?? detected.delimiter;
+  const sourceLabel: DelimitedSourceLabel = delimiter === "\t" ? "tsv" : "csv";
+  const fileName = options.fileName ?? null;
+  const base = emptyResult(fileName, delimiter, sourceLabel);
 
   if (typeof text !== "string" || text.trim().length === 0) {
-    return { ...base, error: "CSV is empty." };
+    return { ...base, error: "File is empty." };
   }
 
   let parsed: { headers: string[]; rows: string[][] };
   try {
-    parsed = parseCsvText(text);
+    parsed = parseDelimitedText(text, delimiter);
   } catch {
-    return { ...base, error: "Could not parse CSV." };
+    return { ...base, error: "Could not parse file." };
   }
 
   if (parsed.headers.length === 0) {
@@ -415,6 +497,48 @@ export function buildCsvPreview(
   };
 }
 
+/**
+ * Backward-compatible CSV builder. Forces comma delimiter and "csv" source.
+ */
+export function buildCsvPreview(
+  text: string,
+  fileName: string | null = null,
+): CsvPreviewParseResult {
+  const r = parseDelimitedSensorPreview(text, { fileName, delimiter: "," });
+  if (!r.ok && r.error === "File is empty.") {
+    return { ...r, error: "CSV is empty." };
+  }
+  if (!r.ok && r.error === "Could not parse file.") {
+    return { ...r, error: "Could not parse CSV." };
+  }
+  return r;
+}
+
+// ---------------------------------------------------------------------------
+// Mapping overrides (local only — never persisted)
+// ---------------------------------------------------------------------------
+
+export type MappingOverrides = Record<string, CanonicalField | null>;
+
+export function applySensorMappingOverrides(
+  preview: CsvPreviewParseResult,
+  overrides: MappingOverrides,
+): CsvPreviewParseResult {
+  if (!preview.ok) return preview;
+  const next: FieldMapping[] = preview.mappings.map((m) => {
+    if (!Object.prototype.hasOwnProperty.call(overrides, m.header)) return m;
+    const v = overrides[m.header];
+    return {
+      header: m.header,
+      field: v,
+      reason: v ? "User override" : "User override — left unmapped",
+    };
+  });
+  const unmapped = next.filter((m) => m.field === null).map((m) => m.header);
+  const flags = detectFlags(preview.headers, preview.rows, next);
+  return { ...preview, mappings: next, unmapped, flags };
+}
+
 // ---------------------------------------------------------------------------
 // Timeline preview — read-only, derived from parsed rows when a timestamp
 // column is present.
@@ -423,12 +547,13 @@ export function buildCsvPreview(
 export interface CsvTimelinePreviewRow {
   capturedAt: string;
   values: Partial<Record<CanonicalField, string>>;
-  sourceLabel: typeof CSV_PREVIEW_SOURCE_LABEL;
+  sourceLabel: DelimitedSourceLabel;
 }
 
 export function buildCsvTimelinePreviewRows(
   result: CsvPreviewParseResult,
   limit = 10,
+  rowsOverride?: string[][],
 ): CsvTimelinePreviewRow[] {
   if (!result.ok) return [];
   const tsIdx = result.mappings.findIndex((m) => m.field === "captured_at");
@@ -440,8 +565,11 @@ export function buildCsvTimelinePreviewRows(
     idx: number;
   }[];
 
+  const source = rowsOverride ?? result.sampleRows;
+  const slice = limit > 0 ? source.slice(0, limit) : source;
+
   const out: CsvTimelinePreviewRow[] = [];
-  for (const row of result.sampleRows.slice(0, limit)) {
+  for (const row of slice) {
     const capturedAt = row[tsIdx] ?? "";
     if (!capturedAt) continue;
     const values: Partial<Record<CanonicalField, string>> = {};
@@ -452,8 +580,212 @@ export function buildCsvTimelinePreviewRows(
     out.push({
       capturedAt,
       values,
-      sourceLabel: CSV_PREVIEW_SOURCE_LABEL,
+      sourceLabel: result.sourceLabel,
     });
   }
   return out;
 }
+
+/**
+ * Builds timeline rows from EVERY parsed row (not the 25-row sample).
+ * Used as input to window-filter + sampling controls.
+ */
+export function buildFullCsvTimelineRows(
+  result: CsvPreviewParseResult,
+): CsvTimelinePreviewRow[] {
+  if (!result.ok) return [];
+  return buildCsvTimelinePreviewRows(result, result.rows.length, result.rows);
+}
+
+// ---------------------------------------------------------------------------
+// Time-window filter
+// ---------------------------------------------------------------------------
+
+export type TimeWindowKind = "all" | "24h" | "7d" | "30d" | "custom";
+
+export interface TimeWindow {
+  kind: TimeWindowKind;
+  /** ISO string (inclusive). */
+  start?: string;
+  /** ISO string (inclusive). */
+  end?: string;
+  /** Defaults to `new Date()`. Tests pass a fixed clock. */
+  now?: Date;
+}
+
+function parseDateSafe(s: string): Date | null {
+  const d = new Date(s);
+  return Number.isFinite(d.getTime()) ? d : null;
+}
+
+export function filterPreviewTimelineByWindow(
+  timeline: CsvTimelinePreviewRow[],
+  window: TimeWindow,
+): CsvTimelinePreviewRow[] {
+  if (!window || window.kind === "all") return timeline;
+
+  if (window.kind === "custom") {
+    const start = window.start ? parseDateSafe(window.start) : null;
+    const end = window.end ? parseDateSafe(window.end) : null;
+    return timeline.filter((r) => {
+      const d = parseDateSafe(r.capturedAt);
+      if (!d) return false;
+      if (start && d < start) return false;
+      if (end && d > end) return false;
+      return true;
+    });
+  }
+
+  const now = window.now ?? new Date();
+  const ms =
+    window.kind === "24h"
+      ? 86_400_000
+      : window.kind === "7d"
+        ? 7 * 86_400_000
+        : 30 * 86_400_000;
+  const cutoff = new Date(now.getTime() - ms);
+  return timeline.filter((r) => {
+    const d = parseDateSafe(r.capturedAt);
+    if (!d) return false;
+    return d >= cutoff && d <= now;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Sampling (deterministic, no randomness)
+// ---------------------------------------------------------------------------
+
+export type SamplingKind =
+  | "every"
+  | "nth5"
+  | "nth10"
+  | "nth25"
+  | "cap100"
+  | "cap500";
+
+export const SAMPLING_OPTIONS: readonly { kind: SamplingKind; label: string }[] = [
+  { kind: "every", label: "Every row" },
+  { kind: "nth5", label: "Every 5th row" },
+  { kind: "nth10", label: "Every 10th row" },
+  { kind: "nth25", label: "Every 25th row" },
+  { kind: "cap100", label: "Max 100 points" },
+  { kind: "cap500", label: "Max 500 points" },
+] as const;
+
+export const TIME_WINDOW_OPTIONS: readonly { kind: TimeWindowKind; label: string }[] = [
+  { kind: "all", label: "All rows" },
+  { kind: "24h", label: "Last 24 hours" },
+  { kind: "7d", label: "Last 7 days" },
+  { kind: "30d", label: "Last 30 days" },
+  { kind: "custom", label: "Custom range" },
+] as const;
+
+export function samplePreviewTimeline<T>(
+  timeline: T[],
+  sampling: SamplingKind,
+): T[] {
+  if (!Array.isArray(timeline) || timeline.length === 0) return [];
+  switch (sampling) {
+    case "every":
+      return timeline.slice();
+    case "nth5":
+      return timeline.filter((_, i) => i % 5 === 0);
+    case "nth10":
+      return timeline.filter((_, i) => i % 10 === 0);
+    case "nth25":
+      return timeline.filter((_, i) => i % 25 === 0);
+    case "cap100":
+    case "cap500": {
+      const cap = sampling === "cap100" ? 100 : 500;
+      if (timeline.length <= cap) return timeline.slice();
+      const step = timeline.length / cap;
+      const out: T[] = [];
+      for (let i = 0; i < cap; i++) {
+        const idx = Math.min(timeline.length - 1, Math.floor(i * step));
+        out.push(timeline[idx]);
+      }
+      return out;
+    }
+    default:
+      return timeline.slice();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Report builder (local-only JSON object)
+// ---------------------------------------------------------------------------
+
+export interface CsvPreviewReportOptions {
+  overrides?: MappingOverrides;
+  timeWindow?: TimeWindow;
+  sampling?: SamplingKind;
+  /** Deterministic timestamp for tests. */
+  generatedAt?: string;
+}
+
+export interface CsvPreviewReport {
+  generatedAt: string;
+  fileName: string | null;
+  sourceLabel: DelimitedSourceLabel;
+  statusLabel: typeof CSV_PREVIEW_STATUS_LABEL;
+  delimiter: "csv" | "tsv";
+  headers: string[];
+  rowCount: number;
+  proposedMappings: { header: string; field: CanonicalField | null; reason: string }[];
+  userOverrides: { header: string; field: CanonicalField | null }[];
+  effectiveMappings: { header: string; field: CanonicalField | null }[];
+  unmappedColumns: string[];
+  suspiciousFlags: SuspiciousFlag[];
+  timeWindow: TimeWindow;
+  sampling: SamplingKind;
+  timelinePreview: CsvTimelinePreviewRow[];
+  notes: string[];
+}
+
+export function buildCsvPreviewReport(
+  preview: CsvPreviewParseResult,
+  options: CsvPreviewReportOptions = {},
+): CsvPreviewReport {
+  const overrides = options.overrides ?? {};
+  const window: TimeWindow = options.timeWindow ?? { kind: "all" };
+  const sampling: SamplingKind = options.sampling ?? "every";
+
+  const overridden = applySensorMappingOverrides(preview, overrides);
+  const fullTimeline = buildFullCsvTimelineRows(overridden);
+  const windowed = filterPreviewTimelineByWindow(fullTimeline, window);
+  const sampled = samplePreviewTimeline(windowed, sampling);
+
+  return {
+    generatedAt: options.generatedAt ?? new Date().toISOString(),
+    fileName: preview.fileName,
+    sourceLabel: preview.sourceLabel,
+    statusLabel: CSV_PREVIEW_STATUS_LABEL,
+    delimiter: preview.delimiter === "\t" ? "tsv" : "csv",
+    headers: preview.headers,
+    rowCount: preview.totalRows,
+    proposedMappings: preview.mappings.map((m) => ({
+      header: m.header,
+      field: m.field,
+      reason: m.reason,
+    })),
+    userOverrides: Object.keys(overrides).map((h) => ({
+      header: h,
+      field: overrides[h],
+    })),
+    effectiveMappings: overridden.mappings.map((m) => ({
+      header: m.header,
+      field: m.field,
+    })),
+    unmappedColumns: overridden.unmapped,
+    suspiciousFlags: overridden.flags,
+    timeWindow: window,
+    sampling,
+    timelinePreview: sampled,
+    notes: [
+      "Preview only — not saved",
+      "No database writes, no Edge Functions, no alerts, no Action Queue items, no AI calls, no device control.",
+      "Generated entirely in the browser from a local file.",
+    ],
+  };
+}
+

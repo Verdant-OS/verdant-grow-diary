@@ -24,6 +24,7 @@ import {
   MAX_MANUAL_DEVICE_NOTE_LEN,
 } from "@/lib/manualSensorSourceLabel";
 import { evaluateManualSnapshotAdvisor } from "@/lib/manualSensorSnapshotAdvisorRules";
+import DerivedVpdStatus from "@/components/DerivedVpdStatus";
 
 interface TentOption {
   id: string;

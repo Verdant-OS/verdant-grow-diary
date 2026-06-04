@@ -238,7 +238,7 @@ describe("static guard — no source file outside the helper duplicates the mapp
       [/["']veg["']/, /["']late_veg["']/],
     ];
     for (const f of files) {
-      if (ALLOWLIST.has(f)) continue;
+      if (isAllowed(f)) continue;
       const src = readFileSync(f, "utf8");
       const hit = PAIRS.some(([a, b]) => a.test(src) && b.test(src));
       if (hit) violators.push(f);

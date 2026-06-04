@@ -170,7 +170,9 @@ describe("EcoWitt ingest endpoint: source code safety scan", () => {
   it("never writes to alerts or action_queue and never calls device control", () => {
     expect(src).not.toMatch(/from\(["']alerts["']\)/);
     expect(src).not.toMatch(/from\(["']action_queue["']\)/);
-    expect(src).not.toMatch(/switchbot/i);
+    // Deliberately avoid the literal "switch" + "bot" string; the EcoWitt-only
+    // scanner forbids it project-wide. We assert the absence indirectly via
+    // the static scanner test (ecowitt-only-sensor-direction.test.ts).
     expect(src).not.toMatch(/device[_-]?control/i);
   });
 

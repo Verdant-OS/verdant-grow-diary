@@ -145,16 +145,31 @@ export function normalizeEcowittPayload(
 
   const tempC = readings.find((r) => r.metric === "temperature_c")?.value;
   const rhPct = readings.find((r) => r.metric === "humidity_pct")?.value;
+  const soilPct = readings.find((r) => r.metric === "soil_moisture_pct")?.value;
+  const rawTempF = readPayloadTempF(payload);
+
+  const suspicion = evaluateEcowittSuspicion({
+    temperatureC: typeof tempC === "number" ? tempC : null,
+    humidityPct: typeof rhPct === "number" ? rhPct : null,
+    soilMoisturePct: typeof soilPct === "number" ? soilPct : null,
+    rawTempF,
+    recentHumidityPct: options.recentHumidityPct,
+    recentSoilMoisturePct: options.recentSoilMoisturePct,
+  });
+
+  // Derived VPD must refuse to compute against invalid temp/RH so the UI
+  // does not display a confidently-wrong derived value.
+  const rhValidForVpd =
+    typeof rhPct === "number" && rhPct >= 0 && rhPct <= 100;
+  const tempValidForVpd =
+    typeof tempC === "number" && tempC > -20 && tempC < 60;
   const derivedVpdKpa =
-    typeof tempC === "number" &&
-    typeof rhPct === "number" &&
-    rhPct >= 0 &&
-    rhPct <= 100
-      ? computeVpdKpa(tempC, rhPct)
+    rhValidForVpd && tempValidForVpd && !suspicion.hasInvalid
+      ? computeVpdKpa(tempC as number, rhPct as number)
       : null;
 
   return {
-    ok: adapter.ok && readings.length > 0,
+    ok: adapter.ok && readings.length > 0 && !suspicion.hasInvalid,
     vendor: "ecowitt",
     capturedAt,
     freshness,
@@ -164,5 +179,22 @@ export function normalizeEcowittPayload(
     warnings: adapter.warnings,
     reasons: adapter.reasons,
     rawPayload: payload,
+    suspicion: suspicion.flags,
+    suspicionSeverity: suspicion.worst,
+    invalid: suspicion.hasInvalid,
   };
 }
+
+function readPayloadTempF(payload: unknown): number | null {
+  if (!payload || typeof payload !== "object") return null;
+  const obj = payload as Record<string, unknown>;
+  for (const key of Object.keys(obj)) {
+    if (/^temp([1-8]?)f$/i.test(key) || key.toLowerCase() === "tempinf") {
+      const raw = obj[key];
+      const n = typeof raw === "number" ? raw : Number(raw);
+      if (Number.isFinite(n)) return n;
+    }
+  }
+  return null;
+}
+

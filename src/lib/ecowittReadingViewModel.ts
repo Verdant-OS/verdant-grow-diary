@@ -54,7 +54,12 @@ export interface EcowittSnapshotViewModel {
   derivedVpdKpa: number | null;
   /** Convenience: per-metric quick-access map for presenter. */
   metrics: Partial<Record<EcowittNormalizedReading["metric"], number>>;
+  /** True if the chosen snapshot was flagged invalid by suspicion rules. */
+  invalid: boolean;
+  /** Calm copy describing why the snapshot is unavailable, or null. */
+  unavailableReason: string | null;
 }
+
 
 const EMPTY_STATE_MESSAGE = "No EcoWitt readings received yet.";
 

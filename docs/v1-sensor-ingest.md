@@ -104,6 +104,8 @@ Content-Type:  application/json
 
 ## 3. Supported `source` labels
 
+Historical / device-specific (back-compat):
+
 ```
 webhook_generic        — anything posting directly
 pi_bridge              — Raspberry Pi forwarder
@@ -115,6 +117,21 @@ esp32_mqtt_bridge      — ESP32 → MQTT broker → bridge → webhook
 home_assistant_bridge  — HA rest_command / automation
 ha_forwarded           — forwarded from HA add-on or script
 ```
+
+Contract-aligned generic transport labels (V1.1+, see
+`docs/sensor-ingest-payload-contract.md`):
+
+```
+ecowitt   — EcoWitt gateway / station bridge
+mqtt      — Generic MQTT broker → local bridge → webhook
+csv       — Bulk historical CSV import
+webhook   — Generic bridge / custom script
+```
+
+Vendor lineage (e.g. `vendor: "ecowitt"` with `source: "mqtt"`) travels in
+the optional top-level `vendor` field and is preserved in
+`raw_payload.vendor`. It is **never** used for auth, ownership, or
+routing.
 
 Unknown sources are rejected with `400 invalid source: <value>`. The label
 is preserved verbatim on the inserted row.

@@ -30,7 +30,8 @@
     "sb:verify": "tsx scripts/verify-seed.ts",
     "test:sensor-safety": "vitest run src/test/csv-sensor-import.test.ts src/test/manual-sensor-freshness-and-delta.test.ts src/test/manual-sensor-chronology-delta.test.ts src/test/plant-manual-sensor-freshness-card.test.tsx",
     "test:static-safety": "vitest run src/test/utils/stripSourceComments.test.ts src/test/action-queue-provenance.test.ts src/test/action-queue-alert-context-chip.test.tsx src/test/action-queue-safety.test.ts src/test/v0-operating-loop-ci-guardrails.test.ts",
-    "test:quicklog-rpc-ownership": "vitest run src/test/quicklog-save-manual-rpc-ownership.test.ts src/test/quicklog-save-manual-rpc-reason-codes.test.ts src/test/quicklog-save-manual-rpc-mixed-boundary.test.ts src/test/quicklog-save-manual-rpc-ci-script.test.ts"
+    "test:quicklog-rpc-ownership": "vitest run src/test/quicklog-save-manual-rpc-ownership.test.ts src/test/quicklog-save-manual-rpc-reason-codes.test.ts src/test/quicklog-save-manual-rpc-mixed-boundary.test.ts src/test/quicklog-save-manual-rpc-ci-script.test.ts",
+    "test:sensor-intelligence-safety": "node scripts/assert-sensor-intelligence-safety.mjs && vitest run src/test/sensor-intelligence-safety.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

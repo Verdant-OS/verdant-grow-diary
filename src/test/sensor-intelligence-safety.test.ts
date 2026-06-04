@@ -9,11 +9,11 @@
  * Pure / read-only. No I/O against Supabase. No automation.
  */
 import { describe, it, expect } from "vitest";
-// @ts-expect-error — JS module, ESM default-friendly
 import {
   scanContent,
   scanRepository,
   SAFETY_CONTRACT_MARKER,
+  // @ts-ignore — JS module without types
 } from "../../scripts/assert-sensor-intelligence-safety.mjs";
 
 describe("sensor-intelligence safety scanner — repository scan", () => {

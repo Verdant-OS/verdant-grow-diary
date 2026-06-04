@@ -3,9 +3,9 @@
  * `sensor_readings` rows for the selected tent.
  *
  * Hard constraints (stop-ship if violated):
- *  - Read-only. No retry / resend / delete / device-control buttons.
- *  - No service_role, no bridge tokens in the client, no edge function
- *    invokes here. Reads come straight through Supabase + RLS.
+ *  - Read-only. No retry / resend / delete buttons. No actuator UI.
+ *  - No elevated DB role and no bridge credentials in the client; reads go
+ *    straight through Supabase + RLS.
  *  - Sensitive fields are redacted via `redactRawPayload` before render.
  *  - Empty / loading / error states are explicit.
  */

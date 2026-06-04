@@ -24,6 +24,8 @@ import {
 import { hasManualHandheldReadings } from "@/lib/quickLogHistoryRules";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { actionDetailPath, alertDetailPath, logsPath, timelinePath } from "@/lib/routes";
+import EnvironmentCsvImportLauncher from "@/components/EnvironmentCsvImportLauncher";
+import TimelineCsvContextPanel from "@/components/TimelineCsvContextPanel";
 import { cn } from "@/lib/utils";
 import { getEventType } from "@/lib/diary";
 import { buildGrowDiaryTimeline } from "@/lib/growDiaryTimelineRules";
@@ -316,6 +318,22 @@ export default function Timeline() {
           <FilterChip active={eventFilter === "followup"} onClick={() => setEventFilter("followup")} label="Follow-ups" icon={<Check className="h-3 w-3" />} count={eventCounts.followup} />
         </div>
       </div>
+
+      <div className="mb-4 flex items-center justify-end gap-2">
+        <EnvironmentCsvImportLauncher
+          growId={activeGrowId}
+          tentId={entries.find((e) => !!e.tent_id)?.tent_id ?? null}
+          variant="compact"
+          label="Import CSV"
+          testIdPrefix="timeline-csv-launcher"
+        />
+      </div>
+
+      <TimelineCsvContextPanel
+        growId={activeGrowId}
+        entries={entries.map((e) => ({ id: e.id, tent_id: e.tent_id, entry_at: e.entry_at }))}
+      />
+
 
       {/* Quick Log history lanes (read-only). Order: recent activity first
           so growers always see what they just saved, then per-event-type

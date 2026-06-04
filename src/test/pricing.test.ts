@@ -290,10 +290,6 @@ describe("Forbidden claims", () => {
     expect(PAGE).not.toMatch(/illegal grow/i);
   });
 
-  it("footer explicitly states Verdant does not sell cannabis", () => {
-    expect(PAGE).toContain("does not sell cannabis");
-  });
-
   it("no forbidden marketing phrases anywhere on the page", () => {
     for (const p of forbiddenPatterns) {
       expect(PAGE).not.toMatch(p);

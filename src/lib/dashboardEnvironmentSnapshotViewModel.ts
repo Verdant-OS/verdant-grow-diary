@@ -125,11 +125,17 @@ export function buildTentSnapshotView(
   if (!snap) return EMPTY;
   const latestRows = rows.filter((r) => r.ts === snap.ts);
 
-  // Source resolution: map SnapshotSource into SensorReadingSource for
-  // label rules. CSV/import wins over the live/manual heuristic when any
-  // contributing row is csv. Unknown sources stay null → "Unknown".
+  // Source resolution: derive from the actual contributing rows so an
+  // unknown/garbage source can never be silently promoted to "live" by
+  // `snapshotFromReadings`'s heuristic default.
+  const RECOGNISED = new Set(["manual", "live", "csv", "import", "sim", "diary"]);
+  const hasRecognised = latestRows.some(
+    (r) => typeof r.source === "string" && RECOGNISED.has(r.source),
+  );
   let canonicalSource: SensorReadingSource | null = null;
-  if (latestRows.some((r) => r.source === "csv" || r.source === "import")) {
+  if (!hasRecognised) {
+    canonicalSource = null;
+  } else if (latestRows.some((r) => r.source === "csv" || r.source === "import")) {
     canonicalSource = "csv";
   } else if (snap.source === "manual" || snap.source === "diary") {
     canonicalSource = "manual";

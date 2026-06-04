@@ -106,10 +106,12 @@ describe("Grow-Room Mode · route + nav wiring", () => {
   const app = readFileSync(APP, "utf8");
   const sidebar = readFileSync(SIDEBAR, "utf8");
 
-  it("App registers a /grow-room route", () => {
+  it("App redirects the legacy /grow-room route to the main Dashboard", () => {
     expect(app).toMatch(/path=["']\/grow-room["']/);
-    expect(app).toMatch(/<GrowRoomMode\s*\/?>/);
+    expect(app).toMatch(/path=["']\/grow-room["']\s+element=\{<Navigate\s+to=["']\/["']\s+replace\s*\/>\}/);
+    expect(app).not.toMatch(/<GrowRoomMode\s*\/?>/);
   });
+
 
   it("Sidebar no longer surfaces the Live Dashboard entry (consolidated into Dashboard)", () => {
     expect(sidebar).not.toMatch(/\/grow-room/);

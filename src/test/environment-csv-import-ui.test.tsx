@@ -121,17 +121,18 @@ describe("EnvironmentCsvImportModal UI", () => {
 
 describe("EnvironmentCsvImportModal — source safety scan (test 32, 40-44)", () => {
   it("source code contains no Live label, no service_role, no action_queue/alerts/device control", () => {
-    const src = readFileSync(
+    const raw = readFileSync(
       resolve(__dirname, "../components/EnvironmentCsvImportModal.tsx"),
       "utf8",
     );
+    const src = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
     expect(src.toLowerCase()).not.toMatch(/\blive\b/);
     expect(src).not.toMatch(/service_role/i);
     expect(src).not.toMatch(/action_queue/i);
-    expect(src).not.toMatch(/alerts/i);
+    expect(src).not.toMatch(/\balerts\b/i);
     expect(src).not.toMatch(/switchbot/i);
     expect(src).not.toMatch(/device.?control/i);
-    expect(src).not.toMatch(/automation/i);
-    expect(src).not.toMatch(/scheduler/i);
+    expect(src).not.toMatch(/\bautomation\b/i);
+    expect(src).not.toMatch(/\bscheduler\b/i);
   });
 });

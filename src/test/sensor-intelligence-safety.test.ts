@@ -81,10 +81,10 @@ describe("sensor-intelligence safety scanner — synthetic violations", () => {
     ).toBe(false);
   });
 
-  it("rejects auto action_queue insert from AI Doctor / drift logic", () => {
+  it("rejects auto action_queue insert from drift autopilot logic", () => {
     const v = scanContent(
-      "src/lib/aiDoctorAutopilot.ts",
-      `// vpdDrift detected\nawait supabase.from('action_queue').insert({ status: 'suggested' });\n`,
+      "src/lib/vpdDriftAutopilot.ts",
+      `// vpdDrift autopilot\nawait supabase.from('action_queue').insert({ status: 'suggested' });\n`,
     );
     expect(
       v.some(
@@ -92,6 +92,19 @@ describe("sensor-intelligence safety scanner — synthetic violations", () => {
           x.rule === "auto-action-queue-insert-from-drift-or-ai-doctor",
       ),
     ).toBe(true);
+  });
+
+  it("allows grower-initiated action_queue insert in user-approval hooks", () => {
+    const v = scanContent(
+      "src/hooks/useApproveSuggestionToActionQueue.ts",
+      `// User clicks approve\nawait supabase.from('action_queue').insert({ status: 'suggested' });\n`,
+    );
+    expect(
+      v.some(
+        (x) =>
+          x.rule === "auto-action-queue-insert-from-drift-or-ai-doctor",
+      ),
+    ).toBe(false);
   });
 
   it("rejects scheduled-analysis code creating approved/applied/executed actions", () => {

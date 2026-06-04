@@ -26,14 +26,19 @@ function buildRows(payload: Record<string, unknown>) {
     allowServerReceivedAtFallback: true,
     serverReceivedAt: NOW,
   });
-  if (!adapter.ok || adapter.input.readings.length === 0) {
+  const readings = (adapter.input.readings ?? []) as Array<{
+    metric: string;
+    value: number;
+    unit?: string | null;
+  }>;
+  if (!adapter.ok || readings.length === 0) {
     return { ok: false as const, adapter };
   }
   const capturedAt =
     typeof adapter.input.captured_at === "string"
       ? adapter.input.captured_at
       : NOW;
-  const rows = adapter.input.readings.map((r) => ({
+  const rows = readings.map((r) => ({
     user_id: USER,
     tent_id: TENT,
     source: "ecowitt" as const,

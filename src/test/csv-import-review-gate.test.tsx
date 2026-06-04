@@ -57,7 +57,8 @@ describe("CsvPreviewReviewGate (disabled)", () => {
       screen.getByText(/I confirm this is my data and understand this import is not live data\./),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/Import requires review and will be enabled in a separate approval-required flow\./),
-    ).toBeInTheDocument();
+      screen.getAllByText(/Import requires review and will be enabled in a separate approval-required flow\./)
+        .length,
+    ).toBeGreaterThan(0);
   });
 });

@@ -336,8 +336,9 @@ export default function CsvSensorPreviewPanel() {
             </span>
           </div>
 
-          {/* Disabled review gate — presentational only. No write handler. */}
+          {/* Disabled review gate + import plan summary — presentational only. */}
           <CsvPreviewReviewGate
+            previewResult={result}
             hasHardBlockedRows={(result.flags ?? []).some((f) => f.severity === "error")}
             hasAcceptedRows={(result.rows ?? []).length > 0}
           />

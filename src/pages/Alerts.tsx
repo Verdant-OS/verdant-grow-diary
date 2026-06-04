@@ -17,6 +17,7 @@ import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { AlertWhyContext } from "@/components/AlertWhyContext";
 import { LinkedActionCountBadge } from "@/components/LinkedActionCountBadge";
+import AlertsAutoPersistForGrow from "@/components/AlertsAutoPersistForGrow";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,6 +29,7 @@ import {
 } from "@/components/ui/select";
 
 import { useScopedGrow } from "@/hooks/useScopedGrow";
+import { useGrows } from "@/store/grows";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import { useAlertEvents } from "@/hooks/useAlertEvents";
 import { useAlertsLinkedActionCounts } from "@/hooks/useAlertsLinkedActionCounts";

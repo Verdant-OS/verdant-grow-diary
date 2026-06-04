@@ -23,6 +23,7 @@ import type { TablesInsert } from "@/integrations/supabase/types";
 // ---------------------------------------------------------------------------
 
 export const WEBHOOK_ALLOWED_SOURCES = [
+  // Historical / device-specific labels (preserved for back-compat).
   "webhook_generic",
   "pi_bridge",
   "node_red_bridge",
@@ -32,6 +33,14 @@ export const WEBHOOK_ALLOWED_SOURCES = [
   "esp32_mqtt_bridge",
   "home_assistant_bridge",
   "ha_forwarded",
+  // Contract-aligned generic transport labels (V1.1+). Vendor lineage
+  // (e.g. EcoWitt, Home Assistant) travels in optional `vendor` /
+  // `metadata.vendor` and is preserved only in raw_payload — never trusted
+  // for ownership, auth, or routing.
+  "ecowitt",
+  "mqtt",
+  "csv",
+  "webhook",
 ] as const;
 
 export type WebhookSource = (typeof WEBHOOK_ALLOWED_SOURCES)[number];
@@ -105,6 +114,13 @@ export interface WebhookIngestPayload {
   captured_at?: unknown;
   metrics?: Record<string, unknown> | null;
   metadata?: Record<string, unknown> | null;
+  /**
+   * Optional vendor lineage (e.g. "ecowitt", "home_assistant", "shelly").
+   * Preserved verbatim into `raw_payload.vendor` for traceability.
+   * NEVER used for ownership, auth, routing, or trust decisions —
+   * any string the caller sends is accepted as lineage metadata only.
+   */
+  vendor?: unknown;
   // Caller-supplied user_id is *intentionally* ignored — server uses JWT.
   user_id?: unknown;
 }
@@ -306,6 +322,10 @@ export function sanitizeRawPayload(
     out.metrics = input.metrics;
   if (input.metadata && typeof input.metadata === "object")
     out.metadata = input.metadata;
+  // Vendor lineage: preserved verbatim as a string only. Non-string values
+  // (objects, arrays, numbers) are dropped to keep raw_payload audit-clean.
+  // Vendor is lineage metadata only — never used for auth or routing.
+  if (isNonEmptyString(input.vendor)) out.vendor = input.vendor;
   // user_id is intentionally dropped.
   return out;
 }

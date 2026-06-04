@@ -125,6 +125,11 @@ const BASE_SOURCE_LABELS: Record<string, string> = {
   esp32_mqtt_bridge: "MQTT bridge",
   home_assistant_bridge: "Home Assistant",
   ha_forwarded: "Home Assistant",
+  // Contract-aligned generic transport labels (V1.1+).
+  ecowitt: "EcoWitt",
+  mqtt: "MQTT bridge",
+  csv: "CSV import",
+  webhook: "Webhook",
 };
 
 /**

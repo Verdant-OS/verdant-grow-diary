@@ -225,3 +225,104 @@ review only when:
 - It cites this contract.
 - Its tests cover §7 validation and §8 guardrails.
 - Its UI surface respects §6 source-truth display rules.
+
+---
+
+## 12. Example payloads (V1.1 — contract-aligned vocabulary)
+
+The pure normalizer (`src/lib/sensorWebhookIngestRules.ts`) and the DB
+trigger `public.validate_sensor_reading()` both accept the four
+contract transports (`ecowitt`, `mqtt`, `csv`, `webhook`) in addition to
+the historical device-specific labels (`esp32_*`, `home_assistant_bridge`,
+`pi_bridge`, …). All examples below assume a server-issued bridge token
+(`Authorization: Bearer vbt_…`) or a user JWT.
+
+### 12.1 EcoWitt over MQTT (local broker → bridge → webhook)
+
+```json
+POST /functions/v1/sensor-ingest-webhook
+Authorization: Bearer vbt_abcdef…
+Idempotency-Key: ecowitt-gw2000-2026-05-26T20:00:00Z
+
+{
+  "tent_id": "11111111-1111-1111-1111-111111111111",
+  "source": "mqtt",
+  "vendor": "ecowitt",
+  "captured_at": "2026-05-26T20:00:00Z",
+  "metrics": {
+    "temp_c": 24.6,
+    "humidity_pct": 58,
+    "co2_ppm": 720
+  },
+  "metadata": {
+    "device_id": "ecowitt-gw2000",
+    "sensor_model": "WH32"
+  }
+}
+```
+
+Notes:
+- Row `source` is persisted as `"mqtt"`.
+- `vendor: "ecowitt"` is preserved verbatim in `raw_payload.vendor` and
+  is **never** used for ownership, auth, or routing.
+
+### 12.2 Home Assistant `rest_command` (HA → webhook)
+
+```yaml
+# configuration.yaml
+rest_command:
+  verdant_publish:
+    url: "https://<project>.functions.supabase.co/sensor-ingest-webhook"
+    method: POST
+    headers:
+      authorization: "Bearer !secret verdant_bridge_token"
+      content-type: "application/json"
+      idempotency-key: "{{ tent }}-{{ now().isoformat() }}"
+    payload: >-
+      {
+        "tent_id": "{{ tent }}",
+        "source": "webhook",
+        "vendor": "home_assistant",
+        "captured_at": "{{ now().isoformat() }}",
+        "metrics": {
+          "temp_c": {{ states('sensor.tent_temp') | float }},
+          "humidity_pct": {{ states('sensor.tent_rh') | float }}
+        },
+        "metadata": { "device_id": "ha-tent-canopy" }
+      }
+```
+
+Notes:
+- Row `source` is persisted as `"webhook"`.
+- `vendor: "home_assistant"` is preserved in `raw_payload.vendor` only.
+- Bridge token is tent-scoped, hashed at rest, and revocable. HA cannot
+  see other tents even if the token leaks.
+
+### 12.3 Generic CSV import
+
+```json
+POST /functions/v1/sensor-ingest-webhook
+Authorization: Bearer <user JWT>
+Idempotency-Key: csv-2026-05-26-batch-7
+
+{
+  "tent_id": "11111111-1111-1111-1111-111111111111",
+  "source": "csv",
+  "vendor": "manual-export",
+  "captured_at": "2026-05-26T20:00:00Z",
+  "metrics": { "temp_c": 24.6, "humidity_pct": 58 }
+}
+```
+
+### Vendor lineage rules (binding)
+
+- `vendor` is OPTIONAL.
+- `vendor` MUST be a non-empty string. Non-string values are dropped from
+  `raw_payload`.
+- `vendor` is preserved verbatim in `raw_payload.vendor` and is the
+  authoritative lineage field for analytics / display.
+- `vendor` is NEVER an allow-list. Unknown vendors are accepted and
+  preserved; the security boundary remains the `source` allow-list, the
+  JWT/bridge token, and tent ownership.
+- `vendor` MUST NOT be used by any code path for authorization, ownership,
+  alerting, Action Queue routing, or device control.

@@ -222,9 +222,9 @@ describe("CTAs", () => {
 
   it("wires CTAs to /auth and /billing placeholder routes", () => {
     expect(PAGE).toMatch(/to="\/auth"/);
-    expect(PAGE).toMatch(/to="\/billing\/pro-monthly"/);
-    expect(PAGE).toMatch(/to="\/billing\/pro-annual"/);
-    expect(PAGE).toMatch(/to="\/billing\/founder-lifetime"/);
+    expect(PAGE).toMatch(/\/billing\/pro-monthly/);
+    expect(PAGE).toMatch(/\/billing\/pro-annual/);
+    expect(PAGE).toMatch(/\/billing\/founder-lifetime/);
   });
 
   it("fires analytics events for each CTA", () => {

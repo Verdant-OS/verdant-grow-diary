@@ -357,17 +357,26 @@ export function sanitizeRawPayload(
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   if (isNonEmptyString(input.tent_id)) out.tent_id = input.tent_id;
-  if (isNonEmptyString(input.source)) out.source = input.source;
+  // Persist the canonical (trimmed/lowercased) source when the caller's
+  // value resolves to an allow-listed label; fall back to the verbatim
+  // non-empty string otherwise so audit logs still show what arrived.
+  const canonicalSrc = normalizeWebhookSource(input.source);
+  if (canonicalSrc) {
+    out.source = canonicalSrc;
+  } else if (isNonEmptyString(input.source)) {
+    out.source = input.source;
+  }
   if (isNonEmptyString(input.captured_at))
     out.captured_at = input.captured_at;
   if (input.metrics && typeof input.metrics === "object")
     out.metrics = input.metrics;
   if (input.metadata && typeof input.metadata === "object")
     out.metadata = input.metadata;
-  // Vendor lineage: preserved verbatim as a string only. Non-string values
-  // (objects, arrays, numbers) are dropped to keep raw_payload audit-clean.
-  // Vendor is lineage metadata only — never used for auth or routing.
-  if (isNonEmptyString(input.vendor)) out.vendor = input.vendor;
+  // Vendor lineage: trimmed string only; empty/whitespace-only and
+  // non-string values are dropped. Vendor is lineage metadata only —
+  // never used for auth, ownership, or routing.
+  const vendor = normalizeVendorLineage(input.vendor);
+  if (vendor) out.vendor = vendor;
   // user_id is intentionally dropped.
   return out;
 }

@@ -128,24 +128,54 @@ export default function CsvSensorPreviewPanel() {
     return samplePreviewTimeline(windowed, sampling);
   }, [effective, window, sampling]);
 
-  const handleDownloadReport = useCallback(() => {
+  const downloadLocalBlob = (blob: Blob, fileName: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadJson = useCallback(() => {
     if (!result || !result.ok) return;
     const report = buildCsvPreviewReport(result, {
       overrides,
       timeWindow: window,
       sampling,
     });
-    const blob = new Blob([JSON.stringify(report, null, 2)], {
-      type: "application/json",
+    downloadLocalBlob(
+      new Blob([JSON.stringify(report, null, 2)], { type: "application/json" }),
+      "verdant-sensor-preview-report.json",
+    );
+  }, [result, overrides, window, sampling]);
+
+  const handleDownloadCsvSummary = useCallback(() => {
+    if (!result || !result.ok) return;
+    const csv = buildCsvPreviewSummaryCsv(result, {
+      overrides,
+      timeWindow: window,
+      sampling,
     });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "verdant-sensor-preview-report.json";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadLocalBlob(
+      new Blob([csv], { type: "text/csv" }),
+      "verdant-sensor-preview-summary.csv",
+    );
+  }, [result, overrides, window, sampling]);
+
+  const handleDownloadPdf = useCallback(() => {
+    if (!result || !result.ok) return;
+    const bytes = buildCsvPreviewReportPdfBytes(result, {
+      overrides,
+      timeWindow: window,
+      sampling,
+    });
+    downloadLocalBlob(
+      new Blob([bytes], { type: "application/pdf" }),
+      "verdant-sensor-preview-report.pdf",
+    );
   }, [result, overrides, window, sampling]);
 
   const setOverride = (header: string, value: string) => {

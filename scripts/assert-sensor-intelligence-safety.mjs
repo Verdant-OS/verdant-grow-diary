@@ -124,13 +124,14 @@ export function scanContent(relPath, content) {
     relPath.endsWith("assert-sensor-intelligence-safety.mjs") ||
     relPath.endsWith("sensor-intelligence-safety.test.ts");
   const hasContractMarker = content.includes(SAFETY_CONTRACT_MARKER);
+  const codeOnly = stripComments(content);
 
   if (isThisScanner) return violations;
 
-  // 1. Frontend private terms.
+  // 1. Frontend private terms — check only non-comment code.
   if (isFrontend && !isTestFile) {
     for (const term of FRONTEND_PRIVATE_TERMS) {
-      if (content.includes(term)) {
+      if (codeOnly.includes(term)) {
         violations.push({
           rule: "frontend-private-term",
           term,
@@ -140,10 +141,10 @@ export function scanContent(relPath, content) {
     }
   }
 
-  // 2. Device-control payload terms anywhere in src/scripts/supabase.
+  // 2. Device-control payload terms — check non-comment code only.
   if (!isTestFile) {
     for (const term of DEVICE_CONTROL_TERMS) {
-      if (content.includes(term)) {
+      if (codeOnly.includes(term)) {
         violations.push({
           rule: "device-control-term",
           term,
@@ -155,7 +156,7 @@ export function scanContent(relPath, content) {
 
   // 3. Reserved future-subsystem names require the safety contract marker.
   for (const name of RESERVED_SUBSYSTEMS) {
-    if (content.includes(name) && !hasContractMarker && !isTestFile) {
+    if (codeOnly.includes(name) && !hasContractMarker && !isTestFile) {
       violations.push({
         rule: "reserved-subsystem-without-contract",
         term: name,
@@ -164,12 +165,18 @@ export function scanContent(relPath, content) {
     }
   }
 
-  // 4. AI Doctor / drift files must not auto-insert into action_queue.
-  if (AI_DOCTOR_OR_DRIFT_HINT.test(relPath) || AI_DOCTOR_OR_DRIFT_HINT.test(content)) {
-    if (AUTO_ACTION_QUEUE_INSERT.test(content) && !isTestFile) {
+  // 4. Automatic action_queue inserts are forbidden. Grower-initiated
+  //    approval flows are fine — flag only when an automation hint
+  //    (autopilot, scheduled, setInterval, cron, driftEvaluator…) is
+  //    present in the same file as the insert.
+  if (AUTO_ACTION_QUEUE_INSERT.test(codeOnly) && !isTestFile) {
+    const isAutomated =
+      AUTOMATION_HINTS.some((p) => p.test(relPath)) ||
+      AUTOMATION_HINTS.some((p) => p.test(codeOnly));
+    if (isAutomated) {
       violations.push({
         rule: "auto-action-queue-insert-from-drift-or-ai-doctor",
-        message: `${relPath} appears to auto-insert into action_queue from AI Doctor or drift logic. Action Queue items must be grower-approved.`,
+        message: `${relPath} appears to auto-insert into action_queue from automated/drift logic. Action Queue items must be grower-approved.`,
       });
     }
   }

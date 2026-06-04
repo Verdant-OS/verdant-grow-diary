@@ -134,25 +134,109 @@ describe("static safety — helper file", () => {
   });
 });
 
-describe("static guard — no JSX duplication of the stage mapping table", () => {
+describe("evaluateVpdAgainstStageTarget — canonical normalization integration", () => {
+  it("legacy 'veg' evaluates against canonical late_veg band (0.9–1.2)", () => {
+    const r = evaluateVpdAgainstStageTarget({ vpdKpa: 1.0, stage: "veg" });
+    expect(r.classification).toBe("in_band");
+    expect(r.target?.stage).toBe("late_veg");
+    expect(evaluateVpdAgainstStageTarget({ vpdKpa: 0.85, stage: "veg" }).classification).toBe("low");
+    expect(evaluateVpdAgainstStageTarget({ vpdKpa: 1.25, stage: "veg" }).classification).toBe("high");
+  });
+  it("legacy 'preflower' evaluates against canonical early_flower band (1.0–1.3)", () => {
+    const r = evaluateVpdAgainstStageTarget({ vpdKpa: 1.15, stage: "preflower" });
+    expect(r.classification).toBe("in_band");
+    expect(r.target?.stage).toBe("early_flower");
+  });
+  it("legacy 'flower' evaluates against canonical mid_late_flower band (1.1–1.5)", () => {
+    const r = evaluateVpdAgainstStageTarget({ vpdKpa: 1.3, stage: "flower" });
+    expect(r.classification).toBe("in_band");
+    expect(r.target?.stage).toBe("mid_late_flower");
+  });
+  it("legacy 'late_flower' evaluates against canonical mid_late_flower band", () => {
+    const r = evaluateVpdAgainstStageTarget({ vpdKpa: 1.3, stage: "late_flower" });
+    expect(r.classification).toBe("in_band");
+    expect(r.target?.stage).toBe("mid_late_flower");
+  });
+  it("all canonical stages still classify in_band at their band midpoint", () => {
+    for (const c of CANONICAL_VPD_TARGET_STAGES) {
+      const r = evaluateVpdAgainstStageTarget({ vpdKpa: 1.05, stage: c });
+      // Just assert we never return stage_unknown for canonical stages.
+      expect(r.classification).not.toBe("stage_unknown");
+    }
+  });
+  it("unknown / null / post-harvest stages never return in_band / healthy", () => {
+    for (const stage of [
+      null,
+      undefined,
+      "",
+      "   ",
+      "mystery",
+      "harvest",
+      "drying",
+      "cure",
+    ]) {
+      for (const vpd of [0.5, 1.0, 1.3, 1.6]) {
+        const r = evaluateVpdAgainstStageTarget({ vpdKpa: vpd, stage });
+        expect(r.classification).toBe("stage_unknown");
+        expect(r.healthy).toBe(false);
+        expect(r.target).toBeNull();
+      }
+    }
+  });
+  it("invalid VPD with a known stage returns unavailable, not in_band", () => {
+    for (const v of [null, undefined, NaN, Infinity, -Infinity]) {
+      const r = evaluateVpdAgainstStageTarget({
+        vpdKpa: v as number,
+        stage: "late_veg",
+      });
+      expect(r.classification).toBe("unavailable");
+      expect(r.healthy).toBe(false);
+    }
+  });
+});
+
+describe("static guard — no source file outside the helper duplicates the mapping table", () => {
   function walk(dir: string, out: string[] = []): string[] {
     for (const entry of readdirSync(dir)) {
       const p = join(dir, entry);
       const st = statSync(p);
       if (st.isDirectory()) {
-        if (entry === "node_modules" || entry === "test" || entry === "__snapshots__") continue;
+        if (entry === "node_modules" || entry === "__snapshots__") continue;
         walk(p, out);
-      } else if (entry.endsWith(".tsx")) {
+      } else if (entry.endsWith(".ts") || entry.endsWith(".tsx")) {
         out.push(p);
       }
     }
     return out;
   }
 
-  it("no .tsx file inlines the legacy→canonical mapping pairs", () => {
+  const ALLOWLIST = new Set<string>([
+    resolve(ROOT, "src/lib/vpdStageNormalizationRules.ts"),
+    resolve(ROOT, "src/test/vpd-stage-normalization-rules.test.ts"),
+  ]);
+
+  it("no other .ts/.tsx file co-locates the legacy→canonical pairs", () => {
     const files = walk(resolve(ROOT, "src"));
     const violators: string[] = [];
-    // Markers that would only co-occur if a JSX file duplicates the table.
+    // Co-occurrence markers that only show up together if a file inlines
+    // the documented legacy → canonical mapping.
+    const PAIRS: Array<[RegExp, RegExp]> = [
+      [/["']preflower["']/, /["']early_flower["']/],
+      [/["']late_flower["']/, /["']mid_late_flower["']/],
+      [/["']veg["']/, /["']late_veg["']/],
+    ];
+    for (const f of files) {
+      if (ALLOWLIST.has(f)) continue;
+      const src = readFileSync(f, "utf8");
+      const hit = PAIRS.some(([a, b]) => a.test(src) && b.test(src));
+      if (hit) violators.push(f);
+    }
+    expect(violators).toEqual([]);
+  });
+
+  it("no .tsx file inlines the legacy→canonical mapping pairs", () => {
+    const files = walk(resolve(ROOT, "src")).filter((f) => f.endsWith(".tsx"));
+    const violators: string[] = [];
     const PAIRS: Array<[RegExp, RegExp]> = [
       [/"preflower"/, /"early_flower"/],
       [/"late_flower"/, /"mid_late_flower"/],
@@ -164,5 +248,27 @@ describe("static guard — no JSX duplication of the stage mapping table", () =>
       if (hit) violators.push(f);
     }
     expect(violators).toEqual([]);
+  });
+});
+
+describe("static safety — vpdTargetRules.ts", () => {
+  const RULES_SRC = readFileSync(
+    resolve(ROOT, "src/lib/vpdTargetRules.ts"),
+    "utf8",
+  );
+  it("imports the normalization helper", () => {
+    expect(RULES_SRC).toMatch(/normalizeToCanonicalVpdTargetStage/);
+    expect(RULES_SRC).toMatch(/from\s+["']@\/lib\/vpdStageNormalizationRules["']/);
+  });
+  it("has no I/O, Supabase, fetch, alert, action_queue, or device-control surface", () => {
+    expect(RULES_SRC).not.toMatch(/service_role/);
+    expect(RULES_SRC).not.toMatch(/from\s+["']@\/integrations\/supabase/);
+    expect(RULES_SRC).not.toMatch(/functions\.invoke/);
+    expect(RULES_SRC).not.toMatch(/\bfetch\s*\(/);
+    expect(RULES_SRC).not.toMatch(/action_queue/);
+    expect(RULES_SRC).not.toMatch(/saveAlert\(|logAlertEvent\(/);
+    expect(RULES_SRC).not.toMatch(
+      /execute_device|setpoint_write|device_control|deviceControl/,
+    );
   });
 });

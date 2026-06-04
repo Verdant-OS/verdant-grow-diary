@@ -296,10 +296,17 @@ export default function ManualSensorReadingCard({
           now.
         </p>
 
+        <DerivedVpdStatus
+          testId="manual-reading-derived-vpd"
+          airTempF={form.airTempF as string}
+          humidityPct={form.humidityPct as string}
+        />
         {advisor.derivedVpdKpa !== null && (
-          <p className="text-[11px] text-muted-foreground" data-testid="manual-reading-derived-vpd">
-            Derived VPD ≈ <strong>{advisor.derivedVpdKpa} kPa</strong> from your air temp +
-            humidity. Saved as the VPD value unless you enter one.
+          <p
+            className="text-[11px] text-muted-foreground"
+            data-testid="manual-reading-derived-vpd-hint"
+          >
+            Saved as the VPD value unless you enter one.
           </p>
         )}
 

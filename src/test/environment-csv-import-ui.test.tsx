@@ -32,7 +32,7 @@ describe("EnvironmentCsvImportModal UI", () => {
     );
     expect(screen.getByTestId("csv-import-entry")).toBeTruthy();
     expect(screen.getByText(/Import historical data/i)).toBeTruthy();
-    expect(screen.getByText(/source-tag/i)).toBeTruthy();
+    expect(screen.getByText(/Data is read-only and source-tagged/i)).toBeTruthy();
   });
 
   it("unit confirm renders only when ambiguous (test 21)", async () => {

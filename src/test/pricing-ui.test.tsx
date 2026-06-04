@@ -48,56 +48,53 @@ describe("Pricing Page UI", () => {
   });
 
   it("toggle switches Pro price between $99/year and $12/month", () => {
-    render(<Pricing />);
+    renderPricing();
     const toggle = screen.getByTestId("billing-toggle");
     const proPrice = screen.getByTestId("pricing-card-pro-price");
 
-    // Default annual
     expect(proPrice.textContent).toContain("$99");
 
-    // Switch to monthly
     fireEvent.click(toggle);
     expect(proPrice.textContent).toContain("$12");
     expect(proPrice.textContent).toContain("/ month");
 
-    // Switch back to annual
     fireEvent.click(toggle);
     expect(proPrice.textContent).toContain("$99");
     expect(proPrice.textContent).toContain("/ year");
   });
 
   it("Pro card displays Most Popular badge", () => {
-    render(<Pricing />);
+    renderPricing();
     const proCard = screen.getByTestId("pricing-card-pro");
     expect(proCard.textContent).toContain("Most Popular");
   });
 
   it("Free card displays 3 AI Doctor credits per grow", () => {
-    render(<Pricing />);
+    renderPricing();
     const freeCard = screen.getByTestId("pricing-card-free");
     expect(freeCard.textContent).toContain("3 AI Doctor credits per grow");
   });
 
   it("Pro card displays 100 AI Doctor credits/month", () => {
-    render(<Pricing />);
+    renderPricing();
     const proCard = screen.getByTestId("pricing-card-pro");
     expect(proCard.textContent).toContain("100 AI Doctor credits / month");
   });
 
   it("Founder Lifetime card displays 100 AI Doctor credits/month", () => {
-    render(<Pricing />);
+    renderPricing();
     const founderCard = screen.getByTestId("pricing-card-founder");
     expect(founderCard.textContent).toContain("100 AI Doctor credits / month");
   });
 
   it("Founder Lifetime card never says unlimited AI", () => {
-    render(<Pricing />);
+    renderPricing();
     const founderCard = screen.getByTestId("pricing-card-founder");
     expect(founderCard.textContent?.toLowerCase()).not.toContain("unlimited ai");
   });
 
   it("trust strip renders read-only / honest labels / no blind automation copy", () => {
-    render(<Pricing />);
+    renderPricing();
     const strip = screen.getByTestId("pricing-trust-strip");
     for (const item of TRUST_STRIP.items) {
       expect(strip.textContent).toContain(item);
@@ -105,27 +102,27 @@ describe("Pricing Page UI", () => {
   });
 
   it("AI credit explainer renders all points from constants", () => {
-    render(<Pricing />);
+    renderPricing();
     for (const point of AI_CREDIT_EXPLAINER.points) {
       expect(screen.getByText(point)).toBeInTheDocument();
     }
   });
 
   it("Free card price is $0", () => {
-    render(<Pricing />);
+    renderPricing();
     const freePrice = screen.getByTestId("pricing-card-free-price");
     expect(freePrice.textContent).toContain("$0");
   });
 
   it("Founder Lifetime card price is $129 one-time", () => {
-    render(<Pricing />);
+    renderPricing();
     const founderPrice = screen.getByTestId("pricing-card-founder-price");
     expect(founderPrice.textContent).toContain("$129");
     expect(founderPrice.textContent).toContain("one-time");
   });
 
   it("annual savings footnote appears on default annual view", () => {
-    render(<Pricing />);
+    renderPricing();
     const proCard = screen.getByTestId("pricing-card-pro");
     expect(proCard.textContent).toContain("31%");
   });

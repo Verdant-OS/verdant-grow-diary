@@ -5,7 +5,7 @@
  *
  * Safety:
  *  - Read-only UI. No writes, no fetch, no supabase client, no
- *    functions.invoke, no device control.
+ *    edge-function invocation, no device control.
  *  - VPD is DERIVED and is never labeled "Live".
  */
 

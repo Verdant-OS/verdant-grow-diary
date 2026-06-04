@@ -335,7 +335,7 @@ export function normalizeWebhookIngestPayload(
   }
 
   const fingerprint = capturedAtIso
-    ? `${tentId}|${source}|${capturedAtIso}|${fingerprintParts.join(",")}`
+    ? `${tentId}|${canonicalSource}|${capturedAtIso}|${fingerprintParts.join(",")}`
     : null;
 
   return {

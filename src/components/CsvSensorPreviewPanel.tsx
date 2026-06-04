@@ -402,25 +402,52 @@ export default function CsvSensorPreviewPanel() {
             </Table>
           </div>
 
-          {/* Flags */}
+          {/* Flags with plain-language explanations */}
           {effective.flags.length > 0 && (
             <div data-testid="csv-preview-flags">
               <h3 className="text-sm font-semibold mb-2">Suspicious values</h3>
-              <ul className="space-y-1 text-sm">
-                {effective.flags.map((f, i) => (
-                  <li
-                    key={`${f.code}-${f.header}-${i}`}
-                    data-testid={`csv-preview-flag-${f.code}`}
-                    className={
-                      f.severity === "error"
-                        ? "text-destructive"
-                        : "text-muted-foreground"
-                    }
-                  >
-                    <span className="font-mono text-xs mr-2">{f.header}</span>
-                    {f.message}
-                  </li>
-                ))}
+              <ul className="space-y-3 text-sm">
+                {effective.flags.map((f, i) => {
+                  const copy = CSV_PREVIEW_WARNING_COPY[f.code as FlagCode];
+                  return (
+                    <li
+                      key={`${f.code}-${f.header}-${i}`}
+                      data-testid={`csv-preview-flag-${f.code}`}
+                      className="rounded-md border border-border bg-muted/30 p-3 space-y-1"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge
+                          variant={f.severity === "error" ? "destructive" : "secondary"}
+                          data-testid={`csv-preview-flag-severity-${f.code}`}
+                        >
+                          {f.severity}
+                        </Badge>
+                        <span className="font-mono text-xs">{f.header}</span>
+                        <span className="font-medium">
+                          {copy?.title ?? f.message}
+                        </span>
+                      </div>
+                      {copy && (
+                        <>
+                          <p
+                            className="text-xs text-muted-foreground"
+                            data-testid={`csv-preview-flag-why-${f.code}`}
+                          >
+                            <span className="font-semibold">Why it matters: </span>
+                            {copy.whyItMatters}
+                          </p>
+                          <p
+                            className="text-xs text-muted-foreground"
+                            data-testid={`csv-preview-flag-fix-${f.code}`}
+                          >
+                            <span className="font-semibold">Suggested fix: </span>
+                            {copy.suggestedFix}
+                          </p>
+                        </>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}

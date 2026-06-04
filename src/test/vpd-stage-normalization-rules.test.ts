@@ -273,6 +273,10 @@ describe("static guard — no source file outside the helper duplicates the mapp
       [/"veg"/, /"late_veg"/],
     ];
     for (const f of files) {
+      // Tests legitimately exercise both legacy and canonical names; the
+      // guard's intent is to prevent runtime/source duplication, not
+      // ban references inside .tsx tests.
+      if (f.includes(`${resolve(ROOT, "src/test")}/`)) continue;
       const src = readFileSync(f, "utf8");
       const hit = PAIRS.some(([a, b]) => a.test(src) && b.test(src));
       if (hit) violators.push(f);

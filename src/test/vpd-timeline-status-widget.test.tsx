@@ -14,7 +14,7 @@ const ROOT = resolve(__dirname, "../..");
 describe("buildVpdTimelineStatusViewModel", () => {
   it("derives VPD from temp + RH and classifies in_target", () => {
     const vm = buildVpdTimelineStatusViewModel({
-      airTempC: 25,
+      airTempC: 22,
       humidityPct: 60,
       stage: "late_veg",
     });

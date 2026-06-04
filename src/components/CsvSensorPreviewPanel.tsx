@@ -24,6 +24,7 @@ import {
   FUTURE_DIARY_CONVERSION_COPY,
   type FlagCode,
 } from "@/lib/csvSensorPreviewWarningCopy";
+import { CsvPreviewReviewGate } from "@/components/CsvPreviewReviewGate";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {

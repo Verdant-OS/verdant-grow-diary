@@ -1,73 +1,49 @@
-import { ListChecks, Droplet, FlaskConical, Scissors, Sparkles, Eye, CheckCircle2, type LucideIcon } from "lucide-react";
+import { ListChecks } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
-import { useTasks, useTents } from "@/hooks/useMockData";
 import { type GrowDataSourceMeta } from "@/hooks/useGrowData";
-import { format } from "date-fns";
 
-// Tasks still rely on useMockData. Disclose as Demo so columns are never
-// mistaken for live scheduling output.
-const TASKS_MOCK_META: GrowDataSourceMeta = {
-  isDemoData: true,
-  dataSource: "mock",
-  sourceReason: "tasks:mock",
+/**
+ * Tasks page — V0 status.
+ *
+ * Verdant does not yet have a real `tasks` table or grower-facing task
+ * pipeline wired in. Per source-truth rules we must NOT show demo/mock
+ * task rows as if they were real schedule output, and we must NOT seed
+ * fake tasks into Supabase. Until a real task source ships, this page
+ * renders a safe empty state and an "Unavailable" disclosure.
+ */
+const TASKS_UNAVAILABLE_META: GrowDataSourceMeta = {
+  isDemoData: false,
+  dataSource: "unavailable",
+  sourceReason: "tasks:no-real-source",
 };
-
-type Task = {
-  id: string;
-  title: string;
-  type: string;
-  tentId: string;
-  dueAt: string | number | Date;
-  status: "today" | "upcoming" | "done";
-  recurring?: string;
-};
-type Tent = { id: string; name: string };
-
-const ICONS: Record<string, LucideIcon> = { water: Droplet, feed: FlaskConical, training: Sparkles, defoliation: Scissors, flush: Droplet, inspect: Eye };
-
-function Column({ title, items, tents }: { title: string; items: Task[]; tents: Tent[] }) {
-  return (
-    <div className="glass rounded-2xl p-4">
-      <h3 className="font-display font-semibold mb-3 flex items-center gap-2">{title} <span className="text-xs text-muted-foreground">({items.length})</span></h3>
-      <ul className="space-y-2">
-        {items.map((t) => {
-          const Icon = ICONS[t.type] || ListChecks;
-          const tent = tents.find((x) => x.id === t.tentId);
-          return (
-            <li key={t.id} className="rounded-xl border border-border/40 p-3">
-              <div className="flex items-start gap-2">
-                <Icon className="h-4 w-4 text-primary mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">{t.title}</p>
-                  <p className="text-[11px] text-muted-foreground">{tent?.name ?? "—"} · {format(new Date(t.dueAt), "MMM d")}{t.recurring ? ` · ${t.recurring}` : ""}</p>
-                </div>
-                {t.status === "done" && <CheckCircle2 className="h-4 w-4 text-[hsl(var(--success))]" />}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
 
 export default function Tasks() {
-  const { data: tasks = [] } = useTasks();
-  const { data: tents = [] } = useTents();
   return (
     <div>
-      <PageHeader title="Tasks" description="Watering, feeding, training, and inspection schedule." icon={<ListChecks className="h-5 w-5" />} />
+      <PageHeader
+        title="Tasks"
+        description="Watering, feeding, training, and inspection schedule."
+        icon={<ListChecks className="h-5 w-5" />}
+      />
       <GrowDataSourceDisclosure
         resource="tasks"
-        hasAnyData={tasks.length > 0}
-        metas={[TASKS_MOCK_META]}
+        hasAnyData={false}
+        metas={[TASKS_UNAVAILABLE_META]}
         testId="tasks-data-source-disclosure"
       />
-      <div className="grid md:grid-cols-3 gap-4">
-        <Column title="Today" items={(tasks as Task[]).filter((t) => t.status === "today")} tents={tents as Tent[]} />
-        <Column title="Upcoming" items={(tasks as Task[]).filter((t) => t.status === "upcoming")} tents={tents as Tent[]} />
-        <Column title="Done" items={(tasks as Task[]).filter((t) => t.status === "done")} tents={tents as Tent[]} />
+      <div
+        className="glass rounded-2xl p-8 text-center"
+        data-testid="tasks-empty-state"
+      >
+        <ListChecks className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+        <h3 className="font-display font-semibold text-base mb-1">
+          No tasks yet.
+        </h3>
+        <p className="text-sm text-muted-foreground max-w-md mx-auto">
+          Create a task from a plant, alert, or grow workflow when there's
+          something to track.
+        </p>
       </div>
     </div>
   );

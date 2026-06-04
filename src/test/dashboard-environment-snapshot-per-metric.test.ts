@@ -47,7 +47,11 @@ describe("buildTentSnapshotView · empty + missing inputs", () => {
 describe("buildTentSnapshotView · source labels", () => {
   it("Manual reading shows Manual", () => {
     const v = buildTentSnapshotView(
-      [row({ source: "manual" }), row({ metric: "humidity_pct", value: 55, source: "manual" })],
+      [
+        row({ source: "manual" }),
+        row({ metric: "humidity_pct", value: 55, source: "manual" }),
+        row({ metric: "vpd_kpa", value: 1.1, source: "manual" }),
+      ],
       "veg",
       NOW,
     );
@@ -56,7 +60,11 @@ describe("buildTentSnapshotView · source labels", () => {
 
   it("CSV/import readings show CSV", () => {
     const v = buildTentSnapshotView(
-      [row({ source: "csv" }), row({ metric: "humidity_pct", value: 55, source: "csv" })],
+      [
+        row({ source: "csv" }),
+        row({ metric: "humidity_pct", value: 55, source: "csv" }),
+        row({ metric: "vpd_kpa", value: 1.1, source: "csv" }),
+      ],
       "veg",
       NOW,
     );
@@ -68,6 +76,7 @@ describe("buildTentSnapshotView · source labels", () => {
       [
         row({ source: "live", raw_payload: { vendor: "ecowitt" } }),
         row({ metric: "humidity_pct", value: 55, source: "live" }),
+        row({ metric: "vpd_kpa", value: 1.1, source: "live" }),
       ],
       "veg",
       NOW,
@@ -77,7 +86,11 @@ describe("buildTentSnapshotView · source labels", () => {
 
   it("unknown source resolves to Unknown — never Live", () => {
     const v = buildTentSnapshotView(
-      [row({ source: "weird-thing" as unknown as string })],
+      [
+        row({ source: "weird-thing" as unknown as string }),
+        row({ metric: "humidity_pct", value: 55, source: "weird-thing" as unknown as string }),
+        row({ metric: "vpd_kpa", value: 1.1, source: "weird-thing" as unknown as string }),
+      ],
       "veg",
       NOW,
     );

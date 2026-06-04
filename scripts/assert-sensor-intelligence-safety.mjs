@@ -73,6 +73,21 @@ const SCHEDULED_STATUS_PATTERNS = [
 const AUTO_ACTION_QUEUE_INSERT =
   /\.from\(\s*["']action_queue["']\s*\)\s*\.insert\s*\(/;
 
+/**
+ * Patterns that indicate *automatic* (non-grower-initiated) execution
+ * paths. Manual user-approval flows (e.g. a hook called from a click
+ * handler) are explicitly allowed.
+ */
+const AUTOMATION_HINTS = [
+  /autopilot/i,
+  /auto[_-]?evaluate/i,
+  /driftEvaluator/i,
+  /driftAutopilot/i,
+  /scheduled[_-]?(plant[_-]?)?analysis/i,
+  /\bsetInterval\s*\(/,
+  /\bcron\b/i,
+];
+
 const FAKE_PEER_PATTERNS = [
   /mockPeerDistribution/i,
   /fakePeerDistribution/i,
@@ -81,8 +96,17 @@ const FAKE_PEER_PATTERNS = [
 ];
 
 const PEER_DISTRIBUTION_HINT = /peer[_\s-]?distribution/i;
-const AI_DOCTOR_OR_DRIFT_HINT = /(aiDoctor|ai_doctor|vpdDrift|vpd_drift|driftRules|driftEvaluator)/i;
 const SCHEDULED_ANALYSIS_HINT = /scheduled[_-]?(plant[_-]?)?analysis/i;
+
+/**
+ * Strip // line comments and /* block * / comments so safety notes like
+ * `// no service_role usage` do not trigger frontend-private-term hits.
+ */
+function stripComments(src) {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+}
 
 /**
  * Scan a single file's content. Returns a list of violation objects.

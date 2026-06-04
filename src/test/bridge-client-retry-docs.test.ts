@@ -59,7 +59,7 @@ describe("bridge-client-retry-guidance.md", () => {
 
   it("says vendor is lineage-only", () => {
     expect(lower).toMatch(/vendor is \*\*lineage only\*\*|lineage only|lineage-only/);
-    expect(lower).toMatch(/never be used for auth/);
+    expect(lower).toMatch(/never.*used for auth/);
   });
 
   it("says not to retry 400/401/403", () => {

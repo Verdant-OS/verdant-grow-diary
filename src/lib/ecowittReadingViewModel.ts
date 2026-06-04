@@ -54,7 +54,12 @@ export interface EcowittSnapshotViewModel {
   derivedVpdKpa: number | null;
   /** Convenience: per-metric quick-access map for presenter. */
   metrics: Partial<Record<EcowittNormalizedReading["metric"], number>>;
+  /** True if the chosen snapshot was flagged invalid by suspicion rules. */
+  invalid: boolean;
+  /** Calm copy describing why the snapshot is unavailable, or null. */
+  unavailableReason: string | null;
 }
+
 
 const EMPTY_STATE_MESSAGE = "No EcoWitt readings received yet.";
 
@@ -113,7 +118,10 @@ export function buildEcowittSnapshotViewModel(
       allowServerReceivedAtFallback:
         options.adapter?.allowServerReceivedAtFallback ?? !!c.receivedAt,
     });
-    if (!snap.ok || snap.readings.length === 0) continue;
+    // Keep invalid/suspicious snapshots so the UI can render an honest
+    // "unavailable" state. Only drop payloads that produced zero readings
+    // at all (nothing to show, not even an invalid value).
+    if (snap.readings.length === 0) continue;
     entries.push({ snap, source: c.source });
   }
 
@@ -127,12 +135,16 @@ export function buildEcowittSnapshotViewModel(
       freshness: null,
       derivedVpdKpa: null,
       metrics: {},
+      invalid: false,
+      unavailableReason: null,
     };
   }
 
   entries.sort((a, b) => capturedAtMs(b.snap) - capturedAtMs(a.snap));
   const chosen = entries[0];
-  const effective = effectiveSource(chosen.source, chosen.snap.freshness);
+  const effective: SensorReadingSource = chosen.snap.invalid
+    ? "invalid"
+    : effectiveSource(chosen.source, chosen.snap.freshness);
   const label = resolveSensorSourceLabel({
     source: effective,
     vendor: "ecowitt",
@@ -150,8 +162,14 @@ export function buildEcowittSnapshotViewModel(
     freshness: chosen.snap.freshness,
     derivedVpdKpa: chosen.snap.derivedVpdKpa,
     metrics,
+    invalid: chosen.snap.invalid,
+    unavailableReason: chosen.snap.invalid
+      ? (chosen.snap.suspicion.find((f) => f.severity === "invalid")?.message ??
+        "Reading marked unavailable.")
+      : null,
   };
 }
+
 
 export const ECOWITT_EMPTY_STATE_MESSAGE = EMPTY_STATE_MESSAGE;
 export const ECOWITT_DERIVED_VPD_LABEL = "Derived VPD";

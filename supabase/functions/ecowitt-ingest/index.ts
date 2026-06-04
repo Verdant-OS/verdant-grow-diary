@@ -29,15 +29,15 @@
 //     retry-storm.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { authenticateBearer, type AuthResult } from "../sensor-ingest-webhook/auth.ts";
-import { computeEcoWittPasskeyFingerprint } from "../../../src/lib/ecowittPasskeyFingerprint.ts";
+import { authenticateBearer, type AuthResult } from "../_shared/sensorIngestAuth.ts";
+import { computeEcoWittPasskeyFingerprint } from "../_shared/ecowittPasskeyFingerprint.ts";
 import {
   buildEcoWittRoutedRows,
   parseEcoWittDateUtc,
   type EcoWittRoutedRow,
   type EcoWittTimestampSource,
-} from "../../../src/lib/ecowittRoutedRowBuilder.ts";
-import type { EcoWittRouterEligibleTent } from "../../../src/lib/ecowittChannelTentRouter.ts";
+} from "../_shared/ecowittRoutedRowBuilder.ts";
+import type { EcoWittRouterEligibleTent } from "../_shared/ecowittChannelTentRouter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

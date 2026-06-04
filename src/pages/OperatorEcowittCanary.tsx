@@ -4,7 +4,7 @@
  * Read-only diagnostics. NO Supabase writes, NO rpc, NO functions.invoke,
  * NO alerts/Action Queue writes, NO AI calls, NO device control.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTents } from "@/hooks/use-tents";
@@ -14,12 +14,17 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
   buildAuditReport,
+  clearAuditFromLocalStorage,
   computeVerdict,
   evaluatePreflight,
+  loadAuditFromLocalStorage,
   parseCanaryPaste,
+  saveAuditToLocalStorage,
+  type BuiltAuditReport,
   type CanaryReportInput,
   type CardStatus,
   type PreflightResult,
+  type VerdictCard,
   type VerdictResult,
 } from "@/lib/ecowittCanaryAuditRules";
 
@@ -40,6 +45,50 @@ function StatusPill({ status }: { status: CardStatus }) {
   );
 }
 
+function EvidenceCard({ card }: { card: VerdictCard }) {
+  return (
+    <Card data-card-key={card.key}>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-base">{card.label}</CardTitle>
+          <StatusPill status={card.status} />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-2 pt-0 text-sm">
+        <p className="text-muted-foreground">{card.reason}</p>
+        {card.evidence_present.length > 0 && (
+          <div data-evidence="present">
+            <div className="text-xs font-semibold uppercase tracking-wide text-primary">Evidence present</div>
+            <ul className="list-disc pl-5 text-xs text-muted-foreground">
+              {card.evidence_present.map((e, i) => (
+                <li key={i}>{e}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {card.evidence_missing.length > 0 && (
+          <div data-evidence="missing">
+            <div className="text-xs font-semibold uppercase tracking-wide text-destructive">
+              {card.status === "fail" ? "Failing evidence" : "Evidence missing"}
+            </div>
+            <ul className="list-disc pl-5 text-xs text-muted-foreground">
+              {card.evidence_missing.map((e, i) => (
+                <li key={i}>{e}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {card.next_action && (
+          <div data-evidence="next" className="text-xs">
+            <span className="font-semibold">Next: </span>
+            <span className="text-muted-foreground">{card.next_action}</span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function OperatorEcowittCanary() {
   const auth = useAuth();
   const authAvailable = !!auth?.user?.id;
@@ -52,6 +101,13 @@ export default function OperatorEcowittCanary() {
   const [report, setReport] = useState<CanaryReportInput | null>(null);
   const [parseNotes, setParseNotes] = useState<string[]>([]);
   const [logReviewed, setLogReviewed] = useState(false);
+  const [savedAudit, setSavedAudit] = useState<BuiltAuditReport | null>(null);
+  const [restoredAudit, setRestoredAudit] = useState<BuiltAuditReport | null>(null);
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSavedAudit(loadAuditFromLocalStorage());
+  }, []);
 
   // Read-only tent fetch for preflight (RLS-enforced).
   const tentQ = useQuery({
@@ -82,22 +138,19 @@ export default function OperatorEcowittCanary() {
     [preflight, report, logReviewed],
   );
 
+  const builtAudit: BuiltAuditReport = useMemo(() => {
+    const tent = tentQ.data ? { id: tentQ.data.id, name: tentQ.data.name } : null;
+    return buildAuditReport({ tent, endpoint: ENDPOINT_PATH, preflight, report, verdict });
+  }, [tentQ.data, preflight, report, verdict]);
+
   const handleImport = () => {
     const parsed = parseCanaryPaste(paste);
     setReport(parsed.report);
     setParseNotes(parsed.parseNotes);
   };
 
-  const downloadReport = () => {
-    const tent = tentQ.data ? { id: tentQ.data.id, name: tentQ.data.name } : null;
-    const body = buildAuditReport({
-      tent,
-      endpoint: ENDPOINT_PATH,
-      preflight,
-      report,
-      verdict,
-    });
-    const blob = new Blob([JSON.stringify(body, null, 2)], { type: "application/json" });
+  const downloadRedactedAudit = () => {
+    const blob = new Blob([JSON.stringify(builtAudit, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -106,6 +159,26 @@ export default function OperatorEcowittCanary() {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+  };
+
+  const rememberAudit = () => {
+    saveAuditToLocalStorage(builtAudit);
+    setSavedAudit(loadAuditFromLocalStorage());
+    setSaveNotice("Saved redacted audit on this device.");
+  };
+
+  const clearSavedAudit = () => {
+    clearAuditFromLocalStorage();
+    setSavedAudit(null);
+    setRestoredAudit(null);
+    setSaveNotice("Cleared saved audit.");
+  };
+
+  const restoreSavedAudit = () => {
+    if (savedAudit) {
+      setRestoredAudit({ ...savedAudit, restored: true });
+      setSaveNotice("Restored audit from local device storage.");
+    }
   };
 
   return (
@@ -124,6 +197,45 @@ export default function OperatorEcowittCanary() {
           </CardContent>
         </Card>
       )}
+
+      {savedAudit && !restoredAudit && (
+        <Card data-testid="saved-audit-banner">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6">
+            <div className="text-sm">
+              <div className="font-medium">Saved redacted audit found</div>
+              <div className="text-xs text-muted-foreground">
+                Generated {savedAudit.generated_at} · verdict {savedAudit.verdict.toUpperCase()}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={restoreSavedAudit}>
+                Restore
+              </Button>
+              <Button size="sm" variant="outline" onClick={clearSavedAudit}>
+                Clear
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {restoredAudit && (
+        <Card data-testid="restored-audit">
+          <CardHeader>
+            <CardTitle className="text-base">Restored from local device storage</CardTitle>
+            <CardDescription>
+              Verdict {restoredAudit.verdict.toUpperCase()} · {restoredAudit.cards.length} cards
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {restoredAudit.cards.map((c) => (
+              <EvidenceCard key={c.key} card={c} />
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {saveNotice && <div className="text-xs text-muted-foreground">{saveNotice}</div>}
 
       {/* Pre-POST Validator */}
       <Card>
@@ -222,15 +334,7 @@ export default function OperatorEcowittCanary() {
       {/* Verification Summary cards */}
       <section aria-label="Verification Summary" className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {verdict.cards.map((c) => (
-          <Card key={c.key} data-card-key={c.key}>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between gap-2">
-                <CardTitle className="text-base">{c.label}</CardTitle>
-                <StatusPill status={c.status} />
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0 text-sm text-muted-foreground">{c.reason}</CardContent>
-          </Card>
+          <EvidenceCard key={c.key} card={c} />
         ))}
       </section>
 
@@ -255,7 +359,17 @@ export default function OperatorEcowittCanary() {
               ))}
             </ul>
           )}
-          <Button onClick={downloadReport}>Download Canary Audit Report</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={downloadRedactedAudit} data-testid="download-redacted-audit">
+              Download Redacted JSON Audit
+            </Button>
+            <Button variant="outline" onClick={rememberAudit} data-testid="remember-audit">
+              Remember this redacted audit on this device
+            </Button>
+            <Button variant="outline" onClick={clearSavedAudit} data-testid="clear-saved-audit">
+              Clear saved audit
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

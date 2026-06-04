@@ -9,6 +9,9 @@ export type PreflightStatus = "pass" | "fail" | "incomplete";
 export type CardStatus = "pass" | "fail" | "incomplete" | "unknown";
 export type Verdict = "go" | "no_go" | "incomplete";
 
+export const REPORT_VERSION = "ecowitt_canary_audit_v1";
+export const LOCAL_STORAGE_KEY = "operator.ecowitt.canary.audit.v1";
+
 export interface PreflightInput {
   /** Whether an authenticated operator session is available. */
   authAvailable: boolean;
@@ -119,12 +122,14 @@ export function evaluatePreflight(input: PreflightInput): PreflightResult {
     key: "tent_active",
     label: "Tent is not archived",
     status: archivedOk ? "pass" : "fail",
-    detail: archivedOk ? undefined : "Tent is archived.",
+    detail: archivedOk ? undefined : "Tent is archived. Select an active canary tent.",
   });
 
   const hw = (tent.hardware_config ?? null) as Record<string, unknown> | null;
   const ecowitt =
-    hw && typeof hw === "object" ? ((hw as Record<string, unknown>).ecowitt as Record<string, unknown> | undefined) : undefined;
+    hw && typeof hw === "object"
+      ? ((hw as Record<string, unknown>).ecowitt as Record<string, unknown> | undefined)
+      : undefined;
 
   if (!ecowitt || typeof ecowitt !== "object") {
     checks.push({
@@ -138,18 +143,18 @@ export function evaluatePreflight(input: PreflightInput): PreflightResult {
   checks.push({ key: "ecowitt_config", label: "hardware_config.ecowitt present", status: "pass" });
 
   const fp = ecowitt.passkey_fingerprint;
-  const fpOk = typeof fp === "string" && fp.startsWith("ewfp_") && fp.length > "ewfp_".length;
   const fpLooksRaw = typeof fp === "string" && (MAC_LIKE.test(fp) || PASSKEY_LIKE.test(fp));
+  const fpOk = typeof fp === "string" && fp.startsWith("ewfp_") && fp.length > "ewfp_".length;
   checks.push({
     key: "fingerprint",
     label: "passkey_fingerprint present and ewfp_-prefixed",
     status: fpOk && !fpLooksRaw ? "pass" : "fail",
     detail: !fp
-      ? "Missing fingerprint."
+      ? "passkey_fingerprint is missing. Compute ewfp_… from the exact PASSKEY used in the canary curl."
       : fpLooksRaw
-        ? "Fingerprint looks like a raw MAC/PASSKEY — never store raw secrets."
+        ? "Fingerprint looks like a raw MAC/PASSKEY. Store only ewfp_… fingerprint, never raw device identifiers."
         : !fpOk
-          ? "Fingerprint must start with 'ewfp_'."
+          ? "passkey_fingerprint must start with 'ewfp_'. Compute ewfp_… from the exact PASSKEY used in the canary curl."
           : undefined,
   });
 
@@ -164,13 +169,17 @@ export function evaluatePreflight(input: PreflightInput): PreflightResult {
     key: "air_numeric",
     label: "air_channels is numeric array",
     status: airNumeric ? "pass" : "fail",
-    detail: airNumeric ? undefined : "air_channels must be numbers (e.g. [1]), not strings.",
+    detail: airNumeric
+      ? undefined
+      : 'air_channels must be numeric array [1]. Strings like ["1"] will not route.',
   });
   checks.push({
     key: "soil_numeric",
     label: "soil_channels is numeric array",
     status: soilNumeric ? "pass" : "fail",
-    detail: soilNumeric ? undefined : "soil_channels must be numbers (e.g. [1]), not strings.",
+    detail: soilNumeric
+      ? undefined
+      : 'soil_channels must be numeric array [1]. Strings like ["1"] will not route.',
   });
 
   const airEq1 = airNumeric && air.length === 1 && air[0] === 1;
@@ -193,7 +202,9 @@ export function evaluatePreflight(input: PreflightInput): PreflightResult {
     key: "channel_9_unmapped",
     label: "channel 9 not mapped",
     status: has9 ? "fail" : "pass",
-    detail: has9 ? "Channel 9 must remain unmapped to validate negative control." : undefined,
+    detail: has9
+      ? "Channel 9 must remain unmapped for the canary. Remove 9 from air_channels/soil_channels."
+      : undefined,
   });
 
   const leakPath = scanForRawSecrets(ecowitt);
@@ -262,7 +273,6 @@ export interface ParsedCanaryReport {
 export function parseCanaryPaste(raw: string): ParsedCanaryReport {
   const trimmed = (raw ?? "").trim();
   if (!trimmed) return { ok: false, report: null, source: "empty", parseNotes: [] };
-  // try JSON
   try {
     const parsed = JSON.parse(trimmed);
     if (parsed && typeof parsed === "object") {
@@ -281,6 +291,57 @@ export function parseCanaryPaste(raw: string): ParsedCanaryReport {
   };
 }
 
+// ----- redaction -----------------------------------------------------------
+
+const REPORT_ALLOWED_KEYS: (keyof CanaryReportInput)[] = [
+  "generated_at",
+  "endpoint",
+  "preflight_status",
+  "responses",
+  "main_row_counts",
+  "malformed_row_counts",
+  "duplicate_replay_counts",
+  "channel_9_count",
+  "leak_scan_count",
+  "secret_value_leak_count",
+  "null_captured_at_count",
+  "timestamp_source_counts",
+  "vpd_provenance",
+  "log_safety_status",
+];
+
+const REDACT_KEY_PATTERN = /(passkey|^mac$|_mac$|api_?key|application_?key|token|auth|secret|service_role|user_id|raw_payload|payload|body)/i;
+
+function deepRedact(node: unknown): unknown {
+  if (node == null) return node;
+  if (typeof node === "string") {
+    return looksLikeRawSecret(node) ? "[REDACTED]" : node;
+  }
+  if (Array.isArray(node)) return node.map(deepRedact);
+  if (typeof node === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+      if (REDACT_KEY_PATTERN.test(k)) {
+        out[k] = "[REDACTED]";
+        continue;
+      }
+      out[k] = deepRedact(v);
+    }
+    return out;
+  }
+  return node;
+}
+
+export function redactReport(r: CanaryReportInput | null): CanaryReportInput | null {
+  if (!r) return null;
+  const allow: Record<string, unknown> = {};
+  for (const k of REPORT_ALLOWED_KEYS) {
+    const v = (r as Record<string, unknown>)[k as string];
+    if (v !== undefined) allow[k as string] = v;
+  }
+  return deepRedact(allow) as CanaryReportInput;
+}
+
 // ----- verdict --------------------------------------------------------------
 
 export interface VerdictCard {
@@ -288,6 +349,9 @@ export interface VerdictCard {
   label: string;
   status: CardStatus;
   reason: string;
+  evidence_present: string[];
+  evidence_missing: string[];
+  next_action?: string;
 }
 
 export interface VerdictResult {
@@ -300,6 +364,16 @@ const REQUIRED_MAIN_METRICS = ["temperature_c", "humidity", "soil_moisture", "vp
 const REQUIRED_MALFORMED_METRICS = ["humidity", "soil_moisture"];
 const FORBIDDEN_MALFORMED_METRICS = ["temperature_c", "vpd_kpa"];
 
+interface CardInit {
+  key: string;
+  label: string;
+  status: CardStatus;
+  reason: string;
+  evidence_present?: string[];
+  evidence_missing?: string[];
+  next_action?: string;
+}
+
 export function computeVerdict(args: {
   preflight: PreflightResult | null;
   report: CanaryReportInput | null;
@@ -310,8 +384,13 @@ export function computeVerdict(args: {
   let anyFail = false;
   let anyIncomplete = false;
 
-  const push = (c: VerdictCard) => {
-    cards.push(c);
+  const push = (c: CardInit) => {
+    const card: VerdictCard = {
+      evidence_present: [],
+      evidence_missing: [],
+      ...c,
+    };
+    cards.push(card);
     if (c.status === "fail") {
       anyFail = true;
       reasons.push(`${c.label}: ${c.reason}`);
@@ -322,46 +401,124 @@ export function computeVerdict(args: {
 
   // Preflight
   if (!args.preflight) {
-    push({ key: "preflight", label: "Preflight", status: "incomplete", reason: "Not run." });
+    push({
+      key: "preflight",
+      label: "Preflight",
+      status: "incomplete",
+      reason: "Not run.",
+      evidence_missing: ["preflight result"],
+      next_action: "Select a canary tent and run the Pre-POST Validator.",
+    });
   } else {
+    const failed = args.preflight.checks.filter((c) => c.status === "fail").map((c) => c.detail || c.label);
+    const passed = args.preflight.checks.filter((c) => c.status === "pass").map((c) => c.label);
     push({
       key: "preflight",
       label: "Preflight",
       status: args.preflight.status === "pass" ? "pass" : args.preflight.status === "fail" ? "fail" : "incomplete",
       reason: args.preflight.reason,
+      evidence_present: passed,
+      evidence_missing: args.preflight.status === "fail" ? failed : [],
+      next_action:
+        args.preflight.status === "fail"
+          ? "Fix the listed hardware_config issues before POSTing."
+          : undefined,
     });
   }
 
   const r = args.report;
-  if (!r) {
-    push({ key: "posts", label: "POSTs", status: "incomplete", reason: "No canary report imported." });
-    push({ key: "sql", label: "SQL Verification", status: "incomplete", reason: "No SQL counts imported." });
-    push({ key: "ts", label: "Timestamp Integrity", status: "incomplete", reason: "Missing." });
-    push({ key: "secrets", label: "Secret Safety", status: "incomplete", reason: "Missing." });
-    push({ key: "dup", label: "Duplicate Replay", status: "incomplete", reason: "Missing." });
-    push({ key: "ch9", label: "Unmapped Channel 9", status: "incomplete", reason: "Missing." });
-  } else {
-    // POSTs
-    const resp = r.responses ?? {};
-    const allOk = ["main", "duplicate", "malformed"].every((k) => {
-      const v = (resp as Record<string, { http?: number; ok?: boolean } | undefined>)[k];
-      return v && (v.ok === true || v.http === 200);
-    });
-    const anyMissing = !resp.main || !resp.duplicate || !resp.malformed;
+  if (!r || Object.keys(r).length === 0) {
     push({
       key: "posts",
       label: "POSTs",
-      status: anyMissing ? "incomplete" : allOk ? "pass" : "fail",
-      reason: anyMissing ? "One or more POST responses missing." : allOk ? "All three POSTs returned 200." : "A POST did not return 200.",
+      status: "incomplete",
+      reason: "No canary report imported.",
+      evidence_missing: ["responses.main", "responses.duplicate", "responses.malformed"],
+      next_action: "Run scripts/ecowitt-canary-harness.sh and paste the JSON output.",
+    });
+    push({
+      key: "sql",
+      label: "SQL Verification",
+      status: "incomplete",
+      reason: "No SQL counts imported.",
+      evidence_missing: ["main_row_counts", "malformed_row_counts"],
+      next_action: "Include sensor_readings row counts in the harness JSON.",
+    });
+    push({
+      key: "ts",
+      label: "Timestamp Integrity",
+      status: "incomplete",
+      reason: "Missing.",
+      evidence_missing: ["timestamp_source_counts"],
+    });
+    push({
+      key: "secrets",
+      label: "Secret Safety",
+      status: "incomplete",
+      reason: "Missing.",
+      evidence_missing: ["leak_scan_count", "secret_value_leak_count", "null_captured_at_count"],
+    });
+    push({
+      key: "dup",
+      label: "Duplicate Replay",
+      status: "incomplete",
+      reason: "Missing.",
+      evidence_missing: ["duplicate_replay_counts"],
+    });
+    push({
+      key: "ch9",
+      label: "Unmapped Channel 9",
+      status: "incomplete",
+      reason: "Missing.",
+      evidence_missing: ["channel_9_count"],
+    });
+  } else {
+    // POSTs
+    const resp = r.responses ?? {};
+    const respKeys = ["main", "duplicate", "malformed"] as const;
+    const respMissing = respKeys.filter((k) => !(resp as Record<string, unknown>)[k]);
+    const respFailed = respKeys.filter((k) => {
+      const v = (resp as Record<string, { http?: number; ok?: boolean } | undefined>)[k];
+      return v && !(v.ok === true || v.http === 200);
+    });
+    push({
+      key: "posts",
+      label: "POSTs",
+      status:
+        respMissing.length > 0
+          ? "incomplete"
+          : respFailed.length === 0
+            ? "pass"
+            : "fail",
+      reason:
+        respMissing.length > 0
+          ? `Missing responses: ${respMissing.join(", ")}.`
+          : respFailed.length === 0
+            ? "All three POSTs returned 200."
+            : `Non-200 responses: ${respFailed.join(", ")}.`,
+      evidence_present: respKeys.filter((k) => !respMissing.includes(k) && !respFailed.includes(k)).map((k) => `${k}=200`),
+      evidence_missing: respMissing.map((k) => `responses.${k}`),
+      next_action:
+        respFailed.length > 0
+          ? "Re-run the harness; investigate the failing POST before grading."
+          : undefined,
     });
 
     // SQL: main row counts
     if (!r.main_row_counts) {
-      push({ key: "sql_main", label: "Main canary rows", status: "incomplete", reason: "Missing." });
+      push({
+        key: "sql_main",
+        label: "Main canary rows (expect 4)",
+        status: "incomplete",
+        reason: "main_row_counts missing.",
+        evidence_missing: ["main_row_counts"],
+        next_action: "Include per-metric row counts in the imported JSON.",
+      });
     } else {
-      const missing = REQUIRED_MAIN_METRICS.filter((m) => (r.main_row_counts?.[m] ?? 0) !== 1);
-      const totalRows = Object.values(r.main_row_counts).reduce((a, b) => a + b, 0);
-      const extra = Object.keys(r.main_row_counts).filter((m) => !REQUIRED_MAIN_METRICS.includes(m));
+      const counts = r.main_row_counts;
+      const missing = REQUIRED_MAIN_METRICS.filter((m) => (counts[m] ?? 0) !== 1);
+      const totalRows = Object.values(counts).reduce((a, b) => a + b, 0);
+      const extra = Object.keys(counts).filter((m) => !REQUIRED_MAIN_METRICS.includes(m));
       const ok = missing.length === 0 && totalRows === 4 && extra.length === 0;
       push({
         key: "sql_main",
@@ -370,95 +527,183 @@ export function computeVerdict(args: {
         reason: ok
           ? "4 rows present: temperature_c, humidity, soil_moisture, vpd_kpa."
           : `Mismatch — total=${totalRows}, missing=${missing.join(",") || "none"}, extra=${extra.join(",") || "none"}.`,
+        evidence_present: REQUIRED_MAIN_METRICS.filter((m) => (counts[m] ?? 0) === 1).map((m) => `${m}=1`),
+        evidence_missing: missing.map((m) => `${m}=1`),
+        next_action: ok ? undefined : "Re-check ingest mapping and re-run the main canary POST.",
       });
     }
 
     // SQL: malformed
     if (!r.malformed_row_counts) {
-      push({ key: "sql_malformed", label: "Malformed canary rows", status: "incomplete", reason: "Missing." });
+      push({
+        key: "sql_malformed",
+        label: "Malformed canary rows (expect 2)",
+        status: "incomplete",
+        reason: "malformed_row_counts missing.",
+        evidence_missing: ["malformed_row_counts"],
+      });
     } else {
       const m = r.malformed_row_counts;
       const present = Object.keys(m).filter((k) => (m[k] ?? 0) > 0);
       const hasForbidden = FORBIDDEN_MALFORMED_METRICS.filter((k) => (m[k] ?? 0) > 0);
       const hasRequired = REQUIRED_MALFORMED_METRICS.every((k) => (m[k] ?? 0) === 1);
       const ok = hasForbidden.length === 0 && hasRequired && present.length === 2;
+      const reason = ok
+        ? "humidity + soil_moisture only; no temperature_c or vpd_kpa."
+        : hasForbidden.includes("vpd_kpa")
+          ? "Hard fail: VPD was generated from malformed temperature input."
+          : hasForbidden.includes("temperature_c")
+            ? "Hard fail: temperature_c row was generated from malformed temperature input."
+            : `Unexpected metric set: present=${present.join(",")}`;
       push({
         key: "sql_malformed",
         label: "Malformed canary rows (expect 2)",
         status: ok ? "pass" : "fail",
-        reason: ok
-          ? "humidity + soil_moisture only; no temperature_c or vpd_kpa."
-          : `Forbidden=${hasForbidden.join(",") || "none"}, present=${present.join(",")}`,
+        reason,
+        evidence_present: REQUIRED_MALFORMED_METRICS.filter((k) => (m[k] ?? 0) === 1).map((k) => `${k}=1`),
+        evidence_missing: hasForbidden.map((k) => `forbidden:${k}`),
+        next_action: ok
+          ? undefined
+          : "Reject the canary. Malformed inputs must drop temperature_c/vpd_kpa rows.",
       });
     }
 
     // Duplicate replay
     if (!r.duplicate_replay_counts) {
-      push({ key: "dup", label: "Duplicate Replay", status: "incomplete", reason: "Missing." });
+      push({
+        key: "dup",
+        label: "Duplicate Replay",
+        status: "incomplete",
+        reason: "Missing.",
+        evidence_missing: ["duplicate_replay_counts"],
+      });
     } else {
       const over = Object.entries(r.duplicate_replay_counts).filter(([, v]) => (v ?? 0) > 1);
       push({
         key: "dup",
         label: "Duplicate Replay",
         status: over.length === 0 ? "pass" : "fail",
-        reason: over.length === 0 ? "Still 1 per metric." : `Metrics with >1: ${over.map(([k]) => k).join(",")}`,
+        reason:
+          over.length === 0
+            ? "Still 1 per metric."
+            : "Duplicate replay produced more than one row per metric. Check dateutc, captured_at, and the sensor_readings_dedupe_uidx constraint.",
+        evidence_present:
+          over.length === 0
+            ? Object.entries(r.duplicate_replay_counts).map(([k, v]) => `${k}=${v}`)
+            : [],
+        evidence_missing: over.map(([k, v]) => `${k}=${v} (expected 1)`),
+        next_action:
+          over.length === 0 ? undefined : "Verify dedupe index exists and dateutc is preserved.",
       });
     }
 
     // Channel 9
     if (typeof r.channel_9_count !== "number") {
-      push({ key: "ch9", label: "Unmapped Channel 9", status: "incomplete", reason: "Missing count." });
-    } else {
       push({
         key: "ch9",
         label: "Unmapped Channel 9",
-        status: r.channel_9_count === 0 ? "pass" : "fail",
-        reason: r.channel_9_count === 0 ? "0 rows from channel 9." : `${r.channel_9_count} rows leaked from channel 9.`,
+        status: "incomplete",
+        reason: "Missing count.",
+        evidence_missing: ["channel_9_count"],
+      });
+    } else {
+      const ok = r.channel_9_count === 0;
+      push({
+        key: "ch9",
+        label: "Unmapped Channel 9",
+        status: ok ? "pass" : "fail",
+        reason: ok
+          ? "0 rows from channel 9 (unmapped, as required)."
+          : `Channel 9 leaked ${r.channel_9_count} rows. Unmapped channels must produce zero rows.`,
+        evidence_present: ok ? ["channel_9_count=0"] : [],
+        evidence_missing: ok ? [] : [`channel_9_count=${r.channel_9_count}`],
+        next_action: ok ? undefined : "Remove channel 9 from hardware_config and re-run.",
       });
     }
 
     // Timestamp integrity
     const tsc = r.timestamp_source_counts;
     if (!tsc) {
-      push({ key: "ts", label: "Timestamp Integrity", status: "incomplete", reason: "Missing." });
-    } else {
-      const onlyServer =
-        (tsc.ecowitt_dateutc ?? 0) === 0 && (tsc.server_received_at ?? 0) > 0;
-      const hasEcowitt = (tsc.ecowitt_dateutc ?? 0) > 0;
       push({
         key: "ts",
         label: "Timestamp Integrity",
-        status: onlyServer ? "fail" : hasEcowitt ? "pass" : "incomplete",
+        status: "incomplete",
+        reason: "Missing.",
+        evidence_missing: ["timestamp_source_counts"],
+      });
+    } else {
+      const eco = tsc.ecowitt_dateutc ?? 0;
+      const srv = tsc.server_received_at ?? 0;
+      const onlyServer = eco === 0 && srv > 0;
+      push({
+        key: "ts",
+        label: "Timestamp Integrity",
+        status: onlyServer ? "fail" : eco > 0 ? "pass" : "incomplete",
         reason: onlyServer
-          ? "Only server_received_at present — ecowitt_dateutc not honored."
-          : hasEcowitt
-            ? "ecowitt_dateutc present for canary rows."
+          ? "Valid canary rows should use timestamp_source = ecowitt_dateutc. server_received_at means dateutc was missing, malformed, or out of the clock-sanity window."
+          : eco > 0
+            ? `ecowitt_dateutc=${eco} for canary rows.`
             : "No timestamp_source counts provided.",
+        evidence_present: eco > 0 ? [`ecowitt_dateutc=${eco}`] : [],
+        evidence_missing: onlyServer ? [`server_received_at=${srv} (expected ecowitt_dateutc)`] : [],
+        next_action: onlyServer
+          ? "Inspect dateutc parsing and clock-sanity bounds in ecowitt-ingest."
+          : undefined,
       });
     }
 
     // Secret safety
-    const leakCount = (r.leak_scan_count ?? null) as number | null;
-    const valLeak = (r.secret_value_leak_count ?? null) as number | null;
-    const nullTs = (r.null_captured_at_count ?? null) as number | null;
-    if (leakCount === null || valLeak === null || nullTs === null) {
-      push({ key: "secrets", label: "Secret Safety", status: "incomplete", reason: "Missing leak/null counts." });
+    const leakCount = r.leak_scan_count;
+    const valLeak = r.secret_value_leak_count;
+    const nullTs = r.null_captured_at_count;
+    if (leakCount == null || valLeak == null || nullTs == null) {
+      push({
+        key: "secrets",
+        label: "Secret Safety",
+        status: "incomplete",
+        reason: "Missing leak/null counts.",
+        evidence_missing: [
+          leakCount == null ? "leak_scan_count" : "",
+          valLeak == null ? "secret_value_leak_count" : "",
+          nullTs == null ? "null_captured_at_count" : "",
+        ].filter(Boolean),
+      });
     } else {
       const ok = leakCount === 0 && valLeak === 0 && nullTs === 0;
+      const reason = ok
+        ? "0 key-name leaks, 0 secret-value leaks, 0 null captured_at."
+        : leakCount > 0 || valLeak > 0
+          ? "Secret-like data was found in raw_payload. Stop before live gateway testing."
+          : `null_captured_at=${nullTs}`;
       push({
         key: "secrets",
         label: "Secret Safety",
         status: ok ? "pass" : "fail",
-        reason: ok
-          ? "0 key-name leaks, 0 secret-value leaks, 0 null captured_at."
-          : `leaks=${leakCount}, value_leaks=${valLeak}, null_captured_at=${nullTs}`,
+        reason,
+        evidence_present: ok
+          ? ["leak_scan_count=0", "secret_value_leak_count=0", "null_captured_at_count=0"]
+          : [],
+        evidence_missing: ok
+          ? []
+          : [
+              leakCount > 0 ? `leak_scan_count=${leakCount}` : "",
+              valLeak > 0 ? `secret_value_leak_count=${valLeak}` : "",
+              nullTs > 0 ? `null_captured_at_count=${nullTs}` : "",
+            ].filter(Boolean),
+        next_action: ok ? undefined : "Do not proceed with live gateway. Scrub payload pipeline.",
       });
     }
 
     // VPD provenance
     const vpd = r.vpd_provenance;
     if (!vpd) {
-      push({ key: "vpd", label: "VPD Provenance", status: "incomplete", reason: "Missing." });
+      push({
+        key: "vpd",
+        label: "VPD Provenance",
+        status: "incomplete",
+        reason: "Missing.",
+        evidence_missing: ["vpd_provenance"],
+      });
     } else {
       const derived = vpd.derived_from ?? [];
       const ok =
@@ -469,30 +714,31 @@ export function computeVerdict(args: {
         key: "vpd",
         label: "VPD Provenance",
         status: ok ? "pass" : "fail",
-        reason: ok ? "calculated=true; derived_from temp+humidity." : "vpd_kpa not provably derived from temp+humidity.",
+        reason: ok
+          ? "calculated=true; derived_from temp+humidity."
+          : "vpd_kpa not provably derived from temp+humidity.",
+        evidence_present: ok ? [`derived_from=${derived.join("+")}`] : [],
+        evidence_missing: ok ? [] : ["calculated=true; derived_from=[temp*,humidity*]"],
       });
     }
 
     // Log safety
+    const logsClean = r.log_safety_status === "clean";
+    const logsLeaked = r.log_safety_status === "leaked";
     push({
       key: "logs",
       label: "Log Safety",
-      status:
-        r.log_safety_status === "clean"
-          ? args.logReviewed
-            ? "pass"
-            : "incomplete"
-          : r.log_safety_status === "leaked"
-            ? "fail"
-            : "incomplete",
-      reason:
-        r.log_safety_status === "clean"
-          ? args.logReviewed
-            ? "Logs reviewed; no secrets found."
-            : "Mark logs as reviewed to confirm."
-          : r.log_safety_status === "leaked"
-            ? "Secret found in logs."
-            : "Log review not yet completed.",
+      status: logsClean ? (args.logReviewed ? "pass" : "incomplete") : logsLeaked ? "fail" : "incomplete",
+      reason: logsClean
+        ? args.logReviewed
+          ? "Logs reviewed; no secrets found."
+          : "Mark logs as reviewed to confirm."
+        : logsLeaked
+          ? "Secret found in logs."
+          : "Log review not yet completed.",
+      evidence_present: logsClean && args.logReviewed ? ["log_safety_status=clean", "operator_reviewed=true"] : [],
+      evidence_missing: !args.logReviewed ? ["operator_reviewed=true"] : [],
+      next_action: logsLeaked ? "Block live gateway; rotate any exposed secrets." : undefined,
     });
   }
 
@@ -505,7 +751,14 @@ export function computeVerdict(args: {
     key: "verdict",
     label: "Final Verdict",
     status: verdict === "go" ? "pass" : verdict === "no_go" ? "fail" : "incomplete",
-    reason: verdict === "go" ? "All canary checks passed." : verdict === "no_go" ? "One or more hard failures." : "Awaiting evidence.",
+    reason:
+      verdict === "go"
+        ? "All canary checks passed."
+        : verdict === "no_go"
+          ? "One or more hard failures."
+          : "Awaiting evidence.",
+    evidence_present: [],
+    evidence_missing: [],
   });
 
   return { verdict, cards, reasons };
@@ -513,28 +766,91 @@ export function computeVerdict(args: {
 
 // ----- report (download) ---------------------------------------------------
 
+export interface BuiltAuditReport {
+  report_version: string;
+  generated_at: string;
+  tent: { id: string; name: string | null } | null;
+  endpoint: string | null;
+  verdict: Verdict;
+  cards: VerdictCard[];
+  reasons: string[];
+  preflight_summary: {
+    status: PreflightStatus | null;
+    reason: string | null;
+    checks: PreflightCheck[];
+  };
+  imported_report: CanaryReportInput | null;
+  safety_notes: string[];
+  restored?: boolean;
+}
+
 export function buildAuditReport(args: {
   tent: { id: string; name?: string | null } | null;
   endpoint?: string | null;
   preflight: PreflightResult | null;
   report: CanaryReportInput | null;
   verdict: VerdictResult;
-}) {
+}): BuiltAuditReport {
   return {
+    report_version: REPORT_VERSION,
     generated_at: new Date().toISOString(),
     tent: args.tent ? { id: args.tent.id, name: args.tent.name ?? null } : null,
     endpoint: args.endpoint ?? null,
-    preflight: args.preflight,
-    canary: args.report,
     verdict: args.verdict.verdict,
     cards: args.verdict.cards,
     reasons: args.verdict.reasons,
+    preflight_summary: {
+      status: args.preflight?.status ?? null,
+      reason: args.preflight?.reason ?? null,
+      checks: args.preflight?.checks ?? [],
+    },
+    imported_report: redactReport(args.report),
     safety_notes: [
       "Read-only diagnostics.",
       "No device control.",
       "No automation.",
       "No alerts written.",
       "No Action Queue writes.",
+      "Secrets, tokens, MACs, and raw payloads are redacted.",
     ],
   };
+}
+
+// ----- localStorage (opt-in) ----------------------------------------------
+
+export function saveAuditToLocalStorage(audit: BuiltAuditReport): void {
+  try {
+    const redacted: BuiltAuditReport = {
+      ...audit,
+      imported_report: redactReport(audit.imported_report ?? null),
+    };
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(redacted));
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+export function loadAuditFromLocalStorage(): BuiltAuditReport | null {
+  try {
+    if (typeof localStorage === "undefined") return null;
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as BuiltAuditReport;
+    if (!parsed || parsed.report_version !== REPORT_VERSION) return null;
+    return { ...parsed, restored: true };
+  } catch {
+    return null;
+  }
+}
+
+export function clearAuditFromLocalStorage(): void {
+  try {
+    if (typeof localStorage !== "undefined") {
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
+    }
+  } catch {
+    /* ignore */
+  }
 }

@@ -157,3 +157,89 @@ describe("diaryTimelineViewModel — static safety", () => {
     }
   });
 });
+
+import {
+  DIARY_TIMELINE_ACTION_STYLES,
+  DIARY_TIMELINE_TONE_CLASS,
+  getDiaryTimelineActionStyle,
+} from "../constants/diaryTimelineActionStyles";
+import { getDiaryTimelineActionView } from "../lib/diaryTimelineViewModel";
+
+describe("diary timeline action styles — icon + tone + aria", () => {
+  const KINDS = [
+    "diary_note",
+    "watering",
+    "feeding",
+    "training",
+    "photo",
+    "environment",
+    "diagnosis",
+    "harvest",
+    "action_followup",
+  ] as const;
+
+  it("every known action kind has a label, icon, tone, and ariaLabel", () => {
+    for (const k of KINDS) {
+      const style = getDiaryTimelineActionStyle(k);
+      expect(style.label.length).toBeGreaterThan(0);
+      expect(style.iconName.length).toBeGreaterThan(0);
+      expect(style.tone.length).toBeGreaterThan(0);
+      expect(style.ariaLabel.length).toBeGreaterThan(0);
+      expect(DIARY_TIMELINE_TONE_CLASS[style.tone]).toBeDefined();
+    }
+  });
+
+  it("unknown / null kind falls back safely", () => {
+    expect(getDiaryTimelineActionStyle(null).kind).toBe("unknown");
+    expect(getDiaryTimelineActionStyle("xyz").label).toBe("Entry");
+  });
+
+  it("the view-model re-exports the style helper", () => {
+    expect(getDiaryTimelineActionView("watering").iconName).toBe("Droplet");
+    expect(getDiaryTimelineActionView("diagnosis").tone).toBe("warning");
+  });
+
+  it("style map covers every defined kind", () => {
+    for (const [k, style] of Object.entries(DIARY_TIMELINE_ACTION_STYLES)) {
+      expect(style.kind).toBe(k);
+    }
+  });
+});
+
+describe("diary timeline filtered-empty state — all filter combos", () => {
+  const FILTER_KEYS = [
+    "all",
+    "notes",
+    "watering",
+    "feeding",
+    "photos",
+    "manual_sensor_snapshot",
+    "warnings",
+  ] as const;
+
+  it("filtered-empty copy is identical regardless of which filter is active", () => {
+    for (const _ of FILTER_KEYS) {
+      const s = selectDiaryTimelineEmptyState({
+        hasAnyEntries: true,
+        filtersActive: true,
+      });
+      expect(s.variant).toBe("filtered-empty");
+      expect(s.title).toBe(DIARY_TIMELINE_FILTERED_EMPTY_COPY);
+    }
+  });
+
+  it("true empty state still renders the friendly Fast Add hint", () => {
+    const s = selectDiaryTimelineEmptyState({
+      hasAnyEntries: false,
+      filtersActive: false,
+    });
+    expect(s.title).toBe(DIARY_TIMELINE_EMPTY_TITLE);
+    expect(s.hint).toBe(DIARY_TIMELINE_EMPTY_HINT);
+  });
+
+  it("non-live sources still never render as Live across kinds", () => {
+    for (const src of ["manual", "csv", "demo", "stale", "invalid", "import"]) {
+      expect(classifyDiaryTimelineSource(src)).not.toBe("live");
+    }
+  });
+});

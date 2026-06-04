@@ -79,12 +79,27 @@ const STATUS_TONE: Record<AlertStatusRow, string> = {
 };
 
 export default function Alerts() {
-  const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } =
+  const { urlGrowId, scopedGrow, scopedGrowName, isValidScopedGrow, backHref } =
     useScopedGrow();
   const scopedGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
   // A grow id was passed in the URL but doesn't map to a grow the viewer
   // owns. Showing every alert would be misleading — render a calm prompt.
   const hasInvalidScope = !!urlGrowId && !isValidScopedGrow;
+
+  // Trigger coverage fix: ensure simply viewing the Alerts page closes the
+  // loop (real/manual reading → derived breach → persisted alert) without
+  // requiring the grower to first visit the Dashboard with `?growId=`.
+  // When unscoped, fall back to all of the user's grows so any active grow
+  // with a fresh breaching snapshot still persists.
+  const { grows, activeGrowId } = useGrows();
+  const persistGrowIds: string[] = scopedGrowId
+    ? [scopedGrowId]
+    : activeGrowId
+      ? [activeGrowId]
+      : grows.map((g) => g.id);
+  const stageByGrow = new Map<string, string | null>(
+    grows.map((g) => [g.id, (g as { stage?: string | null }).stage ?? null]),
+  );
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");

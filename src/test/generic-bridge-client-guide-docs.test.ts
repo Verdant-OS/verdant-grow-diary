@@ -29,7 +29,7 @@ describe("generic-bridge-client-guide.md", () => {
 
   it("requires Idempotency-Key header for bridges", () => {
     expect(doc).toContain("Idempotency-Key");
-    expect(lower).toMatch(/idempotency.*required|must send.*idempotency/);
+    expect(lower).toMatch(/must.{0,8}send an `idempotency-key`|idempotency.*required/);
   });
 
   it("shows EcoWitt-over-MQTT example", () => {

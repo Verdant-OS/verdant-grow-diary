@@ -114,6 +114,13 @@ export interface WebhookIngestPayload {
   captured_at?: unknown;
   metrics?: Record<string, unknown> | null;
   metadata?: Record<string, unknown> | null;
+  /**
+   * Optional vendor lineage (e.g. "ecowitt", "home_assistant", "shelly").
+   * Preserved verbatim into `raw_payload.vendor` for traceability.
+   * NEVER used for ownership, auth, routing, or trust decisions —
+   * any string the caller sends is accepted as lineage metadata only.
+   */
+  vendor?: unknown;
   // Caller-supplied user_id is *intentionally* ignored — server uses JWT.
   user_id?: unknown;
 }

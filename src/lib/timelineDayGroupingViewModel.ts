@@ -116,5 +116,5 @@ export function buildTimelineDayGroups(
       count: dayItems.length,
       items: dayItems,
     };
-  });
+  }).sort((a, b) => (a.dayKey < b.dayKey ? 1 : a.dayKey > b.dayKey ? -1 : 0));
 }

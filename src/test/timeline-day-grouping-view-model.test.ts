@@ -80,7 +80,7 @@ describe("buildTimelineDayGroups", () => {
   });
 
   it("shows Today label when day matches clock", () => {
-    const now = new Date(Date.UTC(2026, 6, 3, 12, 0) + TZ_OFFSET_MS);
+    const now = new Date(Date.UTC(2026, 5, 3, 12, 0) + TZ_OFFSET_MS);
     const items: TimelineMemoryItem[] = [
       makeDiaryItem({ key: "a", occurredAt: localIso(2026, 6, 3, 10) }),
     ];
@@ -89,7 +89,7 @@ describe("buildTimelineDayGroups", () => {
   });
 
   it("shows Yesterday label when day is one before clock", () => {
-    const now = new Date(Date.UTC(2026, 6, 3, 12, 0) + TZ_OFFSET_MS);
+    const now = new Date(Date.UTC(2026, 5, 3, 12, 0) + TZ_OFFSET_MS);
     const items: TimelineMemoryItem[] = [
       makeDiaryItem({ key: "a", occurredAt: localIso(2026, 6, 2, 10) }),
     ];
@@ -98,7 +98,7 @@ describe("buildTimelineDayGroups", () => {
   });
 
   it("shows formatted date for older events", () => {
-    const now = new Date(Date.UTC(2026, 6, 5, 12, 0) + TZ_OFFSET_MS);
+    const now = new Date(Date.UTC(2026, 5, 5, 12, 0) + TZ_OFFSET_MS);
     const items: TimelineMemoryItem[] = [
       makeDiaryItem({ key: "a", occurredAt: localIso(2026, 6, 1, 10) }),
     ];
@@ -146,13 +146,13 @@ describe("buildTimelineDayGroups", () => {
       makeDiaryItem({ key: "a", occurredAt: localIso(2026, 6, 3, 10) }),
     ];
     const groups = buildTimelineDayGroups(items, {
-      now: () => new Date(Date.UTC(2026, 6, 3, 12, 0) + TZ_OFFSET_MS),
+      now: () => new Date(Date.UTC(2026, 5, 3, 12, 0) + TZ_OFFSET_MS),
     });
     expect(groups[0].label).toBe("Today");
   });
 
   it("supports injectable clock as number", () => {
-    const nowMs = new Date(Date.UTC(2026, 6, 3, 12, 0) + TZ_OFFSET_MS).getTime();
+    const nowMs = new Date(Date.UTC(2026, 5, 3, 12, 0) + TZ_OFFSET_MS).getTime();
     const items: TimelineMemoryItem[] = [
       makeDiaryItem({ key: "a", occurredAt: localIso(2026, 6, 3, 10) }),
     ];

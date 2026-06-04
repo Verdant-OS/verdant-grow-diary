@@ -155,7 +155,12 @@ export default function PlantDetail() {
         hasDoctorSection
         hasAssignedTent={!!plant.tentId}
       />
-      <PlantDetailPhotoStrip plantId={plant.id} growId={plant.growId ?? null} />
+      <PlantDetailPhotoStrip
+        plantId={plant.id}
+        growId={plant.growId ?? null}
+        onUploadPhoto={() => setQuickLogOpen(true)}
+      />
+
       <PlantDetailWhatsMissing
         plantId={plant.id}
         growId={plant.growId ?? null}

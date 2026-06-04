@@ -78,7 +78,7 @@ describe("applyFastAddTimestampDefaults — never overwrites user edits", () => 
   });
   it("fills missing occurred_at with default", () => {
     const out = applyFastAddTimestampDefaults(
-      {},
+      {} as { occurred_at?: string; captured_at?: string },
       { occurred_at: FIXED.toISOString() },
     );
     expect(out.occurred_at).toBe(FIXED.toISOString());

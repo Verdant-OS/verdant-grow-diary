@@ -215,8 +215,9 @@ describe("csvSensorPreviewRules v2 — window filter", () => {
     expect(filterPreviewTimelineByWindow(timeline, { kind: "all", now }).length).toBe(4);
   });
 
-  it("'24h' limits to last 24 hours", () => {
-    expect(filterPreviewTimelineByWindow(timeline, { kind: "24h", now }).length).toBe(1);
+  it("'24h' limits to last 24 hours (inclusive cutoff)", () => {
+    // 11:00 today and 12:00 yesterday both fall inside [now - 24h, now].
+    expect(filterPreviewTimelineByWindow(timeline, { kind: "24h", now }).length).toBe(2);
   });
 
   it("'7d' limits to last 7 days", () => {

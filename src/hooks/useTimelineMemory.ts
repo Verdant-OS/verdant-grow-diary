@@ -144,6 +144,7 @@ export interface UseTimelineMemoryResult {
   isLoading: boolean;
   isError: boolean;
   error: unknown;
+  refetch: () => void;
 }
 
 export function useTimelineMemory(
@@ -194,5 +195,8 @@ export function useTimelineMemory(
     isLoading: query.isLoading,
     isError: query.isError,
     error: query.error,
+    refetch: () => {
+      void query.refetch();
+    },
   };
 }

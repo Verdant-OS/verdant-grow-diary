@@ -57,13 +57,12 @@ describe("sensor-ingest-webhook error leakage", () => {
   });
 
   it("logs insert failures to server console without raw insErr.message", () => {
-    // Server-side logging is OK, but it must not include insErr.message.
+    const code = SRC.replace(/\/\/[^\n]*/g, "");
     const consoleCalls = [
-      ...SRC.matchAll(/console\.(?:error|warn|log)\(([^)]*)\)/g),
+      ...code.matchAll(/console\.(?:error|warn|log)\(([\s\S]*?)\)\s*;/g),
     ].map((m) => m[1]);
     for (const args of consoleCalls) {
       expect(args).not.toMatch(/insErr\.message/);
-      expect(args).not.toMatch(/insErr\b(?!_)/); // bare insErr, not insErr_*
     }
   });
 

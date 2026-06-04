@@ -15,6 +15,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { BrowserRouter } from "react-router-dom";
 import Pricing from "@/pages/Pricing";
 import { PRICING, AI_CREDIT_EXPLAINER, TRUST_STRIP } from "@/constants/pricing";
 
@@ -22,6 +23,14 @@ vi.mock("@/lib/pricingAnalytics", () => ({
   trackPricingEvent: vi.fn(),
   PRICING_ANALYTICS_EVENT: "verdant:analytics",
 }));
+
+function renderPricing() {
+  return render(
+    <BrowserRouter>
+      <Pricing />
+    </BrowserRouter>
+  );
+}
 
 describe("Pricing Page UI", () => {
   it("renders all three pricing cards from constants", () => {

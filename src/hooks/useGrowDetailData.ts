@@ -131,18 +131,26 @@ export function useGrowDetailData(): UseGrowDetailData {
     if (!user || !growId) return;
     setLoading(true);
     setNotFound(false);
+    setError(false);
 
-    const { data, error } = await supabase
+    const { data, error: gErr } = await supabase
       .from("grows")
       .select("id,name,stage,grow_type,is_archived,started_at,created_at,updated_at,notes")
       .eq("id", growId)
       .maybeSingle();
-    if (error || !data) {
+    if (gErr) {
+      setGrow(null);
+      setError(true);
+      setLoading(false);
+      return;
+    }
+    if (!data) {
       setGrow(null);
       setNotFound(true);
       setLoading(false);
       return;
     }
+
     setGrow(data as GrowRow);
 
     // Read-only count queries. Any failure degrades to "unavailable".

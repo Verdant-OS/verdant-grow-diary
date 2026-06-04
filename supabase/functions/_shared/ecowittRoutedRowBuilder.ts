@@ -29,8 +29,8 @@ import {
   type EcoWittRouterEligibleTent,
   type EcoWittRouterReading,
   type EcoWittRouterResult,
-} from "@/lib/ecowittChannelTentRouter";
-import { calculateAirVpdKpa } from "@/lib/vpdRules";
+} from "./ecowittChannelTentRouter.ts";
+import { calculateAirVpdKpa } from "./vpdRules.ts";
 
 export type EcoWittRoutedMetric =
   | "temperature_c"

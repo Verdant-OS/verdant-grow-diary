@@ -310,7 +310,7 @@ export default function Alerts() {
         <EmptyState
           icon={<Bell className="h-6 w-6" />}
           title="No open alerts."
-          description="Verdant will show environment or grow warnings here when they appear. Nothing needs your attention right now."
+          description="Alerts will appear when real or manual readings breach your grow targets."
         />
       ) : (
         <div className="space-y-6">

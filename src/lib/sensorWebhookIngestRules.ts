@@ -145,6 +145,32 @@ const METRIC_ALIASES: Record<string, MetricRule> = {
   ppfd: { canonical: "ppfd", min: 0, max: 2500 },
 } as const;
 
+/**
+ * Read-only accessor for the inbound metric alias keys recognised by the
+ * webhook normalizer. Exposed for pure explanation tooling (debug screen,
+ * docs validators) — does NOT change ingest behavior.
+ */
+export function getWebhookMetricAliasKeys(): readonly string[] {
+  return Object.keys(METRIC_ALIASES);
+}
+
+/**
+ * Read-only accessor for the canonical metric a given inbound alias maps to.
+ * Returns `null` for unknown aliases. Pure; used by debug/explainer tooling.
+ */
+export function resolveWebhookMetricAlias(
+  alias: string,
+): { canonical: CanonicalMetric; min: number; max: number; hasConverter: boolean } | null {
+  const rule = METRIC_ALIASES[alias];
+  if (!rule) return null;
+  return {
+    canonical: rule.canonical,
+    min: rule.min,
+    max: rule.max,
+    hasConverter: Boolean(rule.convert),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Input shape (exactly the V1 spec payload)
 // ---------------------------------------------------------------------------

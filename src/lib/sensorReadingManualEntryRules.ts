@@ -91,6 +91,7 @@ export function validateManualEntry(input: ManualEntryInput): ManualEntryValidat
   const vpd = toFinite(input.vpdKpa);
   const co2 = toFinite(input.co2Ppm);
   const soil = toFinite(input.soilMoisturePct);
+  const ppfdClass = classifyPpfd(input.ppfd);
 
   // Hard rejects (impossible values)
   if (humidity !== null && (humidity < 0 || humidity > 100)) {

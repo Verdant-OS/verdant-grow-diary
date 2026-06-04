@@ -53,6 +53,47 @@ export function isWebhookSource(s: unknown): s is WebhookSource {
 }
 
 /**
+ * Normalize a caller-supplied `source` to its canonical allow-listed form.
+ *
+ * Rules (hardened, per sensor-truth contract):
+ *  - Trim leading/trailing whitespace.
+ *  - Lower-case the entire value before comparison.
+ *  - Only EXACT matches to the allow-list pass; partial / fuzzy values
+ *    (`"eco"`, `"mq"`, `"web"`) are rejected.
+ *  - Empty or whitespace-only strings return `null`.
+ *  - Returns `null` when input is not a non-empty string or when the
+ *    normalized value is not allow-listed — the caller surfaces an
+ *    `invalid source` error.
+ *
+ * The DB allow-list (`public.validate_sensor_reading`) already accepts the
+ * canonical lower-case values, so callers MUST persist the canonical form
+ * returned by this helper, not the raw input.
+ */
+export function normalizeWebhookSource(s: unknown): WebhookSource | null {
+  if (typeof s !== "string") return null;
+  const trimmed = s.trim();
+  if (trimmed.length === 0) return null;
+  const lower = trimmed.toLowerCase();
+  return isWebhookSource(lower) ? (lower as WebhookSource) : null;
+}
+
+/**
+ * Normalize a caller-supplied vendor lineage tag.
+ *
+ * Vendor is **lineage only**. It MUST NEVER influence auth, ownership,
+ * routing, permissions, `source`, `user_id`, or `tent_id`. This helper:
+ *  - Trims whitespace.
+ *  - Drops empty / whitespace-only values (returns `null`).
+ *  - Preserves casing for lineage (e.g. `"Home Assistant"`).
+ *  - Rejects non-string values (returns `null`).
+ */
+export function normalizeVendorLineage(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const trimmed = v.trim();
+  return trimmed.length === 0 ? null : trimmed;
+}
+
+/**
  * Canonical metric keys persisted in `sensor_readings.metric`. Webhook
  * payloads use grower-friendly aliases (temp_f, humidity_percent, …) which
  * normalize to these.
@@ -189,9 +230,10 @@ export function normalizeWebhookIngestPayload(
 
   // source -----------------------------------------------------------------
   const source = input.source;
-  if (!isNonEmptyString(source)) {
+  const canonicalSource = normalizeWebhookSource(source);
+  if (!isNonEmptyString(source) || source.trim().length === 0) {
     errors.push("source required");
-  } else if (!isWebhookSource(source)) {
+  } else if (!canonicalSource) {
     errors.push(`invalid source: ${source}`);
   }
 
@@ -225,7 +267,7 @@ export function normalizeWebhookIngestPayload(
 
   // Fail fast on structural errors before walking metrics.
   const tentIdInvalid = !isNonEmptyString(tentId) || !UUID_RE.test(tentId);
-  if (errors.length > 0 && (tentIdInvalid || !capturedAtIso || !isWebhookSource(source))) {
+  if (errors.length > 0 && (tentIdInvalid || !capturedAtIso || !canonicalSource)) {
     return { ok: false, rows: [], errors, skipped, fingerprint: null };
   }
 
@@ -267,7 +309,7 @@ export function normalizeWebhookIngestPayload(
         tent_id: tentId as string,
         metric: rule.canonical,
         value: converted,
-        source: source as WebhookSource,
+        source: canonicalSource as WebhookSource,
         captured_at: capturedAtIso!,
         ts: capturedAtIso!,
         quality: "ok",
@@ -293,7 +335,7 @@ export function normalizeWebhookIngestPayload(
   }
 
   const fingerprint = capturedAtIso
-    ? `${tentId}|${source}|${capturedAtIso}|${fingerprintParts.join(",")}`
+    ? `${tentId}|${canonicalSource}|${capturedAtIso}|${fingerprintParts.join(",")}`
     : null;
 
   return {
@@ -315,17 +357,26 @@ export function sanitizeRawPayload(
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   if (isNonEmptyString(input.tent_id)) out.tent_id = input.tent_id;
-  if (isNonEmptyString(input.source)) out.source = input.source;
+  // Persist the canonical (trimmed/lowercased) source when the caller's
+  // value resolves to an allow-listed label; fall back to the verbatim
+  // non-empty string otherwise so audit logs still show what arrived.
+  const canonicalSrc = normalizeWebhookSource(input.source);
+  if (canonicalSrc) {
+    out.source = canonicalSrc;
+  } else if (isNonEmptyString(input.source)) {
+    out.source = input.source;
+  }
   if (isNonEmptyString(input.captured_at))
     out.captured_at = input.captured_at;
   if (input.metrics && typeof input.metrics === "object")
     out.metrics = input.metrics;
   if (input.metadata && typeof input.metadata === "object")
     out.metadata = input.metadata;
-  // Vendor lineage: preserved verbatim as a string only. Non-string values
-  // (objects, arrays, numbers) are dropped to keep raw_payload audit-clean.
-  // Vendor is lineage metadata only — never used for auth or routing.
-  if (isNonEmptyString(input.vendor)) out.vendor = input.vendor;
+  // Vendor lineage: trimmed string only; empty/whitespace-only and
+  // non-string values are dropped. Vendor is lineage metadata only —
+  // never used for auth, ownership, or routing.
+  const vendor = normalizeVendorLineage(input.vendor);
+  if (vendor) out.vendor = vendor;
   // user_id is intentionally dropped.
   return out;
 }

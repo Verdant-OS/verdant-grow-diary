@@ -31,6 +31,10 @@ export interface GrowDiaryTimelineItem {
   hasSensorSnapshot: boolean;
   /** "live" | "manual" | "stale" | "invalid" | null when missing/legacy. */
   sensorSnapshotState: string | null;
+  /** Display label for the snapshot's transport/origin (presenter-only). */
+  sensorSourceLabel?: string | null;
+  /** Display label for vendor lineage (lineage only; never auth/ownership). */
+  sensorVendorLabel?: string | null;
   tags: string[];
   warnings: string[];
   isUsefulForAiContext: boolean;
@@ -89,6 +93,79 @@ export function sensorSnapshotBadge(state: string | null | undefined): SensorSna
     default:
       return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Source / vendor presenter helpers (presenter-only — no auth/ownership).
+// ---------------------------------------------------------------------------
+
+const SOURCE_DISPLAY_LABELS: Record<string, string> = {
+  // Display labels only. No network calls, no device actions — this map
+  // is purely a presenter lookup for grower-facing badges.
+  pi_bridge: "Pi bridge",
+  node_red_bridge: "Node-RED",
+  ecowitt: "EcoWitt",
+  csv: "CSV",
+  live: "Live",
+  manual: "Manual",
+  sim: "Simulated",
+  stale: "Stale",
+  invalid: "Invalid",
+  demo: "Demo",
+  home_assistant_bridge: "Home Assistant",
+  ha_forwarded: "Home Assistant",
+  esp32_arduino: "ESP32",
+  esp32_arduino_sht31: "ESP32 (SHT31)",
+  esp32_esphome: "ESPHome",
+  webhook: "Webhook",
+  webhook_generic: "Webhook",
+  mqtt: "MQTT",
+  esp32_mqtt_bridge: "MQTT bridge",
+};
+
+const VENDOR_DISPLAY_LABELS: Record<string, string> = {
+  ecowitt: "EcoWitt",
+  home_assistant: "Home Assistant",
+  homeassistant: "Home Assistant",
+  shelly: "Shelly",
+  sensorpush: "SensorPush",
+};
+
+/**
+ * Resolve the display label for a snapshot's `source`. Unknown values
+ * fall back to a sanitized echo of the trimmed input (letters/digits/
+ * dash/underscore/space only, 32-char cap) so a raw enum value never
+ * looks like trusted live telemetry.
+ */
+export function resolveDiarySensorSourceLabel(
+  source: string | null | undefined,
+): string | null {
+  if (typeof source !== "string") return null;
+  const trimmed = source.trim();
+  if (!trimmed) return null;
+  const key = trimmed.toLowerCase();
+  if (SOURCE_DISPLAY_LABELS[key]) return SOURCE_DISPLAY_LABELS[key];
+  const sanitized = key.replace(/[^a-z0-9_\-\s]/g, "").slice(0, 32).trim();
+  if (!sanitized) return null;
+  return sanitized.charAt(0).toUpperCase() + sanitized.slice(1);
+}
+
+/**
+ * Resolve the lineage label for a snapshot's `vendor`. Vendor is
+ * lineage only — it must NEVER influence authorization, ownership, or
+ * routing. Unknown vendors fall back to a sanitized echo so the badge
+ * cannot be styled as authoritative.
+ */
+export function resolveDiarySensorVendorLabel(
+  vendor: string | null | undefined,
+): string | null {
+  if (typeof vendor !== "string") return null;
+  const trimmed = vendor.trim();
+  if (!trimmed) return null;
+  const key = trimmed.toLowerCase();
+  if (VENDOR_DISPLAY_LABELS[key]) return VENDOR_DISPLAY_LABELS[key];
+  // Keep grower-typed casing for unknown vendor lineage; cap length.
+  return trimmed.slice(0, 32);
 }
 
 const EVENT_TYPE_TITLES: Record<string, string> = {
@@ -247,6 +324,12 @@ export function toTimelineItem(
     hasPhoto: !!entry.photoUrl,
     hasSensorSnapshot: !!entry.details.sensorSnapshot,
     sensorSnapshotState: entry.details.sensorSnapshot?.state ?? null,
+    sensorSourceLabel: resolveDiarySensorSourceLabel(
+      entry.details.sensorSnapshot?.source ?? null,
+    ),
+    sensorVendorLabel: resolveDiarySensorVendorLabel(
+      entry.details.sensorSnapshot?.vendor ?? null,
+    ),
     tags: buildTags(entry),
     warnings: entry.warnings.slice(),
     isUsefulForAiContext: entry.isValidForAiContext,

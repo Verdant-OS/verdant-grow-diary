@@ -1,0 +1,22 @@
+# Sample EcoWitt-shaped sensor readings for Verdant CSV import.
+#
+# `source` is the transport/origin Verdant validates. Here readings come
+# directly from an EcoWitt gateway → `source = ecowitt`.
+#
+# If the same readings arrived via an MQTT broker bridging EcoWitt data,
+# the CSV would instead use:
+#   source = mqtt
+#   vendor = ecowitt
+# Vendor is lineage only — never used for auth, ownership, or routing.
+#
+# captured_at uses ISO 8601 with timezone. Lines beginning with `#` are
+# comments and should be stripped before ingest.
+captured_at,temp1f,humidity1,co2,soilmoisture1,source,vendor
+2026-06-04T14:00:00Z,76.4,58,701,33,ecowitt,ecowitt
+2026-06-04T14:05:00Z,76.6,58,706,33,ecowitt,ecowitt
+2026-06-04T14:10:00Z,76.9,57,714,32,ecowitt,ecowitt
+2026-06-04T14:15:00Z,77.1,57,721,32,ecowitt,ecowitt
+2026-06-04T14:20:00Z,77.4,56,733,32,ecowitt,ecowitt
+2026-06-04T14:25:00Z,77.2,57,728,31,ecowitt,ecowitt
+2026-06-04T14:30:00Z,77.0,58,716,31,ecowitt,ecowitt
+2026-06-04T14:35:00Z,76.8,58,710,31,ecowitt,ecowitt

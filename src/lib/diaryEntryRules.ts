@@ -41,6 +41,8 @@ export interface NormalizedDiaryDetails {
     source?: string;
     /** Narrowed state: "live" | "manual" | "stale" | "invalid". */
     state?: string;
+    /** Optional vendor lineage (lineage only — never auth/ownership). */
+    vendor?: string;
   };
   remindAt?: string;
   /** Unknown but preserved keys (sanitized — no functions, no class instances). */
@@ -329,6 +331,8 @@ function normalizeSensorSnapshot(
     ec: num("ec"),
     source: nonBlankString(r.source) ?? undefined,
     state: nonBlankString(r.state) ?? undefined,
+    // Vendor lineage only — never used for auth, ownership, or routing.
+    vendor: nonBlankString(r.vendor) ?? undefined,
   };
   const anyDefined = Object.values(out).some((v) => v !== undefined);
   return anyDefined ? out : undefined;

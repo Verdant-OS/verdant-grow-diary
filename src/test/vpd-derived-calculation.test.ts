@@ -108,11 +108,21 @@ describe("evaluateVpdAgainstStageTarget", () => {
     expect(r2.healthy).toBe(false);
   });
 
-  it("returns unavailable for invalid VPD with known stage", () => {
+  it("returns unavailable for invalid VPD with known stage (legacy stage normalized to canonical)", () => {
     const r = evaluateVpdAgainstStageTarget({ vpdKpa: null, stage: "veg" });
     expect(r.classification).toBe("unavailable");
     expect(r.healthy).toBe(false);
-    expect(r.target?.stage).toBe("veg");
+    // Legacy "veg" is normalized to canonical "late_veg" before band lookup.
+    expect(r.target?.stage).toBe("late_veg");
+  });
+
+  it("returns unavailable for invalid VPD with canonical stage", () => {
+    const r = evaluateVpdAgainstStageTarget({
+      vpdKpa: null,
+      stage: "early_flower",
+    });
+    expect(r.classification).toBe("unavailable");
+    expect(r.target?.stage).toBe("early_flower");
   });
 });
 

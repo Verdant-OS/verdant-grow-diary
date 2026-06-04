@@ -180,6 +180,8 @@ describe("buildTentSnapshotView · per-metric status", () => {
     const v = buildTentSnapshotView(
       [
         row({ ts: STALE_TS, captured_at: STALE_TS, source: "live", raw_payload: { vendor: "ecowitt" } }),
+        row({ ts: STALE_TS, metric: "humidity_pct", value: 55, captured_at: STALE_TS, source: "live" }),
+        row({ ts: STALE_TS, metric: "vpd_kpa", value: 1.1, captured_at: STALE_TS, source: "live" }),
       ],
       "veg",
       NOW,

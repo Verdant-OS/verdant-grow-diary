@@ -18,18 +18,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import IngestInspector from "@/pages/IngestInspector";
 
 // Radix Select calls Element.prototype.scrollIntoView when opening; jsdom lacks it.
-if (!Element.prototype.scrollIntoView) {
-  Element.prototype.scrollIntoView = function () {};
-}
-// Radix Select also pokes hasPointerCapture / releasePointerCapture in jsdom.
-if (!Element.prototype.hasPointerCapture) {
-  // @ts-expect-error jsdom polyfill
-  Element.prototype.hasPointerCapture = () => false;
-}
-if (!Element.prototype.releasePointerCapture) {
-  // @ts-expect-error jsdom polyfill
-  Element.prototype.releasePointerCapture = () => {};
-}
+const elProto = Element.prototype as unknown as Record<string, unknown>;
+if (!elProto.scrollIntoView) elProto.scrollIntoView = function () {};
+if (!elProto.hasPointerCapture) elProto.hasPointerCapture = () => false;
+if (!elProto.releasePointerCapture) elProto.releasePointerCapture = () => {};
 
 type Row = {
   id: string;

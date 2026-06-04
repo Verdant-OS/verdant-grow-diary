@@ -33,6 +33,8 @@ import DashboardZeroTentEmptyState from "@/components/DashboardZeroTentEmptyStat
 
 import DashboardPendingOutcomeReviewsCard from "@/components/DashboardPendingOutcomeReviewsCard";
 import SafeByDesignNotice from "@/components/SafeByDesignNotice";
+import DashboardSensorHealthSummary from "@/components/DashboardSensorHealthSummary";
+import { buildDashboardSensorHealthSummary } from "@/lib/dashboardSensorHealthViewModel";
 import {
   APPROVAL_QUEUE_EMPTY_COPY,
   mapRiskToSeverity,
@@ -582,12 +584,34 @@ export default function Dashboard() {
             <h2 className="font-display font-semibold">Needs attention</h2>
             <Button asChild size="sm" variant="ghost"><Link to={alertsPath()}>All alerts <ArrowRight className="h-3 w-3" /></Link></Button>
           </div>
-          {recentAlerts.length === 0 && <p className="text-sm text-muted-foreground">All systems nominal.</p>}
+          {recentAlerts.length === 0 && (
+            <div
+              className="rounded-xl border border-dashed border-border/50 p-3"
+              role="status"
+              aria-label="No active alerts"
+              data-testid="dashboard-active-alerts-empty"
+            >
+              <p className="text-sm font-medium">No active alerts right now.</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Log a manual reading or review your sensor setup to keep this grow's signal strong.
+              </p>
+            </div>
+          )}
           <ul className="space-y-2">
             {recentAlerts.map((a) => (
-              <li key={a.id} className="rounded-xl border border-border/40 p-3">
-                <div className="flex items-center gap-2 mb-1">
+              <li key={a.id} className="rounded-xl border border-border/40 p-3" data-testid="dashboard-active-alert-item">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <SeverityBadge severity={a.severity === "watch" ? "warning" : a.severity} />
+                  {a.metric && (
+                    <span className="inline-flex items-center rounded-full border border-border/40 bg-secondary/30 px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                      {a.metric}
+                    </span>
+                  )}
+                  {a.source && (
+                    <span className="inline-flex items-center rounded-full border border-border/40 bg-secondary/30 px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                      {a.source}
+                    </span>
+                  )}
                   <span className="text-[11px] text-muted-foreground">{formatDistanceToNow(new Date(a.created_at), { addSuffix: true })}</span>
                 </div>
                 <p className="text-sm font-medium">{a.title}</p>
@@ -616,6 +640,12 @@ export default function Dashboard() {
       </div>
       {scopedGrowId ? (
         <>
+        <DashboardSensorHealthSummary
+          summary={buildDashboardSensorHealthSummary(sensorState)}
+          activeAlertCount={openAlerts}
+          growId={scopedGrowId}
+          className="mt-4"
+        />
         <section
           className="glass rounded-2xl p-4 mt-4"
           aria-label="Latest environment"

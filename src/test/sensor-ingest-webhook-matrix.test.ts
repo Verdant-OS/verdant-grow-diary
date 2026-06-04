@@ -70,7 +70,7 @@ describe("ingest matrix — auth", () => {
   it("rejects empty bearer as unauthorized via JWT path (no sub)", async () => {
     const r = await authenticateBearer("not-a-real-jwt", deps);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toBe("unauthorized");
+    if ("error" in r) expect(r.error).toBe("unauthorized");
   });
 
   it("rejects bridge token when service role is unavailable", async () => {
@@ -79,19 +79,19 @@ describe("ingest matrix — auth", () => {
       serviceKeyAvailable: false,
     });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toBe("server_misconfigured");
+    if ("error" in r) expect(r.error).toBe("server_misconfigured");
   });
 
   it("rejects too-short bridge tokens", async () => {
     const r = await authenticateBearer("vbt_short", deps);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toBe("unauthorized");
+    if ("error" in r) expect(r.error).toBe("unauthorized");
   });
 
   it("rejects unknown bridge token hash", async () => {
     const r = await authenticateBearer("vbt_" + "b".repeat(40), deps);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toBe("unauthorized");
+    if ("error" in r) expect(r.error).toBe("unauthorized");
   });
 
   it("rejects revoked bridge token", async () => {
@@ -113,7 +113,7 @@ describe("ingest matrix — auth", () => {
       },
     });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toBe("token_revoked");
+    if ("error" in r) expect(r.error).toBe("token_revoked");
   });
 
   it("rejects expired bridge token", async () => {
@@ -131,7 +131,7 @@ describe("ingest matrix — auth", () => {
       }),
     });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toBe("token_expired");
+    if ("error" in r) expect(r.error).toBe("token_expired");
   });
 
   it("accepts valid JWT with sub claim", async () => {
@@ -267,7 +267,6 @@ describe("ingest matrix — captured_at", () => {
       // Even with an extraneous occurred_at field, captured_at must still be required.
       basePayload({
         captured_at: undefined,
-        // @ts-expect-error — extraneous field; must not be honored
         occurred_at: "2026-06-04T11:59:00.000Z",
       }),
       { now: NOW },

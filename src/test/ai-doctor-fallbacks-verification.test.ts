@@ -8,7 +8,7 @@
  * inputs.
  *
  * Boundaries:
- *  - No `fetch`, no Supabase, no `functions.invoke`.
+ *  - No real network calls, no Supabase imports, no edge-function invokes.
  *  - No writes to alerts, Action Queue, sensor ingest, or device control.
  *  - No edits to `aiDoctorEngine.ts`, `aiDoctorDiagnosisRules.ts`, or
  *    `aiDoctorConfidenceEdgeClient.ts`.

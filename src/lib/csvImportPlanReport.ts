@@ -278,16 +278,17 @@ export interface CsvImportPlanReport {
 export function buildCsvImportPlanReport(
   plan: CsvImportPlan,
   meta: { fileName: string | null; sourceType: "csv" | "tsv" | null },
-  opts: BuildCsvImportPlanReportOptions,
+  opts?: BuildCsvImportPlanReportOptions,
 ): CsvImportPlanReport {
+  const generatedAt = resolveGeneratedAt(opts);
   const sensorSample = buildSensorDraftSample(
     plan.acceptedWrites,
-    opts.sensorSampleLimit ?? SENSOR_SAMPLE_MAX,
+    opts?.sensorSampleLimit ?? SENSOR_SAMPLE_MAX,
   );
   const blockedGroups = groupBlockedRowsByReason(
     plan.blockedRows,
-    opts.blockedRowContext,
-    opts.blockedSamplePerReasonLimit ?? BLOCKED_SAMPLE_PER_REASON_MAX,
+    opts?.blockedRowContext,
+    opts?.blockedSamplePerReasonLimit ?? BLOCKED_SAMPLE_PER_REASON_MAX,
   );
   const hardBlocks = plan.hardBlockReasons.map((r) => {
     const exp = HARD_BLOCK_EXPLANATIONS[r];
@@ -300,7 +301,7 @@ export function buildCsvImportPlanReport(
   return {
     reportVersion: CSV_IMPORT_PLAN_REPORT_VERSION,
     statusLabel: CSV_IMPORT_PLAN_STATUS_LABEL,
-    generatedAt: opts.generatedAt,
+    generatedAt,
     fileName: meta.fileName,
     sourceType: meta.sourceType,
     ok: plan.ok,

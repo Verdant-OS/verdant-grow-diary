@@ -98,12 +98,15 @@ export interface UseGrowDetailData {
   grow: GrowRow | null;
   loading: boolean;
   notFound: boolean;
+  error: boolean;
   counts: GrowCounts;
   recent: RecentState;
   status: GrowStatus;
   outcomes: GrowOutcomesState;
   growId: string | undefined;
+  refetch: () => void;
 }
+
 
 export function useGrowDetailData(): UseGrowDetailData {
   const { growId } = useParams<{ growId: string }>();

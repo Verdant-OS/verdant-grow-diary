@@ -31,6 +31,8 @@ import {
   TIMELINE_FILTER_RESET_KEY,
 } from "@/lib/timelineFilterViewModel";
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
+import { buildTimelineSensorSnapshotViewModel } from "@/lib/timelineSensorSnapshotViewModel";
+import { buildTimelinePhotoPreviewViewModel } from "@/lib/timelinePhotoPreviewViewModel";
 
 type Props =
   | { scope: "plant"; plantId: string | null | undefined }
@@ -44,6 +46,24 @@ function toScope(props: Props): TimelineMemoryScope | null {
 }
 
 function DiaryItemRow({ item }: { item: Extract<TimelineMemoryItem, { kind: "diary" }> }) {
+  const sensorVm = useMemo(
+    () => buildTimelineSensorSnapshotViewModel(item.sensorSnapshot),
+    [item.sensorSnapshot],
+  );
+  const photoVm = useMemo(
+    () =>
+      buildTimelinePhotoPreviewViewModel({
+        photos: item.photos,
+        photoUrl: item.photoUrl,
+        context: {
+          plantName: item.plantName ?? null,
+          occurredAt: item.occurredAt,
+          eventType: item.eventType,
+        },
+      }),
+    [item.photos, item.photoUrl, item.plantName, item.occurredAt, item.eventType],
+  );
+
   return (
     <div
       data-testid="timeline-memory-diary-item"
@@ -66,12 +86,78 @@ function DiaryItemRow({ item }: { item: Extract<TimelineMemoryItem, { kind: "dia
       {item.note && (
         <p className="mt-1.5 text-sm text-foreground/90 break-words">{item.note}</p>
       )}
-      {item.hasPhoto && (
-        <p className="mt-1 text-xs text-muted-foreground">Photo attached.</p>
+
+      {sensorVm.kind === "chips" && (
+        <div
+          className="mt-2 flex flex-wrap items-center gap-1.5"
+          data-testid="timeline-diary-sensor-chips"
+          data-source={sensorVm.source?.label ?? ""}
+          data-is-live={sensorVm.isLive ? "yes" : "no"}
+        >
+          {sensorVm.chips.map((c) => (
+            <Badge
+              key={c.metric}
+              variant="secondary"
+              className="text-[10px] font-medium"
+              data-testid={`timeline-diary-sensor-chip-${c.metric}`}
+              data-metric={c.metric}
+              data-unit={c.unit}
+            >
+              {c.label} {c.display}
+            </Badge>
+          ))}
+          {sensorVm.sourceLabel && (
+            <Badge
+              variant="outline"
+              className="text-[10px]"
+              data-testid="timeline-diary-sensor-source"
+            >
+              {sensorVm.sourceLabel}
+            </Badge>
+          )}
+        </div>
       )}
+      {sensorVm.kind === "invalid" && (
+        <p
+          className="mt-2 text-xs text-muted-foreground italic"
+          data-testid="timeline-diary-sensor-unavailable"
+        >
+          {sensorVm.message}
+        </p>
+      )}
+
+      {photoVm.kind === "strip" ? (
+        <div
+          className="mt-2 flex items-center gap-1.5"
+          data-testid="timeline-diary-photo-strip"
+          data-total-count={photoVm.totalCount}
+        >
+          {photoVm.thumbnails.map((t, i) => (
+            <img
+              key={`${i}:${t.url}`}
+              src={t.url}
+              alt={t.alt}
+              loading="lazy"
+              data-testid="timeline-diary-photo-thumb"
+              className="h-12 w-12 rounded object-cover border border-border/40"
+            />
+          ))}
+          {photoVm.moreCount > 0 && (
+            <span
+              data-testid="timeline-diary-photo-more"
+              className="text-xs text-muted-foreground"
+            >
+              +{photoVm.moreCount} more
+            </span>
+          )}
+        </div>
+      ) : item.hasPhoto ? (
+        <p className="mt-1 text-xs text-muted-foreground">Photo attached.</p>
+      ) : null}
     </div>
   );
 }
+
 
 export const AI_DOCTOR_EVIDENCE_AUDIT_TITLE =
   "AI Doctor evaluated sensor evidence";

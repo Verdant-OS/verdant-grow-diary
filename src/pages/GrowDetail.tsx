@@ -36,19 +36,47 @@ import ActionOutcomeLearningReport from "@/components/ActionOutcomeLearningRepor
  * No writes. No ai-coach call. No device-control surface.
  */
 export default function GrowDetail() {
-  const { grow, growId, loading, notFound, counts, recent, status, outcomes } = useGrowDetailData();
+  const { grow, growId, loading, notFound, error, counts, recent, status, outcomes, refetch } = useGrowDetailData();
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-muted-foreground">
+      <div
+        className="flex items-center justify-center py-20 text-muted-foreground"
+        role="status"
+        aria-busy="true"
+        aria-label="Loading grow"
+        data-testid="grow-detail-loading"
+      >
         <Loader2 className="h-5 w-5 animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-xl mx-auto" role="alert" data-testid="grow-detail-error">
+        <BackLink />
+        <div className="glass rounded-2xl p-6 text-center">
+          <h1 className="text-lg font-semibold mb-2">Couldn't load this grow</h1>
+          <p className="text-sm text-muted-foreground mb-4">
+            We hit a problem reaching your data. Check your connection and try again.
+          </p>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="inline-flex items-center justify-center min-h-11 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90"
+            data-testid="grow-detail-retry"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
 
   if (notFound || !grow) {
     return (
-      <div className="max-w-xl mx-auto">
+      <div className="max-w-xl mx-auto" data-testid="grow-detail-not-found">
         <BackLink />
         <div className="glass rounded-2xl p-6 text-center">
           <h1 className="text-lg font-semibold mb-2">Grow not found</h1>
@@ -59,6 +87,7 @@ export default function GrowDetail() {
       </div>
     );
   }
+
 
   return (
     <div className="max-w-3xl mx-auto">

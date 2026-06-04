@@ -2,9 +2,9 @@
  * Display-surface tests for manual sensor source/device labels.
  *
  * Verifies that once a manual snapshot is saved with a sanitized device
- * note in `sensor_readings.device_id` (e.g. `manual:SwitchBot CO2 Monitor`),
+ * note in `sensor_readings.device_id` (e.g. `manual:EcoWitt WH45 CO2/THP Monitor`),
  * display surfaces use the shared `formatSensorSourceLabel` helper so
- * growers see "Manual reading · SwitchBot CO2 Monitor" instead of bare
+ * growers see "Manual reading · EcoWitt WH45 CO2/THP Monitor" instead of bare
  * "Manual" — without ever upgrading the row to live/synced/connected.
  *
  * Pure / static checks. No writes, no AI Coach, no action_queue, no
@@ -24,7 +24,7 @@ import { formatSensorDeviceDetail } from "@/lib/sensorDeviceLabels";
 import { buildPlantTentEnvironmentView } from "@/lib/plantTentEnvironmentRules";
 import { buildTentSensorHeaderView } from "@/lib/tentSensorChartRules";
 
-const MANUAL_DEVICE_ID = `${MANUAL_DEVICE_ID_PREFIX}SwitchBot CO2 Monitor`;
+const MANUAL_DEVICE_ID = `${MANUAL_DEVICE_ID_PREFIX}EcoWitt WH45 CO2/THP Monitor`;
 
 function manualRow(metric: string, value: number, deviceId: string | null = MANUAL_DEVICE_ID) {
   return {
@@ -84,7 +84,7 @@ describe("snapshotFromReadings — device_id propagation", () => {
 describe("formatSensorDeviceDetail — manual prefix support", () => {
   it("returns the extracted manual note for a manual: device_id", () => {
     expect(formatSensorDeviceDetail(MANUAL_DEVICE_ID)).toBe(
-      "SwitchBot CO2 Monitor",
+      "EcoWitt WH45 CO2/THP Monitor",
     );
   });
 
@@ -106,13 +106,13 @@ describe("formatSensorDeviceDetail — manual prefix support", () => {
 });
 
 describe("plantTentEnvironmentRules — combined source/device label", () => {
-  it("renders 'Manual reading · SwitchBot CO2 Monitor' for manual + device note", () => {
+  it("renders 'Manual reading · EcoWitt WH45 CO2/THP Monitor' for manual + device note", () => {
     const view = buildPlantTentEnvironmentView([
       manualRow("temperature_c", 24),
       manualRow("humidity_pct", 55),
     ]);
     expect(view.sourceLabel).toBe(
-      `${MANUAL_READING_LABEL} · SwitchBot CO2 Monitor`,
+      `${MANUAL_READING_LABEL} · EcoWitt WH45 CO2/THP Monitor`,
     );
   });
 
@@ -136,7 +136,7 @@ describe("tentSensorChartRules — combined source/device label", () => {
       manualRow("humidity_pct", 55),
     ]);
     expect(view.sourceLabel).toBe(
-      `${MANUAL_READING_LABEL} · SwitchBot CO2 Monitor`,
+      `${MANUAL_READING_LABEL} · EcoWitt WH45 CO2/THP Monitor`,
     );
   });
 });
@@ -145,7 +145,7 @@ describe("formatSensorSourceLabel — manual cannot be relabeled as live/synced/
   it("returns 'Manual reading · …' for manual + device note", () => {
     expect(
       formatSensorSourceLabel({ source: "manual", deviceId: MANUAL_DEVICE_ID }),
-    ).toBe(`${MANUAL_READING_LABEL} · SwitchBot CO2 Monitor`);
+    ).toBe(`${MANUAL_READING_LABEL} · EcoWitt WH45 CO2/THP Monitor`);
   });
 
   it("never returns Live / Synced / Connected for manual source", () => {

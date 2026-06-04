@@ -178,6 +178,9 @@ export function buildEcoWittRoutedRows(
           raw_key: r.source_channel_key,
           raw_value: safeRawValue(lowerPayload[r.source_channel_key]),
           passkey_fingerprint: fingerprint as string,
+          ...(input.timestampSource
+            ? { timestamp_source: input.timestampSource }
+            : {}),
         },
       });
       groupRowCount += 1;

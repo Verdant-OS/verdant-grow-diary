@@ -7,6 +7,7 @@ import {
   CSV_PREVIEW_STATUS_LABEL,
   filterPreviewTimelineByWindow,
   parseDelimitedSensorPreview,
+  samplePreviewTimeline,
   SAMPLING_OPTIONS,
   TIME_WINDOW_OPTIONS,
   type CanonicalField,

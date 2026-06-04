@@ -41,6 +41,23 @@ function readEventType(details: unknown): string | null {
   return typeof v === "string" ? v : null;
 }
 
+function readSensorSnapshot(details: unknown): unknown {
+  if (!details || typeof details !== "object") return undefined;
+  const d = details as Record<string, unknown>;
+  // Prefer explicit `sensor` payload from Quick Log enrichments. The
+  // dedicated `manual_sensor_snapshot` payload is already routed to its
+  // own item kind upstream, so we never double-render it here.
+  if (d.sensor && typeof d.sensor === "object") return d.sensor;
+  return undefined;
+}
+
+function readPhotosArray(details: unknown): unknown {
+  if (!details || typeof details !== "object") return undefined;
+  const d = details as Record<string, unknown>;
+  if (Array.isArray(d.photos)) return d.photos;
+  return undefined;
+}
+
 function diaryRowToDiaryItem(
   row: ManualSnapshotDiaryRow & { photo_url?: string | null },
 ): TimelineDiaryItem {
@@ -51,6 +68,9 @@ function diaryRowToDiaryItem(
     eventType: readEventType(row.details),
     hasPhoto: !!row.photo_url,
     note: row.note,
+    sensorSnapshot: readSensorSnapshot(row.details),
+    photoUrl: row.photo_url ?? null,
+    photos: readPhotosArray(row.details),
   };
 }
 

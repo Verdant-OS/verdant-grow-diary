@@ -3,20 +3,32 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import {
+  buildCsvImportPlan,
+  KNOWN_IMPORT_METRICS,
+  type CsvImportPlan,
+  type ImportMetric,
+  type OwnershipContext,
+  type PreviewRowInput,
+} from "@/lib/csvImportPlanRules";
+import type { CsvPreviewParseResult } from "@/lib/csvSensorPreviewRules";
 
 /**
- * CsvPreviewReviewGate — presentational-only review gate for the future
- * CSV/TSV → sensor import flow.
+ * CsvPreviewReviewGate — presentational-only review gate + import plan summary
+ * for the future CSV/TSV → sensor import flow.
  *
  * Safe-by-Design:
  *  - No write handler. No Supabase call. No fetch. No diary insert.
- *  - The Save/Convert button is ALWAYS disabled in this build. The gate
- *    state shown below is informational so growers/partners can see what
- *    will be required when the approval-required write flow ships.
+ *  - The Save/Convert button is ALWAYS disabled in this build.
+ *  - The plan summary is computed in-memory from the existing preview state
+ *    via buildCsvImportPlan(). No I/O.
  */
 export interface CsvPreviewReviewGateProps {
   hasHardBlockedRows: boolean;
   hasAcceptedRows: boolean;
+  /** Optional preview result; when present, an import plan summary is shown. */
+  previewResult?: CsvPreviewParseResult | null;
 }
 
 const CONFIRM_COPY =
@@ -24,24 +36,116 @@ const CONFIRM_COPY =
 const FUTURE_FLOW_COPY =
   "Import requires review and will be enabled in a separate approval-required flow.";
 
+function buildPlanFromPreview(
+  result: CsvPreviewParseResult,
+  growId: string,
+  tentId: string,
+  plantId: string,
+): CsvImportPlan {
+  const uid = "preview-user";
+  const effectiveGrow = growId.trim() || "preview-grow";
+  const effectiveTent = tentId.trim() || "preview-tent";
+  const effectivePlant = plantId.trim() || "";
+
+  const ownership: OwnershipContext = {
+    authenticated: true,
+    userId: uid,
+    grow: { id: effectiveGrow, ownerUserId: uid },
+    tent: { id: effectiveTent, growId: effectiveGrow, ownerUserId: uid },
+    plant: effectivePlant
+      ? {
+          id: effectivePlant,
+          tentId: effectiveTent,
+          growId: effectiveGrow,
+          ownerUserId: uid,
+        }
+      : null,
+  };
+
+  const tsIdx = result.mappings.findIndex((m) => m.field === "captured_at");
+  const flagByHeader = new Map(result.flags.map((f) => [f.header, f]));
+  const knownMetrics = new Set<string>(KNOWN_IMPORT_METRICS as readonly string[]);
+
+  const rows: PreviewRowInput[] = [];
+  let rowIndex = 0;
+  for (const dataRow of result.rows ?? []) {
+    const capturedAtRaw = tsIdx >= 0 ? (dataRow[tsIdx] ?? "") : "";
+    result.mappings.forEach((m, colIdx) => {
+      if (!m.field || m.field === "captured_at") return;
+      if (!knownMetrics.has(m.field)) return;
+      const raw = dataRow[colIdx];
+      if (raw == null || raw === "") return;
+      const numeric = Number(raw);
+      const value = Number.isFinite(numeric) ? numeric : null;
+      const flag = flagByHeader.get(m.header);
+      const hardFlags = flag && flag.severity === "error" ? [flag.code] : [];
+      const softFlags = flag && flag.severity === "warn" ? [flag.code] : [];
+      const rawRow: Record<string, unknown> = {};
+      result.headers.forEach((h, i) => {
+        rawRow[h] = dataRow[i];
+      });
+      rows.push({
+        rowIndex: rowIndex++,
+        capturedAtRaw,
+        metric: m.field as ImportMetric,
+        value,
+        hardFlags,
+        softFlags,
+        raw: rawRow,
+      });
+    });
+  }
+
+  return buildCsvImportPlan({
+    filename: result.fileName ?? "",
+    fileSizeBytes: 0,
+    totalRowCount: result.totalRows ?? (result.rows ?? []).length,
+    source: result.sourceLabel,
+    columnMappingVersion: "v1",
+    rows,
+    unmappedHeaders: result.unmapped ?? [],
+    detectedDeviceControlHeaders: [],
+    ownership,
+    now: new Date(),
+  });
+}
+
+function reasonCounts<T extends string>(
+  items: ReadonlyArray<{ reasons: ReadonlyArray<T> }>,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const it of items) {
+    for (const r of it.reasons) out[r] = (out[r] ?? 0) + 1;
+  }
+  return out;
+}
+
 export function CsvPreviewReviewGate({
   hasHardBlockedRows,
   hasAcceptedRows,
+  previewResult,
 }: CsvPreviewReviewGateProps) {
   const [growId, setGrowId] = useState("");
   const [tentId, setTentId] = useState("");
   const [plantId, setPlantId] = useState("");
   const [confirmed, setConfirmed] = useState(false);
 
+  const plan = useMemo<CsvImportPlan | null>(() => {
+    if (!previewResult || !previewResult.ok) return null;
+    return buildPlanFromPreview(previewResult, growId, tentId, plantId);
+  }, [previewResult, growId, tentId, plantId]);
+
   const checks = useMemo(
     () => ({
       growSelected: growId.trim().length > 0,
       tentSelected: tentId.trim().length > 0,
       confirmed,
-      hasAcceptedRows,
-      noHardBlocks: !hasHardBlockedRows,
+      hasAcceptedRows: plan ? plan.acceptedWrites.length > 0 : hasAcceptedRows,
+      noHardBlocks: plan
+        ? plan.blockedRows.length === 0 && plan.hardBlockReasons.length === 0
+        : !hasHardBlockedRows,
     }),
-    [growId, tentId, confirmed, hasAcceptedRows, hasHardBlockedRows],
+    [growId, tentId, confirmed, plan, hasAcceptedRows, hasHardBlockedRows],
   );
 
   const gateReady =
@@ -51,9 +155,11 @@ export function CsvPreviewReviewGate({
     checks.hasAcceptedRows &&
     checks.noHardBlocks;
 
-  // Even when gateReady is true, the action stays disabled in this build.
-  // The write path ships in a separate approval-required PR.
   const WRITES_ENABLED = false;
+
+  const blockedReasonCounts = plan ? reasonCounts(plan.blockedRows) : {};
+  const metricBreakdown = plan?.summary.metricBreakdown ?? {};
+  const dateRange = plan?.summary.dateRange ?? { start: null, end: null };
 
   return (
     <section
@@ -69,9 +175,7 @@ export function CsvPreviewReviewGate({
 
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="space-y-1">
-          <Label htmlFor="csv-gate-grow-id" className="text-xs">
-            Grow
-          </Label>
+          <Label htmlFor="csv-gate-grow-id" className="text-xs">Grow</Label>
           <Input
             id="csv-gate-grow-id"
             data-testid="csv-gate-grow-id"
@@ -81,9 +185,7 @@ export function CsvPreviewReviewGate({
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="csv-gate-tent-id" className="text-xs">
-            Tent
-          </Label>
+          <Label htmlFor="csv-gate-tent-id" className="text-xs">Tent</Label>
           <Input
             id="csv-gate-tent-id"
             data-testid="csv-gate-tent-id"
@@ -93,9 +195,7 @@ export function CsvPreviewReviewGate({
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="csv-gate-plant-id" className="text-xs">
-            Plant (optional)
-          </Label>
+          <Label htmlFor="csv-gate-plant-id" className="text-xs">Plant (optional)</Label>
           <Input
             id="csv-gate-plant-id"
             data-testid="csv-gate-plant-id"
@@ -115,6 +215,106 @@ export function CsvPreviewReviewGate({
         />
         <span>{CONFIRM_COPY}</span>
       </label>
+
+      {plan && (
+        <div
+          data-testid="csv-import-plan-summary"
+          className="rounded border border-border/60 bg-background/40 p-3 space-y-3 text-xs"
+        >
+          <div className="flex flex-wrap gap-2" data-testid="csv-import-plan-counts">
+            <Badge variant="secondary" data-testid="csv-import-plan-accepted">
+              Accepted: {plan.acceptedWrites.length}
+            </Badge>
+            <Badge variant="secondary" data-testid="csv-import-plan-blocked">
+              Blocked: {plan.blockedRows.length}
+            </Badge>
+            <Badge variant="secondary" data-testid="csv-import-plan-duplicates">
+              Duplicates skipped: {plan.duplicateSkipped.length}
+            </Badge>
+            <Badge variant="secondary" data-testid="csv-import-plan-ignored">
+              Ignored columns: {plan.ignoredUnmappedHeaders.length + plan.ignoredDeviceControlHeaders.length}
+            </Badge>
+            <Badge variant="outline" data-testid="csv-import-plan-write-drafts">
+              Sensor write drafts: {plan.acceptedWrites.length}
+            </Badge>
+          </div>
+
+          <div data-testid="csv-import-plan-metric-breakdown">
+            <div className="font-semibold mb-1">Metric breakdown</div>
+            {Object.keys(metricBreakdown).length === 0 ? (
+              <div className="text-muted-foreground">No accepted metrics yet.</div>
+            ) : (
+              <ul className="flex flex-wrap gap-1">
+                {Object.entries(metricBreakdown).map(([m, n]) => (
+                  <li key={m}>
+                    <Badge variant="outline" data-testid={`csv-import-plan-metric-${m}`}>
+                      {m}: {n}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div data-testid="csv-import-plan-date-range" className="text-muted-foreground">
+            Date range: {dateRange.start ?? "—"} → {dateRange.end ?? "—"}
+          </div>
+
+          <div data-testid="csv-import-plan-hard-blocks">
+            {plan.hardBlockReasons.length > 0 ? (
+              <>
+                <div className="font-semibold text-destructive mb-1">Batch blocked</div>
+                <ul className="flex flex-wrap gap-1">
+                  {plan.hardBlockReasons.map((r) => (
+                    <li key={r}>
+                      <Badge variant="destructive">{r}</Badge>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : null}
+          </div>
+
+          <div data-testid="csv-import-plan-blocked-reasons">
+            <div className="font-semibold mb-1">Blocked rows by reason</div>
+            {Object.keys(blockedReasonCounts).length === 0 ? (
+              <div className="text-muted-foreground">No blocked rows.</div>
+            ) : (
+              <ul className="flex flex-wrap gap-1">
+                {Object.entries(blockedReasonCounts).map(([reason, n]) => (
+                  <li key={reason}>
+                    <Badge variant="outline" data-testid={`csv-import-plan-block-${reason}`}>
+                      {reason}: {n}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div data-testid="csv-import-plan-diary-summary">
+            <div className="font-semibold mb-1">Diary summary draft (preview, not saved)</div>
+            {plan.diarySummaryDraft ? (
+              <div
+                className="rounded border border-border/60 bg-muted/30 p-2"
+                data-testid="csv-import-plan-diary-summary-card"
+              >
+                <div>{plan.diarySummaryDraft.summary}</div>
+                <div className="text-muted-foreground mt-1">
+                  batch: {plan.diarySummaryDraft.details.import_batch_id.slice(0, 12)}… · accepted{" "}
+                  {plan.diarySummaryDraft.details.accepted_count} · blocked{" "}
+                  {plan.diarySummaryDraft.details.blocked_count} · duplicates{" "}
+                  {plan.diarySummaryDraft.details.duplicate_skipped_count}
+                </div>
+              </div>
+            ) : (
+              <div className="text-muted-foreground">
+                No diary summary draft (nothing would be saved with current inputs).
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <ul
         data-testid="csv-gate-checklist"
@@ -150,11 +350,7 @@ export function CsvPreviewReviewGate({
         >
           Convert to diary entries — coming later
         </Button>
-        <span className="text-xs text-muted-foreground">
-          {gateReady
-            ? "Gate ready. Save remains disabled until the write flow ships."
-            : "Complete the checklist above. Save will remain disabled until then."}
-        </span>
+        <span className="text-xs text-muted-foreground">{FUTURE_FLOW_COPY}</span>
       </div>
     </section>
   );

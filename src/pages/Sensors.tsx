@@ -167,6 +167,14 @@ export default function Sensors() {
           <ManualSensorReadingCard tents={manualTents} defaultTentId={defaultManualTentId} />
         </div>
       )}
+      {manualTents.length > 0 && selectedTent && (
+        <div id="import-sensor-data" className="mt-4 max-w-xl scroll-mt-24" data-testid="sensors-import-sensor-data-anchor">
+          <TentCsvImportCard
+            tentId={tentId}
+            growId={(selectedTent as unknown as { growId?: string | null }).growId ?? null}
+          />
+        </div>
+      )}
       <div className="mt-4 max-w-xl">
         <SensorBridgeHealthCard />
       </div>

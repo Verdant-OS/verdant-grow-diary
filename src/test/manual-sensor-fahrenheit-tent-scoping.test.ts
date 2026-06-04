@@ -91,7 +91,9 @@ describe("Manual sensor temperature is collected and labeled in Fahrenheit", () 
 
 describe("UI surfaces render stored Celsius as user-facing Fahrenheit", () => {
   it("Dashboard, TentDetail, and plant env rules use °F + tempFFromC", () => {
-    for (const src of [DASHBOARD, TENT_DETAIL]) {
+    const dashVm = read("src/lib/dashboardEnvironmentSnapshotViewModel.ts");
+    const dashAll = DASHBOARD + "\n" + dashVm;
+    for (const src of [dashAll, TENT_DETAIL]) {
       expect(src).toMatch(/°F/);
       expect(src).toMatch(/tempFFromC/);
       expect(src).not.toMatch(/°C/);

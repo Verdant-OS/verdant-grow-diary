@@ -162,7 +162,7 @@ export default function Sensors() {
         })}
       </div>
       {manualTents.length > 0 && (
-        <div className="mt-4 max-w-xl">
+        <div id="manual-reading" className="mt-4 max-w-xl scroll-mt-24" data-testid="sensors-manual-reading-anchor">
           <ManualSensorReadingCard tents={manualTents} defaultTentId={defaultManualTentId} />
         </div>
       )}

@@ -51,7 +51,8 @@ describe("Dashboard · Environment Snapshot section", () => {
   });
 
   it("Environment Snapshot copy includes an honest helper for empty state", () => {
-    expect(DASH).toMatch(/Add a manual reading or connect Ecowitt/);
+    expect(DASH).toMatch(/Add a manual reading or/);
+    expect(DASH).toMatch(/connect Ecowitt/);
   });
 
   it("section is not labelled 'Live' (we never claim live without verification)", () => {

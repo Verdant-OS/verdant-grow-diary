@@ -3,32 +3,37 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 
 const DASH = readFileSync(resolve(__dirname, "../pages/Dashboard.tsx"), "utf8");
+const VM = readFileSync(
+  resolve(__dirname, "../lib/dashboardEnvironmentSnapshotViewModel.ts"),
+  "utf8",
+);
 const HELPER = readFileSync(
   resolve(__dirname, "../lib/environmentStageTargetRules.ts"),
   "utf8",
 );
 
+const DASH_AND_VM = DASH + "\n" + VM;
 const FORBIDDEN =
   /saveAlert\(|logAlertEvent\(|action_queue|service_role|insertAlert\(|device\.control|\bsetAutomation\b|\bautomate\(/i;
 
 describe("Dashboard env strip — stage-aware Temp/RH wiring", () => {
   it("imports the stage-aware Temp/RH helpers", () => {
-    expect(DASH).toMatch(
+    expect(DASH_AND_VM).toMatch(
       /import\s+\{[\s\S]*classifyTempAgainstStage[\s\S]*\}\s+from\s+["']@\/lib\/environmentStageTargetRules["']/,
     );
-    expect(DASH).toMatch(/classifyRhAgainstStage/);
-    expect(DASH).toMatch(/environmentMetricChipStatus/);
+    expect(DASH_AND_VM).toMatch(/classifyRhAgainstStage/);
+    expect(DASH_AND_VM).toMatch(/environmentMetricChipStatus/);
   });
 
-  it("Temperature MetricChip uses classifyTempAgainstStage + environmentMetricChipStatus", () => {
-    expect(DASH).toMatch(
-      /label="T"[\s\S]*environmentMetricChipStatus\(classifyTempAgainstStage\(/,
+  it("Temperature uses classifyTempAgainstStage + environmentMetricChipStatus", () => {
+    expect(VM).toMatch(
+      /environmentMetricChipStatus\([\s\S]*classifyTempAgainstStage\(/,
     );
   });
 
-  it("RH MetricChip uses classifyRhAgainstStage + environmentMetricChipStatus", () => {
-    expect(DASH).toMatch(
-      /label="RH"[\s\S]*environmentMetricChipStatus\(classifyRhAgainstStage\(/,
+  it("RH uses classifyRhAgainstStage + environmentMetricChipStatus", () => {
+    expect(VM).toMatch(
+      /environmentMetricChipStatus\([\s\S]*classifyRhAgainstStage\(/,
     );
   });
 

@@ -15,6 +15,7 @@ const VALID_METRICS = [
   "vpd_kpa",
   "co2_ppm",
   "soil_moisture_pct",
+  "ppfd",
 ] as const;
 
 export function validateSensorReadingPayload(p: InsertSensorReadingPayload): void {

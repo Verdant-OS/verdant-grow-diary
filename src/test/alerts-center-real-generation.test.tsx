@@ -176,19 +176,19 @@ describe("alert persistence — source-truth guards", () => {
     const alert: EnvironmentAlert = {
       id: "env:humidity:high",
       severity: "warning",
-      metric: "humidity_pct",
+      metric: "rh",
       title: "Humidity above target",
       reason: "RH 65% above 55%",
       source: "sensor_snapshot",
       createdAt: FRESH,
     };
     const openRow = {
-      metric: "humidity_pct",
+      metric: "rh",
       source: "environment_alerts",
       title: "Humidity above target",
     };
     expect(derivedAlertKey(alert)).toBe(
-      `environment_alerts::humidity_pct::humidity above target`,
+      `environment_alerts::rh::humidity above target`,
     );
     expect(dedupeAgainstOpen([alert], [openRow]).length).toBe(0);
     expect(dedupeAgainstOpen([alert], []).length).toBe(1);

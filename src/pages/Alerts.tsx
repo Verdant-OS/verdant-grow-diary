@@ -172,6 +172,15 @@ export default function Alerts() {
 
   return (
     <div>
+      {/* Side-effect only: evaluate latest valid snapshot vs grow targets
+          and persist breaches into public.alerts. Renders nothing. */}
+      {persistGrowIds.map((gid) => (
+        <AlertsAutoPersistForGrow
+          key={gid}
+          growId={gid}
+          stage={stageByGrow.get(gid) ?? null}
+        />
+      ))}
       <GrowBreadcrumbs
         growId={urlGrowId}
         growName={scopedGrowName}

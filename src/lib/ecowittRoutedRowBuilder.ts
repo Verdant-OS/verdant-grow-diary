@@ -198,6 +198,10 @@ export function buildEcoWittRoutedRows(
           raw_value: "",
           passkey_fingerprint: fingerprint as string,
           calculated: true,
+          derived_from: [
+            slot.temperature_c.source_channel_key,
+            slot.humidity_pct.source_channel_key,
+          ],
         },
       });
       groupRowCount += 1;

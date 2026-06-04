@@ -120,7 +120,7 @@ describe("Free vs Pro vs Founder Lifetime comparison", () => {
       "Sensor snapshot history",
       "Advanced timeline filtering",
     ]) {
-      expect(PAGE).toContain(item);
+      expect(CONSTANTS).toContain(item);
     }
   });
 

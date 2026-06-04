@@ -69,6 +69,7 @@ const READINESS_STYLES: Record<
 export default function PlantDetailAiDoctorContextPanel({
   plantId,
   plant,
+  vpdDrift,
 }: PlantDetailAiDoctorContextPanelProps) {
   const { items, isLoading } = useTimelineMemory(
     { kind: "plant", plantId },

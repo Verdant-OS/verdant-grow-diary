@@ -13,6 +13,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 
 import { buildEcowittSnapshotFromRows } from "@/hooks/useEcowittLatestSnapshot";
 import { EcowittLatestSnapshotCard } from "@/components/EcowittLatestSnapshotCard";
@@ -61,7 +62,9 @@ function wrap() {
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
   return ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    <MemoryRouter>
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    </MemoryRouter>
   );
 }
 

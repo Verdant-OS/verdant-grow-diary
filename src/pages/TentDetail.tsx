@@ -1,4 +1,5 @@
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
+import EcowittLatestSnapshotCard from "@/components/EcowittLatestSnapshotCard";
 import EnvironmentStabilityCard from "@/components/EnvironmentStabilityCard";
 import TentAiDoctorSessionsPanel from "@/components/TentAiDoctorSessionsPanel";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
@@ -239,6 +240,27 @@ export default function TentDetail() {
           <SensorChart data={series as unknown as Parameters<typeof SensorChart>[0]["data"]} metric="temp" height={200} />
         )}
       </div>
+
+      <section
+        className="glass rounded-2xl p-4 mb-6"
+        aria-label="Latest EcoWitt Snapshot"
+        data-testid="tent-detail-ecowitt-section"
+      >
+        <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
+          <div>
+            <h2 className="font-display font-semibold">
+              Latest EcoWitt Snapshot
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Most recent EcoWitt reading for this tent. Not live device control.
+            </p>
+          </div>
+        </div>
+        <EcowittLatestSnapshotCard
+          tentId={id ?? null}
+          title="Latest EcoWitt Snapshot"
+        />
+      </section>
 
       <TentManualSnapshotHistoryList tentId={id ?? null} readings={readings} />
 

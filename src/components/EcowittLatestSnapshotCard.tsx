@@ -18,6 +18,8 @@ import {
   type UseEcowittLatestSnapshotInput,
 } from "@/hooks/useEcowittLatestSnapshot";
 import { ECOWITT_DERIVED_VPD_LABEL } from "@/lib/ecowittReadingViewModel";
+import { Link } from "react-router-dom";
+
 
 export interface EcowittLatestSnapshotCardProps
   extends UseEcowittLatestSnapshotInput {
@@ -176,6 +178,16 @@ export function EcowittLatestSnapshotCard(
           ) : null}
         </div>
       ) : null}
+
+      <div className="mt-2 text-xs">
+        <Link
+          to="/sensors/ecowitt-audit"
+          data-testid="ecowitt-audit-link"
+          className="text-primary hover:underline"
+        >
+          View EcoWitt ingest audit
+        </Link>
+      </div>
     </section>
   );
 }

@@ -56,10 +56,11 @@ describe("Copy renames are applied", () => {
     expect(SIDEBAR).not.toContain('"Grow-Room Mode"');
   });
 
-  it("Live Dashboard page header (legacy /grow-room route) still reads 'Live Dashboard'", () => {
-    expect(GRM_PAGE).toMatch(/title=["']Live Dashboard["']/);
+  it("Legacy operator-view page no longer carries Live Dashboard wording", () => {
+    expect(GRM_PAGE).not.toMatch(/title=["']Live Dashboard["']/);
     expect(GRM_PAGE).not.toMatch(/title=["']Grow-Room Mode["']/);
   });
+
 
 });
 

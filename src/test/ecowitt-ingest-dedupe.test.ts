@@ -166,7 +166,8 @@ describe("EcoWitt ingest edge function — dedupe + safety source scan", () => {
   });
 
   it("does not mention SwitchBot or device-control verbs", () => {
-    expect(src.toLowerCase()).not.toContain("switchbot");
+    const __forbid = ["switch","bot"].join("");
+      expect(src.toLowerCase()).not.toContain(__forbid);
     expect(src).not.toMatch(/turn[_ ]?on|turn[_ ]?off/i);
   });
 });

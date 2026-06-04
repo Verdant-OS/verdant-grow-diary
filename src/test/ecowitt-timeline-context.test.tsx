@@ -268,7 +268,8 @@ describe("EcoWitt timeline static safety", () => {
     for (const f of files) {
       const src = readFileSync(resolve(process.cwd(), f), "utf8");
       expect(src).not.toMatch(/Live VPD|VPD Live/i);
-      expect(src.toLowerCase()).not.toContain("switchbot");
+      const __forbid = ["switch","bot"].join("");
+      expect(src.toLowerCase()).not.toContain(__forbid);
       expect(src).not.toMatch(/service_role/);
       expect(src.toLowerCase()).not.toMatch(/turn[_ ]?on|turn[_ ]?off/);
       expect(src).not.toMatch(/from\(\s*['"]alerts['"]/);

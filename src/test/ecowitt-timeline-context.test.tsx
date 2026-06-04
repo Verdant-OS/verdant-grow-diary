@@ -264,7 +264,7 @@ describe("EcoWitt timeline static safety", () => {
     "src/components/EcowittTimelineSnapshotChip.tsx",
   ];
 
-  it("does not contain Live VPD / device control / SwitchBot / service_role strings", () => {
+  it("does not contain Live VPD / device control / legacy controller / service_role strings", () => {
     for (const f of files) {
       const src = readFileSync(resolve(process.cwd(), f), "utf8");
       expect(src).not.toMatch(/Live VPD|VPD Live/i);

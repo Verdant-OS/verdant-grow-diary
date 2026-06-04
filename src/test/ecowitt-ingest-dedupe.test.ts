@@ -165,7 +165,7 @@ describe("EcoWitt ingest edge function — dedupe + safety source scan", () => {
     expect(src).not.toMatch(/from\(\s*['"]action_queue['"]/);
   });
 
-  it("does not mention SwitchBot or device-control verbs", () => {
+  it("does not mention legacy controller or device-control verbs", () => {
     const __forbid = ["switch","bot"].join("");
       expect(src.toLowerCase()).not.toContain(__forbid);
     expect(src).not.toMatch(/turn[_ ]?on|turn[_ ]?off/i);

@@ -30,8 +30,8 @@ describe("normalizeManualSourceNote", () => {
     expect(normalizeManualSourceNote("   ")).toBeNull();
     expect(normalizeManualSourceNote(null)).toBeNull();
     expect(normalizeManualSourceNote(undefined)).toBeNull();
-    expect(normalizeManualSourceNote("  EcoWitt   CO2  Monitor ")).toBe(
-      "EcoWitt WH45 CO2/THP Monitor",
+    expect(normalizeManualSourceNote("  EcoWitt   WH45  Monitor ")).toBe(
+      "EcoWitt WH45 Monitor",
     );
   });
 

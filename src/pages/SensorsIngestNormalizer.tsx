@@ -70,7 +70,7 @@ export default function SensorsIngestNormalizer() {
   return (
     <div className="container mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
       <PageHeader
-        title="Webhook Normalization Debug"
+        title="Ingest Normalizer"
         description="Paste a sensor ingest JSON payload to see how Verdant would normalize it. This screen is read-only: nothing is sent, stored, or ingested."
       />
 
@@ -86,7 +86,8 @@ export default function SensorsIngestNormalizer() {
         </h2>
         <p className="mb-3 text-xs text-muted-foreground">
           This tool runs entirely in your browser. It never sends network
-          requests, never calls the backend, and never writes any data.
+          requests, never calls the backend, and never writes any data. No
+          new endpoint is created by this screen.
         </p>
 
         <div className="mb-3 flex flex-wrap gap-2" data-testid="webhook-normalizer-examples">
@@ -145,6 +146,15 @@ export default function SensorsIngestNormalizer() {
           className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive"
         >
           {state.parseError}
+        </div>
+      ) : null}
+
+      {state.kind === "idle" ? (
+        <div
+          data-testid="webhook-normalizer-empty-state"
+          className="rounded-lg border border-dashed border-border bg-card/50 p-6 text-center text-sm text-muted-foreground"
+        >
+          Paste a payload and run normalization to preview the result.
         </div>
       ) : null}
 

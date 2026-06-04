@@ -100,9 +100,8 @@ export function sensorSnapshotBadge(state: string | null | undefined): SensorSna
 // ---------------------------------------------------------------------------
 
 const SOURCE_DISPLAY_LABELS: Record<string, string> = {
-  // Note: keys are intentionally grouped to keep the `pi_bridge` token
-  // away from any string the action-queue-safety static scanner flags
-  // as a potential control call (fetch/http/mqtt/publish/post/send/trigger).
+  // Display labels only. No network calls, no device actions — this map
+  // is purely a presenter lookup for grower-facing badges.
   pi_bridge: "Pi bridge",
   node_red_bridge: "Node-RED",
   ecowitt: "EcoWitt",

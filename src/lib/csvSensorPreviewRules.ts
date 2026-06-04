@@ -13,8 +13,11 @@
  */
 
 export const CSV_PREVIEW_SOURCE_LABEL = "csv" as const;
+export const TSV_PREVIEW_SOURCE_LABEL = "tsv" as const;
 export const CSV_PREVIEW_STATUS_LABEL = "Preview only — not saved" as const;
 export const CSV_PREVIEW_MAX_SAMPLE_ROWS = 25;
+
+export type DelimitedSourceLabel = "csv" | "tsv";
 
 export type CanonicalField =
   | "captured_at"
@@ -24,8 +27,22 @@ export type CanonicalField =
   | "co2"
   | "vwc"
   | "ec"
+  | "substrate_temperature"
   | "ph"
   | "ppfd";
+
+export const CANONICAL_FIELDS: readonly CanonicalField[] = [
+  "captured_at",
+  "temperature",
+  "humidity",
+  "vpd",
+  "co2",
+  "vwc",
+  "ec",
+  "substrate_temperature",
+  "ph",
+  "ppfd",
+] as const;
 
 export interface FieldMapping {
   /** Original CSV header text. */

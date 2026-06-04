@@ -381,6 +381,7 @@ describe("No unrelated routes were changed", () => {
         "/register",
         "/reports",
         "/sensors",
+        "/sensors/ecowitt-audit",
         "/settings",
         "/signup",
         "/tasks",

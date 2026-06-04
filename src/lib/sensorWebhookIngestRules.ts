@@ -322,6 +322,10 @@ export function sanitizeRawPayload(
     out.metrics = input.metrics;
   if (input.metadata && typeof input.metadata === "object")
     out.metadata = input.metadata;
+  // Vendor lineage: preserved verbatim as a string only. Non-string values
+  // (objects, arrays, numbers) are dropped to keep raw_payload audit-clean.
+  // Vendor is lineage metadata only — never used for auth or routing.
+  if (isNonEmptyString(input.vendor)) out.vendor = input.vendor;
   // user_id is intentionally dropped.
   return out;
 }

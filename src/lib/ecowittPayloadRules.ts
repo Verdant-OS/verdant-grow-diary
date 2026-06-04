@@ -21,6 +21,11 @@ import {
 } from "@/lib/ecowittPayloadAdapter";
 import { computeVpdKpa } from "@/lib/sensorReadingManualEntryRules";
 import { SENSOR_SOURCE_STALE_MINUTES } from "@/lib/sensorSourceHealthRules";
+import {
+  evaluateEcowittSuspicion,
+  type EcowittSuspicionFlag,
+  type EcowittSuspicionResult,
+} from "@/lib/ecowittSuspiciousReadingRules";
 
 export type EcowittFreshness = "fresh" | "stale" | "missing";
 
@@ -48,12 +53,26 @@ export interface EcowittNormalizedSnapshot {
   warnings: EcoWittAdapterResult["warnings"];
   reasons: EcoWittAdapterResult["reasons"];
   rawPayload: unknown;
+  /** Suspicious-data flags (empty when reading is clean). */
+  suspicion: EcowittSuspicionFlag[];
+  /** Highest suspicion severity, or null when clean. */
+  suspicionSeverity: EcowittSuspicionResult["worst"];
+  /**
+   * True when at least one suspicion flag is `invalid` and the snapshot
+   * should be rendered as "Invalid / Unavailable" instead of healthy.
+   */
+  invalid: boolean;
 }
 
 export interface NormalizeEcowittOptions extends EcoWittAdapterOptions {
   /** Current wall-clock — injected for determinism in tests. */
   now?: Date;
+  /** Recent humidity samples for stuck-at-extreme detection. */
+  recentHumidityPct?: ReadonlyArray<number | null | undefined>;
+  /** Recent soil-moisture samples for stuck-at-extreme detection. */
+  recentSoilMoisturePct?: ReadonlyArray<number | null | undefined>;
 }
+
 
 const ALLOWED_METRICS = new Set<EcowittNormalizedMetric>([
   "temperature_c",

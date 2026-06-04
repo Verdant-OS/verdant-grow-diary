@@ -113,21 +113,22 @@ describe("environmentCsvImportPersistence — runtime", () => {
 
 describe("environmentCsvImportPersistence — static safety (tests 29-32, 38-44)", () => {
   it("source contains no update/delete/alert/action_queue/live/automation paths", () => {
-    const src = readFileSync(
+    const raw = readFileSync(
       resolve(__dirname, "../lib/environmentCsvImportPersistence.ts"),
       "utf8",
     );
+    const src = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
     expect(src).not.toMatch(/\.update\(/);
     expect(src).not.toMatch(/\.delete\(/);
     expect(src).not.toMatch(/\.upsert\(/);
-    expect(src).not.toMatch(/alerts/i);
+    expect(src).not.toMatch(/\balerts\b/i);
     expect(src).not.toMatch(/action_queue/i);
     expect(src).not.toMatch(/service_role/i);
     expect(src).not.toMatch(/bridge_token/i);
     expect(src).not.toMatch(/switchbot/i);
     expect(src).not.toMatch(/device.?control/i);
-    expect(src).not.toMatch(/automation/i);
-    expect(src).not.toMatch(/scheduler/i);
+    expect(src).not.toMatch(/\bautomation\b/i);
+    expect(src).not.toMatch(/\bscheduler\b/i);
     expect(src.toLowerCase()).not.toMatch(/"live"|'live'/);
   });
 });

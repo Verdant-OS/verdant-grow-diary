@@ -174,3 +174,30 @@ describe("GlobalFastAddButton + fastAddActionRules — static safety", () => {
     }
   });
 });
+
+describe("GlobalFastAddButton — picker CTAs in no-context state", () => {
+  it("shows Choose plant and Choose tent CTAs without inserting data", () => {
+    const onNavigate = vi.fn();
+    renderAt("/dashboard", { onNavigate });
+    fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
+    fireEvent.click(screen.getByTestId("global-fast-add-action-watering"));
+    const plantCta = screen.getByTestId("global-fast-add-cta-choose_plant");
+    const tentCta = screen.getByTestId("global-fast-add-cta-choose_tent");
+    expect(plantCta.textContent).toMatch(/choose plant/i);
+    expect(tentCta.textContent).toMatch(/choose tent/i);
+    fireEvent.click(plantCta);
+    expect(onNavigate).toHaveBeenCalledWith("/plants");
+    fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
+    fireEvent.click(screen.getByTestId("global-fast-add-action-feeding"));
+    fireEvent.click(screen.getByTestId("global-fast-add-cta-choose_tent"));
+    expect(onNavigate).toHaveBeenCalledWith("/tents");
+  });
+
+  it("Fast Add still does not perform a Supabase write (no fetch dispatch)", () => {
+    const onDispatchEvent = vi.fn();
+    renderAt("/dashboard", { onDispatchEvent });
+    fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
+    fireEvent.click(screen.getByTestId("global-fast-add-action-watering"));
+    expect(onDispatchEvent).not.toHaveBeenCalled();
+  });
+});

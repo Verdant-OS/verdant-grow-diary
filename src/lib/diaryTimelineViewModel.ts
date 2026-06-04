@@ -11,11 +11,28 @@
  * No I/O, no Supabase, no model calls, no alerts, no Action Queue writes.
  */
 
+import {
+  getDiaryTimelineActionStyle,
+  type DiaryTimelineActionStyle,
+} from "@/constants/diaryTimelineActionStyles";
+
 export const DIARY_TIMELINE_EMPTY_TITLE = "No plant history yet.";
 export const DIARY_TIMELINE_EMPTY_HINT =
   "Use Fast Add to log your first note, watering, photo, or environment check.";
 export const DIARY_TIMELINE_FILTERED_EMPTY_COPY =
   "No entries match these filters.";
+
+export type { DiaryTimelineActionStyle };
+
+/**
+ * Resolve the icon/tone/label view-model for a timeline entry kind.
+ * Always returns a stable shape; unknown kinds fall back to a safe entry.
+ */
+export function getDiaryTimelineActionView(
+  kind: string | null | undefined,
+): DiaryTimelineActionStyle {
+  return getDiaryTimelineActionStyle(kind);
+}
 
 export type DiaryTimelineSourceTag =
   | "live"

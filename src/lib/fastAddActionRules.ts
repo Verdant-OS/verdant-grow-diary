@@ -55,12 +55,23 @@ export const FAST_ADD_ACTIONS: readonly FastAddActionDef[] = [
 export const FAST_ADD_NO_CONTEXT_COPY =
   "Select a plant or tent before logging this action.";
 
+export const FAST_ADD_PICKER_CTAS = [
+  { id: "choose_plant", label: "Choose plant", to: "/plants" },
+  { id: "choose_tent", label: "Choose tent", to: "/tents" },
+] as const;
+export type FastAddPickerCtaId = (typeof FAST_ADD_PICKER_CTAS)[number]["id"];
+
 export interface FastAddSelectionContext {
   plantId: string | null;
   plantName?: string | null;
   tentId: string | null;
   tentName?: string | null;
   growId: string | null;
+}
+
+export interface FastAddTimestampDefaults {
+  occurred_at?: string;
+  captured_at?: string;
 }
 
 export interface FastAddNavigateIntent {
@@ -77,11 +88,14 @@ export interface FastAddOpenQuickLogIntent {
     tentName: string | null;
     growId: string | null;
     eventType: NonNullable<FastAddActionDef["quickLogEventType"]>;
+    occurred_at?: string;
+    captured_at?: string;
   };
 }
 export interface FastAddNeedsContextIntent {
   kind: "needs-context";
   message: typeof FAST_ADD_NO_CONTEXT_COPY;
+  ctas: typeof FAST_ADD_PICKER_CTAS;
 }
 
 export type FastAddIntent =
@@ -103,26 +117,41 @@ function hasContext(ctx: FastAddSelectionContext | null | undefined): boolean {
  * - All other actions request the existing Quick Log sheet via the
  *   already-wired window event. The grower still confirms + saves.
  */
+export interface ResolveFastAddOptions {
+  /** Injectable clock for deterministic tests. Defaults to () => new Date(). */
+  now?: () => Date;
+}
+
 export function resolveFastAddIntent(
   actionId: FastAddActionId,
   ctx: FastAddSelectionContext | null | undefined,
+  options: ResolveFastAddOptions = {},
 ): FastAddIntent {
   if (!hasContext(ctx)) {
-    return { kind: "needs-context", message: FAST_ADD_NO_CONTEXT_COPY };
+    return {
+      kind: "needs-context",
+      message: FAST_ADD_NO_CONTEXT_COPY,
+      ctas: FAST_ADD_PICKER_CTAS,
+    };
   }
   const context = ctx as FastAddSelectionContext;
   const def = FAST_ADD_ACTIONS.find((a) => a.id === actionId);
   if (!def) {
-    return { kind: "needs-context", message: FAST_ADD_NO_CONTEXT_COPY };
+    return {
+      kind: "needs-context",
+      message: FAST_ADD_NO_CONTEXT_COPY,
+      ctas: FAST_ADD_PICKER_CTAS,
+    };
   }
 
   if (def.id === "diagnosis") {
-    // Navigate to AI Doctor surface; scope to plant when known.
     const to = context.plantId
       ? `/plants/${encodeURIComponent(context.plantId)}#ai-doctor`
       : "/doctor";
     return { kind: "navigate", to };
   }
+
+  const defaults = buildFastAddTimestampDefaults(actionId, options.now);
 
   return {
     kind: "open-quicklog",
@@ -134,8 +163,49 @@ export function resolveFastAddIntent(
       tentName: context.tentName ?? null,
       growId: context.growId ?? null,
       eventType: def.quickLogEventType!,
+      ...defaults,
     },
   };
+}
+
+/**
+ * Compute sensible default timestamps for a Fast Add action.
+ *
+ * Pure helper — does NOT persist or dispatch anything. The QuickLog form
+ * still owns the actual write; this only seeds initial values.
+ *
+ * Rules:
+ *  - All logging actions set `occurred_at = now`.
+ *  - Environment Check additionally sets `captured_at = now`.
+ *  - Diagnosis is navigation-only and returns {}.
+ */
+export function buildFastAddTimestampDefaults(
+  actionId: FastAddActionId,
+  now: (() => Date) | undefined = () => new Date(),
+): FastAddTimestampDefaults {
+  if (actionId === "diagnosis") return {};
+  const iso = now().toISOString();
+  if (actionId === "environment") {
+    return { occurred_at: iso, captured_at: iso };
+  }
+  return { occurred_at: iso };
+}
+
+/**
+ * Merge Fast Add timestamp defaults into an existing prefill without
+ * overwriting any user-edited values already present.
+ */
+export function applyFastAddTimestampDefaults<
+  T extends { occurred_at?: string | null; captured_at?: string | null },
+>(existing: T, defaults: FastAddTimestampDefaults): T {
+  const out: T = { ...existing };
+  if (defaults.occurred_at && !existing.occurred_at) {
+    (out as { occurred_at?: string }).occurred_at = defaults.occurred_at;
+  }
+  if (defaults.captured_at && !existing.captured_at) {
+    (out as { captured_at?: string }).captured_at = defaults.captured_at;
+  }
+  return out;
 }
 
 /**
@@ -157,3 +227,4 @@ export function deriveSelectionContextFromPathname(
   }
   return null;
 }
+

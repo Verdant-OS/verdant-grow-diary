@@ -30,6 +30,7 @@ import AiDoctorSessionDetail from "./pages/AiDoctorSessionDetail";
 import AiDoctorSessionsIndex from "./pages/AiDoctorSessionsIndex";
 import Diagnostics from "./pages/Diagnostics";
 import ActionQueue from "./pages/ActionQueue";
+import OperatorEcowittCanary from "./pages/OperatorEcowittCanary";
 import ActionDetail from "./pages/ActionDetail";
 import GrowLineageRepair from "./pages/GrowLineageRepair";
 // GrowRoomMode (legacy Live Dashboard) consolidated into Dashboard; /grow-room redirects.
@@ -114,6 +115,7 @@ const App = () => (
 
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/diagnostics" element={<Diagnostics />} />
+                <Route path="/operator/ecowitt" element={<OperatorEcowittCanary />} />
                 <Route path="/pi-ingest-status" element={<PiIngestStatus />} />
                 <Route path="/ingest-inspector" element={<IngestInspector />} />
                 <Route path="/imports/representative-csv" element={<RepresentativeCsvPreview />} />

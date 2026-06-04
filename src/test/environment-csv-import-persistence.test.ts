@@ -85,8 +85,9 @@ describe("environmentCsvImportPersistence — runtime", () => {
     );
     const res = await persistCsvEnvironmentRows(rows, SCOPE, client, 5);
     expect(res.error).toBeNull();
-    expect(calls).toEqual([5, 5, 5, 5]); // 7 rows × 3 metrics = 21 → chunks of 5
-    expect(res.insertedCount).toBe(20);
+    // 7 rows × 3 metrics = 21 inserts → chunks of 5,5,5,5,1
+    expect(calls).toEqual([5, 5, 5, 5, 1]);
+    expect(res.insertedCount).toBe(21);
   });
 
   it("does no work on empty input", async () => {

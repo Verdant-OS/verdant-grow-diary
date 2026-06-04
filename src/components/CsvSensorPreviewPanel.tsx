@@ -51,7 +51,15 @@ export default function CsvSensorPreviewPanel() {
       });
       return;
     }
-    const text = await file.text();
+    const text =
+      typeof (file as unknown as { text?: () => Promise<string> }).text === "function"
+        ? await file.text()
+        : await new Promise<string>((res, rej) => {
+            const r = new FileReader();
+            r.onload = () => res(String(r.result ?? ""));
+            r.onerror = () => rej(r.error);
+            r.readAsText(file);
+          });
     setResult(buildCsvPreview(text, file.name));
   }, []);
 

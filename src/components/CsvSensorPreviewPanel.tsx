@@ -24,6 +24,7 @@ import {
   FUTURE_DIARY_CONVERSION_COPY,
   type FlagCode,
 } from "@/lib/csvSensorPreviewWarningCopy";
+import { CsvPreviewReviewGate } from "@/components/CsvPreviewReviewGate";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -334,6 +335,13 @@ export default function CsvSensorPreviewPanel() {
               {FUTURE_DIARY_CONVERSION_COPY}
             </span>
           </div>
+
+          {/* Disabled review gate — presentational only. No write handler. */}
+          <CsvPreviewReviewGate
+            hasHardBlockedRows={(result.flags ?? []).some((f) => f.severity === "error")}
+            hasAcceptedRows={(result.rows ?? []).length > 0}
+          />
+
 
           {/* Editable mapping table */}
           <div>

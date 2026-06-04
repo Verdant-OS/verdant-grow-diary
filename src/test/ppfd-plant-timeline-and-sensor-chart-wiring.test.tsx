@@ -33,7 +33,8 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 function buildRecord(overrides: { ppfd?: unknown } = {}): ManualSnapshotRecord {
   const validation = validateManualSnapshot({
-    airTempC: "24",
+    airTemp: "24",
+    airTempUnit: "C",
     humidityPct: "55",
     ppfd: overrides.ppfd as string | number | null | undefined,
   });

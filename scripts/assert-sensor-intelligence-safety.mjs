@@ -182,9 +182,9 @@ export function scanContent(relPath, content) {
   }
 
   // 5. Scheduled-analysis status sentinel — never approved/applied/executed.
-  if (SCHEDULED_ANALYSIS_HINT.test(relPath) || SCHEDULED_ANALYSIS_HINT.test(content)) {
+  if (SCHEDULED_ANALYSIS_HINT.test(relPath) || SCHEDULED_ANALYSIS_HINT.test(codeOnly)) {
     for (const pat of SCHEDULED_STATUS_PATTERNS) {
-      if (pat.test(content) && !isTestFile) {
+      if (pat.test(codeOnly) && !isTestFile) {
         violations.push({
           rule: "scheduled-analysis-unsafe-status",
           message: `${relPath} sets a non-suggested status (approved/applied/executed) in scheduled-analysis code path.`,
@@ -195,9 +195,9 @@ export function scanContent(relPath, content) {
   }
 
   // 6. Fake peer-distribution fallback data.
-  if (PEER_DISTRIBUTION_HINT.test(content) && !isTestFile) {
+  if (PEER_DISTRIBUTION_HINT.test(codeOnly) && !isTestFile) {
     for (const pat of FAKE_PEER_PATTERNS) {
-      if (pat.test(content)) {
+      if (pat.test(codeOnly)) {
         violations.push({
           rule: "fake-peer-distribution-fallback",
           message: `${relPath} appears to synthesize fake peer-distribution data. Demo/fake data must never be displayed as live.`,

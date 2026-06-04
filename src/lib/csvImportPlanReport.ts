@@ -170,7 +170,7 @@ export function buildSensorDraftSample(
       confidence: d.raw_payload.confidence,
       tent_id: d.tent_id,
       plant_id: d.plant_id,
-      idempotency_key_prefix: d.idempotency_key.slice(0, 16),
+      idempotency_key_prefix: d.idempotency_key.slice(0, 12),
     });
   }
   return out;
@@ -283,7 +283,7 @@ export function buildCsvImportPlanReport(
     return { reason: r, title: exp?.title ?? r, explanation: exp?.explanation ?? "", fix: exp?.fix ?? "" };
   });
   const duplicateKeyPrefixes = plan.duplicateSkipped.map((d) =>
-    d.idempotency_key.slice(0, 16),
+    d.idempotency_key.slice(0, 12),
   );
 
   return {

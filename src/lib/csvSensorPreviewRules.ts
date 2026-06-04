@@ -725,8 +725,10 @@ export interface CsvPreviewReportOptions {
 }
 
 export interface CsvPreviewReport {
+  reportVersion: typeof CSV_PREVIEW_REPORT_VERSION;
   generatedAt: string;
   fileName: string | null;
+  sourceType: DelimitedSourceLabel;
   sourceLabel: DelimitedSourceLabel;
   statusLabel: typeof CSV_PREVIEW_STATUS_LABEL;
   delimiter: "csv" | "tsv";
@@ -757,8 +759,10 @@ export function buildCsvPreviewReport(
   const sampled = samplePreviewTimeline(windowed, sampling);
 
   return {
+    reportVersion: CSV_PREVIEW_REPORT_VERSION,
     generatedAt: options.generatedAt ?? new Date().toISOString(),
     fileName: preview.fileName,
+    sourceType: preview.sourceLabel,
     sourceLabel: preview.sourceLabel,
     statusLabel: CSV_PREVIEW_STATUS_LABEL,
     delimiter: preview.delimiter === "\t" ? "tsv" : "csv",
@@ -789,4 +793,54 @@ export function buildCsvPreviewReport(
     ],
   };
 }
+
+// ---------------------------------------------------------------------------
+// CSV summary export (mapping + flag overview, never raw rows)
+// ---------------------------------------------------------------------------
+
+function escapeCsvCell(v: string | number | null | undefined): string {
+  const s = v == null ? "" : String(v);
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+/**
+ * Builds a small text/csv summary of the preview — metadata header rows,
+ * then one row per column with proposed/effective mapping + flag codes.
+ * Intentionally does NOT include raw sensor rows.
+ */
+export function buildCsvPreviewSummaryCsv(
+  preview: CsvPreviewParseResult,
+  options: CsvPreviewReportOptions = {},
+): string {
+  const report = buildCsvPreviewReport(preview, options);
+  const lines: string[] = [];
+  lines.push(`# report_version,${escapeCsvCell(report.reportVersion)}`);
+  lines.push(`# generated_at,${escapeCsvCell(report.generatedAt)}`);
+  lines.push(`# file_name,${escapeCsvCell(report.fileName ?? "")}`);
+  lines.push(`# source_type,${escapeCsvCell(report.sourceType)}`);
+  lines.push(`# status,${escapeCsvCell(report.statusLabel)}`);
+  lines.push(`# row_count,${escapeCsvCell(report.rowCount)}`);
+  lines.push("header,proposed_field,effective_field,flag_codes,reason");
+  const flagsByHeader = new Map<string, string[]>();
+  for (const f of report.suspiciousFlags) {
+    const arr = flagsByHeader.get(f.header) ?? [];
+    arr.push(f.code);
+    flagsByHeader.set(f.header, arr);
+  }
+  const effByHeader = new Map(report.effectiveMappings.map((m) => [m.header, m.field]));
+  for (const m of report.proposedMappings) {
+    lines.push(
+      [
+        escapeCsvCell(m.header),
+        escapeCsvCell(m.field ?? ""),
+        escapeCsvCell(effByHeader.get(m.header) ?? ""),
+        escapeCsvCell((flagsByHeader.get(m.header) ?? []).join("|")),
+        escapeCsvCell(m.reason),
+      ].join(","),
+    );
+  }
+  return lines.join("\n") + "\n";
+}
+
 

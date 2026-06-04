@@ -4,9 +4,9 @@
  *
  *  1. VPD provenance — derived rows distinguishable from measured rows,
  *     and never computed from a dropped/invalid temperature.
- *  2. Timestamp handling — pins the edge function's server-time fallback
- *     for `dateutc` (the current canonical behavior — `dateutc` is NOT
- *     parsed; `captured_at` is stamped from server time at ingest).
+ *  2. Timestamp handling — pins the edge function's strict parse of
+ *     `dateutc` as UTC with safe `server_received_at` fallback, and the
+ *     honest `timestamp_source` stamp on every row.
  *  3. Duplicate behavior — pins the edge function's reliance on the
  *     `sensor_readings_dedupe_uidx` unique index via `ignoreDuplicates`.
  *  4. Secret/log safety — function source never echoes raw PASSKEY/MAC/
@@ -84,14 +84,13 @@ describe("(1) VPD provenance — derived vs measured", () => {
   });
 });
 
-describe("(2) timestamp / dateutc handling (pinned current behavior)", () => {
-  it("edge function stamps captured_at from server time and does NOT parse dateutc", () => {
-    // CURRENT CANONICAL BEHAVIOR: dateutc is treated as untrusted payload
-    // metadata and IGNORED. captured_at = new Date().toISOString() at ingest.
-    // If/when we begin trusting dateutc, this pin must be updated alongside
-    // the runbook.
-    expect(EDGE_SRC).toMatch(/capturedAt\s*=\s*new Date\(\)\.toISOString\(\)/);
-    expect(EDGE_SRC).not.toMatch(/payload\.dateutc|safePayload\.dateutc/);
+describe("(2) timestamp / dateutc handling — gateway-trusted UTC with safe fallback", () => {
+  it("edge function parses dateutc and falls back to server time when absent/malformed", () => {
+    // The edge function calls parseEcoWittDateUtc on payload.dateutc, then
+    // either uses the parsed ISO string or new Date().toISOString().
+    expect(EDGE_SRC).toMatch(/parseEcoWittDateUtc\(/);
+    expect(EDGE_SRC).toMatch(/new Date\(\)\.toISOString\(\)/);
+    expect(EDGE_SRC).toMatch(/timestampSource/);
   });
 
   it("captured_at is set deterministically from the caller-supplied capturedAt", () => {
@@ -106,6 +105,72 @@ describe("(2) timestamp / dateutc handling (pinned current behavior)", () => {
       expect(r.captured_at).toBe(NOW);
       // ISO-8601 UTC — never a local timezone offset.
       expect(r.captured_at.endsWith("Z")).toBe(true);
+    }
+  });
+
+  it("parseEcoWittDateUtc accepts well-formed dateutc as UTC and rejects garbage", async () => {
+    const { parseEcoWittDateUtc } = await import("@/lib/ecowittRoutedRowBuilder");
+    expect(parseEcoWittDateUtc("2026-06-04 21:00:00")).toBe(
+      "2026-06-04T21:00:00.000Z",
+    );
+    expect(parseEcoWittDateUtc("2026-06-04T21:00:00")).toBe(
+      "2026-06-04T21:00:00.000Z",
+    );
+    // Calendar-invalid → rejected (round-trip check).
+    expect(parseEcoWittDateUtc("2026-02-30 12:00:00")).toBeNull();
+    // Wrong format / garbage / missing.
+    expect(parseEcoWittDateUtc("not-a-date")).toBeNull();
+    expect(parseEcoWittDateUtc("")).toBeNull();
+    expect(parseEcoWittDateUtc(null)).toBeNull();
+    expect(parseEcoWittDateUtc(undefined)).toBeNull();
+    expect(parseEcoWittDateUtc(1717533600)).toBeNull();
+  });
+
+  it("two identical payloads with the same valid dateutc produce identical captured_at on every row", () => {
+    const sharedCapturedAt = "2026-06-04T21:00:00.000Z";
+    const payload = { temp1f: "77", humidity1: "50", soilmoisture1: "40" };
+    const a = buildEcoWittRoutedRows({
+      userId: USER,
+      payload,
+      payloadPasskeyFingerprint: FP_A,
+      eligibleTents: [tent],
+      capturedAt: sharedCapturedAt,
+      timestampSource: "ecowitt_dateutc",
+    });
+    const b = buildEcoWittRoutedRows({
+      userId: USER,
+      payload,
+      payloadPasskeyFingerprint: FP_A,
+      eligibleTents: [tent],
+      capturedAt: sharedCapturedAt,
+      timestampSource: "ecowitt_dateutc",
+    });
+    expect(a.rows.length).toBe(b.rows.length);
+    expect(a.rows.length).toBeGreaterThan(0);
+    // Every (metric, captured_at) pair matches — so the partial unique
+    // index (user_id, tent_id, source, metric, captured_at) collapses the
+    // duplicate retry to a skipped insert.
+    const keyOf = (r: typeof a.rows[number]) =>
+      `${r.tent_id}|${r.metric}|${r.captured_at}`;
+    expect(a.rows.map(keyOf).sort()).toEqual(b.rows.map(keyOf).sort());
+    for (const r of [...a.rows, ...b.rows]) {
+      expect(r.captured_at).toBe(sharedCapturedAt);
+      expect(r.raw_payload.timestamp_source).toBe("ecowitt_dateutc");
+    }
+  });
+
+  it("stamps timestamp_source='server_received_at' when caller falls back to server time", () => {
+    const { rows } = buildEcoWittRoutedRows({
+      userId: USER,
+      payload: { temp1f: "77", humidity1: "50" },
+      payloadPasskeyFingerprint: FP_A,
+      eligibleTents: [tent],
+      capturedAt: NOW,
+      timestampSource: "server_received_at",
+    });
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) {
+      expect(r.raw_payload.timestamp_source).toBe("server_received_at");
     }
   });
 });

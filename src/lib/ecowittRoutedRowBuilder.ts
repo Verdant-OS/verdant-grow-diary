@@ -38,6 +38,10 @@ export type EcoWittRoutedMetric =
   | "soil_moisture_pct"
   | "vpd_kpa";
 
+export type EcoWittTimestampSource =
+  | "ecowitt_dateutc"
+  | "server_received_at";
+
 export interface EcoWittRoutedRawPayload {
   provider: "ecowitt";
   channel: number;
@@ -55,6 +59,14 @@ export interface EcoWittRoutedRawPayload {
    * was computed from. Pure metadata in raw_payload — no schema change.
    */
   derived_from?: string[];
+  /**
+   * Origin of `captured_at`:
+   *   - "ecowitt_dateutc"    → parsed from a valid gateway-provided dateutc
+   *   - "server_received_at" → server wall clock at ingest (dateutc missing
+   *                            or malformed). Never claims server time came
+   *                            from EcoWitt.
+   */
+  timestamp_source?: EcoWittTimestampSource;
 }
 
 export interface EcoWittRoutedRow {
@@ -87,6 +99,12 @@ export interface EcoWittRoutedBuildInput {
   payloadPasskeyFingerprint: string | null;
   eligibleTents: EcoWittRouterEligibleTent[];
   capturedAt: string;
+  /**
+   * Optional provenance for `capturedAt`. When provided, it is stamped on
+   * every emitted row's `raw_payload.timestamp_source`. Omit for legacy
+   * callers — rows will simply not carry the metadata.
+   */
+  timestampSource?: EcoWittTimestampSource;
 }
 
 export interface EcoWittRoutedBuildResult {
@@ -100,6 +118,33 @@ function safeRawValue(v: unknown): string {
   const s = typeof v === "string" ? v : String(v);
   return s.length > 64 ? s.slice(0, 64) : s;
 }
+
+/**
+ * Parse an EcoWitt `dateutc` field (gateway custom-upload format:
+ * `YYYY-MM-DD HH:MM:SS`, treated as UTC) into a canonical ISO-8601 UTC
+ * string. Returns `null` when the value is missing, the wrong type, or
+ * does not match the strict format / does not round-trip to a valid date.
+ *
+ * Never parses with local timezone semantics. Never accepts arbitrary
+ * Date-parseable strings — only the documented EcoWitt format.
+ */
+export function parseEcoWittDateUtc(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  const m = trimmed.match(
+    /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/,
+  );
+  if (!m) return null;
+  const [, y, mo, d, h, mi, s] = m;
+  const iso = `${y}-${mo}-${d}T${h}:${mi}:${s}.000Z`;
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return null;
+  // Round-trip check rejects calendar-invalid inputs like 2026-02-30.
+  const rt = new Date(t).toISOString();
+  if (rt !== iso) return null;
+  return iso;
+}
+
 
 export function buildEcoWittRoutedRows(
   input: EcoWittRoutedBuildInput,
@@ -160,6 +205,9 @@ export function buildEcoWittRoutedRows(
           raw_key: r.source_channel_key,
           raw_value: safeRawValue(lowerPayload[r.source_channel_key]),
           passkey_fingerprint: fingerprint as string,
+          ...(input.timestampSource
+            ? { timestamp_source: input.timestampSource }
+            : {}),
         },
       });
       groupRowCount += 1;
@@ -202,6 +250,9 @@ export function buildEcoWittRoutedRows(
             slot.temperature_c.source_channel_key,
             slot.humidity_pct.source_channel_key,
           ],
+          ...(input.timestampSource
+            ? { timestamp_source: input.timestampSource }
+            : {}),
         },
       });
       groupRowCount += 1;

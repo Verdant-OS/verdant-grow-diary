@@ -33,7 +33,9 @@ import { authenticateBearer, type AuthResult } from "../sensor-ingest-webhook/au
 import { computeEcoWittPasskeyFingerprint } from "../../../src/lib/ecowittPasskeyFingerprint.ts";
 import {
   buildEcoWittRoutedRows,
+  parseEcoWittDateUtc,
   type EcoWittRoutedRow,
+  type EcoWittTimestampSource,
 } from "../../../src/lib/ecowittRoutedRowBuilder.ts";
 import type { EcoWittRouterEligibleTent } from "../../../src/lib/ecowittChannelTentRouter.ts";
 
@@ -290,13 +292,28 @@ Deno.serve(async (req) => {
     (tentRows ?? []) as TentHardwareConfigRow[],
   );
 
-  const capturedAt = new Date().toISOString();
+  // Prefer the gateway-provided `dateutc` (parsed strictly as UTC) so that
+  // an idempotent retry of the same payload lands on the same captured_at
+  // and is rejected by the `sensor_readings_dedupe_uidx` partial unique
+  // index. Fall back to server receive time when dateutc is missing or
+  // malformed, and always stamp `timestamp_source` honestly so downstream
+  // never confuses server time with gateway time.
+  const dateutcRaw = (payload as Record<string, unknown>)["dateutc"]
+    ?? (payload as Record<string, unknown>)["DATEUTC"]
+    ?? null;
+  const parsedDateUtc = parseEcoWittDateUtc(dateutcRaw);
+  const capturedAt = parsedDateUtc ?? new Date().toISOString();
+  const timestampSource: EcoWittTimestampSource = parsedDateUtc
+    ? "ecowitt_dateutc"
+    : "server_received_at";
+
   const { rows, summary } = buildEcoWittRoutedRows({
     userId: auth.userId,
     payload: safePayload,
     payloadPasskeyFingerprint: fingerprint,
     eligibleTents,
     capturedAt,
+    timestampSource,
   });
 
   if (rows.length === 0) {

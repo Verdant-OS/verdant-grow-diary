@@ -95,17 +95,32 @@ export function normalizeEcowittPayload(
   const adapter = adaptEcoWittPayloadToBridgeInput(payload, options);
 
   const readings: EcowittNormalizedReading[] = [];
-  for (const r of adapter.input.readings) {
-    if (!ALLOWED_METRICS.has(r.metric as EcowittNormalizedMetric)) continue;
-    if (typeof r.value !== "number" || !Number.isFinite(r.value)) continue;
+  const adapterReadings = Array.isArray(adapter.input.readings)
+    ? (adapter.input.readings as ReadonlyArray<{
+        metric?: unknown;
+        value?: unknown;
+        unit?: unknown;
+      }>)
+    : [];
+  for (const r of adapterReadings) {
+    const metric = r?.metric;
+    if (typeof metric !== "string") continue;
+    if (!ALLOWED_METRICS.has(metric as EcowittNormalizedMetric)) continue;
+    const value = r?.value;
+    if (typeof value !== "number" || !Number.isFinite(value)) continue;
+    const unit = typeof r?.unit === "string" ? r.unit : "";
     readings.push({
-      metric: r.metric as EcowittNormalizedMetric,
-      value: r.value,
-      unit: r.unit,
+      metric: metric as EcowittNormalizedMetric,
+      value,
+      unit,
     });
   }
 
-  const capturedAt = adapter.input.captured_at ?? null;
+  const capturedAtRaw = adapter.input.captured_at;
+  const capturedAt =
+    typeof capturedAtRaw === "string" && capturedAtRaw.length > 0
+      ? capturedAtRaw
+      : null;
   const ageMinutes = ageMinutesBetween(capturedAt, now);
   const freshness = capturedAt ? freshnessFromAge(ageMinutes) : "missing";
 

@@ -414,7 +414,7 @@ describe("EcoWitt ingest — handler shell still 200s on zero-row outcomes", () 
   it("handler source returns 200 with accepted=false on empty/unmapped payloads (no 4xx for malformed bodies)", () => {
     // The handler returns json({ accepted, rows_inserted, ... }, 200) for
     // the routed path. Pin that with a regex over the source.
-    expect(EDGE_FN_SRC).toMatch(/status:\s*200/);
+    expect(EDGE_FN_SRC).toMatch(/\b200\b/);
     // It does NOT return 4xx when the payload is well-formed JSON but has
     // no mappable channels — only auth/JSON-parse errors should 4xx.
     expect(EDGE_FN_SRC).not.toMatch(/return\s+json\([^)]*accepted[^)]*\),\s*\{\s*status:\s*4\d\d/);

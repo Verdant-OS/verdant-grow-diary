@@ -166,6 +166,9 @@ export function CsvPreviewReviewGate({
   const [confirmed, setConfirmed] = useState(false);
   const [showSensorSample, setShowSensorSample] = useState(false);
   const [attachMode, setAttachMode] = useState<"new" | "existing">("new");
+  const [expandedBlockedReasons, setExpandedBlockedReasons] = useState<Record<string, boolean>>({});
+  const toggleBlockedReason = (r: string) =>
+    setExpandedBlockedReasons((p) => ({ ...p, [r]: !p[r] }));
 
   // Stable clock per mount unless caller injects one (tests/exports).
   const [mountedNow] = useState<Date>(() => now ?? new Date());

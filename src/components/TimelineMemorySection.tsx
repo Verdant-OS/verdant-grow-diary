@@ -11,7 +11,7 @@
  *  - Empty filtered state copy is exactly: "No events match this filter."
  */
 import { useMemo, useState } from "react";
-import { History } from "lucide-react";
+import { History, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import ManualSnapshotTimelineCard from "@/components/ManualSnapshotTimelineCard";
@@ -33,6 +33,7 @@ import {
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 import { buildTimelineSensorSnapshotViewModel } from "@/lib/timelineSensorSnapshotViewModel";
 import { buildTimelinePhotoPreviewViewModel } from "@/lib/timelinePhotoPreviewViewModel";
+import { buildTimelineDayGroups } from "@/lib/timelineDayGroupingViewModel";
 
 type Props =
   | { scope: "plant"; plantId: string | null | undefined }

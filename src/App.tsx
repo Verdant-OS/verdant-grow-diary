@@ -44,6 +44,7 @@ import PiIngestStatus from "./pages/PiIngestStatus";
 import IngestInspector from "./pages/IngestInspector";
 import NotFound from "./pages/NotFound";
 import RepresentativeCsvPreview from "./pages/RepresentativeCsvPreview";
+import SensorCsvPreview from "./pages/SensorCsvPreview";
 
 
 

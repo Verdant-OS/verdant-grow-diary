@@ -16,6 +16,7 @@
  */
 
 import { buildManualDeviceId } from "@/lib/manualSensorSourceLabel";
+import { classifyPpfd, PPFD_MAX } from "@/lib/ppfdRules";
 
 
 export type ManualMetric =
@@ -23,7 +24,8 @@ export type ManualMetric =
   | "humidity_pct"
   | "vpd_kpa"
   | "co2_ppm"
-  | "soil_moisture_pct";
+  | "soil_moisture_pct"
+  | "ppfd";
 
 export interface ManualEntryInput {
   /** Air temperature in °F (UI convenience). Converted to °C on save. */
@@ -36,6 +38,12 @@ export interface ManualEntryInput {
   co2Ppm?: string | number | null;
   /** Soil water content %. */
   soilMoisturePct?: string | number | null;
+  /**
+   * PPFD µmol/m²/s from a real PAR/quantum meter. Optional.
+   * Blank is treated as unknown (NOT zero). Never derived from
+   * any other light field. Validated via ppfdRules.
+   */
+  ppfd?: string | number | null;
 }
 
 export interface ManualReadingMetric {
@@ -83,6 +91,7 @@ export function validateManualEntry(input: ManualEntryInput): ManualEntryValidat
   const vpd = toFinite(input.vpdKpa);
   const co2 = toFinite(input.co2Ppm);
   const soil = toFinite(input.soilMoisturePct);
+  const ppfdClass = classifyPpfd(input.ppfd);
 
   // Hard rejects (impossible values)
   if (humidity !== null && (humidity < 0 || humidity > 100)) {
@@ -96,6 +105,15 @@ export function validateManualEntry(input: ManualEntryInput): ManualEntryValidat
   }
   if (vpd !== null && vpd < 0) {
     errors.push("VPD cannot be negative.");
+  }
+  if (ppfdClass.kind === "invalid") {
+    if (ppfdClass.reason === "negative") {
+      errors.push("PPFD cannot be negative.");
+    } else if (ppfdClass.reason === "implausible_high") {
+      errors.push(`PPFD must be between 0 and ${PPFD_MAX} µmol/m²/s.`);
+    } else {
+      errors.push("PPFD must be a finite number.");
+    }
   }
 
   // Suspicious-but-allowed warnings
@@ -137,6 +155,9 @@ export function validateManualEntry(input: ManualEntryInput): ManualEntryValidat
       value: computeVpdKpa(fahrenheitToCelsius(airTempF), humidity),
       derived: true,
     });
+  }
+  if (ppfdClass.kind === "valid") {
+    metrics.push({ metric: "ppfd", value: ppfdClass.value });
   }
 
   if (metrics.length === 0 && errors.length === 0) {

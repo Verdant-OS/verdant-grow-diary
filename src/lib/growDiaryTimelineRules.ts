@@ -322,6 +322,12 @@ export function toTimelineItem(
     hasPhoto: !!entry.photoUrl,
     hasSensorSnapshot: !!entry.details.sensorSnapshot,
     sensorSnapshotState: entry.details.sensorSnapshot?.state ?? null,
+    sensorSourceLabel: resolveDiarySensorSourceLabel(
+      entry.details.sensorSnapshot?.source ?? null,
+    ),
+    sensorVendorLabel: resolveDiarySensorVendorLabel(
+      entry.details.sensorSnapshot?.vendor ?? null,
+    ),
     tags: buildTags(entry),
     warnings: entry.warnings.slice(),
     isUsefulForAiContext: entry.isValidForAiContext,

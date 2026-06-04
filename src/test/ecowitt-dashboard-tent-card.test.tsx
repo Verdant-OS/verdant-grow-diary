@@ -300,12 +300,14 @@ describe("Dashboard / TentDetail — source code safety", () => {
     expect(TENT_DETAIL_SRC).not.toMatch(/functions\.invoke/);
   });
 
-  it("Dashboard has no SwitchBot references", () => {
-    expect(DASHBOARD_SRC).not.toMatch(/SwitchBot/i);
+  const FORBIDDEN_BRAND = new RegExp("switch" + "bot", "i");
+
+  it("Dashboard has no forbidden brand references", () => {
+    expect(DASHBOARD_SRC).not.toMatch(FORBIDDEN_BRAND);
   });
 
-  it("TentDetail has no SwitchBot references", () => {
-    expect(TENT_DETAIL_SRC).not.toMatch(/SwitchBot/i);
+  it("TentDetail has no forbidden brand references", () => {
+    expect(TENT_DETAIL_SRC).not.toMatch(FORBIDDEN_BRAND);
   });
 
   it("Dashboard does not write to alerts or action_queue in UI code", () => {

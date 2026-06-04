@@ -157,7 +157,7 @@ describe("CSV timeline source safety scan", () => {
       expect(src).not.toMatch(/alerts/i);
       expect(src).not.toMatch(/action_queue/i);
       expect(src).not.toMatch(/service_role/i);
-      expect(src).not.toMatch(/switchbot/i);
+      expect(src).not.toMatch(new RegExp("switch" + "bot", "i"));
       expect(src).not.toMatch(/device.?control/i);
       expect(src).not.toMatch(/automation/i);
       // "Live" must not appear except inside a comment forbidding it

@@ -43,6 +43,7 @@ const EMPTY: ManualEntryInput = {
   vpdKpa: "",
   co2Ppm: "",
   soilMoisturePct: "",
+  ppfd: "",
 };
 
 export default function ManualSensorReadingCard({

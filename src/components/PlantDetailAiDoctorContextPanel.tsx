@@ -226,6 +226,11 @@ export default function PlantDetailAiDoctorContextPanel({
         />
       ) : null}
 
+      <AiDoctorVpdDriftSection
+        vpdDrift={vpdDrift ?? null}
+        testId="plant-ai-doctor-context-vpd-drift"
+      />
+
       {noWarningContext ? (
         <p
           className="text-[11px] text-muted-foreground"

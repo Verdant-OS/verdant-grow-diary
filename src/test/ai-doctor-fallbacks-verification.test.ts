@@ -421,12 +421,17 @@ describe("VERDANT-18 · static safety of this test file", () => {
       path.resolve(__dirname, "ai-doctor-fallbacks-verification.test.ts"),
       "utf8",
     );
-    expect(src).not.toMatch(/@\/integrations\/supabase/);
-    expect(src).not.toMatch(/functions\.invoke/);
-    expect(src).not.toMatch(/\.from\(['"][^'"]+['"]\)\s*\.(insert|update|delete|upsert|rpc)/);
-    expect(src).not.toMatch(/service_role/);
-    // No bridge/automation strings outside of the device-control test
-    // fixtures, which are scoped as model-output assertions and stay
-    // string-literal inputs to the sanitizer.
+    // Patterns built from string concatenation so the safety scanner
+    // itself does not match its own literal regex source.
+    const supabaseImport = new RegExp(["@", "/integrations/supabase"].join(""));
+    const functionsInvoke = new RegExp(["functions", "\\.", "invoke"].join(""));
+    const writePath = new RegExp(
+      "\\.from\\(['\"][^'\"]+['\"]\\)\\s*\\.(insert|update|delete|upsert|rpc)",
+    );
+    const serviceRole = new RegExp(["service", "_", "role"].join(""));
+    expect(src).not.toMatch(supabaseImport);
+    expect(src).not.toMatch(functionsInvoke);
+    expect(src).not.toMatch(writePath);
+    expect(src).not.toMatch(serviceRole);
   });
 });

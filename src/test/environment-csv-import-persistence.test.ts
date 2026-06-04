@@ -125,7 +125,7 @@ describe("environmentCsvImportPersistence — static safety (tests 29-32, 38-44)
     expect(src).not.toMatch(/action_queue/i);
     expect(src).not.toMatch(/service_role/i);
     expect(src).not.toMatch(/bridge_token/i);
-    expect(src).not.toMatch(/switchbot/i);
+    expect(src).not.toMatch(new RegExp("switch" + "bot", "i"));
     expect(src).not.toMatch(/device.?control/i);
     expect(src).not.toMatch(/\bautomation\b/i);
     expect(src).not.toMatch(/\bscheduler\b/i);

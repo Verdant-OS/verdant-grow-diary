@@ -218,6 +218,15 @@ describe("static guard — no source file outside the helper duplicates the mapp
     resolve(ROOT, "src/constants/vpdTargets.ts"),
   ]);
 
+  function isAllowed(file: string): boolean {
+    if (ALLOWLIST.has(file)) return true;
+    // Tests legitimately exercise both legacy and canonical names; the
+    // guard's intent is to prevent runtime/source duplication of the
+    // mapping table, not to ban references inside tests.
+    if (file.includes(`${resolve(ROOT, "src/test")}/`)) return true;
+    return false;
+  }
+
   it("no other .ts/.tsx file co-locates the legacy→canonical pairs", () => {
     const files = walk(resolve(ROOT, "src"));
     const violators: string[] = [];

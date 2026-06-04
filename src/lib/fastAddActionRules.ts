@@ -55,12 +55,23 @@ export const FAST_ADD_ACTIONS: readonly FastAddActionDef[] = [
 export const FAST_ADD_NO_CONTEXT_COPY =
   "Select a plant or tent before logging this action.";
 
+export const FAST_ADD_PICKER_CTAS = [
+  { id: "choose_plant", label: "Choose plant", to: "/plants" },
+  { id: "choose_tent", label: "Choose tent", to: "/tents" },
+] as const;
+export type FastAddPickerCtaId = (typeof FAST_ADD_PICKER_CTAS)[number]["id"];
+
 export interface FastAddSelectionContext {
   plantId: string | null;
   plantName?: string | null;
   tentId: string | null;
   tentName?: string | null;
   growId: string | null;
+}
+
+export interface FastAddTimestampDefaults {
+  occurred_at?: string;
+  captured_at?: string;
 }
 
 export interface FastAddNavigateIntent {
@@ -77,11 +88,14 @@ export interface FastAddOpenQuickLogIntent {
     tentName: string | null;
     growId: string | null;
     eventType: NonNullable<FastAddActionDef["quickLogEventType"]>;
+    occurred_at?: string;
+    captured_at?: string;
   };
 }
 export interface FastAddNeedsContextIntent {
   kind: "needs-context";
   message: typeof FAST_ADD_NO_CONTEXT_COPY;
+  ctas: typeof FAST_ADD_PICKER_CTAS;
 }
 
 export type FastAddIntent =

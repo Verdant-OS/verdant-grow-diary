@@ -457,20 +457,82 @@ export default function Dashboard() {
             <div className="space-y-2.5">
               {latestPerTent.map(({ tent, last, stability }) => {
                 const stabilityView = formatStabilityChipView(stability);
+                const snapView = buildTentSnapshotView(
+                  (readingsByTent[tent.id] ?? []) as BuildTentSnapshotInput[],
+                  tent.stage,
+                );
+                const ariaParts = [
+                  tent.name,
+                  snapView.hasReading ? `source ${snapView.sourceLabel}` : null,
+                  snapView.hasReading
+                    ? `last updated ${snapView.lastUpdatedDisplay}`
+                    : null,
+                  ...snapView.metrics.map((m) =>
+                    `${m.label} ${m.display}${m.unit}${m.statusLabel ? ` (${m.statusLabel})` : ""}`,
+                  ),
+                ].filter(Boolean);
                 return (
-                  <Link key={tent.id} to={tentDetailPath(tent.id)} className="block rounded-xl border border-border/40 p-3 hover:bg-secondary/30 transition">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2">
+                  <Link
+                    key={tent.id}
+                    to={tentDetailPath(tent.id)}
+                    aria-label={ariaParts.join(", ")}
+                    data-testid={`dashboard-env-snapshot-tent-${tent.id}`}
+                    className="block rounded-xl border border-border/40 p-3 hover:bg-secondary/30 transition"
+                  >
+                    <div className="flex items-center justify-between mb-1.5 gap-2 flex-wrap">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium text-sm">{tent.name}</span>
                         <StageBadge stage={tent.stage as Stage} />
+                        {snapView.hasReading && (
+                          <span
+                            data-testid={`dashboard-env-snapshot-source-${tent.id}`}
+                            data-source-label={snapView.sourceLabel}
+                            className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide border-border/50 bg-secondary/40 text-muted-foreground"
+                          >
+                            {snapView.sourceLabel}
+                          </span>
+                        )}
                       </div>
-                      { /* alertCount removed — not available in Supabase schema */ }
+                      {snapView.hasReading && (
+                        <span
+                          data-testid={`dashboard-env-snapshot-last-updated-${tent.id}`}
+                          className="text-[11px] text-muted-foreground"
+                        >
+                          Last updated {snapView.lastUpdatedDisplay}
+                        </span>
+                      )}
                     </div>
                     {last && (
                       <div className="flex flex-wrap gap-1.5">
-                        <MetricChip label="T" value={last.temp != null ? (tempFFromC(last.temp) ?? 0).toFixed(1) : "—"} unit="°F" status={environmentMetricChipStatus(classifyTempAgainstStage(last.temp ?? null, { stage: tent.stage }))} />
-                        <MetricChip label="RH" value={last.rh ?? "—"} unit="%" status={environmentMetricChipStatus(classifyRhAgainstStage(last.rh ?? null, { stage: tent.stage }))} />
-                        <MetricChip label="VPD" value={last.vpd ?? "—"} unit=" kPa" status={vpdMetricChipStatus(classifyVpdAgainstStage({ value: last.vpd ?? null, stage: tent.stage }))} />
+                        {snapView.metrics.map((m) => (
+                          <div
+                            key={m.key}
+                            data-testid={`dashboard-env-snapshot-metric-${tent.id}-${m.key}`}
+                            data-status={m.status}
+                            className="inline-flex items-center gap-1"
+                          >
+                            <MetricChip
+                              label={m.key === "temp" ? "T" : m.key === "rh" ? "RH" : "VPD"}
+                              value={m.display}
+                              unit={m.unit}
+                              status={m.chipStatus}
+                            />
+                            {m.statusLabel && (
+                              <span
+                                data-testid={`dashboard-env-snapshot-metric-status-${tent.id}-${m.key}`}
+                                className={
+                                  m.status === "invalid"
+                                    ? "text-[10px] uppercase tracking-wide text-destructive"
+                                    : m.status === "stale"
+                                      ? "text-[10px] uppercase tracking-wide text-amber-600"
+                                      : "text-[10px] uppercase tracking-wide text-muted-foreground"
+                                }
+                              >
+                                {m.statusLabel}
+                              </span>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     )}
                     <div className="mt-1.5">

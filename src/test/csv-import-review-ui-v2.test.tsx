@@ -61,7 +61,7 @@ describe("CSV Import Review UI v2", () => {
       const radio = screen.getByTestId("csv-gate-attach-existing") as HTMLInputElement;
       expect(radio.disabled).toBe(true);
       expect(screen.getByTestId("csv-gate-attach-existing-disabled-copy")).toHaveTextContent(
-        /Existing diary entry selection will be enabled/,
+        /Existing diary entry attach is not available in preview mode/,
       );
     });
 

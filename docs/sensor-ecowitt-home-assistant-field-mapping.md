@@ -16,6 +16,31 @@
 
 ---
 
+## In-app preview: Ingest Normalizer
+
+Verdant ships an in-app debug screen for inspecting how a payload would
+be normalized **without sending it anywhere**:
+
+- **Route:** `/sensors/ingest-normalizer`
+- **Page name:** Ingest Normalizer
+- **Purpose:** Read-only payload preview / debug tool. Paste a JSON
+  payload, click Parse, and see the canonical source, vendor lineage,
+  accepted / skipped / rejected fields, and any ignored unsafe fields.
+- **No network calls.** The screen runs entirely in the browser.
+- **No ingest / write behavior.** Nothing is sent to the backend, no
+  edge function is invoked, and no row is written.
+- **No endpoints created.** This screen does not add a new ingest
+  endpoint; the only ingest endpoint remains `sensor-ingest-webhook`.
+- **Vendor is lineage-only.** The previewed `vendor` field is shown for
+  traceability and is never used for auth, ownership, or routing.
+- **Unknown labels fall back to safe display text.** Unrecognised source
+  or vendor strings render as plain text and are not trusted for auth.
+
+The previous internal slug for this screen is no longer used — always
+link to `/sensors/ingest-normalizer`.
+
+---
+
 ## 1. Endpoint, auth, idempotency
 
 All bridges (EcoWitt-over-MQTT, Home Assistant, generic MQTT) post to the

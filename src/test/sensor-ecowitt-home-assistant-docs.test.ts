@@ -72,4 +72,19 @@ describe("sensor-ecowitt-home-assistant-field-mapping.md", () => {
     expect(doc).not.toMatch(/vbt_[A-Za-z0-9]{24,}/);
     expect(doc).not.toMatch(/service_role\s*[:=]\s*['"]/);
   });
+
+  it("references the in-app Ingest Normalizer route", () => {
+    expect(doc).toContain("/sensors/ingest-normalizer");
+    expect(doc).toContain("Ingest Normalizer");
+  });
+
+  it("describes the Ingest Normalizer as read-only and not an endpoint", () => {
+    expect(lower).toMatch(/read-only|no network calls/);
+    expect(lower).toMatch(/no ingest \/ write behavior|no.*write behavior/);
+    expect(lower).toMatch(/no endpoints? (created|added)|does not add a new ingest endpoint/);
+  });
+
+  it("does not reference the old /sensors/webhook-normalizer route", () => {
+    expect(doc).not.toContain("/sensors/webhook-normalizer");
+  });
 });

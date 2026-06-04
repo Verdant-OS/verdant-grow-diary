@@ -70,7 +70,7 @@ export default function SensorsIngestNormalizer() {
   return (
     <div className="container mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
       <PageHeader
-        title="Webhook Normalization Debug"
+        title="Ingest Normalizer"
         description="Paste a sensor ingest JSON payload to see how Verdant would normalize it. This screen is read-only: nothing is sent, stored, or ingested."
       />
 
@@ -86,7 +86,8 @@ export default function SensorsIngestNormalizer() {
         </h2>
         <p className="mb-3 text-xs text-muted-foreground">
           This tool runs entirely in your browser. It never sends network
-          requests, never calls the backend, and never writes any data.
+          requests, never calls the backend, and never writes any data. No
+          new endpoint is created by this screen.
         </p>
 
         <div className="mb-3 flex flex-wrap gap-2" data-testid="webhook-normalizer-examples">
@@ -148,6 +149,15 @@ export default function SensorsIngestNormalizer() {
         </div>
       ) : null}
 
+      {state.kind === "idle" ? (
+        <div
+          data-testid="webhook-normalizer-empty-state"
+          className="rounded-lg border border-dashed border-border bg-card/50 p-6 text-center text-sm text-muted-foreground"
+        >
+          Paste a payload and run normalization to preview the result.
+        </div>
+      ) : null}
+
       {state.kind === "ok" && state.explanation ? (
         <NormalizationResult explanation={state.explanation} />
       ) : null}
@@ -162,10 +172,20 @@ function NormalizationResult({
 }) {
   return (
     <section
-      aria-label="Normalization result"
+      aria-labelledby="webhook-normalizer-results-heading"
       data-testid="webhook-normalizer-result"
       className="space-y-4"
     >
+      <div className="flex items-center justify-between">
+        <h2
+          id="webhook-normalizer-results-heading"
+          className="text-base font-semibold"
+          data-testid="webhook-normalizer-results-heading"
+        >
+          Normalization Results
+        </h2>
+      </div>
+
       <div
         className="rounded-lg border border-border bg-card p-4"
         data-testid="webhook-normalizer-disclaimer"
@@ -177,51 +197,61 @@ function NormalizationResult({
         </p>
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-4">
+      <div
+        className="rounded-lg border border-border bg-card p-4"
+        data-testid="webhook-normalizer-source-vendor"
+      >
         <h3 className="mb-2 text-sm font-semibold">Source &amp; vendor lineage</h3>
         <SensorSourceLineageLine
           source={(explanation.source.canonical as string) ?? "unknown"}
           vendor={explanation.vendor.canonical}
         />
-        <dl className="mt-2 grid grid-cols-1 gap-1 text-xs text-muted-foreground">
-          <div>
-            <dt className="inline font-medium text-foreground">Raw source:</dt>{" "}
-            <dd
-              className="inline"
-              data-testid="webhook-normalizer-source-raw"
-            >
-              {String(explanation.source.raw ?? "—")}
-            </dd>
-          </div>
-          <div>
-            <dt className="inline font-medium text-foreground">Canonical source:</dt>{" "}
-            <dd
-              className="inline"
-              data-testid="webhook-normalizer-source-canonical"
-            >
-              {explanation.source.canonical ?? "—"}
-            </dd>
-          </div>
-          {explanation.source.reason ? (
-            <div
-              className="text-destructive"
-              data-testid="webhook-normalizer-source-reason"
-            >
-              {explanation.source.reason}
+        <dl className="mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+          <div
+            className="rounded border border-border/60 bg-muted/30 p-2"
+            data-testid="webhook-normalizer-source-beforeafter"
+          >
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              Raw source → Normalized
             </div>
-          ) : null}
-          <div>
-            <dt className="inline font-medium text-foreground">Vendor lineage:</dt>{" "}
-            <dd
-              className="inline"
-              data-testid="webhook-normalizer-vendor-canonical"
-            >
-              {explanation.vendor.canonical ?? "—"}
-            </dd>{" "}
-            <span className="opacity-70">(lineage only — never used for auth)</span>
+            <div className="mt-1 font-mono">
+              <span data-testid="webhook-normalizer-source-raw">
+                {String(explanation.source.raw ?? "—")}
+              </span>
+              <span aria-hidden className="mx-1 opacity-60">→</span>
+              <span data-testid="webhook-normalizer-source-canonical">
+                {explanation.source.canonical ?? "—"}
+              </span>
+            </div>
+            {explanation.source.reason ? (
+              <div
+                className="mt-1 text-destructive"
+                data-testid="webhook-normalizer-source-reason"
+              >
+                {explanation.source.reason}
+              </div>
+            ) : null}
+          </div>
+          <div
+            className="rounded border border-border/60 bg-muted/30 p-2"
+            data-testid="webhook-normalizer-vendor-beforeafter"
+          >
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              Raw vendor → Lineage (never used for auth)
+            </div>
+            <div className="mt-1 font-mono">
+              <span data-testid="webhook-normalizer-vendor-raw">
+                {String(explanation.vendor.raw ?? "—")}
+              </span>
+              <span aria-hidden className="mx-1 opacity-60">→</span>
+              <span data-testid="webhook-normalizer-vendor-canonical">
+                {explanation.vendor.canonical ?? "—"}
+              </span>
+            </div>
           </div>
         </dl>
       </div>
+
 
       <FieldList
         title="Accepted fields"
@@ -273,10 +303,23 @@ function NormalizationResult({
       {explanation.warnings.length > 0 ? (
         <div
           className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm"
-          data-testid="webhook-normalizer-warnings"
+          data-testid="webhook-normalizer-ignored-unsafe-fields"
         >
-          <h3 className="mb-2 text-sm font-semibold">Warnings</h3>
-          <ul className="list-disc space-y-1 pl-5 text-xs">
+          <h3 className="mb-2 text-sm font-semibold">
+            Ignored unsafe fields{" "}
+            <span className="text-xs font-normal text-muted-foreground">
+              (not trusted — never used for auth, ownership, or routing)
+            </span>
+          </h3>
+          <p className="mb-2 text-xs text-muted-foreground">
+            These keys were present in the payload but the server treats
+            them as untrusted. They are stripped from{" "}
+            <code>raw_payload</code> and never used to set the row owner.
+          </p>
+          <ul
+            className="list-disc space-y-1 pl-5 text-xs"
+            data-testid="webhook-normalizer-warnings"
+          >
             {explanation.warnings.map((w, idx) => (
               <li key={`${w}-${idx}`}>{w}</li>
             ))}

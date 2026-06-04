@@ -414,4 +414,8 @@ describe("Plant Detail photo strip — static safety", () => {
   it("page wires the photo strip in", () => {
     expect(PAGE).toMatch(/PlantDetailPhotoStrip/);
   });
+
+  it("page passes an onUploadPhoto handler that opens the plant Quick Log (no /logs nav)", () => {
+    expect(PAGE).toMatch(/onUploadPhoto\s*=\s*\{[^}]*setQuickLogOpen\(true\)/);
+  });
 });

@@ -1,8 +1,27 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Check, Minus, Sparkles, ShieldCheck, Database, Cpu } from "lucide-react";
+import {
+  Check,
+  Minus,
+  Sparkles,
+  ShieldCheck,
+  Database,
+  Cpu,
+  Leaf,
+  Info,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import BrandLogo from "@/components/BrandLogo";
+import PricingCard from "@/components/pricing/PricingCard";
+import {
+  PRICING,
+  AI_CREDIT_EXPLAINER,
+  TRUST_STRIP,
+  PRO_MONTHLY_PRICE_USD,
+  PRO_ANNUAL_PRICE_USD,
+  FOUNDER_LIFETIME_PRICE_USD,
+  FOUNDER_LIFETIME_LIMIT,
+} from "@/constants/pricing";
 import {
   Accordion,
   AccordionContent,
@@ -11,18 +30,7 @@ import {
 } from "@/components/ui/accordion";
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
 
-/**
- * Public pricing page for Verdant Pro and the Founder Lifetime Deal.
- *
- * Marketing-only. Does NOT query any private grow/plant/tent/sensor/alert
- * data and does not call ai-coach. Checkout is intentionally stubbed to
- * placeholder /billing routes until payments are wired.
- */
-
-const FOUNDER_LIFETIME_LIMIT = 75;
-const FOUNDER_LIFETIME_PRICE_USD = 129;
-const PRO_MONTHLY_PRICE_USD = 12;
-const PRO_ANNUAL_PRICE_USD = 115;
+type BillingPeriod = "monthly" | "annual";
 
 type Cell = boolean | string;
 type Row = { label: string; free: Cell; pro: Cell; founder: Cell };
@@ -34,7 +42,7 @@ const COMPARISON_ROWS: Row[] = [
     pro: "Active growers who want sync, history & exports",
     founder: "Early supporters who want lifetime Pro access",
   },
-  { label: "Price", free: "$0", pro: "$12 / month", founder: "$129 one-time" },
+  { label: "Price", free: "$0", pro: "See toggle above", founder: "$129 one-time" },
   { label: "Plant profiles & grow diary", free: true, pro: true, founder: true },
   { label: "Photo logs", free: true, pro: true, founder: true },
   { label: "Manual sensor snapshots", free: true, pro: true, founder: true },
@@ -50,9 +58,21 @@ const COMPARISON_ROWS: Row[] = [
 ];
 
 export default function Pricing() {
+  const [billing, setBilling] = useState<BillingPeriod>("annual");
+
   useEffect(() => {
     trackPricingEvent("pricing_page_view");
   }, []);
+
+  const proPrice =
+    billing === "annual"
+      ? `$${PRO_ANNUAL_PRICE_USD}`
+      : `$${PRO_MONTHLY_PRICE_USD}`;
+  const proCadence = billing === "annual" ? "/ year" : "/ month";
+  const proFootnote =
+    billing === "annual"
+      ? `~${PRICING.pro.annualSavingsPercent}% savings vs. monthly`
+      : `Or $${PRO_ANNUAL_PRICE_USD}/year — save ~${PRICING.pro.annualSavingsPercent}%`;
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -81,23 +101,58 @@ export default function Pricing() {
         </p>
       </section>
 
+      {/* Billing toggle */}
+      <section className="px-6 pb-8 max-w-6xl mx-auto flex items-center justify-center gap-3">
+        <span
+          className={[
+            "text-sm font-medium",
+            billing === "monthly" ? "text-foreground" : "text-muted-foreground",
+          ].join(" ")}
+        >
+          Monthly
+        </span>
+        <button
+          data-testid="billing-toggle"
+          type="button"
+          role="switch"
+          aria-checked={billing === "annual"}
+          onClick={() =>
+            setBilling((prev) => {
+              const next = prev === "annual" ? "monthly" : "annual";
+              trackPricingEvent("pricing_billing_toggle", { period: next });
+              return next;
+            })
+          }
+          className="relative inline-flex h-7 w-12 items-center rounded-full border border-border/60 bg-secondary transition-colors"
+        >
+          <span
+            className={[
+              "inline-block h-5 w-5 rounded-full bg-primary transition-transform",
+              billing === "annual" ? "translate-x-6" : "translate-x-1",
+            ].join(" ")}
+          />
+        </button>
+        <span
+          className={[
+            "text-sm font-medium",
+            billing === "annual" ? "text-foreground" : "text-muted-foreground",
+          ].join(" ")}
+        >
+          Annual
+        </span>
+      </section>
+
       {/* Pricing tier cards */}
       <section className="px-6 pb-10 max-w-6xl mx-auto grid gap-8 md:gap-6 md:grid-cols-3">
         {/* Free */}
-        <TierCard
-          name="Free"
-          price="$0"
-          cadence="/ month"
-          description="Start free. Build your grow diary and see if Verdant fits your workflow."
-          bullets={[
-            "Plant profiles",
-            "Basic grow diary",
-            "Photo logs",
-            "Manual notes",
-            "Basic timeline",
-            "Limited exports",
-            "Manual sensor entries",
-          ]}
+        <PricingCard
+          testId="pricing-card-free"
+          name={PRICING.free.name}
+          subtitle={PRICING.free.subtitle}
+          price={`$${PRICING.free.price}`}
+          cadence={` / ${PRICING.free.cadence}`}
+          description={PRICING.free.description}
+          features={PRICING.free.features}
           cta={
             <Link to="/auth" className="block">
               <Button
@@ -113,67 +168,51 @@ export default function Pricing() {
         />
 
         {/* Pro */}
-        <TierCard
-          name="Pro"
-          price={`$${PRO_MONTHLY_PRICE_USD}`}
-          cadence="/ month"
+        <PricingCard
+          testId="pricing-card-pro"
+          name={PRICING.pro.name}
+          subtitle={PRICING.pro.subtitle}
+          price={proPrice}
+          cadence={proCadence}
+          description={PRICING.pro.description}
+          features={PRICING.pro.features}
           highlighted
-          badge="Most popular"
-          description="Upgrade when Verdant becomes your real grow memory system."
-          bullets={[
-            "Everything in Free",
-            "Cloud sync",
-            "Automatic backups",
-            "Multi-tent support",
-            "Advanced exports",
-            "Sensor snapshot history",
-            "Longer grow history",
-            "Better timeline filtering",
-            "Priority support",
-            "Early access to advanced grow reports",
-            "Future Pro AI features as they stabilize",
-          ]}
-          footnote={`Or $${PRO_ANNUAL_PRICE_USD}/year — save vs. monthly.`}
+          badge={PRICING.pro.badge}
+          footnote={proFootnote}
           cta={
-            <div className="flex flex-col gap-2">
-              <Link to="/billing/pro-monthly" className="block">
-                <Button
-                  size="lg"
-                  className="w-full"
-                  onClick={() => trackPricingEvent("pricing_cta_pro_monthly_clicked")}
-                >
-                  Upgrade to Pro — ${PRO_MONTHLY_PRICE_USD}/mo
-                </Button>
-              </Link>
-              <Link to="/billing/pro-annual" className="block">
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => trackPricingEvent("pricing_cta_pro_annual_clicked")}
-                >
-                  Go annual — ${PRO_ANNUAL_PRICE_USD}/year
-                </Button>
-              </Link>
-            </div>
+            <Link
+              to={billing === "annual" ? "/billing/pro-annual" : "/billing/pro-monthly"}
+              className="block"
+            >
+              <Button
+                size="lg"
+                className="w-full"
+                onClick={() =>
+                  trackPricingEvent(
+                    billing === "annual"
+                      ? "pricing_cta_pro_annual_clicked"
+                      : "pricing_cta_pro_monthly_clicked",
+                  )
+                }
+              >
+                Upgrade to Pro — {proPrice}
+                {proCadence}
+              </Button>
+            </Link>
           }
         />
 
         {/* Founder Lifetime Offer */}
-        <TierCard
-          name="Founder Lifetime Offer"
-          price={`$${FOUNDER_LIFETIME_PRICE_USD}`}
-          cadence="one-time"
-          founder
-          badge={`First ${FOUNDER_LIFETIME_LIMIT} growers`}
-          description="A limited early-supporter offer. Pay once and get full Pro access for the life of the product."
-          bullets={[
-            "Includes full Pro access — no monthly fee",
-            "Lock in Pro at today's price",
-            "Founder badge on your profile",
-            "Direct line to the founder for feedback",
-            "Early access to new Pro features",
-          ]}
+        <PricingCard
+          testId="pricing-card-founder"
+          name={PRICING.founder.name}
+          subtitle={PRICING.founder.subtitle}
+          price={`$${PRICING.founder.price}`}
+          cadence={` ${PRICING.founder.cadence}`}
+          description={PRICING.founder.description}
+          features={PRICING.founder.features}
+          badge={PRICING.founder.badge}
+          footnote={`Limited to the first ${PRICING.founder.limit} early supporters. When they're claimed, this offer ends.`}
           cta={
             <Link to="/billing/founder-lifetime" className="block">
               <Button
@@ -183,12 +222,51 @@ export default function Pricing() {
                   trackPricingEvent("pricing_cta_founder_lifetime_clicked")
                 }
               >
-                Claim Founder Lifetime — ${FOUNDER_LIFETIME_PRICE_USD}
+                Claim Founder Lifetime — ${PRICING.founder.price}
               </Button>
             </Link>
           }
-          footnote={`Limited to the first ${FOUNDER_LIFETIME_LIMIT} early supporters. When they're claimed, this offer ends.`}
         />
+      </section>
+
+      {/* AI Credit explainer */}
+      <section className="px-6 pb-12 max-w-4xl mx-auto">
+        <div className="rounded-2xl border border-border/60 bg-card/30 backdrop-blur p-6 md:p-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Info className="h-4 w-4 text-primary" />
+            <h3 className="font-display text-lg font-semibold">{AI_CREDIT_EXPLAINER.title}</h3>
+          </div>
+          <ul className="space-y-2 text-sm text-muted-foreground">
+            {AI_CREDIT_EXPLAINER.points.map((p) => (
+              <li key={p} className="flex items-start gap-2">
+                <Leaf className="h-3.5 w-3.5 mt-0.5 text-primary/70 shrink-0" />
+                <span>{p}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 text-xs text-muted-foreground italic">
+            {AI_CREDIT_EXPLAINER.note}
+          </p>
+        </div>
+      </section>
+
+      {/* Trust strip */}
+      <section className="px-6 pb-10 max-w-5xl mx-auto">
+        <div
+          data-testid="pricing-trust-strip"
+          className="rounded-xl border border-border/50 bg-card/30 backdrop-blur px-4 py-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground"
+        >
+          <span className="font-semibold text-foreground uppercase tracking-wider">
+            {TRUST_STRIP.label}
+          </span>
+          <span className="hidden sm:inline text-border">|</span>
+          {TRUST_STRIP.items.map((item) => (
+            <span key={item} className="inline-flex items-center gap-1">
+              <Check className="h-3 w-3 text-primary" />
+              {item}
+            </span>
+          ))}
+        </div>
       </section>
 
       {/* Founder Lifetime highlight band */}
@@ -393,85 +471,11 @@ export default function Pricing() {
             verdantgrowdiary.com
           </a>
         </p>
+        <p className="mt-1">
+          Software only. We do not sell cannabis, seeds, or cultivation equipment.
+        </p>
       </footer>
     </main>
-  );
-}
-
-interface TierCardProps {
-  name: string;
-  price: string;
-  cadence: string;
-  description: string;
-  bullets: string[];
-  cta: React.ReactNode;
-  highlighted?: boolean;
-  founder?: boolean;
-  badge?: string;
-  footnote?: string;
-}
-
-function TierCard({
-  name,
-  price,
-  cadence,
-  description,
-  bullets,
-  cta,
-  highlighted,
-  founder,
-  badge,
-  footnote,
-}: TierCardProps) {
-  const [open, setOpen] = useState(false);
-  void open;
-  void setOpen;
-  return (
-    <div
-      className={[
-        "relative rounded-2xl border p-6 flex flex-col bg-card/40 backdrop-blur",
-        founder
-          ? "border-primary/60 ring-1 ring-primary/40 shadow-lg"
-          : highlighted
-            ? "border-primary/40 shadow-md"
-            : "border-border/60",
-      ].join(" ")}
-    >
-      {badge && (
-        <span
-          className={[
-            "absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 text-xs rounded-full",
-            founder
-              ? "bg-primary text-primary-foreground"
-              : "bg-primary/15 text-primary",
-          ].join(" ")}
-        >
-          {badge}
-        </span>
-      )}
-
-      <h3 className="font-display text-xl font-semibold">{name}</h3>
-      <p className="mt-2 text-sm text-muted-foreground min-h-[2.5rem]">{description}</p>
-      <div className="mt-4 flex items-baseline gap-1">
-        <span className="text-3xl md:text-4xl font-display font-bold">{price}</span>
-        <span className="text-sm text-muted-foreground">{cadence}</span>
-      </div>
-
-      <ul className="mt-5 space-y-2 text-sm flex-1">
-        {bullets.map((b) => (
-          <li key={b} className="flex items-start gap-2">
-            <Check className="h-4 w-4 mt-0.5 text-primary shrink-0" />
-            <span>{b}</span>
-          </li>
-        ))}
-      </ul>
-
-      {footnote && (
-        <p className="mt-4 text-xs text-muted-foreground">{footnote}</p>
-      )}
-
-      <div className="mt-6">{cta}</div>
-    </div>
   );
 }
 

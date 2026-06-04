@@ -26,6 +26,10 @@ const EDGE_SRC = readFileSync(
   resolve(process.cwd(), "supabase/functions/ecowitt-ingest/index.ts"),
   "utf8",
 );
+/** Edge function source with // line comments and /* block *​/ comments stripped, for code-only scans. */
+const EDGE_CODE = EDGE_SRC
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 
 const USER = "uuuuuuuu-uuuu-uuuu-uuuu-uuuuuuuuuuuu";
 const NOW = "2026-06-04T21:00:00.000Z";

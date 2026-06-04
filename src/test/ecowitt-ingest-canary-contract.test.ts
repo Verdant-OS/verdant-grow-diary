@@ -229,7 +229,7 @@ describe("(5) static safety — edge source scan", () => {
   });
 
   it("never calls AI / model / automation / device-control verbs", () => {
-    const lower = EDGE_SRC.toLowerCase();
+    const lower = EDGE_CODE.toLowerCase();
     for (const forbidden of [
       "ai_doctor",
       "openai",

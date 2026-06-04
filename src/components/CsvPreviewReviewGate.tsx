@@ -46,8 +46,6 @@ const CONFIRM_COPY =
   "I confirm this is my data and understand this import is not live data.";
 const FUTURE_FLOW_COPY =
   "Import requires review and will be enabled in a separate approval-required flow.";
-const EXISTING_DIARY_DISABLED_COPY =
-  "Existing diary entry selection will be enabled with the reviewed import flow.";
 const SAMPLE_ONLY_COPY = "Sample only. Nothing has been saved.";
 
 interface BuiltPlan {
@@ -166,6 +164,9 @@ export function CsvPreviewReviewGate({
   const [confirmed, setConfirmed] = useState(false);
   const [showSensorSample, setShowSensorSample] = useState(false);
   const [attachMode, setAttachMode] = useState<"new" | "existing">("new");
+  const [expandedBlockedReasons, setExpandedBlockedReasons] = useState<Record<string, boolean>>({});
+  const toggleBlockedReason = (r: string) =>
+    setExpandedBlockedReasons((p) => ({ ...p, [r]: !p[r] }));
 
   // Stable clock per mount unless caller injects one (tests/exports).
   const [mountedNow] = useState<Date>(() => now ?? new Date());
@@ -324,7 +325,10 @@ export function CsvPreviewReviewGate({
           <div data-testid="csv-import-plan-blocked-reasons">
             <div className="font-semibold mb-1">Blocked rows by reason</div>
             {Object.keys(blockedReasonCounts).length === 0 ? (
-              <div className="text-muted-foreground">No blocked rows.</div>
+              <div className="text-muted-foreground space-y-0.5" data-testid="csv-import-plan-blocked-empty">
+                <div>No blocked rows detected.</div>
+                <div>Verdant still requires review before any future import.</div>
+              </div>
             ) : (
               <ul className="flex flex-wrap gap-1">
                 {Object.entries(blockedReasonCounts).map(([reason, n]) => (
@@ -336,44 +340,62 @@ export function CsvPreviewReviewGate({
             )}
           </div>
 
-          {/* Why rows were blocked: explanations + capped samples */}
+          {/* Why rows were blocked: explanations + per-group expand/collapse */}
           {blockedGroups.length > 0 && (
             <div data-testid="csv-import-plan-blocked-explanations" className="space-y-2">
               <div className="font-semibold">Why rows were blocked</div>
-              {blockedGroups.map((g) => (
-                <div
-                  key={g.reason}
-                  data-testid={`csv-import-plan-blocked-group-${g.reason}`}
-                  className="rounded border border-border/60 bg-muted/20 p-2 space-y-1"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{g.title}</span>
-                    <Badge variant="outline" data-testid={`csv-import-plan-blocked-count-${g.reason}`}>{g.count}</Badge>
+              {blockedGroups.map((g) => {
+                const expanded = !!expandedBlockedReasons[g.reason];
+                return (
+                  <div
+                    key={g.reason}
+                    data-testid={`csv-import-plan-blocked-group-${g.reason}`}
+                    data-expanded={expanded ? "true" : "false"}
+                    className="rounded border border-border/60 bg-muted/20 p-2 space-y-1"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{g.title}</span>
+                        <Badge variant="outline" data-testid={`csv-import-plan-blocked-count-${g.reason}`}>{g.count}</Badge>
+                      </div>
+                      {g.samples.length > 0 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          data-testid={`csv-import-plan-blocked-toggle-${g.reason}`}
+                          onClick={() => toggleBlockedReason(g.reason)}
+                        >
+                          {expanded ? "Hide sample rows" : "Show sample rows"}
+                        </Button>
+                      )}
+                    </div>
+                    <div className="text-muted-foreground">{g.explanation}</div>
+                    <div data-testid={`csv-import-plan-blocked-fix-${g.reason}`}>
+                      <span className="font-medium">Fix: </span>{g.fix}
+                    </div>
+                    {expanded && g.samples.length > 0 && (
+                      <ul
+                        data-testid={`csv-import-plan-blocked-samples-${g.reason}`}
+                        data-sample-count={Math.min(g.samples.length, BLOCKED_SAMPLE_PER_REASON_MAX)}
+                        className="list-disc pl-5"
+                      >
+                        {g.samples.slice(0, BLOCKED_SAMPLE_PER_REASON_MAX).map((s, i) => (
+                          <li key={i}>
+                            row {s.rowIndex + 1}
+                            {s.header ? ` · column "${s.header}"` : ""}
+                            {s.attemptedMetric ? ` · ${s.attemptedMetric}` : ""}
+                            {s.rawValue !== undefined ? ` · raw=${String(s.rawValue).slice(0, 40)}` : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
-                  <div className="text-muted-foreground">{g.explanation}</div>
-                  <div data-testid={`csv-import-plan-blocked-fix-${g.reason}`}>
-                    <span className="font-medium">Fix: </span>{g.fix}
-                  </div>
-                  {g.samples.length > 0 && (
-                    <ul
-                      data-testid={`csv-import-plan-blocked-samples-${g.reason}`}
-                      data-sample-count={g.samples.length}
-                      className="list-disc pl-5"
-                    >
-                      {g.samples.slice(0, BLOCKED_SAMPLE_PER_REASON_MAX).map((s, i) => (
-                        <li key={i}>
-                          row {s.rowIndex + 1}
-                          {s.header ? ` · column "${s.header}"` : ""}
-                          {s.attemptedMetric ? ` · ${s.attemptedMetric}` : ""}
-                          {s.rawValue !== undefined ? ` · raw=${String(s.rawValue).slice(0, 40)}` : ""}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
+
 
           {/* Diary summary draft target controls */}
           <div data-testid="csv-import-plan-diary-summary" className="space-y-2">
@@ -415,12 +437,14 @@ export function CsvPreviewReviewGate({
                     Attach to existing diary entry
                   </label>
                   {!hasExistingEntries && (
-                    <span
+                    <div
                       data-testid="csv-gate-attach-existing-disabled-copy"
-                      className="text-muted-foreground"
+                      className="text-muted-foreground space-y-0.5"
                     >
-                      {EXISTING_DIARY_DISABLED_COPY}
-                    </span>
+                      <div>Existing diary entry attach is not available in preview mode.</div>
+                      <div>For now, Verdant shows the single diary summary draft that would be created later.</div>
+                      <div>No diary entry is created from this screen.</div>
+                    </div>
                   )}
                 </div>
               </div>
@@ -466,7 +490,13 @@ export function CsvPreviewReviewGate({
                 {showSensorSample ? "Hide sample sensor write drafts" : "Show sample sensor write drafts"}
               </Button>
             </div>
-            {!showSensorSample ? (
+            {sensorSample.length === 0 ? (
+              <div className="text-muted-foreground space-y-0.5" data-testid="csv-gate-sensor-sample-empty">
+                <div>No accepted sensor write drafts to preview.</div>
+                <div>Fix mappings or blocked rows first, then this section will show a capped sample.</div>
+                <div>Nothing has been saved.</div>
+              </div>
+            ) : !showSensorSample ? (
               <div className="text-muted-foreground" data-testid="csv-gate-sensor-sample-collapsed">
                 {plan.acceptedWrites.length} draft{plan.acceptedWrites.length === 1 ? "" : "s"} would be created. Grouped counts shown above.
               </div>

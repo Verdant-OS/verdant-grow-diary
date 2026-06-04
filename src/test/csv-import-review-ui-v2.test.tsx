@@ -61,7 +61,7 @@ describe("CSV Import Review UI v2", () => {
       const radio = screen.getByTestId("csv-gate-attach-existing") as HTMLInputElement;
       expect(radio.disabled).toBe(true);
       expect(screen.getByTestId("csv-gate-attach-existing-disabled-copy")).toHaveTextContent(
-        /Existing diary entry selection will be enabled/,
+        /Existing diary entry attach is not available in preview mode/,
       );
     });
 
@@ -115,16 +115,29 @@ describe("CSV Import Review UI v2", () => {
   });
 
   describe("blocked-row details by reason group", () => {
-    it("renders groups with count, fix, and capped samples (≤3 per group)", () => {
+    it("renders groups with count + fix; samples appear only after expand and stay capped at ≤3", () => {
       render(
         <CsvPreviewReviewGate previewResult={parse(CSV_BAD)} hasHardBlockedRows={false} hasAcceptedRows now={FIXED_NOW} />,
       );
       const group = screen.getByTestId("csv-import-plan-blocked-group-unparseable_captured_at");
       expect(group).toBeInTheDocument();
+      expect(group.getAttribute("data-expanded")).toBe("false");
       expect(within(group).getByTestId("csv-import-plan-blocked-count-unparseable_captured_at")).toHaveTextContent("4");
       expect(within(group).getByTestId("csv-import-plan-blocked-fix-unparseable_captured_at")).toHaveTextContent(/ISO-8601/);
+      expect(
+        within(group).queryByTestId("csv-import-plan-blocked-samples-unparseable_captured_at"),
+      ).not.toBeInTheDocument();
+      fireEvent.click(within(group).getByTestId("csv-import-plan-blocked-toggle-unparseable_captured_at"));
       const samples = within(group).getByTestId("csv-import-plan-blocked-samples-unparseable_captured_at");
       expect(Number(samples.getAttribute("data-sample-count"))).toBeLessThanOrEqual(3);
+      // Expanding one group should not expand another
+      const otherGroup = screen.getByTestId("csv-import-plan-blocked-group-captured_at_before_2020");
+      expect(otherGroup.getAttribute("data-expanded")).toBe("false");
+      // Hide again
+      fireEvent.click(within(group).getByTestId("csv-import-plan-blocked-toggle-unparseable_captured_at"));
+      expect(
+        within(group).queryByTestId("csv-import-plan-blocked-samples-unparseable_captured_at"),
+      ).not.toBeInTheDocument();
     });
 
     it("renders explanations for old-date group", () => {

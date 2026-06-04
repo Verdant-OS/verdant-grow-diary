@@ -227,10 +227,21 @@ export function groupBlockedRowsByReason(
 // ---------------------------------------------------------------------------
 
 export interface BuildCsvImportPlanReportOptions {
-  generatedAt: string;
+  /** Either a fixed ISO string, a Date, or a clock function returning Date. */
+  generatedAt?: string | Date | (() => Date);
+  /** Alias for generatedAt as a clock function. Either works. */
+  now?: Date | (() => Date);
   sensorSampleLimit?: number;
   blockedSamplePerReasonLimit?: number;
   blockedRowContext?: ReadonlyMap<number, BlockedRowContext>;
+}
+
+function resolveGeneratedAt(opts: BuildCsvImportPlanReportOptions | undefined): string {
+  const src = opts?.generatedAt ?? opts?.now;
+  if (typeof src === "string") return src;
+  if (src instanceof Date) return src.toISOString();
+  if (typeof src === "function") return src().toISOString();
+  return new Date().toISOString();
 }
 
 export interface CsvImportPlanReport {
@@ -267,16 +278,17 @@ export interface CsvImportPlanReport {
 export function buildCsvImportPlanReport(
   plan: CsvImportPlan,
   meta: { fileName: string | null; sourceType: "csv" | "tsv" | null },
-  opts: BuildCsvImportPlanReportOptions,
+  opts?: BuildCsvImportPlanReportOptions,
 ): CsvImportPlanReport {
+  const generatedAt = resolveGeneratedAt(opts);
   const sensorSample = buildSensorDraftSample(
     plan.acceptedWrites,
-    opts.sensorSampleLimit ?? SENSOR_SAMPLE_MAX,
+    opts?.sensorSampleLimit ?? SENSOR_SAMPLE_MAX,
   );
   const blockedGroups = groupBlockedRowsByReason(
     plan.blockedRows,
-    opts.blockedRowContext,
-    opts.blockedSamplePerReasonLimit ?? BLOCKED_SAMPLE_PER_REASON_MAX,
+    opts?.blockedRowContext,
+    opts?.blockedSamplePerReasonLimit ?? BLOCKED_SAMPLE_PER_REASON_MAX,
   );
   const hardBlocks = plan.hardBlockReasons.map((r) => {
     const exp = HARD_BLOCK_EXPLANATIONS[r];
@@ -289,7 +301,7 @@ export function buildCsvImportPlanReport(
   return {
     reportVersion: CSV_IMPORT_PLAN_REPORT_VERSION,
     statusLabel: CSV_IMPORT_PLAN_STATUS_LABEL,
-    generatedAt: opts.generatedAt,
+    generatedAt,
     fileName: meta.fileName,
     sourceType: meta.sourceType,
     ok: plan.ok,

@@ -308,7 +308,29 @@ export default function Dashboard() {
       {tents.length === 0 ? (
         <DashboardZeroTentEmptyState />
       ) : (
-        <div className="grid lg:grid-cols-3 gap-4 mb-6">
+        <section
+          aria-labelledby="dashboard-environment-snapshot-heading"
+          data-testid="dashboard-environment-snapshot"
+          className="mb-6"
+        >
+          <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+            <div>
+              <h2
+                id="dashboard-environment-snapshot-heading"
+                className="font-display font-semibold text-base"
+              >
+                Environment Snapshot
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Latest reading per tent with honest source labels. Add a manual reading or connect Ecowitt to see your environment here.
+              </p>
+            </div>
+            <Button asChild size="sm" variant="ghost">
+              <Link to="/sensors">Open sensors <ArrowRight className="h-3 w-3" /></Link>
+            </Button>
+          </div>
+        <div className="grid lg:grid-cols-3 gap-4">
+
           <div className="lg:col-span-2 glass rounded-2xl p-4">
             <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap">
@@ -399,7 +421,9 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+        </section>
       )}
+
 
       <div className="grid lg:grid-cols-2 gap-4">
         <div className="glass rounded-2xl p-4">

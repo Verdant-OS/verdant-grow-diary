@@ -51,15 +51,16 @@ describe("Copy renames are applied", () => {
     expect(ACTIONS_PANEL).not.toContain("Assigned Tent Action Queue");
   });
 
-  it("Sidebar surfaces 'Live Dashboard' instead of 'Grow-Room Mode'", () => {
-    expect(SIDEBAR).toContain('label: "Live Dashboard"');
+  it("Sidebar no longer surfaces 'Live Dashboard' in primary nav", () => {
+    expect(SIDEBAR).not.toContain('label: "Live Dashboard"');
     expect(SIDEBAR).not.toContain('"Grow-Room Mode"');
   });
 
-  it("Live Dashboard page header reads 'Live Dashboard'", () => {
+  it("Live Dashboard page header (legacy /grow-room route) still reads 'Live Dashboard'", () => {
     expect(GRM_PAGE).toMatch(/title=["']Live Dashboard["']/);
     expect(GRM_PAGE).not.toMatch(/title=["']Grow-Room Mode["']/);
   });
+
 });
 
 describe("Plant Detail status strip surfaces the four key signals", () => {

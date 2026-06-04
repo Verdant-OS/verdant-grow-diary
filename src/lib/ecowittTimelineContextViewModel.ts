@@ -17,6 +17,7 @@
  *    EcoWitt-derived VPD anything other than "Derived VPD". The "live"
  *    canonical source only survives the freshness check; stale rows are
  *    demoted by the snapshot view-model.
+ */
 import {
   buildEcowittSnapshotViewModel,
   type EcowittCandidate,

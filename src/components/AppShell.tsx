@@ -9,6 +9,7 @@ import AppSidebar from "./AppSidebar";
 import MobileNav from "./MobileNav";
 import QuickLog, { type QuickLogPrefill } from "./QuickLog";
 import BrandLogo from "./BrandLogo";
+import GlobalFastAddButton from "./GlobalFastAddButton";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 
 
@@ -61,6 +62,7 @@ export default function AppShell() {
                   <kbd className="hidden lg:inline ml-2 text-[10px] px-1.5 py-0.5 rounded bg-background/60 border border-border/40">⌘K</kbd>
                 </button>
                 
+                <GlobalFastAddButton className="hidden md:inline-flex" />
                 <Button variant="outline" size="sm" onClick={() => { setPrefill(null); setOpenLog(true); }} className="hidden md:inline-flex">
                   <Plus className="h-4 w-4" /> Quick log
                 </Button>

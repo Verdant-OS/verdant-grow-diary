@@ -44,6 +44,7 @@ import PiIngestStatus from "./pages/PiIngestStatus";
 import IngestInspector from "./pages/IngestInspector";
 import NotFound from "./pages/NotFound";
 import RepresentativeCsvPreview from "./pages/RepresentativeCsvPreview";
+import SensorCsvPreview from "./pages/SensorCsvPreview";
 
 
 
@@ -114,6 +115,7 @@ const App = () => (
                 <Route path="/pi-ingest-status" element={<PiIngestStatus />} />
                 <Route path="/ingest-inspector" element={<IngestInspector />} />
                 <Route path="/imports/representative-csv" element={<RepresentativeCsvPreview />} />
+                <Route path="/sensors/csv-preview" element={<SensorCsvPreview />} />
                 {/* Leads is an internal admin/operator module, intentionally not
                     surfaced in grower-facing navigation. Primary route is
                     /admin/leads; /leads is retained as a back-compat alias. */}

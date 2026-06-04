@@ -70,12 +70,24 @@ function DiaryItemRow({ item }: { item: Extract<TimelineMemoryItem, { kind: "dia
       data-testid="timeline-memory-diary-item"
       data-item-key={item.key}
       data-event-type={item.eventType ?? ""}
+      data-stage={item.stage ?? ""}
       className="rounded-lg border border-border/40 bg-card/40 p-3 text-sm"
     >
       <div className="flex items-center justify-between gap-2">
-        <Badge variant="outline" className="text-[10px]">
-          {item.eventType ?? "note"}
-        </Badge>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Badge variant="outline" className="text-[10px]">
+            {item.eventType ?? "note"}
+          </Badge>
+          {item.stage && (
+            <Badge
+              variant="secondary"
+              className="text-[10px]"
+              data-testid="timeline-diary-stage-chip"
+            >
+              {item.stage}
+            </Badge>
+          )}
+        </div>
         <time
           dateTime={item.occurredAt}
           className="text-xs text-muted-foreground"

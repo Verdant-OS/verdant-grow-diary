@@ -1264,9 +1264,18 @@ export default function Dashboard() {
           <section
             className="glass rounded-2xl p-4"
             aria-label="Pending actions"
+            data-testid="dashboard-approval-queue-section"
           >
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="font-display font-semibold">Pending Actions</h2>
+            <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+              <div>
+                <h2 className="font-display font-semibold">Pending Actions</h2>
+                <p
+                  className="text-xs text-muted-foreground"
+                  data-testid="dashboard-approval-queue-subtitle"
+                >
+                  Approval-Required Action Queue · Verdant suggests, you approve.
+                </p>
+              </div>
               <Link
                 to={actionsPath(scopedGrowId)}
                 className="text-xs text-primary hover:underline"
@@ -1274,6 +1283,11 @@ export default function Dashboard() {
                 View all actions →
               </Link>
             </div>
+            <SafeByDesignNotice
+              variant="compact"
+              className="mb-3"
+              testId="dashboard-approval-queue-safe-by-design"
+            />
             {pending.status === "loading" || pending.status === "idle" ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
             ) : pending.status === "unavailable" ? (
@@ -1281,42 +1295,110 @@ export default function Dashboard() {
                 Pending actions unavailable.
               </p>
             ) : pending.items.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No pending actions.
-              </p>
+              <div
+                data-testid="dashboard-approval-queue-empty"
+                className="rounded-lg border border-dashed border-border/60 bg-secondary/10 p-3 text-sm"
+              >
+                <p className="font-medium">{APPROVAL_QUEUE_EMPTY_COPY.title}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {APPROVAL_QUEUE_EMPTY_COPY.hint}
+                </p>
+              </div>
             ) : (
               <ul className="space-y-2">
-                {pending.items.map((a) => (
-                  <li
-                    key={a.id}
-                    className="rounded-lg border border-border/40 bg-secondary/20 p-2 text-sm"
-                  >
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant="outline" className="text-[10px] uppercase">
-                        {a.risk_level} risk
-                      </Badge>
-                      <span className="text-xs font-medium truncate">
-                        {a.suggested_change}
-                      </span>
-                      <span className="ml-auto text-xs text-muted-foreground">
-                        {formatDistanceToNow(new Date(a.created_at), {
-                          addSuffix: true,
-                        })}
-                      </span>
-                    </div>
-                    {a.reason && (
-                      <p className="text-xs mt-1 italic text-muted-foreground">
-                        {a.reason}
-                      </p>
-                    )}
-                    <Link
-                      to={actionDetailPath(a.id)}
-                      className="text-xs text-primary hover:underline"
+                {pending.items.map((a) => {
+                  const severity = mapRiskToSeverity(a.risk_level);
+                  const tentName =
+                    a.tent_id && tents.find((t) => t.id === a.tent_id)?.name;
+                  return (
+                    <li
+                      key={a.id}
+                      data-testid="dashboard-approval-queue-item"
+                      className="rounded-lg border border-border/40 bg-secondary/20 p-3 text-sm"
                     >
-                      View action →
-                    </Link>
-                  </li>
-                ))}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <SeverityBadge severity={severity} />
+                        <Badge variant="outline" className="text-[10px] uppercase">
+                          {a.risk_level} risk
+                        </Badge>
+                        <span className="text-xs font-medium truncate">
+                          {a.suggested_change}
+                        </span>
+                        <span className="ml-auto text-xs text-muted-foreground">
+                          {formatDistanceToNow(new Date(a.created_at), {
+                            addSuffix: true,
+                          })}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex items-center gap-1.5 flex-wrap text-[10px]">
+                        {tentName ? (
+                          <Badge
+                            variant="outline"
+                            className="font-normal"
+                            data-testid="dashboard-approval-queue-item-tent"
+                          >
+                            Tent: {tentName}
+                          </Badge>
+                        ) : null}
+                        {a.source ? (
+                          <Badge
+                            variant="outline"
+                            className="font-normal"
+                            data-testid="dashboard-approval-queue-item-source"
+                          >
+                            Source: {a.source}
+                          </Badge>
+                        ) : null}
+                        <Badge
+                          variant="outline"
+                          className="font-normal"
+                          data-testid="dashboard-approval-queue-item-status"
+                        >
+                          Status: {a.status}
+                        </Badge>
+                      </div>
+                      {a.reason && (
+                        <p className="text-xs mt-2 italic text-muted-foreground">
+                          {a.reason}
+                        </p>
+                      )}
+                      <div className="mt-2 flex items-center gap-2 flex-wrap">
+                        <Button
+                          asChild
+                          size="sm"
+                          className="gradient-leaf text-primary-foreground"
+                          data-testid="dashboard-approval-queue-item-approve"
+                        >
+                          <Link
+                            to={actionDetailPath(a.id)}
+                            aria-label={`Review and approve: ${a.suggested_change}`}
+                            title="Approval-only — no device control is executed"
+                          >
+                            Review &amp; Approve
+                          </Link>
+                        </Button>
+                        <Button
+                          asChild
+                          size="sm"
+                          variant="outline"
+                          data-testid="dashboard-approval-queue-item-dismiss"
+                        >
+                          <Link
+                            to={actionDetailPath(a.id)}
+                            aria-label={`Dismiss: ${a.suggested_change}`}
+                            title="Opens the action detail to record a dismissal"
+                          >
+                            Dismiss
+                          </Link>
+                        </Button>
+                        <span className="text-[10px] text-muted-foreground">
+                          Approving here records your decision. It never sends a
+                          command to fans, lights, pumps, or any equipment.
+                        </span>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>

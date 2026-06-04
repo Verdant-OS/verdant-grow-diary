@@ -125,14 +125,40 @@ export default function GlobalFastAddButton({
           </ul>
 
           {notice ? (
-            <p
-              role="status"
-              aria-live="polite"
-              data-testid="global-fast-add-needs-context"
-              className="px-3 py-2 mt-1 text-xs text-amber-200 border-t border-border/40"
+            <div
+              data-testid="global-fast-add-needs-context-wrap"
+              className="px-3 py-2 mt-1 border-t border-border/40 space-y-2"
             >
-              {notice}
-            </p>
+              <p
+                role="status"
+                aria-live="polite"
+                data-testid="global-fast-add-needs-context"
+                className="text-xs text-amber-200"
+              >
+                {notice}
+              </p>
+              <div className="flex gap-2">
+                {[
+                  { id: "choose_plant", label: "Choose plant", to: "/plants" },
+                  { id: "choose_tent", label: "Choose tent", to: "/tents" },
+                ].map((cta) => (
+                  <button
+                    key={cta.id}
+                    type="button"
+                    data-testid={`global-fast-add-cta-${cta.id}`}
+                    onClick={() => {
+                      if (onNavigate) onNavigate(cta.to);
+                      else navigate(cta.to);
+                      setOpen(false);
+                      setNotice(null);
+                    }}
+                    className="text-xs px-2 py-1 rounded-md border border-border/60 hover:bg-secondary/60"
+                  >
+                    {cta.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           ) : null}
         </div>
       ) : null}

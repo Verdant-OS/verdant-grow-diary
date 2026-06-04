@@ -50,6 +50,11 @@ export interface EcoWittRoutedRawPayload {
   passkey_fingerprint: string;
   /** True for derived rows (VPD). */
   calculated?: true;
+  /**
+   * For derived rows (e.g. vpd_kpa), the lowercased payload keys this row
+   * was computed from. Pure metadata in raw_payload — no schema change.
+   */
+  derived_from?: string[];
 }
 
 export interface EcoWittRoutedRow {

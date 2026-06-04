@@ -34,11 +34,18 @@ function makeSnapshotItem(opts: {
     occurredAt: opts.occurredAt,
     card: {
       id: opts.key,
+      title: "Manual sensor snapshot",
       capturedAt: opts.occurredAt,
       sourceLabel: "Manual",
-      isLive: false,
-      metrics: [],
+      source: "manual",
+      tentId: "tent-1",
+      plantId: null,
+      isTentLevel: true,
+      notes: null,
+      readings: [],
       severity: "ok",
+      warnings: [],
+      errors: [],
     },
   };
 }

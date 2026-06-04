@@ -182,4 +182,22 @@ describe("csvImportPlanReport — report builder", () => {
     expect(a.generatedAt).toBe(b.generatedAt);
     expect(serializeCsvImportPlanReport(a)).toBe(serializeCsvImportPlanReport(b));
   });
+
+  it("accepts an injected clock as Date or function (and report version stays csv_import_plan_v1)", () => {
+    const plan = buildCsvImportPlan(mkInput([rowAt(0)]));
+    const asDate = buildCsvImportPlanReport(plan, { fileName: "a.csv", sourceType: "csv" }, { now: NOW });
+    const asFn = buildCsvImportPlanReport(plan, { fileName: "a.csv", sourceType: "csv" }, { now: () => NOW });
+    expect(asDate.generatedAt).toBe(NOW.toISOString());
+    expect(asFn.generatedAt).toBe(NOW.toISOString());
+    expect(asDate.reportVersion).toBe("csv_import_plan_v1");
+    expect(asFn.reportVersion).toBe("csv_import_plan_v1");
+  });
+
+  it("defaults to current time when no clock is provided and yields a valid ISO string", () => {
+    const plan = buildCsvImportPlan(mkInput([rowAt(0)]));
+    const r = buildCsvImportPlanReport(plan, { fileName: "a.csv", sourceType: "csv" });
+    expect(typeof r.generatedAt).toBe("string");
+    expect(Number.isFinite(new Date(r.generatedAt).getTime())).toBe(true);
+    expect(r.reportVersion).toBe("csv_import_plan_v1");
+  });
 });

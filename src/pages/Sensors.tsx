@@ -26,6 +26,7 @@ const METRICS = [
   { key: "vpd", label: "VPD" },
   { key: "co2", label: "CO₂" },
   { key: "soil", label: "Soil moisture" },
+  { key: "ppfd", label: "PPFD" },
 ] as const;
 
 export default function Sensors() {

@@ -247,7 +247,9 @@ describe("(5) static safety — edge source scan", () => {
     // helpers we explicitly import. There must be NO bare fetch() to a
     // foreign host, and no webhook URL string.
     expect(EDGE_SRC).not.toMatch(/\bfetch\(\s*["'`]https?:\/\//);
-    expect(EDGE_SRC).not.toMatch(/webhook/i);
+    // Outbound webhook URLs (not the internal `sensor-ingest-webhook` auth
+    // helper import path) must not appear.
+    expect(EDGE_SRC).not.toMatch(/https?:\/\/[^\s"'`]*webhook/i);
     expect(EDGE_SRC).not.toMatch(/discord|slack|telegram|sendgrid|mailgun/i);
   });
 });

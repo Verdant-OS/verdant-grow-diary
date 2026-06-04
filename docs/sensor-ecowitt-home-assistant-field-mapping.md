@@ -36,8 +36,8 @@ be normalized **without sending it anywhere**:
 - **Unknown labels fall back to safe display text.** Unrecognised source
   or vendor strings render as plain text and are not trusted for auth.
 
-The previous internal name `/sensors/webhook-normalizer` is no longer
-used — always link to `/sensors/ingest-normalizer`.
+The previous internal slug for this screen is no longer used — always
+link to `/sensors/ingest-normalizer`.
 
 ---
 

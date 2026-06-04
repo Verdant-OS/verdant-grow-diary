@@ -39,6 +39,7 @@ const HEADING_ID = "plant-detail-photo-strip-heading";
 export default function PlantDetailPhotoStrip({
   plantId,
   growId,
+  onUploadPhoto,
 }: PlantDetailPhotoStripProps) {
   const { data: rawDiary, isLoading, isError, refetch } = useDiaryEntries();
 

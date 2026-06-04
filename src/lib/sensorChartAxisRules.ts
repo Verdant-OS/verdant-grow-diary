@@ -12,12 +12,24 @@
  * stored data semantics are unchanged.
  */
 
-export type SensorChartMetricKey = "temp" | "rh" | "vpd" | "co2" | "soil";
+export type SensorChartMetricKey =
+  | "temp"
+  | "rh"
+  | "vpd"
+  | "co2"
+  | "soil"
+  | "ppfd";
 
 export interface SensorChartMetricMeta {
   label: string;
-  /** Display unit appended to tick labels (no leading space). */
+  /** Display unit used in legend / tooltip / CSV header (long form). */
   unit: string;
+  /**
+   * Compact unit used inside Y-axis tick labels where horizontal space
+   * is constrained. Defaults to `unit` when omitted. PPFD uses "µmol"
+   * for ticks but the long "µmol/m²/s" elsewhere.
+   */
+  tickUnit?: string;
   color: string;
   /** Default decimal places for tick values. */
   tickDecimals: number;
@@ -31,10 +43,24 @@ export const SENSOR_CHART_METRIC_META: Record<SensorChartMetricKey, SensorChartM
   vpd:  { label: "VPD",         unit: "kPa", color: "hsl(var(--primary))", tickDecimals: 2, yAxisWidth: 64 },
   co2:  { label: "CO₂",         unit: "ppm", color: "hsl(var(--leaf-glow))", tickDecimals: 0, yAxisWidth: 64 },
   soil: { label: "Soil",        unit: "%",  color: "hsl(var(--accent))",  tickDecimals: 0, yAxisWidth: 44 },
+  ppfd: {
+    label: "PPFD",
+    // Canonical user-facing unit; matches PPFD_UNIT_LONG in ppfdRules.
+    unit: "µmol/m²/s",
+    // Short form for axis tick density — matches PPFD_UNIT_SHORT.
+    tickUnit: "µmol",
+    color: "hsl(var(--success))",
+    tickDecimals: 0,
+    yAxisWidth: 72,
+  },
 };
 
 /** Left chart margin — small breathing room so negative ticks aren't clipped. */
 export const SENSOR_CHART_LEFT_MARGIN = 4;
+
+function tickUnitOf(meta: SensorChartMetricMeta): string {
+  return meta.tickUnit ?? meta.unit;
+}
 
 /**
  * Format a numeric tick value for the Y axis. Keeps the unit visible
@@ -51,20 +77,21 @@ export function formatSensorChartYTick(
   const rounded = m.tickDecimals > 0
     ? Number(value.toFixed(m.tickDecimals))
     : Math.round(value);
-  // Compound units (kPa / ppm) read better with a hair of separation;
-  // attached unit symbols (°F / %) stay flush.
-  const sep = /^[a-z]/i.test(m.unit) ? " " : "";
-  return `${rounded}${sep}${m.unit}`;
+  const unit = tickUnitOf(m);
+  // Compound units (kPa / ppm / µmol) read better with a hair of
+  // separation; attached unit symbols (°F / %) stay flush.
+  const sep = /^[A-Za-zµ]/.test(unit) ? " " : "";
+  return `${rounded}${sep}${unit}`;
 }
 
-/** Tooltip-side formatter — includes a leading space for compound units. */
+/** Tooltip-side formatter — uses the long unit (legend-consistent). */
 export function formatSensorChartTooltipValue(
   value: number,
   metric: SensorChartMetricKey,
 ): string {
   if (!Number.isFinite(value)) return "";
   const m = SENSOR_CHART_METRIC_META[metric];
-  const sep = /^[a-z]/i.test(m.unit) ? " " : "";
+  const sep = /^[A-Za-zµ]/.test(m.unit) ? " " : "";
   return `${value}${sep}${m.unit}`;
 }
 

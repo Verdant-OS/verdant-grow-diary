@@ -53,7 +53,7 @@ describe("mapSensorReadingToAiDoctorContext", () => {
         "co2_ppm",
         "soil_moisture_pct",
       ]);
-      expect(ctx.missingMetrics).toEqual([]);
+      expect(ctx.missingMetrics).toEqual(["ppfd_umol_m2s"]);
       expect(ctx.invalidMetrics).toEqual([]);
       expect(ctx.confidenceImpact).toBe("none");
       expect(ctx.contextSummary).toContain("Live sensor reading");
@@ -186,7 +186,7 @@ describe("mapSensorReadingToAiDoctorContext", () => {
       const ctx = mapSensorReadingToAiDoctorContext(reading);
 
       expect(ctx.usableMetrics).toEqual(["temperature_c"]);
-      expect(ctx.missingMetrics).toHaveLength(4);
+      expect(ctx.missingMetrics).toHaveLength(5);
       expect(ctx.contextSummary).toContain("1 usable metric(s)");
       expect(ctx.contextSummary).not.toMatch(/risk|danger/i);
     });
@@ -202,7 +202,7 @@ describe("mapSensorReadingToAiDoctorContext", () => {
       const ctx = mapSensorReadingToAiDoctorContext(reading);
 
       expect(ctx.usableMetrics).toEqual([]);
-      expect(ctx.missingMetrics).toHaveLength(5);
+      expect(ctx.missingMetrics).toHaveLength(6);
       expect(ctx.contextSummary).toContain("no usable metric values");
     });
   });

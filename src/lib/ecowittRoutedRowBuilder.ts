@@ -99,6 +99,12 @@ export interface EcoWittRoutedBuildInput {
   payloadPasskeyFingerprint: string | null;
   eligibleTents: EcoWittRouterEligibleTent[];
   capturedAt: string;
+  /**
+   * Optional provenance for `capturedAt`. When provided, it is stamped on
+   * every emitted row's `raw_payload.timestamp_source`. Omit for legacy
+   * callers — rows will simply not carry the metadata.
+   */
+  timestampSource?: EcoWittTimestampSource;
 }
 
 export interface EcoWittRoutedBuildResult {

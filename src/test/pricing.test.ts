@@ -188,7 +188,7 @@ describe("Trust strip", () => {
 
 describe("Mobile-first pricing layout", () => {
   it("tier card grid uses extra vertical spacing on mobile", () => {
-    expect(PAGE).toMatch(/grid\\s+gap-8\\s+md:gap-6\\s+md:grid-cols-3/);
+    expect(PAGE).toMatch(/grid\s+gap-8\s+md:gap-6\s+md:grid-cols-3/);
   });
 
   it("comparison table is horizontally scrollable on small screens", () => {

@@ -25,7 +25,7 @@ import {
 describe("buildDerivedVpdStatusViewModel", () => {
   it("returns available + numeric VPD for valid °F + RH", () => {
     const vm = buildDerivedVpdStatusViewModel({
-      airTempF: 77, // 25°C
+      airTempF: 72, // ~22.2°C
       humidityPct: 60,
       stage: "veg",
     });

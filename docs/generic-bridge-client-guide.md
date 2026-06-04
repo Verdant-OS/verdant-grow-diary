@@ -45,7 +45,7 @@ payloads to this HTTPS endpoint.
 ### 3. Auth — bridge tokens (`vbt_...`)
 
 ```
-Authorization: Bearer vbt_xxxxxxxxxxxxxxxxxxxxxxxx
+Authorization: Bearer vbt_xxx…xxx
 ```
 
 - Bridge tokens are issued per device / per integration in the Verdant UI.
@@ -286,7 +286,7 @@ endpoint, full stop.
 
 ```http
 POST /functions/v1/sensor-ingest-webhook
-Authorization: Bearer vbt_xxxxxxxxxxxxxxxxxxxxxxxx
+Authorization: Bearer vbt_xxx…xxx
 Content-Type: application/json
 Idempotency-Key: 8b6c7c3a-2d2c-4b3f-9b3a-2a1d8f5a5e21
 

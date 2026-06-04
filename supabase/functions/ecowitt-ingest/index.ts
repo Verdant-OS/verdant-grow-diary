@@ -26,7 +26,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-verdant-tent-id",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
 };
 
 function json(body: unknown, status: number) {
@@ -40,6 +40,18 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function parsePayload(req: Request): Promise<Record<string, unknown> | null> {
+  // GET: EcoWitt "Customized" upload can be configured as GET with all fields
+  // in the querystring. Read them off the URL and return as a flat map.
+  if (req.method === "GET") {
+    const url = new URL(req.url);
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of url.searchParams.entries()) {
+      // tent_id is a Verdant routing param, not an EcoWitt field.
+      if (k === "tent_id") continue;
+      out[k] = v;
+    }
+    return out;
+  }
   const ctype = (req.headers.get("Content-Type") ?? "").toLowerCase();
   try {
     if (ctype.includes("application/json")) {
@@ -78,7 +90,9 @@ async function parsePayload(req: Request): Promise<Record<string, unknown> | nul
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+  if (req.method !== "POST" && req.method !== "GET") {
+    return json({ error: "method_not_allowed" }, 405);
+  }
 
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) return json({ error: "unauthorized" }, 401);

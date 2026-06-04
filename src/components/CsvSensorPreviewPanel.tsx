@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import {
   applySensorMappingOverrides,
   buildCsvPreviewReport,
+  buildCsvPreviewSummaryCsv,
   buildFullCsvTimelineRows,
   CANONICAL_FIELDS,
   CSV_PREVIEW_STATUS_LABEL,
@@ -17,6 +18,12 @@ import {
   type TimeWindow,
   type TimeWindowKind,
 } from "@/lib/csvSensorPreviewRules";
+import { buildCsvPreviewReportPdfBytes } from "@/lib/csvSensorPreviewPdf";
+import {
+  CSV_PREVIEW_WARNING_COPY,
+  FUTURE_DIARY_CONVERSION_COPY,
+  type FlagCode,
+} from "@/lib/csvSensorPreviewWarningCopy";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -121,24 +128,54 @@ export default function CsvSensorPreviewPanel() {
     return samplePreviewTimeline(windowed, sampling);
   }, [effective, window, sampling]);
 
-  const handleDownloadReport = useCallback(() => {
+  const downloadLocalBlob = (blob: Blob, fileName: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadJson = useCallback(() => {
     if (!result || !result.ok) return;
     const report = buildCsvPreviewReport(result, {
       overrides,
       timeWindow: window,
       sampling,
     });
-    const blob = new Blob([JSON.stringify(report, null, 2)], {
-      type: "application/json",
+    downloadLocalBlob(
+      new Blob([JSON.stringify(report, null, 2)], { type: "application/json" }),
+      "verdant-sensor-preview-report.json",
+    );
+  }, [result, overrides, window, sampling]);
+
+  const handleDownloadCsvSummary = useCallback(() => {
+    if (!result || !result.ok) return;
+    const csv = buildCsvPreviewSummaryCsv(result, {
+      overrides,
+      timeWindow: window,
+      sampling,
     });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "verdant-sensor-preview-report.json";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadLocalBlob(
+      new Blob([csv], { type: "text/csv" }),
+      "verdant-sensor-preview-summary.csv",
+    );
+  }, [result, overrides, window, sampling]);
+
+  const handleDownloadPdf = useCallback(() => {
+    if (!result || !result.ok) return;
+    const bytes = buildCsvPreviewReportPdfBytes(result, {
+      overrides,
+      timeWindow: window,
+      sampling,
+    });
+    downloadLocalBlob(
+      new Blob([bytes.buffer as ArrayBuffer], { type: "application/pdf" }),
+      "verdant-sensor-preview-report.pdf",
+    );
   }, [result, overrides, window, sampling]);
 
   const setOverride = (header: string, value: string) => {
@@ -246,18 +283,55 @@ export default function CsvSensorPreviewPanel() {
             )}
           </div>
 
-          {/* Download report */}
+          {/* Download report buttons */}
           <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
               variant="default"
-              onClick={handleDownloadReport}
+              onClick={handleDownloadJson}
               data-testid="csv-preview-download-report"
             >
-              Download CSV Preview Report
+              Download JSON Report
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleDownloadCsvSummary}
+              data-testid="csv-preview-download-csv-summary"
+            >
+              Download CSV Summary
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleDownloadPdf}
+              data-testid="csv-preview-download-pdf"
+            >
+              Download PDF Report
             </Button>
             <span className="text-xs text-muted-foreground">
-              Generates a local JSON file. No upload, no save.
+              All exports are generated locally. No upload, no save.
+            </span>
+          </div>
+
+          {/* Disabled future-flow CTA (no writes) */}
+          <div
+            data-testid="csv-preview-diary-cta-wrapper"
+            className="rounded-md border border-dashed border-border bg-muted/30 p-3 text-xs flex flex-wrap items-center gap-3"
+          >
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled
+              aria-disabled="true"
+              data-testid="csv-preview-diary-cta"
+              title="Coming later — approval-required flow"
+            >
+              Convert to diary entries — coming later
+            </Button>
+            <span className="text-muted-foreground">
+              {FUTURE_DIARY_CONVERSION_COPY}
             </span>
           </div>
 
@@ -328,25 +402,52 @@ export default function CsvSensorPreviewPanel() {
             </Table>
           </div>
 
-          {/* Flags */}
+          {/* Flags with plain-language explanations */}
           {effective.flags.length > 0 && (
             <div data-testid="csv-preview-flags">
               <h3 className="text-sm font-semibold mb-2">Suspicious values</h3>
-              <ul className="space-y-1 text-sm">
-                {effective.flags.map((f, i) => (
-                  <li
-                    key={`${f.code}-${f.header}-${i}`}
-                    data-testid={`csv-preview-flag-${f.code}`}
-                    className={
-                      f.severity === "error"
-                        ? "text-destructive"
-                        : "text-muted-foreground"
-                    }
-                  >
-                    <span className="font-mono text-xs mr-2">{f.header}</span>
-                    {f.message}
-                  </li>
-                ))}
+              <ul className="space-y-3 text-sm">
+                {effective.flags.map((f, i) => {
+                  const copy = CSV_PREVIEW_WARNING_COPY[f.code as FlagCode];
+                  return (
+                    <li
+                      key={`${f.code}-${f.header}-${i}`}
+                      data-testid={`csv-preview-flag-${f.code}`}
+                      className="rounded-md border border-border bg-muted/30 p-3 space-y-1"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge
+                          variant={f.severity === "error" ? "destructive" : "secondary"}
+                          data-testid={`csv-preview-flag-severity-${f.code}`}
+                        >
+                          {f.severity}
+                        </Badge>
+                        <span className="font-mono text-xs">{f.header}</span>
+                        <span className="font-medium">
+                          {copy?.title ?? f.message}
+                        </span>
+                      </div>
+                      {copy && (
+                        <>
+                          <p
+                            className="text-xs text-muted-foreground"
+                            data-testid={`csv-preview-flag-why-${f.code}`}
+                          >
+                            <span className="font-semibold">Why it matters: </span>
+                            {copy.whyItMatters}
+                          </p>
+                          <p
+                            className="text-xs text-muted-foreground"
+                            data-testid={`csv-preview-flag-fix-${f.code}`}
+                          >
+                            <span className="font-semibold">Suggested fix: </span>
+                            {copy.suggestedFix}
+                          </p>
+                        </>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}

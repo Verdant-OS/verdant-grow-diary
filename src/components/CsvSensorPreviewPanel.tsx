@@ -335,6 +335,13 @@ export default function CsvSensorPreviewPanel() {
             </span>
           </div>
 
+          {/* Disabled review gate — presentational only. No write handler. */}
+          <CsvPreviewReviewGate
+            hasHardBlockedRows={(result.flags ?? []).some((f) => f.severity === "error")}
+            hasAcceptedRows={(result.rows ?? []).length > 0}
+          />
+
+
           {/* Editable mapping table */}
           <div>
             <h3 className="text-sm font-semibold mb-2">Field mapping (editable)</h3>

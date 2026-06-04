@@ -111,11 +111,12 @@ describe("Grow-Room Mode · route + nav wiring", () => {
     expect(app).toMatch(/<GrowRoomMode\s*\/?>/);
   });
 
-  it("Sidebar surfaces the Live Dashboard entry on the /grow-room route", () => {
-    expect(sidebar).toMatch(/\/grow-room/);
-    expect(sidebar).toMatch(/Live Dashboard/);
+  it("Sidebar no longer surfaces the Live Dashboard entry (consolidated into Dashboard)", () => {
+    expect(sidebar).not.toMatch(/\/grow-room/);
+    expect(sidebar).not.toMatch(/Live Dashboard/);
     expect(sidebar).not.toMatch(/"Grow-Room Mode"/);
   });
+
 });
 
 describe("Grow-Room Mode · rules module is I/O-free", () => {

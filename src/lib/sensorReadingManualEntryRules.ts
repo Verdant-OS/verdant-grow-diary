@@ -40,8 +40,8 @@ export interface ManualEntryInput {
   soilMoisturePct?: string | number | null;
   /**
    * PPFD µmol/m²/s from a real PAR/quantum meter. Optional.
-   * Blank is treated as unknown (NOT zero). Never estimated from
-   * lux, wattage, or light percentage. Validated via ppfdRules.
+   * Blank is treated as unknown (NOT zero). Never derived from
+   * any other light field. Validated via ppfdRules.
    */
   ppfd?: string | number | null;
 }

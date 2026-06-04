@@ -201,3 +201,48 @@ describe("GlobalFastAddButton — picker CTAs in no-context state", () => {
     expect(onDispatchEvent).not.toHaveBeenCalled();
   });
 });
+
+describe("GlobalFastAddButton — mobile tap targets & a11y", () => {
+  it("trigger meets ≥44px tap target and has focus-visible ring", () => {
+    renderAt("/plants/p1");
+    const trigger = screen.getByTestId("global-fast-add-trigger");
+    const cls = trigger.className;
+    expect(cls).toMatch(/min-h-11/);
+    expect(cls).toMatch(/min-w-11/);
+    expect(cls).toMatch(/focus-visible:ring/);
+    expect(cls).toMatch(/touch-manipulation/);
+  });
+
+  it("every menu item is ≥44px tall and keyboard-focusable", () => {
+    renderAt("/plants/p1");
+    fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
+    for (const a of FAST_ADD_ACTIONS) {
+      const btn = screen.getByTestId(`global-fast-add-action-${a.id}`);
+      expect(btn.className).toMatch(/min-h-11/);
+      expect(btn.className).toMatch(/focus-visible:ring/);
+      expect(btn.getAttribute("role")).toBe("menuitem");
+    }
+  });
+
+  it("picker CTAs meet ≥44px tap target", () => {
+    renderAt("/dashboard");
+    fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
+    fireEvent.click(screen.getByTestId("global-fast-add-action-watering"));
+    for (const id of ["choose_plant", "choose_tent"]) {
+      const cta = screen.getByTestId(`global-fast-add-cta-${id}`);
+      expect(cta.className).toMatch(/min-h-11/);
+      expect(cta.className).toMatch(/focus-visible:ring/);
+    }
+  });
+
+  it("menu uses role=menu and trigger advertises aria-haspopup", () => {
+    renderAt("/plants/p1");
+    const trigger = screen.getByTestId("global-fast-add-trigger");
+    expect(trigger.getAttribute("aria-haspopup")).toBe("menu");
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByTestId("global-fast-add-menu").getAttribute("role")).toBe(
+      "menu",
+    );
+  });
+});

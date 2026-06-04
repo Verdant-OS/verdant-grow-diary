@@ -122,7 +122,7 @@ describe("csvImportPlanReport — report builder", () => {
     const second = buildCsvImportPlan(mkInput(rows, { existingIdempotencyKeys: keys }));
     const report = buildCsvImportPlanReport(second, { fileName: "a.csv", sourceType: "csv" }, { generatedAt: NOW.toISOString() });
     expect(report.duplicateInfo.count).toBe(1);
-    expect(report.duplicateInfo.keyPrefixes[0].length).toBeLessThanOrEqual(16);
+    expect(report.duplicateInfo.keyPrefixes[0].length).toBeLessThanOrEqual(12);
     // Full key must not appear in serialised JSON
     const fullKey = [...keys][0];
     const json = serializeCsvImportPlanReport(report);
@@ -172,7 +172,7 @@ describe("csvImportPlanReport — report builder", () => {
     const plan = buildCsvImportPlan(mkInput(rows));
     const sample = buildSensorDraftSample(plan.acceptedWrites, 3);
     expect(sample.length).toBe(3);
-    expect(sample[0].idempotency_key_prefix.length).toBeLessThanOrEqual(16);
+    expect(sample[0].idempotency_key_prefix.length).toBeLessThanOrEqual(12);
   });
 
   it("generatedAt is deterministic when injected", () => {

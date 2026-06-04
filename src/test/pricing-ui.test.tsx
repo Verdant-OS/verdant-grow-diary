@@ -34,7 +34,7 @@ function renderPricing() {
 
 describe("Pricing Page UI", () => {
   it("renders all three pricing cards from constants", () => {
-    render(<Pricing />);
+    renderPricing();
     expect(screen.getByTestId("pricing-card-free")).toBeInTheDocument();
     expect(screen.getByTestId("pricing-card-pro")).toBeInTheDocument();
     expect(screen.getByTestId("pricing-card-founder")).toBeInTheDocument();

@@ -331,6 +331,8 @@ function normalizeSensorSnapshot(
     ec: num("ec"),
     source: nonBlankString(r.source) ?? undefined,
     state: nonBlankString(r.state) ?? undefined,
+    // Vendor lineage only — never used for auth, ownership, or routing.
+    vendor: nonBlankString(r.vendor) ?? undefined,
   };
   const anyDefined = Object.values(out).some((v) => v !== undefined);
   return anyDefined ? out : undefined;

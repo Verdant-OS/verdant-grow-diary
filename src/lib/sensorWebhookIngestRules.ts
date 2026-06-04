@@ -53,6 +53,47 @@ export function isWebhookSource(s: unknown): s is WebhookSource {
 }
 
 /**
+ * Normalize a caller-supplied `source` to its canonical allow-listed form.
+ *
+ * Rules (hardened, per sensor-truth contract):
+ *  - Trim leading/trailing whitespace.
+ *  - Lower-case the entire value before comparison.
+ *  - Only EXACT matches to the allow-list pass; partial / fuzzy values
+ *    (`"eco"`, `"mq"`, `"web"`) are rejected.
+ *  - Empty or whitespace-only strings return `null`.
+ *  - Returns `null` when input is not a non-empty string or when the
+ *    normalized value is not allow-listed — the caller surfaces an
+ *    `invalid source` error.
+ *
+ * The DB allow-list (`public.validate_sensor_reading`) already accepts the
+ * canonical lower-case values, so callers MUST persist the canonical form
+ * returned by this helper, not the raw input.
+ */
+export function normalizeWebhookSource(s: unknown): WebhookSource | null {
+  if (typeof s !== "string") return null;
+  const trimmed = s.trim();
+  if (trimmed.length === 0) return null;
+  const lower = trimmed.toLowerCase();
+  return isWebhookSource(lower) ? (lower as WebhookSource) : null;
+}
+
+/**
+ * Normalize a caller-supplied vendor lineage tag.
+ *
+ * Vendor is **lineage only**. It MUST NEVER influence auth, ownership,
+ * routing, permissions, `source`, `user_id`, or `tent_id`. This helper:
+ *  - Trims whitespace.
+ *  - Drops empty / whitespace-only values (returns `null`).
+ *  - Preserves casing for lineage (e.g. `"Home Assistant"`).
+ *  - Rejects non-string values (returns `null`).
+ */
+export function normalizeVendorLineage(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const trimmed = v.trim();
+  return trimmed.length === 0 ? null : trimmed;
+}
+
+/**
  * Canonical metric keys persisted in `sensor_readings.metric`. Webhook
  * payloads use grower-friendly aliases (temp_f, humidity_percent, …) which
  * normalize to these.

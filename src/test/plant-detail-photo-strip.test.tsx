@@ -296,7 +296,49 @@ describe("PlantDetailPhotoStrip render", () => {
     }
   });
 
-  it("upload CTA renders enabled with plant context", () => {
+  it("upload CTA invokes onUploadPhoto and does NOT navigate to /logs", () => {
+    useDiaryEntriesMock.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    const onUploadPhoto = vi.fn();
+    render(
+      <PlantDetailPhotoStrip
+        plantId="p1"
+        growId="g1"
+        onUploadPhoto={onUploadPhoto}
+      />,
+    );
+    const btn = screen.getByTestId("plant-detail-photo-strip-upload");
+    // No anchor / href when handler is provided — must stay on Plant Detail.
+    expect(btn.tagName.toLowerCase()).toBe("button");
+    expect(btn.getAttribute("href")).toBeNull();
+    fireEvent.click(btn);
+    expect(onUploadPhoto).toHaveBeenCalledTimes(1);
+  });
+
+  it("CTA copy is 'Add photo log' (honest about the underlying flow)", () => {
+    useDiaryEntriesMock.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    render(
+      <PlantDetailPhotoStrip
+        plantId="p1"
+        growId="g1"
+        onUploadPhoto={vi.fn()}
+      />,
+    );
+    const btn = screen.getByTestId("plant-detail-photo-strip-upload");
+    expect(btn.textContent ?? "").toMatch(/Add photo log/i);
+    expect(btn.textContent ?? "").not.toMatch(/Upload photo/i);
+  });
+
+  it("falls back to a contextual link (NOT /logs) when no handler is given", () => {
     useDiaryEntriesMock.mockReturnValue({
       data: [],
       isLoading: false,
@@ -305,7 +347,9 @@ describe("PlantDetailPhotoStrip render", () => {
     });
     render(<PlantDetailPhotoStrip plantId="p1" growId="g1" />);
     const link = screen.getByTestId("plant-detail-photo-strip-upload");
-    expect(link.getAttribute("href") ?? "").toMatch(/\/logs/);
+    // Fallback still preserves grow context via query string.
+    const href = link.getAttribute("href") ?? "";
+    expect(href).toContain("growId=g1");
   });
 
   it("upload CTA renders disabled when plant context missing", () => {
@@ -369,5 +413,9 @@ describe("Plant Detail photo strip — static safety", () => {
 
   it("page wires the photo strip in", () => {
     expect(PAGE).toMatch(/PlantDetailPhotoStrip/);
+  });
+
+  it("page passes an onUploadPhoto handler that opens the plant Quick Log (no /logs nav)", () => {
+    expect(PAGE).toMatch(/onUploadPhoto\s*=\s*\{[^}]*setQuickLogOpen\(true\)/);
   });
 });

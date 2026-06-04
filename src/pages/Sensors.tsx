@@ -8,6 +8,7 @@ import SensorChart from "@/components/SensorChart";
 import GrowDataSourceBadge from "@/components/GrowDataSourceBadge";
 import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
 import SensorBridgeHealthCard from "@/components/SensorBridgeHealthCard";
+import TentCsvImportCard from "@/components/TentCsvImportCard";
 import { useGrowTents, useGrowSensorReadings } from "@/hooks/useGrowData";
 import { useTents as useTentRows } from "@/hooks/use-tents";
 import { classifyGrowDataSource } from "@/lib/growDataSourceLabelRules";

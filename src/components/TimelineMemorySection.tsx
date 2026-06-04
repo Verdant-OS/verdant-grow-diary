@@ -131,7 +131,7 @@ function AiDoctorEvidenceAuditRow({
 
 export default function TimelineMemorySection(props: Props) {
   const scope = toScope(props);
-  const { items, isLoading, isError } = useTimelineMemory(scope);
+  const { items, isLoading, isError, refetch } = useTimelineMemory(scope);
   const [filter, setFilter] = useState<TimelineFilterKey>(TIMELINE_FILTER_RESET_KEY);
 
   const chips = useMemo(() => buildTimelineFilterChips(items, filter), [items, filter]);
@@ -159,21 +159,36 @@ export default function TimelineMemorySection(props: Props) {
           <div
             className="h-16 rounded-md bg-muted/40 animate-pulse"
             data-testid="timeline-memory-loading"
+            role="status"
+            aria-label="Loading timeline"
           />
         ) : isError ? (
-          <p
-            className="text-sm text-muted-foreground"
+          <div
+            role="alert"
             data-testid="timeline-memory-error"
+            className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive flex items-center justify-between gap-2"
           >
-            Couldn't load timeline memory right now. Other panels remain visible.
-          </p>
+            <span>Couldn't load timeline memory right now.</span>
+            <button
+              type="button"
+              data-testid="timeline-memory-retry"
+              onClick={() => refetch()}
+              className="text-xs px-3 min-h-11 inline-flex items-center rounded-md border border-border/60 hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation"
+            >
+              Retry
+            </button>
+          </div>
         ) : items.length === 0 ? (
-          <p
-            className="text-sm text-muted-foreground"
+          <div
             data-testid="timeline-memory-empty"
+            className="rounded-md border border-border/40 bg-muted/30 p-3 text-sm space-y-1"
           >
-            No timeline events yet.
-          </p>
+            <p className="text-foreground">No plant history yet.</p>
+            <p className="text-muted-foreground">
+              Use Fast Add or Quick Log to record an observation, watering,
+              feeding, photo, or environment check.
+            </p>
+          </div>
         ) : (
           <>
             <TimelineFilterBar
@@ -200,9 +215,17 @@ export default function TimelineMemorySection(props: Props) {
                     <li key={`aiaudit:${item.key}`}>
                       <AiDoctorEvidenceAuditRow item={item} />
                     </li>
-                  ) : (
+                  ) : item.kind === "diary" ? (
                     <li key={`diary:${item.key}`}>
                       <DiaryItemRow item={item} />
+                    </li>
+                  ) : (
+                    <li
+                      key={`unknown:${(item as { key?: string }).key ?? Math.random()}`}
+                      data-testid="timeline-memory-unknown-fallback"
+                      className="rounded-md border border-border/40 bg-muted/20 p-2 text-xs text-muted-foreground"
+                    >
+                      Entry (unsupported type, hidden from filters).
                     </li>
                   ),
                 )}

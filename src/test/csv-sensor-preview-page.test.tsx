@@ -124,6 +124,11 @@ describe("SensorCsvPreview — UI", () => {
       expect(screen.getByTestId("csv-preview-download-report")).toBeInTheDocument();
     });
 
+    // jsdom does not implement URL.createObjectURL/revokeObjectURL by default.
+    (URL as unknown as { createObjectURL?: (b: Blob) => string }).createObjectURL =
+      (() => "blob:mock") as (b: Blob) => string;
+    (URL as unknown as { revokeObjectURL?: (s: string) => void }).revokeObjectURL =
+      (() => {}) as (s: string) => void;
     const createSpy = vi
       .spyOn(URL, "createObjectURL")
       .mockReturnValue("blob:mock");

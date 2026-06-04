@@ -119,6 +119,33 @@ function safeRawValue(v: unknown): string {
   return s.length > 64 ? s.slice(0, 64) : s;
 }
 
+/**
+ * Parse an EcoWitt `dateutc` field (gateway custom-upload format:
+ * `YYYY-MM-DD HH:MM:SS`, treated as UTC) into a canonical ISO-8601 UTC
+ * string. Returns `null` when the value is missing, the wrong type, or
+ * does not match the strict format / does not round-trip to a valid date.
+ *
+ * Never parses with local timezone semantics. Never accepts arbitrary
+ * Date-parseable strings — only the documented EcoWitt format.
+ */
+export function parseEcoWittDateUtc(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  const m = trimmed.match(
+    /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/,
+  );
+  if (!m) return null;
+  const [, y, mo, d, h, mi, s] = m;
+  const iso = `${y}-${mo}-${d}T${h}:${mi}:${s}.000Z`;
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return null;
+  // Round-trip check rejects calendar-invalid inputs like 2026-02-30.
+  const rt = new Date(t).toISOString();
+  if (rt !== iso) return null;
+  return iso;
+}
+
+
 export function buildEcoWittRoutedRows(
   input: EcoWittRoutedBuildInput,
 ): EcoWittRoutedBuildResult {

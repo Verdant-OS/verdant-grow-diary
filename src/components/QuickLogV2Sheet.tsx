@@ -362,7 +362,8 @@ export default function QuickLogV2Sheet({
             <Button
               className="flex-1"
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || contextBlocked}
+              data-testid="qlv2-save"
             >
               {saving ? "Saving…" : "Save"}
             </Button>

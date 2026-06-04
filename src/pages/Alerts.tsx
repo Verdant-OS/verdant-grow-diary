@@ -79,7 +79,7 @@ const STATUS_TONE: Record<AlertStatusRow, string> = {
 };
 
 export default function Alerts() {
-  const { urlGrowId, scopedGrow, scopedGrowName, isValidScopedGrow, backHref } =
+  const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } =
     useScopedGrow();
   const scopedGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
   // A grow id was passed in the URL but doesn't map to a grow the viewer

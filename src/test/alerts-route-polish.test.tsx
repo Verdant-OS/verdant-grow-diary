@@ -197,7 +197,7 @@ describe("Alerts route — empty + error + retry", () => {
     );
     expect(screen.getByText("No open alerts.")).toBeTruthy();
     expect(
-      screen.getByText(/Verdant will show environment or grow warnings/i),
+      screen.getByText(/Alerts will appear when real or manual readings breach your grow targets/i),
     ).toBeTruthy();
   });
 

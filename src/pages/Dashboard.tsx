@@ -1,4 +1,5 @@
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
+import EcowittLatestSnapshotCard from "@/components/EcowittLatestSnapshotCard";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
 import { formatStabilityChipView } from "@/lib/dashboardStabilityChipCopyRules";
 import StabilityChipDrilldown from "@/components/StabilityChipDrilldown";

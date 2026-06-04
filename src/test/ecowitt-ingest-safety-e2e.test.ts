@@ -210,6 +210,7 @@ describe("EcoWitt ingest — raw_payload redaction & safe-fields-only contract",
       "passkey_fingerprint",
       "calculated",
       "derived_from",
+      "timestamp_source",
     ]);
 
     for (const r of rows) {

@@ -20,6 +20,8 @@ import {
 // ---------------------------------------------------------------------------
 // Pure helper tests — no React needed.
 // ---------------------------------------------------------------------------
+vi.mock("@/components/AlertsAutoPersistForGrow", () => ({ default: () => null }));
+
 describe("alertsRouteView — pure helpers", () => {
   it("formatAlertSourceLabel maps known slugs and tokenizes unknown ones", () => {
     expect(formatAlertSourceLabel("environment_alerts")).toBe(

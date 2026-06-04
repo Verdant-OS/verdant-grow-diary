@@ -24,6 +24,8 @@ const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 const APP = read("src/App.tsx");
 const ALERTS = read("src/pages/Alerts.tsx");
 
+vi.mock("@/components/AlertsAutoPersistForGrow", () => ({ default: () => null }));
+
 describe("Alerts route — quick link contract", () => {
   it("Plant Detail quick-status Alerts link target matches alertsPath helper", () => {
     const v = buildPlantQuickStatusView({

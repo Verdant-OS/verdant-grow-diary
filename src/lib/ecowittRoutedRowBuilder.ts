@@ -223,6 +223,9 @@ export function buildEcoWittRoutedRows(
             slot.temperature_c.source_channel_key,
             slot.humidity_pct.source_channel_key,
           ],
+          ...(input.timestampSource
+            ? { timestamp_source: input.timestampSource }
+            : {}),
         },
       });
       groupRowCount += 1;

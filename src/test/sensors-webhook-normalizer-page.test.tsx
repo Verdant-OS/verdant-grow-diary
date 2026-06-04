@@ -1,5 +1,5 @@
 /**
- * UI tests for the SensorsWebhookNormalizer debug page.
+ * UI tests for the SensorsIngestNormalizer debug page.
  *
  * Safety properties enforced here:
  *  - The page never calls fetch, Supabase, functions.invoke, insert,
@@ -10,7 +10,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import SensorsWebhookNormalizer from "@/pages/SensorsWebhookNormalizer";
+import SensorsIngestNormalizer from "@/pages/SensorsIngestNormalizer";
 
 // Spy on Supabase client to ensure the page never invokes any write
 // or network path.
@@ -33,12 +33,12 @@ vi.mock("@/integrations/supabase/client", () => ({
 function renderPage() {
   return render(
     <MemoryRouter>
-      <SensorsWebhookNormalizer />
+      <SensorsIngestNormalizer />
     </MemoryRouter>,
   );
 }
 
-describe("SensorsWebhookNormalizer", () => {
+describe("SensorsIngestNormalizer", () => {
   let fetchSpy: ReturnType<typeof vi.spyOn> | null = null;
 
   beforeEach(() => {

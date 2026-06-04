@@ -1,5 +1,5 @@
 /**
- * SensorsWebhookNormalizer — read-only, in-app debug screen that lets a
+ * SensorsIngestNormalizer — read-only, in-app debug screen that lets a
  * developer or grower paste a sensor ingest JSON payload and see how
  * Verdant would normalize it.
  *
@@ -28,7 +28,7 @@ interface ParseState {
 
 const IDLE: ParseState = { kind: "idle" };
 
-export default function SensorsWebhookNormalizer() {
+export default function SensorsIngestNormalizer() {
   const [raw, setRaw] = useState<string>("");
   const [state, setState] = useState<ParseState>(IDLE);
 

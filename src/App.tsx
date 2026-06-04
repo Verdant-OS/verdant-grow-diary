@@ -14,7 +14,7 @@ import Plants from "./pages/Plants";
 import PlantDetail from "./pages/PlantDetail";
 import Sensors from "./pages/Sensors";
 import EcowittIngestAudit from "./pages/EcowittIngestAudit";
-import SensorsWebhookNormalizer from "./pages/SensorsWebhookNormalizer";
+import SensorsIngestNormalizer from "./pages/SensorsIngestNormalizer";
 import Tasks from "./pages/Tasks";
 // Cameras removed from current Verdant build (out of V0 scope).
 import Alerts from "./pages/Alerts";
@@ -89,7 +89,7 @@ const App = () => (
                 <Route path="/plants/:id" element={<PlantDetail />} />
                 <Route path="/sensors" element={<Sensors />} />
                 <Route path="/sensors/ecowitt-audit" element={<EcowittIngestAudit />} />
-                <Route path="/sensors/webhook-normalizer" element={<SensorsWebhookNormalizer />} />
+                <Route path="/sensors/ingest-normalizer" element={<SensorsIngestNormalizer />} />
                 <Route path="/logs" element={<Timeline />} />
                 <Route path="/timeline" element={<Timeline />} />
                 <Route path="/tasks" element={<Tasks />} />

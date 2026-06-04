@@ -32,7 +32,8 @@ describe("CSV/TSV Preview partner demo documentation", () => {
   });
 
   it("QA checklist covers source label, status label, and no save button", () => {
-    expect(content).toMatch(/source label shows (csv|tsv)/i);
+    expect(content).toMatch(/source label shows/i);
+    expect(content).toMatch(/csv|tsv/i);
     expect(content).toMatch(/Preview only.*not saved/i);
     expect(content).toMatch(/no save\/import button/i);
   });

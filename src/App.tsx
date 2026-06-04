@@ -108,6 +108,7 @@ const App = () => (
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/diagnostics" element={<Diagnostics />} />
                 <Route path="/pi-ingest-status" element={<PiIngestStatus />} />
+                <Route path="/ingest-inspector" element={<IngestInspector />} />
                 <Route path="/imports/representative-csv" element={<RepresentativeCsvPreview />} />
                 {/* Leads is an internal admin/operator module, intentionally not
                     surfaced in grower-facing navigation. Primary route is

@@ -212,7 +212,7 @@ describe("EcoWitt ingest — raw_payload redaction & safe-fields-only contract",
     ]);
 
     for (const r of rows) {
-      const rp = r.raw_payload as Record<string, unknown>;
+      const rp = r.raw_payload as unknown as Record<string, unknown>;
       // Whitelist: no unexpected keys ever appear.
       for (const k of Object.keys(rp)) {
         expect(ALLOWED_KEYS.has(k)).toBe(true);

@@ -1,7 +1,7 @@
 /**
  * Pure helpers for labeling a sensor reading's source — with special care
  * for manual snapshots so the grower can capture *where* the reading came
- * from (handheld meter, SwitchBot CO₂ monitor, SensorPush, etc.) without
+ * from (handheld meter, EcoWitt console, SensorPush, etc.) without
  * ever making a manual entry look live.
  *
  * No I/O, no React, no Supabase. Deterministic.
@@ -35,7 +35,10 @@ export interface ManualDeviceOption {
  * these imply any integration exists — they are just labels.
  */
 const MANUAL_DEVICE_PRESETS: ManualDeviceOption[] = [
-  { id: "switchbot-co2", label: "SwitchBot CO2 Monitor" },
+  { id: "ecowitt-wh45", label: "EcoWitt WH45 CO2/THP Monitor" },
+  { id: "ecowitt-wh31", label: "EcoWitt WH31 Temp/RH Sensor" },
+  { id: "ecowitt-wh51", label: "EcoWitt WH51 Soil Moisture Sensor" },
+  { id: "ecowitt-gateway", label: "EcoWitt gateway" },
   { id: "sensorpush", label: "SensorPush" },
   { id: "pulse", label: "Pulse" },
   { id: "ac-infinity", label: "AC Infinity controller" },
@@ -134,7 +137,7 @@ const BASE_SOURCE_LABELS: Record<string, string> = {
 
 /**
  * Format the visible source label for a reading. For manual rows with a
- * safe device note, returns e.g. "Manual reading · SwitchBot CO2 Monitor".
+ * safe device note, returns e.g. "Manual reading · EcoWitt WH45 CO2/THP Monitor".
  *
  * Never returns "Live" / "Synced" / "Connected" for a manual source.
  */

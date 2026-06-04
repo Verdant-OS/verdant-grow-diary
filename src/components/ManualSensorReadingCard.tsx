@@ -142,7 +142,7 @@ export default function ManualSensorReadingCard({
           <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
           <span>
             Saved as a <strong>manual snapshot</strong>, not live sensor data. Good for handheld
-            tools like the SwitchBot CO₂/temp/RH monitor.
+            tools and EcoWitt console/app readouts (e.g. WH45 CO₂/THP, WH31 temp/RH, WH51 soil).
           </span>
         </div>
 
@@ -247,7 +247,7 @@ export default function ManualSensorReadingCard({
             unit="ppm"
             value={form.co2Ppm as string}
             onChange={(v) => update("co2Ppm", v)}
-            placeholder="e.g. 800 from SwitchBot CO₂ Monitor"
+            placeholder="e.g. 800 from EcoWitt WH45 CO₂ Monitor"
           />
           <Field
             id="m-vpd"

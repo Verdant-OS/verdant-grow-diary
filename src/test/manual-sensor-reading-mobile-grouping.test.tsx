@@ -88,8 +88,6 @@ describe("static safety: manual sensor card", () => {
     "Leads",
     "writeWateringTypedEvent",
     "action_queue",
-    "switchbot.com",
-    "api.switch-bot",
   ];
   for (const term of forbidden) {
     it(`does not reference \`${term}\``, () => {

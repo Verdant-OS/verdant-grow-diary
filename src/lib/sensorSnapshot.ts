@@ -22,7 +22,7 @@ export interface SensorSnapshot {
    * Raw `device_id` from the contributing sensor row (when one is
    * available). Display surfaces pair this with `source` via
    * `formatSensorSourceLabel` to render labels like
-   * "Manual reading · SwitchBot CO2 Monitor" without ever upgrading
+   * "Manual reading · EcoWitt WH45 CO2/THP Monitor" without ever upgrading
    * a manual row to live.
    */
   device_id?: string | null;

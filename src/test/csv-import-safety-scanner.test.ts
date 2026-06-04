@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 const FILES = [
   "src/lib/csvImportPlanRules.ts",
   "src/lib/csvImportIdempotency.ts",
+  "src/lib/csvImportPlanReport.ts",
   "src/components/CsvPreviewReviewGate.tsx",
 ];
 

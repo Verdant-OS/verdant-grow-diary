@@ -3,7 +3,7 @@
  * and the blocked-row reason taxonomy shown in the disabled review UI.
  *
  * Hard constraints (Safe-by-Design):
- *  - No I/O. No Supabase. No Edge Functions. No fetch / XHR / sendBeacon.
+ *  - No I/O. No Supabase. No Edge Functions. No network calls of any kind.
  *  - No writes. No alerts. No Action Queue. No AI. No automation.
  *    No device control. Pure data shaping only.
  *  - Never echoes secrets / tokens / auth / user_id / service role keys /

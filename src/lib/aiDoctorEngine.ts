@@ -8,7 +8,7 @@
  *
  * Safety:
  *   - No Supabase writes, no alerts, no Action Queue, no device control.
- *   - No service_role, no bridge tokens.
+ *   - No privileged service keys, no bridge credentials.
  *   - No external model/API calls in this phase — all model steps are
  *     deterministic stubs that return cautious low-confidence output.
  *   - Final user-facing confidence comes from the automated

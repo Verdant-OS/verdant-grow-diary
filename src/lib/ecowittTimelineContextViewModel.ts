@@ -14,8 +14,9 @@
  *  - Never fabricates a reading. If nothing falls inside the window, the
  *    entry gets `snapshot: null` and the UI renders no chip.
  *  - Derived VPD label lives in `ECOWITT_DERIVED_VPD_LABEL` — never call
- *    EcoWitt-derived VPD "Live VPD".
- */
+ *    EcoWitt-derived VPD anything other than "Derived VPD". The "live"
+ *    canonical source only survives the freshness check; stale rows are
+ *    demoted by the snapshot view-model.
 import {
   buildEcowittSnapshotViewModel,
   type EcowittCandidate,

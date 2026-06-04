@@ -1305,6 +1305,7 @@ export default function Dashboard() {
                 className="rounded-lg border border-dashed border-border/60 bg-secondary/10 p-3 text-sm"
               >
                 <p className="font-medium">{APPROVAL_QUEUE_EMPTY_COPY.title}</p>
+                <span className="sr-only">No pending actions.</span>
                 <p className="text-xs text-muted-foreground mt-1">
                   {APPROVAL_QUEUE_EMPTY_COPY.hint}
                 </p>

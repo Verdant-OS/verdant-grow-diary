@@ -32,9 +32,9 @@ export interface GrowDiaryTimelineItem {
   /** "live" | "manual" | "stale" | "invalid" | null when missing/legacy. */
   sensorSnapshotState: string | null;
   /** Display label for the snapshot's transport/origin (presenter-only). */
-  sensorSourceLabel: string | null;
+  sensorSourceLabel?: string | null;
   /** Display label for vendor lineage (lineage only; never auth/ownership). */
-  sensorVendorLabel: string | null;
+  sensorVendorLabel?: string | null;
   tags: string[];
   warnings: string[];
   isUsefulForAiContext: boolean;

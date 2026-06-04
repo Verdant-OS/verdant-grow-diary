@@ -289,15 +289,31 @@ function buildSafetyNotes(
 /**
  * Convert a NormalizedSensorReading into AI Doctor context.
  *
- * Pure, deterministic, no side effects.
+ * Pure, deterministic, no side effects. The optional `vpdDrift` argument
+ * carries a pre-computed EWMA drift evaluation (see `vpdDriftRules.ts`
+ * or the SQL helper `public.evaluate_vpd_drift_ewma`). Passing it in
+ * here lets AI Doctor surface a cautious review suggestion without
+ * fetching anything itself and without ever creating an Action Queue
+ * row automatically.
  */
 export function mapSensorReadingToAiDoctorContext(
   reading: NormalizedSensorReading,
+  options?: { vpdDrift?: VpdDriftResult | null },
 ): AiDoctorSensorContext {
   const { usable, missing, invalid } = classifyMetrics(reading);
   const confidenceImpact = computeConfidenceImpact(reading.source, invalid);
   const contextSummary = buildContextSummary(reading.source, usable, missing, invalid);
   const safetyNotes = buildSafetyNotes(reading.source, usable, missing, invalid);
+
+  let vpdDrift: AiDoctorVpdDriftContext | undefined;
+  if (options?.vpdDrift) {
+    vpdDrift = buildVpdDriftAiContext(options.vpdDrift);
+    // Drift safety notes are folded into the main safety list so callers
+    // that only read `safetyNotes` still see them.
+    for (const n of vpdDrift.safetyNotes) {
+      if (!safetyNotes.includes(n)) safetyNotes.push(n);
+    }
+  }
 
   return {
     sourceState: reading.source,
@@ -312,5 +328,6 @@ export function mapSensorReadingToAiDoctorContext(
     confidenceImpact,
     contextSummary,
     safetyNotes,
+    ...(vpdDrift ? { vpdDrift } : {}),
   };
 }

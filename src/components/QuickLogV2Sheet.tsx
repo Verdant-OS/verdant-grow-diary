@@ -41,8 +41,20 @@ export default function QuickLogV2Sheet({
   onOpenChange,
   defaultTargetKey,
 }: Props) {
-  const { data: plants = [] } = usePlants();
-  const { data: tents = [] } = useTents();
+  const plantsQ = usePlants() as {
+    data?: unknown[];
+    isLoading?: boolean;
+    isError?: boolean;
+    refetch?: () => void;
+  };
+  const tentsQ = useTents() as {
+    data?: unknown[];
+    isLoading?: boolean;
+    isError?: boolean;
+    refetch?: () => void;
+  };
+  const plants = (plantsQ.data as Parameters<typeof buildQuickLogV2TargetOptions>[1]) ?? [];
+  const tents = (tentsQ.data as Parameters<typeof buildQuickLogV2TargetOptions>[0]) ?? [];
   const queryClient = useQueryClient();
   const { save, saving } = useQuickLogV2Save();
 
@@ -53,6 +65,12 @@ export default function QuickLogV2Sheet({
     () => buildQuickLogV2TargetOptions(tents, plants),
     [tents, plants],
   );
+
+  const isLoadingContext = Boolean(plantsQ.isLoading || tentsQ.isLoading);
+  const hasFetchError = Boolean(plantsQ.isError || tentsQ.isError);
+  const hasNoTargets =
+    !isLoadingContext && !hasFetchError && options.length === 0;
+  const contextBlocked = isLoadingContext || hasFetchError || hasNoTargets;
 
   useEffect(() => {
     if (open) {
@@ -127,14 +145,87 @@ export default function QuickLogV2Sheet({
         </SheetHeader>
 
         <div className="mt-4 space-y-4">
+          {isLoadingContext && (
+            <div
+              role="status"
+             
+              data-testid="qlv2-context-loading"
+              className="rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground"
+            >
+              Loading your plants and tents…
+            </div>
+          )}
+          {hasFetchError && (
+            <div
+              role="alert"
+              data-testid="qlv2-context-error"
+              className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive flex items-center justify-between gap-2"
+            >
+              <span>Couldn't load your plants and tents.</span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                data-testid="qlv2-context-retry"
+                onClick={() => {
+                  plantsQ.refetch?.();
+                  tentsQ.refetch?.();
+                }}
+              >
+                Retry
+              </Button>
+            </div>
+          )}
+          {hasNoTargets && (
+            <div
+              role="status"
+              data-testid="qlv2-context-empty"
+              className="rounded-md border border-border bg-muted/30 p-3 text-sm space-y-2"
+            >
+              <p className="text-foreground">
+                You don't have any plants or tents yet.
+              </p>
+              <p className="text-muted-foreground">
+                Add one before logging your first action.
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <a
+                  href="/plants"
+                  data-testid="qlv2-context-empty-add-plant"
+                  className="text-sm px-3 min-h-11 inline-flex items-center rounded-md border border-border/60 hover:bg-secondary/60 touch-manipulation"
+                >
+                  Add a plant
+                </a>
+                <a
+                  href="/tents"
+                  data-testid="qlv2-context-empty-add-tent"
+                  className="text-sm px-3 min-h-11 inline-flex items-center rounded-md border border-border/60 hover:bg-secondary/60 touch-manipulation"
+                >
+                  Add a tent
+                </a>
+              </div>
+            </div>
+          )}
+
           <div>
             <Label htmlFor="qlv2-target">Target</Label>
             <Select
               value={form.selectedKey ?? ""}
               onValueChange={(v) => setField("selectedKey", v)}
+              disabled={contextBlocked}
             >
               <SelectTrigger id="qlv2-target" aria-label="Target">
-                <SelectValue placeholder="Choose a tent or plant" />
+                <SelectValue
+                  placeholder={
+                    isLoadingContext
+                      ? "Loading…"
+                      : hasFetchError
+                        ? "Couldn't load targets"
+                        : hasNoTargets
+                          ? "No plants or tents yet"
+                          : "Choose a tent or plant"
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
                 {options.map((o) => (
@@ -271,7 +362,8 @@ export default function QuickLogV2Sheet({
             <Button
               className="flex-1"
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || contextBlocked}
+              data-testid="qlv2-save"
             >
               {saving ? "Saving…" : "Save"}
             </Button>

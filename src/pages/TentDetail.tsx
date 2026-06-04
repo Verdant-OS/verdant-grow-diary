@@ -64,7 +64,7 @@ import { plantDetailPath, tentsPath } from "@/lib/routes";
 export default function TentDetail() {
   const { id } = useParams();
   const [showArchived, setShowArchived] = useState(false);
-  const { data: tent, isLoading } = useGrowTent(id);
+  const { data: tent, isLoading, isError, refetch } = useGrowTent(id);
   const { data: activePlants = [] } = useGrowPlants(id);
   const { data: allPlants = [] } = useGrowPlants(id, undefined, { includeArchived: true });
   const { data: readings = [] } = useSensorReadings(id);
@@ -76,7 +76,51 @@ export default function TentDetail() {
   const hasArchived = shouldShowArchivedToggle(allPlants);
   const visiblePlants = filterVisiblePlants(allPlants, { showArchived });
 
-  if (isLoading) return <div className="glass rounded-2xl h-64 animate-pulse" />;
+  if (isLoading) {
+    return (
+      <div
+        className="glass rounded-2xl h-64 animate-pulse"
+        role="status"
+        aria-busy="true"
+        aria-label="Loading tent"
+        data-testid="tent-detail-loading"
+      />
+    );
+  }
+  if (isError) {
+    return (
+      <div data-testid="tent-detail-error" role="alert">
+        <GrowDataSourceDisclosure
+          resource="tents"
+          hasAnyData={false}
+          metas={[tentMeta]}
+          testId="tent-detail-data-source-disclosure"
+        />
+        <EmptyState
+          icon={<Box className="h-6 w-6" />}
+          title="Couldn't load this tent"
+          description="Something went wrong while loading this tent. Check your connection and try again."
+          action={
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                onClick={() => { void refetch(); }}
+                data-testid="tent-detail-error-retry"
+                className="min-h-11"
+              >
+                Retry
+              </Button>
+              <Button asChild variant="ghost" className="min-h-11">
+                <Link to={tentsPath()}>
+                  <ArrowLeft className="h-4 w-4" /> Back to tents
+                </Link>
+              </Button>
+            </div>
+          }
+        />
+      </div>
+    );
+  }
   if (!tent) {
     return (
       <div>
@@ -93,7 +137,7 @@ export default function TentDetail() {
           action={
             <Button asChild variant="outline">
               <Link to={tentsPath()}>
-                <ArrowLeft className="h-4 w-4" /> Back
+                <ArrowLeft className="h-4 w-4" /> Back to tents
               </Link>
             </Button>
           }

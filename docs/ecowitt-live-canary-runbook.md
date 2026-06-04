@@ -236,9 +236,11 @@ If any item is unchecked, **do not** point the live gateway. File a blocker agai
 
 ---
 
-## 6. Canary tent setup (prerequisite)
+## 6. Canary tent setup (prerequisite) — Selected tent config
 
-The edge function only routes a payload when at least one tent the caller owns has a matching `hardware_config.ecowitt` block. Confirmed shape consumed by the deployed code (`parseEligibleTents` in `supabase/functions/ecowitt-ingest/index.ts`):
+The canary tent MUST map exactly one channel: channel 1. Channel 9 MUST remain unmapped — it appears in the main POST only as a negative-control probe to prove that unmapped channels create zero rows. **If channel 9 is added to `hardware_config`, the canary is invalid** (it will route and insert rows).
+
+Required `tents.hardware_config` shape (confirmed against the deployed `parseEligibleTents` in `supabase/functions/ecowitt-ingest/index.ts`):
 
 ```json
 {
@@ -250,16 +252,54 @@ The edge function only routes a payload when at least one tent the caller owns h
 }
 ```
 
-Notes — these are non-negotiable; the deployed code rejects anything else:
+Non-negotiable type rules (the deployed router silently drops anything else):
 
-- `passkey_fingerprint` is a **string** in the `ewfp_<24 hex>` format produced by `computeEcoWittPasskeyFingerprint(rawPasskey)`. The raw `PASSKEY` is **never** stored on the tent. (If you ever see `hardware_config.ecowitt.passkey` storing the raw value, stop — that's a safety regression.)
-- `air_channels` / `soil_channels` are arrays of **JSON numbers** in `[1..8]`. Strings like `"1"` are silently dropped by the router's type filter.
-- The bridge token used in the `Authorization` header must be scoped to (or its user must own) this tent.
+- `passkey_fingerprint` — **string**, exactly the `ewfp_<24 hex>` format produced by `computeEcoWittPasskeyFingerprint(rawPasskey)`. Raw `PASSKEY` is **never** stored on the tent.
+- `air_channels` / `soil_channels` — arrays of **JSON numbers** in `[1..8]`. Strings like `"1"` are silently filtered out → the canary would route nothing → false-pass.
+- The bridge token used in `Authorization` must be owned by, or scoped to, this tent.
 
-### How to compute the fingerprint locally (do not paste real values into git/chat)
+### Apply the canary tent config
+
+```sql
+UPDATE public.tents
+SET hardware_config = jsonb_set(
+  COALESCE(hardware_config, '{}'::jsonb),
+  '{ecowitt}',
+  '{
+    "passkey_fingerprint": "ewfp_REDACTED_TEST_FINGERPRINT",
+    "air_channels": [1],
+    "soil_channels": [1]
+  }'::jsonb,
+  true
+)
+WHERE id = 'REDACTED_CANARY_TENT_ID';
+```
+
+### Pre-POST validator (run BEFORE firing the harness)
+
+```sql
+SELECT id,
+       hardware_config->'ecowitt'->>'passkey_fingerprint' AS fingerprint,
+       hardware_config->'ecowitt'->'air_channels'         AS air,
+       hardware_config->'ecowitt'->'soil_channels'        AS soil,
+       (hardware_config->'ecowitt'->'air_channels')  @> '[9]'::jsonb
+         OR (hardware_config->'ecowitt'->'soil_channels') @> '[9]'::jsonb
+         AS channel_9_present_FAIL_IF_TRUE
+FROM public.tents
+WHERE id = 'REDACTED_CANARY_TENT_ID';
+```
+
+Pass criteria — abort the canary if any fails:
+
+- `fingerprint` starts with `ewfp_` and is 29 chars total.
+- `air = [1]` (JSON array containing the integer 1, not the string `"1"`).
+- `soil = [1]`.
+- `channel_9_present_FAIL_IF_TRUE = false`.
+
+### How to compute the fingerprint locally (never paste real PASSKEY into git/chat)
 
 ```bash
-node -e '
+PASSKEY="<your test passkey>" node -e '
 const v = process.env.PASSKEY ?? "";
 require("node:crypto").webcrypto.subtle
   .digest("SHA-256", new TextEncoder().encode(v.trim()))
@@ -268,24 +308,19 @@ require("node:crypto").webcrypto.subtle
     console.log("ewfp_" + h.slice(0, 24));
   });
 '
-PASSKEY="<your test passkey>" node -e '…'   # paste at the shell, never commit
 ```
 
-Cross-check by running the canary POST and looking at the function response: `summary.matched_fingerprint` (echoed via `per_tent` accounting) should be the same `ewfp_…` string you stored.
+### Run the harness
 
-### Verifying the tent before POSTing
-
-```sql
-SELECT id,
-       hardware_config->'ecowitt'->>'passkey_fingerprint' AS fingerprint,
-       hardware_config->'ecowitt'->'air_channels'         AS air,
-       hardware_config->'ecowitt'->'soil_channels'        AS soil
-FROM public.tents
-WHERE hardware_config ? 'ecowitt'
-  AND is_archived = false;
+```bash
+export SUPABASE_PROJECT_REF=<ref>
+export ECOWITT_BRIDGE_TOKEN=vbt_...
+export ECOWITT_TEST_PASSKEY=<real test passkey>
+export ECOWITT_TEST_MAC=<real test mac>
+bash scripts/ecowitt-canary-harness.sh
 ```
 
-Expect at least one row whose `fingerprint` starts with `ewfp_` and whose `air`/`soil` are JSON arrays of integers.
+The harness prints a pass/fail matrix and redacts every secret it sees before printing response bodies.
 
 
 ---

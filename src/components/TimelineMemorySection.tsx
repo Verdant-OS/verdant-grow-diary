@@ -11,7 +11,7 @@
  *  - Empty filtered state copy is exactly: "No events match this filter."
  */
 import { useMemo, useState } from "react";
-import { History } from "lucide-react";
+import { History, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import ManualSnapshotTimelineCard from "@/components/ManualSnapshotTimelineCard";
@@ -33,6 +33,7 @@ import {
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 import { buildTimelineSensorSnapshotViewModel } from "@/lib/timelineSensorSnapshotViewModel";
 import { buildTimelinePhotoPreviewViewModel } from "@/lib/timelinePhotoPreviewViewModel";
+import { buildTimelineDayGroups } from "@/lib/timelineDayGroupingViewModel";
 
 type Props =
   | { scope: "plant"; plantId: string | null | undefined }
@@ -69,12 +70,24 @@ function DiaryItemRow({ item }: { item: Extract<TimelineMemoryItem, { kind: "dia
       data-testid="timeline-memory-diary-item"
       data-item-key={item.key}
       data-event-type={item.eventType ?? ""}
+      data-stage={item.stage ?? ""}
       className="rounded-lg border border-border/40 bg-card/40 p-3 text-sm"
     >
       <div className="flex items-center justify-between gap-2">
-        <Badge variant="outline" className="text-[10px]">
-          {item.eventType ?? "note"}
-        </Badge>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Badge variant="outline" className="text-[10px]">
+            {item.eventType ?? "note"}
+          </Badge>
+          {item.stage && (
+            <Badge
+              variant="secondary"
+              className="text-[10px]"
+              data-testid="timeline-diary-stage-chip"
+            >
+              {item.stage}
+            </Badge>
+          )}
+        </div>
         <time
           dateTime={item.occurredAt}
           className="text-xs text-muted-foreground"
@@ -222,6 +235,7 @@ export default function TimelineMemorySection(props: Props) {
 
   const chips = useMemo(() => buildTimelineFilterChips(items, filter), [items, filter]);
   const visible = useMemo(() => filterTimelineMemoryItems(items, filter), [items, filter]);
+  const dayGroups = useMemo(() => buildTimelineDayGroups(visible), [visible]);
 
   return (
     <Card data-testid="timeline-memory-section" data-scope={props.scope}>
@@ -291,31 +305,57 @@ export default function TimelineMemorySection(props: Props) {
                 {TIMELINE_FILTER_EMPTY_STATE_COPY}
               </p>
             ) : (
-              <ul className="space-y-3" data-testid="timeline-memory-list">
-                {visible.map((item) =>
-                  item.kind === "manual_sensor_snapshot" ? (
-                    <li key={`snap:${item.key}`}>
-                      <ManualSnapshotTimelineCard card={item.card} />
-                    </li>
-                  ) : item.kind === "ai_doctor_sensor_evidence_audit" ? (
-                    <li key={`aiaudit:${item.key}`}>
-                      <AiDoctorEvidenceAuditRow item={item} />
-                    </li>
-                  ) : item.kind === "diary" ? (
-                    <li key={`diary:${item.key}`}>
-                      <DiaryItemRow item={item} />
-                    </li>
-                  ) : (
-                    <li
-                      key={`unknown:${(item as { key?: string }).key ?? Math.random()}`}
-                      data-testid="timeline-memory-unknown-fallback"
-                      className="rounded-md border border-border/40 bg-muted/20 p-2 text-xs text-muted-foreground"
-                    >
-                      Entry (unsupported type, hidden from filters).
-                    </li>
-                  ),
-                )}
-              </ul>
+              <div data-testid="timeline-memory-day-groups" className="space-y-5">
+                {dayGroups.map((group) => (
+                  <section
+                    key={group.dayKey}
+                    data-testid="timeline-day-group"
+                    data-day-key={group.dayKey}
+                    className="space-y-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                      <h3
+                        className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                        data-testid="timeline-day-group-label"
+                      >
+                        {group.label}
+                      </h3>
+                      <span
+                        className="text-[10px] text-muted-foreground/70"
+                        data-testid="timeline-day-group-count"
+                      >
+                        {group.count} event{group.count === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                    <ul className="space-y-3" data-testid="timeline-memory-list">
+                      {group.items.map((item) =>
+                        item.kind === "manual_sensor_snapshot" ? (
+                          <li key={`snap:${item.key}`}>
+                            <ManualSnapshotTimelineCard card={item.card} />
+                          </li>
+                        ) : item.kind === "ai_doctor_sensor_evidence_audit" ? (
+                          <li key={`aiaudit:${item.key}`}>
+                            <AiDoctorEvidenceAuditRow item={item} />
+                          </li>
+                        ) : item.kind === "diary" ? (
+                          <li key={`diary:${item.key}`}>
+                            <DiaryItemRow item={item} />
+                          </li>
+                        ) : (
+                          <li
+                            key={`unknown:${(item as { key?: string }).key ?? Math.random()}`}
+                            data-testid="timeline-memory-unknown-fallback"
+                            className="rounded-md border border-border/40 bg-muted/20 p-2 text-xs text-muted-foreground"
+                          >
+                            Entry (unsupported type, hidden from filters).
+                          </li>
+                        ),
+                      )}
+                    </ul>
+                  </section>
+                ))}
+              </div>
             )}
           </>
         )}

@@ -439,12 +439,14 @@ export function CsvPreviewReviewGate({
                     Attach to existing diary entry
                   </label>
                   {!hasExistingEntries && (
-                    <span
+                    <div
                       data-testid="csv-gate-attach-existing-disabled-copy"
-                      className="text-muted-foreground"
+                      className="text-muted-foreground space-y-0.5"
                     >
-                      {EXISTING_DIARY_DISABLED_COPY}
-                    </span>
+                      <div>Existing diary entry attach is not available in preview mode.</div>
+                      <div>For now, Verdant shows the single diary summary draft that would be created later.</div>
+                      <div>No diary entry is created from this screen.</div>
+                    </div>
                   )}
                 </div>
               </div>

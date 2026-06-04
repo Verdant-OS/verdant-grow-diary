@@ -39,6 +39,7 @@ import Pricing from "./pages/Pricing";
 import BillingPlaceholder from "./pages/BillingPlaceholder";
 import Leads from "./pages/Leads";
 import PiIngestStatus from "./pages/PiIngestStatus";
+import IngestInspector from "./pages/IngestInspector";
 import NotFound from "./pages/NotFound";
 import RepresentativeCsvPreview from "./pages/RepresentativeCsvPreview";
 

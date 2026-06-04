@@ -303,10 +303,23 @@ function NormalizationResult({
       {explanation.warnings.length > 0 ? (
         <div
           className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm"
-          data-testid="webhook-normalizer-warnings"
+          data-testid="webhook-normalizer-ignored-unsafe-fields"
         >
-          <h3 className="mb-2 text-sm font-semibold">Warnings</h3>
-          <ul className="list-disc space-y-1 pl-5 text-xs">
+          <h3 className="mb-2 text-sm font-semibold">
+            Ignored unsafe fields{" "}
+            <span className="text-xs font-normal text-muted-foreground">
+              (not trusted — never used for auth, ownership, or routing)
+            </span>
+          </h3>
+          <p className="mb-2 text-xs text-muted-foreground">
+            These keys were present in the payload but the server treats
+            them as untrusted. They are stripped from{" "}
+            <code>raw_payload</code> and never used to set the row owner.
+          </p>
+          <ul
+            className="list-disc space-y-1 pl-5 text-xs"
+            data-testid="webhook-normalizer-warnings"
+          >
             {explanation.warnings.map((w, idx) => (
               <li key={`${w}-${idx}`}>{w}</li>
             ))}

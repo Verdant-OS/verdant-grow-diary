@@ -134,7 +134,7 @@ export default function GrowDetail() {
           to={dashboardPath(growId)}
           icon={<Sparkles className="h-4 w-4" />}
           title="Dashboard"
-          description="Open the live dashboard scoped to this grow."
+          description="Open the dashboard scoped to this grow."
           count="unavailable"
           countLabel="dashboard"
         />

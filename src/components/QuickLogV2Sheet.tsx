@@ -148,7 +148,7 @@ export default function QuickLogV2Sheet({
           {isLoadingContext && (
             <div
               role="status"
-              aria-live="polite"
+             
               data-testid="qlv2-context-loading"
               className="rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground"
             >

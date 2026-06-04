@@ -118,10 +118,6 @@ export default function CsvSensorPreviewPanel() {
     if (!effective || !effective.ok) return [];
     const full = buildFullCsvTimelineRows(effective);
     const windowed = filterPreviewTimelineByWindow(full, window);
-    // Sampling happens in the report builder too; keep timeline preview consistent.
-    const { samplePreviewTimeline } = require("@/lib/csvSensorPreviewRules") as {
-      samplePreviewTimeline: typeof import("@/lib/csvSensorPreviewRules").samplePreviewTimeline;
-    };
     return samplePreviewTimeline(windowed, sampling);
   }, [effective, window, sampling]);
 

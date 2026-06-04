@@ -95,6 +95,10 @@ import DashboardDailyGrowCheckPanel from "@/components/DashboardDailyGrowCheckPa
 import { Badge } from "@/components/ui/badge";
 import SensorSourceBadge from "@/components/SensorSourceBadge";
 import { actionDetailPath, actionsPath, alertDetailPath, alertsPath, dashboardPath, logsPath, tentDetailPath, tentsPath } from "@/lib/routes";
+import {
+  buildTentSnapshotView,
+  type BuildTentSnapshotInput,
+} from "@/lib/dashboardEnvironmentSnapshotViewModel";
 import { formatDistanceToNow } from "date-fns";
 
 

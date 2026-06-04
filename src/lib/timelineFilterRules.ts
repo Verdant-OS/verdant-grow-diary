@@ -67,6 +67,18 @@ export interface TimelineDiaryItem {
   note: string | null;
   /** Optional severity carried by upstream metadata. */
   hasWarning?: boolean;
+  /**
+   * Optional sensor snapshot payload (e.g. `details.sensor`) carried for
+   * Timeline chip rendering. Unknown / malformed shapes are tolerated;
+   * the view-model decides how to render.
+   */
+  sensorSnapshot?: unknown;
+  /** Optional single-photo URL from `diary_entries.photo_url`. */
+  photoUrl?: string | null;
+  /** Optional array of attached photos (URLs or `{ url }` objects). */
+  photos?: unknown;
+  /** Optional plant display name, used to compose accessible alt text. */
+  plantName?: string | null;
 }
 
 export interface TimelineManualSnapshotItem {

@@ -1,0 +1,45 @@
+name: One-Tent Loop smoke test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  one-tent-loop-smoke:
+    name: One-Tent Loop smoke audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache
+        uses: actions/cache@v5.0.5
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Stop-ship: protects the core Verdant operating loop
+      # (Grow → Tent → Plant → Manual Reading → Snapshot → Alert →
+      # Action Queue → Completion → Follow-up Diary → Timeline).
+      # See docs/one-tent-loop-smoke-test-audit.md.
+      - name: One-Tent Loop smoke audit
+        run: bun run test:one-tent-loop-smoke
+
+      - name: EcoWitt-only sensor direction scanner
+        run: node scripts/assert-ecowitt-only-sensor-direction.mjs
+
+      - name: Sensor Intelligence safety scanner
+        run: bun run test:sensor-intelligence-safety

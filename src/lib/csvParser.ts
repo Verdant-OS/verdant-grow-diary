@@ -421,11 +421,15 @@ function detectColumns(headers: string[]): DetectedColumns {
       out.time = h;
       continue;
     }
-    if (out.temperature == null && /(temp(_|\s)?[fc]?$)|temperature|^air.?temp/.test(k)) {
+    if (
+      out.temperature == null &&
+      /temp/.test(k) &&
+      !/setpoint|target/.test(k)
+    ) {
       out.temperature = h;
       continue;
     }
-    if (out.humidity == null && /humidity|relative.?humidity|^rh($|[^a-z])/.test(k)) {
+    if (out.humidity == null && /(humidity|^rh\b|^rh[^a-z])/.test(k)) {
       out.humidity = h;
       continue;
     }

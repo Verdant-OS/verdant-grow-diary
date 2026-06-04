@@ -267,3 +267,7 @@ is safe; a payload mutated between retries will be treated as a new reading.
 - No MQTT subscriber inside the edge function — bridge pattern required.
 - No partner cloud polling, no device control, no automation, no alerts or
   Action Queue rows created from ingested data.
+
+## Bridge client retry & backoff
+
+See [`bridge-client-retry-guidance.md`](./bridge-client-retry-guidance.md) for Full Jitter exponential backoff defaults and bridge-client examples.

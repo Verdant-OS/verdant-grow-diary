@@ -326,3 +326,7 @@ Idempotency-Key: csv-2026-05-26-batch-7
   JWT/bridge token, and tent ownership.
 - `vendor` MUST NOT be used by any code path for authorization, ownership,
   alerting, Action Queue routing, or device control.
+
+## Bridge client retry & backoff
+
+See [`bridge-client-retry-guidance.md`](./bridge-client-retry-guidance.md) for Full Jitter retry policy, Python / ESP32 / Home Assistant / Node-RED / MQTT bridge examples, and the source-vs-vendor rules bridge clients must follow.

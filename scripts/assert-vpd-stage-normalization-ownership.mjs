@@ -50,6 +50,7 @@ const ALLOWED = new Set(
   [
     "src/lib/vpdStageNormalizationRules.ts",
     "src/test/vpd-stage-normalization-rules.test.ts",
+    "src/test/vpd-stage-normalization-ownership.test.ts",
     "docs/vpd-stage-vocabulary.md",
     "scripts/assert-vpd-stage-normalization-ownership.mjs",
   ].map((p) => p.split("/").join(sep)),

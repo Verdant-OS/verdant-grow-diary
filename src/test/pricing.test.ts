@@ -178,9 +178,10 @@ describe("AI Doctor credits", () => {
 describe("Trust strip", () => {
   it("renders the trust strip with required copy", () => {
     expect(PAGE).toMatch(/TRUST_STRIP/);
-    for (const item of TRUST_STRIP.items) {
-      expect(CONSTANTS).toContain(item);
-    }
+    expect(CONSTANTS).toContain("Read-only");
+    expect(CONSTANTS).toContain("Honest data labels");
+    expect(CONSTANTS).toContain("Your history is always yours");
+    expect(CONSTANTS).toContain("No blind automation");
   });
 });
 

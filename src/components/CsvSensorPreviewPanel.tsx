@@ -173,7 +173,7 @@ export default function CsvSensorPreviewPanel() {
       sampling,
     });
     downloadLocalBlob(
-      new Blob([bytes], { type: "application/pdf" }),
+      new Blob([bytes.buffer as ArrayBuffer], { type: "application/pdf" }),
       "verdant-sensor-preview-report.pdf",
     );
   }, [result, overrides, window, sampling]);

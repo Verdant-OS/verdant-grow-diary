@@ -43,6 +43,16 @@ Deno.serve(async (req) => {
   if (!authHeader?.startsWith("Bearer ")) return json({ error: "unauthorized" }, 401);
   const rawToken = authHeader.replace("Bearer ", "");
 
+  // Optional client-supplied idempotency key (recommended for bridge clients:
+  // MQTT, Ecowitt, Home Assistant). The real dedupe guarantee comes from the
+  // partial unique index `sensor_readings_dedupe_uidx`; this header is kept
+  // for traceability in raw_payload. Capped to avoid abuse.
+  const rawIdemHeader = req.headers.get("Idempotency-Key");
+  const idempotencyKey =
+    typeof rawIdemHeader === "string" && rawIdemHeader.length > 0
+      ? rawIdemHeader.slice(0, 128)
+      : null;
+
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -105,49 +115,58 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Choose the client used for read+insert. Bridge path uses service role
-  // (token already authenticated), explicitly stamping user_id on each row.
+  // Choose the client used for insert. Bridge path uses service role (token
+  // already authenticated), explicitly stamping user_id on each row.
   const writer = auth.kind === "bridge" ? admin! : anonForJwt;
 
   const capturedAt = normalized.rows[0].captured_at as string;
   const source = normalized.rows[0].source as string;
-  const { data: existing } = await writer
+
+  // Stamp user_id from auth (never from the request body) and fold the
+  // Idempotency-Key header (if any) into raw_payload for traceability. The
+  // real dedupe guarantee is the partial unique index
+  // `sensor_readings_dedupe_uidx` enforced atomically by Postgres.
+  const toInsert = normalized.rows.map((r) => {
+    const raw = (r as { raw_payload?: Record<string, unknown> }).raw_payload ?? {};
+    return {
+      ...r,
+      user_id: auth.userId,
+      raw_payload: idempotencyKey
+        ? ({ ...raw, idempotency_key: idempotencyKey } as unknown as typeof r.raw_payload)
+        : (r.raw_payload as typeof r.raw_payload),
+    };
+  });
+
+  // Atomic upsert: ON CONFLICT (user_id, tent_id, source, metric, captured_at)
+  // DO NOTHING. Concurrent identical POSTs cannot create duplicates.
+  const { data: upserted, error: insErr } = await writer
     .from("sensor_readings")
-    .select("metric, value")
-    .eq("tent_id", payloadTentId)
-    .eq("source", source)
-    .eq("captured_at", capturedAt);
+    .upsert(toInsert, {
+      onConflict: "user_id,tent_id,source,metric,captured_at",
+      ignoreDuplicates: true,
+    })
+    .select("id");
 
-  const existingKey = new Set(
-    (existing ?? []).map((r) => `${r.metric}:${Number(r.value).toFixed(6)}`),
-  );
-  const toInsert = normalized.rows
-    .filter(
-      (r) => !existingKey.has(
-        `${r.metric}:${Number(r.value as number).toFixed(6)}`,
-      ),
-    )
-    .map((r) => ({ ...r, user_id: auth.userId }));
-
-  if (toInsert.length === 0) {
-    return json({
-      ok: true,
-      inserted: 0,
-      skipped_duplicate: normalized.rows.length,
-      rejected: normalized.errors,
-    }, 200);
-  }
-
-  const { error: insErr } = await writer.from("sensor_readings").insert(toInsert);
   if (insErr) {
-    return json({ error: "insert_failed", detail: insErr.message }, 400);
+    // Never leak PG error text, constraint names, payload values, tokens,
+    // bridge ids, secrets, or internal table names. Log internally only.
+    console.error("[sensor-ingest-webhook] insert failed", {
+      auth_kind: auth.kind,
+      tent_id_present: !!payloadTentId,
+      // Intentionally NOT logging the raw insErr.message.
+    });
+    return json({ error: "insert_failed" }, 400);
   }
+
+  const insertedCount = upserted?.length ?? 0;
+  const skippedDuplicate = toInsert.length - insertedCount;
+
 
   // Bump last_used_at, first_used_at, and ingest_count atomically (server-only RPC).
-  if (auth.kind === "bridge" && admin) {
+  if (auth.kind === "bridge" && admin && insertedCount > 0) {
     await admin.rpc("bump_bridge_token_usage", {
       p_id: auth.tokenId,
-      p_inserted: toInsert.length,
+      p_inserted: insertedCount,
     });
   }
 
@@ -162,7 +181,7 @@ Deno.serve(async (req) => {
       source,
       capturedAt: capturedAt,
       rowsReceived: normalized.rows.length,
-      rowsInserted: toInsert.length,
+      rowsInserted: insertedCount,
     });
     if (auditRow) {
       await admin.from("sensor_ingest_audit_log").insert(auditRow);
@@ -172,11 +191,12 @@ Deno.serve(async (req) => {
 
   return json({
     ok: true,
-    inserted: toInsert.length,
-    skipped_duplicate: normalized.rows.length - toInsert.length,
+    inserted: insertedCount,
+    skipped_duplicate: skippedDuplicate,
     rejected: normalized.errors,
     fingerprint: normalized.fingerprint,
     auth: auth.kind,
+    idempotency_key: idempotencyKey,
   }, 200);
 });
 

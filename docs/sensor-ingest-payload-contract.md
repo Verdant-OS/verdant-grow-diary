@@ -178,7 +178,46 @@ When the production ingest Edge Function is built, it MUST:
 
 ---
 
-## 10. Rollout
+## 10. Canonical endpoint
+
+**`POST /functions/v1/sensor-ingest-webhook` is the canonical generic ingest
+endpoint** for bridge clients (MQTT, Ecowitt, Home Assistant, generic
+webhook). The pi-specific HMAC path `pi-ingest-readings` remains in place
+for the Raspberry Pi bridge and is not affected by this contract.
+
+Authentication: `Authorization: Bearer <vbt_…>` (tent-scoped bridge token)
+or a user JWT.
+
+### Idempotency
+
+Bridge clients **MUST** send a stable `Idempotency-Key: <opaque>` header
+on every request. The key should be stable across retries of the same
+logical batch (e.g. a hash of `vendor + device_id + captured_at + metrics`)
+and unique across distinct batches.
+
+The endpoint enforces atomic dedupe at the database layer via the partial
+unique index `sensor_readings_dedupe_uidx` on
+`(user_id, tent_id, source, metric, captured_at)`. This is the
+authoritative dedupe guarantee — concurrent identical POSTs cannot create
+duplicate rows. The `Idempotency-Key` header is preserved in `raw_payload`
+for traceability and post-hoc reconciliation.
+
+Missing `Idempotency-Key` is not rejected (browser/JWT flows may omit it),
+but bridge integrations without it MUST be flagged in their integration
+review.
+
+### Error surface
+
+The endpoint returns terse JSON error bodies only:
+`unauthorized`, `forbidden_tent`, `invalid_json`, `invalid_payload`,
+`tent_lookup_failed`, `insert_failed`, `server_misconfigured`,
+`auth_lookup_failed`, `method_not_allowed`. It never echoes PG constraint
+messages, payload values, tokens, bridge ids, secrets, or internal table
+names.
+
+---
+
+## 11. Rollout
 
 This document is the gate. A new ingest Edge Function may be opened for
 review only when:

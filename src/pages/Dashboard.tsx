@@ -374,6 +374,15 @@ export default function Dashboard() {
                   </Button>
                   <Button asChild size="sm" variant="outline">
                     <Link
+                      to="/sensors#import-sensor-data"
+                      data-testid="dashboard-environment-snapshot-import-sensor-data"
+                      aria-label="Import sensor data"
+                    >
+                      Import sensor data
+                    </Link>
+                  </Button>
+                  <Button asChild size="sm" variant="outline">
+                    <Link
                       to="/sensors"
                       data-testid="dashboard-environment-snapshot-go-to-sensors"
                       aria-label="Go to Sensors page"

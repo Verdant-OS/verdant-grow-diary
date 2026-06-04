@@ -33,6 +33,12 @@ describe("Dashboard Environment Snapshot · empty / stale / invalid states", () 
     expect(DASH).toMatch(/to see your environment here\./);
   });
 
+  it("empty state has Import sensor data link to Sensors page anchor", () => {
+    expect(DASH).toContain('data-testid="dashboard-environment-snapshot-import-sensor-data"');
+    expect(DASH).toMatch(/to="\/sensors#import-sensor-data"/);
+    expect(DASH).toMatch(/Import sensor data/);
+  });
+
   it("stale/invalid status banner is rendered above the snapshot grid", () => {
     expect(DASH).toContain(
       'data-testid="dashboard-environment-snapshot-status-banner"',

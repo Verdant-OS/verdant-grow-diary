@@ -8,6 +8,7 @@ import SensorChart from "@/components/SensorChart";
 import GrowDataSourceBadge from "@/components/GrowDataSourceBadge";
 import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
 import SensorBridgeHealthCard from "@/components/SensorBridgeHealthCard";
+import TentCsvImportCard from "@/components/TentCsvImportCard";
 import { useGrowTents, useGrowSensorReadings } from "@/hooks/useGrowData";
 import { useTents as useTentRows } from "@/hooks/use-tents";
 import { classifyGrowDataSource } from "@/lib/growDataSourceLabelRules";
@@ -164,6 +165,14 @@ export default function Sensors() {
       {manualTents.length > 0 && (
         <div id="manual-reading" className="mt-4 max-w-xl scroll-mt-24" data-testid="sensors-manual-reading-anchor">
           <ManualSensorReadingCard tents={manualTents} defaultTentId={defaultManualTentId} />
+        </div>
+      )}
+      {manualTents.length > 0 && selectedTent && (
+        <div id="import-sensor-data" className="mt-4 max-w-xl scroll-mt-24" data-testid="sensors-import-sensor-data-anchor">
+          <TentCsvImportCard
+            tentId={tentId}
+            growId={(selectedTent as unknown as { growId?: string | null }).growId ?? null}
+          />
         </div>
       )}
       <div className="mt-4 max-w-xl">

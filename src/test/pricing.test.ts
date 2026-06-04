@@ -154,8 +154,8 @@ describe("Monthly/Annual billing toggle", () => {
   });
 
   it("shows annual Pro price $99/year and monthly $12/month", () => {
-    expect(PAGE).toMatch(/\$99/);
-    expect(PAGE).toMatch(/\$12/);
+    expect(PAGE).toContain("$99");
+    expect(PAGE).toContain("$12");
   });
 });
 

@@ -98,12 +98,15 @@ export interface UseGrowDetailData {
   grow: GrowRow | null;
   loading: boolean;
   notFound: boolean;
+  error: boolean;
   counts: GrowCounts;
   recent: RecentState;
   status: GrowStatus;
   outcomes: GrowOutcomesState;
   growId: string | undefined;
+  refetch: () => void;
 }
+
 
 export function useGrowDetailData(): UseGrowDetailData {
   const { growId } = useParams<{ growId: string }>();
@@ -111,6 +114,8 @@ export function useGrowDetailData(): UseGrowDetailData {
   const [grow, setGrow] = useState<GrowRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [error, setError] = useState(false);
+
   const [counts, setCounts] = useState<GrowCounts>(EMPTY_COUNTS);
   const [recent, setRecent] = useState<RecentState>({ status: "loading" });
   const [outcomes, setOutcomes] = useState<GrowOutcomesState>(EMPTY_GROW_OUTCOMES_STATE);
@@ -126,18 +131,26 @@ export function useGrowDetailData(): UseGrowDetailData {
     if (!user || !growId) return;
     setLoading(true);
     setNotFound(false);
+    setError(false);
 
-    const { data, error } = await supabase
+    const { data, error: gErr } = await supabase
       .from("grows")
       .select("id,name,stage,grow_type,is_archived,started_at,created_at,updated_at,notes")
       .eq("id", growId)
       .maybeSingle();
-    if (error || !data) {
+    if (gErr) {
+      setGrow(null);
+      setError(true);
+      setLoading(false);
+      return;
+    }
+    if (!data) {
       setGrow(null);
       setNotFound(true);
       setLoading(false);
       return;
     }
+
     setGrow(data as GrowRow);
 
     // Read-only count queries. Any failure degrades to "unavailable".
@@ -381,5 +394,5 @@ export function useGrowDetailData(): UseGrowDetailData {
     load();
   }, [load]);
 
-  return { grow, loading, notFound, counts, recent, status, outcomes, growId };
+  return { grow, loading, notFound, error, counts, recent, status, outcomes, growId, refetch: load };
 }

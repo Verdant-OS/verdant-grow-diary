@@ -1431,6 +1431,36 @@ export type Database = {
         }
         Relationships: []
       }
+      vpd_targets: {
+        Row: {
+          created_at: string
+          id: string
+          stage: string
+          updated_at: string
+          user_id: string | null
+          vpd_high_kpa: number
+          vpd_low_kpa: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          stage: string
+          updated_at?: string
+          user_id?: string | null
+          vpd_high_kpa: number
+          vpd_low_kpa: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          stage?: string
+          updated_at?: string
+          user_id?: string | null
+          vpd_high_kpa?: number
+          vpd_low_kpa?: number
+        }
+        Relationships: []
+      }
       watering_events: {
         Row: {
           created_at: string
@@ -1519,6 +1549,22 @@ export type Database = {
           _water_temp_c?: number
         }
         Returns: string
+      }
+      evaluate_vpd_drift_ewma: {
+        Args: {
+          p_alpha?: number
+          p_min_readings?: number
+          p_stage: string
+          p_tent_id: string
+          p_window_minutes?: number
+        }
+        Returns: {
+          classification: string
+          ewma: number
+          high_kpa: number
+          low_kpa: number
+          sample_count: number
+        }[]
       }
       has_role: {
         Args: {

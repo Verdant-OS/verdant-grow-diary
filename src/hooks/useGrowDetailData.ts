@@ -394,5 +394,5 @@ export function useGrowDetailData(): UseGrowDetailData {
     load();
   }, [load]);
 
-  return { grow, loading, notFound, counts, recent, status, outcomes, growId };
+  return { grow, loading, notFound, error, counts, recent, status, outcomes, growId, refetch: load };
 }

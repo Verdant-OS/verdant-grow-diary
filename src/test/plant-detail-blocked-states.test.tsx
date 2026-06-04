@@ -16,11 +16,15 @@ let mockState: {
   isError: boolean;
 } = { data: null, isLoading: true, isError: false };
 
-vi.mock("@/hooks/useGrowData", () => ({
-  useGrowPlant: () => ({ ...mockState, refetch }),
-  useGrowTent: () => ({ data: null }),
-  getGrowDataMeta: () => ({}),
-}));
+vi.mock("@/hooks/useGrowData", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/hooks/useGrowData")>();
+  return {
+    ...actual,
+    useGrowPlant: () => ({ ...mockState, refetch }),
+    useGrowTent: () => ({ data: null }),
+    getGrowDataMeta: () => ({}),
+  };
+});
 
 // Minimal mocks for child component imports — these never render in
 // loading/error/not-found branches, but the page module imports them.

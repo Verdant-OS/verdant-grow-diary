@@ -23,6 +23,7 @@ import type { TablesInsert } from "@/integrations/supabase/types";
 // ---------------------------------------------------------------------------
 
 export const WEBHOOK_ALLOWED_SOURCES = [
+  // Historical / device-specific labels (preserved for back-compat).
   "webhook_generic",
   "pi_bridge",
   "node_red_bridge",
@@ -32,6 +33,14 @@ export const WEBHOOK_ALLOWED_SOURCES = [
   "esp32_mqtt_bridge",
   "home_assistant_bridge",
   "ha_forwarded",
+  // Contract-aligned generic transport labels (V1.1+). Vendor lineage
+  // (e.g. EcoWitt, Home Assistant) travels in optional `vendor` /
+  // `metadata.vendor` and is preserved only in raw_payload — never trusted
+  // for ownership, auth, or routing.
+  "ecowitt",
+  "mqtt",
+  "csv",
+  "webhook",
 ] as const;
 
 export type WebhookSource = (typeof WEBHOOK_ALLOWED_SOURCES)[number];

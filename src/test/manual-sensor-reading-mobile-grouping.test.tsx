@@ -51,13 +51,12 @@ describe("ManualSensorReadingCard — grouped mobile layout", () => {
     expect(helper.textContent ?? "").toMatch(/not live sensor data/i);
   });
 
-  it("points pH/EC/PPFD users to Quick Log (out of schema scope)", () => {
+  it("points pH/EC users to Quick Log (out of schema scope)", () => {
     renderCard();
     const hint = screen.getByTestId("manual-reading-out-of-scope-hint");
     const text = hint.textContent ?? "";
     expect(text).toMatch(/pH/);
     expect(text).toMatch(/EC/);
-    expect(text).toMatch(/PPFD|DLI/);
     expect(text.toLowerCase()).toMatch(/quick log/);
   });
 

@@ -50,10 +50,12 @@ function stubItems(items: TimelineMemoryItem[]) {
 
 describe("TimelineMemorySection day grouping", () => {
   it("renders day group headers with labels", () => {
-    const today = localIso(2026, 6, 5, 10);
+    const now = new Date();
+    const todayIso = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10).toISOString();
+    const twoDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2, 14).toISOString();
     stubItems([
-      makeDiaryItem({ key: "a", occurredAt: today }),
-      makeDiaryItem({ key: "b", occurredAt: localIso(2026, 6, 3, 14) }),
+      makeDiaryItem({ key: "a", occurredAt: todayIso }),
+      makeDiaryItem({ key: "b", occurredAt: twoDaysAgo }),
     ]);
     render(<TimelineMemorySection scope="plant" plantId="p1" />);
 

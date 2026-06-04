@@ -31,6 +31,10 @@ const SOURCE_LABELS: Record<WebhookSource, { label: string; hint: string }> = {
   esp32_mqtt_bridge: { label: "MQTT bridge (ESP32)", hint: "MQTT broker → local bridge → webhook" },
   home_assistant_bridge: { label: "Home Assistant", hint: "HA rest_command → webhook" },
   ha_forwarded: { label: "HA forwarded", hint: "Readings relayed from Home Assistant" },
+  ecowitt: { label: "EcoWitt", hint: "EcoWitt gateway / station bridge" },
+  mqtt: { label: "MQTT", hint: "Generic MQTT broker → local bridge → webhook" },
+  csv: { label: "CSV import", hint: "Bulk historical CSV import" },
+  webhook: { label: "Webhook (generic)", hint: "Generic bridge / custom script" },
 };
 
 export function getSupportedWebhookSourceLabels(): WebhookSourceLabel[] {

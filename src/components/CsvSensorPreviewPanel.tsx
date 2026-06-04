@@ -283,18 +283,55 @@ export default function CsvSensorPreviewPanel() {
             )}
           </div>
 
-          {/* Download report */}
+          {/* Download report buttons */}
           <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
               variant="default"
-              onClick={handleDownloadReport}
+              onClick={handleDownloadJson}
               data-testid="csv-preview-download-report"
             >
-              Download CSV Preview Report
+              Download JSON Report
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleDownloadCsvSummary}
+              data-testid="csv-preview-download-csv-summary"
+            >
+              Download CSV Summary
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleDownloadPdf}
+              data-testid="csv-preview-download-pdf"
+            >
+              Download PDF Report
             </Button>
             <span className="text-xs text-muted-foreground">
-              Generates a local JSON file. No upload, no save.
+              All exports are generated locally. No upload, no save.
+            </span>
+          </div>
+
+          {/* Disabled future-flow CTA (no writes) */}
+          <div
+            data-testid="csv-preview-diary-cta-wrapper"
+            className="rounded-md border border-dashed border-border bg-muted/30 p-3 text-xs flex flex-wrap items-center gap-3"
+          >
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled
+              aria-disabled="true"
+              data-testid="csv-preview-diary-cta"
+              title="Coming later — approval-required flow"
+            >
+              Convert to diary entries — coming later
+            </Button>
+            <span className="text-muted-foreground">
+              {FUTURE_DIARY_CONVERSION_COPY}
             </span>
           </div>
 

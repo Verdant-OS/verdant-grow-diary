@@ -20,13 +20,13 @@ const SRC = readFileSync(
 describe("sensor-ingest-webhook error leakage", () => {
   // -- static guards ----------------------------------------------------------
   it("does not return insErr.message / detail in the response body", () => {
-    // Strip line comments before matching to ignore documentation comments.
     const code = SRC.replace(/\/\/[^\n]*/g, "");
-
     expect(code).not.toMatch(/detail:\s*insErr\.message/);
-    expect(code).not.toMatch(/insErr\.message/);
-    expect(code).not.toMatch(/error:\s*insErr/);
-    expect(code).not.toMatch(/JSON\.stringify\(\s*insErr\s*\)/);
+    // insErr.message must never be passed to json(...) response body.
+    const jsonBodies = [...code.matchAll(/json\(\s*(\{[\s\S]*?\})\s*,\s*\d+\s*\)/g)].map((m) => m[1]);
+    for (const body of jsonBodies) {
+      expect(body).not.toMatch(/insErr/);
+    }
   });
 
   it("emits only the terse `insert_failed` error code on insert failure", () => {

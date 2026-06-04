@@ -139,7 +139,9 @@ export function useDashboardScopedData(
     try {
       const { data, error } = await supabase
         .from("action_queue")
-        .select("id,risk_level,suggested_change,reason,created_at,status")
+        .select(
+          "id,risk_level,suggested_change,reason,created_at,status,tent_id,plant_id,source",
+        )
         .eq("grow_id", growId)
         .eq("status", "pending_approval")
         .order("created_at", { ascending: false })
@@ -155,6 +157,10 @@ export function useDashboardScopedData(
             suggested_change: r.suggested_change,
             reason: r.reason,
             created_at: r.created_at,
+            tent_id: (r as { tent_id?: string | null }).tent_id ?? null,
+            plant_id: (r as { plant_id?: string | null }).plant_id ?? null,
+            source: (r as { source?: string | null }).source ?? null,
+            status: (r as { status?: string }).status ?? "pending_approval",
           })),
         });
       }

@@ -7,15 +7,20 @@
  *   - Stage MUST be known. Unknown / unsupported stage returns
  *     classification "stage_unknown" and is NEVER healthy.
  *   - Missing/invalid VPD returns "unavailable".
+ *   - Stage is normalized to the canonical six-stage vocabulary via
+ *     `normalizeToCanonicalVpdTargetStage`. Legacy app stages (veg,
+ *     preflower, flower, late_flower) are mapped exactly as documented
+ *     in `docs/vpd-stage-vocabulary.md`. The legacy → canonical mapping
+ *     table is NOT duplicated here.
  *   - This helper does not create alerts; alert evaluation is a separate
  *     concern with its own safe path.
  */
 
 import {
   VPD_STAGE_TARGETS,
-  type VpdStageKey,
   type VpdStageTarget,
 } from "@/constants/vpdTargets";
+import { normalizeToCanonicalVpdTargetStage } from "@/lib/vpdStageNormalizationRules";
 
 export type VpdTargetClassification =
   | "low"
@@ -36,21 +41,18 @@ export interface EvaluateVpdAgainstStageTargetResult {
   healthy: boolean;
 }
 
-function normalizeStage(input: string | null | undefined): VpdStageKey | null {
-  if (!input) return null;
-  const s = String(input).trim().toLowerCase().replace(/[\s-]+/g, "_");
-  if (s in VPD_STAGE_TARGETS) return s as VpdStageKey;
-  return null;
-}
-
 export function evaluateVpdAgainstStageTarget(
   input: EvaluateVpdAgainstStageTargetInput,
 ): EvaluateVpdAgainstStageTargetResult {
-  const stage = normalizeStage(input.stage);
-  if (!stage) {
+  const normalized = normalizeToCanonicalVpdTargetStage(input.stage);
+  if (!normalized.known) {
     return { classification: "stage_unknown", target: null, healthy: false };
   }
-  const target = VPD_STAGE_TARGETS[stage];
+  const target = VPD_STAGE_TARGETS[normalized.canonical];
+  if (!target) {
+    // Defensive: canonical stage missing from band table — never treat as healthy.
+    return { classification: "stage_unknown", target: null, healthy: false };
+  }
   const v = input.vpdKpa;
   if (typeof v !== "number" || !Number.isFinite(v)) {
     return { classification: "unavailable", target, healthy: false };

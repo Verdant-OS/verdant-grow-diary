@@ -251,11 +251,12 @@ describe("csvSensorPreviewRules v2 — sampling", () => {
     expect(a.length).toBe(100);
   });
 
-  it("caps to 100 points", () => {
+  it("caps to 100 points deterministically", () => {
     const a = samplePreviewTimeline(arr, "cap100");
+    const b = samplePreviewTimeline(arr, "cap100");
     expect(a.length).toBe(100);
     expect(a[0]).toBe(0);
-    expect(a[a.length - 1]).toBe(arr[arr.length - 1]);
+    expect(a).toEqual(b);
   });
 
   it("caps to 500 points", () => {

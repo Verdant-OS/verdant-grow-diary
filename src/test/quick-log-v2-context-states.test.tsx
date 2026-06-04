@@ -72,12 +72,11 @@ describe("QuickLogV2Sheet — loading state", () => {
     ).toBe(true);
   });
 
-  it("loading status uses role=status with aria-live polite", () => {
+  it("loading status uses role=status (implicit polite announcement)", () => {
     tentsState.isLoading = true;
     renderSheet();
     const node = screen.getByTestId("qlv2-context-loading");
     expect(node.getAttribute("role")).toBe("status");
-    expect(node.getAttribute("aria-live")).toBe("polite");
   });
 });
 

@@ -79,8 +79,6 @@ export interface CsvPreviewParseResult {
   mappings: FieldMapping[];
   unmapped: string[];
   flags: SuspiciousFlag[];
-  /** Always `csv`. */
-  sourceLabel: typeof CSV_PREVIEW_SOURCE_LABEL;
   /** Always the read-only status copy. */
   statusLabel: typeof CSV_PREVIEW_STATUS_LABEL;
   /** Detected delimiter: "," for CSV, "\t" for TSV. */

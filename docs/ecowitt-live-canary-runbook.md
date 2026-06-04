@@ -104,19 +104,25 @@ The `dropped[]` array MUST include a `channel_value_missing_or_invalid` entry fo
 
 ## 3. Duplicate POST test
 
-Run the **main canary** twice, unchanged. The second response MUST report:
+Run the **main canary** twice, unchanged. Because the payload supplies a valid in-range `dateutc`, both POSTs derive the same `captured_at` and the second response MUST report:
 
 ```json
 { "accepted": false, "inserted": 0, "skipped_duplicate": 4 }
 ```
 
-(or `accepted: true, inserted: 0, skipped_duplicate: 4` depending on whether the response was already shaped before this run — what matters is `inserted == 0` on the replay).
-
 This is enforced by the partial unique index `sensor_readings_dedupe_uidx` on `(user_id, tent_id, source, metric, captured_at) WHERE captured_at IS NOT NULL`, combined with `upsert({ ignoreDuplicates: true, onConflict: "user_id,tent_id,source,metric,captured_at" })` in the edge function.
 
-> ⚠️ Current behavior pin: the edge function stamps `captured_at = new Date().toISOString()` at ingest time. It does **not** parse the EcoWitt `dateutc` field. Two POSTs of the same payload at distinct wall-clock instants therefore produce **distinct rows** — duplicate suppression only catches POSTs that share `captured_at` (re-tries within the same ingest invocation, retries that re-use the same server timestamp, or future changes that begin trusting `dateutc`). When/if that changes, update both this runbook and `ecowitt-ingest-canary-contract.test.ts`.
+### How `captured_at` is chosen
 
-For the canary, fire the duplicate POST quickly enough that you can verify behavior; the more durable check is the SQL count (below) — duplicates by `(user_id, tent_id, source, metric, captured_at)` must be exactly 1.
+The edge function calls `parseEcoWittDateUtc(payload.dateutc)`:
+
+- **Valid + in-range** (`[2020-01-01T00:00:00Z, now + 24h]`, strict `YYYY-MM-DD HH:MM:SS` UTC, calendar-valid): parsed ISO string is used as `captured_at`. Every emitted row gets `raw_payload.timestamp_source = "ecowitt_dateutc"`.
+- **Missing / malformed / out-of-range** (e.g. `1970-01-01 00:00:00` from an unset RTC, or `2099-01-01 00:00:00`): fall back to `new Date().toISOString()`. Rows get `raw_payload.timestamp_source = "server_received_at"`.
+
+> Duplicate protection is strongest only when the gateway sends a valid in-range `dateutc`. Server-time fallback POSTs received at distinct instants will produce distinct `captured_at` values and will NOT collide on the dedupe index.
+
+If the first real gateway POST shows `timestamp_source = "server_received_at"`, **pause** the canary — the gateway clock is either missing, malformed, or outside the sane window.
+
 
 ---
 

@@ -52,6 +52,10 @@ export const CLOUD_CANARY_EXPORT_COLUMNS = [
   "row_state",
 ] as const;
 
+/** Fixed filenames per Item 3 LOCKED spec (no timestamp). */
+export const CLOUD_CANARY_EXPORT_CSV_FILENAME = "ecowitt-cloud-canary-summary.csv";
+export const CLOUD_CANARY_EXPORT_JSON_FILENAME = "ecowitt-cloud-canary-summary.json";
+
 /**
  * Build the normalized, ID-free export object from the view-model.
  * This is the single source of truth that both JSON and CSV format from.

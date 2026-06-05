@@ -7,6 +7,7 @@ interface Body {
   growId?: string;
   photoUrl?: string;
   question?: string;
+  idempotencyKey?: string;
 }
 
 interface DiaryRow {
@@ -19,6 +20,10 @@ interface DiaryRow {
   tent_id: string | null;
   details: Record<string, unknown> | null;
 }
+
+// S2: server-pinned tier/feature. Escalation is deferred.
+const FEATURE = "ai_coach";
+const MODEL_TIER = "standard";
 
 const EMPTY_ANALYSIS = {
   summary: "No diary entries yet — log a note, photo, or sensor snapshot to get a real diagnosis.",
@@ -36,6 +41,11 @@ const EMPTY_ANALYSIS = {
   follow_up_3_day: "Aim for 3 entries across the next 3 days to establish a baseline.",
 };
 
+function isUuid(s: unknown): s is string {
+  return typeof s === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
@@ -52,6 +62,44 @@ Deno.serve(async (req) => {
     const body = (await req.json()) as Body;
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
     if (!lovableKey) return json({ error: "AI not configured" }, 500);
+
+    // ---- S2: ai_credit_spend (atomic check-and-spend) -----------------------
+    const growId = isUuid(body.growId) ? body.growId : null;
+    const idempotencyKey = (typeof body.idempotencyKey === "string" &&
+        body.idempotencyKey.length >= 8 && body.idempotencyKey.length <= 200)
+      ? body.idempotencyKey
+      : crypto.randomUUID();
+
+    const { data: spend, error: spendErr } = await supabase.rpc("ai_credit_spend", {
+      p_feature: FEATURE,
+      p_grow_id: growId,
+      p_model_tier: MODEL_TIER,
+      p_idempotency_key: idempotencyKey,
+      p_result: null,
+    });
+    if (spendErr || !spend || typeof spend !== "object") {
+      console.log("ai-coach status=credit_rpc_error");
+      return json({ error: "credit_rpc" }, 500);
+    }
+    const spendObj = spend as Record<string, unknown>;
+    if (spendObj.ok !== true) {
+      console.log(`ai-coach status=credit_denied reason=${String(spendObj.reason ?? "")}`);
+      return json({ error: "credit_denied", credit: spendObj }, 402);
+    }
+    const spendId = typeof spendObj.spend_id === "string" ? spendObj.spend_id : null;
+    const refundKey = "refund:" + (spendId ?? idempotencyKey);
+    const refund = async (reason: string) => {
+      if (!spendId) return;
+      try {
+        await supabase.rpc("ai_credit_refund", {
+          p_spend_id: spendId,
+          p_idempotency_key: refundKey,
+          p_reason: reason,
+        });
+      } catch {
+        console.log("ai-coach status=refund_failed");
+      }
+    };
 
     // --- gather real context ---
     let grow: Record<string, unknown> | null = null;
@@ -96,6 +144,8 @@ Deno.serve(async (req) => {
     const empty = !grow || entries.length === 0;
 
     if (empty && !body.photoUrl) {
+      // No model call → refund the just-spent credit so empty preflights are free.
+      await refund("empty_no_model_call");
       return json({ analysis: EMPTY_ANALYSIS, sparse: true, empty: true });
     }
 
@@ -196,22 +246,37 @@ Rules for diagnosis (structured view, approval-first):
     const text = (body.question ? `QUESTION: ${body.question}\n\n` : "") + context;
     userContent.push({ type: "text", text });
 
-    const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${lovableKey}` },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: userContent },
-        ],
-      }),
-    });
+    let r: Response;
+    try {
+      r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${lovableKey}` },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: userContent },
+          ],
+        }),
+      });
+    } catch {
+      await refund("upstream_network");
+      return json({ error: "AI network error" }, 500);
+    }
 
-    if (r.status === 429) return json({ error: "Rate limit hit, try again soon." }, 429);
-    if (r.status === 402) return json({ error: "AI credits exhausted. Add credits in workspace settings." }, 402);
-    if (!r.ok) return json({ error: `AI error ${r.status}` }, 500);
+    if (r.status === 429) {
+      await refund("upstream_429");
+      return json({ error: "Rate limit hit, try again soon." }, 429);
+    }
+    if (r.status === 402) {
+      await refund("upstream_402");
+      return json({ error: "AI credits exhausted. Add credits in workspace settings." }, 402);
+    }
+    if (!r.ok) {
+      await refund(`upstream_${r.status}`);
+      return json({ error: `AI error ${r.status}` }, 500);
+    }
     const data = await r.json();
     const raw = data.choices?.[0]?.message?.content ?? "{}";
     let parsed: Record<string, unknown> = {};
@@ -236,7 +301,17 @@ Rules for diagnosis (structured view, approval-first):
         ? parsed.diagnosis
         : null;
 
-    return json({ analysis, diagnosis, sparse, empty: false });
+    return json({
+      analysis,
+      diagnosis,
+      sparse,
+      empty: false,
+      credit: {
+        remaining: spendObj.remaining,
+        scope: spendObj.scope,
+        scope_limit: spendObj.scope_limit,
+      },
+    });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : "unknown" }, 500);
   }

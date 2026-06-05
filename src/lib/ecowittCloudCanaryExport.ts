@@ -12,6 +12,10 @@
  */
 
 import type { CloudCanaryPreviewViewModel } from "@/lib/ecowittCloudCanaryViewModel";
+import {
+  isEcowittSuspiciousFlagCode,
+  type EcowittSuspiciousFlagCode,
+} from "@/constants/ecowittSuspiciousFlags";
 
 export interface CloudCanaryExportRow {
   fixture_name: string;
@@ -21,6 +25,8 @@ export interface CloudCanaryExportRow {
   invalid_count: number;
   unmapped_count: number;
   row_state: "normal" | "zero_mapped_gap";
+  /** Closed enum vocabulary only; ID-free by construction. */
+  suspicious_flag_codes: EcowittSuspiciousFlagCode[];
 }
 
 export interface CloudCanaryExportTotals {
@@ -39,6 +45,8 @@ export interface CloudCanaryExport {
   generated_at: string;
   rows: CloudCanaryExportRow[];
   totals: CloudCanaryExportTotals;
+  /** Aggregate enum-coded suspicious flags across all fixtures, deduped + sorted. */
+  suspicious_flag_codes: EcowittSuspiciousFlagCode[];
 }
 
 /** Stable column order for both CSV and the conceptual JSON row shape. */
@@ -50,6 +58,7 @@ export const CLOUD_CANARY_EXPORT_COLUMNS = [
   "invalid_count",
   "unmapped_count",
   "row_state",
+  "suspicious_flag_codes",
 ] as const;
 
 /** Fixed filenames per Item 3 LOCKED spec (no timestamp). */
@@ -65,6 +74,23 @@ export function buildCloudCanaryExport(
   opts: { now?: Date } = {},
 ): CloudCanaryExport {
   const now = opts.now ?? new Date();
+  // Defense-in-depth: even though the view-model already validates codes
+  // against the closed enum, the export re-checks. This guarantees the file
+  // on disk can ONLY contain enum values — never free text.
+  const validateCodes = (
+    codes: ReadonlyArray<string>,
+    where: string,
+  ): EcowittSuspiciousFlagCode[] => {
+    for (const c of codes) {
+      if (!isEcowittSuspiciousFlagCode(c)) {
+        throw new Error(
+          `[cloud-canary-export] Unknown suspicious flag code "${c}" at ${where}.`,
+        );
+      }
+    }
+    return [...codes].sort() as EcowittSuspiciousFlagCode[];
+  };
+
   const rows: CloudCanaryExportRow[] = vm.rows.map((r) => ({
     fixture_name: r.fixture_name,
     mapped_count: r.mapped_count,
@@ -73,6 +99,10 @@ export function buildCloudCanaryExport(
     invalid_count: r.invalid_count,
     unmapped_count: r.unmapped_count,
     row_state: r.state,
+    suspicious_flag_codes: validateCodes(
+      r.suspicious_flag_codes,
+      `row "${r.fixture_name}"`,
+    ),
   }));
   const totals = rows.reduce<CloudCanaryExportTotals>(
     (acc, r) => ({
@@ -98,6 +128,10 @@ export function buildCloudCanaryExport(
     generated_at: now.toISOString(),
     rows,
     totals,
+    suspicious_flag_codes: validateCodes(
+      vm.suspicious_flag_codes,
+      "top-level aggregate",
+    ),
   };
 }
 
@@ -107,6 +141,11 @@ function escapeCsv(value: string | number): string {
     return `"${s.replace(/"/g, '""')}"`;
   }
   return s;
+}
+
+/** Codes are joined with '|' inside one CSV cell — enum values only, no commas. */
+function formatCodesCell(codes: ReadonlyArray<EcowittSuspiciousFlagCode>): string {
+  return escapeCsv(codes.join("|"));
 }
 
 /** CSV with a header comment line, column header row, fixture rows, and a TOTAL row. */
@@ -120,7 +159,11 @@ export function serializeCloudCanaryExportToCsv(exp: CloudCanaryExport): string 
   lines.push(CLOUD_CANARY_EXPORT_COLUMNS.join(","));
   for (const r of exp.rows) {
     lines.push(
-      CLOUD_CANARY_EXPORT_COLUMNS.map((c) => escapeCsv(r[c])).join(","),
+      CLOUD_CANARY_EXPORT_COLUMNS.map((c) =>
+        c === "suspicious_flag_codes"
+          ? formatCodesCell(r.suspicious_flag_codes)
+          : escapeCsv(r[c] as string | number),
+      ).join(","),
     );
   }
   lines.push(
@@ -132,6 +175,7 @@ export function serializeCloudCanaryExportToCsv(exp: CloudCanaryExport): string 
       exp.totals.invalid_count,
       exp.totals.unmapped_count,
       "",
+      formatCodesCell(exp.suspicious_flag_codes),
     ].join(","),
   );
   return lines.join("\n") + "\n";

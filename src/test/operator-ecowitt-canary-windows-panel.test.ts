@@ -95,9 +95,9 @@ describe("OperatorEcowittCanary — Windows run-command panel", () => {
   });
 
   it("shows the security posture note explaining no browser POSTs", () => {
-    expect(src).toContain('data-testid="security-posture-note"');
+    expect(src).toContain('data-testid="no-browser-posts-notice"');
     expect(src).toContain("Verdant does not run EcoWitt canary POSTs from the browser");
-    expect(src).toContain("Run the local harness, then import the redacted output here");
+    expect(src).toContain("Run the local harness on Windows, then import the redacted output here");
   });
 
   it("does not contain real-looking secrets", () => {

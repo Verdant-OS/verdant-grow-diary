@@ -646,12 +646,16 @@ function ResultsDashboard({
   verdict,
   onDownloadJson,
   onDownloadCsv,
+  onCopyJson,
+  copyDisabled,
 }: {
   preflight: PreflightResult | null;
   report: CanaryReportInput | null;
   verdict: VerdictResult;
   onDownloadJson: () => void;
   onDownloadCsv: () => void;
+  onCopyJson: () => void;
+  copyDisabled: boolean;
 }) {
   const verdictLabel = verdict.verdict === "go" ? "GO" : verdict.verdict === "no_go" ? "NO-GO" : "INCOMPLETE";
   const verdictCls =

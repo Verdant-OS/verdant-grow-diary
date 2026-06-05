@@ -70,7 +70,7 @@ describe("buildCloudCanaryPreviewViewModel", () => {
     );
   });
 
-  it("carries the five count fields plus fixture_name, nothing else", () => {
+  it("carries the five count fields plus fixture_name and state, nothing else", () => {
     const expectedKeys: Array<keyof CloudCanaryPreviewRow> = [
       "fixture_name",
       "live_count",
@@ -78,6 +78,7 @@ describe("buildCloudCanaryPreviewViewModel", () => {
       "invalid_count",
       "mapped_count",
       "unmapped_count",
+      "state",
     ];
     for (const row of vm.rows) {
       const keys = Object.keys(row).sort();

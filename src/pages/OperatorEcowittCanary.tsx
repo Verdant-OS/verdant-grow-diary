@@ -631,60 +631,88 @@ export function CloudCanaryPreviewPanel() {
           </div>
         </div>
 
-        <div
-          className="overflow-hidden rounded-md border"
-          data-testid="cloud-canary-per-fixture-table"
-        >
-          <div className="border-b bg-muted/40 px-2 py-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-            Per-fixture counts · fixture/sample canary · not tent data
+        {previewVm.state === "empty" ? (
+          <div
+            data-testid="cloud-canary-empty-state"
+            data-preview-state="empty"
+            className="rounded-md border border-dashed bg-muted/30 p-4 text-center text-xs text-muted-foreground"
+          >
+            <div className="font-semibold text-foreground">Nothing to preview</div>
+            <div className="mt-1">
+              No fixtures are available for the cloud canary right now.
+            </div>
           </div>
-          <table className="w-full text-xs">
-            <thead className="bg-muted text-muted-foreground">
-              <tr>
-                <th className="px-2 py-1 text-left font-semibold">Fixture</th>
-                <th className="px-2 py-1 text-right font-semibold" title="Mapped rows classified as fresh by the normalizer">
-                  Fresh
-                </th>
-                <th className="px-2 py-1 text-right font-semibold">Stale-class</th>
-                <th className="px-2 py-1 text-right font-semibold">Invalid-class</th>
-                <th className="px-2 py-1 text-right font-semibold border-l">Mapped total</th>
-                <th className="px-2 py-1 text-right font-semibold border-l-2 border-l-foreground/30">
-                  Unmapped (separate)
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {previewVm.rows.map((row) => (
-                <tr
-                  key={row.fixture_name}
-                  className="border-t"
-                  data-testid={`cloud-canary-row-${row.fixture_name}`}
-                  data-fixture-name={row.fixture_name}
-                >
-                  <td className="px-2 py-1 font-mono">{row.fixture_name}</td>
-                  <td className="px-2 py-1 text-right tabular-nums" data-col="live">
-                    {row.live_count}
-                  </td>
-                  <td className="px-2 py-1 text-right tabular-nums" data-col="stale">
-                    {row.stale_count}
-                  </td>
-                  <td className="px-2 py-1 text-right tabular-nums" data-col="invalid">
-                    {row.invalid_count}
-                  </td>
-                  <td className="px-2 py-1 text-right tabular-nums border-l font-semibold" data-col="mapped">
-                    {row.mapped_count}
-                  </td>
-                  <td
-                    className="px-2 py-1 text-right tabular-nums border-l-2 border-l-foreground/30"
-                    data-col="unmapped"
-                  >
-                    {row.unmapped_count}
-                  </td>
+        ) : (
+          <div
+            className="overflow-hidden rounded-md border"
+            data-testid="cloud-canary-per-fixture-table"
+            data-preview-state="populated"
+          >
+            <div className="border-b bg-muted/40 px-2 py-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+              Per-fixture counts · fixture/sample canary · not tent data
+            </div>
+            <table className="w-full text-xs">
+              <thead className="bg-muted text-muted-foreground">
+                <tr>
+                  <th className="px-2 py-1 text-left font-semibold">Fixture</th>
+                  <th className="px-2 py-1 text-right font-semibold" title="Mapped rows classified as fresh by the normalizer">
+                    Fresh
+                  </th>
+                  <th className="px-2 py-1 text-right font-semibold">Stale-class</th>
+                  <th className="px-2 py-1 text-right font-semibold">Invalid-class</th>
+                  <th className="px-2 py-1 text-right font-semibold border-l">Mapped total</th>
+                  <th className="px-2 py-1 text-right font-semibold border-l-2 border-l-foreground/30">
+                    Unmapped (separate)
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {previewVm.rows.map((row) => (
+                  <tr
+                    key={row.fixture_name}
+                    className={
+                      row.state === "zero_mapped_gap"
+                        ? "border-t bg-amber-500/10"
+                        : "border-t"
+                    }
+                    data-testid={`cloud-canary-row-${row.fixture_name}`}
+                    data-fixture-name={row.fixture_name}
+                    data-row-state={row.state}
+                  >
+                    <td className="px-2 py-1 font-mono">{row.fixture_name}</td>
+                    <td className="px-2 py-1 text-right tabular-nums" data-col="live">
+                      {row.live_count}
+                    </td>
+                    <td className="px-2 py-1 text-right tabular-nums" data-col="stale">
+                      {row.stale_count}
+                    </td>
+                    <td className="px-2 py-1 text-right tabular-nums" data-col="invalid">
+                      {row.invalid_count}
+                    </td>
+                    <td className="px-2 py-1 text-right tabular-nums border-l font-semibold" data-col="mapped">
+                      {row.mapped_count}
+                    </td>
+                    <td
+                      className="px-2 py-1 text-right tabular-nums border-l-2 border-l-foreground/30"
+                      data-col="unmapped"
+                    >
+                      {row.unmapped_count}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {previewVm.rows.some((r) => r.state === "zero_mapped_gap") && (
+              <div
+                data-testid="cloud-canary-zero-mapped-warning"
+                className="border-t border-amber-500/40 bg-amber-500/10 px-2 py-2 text-[11px] text-amber-300"
+              >
+                <span className="font-semibold">Mapping gap:</span>{" "}
+                Readings present but none mapped to a tent — check mapping config.
+              </div>
+            )}
+          </div>
+        )}
 
         {verdict.suspicious_flag_codes.length > 0 && (
           <div className="flex flex-wrap gap-1" data-testid="cloud-suspicious-codes">

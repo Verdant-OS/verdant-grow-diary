@@ -111,7 +111,7 @@ describe("TimelineMemorySection", () => {
     nextResponse = { data: ROWS, error: null };
     renderSection({ scope: "plant", plantId: "plant-1" });
     await waitFor(() =>
-      expect(screen.getByTestId("timeline-memory-list")).toBeInTheDocument(),
+      expect(screen.getByTestId("timeline-memory-day-groups")).toBeInTheDocument(),
     );
     expect(
       screen.getAllByTestId("manual-snapshot-timeline-card"),
@@ -124,7 +124,7 @@ describe("TimelineMemorySection", () => {
   it("filters to manual snapshots only", async () => {
     nextResponse = { data: ROWS, error: null };
     renderSection({ scope: "plant", plantId: "plant-1" });
-    await waitFor(() => screen.getByTestId("timeline-memory-list"));
+    await waitFor(() => screen.getByTestId("timeline-memory-day-groups"));
     fireEvent.click(screen.getByTestId("timeline-filter-chip-manual_sensor_snapshot"));
     expect(screen.queryAllByTestId("timeline-memory-diary-item")).toHaveLength(0);
     expect(screen.getAllByTestId("manual-snapshot-timeline-card")).toHaveLength(2);
@@ -133,7 +133,7 @@ describe("TimelineMemorySection", () => {
   it("filters to watering when metadata supports it", async () => {
     nextResponse = { data: ROWS, error: null };
     renderSection({ scope: "plant", plantId: "plant-1" });
-    await waitFor(() => screen.getByTestId("timeline-memory-list"));
+    await waitFor(() => screen.getByTestId("timeline-memory-day-groups"));
     fireEvent.click(screen.getByTestId("timeline-filter-chip-watering"));
     const items = screen.getAllByTestId("timeline-memory-diary-item");
     expect(items.map((i) => i.getAttribute("data-item-key"))).toEqual(["water-a"]);
@@ -145,7 +145,7 @@ describe("TimelineMemorySection", () => {
       error: null,
     };
     renderSection({ scope: "plant", plantId: "plant-1" });
-    await waitFor(() => screen.getByTestId("timeline-memory-list"));
+    await waitFor(() => screen.getByTestId("timeline-memory-day-groups"));
     // No watering chip should be rendered (count 0). Manually invoke a
     // filter that has no chip by clicking warnings? Not present either.
     // Click manual_sensor_snapshot then synthesize a hidden filter via
@@ -158,7 +158,7 @@ describe("TimelineMemorySection", () => {
   it("offers a 'Show all' reset that returns to 'All'", async () => {
     nextResponse = { data: ROWS, error: null };
     renderSection({ scope: "plant", plantId: "plant-1" });
-    await waitFor(() => screen.getByTestId("timeline-memory-list"));
+    await waitFor(() => screen.getByTestId("timeline-memory-day-groups"));
     fireEvent.click(screen.getByTestId("timeline-filter-chip-watering"));
     const reset = screen.getByTestId("timeline-filter-reset");
     fireEvent.click(reset);
@@ -188,7 +188,7 @@ describe("TimelineMemorySection", () => {
   it("never shows live/synced/connected/imported wording", async () => {
     nextResponse = { data: ROWS, error: null };
     renderSection({ scope: "plant", plantId: "plant-1" });
-    await waitFor(() => screen.getByTestId("timeline-memory-list"));
+    await waitFor(() => screen.getByTestId("timeline-memory-day-groups"));
     const text =
       screen.getByTestId("timeline-memory-section").textContent?.toLowerCase() ?? "";
     expect(text).not.toMatch(/\blive\b/);

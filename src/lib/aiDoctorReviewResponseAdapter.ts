@@ -12,6 +12,7 @@ import {
   validateAiDoctorReviewResult,
   type AiDoctorReviewResult,
 } from "@/lib/aiDoctorReviewResultContract";
+import type { AiCreditDenial } from "@/lib/aiCreditLimitNoticeViewModel";
 
 export type AiDoctorLiveReviewFailureReason =
   | "config"
@@ -20,14 +21,25 @@ export type AiDoctorLiveReviewFailureReason =
   | "parse"
   | "empty"
   | "invalid"
-  | "shape";
+  | "shape"
+  | "credit_denied";
 
 export type AiDoctorLiveReviewAdapterOutcome =
   | { ok: true; result: AiDoctorReviewResult }
-  | { ok: false; reason: AiDoctorLiveReviewFailureReason };
+  | {
+      ok: false;
+      reason: AiDoctorLiveReviewFailureReason;
+      credit?: AiCreditDenial;
+    };
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function coerceCreditDenial(v: unknown): AiCreditDenial | undefined {
+  if (!isPlainObject(v)) return undefined;
+  // Pass through; downstream view model is defensive on optional fields.
+  return v as unknown as AiCreditDenial;
 }
 
 /**
@@ -50,13 +62,22 @@ export function adaptAiDoctorReviewResponse(
       "empty",
       "invalid",
       "shape",
+      "credit_denied",
     ];
-    return {
-      ok: false,
-      reason: (allowed as string[]).includes(reason)
-        ? (reason as AiDoctorLiveReviewFailureReason)
-        : "invalid",
-    };
+    const mapped: AiDoctorLiveReviewFailureReason = (allowed as string[]).includes(
+      reason,
+    )
+      ? (reason as AiDoctorLiveReviewFailureReason)
+      : "invalid";
+
+    if (mapped === "credit_denied") {
+      return {
+        ok: false,
+        reason: "credit_denied",
+        credit: coerceCreditDenial(input.credit),
+      };
+    }
+    return { ok: false, reason: mapped };
   }
 
   const candidate =

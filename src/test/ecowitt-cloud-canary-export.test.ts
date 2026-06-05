@@ -168,6 +168,7 @@ describe("ecowittCloudCanaryExport — pure serializer", () => {
     expect(Object.keys(parsed).sort()).toEqual(
       [
         "generated_at",
+        "missing_metric_codes",
         "preview_state",
         "rows",
         "source_kind",
@@ -182,6 +183,7 @@ describe("ecowittCloudCanaryExport — pure serializer", () => {
           "fresh_class_count",
           "invalid_count",
           "mapped_count",
+          "missing_metric_codes",
           "row_state",
           "stale_count",
           "suspicious_flag_codes",

@@ -223,7 +223,7 @@ export default function OperatorEcowittCanary() {
   const [savedAudit, setSavedAudit] = useState<BuiltAuditReport | null>(null);
   const [restoredAudit, setRestoredAudit] = useState<BuiltAuditReport | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
-  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setSavedAudit(loadAuditFromLocalStorage());

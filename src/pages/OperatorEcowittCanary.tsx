@@ -769,7 +769,7 @@ export function CloudCanaryPreviewPanel() {
               const url = URL.createObjectURL(blob);
               const a = document.createElement("a");
               a.href = url;
-              a.download = `cloud-canary-fixture-summary-${Date.now()}.json`;
+              a.download = CLOUD_CANARY_EXPORT_JSON_FILENAME;
               document.body.appendChild(a);
               a.click();
               a.remove();

@@ -749,7 +749,7 @@ export function CloudCanaryPreviewPanel() {
               const url = URL.createObjectURL(blob);
               const a = document.createElement("a");
               a.href = url;
-              a.download = `cloud-canary-fixture-summary-${Date.now()}.csv`;
+              a.download = CLOUD_CANARY_EXPORT_CSV_FILENAME;
               document.body.appendChild(a);
               a.click();
               a.remove();

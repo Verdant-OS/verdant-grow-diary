@@ -531,6 +531,130 @@ function DryRunGuidancePanel() {
       </CardContent>
     </Card>
   );
+}
+
+function CloudCanaryPreviewPanel() {
+  const [copied, setCopied] = useState(false);
+
+  const verdict: EcowittCloudCanaryVerdict = useMemo(() => {
+    const ORDER = [
+      "happy_multi_channel",
+      "stale_only",
+      "invalid_humidity",
+      "stuck_soil_extreme",
+      "unmapped_channel",
+      "missing_metrics",
+      "pressure_present",
+      "celsius_looking_fahrenheit",
+    ];
+    const fixtureList = ORDER.map((id) => ({
+      id,
+      payload: (cloudCanaryFixtures.payloads as Record<string, unknown>)[id],
+    }));
+    return runEcowittCloudCanary(
+      fixtureList,
+      cloudCanaryFixtures.mapping as unknown as Parameters<typeof runEcowittCloudCanary>[1],
+      { now: new Date(cloudCanaryFixtures.now) },
+    );
+  }, []);
+
+  const verdictJson = useMemo(() => JSON.stringify(verdict, null, 2), [verdict]);
+
+  const handleCopy = async () => {
+    try {
+      if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
+        throw new Error("Clipboard unavailable");
+      }
+      await navigator.clipboard.writeText(verdictJson);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch (e) {
+      toast.error("Could not copy JSON to clipboard.");
+      // eslint-disable-next-line no-console
+      console.warn("[cloud-canary-preview] copy failed", e);
+    }
+  };
+
+  return (
+    <Card data-testid="cloud-canary-preview-panel">
+      <CardHeader className="pb-2">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <CardTitle className="text-base">Cloud Normalization Canary Preview</CardTitle>
+            <CardDescription>Fixture-only preview · no live API · no DB writes.</CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div
+          data-testid="cloud-canary-fixture-label"
+          className="rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-400"
+        >
+          <span className="font-semibold">Fixture-only:</span> These are static test payloads. No real EcoWitt device is
+          queried.
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+          <div className="rounded-md border p-2 text-center" data-metric="fixtures">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Fixtures</div>
+            <div className="text-sm font-semibold">{verdict.summaries.length}</div>
+          </div>
+          <div className="rounded-md border p-2 text-center" data-metric="normalized">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Normalized</div>
+            <div className="text-sm font-semibold">{verdict.totals.mapped}</div>
+          </div>
+          <div className="rounded-md border p-2 text-center" data-metric="unmapped">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Unmapped</div>
+            <div className="text-sm font-semibold">{verdict.totals.unmapped}</div>
+          </div>
+          <div className="rounded-md border p-2 text-center" data-metric="invalid">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Invalid</div>
+            <div className="text-sm font-semibold">{verdict.totals.invalid}</div>
+          </div>
+          <div className="rounded-md border p-2 text-center" data-metric="stale">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Stale</div>
+            <div className="text-sm font-semibold">{verdict.totals.stale}</div>
+          </div>
+          <div className="rounded-md border p-2 text-center" data-metric="missing-metric">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Missing metric</div>
+            <div className="text-sm font-semibold">{verdict.any_missing_metric ? "Yes" : "No"}</div>
+          </div>
+          <div className="rounded-md border p-2 text-center" data-metric="ec-absence">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">EC invented</div>
+            <div className="text-sm font-semibold">{verdict.any_ec_metric_invented ? "Yes" : "No"}</div>
+          </div>
+          <div className="rounded-md border p-2 text-center" data-metric="suspicious-flags">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Suspicious flags</div>
+            <div className="text-sm font-semibold">{verdict.suspicious_flag_codes.length}</div>
+          </div>
+        </div>
+
+        {verdict.suspicious_flag_codes.length > 0 && (
+          <div className="flex flex-wrap gap-1" data-testid="cloud-suspicious-codes">
+            {verdict.suspicious_flag_codes.map((code) => (
+              <span key={code} className="rounded-md border bg-muted px-2 py-0.5 text-xs font-mono">
+                {code}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleCopy}
+            data-testid="copy-cloud-verdict-json"
+            disabled={copied}
+          >
+            {copied ? "Copied" : "Copy Redacted Verdict JSON"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function RedactionWarningBanner() {
   return (
     <div

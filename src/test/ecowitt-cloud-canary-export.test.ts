@@ -26,9 +26,12 @@ const ORDER = [
   "celsius_looking_fahrenheit",
 ] as const;
 
-const MAC_RE = /[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}/;
-const UUID_RE =
-  /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/;
+// REUSE the shared ID-shaped regexes from the Item 4 render test so that
+// render, CSV, and JSON share ONE definition of "ID-shaped".
+import {
+  MAC_RE,
+  UUID_RE,
+} from "./operator-ecowitt-cloud-canary-per-fixture-table.test";
 const TENT_ID_LIKE = /tent_id|plant_id|raw_payload|passkey|\bMAC\b/i;
 const BANNED = [
   "confirmed",

@@ -179,6 +179,22 @@ export default function BillingPlaceholder() {
           </Link>
         </div>
 
+        <div className="mt-10 text-left">
+          <PaywallCta
+            data-testid="billing-paywall-cta"
+            vm={buildPaywallCtaViewModel({
+              featureTitle: detail?.name ?? "Verdant Pro",
+              requiredPlanLabel: planSlug === "founder-lifetime"
+                ? "Founder Lifetime"
+                : "Pro",
+              secondaryCopy:
+                "Pro access is only granted after a verified billing event. This panel describes what upgrading would unlock — it does not charge or grant access.",
+            })}
+          />
+        </div>
+
+
+
         <p
           className="mt-10 text-xs text-muted-foreground max-w-xl mx-auto"
           data-testid="billing-compliance-note"

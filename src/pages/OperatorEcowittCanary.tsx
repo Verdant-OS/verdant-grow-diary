@@ -6,6 +6,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useTents } from "@/hooks/use-tents";
 import { useAuth } from "@/store/auth";
@@ -17,6 +18,7 @@ import {
   buildDrillDown,
   buildVerdictCsv,
   buildVerdictExport,
+  buildVerdictFilename,
   buildWorkflowSnapshot,
   clearAuditFromLocalStorage,
   clearWorkflowFromLocalStorage,
@@ -25,12 +27,14 @@ import {
   evaluatePreflight,
   loadAuditFromLocalStorage,
   loadWorkflowFromLocalStorage,
-  parseCanaryPaste,
+  migrateLegacyWorkflowSnapshots,
+  parseCanaryImport,
   saveAuditToLocalStorage,
   saveWorkflowToLocalStorage,
   type BuiltAuditReport,
   type CanaryReportInput,
   type CardStatus,
+  type ImportParseError,
   type PreflightResult,
   type VerdictCard,
   type VerdictResult,
@@ -54,8 +58,42 @@ function StatusPill({ status }: { status: CardStatus }) {
   );
 }
 
-function EvidenceCard({ card, drill }: { card: VerdictCard; drill?: ReturnType<typeof buildDrillDown> }) {
-  const [open, setOpen] = useState(false);
+function EvidenceCard({
+  card,
+  drill,
+  autoOpenAndScroll = false,
+}: {
+  card: VerdictCard;
+  drill?: ReturnType<typeof buildDrillDown>;
+  autoOpenAndScroll?: boolean;
+}) {
+  const [open, setOpen] = useState(autoOpenAndScroll && card.status === "fail");
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || !drill || drill.offending.length === 0) return;
+    const targetId = `evidence-row-${card.key}-0`;
+    const raf = requestAnimationFrame(() => {
+      const el = bodyRef.current?.querySelector<HTMLElement>(`#${CSS.escape(targetId)}`);
+      if (!el) return;
+      try {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      } catch {
+        el.scrollIntoView();
+      }
+      try {
+        el.focus({ preventScroll: true });
+      } catch {
+        /* ignore */
+      }
+      setHighlightId(targetId);
+      const t = window.setTimeout(() => setHighlightId(null), 1600);
+      return () => window.clearTimeout(t);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [open, drill, card.key]);
+
   return (
     <Card data-card-key={card.key}>
       <CardHeader className="pb-2">
@@ -107,6 +145,7 @@ function EvidenceCard({ card, drill }: { card: VerdictCard; drill?: ReturnType<t
             </Button>
             {open && (
               <div
+                ref={bodyRef}
                 data-testid={`drilldown-body-${card.key}`}
                 className="mt-2 rounded-md border bg-muted/40 p-2 text-xs"
               >
@@ -115,10 +154,25 @@ function EvidenceCard({ card, drill }: { card: VerdictCard; drill?: ReturnType<t
                 {drill.offending.length > 0 && (
                   <div className="mt-2">
                     <div className="font-semibold text-destructive">Offending evidence</div>
-                    <ul className="list-disc pl-5">
-                      {drill.offending.map((o, i) => (
-                        <li key={i} className="font-mono">{o}</li>
-                      ))}
+                    <ul className="list-disc pl-5" data-testid={`drilldown-rows-${card.key}`}>
+                      {drill.offending.map((o, i) => {
+                        const rowId = `evidence-row-${card.key}-${i}`;
+                        const isHi = highlightId === rowId;
+                        return (
+                          <li
+                            key={i}
+                            id={rowId}
+                            tabIndex={-1}
+                            data-evidence-row={i}
+                            className={
+                              "font-mono outline-none transition-colors " +
+                              (isHi ? "bg-primary/20 ring-1 ring-primary rounded px-1" : "")
+                            }
+                          >
+                            {o}
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 )}
@@ -591,12 +645,16 @@ function ResultsDashboard({
   verdict,
   onDownloadJson,
   onDownloadCsv,
+  onCopyJson,
+  copyDisabled,
 }: {
   preflight: PreflightResult | null;
   report: CanaryReportInput | null;
   verdict: VerdictResult;
   onDownloadJson: () => void;
   onDownloadCsv: () => void;
+  onCopyJson: () => void;
+  copyDisabled: boolean;
 }) {
   const verdictLabel = verdict.verdict === "go" ? "GO" : verdict.verdict === "no_go" ? "NO-GO" : "INCOMPLETE";
   const verdictCls =
@@ -681,6 +739,15 @@ function ResultsDashboard({
           <Button size="sm" variant="outline" onClick={onDownloadJson} data-testid="download-verdict-json">
             Download Verdict JSON
           </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onCopyJson}
+            disabled={copyDisabled}
+            data-testid="copy-verdict-json"
+          >
+            Copy JSON
+          </Button>
           <Button size="sm" variant="outline" onClick={onDownloadCsv} data-testid="download-verdict-csv">
             Download Verdict CSV
           </Button>
@@ -708,9 +775,17 @@ export default function OperatorEcowittCanary() {
   const [importSecretCategories, setImportSecretCategories] = useState<string[]>([]);
   const [savedWorkflow, setSavedWorkflow] = useState<WorkflowSnapshot | null>(null);
   const [workflowRestoredAt, setWorkflowRestoredAt] = useState<string | null>(null);
+  const [importError, setImportError] = useState<ImportParseError | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
+    // One-time, idempotent migration of legacy localStorage workflow snapshots.
+    try {
+      migrateLegacyWorkflowSnapshots();
+    } catch {
+      /* never crash boot */
+    }
     setSavedAudit(loadAuditFromLocalStorage());
     setSavedWorkflow(loadWorkflowFromLocalStorage());
   }, []);
@@ -723,27 +798,73 @@ export default function OperatorEcowittCanary() {
       setImportSecretCategories(cats);
       setReport(null);
       setParseNotes([]);
+      setImportError(null);
       setSaveNotice(null);
+      // Preserve raw input so the user can redact + retry.
+      setPaste(text);
       return;
     }
     setImportSecretCategories([]);
     setPaste(text);
-    const parsed = parseCanaryPaste(text);
-    setReport(parsed.report);
-    setParseNotes(parsed.parseNotes);
+    const result = parseCanaryImport(text);
+    if (!result.ok && result.error) {
+      setImportError(result.error);
+      setReport(null);
+      setParseNotes([]);
+      setSaveNotice(null);
+      return;
+    }
+    setImportError(null);
+    setReport(result.report);
+    setParseNotes(result.parseNotes);
     setSaveNotice(`Imported redacted output from ${sourceLabel}.`);
   };
 
   const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    void readFileAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const readFileAsText = (file: File) => {
+    const okType =
+      /\.(json|txt)$/i.test(file.name) ||
+      file.type === "application/json" ||
+      file.type === "text/plain" ||
+      file.type === "";
+    if (!okType) {
+      setImportError({
+        kind: "unsupported",
+        message: `Unsupported file type: ${file.type || "unknown"}. Use .json or .txt.`,
+      });
+      return;
+    }
+    if (file.size === 0) {
+      setImportError({ kind: "empty", message: "File is empty." });
+      return;
+    }
+    if (file.size > 5_000_000) {
+      setImportError({ kind: "unsupported", message: "File is too large (>5 MB). Trim to canary output only." });
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = String(ev.target?.result ?? "");
       ingestText(text, file.name);
     };
+    reader.onerror = () => {
+      setImportError({ kind: "unsupported", message: "Could not read file." });
+    };
     reader.readAsText(file);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer?.files?.[0];
+    if (!file) return;
+    readFileAsText(file);
   };
 
   const clearImport = () => {
@@ -751,8 +872,10 @@ export default function OperatorEcowittCanary() {
     setReport(null);
     setParseNotes([]);
     setImportSecretCategories([]);
+    setImportError(null);
     setSaveNotice("Cleared import.");
   };
+
 
 
   // Read-only tent fetch for preflight (RLS-enforced).
@@ -808,15 +931,45 @@ export default function OperatorEcowittCanary() {
   const downloadRedactedAudit = () =>
     downloadBlob(JSON.stringify(builtAudit, null, 2), `ecowitt-canary-audit-${Date.now()}.json`, "application/json");
 
+  const workflowSlug = useMemo(() => {
+    const tentName = tentQ.data?.name ?? "";
+    return tentName || "workflow";
+  }, [tentQ.data?.name]);
+
+  const verdictJsonString = useMemo(
+    () => JSON.stringify(buildVerdictExport(builtAudit), null, 2),
+    [builtAudit],
+  );
+
+  const verdictAvailable = verdict.verdict !== "incomplete" || !!report || !!preflight;
+
   const downloadVerdictJson = () =>
     downloadBlob(
-      JSON.stringify(buildVerdictExport(builtAudit), null, 2),
-      `ecowitt-canary-verdict-${Date.now()}.json`,
+      verdictJsonString,
+      buildVerdictFilename({ workflowSlug, ext: "json" }),
       "application/json",
     );
 
   const downloadVerdictCsv = () =>
-    downloadBlob(buildVerdictCsv(builtAudit), `ecowitt-canary-verdict-${Date.now()}.csv`, "text/csv;charset=utf-8;");
+    downloadBlob(
+      buildVerdictCsv(builtAudit),
+      buildVerdictFilename({ workflowSlug, ext: "csv" }),
+      "text/csv;charset=utf-8;",
+    );
+
+  const copyVerdictJson = async () => {
+    try {
+      if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
+        throw new Error("Clipboard API unavailable");
+      }
+      await navigator.clipboard.writeText(verdictJsonString);
+      toast.success("Redacted JSON copied.");
+    } catch (e) {
+      toast.error("Could not copy JSON to clipboard.");
+      // eslint-disable-next-line no-console
+      console.warn("[operator-ecowitt] copy JSON failed", e);
+    }
+  };
 
   const rememberAudit = () => {
     saveAuditToLocalStorage(builtAudit);
@@ -1018,17 +1171,36 @@ export default function OperatorEcowittCanary() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Textarea
-            aria-label="Paste canary harness output"
-            placeholder='Paste redacted OutFile text, or { "main_row_counts": { ... }, ... }'
-            value={paste}
-            onChange={(e) => {
-              setPaste(e.target.value);
-              setImportSecretCategories([]);
+          <div
+            data-testid="import-dropzone"
+            data-dragover={isDragOver ? "true" : "false"}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragOver(true);
             }}
-            rows={8}
-            className="font-mono text-xs"
-          />
+            onDragLeave={() => setIsDragOver(false)}
+            onDrop={handleDrop}
+            className={
+              "rounded-md border-2 border-dashed p-3 transition-colors " +
+              (isDragOver ? "border-primary bg-primary/10" : "border-border bg-muted/30")
+            }
+          >
+            <div className="mb-2 text-xs text-muted-foreground">
+              Drag a redacted <code>.json</code> or <code>.txt</code> file here, or paste below.
+            </div>
+            <Textarea
+              aria-label="Paste canary harness output"
+              placeholder='Paste redacted OutFile text, or { "main_row_counts": { ... }, ... }'
+              value={paste}
+              onChange={(e) => {
+                setPaste(e.target.value);
+                setImportSecretCategories([]);
+                setImportError(null);
+              }}
+              rows={8}
+              className="font-mono text-xs"
+            />
+          </div>
           {importBlocked && (
             <div
               data-testid="import-secret-warning"
@@ -1039,6 +1211,41 @@ export default function OperatorEcowittCanary() {
               </div>
               <div className="mt-1 text-muted-foreground">
                 Pattern categories matched (values not shown): {importSecretCategories.join(", ")}
+              </div>
+            </div>
+          )}
+          {importError && (
+            <div
+              data-testid={`import-error-${importError.kind}`}
+              className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs"
+            >
+              <div className="font-semibold text-destructive">
+                {importError.kind === "json"
+                  ? "Invalid JSON"
+                  : importError.kind === "schema"
+                    ? "Unsupported canary format"
+                    : importError.kind === "empty"
+                      ? "Nothing to import"
+                      : "Unsupported file"}
+              </div>
+              <div className="mt-1 text-muted-foreground">
+                {importError.message}
+                {importError.line !== undefined && (
+                  <>
+                    {" "}
+                    <span data-testid="import-error-location">
+                      (line {importError.line}, column {importError.column ?? "?"})
+                    </span>
+                  </>
+                )}
+              </div>
+              {importError.expectedFields && importError.expectedFields.length > 0 && (
+                <div className="mt-1 text-muted-foreground">
+                  Expected top-level fields: <code>{importError.expectedFields.join(", ")}</code>
+                </div>
+              )}
+              <div className="mt-1 text-muted-foreground">
+                Your input was preserved above so you can fix it and retry.
               </div>
             </div>
           )}
@@ -1094,12 +1301,19 @@ export default function OperatorEcowittCanary() {
         verdict={verdict}
         onDownloadJson={downloadVerdictJson}
         onDownloadCsv={downloadVerdictCsv}
+        onCopyJson={copyVerdictJson}
+        copyDisabled={!verdictAvailable}
       />
 
       {/* Verification Summary cards (each supports drill-down) */}
       <section aria-label="Verification Summary" className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {verdict.cards.map((c) => (
-          <EvidenceCard key={c.key} card={c} drill={buildDrillDown(c, report)} />
+          <EvidenceCard
+            key={c.key}
+            card={c}
+            drill={buildDrillDown(c, report)}
+            autoOpenAndScroll={c.status === "fail"}
+          />
         ))}
       </section>
 

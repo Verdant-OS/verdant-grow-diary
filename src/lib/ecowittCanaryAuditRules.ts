@@ -10,7 +10,89 @@ export type CardStatus = "pass" | "fail" | "incomplete" | "unknown";
 export type Verdict = "go" | "no_go" | "incomplete";
 
 export const REPORT_VERSION = "ecowitt_canary_audit_v1";
+export const VERDICT_REPORT_VERSION = "ecowitt_canary_verdict_v1";
 export const LOCAL_STORAGE_KEY = "operator.ecowitt.canary.audit.v1";
+export const WORKFLOW_STORAGE_KEY = "operator.ecowitt.canary.workflow.v1";
+
+// ----- import secret-scan patterns ----------------------------------------
+
+export const ALLOWED_REDACTION_PLACEHOLDERS = [
+  "vbt_REDACTED",
+  "PASSKEY_REDACTED",
+  "MAC_REDACTED",
+  "SHOULD_NOT_PERSIST",
+  "[REDACTED]",
+];
+
+const PLACEHOLDER_TOKEN_RE = /(vbt_REDACTED|PASSKEY_REDACTED|MAC_REDACTED|SHOULD_NOT_PERSIST|\[REDACTED\])/;
+
+interface SecretPattern {
+  category: string;
+  test: (text: string) => boolean;
+}
+
+const SECRET_IMPORT_PATTERNS: SecretPattern[] = [
+  { category: "bridge token (vbt_)", test: (t) => /\bvbt_(?!REDACTED\b)[A-Za-z0-9_-]{6,}/.test(t) },
+  { category: "MAC address", test: (t) => /\b[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}\b/.test(t) },
+  { category: "JWT-like (eyJ...)", test: (t) => /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/.test(t) },
+  { category: "Stripe-like (sk_)", test: (t) => /\bsk_[A-Za-z0-9]{10,}/.test(t) },
+  { category: "service_role literal", test: (t) => /service_role/i.test(t) },
+  {
+    category: "api_key=value",
+    test: (t) => {
+      const m = t.match(/\bapi_key\s*[=:]\s*["']?([^\s"',}]+)/i);
+      return !!m && !PLACEHOLDER_TOKEN_RE.test(m[1]);
+    },
+  },
+  {
+    category: "application_key=value",
+    test: (t) => {
+      const m = t.match(/\bapplication_key\s*[=:]\s*["']?([^\s"',}]+)/i);
+      return !!m && !PLACEHOLDER_TOKEN_RE.test(m[1]);
+    },
+  },
+  {
+    category: "PASSKEY= non-redacted",
+    test: (t) => {
+      const m = t.match(/\bPASSKEY\s*[=:]\s*["']?([^\s"',}]+)/i);
+      return !!m && !PLACEHOLDER_TOKEN_RE.test(m[1]);
+    },
+  },
+  {
+    category: "MAC= non-redacted",
+    test: (t) => {
+      const m = t.match(/\bMAC\s*[=:]\s*["']?([^\s"',}]+)/i);
+      return !!m && !PLACEHOLDER_TOKEN_RE.test(m[1]);
+    },
+  },
+  {
+    category: "long hex string (32+ chars)",
+    test: (t) => {
+      const re = /\b[0-9a-fA-F]{32,}\b/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(t)) !== null) {
+        const ctxStart = Math.max(0, m.index - 5);
+        if (t.slice(ctxStart, m.index).includes("ewfp_")) continue;
+        return true;
+      }
+      return false;
+    },
+  },
+];
+
+/** Return matched secret-pattern *category names* (never the values). */
+export function detectSecretCategories(text: string): string[] {
+  if (!text) return [];
+  const found = new Set<string>();
+  for (const p of SECRET_IMPORT_PATTERNS) {
+    try {
+      if (p.test(text)) found.add(p.category);
+    } catch {
+      /* ignore */
+    }
+  }
+  return Array.from(found);
+}
 
 export interface PreflightInput {
   /** Whether an authenticated operator session is available. */

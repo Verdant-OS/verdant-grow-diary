@@ -290,4 +290,21 @@ describe("CloudCanaryPreviewPanel — export controls render (Item 3)", () => {
     expect(json).not.toMatch(/missing_metric_count/);
     expect(json).not.toMatch(/suspicious_flag_codes/);
   });
+
+  it("uses the literal export key 'fresh_class_count' in BOTH CSV header and JSON key (NOT 'fresh_count')", () => {
+    const vm = buildVmFromIds(ORDER);
+    const exp = buildCloudCanaryExport(vm, { now: FIXED_NOW });
+    const csv = serializeCloudCanaryExportToCsv(exp);
+    const json = serializeCloudCanaryExportToJson(exp);
+
+    // CSV header row (third line: comment, comment, header)
+    const headerLine = csv.split("\n")[2];
+    const headerCols = headerLine.split(",");
+    expect(headerCols).toContain("fresh_class_count");
+    expect(headerCols).not.toContain("fresh_count");
+
+    // JSON: literal key present, old name absent
+    expect(json).toMatch(/"fresh_class_count"\s*:/);
+    expect(json).not.toMatch(/"fresh_count"\s*:/);
+  });
 });

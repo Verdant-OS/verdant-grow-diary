@@ -22,7 +22,9 @@ import {
 import { buildAiDoctorReviewRequestPacket } from "@/lib/aiDoctorReviewRequestPacket";
 import { useAiDoctorLiveReview } from "@/hooks/useAiDoctorLiveReview";
 import AiDoctorReviewResultPreview from "@/components/AiDoctorReviewResultPreview";
+import AiCreditLimitNotice from "@/components/AiCreditLimitNotice";
 import { useSensorBridgeHealth } from "@/hooks/useSensorBridgeHealth";
+import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import {
   classificationFromStatusResult,
   type Classification,

@@ -313,8 +313,12 @@ describe("CloudCanaryPreviewPanel — export controls render (Item 3)", () => {
     const csv = serializeCloudCanaryExportToCsv(exp);
     const header = csv.split("\n")[2].split(",");
     expect(header).toContain("suspicious_flag_codes");
-    // Stable position: last column
-    expect(header[header.length - 1]).toBe("suspicious_flag_codes");
+    // After Slice B, missing_metric_codes is appended; suspicious_flag_codes
+    // keeps its position right before it.
+    const sIdx = header.indexOf("suspicious_flag_codes");
+    const mIdx = header.indexOf("missing_metric_codes");
+    expect(mIdx).toBe(sIdx + 1);
+    expect(header[header.length - 1]).toBe("missing_metric_codes");
   });
 
   it("Slice A: CSV row for invalid_humidity carries its enum code in the codes cell", () => {
@@ -324,8 +328,8 @@ describe("CloudCanaryPreviewPanel — export controls render (Item 3)", () => {
     const dataLine = csv.split("\n")[3]; // 2 comments + header + 1 row
     const cells = dataLine.split(",");
     expect(cells[0]).toBe("invalid_humidity");
-    // Last cell = codes; |-joined enum values only
-    const codesCell = cells[cells.length - 1];
+    // suspicious_flag_codes is now the second-to-last cell (missing_metric_codes appended after).
+    const codesCell = cells[cells.length - 2];
     const codes = codesCell.split("|");
     expect(codes).toContain("rh_out_of_range_invalid");
     for (const c of codes) {

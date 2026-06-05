@@ -354,7 +354,7 @@ export function normalizeEcowittCloudReadings(
   const warnings: string[] = [];
 
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    return { rows: [], unmapped: [], warnings: ["payload_not_object"] };
+    return { rows: [], unmapped: [], warnings: ["payload_not_object"], missing_metric_codes: [] };
   }
   const obj = payload as Record<string, unknown>;
   const lower: Record<string, unknown> = {};

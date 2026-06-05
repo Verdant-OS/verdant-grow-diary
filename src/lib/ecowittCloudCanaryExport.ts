@@ -121,7 +121,7 @@ export function serializeCloudCanaryExportToCsv(exp: CloudCanaryExport): string 
   }
   lines.push(
     [
-      escapeCsv("__totals__"),
+      escapeCsv("TOTAL"),
       exp.totals.mapped_count,
       exp.totals.fresh_class_count,
       exp.totals.stale_count,

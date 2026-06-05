@@ -740,6 +740,15 @@ function ResultsDashboard({
           <Button size="sm" variant="outline" onClick={onDownloadJson} data-testid="download-verdict-json">
             Download Verdict JSON
           </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onCopyJson}
+            disabled={copyDisabled}
+            data-testid="copy-verdict-json"
+          >
+            Copy JSON
+          </Button>
           <Button size="sm" variant="outline" onClick={onDownloadCsv} data-testid="download-verdict-csv">
             Download Verdict CSV
           </Button>

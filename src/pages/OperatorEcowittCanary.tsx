@@ -14,18 +14,27 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
   buildAuditReport,
+  buildDrillDown,
+  buildVerdictCsv,
+  buildVerdictExport,
+  buildWorkflowSnapshot,
   clearAuditFromLocalStorage,
+  clearWorkflowFromLocalStorage,
   computeVerdict,
+  detectSecretCategories,
   evaluatePreflight,
   loadAuditFromLocalStorage,
+  loadWorkflowFromLocalStorage,
   parseCanaryPaste,
   saveAuditToLocalStorage,
+  saveWorkflowToLocalStorage,
   type BuiltAuditReport,
   type CanaryReportInput,
   type CardStatus,
   type PreflightResult,
   type VerdictCard,
   type VerdictResult,
+  type WorkflowSnapshot,
 } from "@/lib/ecowittCanaryAuditRules";
 
 const ENDPOINT_PATH = "/functions/v1/ecowitt-ingest";
@@ -45,7 +54,8 @@ function StatusPill({ status }: { status: CardStatus }) {
   );
 }
 
-function EvidenceCard({ card }: { card: VerdictCard }) {
+function EvidenceCard({ card, drill }: { card: VerdictCard; drill?: ReturnType<typeof buildDrillDown> }) {
+  const [open, setOpen] = useState(false);
   return (
     <Card data-card-key={card.key}>
       <CardHeader className="pb-2">
@@ -82,6 +92,49 @@ function EvidenceCard({ card }: { card: VerdictCard }) {
           <div data-evidence="next" className="text-xs">
             <span className="font-semibold">Next: </span>
             <span className="text-muted-foreground">{card.next_action}</span>
+          </div>
+        )}
+        {drill && (
+          <div data-drilldown-card={card.key} className="pt-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setOpen((v) => !v)}
+              data-testid={`drilldown-toggle-${card.key}`}
+              className="h-7 px-2 text-xs"
+            >
+              {open ? "Hide drill-down" : "Drill down"}
+            </Button>
+            {open && (
+              <div
+                data-testid={`drilldown-body-${card.key}`}
+                className="mt-2 rounded-md border bg-muted/40 p-2 text-xs"
+              >
+                <div className="font-semibold">Status: {drill.status.toUpperCase()}</div>
+                <div className="mt-1 text-muted-foreground">{drill.reason}</div>
+                {drill.offending.length > 0 && (
+                  <div className="mt-2">
+                    <div className="font-semibold text-destructive">Offending evidence</div>
+                    <ul className="list-disc pl-5">
+                      {drill.offending.map((o, i) => (
+                        <li key={i} className="font-mono">{o}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {drill.unavailable && drill.offending.length === 0 && (
+                  <div className="mt-2 italic text-muted-foreground">
+                    offending row not available in imported report
+                  </div>
+                )}
+                {drill.next_action && (
+                  <div className="mt-2">
+                    <span className="font-semibold">Next: </span>
+                    {drill.next_action}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </CardContent>
@@ -536,10 +589,14 @@ function ResultsDashboard({
   preflight,
   report,
   verdict,
+  onDownloadJson,
+  onDownloadCsv,
 }: {
   preflight: PreflightResult | null;
   report: CanaryReportInput | null;
   verdict: VerdictResult;
+  onDownloadJson: () => void;
+  onDownloadCsv: () => void;
 }) {
   const verdictLabel = verdict.verdict === "go" ? "GO" : verdict.verdict === "no_go" ? "NO-GO" : "INCOMPLETE";
   const verdictCls =
@@ -619,6 +676,15 @@ function ResultsDashboard({
             ))}
           </ul>
         )}
+
+        <div className="flex flex-wrap gap-2" data-testid="dashboard-exports">
+          <Button size="sm" variant="outline" onClick={onDownloadJson} data-testid="download-verdict-json">
+            Download Verdict JSON
+          </Button>
+          <Button size="sm" variant="outline" onClick={onDownloadCsv} data-testid="download-verdict-csv">
+            Download Verdict CSV
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
@@ -639,11 +705,34 @@ export default function OperatorEcowittCanary() {
   const [savedAudit, setSavedAudit] = useState<BuiltAuditReport | null>(null);
   const [restoredAudit, setRestoredAudit] = useState<BuiltAuditReport | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
+  const [importSecretCategories, setImportSecretCategories] = useState<string[]>([]);
+  const [savedWorkflow, setSavedWorkflow] = useState<WorkflowSnapshot | null>(null);
+  const [workflowRestoredAt, setWorkflowRestoredAt] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setSavedAudit(loadAuditFromLocalStorage());
+    setSavedWorkflow(loadWorkflowFromLocalStorage());
   }, []);
+
+  const importBlocked = importSecretCategories.length > 0;
+
+  const ingestText = (text: string, sourceLabel: string) => {
+    const cats = detectSecretCategories(text);
+    if (cats.length > 0) {
+      setImportSecretCategories(cats);
+      setReport(null);
+      setParseNotes([]);
+      setSaveNotice(null);
+      return;
+    }
+    setImportSecretCategories([]);
+    setPaste(text);
+    const parsed = parseCanaryPaste(text);
+    setReport(parsed.report);
+    setParseNotes(parsed.parseNotes);
+    setSaveNotice(`Imported redacted output from ${sourceLabel}.`);
+  };
 
   const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -651,15 +740,20 @@ export default function OperatorEcowittCanary() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = String(ev.target?.result ?? "");
-      setPaste(text);
-      const parsed = parseCanaryPaste(text);
-      setReport(parsed.report);
-      setParseNotes(parsed.parseNotes);
-      setSaveNotice(`Loaded redacted output from ${file.name}. Review then Import.`);
+      ingestText(text, file.name);
     };
     reader.readAsText(file);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
+
+  const clearImport = () => {
+    setPaste("");
+    setReport(null);
+    setParseNotes([]);
+    setImportSecretCategories([]);
+    setSaveNotice("Cleared import.");
+  };
+
 
   // Read-only tent fetch for preflight (RLS-enforced).
   const tentQ = useQuery({
@@ -696,22 +790,33 @@ export default function OperatorEcowittCanary() {
   }, [tentQ.data, preflight, report, verdict]);
 
   const handleImport = () => {
-    const parsed = parseCanaryPaste(paste);
-    setReport(parsed.report);
-    setParseNotes(parsed.parseNotes);
+    ingestText(paste, "paste");
   };
 
-  const downloadRedactedAudit = () => {
-    const blob = new Blob([JSON.stringify(builtAudit, null, 2)], { type: "application/json" });
+  const downloadBlob = (content: string, filename: string, mime: string) => {
+    const blob = new Blob([content], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `ecowitt-canary-audit-${Date.now()}.json`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
   };
+
+  const downloadRedactedAudit = () =>
+    downloadBlob(JSON.stringify(builtAudit, null, 2), `ecowitt-canary-audit-${Date.now()}.json`, "application/json");
+
+  const downloadVerdictJson = () =>
+    downloadBlob(
+      JSON.stringify(buildVerdictExport(builtAudit), null, 2),
+      `ecowitt-canary-verdict-${Date.now()}.json`,
+      "application/json",
+    );
+
+  const downloadVerdictCsv = () =>
+    downloadBlob(buildVerdictCsv(builtAudit), `ecowitt-canary-verdict-${Date.now()}.csv`, "text/csv;charset=utf-8;");
 
   const rememberAudit = () => {
     saveAuditToLocalStorage(builtAudit);
@@ -732,6 +837,29 @@ export default function OperatorEcowittCanary() {
       setSaveNotice("Restored audit from local device storage.");
     }
   };
+
+  // Auto-save redacted workflow snapshot (never raw paste).
+  useEffect(() => {
+    if (!preflight && !report) return;
+    const snap = buildWorkflowSnapshot({ preflight, report, verdict });
+    saveWorkflowToLocalStorage(snap);
+  }, [preflight, report, verdict]);
+
+  const restoreSavedWorkflow = () => {
+    if (!savedWorkflow) return;
+    if (savedWorkflow.preflight) setPreflight(savedWorkflow.preflight);
+    if (savedWorkflow.imported_report) setReport(savedWorkflow.imported_report);
+    setWorkflowRestoredAt(savedWorkflow.saved_at);
+    setSaveNotice("Restored EcoWitt canary workflow from local device storage.");
+  };
+
+  const clearSavedWorkflow = () => {
+    clearWorkflowFromLocalStorage();
+    setSavedWorkflow(null);
+    setWorkflowRestoredAt(null);
+    setSaveNotice("Cleared saved workflow.");
+  };
+
 
   return (
     <div className="container mx-auto max-w-5xl space-y-6 p-4 md:p-6" data-testid="operator-ecowitt-canary">
@@ -785,6 +913,36 @@ export default function OperatorEcowittCanary() {
             ))}
           </CardContent>
         </Card>
+      )}
+
+      {savedWorkflow && !workflowRestoredAt && (
+        <Card data-testid="saved-workflow-banner">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6">
+            <div className="text-sm">
+              <div className="font-medium">Saved EcoWitt canary workflow found</div>
+              <div className="text-xs text-muted-foreground">
+                Saved {savedWorkflow.saved_at} · verdict {savedWorkflow.verdict.toUpperCase()} · {savedWorkflow.counts.pass} pass / {savedWorkflow.counts.fail} fail / {savedWorkflow.counts.incomplete} incomplete
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={restoreSavedWorkflow} data-testid="restore-saved-workflow">
+                Restore
+              </Button>
+              <Button size="sm" variant="outline" onClick={clearSavedWorkflow} data-testid="clear-saved-workflow">
+                Clear saved workflow
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {workflowRestoredAt && (
+        <div
+          className="inline-flex items-center rounded-md border border-primary/40 bg-primary/10 px-2 py-0.5 text-xs text-primary"
+          data-testid="restored-from-local"
+        >
+          Restored from local device storage · {workflowRestoredAt}
+        </div>
       )}
 
       {saveNotice && <div className="text-xs text-muted-foreground">{saveNotice}</div>}
@@ -851,27 +1009,40 @@ export default function OperatorEcowittCanary() {
         </CardContent>
       </Card>
 
-      {/* Canary Results Import */}
-      <Card>
+      {/* Import canary output */}
+      <Card data-testid="import-canary-output">
         <CardHeader>
-          <CardTitle>Canary Results Import</CardTitle>
+          <CardTitle>Import canary output</CardTitle>
           <CardDescription>
-            Paste the harness JSON report. Plain text is accepted but cannot reach a GO verdict.
+            Upload a redacted <code>.txt</code> / <code>.json</code> harness output, or paste it below. Browser POSTs are never made from this page.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <Textarea
             aria-label="Paste canary harness output"
-            placeholder='{ "main_row_counts": { "temperature_c": 1, ... }, ... }'
+            placeholder='Paste redacted OutFile text, or { "main_row_counts": { ... }, ... }'
             value={paste}
-            onChange={(e) => setPaste(e.target.value)}
+            onChange={(e) => {
+              setPaste(e.target.value);
+              setImportSecretCategories([]);
+            }}
             rows={8}
             className="font-mono text-xs"
           />
+          {importBlocked && (
+            <div
+              data-testid="import-secret-warning"
+              className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs"
+            >
+              <div className="font-semibold text-destructive">
+                Possible unredacted secret detected. Redact before importing.
+              </div>
+              <div className="mt-1 text-muted-foreground">
+                Pattern categories matched (values not shown): {importSecretCategories.join(", ")}
+              </div>
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-3">
-            <Button variant="secondary" onClick={handleImport} disabled={!paste.trim()}>
-              Import Canary Results
-            </Button>
             <input
               ref={fileInputRef}
               type="file"
@@ -885,7 +1056,18 @@ export default function OperatorEcowittCanary() {
               onClick={() => fileInputRef.current?.click()}
               data-testid="load-outfile-button"
             >
-              Load from OutFile
+              Load from OutFile (.txt / .json)
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={handleImport}
+              disabled={!paste.trim()}
+              data-testid="import-redacted-output"
+            >
+              Import redacted output
+            </Button>
+            <Button variant="ghost" onClick={clearImport} data-testid="clear-import">
+              Clear import
             </Button>
             <label className="flex items-center gap-2 text-sm">
               <input
@@ -906,12 +1088,18 @@ export default function OperatorEcowittCanary() {
         </CardContent>
       </Card>
 
-      <ResultsDashboard preflight={preflight} report={report} verdict={verdict} />
+      <ResultsDashboard
+        preflight={preflight}
+        report={report}
+        verdict={verdict}
+        onDownloadJson={downloadVerdictJson}
+        onDownloadCsv={downloadVerdictCsv}
+      />
 
-      {/* Verification Summary cards */}
+      {/* Verification Summary cards (each supports drill-down) */}
       <section aria-label="Verification Summary" className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {verdict.cards.map((c) => (
-          <EvidenceCard key={c.key} card={c} />
+          <EvidenceCard key={c.key} card={c} drill={buildDrillDown(c, report)} />
         ))}
       </section>
 

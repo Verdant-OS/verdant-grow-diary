@@ -79,9 +79,10 @@ export const CLOUD_CANARY_EXPORT_JSON_FILENAME = "ecowitt-cloud-canary-summary.j
  */
 export function buildCloudCanaryExport(
   vm: CloudCanaryPreviewViewModel,
+  // Accepted for back-compat; intentionally unused. Payload is deterministic
+  // — no timestamps in the file. Run-timing for the UI lives in the panel.
+  _opts: { now?: Date } = {},
 ): CloudCanaryExport {
-  // Deterministic by construction — no timestamps, no wall-clock, no randomness.
-  // Run-timing values for the UI live in the panel, never in the payload.
   // against the closed enum, the export re-checks. This guarantees the file
   // on disk can ONLY contain enum values — never free text.
   const validateSuspiciousCodes = (

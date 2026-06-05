@@ -1229,3 +1229,351 @@ export function clearWorkflowFromLocalStorage(): void {
     /* ignore */
   }
 }
+
+// ----- export filename helpers --------------------------------------------
+
+/** Sanitize a single filename piece: lowercase, dashes, strip unsafe chars. */
+export function sanitizeFilenamePart(input: string | null | undefined, fallback = "workflow"): string {
+  const s = (input ?? "").toString().trim().toLowerCase();
+  const cleaned = s
+    .replace(/[\s_]+/g, "-")
+    .replace(/[^a-z0-9.-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^[-.]+|[-.]+$/g, "");
+  return cleaned || fallback;
+}
+
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : String(n);
+}
+
+/** Local-time YYYY-MM-DD_HHmm stamp. */
+export function localTimestampStamp(now: Date = new Date()): string {
+  return (
+    `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}_` +
+    `${pad2(now.getHours())}${pad2(now.getMinutes())}`
+  );
+}
+
+/**
+ * Build a default verdict export filename.
+ * Pattern: verdant-canary-verdict-{slug}-{YYYY-MM-DD_HHmm}.{ext}
+ */
+export function buildVerdictFilename(args: {
+  workflowSlug?: string | null;
+  ext?: "json" | "csv";
+  now?: Date;
+} = {}): string {
+  const slug = sanitizeFilenamePart(args.workflowSlug ?? "", "workflow");
+  const stamp = localTimestampStamp(args.now ?? new Date());
+  const ext = args.ext ?? "json";
+  return `verdant-canary-verdict-${slug}-${stamp}.${ext}`;
+}
+
+// ----- JSON parse error with line/column ----------------------------------
+
+export interface JsonParseDetail {
+  message: string;
+  position?: number;
+  line?: number;
+  column?: number;
+}
+
+/** Convert a 0-based char position into 1-based line/column. */
+export function positionToLineColumn(text: string, position: number): { line: number; column: number } {
+  let line = 1;
+  let column = 1;
+  const max = Math.min(position, text.length);
+  for (let i = 0; i < max; i++) {
+    if (text.charCodeAt(i) === 10) {
+      line++;
+      column = 1;
+    } else {
+      column++;
+    }
+  }
+  return { line, column };
+}
+
+/** Extract a 0-based char position from a JSON.parse error message, if present. */
+export function extractJsonErrorPosition(msg: string): number | undefined {
+  const m = msg.match(/position\s+(\d+)/i);
+  if (m) return Number(m[1]);
+  const ln = msg.match(/line\s+(\d+)\s+column\s+(\d+)/i);
+  if (ln) return undefined; // caller can use line/col directly if needed
+  return undefined;
+}
+
+export type ImportParseErrorKind = "json" | "schema" | "empty" | "unsupported";
+
+export interface ImportParseError {
+  kind: ImportParseErrorKind;
+  message: string;
+  line?: number;
+  column?: number;
+  expectedFields?: string[];
+}
+
+export interface ImportParseResult {
+  ok: boolean;
+  report: CanaryReportInput | null;
+  source: "json" | "text" | "empty";
+  parseNotes: string[];
+  error?: ImportParseError;
+}
+
+const CANARY_TOP_LEVEL_FIELDS = [
+  "responses",
+  "main_row_counts",
+  "malformed_row_counts",
+  "duplicate_replay_counts",
+  "channel_9_count",
+  "leak_scan_count",
+  "timestamp_source_counts",
+  "vpd_provenance",
+];
+
+/**
+ * Strict-ish import parser. Distinguishes JSON parse errors (with
+ * line/column) from schema mismatches (unknown top-level shape).
+ * Plain text is still accepted as a soft-import like parseCanaryPaste.
+ */
+export function parseCanaryImport(raw: string): ImportParseResult {
+  const trimmed = (raw ?? "").trim();
+  if (!trimmed) {
+    return {
+      ok: false,
+      report: null,
+      source: "empty",
+      parseNotes: [],
+      error: { kind: "empty", message: "No content to import." },
+    };
+  }
+  const looksJson = trimmed.startsWith("{") || trimmed.startsWith("[");
+  if (looksJson) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return {
+          ok: false,
+          report: null,
+          source: "json",
+          parseNotes: [],
+          error: {
+            kind: "schema",
+            message: "Canary report must be a JSON object at the top level.",
+            expectedFields: CANARY_TOP_LEVEL_FIELDS,
+          },
+        };
+      }
+      const hasKnown = CANARY_TOP_LEVEL_FIELDS.some((k) => k in (parsed as Record<string, unknown>));
+      if (!hasKnown) {
+        return {
+          ok: false,
+          report: parsed as CanaryReportInput,
+          source: "json",
+          parseNotes: [],
+          error: {
+            kind: "schema",
+            message: "JSON parsed, but none of the expected canary fields were found.",
+            expectedFields: CANARY_TOP_LEVEL_FIELDS,
+          },
+        };
+      }
+      return { ok: true, report: parsed as CanaryReportInput, source: "json", parseNotes: [] };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const pos = extractJsonErrorPosition(msg);
+      const lc = typeof pos === "number" ? positionToLineColumn(trimmed, pos) : undefined;
+      return {
+        ok: false,
+        report: null,
+        source: "json",
+        parseNotes: [],
+        error: {
+          kind: "json",
+          message: msg,
+          line: lc?.line,
+          column: lc?.column,
+        },
+      };
+    }
+  }
+  // Plain text path mirrors parseCanaryPaste's lenient behavior.
+  return {
+    ok: true,
+    report: {},
+    source: "text",
+    parseNotes: [
+      "Plain-text paste detected. Verdict cannot be GO without structured JSON or manual SQL verification.",
+    ],
+  };
+}
+
+// ----- workflow snapshot migration (legacy → v1) --------------------------
+
+export const WORKFLOW_BACKUP_KEY = "verdant.workflowSnapshots.backup.preV1";
+export const WORKFLOW_MIGRATION_FLAG = "verdant.workflowSnapshots.migration.v1.done";
+export const LEGACY_WORKFLOW_STORAGE_KEYS = [
+  "operator.ecowitt.canary.workflow",
+  "operator.ecowitt.canary.workflow.v0",
+];
+
+export interface WorkflowSnapshotV1 {
+  schemaVersion: 1;
+  workflowId: string;
+  workflowName: string;
+  createdAt: string;
+  updatedAt: string;
+  verdict: unknown | null;
+  evidence: unknown[];
+  source: "localStorage-migration" | "manual-import" | "canary-run";
+  metadata: {
+    migratedFrom?: string;
+    migratedAt?: string;
+  };
+}
+
+function safeRandomId(): string {
+  try {
+    const g = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+    if (g?.randomUUID) return g.randomUUID();
+  } catch {
+    /* ignore */
+  }
+  return `wf_${Math.random().toString(36).slice(2)}_${Date.now()}`;
+}
+
+/** Idempotent normalize: legacy snapshot → v1. */
+export function migrateSnapshotToV1(
+  legacy: unknown,
+  opts: { migratedFrom?: string } = {},
+): WorkflowSnapshotV1 | null {
+  if (!legacy || typeof legacy !== "object") return null;
+  const obj = legacy as Record<string, unknown>;
+  if (obj.schemaVersion === 1 && typeof obj.workflowId === "string") {
+    return obj as unknown as WorkflowSnapshotV1;
+  }
+  const nowIso = new Date().toISOString();
+  const verdict =
+    typeof obj.verdict === "object" || typeof obj.verdict === "string" ? obj.verdict ?? null : null;
+  const cards = Array.isArray(obj.cards) ? obj.cards : Array.isArray(obj.evidence) ? obj.evidence : [];
+  const savedAt = typeof obj.saved_at === "string" ? obj.saved_at : nowIso;
+  return {
+    schemaVersion: 1,
+    workflowId: typeof obj.workflowId === "string" ? obj.workflowId : safeRandomId(),
+    workflowName: typeof obj.workflowName === "string" ? obj.workflowName : "EcoWitt canary workflow",
+    createdAt: typeof obj.createdAt === "string" ? obj.createdAt : savedAt,
+    updatedAt: nowIso,
+    verdict: verdict ?? null,
+    evidence: cards,
+    source: "localStorage-migration",
+    metadata: {
+      migratedFrom: opts.migratedFrom,
+      migratedAt: nowIso,
+    },
+  };
+}
+
+export interface MigrationOutcome {
+  ran: boolean;
+  migratedCount: number;
+  skippedCount: number;
+  backedUp: boolean;
+  alreadyV1: boolean;
+  errors: string[];
+}
+
+/**
+ * One-time, idempotent migration of legacy localStorage workflow snapshots
+ * into the current v1 schema. Never throws. Skips already-v1 entries.
+ * Backs up the original raw payload of any key it touches before writing.
+ */
+export function migrateLegacyWorkflowSnapshots(): MigrationOutcome {
+  const out: MigrationOutcome = {
+    ran: false,
+    migratedCount: 0,
+    skippedCount: 0,
+    backedUp: false,
+    alreadyV1: false,
+    errors: [],
+  };
+  try {
+    if (typeof localStorage === "undefined") return out;
+    if (localStorage.getItem(WORKFLOW_MIGRATION_FLAG) === "1") return out;
+    out.ran = true;
+
+    const backup: Record<string, string | null> = {};
+    const candidates = [WORKFLOW_STORAGE_KEY, ...LEGACY_WORKFLOW_STORAGE_KEYS];
+    for (const key of candidates) {
+      try {
+        backup[key] = localStorage.getItem(key);
+      } catch (e) {
+        out.errors.push(`read ${key}: ${String(e)}`);
+      }
+    }
+
+    // Back up before any destructive write.
+    try {
+      localStorage.setItem(WORKFLOW_BACKUP_KEY, JSON.stringify({ at: new Date().toISOString(), backup }));
+      out.backedUp = true;
+    } catch (e) {
+      out.errors.push(`backup write: ${String(e)}`);
+    }
+
+    // Current v1 key: normalize if needed.
+    const currentRaw = backup[WORKFLOW_STORAGE_KEY];
+    if (currentRaw) {
+      try {
+        const parsed = JSON.parse(currentRaw);
+        if (parsed && typeof parsed === "object" && (parsed as Record<string, unknown>).schemaVersion === 1) {
+          out.alreadyV1 = true;
+        } else {
+          const migrated = migrateSnapshotToV1(parsed, { migratedFrom: WORKFLOW_STORAGE_KEY });
+          if (migrated) {
+            // Preserve original snapshot fields too so existing UI keeps working.
+            const merged = { ...(parsed as Record<string, unknown>), ...migrated };
+            localStorage.setItem(WORKFLOW_STORAGE_KEY, JSON.stringify(merged));
+            out.migratedCount++;
+          } else {
+            out.skippedCount++;
+          }
+        }
+      } catch (e) {
+        out.errors.push(`migrate ${WORKFLOW_STORAGE_KEY}: ${String(e)}`);
+        out.skippedCount++;
+      }
+    }
+
+    // Legacy keys: migrate into v1 key only if v1 isn't present.
+    for (const key of LEGACY_WORKFLOW_STORAGE_KEYS) {
+      const raw = backup[key];
+      if (!raw) continue;
+      try {
+        if (!localStorage.getItem(WORKFLOW_STORAGE_KEY)) {
+          const parsed = JSON.parse(raw);
+          const migrated = migrateSnapshotToV1(parsed, { migratedFrom: key });
+          if (migrated) {
+            localStorage.setItem(WORKFLOW_STORAGE_KEY, JSON.stringify(migrated));
+            out.migratedCount++;
+          } else {
+            out.skippedCount++;
+          }
+        }
+        localStorage.removeItem(key);
+      } catch (e) {
+        out.errors.push(`migrate legacy ${key}: ${String(e)}`);
+        out.skippedCount++;
+      }
+    }
+
+    try {
+      localStorage.setItem(WORKFLOW_MIGRATION_FLAG, "1");
+    } catch {
+      /* ignore */
+    }
+  } catch (e) {
+    out.errors.push(`migration: ${String(e)}`);
+  }
+  return out;
+}

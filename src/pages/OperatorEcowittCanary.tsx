@@ -1171,17 +1171,36 @@ export default function OperatorEcowittCanary() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Textarea
-            aria-label="Paste canary harness output"
-            placeholder='Paste redacted OutFile text, or { "main_row_counts": { ... }, ... }'
-            value={paste}
-            onChange={(e) => {
-              setPaste(e.target.value);
-              setImportSecretCategories([]);
+          <div
+            data-testid="import-dropzone"
+            data-dragover={isDragOver ? "true" : "false"}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragOver(true);
             }}
-            rows={8}
-            className="font-mono text-xs"
-          />
+            onDragLeave={() => setIsDragOver(false)}
+            onDrop={handleDrop}
+            className={
+              "rounded-md border-2 border-dashed p-3 transition-colors " +
+              (isDragOver ? "border-primary bg-primary/10" : "border-border bg-muted/30")
+            }
+          >
+            <div className="mb-2 text-xs text-muted-foreground">
+              Drag a redacted <code>.json</code> or <code>.txt</code> file here, or paste below.
+            </div>
+            <Textarea
+              aria-label="Paste canary harness output"
+              placeholder='Paste redacted OutFile text, or { "main_row_counts": { ... }, ... }'
+              value={paste}
+              onChange={(e) => {
+                setPaste(e.target.value);
+                setImportSecretCategories([]);
+                setImportError(null);
+              }}
+              rows={8}
+              className="font-mono text-xs"
+            />
+          </div>
           {importBlocked && (
             <div
               data-testid="import-secret-warning"
@@ -1192,6 +1211,41 @@ export default function OperatorEcowittCanary() {
               </div>
               <div className="mt-1 text-muted-foreground">
                 Pattern categories matched (values not shown): {importSecretCategories.join(", ")}
+              </div>
+            </div>
+          )}
+          {importError && (
+            <div
+              data-testid={`import-error-${importError.kind}`}
+              className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs"
+            >
+              <div className="font-semibold text-destructive">
+                {importError.kind === "json"
+                  ? "Invalid JSON"
+                  : importError.kind === "schema"
+                    ? "Unsupported canary format"
+                    : importError.kind === "empty"
+                      ? "Nothing to import"
+                      : "Unsupported file"}
+              </div>
+              <div className="mt-1 text-muted-foreground">
+                {importError.message}
+                {importError.line !== undefined && (
+                  <>
+                    {" "}
+                    <span data-testid="import-error-location">
+                      (line {importError.line}, column {importError.column ?? "?"})
+                    </span>
+                  </>
+                )}
+              </div>
+              {importError.expectedFields && importError.expectedFields.length > 0 && (
+                <div className="mt-1 text-muted-foreground">
+                  Expected top-level fields: <code>{importError.expectedFields.join(", ")}</code>
+                </div>
+              )}
+              <div className="mt-1 text-muted-foreground">
+                Your input was preserved above so you can fix it and retry.
               </div>
             </div>
           )}

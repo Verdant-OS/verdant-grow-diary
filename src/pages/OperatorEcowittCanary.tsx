@@ -790,22 +790,33 @@ export default function OperatorEcowittCanary() {
   }, [tentQ.data, preflight, report, verdict]);
 
   const handleImport = () => {
-    const parsed = parseCanaryPaste(paste);
-    setReport(parsed.report);
-    setParseNotes(parsed.parseNotes);
+    ingestText(paste, "paste");
   };
 
-  const downloadRedactedAudit = () => {
-    const blob = new Blob([JSON.stringify(builtAudit, null, 2)], { type: "application/json" });
+  const downloadBlob = (content: string, filename: string, mime: string) => {
+    const blob = new Blob([content], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `ecowitt-canary-audit-${Date.now()}.json`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
   };
+
+  const downloadRedactedAudit = () =>
+    downloadBlob(JSON.stringify(builtAudit, null, 2), `ecowitt-canary-audit-${Date.now()}.json`, "application/json");
+
+  const downloadVerdictJson = () =>
+    downloadBlob(
+      JSON.stringify(buildVerdictExport(builtAudit), null, 2),
+      `ecowitt-canary-verdict-${Date.now()}.json`,
+      "application/json",
+    );
+
+  const downloadVerdictCsv = () =>
+    downloadBlob(buildVerdictCsv(builtAudit), `ecowitt-canary-verdict-${Date.now()}.csv`, "text/csv;charset=utf-8;");
 
   const rememberAudit = () => {
     saveAuditToLocalStorage(builtAudit);
@@ -826,6 +837,29 @@ export default function OperatorEcowittCanary() {
       setSaveNotice("Restored audit from local device storage.");
     }
   };
+
+  // Auto-save redacted workflow snapshot (never raw paste).
+  useEffect(() => {
+    if (!preflight && !report) return;
+    const snap = buildWorkflowSnapshot({ preflight, report, verdict });
+    saveWorkflowToLocalStorage(snap);
+  }, [preflight, report, verdict]);
+
+  const restoreSavedWorkflow = () => {
+    if (!savedWorkflow) return;
+    if (savedWorkflow.preflight) setPreflight(savedWorkflow.preflight);
+    if (savedWorkflow.imported_report) setReport(savedWorkflow.imported_report);
+    setWorkflowRestoredAt(savedWorkflow.saved_at);
+    setSaveNotice("Restored EcoWitt canary workflow from local device storage.");
+  };
+
+  const clearSavedWorkflow = () => {
+    clearWorkflowFromLocalStorage();
+    setSavedWorkflow(null);
+    setWorkflowRestoredAt(null);
+    setSaveNotice("Cleared saved workflow.");
+  };
+
 
   return (
     <div className="container mx-auto max-w-5xl space-y-6 p-4 md:p-6" data-testid="operator-ecowitt-canary">

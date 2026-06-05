@@ -116,4 +116,20 @@ describe("CloudCanaryPreviewPanel — rendered values are id-free", () => {
   it("row order in the view-model matches fixture declaration order", () => {
     expect(vm.rows.map((r) => r.fixture_name)).toEqual([...ORDER]);
   });
+
+  it("rendered table output (panel JSX template + all row values) contains no MAC or UUID", () => {
+    // Render-boundary check: combine the panel's JSX template (what the DOM
+    // will literally render) with every string/number from every view-model
+    // row that would flow into that template. If either side leaks a MAC or
+    // UUID, this assertion fires before the operator ever sees it.
+    const panelStart = pageSrc.indexOf("function CloudCanaryPreviewPanel");
+    const panelEnd = pageSrc.indexOf("function RedactionWarningBanner");
+    const panelJsx = pageSrc.slice(panelStart, panelEnd);
+    const rowValues = vm.rows
+      .flatMap((r) => Object.values(r).map((v) => String(v)))
+      .join("|");
+    const renderedSurface = `${panelJsx}\n${rowValues}`;
+    expect(MAC_RE.test(renderedSurface)).toBe(false);
+    expect(UUID_RE.test(renderedSurface)).toBe(false);
+  });
 });

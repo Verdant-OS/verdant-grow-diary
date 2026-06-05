@@ -16,7 +16,7 @@ import type { CloudCanaryPreviewViewModel } from "@/lib/ecowittCloudCanaryViewMo
 export interface CloudCanaryExportRow {
   fixture_name: string;
   mapped_count: number;
-  fresh_count: number;
+  fresh_class_count: number;
   stale_count: number;
   invalid_count: number;
   unmapped_count: number;
@@ -26,7 +26,7 @@ export interface CloudCanaryExportRow {
 export interface CloudCanaryExportTotals {
   fixture_count: number;
   mapped_count: number;
-  fresh_count: number;
+  fresh_class_count: number;
   stale_count: number;
   invalid_count: number;
   unmapped_count: number;
@@ -45,7 +45,7 @@ export interface CloudCanaryExport {
 export const CLOUD_CANARY_EXPORT_COLUMNS = [
   "fixture_name",
   "mapped_count",
-  "fresh_count",
+  "fresh_class_count",
   "stale_count",
   "invalid_count",
   "unmapped_count",
@@ -64,7 +64,7 @@ export function buildCloudCanaryExport(
   const rows: CloudCanaryExportRow[] = vm.rows.map((r) => ({
     fixture_name: r.fixture_name,
     mapped_count: r.mapped_count,
-    fresh_count: r.live_count,
+    fresh_class_count: r.live_count,
     stale_count: r.stale_count,
     invalid_count: r.invalid_count,
     unmapped_count: r.unmapped_count,
@@ -74,7 +74,7 @@ export function buildCloudCanaryExport(
     (acc, r) => ({
       fixture_count: acc.fixture_count + 1,
       mapped_count: acc.mapped_count + r.mapped_count,
-      fresh_count: acc.fresh_count + r.fresh_count,
+      fresh_class_count: acc.fresh_class_count + r.fresh_class_count,
       stale_count: acc.stale_count + r.stale_count,
       invalid_count: acc.invalid_count + r.invalid_count,
       unmapped_count: acc.unmapped_count + r.unmapped_count,
@@ -82,7 +82,7 @@ export function buildCloudCanaryExport(
     {
       fixture_count: 0,
       mapped_count: 0,
-      fresh_count: 0,
+      fresh_class_count: 0,
       stale_count: 0,
       invalid_count: 0,
       unmapped_count: 0,
@@ -123,7 +123,7 @@ export function serializeCloudCanaryExportToCsv(exp: CloudCanaryExport): string 
     [
       escapeCsv("__totals__"),
       exp.totals.mapped_count,
-      exp.totals.fresh_count,
+      exp.totals.fresh_class_count,
       exp.totals.stale_count,
       exp.totals.invalid_count,
       exp.totals.unmapped_count,

@@ -65,7 +65,7 @@ describe("ecowittCloudCanaryExport — pure serializer", () => {
       const r = exp.rows[i];
       const v = vm.rows[i];
       expect(r.mapped_count).toBe(v.mapped_count);
-      expect(r.fresh_count).toBe(v.live_count);
+      expect(r.fresh_class_count).toBe(v.live_count);
       expect(r.stale_count).toBe(v.stale_count);
       expect(r.invalid_count).toBe(v.invalid_count);
       expect(r.unmapped_count).toBe(v.unmapped_count);
@@ -80,7 +80,7 @@ describe("ecowittCloudCanaryExport — pure serializer", () => {
       exp.rows.reduce((a, r) => a + (r[k] as number), 0);
     expect(exp.totals.fixture_count).toBe(exp.rows.length);
     expect(exp.totals.mapped_count).toBe(sum("mapped_count"));
-    expect(exp.totals.fresh_count).toBe(sum("fresh_count"));
+    expect(exp.totals.fresh_class_count).toBe(sum("fresh_class_count"));
     expect(exp.totals.stale_count).toBe(sum("stale_count"));
     expect(exp.totals.invalid_count).toBe(sum("invalid_count"));
     expect(exp.totals.unmapped_count).toBe(sum("unmapped_count"));
@@ -96,7 +96,7 @@ describe("ecowittCloudCanaryExport — pure serializer", () => {
     const expected = [
       "happy_multi_channel",
       happy.mapped_count,
-      happy.fresh_count,
+      happy.fresh_class_count,
       happy.stale_count,
       happy.invalid_count,
       happy.unmapped_count,
@@ -117,7 +117,7 @@ describe("ecowittCloudCanaryExport — pure serializer", () => {
     expect(happy).toBeTruthy();
     const expVmRow = vm.rows.find((r) => r.fixture_name === "happy_multi_channel")!;
     expect(happy.mapped_count).toBe(expVmRow.mapped_count);
-    expect(happy.fresh_count).toBe(expVmRow.live_count);
+    expect(happy.fresh_class_count).toBe(expVmRow.live_count);
     expect(happy.stale_count).toBe(expVmRow.stale_count);
     expect(happy.invalid_count).toBe(expVmRow.invalid_count);
     expect(happy.unmapped_count).toBe(expVmRow.unmapped_count);
@@ -137,7 +137,7 @@ describe("ecowittCloudCanaryExport — pure serializer", () => {
       return {
         fixture_name: cols[0],
         mapped_count: Number(cols[1]),
-        fresh_count: Number(cols[2]),
+        fresh_class_count: Number(cols[2]),
         stale_count: Number(cols[3]),
         invalid_count: Number(cols[4]),
         unmapped_count: Number(cols[5]),
@@ -164,7 +164,7 @@ describe("ecowittCloudCanaryExport — pure serializer", () => {
       expect(Object.keys(r).sort()).toEqual(
         [
           "fixture_name",
-          "fresh_count",
+          "fresh_class_count",
           "invalid_count",
           "mapped_count",
           "row_state",

@@ -915,6 +915,36 @@ export default function OperatorEcowittCanary() {
         </Card>
       )}
 
+      {savedWorkflow && !workflowRestoredAt && (
+        <Card data-testid="saved-workflow-banner">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6">
+            <div className="text-sm">
+              <div className="font-medium">Saved EcoWitt canary workflow found</div>
+              <div className="text-xs text-muted-foreground">
+                Saved {savedWorkflow.saved_at} · verdict {savedWorkflow.verdict.toUpperCase()} · {savedWorkflow.counts.pass} pass / {savedWorkflow.counts.fail} fail / {savedWorkflow.counts.incomplete} incomplete
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={restoreSavedWorkflow} data-testid="restore-saved-workflow">
+                Restore
+              </Button>
+              <Button size="sm" variant="outline" onClick={clearSavedWorkflow} data-testid="clear-saved-workflow">
+                Clear saved workflow
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {workflowRestoredAt && (
+        <div
+          className="inline-flex items-center rounded-md border border-primary/40 bg-primary/10 px-2 py-0.5 text-xs text-primary"
+          data-testid="restored-from-local"
+        >
+          Restored from local device storage · {workflowRestoredAt}
+        </div>
+      )}
+
       {saveNotice && <div className="text-xs text-muted-foreground">{saveNotice}</div>}
 
       <NoBrowserPostsNotice />

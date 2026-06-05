@@ -27,8 +27,21 @@
 
   Do NOT paste the curl command into any prompt. Paste only the requested
   single value (e.g. only the `vbt_...` bridge token).
+
+  Supports two operator-friendly switches:
+
+    -DryRun           : Validate inputs and print what WOULD be sent,
+                        without making any network call. Useful in
+                        automation, CI smoke checks, and operator demos.
+
+    -OutFile <path>   : Append the fully redacted matrix + SQL block to
+                        the given file. Secrets are never written.
 #>
 
+param(
+  [switch]$DryRun,
+  [string]$OutFile = ''
+)
 
 $ErrorActionPreference = 'Stop'
 

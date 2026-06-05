@@ -167,7 +167,6 @@ describe("ecowittCloudCanaryExport — pure serializer", () => {
     const parsed = JSON.parse(json);
     expect(Object.keys(parsed).sort()).toEqual(
       [
-        "generated_at",
         "missing_metric_codes",
         "preview_state",
         "rows",

@@ -18,35 +18,30 @@
 -- that RAISE on violation, wrapped in a transaction with ROLLBACK at the end
 -- so seeded auth.users / billing_subscriptions rows never persist.
 --
--- Usage:
---   psql "$SUPABASE_DB_URL" -f supabase/tests/billing_subscriptions_rls.sql
+-- Usage — caller seeds two auth.users via the admin API (service_role), then
+-- passes their UUIDs in:
+--
+--   psql "$SUPABASE_DB_URL" \
+--     -v uid_a="'00000000-0000-4000-8000-0000b1110001'" \
+--     -v uid_b="'00000000-0000-4000-8000-0000b1110002'" \
+--     -f supabase/tests/billing_subscriptions_rls.sql
+--
+-- Seeding auth.users is intentionally NOT done from this script: the project's
+-- sandbox psql role (sandbox_exec) lacks auth-schema privileges, and seeding
+-- via the admin API mirrors how a real webhook would create downstream rows.
+-- See scripts/run-billing-rls-harness.ts for the full seed→run→teardown flow.
 --
 -- This script is NOT wired into the default Vitest suite (it requires a live
--- DB connection and superuser-level seeding into auth.users). Invoke
--- separately when verifying entitlement RLS.
+-- DB connection + service_role for seeding). Invoke separately when verifying
+-- entitlement RLS. service_role is used ONLY for seeding; every rejected
+-- mutation assertion below runs under the authenticated or anon role.
 -- =============================================================================
 
 \set ON_ERROR_STOP on
 BEGIN;
 
--- Deterministic test UUIDs (clearly marked as RLS-harness rows).
-\set uid_a '\'00000000-0000-4000-8000-0000b1110001\''
-\set uid_b '\'00000000-0000-4000-8000-0000b1110002\''
-
--- ---------------------------------------------------------------------------
--- Seed two auth.users + billing_subscriptions rows via the privileged role
--- this script runs under (the client roles cannot do this — that's the point).
--- ---------------------------------------------------------------------------
-INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password,
-                        email_confirmed_at, created_at, updated_at)
-VALUES (:uid_a::uuid, '00000000-0000-0000-0000-000000000000', 'authenticated',
-        'authenticated', 'rls-harness-a@verdant.test', '',
-        now(), now(), now()),
-       (:uid_b::uuid, '00000000-0000-0000-0000-000000000000', 'authenticated',
-        'authenticated', 'rls-harness-b@verdant.test', '',
-        now(), now(), now())
-ON CONFLICT (id) DO NOTHING;
-
+-- Seed billing_subscriptions rows for the two pre-created auth.users.
+-- (auth.users rows themselves are created by the caller via admin API.)
 INSERT INTO public.billing_subscriptions (user_id, plan_id, status)
 VALUES (:uid_a::uuid, 'free', 'active'),
        (:uid_b::uuid, 'free', 'active')

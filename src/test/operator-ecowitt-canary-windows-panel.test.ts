@@ -45,7 +45,11 @@ describe("OperatorEcowittCanary — Windows run-command panel", () => {
   });
 
   it("does not introduce ingest / writes / device control side effects", () => {
-    const lower = src.toLowerCase();
+    // Strip block + line comments so safety disclaimers don't false-positive.
+    const stripped = src
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|\s)\/\/.*$/gm, "")
+      .toLowerCase();
     for (const w of [
       "action_queue",
       "ai_doctor",
@@ -56,9 +60,8 @@ describe("OperatorEcowittCanary — Windows run-command panel", () => {
       "relay",
       "actuator",
     ]) {
-      expect(lower).not.toContain(w);
+      expect(stripped).not.toContain(w);
     }
-    // Only the read-only tent fetch should exist in this file; no insert/update/delete.
     expect(src).not.toMatch(/\.insert\(/);
     expect(src).not.toMatch(/\.update\(/);
     expect(src).not.toMatch(/\.delete\(/);

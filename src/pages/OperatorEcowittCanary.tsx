@@ -89,46 +89,66 @@ function EvidenceCard({ card }: { card: VerdictCard }) {
   );
 }
 
-const WINDOWS_RUN_COMMANDS: Array<{ label: string; cmd: string; hint: string }> = [
+const REPO_PLACEHOLDER = "<VERDANT_REPO_ROOT>";
+
+const WINDOWS_RUN_COMMAND_TEMPLATES: Array<{ key: string; label: string; build: (root: string) => string; hint: string }> = [
   {
+    key: "recommended",
     label: "Recommended (root launcher)",
-    cmd: `cd <VERDANT_REPO_ROOT>
-powershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1`,
+    build: (root) => `cd ${root}\npowershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1`,
     hint: "Run from the repo root. Works even if PowerShell opens in C:\\WINDOWS\\system32.",
   },
   {
+    key: "dryrun",
     label: "Dry-run (no network call)",
-    cmd: `cd <VERDANT_REPO_ROOT>
-powershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1 -DryRun`,
+    build: (root) => `cd ${root}\npowershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1 -DryRun`,
     hint: "Validates inputs and redaction. Sends zero HTTP requests. Safe for demos and CI.",
   },
   {
+    key: "outfile",
     label: "Write redacted output to a file",
-    cmd: `cd <VERDANT_REPO_ROOT>
-powershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1 -OutFile .\\canary-out.txt`,
+    build: (root) => `cd ${root}\npowershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1 -OutFile .\\canary-out.txt`,
     hint: "Appends matrix + SQL block. Secrets are never written to disk.",
   },
 ];
 
-function CopyButton({ text, copied, onCopy }: { text: string; copied: boolean; onCopy: () => void }) {
+export function commandContainsPlaceholder(cmd: string): boolean {
+  return cmd.includes(REPO_PLACEHOLDER);
+}
+
+export function buildWindowsCommand(template: (root: string) => string, repoPath: string): string {
+  const trimmed = repoPath.trim();
+  return template(trimmed.length > 0 ? trimmed : REPO_PLACEHOLDER);
+}
+
+function CopyButton({ text, copied, onCopy, label }: { text: string; copied: boolean; onCopy: () => void; label?: string }) {
   return (
-    <Button size="sm" variant="outline" onClick={onCopy} data-copied={copied}>
+    <Button size="sm" variant="outline" onClick={onCopy} data-copied={copied} aria-label={label}>
       {copied ? "Copied" : "Copy"}
     </Button>
   );
 }
 
 function WindowsRunCommandPanel() {
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const copy = async (idx: number, cmd: string) => {
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [repoPath, setRepoPath] = useState("");
+  const [warningKey, setWarningKey] = useState<string | null>(null);
+
+  const attemptCopy = async (key: string, cmd: string, force: boolean) => {
+    if (!force && commandContainsPlaceholder(cmd)) {
+      setWarningKey(key);
+      return;
+    }
     try {
       await navigator.clipboard.writeText(cmd);
-      setCopiedIndex(idx);
-      setTimeout(() => setCopiedIndex(null), 1500);
+      setCopiedKey(key);
+      setWarningKey(null);
+      setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 1500);
     } catch {
-      setCopiedIndex(null);
+      setCopiedKey(null);
     }
   };
+
   return (
     <Card data-testid="windows-run-command-panel">
       <CardHeader>
@@ -138,16 +158,71 @@ function WindowsRunCommandPanel() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {WINDOWS_RUN_COMMANDS.map((row, idx) => (
-          <div key={row.label} className="rounded-md border p-3" data-cmd-label={row.label}>
-            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{row.label}</div>
-            <code className="block whitespace-pre rounded bg-muted p-2 font-mono text-xs">{row.cmd}</code>
-            <div className="mt-2 flex items-center justify-between gap-2">
-              <span className="text-xs text-muted-foreground">{row.hint}</span>
-              <CopyButton text={row.cmd} copied={copiedIndex === idx} onCopy={() => copy(idx, row.cmd)} />
-            </div>
+        <div className="rounded-md border p-3" data-testid="repo-path-input">
+          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground" htmlFor="repo-path">
+            Verdant repo path (optional)
+          </label>
+          <input
+            id="repo-path"
+            type="text"
+            value={repoPath}
+            onChange={(e) => {
+              setRepoPath(e.target.value);
+              setWarningKey(null);
+            }}
+            placeholder={`e.g. C:\\Users\\Cheek\\Projects\\verdant`}
+            className="w-full rounded-md border bg-background px-2 py-1 font-mono text-xs"
+            autoComplete="off"
+            spellCheck={false}
+          />
+          <div className="mt-1 text-[11px] text-muted-foreground">
+            Stored only in this browser tab. Never sent to the server. Leave empty to copy the{" "}
+            <code>{REPO_PLACEHOLDER}</code> placeholder instead.
           </div>
-        ))}
+        </div>
+
+        {WINDOWS_RUN_COMMAND_TEMPLATES.map((row) => {
+          const cmd = buildWindowsCommand(row.build, repoPath);
+          const hasPlaceholder = commandContainsPlaceholder(cmd);
+          const showWarning = warningKey === row.key;
+          return (
+            <div key={row.key} className="rounded-md border p-3" data-cmd-label={row.label} data-cmd-key={row.key}>
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{row.label}</div>
+              <code className="block whitespace-pre rounded bg-muted p-2 font-mono text-xs">{cmd}</code>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground">{row.hint}</span>
+                <CopyButton
+                  text={cmd}
+                  copied={copiedKey === row.key}
+                  onCopy={() => attemptCopy(row.key, cmd, false)}
+                  label={`Copy ${row.label}`}
+                />
+              </div>
+              {showWarning && hasPlaceholder && (
+                <div
+                  data-testid={`placeholder-warning-${row.key}`}
+                  className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs"
+                >
+                  <div className="font-semibold text-amber-400">
+                    This command still contains <code>{REPO_PLACEHOLDER}</code>.
+                  </div>
+                  <div className="mt-1 text-muted-foreground">
+                    Replace it with your actual Verdant repo path before running, or enter it in the field above.
+                  </div>
+                  <div className="mt-2 flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => attemptCopy(row.key, cmd, true)}>
+                      Copy placeholder command anyway
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setWarningKey(null)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+
         <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
           <div className="text-xs font-semibold uppercase tracking-wide text-amber-400">Redaction Guarantee</div>
           <ul className="mt-1 list-disc pl-5 text-xs text-muted-foreground">
@@ -162,30 +237,132 @@ function WindowsRunCommandPanel() {
   );
 }
 
-const DRY_RUN_EXAMPLE = `=== EcoWitt Canary Dry-Run ===
+const REDACTION_PREVIEW_ROWS: Array<{ label: string; before: string; after: string }> = [
+  { label: "Bridge token", before: "vbt_live_9f3c2a1b4d5e6f70 (example)", after: "vbt_REDACTED" },
+  { label: "PASSKEY", before: "A1B2C3D4E5F60718293A4B5C6D7E8F90 (example)", after: "PASSKEY_REDACTED" },
+  { label: "MAC", before: "AA:BB:CC:11:22:33 (example)", after: "MAC_REDACTED" },
+  { label: "API key test field", before: "ak_test_examplevalue (example)", after: "SHOULD_NOT_PERSIST" },
+];
+
+function RedactionPreviewPanel() {
+  const [open, setOpen] = useState(false);
+  return (
+    <Card data-testid="redaction-preview-panel">
+      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+        <div>
+          <CardTitle className="text-base">Preview redacted output</CardTitle>
+          <CardDescription>Example only · not a live run · no real secrets shown.</CardDescription>
+        </div>
+        <Button size="sm" variant="outline" onClick={() => setOpen((v) => !v)} data-testid="redaction-preview-toggle">
+          {open ? "Hide preview" : "Show preview"}
+        </Button>
+      </CardHeader>
+      {open && (
+        <CardContent className="space-y-3" data-testid="redaction-preview-body">
+          <div className="overflow-hidden rounded-md border">
+            <table className="w-full text-xs">
+              <thead className="bg-muted text-muted-foreground">
+                <tr>
+                  <th className="px-2 py-1 text-left font-semibold">Field</th>
+                  <th className="px-2 py-1 text-left font-semibold">Before (example)</th>
+                  <th className="px-2 py-1 text-left font-semibold">After (what harness emits)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {REDACTION_PREVIEW_ROWS.map((r) => (
+                  <tr key={r.label} className="border-t">
+                    <td className="px-2 py-1 font-medium">{r.label}</td>
+                    <td className="px-2 py-1 font-mono text-muted-foreground">{r.before}</td>
+                    <td className="px-2 py-1 font-mono text-primary">{r.after}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
+            If you see a real token, PASSKEY, MAC, or API key in your output, do not paste it anywhere. Re-run with the
+            latest harness.
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+const DRY_RUN_SECTIONS: Array<{ id: string; title: string; body: string }> = [
+  {
+    id: "section-header",
+    title: "Header / input validation",
+    body: `=== EcoWitt Canary Dry-Run ===
 Mode:          DryRun (no HTTP requests will be sent)
 Bridge URL:    https://<edge>/functions/v1/ecowitt-ingest
-Bridge Token:  vbt_***REDACTED***
-PASSKEY:       ***REDACTED***
-MAC:           **:**:**:**:**:**
-
-[1/3] Scenario: happy_path        -> inputs OK, redaction OK
-[2/3] Scenario: missing_passkey   -> inputs OK, redaction OK
-[3/3] Scenario: malformed_payload -> inputs OK, redaction OK
-
---- Audit Matrix (redacted) ---
+Bridge Token:  vbt_REDACTED
+PASSKEY:       PASSKEY_REDACTED
+MAC:           MAC_REDACTED`,
+  },
+  {
+    id: "section-main",
+    title: "Scenario: main canary",
+    body: `[1/3] Scenario: main_canary       -> inputs OK, redaction OK
+       channel 9 present, payload validated`,
+  },
+  {
+    id: "section-duplicate",
+    title: "Scenario: duplicate replay",
+    body: `[2/3] Scenario: duplicate_replay  -> inputs OK, redaction OK
+       same captured_at re-sent, expected idempotent`,
+  },
+  {
+    id: "section-malformed",
+    title: "Scenario: malformed canary",
+    body: `[3/3] Scenario: malformed_canary  -> inputs OK, redaction OK
+       missing 21:05 timestamp, expected 4xx`,
+  },
+  {
+    id: "section-matrix",
+    title: "Audit matrix",
+    body: `--- Audit Matrix (redacted) ---
 | # | scenario           | expected | redacted |
-| 1 | happy_path         | 200      | yes      |
-| 2 | missing_passkey    | 4xx      | yes      |
-| 3 | malformed_payload  | 4xx      | yes      |
-
---- SQL Verification Block ---
+| 1 | main_canary        | 200      | yes      |
+| 2 | duplicate_replay   | 200/204  | yes      |
+| 3 | malformed_canary   | 4xx      | yes      |`,
+  },
+  {
+    id: "section-sql",
+    title: "SQL verification block",
+    body: `--- SQL Verification Block ---
 -- (read-only; paste into Operator SQL panel)
-select count(*) from sensor_readings where source = 'ecowitt' and captured_at > now() - interval '15 min';
+select count(*) from sensor_readings where source = 'ecowitt' and captured_at > now() - interval '15 min';`,
+  },
+  {
+    id: "section-footer",
+    title: "Footer / next-step instruction",
+    body: `Dry-run complete. 0 HTTP requests sent. No secrets written to disk.
+Next: paste this redacted block into ChatGPT for grading.`,
+  },
+];
 
-Dry-run complete. 0 HTTP requests sent. No secrets written to disk.`;
+const DRY_RUN_FAILURES: Array<{ label: string; anchor: string }> = [
+  { label: "Invalid bridge token", anchor: "section-header" },
+  { label: "Pasted curl command into token prompt", anchor: "section-header" },
+  { label: "Main POST command missing channel 9", anchor: "section-main" },
+  { label: "Duplicate replay did not return idempotent status", anchor: "section-duplicate" },
+  { label: "Malformed POST missing 21:05 timestamp", anchor: "section-malformed" },
+  { label: "Matrix missing HTTP 200 checks", anchor: "section-matrix" },
+  { label: "No SQL block printed", anchor: "section-sql" },
+  { label: "No final paste-to-ChatGPT instruction", anchor: "section-footer" },
+];
 
 function DryRunGuidancePanel() {
+  const scrollTo = (anchor: string) => {
+    const el = document.getElementById(anchor);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("ring-2", "ring-primary");
+      setTimeout(() => el.classList.remove("ring-2", "ring-primary"), 1500);
+    }
+  };
+
   return (
     <Card data-testid="dry-run-guidance-panel">
       <CardHeader>
@@ -196,34 +373,23 @@ function DryRunGuidancePanel() {
         <ol className="list-decimal space-y-1 pl-5">
           <li>Run the dry-run command above. It checks inputs and redaction without sending any HTTP requests.</li>
           <li>If dry-run passes, you are ready for the live canary.</li>
-          <li>If dry-run fails, fix the error (usually a malformed token or a curl.exe paste) before proceeding.</li>
+          <li>If dry-run fails, click a failure below to jump to the section in the example output.</li>
           <li>For automated CI, use the OutFile mode and import the redacted result below.</li>
         </ol>
 
         <div data-testid="dry-run-success-example" className="rounded-md border bg-muted/40 p-3">
-          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-foreground">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground">
             What a successful dry-run looks like
           </div>
-          <pre className="max-h-72 overflow-auto whitespace-pre rounded bg-background p-2 font-mono text-[11px] leading-snug text-foreground">
-{DRY_RUN_EXAMPLE}
-          </pre>
-          <div className="mt-2 grid gap-1 text-xs">
-            <div>
-              <span className="font-semibold text-foreground">Header block</span> — confirms <code>Mode: DryRun</code> and
-              that bridge token, PASSKEY, and MAC are shown as <code>***REDACTED***</code>.
-            </div>
-            <div>
-              <span className="font-semibold text-foreground">Scenario lines</span> — each of the three scenarios should
-              end with <code>inputs OK, redaction OK</code>.
-            </div>
-            <div>
-              <span className="font-semibold text-foreground">Audit Matrix</span> — every row must show{" "}
-              <code>redacted = yes</code>.
-            </div>
-            <div>
-              <span className="font-semibold text-foreground">Footer</span> — must say{" "}
-              <code>0 HTTP requests sent. No secrets written to disk.</code>
-            </div>
+          <div className="space-y-2">
+            {DRY_RUN_SECTIONS.map((s) => (
+              <div key={s.id} id={s.id} data-section-id={s.id} className="rounded border bg-background p-2 transition">
+                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {s.title}
+                </div>
+                <pre className="whitespace-pre font-mono text-[11px] leading-snug text-foreground">{s.body}</pre>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -232,24 +398,22 @@ function DryRunGuidancePanel() {
           className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs"
         >
           <div className="mb-1 font-semibold text-destructive">Where to look when dry-run fails</div>
-          <ul className="list-disc space-y-1 pl-5">
-            <li>
-              <span className="font-semibold text-foreground">Header shows a raw token</span> (anything that is not{" "}
-              <code>***REDACTED***</code>) — abort, treat as a leak, rotate the token.
-            </li>
-            <li>
-              <span className="font-semibold text-foreground">Scenario line says <code>inputs FAIL</code></span> — you
-              probably pasted a full <code>curl.exe</code> command into a Read-Host prompt. Re-run and paste only the
-              token value.
-            </li>
-            <li>
-              <span className="font-semibold text-foreground">Audit Matrix missing rows</span> — input validation aborted
-              early; check the first FAIL line for the bad field name.
-            </li>
-            <li>
-              <span className="font-semibold text-foreground">Footer says HTTP &gt; 0</span> in dry-run mode — stop and
-              report; the <code>-DryRun</code> flag was not respected.
-            </li>
+          <ul className="space-y-1">
+            {DRY_RUN_FAILURES.map((f) => (
+              <li key={f.label}>
+                <button
+                  type="button"
+                  onClick={() => scrollTo(f.anchor)}
+                  data-failure-anchor={f.anchor}
+                  className="text-left text-destructive underline-offset-2 hover:underline"
+                >
+                  {f.label}
+                </button>{" "}
+                <span className="text-muted-foreground">
+                  → {DRY_RUN_SECTIONS.find((s) => s.id === f.anchor)?.title}
+                </span>
+              </li>
+            ))}
           </ul>
         </div>
       </CardContent>

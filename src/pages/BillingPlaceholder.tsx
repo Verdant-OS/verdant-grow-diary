@@ -188,7 +188,8 @@ export default function BillingPlaceholder() {
                 ? "Founder Lifetime"
                 : "Pro",
               secondaryCopy:
-                "Pro access is only granted after a verified billing event. This panel describes what upgrading would unlock — it does not charge or grant access.",
+                "Upgrading is only completed after a verified billing event. This panel describes what an upgrade would unlock — it does not charge your account or grant access.",
+
             })}
           />
         </div>

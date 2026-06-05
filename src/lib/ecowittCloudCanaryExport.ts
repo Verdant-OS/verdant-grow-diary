@@ -13,7 +13,6 @@
 
 import type { CloudCanaryPreviewViewModel } from "@/lib/ecowittCloudCanaryViewModel";
 import {
-  ECOWITT_SUSPICIOUS_FLAG_CODES,
   isEcowittSuspiciousFlagCode,
   type EcowittSuspiciousFlagCode,
 } from "@/constants/ecowittSuspiciousFlags";

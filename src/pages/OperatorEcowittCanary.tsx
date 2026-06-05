@@ -674,6 +674,9 @@ export function CloudCanaryPreviewPanel() {
                   <th className="px-2 py-1 text-left font-semibold border-l" title="Closed-vocabulary data-classification codes from the normalizer">
                     Suspicious codes
                   </th>
+                  <th className="px-2 py-1 text-left font-semibold border-l" title="Closed-vocabulary missing-metric codes from the normalizer">
+                    Missing-metric codes
+                  </th>
                 </tr>
               </thead>
               <tbody>

@@ -649,12 +649,11 @@ export function CloudCanaryPreviewPanel() {
           <div
             data-testid="cloud-canary-empty-state"
             data-preview-state="empty"
-            className="rounded-md border border-dashed bg-muted/30 p-4 text-center text-xs text-muted-foreground"
+            className="rounded-md border border-dashed bg-muted/30 p-4 text-center text-xs text-muted-foreground space-y-1"
           >
-            <div className="font-semibold text-foreground">Nothing to preview</div>
-            <div className="mt-1">
-              No fixtures are available for the cloud canary right now.
-            </div>
+            <div className="font-semibold text-foreground">No canary preview to show yet</div>
+            <div>No fixtures are loaded, so there is nothing to summarize.</div>
+            <div>No file is written until you choose a download option.</div>
           </div>
         ) : (
           <div
@@ -786,107 +785,112 @@ export function CloudCanaryPreviewPanel() {
           </div>
         )}
 
-        <div
-          data-testid="cloud-canary-export-preview"
-          className="space-y-2"
-        >
-          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-            Fixture/sample canary export preview · exact bytes that will download
-          </div>
-          <details className="rounded-md border bg-muted/30">
-            <summary className="cursor-pointer px-2 py-1 text-xs font-semibold">
-              Preview CSV ({CLOUD_CANARY_EXPORT_CSV_FILENAME})
-            </summary>
-            <pre
-              data-testid="cloud-canary-export-preview-csv"
-              className="max-h-72 overflow-auto whitespace-pre px-2 py-2 font-mono text-[11px] leading-snug"
+        {previewVm.state === "populated" && (
+          <>
+            <div
+              data-testid="cloud-canary-export-preview"
+              className="space-y-2"
             >
-              {exportCsv}
-            </pre>
-          </details>
-          <details className="rounded-md border bg-muted/30">
-            <summary className="cursor-pointer px-2 py-1 text-xs font-semibold">
-              Preview JSON ({CLOUD_CANARY_EXPORT_JSON_FILENAME})
-            </summary>
-            <pre
-              data-testid="cloud-canary-export-preview-json"
-              className="max-h-72 overflow-auto whitespace-pre px-2 py-2 font-mono text-[11px] leading-snug"
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                Fixture/sample canary export preview · exact bytes that will download
+              </div>
+              <details className="rounded-md border bg-muted/30">
+                <summary className="cursor-pointer px-2 py-1 text-xs font-semibold">
+                  Preview CSV ({CLOUD_CANARY_EXPORT_CSV_FILENAME})
+                </summary>
+                <pre
+                  data-testid="cloud-canary-export-preview-csv"
+                  className="max-h-72 overflow-auto whitespace-pre px-2 py-2 font-mono text-[11px] leading-snug"
+                >
+                  {exportCsv}
+                </pre>
+              </details>
+              <details className="rounded-md border bg-muted/30">
+                <summary className="cursor-pointer px-2 py-1 text-xs font-semibold">
+                  Preview JSON ({CLOUD_CANARY_EXPORT_JSON_FILENAME})
+                </summary>
+                <pre
+                  data-testid="cloud-canary-export-preview-json"
+                  className="max-h-72 overflow-auto whitespace-pre px-2 py-2 font-mono text-[11px] leading-snug"
+                >
+                  {exportJson}
+                </pre>
+              </details>
+            </div>
+
+            <div
+              data-testid="cloud-canary-export-meta"
+              className="rounded-md border bg-muted/20 px-2 py-1.5 text-[11px] text-muted-foreground"
             >
-              {exportJson}
-            </pre>
-          </details>
-        </div>
+              <div>
+                Download files:{" "}
+                <span data-testid="cloud-canary-export-filename-csv" className="font-mono">
+                  {CLOUD_CANARY_EXPORT_CSV_FILENAME}
+                </span>
+                {" · "}
+                <span data-testid="cloud-canary-export-filename-json" className="font-mono">
+                  {CLOUD_CANARY_EXPORT_JSON_FILENAME}
+                </span>
+              </div>
+              <div>
+                Preview viewed at{" "}
+                <span data-testid="cloud-canary-export-run-timing" className="font-mono">
+                  {runViewedAt}
+                </span>{" "}
+                (display only — not written to the file)
+              </div>
+            </div>
 
-        <div
-          data-testid="cloud-canary-export-meta"
-          className="rounded-md border bg-muted/20 px-2 py-1.5 text-[11px] text-muted-foreground"
-        >
-          <div>
-            Download files:{" "}
-            <span data-testid="cloud-canary-export-filename-csv" className="font-mono">
-              {CLOUD_CANARY_EXPORT_CSV_FILENAME}
-            </span>
-            {" · "}
-            <span data-testid="cloud-canary-export-filename-json" className="font-mono">
-              {CLOUD_CANARY_EXPORT_JSON_FILENAME}
-            </span>
-          </div>
-          <div>
-            Preview viewed at{" "}
-            <span data-testid="cloud-canary-export-run-timing" className="font-mono">
-              {runViewedAt}
-            </span>{" "}
-            (display only — not written to the file)
-          </div>
-        </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleCopy}
+                data-testid="copy-cloud-verdict-json"
+                disabled={copied}
+              >
+                {copied ? "Copied" : "Copy Redacted Verdict JSON"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const blob = new Blob([exportCsv], { type: "text/csv" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = CLOUD_CANARY_EXPORT_CSV_FILENAME;
+                  document.body.appendChild(a);
+                  a.click();
+                  a.remove();
+                  URL.revokeObjectURL(url);
+                }}
+                data-testid="download-cloud-canary-summary-csv"
+              >
+                Download Fixture Summary CSV
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const blob = new Blob([exportJson], { type: "application/json" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = CLOUD_CANARY_EXPORT_JSON_FILENAME;
+                  document.body.appendChild(a);
+                  a.click();
+                  a.remove();
+                  URL.revokeObjectURL(url);
+                }}
+                data-testid="download-cloud-canary-summary-json"
+              >
+                Download Fixture Summary JSON
+              </Button>
+            </div>
+          </>
+        )}
 
-        <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleCopy}
-            data-testid="copy-cloud-verdict-json"
-            disabled={copied}
-          >
-            {copied ? "Copied" : "Copy Redacted Verdict JSON"}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              const blob = new Blob([exportCsv], { type: "text/csv" });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = CLOUD_CANARY_EXPORT_CSV_FILENAME;
-              document.body.appendChild(a);
-              a.click();
-              a.remove();
-              URL.revokeObjectURL(url);
-            }}
-            data-testid="download-cloud-canary-summary-csv"
-          >
-            Download Fixture Summary CSV
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              const blob = new Blob([exportJson], { type: "application/json" });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = CLOUD_CANARY_EXPORT_JSON_FILENAME;
-              document.body.appendChild(a);
-              a.click();
-              a.remove();
-              URL.revokeObjectURL(url);
-            }}
-            data-testid="download-cloud-canary-summary-json"
-          >
-            Download Fixture Summary JSON
-          </Button>
-        </div>
       </CardContent>
     </Card>
   );

@@ -377,57 +377,39 @@ describe("sitemap", () => {
 });
 
 describe("No unrelated routes were changed", () => {
-  it("App.tsx route list matches the expected pricing-aware set", () => {
-    const paths = [...APP.matchAll(/path="([^"]+)"/g)].map((m) => m[1]).sort();
-    expect(paths).toEqual(
-      [
-        "*",
-        "/",
-        "/action-queue",
-        "/actions",
-        "/actions/:actionId",
-        "/admin/leads",
-        "/alerts",
-        "/alerts/:alertId",
-        "/auth",
-        "/billing/:plan",
-        "/daily-check",
-        "/demo",
-        "/diagnostics",
-        "/doctor",
-        "/doctor/sessions",
-        "/doctor/sessions/:sessionId",
-        "/features",
-        "/grow-lineage",
-        "/grow-room",
-        "/grows",
-        "/grows/:growId",
-        "/hardware-integrations",
-        "/imports/representative-csv",
-        "/ingest-inspector",
-        "/leads",
-        "/login",
-        "/logs",
-        "/operator/ecowitt",
-        "/partners/csv-preview",
-        "/pi-ingest-status",
-        "/plants",
-        "/plants/:id",
-        "/pricing",
-        "/register",
-        "/reports",
-        "/sensors",
-        "/sensors/csv-preview",
-        "/sensors/ecowitt-audit",
-        "/sensors/ingest-normalizer",
-        "/settings",
-        "/signup",
-        "/tasks",
-        "/tents",
-        "/tents/:id",
-        "/timeline",
-        "/welcome",
-      ].sort(),
+  it("App.tsx routes and the manifest stay in sync (bidirectional)", async () => {
+    const { getAppRouteManifestPathsSorted, APP_ROUTES } = await import(
+      "@/lib/appRouteManifest"
     );
+    const appPaths = [...APP.matchAll(/path="([^"]+)"/g)]
+      .map((m) => m[1])
+      .sort();
+    const manifestPaths = getAppRouteManifestPathsSorted();
+
+    // Bidirectional drift: every App route must appear in the manifest, and
+    // every manifest path must be mounted in App.tsx. Failing message names
+    // the offending side so the fix is obvious.
+    const missingFromManifest = appPaths.filter(
+      (p) => !manifestPaths.includes(p),
+    );
+    const missingFromApp = manifestPaths.filter((p) => !appPaths.includes(p));
+    expect(missingFromManifest).toEqual([]);
+    expect(missingFromApp).toEqual([]);
+
+    // Belt-and-braces: full set equality on top of the diff assertions above.
+    expect(appPaths).toEqual(manifestPaths);
+
+    // Explicit guard against the original bug — `/operator/ecowitt` must be
+    // present so the Cloud Canary route is always covered by drift checks.
+    expect(manifestPaths).toContain("/operator/ecowitt");
+
+    // Manifest must have no duplicate paths.
+    const seen = new Set<string>();
+    const dupes: string[] = [];
+    for (const r of APP_ROUTES) {
+      if (seen.has(r.path)) dupes.push(r.path);
+      seen.add(r.path);
+    }
+    expect(dupes).toEqual([]);
   });
 });

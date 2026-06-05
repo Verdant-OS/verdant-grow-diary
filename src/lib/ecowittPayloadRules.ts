@@ -483,7 +483,7 @@ export function normalizeEcowittCloudReadings(
           device_mac: mac ?? "",
           channel: bucket.channel,
           reading,
-          confidence,
+          confidence: stuckRh ? 0.0 : confidence,
           suspicion_codes: suspicionCodes,
         });
       };

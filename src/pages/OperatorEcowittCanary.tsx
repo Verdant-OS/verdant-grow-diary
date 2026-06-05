@@ -89,6 +89,66 @@ function EvidenceCard({ card }: { card: VerdictCard }) {
   );
 }
 
+const WINDOWS_RUN_COMMANDS: Array<{ label: string; cmd: string; hint: string }> = [
+  {
+    label: "Recommended (root launcher)",
+    cmd: "powershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1",
+    hint: "Run from the repo root. Works even if PowerShell opens in C:\\WINDOWS\\system32.",
+  },
+  {
+    label: "Dry-run (no network call)",
+    cmd: "powershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1 -DryRun",
+    hint: "Validates inputs and redaction. Sends zero HTTP requests. Safe for demos and CI.",
+  },
+  {
+    label: "Write redacted output to a file",
+    cmd: "powershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1 -OutFile .\\canary-out.txt",
+    hint: "Appends matrix + SQL block. Secrets are never written to disk.",
+  },
+];
+
+function WindowsRunCommandPanel() {
+  const [copied, setCopied] = useState<string | null>(null);
+  const copy = async (cmd: string) => {
+    try {
+      await navigator.clipboard.writeText(cmd);
+      setCopied(cmd);
+      setTimeout(() => setCopied(null), 1500);
+    } catch {
+      setCopied(null);
+    }
+  };
+  return (
+    <Card data-testid="windows-run-command-panel">
+      <CardHeader>
+        <CardTitle className="text-base">Run EcoWitt Canary on Windows</CardTitle>
+        <CardDescription>
+          Operator-only. Paste a command into PowerShell from the repo root. Do not paste curl commands into prompts.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {WINDOWS_RUN_COMMANDS.map((row) => (
+          <div key={row.label} className="rounded-md border p-3" data-cmd-label={row.label}>
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{row.label}</div>
+            <code className="block break-all rounded bg-muted p-2 font-mono text-xs">{row.cmd}</code>
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <span className="text-xs text-muted-foreground">{row.hint}</span>
+              <Button size="sm" variant="outline" onClick={() => copy(row.cmd)}>
+                {copied === row.cmd ? "Copied" : "Copy"}
+              </Button>
+            </div>
+          </div>
+        ))}
+        <ul className="list-disc pl-5 text-xs text-muted-foreground">
+          <li>Paste only the requested value at each prompt (e.g. only the <code>vbt_...</code> token).</li>
+          <li>The harness aborts with a clear error if any input contains <code>curl.exe</code> or whitespace.</li>
+          <li>All output redacts bridge token, PASSKEY, and MAC.</li>
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function OperatorEcowittCanary() {
   const auth = useAuth();
   const authAvailable = !!auth?.user?.id;

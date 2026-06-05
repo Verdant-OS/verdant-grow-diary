@@ -150,7 +150,6 @@ export function buildCloudCanaryExport(
   return {
     source_kind: "fixture_sample_canary",
     preview_state: vm.state,
-    generated_at: now.toISOString(),
     rows,
     totals,
     suspicious_flag_codes: validateSuspiciousCodes(

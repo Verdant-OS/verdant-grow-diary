@@ -439,6 +439,191 @@ function RedactionWarningBanner() {
   );
 }
 
+function NoBrowserPostsNotice() {
+  return (
+    <div
+      className="rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground"
+      data-testid="no-browser-posts-notice"
+    >
+      <span className="font-medium text-foreground">For security, Verdant does not run EcoWitt canary POSTs from the browser.</span>{" "}
+      Run the local harness on Windows, then import the redacted output here. No bridge tokens, PASSKEYs, or MACs are ever entered into this page.
+    </div>
+  );
+}
+
+type WorkflowStageStatus = "pass" | "fail" | "incomplete" | "active" | "pending";
+
+function StageDot({ status }: { status: WorkflowStageStatus }) {
+  const cls: Record<WorkflowStageStatus, string> = {
+    pass: "bg-primary text-primary-foreground border-primary",
+    fail: "bg-destructive text-destructive-foreground border-destructive",
+    incomplete: "bg-muted text-muted-foreground border-border",
+    active: "bg-background text-foreground border-primary",
+    pending: "bg-background text-muted-foreground border-border",
+  };
+  const label: Record<WorkflowStageStatus, string> = {
+    pass: "✓",
+    fail: "!",
+    incomplete: "•",
+    active: "•",
+    pending: "•",
+  };
+  return (
+    <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold ${cls[status]}`}>
+      {label[status]}
+    </span>
+  );
+}
+
+function CanaryWorkflowStatusBar({
+  preflight,
+  reportLoaded,
+  verdict,
+}: {
+  preflight: PreflightResult | null;
+  reportLoaded: boolean;
+  verdict: VerdictResult;
+}) {
+  const preflightStatus: WorkflowStageStatus = preflight
+    ? preflight.status === "pass"
+      ? "pass"
+      : preflight.status === "fail"
+        ? "fail"
+        : "incomplete"
+    : "active";
+  const runStatus: WorkflowStageStatus = preflight?.status === "pass" ? "active" : "pending";
+  const importStatus: WorkflowStageStatus = reportLoaded ? "pass" : preflight?.status === "pass" ? "active" : "pending";
+  const verdictStatus: WorkflowStageStatus = !reportLoaded
+    ? "pending"
+    : verdict.verdict === "go"
+      ? "pass"
+      : verdict.verdict === "no_go"
+        ? "fail"
+        : "incomplete";
+
+  const stages: Array<{ key: string; label: string; hint: string; status: WorkflowStageStatus }> = [
+    { key: "preflight", label: "Preflight", hint: "Tent + EcoWitt mapping", status: preflightStatus },
+    { key: "run", label: "Run harness", hint: "Local PowerShell only", status: runStatus },
+    { key: "import", label: "Import output", hint: "Redacted paste / OutFile", status: importStatus },
+    { key: "verdict", label: "Verdict", hint: "GO / NO-GO / INCOMPLETE", status: verdictStatus },
+  ];
+
+  return (
+    <Card data-testid="canary-workflow-status-bar">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">Canary Workflow</CardTitle>
+        <CardDescription>Self-contained UI workflow · no browser POSTs · no Supabase writes.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ol className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
+          {stages.map((s, i) => (
+            <li key={s.key} className="flex items-center gap-3 rounded-md border p-2" data-stage={s.key} data-status={s.status}>
+              <StageDot status={s.status} />
+              <div className="min-w-0">
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step {i + 1}</div>
+                <div className="text-sm font-medium">{s.label}</div>
+                <div className="truncate text-xs text-muted-foreground">{s.hint}</div>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ResultsDashboard({
+  preflight,
+  report,
+  verdict,
+}: {
+  preflight: PreflightResult | null;
+  report: CanaryReportInput | null;
+  verdict: VerdictResult;
+}) {
+  const verdictLabel = verdict.verdict === "go" ? "GO" : verdict.verdict === "no_go" ? "NO-GO" : "INCOMPLETE";
+  const verdictCls =
+    verdict.verdict === "go"
+      ? "bg-primary/15 text-primary border-primary/40"
+      : verdict.verdict === "no_go"
+        ? "bg-destructive/15 text-destructive border-destructive/40"
+        : "bg-muted text-muted-foreground border-border";
+
+  const passCount = verdict.cards.filter((c) => c.status === "pass").length;
+  const failCount = verdict.cards.filter((c) => c.status === "fail").length;
+  const incompleteCount = verdict.cards.filter((c) => c.status === "incomplete" || c.status === "unknown").length;
+
+  const mainRows = report?.main_row_counts
+    ? Object.values(report.main_row_counts).reduce((a, b) => a + (b ?? 0), 0)
+    : null;
+  const malformedRows = report?.malformed_row_counts
+    ? Object.values(report.malformed_row_counts).reduce((a, b) => a + (b ?? 0), 0)
+    : null;
+  const ch9 = report?.channel_9_count ?? null;
+  const leaks = report?.leak_scan_count ?? null;
+
+  return (
+    <Card data-testid="canary-results-dashboard">
+      <CardHeader className="pb-2">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <CardTitle className="text-base">Results Dashboard</CardTitle>
+            <CardDescription>
+              {report
+                ? "Live view of the imported canary report."
+                : "Waiting for redacted harness output. Run the harness on Windows, then import."}
+            </CardDescription>
+          </div>
+          <span
+            className={`inline-flex items-center rounded-md border px-3 py-1 text-sm font-semibold ${verdictCls}`}
+            data-testid="dashboard-verdict-pill"
+          >
+            {verdictLabel}
+          </span>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+          <div className="rounded-md border p-2 text-center" data-metric="preflight">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Preflight</div>
+            <div className="text-sm font-semibold">
+              {preflight ? preflight.status.toUpperCase() : "—"}
+            </div>
+          </div>
+          <div className="rounded-md border p-2 text-center" data-metric="main-rows">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Main rows</div>
+            <div className="text-sm font-semibold">{mainRows ?? "—"} <span className="text-xs text-muted-foreground">/ 4</span></div>
+          </div>
+          <div className="rounded-md border p-2 text-center" data-metric="malformed-rows">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Malformed</div>
+            <div className="text-sm font-semibold">{malformedRows ?? "—"} <span className="text-xs text-muted-foreground">/ 2</span></div>
+          </div>
+          <div className="rounded-md border p-2 text-center" data-metric="channel-9">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Ch 9 / leaks</div>
+            <div className="text-sm font-semibold">
+              {ch9 ?? "—"} / {leaks ?? "—"}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span className="rounded-md border bg-primary/10 px-2 py-0.5 text-primary">{passCount} pass</span>
+          <span className="rounded-md border bg-destructive/10 px-2 py-0.5 text-destructive">{failCount} fail</span>
+          <span className="rounded-md border bg-muted px-2 py-0.5 text-muted-foreground">{incompleteCount} incomplete</span>
+        </div>
+
+        {verdict.reasons.length > 0 && (
+          <ul className="list-disc pl-5 text-xs text-destructive" data-testid="dashboard-reasons">
+            {verdict.reasons.map((r, i) => (
+              <li key={i}>{r}</li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function OperatorEcowittCanary() {
   const auth = useAuth();
   const authAvailable = !!auth?.user?.id;
@@ -604,6 +789,9 @@ export default function OperatorEcowittCanary() {
 
       {saveNotice && <div className="text-xs text-muted-foreground">{saveNotice}</div>}
 
+      <NoBrowserPostsNotice />
+      <CanaryWorkflowStatusBar preflight={preflight} reportLoaded={!!report} verdict={verdict} />
+
       <RedactionWarningBanner />
       <RedactionPreviewPanel />
       <WindowsRunCommandPanel />
@@ -717,6 +905,8 @@ export default function OperatorEcowittCanary() {
           )}
         </CardContent>
       </Card>
+
+      <ResultsDashboard preflight={preflight} report={report} verdict={verdict} />
 
       {/* Verification Summary cards */}
       <section aria-label="Verification Summary" className="grid grid-cols-1 gap-3 md:grid-cols-2">

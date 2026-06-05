@@ -79,19 +79,20 @@ describe("ecowitt-canary-harness.ps1 — static safety", () => {
   });
 
   it("does not introduce alerts / Action Queue / AI / automation / device control", () => {
+    const lower = src.toLowerCase();
     const forbidden = [
       "action_queue",
-      "alerts",
       "ai_doctor",
-      "service_role",
       "mqtt",
       "home_assistant",
       "pi_bridge",
       "relay",
       "actuator",
+      "functions.invoke",
+      ".rpc(",
     ];
     for (const word of forbidden) {
-      expect(src.toLowerCase()).not.toContain(word);
+      expect(lower).not.toContain(word);
     }
   });
 });

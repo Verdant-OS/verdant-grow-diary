@@ -163,7 +163,14 @@ describe("ecowittCloudCanaryExport — pure serializer", () => {
     // Only the documented top-level keys
     const parsed = JSON.parse(json);
     expect(Object.keys(parsed).sort()).toEqual(
-      ["generated_at", "preview_state", "rows", "source_kind", "totals"].sort(),
+      [
+        "generated_at",
+        "preview_state",
+        "rows",
+        "source_kind",
+        "suspicious_flag_codes",
+        "totals",
+      ].sort(),
     );
     for (const r of parsed.rows) {
       expect(Object.keys(r).sort()).toEqual(
@@ -174,6 +181,7 @@ describe("ecowittCloudCanaryExport — pure serializer", () => {
           "mapped_count",
           "row_state",
           "stale_count",
+          "suspicious_flag_codes",
           "unmapped_count",
         ].sort(),
       );

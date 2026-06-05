@@ -24,13 +24,25 @@ Use this runbook the first time a real EcoWitt gateway is pointed at Verdant. It
 
 Two harnesses are provided. Both run the same three POSTs (main, duplicate replay, malformed) and print a redacted pass/fail matrix plus the SQL verification block.
 
-### Windows (recommended): PowerShell
+### Windows (recommended): PowerShell root launcher
 
-PowerShell is the **recommended path on Windows**. It prompts safely for each secret, validates the bridge token shape **before** any network call, and never echoes raw secrets.
+PowerShell is the **recommended path on Windows**.
+Use the root launcher so you do **not** have to `cd` into the repo first:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\ecowitt-canary-harness.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Run-EcoWittCanary.ps1
 ```
+
+> ⚠️ **If PowerShell opens in `C:\WINDOWS\system32`, use the root launcher above.**
+> Do not run ` .\scripts\ecowitt-canary-harness.ps1` from System32 — the relative path will fail.
+> Do not paste curl commands into secret prompts.
+> Paste only the `vbt_...` bridge token when prompted.
+
+Alternative — double-click in File Explorer:
+
+- `Run-EcoWittCanary.cmd`  (keeps window open after completion)
+
+The root launcher safely prompts for each secret, validates the bridge token shape **before** any network call, and never echoes raw secrets.
 
 You will be prompted for four values, one at a time:
 

@@ -568,6 +568,10 @@ export function CloudCanaryPreviewPanel() {
 
   const verdictJson = useMemo(() => JSON.stringify(verdict, null, 2), [verdict]);
   const previewVm = useMemo(() => buildCloudCanaryPreviewViewModel(verdict), [verdict]);
+  // Slice C: ONE serializer pass — preview + download read the same bytes.
+  const exportObj = useMemo(() => buildCloudCanaryExport(previewVm), [previewVm]);
+  const exportCsv = useMemo(() => serializeCloudCanaryExportToCsv(exportObj), [exportObj]);
+  const exportJson = useMemo(() => serializeCloudCanaryExportToJson(exportObj), [exportObj]);
 
   const handleCopy = async () => {
     try {

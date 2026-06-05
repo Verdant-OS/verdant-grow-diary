@@ -221,10 +221,15 @@ import {
   normalizeSensorReading,
   type NormalizedSensorReading,
 } from "@/lib/sensorReadingNormalizationRules";
+import {
+  ECOWITT_MISSING_METRIC_CODES,
+  type EcowittMissingMetricCode,
+} from "@/constants/ecowittMissingMetricCodes";
 
 export type EcowittCloudUnmappedReason =
   | "no_tent_mapping_for_channel"
   | "unsupported_metric_for_ecowitt";
+
 
 export interface EcowittCloudUnmappedChannel {
   raw_key: string;

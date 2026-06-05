@@ -16,6 +16,10 @@ import {
   isEcowittSuspiciousFlagCode,
   type EcowittSuspiciousFlagCode,
 } from "@/constants/ecowittSuspiciousFlags";
+import {
+  isEcowittMissingMetricCode,
+  type EcowittMissingMetricCode,
+} from "@/constants/ecowittMissingMetricCodes";
 
 export interface CloudCanaryExportRow {
   fixture_name: string;
@@ -27,6 +31,8 @@ export interface CloudCanaryExportRow {
   row_state: "normal" | "zero_mapped_gap";
   /** Closed enum vocabulary only; ID-free by construction. */
   suspicious_flag_codes: EcowittSuspiciousFlagCode[];
+  /** Closed enum vocabulary only; ID-free by construction. */
+  missing_metric_codes: EcowittMissingMetricCode[];
 }
 
 export interface CloudCanaryExportTotals {
@@ -47,6 +53,8 @@ export interface CloudCanaryExport {
   totals: CloudCanaryExportTotals;
   /** Aggregate enum-coded suspicious flags across all fixtures, deduped + sorted. */
   suspicious_flag_codes: EcowittSuspiciousFlagCode[];
+  /** Aggregate enum-coded missing-metric codes across all fixtures, deduped + sorted. */
+  missing_metric_codes: EcowittMissingMetricCode[];
 }
 
 /** Stable column order for both CSV and the conceptual JSON row shape. */
@@ -59,6 +67,7 @@ export const CLOUD_CANARY_EXPORT_COLUMNS = [
   "unmapped_count",
   "row_state",
   "suspicious_flag_codes",
+  "missing_metric_codes",
 ] as const;
 
 /** Fixed filenames per Item 3 LOCKED spec (no timestamp). */
@@ -77,7 +86,7 @@ export function buildCloudCanaryExport(
   // Defense-in-depth: even though the view-model already validates codes
   // against the closed enum, the export re-checks. This guarantees the file
   // on disk can ONLY contain enum values — never free text.
-  const validateCodes = (
+  const validateSuspiciousCodes = (
     codes: ReadonlyArray<string>,
     where: string,
   ): EcowittSuspiciousFlagCode[] => {
@@ -90,6 +99,19 @@ export function buildCloudCanaryExport(
     }
     return [...codes].sort() as EcowittSuspiciousFlagCode[];
   };
+  const validateMissingMetricCodes = (
+    codes: ReadonlyArray<string>,
+    where: string,
+  ): EcowittMissingMetricCode[] => {
+    for (const c of codes) {
+      if (!isEcowittMissingMetricCode(c)) {
+        throw new Error(
+          `[cloud-canary-export] Unknown missing metric code "${c}" at ${where}.`,
+        );
+      }
+    }
+    return [...codes].sort() as EcowittMissingMetricCode[];
+  };
 
   const rows: CloudCanaryExportRow[] = vm.rows.map((r) => ({
     fixture_name: r.fixture_name,
@@ -99,8 +121,12 @@ export function buildCloudCanaryExport(
     invalid_count: r.invalid_count,
     unmapped_count: r.unmapped_count,
     row_state: r.state,
-    suspicious_flag_codes: validateCodes(
+    suspicious_flag_codes: validateSuspiciousCodes(
       r.suspicious_flag_codes,
+      `row "${r.fixture_name}"`,
+    ),
+    missing_metric_codes: validateMissingMetricCodes(
+      r.missing_metric_codes,
       `row "${r.fixture_name}"`,
     ),
   }));
@@ -128,8 +154,12 @@ export function buildCloudCanaryExport(
     generated_at: now.toISOString(),
     rows,
     totals,
-    suspicious_flag_codes: validateCodes(
+    suspicious_flag_codes: validateSuspiciousCodes(
       vm.suspicious_flag_codes,
+      "top-level aggregate",
+    ),
+    missing_metric_codes: validateMissingMetricCodes(
+      vm.missing_metric_codes,
       "top-level aggregate",
     ),
   };
@@ -144,7 +174,7 @@ function escapeCsv(value: string | number): string {
 }
 
 /** Codes are joined with '|' inside one CSV cell — enum values only, no commas. */
-function formatCodesCell(codes: ReadonlyArray<EcowittSuspiciousFlagCode>): string {
+function formatCodesCell(codes: ReadonlyArray<string>): string {
   return escapeCsv(codes.join("|"));
 }
 
@@ -159,11 +189,11 @@ export function serializeCloudCanaryExportToCsv(exp: CloudCanaryExport): string 
   lines.push(CLOUD_CANARY_EXPORT_COLUMNS.join(","));
   for (const r of exp.rows) {
     lines.push(
-      CLOUD_CANARY_EXPORT_COLUMNS.map((c) =>
-        c === "suspicious_flag_codes"
-          ? formatCodesCell(r.suspicious_flag_codes)
-          : escapeCsv(r[c] as string | number),
-      ).join(","),
+      CLOUD_CANARY_EXPORT_COLUMNS.map((c) => {
+        if (c === "suspicious_flag_codes") return formatCodesCell(r.suspicious_flag_codes);
+        if (c === "missing_metric_codes") return formatCodesCell(r.missing_metric_codes);
+        return escapeCsv(r[c] as string | number);
+      }).join(","),
     );
   }
   lines.push(
@@ -176,6 +206,7 @@ export function serializeCloudCanaryExportToCsv(exp: CloudCanaryExport): string 
       exp.totals.unmapped_count,
       "",
       formatCodesCell(exp.suspicious_flag_codes),
+      formatCodesCell(exp.missing_metric_codes),
     ].join(","),
   );
   return lines.join("\n") + "\n";
@@ -184,3 +215,4 @@ export function serializeCloudCanaryExportToCsv(exp: CloudCanaryExport): string 
 export function serializeCloudCanaryExportToJson(exp: CloudCanaryExport): string {
   return JSON.stringify(exp, null, 2);
 }
+

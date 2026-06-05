@@ -291,14 +291,74 @@ describe("CloudCanaryPreviewPanel — export controls render (Item 3)", () => {
     expect(pageSrc).not.toMatch(/cloud-canary-fixture-summary-\$\{Date\.now/);
   });
 
-  it("export omits view-model gap fields (missing_metric_count, suspicious_flag_codes)", () => {
-    // Audit-confirmed gaps: the view-model does NOT expose these. Per spec,
-    // the export must NOT add them; they are deferred to a separate slice.
+  it("export omits the still-deferred missing_metric_count gap field", () => {
+    // missing_metric_count is NOT yet derivable from slice-1 verdict output;
+    // the view-model deliberately does not expose it, so the export must not.
+    // suspicious_flag_codes IS now surfaced by the view-model and IS emitted
+    // by the export (covered by the Slice A tests below).
     const vm = buildVmFromIds(ORDER);
     const exp = buildCloudCanaryExport(vm, { now: FIXED_NOW });
     const json = serializeCloudCanaryExportToJson(exp);
     expect(json).not.toMatch(/missing_metric_count/);
-    expect(json).not.toMatch(/suspicious_flag_codes/);
+  });
+
+  it("Slice A: CSV header includes the suspicious_flag_codes column", () => {
+    const vm = buildVmFromIds(ORDER);
+    const exp = buildCloudCanaryExport(vm, { now: FIXED_NOW });
+    const csv = serializeCloudCanaryExportToCsv(exp);
+    const header = csv.split("\n")[2].split(",");
+    expect(header).toContain("suspicious_flag_codes");
+    // Stable position: last column
+    expect(header[header.length - 1]).toBe("suspicious_flag_codes");
+  });
+
+  it("Slice A: CSV row for invalid_humidity carries its enum code in the codes cell", () => {
+    const vm = buildVmFromIds(["invalid_humidity"] as const);
+    const exp = buildCloudCanaryExport(vm, { now: FIXED_NOW });
+    const csv = serializeCloudCanaryExportToCsv(exp);
+    const dataLine = csv.split("\n")[3]; // 2 comments + header + 1 row
+    const cells = dataLine.split(",");
+    expect(cells[0]).toBe("invalid_humidity");
+    // Last cell = codes; |-joined enum values only
+    const codesCell = cells[cells.length - 1];
+    const codes = codesCell.split("|");
+    expect(codes).toContain("rh_out_of_range_invalid");
+    for (const c of codes) {
+      expect(ECOWITT_SUSPICIOUS_FLAG_CODES).toContain(c);
+    }
+  });
+
+  it("Slice A: JSON row + top-level surfaces enum codes only (closed-set invariant)", () => {
+    const vm = buildVmFromIds(ORDER);
+    const exp = buildCloudCanaryExport(vm, { now: FIXED_NOW });
+    const json = JSON.parse(serializeCloudCanaryExportToJson(exp));
+
+    expect(Array.isArray(json.suspicious_flag_codes)).toBe(true);
+    for (const c of json.suspicious_flag_codes) {
+      expect(ECOWITT_SUSPICIOUS_FLAG_CODES).toContain(c);
+    }
+    for (const r of json.rows) {
+      expect(Array.isArray(r.suspicious_flag_codes)).toBe(true);
+      for (const c of r.suspicious_flag_codes) {
+        expect(ECOWITT_SUSPICIOUS_FLAG_CODES).toContain(c);
+      }
+    }
+    // Aggregate == union of per-row codes, sorted + deduped
+    const union = new Set<string>();
+    for (const r of json.rows) for (const c of r.suspicious_flag_codes) union.add(c);
+    expect(json.suspicious_flag_codes).toEqual([...union].sort());
+  });
+
+  it("Slice A: export refuses an unknown code rather than echoing free text", () => {
+    const vm = buildVmFromIds(["happy_multi_channel"] as const);
+    // Tamper with VM aggregate to inject a non-enum value.
+    const tainted = {
+      ...vm,
+      suspicious_flag_codes: ["AA:BB:CC:DD:EE:01"] as never,
+    };
+    expect(() => buildCloudCanaryExport(tainted)).toThrow(
+      /Unknown suspicious flag code/,
+    );
   });
 
   it("uses the literal export key 'fresh_class_count' in BOTH CSV header and JSON key (NOT 'fresh_count')", () => {

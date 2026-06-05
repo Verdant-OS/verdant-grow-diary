@@ -27,8 +27,21 @@
 
   Do NOT paste the curl command into any prompt. Paste only the requested
   single value (e.g. only the `vbt_...` bridge token).
+
+  Supports two operator-friendly switches:
+
+    -DryRun           : Validate inputs and print what WOULD be sent,
+                        without making any network call. Useful in
+                        automation, CI smoke checks, and operator demos.
+
+    -OutFile <path>   : Append the fully redacted matrix + SQL block to
+                        the given file. Secrets are never written.
 #>
 
+param(
+  [switch]$DryRun,
+  [string]$OutFile = ''
+)
 
 $ErrorActionPreference = 'Stop'
 
@@ -102,6 +115,13 @@ Write-Host "Endpoint: $Endpoint"
 Write-Host "Auth     : Bearer vbt_REDACTED"
 Write-Host "PASSKEY  : PASSKEY_REDACTED"
 Write-Host "MAC      : MAC_REDACTED"
+if ($DryRun) {
+  Write-Host ""
+  Write-Host "[DRY-RUN] No network calls will be made. Inputs validated and redacted." -ForegroundColor Yellow
+}
+if ($OutFile) {
+  Write-Host "OutFile  : $OutFile (redacted matrix + SQL will be appended)"
+}
 Write-Host ""
 
 # --- pass/fail tracking ---
@@ -130,6 +150,14 @@ function Invoke-CanaryPost {
 
   Write-Host ""
   Write-Host "=== POST: $Label (dateutc=$DateUtc) ==="
+
+  if ($DryRun) {
+    Write-Host "  [DRY-RUN] would POST to $Endpoint"
+    Write-Host "  [DRY-RUN] Authorization: Bearer vbt_REDACTED"
+    Write-Host "  [DRY-RUN] PASSKEY=PASSKEY_REDACTED MAC=MAC_REDACTED dateutc=$DateUtc temp1f=$Temp1f"
+    Mark-Pass "$Label dry-run validated (no network call)"
+    return
+  }
 
   $bodyFile = [System.IO.Path]::GetTempFileName()
   $args = @(
@@ -233,5 +261,29 @@ Write-Host $sql
 
 Write-Host ""
 Write-Host "Now paste the scrubbed SQL output into ChatGPT for GO/NO-GO grading." -ForegroundColor Cyan
+
+if ($OutFile) {
+  # Build a fully redacted artifact. Secrets are never written to disk.
+  $mode = if ($DryRun) { 'dry-run' } else { 'live' }
+  $stamp = (Get-Date).ToString('s')
+  $lines = New-Object System.Collections.Generic.List[string]
+  $lines.Add("# EcoWitt canary harness output ($mode)")          | Out-Null
+  $lines.Add("# generated_at: $stamp")                            | Out-Null
+  $lines.Add("# endpoint    : $Endpoint")                         | Out-Null
+  $lines.Add("# auth        : Bearer vbt_REDACTED")               | Out-Null
+  $lines.Add("# PASSKEY     : PASSKEY_REDACTED")                  | Out-Null
+  $lines.Add("# MAC         : MAC_REDACTED")                      | Out-Null
+  $lines.Add("passed: $($script:PassCount)")                      | Out-Null
+  $lines.Add("failed: $($script:FailCount)")                      | Out-Null
+  foreach ($n in $script:FailNotes) { $lines.Add("  - $(Redact $n)") | Out-Null }
+  $lines.Add("")                                                  | Out-Null
+  $lines.Add("--- SQL VERIFICATION ---")                          | Out-Null
+  $lines.Add($sql)                                                | Out-Null
+  $joined = ($lines -join [Environment]::NewLine)
+  # Final defensive redaction pass before any file write.
+  $joined = Redact $joined
+  Add-Content -Path $OutFile -Value $joined
+  Write-Host "Wrote redacted output to: $OutFile" -ForegroundColor Cyan
+}
 
 if ($script:FailCount -gt 0) { exit 1 } else { exit 0 }

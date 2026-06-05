@@ -783,6 +783,37 @@ export function CloudCanaryPreviewPanel() {
           </div>
         )}
 
+        <div
+          data-testid="cloud-canary-export-preview"
+          className="space-y-2"
+        >
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            Fixture/sample canary export preview · exact bytes that will download
+          </div>
+          <details className="rounded-md border bg-muted/30">
+            <summary className="cursor-pointer px-2 py-1 text-xs font-semibold">
+              Preview CSV ({CLOUD_CANARY_EXPORT_CSV_FILENAME})
+            </summary>
+            <pre
+              data-testid="cloud-canary-export-preview-csv"
+              className="max-h-72 overflow-auto whitespace-pre px-2 py-2 font-mono text-[11px] leading-snug"
+            >
+              {exportCsv}
+            </pre>
+          </details>
+          <details className="rounded-md border bg-muted/30">
+            <summary className="cursor-pointer px-2 py-1 text-xs font-semibold">
+              Preview JSON ({CLOUD_CANARY_EXPORT_JSON_FILENAME})
+            </summary>
+            <pre
+              data-testid="cloud-canary-export-preview-json"
+              className="max-h-72 overflow-auto whitespace-pre px-2 py-2 font-mono text-[11px] leading-snug"
+            >
+              {exportJson}
+            </pre>
+          </details>
+        </div>
+
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
@@ -797,9 +828,7 @@ export function CloudCanaryPreviewPanel() {
             size="sm"
             variant="outline"
             onClick={() => {
-              const exp = buildCloudCanaryExport(previewVm);
-              const csv = serializeCloudCanaryExportToCsv(exp);
-              const blob = new Blob([csv], { type: "text/csv" });
+              const blob = new Blob([exportCsv], { type: "text/csv" });
               const url = URL.createObjectURL(blob);
               const a = document.createElement("a");
               a.href = url;
@@ -817,9 +846,7 @@ export function CloudCanaryPreviewPanel() {
             size="sm"
             variant="outline"
             onClick={() => {
-              const exp = buildCloudCanaryExport(previewVm);
-              const json = serializeCloudCanaryExportToJson(exp);
-              const blob = new Blob([json], { type: "application/json" });
+              const blob = new Blob([exportJson], { type: "application/json" });
               const url = URL.createObjectURL(blob);
               const a = document.createElement("a");
               a.href = url;

@@ -240,7 +240,7 @@ function WindowsRunCommandPanel() {
 const REDACTION_PREVIEW_ROWS: Array<{ label: string; before: string; after: string }> = [
   { label: "Bridge token", before: "vbt_live_9f3c2a1b4d5e6f70 (example)", after: "vbt_REDACTED" },
   { label: "PASSKEY", before: "A1B2C3D4E5F60718293A4B5C6D7E8F90 (example)", after: "PASSKEY_REDACTED" },
-  { label: "MAC", before: "AA:BB:CC:11:22:33 (example)", after: "MAC_REDACTED" },
+  { label: "MAC", before: "XX:XX:XX:XX:XX:XX (example)", after: "MAC_REDACTED" },
   { label: "API key test field", before: "ak_test_examplevalue (example)", after: "SHOULD_NOT_PERSIST" },
 ];
 

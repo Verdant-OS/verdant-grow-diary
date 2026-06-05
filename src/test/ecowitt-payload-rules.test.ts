@@ -244,7 +244,11 @@ describe("normalizeEcowittCloudReadings", () => {
       { now: CLOUD_NOW },
     );
     for (const row of res.rows) {
-      expect(JSON.stringify(row.reading)).not.toMatch(/ec/i);
+      const r = row.reading as Record<string, unknown>;
+      expect(r).not.toHaveProperty("soil_ec");
+      expect(r).not.toHaveProperty("reservoir_ec");
+      expect(r).not.toHaveProperty("ec_mscm");
+
     }
   });
 

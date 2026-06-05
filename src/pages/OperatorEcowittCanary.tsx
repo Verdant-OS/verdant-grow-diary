@@ -6,6 +6,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useTents } from "@/hooks/use-tents";
 import { useAuth } from "@/store/auth";
@@ -17,6 +18,7 @@ import {
   buildDrillDown,
   buildVerdictCsv,
   buildVerdictExport,
+  buildVerdictFilename,
   buildWorkflowSnapshot,
   clearAuditFromLocalStorage,
   clearWorkflowFromLocalStorage,
@@ -25,12 +27,15 @@ import {
   evaluatePreflight,
   loadAuditFromLocalStorage,
   loadWorkflowFromLocalStorage,
+  migrateLegacyWorkflowSnapshots,
+  parseCanaryImport,
   parseCanaryPaste,
   saveAuditToLocalStorage,
   saveWorkflowToLocalStorage,
   type BuiltAuditReport,
   type CanaryReportInput,
   type CardStatus,
+  type ImportParseError,
   type PreflightResult,
   type VerdictCard,
   type VerdictResult,

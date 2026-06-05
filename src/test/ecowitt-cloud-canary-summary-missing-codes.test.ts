@@ -124,9 +124,9 @@ describe("REGRESSION — all 12 fixtures: existing summary fields unchanged", ()
     missing_metrics: { mapped: 0, unmapped: 0, invalid: 0, stale: 0, live: 0, missing_metric: true, pressure_unmapped: false, ec_metric_invented: false },
     pressure_present: { mapped: 2, unmapped: 1, invalid: 0, stale: 0, live: 2, missing_metric: false, pressure_unmapped: true, ec_metric_invented: false },
     celsius_looking_fahrenheit: { mapped: 2, unmapped: 0, invalid: 0, stale: 0, live: 2, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
-    captured_at_missing: { mapped: 3, unmapped: 0, invalid: 0, stale: 0, live: 3, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
-    missing_humidity_only: { mapped: 3, unmapped: 0, invalid: 0, stale: 0, live: 3, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
-    missing_temperature_only: { mapped: 3, unmapped: 0, invalid: 0, stale: 0, live: 3, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
+    captured_at_missing: { mapped: 3, unmapped: 0, invalid: 3, stale: 0, live: 0, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
+    missing_humidity_only: { mapped: 2, unmapped: 0, invalid: 0, stale: 0, live: 2, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
+    missing_temperature_only: { mapped: 2, unmapped: 0, invalid: 0, stale: 0, live: 2, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
     missing_soil_only: { mapped: 2, unmapped: 0, invalid: 0, stale: 0, live: 2, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
   };
 

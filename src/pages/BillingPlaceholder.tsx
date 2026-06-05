@@ -2,6 +2,8 @@ import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import BrandLogo from "@/components/BrandLogo";
+import PaywallCta from "@/components/PaywallCta";
+import { buildPaywallCtaViewModel } from "@/lib/paywallCtaViewModel";
 import {
   resolvePaddleConfig,
   unavailableMessage,

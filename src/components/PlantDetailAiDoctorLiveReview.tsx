@@ -22,7 +22,9 @@ import {
 import { buildAiDoctorReviewRequestPacket } from "@/lib/aiDoctorReviewRequestPacket";
 import { useAiDoctorLiveReview } from "@/hooks/useAiDoctorLiveReview";
 import AiDoctorReviewResultPreview from "@/components/AiDoctorReviewResultPreview";
+import AiCreditLimitNotice from "@/components/AiCreditLimitNotice";
 import { useSensorBridgeHealth } from "@/hooks/useSensorBridgeHealth";
+import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import {
   classificationFromStatusResult,
   type Classification,
@@ -118,12 +120,25 @@ export default function PlantDetailAiDoctorLiveReview({
     persist,
   });
 
+  const { entitlement } = useMyEntitlements();
+
   if (!allowed) return null;
 
   const confidenceCopy =
     context.readiness === "partial"
       ? AI_DOCTOR_LIVE_REVIEW_PARTIAL_COPY
       : AI_DOCTOR_LIVE_REVIEW_STRONG_COPY;
+
+  const currentPlanLabel =
+    entitlement.displayPlanId === "free"
+      ? "Free"
+      : entitlement.displayPlanId === "pro_monthly"
+        ? "Pro (monthly)"
+        : entitlement.displayPlanId === "pro_annual"
+          ? "Pro (annual)"
+          : entitlement.displayPlanId === "founder_lifetime"
+            ? "Founder Lifetime"
+            : undefined;
 
   return (
     <section
@@ -178,14 +193,22 @@ export default function PlantDetailAiDoctorLiveReview({
       ) : null}
 
       {review.status === "error" ? (
-        <p
-          className="text-xs text-amber-200"
-          data-testid="plant-ai-doctor-live-review-failure"
-          role="status"
-          aria-live="polite"
-        >
-          {AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY}
-        </p>
+        review.reason === "credit_denied" && review.credit ? (
+          <AiCreditLimitNotice
+            credit={review.credit}
+            currentPlanLabel={currentPlanLabel}
+            data-testid="plant-ai-doctor-live-review-credit-denied"
+          />
+        ) : (
+          <p
+            className="text-xs text-amber-200"
+            data-testid="plant-ai-doctor-live-review-failure"
+            role="status"
+            aria-live="polite"
+          >
+            {AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY}
+          </p>
+        )
       ) : null}
 
       {review.status === "result" && review.result ? (

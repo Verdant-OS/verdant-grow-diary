@@ -28,6 +28,7 @@ import {
 } from "@/lib/aiDoctorReviewResponseAdapter";
 import type { AiDoctorReviewResult } from "@/lib/aiDoctorReviewResultContract";
 import type { Classification } from "@/lib/sensorSnapshotStatusContract";
+import type { AiCreditDenial } from "@/lib/aiCreditLimitNoticeViewModel";
 import {
   persistAiDoctorSession,
   type AiDoctorSessionInput,
@@ -44,6 +45,8 @@ export interface AiDoctorLiveReviewState {
   status: AiDoctorLiveReviewStatus;
   result: AiDoctorReviewResult | null;
   reason: AiDoctorLiveReviewFailureReason | null;
+  /** Only populated when reason === 'credit_denied'. */
+  credit?: AiCreditDenial;
 }
 
 export interface UseAiDoctorLiveReviewOptions {
@@ -118,7 +121,13 @@ export function useAiDoctorLiveReview(
       }
       const outcome = adaptAiDoctorReviewResponse(data);
       if (outcome.ok === false) {
-        setState({ status: "error", result: null, reason: outcome.reason });
+        setState({
+          status: "error",
+          result: null,
+          reason: outcome.reason,
+          credit:
+            outcome.reason === "credit_denied" ? outcome.credit : undefined,
+        });
         return;
       }
       setState({ status: "result", result: outcome.result, reason: null });

@@ -16,7 +16,7 @@ import {
   type EcowittCloudNormalizationResult,
   type NormalizeEcowittCloudOptions,
 } from "@/lib/ecowittPayloadRules";
-import type { EcowittMissingMetricCode } from "@/constants/ecowittMissingMetricCodes";
+
 
 export interface EcowittCloudCanaryFixture {
   /** Stable id for the fixture (e.g. "happy_multi_channel"). Never a secret. */
@@ -32,11 +32,6 @@ export interface EcowittCloudCanarySummary {
   stale_count: number;
   live_count: number;
   suspicious_flag_codes: string[];
-  /**
-   * Closed-vocabulary missing-metric signals from the cloud normalizer,
-   * deduped + sorted, ID-free by construction.
-   */
-  missing_metric_codes: EcowittMissingMetricCode[];
   missing_metric: boolean;
   ec_metric_invented: boolean;
   /** True if at least one unmapped pressure channel was surfaced. */
@@ -101,7 +96,7 @@ function summarizeOne(
     stale_count: stale,
     live_count: live,
     suspicious_flag_codes: [...codes].sort(),
-    missing_metric_codes: [...res.missing_metric_codes].sort(),
+    
     missing_metric: res.rows.length === 0 && res.unmapped.length === 0,
     ec_metric_invented: hasEcMetric(res),
     pressure_unmapped: res.unmapped.some((u) => u.metric === "pressure_hpa"),

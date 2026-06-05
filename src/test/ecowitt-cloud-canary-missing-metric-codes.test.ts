@@ -1,17 +1,14 @@
 /**
- * Asserts EcowittCloudCanarySummary.missing_metric_codes for the closed
- * vocabulary defined in src/constants/ecowittMissingMetricCodes.ts.
- *
- * Fixtures cover:
- *  - clean (happy_multi_channel)        -> []
- *  - missing humidity only              -> ["air_humidity_missing"]
- *  - missing temperature only           -> ["air_temperature_missing"]
- *  - missing soil only                  -> ["soil_moisture_missing"]
- *  - captured_at gap                    -> includes "captured_at_missing"
- *
- * Codes must be deduped, sorted, and contain no MAC / UUID / tent_id.
+ * Bucket-level expected-metric detection on normalizeEcowittCloudReadings
+ * (Slice B-pre-pre — slice-1). Tests target the result-level
+ * `missing_metric_codes` array. Summary/view-model/export wiring is OUT of
+ * scope and is asserted UNCHANGED in regression.
  */
 import { describe, it, expect } from "vitest";
+import {
+  normalizeEcowittCloudReadings,
+  type EcowittCloudMappingConfig,
+} from "@/lib/ecowittPayloadRules";
 import { runEcowittCloudCanary } from "@/lib/ecowittCloudCanaryVerdict";
 import {
   ECOWITT_MISSING_METRIC_CODES,
@@ -19,81 +16,214 @@ import {
 } from "@/constants/ecowittMissingMetricCodes";
 import fixtures from "../../fixtures/ecowitt-cloud-canary-payloads.json";
 
-const ID_PATTERNS = [
-  /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i, // UUID
-  /\b[0-9A-F]{2}(?::[0-9A-F]{2}){5}\b/i, // MAC
-];
+const MAC_RE = /\b[0-9A-F]{2}(?::[0-9A-F]{2}){5}\b/i;
+const UUID_RE =
+  /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i;
 
-const mapping = fixtures.mapping as unknown as Parameters<
-  typeof runEcowittCloudCanary
->[1];
-const options = { now: new Date(fixtures.now) };
+const TENT_A = "11111111-1111-1111-1111-111111111111";
+const TENT_B = "22222222-2222-2222-2222-222222222222";
+const MAC = "AA:BB:CC:DD:EE:01";
 
-function summarize(id: string) {
-  const payload = (fixtures.payloads as Record<string, unknown>)[id];
-  expect(payload, `fixture ${id} present`).toBeDefined();
-  const verdict = runEcowittCloudCanary([{ id, payload }], mapping, options);
-  return verdict.summaries[0];
+const mapping: EcowittCloudMappingConfig = {
+  byMac: {
+    [MAC]: {
+      air: { 1: TENT_A, 2: TENT_B },
+      soil: { 1: TENT_A },
+    },
+  },
+};
+const opts = { now: new Date(fixtures.now) };
+
+function normalize(payload: Record<string, unknown>) {
+  return normalizeEcowittCloudReadings(payload, mapping, opts);
 }
 
-describe("EcowittCloudCanarySummary.missing_metric_codes", () => {
-  it("clean fixture has empty missing_metric_codes", () => {
-    const s = summarize("happy_multi_channel");
-    expect(s.missing_metric_codes).toEqual([]);
+describe("normalizeEcowittCloudReadings — missing_metric_codes (mapped only)", () => {
+  it("mapped air channel: temp present, humidity absent -> air_humidity_absent", () => {
+    const res = normalize({
+      MAC,
+      dateutc: "2026-06-04 12:20:00",
+      temp1f: 77,
+      soilmoisture1: 40,
+    });
+    expect(res.missing_metric_codes).toContain("air_humidity_absent");
+    expect(res.missing_metric_codes).not.toContain("air_temperature_absent");
+    expect(res.missing_metric_codes).not.toContain("soil_moisture_absent");
   });
 
-  it("missing humidity emits air_humidity_missing", () => {
-    const s = summarize("missing_humidity_only");
-    expect(s.missing_metric_codes).toEqual(["air_humidity_missing"]);
+  it("mapped air channel: humidity present, temp absent -> air_temperature_absent", () => {
+    const res = normalize({
+      MAC,
+      dateutc: "2026-06-04 12:20:00",
+      humidity1: 55,
+      soilmoisture1: 40,
+    });
+    expect(res.missing_metric_codes).toContain("air_temperature_absent");
+    expect(res.missing_metric_codes).not.toContain("air_humidity_absent");
   });
 
-  it("missing temperature emits air_temperature_missing", () => {
-    const s = summarize("missing_temperature_only");
-    expect(s.missing_metric_codes).toEqual(["air_temperature_missing"]);
+  it("mapped soil channel: soil absent -> soil_moisture_absent", () => {
+    const res = normalize({
+      MAC,
+      dateutc: "2026-06-04 12:20:00",
+      temp1f: 77,
+      humidity1: 55,
+    });
+    expect(res.missing_metric_codes).toEqual(["soil_moisture_absent"]);
   });
 
-  it("missing soil on a mapped soil channel emits soil_moisture_missing", () => {
-    const s = summarize("missing_soil_only");
-    expect(s.missing_metric_codes).toEqual(["soil_moisture_missing"]);
+  it("fully-populated mapped channels -> empty array", () => {
+    const res = normalize(
+      fixtures.payloads.happy_multi_channel as Record<string, unknown>,
+    );
+    expect(res.missing_metric_codes).toEqual([]);
   });
 
-  it("captured_at gap emits captured_at_missing", () => {
-    const s = summarize("captured_at_missing");
-    expect(s.missing_metric_codes).toContain("captured_at_missing");
+  it("UNMAPPED channel missing a metric is NOT flagged (stays unmapped only)", () => {
+    // Channel 7 has no mapping; temp7f present, humidity7 absent.
+    const res = normalize({
+      MAC,
+      dateutc: "2026-06-04 12:20:00",
+      temp7f: 70,
+      temp1f: 77,
+      humidity1: 55,
+      soilmoisture1: 40,
+    });
+    expect(res.missing_metric_codes).toEqual([]);
+    // Unmapped path is what represents channel 7.
+    expect(res.unmapped.some((u) => u.channel === 7)).toBe(true);
   });
 
-  it("codes are deduped, sorted, and from the closed vocabulary only", () => {
+  it("only closed-set codes appear; no collision with existing vocab", () => {
     for (const id of Object.keys(fixtures.payloads)) {
-      const s = summarize(id);
-      const sorted = [...s.missing_metric_codes].sort();
-      expect(s.missing_metric_codes).toEqual(sorted);
-      expect(new Set(s.missing_metric_codes).size).toBe(
-        s.missing_metric_codes.length,
+      const res = normalize(
+        (fixtures.payloads as Record<string, Record<string, unknown>>)[id],
       );
-      for (const c of s.missing_metric_codes) {
+      for (const c of res.missing_metric_codes) {
         expect(isEcowittMissingMetricCode(c)).toBe(true);
       }
-    }
-  });
-
-  it("missing_metric_codes serialization is ID-free", () => {
-    for (const id of Object.keys(fixtures.payloads)) {
-      const s = summarize(id);
-      const blob = JSON.stringify(s.missing_metric_codes);
-      for (const re of ID_PATTERNS) {
-        expect(blob, `fixture ${id}`).not.toMatch(re);
+      // Provable-absent collision with neighboring vocabularies.
+      const forbidden = new Set([
+        "payload_not_object",
+        "captured_at_missing_or_unparseable",
+        "unsupported_metric_for_ecowitt",
+        "no_tent_mapping_for_channel",
+        "pressure_unmapped",
+        "rh_out_of_range_invalid",
+        "temperature_implausible_invalid",
+        "humidity_stuck_extreme",
+        "soil_moisture_stuck_extreme",
+        "celsius_looking_fahrenheit",
+        "impossible_temp_rh_combo",
+      ]);
+      for (const c of res.missing_metric_codes) {
+        expect(forbidden.has(c)).toBe(false);
       }
     }
   });
 
-  it("closed vocabulary set is exhaustive for these fixtures", () => {
-    expect(new Set(ECOWITT_MISSING_METRIC_CODES)).toEqual(
+  it("determinism: same input -> same codes, stable sorted order", () => {
+    const payload = {
+      MAC,
+      dateutc: "2026-06-04 12:20:00",
+      // Channel 1 mapped air + soil: missing temp + soil
+      humidity1: 55,
+      // Channel 2 mapped air: missing humidity
+      temp2f: 72,
+    };
+    const a = normalize(payload).missing_metric_codes;
+    const b = normalize(payload).missing_metric_codes;
+    expect(a).toEqual(b);
+    expect(a).toEqual([...a].sort());
+    expect(new Set(a).size).toBe(a.length);
+    expect(new Set(a)).toEqual(
       new Set([
-        "captured_at_missing",
-        "air_temperature_missing",
-        "air_humidity_missing",
-        "soil_moisture_missing",
+        "air_temperature_absent",
+        "air_humidity_absent",
+        "soil_moisture_absent",
       ]),
     );
+  });
+
+  it("result is ID-free (no MAC or UUID in missing_metric_codes)", () => {
+    for (const id of Object.keys(fixtures.payloads)) {
+      const res = normalize(
+        (fixtures.payloads as Record<string, Record<string, unknown>>)[id],
+      );
+      const blob = JSON.stringify(res.missing_metric_codes);
+      expect(blob).not.toMatch(MAC_RE);
+      expect(blob).not.toMatch(UUID_RE);
+    }
+  });
+
+  it("vocabulary export is exactly the three documented codes", () => {
+    expect(new Set(ECOWITT_MISSING_METRIC_CODES)).toEqual(
+      new Set([
+        "air_temperature_absent",
+        "air_humidity_absent",
+        "soil_moisture_absent",
+      ]),
+    );
+  });
+});
+
+describe("REGRESSION — existing result fields unchanged for all 8 canary fixtures", () => {
+  const ORDER = [
+    "happy_multi_channel",
+    "stale_only",
+    "invalid_humidity",
+    "stuck_soil_extreme",
+    "unmapped_channel",
+    "missing_metrics",
+    "pressure_present",
+    "celsius_looking_fahrenheit",
+  ] as const;
+
+  // Snapshot of existing summary fields (pre-slice values) — must not change.
+  const EXPECTED: Record<
+    string,
+    {
+      mapped: number;
+      unmapped: number;
+      invalid: number;
+      stale: number;
+      live: number;
+      missing_metric: boolean;
+      pressure_unmapped: boolean;
+      ec_metric_invented: boolean;
+    }
+  > = {
+    happy_multi_channel: { mapped: 5, unmapped: 0, invalid: 0, stale: 0, live: 5, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
+    stale_only: { mapped: 2, unmapped: 0, invalid: 0, stale: 2, live: 0, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
+    invalid_humidity: { mapped: 2, unmapped: 0, invalid: 2, stale: 0, live: 0, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
+    stuck_soil_extreme: { mapped: 1, unmapped: 0, invalid: 0, stale: 0, live: 1, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
+    unmapped_channel: { mapped: 0, unmapped: 2, invalid: 0, stale: 0, live: 0, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
+    missing_metrics: { mapped: 0, unmapped: 0, invalid: 0, stale: 0, live: 0, missing_metric: true, pressure_unmapped: false, ec_metric_invented: false },
+    pressure_present: { mapped: 2, unmapped: 1, invalid: 0, stale: 0, live: 2, missing_metric: false, pressure_unmapped: true, ec_metric_invented: false },
+    celsius_looking_fahrenheit: { mapped: 2, unmapped: 0, invalid: 0, stale: 0, live: 2, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
+  };
+
+  const verdict = runEcowittCloudCanary(
+    ORDER.map((id) => ({
+      id,
+      payload: (fixtures.payloads as Record<string, unknown>)[id],
+    })),
+    fixtures.mapping as unknown as Parameters<typeof runEcowittCloudCanary>[1],
+    opts,
+  );
+
+  it.each(ORDER)("%s — existing summary fields unchanged", (id) => {
+    const s = verdict.summaries.find((x) => x.fixture_id === id)!;
+    const exp = EXPECTED[id];
+    expect({
+      mapped: s.mapped_count,
+      unmapped: s.unmapped_count,
+      invalid: s.invalid_count,
+      stale: s.stale_count,
+      live: s.live_count,
+      missing_metric: s.missing_metric,
+      pressure_unmapped: s.pressure_unmapped,
+      ec_metric_invented: s.ec_metric_invented,
+    }).toEqual(exp);
   });
 });

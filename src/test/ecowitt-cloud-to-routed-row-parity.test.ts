@@ -71,8 +71,16 @@ function ecLookingPayload() {
   };
 }
 
-function adapt(payload: Record<string, unknown>) {
-  const norm = normalizeEcowittCloudReadings(payload, MAPPING, { now: NOW });
+function adapt(
+  payload: Record<string, unknown>,
+  opts: { stuckSoilCh?: number } = {},
+) {
+  const norm = normalizeEcowittCloudReadings(payload, MAPPING, {
+    now: NOW,
+    recentSoilMoisturePctByChannel: opts.stuckSoilCh
+      ? { [opts.stuckSoilCh]: [100, 100, 100, 100, 100] }
+      : undefined,
+  });
   const adapted = adaptEcowittCloudRowsToRoutedShape({
     userId: FAKE_USER,
     passkeyFingerprint: FAKE_FP,
@@ -120,7 +128,7 @@ describe("ecowitt cloud → routed row parity", () => {
   });
 
   it("invalid status is preserved and surfaces as quality=invalid", () => {
-    const { adapted } = adapt(invalidSoilStuckPayload());
+    const { adapted } = adapt(invalidSoilStuckPayload(), { stuckSoilCh: 2 });
     expect(adapted.rows.length).toBe(1);
     const row = adapted.rows[0];
     expect(row.metric).toBe("soil_moisture_pct");

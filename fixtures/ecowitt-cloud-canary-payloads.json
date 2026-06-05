@@ -64,6 +64,30 @@
       "dateutc": "2026-06-04 12:20:00",
       "temp1f": 25,
       "humidity1": 55
+    },
+    "captured_at_missing": {
+      "MAC": "AA:BB:CC:DD:EE:01",
+      "temp1f": 77,
+      "humidity1": 55,
+      "soilmoisture1": 40
+    },
+    "missing_humidity_only": {
+      "MAC": "AA:BB:CC:DD:EE:01",
+      "dateutc": "2026-06-04 12:20:00",
+      "temp1f": 77,
+      "soilmoisture1": 40
+    },
+    "missing_temperature_only": {
+      "MAC": "AA:BB:CC:DD:EE:01",
+      "dateutc": "2026-06-04 12:20:00",
+      "humidity1": 55,
+      "soilmoisture1": 40
+    },
+    "missing_soil_only": {
+      "MAC": "AA:BB:CC:DD:EE:01",
+      "dateutc": "2026-06-04 12:20:00",
+      "temp1f": 77,
+      "humidity1": 55
     }
   }
 }

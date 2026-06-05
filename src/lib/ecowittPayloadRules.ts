@@ -221,10 +221,15 @@ import {
   normalizeSensorReading,
   type NormalizedSensorReading,
 } from "@/lib/sensorReadingNormalizationRules";
+import {
+  ECOWITT_MISSING_METRIC_CODES,
+  type EcowittMissingMetricCode,
+} from "@/constants/ecowittMissingMetricCodes";
 
 export type EcowittCloudUnmappedReason =
   | "no_tent_mapping_for_channel"
   | "unsupported_metric_for_ecowitt";
+
 
 export interface EcowittCloudUnmappedChannel {
   raw_key: string;
@@ -294,7 +299,14 @@ export interface EcowittCloudNormalizationResult {
   rows: EcowittCloudReadingRow[];
   unmapped: EcowittCloudUnmappedChannel[];
   warnings: string[];
+  /**
+   * Closed-vocabulary "missing metric" signals derived at the
+   * (mac, channel)-bucket level. Deduped + sorted. ID-free by construction
+   * (codes only, no MAC / tent_id / channel index).
+   */
+  missing_metric_codes: EcowittMissingMetricCode[];
 }
+
 
 const ECOWITT_TEMP_F_RE = /^temp([1-8])f$/i;
 const ECOWITT_HUMIDITY_CH_RE = /^humidity([1-8])$/i;
@@ -342,7 +354,7 @@ export function normalizeEcowittCloudReadings(
   const warnings: string[] = [];
 
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    return { rows: [], unmapped: [], warnings: ["payload_not_object"] };
+    return { rows: [], unmapped: [], warnings: ["payload_not_object"], missing_metric_codes: [] };
   }
   const obj = payload as Record<string, unknown>;
   const lower: Record<string, unknown> = {};
@@ -416,7 +428,27 @@ export function normalizeEcowittCloudReadings(
     });
   }
 
+  // ---- Per-bucket missing-metric detection (closed vocabulary) -------------
+  // Codes are bound to bucket existence + mapping so silent / unmapped
+  // channels do not generate noise. captured_at_missing is payload-level.
+  const missingSet = new Set<EcowittMissingMetricCode>();
+  if (!capturedAt) missingSet.add("captured_at_missing");
   for (const bucket of buckets.values()) {
+    const airTent = perMac?.air?.[bucket.channel] ?? null;
+    const soilTent = perMac?.soil?.[bucket.channel] ?? null;
+    const hasAirData = bucket.tempF !== undefined || bucket.rhPct !== undefined;
+    const hasAnyData = hasAirData || bucket.soilPct !== undefined;
+    if (airTent && hasAirData) {
+      if (bucket.tempF === undefined) missingSet.add("air_temperature_missing");
+      if (bucket.rhPct === undefined) missingSet.add("air_humidity_missing");
+    }
+    if (soilTent && hasAnyData && bucket.soilPct === undefined) {
+      missingSet.add("soil_moisture_missing");
+    }
+  }
+
+  for (const bucket of buckets.values()) {
+
     const airTent = perMac?.air?.[bucket.channel] ?? null;
     const soilTent = perMac?.soil?.[bucket.channel] ?? null;
 
@@ -560,7 +592,14 @@ export function normalizeEcowittCloudReadings(
       a.reading.captured_at.localeCompare(b.reading.captured_at),
   );
 
-  return { rows, unmapped, warnings };
+  const missing_metric_codes = [...missingSet].sort() as EcowittMissingMetricCode[];
+  // Defensive sanity: vocabulary must remain closed.
+  for (const c of missing_metric_codes) {
+    if (!(ECOWITT_MISSING_METRIC_CODES as readonly string[]).includes(c)) {
+      throw new Error(`[ecowitt-cloud-normalize] Unknown missing_metric_code "${c}"`);
+    }
+  }
+  return { rows, unmapped, warnings, missing_metric_codes };
 }
 
 

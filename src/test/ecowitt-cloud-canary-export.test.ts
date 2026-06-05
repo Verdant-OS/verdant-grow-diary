@@ -106,7 +106,7 @@ describe("ecowittCloudCanaryExport — pure serializer", () => {
       happy.row_state,
     ].join(",");
     expect(csv).toContain(expected);
-    expect(csv).toMatch(/__totals__/);
+    expect(csv).toMatch(/^TOTAL,/m);
   });
 
   it("JSON contains expected counts for the same known fixture", () => {

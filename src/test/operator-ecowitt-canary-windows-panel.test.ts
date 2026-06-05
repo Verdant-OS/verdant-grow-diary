@@ -22,7 +22,7 @@ describe("OperatorEcowittCanary — Windows run-command panel", () => {
   it("shows the recommended root-launcher command with cd prefix", () => {
     expect(src).toContain("cd <VERDANT_REPO_ROOT>");
     expect(src).toContain(
-      "powershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1",
+      'powershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1',
     );
   });
 

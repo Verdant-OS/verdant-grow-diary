@@ -534,7 +534,7 @@ function DryRunGuidancePanel() {
   );
 }
 
-function CloudCanaryPreviewPanel() {
+export function CloudCanaryPreviewPanel() {
   const [copied, setCopied] = useState(false);
 
   const verdict: EcowittCloudCanaryVerdict = useMemo(() => {

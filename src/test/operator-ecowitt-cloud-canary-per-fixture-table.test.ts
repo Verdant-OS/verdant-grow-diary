@@ -117,19 +117,21 @@ describe("CloudCanaryPreviewPanel — rendered values are id-free", () => {
     expect(vm.rows.map((r) => r.fixture_name)).toEqual([...ORDER]);
   });
 
-  it("rendered table output (panel JSX template + all row values) contains no MAC or UUID", () => {
-    // Render-boundary check: combine the panel's JSX template (what the DOM
-    // will literally render) with every string/number from every view-model
-    // row that would flow into that template. If either side leaks a MAC or
-    // UUID, this assertion fires before the operator ever sees it.
-    const panelStart = pageSrc.indexOf("function CloudCanaryPreviewPanel");
-    const panelEnd = pageSrc.indexOf("function RedactionWarningBanner");
-    const panelJsx = pageSrc.slice(panelStart, panelEnd);
-    const rowValues = vm.rows
-      .flatMap((r) => Object.values(r).map((v) => String(v)))
-      .join("|");
-    const renderedSurface = `${panelJsx}\n${rowValues}`;
-    expect(MAC_RE.test(renderedSurface)).toBe(false);
-    expect(UUID_RE.test(renderedSurface)).toBe(false);
+  it("actual rendered panel output contains no MAC or UUID", async () => {
+    // True render-boundary check: mount the real CloudCanaryPreviewPanel
+    // component (which builds its view-model from the same fixtures) and
+    // scan the resulting HTML string. This catches any raw identifier wired
+    // into the JSX after the view-model layer.
+    const React = await import("react");
+    const { renderToString } = await import("react-dom/server");
+    const { CloudCanaryPreviewPanel } = await import(
+      "@/pages/OperatorEcowittCanary"
+    );
+    const html = renderToString(
+      React.createElement(CloudCanaryPreviewPanel),
+    );
+    expect(html.length).toBeGreaterThan(0);
+    expect(MAC_RE.test(html)).toBe(false);
+    expect(UUID_RE.test(html)).toBe(false);
   });
 });

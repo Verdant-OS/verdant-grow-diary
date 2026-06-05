@@ -26,6 +26,8 @@ export interface CloudCanaryExportRow {
   invalid_count: number;
   unmapped_count: number;
   row_state: "normal" | "zero_mapped_gap";
+  /** Closed enum vocabulary only; ID-free by construction. */
+  suspicious_flag_codes: EcowittSuspiciousFlagCode[];
 }
 
 export interface CloudCanaryExportTotals {

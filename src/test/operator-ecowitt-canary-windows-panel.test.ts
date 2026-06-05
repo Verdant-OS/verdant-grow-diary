@@ -94,6 +94,12 @@ describe("OperatorEcowittCanary — Windows run-command panel", () => {
     expect(src).not.toMatch(/\.upsert\(/);
   });
 
+  it("shows the security posture note explaining no browser POSTs", () => {
+    expect(src).toContain('data-testid="security-posture-note"');
+    expect(src).toContain("Verdant does not run EcoWitt canary POSTs from the browser");
+    expect(src).toContain("Run the local harness, then import the redacted output here");
+  });
+
   it("does not contain real-looking secrets", () => {
     // Allow the literal placeholder words REDACTED / PASSKEY_REDACTED used in preview rows.
     const stripped = src.replace(/REDACTED/g, "X");

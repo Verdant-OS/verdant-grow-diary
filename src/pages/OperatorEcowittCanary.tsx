@@ -39,7 +39,9 @@ function StatusPill({ status }: { status: CardStatus }) {
   };
   const v = map[status];
   return (
-    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${v.cls}`}>
+    <span
+      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${v.cls}`}
+    >
       {v.label}
     </span>
   );
@@ -58,7 +60,9 @@ function EvidenceCard({ card }: { card: VerdictCard }) {
         <p className="text-muted-foreground">{card.reason}</p>
         {card.evidence_present.length > 0 && (
           <div data-evidence="present">
-            <div className="text-xs font-semibold uppercase tracking-wide text-primary">Evidence present</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-primary">
+              Evidence present
+            </div>
             <ul className="list-disc pl-5 text-xs text-muted-foreground">
               {card.evidence_present.map((e, i) => (
                 <li key={i}>{e}</li>
@@ -91,23 +95,31 @@ function EvidenceCard({ card }: { card: VerdictCard }) {
 
 const REPO_PLACEHOLDER = "<VERDANT_REPO_ROOT>";
 
-const WINDOWS_RUN_COMMAND_TEMPLATES: Array<{ key: string; label: string; build: (root: string) => string; hint: string }> = [
+const WINDOWS_RUN_COMMAND_TEMPLATES: Array<{
+  key: string;
+  label: string;
+  build: (root: string) => string;
+  hint: string;
+}> = [
   {
     key: "recommended",
     label: "Recommended (root launcher)",
-    build: (root) => `cd ${root}\npowershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1`,
+    build: (root) =>
+      `cd ${root}\npowershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1`,
     hint: "Run from the repo root. Works even if PowerShell opens in C:\\WINDOWS\\system32.",
   },
   {
     key: "dryrun",
     label: "Dry-run (no network call)",
-    build: (root) => `cd ${root}\npowershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1 -DryRun`,
+    build: (root) =>
+      `cd ${root}\npowershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1 -DryRun`,
     hint: "Validates inputs and redaction. Sends zero HTTP requests. Safe for demos and CI.",
   },
   {
     key: "outfile",
     label: "Write redacted output to a file",
-    build: (root) => `cd ${root}\npowershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1 -OutFile .\\canary-out.txt`,
+    build: (root) =>
+      `cd ${root}\npowershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1 -OutFile .\\canary-out.txt`,
     hint: "Appends matrix + SQL block. Secrets are never written to disk.",
   },
 ];
@@ -121,7 +133,17 @@ export function buildWindowsCommand(template: (root: string) => string, repoPath
   return template(trimmed.length > 0 ? trimmed : REPO_PLACEHOLDER);
 }
 
-function CopyButton({ text, copied, onCopy, label }: { text: string; copied: boolean; onCopy: () => void; label?: string }) {
+function CopyButton({
+  text,
+  copied,
+  onCopy,
+  label,
+}: {
+  text: string;
+  copied: boolean;
+  onCopy: () => void;
+  label?: string;
+}) {
   return (
     <Button size="sm" variant="outline" onClick={onCopy} data-copied={copied} aria-label={label}>
       {copied ? "Copied" : "Copy"}
@@ -154,12 +176,16 @@ function WindowsRunCommandPanel() {
       <CardHeader>
         <CardTitle className="text-base">Run EcoWitt Canary on Windows</CardTitle>
         <CardDescription>
-          Operator-only. Paste a command into PowerShell from the repo root. Do not paste curl commands into prompts.
+          Operator-only. Paste a command into PowerShell from the repo root. Do not paste curl
+          commands into prompts.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="rounded-md border p-3" data-testid="repo-path-input">
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground" htmlFor="repo-path">
+          <label
+            className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+            htmlFor="repo-path"
+          >
             Verdant repo path (optional)
           </label>
           <input
@@ -186,9 +212,18 @@ function WindowsRunCommandPanel() {
           const hasPlaceholder = commandContainsPlaceholder(cmd);
           const showWarning = warningKey === row.key;
           return (
-            <div key={row.key} className="rounded-md border p-3" data-cmd-label={row.label} data-cmd-key={row.key}>
-              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{row.label}</div>
-              <code className="block whitespace-pre rounded bg-muted p-2 font-mono text-xs">{cmd}</code>
+            <div
+              key={row.key}
+              className="rounded-md border p-3"
+              data-cmd-label={row.label}
+              data-cmd-key={row.key}
+            >
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {row.label}
+              </div>
+              <code className="block whitespace-pre rounded bg-muted p-2 font-mono text-xs">
+                {cmd}
+              </code>
               <div className="mt-2 flex items-center justify-between gap-2">
                 <span className="text-xs text-muted-foreground">{row.hint}</span>
                 <CopyButton
@@ -207,10 +242,15 @@ function WindowsRunCommandPanel() {
                     This command still contains <code>{REPO_PLACEHOLDER}</code>.
                   </div>
                   <div className="mt-1 text-muted-foreground">
-                    Replace it with your actual Verdant repo path before running, or enter it in the field above.
+                    Replace it with your actual Verdant repo path before running, or enter it in the
+                    field above.
                   </div>
                   <div className="mt-2 flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => attemptCopy(row.key, cmd, true)}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => attemptCopy(row.key, cmd, true)}
+                    >
                       Copy placeholder command anyway
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => setWarningKey(null)}>
@@ -224,12 +264,24 @@ function WindowsRunCommandPanel() {
         })}
 
         <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
-          <div className="text-xs font-semibold uppercase tracking-wide text-amber-400">Redaction Guarantee</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-amber-400">
+            Redaction Guarantee
+          </div>
           <ul className="mt-1 list-disc pl-5 text-xs text-muted-foreground">
-            <li>Paste only the requested value at each prompt (e.g. only the <code>vbt_...</code> token).</li>
-            <li>The harness aborts with a clear error if any input contains <code>curl.exe</code> or whitespace.</li>
-            <li>All output redacts bridge token, PASSKEY, and MAC before printing or writing to disk.</li>
-            <li>Never paste a raw cURL command into a PowerShell prompt; only paste the token string.</li>
+            <li>
+              Paste only the requested value at each prompt (e.g. only the <code>vbt_...</code>{" "}
+              token).
+            </li>
+            <li>
+              The harness aborts with a clear error if any input contains <code>curl.exe</code> or
+              whitespace.
+            </li>
+            <li>
+              All output redacts bridge token, PASSKEY, and MAC before printing or writing to disk.
+            </li>
+            <li>
+              Never paste a raw cURL command into a PowerShell prompt; only paste the token string.
+            </li>
           </ul>
         </div>
       </CardContent>
@@ -239,9 +291,17 @@ function WindowsRunCommandPanel() {
 
 const REDACTION_PREVIEW_ROWS: Array<{ label: string; before: string; after: string }> = [
   { label: "Bridge token", before: "vbt_live_9f3c2a1b4d5e6f70 (example)", after: "vbt_REDACTED" },
-  { label: "PASSKEY", before: "A1B2C3D4E5F60718293A4B5C6D7E8F90 (example)", after: "PASSKEY_REDACTED" },
+  {
+    label: "PASSKEY",
+    before: "A1B2C3D4E5F60718293A4B5C6D7E8F90 (example)",
+    after: "PASSKEY_REDACTED",
+  },
   { label: "MAC", before: "XX:XX:XX:XX:XX:XX (example)", after: "MAC_REDACTED" },
-  { label: "API key test field", before: "ak_test_examplevalue (example)", after: "SHOULD_NOT_PERSIST" },
+  {
+    label: "API key test field",
+    before: "ak_test_examplevalue (example)",
+    after: "SHOULD_NOT_PERSIST",
+  },
 ];
 
 function RedactionPreviewPanel() {
@@ -253,7 +313,12 @@ function RedactionPreviewPanel() {
           <CardTitle className="text-base">Preview redacted output</CardTitle>
           <CardDescription>Example only · not a live run · no real secrets shown.</CardDescription>
         </div>
-        <Button size="sm" variant="outline" onClick={() => setOpen((v) => !v)} data-testid="redaction-preview-toggle">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setOpen((v) => !v)}
+          data-testid="redaction-preview-toggle"
+        >
           {open ? "Hide preview" : "Show preview"}
         </Button>
       </CardHeader>
@@ -280,8 +345,8 @@ function RedactionPreviewPanel() {
             </table>
           </div>
           <div className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
-            If you see a real token, PASSKEY, MAC, or API key in your output, do not paste it anywhere. Re-run with the
-            latest harness.
+            If you see a real token, PASSKEY, MAC, or API key in your output, do not paste it
+            anywhere. Re-run with the latest harness.
           </div>
         </CardContent>
       )}
@@ -371,9 +436,14 @@ function DryRunGuidancePanel() {
       </CardHeader>
       <CardContent className="space-y-3 text-sm text-muted-foreground">
         <ol className="list-decimal space-y-1 pl-5">
-          <li>Run the dry-run command above. It checks inputs and redaction without sending any HTTP requests.</li>
+          <li>
+            Run the dry-run command above. It checks inputs and redaction without sending any HTTP
+            requests.
+          </li>
           <li>If dry-run passes, you are ready for the live canary.</li>
-          <li>If dry-run fails, click a failure below to jump to the section in the example output.</li>
+          <li>
+            If dry-run fails, click a failure below to jump to the section in the example output.
+          </li>
           <li>For automated CI, use the OutFile mode and import the redacted result below.</li>
         </ol>
 
@@ -383,11 +453,18 @@ function DryRunGuidancePanel() {
           </div>
           <div className="space-y-2">
             {DRY_RUN_SECTIONS.map((s) => (
-              <div key={s.id} id={s.id} data-section-id={s.id} className="rounded border bg-background p-2 transition">
+              <div
+                key={s.id}
+                id={s.id}
+                data-section-id={s.id}
+                className="rounded border bg-background p-2 transition"
+              >
                 <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                   {s.title}
                 </div>
-                <pre className="whitespace-pre font-mono text-[11px] leading-snug text-foreground">{s.body}</pre>
+                <pre className="whitespace-pre font-mono text-[11px] leading-snug text-foreground">
+                  {s.body}
+                </pre>
               </div>
             ))}
           </div>
@@ -397,7 +474,9 @@ function DryRunGuidancePanel() {
           data-testid="dry-run-failure-guide"
           className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs"
         >
-          <div className="mb-1 font-semibold text-destructive">Where to look when dry-run fails</div>
+          <div className="mb-1 font-semibold text-destructive">
+            Where to look when dry-run fails
+          </div>
           <ul className="space-y-1">
             {DRY_RUN_FAILURES.map((f) => (
               <li key={f.label}>
@@ -431,8 +510,9 @@ function RedactionWarningBanner() {
       <div>
         <div className="font-medium text-destructive">Secrets are redacted automatically</div>
         <div className="text-muted-foreground">
-          The harness replaces bridge tokens, PASSKEYs, and MACs with placeholders before printing or saving. If you see
-          a real secret in any output, treat it as a leak and abort immediately.
+          The harness replaces bridge tokens, PASSKEYs, and MACs with placeholders before printing
+          or saving. If you see a real secret in any output, treat it as a leak and abort
+          immediately.
         </div>
       </div>
     </div>
@@ -549,11 +629,15 @@ export default function OperatorEcowittCanary() {
   };
 
   return (
-    <div className="container mx-auto max-w-5xl space-y-6 p-4 md:p-6" data-testid="operator-ecowitt-canary">
+    <div
+      className="container mx-auto max-w-5xl space-y-6 p-4 md:p-6"
+      data-testid="operator-ecowitt-canary"
+    >
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">EcoWitt Canary Audit</h1>
         <p className="text-sm text-muted-foreground">
-          Operator Mode · Read-only diagnostics · Endpoint: <code className="font-mono">{ENDPOINT_PATH}</code>
+          Operator Mode · Read-only diagnostics · Endpoint:{" "}
+          <code className="font-mono">{ENDPOINT_PATH}</code>
         </p>
       </header>
 
@@ -604,6 +688,17 @@ export default function OperatorEcowittCanary() {
 
       {saveNotice && <div className="text-xs text-muted-foreground">{saveNotice}</div>}
 
+      <div
+        className="rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground"
+        data-testid="security-posture-note"
+      >
+        🔒{" "}
+        <span className="font-medium text-foreground">
+          For security, Verdant does not run EcoWitt canary POSTs from the browser.
+        </span>{" "}
+        Run the local harness, then import the redacted output here.
+      </div>
+
       <RedactionWarningBanner />
       <RedactionPreviewPanel />
       <WindowsRunCommandPanel />
@@ -633,17 +728,28 @@ export default function OperatorEcowittCanary() {
                 </option>
               ))}
             </select>
-            <Button onClick={runPreflight} disabled={!authAvailable || !selectedTentId || tentQ.isLoading}>
+            <Button
+              onClick={runPreflight}
+              disabled={!authAvailable || !selectedTentId || tentQ.isLoading}
+            >
               Run Pre-POST Validator
             </Button>
-            {tentQ.isLoading && <span className="text-xs text-muted-foreground">Loading tent…</span>}
+            {tentQ.isLoading && (
+              <span className="text-xs text-muted-foreground">Loading tent…</span>
+            )}
           </div>
 
           {preflight && (
             <div className="space-y-2 rounded-md border p-3">
               <div className="flex items-center gap-2">
                 <StatusPill
-                  status={preflight.status === "pass" ? "pass" : preflight.status === "fail" ? "fail" : "incomplete"}
+                  status={
+                    preflight.status === "pass"
+                      ? "pass"
+                      : preflight.status === "fail"
+                        ? "fail"
+                        : "incomplete"
+                  }
                 />
                 <span className="text-sm">{preflight.reason}</span>
               </div>
@@ -731,11 +837,16 @@ export default function OperatorEcowittCanary() {
           <CardTitle>
             Verdict:{" "}
             <span data-testid="canary-verdict">
-              {verdict.verdict === "go" ? "GO" : verdict.verdict === "no_go" ? "NO-GO" : "INCOMPLETE"}
+              {verdict.verdict === "go"
+                ? "GO"
+                : verdict.verdict === "no_go"
+                  ? "NO-GO"
+                  : "INCOMPLETE"}
             </span>
           </CardTitle>
           <CardDescription>
-            Read-only diagnostics · no device control · no automation · no alerts · no Action Queue writes.
+            Read-only diagnostics · no device control · no automation · no alerts · no Action Queue
+            writes.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">

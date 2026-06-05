@@ -20,6 +20,45 @@ Use this runbook the first time a real EcoWitt gateway is pointed at Verdant. It
 
 ---
 
+## Recommended runners
+
+Two harnesses are provided. Both run the same three POSTs (main, duplicate replay, malformed) and print a redacted pass/fail matrix plus the SQL verification block.
+
+### Windows (recommended): PowerShell
+
+PowerShell is the **recommended path on Windows**. It prompts safely for each secret, validates the bridge token shape **before** any network call, and never echoes raw secrets.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\ecowitt-canary-harness.ps1
+```
+
+You will be prompted for four values, one at a time:
+
+1. `SUPABASE_PROJECT_REF`
+2. `ECOWITT_BRIDGE_TOKEN` — paste only the `vbt_...` token
+3. `ECOWITT_TEST_PASSKEY` — paste only the PASSKEY value
+4. `ECOWITT_TEST_MAC` — paste only the MAC value
+
+> ⚠️ **Do not paste the curl command into the token prompt. Paste only the `vbt_...` token.**
+> The script will hard-fail with a clear error if any input contains `curl.exe`, whitespace, or does not start with `vbt_`. No request is sent when validation fails.
+
+All output redacts the bridge token, PASSKEY, and MAC as `vbt_REDACTED`, `PASSKEY_REDACTED`, and `MAC_REDACTED`. After the POSTs, the script prints the SQL verification block — copy it into the Supabase SQL editor, then paste the scrubbed results into ChatGPT for GO/NO-GO grading.
+
+### macOS / Linux / Git Bash / WSL (optional): Bash
+
+```bash
+SUPABASE_PROJECT_REF="..." \
+ECOWITT_BRIDGE_TOKEN="vbt_..." \
+ECOWITT_TEST_PASSKEY="..." \
+ECOWITT_TEST_MAC="..." \
+./scripts/ecowitt-canary-harness.sh
+```
+
+The Bash harness is functionally equivalent. Use it on Unix-like shells where the PowerShell harness is unavailable.
+
+---
+
+
 ## 1. Main canary POST (well-formed, mapped channels + one unmapped channel)
 
 ```bash

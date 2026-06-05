@@ -2,10 +2,13 @@
 // non-persistent. Never returns raw model text. Fails closed.
 //
 // Hard constraints:
-//  - No DB writes. No ai_doctor_sessions / alerts / action_queue /
-//    sensor_readings writes. No equipment / device control.
+//  - No DB writes beyond the ai_credit_spends ledger via ai_credit_spend /
+//    ai_credit_refund RPCs (S2). No ai_doctor_sessions / alerts /
+//    action_queue / sensor_readings writes. No equipment / device control.
 //  - LOVABLE_API_KEY stays server-only. Never echoed to client.
-//  - Response is always { ok: true, result } or { ok: false, reason }.
+//  - Response is always { ok: true, result, credit? } or
+//    { ok: false, reason, credit? }.
+//  - Model tier + weight are decided SERVER-SIDE. Client cannot self-discount.
 //  - Logs include only safe status/reason codes — never raw model text,
 //    full packets, secrets, tokens, or unvalidated AI output.
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
@@ -15,6 +18,9 @@ import { validateAiDoctorReviewResult } from "./contract.ts";
 const TIMEOUT_MS = 25_000;
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const MODEL = "google/gemini-3-flash-preview";
+// S2: server-pinned tier/feature. Escalation is deferred.
+const FEATURE = "ai_doctor_review";
+const MODEL_TIER = "standard";
 
 const SYSTEM_PROMPT =
   "You are a cautious cannabis grow assistant. Reply ONLY through the " +
@@ -66,18 +72,28 @@ const TOOL_SCHEMA = {
   },
 };
 
-function calmFailure(reason: string): Response {
-  return new Response(JSON.stringify({ ok: false, reason }), {
+function calmFailure(reason: string, extra?: Record<string, unknown>): Response {
+  return new Response(JSON.stringify({ ok: false, reason, ...(extra ?? {}) }), {
     status: 200,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
 
-function safeOk(result: unknown): Response {
-  return new Response(JSON.stringify({ ok: true, result }), {
+function safeOk(result: unknown, credit?: Record<string, unknown>): Response {
+  return new Response(JSON.stringify({ ok: true, result, ...(credit ? { credit } : {}) }), {
     status: 200,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+function isUuid(s: unknown): s is string {
+  return typeof s === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+}
+
+function readPacketField(packet: unknown, key: string): unknown {
+  if (!packet || typeof packet !== "object") return undefined;
+  return (packet as Record<string, unknown>)[key];
 }
 
 Deno.serve(async (req) => {
@@ -115,6 +131,68 @@ Deno.serve(async (req) => {
       return calmFailure("shape");
     }
 
+    // S2: server resolves grow scope from client-supplied grow_id (validated as
+    // UUID; ownership is re-verified inside ai_credit_spend). Client may
+    // supply idempotency_key for safe retries; we generate one otherwise.
+    const rawGrowId = readPacketField(packet, "grow_id") ??
+      readPacketField(packet, "growId");
+    const growId = isUuid(rawGrowId) ? rawGrowId : null;
+    const rawKey = readPacketField(packet, "idempotency_key") ??
+      readPacketField(packet, "idempotencyKey");
+    const idempotencyKey = (typeof rawKey === "string" &&
+        rawKey.length >= 8 && rawKey.length <= 200)
+      ? rawKey
+      : crypto.randomUUID();
+
+    // ---- ai_credit_spend (atomic check-and-spend) ---------------------------
+    const { data: spend, error: spendErr } = await supabase.rpc(
+      "ai_credit_spend",
+      {
+        p_feature: FEATURE,
+        p_grow_id: growId,
+        p_model_tier: MODEL_TIER,
+        p_idempotency_key: idempotencyKey,
+        p_result: null,
+      },
+    );
+    if (spendErr || !spend || typeof spend !== "object") {
+      console.log(`ai-doctor-review status=credit_rpc_error`);
+      return calmFailure("credit_rpc");
+    }
+    const spendObj = spend as Record<string, unknown>;
+    if (spendObj.ok !== true) {
+      console.log(
+        `ai-doctor-review status=credit_denied reason=${String(spendObj.reason ?? "")}`,
+      );
+      return calmFailure("credit_denied", { credit: spendObj });
+    }
+    // Replayed prior result → return cached result without calling the model.
+    if (spendObj.status === "replayed" && spendObj.result) {
+      const cached = validateAiDoctorReviewResult(spendObj.result);
+      if (cached.ok) {
+        console.log("ai-doctor-review status=ok_replayed");
+        return safeOk(cached.result, { replayed: true });
+      }
+      // Cached result corrupt; fall through to fresh model call. The spend
+      // row is already recorded so we do not double-charge.
+    }
+
+    const spendId = typeof spendObj.spend_id === "string" ? spendObj.spend_id : null;
+    const refundKey = "refund:" + (spendId ?? idempotencyKey);
+
+    async function refund(reason: string): Promise<void> {
+      if (!spendId) return;
+      try {
+        await supabase.rpc("ai_credit_refund", {
+          p_spend_id: spendId,
+          p_idempotency_key: refundKey,
+          p_reason: reason,
+        });
+      } catch {
+        console.log("ai-doctor-review status=refund_failed");
+      }
+    }
+
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
     let upstream: Response;
@@ -145,6 +223,7 @@ Deno.serve(async (req) => {
       });
     } catch {
       console.log("ai-doctor-review status=timeout_or_network");
+      await refund("upstream_timeout");
       return calmFailure("timeout");
     } finally {
       clearTimeout(timer);
@@ -152,12 +231,8 @@ Deno.serve(async (req) => {
 
     if (!upstream.ok) {
       console.log(`ai-doctor-review status=http_${upstream.status}`);
-      // Drain body to avoid resource leak.
-      try {
-        await upstream.text();
-      } catch {
-        /* ignore */
-      }
+      try { await upstream.text(); } catch { /* ignore */ }
+      await refund(`upstream_http_${upstream.status}`);
       return calmFailure("http");
     }
 
@@ -166,12 +241,14 @@ Deno.serve(async (req) => {
       payload = await upstream.json();
     } catch {
       console.log("ai-doctor-review status=parse_error");
+      await refund("upstream_parse");
       return calmFailure("parse");
     }
 
     const toolArgsStr = readToolArguments(payload);
     if (!toolArgsStr) {
       console.log("ai-doctor-review status=empty");
+      await refund("upstream_empty");
       return calmFailure("empty");
     }
     let candidate: unknown;
@@ -179,17 +256,23 @@ Deno.serve(async (req) => {
       candidate = JSON.parse(toolArgsStr);
     } catch {
       console.log("ai-doctor-review status=parse_error");
+      await refund("upstream_parse");
       return calmFailure("parse");
     }
 
     const v = validateAiDoctorReviewResult(candidate);
     if (v.ok === false) {
       console.log(`ai-doctor-review status=invalid reason=${v.reason}`);
+      await refund(`invalid_${v.reason}`);
       return calmFailure("invalid");
     }
 
     console.log("ai-doctor-review status=ok");
-    return safeOk(v.result);
+    return safeOk(v.result, {
+      remaining: spendObj.remaining,
+      scope: spendObj.scope,
+      scope_limit: spendObj.scope_limit,
+    });
   } catch {
     console.log("ai-doctor-review status=unexpected");
     return calmFailure("http");

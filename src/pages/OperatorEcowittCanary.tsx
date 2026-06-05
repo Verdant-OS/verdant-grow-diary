@@ -59,8 +59,42 @@ function StatusPill({ status }: { status: CardStatus }) {
   );
 }
 
-function EvidenceCard({ card, drill }: { card: VerdictCard; drill?: ReturnType<typeof buildDrillDown> }) {
-  const [open, setOpen] = useState(false);
+function EvidenceCard({
+  card,
+  drill,
+  autoOpenAndScroll = false,
+}: {
+  card: VerdictCard;
+  drill?: ReturnType<typeof buildDrillDown>;
+  autoOpenAndScroll?: boolean;
+}) {
+  const [open, setOpen] = useState(autoOpenAndScroll && card.status === "fail");
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || !drill || drill.offending.length === 0) return;
+    const targetId = `evidence-row-${card.key}-0`;
+    const raf = requestAnimationFrame(() => {
+      const el = bodyRef.current?.querySelector<HTMLElement>(`#${CSS.escape(targetId)}`);
+      if (!el) return;
+      try {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      } catch {
+        el.scrollIntoView();
+      }
+      try {
+        el.focus({ preventScroll: true });
+      } catch {
+        /* ignore */
+      }
+      setHighlightId(targetId);
+      const t = window.setTimeout(() => setHighlightId(null), 1600);
+      return () => window.clearTimeout(t);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [open, drill, card.key]);
+
   return (
     <Card data-card-key={card.key}>
       <CardHeader className="pb-2">
@@ -112,6 +146,7 @@ function EvidenceCard({ card, drill }: { card: VerdictCard; drill?: ReturnType<t
             </Button>
             {open && (
               <div
+                ref={bodyRef}
                 data-testid={`drilldown-body-${card.key}`}
                 className="mt-2 rounded-md border bg-muted/40 p-2 text-xs"
               >
@@ -120,10 +155,25 @@ function EvidenceCard({ card, drill }: { card: VerdictCard; drill?: ReturnType<t
                 {drill.offending.length > 0 && (
                   <div className="mt-2">
                     <div className="font-semibold text-destructive">Offending evidence</div>
-                    <ul className="list-disc pl-5">
-                      {drill.offending.map((o, i) => (
-                        <li key={i} className="font-mono">{o}</li>
-                      ))}
+                    <ul className="list-disc pl-5" data-testid={`drilldown-rows-${card.key}`}>
+                      {drill.offending.map((o, i) => {
+                        const rowId = `evidence-row-${card.key}-${i}`;
+                        const isHi = highlightId === rowId;
+                        return (
+                          <li
+                            key={i}
+                            id={rowId}
+                            tabIndex={-1}
+                            data-evidence-row={i}
+                            className={
+                              "font-mono outline-none transition-colors " +
+                              (isHi ? "bg-primary/20 ring-1 ring-primary rounded px-1" : "")
+                            }
+                          >
+                            {o}
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 )}

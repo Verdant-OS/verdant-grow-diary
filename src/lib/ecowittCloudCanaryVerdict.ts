@@ -93,6 +93,17 @@ function summarizeOne(
     else if (row.reading.source === "live") live += 1;
     for (const c of row.suspicion_codes) codes.add(c);
   }
+
+  // Defense-in-depth: validate every missing-metric code against the closed vocabulary.
+  for (const code of res.missing_metric_codes) {
+    if (!isEcowittMissingMetricCode(code)) {
+      throw new Error(
+        `EcowittCloudCanarySummary: unknown missing_metric_code "${code}" from fixture "${fixture.id}". ` +
+          `Expected one of: ${ECOWITT_MISSING_METRIC_CODES.join(", ")}.`,
+      );
+    }
+  }
+
   return {
     fixture_id: fixture.id,
     mapped_count: res.rows.length,
@@ -101,7 +112,7 @@ function summarizeOne(
     stale_count: stale,
     live_count: live,
     suspicious_flag_codes: [...codes].sort(),
-    
+    missing_metric_codes: res.missing_metric_codes,
     missing_metric: res.rows.length === 0 && res.unmapped.length === 0,
     ec_metric_invented: hasEcMetric(res),
     pressure_unmapped: res.unmapped.some((u) => u.metric === "pressure_hpa"),

@@ -1056,7 +1056,7 @@ export default function OperatorEcowittCanary() {
               onClick={() => fileInputRef.current?.click()}
               data-testid="load-outfile-button"
             >
-              Upload .txt / .json
+              Load from OutFile (.txt / .json)
             </Button>
             <Button
               variant="secondary"

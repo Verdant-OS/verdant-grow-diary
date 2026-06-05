@@ -39,8 +39,12 @@ const verdict = runEcowittCloudCanary(
 );
 const vm = buildCloudCanaryPreviewViewModel(verdict);
 
-const MAC_RE = /[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}/;
-const UUID_RE =
+/**
+ * Shared "ID-shaped" regex definitions. Other tests (Item 3 export) MUST
+ * import these so render, CSV, and JSON enforce one definition of an ID.
+ */
+export const MAC_RE = /[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}/;
+export const UUID_RE =
   /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/;
 
 const BANNED_UI_WORDS = [

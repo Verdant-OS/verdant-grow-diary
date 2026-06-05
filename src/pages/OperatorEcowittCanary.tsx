@@ -49,6 +49,8 @@ import {
   buildCloudCanaryExport,
   serializeCloudCanaryExportToCsv,
   serializeCloudCanaryExportToJson,
+  CLOUD_CANARY_EXPORT_CSV_FILENAME,
+  CLOUD_CANARY_EXPORT_JSON_FILENAME,
 } from "@/lib/ecowittCloudCanaryExport";
 import cloudCanaryFixtures from "../../fixtures/ecowitt-cloud-canary-payloads.json";
 
@@ -749,7 +751,7 @@ export function CloudCanaryPreviewPanel() {
               const url = URL.createObjectURL(blob);
               const a = document.createElement("a");
               a.href = url;
-              a.download = `cloud-canary-fixture-summary-${Date.now()}.csv`;
+              a.download = CLOUD_CANARY_EXPORT_CSV_FILENAME;
               document.body.appendChild(a);
               a.click();
               a.remove();
@@ -769,7 +771,7 @@ export function CloudCanaryPreviewPanel() {
               const url = URL.createObjectURL(blob);
               const a = document.createElement("a");
               a.href = url;
-              a.download = `cloud-canary-fixture-summary-${Date.now()}.json`;
+              a.download = CLOUD_CANARY_EXPORT_JSON_FILENAME;
               document.body.appendChild(a);
               a.click();
               a.remove();

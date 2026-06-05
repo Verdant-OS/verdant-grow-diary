@@ -26,9 +26,12 @@ const ORDER = [
   "celsius_looking_fahrenheit",
 ] as const;
 
-const MAC_RE = /[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}/;
-const UUID_RE =
-  /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/;
+// REUSE the shared ID-shaped regexes from the Item 4 render test so that
+// render, CSV, and JSON share ONE definition of "ID-shaped".
+import {
+  MAC_RE,
+  UUID_RE,
+} from "./operator-ecowitt-cloud-canary-per-fixture-table.test";
 const TENT_ID_LIKE = /tent_id|plant_id|raw_payload|passkey|\bMAC\b/i;
 const BANNED = [
   "confirmed",
@@ -65,7 +68,7 @@ describe("ecowittCloudCanaryExport — pure serializer", () => {
       const r = exp.rows[i];
       const v = vm.rows[i];
       expect(r.mapped_count).toBe(v.mapped_count);
-      expect(r.fresh_count).toBe(v.live_count);
+      expect(r.fresh_class_count).toBe(v.live_count);
       expect(r.stale_count).toBe(v.stale_count);
       expect(r.invalid_count).toBe(v.invalid_count);
       expect(r.unmapped_count).toBe(v.unmapped_count);
@@ -80,7 +83,7 @@ describe("ecowittCloudCanaryExport — pure serializer", () => {
       exp.rows.reduce((a, r) => a + (r[k] as number), 0);
     expect(exp.totals.fixture_count).toBe(exp.rows.length);
     expect(exp.totals.mapped_count).toBe(sum("mapped_count"));
-    expect(exp.totals.fresh_count).toBe(sum("fresh_count"));
+    expect(exp.totals.fresh_class_count).toBe(sum("fresh_class_count"));
     expect(exp.totals.stale_count).toBe(sum("stale_count"));
     expect(exp.totals.invalid_count).toBe(sum("invalid_count"));
     expect(exp.totals.unmapped_count).toBe(sum("unmapped_count"));
@@ -96,14 +99,14 @@ describe("ecowittCloudCanaryExport — pure serializer", () => {
     const expected = [
       "happy_multi_channel",
       happy.mapped_count,
-      happy.fresh_count,
+      happy.fresh_class_count,
       happy.stale_count,
       happy.invalid_count,
       happy.unmapped_count,
       happy.row_state,
     ].join(",");
     expect(csv).toContain(expected);
-    expect(csv).toMatch(/__totals__/);
+    expect(csv).toMatch(/^TOTAL,/m);
   });
 
   it("JSON contains expected counts for the same known fixture", () => {
@@ -117,7 +120,7 @@ describe("ecowittCloudCanaryExport — pure serializer", () => {
     expect(happy).toBeTruthy();
     const expVmRow = vm.rows.find((r) => r.fixture_name === "happy_multi_channel")!;
     expect(happy.mapped_count).toBe(expVmRow.mapped_count);
-    expect(happy.fresh_count).toBe(expVmRow.live_count);
+    expect(happy.fresh_class_count).toBe(expVmRow.live_count);
     expect(happy.stale_count).toBe(expVmRow.stale_count);
     expect(happy.invalid_count).toBe(expVmRow.invalid_count);
     expect(happy.unmapped_count).toBe(expVmRow.unmapped_count);
@@ -137,7 +140,7 @@ describe("ecowittCloudCanaryExport — pure serializer", () => {
       return {
         fixture_name: cols[0],
         mapped_count: Number(cols[1]),
-        fresh_count: Number(cols[2]),
+        fresh_class_count: Number(cols[2]),
         stale_count: Number(cols[3]),
         invalid_count: Number(cols[4]),
         unmapped_count: Number(cols[5]),
@@ -164,7 +167,7 @@ describe("ecowittCloudCanaryExport — pure serializer", () => {
       expect(Object.keys(r).sort()).toEqual(
         [
           "fixture_name",
-          "fresh_count",
+          "fresh_class_count",
           "invalid_count",
           "mapped_count",
           "row_state",
@@ -270,5 +273,21 @@ describe("CloudCanaryPreviewPanel — export controls render (Item 3)", () => {
     expect(UUID_RE.test(html)).toBe(false);
     expect(html).toContain("Download Fixture Summary CSV");
     expect(html).toContain("Download Fixture Summary JSON");
+  });
+
+  it("uses the fixed Item 3 filenames (no timestamp)", () => {
+    expect(pageSrc).toContain("CLOUD_CANARY_EXPORT_CSV_FILENAME");
+    expect(pageSrc).toContain("CLOUD_CANARY_EXPORT_JSON_FILENAME");
+    expect(pageSrc).not.toMatch(/cloud-canary-fixture-summary-\$\{Date\.now/);
+  });
+
+  it("export omits view-model gap fields (missing_metric_count, suspicious_flag_codes)", () => {
+    // Audit-confirmed gaps: the view-model does NOT expose these. Per spec,
+    // the export must NOT add them; they are deferred to a separate slice.
+    const vm = buildVmFromIds(ORDER);
+    const exp = buildCloudCanaryExport(vm, { now: FIXED_NOW });
+    const json = serializeCloudCanaryExportToJson(exp);
+    expect(json).not.toMatch(/missing_metric_count/);
+    expect(json).not.toMatch(/suspicious_flag_codes/);
   });
 });

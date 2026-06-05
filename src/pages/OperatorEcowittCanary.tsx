@@ -452,6 +452,21 @@ export default function OperatorEcowittCanary() {
             <Button variant="secondary" onClick={handleImport} disabled={!paste.trim()}>
               Import Canary Results
             </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".txt,.json"
+              className="sr-only"
+              onChange={handleFileImport}
+              data-testid="outfile-import-input"
+            />
+            <Button
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              data-testid="load-outfile-button"
+            >
+              Load from OutFile
+            </Button>
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"

@@ -16,7 +16,7 @@ import {
   type EcowittCloudNormalizationResult,
   type NormalizeEcowittCloudOptions,
 } from "@/lib/ecowittPayloadRules";
-import type { EcowittMissingMetricCode } from "@/constants/ecowittMissingMetricCodes";
+
 
 export interface EcowittCloudCanaryFixture {
   /** Stable id for the fixture (e.g. "happy_multi_channel"). Never a secret. */

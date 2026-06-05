@@ -107,9 +107,8 @@ describe("Slice C-fix — deterministic export payload", () => {
     const exp = buildCloudCanaryExport(vm);
     const csv = serializeCloudCanaryExportToCsv(exp);
     const json = JSON.parse(serializeCloudCanaryExportToJson(exp));
-    // After removing the generated_at comment line, data starts at index 2
-    // (1 comment + header).
-    const dataLine = csv.split("\n")[2];
+    // CSV layout: 2 comment lines + header + data (data starts at index 3).
+    const dataLine = csv.split("\n")[3];
     const cells = dataLine.split(",");
     expect(cells.length).toBe(9);
     expect(cells[cells.length - 2]).toBe("");

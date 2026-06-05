@@ -12,6 +12,12 @@
   Run from the repo root with:
       powershell -NoProfile -ExecutionPolicy Bypass -File .\Run-EcoWittCanary.ps1
 
+  Dry-run (validates inputs + redaction, no network call):
+      powershell -NoProfile -ExecutionPolicy Bypass -File .\Run-EcoWittCanary.ps1 -DryRun
+
+  Write redacted matrix + SQL to a file (secrets never written):
+      powershell -NoProfile -ExecutionPolicy Bypass -File .\Run-EcoWittCanary.ps1 -OutFile .\canary-out.txt
+
   Or double-click Run-EcoWittCanary.cmd in File Explorer.
 #>
 $ErrorActionPreference = 'Stop'

@@ -776,9 +776,17 @@ export default function OperatorEcowittCanary() {
   const [importSecretCategories, setImportSecretCategories] = useState<string[]>([]);
   const [savedWorkflow, setSavedWorkflow] = useState<WorkflowSnapshot | null>(null);
   const [workflowRestoredAt, setWorkflowRestoredAt] = useState<string | null>(null);
+  const [importError, setImportError] = useState<ImportParseError | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
+    // One-time, idempotent migration of legacy localStorage workflow snapshots.
+    try {
+      migrateLegacyWorkflowSnapshots();
+    } catch {
+      /* never crash boot */
+    }
     setSavedAudit(loadAuditFromLocalStorage());
     setSavedWorkflow(loadWorkflowFromLocalStorage());
   }, []);
@@ -791,27 +799,73 @@ export default function OperatorEcowittCanary() {
       setImportSecretCategories(cats);
       setReport(null);
       setParseNotes([]);
+      setImportError(null);
       setSaveNotice(null);
+      // Preserve raw input so the user can redact + retry.
+      setPaste(text);
       return;
     }
     setImportSecretCategories([]);
     setPaste(text);
-    const parsed = parseCanaryPaste(text);
-    setReport(parsed.report);
-    setParseNotes(parsed.parseNotes);
+    const result = parseCanaryImport(text);
+    if (!result.ok && result.error) {
+      setImportError(result.error);
+      setReport(null);
+      setParseNotes([]);
+      setSaveNotice(null);
+      return;
+    }
+    setImportError(null);
+    setReport(result.report);
+    setParseNotes(result.parseNotes);
     setSaveNotice(`Imported redacted output from ${sourceLabel}.`);
   };
 
   const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    void readFileAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const readFileAsText = (file: File) => {
+    const okType =
+      /\.(json|txt)$/i.test(file.name) ||
+      file.type === "application/json" ||
+      file.type === "text/plain" ||
+      file.type === "";
+    if (!okType) {
+      setImportError({
+        kind: "unsupported",
+        message: `Unsupported file type: ${file.type || "unknown"}. Use .json or .txt.`,
+      });
+      return;
+    }
+    if (file.size === 0) {
+      setImportError({ kind: "empty", message: "File is empty." });
+      return;
+    }
+    if (file.size > 5_000_000) {
+      setImportError({ kind: "unsupported", message: "File is too large (>5 MB). Trim to canary output only." });
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = String(ev.target?.result ?? "");
       ingestText(text, file.name);
     };
+    reader.onerror = () => {
+      setImportError({ kind: "unsupported", message: "Could not read file." });
+    };
     reader.readAsText(file);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer?.files?.[0];
+    if (!file) return;
+    readFileAsText(file);
   };
 
   const clearImport = () => {
@@ -819,8 +873,10 @@ export default function OperatorEcowittCanary() {
     setReport(null);
     setParseNotes([]);
     setImportSecretCategories([]);
+    setImportError(null);
     setSaveNotice("Cleared import.");
   };
+
 
 
   // Read-only tent fetch for preflight (RLS-enforced).

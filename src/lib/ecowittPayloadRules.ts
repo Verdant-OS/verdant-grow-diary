@@ -456,8 +456,10 @@ export function normalizeEcowittCloudReadings(
           });
           return;
         }
+        const stuckRh = suspicionCodes.includes("humidity_stuck_extreme");
         const declared =
-          suspicion.hasInvalid || !capturedAt ? "invalid" : "live";
+          suspicion.hasInvalid || stuckRh || !capturedAt ? "invalid" : "live";
+
         const reading = normalizeSensorReading(
           {
             captured_at: capturedAt ?? new Date(0).toISOString(),

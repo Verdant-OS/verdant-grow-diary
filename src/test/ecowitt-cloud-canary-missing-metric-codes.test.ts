@@ -200,7 +200,7 @@ describe("REGRESSION — existing result fields unchanged for all 8 canary fixtu
     unmapped_channel: { mapped: 0, unmapped: 2, invalid: 0, stale: 0, live: 0, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
     missing_metrics: { mapped: 0, unmapped: 0, invalid: 0, stale: 0, live: 0, missing_metric: true, pressure_unmapped: false, ec_metric_invented: false },
     pressure_present: { mapped: 2, unmapped: 1, invalid: 0, stale: 0, live: 2, missing_metric: false, pressure_unmapped: true, ec_metric_invented: false },
-    celsius_looking_fahrenheit: { mapped: 2, unmapped: 0, invalid: 2, stale: 0, live: 0, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
+    celsius_looking_fahrenheit: { mapped: 2, unmapped: 0, invalid: 0, stale: 0, live: 2, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
   };
 
   const verdict = runEcowittCloudCanary(

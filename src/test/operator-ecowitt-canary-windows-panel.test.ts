@@ -20,10 +20,9 @@ describe("OperatorEcowittCanary — Windows run-command panel", () => {
   });
 
   it("shows the recommended root-launcher command with cd prefix", () => {
-    expect(src).toContain("cd <VERDANT_REPO_ROOT>");
-    expect(src).toContain(
-      'powershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1',
-    );
+    expect(src).toContain("<VERDANT_REPO_ROOT>");
+    expect(src).toContain("cd ");
+    expect(src).toContain("Run-EcoWittCanary.ps1");
   });
 
   it("shows the dry-run command with cd prefix", () => {

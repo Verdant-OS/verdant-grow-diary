@@ -4,7 +4,7 @@
  * Read-only diagnostics. NO Supabase writes, NO rpc, NO functions.invoke,
  * NO alerts/Action Queue writes, NO AI calls, NO device control.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTents } from "@/hooks/use-tents";

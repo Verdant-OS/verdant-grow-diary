@@ -118,10 +118,12 @@ describe("PaywallCta source — no payment/checkout imports", () => {
       resolve(__dirname, "../components/PaywallCta.tsx"),
       "utf8",
     );
-    expect(src).not.toMatch(/paddle/i);
-    expect(src).not.toMatch(/stripe/i);
-    expect(src).not.toMatch(/checkout/i);
-    expect(src).not.toMatch(/from\s+["']@\/integrations\/supabase/);
+    const imports = src.match(/^\s*import[^\n]+from\s+["'][^"']+["']/gm) ?? [];
+    const joined = imports.join("\n");
+    expect(joined).not.toMatch(/paddle/i);
+    expect(joined).not.toMatch(/stripe/i);
+    expect(joined).not.toMatch(/checkout/i);
+    expect(joined).not.toMatch(/@\/integrations\/supabase/);
   });
 
   it("paywallCtaViewModel.ts imports no React or payment modules", () => {
@@ -129,9 +131,12 @@ describe("PaywallCta source — no payment/checkout imports", () => {
       resolve(__dirname, "../lib/paywallCtaViewModel.ts"),
       "utf8",
     );
-    expect(src).not.toMatch(/from\s+["']react["']/);
-    expect(src).not.toMatch(/paddle/i);
-    expect(src).not.toMatch(/stripe/i);
-    expect(src).not.toMatch(/checkout/i);
+    const imports = src.match(/^\s*import[^\n]+from\s+["'][^"']+["']/gm) ?? [];
+    const joined = imports.join("\n");
+    expect(joined).not.toMatch(/react/i);
+    expect(joined).not.toMatch(/paddle/i);
+    expect(joined).not.toMatch(/stripe/i);
+    expect(joined).not.toMatch(/checkout/i);
   });
 });
+

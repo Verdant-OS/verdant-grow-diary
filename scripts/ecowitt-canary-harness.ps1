@@ -262,4 +262,28 @@ Write-Host $sql
 Write-Host ""
 Write-Host "Now paste the scrubbed SQL output into ChatGPT for GO/NO-GO grading." -ForegroundColor Cyan
 
+if ($OutFile) {
+  # Build a fully redacted artifact. Secrets are never written to disk.
+  $mode = if ($DryRun) { 'dry-run' } else { 'live' }
+  $stamp = (Get-Date).ToString('s')
+  $lines = New-Object System.Collections.Generic.List[string]
+  $lines.Add("# EcoWitt canary harness output ($mode)")          | Out-Null
+  $lines.Add("# generated_at: $stamp")                            | Out-Null
+  $lines.Add("# endpoint    : $Endpoint")                         | Out-Null
+  $lines.Add("# auth        : Bearer vbt_REDACTED")               | Out-Null
+  $lines.Add("# PASSKEY     : PASSKEY_REDACTED")                  | Out-Null
+  $lines.Add("# MAC         : MAC_REDACTED")                      | Out-Null
+  $lines.Add("passed: $($script:PassCount)")                      | Out-Null
+  $lines.Add("failed: $($script:FailCount)")                      | Out-Null
+  foreach ($n in $script:FailNotes) { $lines.Add("  - $(Redact $n)") | Out-Null }
+  $lines.Add("")                                                  | Out-Null
+  $lines.Add("--- SQL VERIFICATION ---")                          | Out-Null
+  $lines.Add($sql)                                                | Out-Null
+  $joined = ($lines -join [Environment]::NewLine)
+  # Final defensive redaction pass before any file write.
+  $joined = Redact $joined
+  Add-Content -Path $OutFile -Value $joined
+  Write-Host "Wrote redacted output to: $OutFile" -ForegroundColor Cyan
+}
+
 if ($script:FailCount -gt 0) { exit 1 } else { exit 0 }

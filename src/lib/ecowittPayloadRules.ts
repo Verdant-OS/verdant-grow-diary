@@ -592,7 +592,14 @@ export function normalizeEcowittCloudReadings(
       a.reading.captured_at.localeCompare(b.reading.captured_at),
   );
 
-  return { rows, unmapped, warnings };
+  const missing_metric_codes = [...missingSet].sort() as EcowittMissingMetricCode[];
+  // Defensive sanity: vocabulary must remain closed.
+  for (const c of missing_metric_codes) {
+    if (!(ECOWITT_MISSING_METRIC_CODES as readonly string[]).includes(c)) {
+      throw new Error(`[ecowitt-cloud-normalize] Unknown missing_metric_code "${c}"`);
+    }
+  }
+  return { rows, unmapped, warnings, missing_metric_codes };
 }
 
 

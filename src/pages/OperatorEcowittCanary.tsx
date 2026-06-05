@@ -931,15 +931,45 @@ export default function OperatorEcowittCanary() {
   const downloadRedactedAudit = () =>
     downloadBlob(JSON.stringify(builtAudit, null, 2), `ecowitt-canary-audit-${Date.now()}.json`, "application/json");
 
+  const workflowSlug = useMemo(() => {
+    const tentName = tentQ.data?.name ?? "";
+    return tentName || "workflow";
+  }, [tentQ.data?.name]);
+
+  const verdictJsonString = useMemo(
+    () => JSON.stringify(buildVerdictExport(builtAudit), null, 2),
+    [builtAudit],
+  );
+
+  const verdictAvailable = verdict.verdict !== "incomplete" || !!report || !!preflight;
+
   const downloadVerdictJson = () =>
     downloadBlob(
-      JSON.stringify(buildVerdictExport(builtAudit), null, 2),
-      `ecowitt-canary-verdict-${Date.now()}.json`,
+      verdictJsonString,
+      buildVerdictFilename({ workflowSlug, ext: "json" }),
       "application/json",
     );
 
   const downloadVerdictCsv = () =>
-    downloadBlob(buildVerdictCsv(builtAudit), `ecowitt-canary-verdict-${Date.now()}.csv`, "text/csv;charset=utf-8;");
+    downloadBlob(
+      buildVerdictCsv(builtAudit),
+      buildVerdictFilename({ workflowSlug, ext: "csv" }),
+      "text/csv;charset=utf-8;",
+    );
+
+  const copyVerdictJson = async () => {
+    try {
+      if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
+        throw new Error("Clipboard API unavailable");
+      }
+      await navigator.clipboard.writeText(verdictJsonString);
+      toast.success("Redacted JSON copied.");
+    } catch (e) {
+      toast.error("Could not copy JSON to clipboard.");
+      // eslint-disable-next-line no-console
+      console.warn("[operator-ecowitt] copy JSON failed", e);
+    }
+  };
 
   const rememberAudit = () => {
     saveAuditToLocalStorage(builtAudit);

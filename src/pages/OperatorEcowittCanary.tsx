@@ -44,6 +44,7 @@ import {
   runEcowittCloudCanary,
   type EcowittCloudCanaryVerdict,
 } from "@/lib/ecowittCloudCanaryVerdict";
+import { buildCloudCanaryPreviewViewModel } from "@/lib/ecowittCloudCanaryViewModel";
 import cloudCanaryFixtures from "../../fixtures/ecowitt-cloud-canary-payloads.json";
 
 const ENDPOINT_PATH = "/functions/v1/ecowitt-ingest";
@@ -559,6 +560,7 @@ function CloudCanaryPreviewPanel() {
   }, []);
 
   const verdictJson = useMemo(() => JSON.stringify(verdict, null, 2), [verdict]);
+  const previewVm = useMemo(() => buildCloudCanaryPreviewViewModel(verdict), [verdict]);
 
   const handleCopy = async () => {
     try {
@@ -627,6 +629,61 @@ function CloudCanaryPreviewPanel() {
             <div className="text-xs uppercase tracking-wide text-muted-foreground">Suspicious flags</div>
             <div className="text-sm font-semibold">{verdict.suspicious_flag_codes.length}</div>
           </div>
+        </div>
+
+        <div
+          className="overflow-hidden rounded-md border"
+          data-testid="cloud-canary-per-fixture-table"
+        >
+          <div className="border-b bg-muted/40 px-2 py-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+            Per-fixture counts · fixture/sample canary · not tent data
+          </div>
+          <table className="w-full text-xs">
+            <thead className="bg-muted text-muted-foreground">
+              <tr>
+                <th className="px-2 py-1 text-left font-semibold">Fixture</th>
+                <th className="px-2 py-1 text-right font-semibold" title="Mapped rows classified as fresh by the normalizer">
+                  Fresh
+                </th>
+                <th className="px-2 py-1 text-right font-semibold">Stale-class</th>
+                <th className="px-2 py-1 text-right font-semibold">Invalid-class</th>
+                <th className="px-2 py-1 text-right font-semibold border-l">Mapped total</th>
+                <th className="px-2 py-1 text-right font-semibold border-l-2 border-l-foreground/30">
+                  Unmapped (separate)
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {previewVm.rows.map((row) => (
+                <tr
+                  key={row.fixture_name}
+                  className="border-t"
+                  data-testid={`cloud-canary-row-${row.fixture_name}`}
+                  data-fixture-name={row.fixture_name}
+                >
+                  <td className="px-2 py-1 font-mono">{row.fixture_name}</td>
+                  <td className="px-2 py-1 text-right tabular-nums" data-col="live">
+                    {row.live_count}
+                  </td>
+                  <td className="px-2 py-1 text-right tabular-nums" data-col="stale">
+                    {row.stale_count}
+                  </td>
+                  <td className="px-2 py-1 text-right tabular-nums" data-col="invalid">
+                    {row.invalid_count}
+                  </td>
+                  <td className="px-2 py-1 text-right tabular-nums border-l font-semibold" data-col="mapped">
+                    {row.mapped_count}
+                  </td>
+                  <td
+                    className="px-2 py-1 text-right tabular-nums border-l-2 border-l-foreground/30"
+                    data-col="unmapped"
+                  >
+                    {row.unmapped_count}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
 
         {verdict.suspicious_flag_codes.length > 0 && (

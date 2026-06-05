@@ -40,6 +40,11 @@ import {
   type VerdictResult,
   type WorkflowSnapshot,
 } from "@/lib/ecowittCanaryAuditRules";
+import {
+  runEcowittCloudCanary,
+  type EcowittCloudCanaryVerdict,
+} from "@/lib/ecowittCloudCanaryVerdict";
+import cloudCanaryFixtures from "../../fixtures/ecowitt-cloud-canary-payloads.json";
 
 const ENDPOINT_PATH = "/functions/v1/ecowitt-ingest";
 

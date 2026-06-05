@@ -95,7 +95,9 @@ describe("OperatorEcowittCanary — Windows run-command panel", () => {
   });
 
   it("does not contain real-looking secrets", () => {
-    expect(src).not.toMatch(/vbt_[A-Za-z0-9]{8,}/);
-    expect(src).not.toMatch(/\b[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}\b/);
+    // Allow the literal placeholder words REDACTED / PASSKEY_REDACTED used in preview rows.
+    const stripped = src.replace(/REDACTED/g, "X");
+    expect(stripped).not.toMatch(/vbt_[A-Za-z0-9]{8,}/);
+    expect(stripped).not.toMatch(/\b[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}\b/);
   });
 });

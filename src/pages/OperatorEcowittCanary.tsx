@@ -572,6 +572,9 @@ export function CloudCanaryPreviewPanel() {
   const exportObj = useMemo(() => buildCloudCanaryExport(previewVm), [previewVm]);
   const exportCsv = useMemo(() => serializeCloudCanaryExportToCsv(exportObj), [exportObj]);
   const exportJson = useMemo(() => serializeCloudCanaryExportToJson(exportObj), [exportObj]);
+  // Slice C-fix: run-timing is presentation-only and NEVER threaded into the
+  // serializer (the payload is deterministic). Computed once per render cycle.
+  const runViewedAt = useMemo(() => new Date().toISOString(), [exportObj]);
 
   const handleCopy = async () => {
     try {
@@ -812,6 +815,29 @@ export function CloudCanaryPreviewPanel() {
               {exportJson}
             </pre>
           </details>
+        </div>
+
+        <div
+          data-testid="cloud-canary-export-meta"
+          className="rounded-md border bg-muted/20 px-2 py-1.5 text-[11px] text-muted-foreground"
+        >
+          <div>
+            Download files:{" "}
+            <span data-testid="cloud-canary-export-filename-csv" className="font-mono">
+              {CLOUD_CANARY_EXPORT_CSV_FILENAME}
+            </span>
+            {" · "}
+            <span data-testid="cloud-canary-export-filename-json" className="font-mono">
+              {CLOUD_CANARY_EXPORT_JSON_FILENAME}
+            </span>
+          </div>
+          <div>
+            Preview viewed at{" "}
+            <span data-testid="cloud-canary-export-run-timing" className="font-mono">
+              {runViewedAt}
+            </span>{" "}
+            (display only — not written to the file)
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-2">

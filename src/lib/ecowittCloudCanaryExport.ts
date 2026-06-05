@@ -48,7 +48,6 @@ export interface CloudCanaryExport {
   /** Fixture-only / sample canary — honest label, no banned words. */
   source_kind: "fixture_sample_canary";
   preview_state: "empty" | "populated";
-  generated_at: string;
   rows: CloudCanaryExportRow[];
   totals: CloudCanaryExportTotals;
   /** Aggregate enum-coded suspicious flags across all fixtures, deduped + sorted. */
@@ -80,10 +79,10 @@ export const CLOUD_CANARY_EXPORT_JSON_FILENAME = "ecowitt-cloud-canary-summary.j
  */
 export function buildCloudCanaryExport(
   vm: CloudCanaryPreviewViewModel,
-  opts: { now?: Date } = {},
+  // Accepted for back-compat; intentionally unused. Payload is deterministic
+  // — no timestamps in the file. Run-timing for the UI lives in the panel.
+  _opts: { now?: Date } = {},
 ): CloudCanaryExport {
-  const now = opts.now ?? new Date();
-  // Defense-in-depth: even though the view-model already validates codes
   // against the closed enum, the export re-checks. This guarantees the file
   // on disk can ONLY contain enum values — never free text.
   const validateSuspiciousCodes = (
@@ -151,7 +150,6 @@ export function buildCloudCanaryExport(
   return {
     source_kind: "fixture_sample_canary",
     preview_state: vm.state,
-    generated_at: now.toISOString(),
     rows,
     totals,
     suspicious_flag_codes: validateSuspiciousCodes(
@@ -185,7 +183,7 @@ export function serializeCloudCanaryExportToCsv(exp: CloudCanaryExport): string 
   lines.push(
     `# Verdant Cloud Canary — fixture/sample canary summary · counts only · not tent data`,
   );
-  lines.push(`# preview_state=${exp.preview_state} generated_at=${exp.generated_at}`);
+  lines.push(`# preview_state=${exp.preview_state}`);
   lines.push(CLOUD_CANARY_EXPORT_COLUMNS.join(","));
   for (const r of exp.rows) {
     lines.push(

@@ -45,6 +45,8 @@ export interface AiDoctorLiveReviewState {
   status: AiDoctorLiveReviewStatus;
   result: AiDoctorReviewResult | null;
   reason: AiDoctorLiveReviewFailureReason | null;
+  /** Only populated when reason === 'credit_denied'. */
+  credit?: AiCreditDenial;
 }
 
 export interface UseAiDoctorLiveReviewOptions {

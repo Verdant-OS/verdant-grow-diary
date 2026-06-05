@@ -35,7 +35,7 @@ describe("ecowitt-canary-harness.ps1 — static safety", () => {
   });
 
   it("rejects whitespace in the bridge token", () => {
-    expect(src).toMatch(/BridgeToken -match '\\\\s'/);
+    expect(src).toMatch(/BridgeToken -match '\\s'/);
   });
 
   it("redacts the bridge token, PASSKEY, and MAC", () => {

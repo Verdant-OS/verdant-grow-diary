@@ -44,6 +44,26 @@ Alternative — double-click in File Explorer:
 
 The root launcher safely prompts for each secret, validates the bridge token shape **before** any network call, and never echoes raw secrets.
 
+#### Dry-run (no network call)
+
+Useful for operator demos, CI smoke checks, and verifying input validation + redaction without touching the live ingest endpoint:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Run-EcoWittCanary.ps1 -DryRun
+```
+
+In dry-run, the script prints what **would** be sent (with redacted secrets) but makes **zero** HTTP calls.
+
+#### Write redacted output to a file
+
+For automation or audit archival, write the fully redacted matrix + SQL block to a file. Secrets are never written to disk:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Run-EcoWittCanary.ps1 -OutFile .\canary-out.txt
+```
+
+You can combine both flags: `-DryRun -OutFile .\canary-dryrun.txt`.
+
 You will be prompted for four values, one at a time:
 
 1. `SUPABASE_PROJECT_REF`

@@ -150,6 +150,69 @@ export type Database = {
           },
         ]
       }
+      ai_credit_spends: {
+        Row: {
+          created_at: string
+          feature: string
+          grow_id: string | null
+          id: string
+          idempotency_key: string
+          meta: Json
+          model_tier: string
+          period_key: string
+          refund_of: string | null
+          result: Json | null
+          status: string
+          user_id: string
+          weight: number
+        }
+        Insert: {
+          created_at?: string
+          feature: string
+          grow_id?: string | null
+          id?: string
+          idempotency_key: string
+          meta?: Json
+          model_tier: string
+          period_key: string
+          refund_of?: string | null
+          result?: Json | null
+          status: string
+          user_id: string
+          weight: number
+        }
+        Update: {
+          created_at?: string
+          feature?: string
+          grow_id?: string | null
+          id?: string
+          idempotency_key?: string
+          meta?: Json
+          model_tier?: string
+          period_key?: string
+          refund_of?: string | null
+          result?: Json | null
+          status?: string
+          user_id?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_credit_spends_grow_id_fkey"
+            columns: ["grow_id"]
+            isOneToOne: false
+            referencedRelation: "grows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_credit_spends_refund_of_fkey"
+            columns: ["refund_of"]
+            isOneToOne: false
+            referencedRelation: "ai_credit_spends"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_doctor_session_reviews: {
         Row: {
           created_at: string
@@ -1561,6 +1624,31 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      ai_credit_allowance: {
+        Args: { p_plan_id: string }
+        Returns: {
+          per_grow: number
+          per_month: number
+        }[]
+      }
+      ai_credit_refund: {
+        Args: {
+          p_idempotency_key: string
+          p_reason?: string
+          p_spend_id: string
+        }
+        Returns: Json
+      }
+      ai_credit_spend: {
+        Args: {
+          p_feature: string
+          p_grow_id: string
+          p_idempotency_key: string
+          p_model_tier: string
+          p_result?: Json
+        }
+        Returns: Json
+      }
       award_nugs: {
         Args: {
           _amount: number

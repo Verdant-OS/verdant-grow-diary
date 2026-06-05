@@ -906,6 +906,8 @@ export default function OperatorEcowittCanary() {
         </CardContent>
       </Card>
 
+      <ResultsDashboard preflight={preflight} report={report} verdict={verdict} />
+
       {/* Verification Summary cards */}
       <section aria-label="Verification Summary" className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {verdict.cards.map((c) => (

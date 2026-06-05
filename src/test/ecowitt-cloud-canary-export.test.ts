@@ -13,6 +13,7 @@ import {
   serializeCloudCanaryExportToJson,
   CLOUD_CANARY_EXPORT_COLUMNS,
 } from "@/lib/ecowittCloudCanaryExport";
+import { ECOWITT_SUSPICIOUS_FLAG_CODES } from "@/constants/ecowittSuspiciousFlags";
 import fixtures from "../../fixtures/ecowitt-cloud-canary-payloads.json";
 
 const ORDER = [

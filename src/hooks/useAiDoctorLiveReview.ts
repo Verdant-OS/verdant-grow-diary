@@ -28,6 +28,7 @@ import {
 } from "@/lib/aiDoctorReviewResponseAdapter";
 import type { AiDoctorReviewResult } from "@/lib/aiDoctorReviewResultContract";
 import type { Classification } from "@/lib/sensorSnapshotStatusContract";
+import type { AiCreditDenial } from "@/lib/aiCreditLimitNoticeViewModel";
 import {
   persistAiDoctorSession,
   type AiDoctorSessionInput,

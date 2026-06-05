@@ -1247,12 +1247,19 @@ export default function OperatorEcowittCanary() {
         verdict={verdict}
         onDownloadJson={downloadVerdictJson}
         onDownloadCsv={downloadVerdictCsv}
+        onCopyJson={copyVerdictJson}
+        copyDisabled={!verdictAvailable}
       />
 
       {/* Verification Summary cards (each supports drill-down) */}
       <section aria-label="Verification Summary" className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {verdict.cards.map((c) => (
-          <EvidenceCard key={c.key} card={c} drill={buildDrillDown(c, report)} />
+          <EvidenceCard
+            key={c.key}
+            card={c}
+            drill={buildDrillDown(c, report)}
+            autoOpenAndScroll={c.status === "fail"}
+          />
         ))}
       </section>
 

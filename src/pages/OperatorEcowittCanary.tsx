@@ -373,7 +373,9 @@ export default function OperatorEcowittCanary() {
 
       {saveNotice && <div className="text-xs text-muted-foreground">{saveNotice}</div>}
 
+      <RedactionWarningBanner />
       <WindowsRunCommandPanel />
+      <DryRunGuidancePanel />
 
       {/* Pre-POST Validator */}
       <Card>

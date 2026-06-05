@@ -299,7 +299,14 @@ export interface EcowittCloudNormalizationResult {
   rows: EcowittCloudReadingRow[];
   unmapped: EcowittCloudUnmappedChannel[];
   warnings: string[];
+  /**
+   * Closed-vocabulary "missing metric" signals derived at the
+   * (mac, channel)-bucket level. Deduped + sorted. ID-free by construction
+   * (codes only, no MAC / tent_id / channel index).
+   */
+  missing_metric_codes: EcowittMissingMetricCode[];
 }
+
 
 const ECOWITT_TEMP_F_RE = /^temp([1-8])f$/i;
 const ECOWITT_HUMIDITY_CH_RE = /^humidity([1-8])$/i;

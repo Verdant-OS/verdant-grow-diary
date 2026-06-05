@@ -1,31 +1,30 @@
 /**
  * Closed vocabulary for Ecowitt cloud normalization "missing metric" signals.
  *
- * These codes are emitted by `normalizeEcowittCloudReadings` at the
- * (mac, channel)-bucket level and aggregated on the verdict summary as
- * `missing_metric_codes`. The vocabulary is intentionally narrow:
+ * Emitted by `normalizeEcowittCloudReadings` at the (mac, channel)-bucket
+ * level, for MAPPED channels only (a channel that routed to a tent for at
+ * least one metric). Unmapped channels are already represented by the
+ * existing `unmapped` array — they MUST NOT also be flagged here.
  *
- *  - "captured_at_missing"       — payload had no parseable dateutc
- *  - "air_temperature_missing"   — channel mapped for air, bucket has humidity
- *                                  but no temperature
- *  - "air_humidity_missing"      — channel mapped for air, bucket has temp
- *                                  but no humidity
- *  - "soil_moisture_missing"     — channel mapped for soil, bucket exists
- *                                  but no soilmoisture
+ * Vocabulary:
+ *  - "air_temperature_absent"  — mapped air channel produced data but no temp
+ *  - "air_humidity_absent"     — mapped air channel produced data but no humidity
+ *  - "soil_moisture_absent"    — mapped soil channel exists but no soilmoisture
  *
- * Detection is bound to bucket existence + mapping so that unmapped channels
- * and silent mapped channels never emit codes (avoids "everything missing"
- * noise from empty payloads).
+ * Explicitly NOT in vocabulary (collision-free with existing signals):
+ *  - payload-shape  → warnings.payload_not_object
+ *  - timestamp gap  → warnings.captured_at_missing_or_unparseable
+ *  - pressure       → unmapped.unsupported_metric_for_ecowitt / pressure_unmapped
+ *  - no mapping     → unmapped.no_tent_mapping_for_channel / unmapped_count
+ *  - empty payload  → summary.missing_metric boolean
  *
- * NEVER add free-text — only literals from this enum may reach the verdict
- * summary, view-model, or export.
+ * NEVER add free text. NEVER include MAC / channel index / tent_id in any code.
  */
 
 export const ECOWITT_MISSING_METRIC_CODES = [
-  "captured_at_missing",
-  "air_temperature_missing",
-  "air_humidity_missing",
-  "soil_moisture_missing",
+  "air_temperature_absent",
+  "air_humidity_absent",
+  "soil_moisture_absent",
 ] as const;
 
 export type EcowittMissingMetricCode =

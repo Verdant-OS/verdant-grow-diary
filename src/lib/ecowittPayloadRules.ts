@@ -428,24 +428,30 @@ export function normalizeEcowittCloudReadings(
     });
   }
 
-  // ---- Per-bucket missing-metric detection (closed vocabulary) -------------
-  // Codes are bound to bucket existence + mapping so silent / unmapped
-  // channels do not generate noise. captured_at_missing is payload-level.
+  // ---- Per-bucket expected-metric detection (closed vocabulary) -----------
+  // MAPPED channels only. Unmapped channels are already represented by the
+  // `unmapped` array — do NOT re-flag them here. Timestamp gaps stay on
+  // `warnings.captured_at_missing_or_unparseable` — they are NOT missing
+  // metrics. Empty payloads continue to surface via summary.missing_metric.
   const missingSet = new Set<EcowittMissingMetricCode>();
-  if (!capturedAt) missingSet.add("captured_at_missing");
   for (const bucket of buckets.values()) {
     const airTent = perMac?.air?.[bucket.channel] ?? null;
     const soilTent = perMac?.soil?.[bucket.channel] ?? null;
     const hasAirData = bucket.tempF !== undefined || bucket.rhPct !== undefined;
     const hasAnyData = hasAirData || bucket.soilPct !== undefined;
+    // Air: only flag when the channel is mapped for air AND produced some
+    // air data (so the channel actually routed at least one air metric).
     if (airTent && hasAirData) {
-      if (bucket.tempF === undefined) missingSet.add("air_temperature_missing");
-      if (bucket.rhPct === undefined) missingSet.add("air_humidity_missing");
+      if (bucket.tempF === undefined) missingSet.add("air_temperature_absent");
+      if (bucket.rhPct === undefined) missingSet.add("air_humidity_absent");
     }
+    // Soil: only flag when the channel is mapped for soil AND the bucket
+    // exists (had any data) but soilmoisture is absent.
     if (soilTent && hasAnyData && bucket.soilPct === undefined) {
-      missingSet.add("soil_moisture_missing");
+      missingSet.add("soil_moisture_absent");
     }
   }
+
 
   for (const bucket of buckets.values()) {
 

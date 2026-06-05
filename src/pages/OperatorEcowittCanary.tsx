@@ -705,11 +705,34 @@ export default function OperatorEcowittCanary() {
   const [savedAudit, setSavedAudit] = useState<BuiltAuditReport | null>(null);
   const [restoredAudit, setRestoredAudit] = useState<BuiltAuditReport | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
+  const [importSecretCategories, setImportSecretCategories] = useState<string[]>([]);
+  const [savedWorkflow, setSavedWorkflow] = useState<WorkflowSnapshot | null>(null);
+  const [workflowRestoredAt, setWorkflowRestoredAt] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setSavedAudit(loadAuditFromLocalStorage());
+    setSavedWorkflow(loadWorkflowFromLocalStorage());
   }, []);
+
+  const importBlocked = importSecretCategories.length > 0;
+
+  const ingestText = (text: string, sourceLabel: string) => {
+    const cats = detectSecretCategories(text);
+    if (cats.length > 0) {
+      setImportSecretCategories(cats);
+      setReport(null);
+      setParseNotes([]);
+      setSaveNotice(null);
+      return;
+    }
+    setImportSecretCategories([]);
+    setPaste(text);
+    const parsed = parseCanaryPaste(text);
+    setReport(parsed.report);
+    setParseNotes(parsed.parseNotes);
+    setSaveNotice(`Imported redacted output from ${sourceLabel}.`);
+  };
 
   const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -717,15 +740,20 @@ export default function OperatorEcowittCanary() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = String(ev.target?.result ?? "");
-      setPaste(text);
-      const parsed = parseCanaryPaste(text);
-      setReport(parsed.report);
-      setParseNotes(parsed.parseNotes);
-      setSaveNotice(`Loaded redacted output from ${file.name}. Review then Import.`);
+      ingestText(text, file.name);
     };
     reader.readAsText(file);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
+
+  const clearImport = () => {
+    setPaste("");
+    setReport(null);
+    setParseNotes([]);
+    setImportSecretCategories([]);
+    setSaveNotice("Cleared import.");
+  };
+
 
   // Read-only tent fetch for preflight (RLS-enforced).
   const tentQ = useQuery({

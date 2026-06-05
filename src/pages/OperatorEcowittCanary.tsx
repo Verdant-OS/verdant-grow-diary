@@ -45,6 +45,11 @@ import {
   type EcowittCloudCanaryVerdict,
 } from "@/lib/ecowittCloudCanaryVerdict";
 import { buildCloudCanaryPreviewViewModel } from "@/lib/ecowittCloudCanaryViewModel";
+import {
+  buildCloudCanaryExport,
+  serializeCloudCanaryExportToCsv,
+  serializeCloudCanaryExportToJson,
+} from "@/lib/ecowittCloudCanaryExport";
 import cloudCanaryFixtures from "../../fixtures/ecowitt-cloud-canary-payloads.json";
 
 const ENDPOINT_PATH = "/functions/v1/ecowitt-ingest";
@@ -733,6 +738,46 @@ export function CloudCanaryPreviewPanel() {
             disabled={copied}
           >
             {copied ? "Copied" : "Copy Redacted Verdict JSON"}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              const exp = buildCloudCanaryExport(previewVm);
+              const csv = serializeCloudCanaryExportToCsv(exp);
+              const blob = new Blob([csv], { type: "text/csv" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `cloud-canary-fixture-summary-${Date.now()}.csv`;
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              URL.revokeObjectURL(url);
+            }}
+            data-testid="download-cloud-canary-summary-csv"
+          >
+            Download Fixture Summary CSV
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              const exp = buildCloudCanaryExport(previewVm);
+              const json = serializeCloudCanaryExportToJson(exp);
+              const blob = new Blob([json], { type: "application/json" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `cloud-canary-fixture-summary-${Date.now()}.json`;
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              URL.revokeObjectURL(url);
+            }}
+            data-testid="download-cloud-canary-summary-json"
+          >
+            Download Fixture Summary JSON
           </Button>
         </div>
       </CardContent>

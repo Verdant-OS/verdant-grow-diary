@@ -671,6 +671,9 @@ export function CloudCanaryPreviewPanel() {
                   <th className="px-2 py-1 text-right font-semibold border-l-2 border-l-foreground/30">
                     Unmapped (separate)
                   </th>
+                  <th className="px-2 py-1 text-left font-semibold border-l" title="Closed-vocabulary data-classification codes from the normalizer">
+                    Suspicious codes
+                  </th>
                 </tr>
               </thead>
               <tbody>

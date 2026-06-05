@@ -151,6 +151,14 @@ function Invoke-CanaryPost {
   Write-Host ""
   Write-Host "=== POST: $Label (dateutc=$DateUtc) ==="
 
+  if ($DryRun) {
+    Write-Host "  [DRY-RUN] would POST to $Endpoint"
+    Write-Host "  [DRY-RUN] Authorization: Bearer vbt_REDACTED"
+    Write-Host "  [DRY-RUN] PASSKEY=PASSKEY_REDACTED MAC=MAC_REDACTED dateutc=$DateUtc temp1f=$Temp1f"
+    Mark-Pass "$Label dry-run validated (no network call)"
+    return
+  }
+
   $bodyFile = [System.IO.Path]::GetTempFileName()
   $args = @(
     '-sS', '-o', $bodyFile, '-w', '%{http_code}',

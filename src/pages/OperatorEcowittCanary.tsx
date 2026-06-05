@@ -531,8 +531,6 @@ function DryRunGuidancePanel() {
       </CardContent>
     </Card>
   );
-}
-
 function RedactionWarningBanner() {
   return (
     <div

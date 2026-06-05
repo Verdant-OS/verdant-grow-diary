@@ -589,10 +589,14 @@ function ResultsDashboard({
   preflight,
   report,
   verdict,
+  onDownloadJson,
+  onDownloadCsv,
 }: {
   preflight: PreflightResult | null;
   report: CanaryReportInput | null;
   verdict: VerdictResult;
+  onDownloadJson: () => void;
+  onDownloadCsv: () => void;
 }) {
   const verdictLabel = verdict.verdict === "go" ? "GO" : verdict.verdict === "no_go" ? "NO-GO" : "INCOMPLETE";
   const verdictCls =

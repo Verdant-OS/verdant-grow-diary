@@ -32,6 +32,11 @@ export interface EcowittCloudCanarySummary {
   stale_count: number;
   live_count: number;
   suspicious_flag_codes: string[];
+  /**
+   * Closed-vocabulary missing-metric signals from the cloud normalizer,
+   * deduped + sorted, ID-free by construction.
+   */
+  missing_metric_codes: EcowittMissingMetricCode[];
   missing_metric: boolean;
   ec_metric_invented: boolean;
   /** True if at least one unmapped pressure channel was surfaced. */

@@ -54,7 +54,8 @@ function StatusPill({ status }: { status: CardStatus }) {
   );
 }
 
-function EvidenceCard({ card }: { card: VerdictCard }) {
+function EvidenceCard({ card, drill }: { card: VerdictCard; drill?: ReturnType<typeof buildDrillDown> }) {
+  const [open, setOpen] = useState(false);
   return (
     <Card data-card-key={card.key}>
       <CardHeader className="pb-2">
@@ -91,6 +92,49 @@ function EvidenceCard({ card }: { card: VerdictCard }) {
           <div data-evidence="next" className="text-xs">
             <span className="font-semibold">Next: </span>
             <span className="text-muted-foreground">{card.next_action}</span>
+          </div>
+        )}
+        {drill && (
+          <div data-drilldown-card={card.key} className="pt-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setOpen((v) => !v)}
+              data-testid={`drilldown-toggle-${card.key}`}
+              className="h-7 px-2 text-xs"
+            >
+              {open ? "Hide drill-down" : "Drill down"}
+            </Button>
+            {open && (
+              <div
+                data-testid={`drilldown-body-${card.key}`}
+                className="mt-2 rounded-md border bg-muted/40 p-2 text-xs"
+              >
+                <div className="font-semibold">Status: {drill.status.toUpperCase()}</div>
+                <div className="mt-1 text-muted-foreground">{drill.reason}</div>
+                {drill.offending.length > 0 && (
+                  <div className="mt-2">
+                    <div className="font-semibold text-destructive">Offending evidence</div>
+                    <ul className="list-disc pl-5">
+                      {drill.offending.map((o, i) => (
+                        <li key={i} className="font-mono">{o}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {drill.unavailable && drill.offending.length === 0 && (
+                  <div className="mt-2 italic text-muted-foreground">
+                    offending row not available in imported report
+                  </div>
+                )}
+                {drill.next_action && (
+                  <div className="mt-2">
+                    <span className="font-semibold">Next: </span>
+                    {drill.next_action}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </CardContent>

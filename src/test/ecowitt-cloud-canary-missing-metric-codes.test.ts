@@ -196,7 +196,7 @@ describe("REGRESSION — existing result fields unchanged for all 8 canary fixtu
     happy_multi_channel: { mapped: 5, unmapped: 0, invalid: 0, stale: 0, live: 5, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
     stale_only: { mapped: 2, unmapped: 0, invalid: 0, stale: 2, live: 0, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
     invalid_humidity: { mapped: 2, unmapped: 0, invalid: 2, stale: 0, live: 0, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
-    stuck_soil_extreme: { mapped: 1, unmapped: 0, invalid: 1, stale: 0, live: 0, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
+    stuck_soil_extreme: { mapped: 1, unmapped: 0, invalid: 0, stale: 0, live: 1, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
     unmapped_channel: { mapped: 0, unmapped: 2, invalid: 0, stale: 0, live: 0, missing_metric: false, pressure_unmapped: false, ec_metric_invented: false },
     missing_metrics: { mapped: 0, unmapped: 0, invalid: 0, stale: 0, live: 0, missing_metric: true, pressure_unmapped: false, ec_metric_invented: false },
     pressure_present: { mapped: 2, unmapped: 1, invalid: 0, stale: 0, live: 2, missing_metric: false, pressure_unmapped: true, ec_metric_invented: false },

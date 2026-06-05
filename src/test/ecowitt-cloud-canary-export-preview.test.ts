@@ -92,25 +92,37 @@ async function renderPanelHtml(): Promise<string> {
 }
 
 describe("Slice C — pre-download preview byte-equality with download serializer", () => {
+  // The panel and the expected serializer both stamp generated_at with `new Date()`
+  // — they're produced at slightly different instants, so we normalize that one
+  // ISO field before asserting byte equality. Every other byte must match.
+  const stripCsvTs = (s: string) =>
+    s.replace(/generated_at=[^\s]+/, "generated_at=<TS>");
+  const stripJsonTs = (s: string) =>
+    s.replace(/"generated_at":\s*"[^"]+"/, '"generated_at":"<TS>"');
+
   it("CSV preview block === serializer CSV output the download writes", async () => {
     const html = await renderPanelHtml();
     const preview = extractPre(html, "cloud-canary-export-preview-csv");
     const { csv } = buildExpected();
-    expect(preview).toBe(csv);
+    expect(stripCsvTs(preview)).toBe(stripCsvTs(csv));
   });
 
   it("JSON preview block === serializer JSON output the download writes (literal bytes)", async () => {
     const html = await renderPanelHtml();
     const preview = extractPre(html, "cloud-canary-export-preview-json");
     const { json } = buildExpected();
-    expect(preview).toBe(json);
+    expect(stripJsonTs(preview)).toBe(stripJsonTs(json));
   });
 
-  it("JSON preview parses to the same object the download would emit", async () => {
+  it("JSON preview parses to the same object the download would emit (ignoring generated_at)", async () => {
     const html = await renderPanelHtml();
     const preview = extractPre(html, "cloud-canary-export-preview-json");
     const { json } = buildExpected();
-    expect(JSON.parse(preview)).toEqual(JSON.parse(json));
+    const a = JSON.parse(preview);
+    const b = JSON.parse(json);
+    delete a.generated_at;
+    delete b.generated_at;
+    expect(a).toEqual(b);
   });
 
   it("CSV preview reflects both code columns, the TOTAL row, and |-join verbatim", async () => {

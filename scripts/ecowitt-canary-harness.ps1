@@ -12,14 +12,23 @@
   `PASSKEY_REDACTED`, and `MAC_REDACTED` in all output (including curl echoes
   and response bodies).
 
+  This script is location-aware: it resolves the project root from its own
+  path, so it works whether invoked from the repo root, via absolute path,
+  or through the root launcher `Run-EcoWittCanary.ps1`.
+
 .NOTES
   Run from the repo root with:
 
       powershell -ExecutionPolicy Bypass -File .\scripts\ecowitt-canary-harness.ps1
 
+  Or use the root launcher (works from any working directory):
+
+      powershell -NoProfile -ExecutionPolicy Bypass -File .\Run-EcoWittCanary.ps1
+
   Do NOT paste the curl command into any prompt. Paste only the requested
   single value (e.g. only the `vbt_...` bridge token).
 #>
+
 
 $ErrorActionPreference = 'Stop'
 

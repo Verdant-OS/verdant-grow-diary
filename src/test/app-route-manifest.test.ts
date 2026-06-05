@@ -66,10 +66,7 @@ describe("appRouteManifest — structural invariants", () => {
     expect(blob).not.toMatch(/protected-tier/i);
     expect(blob).not.toMatch(/requiredTier/i);
     for (const entry of APP_ROUTES) {
-      expect(entry.access).not.toBe(
-        // @ts-expect-error — intentionally checking absence of forbidden value.
-        "protected-tier",
-      );
+      expect(entry.access as string).not.toBe("protected-tier");
     }
   });
 

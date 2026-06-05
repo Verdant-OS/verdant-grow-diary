@@ -46,6 +46,8 @@ export interface CloudCanaryExport {
   generated_at: string;
   rows: CloudCanaryExportRow[];
   totals: CloudCanaryExportTotals;
+  /** Aggregate enum-coded suspicious flags across all fixtures, deduped + sorted. */
+  suspicious_flag_codes: EcowittSuspiciousFlagCode[];
 }
 
 /** Stable column order for both CSV and the conceptual JSON row shape. */
@@ -57,6 +59,7 @@ export const CLOUD_CANARY_EXPORT_COLUMNS = [
   "invalid_count",
   "unmapped_count",
   "row_state",
+  "suspicious_flag_codes",
 ] as const;
 
 /** Fixed filenames per Item 3 LOCKED spec (no timestamp). */

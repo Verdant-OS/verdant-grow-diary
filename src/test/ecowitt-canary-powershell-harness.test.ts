@@ -55,7 +55,7 @@ describe("ecowitt-canary-harness.ps1 — static safety", () => {
     expect(src).toMatch(/-Label "main"/);
     expect(src).toMatch(/-Label "duplicate"/);
     expect(src).toMatch(/-Label "malformed"/);
-    expect(src).toContain("temp1f=abc"); // malformed temperature marker (in SQL block context-free check below ok)
+    expect(src).toMatch(/-Temp1f "abc"/);
   });
 
   it("posts the unmapped channel-9 negative-control fields", () => {

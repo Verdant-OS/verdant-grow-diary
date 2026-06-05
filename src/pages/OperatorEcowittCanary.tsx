@@ -29,7 +29,7 @@ import {
   loadWorkflowFromLocalStorage,
   migrateLegacyWorkflowSnapshots,
   parseCanaryImport,
-  parseCanaryImport as _parseCanaryImportAlias,
+  saveAuditToLocalStorage,
   saveAuditToLocalStorage,
   saveWorkflowToLocalStorage,
   type BuiltAuditReport,

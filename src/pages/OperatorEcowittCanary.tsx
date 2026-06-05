@@ -1009,27 +1009,40 @@ export default function OperatorEcowittCanary() {
         </CardContent>
       </Card>
 
-      {/* Canary Results Import */}
-      <Card>
+      {/* Import canary output */}
+      <Card data-testid="import-canary-output">
         <CardHeader>
-          <CardTitle>Canary Results Import</CardTitle>
+          <CardTitle>Import canary output</CardTitle>
           <CardDescription>
-            Paste the harness JSON report. Plain text is accepted but cannot reach a GO verdict.
+            Upload a redacted <code>.txt</code> / <code>.json</code> harness output, or paste it below. Browser POSTs are never made from this page.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <Textarea
             aria-label="Paste canary harness output"
-            placeholder='{ "main_row_counts": { "temperature_c": 1, ... }, ... }'
+            placeholder='Paste redacted OutFile text, or { "main_row_counts": { ... }, ... }'
             value={paste}
-            onChange={(e) => setPaste(e.target.value)}
+            onChange={(e) => {
+              setPaste(e.target.value);
+              setImportSecretCategories([]);
+            }}
             rows={8}
             className="font-mono text-xs"
           />
+          {importBlocked && (
+            <div
+              data-testid="import-secret-warning"
+              className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs"
+            >
+              <div className="font-semibold text-destructive">
+                Possible unredacted secret detected. Redact before importing.
+              </div>
+              <div className="mt-1 text-muted-foreground">
+                Pattern categories matched (values not shown): {importSecretCategories.join(", ")}
+              </div>
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-3">
-            <Button variant="secondary" onClick={handleImport} disabled={!paste.trim()}>
-              Import Canary Results
-            </Button>
             <input
               ref={fileInputRef}
               type="file"
@@ -1043,7 +1056,18 @@ export default function OperatorEcowittCanary() {
               onClick={() => fileInputRef.current?.click()}
               data-testid="load-outfile-button"
             >
-              Load from OutFile
+              Upload .txt / .json
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={handleImport}
+              disabled={!paste.trim()}
+              data-testid="import-redacted-output"
+            >
+              Import redacted output
+            </Button>
+            <Button variant="ghost" onClick={clearImport} data-testid="clear-import">
+              Clear import
             </Button>
             <label className="flex items-center gap-2 text-sm">
               <input
@@ -1064,12 +1088,18 @@ export default function OperatorEcowittCanary() {
         </CardContent>
       </Card>
 
-      <ResultsDashboard preflight={preflight} report={report} verdict={verdict} />
+      <ResultsDashboard
+        preflight={preflight}
+        report={report}
+        verdict={verdict}
+        onDownloadJson={downloadVerdictJson}
+        onDownloadCsv={downloadVerdictCsv}
+      />
 
-      {/* Verification Summary cards */}
+      {/* Verification Summary cards (each supports drill-down) */}
       <section aria-label="Verification Summary" className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {verdict.cards.map((c) => (
-          <EvidenceCard key={c.key} card={c} />
+          <EvidenceCard key={c.key} card={c} drill={buildDrillDown(c, report)} />
         ))}
       </section>
 

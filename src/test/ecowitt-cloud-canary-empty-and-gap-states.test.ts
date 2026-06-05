@@ -115,8 +115,8 @@ describe("Cloud Canary panel — render states (Item 2)", () => {
 
   it("panel source contains an empty-state branch with neutral copy", () => {
     expect(pageSrc).toContain('data-testid="cloud-canary-empty-state"');
-    expect(pageSrc).toMatch(/Nothing to preview/);
-    expect(pageSrc).toMatch(/No fixtures are available/);
+    expect(pageSrc).toMatch(/No canary preview to show yet/);
+    expect(pageSrc).toMatch(/No fixtures are loaded/);
   });
 
   it("panel source contains a zero-mapped warning with caution copy pointing at mapping config", () => {

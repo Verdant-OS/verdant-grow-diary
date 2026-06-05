@@ -408,6 +408,7 @@ describe("No unrelated routes were changed", () => {
         "/leads",
         "/login",
         "/logs",
+        "/operator/ecowitt",
         "/partners/csv-preview",
         "/pi-ingest-status",
         "/plants",

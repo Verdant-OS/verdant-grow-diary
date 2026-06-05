@@ -183,7 +183,7 @@ export function serializeCloudCanaryExportToCsv(exp: CloudCanaryExport): string 
   lines.push(
     `# Verdant Cloud Canary — fixture/sample canary summary · counts only · not tent data`,
   );
-  lines.push(`# preview_state=${exp.preview_state} generated_at=${exp.generated_at}`);
+  lines.push(`# preview_state=${exp.preview_state}`);
   lines.push(CLOUD_CANARY_EXPORT_COLUMNS.join(","));
   for (const r of exp.rows) {
     lines.push(

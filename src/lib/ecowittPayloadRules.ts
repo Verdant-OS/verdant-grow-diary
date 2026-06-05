@@ -428,7 +428,27 @@ export function normalizeEcowittCloudReadings(
     });
   }
 
+  // ---- Per-bucket missing-metric detection (closed vocabulary) -------------
+  // Codes are bound to bucket existence + mapping so silent / unmapped
+  // channels do not generate noise. captured_at_missing is payload-level.
+  const missingSet = new Set<EcowittMissingMetricCode>();
+  if (!capturedAt) missingSet.add("captured_at_missing");
   for (const bucket of buckets.values()) {
+    const airTent = perMac?.air?.[bucket.channel] ?? null;
+    const soilTent = perMac?.soil?.[bucket.channel] ?? null;
+    const hasAirData = bucket.tempF !== undefined || bucket.rhPct !== undefined;
+    const hasAnyData = hasAirData || bucket.soilPct !== undefined;
+    if (airTent && hasAirData) {
+      if (bucket.tempF === undefined) missingSet.add("air_temperature_missing");
+      if (bucket.rhPct === undefined) missingSet.add("air_humidity_missing");
+    }
+    if (soilTent && hasAnyData && bucket.soilPct === undefined) {
+      missingSet.add("soil_moisture_missing");
+    }
+  }
+
+  for (const bucket of buckets.values()) {
+
     const airTent = perMac?.air?.[bucket.channel] ?? null;
     const soilTent = perMac?.soil?.[bucket.channel] ?? null;
 

@@ -36,6 +36,7 @@ export interface EcowittCloudCanarySummary {
   stale_count: number;
   live_count: number;
   suspicious_flag_codes: string[];
+  missing_metric_codes: string[];
   missing_metric: boolean;
   ec_metric_invented: boolean;
   /** True if at least one unmapped pressure channel was surfaced. */

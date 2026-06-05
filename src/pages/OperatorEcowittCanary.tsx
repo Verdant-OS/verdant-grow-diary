@@ -223,10 +223,27 @@ export default function OperatorEcowittCanary() {
   const [savedAudit, setSavedAudit] = useState<BuiltAuditReport | null>(null);
   const [restoredAudit, setRestoredAudit] = useState<BuiltAuditReport | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setSavedAudit(loadAuditFromLocalStorage());
   }, []);
+
+  const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = String(ev.target?.result ?? "");
+      setPaste(text);
+      const parsed = parseCanaryPaste(text);
+      setReport(parsed.report);
+      setParseNotes(parsed.parseNotes);
+      setSaveNotice(`Loaded redacted output from ${file.name}. Review then Import.`);
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   // Read-only tent fetch for preflight (RLS-enforced).
   const tentQ = useQuery({

@@ -92,38 +92,30 @@ async function renderPanelHtml(): Promise<string> {
 }
 
 describe("Slice C — pre-download preview byte-equality with download serializer", () => {
-  // The panel and the expected serializer both stamp generated_at with `new Date()`
-  // — they're produced at slightly different instants, so we normalize that one
-  // ISO field before asserting byte equality. Every other byte must match.
-  const stripCsvTs = (s: string) =>
-    s.replace(/generated_at=[^\s]+/, "generated_at=<TS>");
-  const stripJsonTs = (s: string) =>
-    s.replace(/"generated_at":\s*"[^"]+"/, '"generated_at":"<TS>"');
+  // Slice C-fix: payload is deterministic (no generated_at), so true
+  // byte-equality is asserted with no normalization workarounds.
 
-  it("CSV preview block === serializer CSV output the download writes", async () => {
+  it("CSV preview block === serializer CSV output the download writes (literal bytes)", async () => {
     const html = await renderPanelHtml();
     const preview = extractPre(html, "cloud-canary-export-preview-csv");
     const { csv } = buildExpected();
-    expect(stripCsvTs(preview)).toBe(stripCsvTs(csv));
+    expect(preview).toBe(csv);
   });
 
   it("JSON preview block === serializer JSON output the download writes (literal bytes)", async () => {
     const html = await renderPanelHtml();
     const preview = extractPre(html, "cloud-canary-export-preview-json");
     const { json } = buildExpected();
-    expect(stripJsonTs(preview)).toBe(stripJsonTs(json));
+    expect(preview).toBe(json);
   });
 
-  it("JSON preview parses to the same object the download would emit (ignoring generated_at)", async () => {
+  it("JSON preview parses to the same object the download would emit", async () => {
     const html = await renderPanelHtml();
     const preview = extractPre(html, "cloud-canary-export-preview-json");
     const { json } = buildExpected();
-    const a = JSON.parse(preview);
-    const b = JSON.parse(json);
-    delete a.generated_at;
-    delete b.generated_at;
-    expect(a).toEqual(b);
+    expect(JSON.parse(preview)).toEqual(JSON.parse(json));
   });
+
 
   it("CSV preview reflects both code columns, the TOTAL row, and |-join verbatim", async () => {
     const html = await renderPanelHtml();

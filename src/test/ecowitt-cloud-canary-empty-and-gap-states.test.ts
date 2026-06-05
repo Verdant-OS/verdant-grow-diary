@@ -171,4 +171,37 @@ describe("Cloud Canary panel — render states (Item 2)", () => {
     // No row carries a gap state in the empty case
     expect(vm.rows.some((r) => r.state === "zero_mapped_gap")).toBe(false);
   });
+
+  it("mixed render: gap row has caution (amber) treatment; normal rows do not", async () => {
+    const React = await import("react");
+    const { renderToString } = await import("react-dom/server");
+    const { CloudCanaryPreviewPanel } = await import(
+      "@/pages/OperatorEcowittCanary"
+    );
+    const html = renderToString(React.createElement(CloudCanaryPreviewPanel));
+
+    // Real fixtures contain BOTH normal rows (e.g. happy_multi_channel) and
+    // a zero_mapped_gap row (unmapped_channel), so the rendered output is mixed.
+    const rowRe = /<tr\b[^>]*data-row-state="(normal|zero_mapped_gap)"[^>]*>/g;
+    const rowTags = Array.from(html.matchAll(rowRe)).map((m) => ({
+      tag: m[0],
+      state: m[1] as "normal" | "zero_mapped_gap",
+    }));
+    const gapRows = rowTags.filter((r) => r.state === "zero_mapped_gap");
+    const normalRows = rowTags.filter((r) => r.state === "normal");
+    expect(gapRows.length).toBeGreaterThan(0);
+    expect(normalRows.length).toBeGreaterThan(0);
+
+    // Caution treatment present on gap row(s); absent from normal row(s).
+    for (const r of gapRows) {
+      expect(r.tag).toContain("bg-amber-500/10");
+    }
+    for (const r of normalRows) {
+      expect(r.tag).not.toContain("bg-amber");
+    }
+
+    // Footer caution block renders for the mixed case.
+    expect(html).toContain('data-testid="cloud-canary-zero-mapped-warning"');
+    expect(html).toContain("Mapping gap");
+  });
 });

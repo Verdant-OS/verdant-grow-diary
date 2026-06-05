@@ -676,6 +676,15 @@ function ResultsDashboard({
             ))}
           </ul>
         )}
+
+        <div className="flex flex-wrap gap-2" data-testid="dashboard-exports">
+          <Button size="sm" variant="outline" onClick={onDownloadJson} data-testid="download-verdict-json">
+            Download Verdict JSON
+          </Button>
+          <Button size="sm" variant="outline" onClick={onDownloadCsv} data-testid="download-verdict-csv">
+            Download Verdict CSV
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

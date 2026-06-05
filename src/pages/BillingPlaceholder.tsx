@@ -2,6 +2,8 @@ import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import BrandLogo from "@/components/BrandLogo";
+import PaywallCta from "@/components/PaywallCta";
+import { buildPaywallCtaViewModel } from "@/lib/paywallCtaViewModel";
 import {
   resolvePaddleConfig,
   unavailableMessage,
@@ -176,6 +178,23 @@ export default function BillingPlaceholder() {
             <Button size="lg" variant="outline">Back to pricing</Button>
           </Link>
         </div>
+
+        <div className="mt-10 text-left">
+          <PaywallCta
+            data-testid="billing-paywall-cta"
+            vm={buildPaywallCtaViewModel({
+              featureTitle: detail?.name ?? "Verdant Pro",
+              requiredPlanLabel: planSlug === "founder-lifetime"
+                ? "Founder Lifetime"
+                : "Pro",
+              secondaryCopy:
+                "Upgrading is only completed after a verified billing event. This panel describes what an upgrade would unlock — it does not charge your account or grant access.",
+
+            })}
+          />
+        </div>
+
+
 
         <p
           className="mt-10 text-xs text-muted-foreground max-w-xl mx-auto"

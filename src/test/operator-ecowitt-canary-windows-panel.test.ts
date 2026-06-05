@@ -19,13 +19,14 @@ describe("OperatorEcowittCanary — Windows run-command panel", () => {
     expect(src).toContain('data-testid="windows-run-command-panel"');
   });
 
-  it("shows the recommended root-launcher command", () => {
+  it("shows the recommended root-launcher command with cd prefix", () => {
+    expect(src).toContain("cd <VERDANT_REPO_ROOT>");
     expect(src).toContain(
-      "powershell -NoProfile -ExecutionPolicy Bypass -File .\\\\Run-EcoWittCanary.ps1",
+      'powershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1',
     );
   });
 
-  it("shows the dry-run command", () => {
+  it("shows the dry-run command with cd prefix", () => {
     expect(src).toContain("-DryRun");
     expect(src.toLowerCase()).toContain("no network call");
   });
@@ -39,9 +40,35 @@ describe("OperatorEcowittCanary — Windows run-command panel", () => {
     expect(src.toLowerCase()).toContain("do not paste curl commands");
   });
 
-  it("offers a copy-to-clipboard button (no auto-execution)", () => {
+  it("offers a copy-to-clipboard button per command (no auto-execution)", () => {
     expect(src).toContain("navigator.clipboard.writeText");
     expect(src).toContain("Copied");
+    expect(src).toContain("CopyButton");
+  });
+
+  it("includes a redaction guarantee warning box", () => {
+    expect(src).toContain("Redaction Guarantee");
+    expect(src).toContain("redacts bridge token");
+  });
+
+  it("includes a dry-run guidance panel", () => {
+    expect(src).toContain("DryRunGuidancePanel");
+    expect(src).toContain('data-testid="dry-run-guidance-panel"');
+    expect(src).toContain("Dry-Run Guidance");
+    expect(src).toContain("Validate your setup before making any live POSTs");
+  });
+
+  it("includes a redaction warning banner", () => {
+    expect(src).toContain("RedactionWarningBanner");
+    expect(src).toContain('data-testid="redaction-warning-banner"');
+    expect(src).toContain("Secrets are redacted automatically");
+  });
+
+  it("includes a Load from OutFile button and hidden file input", () => {
+    expect(src).toContain("Load from OutFile");
+    expect(src).toContain('data-testid="load-outfile-button"');
+    expect(src).toContain('data-testid="outfile-import-input"');
+    expect(src).toContain("handleFileImport");
   });
 
   it("does not introduce ingest / writes / device control side effects", () => {

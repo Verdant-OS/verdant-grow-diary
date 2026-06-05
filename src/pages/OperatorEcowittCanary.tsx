@@ -4,7 +4,7 @@
  * Read-only diagnostics. NO Supabase writes, NO rpc, NO functions.invoke,
  * NO alerts/Action Queue writes, NO AI calls, NO device control.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTents } from "@/hooks/use-tents";
@@ -92,30 +92,41 @@ function EvidenceCard({ card }: { card: VerdictCard }) {
 const WINDOWS_RUN_COMMANDS: Array<{ label: string; cmd: string; hint: string }> = [
   {
     label: "Recommended (root launcher)",
-    cmd: "powershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1",
+    cmd: `cd <VERDANT_REPO_ROOT>
+powershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1`,
     hint: "Run from the repo root. Works even if PowerShell opens in C:\\WINDOWS\\system32.",
   },
   {
     label: "Dry-run (no network call)",
-    cmd: "powershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1 -DryRun",
+    cmd: `cd <VERDANT_REPO_ROOT>
+powershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1 -DryRun`,
     hint: "Validates inputs and redaction. Sends zero HTTP requests. Safe for demos and CI.",
   },
   {
     label: "Write redacted output to a file",
-    cmd: "powershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1 -OutFile .\\canary-out.txt",
+    cmd: `cd <VERDANT_REPO_ROOT>
+powershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1 -OutFile .\\canary-out.txt`,
     hint: "Appends matrix + SQL block. Secrets are never written to disk.",
   },
 ];
 
+function CopyButton({ text, copied, onCopy }: { text: string; copied: boolean; onCopy: () => void }) {
+  return (
+    <Button size="sm" variant="outline" onClick={onCopy} data-copied={copied}>
+      {copied ? "Copied" : "Copy"}
+    </Button>
+  );
+}
+
 function WindowsRunCommandPanel() {
-  const [copied, setCopied] = useState<string | null>(null);
-  const copy = async (cmd: string) => {
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const copy = async (idx: number, cmd: string) => {
     try {
       await navigator.clipboard.writeText(cmd);
-      setCopied(cmd);
-      setTimeout(() => setCopied(null), 1500);
+      setCopiedIndex(idx);
+      setTimeout(() => setCopiedIndex(null), 1500);
     } catch {
-      setCopied(null);
+      setCopiedIndex(null);
     }
   };
   return (
@@ -127,25 +138,73 @@ function WindowsRunCommandPanel() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {WINDOWS_RUN_COMMANDS.map((row) => (
+        {WINDOWS_RUN_COMMANDS.map((row, idx) => (
           <div key={row.label} className="rounded-md border p-3" data-cmd-label={row.label}>
             <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{row.label}</div>
-            <code className="block break-all rounded bg-muted p-2 font-mono text-xs">{row.cmd}</code>
+            <code className="block whitespace-pre rounded bg-muted p-2 font-mono text-xs">{row.cmd}</code>
             <div className="mt-2 flex items-center justify-between gap-2">
               <span className="text-xs text-muted-foreground">{row.hint}</span>
-              <Button size="sm" variant="outline" onClick={() => copy(row.cmd)}>
-                {copied === row.cmd ? "Copied" : "Copy"}
-              </Button>
+              <CopyButton text={row.cmd} copied={copiedIndex === idx} onCopy={() => copy(idx, row.cmd)} />
             </div>
           </div>
         ))}
-        <ul className="list-disc pl-5 text-xs text-muted-foreground">
-          <li>Paste only the requested value at each prompt (e.g. only the <code>vbt_...</code> token).</li>
-          <li>The harness aborts with a clear error if any input contains <code>curl.exe</code> or whitespace.</li>
-          <li>All output redacts bridge token, PASSKEY, and MAC.</li>
-        </ul>
+        <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-amber-400">Redaction Guarantee</div>
+          <ul className="mt-1 list-disc pl-5 text-xs text-muted-foreground">
+            <li>Paste only the requested value at each prompt (e.g. only the <code>vbt_...</code> token).</li>
+            <li>The harness aborts with a clear error if any input contains <code>curl.exe</code> or whitespace.</li>
+            <li>All output redacts bridge token, PASSKEY, and MAC before printing or writing to disk.</li>
+            <li>Never paste a raw cURL command into a PowerShell prompt; only paste the token string.</li>
+          </ul>
+        </div>
       </CardContent>
     </Card>
+  );
+}
+
+function DryRunGuidancePanel() {
+  return (
+    <Card data-testid="dry-run-guidance-panel">
+      <CardHeader>
+        <CardTitle className="text-base">Dry-Run Guidance</CardTitle>
+        <CardDescription>Validate your setup before making any live POSTs.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2 text-sm text-muted-foreground">
+        <p>
+          <span className="font-semibold text-foreground">1.</span> Run the dry-run command above. It checks inputs and
+          redaction without sending any HTTP requests.
+        </p>
+        <p>
+          <span className="font-semibold text-foreground">2.</span> If dry-run passes, you are ready for the live canary.
+        </p>
+        <p>
+          <span className="font-semibold text-foreground">3.</span> If dry-run fails, fix the error (usually a malformed
+          token or a curl.exe paste) before proceeding.
+        </p>
+        <p>
+          <span className="font-semibold text-foreground">4.</span> For automated CI, use the OutFile mode and import the
+          redacted result below.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function RedactionWarningBanner() {
+  return (
+    <div
+      className="flex items-start gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm"
+      data-testid="redaction-warning-banner"
+    >
+      <span className="text-lg">🛡️</span>
+      <div>
+        <div className="font-medium text-destructive">Secrets are redacted automatically</div>
+        <div className="text-muted-foreground">
+          The harness replaces bridge tokens, PASSKEYs, and MACs with placeholders before printing or saving. If you see
+          a real secret in any output, treat it as a leak and abort immediately.
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -164,10 +223,27 @@ export default function OperatorEcowittCanary() {
   const [savedAudit, setSavedAudit] = useState<BuiltAuditReport | null>(null);
   const [restoredAudit, setRestoredAudit] = useState<BuiltAuditReport | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setSavedAudit(loadAuditFromLocalStorage());
   }, []);
+
+  const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = String(ev.target?.result ?? "");
+      setPaste(text);
+      const parsed = parseCanaryPaste(text);
+      setReport(parsed.report);
+      setParseNotes(parsed.parseNotes);
+      setSaveNotice(`Loaded redacted output from ${file.name}. Review then Import.`);
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   // Read-only tent fetch for preflight (RLS-enforced).
   const tentQ = useQuery({
@@ -297,7 +373,9 @@ export default function OperatorEcowittCanary() {
 
       {saveNotice && <div className="text-xs text-muted-foreground">{saveNotice}</div>}
 
+      <RedactionWarningBanner />
       <WindowsRunCommandPanel />
+      <DryRunGuidancePanel />
 
       {/* Pre-POST Validator */}
       <Card>
@@ -373,6 +451,21 @@ export default function OperatorEcowittCanary() {
           <div className="flex flex-wrap items-center gap-3">
             <Button variant="secondary" onClick={handleImport} disabled={!paste.trim()}>
               Import Canary Results
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".txt,.json"
+              className="sr-only"
+              onChange={handleFileImport}
+              data-testid="outfile-import-input"
+            />
+            <Button
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              data-testid="load-outfile-button"
+            >
+              Load from OutFile
             </Button>
             <label className="flex items-center gap-2 text-sm">
               <input

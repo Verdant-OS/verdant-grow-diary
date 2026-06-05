@@ -115,6 +115,13 @@ Write-Host "Endpoint: $Endpoint"
 Write-Host "Auth     : Bearer vbt_REDACTED"
 Write-Host "PASSKEY  : PASSKEY_REDACTED"
 Write-Host "MAC      : MAC_REDACTED"
+if ($DryRun) {
+  Write-Host ""
+  Write-Host "[DRY-RUN] No network calls will be made. Inputs validated and redacted." -ForegroundColor Yellow
+}
+if ($OutFile) {
+  Write-Host "OutFile  : $OutFile (redacted matrix + SQL will be appended)"
+}
 Write-Host ""
 
 # --- pass/fail tracking ---

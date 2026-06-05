@@ -1234,6 +1234,7 @@ export default function OperatorEcowittCanary() {
       <RedactionPreviewPanel />
       <WindowsRunCommandPanel />
       <DryRunGuidancePanel />
+      <CloudCanaryPreviewPanel />
 
       {/* Pre-POST Validator */}
       <Card>

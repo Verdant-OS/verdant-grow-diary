@@ -162,6 +162,29 @@ function WindowsRunCommandPanel() {
   );
 }
 
+const DRY_RUN_EXAMPLE = `=== EcoWitt Canary Dry-Run ===
+Mode:          DryRun (no HTTP requests will be sent)
+Bridge URL:    https://<edge>/functions/v1/ecowitt-ingest
+Bridge Token:  vbt_***REDACTED***
+PASSKEY:       ***REDACTED***
+MAC:           **:**:**:**:**:**
+
+[1/3] Scenario: happy_path        -> inputs OK, redaction OK
+[2/3] Scenario: missing_passkey   -> inputs OK, redaction OK
+[3/3] Scenario: malformed_payload -> inputs OK, redaction OK
+
+--- Audit Matrix (redacted) ---
+| # | scenario           | expected | redacted |
+| 1 | happy_path         | 200      | yes      |
+| 2 | missing_passkey    | 4xx      | yes      |
+| 3 | malformed_payload  | 4xx      | yes      |
+
+--- SQL Verification Block ---
+-- (read-only; paste into Operator SQL panel)
+select count(*) from sensor_readings where source = 'ecowitt' and captured_at > now() - interval '15 min';
+
+Dry-run complete. 0 HTTP requests sent. No secrets written to disk.`;
+
 function DryRunGuidancePanel() {
   return (
     <Card data-testid="dry-run-guidance-panel">
@@ -169,22 +192,66 @@ function DryRunGuidancePanel() {
         <CardTitle className="text-base">Dry-Run Guidance</CardTitle>
         <CardDescription>Validate your setup before making any live POSTs.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-2 text-sm text-muted-foreground">
-        <p>
-          <span className="font-semibold text-foreground">1.</span> Run the dry-run command above. It checks inputs and
-          redaction without sending any HTTP requests.
-        </p>
-        <p>
-          <span className="font-semibold text-foreground">2.</span> If dry-run passes, you are ready for the live canary.
-        </p>
-        <p>
-          <span className="font-semibold text-foreground">3.</span> If dry-run fails, fix the error (usually a malformed
-          token or a curl.exe paste) before proceeding.
-        </p>
-        <p>
-          <span className="font-semibold text-foreground">4.</span> For automated CI, use the OutFile mode and import the
-          redacted result below.
-        </p>
+      <CardContent className="space-y-3 text-sm text-muted-foreground">
+        <ol className="list-decimal space-y-1 pl-5">
+          <li>Run the dry-run command above. It checks inputs and redaction without sending any HTTP requests.</li>
+          <li>If dry-run passes, you are ready for the live canary.</li>
+          <li>If dry-run fails, fix the error (usually a malformed token or a curl.exe paste) before proceeding.</li>
+          <li>For automated CI, use the OutFile mode and import the redacted result below.</li>
+        </ol>
+
+        <div data-testid="dry-run-success-example" className="rounded-md border bg-muted/40 p-3">
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-foreground">
+            What a successful dry-run looks like
+          </div>
+          <pre className="max-h-72 overflow-auto whitespace-pre rounded bg-background p-2 font-mono text-[11px] leading-snug text-foreground">
+{DRY_RUN_EXAMPLE}
+          </pre>
+          <div className="mt-2 grid gap-1 text-xs">
+            <div>
+              <span className="font-semibold text-foreground">Header block</span> — confirms <code>Mode: DryRun</code> and
+              that bridge token, PASSKEY, and MAC are shown as <code>***REDACTED***</code>.
+            </div>
+            <div>
+              <span className="font-semibold text-foreground">Scenario lines</span> — each of the three scenarios should
+              end with <code>inputs OK, redaction OK</code>.
+            </div>
+            <div>
+              <span className="font-semibold text-foreground">Audit Matrix</span> — every row must show{" "}
+              <code>redacted = yes</code>.
+            </div>
+            <div>
+              <span className="font-semibold text-foreground">Footer</span> — must say{" "}
+              <code>0 HTTP requests sent. No secrets written to disk.</code>
+            </div>
+          </div>
+        </div>
+
+        <div
+          data-testid="dry-run-failure-guide"
+          className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs"
+        >
+          <div className="mb-1 font-semibold text-destructive">Where to look when dry-run fails</div>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>
+              <span className="font-semibold text-foreground">Header shows a raw token</span> (anything that is not{" "}
+              <code>***REDACTED***</code>) — abort, treat as a leak, rotate the token.
+            </li>
+            <li>
+              <span className="font-semibold text-foreground">Scenario line says <code>inputs FAIL</code></span> — you
+              probably pasted a full <code>curl.exe</code> command into a Read-Host prompt. Re-run and paste only the
+              token value.
+            </li>
+            <li>
+              <span className="font-semibold text-foreground">Audit Matrix missing rows</span> — input validation aborted
+              early; check the first FAIL line for the bad field name.
+            </li>
+            <li>
+              <span className="font-semibold text-foreground">Footer says HTTP &gt; 0</span> in dry-run mode — stop and
+              report; the <code>-DryRun</code> flag was not respected.
+            </li>
+          </ul>
+        </div>
       </CardContent>
     </Card>
   );

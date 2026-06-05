@@ -674,6 +674,9 @@ export function CloudCanaryPreviewPanel() {
                   <th className="px-2 py-1 text-left font-semibold border-l" title="Closed-vocabulary data-classification codes from the normalizer">
                     Suspicious codes
                   </th>
+                  <th className="px-2 py-1 text-left font-semibold border-l" title="Closed-vocabulary missing-metric codes from the normalizer">
+                    Missing-metric codes
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -721,6 +724,27 @@ export function CloudCanaryPreviewPanel() {
                             <span
                               key={code}
                               data-suspicious-code={code}
+                              className="rounded-md border bg-muted px-1.5 py-0.5 font-mono text-[10px]"
+                            >
+                              {code}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td
+                      className="px-2 py-1 border-l align-top"
+                      data-col="missing-metric-codes"
+                      data-missing-metric-code-count={row.missing_metric_codes.length}
+                    >
+                      {row.missing_metric_codes.length === 0 ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {row.missing_metric_codes.map((code) => (
+                            <span
+                              key={code}
+                              data-missing-metric-code={code}
                               className="rounded-md border bg-muted px-1.5 py-0.5 font-mono text-[10px]"
                             >
                               {code}

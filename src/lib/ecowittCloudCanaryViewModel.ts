@@ -22,6 +22,11 @@ import {
   isEcowittSuspiciousFlagCode,
   type EcowittSuspiciousFlagCode,
 } from "@/constants/ecowittSuspiciousFlags";
+import {
+  ECOWITT_MISSING_METRIC_CODES,
+  isEcowittMissingMetricCode,
+  type EcowittMissingMetricCode,
+} from "@/constants/ecowittMissingMetricCodes";
 
 export type CloudCanaryRowState = "normal" | "zero_mapped_gap";
 
@@ -49,6 +54,12 @@ export interface CloudCanaryPreviewRow {
    * Codes are from ECOWITT_SUSPICIOUS_FLAG_CODES only — never free text.
    */
   suspicious_flag_codes: EcowittSuspiciousFlagCode[];
+  /**
+   * Closed-vocabulary missing-metric codes for this fixture, deduped + sorted.
+   * Codes are from ECOWITT_MISSING_METRIC_CODES only — never free text.
+   * Distinct surface from `captured_at_*` (timestamp) signals.
+   */
+  missing_metric_codes: EcowittMissingMetricCode[];
 }
 
 export type CloudCanaryPreviewState = "empty" | "populated";
@@ -61,9 +72,11 @@ export interface CloudCanaryPreviewViewModel {
   rows: CloudCanaryPreviewRow[];
   /** Aggregate enum-coded suspicious flags across all fixtures, deduped + sorted. */
   suspicious_flag_codes: EcowittSuspiciousFlagCode[];
+  /** Aggregate enum-coded missing-metric codes across all fixtures, deduped + sorted. */
+  missing_metric_codes: EcowittMissingMetricCode[];
 }
 
-function coerceCodes(
+function coerceSuspiciousCodes(
   raw: ReadonlyArray<string>,
   fixtureName: string,
 ): EcowittSuspiciousFlagCode[] {
@@ -81,6 +94,23 @@ function coerceCodes(
   return [...out].sort();
 }
 
+function coerceMissingMetricCodes(
+  raw: ReadonlyArray<string>,
+  fixtureName: string,
+): EcowittMissingMetricCode[] {
+  const out = new Set<EcowittMissingMetricCode>();
+  for (const c of raw) {
+    if (!isEcowittMissingMetricCode(c)) {
+      throw new Error(
+        `[cloud-canary-view-model] Unknown missing metric code "${c}" on fixture "${fixtureName}". ` +
+          `Add it to ECOWITT_MISSING_METRIC_CODES before surfacing.`,
+      );
+    }
+    out.add(c);
+  }
+  return [...out].sort();
+}
+
 export function buildCloudCanaryPreviewViewModel(
   verdict: EcowittCloudCanaryVerdict,
 ): CloudCanaryPreviewViewModel {
@@ -92,20 +122,40 @@ export function buildCloudCanaryPreviewViewModel(
     mapped_count: s.mapped_count,
     unmapped_count: s.unmapped_count,
     state: s.mapped_count === 0 ? "zero_mapped_gap" : "normal",
-    suspicious_flag_codes: coerceCodes(s.suspicious_flag_codes, s.fixture_id),
+    suspicious_flag_codes: coerceSuspiciousCodes(
+      s.suspicious_flag_codes,
+      s.fixture_id,
+    ),
+    missing_metric_codes: coerceMissingMetricCodes(
+      s.missing_metric_codes,
+      s.fixture_id,
+    ),
   }));
   const is_empty = rows.length === 0;
-  const aggregate = coerceCodes(verdict.suspicious_flag_codes, "__aggregate__");
+  const suspicious_aggregate = coerceSuspiciousCodes(
+    verdict.suspicious_flag_codes,
+    "__aggregate__",
+  );
+  // Verdict has no top-level missing_metric_codes aggregate yet — derive it
+  // here as the union of per-row codes (deduped + sorted), mirroring Slice A.
+  const missing_union = new Set<EcowittMissingMetricCode>();
+  for (const r of rows) for (const c of r.missing_metric_codes) missing_union.add(c);
   return {
     state: is_empty ? "empty" : "populated",
     is_empty,
     rows,
-    suspicious_flag_codes: aggregate,
+    suspicious_flag_codes: suspicious_aggregate,
+    missing_metric_codes: [...missing_union].sort(),
   };
 }
 
-// Re-export the closed vocabulary for tests and presenters that need it.
+// Re-export the closed vocabularies for tests and presenters that need them.
 export {
   ECOWITT_SUSPICIOUS_FLAG_CODES,
   type EcowittSuspiciousFlagCode,
 } from "@/constants/ecowittSuspiciousFlags";
+export {
+  ECOWITT_MISSING_METRIC_CODES,
+  type EcowittMissingMetricCode,
+} from "@/constants/ecowittMissingMetricCodes";
+

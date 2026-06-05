@@ -13,7 +13,7 @@ import {
   scanContent,
   scanRepository,
   SAFETY_CONTRACT_MARKER,
-  // @ts-ignore — JS module without types
+  // @ts-expect-error — JS module without types
 } from "../../scripts/assert-sensor-intelligence-safety.mjs";
 
 describe("sensor-intelligence safety scanner — repository scan", () => {

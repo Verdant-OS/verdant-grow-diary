@@ -26,7 +26,7 @@ const EDGE_SRC = readFileSync(
   resolve(process.cwd(), "supabase/functions/ecowitt-ingest/index.ts"),
   "utf8",
 );
-/** Edge function source with // line comments and /* block *​/ comments stripped, for code-only scans. */
+/** Edge function source with line and block comments stripped, for code-only scans. */
 const EDGE_CODE = EDGE_SRC
   .replace(/\/\*[\s\S]*?\*\//g, "")
   .replace(/(^|[^:])\/\/[^\n]*/g, "$1");

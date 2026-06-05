@@ -105,7 +105,7 @@ describe("scripts/ecowitt-canary-harness.ps1 — location independence", () => {
   it("does not depend on current working directory for file paths", () => {
     // It uses GetTempFileName for body files, not relative paths
     expect(src).toContain("GetTempFileName");
-    expect(src).not.toMatch(/Test-Path\s+['\"]?\.\//);
+    expect(src).not.toMatch(/Test-Path\s+['"]?\.\//);
     expect(src).not.toMatch(/\.\.\\scripts\\/);
   });
 

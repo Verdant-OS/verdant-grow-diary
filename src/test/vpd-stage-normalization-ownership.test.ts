@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, cpSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, cpSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -20,10 +20,10 @@ function runScannerIn(cwd: string) {
 
 describe("scripts/assert-vpd-stage-normalization-ownership.mjs", () => {
   it("the scanner file and package script exist", () => {
-    expect(() => require("node:fs").readFileSync(resolve(ROOT, SCRIPT), "utf8"))
+    expect(() => readFileSync(resolve(ROOT, SCRIPT), "utf8"))
       .not.toThrow();
     const pkg = JSON.parse(
-      require("node:fs").readFileSync(resolve(ROOT, "package.json"), "utf8"),
+      readFileSync(resolve(ROOT, "package.json"), "utf8"),
     );
     expect(pkg.scripts["test:vpd-stage-normalization-ownership"]).toMatch(
       /assert-vpd-stage-normalization-ownership\.mjs/,

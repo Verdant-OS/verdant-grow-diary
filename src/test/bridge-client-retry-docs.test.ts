@@ -36,12 +36,12 @@ describe("bridge-client-retry-guidance.md", () => {
   });
 
   it("uses placeholder token format vbt_...", () => {
-    expect(doc).toMatch(/vbt_[x\.…a-z]/i);
+    expect(doc).toMatch(/vbt_[x.…a-z]/i);
   });
 
   it("does not include real-looking secrets", () => {
     // No JWT-shaped tokens, no long base64 secrets.
-    expect(doc).not.toMatch(/eyJ[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}/);
+    expect(doc).not.toMatch(/eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/);
     expect(doc).not.toMatch(/sk_live_[A-Za-z0-9]{16,}/);
     expect(doc).not.toMatch(/vbt_[A-Za-z0-9]{24,}/);
   });

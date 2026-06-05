@@ -78,7 +78,7 @@ describe("generic-bridge-client-guide.md", () => {
   });
 
   it("does not include real-looking secrets", () => {
-    expect(doc).not.toMatch(/eyJ[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}/);
+    expect(doc).not.toMatch(/eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/);
     expect(doc).not.toMatch(/vbt_[A-Za-z0-9]{24,}/);
     expect(doc).not.toMatch(/service_role\s*[:=]\s*['"]/);
   });

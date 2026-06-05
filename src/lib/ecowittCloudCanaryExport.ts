@@ -48,7 +48,6 @@ export interface CloudCanaryExport {
   /** Fixture-only / sample canary — honest label, no banned words. */
   source_kind: "fixture_sample_canary";
   preview_state: "empty" | "populated";
-  generated_at: string;
   rows: CloudCanaryExportRow[];
   totals: CloudCanaryExportTotals;
   /** Aggregate enum-coded suspicious flags across all fixtures, deduped + sorted. */

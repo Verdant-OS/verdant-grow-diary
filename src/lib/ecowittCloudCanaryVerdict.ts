@@ -11,6 +11,10 @@
  */
 
 import {
+  ECOWITT_MISSING_METRIC_CODES,
+  isEcowittMissingMetricCode,
+} from "@/constants/ecowittMissingMetricCodes";
+import {
   normalizeEcowittCloudReadings,
   type EcowittCloudMappingConfig,
   type EcowittCloudNormalizationResult,

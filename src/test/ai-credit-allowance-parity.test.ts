@@ -19,18 +19,27 @@ function q(sql: string): string {
 }
 
 describe.skipIf(!DB_URL)("ai_credit_allowance ↔ PLAN_CATALOG parity", () => {
-  for (const planId of Object.keys(PLAN_CATALOG)) {
-    it(`SQL allowance matches TS capabilities for ${planId}`, () => {
+  // The SQL function returns the *active* scope: when per_grow is non-null
+  // the plan is per-grow scoped and per_month is null (and vice versa).
+  // The TS catalog stores both fields independently; we project the active
+  // scope so we're comparing apples to apples.
+  function expected(planId: keyof typeof PLAN_CATALOG) {
+    const cap = PLAN_CATALOG[planId];
+    if (cap.aiCreditsPerGrow !== null) return { per_grow: cap.aiCreditsPerGrow, per_month: null };
+    return { per_grow: null, per_month: cap.aiMonthlyCredits };
+  }
+
+  for (const planId of Object.keys(PLAN_CATALOG) as Array<keyof typeof PLAN_CATALOG>) {
+    it(`SQL allowance matches active-scope TS capability for ${planId}`, () => {
       const row = q(
         `select coalesce(per_grow::text,'null') || '|' || coalesce(per_month::text,'null') from public.ai_credit_allowance('${planId}')`,
       );
       const [perGrowStr, perMonthStr] = row.split("|");
-      const sqlPerGrow = perGrowStr === "null" ? null : Number(perGrowStr);
-      const sqlPerMonth = perMonthStr === "null" ? null : Number(perMonthStr);
-
-      const cap = PLAN_CATALOG[planId as keyof typeof PLAN_CATALOG];
-      expect({ per_grow: sqlPerGrow, per_month: sqlPerMonth })
-        .toEqual({ per_grow: cap.aiCreditsPerGrow, per_month: cap.aiMonthlyCredits });
+      const sql = {
+        per_grow: perGrowStr === "null" ? null : Number(perGrowStr),
+        per_month: perMonthStr === "null" ? null : Number(perMonthStr),
+      };
+      expect(sql).toEqual(expected(planId));
     });
   }
 

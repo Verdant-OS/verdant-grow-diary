@@ -79,6 +79,7 @@ describe("buildCloudCanaryPreviewViewModel", () => {
       "mapped_count",
       "unmapped_count",
       "state",
+      "suspicious_flag_codes",
     ];
     for (const row of vm.rows) {
       const keys = Object.keys(row).sort();

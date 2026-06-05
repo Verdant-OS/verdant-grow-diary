@@ -671,6 +671,9 @@ export function CloudCanaryPreviewPanel() {
                   <th className="px-2 py-1 text-right font-semibold border-l-2 border-l-foreground/30">
                     Unmapped (separate)
                   </th>
+                  <th className="px-2 py-1 text-left font-semibold border-l" title="Closed-vocabulary data-classification codes from the normalizer">
+                    Suspicious codes
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -704,6 +707,27 @@ export function CloudCanaryPreviewPanel() {
                       data-col="unmapped"
                     >
                       {row.unmapped_count}
+                    </td>
+                    <td
+                      className="px-2 py-1 border-l align-top"
+                      data-col="suspicious-codes"
+                      data-suspicious-code-count={row.suspicious_flag_codes.length}
+                    >
+                      {row.suspicious_flag_codes.length === 0 ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {row.suspicious_flag_codes.map((code) => (
+                            <span
+                              key={code}
+                              data-suspicious-code={code}
+                              className="rounded-md border bg-muted px-1.5 py-0.5 font-mono text-[10px]"
+                            >
+                              {code}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}

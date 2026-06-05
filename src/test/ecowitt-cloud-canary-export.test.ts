@@ -274,4 +274,20 @@ describe("CloudCanaryPreviewPanel — export controls render (Item 3)", () => {
     expect(html).toContain("Download Fixture Summary CSV");
     expect(html).toContain("Download Fixture Summary JSON");
   });
+
+  it("uses the fixed Item 3 filenames (no timestamp)", () => {
+    expect(pageSrc).toContain("CLOUD_CANARY_EXPORT_CSV_FILENAME");
+    expect(pageSrc).toContain("CLOUD_CANARY_EXPORT_JSON_FILENAME");
+    expect(pageSrc).not.toMatch(/cloud-canary-fixture-summary-\$\{Date\.now/);
+  });
+
+  it("export omits view-model gap fields (missing_metric_count, suspicious_flag_codes)", () => {
+    // Audit-confirmed gaps: the view-model does NOT expose these. Per spec,
+    // the export must NOT add them; they are deferred to a separate slice.
+    const vm = buildVmFromIds(ORDER);
+    const exp = buildCloudCanaryExport(vm, { now: FIXED_NOW });
+    const json = serializeCloudCanaryExportToJson(exp);
+    expect(json).not.toMatch(/missing_metric_count/);
+    expect(json).not.toMatch(/suspicious_flag_codes/);
+  });
 });

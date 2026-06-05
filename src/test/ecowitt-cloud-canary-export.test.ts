@@ -145,6 +145,8 @@ describe("ecowittCloudCanaryExport — pure serializer", () => {
         invalid_count: Number(cols[4]),
         unmapped_count: Number(cols[5]),
         row_state: cols[6],
+        suspicious_flag_codes:
+          cols[7] && cols[7].length > 0 ? cols[7].split("|") : [],
       };
     });
     expect(csvRows).toEqual(json.rows);

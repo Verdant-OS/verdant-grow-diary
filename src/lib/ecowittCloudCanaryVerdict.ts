@@ -96,7 +96,7 @@ function summarizeOne(
     stale_count: stale,
     live_count: live,
     suspicious_flag_codes: [...codes].sort(),
-    missing_metric_codes: [...res.missing_metric_codes].sort(),
+    
     missing_metric: res.rows.length === 0 && res.unmapped.length === 0,
     ec_metric_invented: hasEcMetric(res),
     pressure_unmapped: res.unmapped.some((u) => u.metric === "pressure_hpa"),

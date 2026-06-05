@@ -148,6 +148,8 @@ describe("ecowittCloudCanaryExport — pure serializer", () => {
         row_state: cols[6],
         suspicious_flag_codes:
           cols[7] && cols[7].length > 0 ? cols[7].split("|") : [],
+        missing_metric_codes:
+          cols[8] && cols[8].length > 0 ? cols[8].split("|") : [],
       };
     });
     expect(csvRows).toEqual(json.rows);

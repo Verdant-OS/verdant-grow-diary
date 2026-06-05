@@ -193,14 +193,22 @@ export default function PlantDetailAiDoctorLiveReview({
       ) : null}
 
       {review.status === "error" ? (
-        <p
-          className="text-xs text-amber-200"
-          data-testid="plant-ai-doctor-live-review-failure"
-          role="status"
-          aria-live="polite"
-        >
-          {AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY}
-        </p>
+        review.reason === "credit_denied" && review.credit ? (
+          <AiCreditLimitNotice
+            credit={review.credit}
+            currentPlanLabel={currentPlanLabel}
+            data-testid="plant-ai-doctor-live-review-credit-denied"
+          />
+        ) : (
+          <p
+            className="text-xs text-amber-200"
+            data-testid="plant-ai-doctor-live-review-failure"
+            role="status"
+            aria-live="polite"
+          >
+            {AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY}
+          </p>
+        )
       ) : null}
 
       {review.status === "result" && review.result ? (

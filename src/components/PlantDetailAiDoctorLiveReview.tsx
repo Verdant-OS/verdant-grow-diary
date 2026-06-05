@@ -120,12 +120,25 @@ export default function PlantDetailAiDoctorLiveReview({
     persist,
   });
 
+  const { entitlement } = useMyEntitlements();
+
   if (!allowed) return null;
 
   const confidenceCopy =
     context.readiness === "partial"
       ? AI_DOCTOR_LIVE_REVIEW_PARTIAL_COPY
       : AI_DOCTOR_LIVE_REVIEW_STRONG_COPY;
+
+  const currentPlanLabel =
+    entitlement.displayPlanId === "free"
+      ? "Free"
+      : entitlement.displayPlanId === "pro_monthly"
+        ? "Pro (monthly)"
+        : entitlement.displayPlanId === "pro_annual"
+          ? "Pro (annual)"
+          : entitlement.displayPlanId === "founder_lifetime"
+            ? "Founder Lifetime"
+            : undefined;
 
   return (
     <section

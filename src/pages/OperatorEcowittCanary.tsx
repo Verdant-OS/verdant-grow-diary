@@ -789,6 +789,9 @@ export default function OperatorEcowittCanary() {
 
       {saveNotice && <div className="text-xs text-muted-foreground">{saveNotice}</div>}
 
+      <NoBrowserPostsNotice />
+      <CanaryWorkflowStatusBar preflight={preflight} reportLoaded={!!report} verdict={verdict} />
+
       <RedactionWarningBanner />
       <RedactionPreviewPanel />
       <WindowsRunCommandPanel />

@@ -936,3 +936,296 @@ export function clearAuditFromLocalStorage(): void {
     /* ignore */
   }
 }
+
+// ----- verdict drill-down --------------------------------------------------
+
+export interface DrillDownDetail {
+  status: CardStatus;
+  reason: string;
+  evidence_present: string[];
+  evidence_missing: string[];
+  next_action?: string;
+  offending: string[];
+  unavailable: boolean;
+}
+
+/**
+ * Compute per-category drill-down evidence for the Results Dashboard.
+ * Pulls offending row hints from the imported report when present.
+ * Never invents evidence; sets `unavailable: true` when none can be shown.
+ */
+export function buildDrillDown(
+  card: VerdictCard,
+  report: CanaryReportInput | null,
+): DrillDownDetail {
+  const base = {
+    status: card.status,
+    reason: card.reason,
+    evidence_present: card.evidence_present,
+    evidence_missing: card.evidence_missing,
+    next_action: card.next_action,
+  };
+  const offending: string[] = [];
+  let unavailable = false;
+  const r = report ?? {};
+  switch (card.key) {
+    case "ch9":
+      if ((r.channel_9_count ?? 0) > 0) {
+        offending.push(`channel_9_count=${r.channel_9_count}`);
+      } else if (card.status === "incomplete") {
+        unavailable = true;
+      }
+      break;
+    case "sql_malformed": {
+      const m = r.malformed_row_counts ?? {};
+      for (const k of FORBIDDEN_MALFORMED_METRICS) {
+        if ((m[k] ?? 0) > 0) offending.push(`${k}=${m[k]} (forbidden)`);
+      }
+      if (offending.length === 0 && card.status === "fail") {
+        offending.push(`metrics present: ${Object.keys(m).join(",") || "none"}`);
+      }
+      if (offending.length === 0 && card.status === "incomplete") unavailable = true;
+      break;
+    }
+    case "dup": {
+      const dr = r.duplicate_replay_counts ?? {};
+      for (const [k, v] of Object.entries(dr)) {
+        if ((v ?? 0) > 1) offending.push(`${k}=${v} (expected 1)`);
+      }
+      if (offending.length === 0 && card.status === "incomplete") unavailable = true;
+      break;
+    }
+    case "ts": {
+      const tsc = r.timestamp_source_counts ?? {};
+      const srv = tsc.server_received_at ?? 0;
+      const eco = tsc.ecowitt_dateutc ?? 0;
+      if (srv > 0 && eco === 0) offending.push(`server_received_at=${srv}`);
+      else if (card.status === "incomplete") unavailable = true;
+      break;
+    }
+    case "secrets": {
+      if ((r.leak_scan_count ?? 0) > 0) offending.push(`leak_scan_count=${r.leak_scan_count}`);
+      if ((r.secret_value_leak_count ?? 0) > 0) offending.push(`secret_value_leak_count=${r.secret_value_leak_count}`);
+      if ((r.null_captured_at_count ?? 0) > 0) offending.push(`null_captured_at_count=${r.null_captured_at_count}`);
+      if (offending.length === 0 && card.status === "incomplete") unavailable = true;
+      break;
+    }
+    case "sql_main": {
+      const counts = r.main_row_counts ?? {};
+      for (const k of REQUIRED_MAIN_METRICS) {
+        if ((counts[k] ?? 0) !== 1) offending.push(`${k}=${counts[k] ?? 0} (expected 1)`);
+      }
+      for (const k of Object.keys(counts)) {
+        if (!REQUIRED_MAIN_METRICS.includes(k)) offending.push(`${k}=${counts[k]} (unexpected)`);
+      }
+      if (offending.length === 0 && card.status === "incomplete") unavailable = true;
+      break;
+    }
+    case "vpd": {
+      const v = r.vpd_provenance;
+      if (!v) unavailable = true;
+      else if (card.status === "fail") {
+        offending.push(`calculated=${v.calculated}; derived_from=${(v.derived_from ?? []).join(",") || "(none)"}`);
+      }
+      break;
+    }
+    case "posts": {
+      const resp = r.responses ?? {};
+      for (const k of ["main", "duplicate", "malformed"] as const) {
+        const v = (resp as Record<string, { http?: number; ok?: boolean } | undefined>)[k];
+        if (v && v.ok !== true && v.http !== 200) {
+          offending.push(`${k}.http=${v.http ?? "?"} ok=${String(v.ok ?? false)}`);
+        }
+      }
+      if (offending.length === 0 && card.status === "incomplete") unavailable = true;
+      break;
+    }
+    default:
+      if (card.status === "incomplete") unavailable = true;
+  }
+  return { ...base, offending, unavailable };
+}
+
+// ----- verdict export (JSON + CSV) ----------------------------------------
+
+export interface VerdictExport {
+  report_version: string;
+  generated_at: string;
+  verdict: Verdict;
+  workflow_stages: { key: string; status: string }[];
+  cards: VerdictCard[];
+  evidence_checklist: { key: string; label: string; status: CardStatus }[];
+  sql_summary: {
+    main_row_counts: Record<string, number> | null;
+    malformed_row_counts: Record<string, number> | null;
+    duplicate_replay_counts: Record<string, number> | null;
+    channel_9_count: number | null;
+  };
+  timestamp_source_summary: Record<string, number> | null;
+  duplicate_replay_summary: Record<string, number> | null;
+  channel_9_summary: { count: number | null };
+  secret_scan_summary: {
+    leak_scan_count: number | null;
+    secret_value_leak_count: number | null;
+    null_captured_at_count: number | null;
+  };
+  vpd_provenance_summary: { calculated: boolean | null; derived_from: string[] } | null;
+  safety_notes: string[];
+}
+
+export function buildVerdictExport(audit: BuiltAuditReport): VerdictExport {
+  const r = audit.imported_report ?? null;
+  const vpd = r?.vpd_provenance ?? null;
+  return {
+    report_version: VERDICT_REPORT_VERSION,
+    generated_at: new Date().toISOString(),
+    verdict: audit.verdict,
+    workflow_stages: audit.cards.map((c) => ({ key: c.key, status: c.status })),
+    cards: audit.cards,
+    evidence_checklist: audit.cards.map((c) => ({ key: c.key, label: c.label, status: c.status })),
+    sql_summary: {
+      main_row_counts: r?.main_row_counts ?? null,
+      malformed_row_counts: r?.malformed_row_counts ?? null,
+      duplicate_replay_counts: r?.duplicate_replay_counts ?? null,
+      channel_9_count: r?.channel_9_count ?? null,
+    },
+    timestamp_source_summary: r?.timestamp_source_counts ?? null,
+    duplicate_replay_summary: r?.duplicate_replay_counts ?? null,
+    channel_9_summary: { count: r?.channel_9_count ?? null },
+    secret_scan_summary: {
+      leak_scan_count: r?.leak_scan_count ?? null,
+      secret_value_leak_count: r?.secret_value_leak_count ?? null,
+      null_captured_at_count: r?.null_captured_at_count ?? null,
+    },
+    vpd_provenance_summary: vpd
+      ? { calculated: vpd.calculated ?? null, derived_from: vpd.derived_from ?? [] }
+      : null,
+    safety_notes: audit.safety_notes,
+  };
+}
+
+function csvEscape(v: unknown): string {
+  if (v === null || v === undefined) return "";
+  const s = String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+export function buildVerdictCsv(audit: BuiltAuditReport): string {
+  const header = ["category", "status", "evidence_present", "evidence_missing", "next_action", "value", "expected", "verdict"];
+  const verdict = audit.verdict;
+  const rows = audit.cards.map((c) => [
+    c.key,
+    c.status,
+    c.evidence_present.join("|"),
+    c.evidence_missing.join("|"),
+    c.next_action ?? "",
+    c.evidence_present.join("|"),
+    c.evidence_missing.join("|") || "pass",
+    verdict,
+  ]);
+  return [header, ...rows].map((r) => r.map(csvEscape).join(",")).join("\n");
+}
+
+// ----- workflow snapshot persistence (redacted only) -----------------------
+
+export interface WorkflowSnapshot {
+  schema: typeof WORKFLOW_STORAGE_KEY;
+  saved_at: string;
+  preflight: PreflightResult | null;
+  report_metadata: {
+    present: boolean;
+    has_responses: boolean;
+    has_main_counts: boolean;
+    has_malformed_counts: boolean;
+    has_sql_verification: boolean;
+    has_timestamp_source: boolean;
+  };
+  verdict: Verdict;
+  cards: VerdictCard[];
+  counts: { pass: number; fail: number; incomplete: number };
+  timestamp_source_summary: Record<string, number> | null;
+  sql_summary: {
+    main_row_counts: Record<string, number> | null;
+    malformed_row_counts: Record<string, number> | null;
+    duplicate_replay_counts: Record<string, number> | null;
+    channel_9_count: number | null;
+  } | null;
+  imported_report: CanaryReportInput | null;
+}
+
+export function buildWorkflowSnapshot(args: {
+  preflight: PreflightResult | null;
+  report: CanaryReportInput | null;
+  verdict: VerdictResult;
+}): WorkflowSnapshot {
+  const r = args.report;
+  const redacted = redactReport(r);
+  const cards = args.verdict.cards;
+  return {
+    schema: WORKFLOW_STORAGE_KEY,
+    saved_at: new Date().toISOString(),
+    preflight: args.preflight,
+    report_metadata: {
+      present: !!r,
+      has_responses: !!r?.responses,
+      has_main_counts: !!r?.main_row_counts,
+      has_malformed_counts: !!r?.malformed_row_counts,
+      has_sql_verification: !!(r?.main_row_counts || r?.malformed_row_counts),
+      has_timestamp_source: !!r?.timestamp_source_counts,
+    },
+    verdict: args.verdict.verdict,
+    cards,
+    counts: {
+      pass: cards.filter((c) => c.status === "pass").length,
+      fail: cards.filter((c) => c.status === "fail").length,
+      incomplete: cards.filter((c) => c.status === "incomplete" || c.status === "unknown").length,
+    },
+    timestamp_source_summary: r?.timestamp_source_counts ?? null,
+    sql_summary: r
+      ? {
+          main_row_counts: r.main_row_counts ?? null,
+          malformed_row_counts: r.malformed_row_counts ?? null,
+          duplicate_replay_counts: r.duplicate_replay_counts ?? null,
+          channel_9_count: r.channel_9_count ?? null,
+        }
+      : null,
+    imported_report: redacted,
+  };
+}
+
+export function saveWorkflowToLocalStorage(snap: WorkflowSnapshot): { ok: boolean; reason?: string } {
+  try {
+    const serialized = JSON.stringify(snap);
+    const cats = detectSecretCategories(serialized);
+    if (cats.length > 0) {
+      return { ok: false, reason: `Refused to save: secret-looking pattern(s) detected: ${cats.join(", ")}` };
+    }
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(WORKFLOW_STORAGE_KEY, serialized);
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, reason: String(e) };
+  }
+}
+
+export function loadWorkflowFromLocalStorage(): WorkflowSnapshot | null {
+  try {
+    if (typeof localStorage === "undefined") return null;
+    const raw = localStorage.getItem(WORKFLOW_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as WorkflowSnapshot;
+    if (!parsed || parsed.schema !== WORKFLOW_STORAGE_KEY) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function clearWorkflowFromLocalStorage(): void {
+  try {
+    if (typeof localStorage !== "undefined") localStorage.removeItem(WORKFLOW_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}

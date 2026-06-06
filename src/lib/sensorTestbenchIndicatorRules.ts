@@ -186,5 +186,11 @@ export function buildEcowittPowerShellSnippet(
     `$env:VERDANT_TENT_ID = "${tent}"`,
     `$env:VERDANT_BRIDGE_TOKEN = "${token}"`,
     `$env:VERDANT_INGEST_URL = "${url}"`,
+    ``,
+    `# Start the listener:`,
+    `cd $HOME\\verdant-testbench`,
+    `.\\.venv\\Scripts\\Activate.ps1`,
+    `python ecowitt_listener.py`,
   ].join("\n");
 }
+

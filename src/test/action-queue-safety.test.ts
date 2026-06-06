@@ -99,15 +99,62 @@ const AI_COACH_CODE = AI_COACH_SRC
   .replace(/(^|[^:])\/\/.*$/gm, "$1");
 
 describe("Action Queue safety — current posture (suggest-only by construction)", () => {
-  it("1. ai-coach performs NO writes (no .insert / .upsert / .update / .delete / .rpc)", () => {
-    // Strong invariant: the AI Coach must be read-only on the database.
+  it("1. ai-coach performs NO row writes (no .insert / .upsert / .update / .delete) and only approved RPCs", () => {
+    // Strong invariant: the AI Coach must be read-only on tables.
     expect(AI_COACH_CODE).not.toMatch(/\.insert\s*\(/);
     expect(AI_COACH_CODE).not.toMatch(/\.upsert\s*\(/);
     expect(AI_COACH_CODE).not.toMatch(/\.update\s*\(/);
     expect(AI_COACH_CODE).not.toMatch(/\.delete\s*\(/);
-    expect(AI_COACH_CODE).not.toMatch(/\.rpc\s*\(/);
     // And specifically never writes to action_queue (even once the table exists).
     expect(AI_COACH_CODE).not.toMatch(/action_queue/i);
+
+    // RPC allow-list: ai-coach may only call approved credit-metering RPCs.
+    // Anything else (device control, automation, action_queue writers,
+    // role/billing mutators) is forbidden.
+    const APPROVED_RPCS = new Set(["ai_credit_spend", "ai_credit_refund"]);
+    const rpcCalls = [
+      ...AI_COACH_CODE.matchAll(/\.rpc\s*\(\s*["'`]([a-zA-Z0-9_]+)["'`]/g),
+    ].map((m) => m[1]);
+    for (const name of rpcCalls) {
+      expect(
+        APPROVED_RPCS.has(name),
+        `ai-coach called unapproved RPC: ${name}. Only credit-metering RPCs are allowed.`,
+      ).toBe(true);
+    }
+    // Banned RPC name patterns — device-control / automation / action_queue writers.
+    const BANNED_RPC_PATTERNS = [
+      /action_queue/i,
+      /device/i,
+      /relay/i,
+      /actuator/i,
+      /autopilot/i,
+      /auto[_-]?execute/i,
+      /dispatch[_-]?command/i,
+      /grant[_-]?role/i,
+      /set[_-]?billing/i,
+      /set[_-]?plan/i,
+    ];
+    for (const name of rpcCalls) {
+      for (const re of BANNED_RPC_PATTERNS) {
+        expect(name, `ai-coach RPC name matches banned pattern ${re}`).not.toMatch(re);
+      }
+    }
+  });
+
+  it("1b. ai-coach RPC calls are scoped to credit metering, never Action Queue writes", () => {
+    // Pair each .rpc(...) call with a small surrounding window and assert that
+    // window does not reference action_queue. This guarantees the approved
+    // RPC allow-list is not abused as a side-channel for Action Queue writes.
+    const matches = [...AI_COACH_CODE.matchAll(/\.rpc\s*\(\s*["'`]([a-zA-Z0-9_]+)["'`]/g)];
+    expect(matches.length, "ai-coach should call at least one approved RPC (ai_credit_spend)").toBeGreaterThan(0);
+    for (const m of matches) {
+      const idx = m.index ?? 0;
+      const window = AI_COACH_CODE.slice(Math.max(0, idx - 200), idx + 400);
+      expect(m[1]).toMatch(/^ai_credit_(spend|refund)$/);
+      expect(window, `ai-coach RPC ${m[1]} must not touch action_queue`).not.toMatch(
+        /action_queue/i,
+      );
+    }
   });
 
   it("2. no AI / coach code reaches MQTT, Home Assistant, Pi bridge, webhooks, or device endpoints", () => {

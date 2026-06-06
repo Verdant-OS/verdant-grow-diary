@@ -295,6 +295,23 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     () => (responseInspector ? formatSafeResponseInspectorPlainText(responseInspector) : null),
     [responseInspector],
   );
+  const validationAriaLabel = useMemo(
+    () => buildCanonicalValidationA11yLabel({ status: validationUi.status }),
+    [validationUi.status],
+  );
+  const shareModalState = useMemo(
+    () =>
+      buildDiagnosticsShareModalState({
+        bundleFilename: bundleFilenamePreview,
+        validationUi,
+        lastTestResult:
+          result && resultClass
+            ? { http_status: result.status, classification: resultClass.category }
+            : null,
+        inspectorPlainText,
+      }),
+    [bundleFilenamePreview, validationUi, result, resultClass, inspectorPlainText],
+  );
 
 
 

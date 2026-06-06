@@ -194,6 +194,17 @@ export default function QuickLog({
     }
   }, [open, stripView.status, selectedPlant?.tent_id, snapshot]);
 
+  // On open/reset, recompute the Hardware readings default from current
+  // values unless the grower already toggled it in this session.
+  useEffect(() => {
+    if (!open) {
+      hardwareUserTouchedRef.current = false;
+      return;
+    }
+    if (hardwareUserTouchedRef.current) return;
+    setHardwareOpen(computeQuickLogHardwareDefaultOpen(hardware));
+  }, [open, hardware]);
+
   function reset() {
     setNote("");
     setShowMore(false);
@@ -211,6 +222,8 @@ export default function QuickLog({
       ppfdCanopy: "",
       lightDistance: "",
     });
+    hardwareUserTouchedRef.current = false;
+    setHardwareOpen(false);
   }
 
   async function submit(e: React.FormEvent) {

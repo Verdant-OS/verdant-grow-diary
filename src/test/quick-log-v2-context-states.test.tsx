@@ -141,3 +141,68 @@ describe("QuickLogV2Sheet — happy path still enables Save", () => {
     ).toBe(false);
   });
 });
+
+describe("QuickLogV2Sheet — photo gate (not enabled)", () => {
+  it("selecting Photo action shows the gate message with role=status", () => {
+    plantsState.data = [
+      { id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" },
+    ];
+    tentsState.data = [{ id: "tent-1", name: "Tent 1", grow_id: "grow-1" }];
+    renderSheet();
+    fireEvent.click(screen.getByRole("button", { name: /photo/i }));
+    const gate = screen.getByTestId("qlv2-photo-gate");
+    expect(gate).toBeTruthy();
+    expect(gate.getAttribute("role")).toBe("status");
+    expect(gate.textContent).toMatch(/Photo saving is not enabled yet/i);
+  });
+
+  it("Photo gate uses the helper copy and aria-label", () => {
+    plantsState.data = [
+      { id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" },
+    ];
+    tentsState.data = [{ id: "tent-1", name: "Tent 1", grow_id: "grow-1" }];
+    renderSheet();
+    fireEvent.click(screen.getByRole("button", { name: /photo/i }));
+    const gate = screen.getByTestId("qlv2-photo-gate");
+    expect(gate.getAttribute("aria-label")).toMatch(/unavailable/i);
+    expect(gate.textContent).toMatch(/future update/i);
+  });
+
+  it("does not render Take Photo or Choose from Library buttons", () => {
+    plantsState.data = [
+      { id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" },
+    ];
+    tentsState.data = [{ id: "tent-1", name: "Tent 1", grow_id: "grow-1" }];
+    renderSheet();
+    fireEvent.click(screen.getByRole("button", { name: /photo/i }));
+    expect(
+      screen.queryByRole("button", { name: /take photo/i }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /choose from library/i }),
+    ).toBeNull();
+  });
+
+  it("does not render any file input when Photo is selected", () => {
+    plantsState.data = [
+      { id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" },
+    ];
+    tentsState.data = [{ id: "tent-1", name: "Tent 1", grow_id: "grow-1" }];
+    renderSheet();
+    fireEvent.click(screen.getByRole("button", { name: /photo/i }));
+    expect(document.querySelector('input[type="file"]')).toBeNull();
+  });
+
+  it("Save is disabled when Photo action is selected", () => {
+    plantsState.data = [
+      { id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" },
+    ];
+    tentsState.data = [{ id: "tent-1", name: "Tent 1", grow_id: "grow-1" }];
+    renderSheet();
+    fireEvent.click(screen.getByRole("button", { name: /photo/i }));
+    const save = screen.getByTestId("qlv2-save") as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.click(save);
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+});

@@ -50,7 +50,10 @@ vi.mock("@/store/grows", () => ({
 }));
 vi.mock("@/hooks/use-plants", () => ({
   usePlants: () => ({
-    data: [{ id: "p1", name: "Blue Dream", strain: "BD", tent_id: "t1", grow_id: "g1" }],
+    data: [
+      { id: "p1", name: "Blue Dream", strain: "BD", tent_id: "t1", grow_id: "g1" },
+      { id: "p2", name: "OG Kush", strain: "OG", tent_id: "t1", grow_id: "g1" },
+    ],
   }),
 }));
 vi.mock("sonner", () => ({

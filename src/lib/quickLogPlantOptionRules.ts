@@ -58,3 +58,36 @@ export function quickLogPlantHelperText(
   }
   return `Showing plants from ${activeGrowName ?? "this grow"}. Archived/merged plants hidden.`;
 }
+
+/**
+ * Picks the default Quick Log plant id to apply when the picker is empty.
+ *
+ * Resolution order (pure, deterministic, no I/O):
+ *   1. If the grower has already chosen a plant in this session
+ *      (`currentPlantId` is set AND matches a scoped plant), keep it.
+ *   2. If `prefillPlantId` is set AND matches a scoped plant, use it.
+ *   3. If exactly one scoped plant exists, auto-select it.
+ *   4. Otherwise return "" (no auto-pick — grower must choose).
+ *
+ * Notes:
+ *   - `scopedPlants` is already filtered by `filterQuickLogPlantOptions`,
+ *     so archived/merged/out-of-scope plants are not reachable here.
+ *   - Returns "" (not null) so the caller can pass it straight to
+ *     `setPlantId(...)` without a null-coalesce branch.
+ *   - Never overrides a valid current selection — this preserves the
+ *     verified validation/save contract (plant required, grower chosen).
+ */
+export function pickDefaultQuickLogPlant<T extends MinimalQuickLogPlant>(
+  scopedPlants: ReadonlyArray<T>,
+  prefillPlantId?: string | null,
+  currentPlantId?: string | null,
+): string {
+  if (currentPlantId && scopedPlants.some((p) => p.id === currentPlantId)) {
+    return currentPlantId;
+  }
+  if (prefillPlantId && scopedPlants.some((p) => p.id === prefillPlantId)) {
+    return prefillPlantId;
+  }
+  if (scopedPlants.length === 1) return scopedPlants[0].id;
+  return "";
+}

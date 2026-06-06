@@ -29,6 +29,9 @@ import { ACTION_QUEUE_SOURCE_VALUES } from "@/lib/actionQueueProvenanceRules";
 import { persistAiDoctorSession } from "@/lib/aiDoctorSessionPersistence";
 import { harmonizeDiagnosisConfidence } from "@/lib/aiDoctorConfidenceRules";
 import { actionsPath } from "@/lib/routes";
+import AiCreditLimitNotice from "@/components/AiCreditLimitNotice";
+import { parseAiCoachCreditDenial } from "@/lib/aiCoachCreditDenialAdapter";
+import type { AiCreditDenial } from "@/lib/aiCreditLimitNoticeViewModel";
 
 type Mode = "diagnose" | "next_steps";
 

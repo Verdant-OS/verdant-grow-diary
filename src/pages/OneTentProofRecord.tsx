@@ -122,10 +122,10 @@ export default function OneTentProofRecord() {
     <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
       <header className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center rounded-md border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+          <span data-testid="chip-proof-record" className="inline-flex items-center rounded-md border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
             Proof Record
           </span>
-          <span className="inline-flex items-center rounded-md border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+          <span data-testid="chip-review-only" className="inline-flex items-center rounded-md border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
             Review only
           </span>
           {sourceLabel ? (

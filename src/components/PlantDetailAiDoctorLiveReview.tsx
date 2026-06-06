@@ -220,6 +220,12 @@ export default function PlantDetailAiDoctorLiveReview({
           >
             {AI_DOCTOR_LIVE_REVIEW_VALIDATED_LABEL}
           </p>
+          {review.creditRemaining ? (
+            <AiCreditRemainingBadge
+              credit={review.creditRemaining}
+              data-testid="plant-ai-doctor-live-review-credit-remaining"
+            />
+          ) : null}
           <AiDoctorReviewResultPreview
             result={review.result}
             testIdPrefix="plant-detail-live"

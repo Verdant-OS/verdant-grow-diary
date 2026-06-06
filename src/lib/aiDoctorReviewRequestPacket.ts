@@ -48,6 +48,16 @@ export interface AiDoctorReviewRequestSnapshot {
   readings: AiDoctorReviewRequestSnapshotReading[];
 }
 
+export interface AiDoctorReviewRequestSnapshotAnnotation {
+  line: string;
+  source: AiCoachSnapshotSource;
+  stale: boolean;
+  trust: AiCoachSnapshotTrust;
+  includesValues: boolean;
+  safetyNotes: string[];
+  missingInformationHints: string[];
+}
+
 export interface AiDoctorReviewRequestPacket {
   schemaVersion: typeof AI_DOCTOR_REVIEW_PACKET_SCHEMA_VERSION;
   plant: AiDoctorReviewRequestPlantProfile;
@@ -58,7 +68,14 @@ export interface AiDoctorReviewRequestPacket {
   };
   recentEvents: AiDoctorReviewRequestEvent[];
   recentSensorSnapshot: AiDoctorReviewRequestSnapshot | null;
+  /**
+   * Additive: source-aware annotation built from the same shared helper
+   * used by ai-coach. Preserves provenance (live/manual/csv/demo/stale/
+   * invalid/unknown), surfaces safety notes, and never relabels.
+   */
+  recentSensorSnapshotAnnotation: AiDoctorReviewRequestSnapshotAnnotation | null;
 }
+
 
 export interface BuildAiDoctorReviewPacketArgs {
   plant: (AiDoctorContextPlantSource & { potSize?: string | null }) | null;

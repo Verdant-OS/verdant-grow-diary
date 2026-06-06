@@ -325,8 +325,14 @@ export default function QuickLog({
           </div>
 
 
-          {/* Event type + Stage */}
-          <div className="grid grid-cols-2 gap-2">
+          {/* Event + Stage + Current Setup — compact responsive row.
+              Mobile (<sm): 2 cols, Setup wraps onto its own line.
+              ≥sm: all three sit side-by-side. Plant keeps its own row
+              below so the validation alert/helper has full width. */}
+          <div
+            data-testid="quicklog-context-row"
+            className="grid grid-cols-2 sm:grid-cols-3 gap-2"
+          >
             <div>
               <Label className="text-xs">Event</Label>
               <Select value={eventType} onValueChange={setEventType}>
@@ -368,11 +374,7 @@ export default function QuickLog({
                 </SelectContent>
               </Select>
             </div>
-          </div>
-
-          {/* Current Setup + Plant */}
-          <div className="grid grid-cols-2 gap-2">
-            <div>
+            <div className="col-span-2 sm:col-span-1">
               <Label className="text-xs">Current Setup</Label>
               <Select value={activeGrowId ?? ""} onValueChange={setActiveGrowId}>
                 <SelectTrigger>
@@ -387,48 +389,52 @@ export default function QuickLog({
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label className="text-xs">Plant</Label>
-              <Select
-                value={plantId || "__none"}
-                onValueChange={(v) => setPlantId(v === "__none" ? "" : v)}
-              >
-                <SelectTrigger
-                  data-testid="quick-log-plant-select"
-                  aria-invalid={!selectedPlant}
-                  aria-describedby={!selectedPlant ? "quick-log-plant-error" : undefined}
-                >
-                  <SelectValue placeholder="Choose a plant" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none">Choose a plant…</SelectItem>
-                  {scopedPlants.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                      {p.strain ? ` · ${p.strain}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {!selectedPlant ? (
-                <p
-                  id="quick-log-plant-error"
-                  role="alert"
-                  className="text-[11px] text-destructive mt-1"
-                  data-testid="quick-log-plant-error"
-                >
-                  Choose a plant before saving this entry.
-                </p>
-              ) : (
-                <p
-                  className="text-[11px] text-muted-foreground mt-1"
-                  data-testid="quick-log-plant-helper"
-                >
-                  {quickLogPlantHelperText(activeGrow?.name ?? null, !!activeGrowId)}
-                </p>
-              )}
-            </div>
           </div>
+
+          {/* Plant — full-width row so the validation alert + helper text
+              have room to read on narrow viewports. */}
+          <div>
+            <Label className="text-xs">Plant</Label>
+            <Select
+              value={plantId || "__none"}
+              onValueChange={(v) => setPlantId(v === "__none" ? "" : v)}
+            >
+              <SelectTrigger
+                data-testid="quick-log-plant-select"
+                aria-invalid={!selectedPlant}
+                aria-describedby={!selectedPlant ? "quick-log-plant-error" : undefined}
+              >
+                <SelectValue placeholder="Choose a plant" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none">Choose a plant…</SelectItem>
+                {scopedPlants.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                    {p.strain ? ` · ${p.strain}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {!selectedPlant ? (
+              <p
+                id="quick-log-plant-error"
+                role="alert"
+                className="text-[11px] text-destructive mt-1"
+                data-testid="quick-log-plant-error"
+              >
+                Choose a plant before saving this entry.
+              </p>
+            ) : (
+              <p
+                className="text-[11px] text-muted-foreground mt-1"
+                data-testid="quick-log-plant-helper"
+              >
+                {quickLogPlantHelperText(activeGrow?.name ?? null, !!activeGrowId)}
+              </p>
+            )}
+          </div>
+
 
           <div>
             <Label>What's happening?</Label>

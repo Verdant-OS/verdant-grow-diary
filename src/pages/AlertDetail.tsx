@@ -119,11 +119,15 @@ export default function AlertDetail() {
   const linkedActionCounts = useAlertsLinkedActionCounts(linkedActionAlertIds);
   const [eventsKey, setEventsKey] = useState(0);
   const [existingActionId, setExistingActionId] = useState<string | null>(null);
+  const [existingActionRows, setExistingActionRows] = useState<
+    ActionQueueRowForDedupe[]
+  >([]);
   const [queuing, setQueuing] = useState(false);
   const [relatedActions, setRelatedActions] = useState<RelatedActionRow[]>([]);
   const [relatedLoaded, setRelatedLoaded] = useState(false);
   const [outcomeRows, setOutcomeRows] = useState<RawOutcomeDiaryRow[]>([]);
   const [linkedAiDoctorSessionIds, setLinkedAiDoctorSessionIds] = useState<string[]>([]);
+
 
   const load = useCallback(async () => {
     if (!alertId) return;

@@ -1069,10 +1069,21 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
             )}
             <div className="mt-2">
               <a
-                href="#sensors-testbench-canonical-validation"
-                className="text-[11px] underline text-muted-foreground"
+                href="#canonical-ingest-validation-details"
+                className="inline-flex items-center text-[11px] underline text-muted-foreground rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 data-testid="sensors-testbench-result-readiness-badge"
                 data-status={validationUi.status}
+                aria-label={validationAriaLabel}
+                onClick={(e) => {
+                  e.preventDefault();
+                  focusValidationDetails();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    focusValidationDetails();
+                  }
+                }}
               >
                 Canonical payload:{" "}
                 <Badge

@@ -323,8 +323,9 @@ export default function QuickLog({
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-4">
-          {/* Photo — disabled in unified Quick Log slice. Photo attach
-              will return when grow_events gains a photo writer path. */}
+          {/* Photo attach is temporarily disabled in the unified Quick
+              Log slice. Copy stays grower-facing — never references
+              internal table or writer names. */}
           <div
             data-testid="quicklog-photo-coming-soon"
             className="relative aspect-square w-full rounded-xl border-2 border-dashed border-border/40 overflow-hidden bg-secondary/20"
@@ -333,7 +334,7 @@ export default function QuickLog({
               <Camera className="h-10 w-10 opacity-50" />
               <span className="text-sm font-medium">Photo attach — coming soon</span>
               <span className="text-[11px] leading-snug">
-                Photo logs will return after the unified grow_events writer is expanded.
+                Photo logging is coming soon.
               </span>
             </div>
           </div>

@@ -1089,6 +1089,41 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
                   </li>
                 ))}
               </ul>
+            )}
+            <div className="mt-2">
+              <a
+                href="#canonical-ingest-validation-details"
+                className="inline-flex items-center text-[11px] underline text-muted-foreground rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                data-testid="sensors-testbench-result-readiness-badge"
+                data-status={validationUi.status}
+                aria-label={validationAriaLabel}
+                onClick={(e) => {
+                  e.preventDefault();
+                  focusValidationDetails();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    focusValidationDetails();
+                  }
+                }}
+              >
+                Canonical payload:{" "}
+                <Badge
+                  variant="outline"
+                  className={
+                    validationUi.badgeTone === "ready"
+                      ? "ml-1 text-[10px] text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
+                      : validationUi.badgeTone === "warn"
+                        ? "ml-1 text-[10px] text-amber-700 dark:text-amber-300 border-amber-500/40"
+                        : "ml-1 text-[10px]"
+                  }
+                >
+                  {validationUi.statusLabel}
+                </Badge>
+              </a>
+            </div>
+          </div>
         )}
 
         {networkDiagnostics && networkDiagnostics.status !== "not_applicable" && (
@@ -1151,40 +1186,6 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
                 </ul>
               </div>
             )}
-          </div>
-            <div className="mt-2">
-              <a
-                href="#canonical-ingest-validation-details"
-                className="inline-flex items-center text-[11px] underline text-muted-foreground rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                data-testid="sensors-testbench-result-readiness-badge"
-                data-status={validationUi.status}
-                aria-label={validationAriaLabel}
-                onClick={(e) => {
-                  e.preventDefault();
-                  focusValidationDetails();
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    focusValidationDetails();
-                  }
-                }}
-              >
-                Canonical payload:{" "}
-                <Badge
-                  variant="outline"
-                  className={
-                    validationUi.badgeTone === "ready"
-                      ? "ml-1 text-[10px] text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
-                      : validationUi.badgeTone === "warn"
-                        ? "ml-1 text-[10px] text-amber-700 dark:text-amber-300 border-amber-500/40"
-                        : "ml-1 text-[10px]"
-                  }
-                >
-                  {validationUi.statusLabel}
-                </Badge>
-              </a>
-            </div>
           </div>
         )}
 

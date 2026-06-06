@@ -136,10 +136,10 @@ Deno.serve(async (req) => {
         (t ?? []).forEach((row: Record<string, unknown>) => tentsById.set(row.id as string, row));
       }
 
-      for (const row of entries) {
-        const snap = (row.details as Record<string, unknown> | null)?.sensor_snapshot;
-        if (snap && typeof snap === "object") { latestSnapshot = snap as Record<string, unknown>; break; }
-      }
+      // Select the freshest snapshot by its own captured_at (not by
+      // diary entry_at order). Missing/invalid timestamps cannot
+      // outrank a valid current reading.
+      latestSnapshot = pickLatestSensorSnapshotByCapturedAt(entries);
     }
 
     const sparse = entries.length < 2;

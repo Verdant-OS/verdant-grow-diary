@@ -166,6 +166,8 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
   const [tokens, setTokens] = useState<BridgeTokenRow[]>([]);
   const [history, setHistory] = useState<SensorIngestHistoryItem[]>([]);
   const [lastPayload, setLastPayload] = useState<unknown>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const validationDetailsRef = useRef<HTMLDivElement | null>(null);
 
   // Reset reveal/result/history when tent changes — plaintext token must
   // never be reused across tents, and history is per-tent only.

@@ -28,10 +28,7 @@ import {
 } from "@/lib/quickLogV2Rules";
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
-import {
-  buildQuickLogPhotoGateState,
-  isQuickLogPhotoSavingSupported,
-} from "@/lib/quickLogPhotoGateRules";
+import { buildQuickLogPhotoGateState } from "@/lib/quickLogPhotoGateRules";
 
 interface Props {
   open: boolean;

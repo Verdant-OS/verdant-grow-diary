@@ -242,7 +242,7 @@ describe("One-Tent Loop E2E smoke", () => {
       reason: draftResult.draft.reason,
       grow_id: GROW_ID,
     };
-    expect(actionMatchesAlert(existingRow, persistedAlert.id)).toBe(true);
+    expect(actionMatchesAlert(existingRow, persistedAlert)).toBe(true);
     // Second click MUST detect the existing row and skip insert.
   });
 

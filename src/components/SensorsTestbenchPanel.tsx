@@ -47,6 +47,7 @@ import {
 } from "@/lib/sensorIngestTestResultRules";
 import {
   buildCanonicalIngestPayloadValidation,
+  buildDiagnosticsBundleFilenamePreview,
   buildDiagnosticsBundleFiles,
   buildDownloadFilename,
   buildPowerShellCopyWarningState,
@@ -56,8 +57,10 @@ import {
   buildSensorIngestCurl,
   buildSensorIngestHistoryItem,
   buildSensorIngestTestPayload,
+  buildSensorTestbenchValidationUiState,
   diagnosticsExportToJson,
   diagnosticsExportToText,
+  formatSafeResponseInspectorPlainText,
   historyExportToJson,
   SENSOR_INGEST_HISTORY_MAX,
   type SensorIngestHistoryItem,
@@ -259,15 +262,28 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     () => buildCanonicalIngestPayloadValidation(validationPayload),
     [validationPayload],
   );
-  const canonicalReady = canonicalValidation.ready;
-  const canonicalDisabledHint = canonicalReady
-    ? null
-    : `Payload not ready — missing/invalid: ${
-        [
-          ...canonicalValidation.missing,
-          ...canonicalValidation.invalid.map((i) => i.field),
-        ].join(", ") || "—"
-      }`;
+  const validationUi = useMemo(
+    () =>
+      buildSensorTestbenchValidationUiState({
+        validation: canonicalValidation,
+        hasLastTest: lastPayload !== null,
+      }),
+    [canonicalValidation, lastPayload],
+  );
+  const canonicalReady = !validationUi.actionsDisabled;
+  const canonicalDisabledHint = validationUi.disabledReason;
+  const bundleFilenamePreview = useMemo(
+    () => buildDiagnosticsBundleFilenamePreview(new Date()),
+    // Re-compute when validation flips so the displayed name refreshes when
+    // the user opens the panel afresh; the actual download still builds a
+    // new timestamp at click time.
+    [validationUi.status],
+  );
+  const inspectorPlainText = useMemo(
+    () => (responseInspector ? formatSafeResponseInspectorPlainText(responseInspector) : null),
+    [responseInspector],
+  );
+
 
 
 
@@ -533,11 +549,8 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = buildDownloadFilename(
-        "verdant-sensor-diagnostics-bundle",
-        "zip",
-        new Date(),
-      );
+      a.download = buildDiagnosticsBundleFilenamePreview(new Date());
+
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -682,12 +695,19 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
           </div>
         </div>
 
-        <p className="text-[11px] text-muted-foreground mb-2">
+        <p className="text-[11px] text-muted-foreground mb-1">
           Exports contain safe identity only. The curl and PowerShell buttons
           include the bridge token only while the one-time reveal is in memory
           — do not paste them into chat, screenshots, or git. Revoke any token
           that leaks.
         </p>
+        <p
+          className="text-[11px] text-muted-foreground mb-2 font-mono"
+          data-testid="sensors-diag-bundle-filename-preview"
+        >
+          bundle filename: {bundleFilenamePreview}
+        </p>
+
 
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
           <dt className="text-muted-foreground">App Supabase URL</dt>
@@ -899,7 +919,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
             data-status={responseInspector.http_status}
             data-classification={responseInspector.classification}
           >
-            <div className="font-medium mb-1 flex items-center gap-2">
+            <div className="font-medium mb-1 flex flex-wrap items-center gap-2">
               <Eye className="size-3" />
               Response inspector
               <Badge variant="outline" className="text-[10px]">
@@ -911,6 +931,24 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
               <Badge variant="outline" className="text-[10px]">
                 {responseInspector.kind}
               </Badge>
+              <Button
+                size="sm"
+                variant="outline"
+                className="ml-auto h-7"
+                onClick={() =>
+                  inspectorPlainText &&
+                  safeCopy(inspectorPlainText, "Response inspector (redacted)")
+                }
+                disabled={!inspectorPlainText}
+                data-testid="sensors-testbench-response-inspector-copy"
+                title={
+                  inspectorPlainText
+                    ? "Copy the redacted inspector output for support."
+                    : "Run a test to enable inspector copy."
+                }
+              >
+                <Copy className="size-3 mr-1" /> Copy redacted
+              </Button>
             </div>
             {responseInspector.note && (
               <div className="text-muted-foreground mb-1">
@@ -939,59 +977,113 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
                 ))}
               </ul>
             )}
+            <div className="mt-2">
+              <a
+                href="#sensors-testbench-canonical-validation"
+                className="text-[11px] underline text-muted-foreground"
+                data-testid="sensors-testbench-result-readiness-badge"
+                data-status={validationUi.status}
+              >
+                Canonical payload:{" "}
+                <Badge
+                  variant="outline"
+                  className={
+                    validationUi.badgeTone === "ready"
+                      ? "ml-1 text-[10px] text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
+                      : validationUi.badgeTone === "warn"
+                        ? "ml-1 text-[10px] text-amber-700 dark:text-amber-300 border-amber-500/40"
+                        : "ml-1 text-[10px]"
+                  }
+                >
+                  {validationUi.statusLabel}
+                </Badge>
+              </a>
+            </div>
           </div>
         )}
 
-        {/* Canonical payload validation summary — gates preview/copy/export. */}
+
+        {/* Canonical payload validation summary — view-model driven. */}
         <div
           className="mt-3 border-t border-border/40 pt-2 text-xs"
+          id="sensors-testbench-canonical-validation"
           data-testid="sensors-testbench-canonical-validation"
           data-ready={canonicalReady ? "true" : "false"}
+          data-status={validationUi.status}
         >
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <span className="font-medium">Canonical payload</span>
             <Badge
               variant="outline"
               className={
-                canonicalReady
+                validationUi.badgeTone === "ready"
                   ? "text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
-                  : "text-amber-700 dark:text-amber-300 border-amber-500/40"
+                  : validationUi.badgeTone === "warn"
+                    ? "text-amber-700 dark:text-amber-300 border-amber-500/40"
+                    : ""
               }
               data-testid="sensors-testbench-canonical-validation-badge"
+              data-tone={validationUi.badgeTone}
             >
-              {canonicalReady ? "Ready" : "Not ready"}
+              {validationUi.statusLabel}
             </Badge>
             <span className="text-muted-foreground">
               {canonicalValidation.readingsCount} reading
               {canonicalValidation.readingsCount === 1 ? "" : "s"}
             </span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
-            <div data-testid="sensors-testbench-canonical-present">
-              <div className="text-muted-foreground">present</div>
-              <div>{canonicalValidation.present.join(", ") || "—"}</div>
-            </div>
+
+          {validationUi.emptyStateMessage && (
+            <p
+              className="text-muted-foreground mb-2"
+              data-testid="sensors-testbench-canonical-empty"
+            >
+              {validationUi.emptyStateMessage}
+            </p>
+          )}
+
+          {/* Ordered summary: missing → invalid → optional → present. */}
+          <div className="space-y-1 text-[11px]">
             <div data-testid="sensors-testbench-canonical-missing">
-              <div className="text-muted-foreground">missing</div>
-              <div>{canonicalValidation.missing.join(", ") || "—"}</div>
+              <span className="text-muted-foreground">missing: </span>
+              {validationUi.summary.missing.length === 0 ? (
+                <span>—</span>
+              ) : (
+                <span>
+                  {validationUi.summary.missing
+                    .map((m) => `${m.label} (${m.reason})`)
+                    .join(", ")}
+                </span>
+              )}
             </div>
             <div data-testid="sensors-testbench-canonical-invalid">
-              <div className="text-muted-foreground">invalid</div>
-              <div>
-                {canonicalValidation.invalid
-                  .map((i) => `${i.field}: ${i.reason}`)
-                  .join("; ") || "—"}
-              </div>
+              <span className="text-muted-foreground">invalid: </span>
+              {validationUi.summary.invalid.length === 0 ? (
+                <span>—</span>
+              ) : (
+                <span>
+                  {validationUi.summary.invalid
+                    .map((i) => `${i.label}: ${i.reason}`)
+                    .join("; ")}
+                </span>
+              )}
+            </div>
+            <div data-testid="sensors-testbench-canonical-optional">
+              <span className="text-muted-foreground">optional: </span>
+              <span>{validationUi.summary.optional.join(", ") || "—"}</span>
+            </div>
+            <div data-testid="sensors-testbench-canonical-present">
+              <span className="text-muted-foreground">present: </span>
+              <span>{validationUi.summary.present.join(", ") || "—"}</span>
             </div>
           </div>
-          {!canonicalReady && (
+
+          {validationUi.disabledReason && (
             <p
               className="mt-1 text-amber-700 dark:text-amber-300"
               data-testid="sensors-testbench-canonical-helper"
             >
-              Preview, curl, PowerShell, history exports, and bundle download
-              are disabled until source, captured_at, tent_id, confidence, and
-              at least one valid reading are present.
+              {validationUi.disabledReason}
             </p>
           )}
         </div>
@@ -1004,12 +1096,12 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
             <Eye className="size-3" />
             Canonical ingest payload used for last test
           </summary>
-          {!canonicalReady ? (
+          {validationUi.status === "not_ready" ? (
             <p
               className="text-amber-700 dark:text-amber-300 mt-2"
               data-testid="sensors-testbench-payload-preview-blocked"
             >
-              Preview disabled — {canonicalDisabledHint}
+              {validationUi.disabledReason}
             </p>
           ) : lastPayload ? (
             <pre
@@ -1023,11 +1115,13 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
               className="text-muted-foreground mt-2"
               data-testid="sensors-testbench-payload-preview-empty"
             >
-              No test payload sent yet. Mint a token and run “Send test payload”
-              to preview the exact JSON Verdant submits.
+              No test payload sent yet.{" "}
+              {validationUi.emptyStateMessage ??
+                "Mint a token and run “Send test payload” to preview the exact JSON Verdant submits."}
             </p>
           )}
         </details>
+
 
 
         {history.length > 0 && (

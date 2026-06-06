@@ -651,7 +651,7 @@ export function buildCanonicalIngestPayloadValidation(
     if (Number.isFinite(Date.parse(capturedAt))) {
       present.push("captured_at");
     } else {
-      invalid.push({ field: "captured_at", reason: "not a parseable date" });
+      invalid.push({ field: "captured_at", reason: "malformed timestamp" });
     }
   } else {
     missing.push("captured_at");
@@ -671,22 +671,40 @@ export function buildCanonicalIngestPayloadValidation(
   }
 
   const readings = (p.readings ?? p.metrics) as unknown;
-  if (readings && typeof readings === "object" && !Array.isArray(readings)) {
-    const entries = Object.entries(readings as Record<string, unknown>);
-    const validOnes = entries.filter(
-      ([, v]) =>
-        (typeof v === "number" && Number.isFinite(v)) ||
-        (typeof v === "string" && v.length > 0),
-    );
-    readingsCount = validOnes.length;
-    if (validOnes.length > 0) {
-      present.push("readings");
+  if (readings === undefined || readings === null) {
+    missing.push("readings");
+  } else if (Array.isArray(readings)) {
+    if (readings.length === 0) {
+      invalid.push({ field: "readings", reason: "empty readings array" });
     } else {
-      invalid.push({ field: "readings", reason: "no valid reading values" });
+      // Treat array entries as scalars; count valid ones.
+      const validOnes = readings.filter(
+        (v) =>
+          (typeof v === "number" && Number.isFinite(v)) ||
+          (typeof v === "string" && v.length > 0),
+      );
+      readingsCount = validOnes.length;
+      if (validOnes.length > 0) present.push("readings");
+      else invalid.push({ field: "readings", reason: "no valid reading values" });
+    }
+  } else if (typeof readings === "object") {
+    const entries = Object.entries(readings as Record<string, unknown>);
+    if (entries.length === 0) {
+      invalid.push({ field: "readings", reason: "empty readings object" });
+    } else {
+      const validOnes = entries.filter(
+        ([, v]) =>
+          (typeof v === "number" && Number.isFinite(v)) ||
+          (typeof v === "string" && v.length > 0),
+      );
+      readingsCount = validOnes.length;
+      if (validOnes.length > 0) present.push("readings");
+      else invalid.push({ field: "readings", reason: "no valid reading values" });
     }
   } else {
-    missing.push("readings");
+    invalid.push({ field: "readings", reason: "readings must be an object" });
   }
+
 
   const rawTop = p.raw_payload;
   if (rawTop !== undefined && rawTop !== null) {
@@ -712,4 +730,184 @@ export function buildCanonicalIngestPayloadValidation(
 
   const ready = missing.length === 0 && invalid.length === 0;
   return { ready, present, missing, invalid, readingsCount };
+}
+
+// ---------------------------------------------------------------------------
+// Validation UI view-model (status, disabled reasons, summary ordering)
+// ---------------------------------------------------------------------------
+
+/** Friendly labels for each canonical field. */
+export const CANONICAL_FIELD_LABELS: Record<CanonicalIngestField, string> = {
+  source: "source",
+  captured_at: "captured_at",
+  tent_id: "tent_id",
+  confidence: "confidence",
+  readings: "readings",
+};
+
+/** Spec-mandated short missing reason per field. */
+export const CANONICAL_MISSING_REASONS: Record<CanonicalIngestField, string> = {
+  source: "missing source label",
+  captured_at: "missing captured_at or timestamp",
+  tent_id: "missing tent context",
+  confidence: "missing or invalid value",
+  readings: "missing readings (need at least one)",
+};
+
+export type ValidationUiStatus = "ready" | "not_ready" | "no_test_yet";
+
+export interface ValidationFieldEntry {
+  field: CanonicalIngestField | "raw_payload";
+  label: string;
+  reason: string;
+}
+
+export interface SensorTestbenchValidationUiState {
+  status: ValidationUiStatus;
+  statusLabel: string;
+  badgeTone: "ready" | "warn" | "muted";
+  emptyStateMessage: string | null;
+  disabledReason: string | null;
+  actionsDisabled: boolean;
+  summary: {
+    missing: ValidationFieldEntry[];
+    invalid: ValidationFieldEntry[];
+    present: CanonicalIngestField[];
+    optional: string[];
+  };
+}
+
+/**
+ * Convert a canonical validation + "has last test?" flag into a single,
+ * presenter-friendly view-model. UI renders this output directly so that
+ * field labels, disabled reasons, and summary ordering live in one place.
+ */
+export function buildSensorTestbenchValidationUiState(input: {
+  validation: CanonicalIngestValidation;
+  hasLastTest: boolean;
+}): SensorTestbenchValidationUiState {
+  const { validation, hasLastTest } = input;
+  const missing: ValidationFieldEntry[] = validation.missing.map((f) => ({
+    field: f,
+    label: CANONICAL_FIELD_LABELS[f],
+    reason: CANONICAL_MISSING_REASONS[f],
+  }));
+  const invalid: ValidationFieldEntry[] = validation.invalid.map((i) => ({
+    field: i.field,
+    label:
+      i.field === "raw_payload"
+        ? "raw_payload"
+        : CANONICAL_FIELD_LABELS[i.field],
+    reason: i.reason,
+  }));
+
+  if (!validation.ready) {
+    // Build a precise blocking sentence. When only one required field is
+    // missing/invalid, name only that field.
+    const blockers = [
+      ...missing.map((m) => m.label),
+      ...invalid
+        .filter((i) => i.field !== "raw_payload")
+        .map((i) => `${i.label} (${i.reason})`),
+    ];
+    let reason: string;
+    if (blockers.length === 0) {
+      reason = "Disabled until canonical payload is complete.";
+    } else if (blockers.length === 1) {
+      reason = `Disabled until canonical payload includes ${blockers[0]}.`;
+    } else {
+      reason = `Disabled until canonical payload includes ${blockers.join(", ")}.`;
+    }
+    return {
+      status: "not_ready",
+      statusLabel: "Not ready",
+      badgeTone: "warn",
+      emptyStateMessage: null,
+      disabledReason: reason,
+      actionsDisabled: true,
+      summary: {
+        missing,
+        invalid,
+        present: validation.present,
+        optional: ["raw_payload"],
+      },
+    };
+  }
+
+  if (!hasLastTest) {
+    return {
+      status: "no_test_yet",
+      statusLabel: "No test yet",
+      badgeTone: "muted",
+      emptyStateMessage:
+        "Run a test to generate a payload preview, response inspector, and diagnostics bundle.",
+      disabledReason: null,
+      actionsDisabled: false,
+      summary: {
+        missing,
+        invalid,
+        present: validation.present,
+        optional: ["raw_payload"],
+      },
+    };
+  }
+
+  return {
+    status: "ready",
+    statusLabel: "Ready",
+    badgeTone: "ready",
+    emptyStateMessage: null,
+    disabledReason: null,
+    actionsDisabled: false,
+    summary: {
+      missing,
+      invalid,
+      present: validation.present,
+      optional: ["raw_payload"],
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Diagnostics bundle filename preview
+// ---------------------------------------------------------------------------
+
+/** Deterministic preview of the .zip name produced by the bundle download. */
+export function buildDiagnosticsBundleFilenamePreview(date: Date): string {
+  return buildDownloadFilename(
+    "verdant-sensor-diagnostics-bundle",
+    "zip",
+    date,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Plain-text formatter for the safe response inspector (support-safe copy)
+// ---------------------------------------------------------------------------
+
+/**
+ * Render the redacted inspector as plain text for support copy/paste. The
+ * function never sees the raw response body — it consumes the already-
+ * redacted inspector output. A defensive token-redaction pass is applied as
+ * belt-and-suspenders.
+ */
+export function formatSafeResponseInspectorPlainText(
+  inspector: SafeResponseInspector,
+): string {
+  const lines: string[] = [];
+  lines.push("Verdant sensor ingest — response inspector");
+  lines.push(`HTTP ${inspector.http_status}`);
+  lines.push(`classification: ${inspector.classification}`);
+  lines.push(`kind: ${inspector.kind}`);
+  if (inspector.note) lines.push(`note: ${inspector.note}`);
+  lines.push("breakdown:");
+  if (inspector.fields.length === 0) {
+    lines.push("  (empty)");
+  } else {
+    for (const f of inspector.fields) {
+      const tag = f.redacted ? " [redacted]" : "";
+      lines.push(`  ${f.path} (${f.type})${tag}: ${f.preview}`);
+    }
+  }
+  return redactTokens(lines.join("\n"));
 }

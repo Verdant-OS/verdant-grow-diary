@@ -178,6 +178,9 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
   const [result, setResult] = useState<TestPayloadResult | null>(null);
   const [tokens, setTokens] = useState<BridgeTokenRow[]>([]);
   const [history, setHistory] = useState<SensorIngestHistoryItem[]>([]);
+  const [diagnosticsHistory, setDiagnosticsHistory] = useState<
+    SensorDiagnosticsRunHistoryEntry[]
+  >([]);
   const [lastPayload, setLastPayload] = useState<unknown>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const validationDetailsRef = useRef<HTMLDivElement | null>(null);

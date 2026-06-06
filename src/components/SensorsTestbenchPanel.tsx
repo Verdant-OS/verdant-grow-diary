@@ -20,11 +20,19 @@
  *  - No service_role. Auth is the bridge token Bearer header for tests.
  *  - No device control. No automation. Testbench is auditable, not live.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Copy, KeyRound, Send, ShieldAlert, Activity, CheckCircle2, XCircle, Server, Trash2, Terminal, FileJson, History, Download, Eye } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Copy, KeyRound, Send, ShieldAlert, Activity, CheckCircle2, XCircle, Server, Trash2, Terminal, FileJson, History, Download, Eye, Share2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import {
@@ -47,8 +55,10 @@ import {
 } from "@/lib/sensorIngestTestResultRules";
 import {
   buildCanonicalIngestPayloadValidation,
+  buildCanonicalValidationA11yLabel,
   buildDiagnosticsBundleFilenamePreview,
   buildDiagnosticsBundleFiles,
+  buildDiagnosticsShareModalState,
   buildDownloadFilename,
   buildPowerShellCopyWarningState,
   buildPowerShellIngestTestScript,

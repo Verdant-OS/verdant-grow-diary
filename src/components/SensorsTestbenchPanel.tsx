@@ -695,12 +695,19 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
           </div>
         </div>
 
-        <p className="text-[11px] text-muted-foreground mb-2">
+        <p className="text-[11px] text-muted-foreground mb-1">
           Exports contain safe identity only. The curl and PowerShell buttons
           include the bridge token only while the one-time reveal is in memory
           — do not paste them into chat, screenshots, or git. Revoke any token
           that leaks.
         </p>
+        <p
+          className="text-[11px] text-muted-foreground mb-2 font-mono"
+          data-testid="sensors-diag-bundle-filename-preview"
+        >
+          bundle filename: {bundleFilenamePreview}
+        </p>
+
 
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
           <dt className="text-muted-foreground">App Supabase URL</dt>

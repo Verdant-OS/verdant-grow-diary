@@ -22,6 +22,8 @@ import { STAGES } from "@/lib/grow";
 
 import { EC_UNITS, type EcUnit } from "@/constants/units";
 import { usePlants } from "@/hooks/use-plants";
+import { useTents } from "@/hooks/use-tents";
+import { shouldRequireFirstTentSetup } from "@/lib/firstTentSetupRules";
 import { evaluateQuickLogPreview } from "@/lib/quickLogPreviewRules";
 import {
   appendHardwareReadingsToNote,

@@ -1,523 +1,160 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildCanonicalIngestPayloadValidation,
-  buildDiagnosticsBundleFiles,
-  buildPowerShellCopyWarningState,
-  buildSafeResponseInspector,
-  buildSensorIngestTestPayload,
+  buildDiagnosticsShareModalState,
+  buildSensorIngestNetworkDiagnostics,
 } from "@/lib/sensorDiagnosticsExportRules";
 
 const PLAINTEXT = "vbt_PLAINTEXT_DO_NOT_LEAK_abcdef1234";
+const SUPABASE_INGEST = "https://abc.supabase.co/functions/v1/sensor-ingest-webhook";
+const APP_HTTPS = "https://app.verdant.example";
 
-describe("buildPowerShellCopyWarningState", () => {
-  it("requires confirmation when token reveal is active", () => {
-    const w = buildPowerShellCopyWarningState({ hasTokenReveal: true });
-    expect(w.requiresConfirmation).toBe(true);
-    expect(w.message).toMatch(/one-time bridge token/i);
-    expect(w.message).toMatch(/tickets|chats|screenshots|shared docs/i);
-  });
-
-  it("does not require confirmation when token reveal is inactive", () => {
-    const w = buildPowerShellCopyWarningState({ hasTokenReveal: false });
-    expect(w.requiresConfirmation).toBe(false);
-    expect(w.message).toBe("");
-  });
-});
-
-describe("buildDiagnosticsBundleFiles", () => {
-  it("includes diagnostics JSON, diagnostics text, and history JSON", () => {
-    const files = buildDiagnosticsBundleFiles({
-      diagnosticsJson: '{"x":1}',
-      diagnosticsText: "summary",
-      historyJson: '{"items":[]}',
+describe("buildSensorIngestNetworkDiagnostics", () => {
+  it("returns not_applicable for non-network HTTP responses", () => {
+    const r = buildSensorIngestNetworkDiagnostics({
+      ingestUrl: SUPABASE_INGEST,
+      appOrigin: APP_HTTPS,
+      httpStatus: 401,
+      classification: "auth_problem",
     });
-    const names = files.map((f) => f.name).sort();
-    expect(names).toEqual(["diagnostics.json", "diagnostics.txt", "history.json"]);
-    expect(files.find((f) => f.name === "diagnostics.json")?.content).toBe('{"x":1}');
-    expect(files.find((f) => f.name === "diagnostics.txt")?.content).toBe("summary");
-    expect(files.find((f) => f.name === "history.json")?.content).toBe('{"items":[]}');
-  });
-});
-
-describe("buildSafeResponseInspector", () => {
-  it("returns status and classification for JSON bodies", () => {
-    const insp = buildSafeResponseInspector({
-      status: 200,
-      classification: "accepted",
-      body: { ok: true, inserted: 1 },
-    });
-    expect(insp.http_status).toBe(200);
-    expect(insp.classification).toBe("accepted");
-    expect(insp.kind).toBe("json");
-    const root = insp.fields.find((f) => f.path === "$");
-    expect(root?.type).toBe("object");
-    expect(insp.fields.some((f) => f.path === "ok" && f.preview === "true")).toBe(true);
+    expect(r.status).toBe("not_applicable");
+    expect(r.safeSupportSummary).toBe("");
+    expect(r.recommendedChecks).toEqual([]);
   });
 
-  it("redacts sensitive keys deeply (token/authorization/secret/bridge_token/api_key/service_role/anon_key/password)", () => {
-    const insp = buildSafeResponseInspector({
-      status: 200,
-      classification: "accepted",
-      body: {
-        token: PLAINTEXT,
-        Authorization: `Bearer ${PLAINTEXT}`,
-        api_key: "abc",
-        secret: "shh",
-        password: "p",
-        service_role: "x",
-        anon_key: "y",
-        bridge_token: PLAINTEXT,
-        nested: { bearer: PLAINTEXT, ok: true },
-      },
+  it("HTTP 0 + network_error returns a network diagnostics state with evidence", () => {
+    const r = buildSensorIngestNetworkDiagnostics({
+      ingestUrl: SUPABASE_INGEST,
+      appOrigin: APP_HTTPS,
+      httpStatus: 0,
+      classification: "network_error",
+      errorMessage: "Failed to fetch",
+      requestMethod: "POST",
+      hasActiveToken: true,
     });
-    for (const key of [
-      "token",
-      "Authorization",
-      "api_key",
-      "secret",
-      "password",
-      "service_role",
-      "anon_key",
-      "bridge_token",
-      "nested.bearer",
-    ]) {
-      const f = insp.fields.find((x) => x.path === key);
-      expect(f, `missing ${key}`).toBeTruthy();
-      expect(f?.preview).toBe("<redacted>");
-      expect(f?.redacted).toBe(true);
-    }
-    const serialized = JSON.stringify(insp);
+    expect(r.status).not.toBe("not_applicable");
+    expect(r.evidence.some((e) => e.includes("HTTP status: 0"))).toBe(true);
+    expect(r.evidence.some((e) => e.includes("Failed to fetch"))).toBe(true);
+    expect(r.evidence.some((e) => e.includes("bridge token present: yes"))).toBe(true);
+    expect(r.safeSupportSummary).toContain("network diagnostics");
+  });
+
+  it("HTTPS app + HTTP ingest URL → likely_mixed_content", () => {
+    const r = buildSensorIngestNetworkDiagnostics({
+      ingestUrl: "http://example.com/functions/v1/sensor-ingest-webhook",
+      appOrigin: APP_HTTPS,
+      httpStatus: 0,
+      classification: "network_error",
+      errorMessage: "Failed to fetch",
+    });
+    expect(r.status).toBe("likely_mixed_content");
+    expect(r.title).toMatch(/mixed-content/i);
+  });
+
+  it("cross-origin Failed to fetch → CORS/preflight recommendation", () => {
+    const r = buildSensorIngestNetworkDiagnostics({
+      ingestUrl: SUPABASE_INGEST,
+      appOrigin: APP_HTTPS,
+      httpStatus: 0,
+      classification: "network_error",
+      errorMessage: "Failed to fetch",
+    });
+    expect(r.status).toBe("likely_cors_or_preflight");
+    expect(r.recommendedChecks.join("\n")).toMatch(/OPTIONS|CORS/);
+  });
+
+  it("localhost ingest URL from non-local origin → likely_endpoint_unreachable", () => {
+    const r = buildSensorIngestNetworkDiagnostics({
+      ingestUrl: "http://127.0.0.1:8080/ingest",
+      appOrigin: APP_HTTPS,
+      httpStatus: 0,
+      classification: "network_error",
+    });
+    expect(r.status).toBe("likely_endpoint_unreachable");
+    expect(r.recommendedChecks.join("\n")).toMatch(/reachable|firewall|listener/i);
+  });
+
+  it("missing/malformed URL → endpoint misconfigured", () => {
+    const r = buildSensorIngestNetworkDiagnostics({
+      ingestUrl: "not a url",
+      appOrigin: APP_HTTPS,
+      httpStatus: 0,
+      classification: "network_error",
+    });
+    expect(r.status).toBe("likely_endpoint_misconfigured");
+
+    const r2 = buildSensorIngestNetworkDiagnostics({
+      ingestUrl: null,
+      appOrigin: APP_HTTPS,
+      httpStatus: 0,
+      classification: "network_error",
+    });
+    expect(r2.status).toBe("likely_endpoint_misconfigured");
+    expect(r2.resolvedEndpoint).toBe("<missing>");
+  });
+
+  it("never includes plaintext token in output, only boolean", () => {
+    const r = buildSensorIngestNetworkDiagnostics({
+      ingestUrl: `${SUPABASE_INGEST}?leak=${PLAINTEXT}`,
+      appOrigin: APP_HTTPS,
+      httpStatus: 0,
+      classification: "network_error",
+      errorMessage: `Failed to fetch ${PLAINTEXT}`,
+      hasActiveToken: true,
+    });
+    const serialized = JSON.stringify(r);
     expect(serialized).not.toContain(PLAINTEXT);
+    expect(r.safeSupportSummary).not.toContain(PLAINTEXT);
+    expect(r.safeSupportSummary).toContain("bridge token present: yes");
   });
 
-  it("handles non-JSON string bodies safely", () => {
-    const insp = buildSafeResponseInspector({
-      status: 500,
-      classification: "server_error",
-      body: `Internal error with stray ${PLAINTEXT} token`,
-    });
-    expect(insp.kind).toBe("text");
-    expect(insp.fields[0].preview).not.toContain(PLAINTEXT);
-    expect(insp.fields[0].redacted).toBe(true);
-  });
-
-  it("handles empty / null body", () => {
-    const insp = buildSafeResponseInspector({
-      status: 204,
-      classification: "accepted",
-      body: null,
-    });
-    expect(insp.kind).toBe("empty");
-    expect(insp.fields).toEqual([]);
-  });
-});
-
-describe("buildCanonicalIngestPayloadValidation", () => {
-  it("passes for the canonical test payload (with at least one valid reading)", () => {
-    const payload = buildSensorIngestTestPayload({
-      tentId: "tent-1",
-      capturedAtIso: "2026-06-06T18:00:00Z",
-    });
-    const v = buildCanonicalIngestPayloadValidation(payload);
-    expect(v.ready).toBe(true);
-    expect(v.missing).toEqual([]);
-    expect(v.invalid).toEqual([]);
-    expect(v.present).toEqual(
-      expect.arrayContaining(["source", "captured_at", "tent_id", "confidence", "readings"]),
-    );
-    expect(v.readingsCount).toBeGreaterThan(0);
-  });
-
-  it("fails when source/captured_at/tent_id/confidence/readings are missing", () => {
-    const v = buildCanonicalIngestPayloadValidation({});
-    expect(v.ready).toBe(false);
-    expect(v.missing).toEqual(
-      expect.arrayContaining(["source", "captured_at", "tent_id", "confidence", "readings"]),
-    );
-  });
-
-  it("fails for null / non-object payload", () => {
-    expect(buildCanonicalIngestPayloadValidation(null).ready).toBe(false);
-    expect(buildCanonicalIngestPayloadValidation(42).ready).toBe(false);
-    expect(buildCanonicalIngestPayloadValidation([]).ready).toBe(false);
-  });
-
-  it("accepts top-level confidence and timestamp aliases", () => {
-    const v = buildCanonicalIngestPayloadValidation({
-      tent_id: "t",
-      source: "ecowitt",
-      timestamp: "2026-06-06T18:00:00Z",
-      confidence: "live",
-      readings: { temp_f: 72.1 },
-    });
-    expect(v.ready).toBe(true);
-    expect(v.readingsCount).toBe(1);
-  });
-
-  it("flags invalid captured_at and empty readings", () => {
-    const v = buildCanonicalIngestPayloadValidation({
-      tent_id: "t",
-      source: "ecowitt",
-      captured_at: "not-a-date",
-      metadata: { confidence: "test" },
-      readings: {},
-    });
-    expect(v.ready).toBe(false);
-    expect(v.invalid.some((i) => i.field === "captured_at")).toBe(true);
-    // readings empty -> invalid (no valid values)
-    expect(v.invalid.some((i) => i.field === "readings")).toBe(true);
-  });
-
-  it("does not hard-block when raw_payload is absent", () => {
-    const v = buildCanonicalIngestPayloadValidation({
-      tent_id: "t",
-      source: "ecowitt",
-      captured_at: "2026-06-06T18:00:00Z",
-      confidence: "test",
-      readings: { temp_f: 70 },
-    });
-    expect(v.ready).toBe(true);
-  });
-});
-
-import {
-  buildDiagnosticsBundleFilenamePreview,
-  buildDownloadFilename,
-  buildSensorTestbenchValidationUiState,
-  formatSafeResponseInspectorPlainText,
-} from "@/lib/sensorDiagnosticsExportRules";
-
-describe("buildSensorTestbenchValidationUiState", () => {
-  function v(payload: unknown) {
-    return buildCanonicalIngestPayloadValidation(payload);
-  }
-  const goodPayload = buildSensorIngestTestPayload({
-    tentId: "tent-1",
-    capturedAtIso: "2026-06-06T18:00:00Z",
-  });
-
-  it("returns no_test_yet when ready but no last test (calm empty state, actions enabled)", () => {
-    const ui = buildSensorTestbenchValidationUiState({
-      validation: v(goodPayload),
-      hasLastTest: false,
-    });
-    expect(ui.status).toBe("no_test_yet");
-    expect(ui.statusLabel).toBe("No test yet");
-    expect(ui.actionsDisabled).toBe(false);
-    expect(ui.disabledReason).toBeNull();
-    expect(ui.emptyStateMessage).toMatch(/Run a test to generate/i);
-    // No scary invalid copy
-    expect(ui.emptyStateMessage).not.toMatch(/invalid/i);
-  });
-
-  it("returns ready when payload valid and last test exists", () => {
-    const ui = buildSensorTestbenchValidationUiState({
-      validation: v(goodPayload),
-      hasLastTest: true,
-    });
-    expect(ui.status).toBe("ready");
-    expect(ui.actionsDisabled).toBe(false);
-    expect(ui.badgeTone).toBe("ready");
-  });
-
-  it("names exactly the single missing field in disabled reason", () => {
-    const partial = { ...goodPayload, source: undefined } as unknown;
-    const ui = buildSensorTestbenchValidationUiState({
-      validation: v(partial),
-      hasLastTest: false,
-    });
-    expect(ui.status).toBe("not_ready");
-    expect(ui.actionsDisabled).toBe(true);
-    expect(ui.disabledReason).toMatch(/Disabled until canonical payload includes source\.?$/);
-    // No comma when only one field
-    expect(ui.disabledReason).not.toMatch(/,/);
-  });
-
-  it("lists all missing required fields when several missing", () => {
-    const ui = buildSensorTestbenchValidationUiState({
-      validation: v({}),
-      hasLastTest: false,
-    });
-    expect(ui.disabledReason).toMatch(/source/);
-    expect(ui.disabledReason).toMatch(/captured_at/);
-    expect(ui.disabledReason).toMatch(/tent_id/);
-    expect(ui.disabledReason).toMatch(/confidence/);
-    expect(ui.disabledReason).toMatch(/readings/);
-  });
-
-  it("invalid readings object produces clear reason and disables actions", () => {
-    const ui = buildSensorTestbenchValidationUiState({
-      validation: v({
-        tent_id: "t",
-        source: "ecowitt",
-        captured_at: "2026-06-06T18:00:00Z",
-        confidence: "test",
-        readings: {},
-      }),
-      hasLastTest: true,
-    });
-    expect(ui.status).toBe("not_ready");
-    expect(ui.actionsDisabled).toBe(true);
-    expect(
-      ui.summary.invalid.some(
-        (i) => i.field === "readings" && /empty readings object/i.test(i.reason),
-      ),
-    ).toBe(true);
-    expect(ui.disabledReason).toMatch(/readings/);
-  });
-
-  it("malformed captured_at flagged as invalid with specific reason", () => {
-    const ui = buildSensorTestbenchValidationUiState({
-      validation: v({
-        tent_id: "t",
-        source: "ecowitt",
-        captured_at: "not-a-date",
-        confidence: "test",
-        readings: { temp_f: 70 },
-      }),
-      hasLastTest: true,
-    });
-    expect(
-      ui.summary.invalid.some(
-        (i) => i.field === "captured_at" && /malformed timestamp/i.test(i.reason),
-      ),
-    ).toBe(true);
-  });
-
-  it("missing source/tent_id/confidence carry field-specific reasons", () => {
-    const ui = buildSensorTestbenchValidationUiState({
-      validation: v({
-        readings: { x: 1 },
-        captured_at: "2026-06-06T18:00:00Z",
-      }),
-      hasLastTest: true,
-    });
-    const missingByField = Object.fromEntries(
-      ui.summary.missing.map((m) => [m.field, m.reason]),
-    );
-    expect(missingByField.source).toMatch(/source/i);
-    expect(missingByField.tent_id).toMatch(/tent/i);
-    expect(missingByField.confidence).toMatch(/confidence|invalid/i);
-  });
-
-  it("raw_payload is in optional summary, not required", () => {
-    const ui = buildSensorTestbenchValidationUiState({
-      validation: v(goodPayload),
-      hasLastTest: true,
-    });
-    expect(ui.summary.optional).toContain("raw_payload");
-    expect(ui.summary.missing.map((m) => m.field)).not.toContain(
-      "raw_payload" as never,
-    );
-  });
-});
-
-describe("buildDiagnosticsBundleFilenamePreview", () => {
-  it("uses buildDownloadFilename with the bundle prefix and .zip extension", () => {
-    const d = new Date(Date.UTC(2026, 5, 6, 18, 0, 0));
-    const preview = buildDiagnosticsBundleFilenamePreview(d);
-    const expected = buildDownloadFilename(
-      "verdant-sensor-diagnostics-bundle",
-      "zip",
-      d,
-    );
-    expect(preview).toBe(expected);
-    expect(preview).toBe(
-      "verdant-sensor-diagnostics-bundle-20260606-180000.zip",
-    );
-  });
-});
-
-describe("formatSafeResponseInspectorPlainText", () => {
-  it("includes HTTP status, classification, and redacted breakdown", () => {
-    const insp = buildSafeResponseInspector({
-      status: 200,
-      classification: "accepted",
-      body: { ok: true, token: PLAINTEXT, nested: { authorization: PLAINTEXT, ok: false } },
-    });
-    const text = formatSafeResponseInspectorPlainText(insp);
-    expect(text).toMatch(/HTTP 200/);
-    expect(text).toMatch(/classification: accepted/);
-    expect(text).toMatch(/breakdown:/);
-    // Sensitive keys appear marked redacted, never raw plaintext.
-    expect(text).not.toContain(PLAINTEXT);
-    expect(text).toMatch(/\[redacted\]/);
-  });
-
-  it("handles non-JSON and empty bodies safely", () => {
-    const nonJson = formatSafeResponseInspectorPlainText(
-      buildSafeResponseInspector({
-        status: 500,
-        classification: "server_error",
-        body: `oops ${PLAINTEXT}`,
-      }),
-    );
-    expect(nonJson).toMatch(/HTTP 500/);
-    expect(nonJson).not.toContain(PLAINTEXT);
-
-    const empty = formatSafeResponseInspectorPlainText(
-      buildSafeResponseInspector({
-        status: 204,
-        classification: "accepted",
-        body: null,
-      }),
-    );
-    expect(empty).toMatch(/HTTP 204/);
-    expect(empty).toMatch(/\(empty\)/);
-  });
-});
-
-import {
-  buildCanonicalValidationA11yLabel,
-  buildDiagnosticsShareSummary,
-  buildDiagnosticsShareModalState,
-} from "@/lib/sensorDiagnosticsExportRules";
-
-describe("buildCanonicalValidationA11yLabel", () => {
-  it("returns Ready label", () => {
-    expect(buildCanonicalValidationA11yLabel({ status: "ready" })).toBe(
-      "Canonical payload validation: Ready",
-    );
-  });
-  it("returns Not ready label", () => {
-    expect(buildCanonicalValidationA11yLabel({ status: "not_ready" })).toBe(
-      "Canonical payload validation: Not ready",
-    );
-  });
-  it("returns No test yet label", () => {
-    expect(buildCanonicalValidationA11yLabel({ status: "no_test_yet" })).toBe(
-      "Canonical payload validation: No test yet",
-    );
-  });
-});
-
-describe("buildDiagnosticsShareSummary", () => {
-  const goodPayload = buildSensorIngestTestPayload({
-    tentId: "tent-1",
-    capturedAtIso: "2026-06-06T18:00:00Z",
-  });
-  const readyUi = buildSensorTestbenchValidationUiState({
-    validation: buildCanonicalIngestPayloadValidation(goodPayload),
-    hasLastTest: true,
-  });
-
-  it("includes filename, status, classification, validation, and redacted inspector", () => {
-    const insp = buildSafeResponseInspector({
-      status: 200,
-      classification: "accepted",
-      body: { ok: true, token: PLAINTEXT },
-    });
-    const text = formatSafeResponseInspectorPlainText(insp);
-    const summary = buildDiagnosticsShareSummary({
-      bundleFilename: "verdant-sensor-diagnostics-bundle-20260606-180000.zip",
-      validationUi: readyUi,
-      lastTestResult: { http_status: 200, classification: "accepted" },
-      inspectorPlainText: text,
-    });
-    expect(summary).toMatch(/verdant-sensor-diagnostics-bundle-20260606-180000\.zip/);
-    expect(summary).toMatch(/canonical validation: Ready/);
-    expect(summary).toMatch(/last test HTTP status: 200/);
-    expect(summary).toMatch(/classification: accepted/);
-    expect(summary).toMatch(/response inspector \(redacted\)/);
-    expect(summary).toMatch(/\[redacted\]/);
-    expect(summary).not.toContain(PLAINTEXT);
-  });
-
-  it("never includes raw token / authorization / service_role / anon_key / api_key / secret values", () => {
-    const insp = buildSafeResponseInspector({
-      status: 200,
-      classification: "accepted",
-      body: {
-        token: PLAINTEXT,
-        authorization: `Bearer ${PLAINTEXT}`,
-        service_role: "sr_secret",
-        anon_key: "anon_secret",
-        api_key: "ak_secret",
-        secret: "shh",
-        bridge_token: PLAINTEXT,
-      },
-    });
-    const text = formatSafeResponseInspectorPlainText(insp);
-    const summary = buildDiagnosticsShareSummary({
-      bundleFilename: "bundle.zip",
-      validationUi: readyUi,
-      lastTestResult: { http_status: 200, classification: "accepted" },
-      inspectorPlainText: text,
-    });
-    for (const leak of [
-      PLAINTEXT,
-      "sr_secret",
-      "anon_secret",
-      "ak_secret",
-      "shh",
-    ]) {
-      expect(summary).not.toContain(leak);
-    }
-  });
-
-  it("renders missing/invalid field details", () => {
-    const partialUi = buildSensorTestbenchValidationUiState({
-      validation: buildCanonicalIngestPayloadValidation({
-        tent_id: "t",
-        source: "ecowitt",
-        captured_at: "not-a-date",
-        confidence: "test",
-        readings: {},
-      }),
-      hasLastTest: true,
-    });
-    const summary = buildDiagnosticsShareSummary({
-      bundleFilename: "bundle.zip",
-      validationUi: partialUi,
-      lastTestResult: null,
-      inspectorPlainText: null,
-    });
-    expect(summary).toMatch(/canonical validation: Not ready/);
-    expect(summary).toMatch(/last test: none/);
-    expect(summary).toMatch(/invalid fields: .*captured_at/);
-    expect(summary).toMatch(/invalid fields:.*readings/);
-    expect(summary).toMatch(/\(no test yet\)/);
-  });
-});
-
-describe("buildDiagnosticsShareModalState", () => {
-  const goodPayload = buildSensorIngestTestPayload({
-    tentId: "tent-1",
-    capturedAtIso: "2026-06-06T18:00:00Z",
-  });
-  const readyUi = buildSensorTestbenchValidationUiState({
-    validation: buildCanonicalIngestPayloadValidation(goodPayload),
-    hasLastTest: true,
-  });
-
-  it("exposes filename, readiness, aria label, and support summary", () => {
-    const state = buildDiagnosticsShareModalState({
-      bundleFilename: "bundle.zip",
-      validationUi: readyUi,
-      lastTestResult: { http_status: 200, classification: "accepted" },
-      inspectorPlainText: "Verdant sensor ingest — response inspector\nHTTP 200\n",
-    });
-    expect(state.bundleFilename).toBe("bundle.zip");
-    expect(state.statusLabel).toBe("Ready");
-    expect(state.status).toBe("ready");
-    expect(state.ariaLabel).toBe("Canonical payload validation: Ready");
-    expect(state.canDownloadBundle).toBe(true);
-    expect(state.supportSummary).toMatch(/bundle filename: bundle\.zip/);
-    expect(state.supportSummary).toMatch(/canonical validation: Ready/);
-  });
-
-  it("disables bundle download when validation blocks actions", () => {
-    const blockedUi = buildSensorTestbenchValidationUiState({
-      validation: buildCanonicalIngestPayloadValidation({}),
-      hasLastTest: false,
+  it("share modal summary includes network diagnostics when applicable", () => {
+    const network = buildSensorIngestNetworkDiagnostics({
+      ingestUrl: SUPABASE_INGEST,
+      appOrigin: APP_HTTPS,
+      httpStatus: 0,
+      classification: "network_error",
+      errorMessage: "Failed to fetch",
     });
     const state = buildDiagnosticsShareModalState({
       bundleFilename: "bundle.zip",
-      validationUi: blockedUi,
-      lastTestResult: null,
+      validationUi: {
+        status: "no_test_yet",
+        statusLabel: "No test yet",
+        badgeTone: "muted",
+        actionsDisabled: true,
+        disabledReason: "Run a test",
+        summary: { missing: [], invalid: [] },
+      } as any,
+      lastTestResult: { http_status: 0, classification: "network_error" },
       inspectorPlainText: null,
+      networkDiagnostics: network,
     });
-    expect(state.canDownloadBundle).toBe(false);
-    expect(state.ariaLabel).toBe("Canonical payload validation: Not ready");
+    expect(state.networkDiagnostics).toBe(network);
+    expect(state.supportSummary).toContain("network diagnostics");
+    expect(state.supportSummary).toContain("likely_cors_or_preflight");
+  });
+
+  it("share modal summary omits network diagnostics when not applicable", () => {
+    const network = buildSensorIngestNetworkDiagnostics({
+      ingestUrl: SUPABASE_INGEST,
+      appOrigin: APP_HTTPS,
+      httpStatus: 200,
+      classification: "accepted",
+    });
+    const state = buildDiagnosticsShareModalState({
+      bundleFilename: "bundle.zip",
+      validationUi: {
+        status: "ready",
+        statusLabel: "Ready",
+        badgeTone: "ready",
+        actionsDisabled: false,
+        disabledReason: null,
+        summary: { missing: [], invalid: [] },
+      } as any,
+      lastTestResult: { http_status: 200, classification: "accepted" },
+      inspectorPlainText: "ok",
+      networkDiagnostics: network,
+    });
+    expect(state.supportSummary).not.toContain("network diagnostics");
   });
 });

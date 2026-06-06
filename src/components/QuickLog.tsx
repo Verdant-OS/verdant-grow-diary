@@ -142,6 +142,22 @@ export default function QuickLog({
     [plantId, scopedPlants],
   );
 
+  // Speed slice: when no plant is selected, auto-apply the deterministic
+  // default (single scoped candidate or valid prefill). Never overrides a
+  // grower's current selection — pickDefaultQuickLogPlant returns
+  // currentPlantId unchanged when it's valid. Re-evaluates when the dialog
+  // re-opens or scoped plants change.
+  useEffect(() => {
+    if (!open) return;
+    if (plantId) return;
+    const next = pickDefaultQuickLogPlant(
+      scopedPlants,
+      prefill?.plantId ?? null,
+      plantId || null,
+    );
+    if (next && next !== plantId) setPlantId(next);
+  }, [open, plantId, scopedPlants, prefill?.plantId]);
+
   // Drive the sensor snapshot strip + auto-attach default from the same
   // contract-derived status the strip uses. We call the loader here so the
   // parent can react to status transitions without duplicating any

@@ -31,6 +31,7 @@ import { harmonizeDiagnosisConfidence } from "@/lib/aiDoctorConfidenceRules";
 import { actionsPath } from "@/lib/routes";
 import AiCreditLimitNotice from "@/components/AiCreditLimitNotice";
 import AiCreditRemainingBadge from "@/components/AiCreditRemainingBadge";
+import AiCreditServiceDegradedNotice from "@/components/AiCreditServiceDegradedNotice";
 import { adaptCreditedAiResponse } from "@/lib/aiCreditedResponseAdapter";
 import type { AiCreditDenial } from "@/lib/aiCreditLimitNoticeViewModel";
 

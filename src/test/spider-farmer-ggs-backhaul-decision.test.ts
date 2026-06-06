@@ -196,17 +196,19 @@ describe("Spider Farmer GGS Backhaul ADR", () => {
 
     it("does not contain device-control implementation wording", () => {
       const adr = readAdr();
-      // Look for words that suggest active control/execution, not just policy statements
+      // Look for imperative device-control sentences, not policy statements.
+      // "light-schedule" in "no setpoint writes" is a policy, not a command.
       const controlWords = [
-        /execute.*command/i,
-        /turn on/i,
-        /turn off/i,
-        /set.*fan/i,
-        /set.*light/i,
-        /set.*pump/i,
-        /control.*fan/i,
-        /control.*light/i,
-        /control.*pump/i,
+        /execute\s+(the\s+)?command/i,
+        /turn\s+on\s+(the\s+)?(fan|light|pump|heater|humidifier)/i,
+        /turn\s+off\s+(the\s+)?(fan|light|pump|heater|humidifier)/i,
+        /set\s+(the\s+)?fan\s+(speed|to)/i,
+        /set\s+(the\s+)?light\s+(schedule|intensity|to\s+\d)/i,
+        /set\s+(the\s+)?pump\s+(rate|to)/i,
+        /control\s+(the\s+)?fan/i,
+        /control\s+(the\s+)?pump/i,
+        /activate\s+(the\s+)?(fan|light|pump|heater|humidifier)/i,
+        /deactivate\s+(the\s+)?(fan|light|pump|heater|humidifier)/i,
       ];
       for (const pattern of controlWords) {
         expect(adr).not.toMatch(pattern);

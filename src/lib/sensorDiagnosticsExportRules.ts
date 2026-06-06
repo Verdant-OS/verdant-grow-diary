@@ -1120,8 +1120,13 @@ export function buildSensorIngestNetworkDiagnostics(
   const notApplicable = httpStatus !== 0 && classification !== "network_error";
   const ingest = parseUrlSafe(ingestUrl ?? null);
   const origin = parseUrlSafe(appOrigin ?? null);
-  const resolvedEndpoint = ingestUrl && ingestUrl.length > 0 ? ingestUrl : "<missing>";
-  const appOriginDisplay = appOrigin && appOrigin.length > 0 ? appOrigin : "<unknown>";
+  const resolvedEndpoint = redactTokens(
+    ingestUrl && ingestUrl.length > 0 ? ingestUrl : "<missing>",
+  );
+  const appOriginDisplay = redactTokens(
+    appOrigin && appOrigin.length > 0 ? appOrigin : "<unknown>",
+  );
+  const safeErrorMessage = errorMessage ? redactTokens(errorMessage) : null;
 
   if (notApplicable) {
     return {

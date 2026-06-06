@@ -31,6 +31,7 @@ import AiDoctorSessionsIndex from "./pages/AiDoctorSessionsIndex";
 import Diagnostics from "./pages/Diagnostics";
 import ActionQueue from "./pages/ActionQueue";
 import OperatorEcowittCanary from "./pages/OperatorEcowittCanary";
+import OneTentProofRecord from "./pages/OneTentProofRecord";
 import ActionDetail from "./pages/ActionDetail";
 import GrowLineageRepair from "./pages/GrowLineageRepair";
 // GrowRoomMode (legacy Live Dashboard) consolidated into Dashboard; /grow-room redirects.
@@ -116,6 +117,7 @@ const App = () => (
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/diagnostics" element={<Diagnostics />} />
                 <Route path="/operator/ecowitt" element={<OperatorEcowittCanary />} />
+                <Route path="/operator/one-tent-proof-record" element={<OneTentProofRecord />} />
                 <Route path="/pi-ingest-status" element={<PiIngestStatus />} />
                 <Route path="/ingest-inspector" element={<IngestInspector />} />
                 <Route path="/imports/representative-csv" element={<RepresentativeCsvPreview />} />

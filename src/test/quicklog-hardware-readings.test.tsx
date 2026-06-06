@@ -252,6 +252,7 @@ describe("QuickLog hardware readings UI", () => {
     fireEvent.change(dialog.querySelector("textarea") as HTMLTextAreaElement, {
       target: { value: "Reading" },
     });
+    fireEvent.click(screen.getByTestId("quicklog-hardware-toggle"));
     const section = screen.getByTestId("quicklog-hardware-readings");
     const inputs = section.querySelectorAll("input");
     fireEvent.change(inputs[0], { target: { value: "6.2" } });

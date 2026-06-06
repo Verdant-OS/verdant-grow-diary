@@ -3,6 +3,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { adaptCreditedAiResponse } from "@/lib/aiCreditedResponseAdapter";
+import { validateAiDoctorReviewResult } from "@/lib/aiDoctorReviewResultContract";
 
 const validResult = () => ({
   summary: "Plant shows mild leaf curl on lower fan leaves.",

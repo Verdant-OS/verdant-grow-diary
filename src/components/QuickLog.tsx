@@ -352,16 +352,20 @@ export default function QuickLog({
               </Select>
             </div>
             <div>
-              <Label className="text-xs">Plant (optional)</Label>
+              <Label className="text-xs">Plant</Label>
               <Select
                 value={plantId || "__none"}
                 onValueChange={(v) => setPlantId(v === "__none" ? "" : v)}
               >
-                <SelectTrigger data-testid="quick-log-plant-select">
-                  <SelectValue placeholder="None" />
+                <SelectTrigger
+                  data-testid="quick-log-plant-select"
+                  aria-invalid={!selectedPlant}
+                  aria-describedby={!selectedPlant ? "quick-log-plant-error" : undefined}
+                >
+                  <SelectValue placeholder="Choose a plant" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none">No specific plant</SelectItem>
+                  <SelectItem value="__none">Choose a plant…</SelectItem>
                   {scopedPlants.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.name}
@@ -370,12 +374,23 @@ export default function QuickLog({
                   ))}
                 </SelectContent>
               </Select>
-              <p
-                className="text-[11px] text-muted-foreground mt-1"
-                data-testid="quick-log-plant-helper"
-              >
-                {quickLogPlantHelperText(activeGrow?.name ?? null, !!activeGrowId)}
-              </p>
+              {!selectedPlant ? (
+                <p
+                  id="quick-log-plant-error"
+                  role="alert"
+                  className="text-[11px] text-destructive mt-1"
+                  data-testid="quick-log-plant-error"
+                >
+                  Choose a plant before saving this entry.
+                </p>
+              ) : (
+                <p
+                  className="text-[11px] text-muted-foreground mt-1"
+                  data-testid="quick-log-plant-helper"
+                >
+                  {quickLogPlantHelperText(activeGrow?.name ?? null, !!activeGrowId)}
+                </p>
+              )}
             </div>
           </div>
 

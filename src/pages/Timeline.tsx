@@ -373,7 +373,7 @@ export default function Timeline() {
           lanes. Action Queue / Alert event logs are surfaced at the
           bottom so Quick Log entries are not buried. */}
       <div className="mt-4">
-        <RecentQuickLogActivityPanel rawEntries={entries} limit={10} />
+        <RecentQuickLogActivityPanel rawEntries={recentLaneRawEntries} limit={10} />
       </div>
 
       <div className="mt-4">

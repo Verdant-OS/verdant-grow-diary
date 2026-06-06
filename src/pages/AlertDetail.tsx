@@ -680,12 +680,21 @@ export default function AlertDetail() {
                         Not enough alert context to draft a safe action.
                       </p>
                     )}
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {existingActionId ? (
+                    <div
+                      className="flex flex-wrap gap-2 mt-2"
+                      data-testid="alert-handoff-decision"
+                      data-decision-state={addButtonDecision.state}
+                      data-decision-reason={addButtonDecision.reasonCode}
+                    >
+                      {addButtonDecision.state === "already_exists" &&
+                      (existingActionId ?? addButtonDecision.existingActionId) ? (
                         <>
                           <Button asChild size="sm" variant="secondary">
                             <Link
-                              to={`/actions/${existingActionId}`}
+                              to={`/actions/${
+                                existingActionId ??
+                                addButtonDecision.existingActionId
+                              }`}
                               data-testid="alert-handoff-already-queued-link"
                             >
                               ✓ Action already queued — view details
@@ -700,7 +709,11 @@ export default function AlertDetail() {
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={!canQueue || queuing}
+                          disabled={
+                            !canQueue ||
+                            queuing ||
+                            addButtonDecision.state !== "can_add"
+                          }
                           onClick={addAlertToActionQueue}
                           data-testid="alert-handoff-add-button"
                           aria-busy={queuing || undefined}
@@ -709,6 +722,7 @@ export default function AlertDetail() {
                         </Button>
                       )}
                     </div>
+
                   </div>
                 </div>
               </div>

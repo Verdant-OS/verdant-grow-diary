@@ -37,10 +37,10 @@ describe("SensorSourceProvenanceBadge", () => {
     );
   });
 
-  it("renders Live for live readings", () => {
+  it("renders Live sensor for live readings", () => {
     render(<SensorSourceProvenanceBadge source="live" />);
     const el = screen.getByTestId(TESTID);
-    expect(el.textContent).toBe("Live");
+    expect(el.textContent).toBe("Live sensor");
     expect(el.getAttribute("data-tone")).toBe("live");
     expect(el.getAttribute("data-degraded")).toBe("false");
   });

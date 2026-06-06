@@ -353,6 +353,19 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     [bundleFilenamePreview, validationUi, result, resultClass, inspectorPlainText, networkDiagnostics],
   );
 
+  const verifyCommands = useMemo(() => {
+    const canonical = buildCanonicalSensorIngestUrl(SUPABASE_URL);
+    return buildSensorIngestVerifyCommands({
+      ingestUrl: canonical,
+      appOrigin:
+        typeof window !== "undefined" && window.location
+          ? window.location.origin
+          : null,
+    });
+  }, []);
+
+
+
 
 
 

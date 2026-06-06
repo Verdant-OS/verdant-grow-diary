@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
     })
     .select("id, name, token_prefix, expires_at, created_at")
     .single();
-  if (insErr) return json({ error: "insert_failed", detail: insErr.message }, 400);
+  if (insErr) { console.error("mint-bridge-token insert_failed", insErr); return json({ error: "insert_failed" }, 400); }
 
   return json({ ok: true, token: plaintext, record: inserted }, 200);
 });

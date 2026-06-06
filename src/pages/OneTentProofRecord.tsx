@@ -6,7 +6,7 @@
  *
  * Safe-by-Design:
  *  - No Supabase reads or writes.
- *  - No fetch, no rpc, no functions.invoke, no Edge Functions.
+ *  - No fetch, no rpc, no Edge Function calls.
  *  - No sensor / alert / Action Queue / target writes.
  *  - No automation. No device control.
  *  - Never generates fake proof data — missing fields stay missing.

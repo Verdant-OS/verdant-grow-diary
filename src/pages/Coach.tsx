@@ -82,6 +82,7 @@ export default function Coach() {
   // result still belongs to the most recent diagnosis (race-safe).
   const [persistedSessionId, setPersistedSessionId] = useState<string | null>(null);
   const [creditDenial, setCreditDenial] = useState<AiCreditDenial | null>(null);
+  const [upstreamCreditExhausted, setUpstreamCreditExhausted] = useState(false);
   const diagnosisSeqRef = useRef(0);
 
   // --- Real grow context for AI sufficiency evaluation (presenter only) ---

@@ -183,7 +183,7 @@ describe("AlertDetail — Linked action count badge", () => {
     actionQueueRows = [];
     renderDetail();
     await screen.findByText("VPD too high");
-    await new Promise((r) => setTimeout(r, 30));
+    await flushAsync();
     expect(screen.queryByTestId("alert-detail-linked-action")).toBeNull();
   });
 
@@ -204,7 +204,7 @@ describe("AlertDetail — Linked action count badge", () => {
     ];
     renderDetail();
     await screen.findByText("VPD too high");
-    await new Promise((r) => setTimeout(r, 30));
+    await flushAsync();
     expect(screen.queryByTestId("alert-detail-linked-action")).toBeNull();
   });
 
@@ -219,7 +219,7 @@ describe("AlertDetail — Linked action count badge", () => {
     ];
     renderDetail();
     await screen.findByText("VPD too high");
-    await new Promise((r) => setTimeout(r, 30));
+    await flushAsync();
     expect(screen.queryByTestId("alert-detail-linked-action")).toBeNull();
   });
 

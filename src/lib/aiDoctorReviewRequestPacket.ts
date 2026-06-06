@@ -83,7 +83,10 @@ export interface BuildAiDoctorReviewPacketArgs {
   plant: (AiDoctorContextPlantSource & { potSize?: string | null }) | null;
   timelineItems: readonly TimelineMemoryItem[] | null | undefined;
   context: AiDoctorContextResult;
+  /** Injectable clock for deterministic staleness annotation. */
+  now?: Date;
 }
+
 
 function cleanStringOrNull(v: unknown): string | null {
   if (typeof v !== "string") return null;

@@ -360,7 +360,7 @@ export function normalizeSpiderFarmerGgsPayload(
   }
 
   // Deterministic warning order.
-  const warnings = Array.from(warningSet).sort();
+  const warnings = [...warningSet].sort();
 
   // Confidence — conservative, deterministic.
   let confidence = 0;

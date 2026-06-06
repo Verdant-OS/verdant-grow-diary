@@ -38,6 +38,7 @@ import {
 } from "@/lib/manualSensorChronologyDeltaRules";
 import type { ManualSensorMetric } from "@/lib/manualSensorFreshnessRules";
 import { usePlantManualSensorLogs } from "@/hooks/usePlantManualSensorHistory";
+import { buildQuickLogPhotoGateState } from "@/lib/quickLogPhotoGateRules";
 
 interface Props {
   open: boolean;

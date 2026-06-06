@@ -9,6 +9,38 @@
 
 import { getActionQueueSourceLabel } from "@/lib/actionQueueProvenanceRules";
 
+/**
+ * Sanitize grower-facing action copy by replacing internal AI prompt
+ * tokens (e.g. `LATEST_SENSOR_SNAPSHOT`) with human-readable text.
+ *
+ * AI Doctor / AI Coach prompts include a stable annotation prefix
+ * `LATEST_SENSOR_SNAPSHOT [source=..., ...]: ...` so the model knows
+ * which line carries the latest reading. When the model echoes that
+ * token back into `suggested_change` / `reason`, the raw identifier
+ * must NEVER reach the grower's screen.
+ *
+ * Pure / deterministic / display-only. No business-logic changes.
+ */
+export function sanitizeActionCopy(
+  text: string | null | undefined,
+): string {
+  if (text == null) return "";
+  const s = String(text);
+  if (!s) return "";
+  // Strip the optional `[source=..., stale=..., trust=...]` annotation
+  // tail when it directly follows the token, then replace the token
+  // itself with a calm human phrase. Collapse any double-spaces left
+  // behind.
+  return s
+    .replace(
+      /LATEST_SENSOR_SNAPSHOT\s*\[[^\]]*\]\s*:?/g,
+      "the latest sensor snapshot",
+    )
+    .replace(/LATEST_SENSOR_SNAPSHOT/g, "the latest sensor snapshot")
+    .replace(/ {2,}/g, " ")
+    .trim();
+}
+
 type RiskLevel = "low" | "medium" | "high" | "critical";
 
 export const RISK_LABEL: Record<RiskLevel, string> = {

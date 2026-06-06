@@ -103,35 +103,6 @@ function pickEventCategory(item: TimelineMemoryItem): string {
   return "other";
 }
 
-function pickMostRecentSnapshot(
-  items: readonly TimelineMemoryItem[],
-): AiDoctorReviewRequestSnapshot | null {
-  let best: { item: TimelineMemoryItem; t: number } | null = null;
-  for (const it of items) {
-    if (it.kind !== "manual_sensor_snapshot") continue;
-    const t = Date.parse(it.occurredAt);
-    if (!Number.isFinite(t)) continue;
-    if (!best || t > best.t) best = { item: it, t };
-  }
-  if (!best || best.item.kind !== "manual_sensor_snapshot") return null;
-  const card = best.item.card;
-  const readings: AiDoctorReviewRequestSnapshotReading[] = [];
-  for (const r of card.readings ?? []) {
-    if (
-      typeof r.field === "string" &&
-      typeof r.value === "number" &&
-      Number.isFinite(r.value) &&
-      typeof r.unit === "string"
-    ) {
-      readings.push({ field: r.field, value: r.value, unit: r.unit });
-    }
-  }
-  return {
-    capturedAt: card.capturedAt,
-    severity: card.severity,
-    readings,
-  };
-}
 
 function pickMostRecentSnapshotItem(
   items: readonly TimelineMemoryItem[],

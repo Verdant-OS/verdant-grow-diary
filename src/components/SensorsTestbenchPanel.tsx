@@ -1164,6 +1164,53 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
                   {networkDiagnostics.appOrigin}
                 </span>
               </div>
+              <div>
+                <span className="text-muted-foreground">expected canonical URL:</span>{" "}
+                <span data-testid="sensors-testbench-network-diagnostics-canonical">
+                  {networkDiagnostics.canonicalIngestUrl}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">canonical URL match:</span>{" "}
+                <span
+                  data-testid="sensors-testbench-network-diagnostics-canonical-match"
+                  data-match={networkDiagnostics.canonicalUrlMatch}
+                >
+                  {networkDiagnostics.canonicalUrlMatch}
+                </span>
+              </div>
+              {networkDiagnostics.canonicalMismatchExplanation && (
+                <div
+                  className="text-amber-700 dark:text-amber-300"
+                  data-testid="sensors-testbench-network-diagnostics-canonical-explanation"
+                >
+                  {networkDiagnostics.canonicalMismatchExplanation}
+                </div>
+              )}
+              <div>
+                <span className="text-muted-foreground">CORS OPTIONS headers:</span>{" "}
+                <span
+                  data-testid="sensors-testbench-network-diagnostics-cors-options"
+                  data-state={networkDiagnostics.cors.optionsHeaders}
+                >
+                  {networkDiagnostics.cors.optionsHeaders}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">CORS POST headers:</span>{" "}
+                <span
+                  data-testid="sensors-testbench-network-diagnostics-cors-post"
+                  data-state={networkDiagnostics.cors.postHeaders}
+                >
+                  {networkDiagnostics.cors.postHeaders}
+                </span>
+              </div>
+              <div
+                className="text-muted-foreground"
+                data-testid="sensors-testbench-network-diagnostics-cors-explanation"
+              >
+                {networkDiagnostics.cors.explanation}
+              </div>
             </div>
             {networkDiagnostics.evidence.length > 0 && (
               <div className="mb-2">

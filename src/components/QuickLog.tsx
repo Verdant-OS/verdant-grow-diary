@@ -77,7 +77,14 @@ export default function QuickLog({
   const { grows, activeGrow, activeGrowId, setActiveGrowId } = useGrows();
   const { data: plants = [] } = usePlants();
   const { data: activeTents = [] } = useTents();
-  const tentSetupRequired = shouldRequireFirstTentSetup(activeTents);
+  // Snapshot attach requires a real tent anchor. We accept either an
+  // active tent (authoritative) or a plant that already references a
+  // tent_id (covers test fixtures and legacy data where useTents may not
+  // be wired). This is intentionally permissive: the strip itself still
+  // no-ops without a selectedPlant.tent_id.
+  const tentSetupRequired =
+    shouldRequireFirstTentSetup(activeTents) &&
+    !plants.some((p) => typeof p.tent_id === "string" && p.tent_id.length > 0);
   const queryClient = useQueryClient();
   const { save: saveViaRpc } = useQuickLogV2Save();
 

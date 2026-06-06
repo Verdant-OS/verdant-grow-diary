@@ -37,7 +37,8 @@
     "check:gamification-rls": "node scripts/check-gamification-rls.mjs",
     "scan:gamification-direct-inserts": "node scripts/scan-gamification-direct-inserts.mjs",
     "smoke:award-nugs": "bun run scripts/smoke-award-nugs.ts",
-    "test:security-gamification": "node scripts/scan-gamification-direct-inserts.mjs && vitest run src/test/scan-gamification-direct-inserts.test.ts"
+    "test:security-gamification": "node scripts/scan-gamification-direct-inserts.mjs && vitest run src/test/scan-gamification-direct-inserts.test.ts",
+    "check:shelly-ht-edge-sources": "node scripts/assert-shelly-ht-edge-sources-present.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

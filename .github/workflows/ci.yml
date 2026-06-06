@@ -70,8 +70,14 @@ jobs:
       # gated on workflow_dispatch + push-to-main only.
 
 
+      # Stop-ship: every Shelly H&T edge function declared in
+      # supabase/config.toml must have its source file in the repo.
+      - name: Shelly H&T edge function sources present
+        run: bun run check:shelly-ht-edge-sources
+
       - name: Full test suite
         run: bunx vitest run
+
 
       - name: Build
         run: bun run build

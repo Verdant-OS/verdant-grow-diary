@@ -395,6 +395,9 @@ export function buildAiSensorSnapshotContext(
       // stale but timestamp valid
       const readings = formatReadingsForLine(snapshot);
       message = `${readings} (stale: readings may not reflect current tent conditions)`;
+      safetyNotes.push(
+        "Snapshot is older than the freshness window; readings may not reflect current tent conditions.",
+      );
     }
   } else if (source === "live") {
     trust = "high";

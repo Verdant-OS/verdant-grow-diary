@@ -510,7 +510,14 @@ export default function AlertDetail() {
               >
                 {alert.source}
               </Badge>
+              {derivedSensorSource ? (
+                <SensorSourceProvenanceBadge
+                  source={derivedSensorSource}
+                  testId="alert-detail-sensor-source-badge"
+                />
+              ) : null}
             </div>
+
             <h2 id="alert-detail-title" className="font-display font-semibold text-base">{alert.title}</h2>
             <p className="text-sm text-muted-foreground mt-1">{alert.reason}</p>
 

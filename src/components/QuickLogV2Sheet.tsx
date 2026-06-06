@@ -95,12 +95,9 @@ export default function QuickLogV2Sheet({
     setLocalError(null);
   };
 
-  const handlePhotoPick = () => {
-    if (!isQuickLogPhotoSavingSupported()) {
-      setLocalError("Photo saving is not enabled yet.");
-      return;
-    }
-  };
+  // Photo gate state — pure helper; recomputed cheaply. Memoized so the
+  // gated UI block reads a single deterministic snapshot per render.
+  const photoGate = useMemo(() => buildQuickLogPhotoGateState(), []);
 
   const handleSave = async () => {
     setLocalError(null);

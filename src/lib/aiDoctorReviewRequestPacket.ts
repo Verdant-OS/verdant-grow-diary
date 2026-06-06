@@ -128,6 +128,56 @@ function pickMostRecentSnapshot(
   };
 }
 
+function pickMostRecentSnapshotItem(
+  items: readonly TimelineMemoryItem[],
+): { card: ManualSnapshotCard; t: number } | null {
+  let best: { item: TimelineMemoryItem; t: number } | null = null;
+  for (const it of items) {
+    if (it.kind !== "manual_sensor_snapshot") continue;
+    const t = Date.parse(it.occurredAt);
+    if (!Number.isFinite(t)) continue;
+    if (!best || t > best.t) best = { item: it, t };
+  }
+  if (!best || best.item.kind !== "manual_sensor_snapshot") return null;
+  return { card: best.item.card as ManualSnapshotCard, t: best.t };
+}
+
+type ManualSnapshotCard = {
+  capturedAt: string;
+  severity: "ok" | "warning" | "invalid";
+  source?: string;
+  readings?: ReadonlyArray<{ field: string; value: number; unit: string }>;
+};
+
+function buildAnnotationFromCard(
+  card: ManualSnapshotCard,
+  now: Date | undefined,
+): AiDoctorReviewRequestSnapshotAnnotation {
+  // Project the card into the shape the shared helper consumes. We map
+  // severity=invalid → source=invalid so safety notes propagate, and we
+  // forward numeric readings so the shared helper can format them when
+  // the source is trustworthy.
+  const projected: Record<string, unknown> = {
+    source: card.severity === "invalid" ? "invalid" : (card.source ?? "manual"),
+    captured_at: card.capturedAt,
+  };
+  for (const r of card.readings ?? []) {
+    if (typeof r.field === "string" && typeof r.value === "number" && Number.isFinite(r.value)) {
+      projected[r.field] = r.value;
+    }
+  }
+  const ctx = buildAiCoachSensorSnapshotContext(projected, { now });
+  return {
+    line: ctx.line,
+    source: ctx.source,
+    stale: ctx.stale,
+    trust: ctx.trust,
+    includesValues: ctx.includesValues,
+    safetyNotes: [...ctx.safetyNotes],
+    missingInformationHints: [...ctx.missingInformationHints],
+  };
+}
+
 /**
  * Build a compact, bounded packet for the server-side review request.
  * The returned object is JSON-safe and contains no sensitive keys.
@@ -151,6 +201,29 @@ export function buildAiDoctorReviewRequestPacket(
     recentEvents.push({ at, category: pickEventCategory(it) });
   }
 
+  const latest = pickMostRecentSnapshotItem(sorted);
+  let recentSensorSnapshot: AiDoctorReviewRequestSnapshot | null = null;
+  let recentSensorSnapshotAnnotation: AiDoctorReviewRequestSnapshotAnnotation | null = null;
+  if (latest) {
+    const readings: AiDoctorReviewRequestSnapshotReading[] = [];
+    for (const r of latest.card.readings ?? []) {
+      if (
+        typeof r.field === "string" &&
+        typeof r.value === "number" &&
+        Number.isFinite(r.value) &&
+        typeof r.unit === "string"
+      ) {
+        readings.push({ field: r.field, value: r.value, unit: r.unit });
+      }
+    }
+    recentSensorSnapshot = {
+      capturedAt: latest.card.capturedAt,
+      severity: latest.card.severity,
+      readings,
+    };
+    recentSensorSnapshotAnnotation = buildAnnotationFromCard(latest.card, args.now);
+  }
+
   return {
     schemaVersion: AI_DOCTOR_REVIEW_PACKET_SCHEMA_VERSION,
     plant: {
@@ -165,6 +238,8 @@ export function buildAiDoctorReviewRequestPacket(
       missing: [...args.context.missing],
     },
     recentEvents,
-    recentSensorSnapshot: pickMostRecentSnapshot(sorted),
+    recentSensorSnapshot,
+    recentSensorSnapshotAnnotation,
   };
 }
+

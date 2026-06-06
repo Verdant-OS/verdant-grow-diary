@@ -193,6 +193,14 @@ export default function Sensors() {
       <div className="mt-4 max-w-xl">
         <SensorBridgeHealthCard />
       </div>
+      {manualTents.find((t) => t.id === tentId) && (
+        <div className="mt-4 max-w-2xl">
+          <SensorsTestbenchPanel
+            tentId={tentId}
+            tentName={selectedTent?.name ?? null}
+          />
+        </div>
+      )}
     </div>
   );
 }

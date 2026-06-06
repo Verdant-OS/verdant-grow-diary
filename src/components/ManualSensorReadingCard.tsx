@@ -433,6 +433,8 @@ export default function ManualSensorReadingCard({
             )}
           </Button>
         </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );

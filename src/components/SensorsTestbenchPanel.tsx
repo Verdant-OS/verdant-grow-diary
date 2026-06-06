@@ -626,8 +626,13 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
               size="sm"
               variant="outline"
               onClick={copyCurl}
+              disabled={!canonicalReady}
               data-testid="sensors-diag-copy-curl"
-              title="Contains token if copied during reveal. Do not paste into chat, screenshots, or git."
+              title={
+                canonicalReady
+                  ? "Contains token if copied during reveal. Do not paste into chat, screenshots, or git."
+                  : canonicalDisabledHint ?? undefined
+              }
             >
               <Terminal className="size-3 mr-1" /> curl
             </Button>
@@ -635,8 +640,13 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
               size="sm"
               variant="outline"
               onClick={copyPowerShellIngest}
+              disabled={!canonicalReady}
               data-testid="sensors-diag-copy-powershell-ingest"
-              title="Contains token if copied during reveal. Do not paste into chat, screenshots, or git."
+              title={
+                canonicalReady
+                  ? "Contains token if copied during reveal. Confirmation required when token is revealed."
+                  : canonicalDisabledHint ?? undefined
+              }
             >
               <Terminal className="size-3 mr-1" /> PowerShell
             </Button>
@@ -656,8 +666,23 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
             >
               <Download className="size-3 mr-1" /> .txt
             </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={downloadDiagnosticsBundle}
+              disabled={!canonicalReady}
+              data-testid="sensors-diag-download-bundle"
+              title={
+                canonicalReady
+                  ? "Download diagnostics + history as one .zip — client-side only."
+                  : canonicalDisabledHint ?? undefined
+              }
+            >
+              <Download className="size-3 mr-1" /> bundle
+            </Button>
           </div>
         </div>
+
         <p className="text-[11px] text-muted-foreground mb-2">
           Exports contain safe identity only. The curl and PowerShell buttons
           include the bridge token only while the one-time reveal is in memory

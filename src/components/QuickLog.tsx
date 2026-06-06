@@ -19,7 +19,7 @@ import { useGrows } from "@/store/grows";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { STAGES } from "@/lib/grow";
-import { EVENT_TYPES } from "@/lib/diary";
+
 import { EC_UNITS, type EcUnit } from "@/constants/units";
 import { usePlants } from "@/hooks/use-plants";
 import { evaluateQuickLogPreview } from "@/lib/quickLogPreviewRules";

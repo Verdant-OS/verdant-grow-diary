@@ -11,6 +11,7 @@ import SensorBridgeHealthCard from "@/components/SensorBridgeHealthCard";
 import TentCsvImportCard from "@/components/TentCsvImportCard";
 import EnvironmentCsvImportLauncher from "@/components/EnvironmentCsvImportLauncher";
 import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
+import SensorsTestbenchPanel from "@/components/SensorsTestbenchPanel";
 import { useGrowTents, useGrowSensorReadings } from "@/hooks/useGrowData";
 import { useTents as useTentRows } from "@/hooks/use-tents";
 import { classifyGrowDataSource } from "@/lib/growDataSourceLabelRules";

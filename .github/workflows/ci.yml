@@ -75,6 +75,12 @@ jobs:
       - name: Shelly H&T edge function sources present
         run: bun run check:shelly-ht-edge-sources
 
+      # Stop-ship: App route manifest must stay in sync with src/App.tsx and
+      # every Alerts quick-link target must resolve to a registered, mounted
+      # auth route. Runs on every PR to catch drift before the full suite.
+      - name: Route manifest + Alerts quick-link drift
+        run: bunx vitest run src/test/route-manifest-sync.test.ts src/test/alerts-route-quick-link-contract.test.tsx
+
       - name: Full test suite
         run: bunx vitest run
 

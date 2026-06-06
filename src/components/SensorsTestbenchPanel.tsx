@@ -520,6 +520,38 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     );
   }
 
+  async function downloadDiagnosticsBundle() {
+    if (typeof window === "undefined") return;
+    try {
+      const files = buildDiagnosticsBundleFiles({
+        diagnosticsJson: diagnosticsExportToJson(buildDiagnosticsPayload()),
+        diagnosticsText: diagnosticsExportToText(buildDiagnosticsPayload()),
+        historyJson: historyExportToJson(buildHistoryPayload()),
+      });
+      const zip = new JSZip();
+      for (const f of files) zip.file(f.name, f.content);
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = buildDownloadFilename(
+        "verdant-sensor-diagnostics-bundle",
+        "zip",
+        new Date(),
+      );
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch {
+      toast({
+        title: "Bundle download unavailable — copy individual exports instead.",
+        variant: "destructive",
+      });
+    }
+  }
+
+
   function clearHistory() {
     setHistory([]);
   }

@@ -75,6 +75,14 @@ import {
   formatSafeResponseInspectorPlainText,
   historyExportToJson,
   SENSOR_INGEST_HISTORY_MAX,
+  buildNetworkDiagnosticsDownloadFilename,
+  buildNetworkDiagnosticsExportJson,
+  buildSensorDiagnosticsRunHistoryEntry,
+  buildSensorDiagnosticsRunHistoryFilename,
+  buildSensorIngestVerifyCommands,
+  sensorDiagnosticsRunHistoryToJson,
+  trimSensorDiagnosticsRunHistory,
+  type SensorDiagnosticsRunHistoryEntry,
   type SensorIngestHistoryItem,
 } from "@/lib/sensorDiagnosticsExportRules";
 import JSZip from "jszip";

@@ -62,24 +62,13 @@ jobs:
       - name: Gamification direct-insert scan + static tests
         run: bun run test:security-gamification
 
-      # Stop-ship: live RLS/RPC verification for gamification.
-      # Confirms INSERT policies stay dropped, SELECT policies + award_nugs
-      # grants remain intact. Skipped (neutral) on PRs without DB access.
-      - name: Gamification RLS live verification
-        if: ${{ env.SUPABASE_DB_URL != '' }}
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: bun run check:gamification-rls
+      # NOTE: Gamification RLS live verification and award_nugs staging smoke
+      # are intentionally NOT in this PR-default workflow. They require
+      # privileged staging credentials (DB URL / service role / anon key) and
+      # must not be reachable from untrusted PRs. They live in the separate
+      # manual workflow .github/workflows/gamification-staging-smoke.yml,
+      # gated on workflow_dispatch + push-to-main only.
 
-      # Optional: end-to-end smoke that award_nugs works via authenticated
-      # session. Requires staging env vars; skipped (neutral) without them.
-      - name: Gamification award_nugs smoke (staging)
-        if: ${{ env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SUPABASE_ANON_KEY != '' }}
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        run: bun run smoke:award-nugs
 
       - name: Full test suite
         run: bunx vitest run

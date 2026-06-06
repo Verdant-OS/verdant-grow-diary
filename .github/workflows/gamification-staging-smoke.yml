@@ -1,0 +1,55 @@
+name: Gamification staging smoke
+
+# Manual / protected workflow for live gamification verification.
+#
+# Why separate from ci.yml:
+#   - requires privileged staging credentials (DB URL, anon key, and the
+#     service role key used ONLY to seed/teardown a throwaway test user
+#     inside scripts/smoke-award-nugs.ts)
+#   - must NOT run on untrusted pull_request events
+#   - the PR-default ci.yml workflow is asserted by
+#     src/test/v0-operating-loop-ci-guardrails.test.ts to be free of
+#     external-secret and service_role references
+#
+# Behavior:
+#   - runs on manual dispatch and on push to main only
+#   - each step is gated on its required env vars being present, so a
+#     fork or an unconfigured environment cleanly skips instead of failing
+#   - never echoes secrets; the underlying scripts refuse to run against
+#     production hosts unless RLS_SMOKE_ALLOW_PROD=1 is set
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  gamification-staging-smoke:
+    name: Gamification RLS + award_nugs smoke (staging)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Gamification RLS live verification
+        if: ${{ env.SUPABASE_DB_URL != '' }}
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: bun run check:gamification-rls
+
+      - name: Gamification award_nugs smoke
+        if: ${{ env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SUPABASE_ANON_KEY != '' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: bun run smoke:award-nugs

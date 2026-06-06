@@ -1,65 +1,85 @@
 /**
- * aiCreditRemainingBadgeViewModel — pure VM for the post-success
- * "credits left" badge shown after a validated AI Doctor review.
+ * aiCreditRemainingBadgeViewModel — pure view model for the post-success
+ * AI Doctor credit-remaining badge (S3.1).
  *
- * Pure: no React, no Supabase, no fetch, no Date reads.
+ * Consumes the `credit` payload already returned by `ai-doctor-review` on a
+ * successful run: `{ remaining, scope, scope_limit, period_key? }`.
+ *
+ * Hard constraints:
+ *  - Pure: no React, no Supabase, no fetch, no Date reads.
+ *  - No CTA. No upgrade prompt. No urgency language.
+ *  - Missing / malformed input → hidden.
+ *  - Unknown scope → hidden (fail closed).
+ *  - `remaining` below 0 clamps to 0.
+ *  - Never asserts AI results are guaranteed.
  */
 
 export type AiCreditRemainingScope = "per_grow" | "per_month" | string;
 
+/**
+ * Shape of the `credit` field that `ai-doctor-review` returns on success.
+ * Every field is optional so callers can hand us raw decoded JSON safely.
+ */
 export interface AiCreditRemainingInput {
   remaining?: number | null;
-  scope_limit?: number | null;
   scope?: AiCreditRemainingScope | null;
+  scope_limit?: number | null;
   period_key?: string | null;
 }
 
 export interface AiCreditRemainingBadgeViewModel {
   visible: boolean;
   label: string;
-  title?: string;
-  tone: "neutral" | "watch";
+  /** Only set for per_month. */
+  helper?: string;
+  scope?: "per_grow" | "per_month";
+  remaining?: number;
+  scopeLimit?: number;
 }
 
-const HIDDEN: AiCreditRemainingBadgeViewModel = {
-  visible: false,
-  label: "",
-  tone: "neutral",
-};
+const HIDDEN: AiCreditRemainingBadgeViewModel = { visible: false, label: "" };
 
-function isFiniteNumber(v: unknown): v is number {
+const PER_MONTH_HELPER = "Resets on the 1st of the month (UTC).";
+
+function isFiniteInt(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v);
 }
 
-export function buildAiCreditRemainingBadgeViewModel(
-  credit?: AiCreditRemainingInput | null,
-): AiCreditRemainingBadgeViewModel {
-  if (!credit || typeof credit !== "object") return HIDDEN;
+function clampNonNegative(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  return n < 0 ? 0 : Math.floor(n);
+}
 
-  const scope = credit.scope;
+export function buildAiCreditRemainingBadgeViewModel(
+  input: AiCreditRemainingInput | null | undefined,
+): AiCreditRemainingBadgeViewModel {
+  if (!input || typeof input !== "object") return HIDDEN;
+
+  const { remaining, scope, scope_limit: scopeLimit } = input;
+
+  if (!isFiniteInt(remaining)) return HIDDEN;
+  if (!isFiniteInt(scopeLimit) || scopeLimit <= 0) return HIDDEN;
   if (scope !== "per_grow" && scope !== "per_month") return HIDDEN;
 
-  if (!isFiniteNumber(credit.remaining)) return HIDDEN;
-  if (!isFiniteNumber(credit.scope_limit) || credit.scope_limit <= 0) {
-    return HIDDEN;
-  }
-
-  const remaining = Math.max(0, Math.floor(credit.remaining));
-  const limit = Math.floor(credit.scope_limit);
-  const tone: "neutral" | "watch" = remaining <= 0 ? "watch" : "neutral";
+  const remainingClamped = clampNonNegative(remaining);
+  const limitClamped = clampNonNegative(scopeLimit);
 
   if (scope === "per_grow") {
     return {
       visible: true,
-      tone,
-      label: `${remaining} of ${limit} AI Doctor checks left for this grow`,
+      label: `${remainingClamped} of ${limitClamped} AI Doctor checks left for this grow`,
+      scope: "per_grow",
+      remaining: remainingClamped,
+      scopeLimit: limitClamped,
     };
   }
 
   return {
     visible: true,
-    tone,
-    label: `${remaining} of ${limit} AI Doctor checks left this month`,
-    title: "Resets on the 1st of the month (UTC).",
+    label: `${remainingClamped} of ${limitClamped} AI Doctor checks left this month`,
+    helper: PER_MONTH_HELPER,
+    scope: "per_month",
+    remaining: remainingClamped,
+    scopeLimit: limitClamped,
   };
 }

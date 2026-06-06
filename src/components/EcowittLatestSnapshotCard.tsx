@@ -18,7 +18,9 @@ import {
   type UseEcowittLatestSnapshotInput,
 } from "@/hooks/useEcowittLatestSnapshot";
 import { ECOWITT_DERIVED_VPD_LABEL } from "@/lib/ecowittReadingViewModel";
+import SensorSourceProvenanceBadge from "@/components/SensorSourceProvenanceBadge";
 import { Link } from "react-router-dom";
+
 
 
 export interface EcowittLatestSnapshotCardProps

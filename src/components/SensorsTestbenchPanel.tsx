@@ -421,6 +421,58 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     }
   }
 
+  async function copyRedactedInspector() {
+    if (!inspectorPlainText) return;
+    try {
+      if (!navigator.clipboard?.writeText) {
+        toast({
+          title: "Could not copy diagnostics summary. You can select and copy manually.",
+          variant: "destructive",
+        });
+        return;
+      }
+      await navigator.clipboard.writeText(inspectorPlainText);
+      toast({
+        title: "Copied redacted diagnostics summary.",
+        description: "Sensitive values were redacted.",
+      });
+    } catch {
+      toast({
+        title: "Could not copy diagnostics summary. You can select and copy manually.",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function copyShareSummary() {
+    try {
+      if (!navigator.clipboard?.writeText) {
+        toast({
+          title: "Could not copy diagnostics summary. You can select and copy manually.",
+          variant: "destructive",
+        });
+        return;
+      }
+      await navigator.clipboard.writeText(shareModalState.supportSummary);
+      toast({
+        title: "Copied support-ready diagnostics summary.",
+        description: "Sensitive values were redacted.",
+      });
+    } catch {
+      toast({
+        title: "Could not copy diagnostics summary. You can select and copy manually.",
+        variant: "destructive",
+      });
+    }
+  }
+
+  function focusValidationDetails() {
+    const el = validationDetailsRef.current;
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    el.focus({ preventScroll: true });
+  }
+
 
   async function copyPowerShell() {
     await safeCopy(powershell, "PowerShell snippet");

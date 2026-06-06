@@ -57,6 +57,30 @@ jobs:
       - name: QuickLog v2 RPC ownership + security
         run: bun run test:quicklog-rpc-ownership
 
+      # Stop-ship: gamification writes must remain RPC-only.
+      # Static scan: no client-side .from('nug_events'|'unlocks'|'user_quests').insert.
+      - name: Gamification direct-insert scan + static tests
+        run: bun run test:security-gamification
+
+      # Stop-ship: live RLS/RPC verification for gamification.
+      # Confirms INSERT policies stay dropped, SELECT policies + award_nugs
+      # grants remain intact. Skipped (neutral) on PRs without DB access.
+      - name: Gamification RLS live verification
+        if: ${{ env.SUPABASE_DB_URL != '' }}
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: bun run check:gamification-rls
+
+      # Optional: end-to-end smoke that award_nugs works via authenticated
+      # session. Requires staging env vars; skipped (neutral) without them.
+      - name: Gamification award_nugs smoke (staging)
+        if: ${{ env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SUPABASE_ANON_KEY != '' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: bun run smoke:award-nugs
+
       - name: Full test suite
         run: bunx vitest run
 

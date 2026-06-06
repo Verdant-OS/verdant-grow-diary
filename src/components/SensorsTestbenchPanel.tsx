@@ -330,9 +330,69 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
 
 
   async function copyPowerShell() {
-    await navigator.clipboard.writeText(powershell);
-    toast({ title: "PowerShell snippet copied" });
+    await safeCopy(powershell, "PowerShell snippet");
   }
+
+  function buildDiagnosticsPayload() {
+    return {
+      generated_at: new Date().toISOString(),
+      supabase_url: SUPABASE_URL ?? null,
+      ingest_url: INGEST_URL,
+      tent_id: tentId,
+      tent_name: tentName ?? null,
+      token: activeToken
+        ? {
+            token_prefix: activeToken.token_prefix,
+            name: activeToken.name,
+            status: bridgeTokenStatus(activeToken),
+            last_used_at: activeToken.last_used_at,
+            ingest_count: activeToken.ingest_count,
+            expires_at: activeToken.expires_at,
+          }
+        : null,
+      env_match: envMatch,
+      latest_test_result:
+        result && resultClass
+          ? {
+              attempted_at: history[0]?.attempted_at ?? new Date().toISOString(),
+              http_status: result.status,
+              classification: resultClass.category,
+              headline: resultClass.headline,
+              body: result.body,
+            }
+          : null,
+    };
+  }
+
+  async function copyDiagnosticsJson() {
+    await safeCopy(
+      diagnosticsExportToJson(buildDiagnosticsPayload()),
+      "Diagnostics JSON",
+    );
+  }
+
+  async function copyDiagnosticsText() {
+    await safeCopy(
+      diagnosticsExportToText(buildDiagnosticsPayload()),
+      "Diagnostics text",
+    );
+  }
+
+  async function copyCurl() {
+    const cmd = buildSensorIngestCurl({
+      ingestUrl: INGEST_URL,
+      tentId,
+      bridgeTokenPlaintext: reveal,
+      idempotencyKey: `testbench-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      capturedAtIso: new Date().toISOString(),
+    });
+    await safeCopy(cmd, "curl command");
+  }
+
+  function clearHistory() {
+    setHistory([]);
+  }
+
 
   if (!tentId) {
     return null;

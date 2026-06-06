@@ -13,6 +13,7 @@ import {
   type AiDoctorReviewResult,
 } from "@/lib/aiDoctorReviewResultContract";
 import type { AiCreditDenial } from "@/lib/aiCreditLimitNoticeViewModel";
+import type { AiCreditRemainingInput } from "@/lib/aiCreditRemainingBadgeViewModel";
 
 export type AiDoctorLiveReviewFailureReason =
   | "config"
@@ -25,7 +26,12 @@ export type AiDoctorLiveReviewFailureReason =
   | "credit_denied";
 
 export type AiDoctorLiveReviewAdapterOutcome =
-  | { ok: true; result: AiDoctorReviewResult }
+  | {
+      ok: true;
+      result: AiDoctorReviewResult;
+      /** Pass-through from the server `{ ok:true, result, credit? }` envelope. */
+      credit?: AiCreditRemainingInput;
+    }
   | {
       ok: false;
       reason: AiDoctorLiveReviewFailureReason;
@@ -41,6 +47,12 @@ function coerceCreditDenial(v: unknown): AiCreditDenial | undefined {
   // Pass through; downstream view model is defensive on optional fields.
   return v as unknown as AiCreditDenial;
 }
+
+function coerceCreditRemaining(v: unknown): AiCreditRemainingInput | undefined {
+  if (!isPlainObject(v)) return undefined;
+  return v as unknown as AiCreditRemainingInput;
+}
+
 
 /**
  * Adapt an unknown payload received from the server-side review endpoint.

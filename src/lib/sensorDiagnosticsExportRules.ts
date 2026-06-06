@@ -1166,6 +1166,8 @@ export function buildSensorIngestNetworkDiagnostics(
     summary =
       "The ingest URL points at a localhost or private-network address that this browser likely cannot reach from the current origin.";
     checks.push(`Confirm the device serving ${ingest.host} is reachable from this machine and network.`);
+    checks.push("If using a Pi/PC bridge, verify the listener is running and the firewall allows the port.");
+    checks.push("Open the ingest URL directly in a new browser tab to confirm reachability.");
   } else if (origin && origin.protocol === "https:" && ingest.protocol === "http:") {
     status = "likely_mixed_content";
     title = "Likely mixed-content block (HTTPS app calling HTTP endpoint)";
@@ -1173,13 +1175,6 @@ export function buildSensorIngestNetworkDiagnostics(
       "Browsers block HTTP requests from HTTPS pages. The ingest endpoint must be served over HTTPS.";
     checks.push("Serve the ingest endpoint over HTTPS, or run the app over HTTP for local testing only.");
     checks.push("Verify the ingest URL scheme in your environment configuration.");
-    status = "likely_endpoint_unreachable";
-    title = "Local/private ingest endpoint not reachable from this browser";
-    summary =
-      "The ingest URL points at a localhost or private-network address that this browser likely cannot reach from the current origin.";
-    checks.push(`Confirm the device serving ${ingest.host} is reachable from this machine and network.`);
-    checks.push("If using a Pi/PC bridge, verify the listener is running and the firewall allows the port.");
-    checks.push("Open the ingest URL directly in a new browser tab to confirm reachability.");
   } else if (origin && origin.origin !== ingest.origin) {
     status = "likely_cors_or_preflight";
     title = "Likely CORS or preflight failure (cross-origin Failed to fetch)";

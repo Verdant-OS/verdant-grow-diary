@@ -106,10 +106,11 @@ describe("redactRecordInput", () => {
     const r = buildOneTentProofRecord({
       scope: {
         growName: "Tent A",
-        // @ts-expect-error denylisted
-        user_id: "uuid-x",
       },
+      // denylisted top-level field — should be stripped by redaction pass
+      user_id: "uuid-x",
     } as any);
+
     const json = serializeProofRecordToJson(r);
     expect(json).toContain("Tent A");
     expect(json).not.toContain("uuid-x");

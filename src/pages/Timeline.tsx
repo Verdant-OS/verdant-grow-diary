@@ -214,6 +214,16 @@ export default function Timeline() {
     });
   }, [entries, stageFilter, eventFilter]);
 
+  // Merge `grow_events` (Quick Log v2 manual saves) into the raw entries
+  // passed to the Recent Quick Logs panel so just-saved entries surface at
+  // the top. `buildRecentQuickLogActivity` sorts newest-first by entry_at,
+  // so the merged stream is correctly ordered without extra logic.
+  const recentLaneRawEntries = useMemo(
+    () => [...entries, ...mapGrowEventsToRecentRawEntries(growEvents)],
+    [entries, growEvents],
+  );
+
+
   // Pure normalized timeline view-model. Drives per-entry tags/warnings and a
   // future-proof empty/limited disclosure. Includes invalid entries so
   // malformed diary rows still surface as "Limited data" instead of vanishing.

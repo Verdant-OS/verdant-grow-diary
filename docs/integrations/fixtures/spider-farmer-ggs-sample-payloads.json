@@ -1,0 +1,128 @@
+{
+  "$comment": "Synthetic Spider Farmer GGS sample payloads. NOT real exports from any device. Used only for read-only mapping tests. now = 2026-06-06T12:00:00.000Z.",
+  "now": "2026-06-06T12:00:00.000Z",
+  "samples": [
+    {
+      "id": "live_clean_mqtt",
+      "description": "Clean live-like MQTT payload from a bridge.",
+      "expect": {
+        "source": "live",
+        "transport": "mqtt",
+        "readingsInclude": ["temp_f", "humidity", "vpd_kpa"],
+        "warningsExclude": ["reading_stale", "captured_at_missing", "captured_at_invalid", "no_readings_mapped"]
+      },
+      "payload": {
+        "provider": "spider_farmer_ggs",
+        "transport": "mqtt",
+        "source": "live",
+        "captured_at": "2026-06-06T11:59:00.000Z",
+        "received_at": "2026-06-06T11:59:01.000Z",
+        "tent_id": "tent-demo-1",
+        "controller_id": "ggs-fixture-001",
+        "confidence": 0.9,
+        "topic": "verdant/bridge/ggs-fixture-001/state",
+        "temp_f": 78.2,
+        "humidity": 55,
+        "vpd_kpa": 1.1,
+        "fan_state": "on",
+        "light_state": "on",
+        "raw_payload": { "frame": "synthetic-clean" }
+      }
+    },
+    {
+      "id": "stale_old_reading",
+      "description": "Reading older than the 15-minute stale threshold.",
+      "expect": {
+        "source": "stale",
+        "transport": "bridge",
+        "readingsInclude": ["temp_f", "humidity"],
+        "warningsInclude": ["reading_stale"]
+      },
+      "payload": {
+        "provider": "spider_farmer_ggs",
+        "transport": "bridge",
+        "source": "live",
+        "captured_at": "2026-06-06T11:30:00.000Z",
+        "received_at": "2026-06-06T11:30:01.000Z",
+        "tent_id": "tent-demo-1",
+        "controller_id": "ggs-fixture-002",
+        "confidence": 0.4,
+        "temp_f": 76,
+        "humidity": 58,
+        "raw_payload": { "frame": "synthetic-stale" }
+      }
+    },
+    {
+      "id": "invalid_timestamp",
+      "description": "Garbage captured_at string must not silently become 'now'.",
+      "expect": {
+        "source": "invalid",
+        "transport": "home_assistant",
+        "warningsInclude": ["captured_at_invalid"],
+        "capturedAtNull": true
+      },
+      "payload": {
+        "provider": "spider_farmer_ggs",
+        "transport": "home_assistant",
+        "source": "live",
+        "captured_at": "not-a-real-timestamp",
+        "received_at": "2026-06-06T12:00:00.000Z",
+        "tent_id": "tent-demo-1",
+        "controller_id": "ggs-fixture-003",
+        "confidence": 0,
+        "entity_id": "sensor.ggs_fixture_003_temperature",
+        "temp_f": 77,
+        "humidity": 52,
+        "raw_payload": { "frame": "synthetic-bad-timestamp" }
+      }
+    },
+    {
+      "id": "unit_mismatch",
+      "description": "temp_c with explicit unit 'F' must NOT spawn a phantom temp_f.",
+      "expect": {
+        "source": "live",
+        "transport": "mqtt",
+        "readingsInclude": ["temp_c"],
+        "readingsExclude": ["temp_f"]
+      },
+      "payload": {
+        "provider": "spider_farmer_ggs",
+        "transport": "mqtt",
+        "source": "live",
+        "captured_at": "2026-06-06T11:58:30.000Z",
+        "received_at": "2026-06-06T11:58:31.000Z",
+        "tent_id": "tent-demo-2",
+        "controller_id": "ggs-fixture-004",
+        "confidence": 0.8,
+        "temp_c": 24.5,
+        "unit": "F",
+        "humidity": 60,
+        "raw_payload": { "frame": "synthetic-unit-mismatch" }
+      }
+    },
+    {
+      "id": "numeric_strings_mqtt",
+      "description": "MQTT-style payload with stringified numerics; must normalize.",
+      "expect": {
+        "source": "live",
+        "transport": "mqtt",
+        "readingsInclude": ["temp_f", "humidity", "co2_ppm"]
+      },
+      "payload": {
+        "provider": "spider_farmer_ggs",
+        "transport": "mqtt",
+        "source": "live",
+        "captured_at": "2026-06-06T11:59:45.000Z",
+        "received_at": "2026-06-06T11:59:46.000Z",
+        "tent_id": "tent-demo-3",
+        "controller_id": "ggs-fixture-005",
+        "confidence": 0.85,
+        "topic": "verdant/bridge/ggs-fixture-005/state",
+        "temp_f": "78.4",
+        "humidity": "55",
+        "co2_ppm": "  900  ",
+        "raw_payload": { "frame": "synthetic-numeric-strings" }
+      }
+    }
+  ]
+}

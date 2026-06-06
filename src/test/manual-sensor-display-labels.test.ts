@@ -93,11 +93,12 @@ describe("formatSensorDeviceDetail — manual prefix support", () => {
     expect(formatSensorDeviceDetail("")).toBeNull();
   });
 
-  it("still returns the Shelly H&T label for live webhook ingest", () => {
-    expect(formatSensorDeviceDetail("shelly-ht-gen4")).toBe("Shelly H&T Gen4");
-    expect(formatSensorDeviceDetail("shelly-ht-gen4:kitchen-1")).toBe(
-      "Shelly H&T Gen4",
-    );
+  it("returns null for retired Shelly H&T device ids (integration retired)", () => {
+    // Shelly H&T has been retired. The device-label mapping must NOT
+    // expose any active label for it. See
+    // docs/retired-sensor-integrations.md.
+    expect(formatSensorDeviceDetail("shelly-ht-gen4")).toBeNull();
+    expect(formatSensorDeviceDetail("shelly-ht-gen4:kitchen-1")).toBeNull();
   });
 
   it("returns null for unknown device ids", () => {

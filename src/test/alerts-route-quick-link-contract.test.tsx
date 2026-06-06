@@ -87,12 +87,18 @@ describe("Alerts route — quick link contract", () => {
 
 
   it("page scaffolding does not leak token/raw_payload/provenance/service_role copy", () => {
-    const blob = ALERTS.toLowerCase();
+    // The page legitimately renders <SensorSourceProvenanceBadge /> for
+    // source-labeled telemetry (Verdant safety rule). Strip the component
+    // identifier before the leak check so the substring test still catches
+    // raw user-visible "provenance" copy without flagging the safety badge.
+    const blob = ALERTS.replace(/SensorSourceProvenanceBadge/g, "")
+      .toLowerCase();
     expect(blob).not.toContain("service_role");
     expect(blob).not.toContain("raw_payload");
     expect(blob).not.toContain("provenance");
     expect(blob).not.toContain("bearer ");
   });
+
 });
 
 describe("Alerts route — static safety", () => {

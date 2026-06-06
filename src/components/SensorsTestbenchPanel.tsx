@@ -589,9 +589,9 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
       now.toISOString(),
     );
     downloadBlob(
-      buildSensorDiagnosticsRunHistoryFilename(now),
-      "application/json",
       json,
+      "application/json",
+      buildSensorDiagnosticsRunHistoryFilename(now),
     );
   }
 

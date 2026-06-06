@@ -107,7 +107,12 @@ export default function QuickLog({
     lightDistance: "",
   });
   const [busy, setBusy] = useState(false);
-  
+  // Hardware readings collapse state. Default is recomputed via a pure
+  // helper whenever the dialog opens/resets, and remains under grower
+  // control once they toggle it in-session.
+  const [hardwareOpen, setHardwareOpen] = useState(false);
+  const hardwareUserTouchedRef = useRef(false);
+
   // Tracks whether the grower has manually changed the attach toggle in
   // this session. Until they do, we may auto-default it based on whether
   // the latest snapshot classifies as `usable` (Gate 1 trust rule).

@@ -546,12 +546,38 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
             >
               <Terminal className="size-3 mr-1" /> curl
             </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={copyPowerShellIngest}
+              data-testid="sensors-diag-copy-powershell-ingest"
+              title="Contains token if copied during reveal. Do not paste into chat, screenshots, or git."
+            >
+              <Terminal className="size-3 mr-1" /> PowerShell
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={downloadDiagnosticsJson}
+              data-testid="sensors-diag-download-json"
+            >
+              <Download className="size-3 mr-1" /> .json
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={downloadDiagnosticsText}
+              data-testid="sensors-diag-download-text"
+            >
+              <Download className="size-3 mr-1" /> .txt
+            </Button>
           </div>
         </div>
         <p className="text-[11px] text-muted-foreground mb-2">
-          Exports contain safe identity only. The curl button includes the
-          bridge token only while the one-time reveal is in memory — do not
-          paste it into chat, screenshots, or git. Revoke any token that leaks.
+          Exports contain safe identity only. The curl and PowerShell buttons
+          include the bridge token only while the one-time reveal is in memory
+          — do not paste them into chat, screenshots, or git. Revoke any token
+          that leaks.
         </p>
 
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">

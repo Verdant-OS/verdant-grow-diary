@@ -313,7 +313,8 @@ Rules for diagnosis (structured view, approval-first):
       },
     });
   } catch (e) {
-    return json({ error: e instanceof Error ? e.message : "unknown" }, 500);
+    console.error("ai-coach unhandled_error", e);
+    return json({ error: "server_error" }, 500);
   }
 });
 

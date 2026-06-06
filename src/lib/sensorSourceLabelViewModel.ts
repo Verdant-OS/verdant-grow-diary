@@ -120,17 +120,46 @@ export function buildSensorSourceBadge(
         extractManualDeviceNote(input.deviceId ?? null)
       : null;
 
-  let label = resolved.label;
-  if (source === "manual") {
-    label = manualDeviceNote
-      ? `${MANUAL_READING_LABEL} · ${manualDeviceNote}`
-      : MANUAL_READING_LABEL;
+  // Presenter-only badge copy. Underlying enum and
+  // `resolveSensorSourceLabel` are untouched so other surfaces
+  // (dashboard, timeline, ingest) keep their short pill copy.
+  let label: string;
+  switch (tone) {
+    case "manual":
+      label = manualDeviceNote
+        ? `${MANUAL_READING_LABEL} · ${manualDeviceNote}`
+        : MANUAL_READING_LABEL;
+      break;
+    case "live":
+      // Honour vendor promotion (e.g. "Ecowitt") when present;
+      // otherwise render "Live sensor" — never bare "Live".
+      label = resolved.vendorPromoted ? resolved.label : "Live sensor";
+      break;
+    case "csv":
+      label = "CSV import";
+      break;
+    case "demo":
+      label = "Demo data";
+      break;
+    case "stale":
+      label = "Stale reading";
+      break;
+    case "invalid":
+      label = "Invalid reading";
+      break;
+    case "unknown":
+    default:
+      label = "Unknown source";
+      break;
   }
 
+  // Plain, safe aria copy — never includes raw enum tags, alert ids,
+  // grow ids, or back-pointer tokens. Manual still surfaces the
+  // grower-entered device note when present.
   const ariaLabel =
-    tone === "manual"
-      ? `Source: manual reading${manualDeviceNote ? `, ${manualDeviceNote}` : ""}`
-      : `Source: ${label.toLowerCase()}`;
+    tone === "manual" && manualDeviceNote
+      ? `Sensor source: Manual reading, ${manualDeviceNote}`
+      : `Sensor source: ${label}`;
 
   return {
     label,

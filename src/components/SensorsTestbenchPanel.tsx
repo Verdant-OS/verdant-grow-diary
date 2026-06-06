@@ -1015,20 +1015,29 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
               <Button
                 size="sm"
                 variant="outline"
-                className="ml-auto h-7"
-                onClick={() =>
-                  inspectorPlainText &&
-                  safeCopy(inspectorPlainText, "Response inspector (redacted)")
-                }
+                className="ml-auto h-7 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                onClick={copyRedactedInspector}
                 disabled={!inspectorPlainText}
                 data-testid="sensors-testbench-response-inspector-copy"
+                aria-label="Copy redacted response inspector summary"
                 title={
                   inspectorPlainText
-                    ? "Copy the redacted inspector output for support."
+                    ? "Copy the redacted inspector output for support. Sensitive values are redacted."
                     : "Run a test to enable inspector copy."
                 }
               >
                 <Copy className="size-3 mr-1" /> Copy redacted
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                onClick={() => setShareOpen(true)}
+                data-testid="sensors-testbench-share-open"
+                aria-label="Open share diagnostics modal"
+                title="Open a support-ready share view of these diagnostics."
+              >
+                <Share2 className="size-3 mr-1" /> Share diagnostics
               </Button>
             </div>
             {responseInspector.note && (

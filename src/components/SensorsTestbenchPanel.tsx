@@ -20,11 +20,19 @@
  *  - No service_role. Auth is the bridge token Bearer header for tests.
  *  - No device control. No automation. Testbench is auditable, not live.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Copy, KeyRound, Send, ShieldAlert, Activity, CheckCircle2, XCircle, Server, Trash2, Terminal, FileJson, History, Download, Eye } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Copy, KeyRound, Send, ShieldAlert, Activity, CheckCircle2, XCircle, Server, Trash2, Terminal, FileJson, History, Download, Eye, Share2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import {
@@ -47,8 +55,10 @@ import {
 } from "@/lib/sensorIngestTestResultRules";
 import {
   buildCanonicalIngestPayloadValidation,
+  buildCanonicalValidationA11yLabel,
   buildDiagnosticsBundleFilenamePreview,
   buildDiagnosticsBundleFiles,
+  buildDiagnosticsShareModalState,
   buildDownloadFilename,
   buildPowerShellCopyWarningState,
   buildPowerShellIngestTestScript,
@@ -156,6 +166,8 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
   const [tokens, setTokens] = useState<BridgeTokenRow[]>([]);
   const [history, setHistory] = useState<SensorIngestHistoryItem[]>([]);
   const [lastPayload, setLastPayload] = useState<unknown>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const validationDetailsRef = useRef<HTMLDivElement | null>(null);
 
   // Reset reveal/result/history when tent changes — plaintext token must
   // never be reused across tents, and history is per-tent only.
@@ -283,6 +295,23 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     () => (responseInspector ? formatSafeResponseInspectorPlainText(responseInspector) : null),
     [responseInspector],
   );
+  const validationAriaLabel = useMemo(
+    () => buildCanonicalValidationA11yLabel({ status: validationUi.status }),
+    [validationUi.status],
+  );
+  const shareModalState = useMemo(
+    () =>
+      buildDiagnosticsShareModalState({
+        bundleFilename: bundleFilenamePreview,
+        validationUi,
+        lastTestResult:
+          result && resultClass
+            ? { http_status: result.status, classification: resultClass.category }
+            : null,
+        inspectorPlainText,
+      }),
+    [bundleFilenamePreview, validationUi, result, resultClass, inspectorPlainText],
+  );
 
 
 
@@ -390,6 +419,58 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
         variant: "destructive",
       });
     }
+  }
+
+  async function copyRedactedInspector() {
+    if (!inspectorPlainText) return;
+    try {
+      if (!navigator.clipboard?.writeText) {
+        toast({
+          title: "Could not copy diagnostics summary. You can select and copy manually.",
+          variant: "destructive",
+        });
+        return;
+      }
+      await navigator.clipboard.writeText(inspectorPlainText);
+      toast({
+        title: "Copied redacted diagnostics summary.",
+        description: "Sensitive values were redacted.",
+      });
+    } catch {
+      toast({
+        title: "Could not copy diagnostics summary. You can select and copy manually.",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function copyShareSummary() {
+    try {
+      if (!navigator.clipboard?.writeText) {
+        toast({
+          title: "Could not copy diagnostics summary. You can select and copy manually.",
+          variant: "destructive",
+        });
+        return;
+      }
+      await navigator.clipboard.writeText(shareModalState.supportSummary);
+      toast({
+        title: "Copied support-ready diagnostics summary.",
+        description: "Sensitive values were redacted.",
+      });
+    } catch {
+      toast({
+        title: "Could not copy diagnostics summary. You can select and copy manually.",
+        variant: "destructive",
+      });
+    }
+  }
+
+  function focusValidationDetails() {
+    const el = validationDetailsRef.current;
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    el.focus({ preventScroll: true });
   }
 
 
@@ -934,20 +1015,29 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
               <Button
                 size="sm"
                 variant="outline"
-                className="ml-auto h-7"
-                onClick={() =>
-                  inspectorPlainText &&
-                  safeCopy(inspectorPlainText, "Response inspector (redacted)")
-                }
+                className="ml-auto h-7 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                onClick={copyRedactedInspector}
                 disabled={!inspectorPlainText}
                 data-testid="sensors-testbench-response-inspector-copy"
+                aria-label="Copy redacted response inspector summary"
                 title={
                   inspectorPlainText
-                    ? "Copy the redacted inspector output for support."
+                    ? "Copy the redacted inspector output for support. Sensitive values are redacted."
                     : "Run a test to enable inspector copy."
                 }
               >
                 <Copy className="size-3 mr-1" /> Copy redacted
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                onClick={() => setShareOpen(true)}
+                data-testid="sensors-testbench-share-open"
+                aria-label="Open share diagnostics modal"
+                title="Open a support-ready share view of these diagnostics."
+              >
+                <Share2 className="size-3 mr-1" /> Share diagnostics
               </Button>
             </div>
             {responseInspector.note && (
@@ -979,10 +1069,21 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
             )}
             <div className="mt-2">
               <a
-                href="#sensors-testbench-canonical-validation"
-                className="text-[11px] underline text-muted-foreground"
+                href="#canonical-ingest-validation-details"
+                className="inline-flex items-center text-[11px] underline text-muted-foreground rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 data-testid="sensors-testbench-result-readiness-badge"
                 data-status={validationUi.status}
+                aria-label={validationAriaLabel}
+                onClick={(e) => {
+                  e.preventDefault();
+                  focusValidationDetails();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    focusValidationDetails();
+                  }
+                }}
               >
                 Canonical payload:{" "}
                 <Badge
@@ -1005,12 +1106,17 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
 
         {/* Canonical payload validation summary — view-model driven. */}
         <div
-          className="mt-3 border-t border-border/40 pt-2 text-xs"
-          id="sensors-testbench-canonical-validation"
+          className="mt-3 border-t border-border/40 pt-2 text-xs rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          id="canonical-ingest-validation-details"
+          ref={validationDetailsRef}
+          tabIndex={-1}
           data-testid="sensors-testbench-canonical-validation"
           data-ready={canonicalReady ? "true" : "false"}
           data-status={validationUi.status}
+          aria-label={validationAriaLabel}
         >
+          {/* Back-compat alias for legacy in-page anchor */}
+          <span id="sensors-testbench-canonical-validation" className="sr-only" />
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <span className="font-medium">Canonical payload</span>
             <Badge
@@ -1024,6 +1130,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
               }
               data-testid="sensors-testbench-canonical-validation-badge"
               data-tone={validationUi.badgeTone}
+              aria-label={validationAriaLabel}
             >
               {validationUi.statusLabel}
             </Badge>
@@ -1214,6 +1321,116 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
           </div>
         )}
       </div>
+
+      <Dialog open={shareOpen} onOpenChange={setShareOpen}>
+        <DialogContent
+          className="max-w-2xl"
+          data-testid="sensors-testbench-share-modal"
+        >
+          <DialogHeader>
+            <DialogTitle>Share diagnostics</DialogTitle>
+            <DialogDescription>
+              Support-ready summary. Sensitive values (tokens, authorization,
+              secrets, service_role) are redacted before they leave this panel.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 text-xs">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-muted-foreground">bundle filename:</span>
+              <code
+                className="font-mono break-all"
+                data-testid="sensors-testbench-share-bundle-filename"
+              >
+                {shareModalState.bundleFilename}
+              </code>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-muted-foreground">canonical readiness:</span>
+              <Badge
+                variant="outline"
+                className={
+                  shareModalState.badgeTone === "ready"
+                    ? "text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
+                    : shareModalState.badgeTone === "warn"
+                      ? "text-amber-700 dark:text-amber-300 border-amber-500/40"
+                      : ""
+                }
+                aria-label={shareModalState.ariaLabel}
+                data-testid="sensors-testbench-share-readiness"
+                data-status={shareModalState.status}
+              >
+                {shareModalState.statusLabel}
+              </Badge>
+            </div>
+            <div>
+              <div className="text-muted-foreground mb-1">
+                support-ready summary
+              </div>
+              <pre
+                className="bg-muted/40 rounded p-2 max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px]"
+                data-testid="sensors-testbench-share-summary"
+              >
+{shareModalState.supportSummary}
+              </pre>
+            </div>
+            {shareModalState.redactedInspectorText && (
+              <div>
+                <div className="text-muted-foreground mb-1">
+                  redacted response inspector
+                </div>
+                <pre
+                  className="bg-muted/40 rounded p-2 max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px]"
+                  data-testid="sensors-testbench-share-inspector"
+                >
+{shareModalState.redactedInspectorText}
+                </pre>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={copyShareSummary}
+              data-testid="sensors-testbench-share-copy-summary"
+              aria-label="Copy support-ready diagnostics summary"
+            >
+              <Copy className="size-3 mr-1" /> Copy summary
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={copyRedactedInspector}
+              disabled={!shareModalState.redactedInspectorText}
+              data-testid="sensors-testbench-share-copy-inspector"
+              aria-label="Copy redacted response inspector"
+            >
+              <Copy className="size-3 mr-1" /> Copy inspector
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={downloadDiagnosticsBundle}
+              disabled={!shareModalState.canDownloadBundle}
+              data-testid="sensors-testbench-share-download-bundle"
+              aria-label="Download diagnostics bundle"
+            >
+              <Download className="size-3 mr-1" /> Download bundle
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShareOpen(false)}
+              data-testid="sensors-testbench-share-close"
+              aria-label="Close share diagnostics modal"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

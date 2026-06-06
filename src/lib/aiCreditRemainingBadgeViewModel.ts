@@ -62,7 +62,7 @@ export interface AiCreditRemainingBadgeOptions {
 }
 
 function nounFor(surface: AiCreditRemainingSurface): string {
-  return surface === "coach" ? "AI credits" : "AI Doctor checks";
+  return surface === "coach" ? "AI Coach credits" : "AI Doctor credits";
 }
 
 export function buildAiCreditRemainingBadgeViewModel(

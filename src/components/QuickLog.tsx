@@ -443,29 +443,44 @@ export default function QuickLog({
             </div>
           )}
 
-          <label
-            className={`flex items-center justify-between gap-2 rounded-lg border p-3 ${selectedPlant ? "border-border/60" : "border-border/40 opacity-60"}`}
-          >
-            <span className="text-sm flex items-center gap-2">
-              <Gauge className="h-4 w-4 text-primary" />
-              Attach sensor snapshot
-            </span>
-            <Switch
-              checked={snapshot && !!selectedPlant}
-              onCheckedChange={(v) => {
-                snapshotUserTouchedRef.current = true;
-                setSnapshot(v);
-              }}
-              disabled={!selectedPlant}
-            />
-          </label>
-          {snapshot && !selectedPlant && (
+          {tentSetupRequired ? (
             <p
-              className="text-[11px] text-muted-foreground -mt-2"
-              data-testid="quick-log-snapshot-plant-warning"
+              data-testid="quick-log-snapshot-tent-required"
+              className="rounded-lg border border-border/60 bg-secondary/30 p-3 text-[12px] text-muted-foreground"
             >
-              Choose a plant before attaching plant-specific readings.
+              Sensor snapshots need a tent first.{" "}
+              <a href="/tents" className="underline text-primary">
+                Create your first tent
+              </a>{" "}
+              to attach environment context to logs.
             </p>
+          ) : (
+            <>
+              <label
+                className={`flex items-center justify-between gap-2 rounded-lg border p-3 ${selectedPlant ? "border-border/60" : "border-border/40 opacity-60"}`}
+              >
+                <span className="text-sm flex items-center gap-2">
+                  <Gauge className="h-4 w-4 text-primary" />
+                  Attach sensor snapshot
+                </span>
+                <Switch
+                  checked={snapshot && !!selectedPlant}
+                  onCheckedChange={(v) => {
+                    snapshotUserTouchedRef.current = true;
+                    setSnapshot(v);
+                  }}
+                  disabled={!selectedPlant}
+                />
+              </label>
+              {snapshot && !selectedPlant && (
+                <p
+                  className="text-[11px] text-muted-foreground -mt-2"
+                  data-testid="quick-log-snapshot-plant-warning"
+                >
+                  Choose a plant before attaching plant-specific readings.
+                </p>
+              )}
+            </>
           )}
 
           <label className="flex items-center justify-between gap-2 rounded-lg border border-border/60 p-3">

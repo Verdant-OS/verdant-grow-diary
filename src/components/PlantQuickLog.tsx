@@ -38,6 +38,7 @@ import {
 } from "@/lib/manualSensorChronologyDeltaRules";
 import type { ManualSensorMetric } from "@/lib/manualSensorFreshnessRules";
 import { usePlantManualSensorLogs } from "@/hooks/usePlantManualSensorHistory";
+import { buildQuickLogPhotoGateState } from "@/lib/quickLogPhotoGateRules";
 
 interface Props {
   open: boolean;
@@ -65,6 +66,11 @@ export default function PlantQuickLog({
   const fileRef = useRef<HTMLInputElement | null>(null);
   const libraryFileRef = useRef<HTMLInputElement | null>(null);
   const { data: logs } = usePlantManualSensorLogs(open ? plantId : null);
+  // Shared photo gate state — single source of truth for picker labels,
+  // helper copy, and input aria-labels. PlantQuickLog is not gated by
+  // gate.supported (it ships its own working diary-photos upload path);
+  // only the visible strings are sourced from the helper.
+  const photoGate = useMemo(() => buildQuickLogPhotoGateState(), []);
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -249,7 +255,7 @@ export default function PlantQuickLog({
                     className="h-12"
                   >
                     <Camera className="h-4 w-4 mr-2" aria-hidden="true" />
-                    Take Photo
+                    {photoGate.takePhotoLabel}
                   </Button>
                   <Button
                     type="button"
@@ -259,11 +265,11 @@ export default function PlantQuickLog({
                     aria-controls="plant-quick-log-photo-library-input"
                     className="h-12"
                   >
-                    Choose from Library
+                    {photoGate.chooseLibraryLabel}
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Add a new photo or pick one already on your phone. Optional.
+                  {photoGate.pickerHelperText}
                 </p>
               </div>
             )}
@@ -275,7 +281,7 @@ export default function PlantQuickLog({
               accept="image/*"
               capture="environment"
               className="hidden"
-              aria-label="Take a new photo with your camera"
+              aria-label={photoGate.cameraInputAriaLabel}
               tabIndex={-1}
               onChange={(e) => handleFileSelected(e.target.files?.[0] ?? null)}
               data-testid="plant-quick-log-photo-input"
@@ -287,7 +293,7 @@ export default function PlantQuickLog({
               type="file"
               accept="image/*"
               className="hidden"
-              aria-label="Choose a photo from your library"
+              aria-label={photoGate.libraryInputAriaLabel}
               tabIndex={-1}
               onChange={(e) => handleFileSelected(e.target.files?.[0] ?? null)}
               data-testid="plant-quick-log-photo-library-input"

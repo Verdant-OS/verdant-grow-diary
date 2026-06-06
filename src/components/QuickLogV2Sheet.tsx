@@ -28,10 +28,7 @@ import {
 } from "@/lib/quickLogV2Rules";
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
-import {
-  buildQuickLogPhotoGateState,
-  isQuickLogPhotoSavingSupported,
-} from "@/lib/quickLogPhotoGateRules";
+import { buildQuickLogPhotoGateState } from "@/lib/quickLogPhotoGateRules";
 
 interface Props {
   open: boolean;
@@ -95,12 +92,9 @@ export default function QuickLogV2Sheet({
     setLocalError(null);
   };
 
-  const handlePhotoPick = () => {
-    if (!isQuickLogPhotoSavingSupported()) {
-      setLocalError("Photo saving is not enabled yet.");
-      return;
-    }
-  };
+  // Photo gate state — pure helper; recomputed cheaply. Memoized so the
+  // gated UI block reads a single deterministic snapshot per render.
+  const photoGate = useMemo(() => buildQuickLogPhotoGateState(), []);
 
   const handleSave = async () => {
     setLocalError(null);
@@ -285,22 +279,32 @@ export default function QuickLogV2Sheet({
             <div
               className="rounded-md border border-border bg-muted/30 p-3 text-sm"
               role="status"
-              aria-label={buildQuickLogPhotoGateState().ariaLabel}
+              aria-label={photoGate.ariaLabel}
+              aria-describedby="qlv2-photo-gate-helper"
               data-testid="qlv2-photo-gate"
             >
               <p className="font-medium text-foreground">
-                {buildQuickLogPhotoGateState().disabledTitle}
+                {photoGate.disabledTitle}
               </p>
               <p className="mt-1 text-muted-foreground">
-                {buildQuickLogPhotoGateState().disabledCopy}
+                {photoGate.disabledCopy}
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {buildQuickLogPhotoGateState().helperText}
+              <p
+                id="qlv2-photo-gate-helper"
+                className="mt-1 text-xs text-muted-foreground"
+                data-testid="qlv2-photo-gate-helper"
+              >
+                {photoGate.helperText}
               </p>
               {/*
-                TODO: Future picker should use the same two-source pattern as
-                PlantQuickLog (Take Photo + Choose from Library) once
-                QuickLogV2 photo saving is enabled.
+                Photo saving stays gated off in QuickLogV2Sheet until the
+                atomic-RPC + diary-photos path is wired here. While gated:
+                  - no <input type="file"> is rendered
+                  - no Take Photo / Choose from Library buttons are rendered
+                  - handleSave still blocks action === "photo"
+                When enabling, reuse buildQuickLogPhotoGateState().takePhotoLabel
+                / chooseLibraryLabel / pickerHelperText so the two surfaces
+                stay aligned with PlantQuickLog.
               */}
             </div>
           )}

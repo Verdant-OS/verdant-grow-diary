@@ -34,6 +34,26 @@ describe("quickLogPhotoGateRules", () => {
     expect(gate.futureActionLabel).toBe("Add photo");
   });
 
+  it("gate state exposes active picker labels for PlantQuickLog reuse", () => {
+    const gate = buildQuickLogPhotoGateState();
+    expect(gate.takePhotoLabel).toBe("Take Photo");
+    expect(gate.chooseLibraryLabel).toBe("Choose from Library");
+    expect(gate.pickerHelperText).toMatch(/already on your phone/i);
+    expect(gate.pickerHelperText).toMatch(/optional/i);
+    expect(gate.cameraInputAriaLabel).toMatch(/camera/i);
+    expect(gate.libraryInputAriaLabel).toMatch(/library/i);
+  });
+
+  it("active picker labels are present regardless of supported flag", () => {
+    // Even while photo saving is gated off in QuickLogV2Sheet, PlantQuickLog
+    // still renders the active picker, so labels must always be populated.
+    const gate = buildQuickLogPhotoGateState();
+    expect(gate.takePhotoLabel.length).toBeGreaterThan(0);
+    expect(gate.chooseLibraryLabel.length).toBeGreaterThan(0);
+    expect(gate.cameraInputAriaLabel.length).toBeGreaterThan(0);
+    expect(gate.libraryInputAriaLabel.length).toBeGreaterThan(0);
+  });
+
   it("gate state is deterministic (same output every call)", () => {
     const a = buildQuickLogPhotoGateState();
     const b = buildQuickLogPhotoGateState();

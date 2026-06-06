@@ -43,9 +43,9 @@ describe("sensorSourceLabelViewModel", () => {
     expect(b.label).toContain("Manual");
   });
 
-  it("renders live readings as Live and marks them healthy (not degraded)", () => {
+  it("renders live readings as Live sensor and marks them healthy (not degraded)", () => {
     const b = buildSensorSourceBadge({ source: "live" });
-    expect(b.label).toBe("Live");
+    expect(b.label).toBe("Live sensor");
     expect(b.tone).toBe("live");
     expect(b.isDegraded).toBe(false);
   });
@@ -58,35 +58,54 @@ describe("sensorSourceLabelViewModel", () => {
   });
 
   it.each(["demo", "stale", "invalid"] as const)(
-    "marks %s readings degraded with their own tone",
+    "marks %s readings degraded with their own tone, never as Live",
     (source) => {
       const b = buildSensorSourceBadge({ source });
       expect(b.tone).toBe(source);
       expect(b.isDegraded).toBe(true);
-      expect(b.label.toLowerCase()).not.toBe("live");
+      expect(b.label.toLowerCase()).not.toContain("live");
     },
   );
 
-  it("collapses unknown/missing source to Unknown — never Live", () => {
+  it("renders demo/stale/invalid with clear degraded copy", () => {
+    expect(buildSensorSourceBadge({ source: "demo" }).label).toBe("Demo data");
+    expect(buildSensorSourceBadge({ source: "stale" }).label).toBe(
+      "Stale reading",
+    );
+    expect(buildSensorSourceBadge({ source: "invalid" }).label).toBe(
+      "Invalid reading",
+    );
+  });
+
+  it("collapses unknown/missing source to Unknown source — never Live", () => {
     const b1 = buildSensorSourceBadge({
       source: "ghost" as unknown as undefined,
     });
-    expect(b1.label).toBe("Unknown");
+    expect(b1.label).toBe("Unknown source");
     expect(b1.tone).toBe("unknown");
     expect(b1.isDegraded).toBe(true);
 
     const b2 = buildSensorSourceBadge({ source: null });
-    expect(b2.label).toBe("Unknown");
+    expect(b2.label).toBe("Unknown source");
     expect(b2.tone).toBe("unknown");
   });
 
-  it("ariaLabel describes the source for screen readers without leaking ids", () => {
-    const b = buildSensorSourceBadge({
+  it("ariaLabel is plain 'Sensor source: …' and never leaks raw tags", () => {
+    expect(buildSensorSourceBadge({ source: "manual" }).ariaLabel).toBe(
+      "Sensor source: Manual reading",
+    );
+    expect(buildSensorSourceBadge({ source: "stale" }).ariaLabel).toBe(
+      "Sensor source: Stale reading",
+    );
+    expect(buildSensorSourceBadge({ source: null }).ariaLabel).toBe(
+      "Sensor source: Unknown source",
+    );
+    const m = buildSensorSourceBadge({
       source: "manual",
       manualDeviceNote: "EcoWitt WH45",
     });
-    expect(b.ariaLabel.toLowerCase()).toContain("manual reading");
-    expect(b.ariaLabel).toContain("EcoWitt WH45");
+    expect(m.ariaLabel).toBe("Sensor source: Manual reading, EcoWitt WH45");
+    expect(m.ariaLabel).not.toMatch(/\[alert:|\[source:/);
   });
 
   it("tone classes for degraded states differ from live", () => {
@@ -96,9 +115,9 @@ describe("sensorSourceLabelViewModel", () => {
     }
   });
 
-  it("CSV readings render as CSV with their own tone", () => {
+  it("CSV readings render as CSV import with their own tone", () => {
     const b = buildSensorSourceBadge({ source: "csv" });
-    expect(b.label).toBe("CSV");
+    expect(b.label).toBe("CSV import");
     expect(b.tone).toBe("csv");
     expect(b.isDegraded).toBe(false);
   });

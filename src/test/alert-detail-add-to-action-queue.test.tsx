@@ -192,7 +192,7 @@ describe("AlertDetail — Add to Action Queue (render-level)", () => {
     expect(btn).toBeInTheDocument();
     expect(btn).not.toBeDisabled();
     // Give effects a moment to settle.
-    await new Promise((r) => setTimeout(r, 30));
+    await flushAsync();
     expect(actionQueueInserts()).toHaveLength(0);
   });
 
@@ -200,7 +200,7 @@ describe("AlertDetail — Add to Action Queue (render-level)", () => {
     
     renderDetail();
     const btn = await screen.findByTestId("alert-handoff-add-button");
-    fireEvent.click(btn);
+    await clickAct(btn);
 
     await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
     const aqInserts = actionQueueInserts();
@@ -234,7 +234,7 @@ describe("AlertDetail — Add to Action Queue (render-level)", () => {
   it("also writes an audit event row (action_queue_events) without client user_id", async () => {
     
     renderDetail();
-    fireEvent.click(await screen.findByTestId("alert-handoff-add-button"));
+    await clickAct(await screen.findByTestId("alert-handoff-add-button"));
     await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
 
     const auditInserts = inserts.filter((i) => i.table === "action_queue_events");
@@ -271,7 +271,7 @@ describe("AlertDetail — Add to Action Queue (render-level)", () => {
     
     renderDetail();
     const btn = await screen.findByTestId("alert-handoff-add-button");
-    fireEvent.click(btn);
+    await clickAct(btn);
 
     await waitFor(() => expect(toastError).toHaveBeenCalled());
     expect(toastSuccess).not.toHaveBeenCalled();
@@ -286,7 +286,7 @@ describe("AlertDetail — Add to Action Queue (render-level)", () => {
     currentAlert = { ...OPEN_ALERT, status: "resolved" };
     renderDetail();
     await screen.findByText(OPEN_ALERT.title);
-    await new Promise((r) => setTimeout(r, 30));
+    await flushAsync();
     expect(screen.queryByTestId("alert-handoff-add-button")).toBeNull();
     expect(screen.queryByTestId("alert-handoff-region")).toBeNull();
   });

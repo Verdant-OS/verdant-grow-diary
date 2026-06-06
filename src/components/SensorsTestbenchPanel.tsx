@@ -1106,12 +1106,17 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
 
         {/* Canonical payload validation summary — view-model driven. */}
         <div
-          className="mt-3 border-t border-border/40 pt-2 text-xs"
-          id="sensors-testbench-canonical-validation"
+          className="mt-3 border-t border-border/40 pt-2 text-xs rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          id="canonical-ingest-validation-details"
+          ref={validationDetailsRef}
+          tabIndex={-1}
           data-testid="sensors-testbench-canonical-validation"
           data-ready={canonicalReady ? "true" : "false"}
           data-status={validationUi.status}
+          aria-label={validationAriaLabel}
         >
+          {/* Back-compat alias for legacy in-page anchor */}
+          <span id="sensors-testbench-canonical-validation" className="sr-only" />
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <span className="font-medium">Canonical payload</span>
             <Badge
@@ -1125,6 +1130,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
               }
               data-testid="sensors-testbench-canonical-validation-badge"
               data-tone={validationUi.badgeTone}
+              aria-label={validationAriaLabel}
             >
               {validationUi.statusLabel}
             </Badge>

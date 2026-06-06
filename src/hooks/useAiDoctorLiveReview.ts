@@ -46,7 +46,7 @@ export type AiDoctorLiveReviewStatus =
 export interface AiDoctorLiveReviewState {
   status: AiDoctorLiveReviewStatus;
   result: AiDoctorReviewResult | null;
-  reason: AiDoctorLiveReviewFailureReason | null;
+  reason: AiCreditedFailureReason | null;
   /** Only populated when reason === 'credit_denied'. */
   credit?: AiCreditDenial;
   /** Only populated on successful runs when the server returned a credit payload. */

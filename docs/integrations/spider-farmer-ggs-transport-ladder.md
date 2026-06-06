@@ -5,7 +5,7 @@ in which Verdant may move toward GGS-derived sensor telemetry. It is an
 extension of `spider-farmer-ggs-backhaul-decision.md` and inherits all
 of that document's read-only / no-device-control constraints.
 
-Verdant is **not** an official Spider Farmer partner. Nothing here
+Verdant is not an official Spider Farmer partner. Nothing here
 implies endorsement, certification, or production-readiness. The GGS
 integration is an experimental, read-only research path.
 
@@ -58,7 +58,7 @@ about Verdant's bridge, not the controller.
 ## Out-of-scope fallback routes
 
 The following are separate, optional fallback routes for compatible
-non-GGS WiFi gear and are **not** the default GGS assumption:
+non-GGS WiFi gear and are not the default GGS assumption:
 
 - Tuya local API
 - Tuya cloud API

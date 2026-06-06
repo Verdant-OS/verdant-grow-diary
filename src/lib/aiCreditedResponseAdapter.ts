@@ -113,7 +113,7 @@ export function adaptCreditedAiResponse<T = unknown>(
 
   const isEnvelope = input.ok === true && isPlainObject(input.result);
   const candidate = isEnvelope ? input.result : input;
-  const v = validate(candidate);
+  const v = validator(candidate);
   if (v.ok === false) return { ok: false, reason: "invalid" };
   const credit = isEnvelope ? coerceCreditRemaining(input.credit) : undefined;
   return credit

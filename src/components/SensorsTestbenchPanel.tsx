@@ -262,15 +262,28 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     () => buildCanonicalIngestPayloadValidation(validationPayload),
     [validationPayload],
   );
-  const canonicalReady = canonicalValidation.ready;
-  const canonicalDisabledHint = canonicalReady
-    ? null
-    : `Payload not ready — missing/invalid: ${
-        [
-          ...canonicalValidation.missing,
-          ...canonicalValidation.invalid.map((i) => i.field),
-        ].join(", ") || "—"
-      }`;
+  const validationUi = useMemo(
+    () =>
+      buildSensorTestbenchValidationUiState({
+        validation: canonicalValidation,
+        hasLastTest: lastPayload !== null,
+      }),
+    [canonicalValidation, lastPayload],
+  );
+  const canonicalReady = !validationUi.actionsDisabled;
+  const canonicalDisabledHint = validationUi.disabledReason;
+  const bundleFilenamePreview = useMemo(
+    () => buildDiagnosticsBundleFilenamePreview(new Date()),
+    // Re-compute when validation flips so the displayed name refreshes when
+    // the user opens the panel afresh; the actual download still builds a
+    // new timestamp at click time.
+    [validationUi.status],
+  );
+  const inspectorPlainText = useMemo(
+    () => (responseInspector ? formatSafeResponseInspectorPlainText(responseInspector) : null),
+    [responseInspector],
+  );
+
 
 
 

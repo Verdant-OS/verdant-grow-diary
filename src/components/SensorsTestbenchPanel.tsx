@@ -59,6 +59,7 @@ import {
   buildDiagnosticsBundleFilenamePreview,
   buildDiagnosticsBundleFiles,
   buildDiagnosticsShareModalState,
+  buildCanonicalSensorIngestUrl,
   buildSensorIngestNetworkDiagnostics,
   buildDownloadFilename,
   buildPowerShellCopyWarningState,
@@ -79,7 +80,10 @@ import {
 import JSZip from "jszip";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const INGEST_URL = `${SUPABASE_URL}/functions/v1/sensor-ingest-webhook`;
+// Canonical ingest URL — single source of truth. Do not concatenate in JSX.
+const INGEST_URL =
+  buildCanonicalSensorIngestUrl(SUPABASE_URL) ??
+  `${SUPABASE_URL}/functions/v1/sensor-ingest-webhook`;
 
 
 interface Props {
@@ -318,6 +322,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
           : null,
       requestMethod: "POST",
       hasActiveToken: !!reveal,
+      supabaseUrl: SUPABASE_URL,
     });
   }, [result, resultClass, reveal]);
 
@@ -1158,6 +1163,53 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
                 <span data-testid="sensors-testbench-network-diagnostics-origin">
                   {networkDiagnostics.appOrigin}
                 </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">expected canonical URL:</span>{" "}
+                <span data-testid="sensors-testbench-network-diagnostics-canonical">
+                  {networkDiagnostics.canonicalIngestUrl}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">canonical URL match:</span>{" "}
+                <span
+                  data-testid="sensors-testbench-network-diagnostics-canonical-match"
+                  data-match={networkDiagnostics.canonicalUrlMatch}
+                >
+                  {networkDiagnostics.canonicalUrlMatch}
+                </span>
+              </div>
+              {networkDiagnostics.canonicalMismatchExplanation && (
+                <div
+                  className="text-amber-700 dark:text-amber-300"
+                  data-testid="sensors-testbench-network-diagnostics-canonical-explanation"
+                >
+                  {networkDiagnostics.canonicalMismatchExplanation}
+                </div>
+              )}
+              <div>
+                <span className="text-muted-foreground">CORS OPTIONS headers:</span>{" "}
+                <span
+                  data-testid="sensors-testbench-network-diagnostics-cors-options"
+                  data-state={networkDiagnostics.cors.optionsHeaders}
+                >
+                  {networkDiagnostics.cors.optionsHeaders}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">CORS POST headers:</span>{" "}
+                <span
+                  data-testid="sensors-testbench-network-diagnostics-cors-post"
+                  data-state={networkDiagnostics.cors.postHeaders}
+                >
+                  {networkDiagnostics.cors.postHeaders}
+                </span>
+              </div>
+              <div
+                className="text-muted-foreground"
+                data-testid="sensors-testbench-network-diagnostics-cors-explanation"
+              >
+                {networkDiagnostics.cors.explanation}
               </div>
             </div>
             {networkDiagnostics.evidence.length > 0 && (

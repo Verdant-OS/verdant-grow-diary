@@ -1056,7 +1056,20 @@ export type SensorIngestNetworkDiagnosticsStatus =
   | "likely_mixed_content"
   | "likely_endpoint_unreachable"
   | "likely_endpoint_misconfigured"
+  | "likely_wrong_function_path"
+  | "likely_supabase_url_missing"
+  | "likely_supabase_url_malformed"
   | "needs_network_inspection";
+
+export type CanonicalIngestUrlMatch = "matches" | "mismatch" | "unavailable";
+
+export type CorsHeaderObservation = "present" | "missing" | "unknown";
+
+export interface SensorIngestCorsObservability {
+  optionsHeaders: CorsHeaderObservation;
+  postHeaders: CorsHeaderObservation;
+  explanation: string;
+}
 
 export interface SensorIngestNetworkDiagnostics {
   status: SensorIngestNetworkDiagnosticsStatus;
@@ -1067,6 +1080,10 @@ export interface SensorIngestNetworkDiagnostics {
   safeSupportSummary: string;
   resolvedEndpoint: string;
   appOrigin: string;
+  canonicalIngestUrl: string;
+  canonicalUrlMatch: CanonicalIngestUrlMatch;
+  canonicalMismatchExplanation: string | null;
+  cors: SensorIngestCorsObservability;
 }
 
 export interface SensorIngestNetworkDiagnosticsInput {
@@ -1077,6 +1094,34 @@ export interface SensorIngestNetworkDiagnosticsInput {
   errorMessage?: string | null;
   requestMethod?: string | null;
   hasActiveToken?: boolean;
+  /**
+   * Canonical Supabase URL (typically `import.meta.env.VITE_SUPABASE_URL`).
+   * Diagnostics derive the expected canonical ingest URL from this value and
+   * flag mismatch vs. the resolved `ingestUrl` actually used by the request.
+   */
+  supabaseUrl?: string | null;
+}
+
+const CANONICAL_INGEST_PATH = "/functions/v1/sensor-ingest-webhook";
+
+/**
+ * Build the canonical Verdant sensor ingest URL from a Supabase project URL.
+ * Returns null when the project URL is missing or invalid. This is the single
+ * source of truth for the testbench ingest URL — JSX must not concatenate it.
+ */
+export function buildCanonicalSensorIngestUrl(
+  supabaseUrl: string | null | undefined,
+): string | null {
+  if (!supabaseUrl || typeof supabaseUrl !== "string") return null;
+  const trimmed = supabaseUrl.trim().replace(/\/+$/, "");
+  if (!/^https?:\/\//i.test(trimmed)) return null;
+  try {
+    // eslint-disable-next-line no-new
+    new URL(trimmed);
+  } catch {
+    return null;
+  }
+  return `${trimmed}${CANONICAL_INGEST_PATH}`;
 }
 
 function parseUrlSafe(u: string | null | undefined): URL | null {
@@ -1099,6 +1144,97 @@ function isPrivateHost(host: string): boolean {
   return false;
 }
 
+function classifyCanonical(
+  ingestUrl: string | null | undefined,
+  supabaseUrl: string | null | undefined,
+): {
+  canonical: string;
+  match: CanonicalIngestUrlMatch;
+  explanation: string | null;
+  supabaseStatus: "ok" | "missing" | "malformed";
+  wrongPath: boolean;
+} {
+  const hasSupabase =
+    typeof supabaseUrl === "string" && supabaseUrl.trim().length > 0;
+  const canonicalUrl = hasSupabase ? buildCanonicalSensorIngestUrl(supabaseUrl) : null;
+  const canonical = canonicalUrl ?? "<unavailable>";
+  let supabaseStatus: "ok" | "missing" | "malformed" = "ok";
+  if (!hasSupabase) supabaseStatus = "missing";
+  else if (!canonicalUrl) supabaseStatus = "malformed";
+
+  if (!canonicalUrl) {
+    return {
+      canonical,
+      match: "unavailable",
+      explanation:
+        supabaseStatus === "missing"
+          ? "VITE_SUPABASE_URL is not configured; cannot compute canonical ingest URL."
+          : "VITE_SUPABASE_URL is malformed; cannot compute canonical ingest URL.",
+      supabaseStatus,
+      wrongPath: false,
+    };
+  }
+
+  const used = parseUrlSafe(ingestUrl ?? null);
+  const expected = parseUrlSafe(canonicalUrl);
+  if (!used || !expected) {
+    return {
+      canonical,
+      match: "mismatch",
+      explanation:
+        "Configured ingest URL is missing or invalid; expected canonical Supabase Edge Function URL.",
+      supabaseStatus,
+      wrongPath: false,
+    };
+  }
+  const wrongPath = used.origin === expected.origin && used.pathname !== expected.pathname;
+  if (used.origin !== expected.origin || used.pathname !== expected.pathname) {
+    return {
+      canonical,
+      match: "mismatch",
+      explanation: wrongPath
+        ? `Ingest URL targets path "${used.pathname}" but the canonical function path is "${CANONICAL_INGEST_PATH}".`
+        : `Ingest URL origin "${used.origin}" does not match canonical Supabase origin "${expected.origin}".`,
+      supabaseStatus,
+      wrongPath,
+    };
+  }
+  return {
+    canonical,
+    match: "matches",
+    explanation: null,
+    supabaseStatus,
+    wrongPath: false,
+  };
+}
+
+function buildCorsObservability(
+  status: SensorIngestNetworkDiagnosticsStatus,
+): SensorIngestCorsObservability {
+  if (status === "not_applicable") {
+    return {
+      optionsHeaders: "unknown",
+      postHeaders: "unknown",
+      explanation:
+        "No network failure observed; CORS headers were not separately probed from this panel.",
+    };
+  }
+  if (status === "likely_cors_or_preflight") {
+    return {
+      optionsHeaders: "missing",
+      postHeaders: "unknown",
+      explanation:
+        "Browser blocked the response; verify with Edge Function tests or curl. OPTIONS preflight likely missing required CORS headers.",
+    };
+  }
+  return {
+    optionsHeaders: "unknown",
+    postHeaders: "unknown",
+    explanation:
+      "Browser blocked the response; verify with Edge Function tests or curl.",
+  };
+}
+
 /**
  * Build operator-friendly diagnostics for HTTP 0 / network_error cases.
  * Pure function. Never reads tokens; only accepts a boolean indicator.
@@ -1115,6 +1251,7 @@ export function buildSensorIngestNetworkDiagnostics(
     errorMessage,
     requestMethod,
     hasActiveToken,
+    supabaseUrl,
   } = input;
 
   const notApplicable = httpStatus !== 0 && classification !== "network_error";
@@ -1127,6 +1264,8 @@ export function buildSensorIngestNetworkDiagnostics(
     appOrigin && appOrigin.length > 0 ? appOrigin : "<unknown>",
   );
   const safeErrorMessage = errorMessage ? redactTokens(errorMessage) : null;
+  const supabaseUrlProvided = Object.prototype.hasOwnProperty.call(input, "supabaseUrl");
+  const canonical = classifyCanonical(ingestUrl, supabaseUrl);
 
   if (notApplicable) {
     return {
@@ -1139,6 +1278,10 @@ export function buildSensorIngestNetworkDiagnostics(
       safeSupportSummary: "",
       resolvedEndpoint,
       appOrigin: appOriginDisplay,
+      canonicalIngestUrl: redactTokens(canonical.canonical),
+      canonicalUrlMatch: canonical.match,
+      canonicalMismatchExplanation: canonical.explanation,
+      cors: buildCorsObservability("not_applicable"),
     };
   }
 
@@ -1148,6 +1291,8 @@ export function buildSensorIngestNetworkDiagnostics(
   if (safeErrorMessage) evidence.push(`error message: ${safeErrorMessage}`);
   if (requestMethod) evidence.push(`request method: ${requestMethod}`);
   evidence.push(`resolved ingest URL: ${resolvedEndpoint}`);
+  evidence.push(`expected canonical URL: ${redactTokens(canonical.canonical)}`);
+  evidence.push(`canonical URL match: ${canonical.match}`);
   evidence.push(`browser origin: ${appOriginDisplay}`);
   if (typeof hasActiveToken === "boolean") {
     evidence.push(`bridge token present: ${hasActiveToken ? "yes" : "no"}`);
@@ -1158,7 +1303,26 @@ export function buildSensorIngestNetworkDiagnostics(
   let summary: string;
   const checks: string[] = [];
 
-  if (!ingest) {
+  if (supabaseUrlProvided && canonical.supabaseStatus === "missing") {
+    status = "likely_supabase_url_missing";
+    title = "VITE_SUPABASE_URL is not configured";
+    summary =
+      "The app cannot build the canonical ingest URL because VITE_SUPABASE_URL is missing from the environment.";
+    checks.push("Set VITE_SUPABASE_URL in the app environment to your Supabase project URL.");
+    checks.push("Reload the app after the environment is configured.");
+  } else if (supabaseUrlProvided && canonical.supabaseStatus === "malformed") {
+    status = "likely_supabase_url_malformed";
+    title = "VITE_SUPABASE_URL is malformed";
+    summary =
+      "The configured VITE_SUPABASE_URL is not a valid https URL, so the canonical ingest URL cannot be built.";
+    checks.push("Confirm VITE_SUPABASE_URL is a valid https://<ref>.supabase.co URL.");
+  } else if (supabaseUrlProvided && canonical.wrongPath) {
+    status = "likely_wrong_function_path";
+    title = "Ingest URL targets the wrong function path";
+    summary = `Expected canonical path "${CANONICAL_INGEST_PATH}" but the configured ingest URL uses a different path.`;
+    checks.push("Update the ingest URL to use the canonical Supabase Edge Function path.");
+    checks.push("Avoid duplicating URL construction in JSX; use buildCanonicalSensorIngestUrl().");
+  } else if (!ingest) {
     status = "likely_endpoint_misconfigured";
     title = "Ingest endpoint URL missing or malformed";
     summary =
@@ -1198,14 +1362,23 @@ export function buildSensorIngestNetworkDiagnostics(
     checks.push("Check for browser extensions, VPNs, or ad-blockers that may block the request.");
   }
 
+  if (canonical.match === "mismatch" && canonical.explanation) {
+    checks.push(`Canonical URL mismatch: ${canonical.explanation}`);
+  }
   checks.push("Verify the ingest URL and path match the deployed Edge Function.");
   checks.push("Confirm the HTTPS app is not calling an HTTP endpoint.");
+
+  const cors = buildCorsObservability(status);
 
   const lines: string[] = [];
   lines.push("Verdant sensor ingest — network diagnostics");
   lines.push(`status: ${status}`);
   lines.push(`title: ${title}`);
   lines.push(`summary: ${summary}`);
+  lines.push(`canonical URL match: ${canonical.match}`);
+  if (canonical.explanation) lines.push(`canonical note: ${canonical.explanation}`);
+  lines.push(`cors options headers: ${cors.optionsHeaders}`);
+  lines.push(`cors post headers:    ${cors.postHeaders}`);
   lines.push("evidence:");
   for (const e of evidence) lines.push(`  - ${e}`);
   lines.push("recommended checks:");
@@ -1220,5 +1393,9 @@ export function buildSensorIngestNetworkDiagnostics(
     safeSupportSummary: redactTokens(lines.join("\n")),
     resolvedEndpoint,
     appOrigin: appOriginDisplay,
+    canonicalIngestUrl: redactTokens(canonical.canonical),
+    canonicalUrlMatch: canonical.match,
+    canonicalMismatchExplanation: canonical.explanation,
+    cors,
   };
 }

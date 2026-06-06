@@ -85,8 +85,7 @@ export default function AppShell() {
                     </Button>
                   }
                 />
-                {/* _signOut retained via useAuth for typed access; sign-out flows through SignOutConfirmDialog */}
-                {void _signOut}
+
               </div>
             </div>
           </header>

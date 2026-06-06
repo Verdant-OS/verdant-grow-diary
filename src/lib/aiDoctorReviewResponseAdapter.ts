@@ -92,9 +92,13 @@ export function adaptAiDoctorReviewResponse(
     return { ok: false, reason: mapped };
   }
 
-  const candidate =
-    input.ok === true && isPlainObject(input.result) ? input.result : input;
+  const isEnvelope = input.ok === true && isPlainObject(input.result);
+  const candidate = isEnvelope ? input.result : input;
   const v = validateAiDoctorReviewResult(candidate);
   if (v.ok === false) return { ok: false, reason: "invalid" };
-  return { ok: true, result: v.result };
+  const credit = isEnvelope ? coerceCreditRemaining(input.credit) : undefined;
+  return credit
+    ? { ok: true, result: v.result, credit }
+    : { ok: true, result: v.result };
 }
+

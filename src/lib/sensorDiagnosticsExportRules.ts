@@ -1303,20 +1303,20 @@ export function buildSensorIngestNetworkDiagnostics(
   let summary: string;
   const checks: string[] = [];
 
-  if (canonical.supabaseStatus === "missing") {
+  if (supabaseUrlProvided && canonical.supabaseStatus === "missing") {
     status = "likely_supabase_url_missing";
     title = "VITE_SUPABASE_URL is not configured";
     summary =
       "The app cannot build the canonical ingest URL because VITE_SUPABASE_URL is missing from the environment.";
     checks.push("Set VITE_SUPABASE_URL in the app environment to your Supabase project URL.");
     checks.push("Reload the app after the environment is configured.");
-  } else if (canonical.supabaseStatus === "malformed") {
+  } else if (supabaseUrlProvided && canonical.supabaseStatus === "malformed") {
     status = "likely_supabase_url_malformed";
     title = "VITE_SUPABASE_URL is malformed";
     summary =
       "The configured VITE_SUPABASE_URL is not a valid https URL, so the canonical ingest URL cannot be built.";
     checks.push("Confirm VITE_SUPABASE_URL is a valid https://<ref>.supabase.co URL.");
-  } else if (canonical.wrongPath) {
+  } else if (supabaseUrlProvided && canonical.wrongPath) {
     status = "likely_wrong_function_path";
     title = "Ingest URL targets the wrong function path";
     summary = `Expected canonical path "${CANONICAL_INGEST_PATH}" but the configured ingest URL uses a different path.`;

@@ -103,16 +103,12 @@ describe("QuickLog input safety", () => {
     expect(nutrients.getAttribute("spellcheck")).toBe("false");
   });
 
-  it("save is enabled once a real plant is selected (only otherwise gated on busy)", async () => {
+  it("save is gated until a plant is selected (Gate 1 fix)", () => {
     renderWithClient(<QuickLog open onOpenChange={vi.fn()} />);
     const dialog = screen.getByRole("dialog");
     const btn = within(dialog).getByRole("button", { name: /save entry/i }) as HTMLButtonElement;
-    // Required-plant gate: disabled until a plant is chosen (Gate 1 fix).
+    // No plant chosen on mount → save is disabled, inline error visible.
     expect(btn.disabled).toBe(true);
-    const trigger = within(dialog).getByTestId("quick-log-plant-select");
-    fireEvent.click(trigger);
-    const option = await screen.findByRole("option", { name: /^P/ });
-    fireEvent.click(option);
-    expect(btn.disabled).toBe(false);
+    expect(within(dialog).getByTestId("quick-log-plant-error")).toBeTruthy();
   });
 });

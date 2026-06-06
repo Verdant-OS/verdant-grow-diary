@@ -73,12 +73,41 @@ describe("ai doctor live review — edge static safety", () => {
   for (const path of EDGE_FILES) {
     const src = read(path);
 
-    it(`${path}: no DB writes / rpc`, () => {
+    it(`${path}: no DB writes; only approved credit-metering RPCs`, () => {
       expect(src).not.toMatch(/\.insert\(/);
       expect(src).not.toMatch(/\.upsert\(/);
       expect(src).not.toMatch(/\.update\(/);
       expect(src).not.toMatch(/\.delete\(/);
-      expect(src).not.toMatch(/\.rpc\(/);
+      // RPC allow-list: live-review edge may ONLY call the approved
+      // credit-metering RPCs (atomic spend + matching refund on
+      // upstream failure). Mirrors the allow-list pattern enforced for
+      // ai-coach in action-queue-safety.test.ts.
+      const APPROVED_RPCS = new Set(["ai_credit_spend", "ai_credit_refund"]);
+      const rpcCalls = [
+        ...src.matchAll(/\.rpc\s*\(\s*["'`]([a-zA-Z0-9_]+)["'`]/g),
+      ].map((m) => m[1]);
+      for (const name of rpcCalls) {
+        expect(
+          APPROVED_RPCS.has(name),
+          `${path} called unapproved RPC: ${name}. Only credit-metering RPCs are allowed.`,
+        ).toBe(true);
+      }
+      for (const re of [
+        /action_queue/i,
+        /device/i,
+        /relay/i,
+        /actuator/i,
+        /autopilot/i,
+        /auto[_-]?execute/i,
+        /dispatch[_-]?command/i,
+        /grant[_-]?role/i,
+        /set[_-]?billing/i,
+        /set[_-]?plan/i,
+      ]) {
+        for (const name of rpcCalls) {
+          expect(name, `${path} RPC name matches banned pattern ${re}`).not.toMatch(re);
+        }
+      }
     });
 
     it(`${path}: no writes to AI Doctor sessions / alerts / action_queue / sensor_readings`, () => {

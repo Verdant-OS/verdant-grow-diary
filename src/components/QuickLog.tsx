@@ -150,7 +150,7 @@ export default function QuickLog({
     [plantId, scopedPlants],
   );
 
-  // Speed slice: when no plant is selected, auto-apply the deterministic
+  // Speed slice: when no plant is selected, preselect the deterministic
   // default (single scoped candidate or valid prefill). Never overrides a
   // grower's current selection — pickDefaultQuickLogPlant returns
   // currentPlantId unchanged when it's valid. Re-evaluates when the dialog

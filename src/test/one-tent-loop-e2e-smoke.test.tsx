@@ -240,6 +240,7 @@ describe("One-Tent Loop E2E smoke", () => {
       source: "environment_alert",
       status: "pending_approval",
       reason: draftResult.draft.reason,
+      grow_id: GROW_ID,
     };
     expect(actionMatchesAlert(existingRow, persistedAlert.id)).toBe(true);
     // Second click MUST detect the existing row and skip insert.

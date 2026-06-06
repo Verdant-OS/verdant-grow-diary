@@ -1396,7 +1396,7 @@ export default function Dashboard() {
                       </div>
                       {a.reason && (
                         <p className="text-xs mt-2 italic text-muted-foreground">
-                          {a.reason}
+                          {sanitizeActionCopy(a.reason)}
                         </p>
                       )}
                       <div className="mt-2 flex items-center gap-2 flex-wrap">

@@ -46,7 +46,12 @@ vi.mock("@/store/grows", () => ({
   }),
 }));
 vi.mock("@/hooks/use-plants", () => ({
-  usePlants: () => ({ data: [{ id: "p1", name: "P", tent_id: "t1", grow_id: "g1" }] }),
+  usePlants: () => ({
+    data: [
+      { id: "p1", name: "P", tent_id: "t1", grow_id: "g1" },
+      { id: "p2", name: "Q", tent_id: "t1", grow_id: "g1" },
+    ],
+  }),
 }));
 vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), message: vi.fn() },

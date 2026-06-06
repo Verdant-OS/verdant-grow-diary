@@ -24,7 +24,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Copy, KeyRound, Send, ShieldAlert, Activity, CheckCircle2, XCircle, Server, Trash2, Terminal, FileJson, History } from "lucide-react";
+import { Copy, KeyRound, Send, ShieldAlert, Activity, CheckCircle2, XCircle, Server, Trash2, Terminal, FileJson, History, Download, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import {
@@ -46,11 +46,16 @@ import {
   classifySensorIngestTestResult,
 } from "@/lib/sensorIngestTestResultRules";
 import {
+  buildDownloadFilename,
+  buildHistoryExport,
+  buildPowerShellIngestTestScript,
+  buildRedactedPayloadPreview,
   buildSensorIngestCurl,
   buildSensorIngestHistoryItem,
   buildSensorIngestTestPayload,
   diagnosticsExportToJson,
   diagnosticsExportToText,
+  historyExportToJson,
   SENSOR_INGEST_HISTORY_MAX,
   type SensorIngestHistoryItem,
 } from "@/lib/sensorDiagnosticsExportRules";

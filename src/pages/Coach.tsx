@@ -390,6 +390,18 @@ export default function Coach() {
         </div>
       </div>
 
+      {creditDenial && (
+        <div className="mt-4 animate-fade-in">
+          <AiCreditLimitNotice
+            credit={creditDenial}
+            surface="coach"
+            data-testid="coach-credit-limit-notice"
+          />
+        </div>
+      )}
+
+
+
       {diagnosis && (
         <div className="mt-4 animate-fade-in">
           <StructuredDiagnosisCard

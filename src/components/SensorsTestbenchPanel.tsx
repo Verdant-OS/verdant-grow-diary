@@ -131,6 +131,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
   const [minting, setMinting] = useState(false);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<TestPayloadResult | null>(null);
+  const [tokens, setTokens] = useState<BridgeTokenRow[]>([]);
 
   // Reset reveal/result when tent changes — plaintext token must never
   // be reused across tents.
@@ -144,10 +145,11 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     if (!tentId) {
       setRows([]);
       setIngestCount(0);
+      setTokens([]);
       return;
     }
     (async () => {
-      const [{ data: latest }, { count }] = await Promise.all([
+      const [{ data: latest }, { count }, { data: tokenRows }] = await Promise.all([
         supabase
           .from("sensor_readings")
           .select("source, captured_at, created_at, raw_payload")
@@ -158,20 +160,56 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
           .from("sensor_readings")
           .select("id", { count: "exact", head: true })
           .eq("tent_id", tentId),
+        supabase
+          .from("bridge_tokens")
+          .select(
+            "id, name, token_prefix, expires_at, last_used_at, first_used_at, ingest_count, revoked_at, created_at",
+          )
+          .eq("tent_id", tentId)
+          .order("created_at", { ascending: false }),
       ]);
       if (cancelled) return;
       setRows((latest ?? []) as typeof rows);
       setIngestCount(count ?? 0);
+      setTokens((tokenRows ?? []) as BridgeTokenRow[]);
     })();
     return () => {
       cancelled = true;
     };
-  }, [tentId, result]);
+  }, [tentId, result, minting]);
 
   const classification = useMemo(
     () => classifySensorTestbench({ rows }),
     [rows],
   );
+
+  const activeToken = useMemo<BridgeTokenRow | null>(() => {
+    const active = tokens.find((t) => bridgeTokenStatus(t) === "active");
+    return active ?? tokens[0] ?? null;
+  }, [tokens]);
+
+  const envMatch = useMemo(
+    () =>
+      buildEnvMatchChecklist({
+        supabaseUrl: SUPABASE_URL,
+        ingestUrl: INGEST_URL,
+        tentId,
+        hasActiveToken: !!activeToken && bridgeTokenStatus(activeToken) === "active",
+        tokenTentScoped: true, // tokens query is filtered by tent_id
+        lastIngestAtIso: activeToken?.last_used_at ?? classification.latestAtIso,
+      }),
+    [tentId, activeToken, classification.latestAtIso],
+  );
+
+  const resultClass = useMemo(() => {
+    if (!result) return null;
+    return classifySensorIngestTestResult({
+      status: result.status,
+      body: result.body,
+      networkError: result.status === 0,
+    });
+  }, [result]);
+
 
   const powershell = useMemo(
     () =>

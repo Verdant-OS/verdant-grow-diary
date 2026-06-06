@@ -36,7 +36,17 @@ let hits = "";
 try {
   hits = execFileSync(
     "rg",
-    ["-nU", "--no-heading", "--color=never", PATTERN, ...roots],
+    [
+      "-nU",
+      "--no-heading",
+      "--color=never",
+      // Exclude this scan's own self-test (it intentionally contains the
+      // forbidden patterns as string fixtures).
+      "-g",
+      "!**/scan-gamification-direct-inserts.test.ts",
+      PATTERN,
+      ...roots,
+    ],
     { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
   );
 } catch (err) {

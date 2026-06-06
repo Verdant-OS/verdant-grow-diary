@@ -81,7 +81,8 @@ describe("QuickLog input safety", () => {
     renderWithClient(<QuickLog open onOpenChange={vi.fn()} />);
     const dialog = screen.getByRole("dialog");
     fireEvent.click(within(dialog).getByText("Add more details"));
-    // pH lives only in the Hardware readings section now.
+    // Expand Hardware readings — pH lives only there now.
+    fireEvent.click(within(dialog).getByTestId("quicklog-hardware-toggle"));
     const hardware = within(dialog).getByTestId("quicklog-hardware-readings");
     expect(within(hardware).getByText("Feed/Input pH")).toBeInTheDocument();
     expect(within(hardware).getByText("Runoff pH")).toBeInTheDocument();

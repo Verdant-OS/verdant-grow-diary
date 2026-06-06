@@ -2,22 +2,26 @@
  * One-Tent Proof Record export rules.
  *
  * Pure helpers for assembling, redacting, serializing, and naming a
- * downloadable Proof Record that captures one manual end-to-end loop:
- *   grow → tent → plant → manual reading → snapshot → alert →
- *   Action Queue → completion → follow-up diary entry → timeline proof.
+ * downloadable Operator Self-Report covering one manual end-to-end loop:
+ *   grow → tent → plant → Quick Log → Timeline → Sensor Snapshot →
+ *   AI Doctor → Alert → Approval-Required Action Queue → follow-up.
  *
  * Safe-by-Design:
  *  - No I/O, no React, no DOM, no Supabase, no Edge Functions.
  *  - No fetch, no rpc, no functions.invoke, no service_role.
  *  - No sensor / alert / Action Queue writes — review only.
- *  - Never fabricates data. Missing fields stay missing.
+ *  - Never fabricates data. Missing fields stay missing (null).
  *  - Strips internal/private fields: user_id, tokens, service role keys,
  *    bridge tokens, auth headers.
- *  - Source labels are preserved verbatim (manual/live/csv/demo/stale/invalid).
+ *  - Source labels are preserved verbatim from ALLOWED_SOURCE_LABELS.
+ *  - The exported record self-identifies as `unverified: true` via the
+ *    computed `integrity` block — partners must never mistake a self-report
+ *    for verified loop traversal.
  */
+import { APP_ROUTES } from "@/lib/appRouteManifest";
 
 export const ONE_TENT_PROOF_RECORD_KIND = "verdant.one-tent-proof-record" as const;
-export const ONE_TENT_PROOF_RECORD_VERSION = 1 as const;
+export const ONE_TENT_PROOF_RECORD_VERSION = 2 as const;
 
 export type ProofSourceLabel =
   | "manual"
@@ -28,7 +32,7 @@ export type ProofSourceLabel =
   | "invalid"
   | "unknown";
 
-const ALLOWED_SOURCE_LABELS: ReadonlyArray<ProofSourceLabel> = [
+export const ALLOWED_SOURCE_LABELS: ReadonlyArray<ProofSourceLabel> = [
   "manual",
   "live",
   "csv",
@@ -73,7 +77,6 @@ export interface ProofReadingInput {
   value?: number | string;
   unit?: string;
   capturedAt?: string;
-  /** Source label as rendered in the UI (manual/live/csv/demo/stale/invalid). */
   sourceLabel?: ProofSourceLabel;
   routeObserved?: string;
 }
@@ -83,6 +86,8 @@ export interface ProofTargetInput {
   originalValue?: number | string;
   temporaryValue?: number | string;
   restored?: boolean;
+  restoredAt?: string;
+  restoreDiaryEntryId?: string;
 }
 
 export interface ProofAlertInput {
@@ -92,11 +97,18 @@ export interface ProofAlertInput {
   createdAt?: string;
 }
 
+export interface ProofApprovalGateInput {
+  requiredObserved?: boolean;
+  approvedAt?: string;
+}
+
 export interface ProofActionInput {
   id?: string;
   status?: string;
   completionResult?: string;
   completedAt?: string;
+  linkedAlertId?: string;
+  approvalGate?: ProofApprovalGateInput;
 }
 
 export interface ProofFollowupInput {
@@ -115,8 +127,31 @@ export interface ProofScopeInput {
   stage?: string;
 }
 
+export interface ProofQuickLogInput {
+  diaryEntryId?: string;
+  actionType?: string;
+  photoAttached?: boolean;
+}
+
+export interface ProofTimelineInput {
+  rowId?: string;
+  routeObserved?: string;
+  chipVisible?: boolean;
+}
+
+export interface ProofAiDoctorInput {
+  sessionId?: string;
+  confidence?: string;
+  riskLevel?: string;
+  missingInfoPresent?: boolean;
+  doNotDoPresent?: boolean;
+}
+
 export interface ProofRecordInput {
   scope?: ProofScopeInput;
+  quickLog?: ProofQuickLogInput;
+  timeline?: ProofTimelineInput;
+  aiDoctor?: ProofAiDoctorInput;
   reading?: ProofReadingInput;
   snapshotRoute?: string;
   target?: ProofTargetInput;
@@ -128,6 +163,25 @@ export interface ProofRecordInput {
   assembledAt?: string;
   /** Extra unstructured operator notes. */
   notes?: string;
+}
+
+export interface ProofIntegrity {
+  /** Always true — this surface only produces unverified self-reports. */
+  unverified: true;
+  /** Required field paths that are still null. Sorted ascending. */
+  missingFields: string[];
+  /**
+   * `true` when every present timestamp pair is in chronological order,
+   * `false` when any later step's timestamp predates an earlier step,
+   * `null` when no two comparable timestamps are present.
+   */
+  chronologyValid: boolean | null;
+  /**
+   * `true` when every provided route string matches an `APP_ROUTES` pattern
+   * (with `:param` segments allowed). `false` when any provided route is
+   * not registered. `null` when no route strings were provided.
+   */
+  routesValid: boolean | null;
 }
 
 export interface ProofRecord {
@@ -145,7 +199,16 @@ export interface ProofRecord {
     plantName: string | null;
     stage: string | null;
   };
-
+  quickLog: {
+    diaryEntryId: string | null;
+    actionType: string | null;
+    photoAttached: boolean | null;
+  };
+  timeline: {
+    rowId: string | null;
+    routeObserved: string | null;
+    chipVisible: boolean | null;
+  };
   reading: {
     metric: string | null;
     value: number | string | null;
@@ -155,11 +218,20 @@ export interface ProofRecord {
     routeObserved: string | null;
   };
   snapshotRoute: string | null;
+  aiDoctor: {
+    sessionId: string | null;
+    confidence: string | null;
+    riskLevel: string | null;
+    missingInfoPresent: boolean | null;
+    doNotDoPresent: boolean | null;
+  };
   target: {
     metric: string | null;
     originalValue: number | string | null;
     temporaryValue: number | string | null;
     restored: boolean | null;
+    restoredAt: string | null;
+    restoreDiaryEntryId: string | null;
   };
   alert: {
     id: string | null;
@@ -172,6 +244,11 @@ export interface ProofRecord {
     status: string | null;
     completionResult: string | null;
     completedAt: string | null;
+    linkedAlertId: string | null;
+    approvalGate: {
+      requiredObserved: boolean | null;
+      approvedAt: string | null;
+    };
   };
   followup: {
     diaryEntryId: string | null;
@@ -180,6 +257,7 @@ export interface ProofRecord {
   };
   uxFrictionNotes: string | null;
   notes: string | null;
+  integrity: ProofIntegrity;
 }
 
 function s(v: unknown): string | null {
@@ -201,8 +279,7 @@ function src(v: unknown): ProofSourceLabel | null {
 
 /**
  * Deep-clone JSON-compatible input while dropping any key whose name matches
- * the redacted-field denylist (case-insensitive). Used as a defensive pass
- * over operator-pasted blobs before they enter the record.
+ * the redacted-field denylist (case-insensitive).
  */
 export function redactRecordInput<T>(value: T): T {
   if (Array.isArray(value)) {
@@ -219,27 +296,180 @@ export function redactRecordInput<T>(value: T): T {
   return value;
 }
 
+// ---------------------------------------------------------------------------
+// Integrity helpers (pure)
+// ---------------------------------------------------------------------------
+
 /**
- * Build a canonical ProofRecord from operator-provided inputs.
- *
- * - Missing fields render as `null`, never fabricated.
- * - Source labels are preserved verbatim from the allowed enum.
- * - Redaction is applied to the input shape as a second safety net.
+ * Required loop-evidence field paths. Order is irrelevant; the integrity
+ * block always reports missing entries sorted ascending for deterministic
+ * snapshots.
  */
-export function buildOneTentProofRecord(input: ProofRecordInput | undefined | null): ProofRecord {
+const REQUIRED_EVIDENCE_PATHS: ReadonlyArray<string> = [
+  "action.id",
+  "aiDoctor.sessionId",
+  "alert.id",
+  "followup.diaryEntryId",
+  "quickLog.diaryEntryId",
+  "reading.sourceLabel",
+  "scope.growId",
+  "scope.plantId",
+  "scope.tentId",
+  "timeline.rowId",
+];
+
+/** Loop-step evidence fields used by the empty-record gate (subset). */
+const LOOP_STEP_EVIDENCE_PATHS: ReadonlyArray<string> = [
+  "action.id",
+  "aiDoctor.sessionId",
+  "alert.id",
+  "followup.diaryEntryId",
+  "quickLog.diaryEntryId",
+  "reading.sourceLabel",
+  "timeline.rowId",
+];
+
+function getByPath(record: ProofRecord, path: string): unknown {
+  const parts = path.split(".");
+  let cur: unknown = record;
+  for (const p of parts) {
+    if (cur && typeof cur === "object" && p in (cur as Record<string, unknown>)) {
+      cur = (cur as Record<string, unknown>)[p];
+    } else {
+      return undefined;
+    }
+  }
+  return cur;
+}
+
+function computeMissingFields(record: ProofRecord): string[] {
+  const missing = REQUIRED_EVIDENCE_PATHS.filter(
+    (p) => getByPath(record, p) === null,
+  );
+  return [...missing].sort();
+}
+
+/**
+ * Compare two ISO timestamps. Returns `0` if either side is missing or
+ * unparseable, `-1`/`1`/`0` otherwise (and `0` is treated as "no signal").
+ */
+function compareIso(a: string | null, c: string | null): number | null {
+  if (!a || !c) return null;
+  const ta = Date.parse(a);
+  const tc = Date.parse(c);
+  if (!Number.isFinite(ta) || !Number.isFinite(tc)) return null;
+  if (ta === tc) return 0;
+  return ta < tc ? -1 : 1;
+}
+
+function computeChronologyValid(record: ProofRecord): boolean | null {
+  // Ordered timeline of loop timestamps. Any two present, comparable entries
+  // must be in non-decreasing order; otherwise chronology is invalid.
+  const chain: ReadonlyArray<string | null> = [
+    record.reading.capturedAt,
+    record.alert.createdAt,
+    record.action.approvalGate.approvedAt,
+    record.action.completedAt,
+    record.target.restoredAt,
+  ];
+
+  let comparisons = 0;
+  for (let i = 0; i < chain.length; i++) {
+    for (let j = i + 1; j < chain.length; j++) {
+      const cmp = compareIso(chain[i], chain[j]);
+      if (cmp === null) continue;
+      comparisons += 1;
+      if (cmp > 0) return false;
+    }
+  }
+  return comparisons === 0 ? null : true;
+}
+
+/**
+ * Build a per-pattern regex from each registered `APP_ROUTES` path.
+ * `:param` segments accept any non-`/` value. Query/hash stripped from the
+ * candidate href before matching.
+ */
+function buildRoutePatternMatchers(): RegExp[] {
+  return APP_ROUTES.map((r) => {
+    const escaped = r.path
+      .split("/")
+      .map((seg) => (seg.startsWith(":") ? "[^/]+" : seg.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+      .join("/");
+    return new RegExp(`^${escaped}$`);
+  });
+}
+
+const ROUTE_MATCHERS = buildRoutePatternMatchers();
+
+function isRegisteredRoute(href: string): boolean {
+  const base = href.split("?")[0].split("#")[0];
+  // Also accept literal pattern strings like "/alerts/:alertId".
+  for (const r of APP_ROUTES) {
+    if (r.path === base) return true;
+  }
+  return ROUTE_MATCHERS.some((re) => re.test(base));
+}
+
+function computeRoutesValid(record: ProofRecord): boolean | null {
+  const provided = [
+    record.reading.routeObserved,
+    record.snapshotRoute,
+    record.timeline.routeObserved,
+  ].filter((v): v is string => typeof v === "string" && v.length > 0);
+  if (provided.length === 0) return null;
+  return provided.every(isRegisteredRoute);
+}
+
+export function computeProofIntegrity(record: ProofRecord): ProofIntegrity {
+  return {
+    unverified: true,
+    missingFields: computeMissingFields(record),
+    chronologyValid: computeChronologyValid(record),
+    routesValid: computeRoutesValid(record),
+  };
+}
+
+/**
+ * Returns true when the record has the minimum scope + at least one loop
+ * step's evidence id. UI uses this to gate the Download button.
+ */
+export function canExportProofRecord(record: ProofRecord): boolean {
+  const hasScope =
+    record.scope.growId !== null &&
+    record.scope.tentId !== null &&
+    record.scope.plantId !== null;
+  if (!hasScope) return false;
+  return LOOP_STEP_EVIDENCE_PATHS.some(
+    (p) => getByPath(record, p) !== null,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Record assembly
+// ---------------------------------------------------------------------------
+
+export function buildOneTentProofRecord(
+  input: ProofRecordInput | undefined | null,
+): ProofRecord {
   const safe = redactRecordInput(input ?? {}) as ProofRecordInput;
   const scope = safe.scope ?? {};
+  const quickLog = safe.quickLog ?? {};
+  const timeline = safe.timeline ?? {};
   const reading = safe.reading ?? {};
+  const aiDoctor = safe.aiDoctor ?? {};
   const target = safe.target ?? {};
   const alert = safe.alert ?? {};
   const action = safe.action ?? {};
+  const approvalGate = action.approvalGate ?? {};
   const followup = safe.followup ?? {};
-  return {
+
+  const base: Omit<ProofRecord, "integrity"> = {
     kind: ONE_TENT_PROOF_RECORD_KIND,
     version: ONE_TENT_PROOF_RECORD_VERSION,
     reviewOnly: true,
     noLiveDataPromise:
-      "Review only. No live data unless explicitly source-labeled 'live'.",
+      "Unverified operator self-report. No live data unless explicitly source-labeled 'live'.",
     assembledAt: s(safe.assembledAt),
     scope: {
       growId: s(scope.growId),
@@ -249,7 +479,16 @@ export function buildOneTentProofRecord(input: ProofRecordInput | undefined | nu
       plantId: s(scope.plantId),
       plantName: s(scope.plantName),
       stage: s(scope.stage),
-
+    },
+    quickLog: {
+      diaryEntryId: s(quickLog.diaryEntryId),
+      actionType: s(quickLog.actionType),
+      photoAttached: b(quickLog.photoAttached),
+    },
+    timeline: {
+      rowId: s(timeline.rowId),
+      routeObserved: s(timeline.routeObserved),
+      chipVisible: b(timeline.chipVisible),
     },
     reading: {
       metric: s(reading.metric),
@@ -260,11 +499,20 @@ export function buildOneTentProofRecord(input: ProofRecordInput | undefined | nu
       routeObserved: s(reading.routeObserved),
     },
     snapshotRoute: s(safe.snapshotRoute),
+    aiDoctor: {
+      sessionId: s(aiDoctor.sessionId),
+      confidence: s(aiDoctor.confidence),
+      riskLevel: s(aiDoctor.riskLevel),
+      missingInfoPresent: b(aiDoctor.missingInfoPresent),
+      doNotDoPresent: b(aiDoctor.doNotDoPresent),
+    },
     target: {
       metric: s(target.metric),
       originalValue: n(target.originalValue),
       temporaryValue: n(target.temporaryValue),
       restored: b(target.restored),
+      restoredAt: s(target.restoredAt),
+      restoreDiaryEntryId: s(target.restoreDiaryEntryId),
     },
     alert: {
       id: s(alert.id),
@@ -277,6 +525,11 @@ export function buildOneTentProofRecord(input: ProofRecordInput | undefined | nu
       status: s(action.status),
       completionResult: s(action.completionResult),
       completedAt: s(action.completedAt),
+      linkedAlertId: s(action.linkedAlertId),
+      approvalGate: {
+        requiredObserved: b(approvalGate.requiredObserved),
+        approvedAt: s(approvalGate.approvedAt),
+      },
     },
     followup: {
       diaryEntryId: s(followup.diaryEntryId),
@@ -286,6 +539,10 @@ export function buildOneTentProofRecord(input: ProofRecordInput | undefined | nu
     uxFrictionNotes: s(safe.uxFrictionNotes),
     notes: s(safe.notes),
   };
+
+  const full = base as ProofRecord;
+  full.integrity = computeProofIntegrity(full);
+  return full;
 }
 
 export function serializeProofRecordToJson(record: ProofRecord): string {

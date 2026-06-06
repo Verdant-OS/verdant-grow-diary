@@ -24,7 +24,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Copy, KeyRound, Send, ShieldAlert, Activity, CheckCircle2, XCircle, Server } from "lucide-react";
+import { Copy, KeyRound, Send, ShieldAlert, Activity, CheckCircle2, XCircle, Server, Trash2, Terminal, FileJson, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import {
@@ -45,9 +45,19 @@ import {
   buildEnvMatchChecklist,
   classifySensorIngestTestResult,
 } from "@/lib/sensorIngestTestResultRules";
+import {
+  buildSensorIngestCurl,
+  buildSensorIngestHistoryItem,
+  buildSensorIngestTestPayload,
+  diagnosticsExportToJson,
+  diagnosticsExportToText,
+  SENSOR_INGEST_HISTORY_MAX,
+  type SensorIngestHistoryItem,
+} from "@/lib/sensorDiagnosticsExportRules";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const INGEST_URL = `${SUPABASE_URL}/functions/v1/sensor-ingest-webhook`;
+
 
 interface Props {
   tentId: string | null;
@@ -132,13 +142,16 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<TestPayloadResult | null>(null);
   const [tokens, setTokens] = useState<BridgeTokenRow[]>([]);
+  const [history, setHistory] = useState<SensorIngestHistoryItem[]>([]);
 
-  // Reset reveal/result when tent changes — plaintext token must never
-  // be reused across tents.
+  // Reset reveal/result/history when tent changes — plaintext token must
+  // never be reused across tents, and history is per-tent only.
   useEffect(() => {
     setReveal(null);
     setResult(null);
+    setHistory([]);
   }, [tentId]);
+
 
   useEffect(() => {
     let cancelled = false;
@@ -250,40 +263,23 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     setSending(true);
     setResult(null);
     const capturedAt = new Date().toISOString();
-    const payload = {
-      tent_id: tentId,
-      source: "ecowitt",
-      vendor: "ecowitt_windows_testbench",
-      captured_at: capturedAt,
-      metrics: {
-        temp_f: 77.4,
-        humidity_percent: 58,
-        soil_moisture_pct: 33,
-        co2_ppm: 721,
-      },
-      metadata: {
-        device_id: "verdant-ui-ingest-test",
-        confidence: "test",
-        raw_payload: {
-          temp1f: "77.4",
-          humidity1: "58",
-          soilmoisture1: "33",
-          co2: "721",
-          source: "sensors_ui_test_button",
-        },
-      },
-    };
+    const payload = buildSensorIngestTestPayload({
+      tentId,
+      capturedAtIso: capturedAt,
+    });
+    const idempotencyKey = `testbench-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     let res: Response | null = null;
     let body: unknown = null;
     let status = 0;
+    let networkError = false;
     try {
       res = await fetch(INGEST_URL, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${reveal}`,
           "Content-Type": "application/json",
-          "Idempotency-Key": `testbench-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          "Idempotency-Key": idempotencyKey,
         },
         body: JSON.stringify(payload),
       });
@@ -294,16 +290,109 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
         body = { error: "non_json_response" };
       }
     } catch (err) {
+      networkError = true;
       body = { error: "network_error", message: (err as Error).message };
     }
     setSending(false);
     setResult({ status, ok: !!res?.ok, body });
+    // Append to local history (newest first, capped). History items do not
+    // store Authorization headers or plaintext tokens.
+    const classification = classifySensorIngestTestResult({ status, body, networkError });
+    const item = buildSensorIngestHistoryItem({
+      attempted_at: capturedAt,
+      request_url: INGEST_URL,
+      idempotency_key: idempotencyKey,
+      http_status: status,
+      body,
+      classification,
+    });
+    setHistory((prev) => [item, ...prev].slice(0, SENSOR_INGEST_HISTORY_MAX));
   }
 
-  async function copyPowerShell() {
-    await navigator.clipboard.writeText(powershell);
-    toast({ title: "PowerShell snippet copied" });
+  async function safeCopy(text: string, label: string) {
+    try {
+      if (!navigator.clipboard?.writeText) {
+        toast({
+          title: "Clipboard unavailable — select and copy manually.",
+          variant: "destructive",
+        });
+        return;
+      }
+      await navigator.clipboard.writeText(text);
+      toast({ title: `${label} copied` });
+    } catch {
+      toast({
+        title: "Clipboard unavailable — select and copy manually.",
+        variant: "destructive",
+      });
+    }
   }
+
+
+  async function copyPowerShell() {
+    await safeCopy(powershell, "PowerShell snippet");
+  }
+
+  function buildDiagnosticsPayload() {
+    return {
+      generated_at: new Date().toISOString(),
+      supabase_url: SUPABASE_URL ?? null,
+      ingest_url: INGEST_URL,
+      tent_id: tentId,
+      tent_name: tentName ?? null,
+      token: activeToken
+        ? {
+            token_prefix: activeToken.token_prefix,
+            name: activeToken.name,
+            status: bridgeTokenStatus(activeToken),
+            last_used_at: activeToken.last_used_at,
+            ingest_count: activeToken.ingest_count,
+            expires_at: activeToken.expires_at,
+          }
+        : null,
+      env_match: envMatch,
+      latest_test_result:
+        result && resultClass
+          ? {
+              attempted_at: history[0]?.attempted_at ?? new Date().toISOString(),
+              http_status: result.status,
+              classification: resultClass.category,
+              headline: resultClass.headline,
+              body: result.body,
+            }
+          : null,
+    };
+  }
+
+  async function copyDiagnosticsJson() {
+    await safeCopy(
+      diagnosticsExportToJson(buildDiagnosticsPayload()),
+      "Diagnostics JSON",
+    );
+  }
+
+  async function copyDiagnosticsText() {
+    await safeCopy(
+      diagnosticsExportToText(buildDiagnosticsPayload()),
+      "Diagnostics text",
+    );
+  }
+
+  async function copyCurl() {
+    const cmd = buildSensorIngestCurl({
+      ingestUrl: INGEST_URL,
+      tentId,
+      bridgeTokenPlaintext: reveal,
+      idempotencyKey: `testbench-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      capturedAtIso: new Date().toISOString(),
+    });
+    await safeCopy(cmd, "curl command");
+  }
+
+  function clearHistory() {
+    setHistory([]);
+  }
+
 
   if (!tentId) {
     return null;
@@ -347,10 +436,45 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
         className="rounded-lg border border-border/60 p-3 mb-3"
         data-testid="sensors-diagnostics"
       >
-        <div className="flex items-center gap-2 mb-2">
-          <Server className="size-4 text-muted-foreground" />
-          <div className="text-sm font-medium">Environment diagnostics</div>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <div className="flex items-center gap-2">
+            <Server className="size-4 text-muted-foreground" />
+            <div className="text-sm font-medium">Environment diagnostics</div>
+          </div>
+          <div className="flex gap-1">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={copyDiagnosticsJson}
+              data-testid="sensors-diag-copy-json"
+            >
+              <FileJson className="size-3 mr-1" /> JSON
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={copyDiagnosticsText}
+              data-testid="sensors-diag-copy-text"
+            >
+              <Copy className="size-3 mr-1" /> Text
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={copyCurl}
+              data-testid="sensors-diag-copy-curl"
+              title="Contains token if copied during reveal. Do not paste into chat, screenshots, or git."
+            >
+              <Terminal className="size-3 mr-1" /> curl
+            </Button>
+          </div>
         </div>
+        <p className="text-[11px] text-muted-foreground mb-2">
+          Exports contain safe identity only. The curl button includes the
+          bridge token only while the one-time reveal is in memory — do not
+          paste it into chat, screenshots, or git. Revoke any token that leaks.
+        </p>
+
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
           <dt className="text-muted-foreground">App Supabase URL</dt>
           <dd
@@ -553,7 +677,74 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
           </div>
         )}
 
+        {history.length > 0 && (
+          <div
+            className="mt-3 border-t border-border/40 pt-2"
+            data-testid="sensors-testbench-history"
+          >
+            <div className="flex items-center justify-between mb-1 gap-2">
+              <div className="text-xs font-medium flex items-center gap-1">
+                <History className="size-3" />
+                Local test history — clears on refresh
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={clearHistory}
+                data-testid="sensors-testbench-history-clear"
+              >
+                <Trash2 className="size-3 mr-1" /> Clear
+              </Button>
+            </div>
+            <ul className="space-y-1">
+              {history.map((h) => (
+                <li
+                  key={h.id}
+                  className="rounded border border-border/50 p-2 text-[11px]"
+                  data-testid="sensors-testbench-history-item"
+                  data-status={h.http_status}
+                  data-category={h.classification}
+                >
+                  <div className="flex flex-wrap items-center gap-1">
+                    <span className="font-mono">{h.attempted_at}</span>
+                    <span>·</span>
+                    <span className="font-medium">HTTP {h.http_status}</span>
+                    <span>·</span>
+                    <span>{h.classification}</span>
+                    {h.inserted !== null && (
+                      <span className="text-muted-foreground">
+                        · inserted {h.inserted}
+                      </span>
+                    )}
+                    {h.skipped_duplicate !== null && (
+                      <span className="text-muted-foreground">
+                        · dup {h.skipped_duplicate}
+                      </span>
+                    )}
+                    {h.rejected_count !== null && (
+                      <span className="text-muted-foreground">
+                        · rejected {h.rejected_count}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-muted-foreground break-all">
+                    key: {h.idempotency_key}
+                  </div>
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-muted-foreground">
+                      response body
+                    </summary>
+                    <pre className="bg-muted/40 rounded p-2 mt-1 overflow-x-auto whitespace-pre-wrap break-words">
+{JSON.stringify(h.body, null, 2)}
+                    </pre>
+                  </details>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );
 }
+

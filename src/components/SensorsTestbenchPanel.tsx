@@ -79,7 +79,10 @@ import {
 import JSZip from "jszip";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const INGEST_URL = `${SUPABASE_URL}/functions/v1/sensor-ingest-webhook`;
+// Canonical ingest URL — single source of truth. Do not concatenate in JSX.
+const INGEST_URL =
+  buildCanonicalSensorIngestUrl(SUPABASE_URL) ??
+  `${SUPABASE_URL}/functions/v1/sensor-ingest-webhook`;
 
 
 interface Props {

@@ -191,6 +191,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     setReveal(null);
     setResult(null);
     setHistory([]);
+    setDiagnosticsHistory([]);
     setLastPayload(null);
   }, [tentId]);
 

@@ -151,7 +151,8 @@ Deno.serve(async (req) => {
     if (code === "23505") {
       return jsonResponse({ ok: true, duplicate: true }, 200);
     }
-    return jsonResponse({ error: "insert_failed", detail: error.message }, 500);
+    console.error("paddle-webhook insert_failed", error);
+    return jsonResponse({ error: "insert_failed" }, 500);
   }
 
   // NOTE: No entitlement changes here. Pro access is intentionally NOT

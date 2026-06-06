@@ -1332,8 +1332,140 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
                 </ul>
               </div>
             )}
+            <div className="mt-2 flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={downloadNetworkDiagnosticsJson}
+                data-testid="sensors-testbench-network-diagnostics-download"
+              >
+                Download network diagnostics JSON
+              </Button>
+            </div>
           </div>
         )}
+
+        {/* How to verify — safe curl commands. Token is always a placeholder. */}
+        {verifyCommands.available && (
+          <div
+            className="mt-3 border border-border/40 rounded p-2 text-xs"
+            data-testid="sensors-testbench-verify-commands"
+          >
+            <div className="font-medium mb-1 flex items-center gap-2">
+              <Badge variant="outline" className="text-[10px]">How to verify</Badge>
+              <span>Safe curl commands (placeholders only)</span>
+            </div>
+            <p
+              className="text-amber-700 dark:text-amber-300 mb-2"
+              data-testid="sensors-testbench-verify-commands-note"
+            >
+              {verifyCommands.note}
+            </p>
+            <div className="mb-2">
+              <div className="text-muted-foreground mb-1">OPTIONS preflight check</div>
+              <pre
+                className="bg-muted/40 rounded p-2 overflow-x-auto whitespace-pre"
+                data-testid="sensors-testbench-verify-options"
+              >
+                {verifyCommands.options}
+              </pre>
+              <div className="mt-1 flex justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => safeCopy(verifyCommands.options, "OPTIONS curl")}
+                  data-testid="sensors-testbench-verify-options-copy"
+                >
+                  Copy OPTIONS
+                </Button>
+              </div>
+            </div>
+            <div>
+              <div className="text-muted-foreground mb-1">POST with placeholder token</div>
+              <pre
+                className="bg-muted/40 rounded p-2 overflow-x-auto whitespace-pre"
+                data-testid="sensors-testbench-verify-post"
+              >
+                {verifyCommands.post}
+              </pre>
+              <div className="mt-1 flex justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => safeCopy(verifyCommands.post, "POST curl (placeholder token)")}
+                  data-testid="sensors-testbench-verify-post-copy"
+                >
+                  Copy POST
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Diagnostics run history — last 10 Send-test results (redacted). */}
+        {diagnosticsHistory.length > 0 && (
+          <div
+            className="mt-3 border border-border/40 rounded p-2 text-xs"
+            data-testid="sensors-testbench-diagnostics-history"
+          >
+            <div className="flex items-center justify-between mb-1">
+              <div className="font-medium flex items-center gap-2">
+                <Badge variant="outline" className="text-[10px]">Diagnostics history</Badge>
+                <span className="text-muted-foreground">
+                  Last {diagnosticsHistory.length} of {SENSOR_DIAGNOSTICS_RUN_HISTORY_MAX}
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={downloadDiagnosticsRunHistoryJson}
+                  data-testid="sensors-testbench-diagnostics-history-download"
+                >
+                  Download JSON
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearDiagnosticsHistory}
+                  data-testid="sensors-testbench-diagnostics-history-clear"
+                >
+                  Clear history
+                </Button>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-[11px] font-mono">
+                <thead className="text-muted-foreground">
+                  <tr className="text-left">
+                    <th className="pr-2">time</th>
+                    <th className="pr-2">HTTP</th>
+                    <th className="pr-2">classification</th>
+                    <th className="pr-2">URL match</th>
+                    <th className="pr-2">CORS opt</th>
+                    <th className="pr-2">CORS post</th>
+                    <th>status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {diagnosticsHistory.map((e, i) => (
+                    <tr key={i} data-testid="sensors-testbench-diagnostics-history-row">
+                      <td className="pr-2">{relativeFromIso(e.attempted_at)}</td>
+                      <td className="pr-2">{e.http_status}</td>
+                      <td className="pr-2">{e.classification}</td>
+                      <td className="pr-2">{e.canonical_url_match}</td>
+                      <td className="pr-2">{e.cors_options}</td>
+                      <td className="pr-2">{e.cors_post}</td>
+                      <td>{e.diagnostics_status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+
 
 
         {/* Canonical payload validation summary — view-model driven. */}

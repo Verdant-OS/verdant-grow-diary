@@ -16,7 +16,21 @@
  *    downstream logic.
  */
 
-import type { TablesInsert } from "@/integrations/supabase/types";
+// Deno edge runtime cannot reach src/integrations/supabase/types. The only
+// use is the NormalizedRow alias below; we declare a minimal structural
+// type that matches sensor_readings inserts.
+type TablesInsert<_T extends "sensor_readings"> = {
+  user_id?: string;
+  tent_id: string;
+  source: string;
+  metric: string;
+  value: number;
+  captured_at: string;
+  device_id?: string | null;
+  quality?: string | null;
+  raw_payload?: Record<string, unknown> | null;
+  [k: string]: unknown;
+};
 
 // ---------------------------------------------------------------------------
 // Allow-lists (mirror the public.validate_sensor_reading trigger)

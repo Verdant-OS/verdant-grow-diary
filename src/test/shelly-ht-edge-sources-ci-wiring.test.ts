@@ -9,7 +9,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const ROOT = resolve(__dirname, "../..");
-const SCRIPT = resolve(ROOT, "scripts/assert-shelly-ht-edge-sources-present.mjs");
+const SCRIPT = resolve(ROOT, "scripts/assert-shelly-ht-edge-sources-present.ts");
 const PKG = resolve(ROOT, "package.json");
 const CI = resolve(ROOT, ".github/workflows/ci.yml");
 
@@ -20,13 +20,14 @@ describe("Shelly H&T edge source presence guard wiring", () => {
     expect(existsSync(SCRIPT)).toBe(true);
   });
 
-  it("package.json defines the guard script and runs the .mjs file", () => {
+  it("package.json defines the guard script and runs the .ts file with bun", () => {
     const pkg = JSON.parse(readFileSync(PKG, "utf8")) as {
       scripts?: Record<string, string>;
     };
     const cmd = pkg.scripts?.[SCRIPT_NAME];
     expect(cmd).toBeTruthy();
-    expect(cmd).toContain("scripts/assert-shelly-ht-edge-sources-present.mjs");
+    expect(cmd).toContain("scripts/assert-shelly-ht-edge-sources-present.ts");
+    expect(cmd).toMatch(/^bun\s+/);
   });
 
   it("CI workflow invokes the guard script as a dedicated step", () => {
@@ -34,5 +35,10 @@ describe("Shelly H&T edge source presence guard wiring", () => {
     expect(ci).toMatch(
       new RegExp(`run:\\s*bun\\s+run\\s+${SCRIPT_NAME.replace(":", "\\:")}`),
     );
+  });
+
+  it("legacy .mjs guard script has been removed in favor of the .ts version", () => {
+    const legacy = resolve(ROOT, "scripts/assert-shelly-ht-edge-sources-present.mjs");
+    expect(existsSync(legacy)).toBe(false);
   });
 });

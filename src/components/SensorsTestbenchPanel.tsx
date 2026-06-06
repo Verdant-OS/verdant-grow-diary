@@ -59,6 +59,7 @@ import {
   buildDiagnosticsBundleFilenamePreview,
   buildDiagnosticsBundleFiles,
   buildDiagnosticsShareModalState,
+  buildCanonicalSensorIngestUrl,
   buildSensorIngestNetworkDiagnostics,
   buildDownloadFilename,
   buildPowerShellCopyWarningState,

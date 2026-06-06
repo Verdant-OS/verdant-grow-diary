@@ -325,8 +325,26 @@ export default function AlertDetail() {
     };
   }, [alert, relatedLoaded, relatedActions.length]);
 
+  const addButtonDecision = useMemo(
+    () => decideAddButtonState({ alert, existingRows: existingActionRows }),
+    [alert, existingActionRows],
+  );
+
   async function addAlertToActionQueue() {
-    if (!alert || !draftResult || !draftResult.ok || existingActionId) return;
+    if (!alert || !draftResult || !draftResult.ok) return;
+    // Second line of defense: shared pure guard. Blocks duplicates
+    // (including fast double-clicks while a row is being inserted) and
+    // any ineligible-state click.
+    if (
+      existingActionId ||
+      shouldBlockInsert({
+        alert,
+        existingRows: existingActionRows,
+        inFlight: queuing,
+      })
+    ) {
+      return;
+    }
     setQueuing(true);
     const { draft } = draftResult;
     // SECURITY: never send user_id from the client. DB default (auth.uid()) wins.
@@ -364,6 +382,18 @@ export default function AlertDetail() {
     }
     if (inserted?.id) {
       setExistingActionId(inserted.id);
+      // Reflect the new row in the dedupe pool so a fast follow-up click
+      // is blocked by `decideAddButtonState` before any insert.
+      setExistingActionRows((rows) => [
+        ...rows,
+        {
+          id: inserted.id as string,
+          grow_id: (inserted.grow_id as string | null) ?? draft.grow_id,
+          source: "environment_alert",
+          status: "pending_approval",
+          reason: draft.reason,
+        },
+      ]);
       const { error: auditError } = await supabase.from("action_queue_events").insert({
         action_queue_id: inserted.id,
         grow_id: inserted.grow_id ?? draft.grow_id,
@@ -383,6 +413,12 @@ export default function AlertDetail() {
     setQueuing(false);
     toast.success("Action queued for approval.");
   }
+
+  const derivedSensorSource = useMemo(
+    () => deriveAlertReadingSource(alert),
+    [alert],
+  );
+
 
   return (
     <div>

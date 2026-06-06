@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { adaptAiDoctorReviewResponse } from "@/lib/aiDoctorReviewResponseAdapter";
+import { adaptCreditedAiResponse } from "@/lib/aiCreditedResponseAdapter";
 
 const credit = {
   ok: false,
@@ -13,9 +13,9 @@ const credit = {
   period_key: "2026-06",
 };
 
-describe("adaptAiDoctorReviewResponse — credit_denied passthrough", () => {
+describe("adaptCreditedAiResponse — credit_denied passthrough", () => {
   it("round-trips reason=credit_denied with credit payload intact", () => {
-    const out = adaptAiDoctorReviewResponse({
+    const out = adaptCreditedAiResponse({
       ok: false,
       reason: "credit_denied",
       credit,
@@ -37,14 +37,14 @@ describe("adaptAiDoctorReviewResponse — credit_denied passthrough", () => {
       "invalid",
       "shape",
     ]) {
-      const out = adaptAiDoctorReviewResponse({ ok: false, reason });
+      const out = adaptCreditedAiResponse({ ok: false, reason });
       expect(out.ok).toBe(false);
       if (out.ok === false) expect(out.reason).toBe(reason);
     }
   });
 
   it("unknown reason still falls back to 'invalid' (no regression)", () => {
-    const out = adaptAiDoctorReviewResponse({ ok: false, reason: "gibberish" });
+    const out = adaptCreditedAiResponse({ ok: false, reason: "gibberish" });
     expect(out.ok).toBe(false);
     if (out.ok === false) expect(out.reason).toBe("invalid");
   });

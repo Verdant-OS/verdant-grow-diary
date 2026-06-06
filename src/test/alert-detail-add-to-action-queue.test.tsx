@@ -14,7 +14,22 @@
  * No new write paths, no schema changes, no automation, no device control.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { act, render, screen, waitFor, fireEvent } from "@testing-library/react";
+
+// Flush pending async state updates inside React's act() boundary so async
+// effects in AlertDetail (e.g. linked-action-count queries) don't trigger
+// "not wrapped in act(...)" warnings during tests.
+async function flushAsync(ms = 30) {
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, ms));
+  });
+}
+
+async function clickAct(el: Element) {
+  await act(async () => {
+    fireEvent.click(el);
+  });
+}
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import AlertDetail from "@/pages/AlertDetail";
 

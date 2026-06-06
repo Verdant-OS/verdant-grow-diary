@@ -1160,6 +1160,12 @@ export function buildSensorIngestNetworkDiagnostics(
       "The browser could not request the ingest endpoint because the URL is missing or invalid.";
     checks.push("Confirm the Supabase URL is set and the ingest path resolves to a valid URL.");
     checks.push("Reload the app after fixing the environment configuration.");
+  } else if (isPrivateHost(ingest.hostname) && origin && !isPrivateHost(origin.hostname)) {
+    status = "likely_endpoint_unreachable";
+    title = "Local/private ingest endpoint not reachable from this browser";
+    summary =
+      "The ingest URL points at a localhost or private-network address that this browser likely cannot reach from the current origin.";
+    checks.push(`Confirm the device serving ${ingest.host} is reachable from this machine and network.`);
   } else if (origin && origin.protocol === "https:" && ingest.protocol === "http:") {
     status = "likely_mixed_content";
     title = "Likely mixed-content block (HTTPS app calling HTTP endpoint)";
@@ -1167,7 +1173,6 @@ export function buildSensorIngestNetworkDiagnostics(
       "Browsers block HTTP requests from HTTPS pages. The ingest endpoint must be served over HTTPS.";
     checks.push("Serve the ingest endpoint over HTTPS, or run the app over HTTP for local testing only.");
     checks.push("Verify the ingest URL scheme in your environment configuration.");
-  } else if (isPrivateHost(ingest.hostname) && origin && !isPrivateHost(origin.hostname)) {
     status = "likely_endpoint_unreachable";
     title = "Local/private ingest endpoint not reachable from this browser";
     summary =

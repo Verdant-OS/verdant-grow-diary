@@ -11,12 +11,22 @@
  *     the page-level scaffolding.
  *  3. Safe degradation copy is present for the unavailable/empty branches.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { alertsPath } from "@/lib/routes";
+import {
+  alertsPath,
+  alertDetailPath,
+  actionQueueAlertContextPath,
+} from "@/lib/routes";
 import { buildPlantQuickStatusView } from "@/lib/plantQuickStatusRules";
+import { APP_ROUTES } from "@/lib/appRouteManifest";
+import {
+  scanForLeakedTerms,
+  DEFAULT_FORBIDDEN_LEAK_TERMS,
+  DEFAULT_ALLOWED_LEAK_IDENTIFIERS,
+} from "./helpers/sourceLeakScanTestHelper";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
@@ -25,6 +35,23 @@ const APP = read("src/App.tsx");
 const ALERTS = read("src/pages/Alerts.tsx");
 
 vi.mock("@/components/AlertsAutoPersistForGrow", () => ({ default: () => null }));
+
+/**
+ * Reduce a concrete href (possibly with query string + concrete ids) to the
+ * manifest-shaped pattern. Examples:
+ *   /alerts?growId=grow-1        → /alerts
+ *   /alerts/abc-123              → /alerts/:alertId
+ *   /actions?alert=abc           → /actions
+ *
+ * We do NOT invent params; we map any path segment that follows
+ * `/alerts/` or `/actions/` to its manifest segment name.
+ */
+function toManifestPattern(href: string): string {
+  const base = href.split("?")[0].split("#")[0];
+  if (/^\/alerts\/[^/]+$/.test(base)) return "/alerts/:alertId";
+  if (/^\/actions\/[^/]+$/.test(base)) return "/actions/:actionId";
+  return base;
+}
 
 describe("Alerts route — quick link contract", () => {
   it("Plant Detail quick-status Alerts link target matches alertsPath helper", () => {
@@ -87,18 +114,114 @@ describe("Alerts route — quick link contract", () => {
 
 
   it("page scaffolding does not leak token/raw_payload/provenance/service_role copy", () => {
-    // The page legitimately renders <SensorSourceProvenanceBadge /> for
-    // source-labeled telemetry (Verdant safety rule). Strip the component
-    // identifier before the leak check so the substring test still catches
-    // raw user-visible "provenance" copy without flagging the safety badge.
-    const blob = ALERTS.replace(/SensorSourceProvenanceBadge/g, "")
-      .toLowerCase();
-    expect(blob).not.toContain("service_role");
-    expect(blob).not.toContain("raw_payload");
-    expect(blob).not.toContain("provenance");
-    expect(blob).not.toContain("bearer ");
+    // Uses the shared scanner so the allow-list for <SensorSourceProvenanceBadge />
+    // stays in one place (src/test/helpers/sourceLeakScanTestHelper.ts).
+    const findings = scanForLeakedTerms(ALERTS);
+    expect(findings).toEqual([]);
   });
 
+  it("shared leak scanner allow-list stays minimal and explicit", () => {
+    // Guard against silently growing the allow-list. Today the only safe
+    // identifier we strip is the sensor-truth provenance badge.
+    expect([...DEFAULT_ALLOWED_LEAK_IDENTIFIERS]).toEqual([
+      "SensorSourceProvenanceBadge",
+    ]);
+    // Forbidden terms must still include the four standing safety strings.
+    expect(new Set(DEFAULT_FORBIDDEN_LEAK_TERMS)).toEqual(
+      new Set(["service_role", "raw_payload", "bearer ", "provenance"]),
+    );
+  });
+
+  it("shared leak scanner still flags raw user-visible 'provenance' copy", () => {
+    // Negative-control: if a future edit accidentally renders the word
+    // outside the badge component, the scanner must catch it.
+    const synthetic = `import X from "x";\nexport default () => <p>provenance</p>;`;
+    const findings = scanForLeakedTerms(synthetic);
+    expect(findings.map((f) => f.term)).toContain("provenance");
+  });
+
+  it("shared leak scanner still flags service_role / raw_payload / bearer leaks", () => {
+    const synthetic = [
+      'const k = "service_role";',
+      'const p = "raw_payload";',
+      'const h = "Bearer abc";',
+    ].join("\n");
+    const terms = scanForLeakedTerms(synthetic).map((f) => f.term).sort();
+    expect(terms).toEqual(["bearer ", "raw_payload", "service_role"]);
+  });
+});
+
+describe("Alerts route — quick-link targets resolve to manifest entries", () => {
+  // Single source of truth for the alert quick-link surface this test owns.
+  // Adding a new alert-shaped quick-link helper? Add it here so the snapshot
+  // covers it and the manifest cross-check holds.
+  const QUICK_LINKS: ReadonlyArray<{ name: string; href: string }> = [
+    { name: "alertsPath()", href: alertsPath() },
+    { name: "alertsPath(growId)", href: alertsPath("grow-1") },
+    { name: "alertDetailPath(alertId)", href: alertDetailPath("alert-1") },
+    {
+      name: "actionQueueAlertContextPath(alertId)",
+      href: actionQueueAlertContextPath("alert-1"),
+    },
+  ];
+
+  it("every alert quick-link href reduces to a registered manifest path", () => {
+    const manifestSet = new Set(APP_ROUTES.map((r) => r.path));
+    const offenders = QUICK_LINKS.filter(
+      (l) => !manifestSet.has(toManifestPattern(l.href)),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it("alert quick-link manifest entries are gated as auth (not public)", () => {
+    const offenders = QUICK_LINKS.filter((l) => {
+      const entry = APP_ROUTES.find((r) => r.path === toManifestPattern(l.href));
+      return !entry || entry.access !== "auth";
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  it("alert quick-link manifest paths are mounted in App.tsx", () => {
+    // App.tsx mounts the same path literal we resolve to. Catches the case
+    // where a manifest entry is correct but the route was un-mounted.
+    const offenders = QUICK_LINKS.filter(
+      (l) => !APP.includes(`path="${toManifestPattern(l.href)}"`),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it("snapshot: alert quick-link hrefs → manifest pattern (narrow, stable)", () => {
+    const snapshot = QUICK_LINKS.map((l) => ({
+      name: l.name,
+      href: l.href,
+      manifestPattern: toManifestPattern(l.href),
+    }));
+    // Intentionally narrow — only alert quick-link targets, not the whole
+    // manifest. Update this snapshot only when an alert quick-link helper
+    // is intentionally added/removed/renamed.
+    expect(snapshot).toEqual([
+      {
+        name: "alertsPath()",
+        href: "/alerts",
+        manifestPattern: "/alerts",
+      },
+      {
+        name: "alertsPath(growId)",
+        href: "/alerts?growId=grow-1",
+        manifestPattern: "/alerts",
+      },
+      {
+        name: "alertDetailPath(alertId)",
+        href: "/alerts/alert-1",
+        manifestPattern: "/alerts/:alertId",
+      },
+      {
+        name: "actionQueueAlertContextPath(alertId)",
+        href: "/actions?alert=alert-1",
+        manifestPattern: "/actions",
+      },
+    ]);
+  });
 });
 
 describe("Alerts route — static safety", () => {

@@ -163,11 +163,16 @@ export default function Sensors() {
           );
         })}
       </div>
-      {manualTents.length > 0 && (
-        <div id="manual-reading" className="mt-4 max-w-xl scroll-mt-24" data-testid="sensors-manual-reading-anchor">
+      <div id="manual-reading" className="mt-4 max-w-xl scroll-mt-24" data-testid="sensors-manual-reading-anchor">
+        {manualTents.length === 0 ? (
+          <FirstTentSetupEmptyState
+            surface="sensor_pairing"
+            testId="sensors-first-tent-setup"
+          />
+        ) : (
           <ManualSensorReadingCard tents={manualTents} defaultTentId={defaultManualTentId} />
-        </div>
-      )}
+        )}
+      </div>
       {manualTents.length > 0 && selectedTent && (
         <div id="import-sensor-data" className="mt-4 max-w-xl scroll-mt-24" data-testid="sensors-import-sensor-data-anchor">
           <TentCsvImportCard

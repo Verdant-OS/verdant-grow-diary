@@ -136,7 +136,16 @@ export interface ProofRecord {
   reviewOnly: true;
   noLiveDataPromise: string;
   assembledAt: string | null;
-  scope: Required<ProofScopeInput>;
+  scope: {
+    growId: string | null;
+    growName: string | null;
+    tentId: string | null;
+    tentName: string | null;
+    plantId: string | null;
+    plantName: string | null;
+    stage: string | null;
+  };
+
   reading: {
     metric: string | null;
     value: number | string | null;

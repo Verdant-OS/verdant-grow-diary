@@ -2,7 +2,8 @@
  * aiDoctorReviewResponseAdapter — validates server payloads, fails closed.
  */
 import { describe, it, expect } from "vitest";
-import { adaptAiDoctorReviewResponse } from "@/lib/aiDoctorReviewResponseAdapter";
+import { adaptCreditedAiResponse } from "@/lib/aiCreditedResponseAdapter";
+import { validateAiDoctorReviewResult } from "@/lib/aiDoctorReviewResultContract";
 
 const validResult = () => ({
   summary: "Plant shows mild leaf curl on lower fan leaves.",
@@ -18,9 +19,9 @@ const validResult = () => ({
   risk_level: "watch",
 });
 
-describe("adaptAiDoctorReviewResponse", () => {
+describe("adaptCreditedAiResponse", () => {
   it("accepts an envelope with ok=true and a valid result", () => {
-    const out = adaptAiDoctorReviewResponse({
+    const out = adaptCreditedAiResponse({
       ok: true,
       result: validResult(),
     });
@@ -28,27 +29,30 @@ describe("adaptAiDoctorReviewResponse", () => {
   });
 
   it("accepts a bare valid result (no envelope)", () => {
-    const out = adaptAiDoctorReviewResponse(validResult());
+    const out = adaptCreditedAiResponse(validResult());
     expect(out.ok).toBe(true);
   });
 
   it("returns calm failure for null / undefined / strings", () => {
-    expect(adaptAiDoctorReviewResponse(null).ok).toBe(false);
-    expect(adaptAiDoctorReviewResponse(undefined).ok).toBe(false);
-    expect(adaptAiDoctorReviewResponse("oops" as unknown).ok).toBe(false);
+    expect(adaptCreditedAiResponse(null).ok).toBe(false);
+    expect(adaptCreditedAiResponse(undefined).ok).toBe(false);
+    expect(adaptCreditedAiResponse("oops" as unknown).ok).toBe(false);
   });
 
   it("passes through server-provided ok=false reason", () => {
-    const out = adaptAiDoctorReviewResponse({ ok: false, reason: "config" });
+    const out = adaptCreditedAiResponse({ ok: false, reason: "config" });
     expect(out.ok).toBe(false);
     if (out.ok === false) expect(out.reason).toBe("config");
   });
 
   it("rejects raw imperative device-control content as invalid", () => {
-    const out = adaptAiDoctorReviewResponse({
-      ...validResult(),
-      immediate_action: "Turn on the humidifier.",
-    });
+    const out = adaptCreditedAiResponse(
+      {
+        ...validResult(),
+        immediate_action: "Turn on the humidifier.",
+      },
+      validateAiDoctorReviewResult,
+    );
     expect(out.ok).toBe(false);
     if (out.ok === false) expect(out.reason).toBe("invalid");
   });

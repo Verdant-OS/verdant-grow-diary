@@ -23,9 +23,10 @@ import { useCallback, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { AiDoctorReviewRequestPacket } from "@/lib/aiDoctorReviewRequestPacket";
 import {
-  adaptAiDoctorReviewResponse,
-  type AiDoctorLiveReviewFailureReason,
-} from "@/lib/aiDoctorReviewResponseAdapter";
+  adaptCreditedAiResponse,
+  type AiCreditedFailureReason,
+} from "@/lib/aiCreditedResponseAdapter";
+import { validateAiDoctorReviewResult } from "@/lib/aiDoctorReviewResultContract";
 import type { AiDoctorReviewResult } from "@/lib/aiDoctorReviewResultContract";
 import type { Classification } from "@/lib/sensorSnapshotStatusContract";
 import type { AiCreditDenial } from "@/lib/aiCreditLimitNoticeViewModel";
@@ -45,7 +46,7 @@ export type AiDoctorLiveReviewStatus =
 export interface AiDoctorLiveReviewState {
   status: AiDoctorLiveReviewStatus;
   result: AiDoctorReviewResult | null;
-  reason: AiDoctorLiveReviewFailureReason | null;
+  reason: AiCreditedFailureReason | null;
   /** Only populated when reason === 'credit_denied'. */
   credit?: AiCreditDenial;
   /** Only populated on successful runs when the server returned a credit payload. */
@@ -123,14 +124,17 @@ export function useAiDoctorLiveReview(
         setState({ status: "error", result: null, reason: "http" });
         return;
       }
-      const outcome = adaptAiDoctorReviewResponse(data);
+      const outcome = adaptCreditedAiResponse(data, validateAiDoctorReviewResult);
       if (outcome.ok === false) {
         setState({
           status: "error",
           result: null,
           reason: outcome.reason,
           credit:
-            outcome.reason === "credit_denied" ? outcome.credit : undefined,
+            outcome.reason === "credit_denied" ||
+            outcome.reason === "upstream_credit_exhausted"
+              ? outcome.credit
+              : undefined,
         });
         return;
       }

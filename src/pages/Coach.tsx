@@ -31,7 +31,7 @@ import { harmonizeDiagnosisConfidence } from "@/lib/aiDoctorConfidenceRules";
 import { actionsPath } from "@/lib/routes";
 import AiCreditLimitNotice from "@/components/AiCreditLimitNotice";
 import AiCreditRemainingBadge from "@/components/AiCreditRemainingBadge";
-import { parseAiCoachCreditDenial } from "@/lib/aiCoachCreditDenialAdapter";
+import { adaptCreditedAiResponse } from "@/lib/aiCreditedResponseAdapter";
 import type { AiCreditDenial } from "@/lib/aiCreditLimitNoticeViewModel";
 
 type Mode = "diagnose" | "next_steps";
@@ -82,6 +82,7 @@ export default function Coach() {
   // result still belongs to the most recent diagnosis (race-safe).
   const [persistedSessionId, setPersistedSessionId] = useState<string | null>(null);
   const [creditDenial, setCreditDenial] = useState<AiCreditDenial | null>(null);
+  const [upstreamCreditExhausted, setUpstreamCreditExhausted] = useState(false);
   const diagnosisSeqRef = useRef(0);
 
   // --- Real grow context for AI sufficiency evaluation (presenter only) ---
@@ -251,7 +252,8 @@ export default function Coach() {
   async function ask(mode: Mode) {
     if (!user) return;
     const seq = ++diagnosisSeqRef.current;
-    setBusy(true); setResult(null); setPersistedSessionId(null); setCreditDenial(null);
+    setBusy(true); setResult(null); setPersistedSessionId(null);
+    setCreditDenial(null); setUpstreamCreditExhausted(false);
     try {
       let photoUrl: string | undefined;
       if (mode === "diagnose" && photoFile) {
@@ -267,19 +269,29 @@ export default function Coach() {
         body: { mode, growId: activeGrowId, photoUrl, question: question.trim() || undefined },
       });
       if (error) {
-        // S3.2: HTTP 402 credit denial surfaces here as FunctionsHttpError.
-        // Parse it before falling through to the generic failure toast so
-        // the grower sees a calm, branch-correct credit-limit notice.
-        const denial = await parseAiCoachCreditDenial(error);
-        if (denial) {
-          setCreditDenial(denial.credit);
-          return;
-        }
+        // Credit denials are now HTTP 200 business envelopes (handled
+        // below by the shared adapter). Any `error` here is a real
+        // transport / auth / config failure.
         throw error;
       }
-      const d = data as CoachResponse | null;
+      // Shared credited-AI envelope adapter. Coach success payload is
+      // pass-through (Coach has its own sanitizers downstream).
+      const outcome = adaptCreditedAiResponse<CoachResponse>(data);
+      if (outcome.ok === false) {
+        if (outcome.reason === "credit_denied") {
+          if (outcome.credit) setCreditDenial(outcome.credit);
+          return;
+        }
+        if (outcome.reason === "upstream_credit_exhausted") {
+          setUpstreamCreditExhausted(true);
+          return;
+        }
+        throw new Error(outcome.reason);
+      }
+      const d = outcome.result as CoachResponse | null;
       if (d?.error) throw new Error(d.error);
       setResult(d ?? null);
+
 
       // Persist a read-only snapshot of the completed AI Doctor response.
       // SECURITY: never include user_id (DB default auth.uid()). Only the
@@ -407,6 +419,24 @@ export default function Coach() {
           />
         </div>
       )}
+
+      {upstreamCreditExhausted && (
+        <div
+          className="mt-4 animate-fade-in rounded-md border border-border/60 bg-background/40 px-3 py-2 text-sm text-muted-foreground"
+          data-testid="coach-upstream-credit-exhausted-notice"
+          role="status"
+        >
+          <p className="font-medium text-foreground">
+            AI Coach is briefly unavailable.
+          </p>
+          <p className="mt-1 text-xs">
+            The upstream AI service is temporarily out of capacity. Your
+            request was not charged. Please try again shortly.
+          </p>
+        </div>
+      )}
+
+
 
       {!creditDenial && result?.credit ? (
         <div className="mt-3" data-testid="coach-credit-remaining-wrap">

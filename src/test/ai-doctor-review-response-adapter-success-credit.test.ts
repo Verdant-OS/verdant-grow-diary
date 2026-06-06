@@ -3,7 +3,7 @@
  * (S3.1), and success envelope WITHOUT `credit` still works unchanged.
  */
 import { describe, it, expect } from "vitest";
-import { adaptAiDoctorReviewResponse } from "@/lib/aiDoctorReviewResponseAdapter";
+import { adaptCreditedAiResponse } from "@/lib/aiCreditedResponseAdapter";
 
 const validResult = () => ({
   summary: "Plant shows mild leaf curl on lower fan leaves.",
@@ -19,9 +19,9 @@ const validResult = () => ({
   risk_level: "watch" as const,
 });
 
-describe("adaptAiDoctorReviewResponse — success credit passthrough (S3.1)", () => {
+describe("adaptCreditedAiResponse — success credit passthrough (S3.1)", () => {
   it("preserves `credit` on success envelope", () => {
-    const out = adaptAiDoctorReviewResponse({
+    const out = adaptCreditedAiResponse({
       ok: true,
       result: validResult(),
       credit: { remaining: 97, scope: "per_month", scope_limit: 100 },
@@ -37,7 +37,7 @@ describe("adaptAiDoctorReviewResponse — success credit passthrough (S3.1)", ()
   });
 
   it("success envelope without `credit` still works (credit undefined)", () => {
-    const out = adaptAiDoctorReviewResponse({
+    const out = adaptCreditedAiResponse({
       ok: true,
       result: validResult(),
     });
@@ -49,7 +49,7 @@ describe("adaptAiDoctorReviewResponse — success credit passthrough (S3.1)", ()
   });
 
   it("bare-result (legacy) still works and has no credit", () => {
-    const out = adaptAiDoctorReviewResponse(validResult());
+    const out = adaptCreditedAiResponse(validResult());
     expect(out.ok).toBe(true);
     if (out.ok) expect(out.credit).toBeUndefined();
   });

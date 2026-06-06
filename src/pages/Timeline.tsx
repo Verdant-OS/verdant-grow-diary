@@ -151,6 +151,20 @@ export default function Timeline() {
     }
     setEntries(rows);
 
+    // Quick Log v2 manual saves land in `grow_events`, not `diary_entries`.
+    // Fetch them in parallel for the Recent Quick Logs panel so newly
+    // saved entries appear at the top instead of being invisible until
+    // the legacy diary writer is exercised. RLS scopes to owner.
+    const { data: geData } = await supabase
+      .from("grow_events")
+      .select("id,grow_id,plant_id,tent_id,event_type,occurred_at,note,source,is_deleted")
+      .eq("grow_id", activeGrowId)
+      .eq("is_deleted", false)
+      .order("occurred_at", { ascending: false })
+      .limit(100);
+    setGrowEvents((geData as unknown as GrowEventRowForRecent[]) || []);
+
+
     // Action Queue events for this grow (read-only audit trail).
     // RLS ensures only the owner sees their events.
     const { data: aqe } = await supabase.from("action_queue_events")

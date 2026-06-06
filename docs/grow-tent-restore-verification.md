@@ -70,7 +70,7 @@ secrets.
 ## Hard rules
 
 - **Read-only.** No INSERT, UPDATE, DELETE, UPSERT, TRUNCATE, ALTER,
-  DROP, CREATE POLICY, or service-role usage anywhere in this pack.
+  DROP, CREATE-POLICY, or service-role usage anywhere in this pack.
 - **No fabricated rows.** Never use the report output as justification
   to insert placeholder/archived `grows` or `tents` rows. Real data
   must be recovered from Supabase backup/PITR only.

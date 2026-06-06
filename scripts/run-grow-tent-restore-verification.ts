@@ -9,7 +9,7 @@
  * operator can compare snapshots.
  *
  * NEVER inserts, updates, deletes, upserts, truncates, alters, drops,
- * or fabricates rows. NEVER prints secrets. NEVER uses service_role.
+ * or fabricates rows. NEVER prints secrets. NEVER uses service-role.
  *
  * Usage:
  *   VERDANT_ENV=production bun run scripts/run-grow-tent-restore-verification.ts

@@ -335,32 +335,7 @@ export default function QuickLog({
             data-testid="quicklog-context-row"
             className="grid grid-cols-2 sm:grid-cols-3 gap-2"
           >
-            <div>
-              <Label className="text-xs">Event</Label>
-              <Select value={eventType} onValueChange={setEventType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {EVENT_TYPES.map((t) => {
-                    const supported = isSupportedLegacyEventType(t.value);
-                    return (
-                      <SelectItem key={t.value} value={t.value} disabled={!supported}>
-                        <span className="inline-flex items-center gap-2">
-                          <t.icon className="h-3.5 w-3.5" />
-                          {t.label}
-                          {!supported && (
-                            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                              Coming soon
-                            </span>
-                          )}
-                        </span>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
+            <EventTypeSelector value={eventType} onValueChange={setEventType} />
             <div>
               <Label className="text-xs">Stage</Label>
               <Select value={stage} onValueChange={setStage}>

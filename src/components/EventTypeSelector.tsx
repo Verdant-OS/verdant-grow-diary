@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { EVENT_TYPES } from "@/lib/diary";
-import { isSupportedLegacyEventType } from "@/lib/quickLogEventTypeRules";
+import { isSupportedLegacyEventType } from "@/lib/legacyQuickLogUnifiedSave";
 
 export interface EventTypeSelectorProps {
   value: string;

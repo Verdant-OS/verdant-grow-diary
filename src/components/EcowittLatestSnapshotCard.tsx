@@ -59,15 +59,25 @@ export function EcowittLatestSnapshotCard(
     >
       <header className="mb-3 flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">{title}</h3>
-        {viewModel?.sourceLabel ? (
-          <span
-            data-testid="ecowitt-source-badge"
-            className="rounded-full border border-border px-2 py-0.5 text-xs font-medium text-muted-foreground"
-          >
-            {viewModel.sourceLabel.label}
-          </span>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {viewModel?.source ? (
+            <SensorSourceProvenanceBadge
+              source={viewModel.source}
+              vendor="ecowitt"
+              testId="snapshot-sensor-source-badge"
+            />
+          ) : null}
+          {viewModel?.sourceLabel ? (
+            <span
+              data-testid="ecowitt-source-badge"
+              className="rounded-full border border-border px-2 py-0.5 text-xs font-medium text-muted-foreground"
+            >
+              {viewModel.sourceLabel.label}
+            </span>
+          ) : null}
+        </div>
       </header>
+
 
       {status === "loading" ? (
         <p

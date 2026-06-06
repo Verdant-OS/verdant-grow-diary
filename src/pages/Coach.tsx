@@ -73,6 +73,7 @@ export default function Coach() {
   // Reset whenever a new ask() starts; only applied if the persistence
   // result still belongs to the most recent diagnosis (race-safe).
   const [persistedSessionId, setPersistedSessionId] = useState<string | null>(null);
+  const [creditDenial, setCreditDenial] = useState<AiCreditDenial | null>(null);
   const diagnosisSeqRef = useRef(0);
 
   // --- Real grow context for AI sufficiency evaluation (presenter only) ---

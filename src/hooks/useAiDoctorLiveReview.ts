@@ -23,9 +23,10 @@ import { useCallback, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { AiDoctorReviewRequestPacket } from "@/lib/aiDoctorReviewRequestPacket";
 import {
-  adaptAiDoctorReviewResponse,
-  type AiDoctorLiveReviewFailureReason,
-} from "@/lib/aiDoctorReviewResponseAdapter";
+  adaptCreditedAiResponse,
+  type AiCreditedFailureReason,
+} from "@/lib/aiCreditedResponseAdapter";
+import { validateAiDoctorReviewResult } from "@/lib/aiDoctorReviewResultContract";
 import type { AiDoctorReviewResult } from "@/lib/aiDoctorReviewResultContract";
 import type { Classification } from "@/lib/sensorSnapshotStatusContract";
 import type { AiCreditDenial } from "@/lib/aiCreditLimitNoticeViewModel";

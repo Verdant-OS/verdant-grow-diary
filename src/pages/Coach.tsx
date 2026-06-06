@@ -408,6 +408,18 @@ export default function Coach() {
         </div>
       )}
 
+      {!creditDenial && result?.credit ? (
+        <div className="mt-3" data-testid="coach-credit-remaining-wrap">
+          <AiCreditRemainingBadge
+            credit={result.credit}
+            surface="coach"
+            data-testid="coach-credit-remaining-badge"
+          />
+        </div>
+      ) : null}
+
+
+
 
 
       {diagnosis && (

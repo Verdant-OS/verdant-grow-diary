@@ -571,9 +571,9 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
           : null,
     });
     downloadBlob(
-      buildNetworkDiagnosticsDownloadFilename(now),
-      "application/json",
       json,
+      "application/json",
+      buildNetworkDiagnosticsDownloadFilename(now),
     );
     toast({
       title: "Downloaded network diagnostics JSON",

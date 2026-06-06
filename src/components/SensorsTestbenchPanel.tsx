@@ -523,21 +523,32 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
             appear as testbench, not live.
           </p>
         )}
-        {result && (
+        {result && resultClass && (
           <div
             className="mt-2 text-xs"
             data-testid="sensors-testbench-result"
             data-status={result.status}
             data-ok={result.ok ? "true" : "false"}
+            data-category={resultClass.category}
           >
-            <div className="font-medium mb-1">
-              HTTP {result.status} · {result.ok ? "ok" : "error"}
+            <div
+              className={`font-medium mb-1 ${resultClass.isSuccess ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"}`}
+              data-testid="sensors-testbench-result-headline"
+            >
+              {resultClass.headline}
+            </div>
+            <div
+              className="text-muted-foreground mb-2"
+              data-testid="sensors-testbench-result-detail"
+            >
+              {resultClass.detail}
             </div>
             <pre className="bg-muted/40 rounded p-2 overflow-x-auto whitespace-pre-wrap break-words">
 {JSON.stringify(result.body, null, 2)}
             </pre>
           </div>
         )}
+
       </div>
     </div>
   );

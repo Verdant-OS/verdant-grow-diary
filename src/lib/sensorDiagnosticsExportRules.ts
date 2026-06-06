@@ -651,7 +651,7 @@ export function buildCanonicalIngestPayloadValidation(
     if (Number.isFinite(Date.parse(capturedAt))) {
       present.push("captured_at");
     } else {
-      invalid.push({ field: "captured_at", reason: "not a parseable date" });
+      invalid.push({ field: "captured_at", reason: "malformed timestamp" });
     }
   } else {
     missing.push("captured_at");
@@ -671,22 +671,40 @@ export function buildCanonicalIngestPayloadValidation(
   }
 
   const readings = (p.readings ?? p.metrics) as unknown;
-  if (readings && typeof readings === "object" && !Array.isArray(readings)) {
-    const entries = Object.entries(readings as Record<string, unknown>);
-    const validOnes = entries.filter(
-      ([, v]) =>
-        (typeof v === "number" && Number.isFinite(v)) ||
-        (typeof v === "string" && v.length > 0),
-    );
-    readingsCount = validOnes.length;
-    if (validOnes.length > 0) {
-      present.push("readings");
+  if (readings === undefined || readings === null) {
+    missing.push("readings");
+  } else if (Array.isArray(readings)) {
+    if (readings.length === 0) {
+      invalid.push({ field: "readings", reason: "empty readings array" });
     } else {
-      invalid.push({ field: "readings", reason: "no valid reading values" });
+      // Treat array entries as scalars; count valid ones.
+      const validOnes = readings.filter(
+        (v) =>
+          (typeof v === "number" && Number.isFinite(v)) ||
+          (typeof v === "string" && v.length > 0),
+      );
+      readingsCount = validOnes.length;
+      if (validOnes.length > 0) present.push("readings");
+      else invalid.push({ field: "readings", reason: "no valid reading values" });
+    }
+  } else if (typeof readings === "object") {
+    const entries = Object.entries(readings as Record<string, unknown>);
+    if (entries.length === 0) {
+      invalid.push({ field: "readings", reason: "empty readings object" });
+    } else {
+      const validOnes = entries.filter(
+        ([, v]) =>
+          (typeof v === "number" && Number.isFinite(v)) ||
+          (typeof v === "string" && v.length > 0),
+      );
+      readingsCount = validOnes.length;
+      if (validOnes.length > 0) present.push("readings");
+      else invalid.push({ field: "readings", reason: "no valid reading values" });
     }
   } else {
-    missing.push("readings");
+    invalid.push({ field: "readings", reason: "readings must be an object" });
   }
+
 
   const rawTop = p.raw_payload;
   if (rawTop !== undefined && rawTop !== null) {

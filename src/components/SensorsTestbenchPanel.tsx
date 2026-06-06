@@ -24,7 +24,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Copy, KeyRound, Send, ShieldAlert, Activity, CheckCircle2, XCircle, Server, Trash2, Terminal, FileJson, History } from "lucide-react";
+import { Copy, KeyRound, Send, ShieldAlert, Activity, CheckCircle2, XCircle, Server, Trash2, Terminal, FileJson, History, Download, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import {
@@ -46,11 +46,16 @@ import {
   classifySensorIngestTestResult,
 } from "@/lib/sensorIngestTestResultRules";
 import {
+  buildDownloadFilename,
+  buildHistoryExport,
+  buildPowerShellIngestTestScript,
+  buildRedactedPayloadPreview,
   buildSensorIngestCurl,
   buildSensorIngestHistoryItem,
   buildSensorIngestTestPayload,
   diagnosticsExportToJson,
   diagnosticsExportToText,
+  historyExportToJson,
   SENSOR_INGEST_HISTORY_MAX,
   type SensorIngestHistoryItem,
 } from "@/lib/sensorDiagnosticsExportRules";
@@ -143,6 +148,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
   const [result, setResult] = useState<TestPayloadResult | null>(null);
   const [tokens, setTokens] = useState<BridgeTokenRow[]>([]);
   const [history, setHistory] = useState<SensorIngestHistoryItem[]>([]);
+  const [lastPayload, setLastPayload] = useState<unknown>(null);
 
   // Reset reveal/result/history when tent changes — plaintext token must
   // never be reused across tents, and history is per-tent only.
@@ -150,6 +156,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     setReveal(null);
     setResult(null);
     setHistory([]);
+    setLastPayload(null);
   }, [tentId]);
 
 
@@ -267,6 +274,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
       tentId,
       capturedAtIso: capturedAt,
     });
+    setLastPayload(payload);
     const idempotencyKey = `testbench-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     let res: Response | null = null;
@@ -389,9 +397,80 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     await safeCopy(cmd, "curl command");
   }
 
+  async function copyPowerShellIngest() {
+    const cmd = buildPowerShellIngestTestScript({
+      ingestUrl: INGEST_URL,
+      tentId,
+      bridgeTokenPlaintext: reveal,
+      idempotencyKey: `testbench-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      capturedAtIso: new Date().toISOString(),
+    });
+    await safeCopy(cmd, "PowerShell ingest test");
+  }
+
+  function buildHistoryPayload() {
+    return {
+      generated_at: new Date().toISOString(),
+      tent_id: tentId,
+      tent_name: tentName ?? null,
+      ingest_url: INGEST_URL,
+      items: history,
+    };
+  }
+
+  async function copyHistoryJson() {
+    await safeCopy(historyExportToJson(buildHistoryPayload()), "History JSON");
+  }
+
+  function downloadBlob(content: string, mime: string, filename: string) {
+    if (typeof window === "undefined") return;
+    try {
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      // Revoke after the click handler microtask so the download starts.
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch {
+      toast({
+        title: "Download unavailable — copy the content instead.",
+        variant: "destructive",
+      });
+    }
+  }
+
+  function downloadDiagnosticsJson() {
+    downloadBlob(
+      diagnosticsExportToJson(buildDiagnosticsPayload()),
+      "application/json",
+      buildDownloadFilename("verdant-sensor-diagnostics", "json", new Date()),
+    );
+  }
+
+  function downloadDiagnosticsText() {
+    downloadBlob(
+      diagnosticsExportToText(buildDiagnosticsPayload()),
+      "text/plain",
+      buildDownloadFilename("verdant-sensor-diagnostics", "txt", new Date()),
+    );
+  }
+
+  function downloadHistoryJson() {
+    downloadBlob(
+      historyExportToJson(buildHistoryPayload()),
+      "application/json",
+      buildDownloadFilename("verdant-sensor-ingest-history", "json", new Date()),
+    );
+  }
+
   function clearHistory() {
     setHistory([]);
   }
+
 
 
   if (!tentId) {
@@ -467,12 +546,38 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
             >
               <Terminal className="size-3 mr-1" /> curl
             </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={copyPowerShellIngest}
+              data-testid="sensors-diag-copy-powershell-ingest"
+              title="Contains token if copied during reveal. Do not paste into chat, screenshots, or git."
+            >
+              <Terminal className="size-3 mr-1" /> PowerShell
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={downloadDiagnosticsJson}
+              data-testid="sensors-diag-download-json"
+            >
+              <Download className="size-3 mr-1" /> .json
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={downloadDiagnosticsText}
+              data-testid="sensors-diag-download-text"
+            >
+              <Download className="size-3 mr-1" /> .txt
+            </Button>
           </div>
         </div>
         <p className="text-[11px] text-muted-foreground mb-2">
-          Exports contain safe identity only. The curl button includes the
-          bridge token only while the one-time reveal is in memory — do not
-          paste it into chat, screenshots, or git. Revoke any token that leaks.
+          Exports contain safe identity only. The curl and PowerShell buttons
+          include the bridge token only while the one-time reveal is in memory
+          — do not paste them into chat, screenshots, or git. Revoke any token
+          that leaks.
         </p>
 
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
@@ -677,24 +782,68 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
           </div>
         )}
 
+        <details
+          className="mt-3 border-t border-border/40 pt-2 text-xs"
+          data-testid="sensors-testbench-payload-preview"
+        >
+          <summary className="cursor-pointer font-medium flex items-center gap-1">
+            <Eye className="size-3" />
+            Canonical ingest payload used for last test
+          </summary>
+          {lastPayload ? (
+            <pre
+              className="bg-muted/40 rounded p-2 mt-2 overflow-x-auto whitespace-pre-wrap break-words"
+              data-testid="sensors-testbench-payload-preview-body"
+            >
+{buildRedactedPayloadPreview(lastPayload)}
+            </pre>
+          ) : (
+            <p
+              className="text-muted-foreground mt-2"
+              data-testid="sensors-testbench-payload-preview-empty"
+            >
+              No test payload sent yet. Mint a token and run “Send test payload”
+              to preview the exact JSON Verdant submits.
+            </p>
+          )}
+        </details>
+
         {history.length > 0 && (
           <div
             className="mt-3 border-t border-border/40 pt-2"
             data-testid="sensors-testbench-history"
           >
-            <div className="flex items-center justify-between mb-1 gap-2">
+            <div className="flex flex-wrap items-center justify-between mb-1 gap-2">
               <div className="text-xs font-medium flex items-center gap-1">
                 <History className="size-3" />
                 Local test history — clears on refresh
               </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={clearHistory}
-                data-testid="sensors-testbench-history-clear"
-              >
-                <Trash2 className="size-3 mr-1" /> Clear
-              </Button>
+              <div className="flex gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={copyHistoryJson}
+                  data-testid="sensors-testbench-history-copy-json"
+                >
+                  <FileJson className="size-3 mr-1" /> Copy JSON
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={downloadHistoryJson}
+                  data-testid="sensors-testbench-history-download-json"
+                >
+                  <Download className="size-3 mr-1" /> Download
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={clearHistory}
+                  data-testid="sensors-testbench-history-clear"
+                >
+                  <Trash2 className="size-3 mr-1" /> Clear
+                </Button>
+              </div>
             </div>
             <ul className="space-y-1">
               {history.map((h) => (

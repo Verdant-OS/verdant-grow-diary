@@ -263,3 +263,112 @@ export function buildSensorIngestHistoryItem(
 }
 
 export const SENSOR_INGEST_HISTORY_MAX = 20;
+
+/**
+ * Pretty-print the canonical ingest payload used for the last test. Defensive
+ * token redaction in case a caller embedded a stray vbt_ string. Never
+ * includes Authorization headers — the input is the JSON body only.
+ */
+export function buildRedactedPayloadPreview(payload: unknown): string {
+  return redactTokens(JSON.stringify(payload, null, 2));
+}
+
+export interface BuildPowerShellIngestInput {
+  ingestUrl: string;
+  tentId: string | null;
+  bridgeTokenPlaintext: string | null;
+  idempotencyKey: string;
+  capturedAtIso: string;
+}
+
+/**
+ * Windows PowerShell Invoke-RestMethod script for the active ingest endpoint.
+ * Embeds the real token only when the caller passes the one-time reveal;
+ * otherwise renders a safe placeholder.
+ */
+export function buildPowerShellIngestTestScript(
+  input: BuildPowerShellIngestInput,
+): string {
+  const tent = input.tentId && input.tentId.length > 0 ? input.tentId : "<TENT-UUID>";
+  const token =
+    input.bridgeTokenPlaintext && input.bridgeTokenPlaintext.startsWith("vbt_")
+      ? input.bridgeTokenPlaintext
+      : "<vbt_… mint a token to reveal>";
+  const payload = buildSensorIngestTestPayload({
+    tentId: tent,
+    capturedAtIso: input.capturedAtIso,
+  });
+  const payloadJson = JSON.stringify(payload, null, 2);
+  return [
+    `$headers = @{`,
+    `  "Content-Type"    = "application/json"`,
+    `  "Authorization"   = "Bearer ${token}"`,
+    `  "Idempotency-Key" = "${input.idempotencyKey}"`,
+    `}`,
+    ``,
+    `$body = @'`,
+    payloadJson,
+    `'@`,
+    ``,
+    `Invoke-RestMethod -Method Post -Uri "${input.ingestUrl}" -Headers $headers -Body $body`,
+  ].join("\n");
+}
+
+export interface BuildHistoryExportInput {
+  generated_at: string;
+  tent_id: string | null;
+  tent_name: string | null;
+  ingest_url: string | null;
+  items: SensorIngestHistoryItem[];
+}
+
+export interface HistoryExport extends BuildHistoryExportInput {
+  items: SensorIngestHistoryItem[];
+}
+
+export function buildHistoryExport(
+  input: BuildHistoryExportInput,
+): HistoryExport {
+  return {
+    generated_at: input.generated_at,
+    tent_id: input.tent_id,
+    tent_name: input.tent_name,
+    ingest_url: input.ingest_url,
+    // newest first; defensively reshape to drop any unexpected fields
+    items: input.items.map((h) => ({
+      id: h.id,
+      attempted_at: h.attempted_at,
+      request_url: h.request_url,
+      idempotency_key: h.idempotency_key,
+      http_status: h.http_status,
+      classification: h.classification,
+      headline: h.headline,
+      detail: h.detail,
+      body: h.body,
+      inserted: h.inserted,
+      skipped_duplicate: h.skipped_duplicate,
+      rejected_count: h.rejected_count,
+    })),
+  };
+}
+
+export function historyExportToJson(input: BuildHistoryExportInput): string {
+  return redactTokens(JSON.stringify(buildHistoryExport(input), null, 2));
+}
+
+/**
+ * Deterministic, filesystem-safe filename like:
+ *   verdant-sensor-diagnostics-20260606-180000.json
+ */
+export function buildDownloadFilename(
+  prefix: string,
+  ext: "json" | "txt",
+  date: Date,
+): string {
+  const safePrefix = prefix.replace(/[^a-zA-Z0-9-_]/g, "-").replace(/-+/g, "-");
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const stamp =
+    `${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}` +
+    `-${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}${pad(date.getUTCSeconds())}`;
+  return `${safePrefix}-${stamp}.${ext}`;
+}

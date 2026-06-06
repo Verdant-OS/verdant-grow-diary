@@ -49,7 +49,6 @@ import {
   buildCanonicalIngestPayloadValidation,
   buildDiagnosticsBundleFiles,
   buildDownloadFilename,
-  buildDownloadFilename,
   buildPowerShellCopyWarningState,
   buildPowerShellIngestTestScript,
   buildRedactedPayloadPreview,

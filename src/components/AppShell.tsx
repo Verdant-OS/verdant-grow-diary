@@ -17,7 +17,9 @@ import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 
 
 export default function AppShell() {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, signOut: _signOut } = useAuth();
+  // Protected-route boundary: re-validate session against the auth server.
+  useRequireAuth("/auth");
   // Real persisted alerts (open only). RLS-scoped to the signed-in user.
   // Replaces the prior mock badge to remove the demo-vs-live mismatch.
   const { alerts: openAlerts } = useAlertsList({ status: "open" });

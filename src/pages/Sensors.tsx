@@ -11,6 +11,7 @@ import SensorBridgeHealthCard from "@/components/SensorBridgeHealthCard";
 import TentCsvImportCard from "@/components/TentCsvImportCard";
 import EnvironmentCsvImportLauncher from "@/components/EnvironmentCsvImportLauncher";
 import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
+import SensorsTestbenchPanel from "@/components/SensorsTestbenchPanel";
 import { useGrowTents, useGrowSensorReadings } from "@/hooks/useGrowData";
 import { useTents as useTentRows } from "@/hooks/use-tents";
 import { classifyGrowDataSource } from "@/lib/growDataSourceLabelRules";
@@ -192,6 +193,14 @@ export default function Sensors() {
       <div className="mt-4 max-w-xl">
         <SensorBridgeHealthCard />
       </div>
+      {manualTents.find((t) => t.id === tentId) && (
+        <div className="mt-4 max-w-2xl">
+          <SensorsTestbenchPanel
+            tentId={tentId}
+            tentName={selectedTent?.name ?? null}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -892,6 +892,111 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
           </div>
         )}
 
+        {responseInspector && (
+          <div
+            className="mt-3 border-t border-border/40 pt-2 text-xs"
+            data-testid="sensors-testbench-response-inspector"
+            data-kind={responseInspector.kind}
+            data-status={responseInspector.http_status}
+            data-classification={responseInspector.classification}
+          >
+            <div className="font-medium mb-1 flex items-center gap-2">
+              <Eye className="size-3" />
+              Response inspector
+              <Badge variant="outline" className="text-[10px]">
+                HTTP {responseInspector.http_status}
+              </Badge>
+              <Badge variant="outline" className="text-[10px]">
+                {responseInspector.classification}
+              </Badge>
+              <Badge variant="outline" className="text-[10px]">
+                {responseInspector.kind}
+              </Badge>
+            </div>
+            {responseInspector.note && (
+              <div className="text-muted-foreground mb-1">
+                {responseInspector.note}
+              </div>
+            )}
+            {responseInspector.fields.length > 0 && (
+              <ul
+                className="font-mono text-[11px] bg-muted/40 rounded p-2 space-y-0.5"
+                data-testid="sensors-testbench-response-inspector-fields"
+              >
+                {responseInspector.fields.map((f, i) => (
+                  <li
+                    key={`${f.path}-${i}`}
+                    className="flex flex-wrap gap-x-2"
+                    data-testid="sensors-testbench-response-inspector-field"
+                    data-path={f.path}
+                    data-redacted={f.redacted ? "true" : "false"}
+                  >
+                    <span className="text-muted-foreground">{f.path}</span>
+                    <span className="text-muted-foreground">({f.type})</span>
+                    <span className={f.redacted ? "text-amber-700 dark:text-amber-300" : ""}>
+                      {f.preview}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {/* Canonical payload validation summary — gates preview/copy/export. */}
+        <div
+          className="mt-3 border-t border-border/40 pt-2 text-xs"
+          data-testid="sensors-testbench-canonical-validation"
+          data-ready={canonicalReady ? "true" : "false"}
+        >
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <span className="font-medium">Canonical payload</span>
+            <Badge
+              variant="outline"
+              className={
+                canonicalReady
+                  ? "text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
+                  : "text-amber-700 dark:text-amber-300 border-amber-500/40"
+              }
+              data-testid="sensors-testbench-canonical-validation-badge"
+            >
+              {canonicalReady ? "Ready" : "Not ready"}
+            </Badge>
+            <span className="text-muted-foreground">
+              {canonicalValidation.readingsCount} reading
+              {canonicalValidation.readingsCount === 1 ? "" : "s"}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+            <div data-testid="sensors-testbench-canonical-present">
+              <div className="text-muted-foreground">present</div>
+              <div>{canonicalValidation.present.join(", ") || "—"}</div>
+            </div>
+            <div data-testid="sensors-testbench-canonical-missing">
+              <div className="text-muted-foreground">missing</div>
+              <div>{canonicalValidation.missing.join(", ") || "—"}</div>
+            </div>
+            <div data-testid="sensors-testbench-canonical-invalid">
+              <div className="text-muted-foreground">invalid</div>
+              <div>
+                {canonicalValidation.invalid
+                  .map((i) => `${i.field}: ${i.reason}`)
+                  .join("; ") || "—"}
+              </div>
+            </div>
+          </div>
+          {!canonicalReady && (
+            <p
+              className="mt-1 text-amber-700 dark:text-amber-300"
+              data-testid="sensors-testbench-canonical-helper"
+            >
+              Preview, curl, PowerShell, history exports, and bundle download
+              are disabled until source, captured_at, tent_id, confidence, and
+              at least one valid reading are present.
+            </p>
+          )}
+        </div>
+
         <details
           className="mt-3 border-t border-border/40 pt-2 text-xs"
           data-testid="sensors-testbench-payload-preview"
@@ -900,7 +1005,14 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
             <Eye className="size-3" />
             Canonical ingest payload used for last test
           </summary>
-          {lastPayload ? (
+          {!canonicalReady ? (
+            <p
+              className="text-amber-700 dark:text-amber-300 mt-2"
+              data-testid="sensors-testbench-payload-preview-blocked"
+            >
+              Preview disabled — {canonicalDisabledHint}
+            </p>
+          ) : lastPayload ? (
             <pre
               className="bg-muted/40 rounded p-2 mt-2 overflow-x-auto whitespace-pre-wrap break-words"
               data-testid="sensors-testbench-payload-preview-body"
@@ -917,6 +1029,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
             </p>
           )}
         </details>
+
 
         {history.length > 0 && (
           <div

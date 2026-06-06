@@ -27,7 +27,7 @@ import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
-import { buildActionRowAriaLabel, buildActionButtonAriaLabel, buildStatusBadgeAriaLabel } from "@/lib/actionQueueRowView";
+import { buildActionRowAriaLabel, buildActionButtonAriaLabel, buildStatusBadgeAriaLabel, sanitizeActionCopy } from "@/lib/actionQueueRowView";
 import { actionDetailPath, actionsPath, aiDoctorSessionDetailPath, alertDetailPath } from "@/lib/routes";
 import { toast } from "sonner";
 import {
@@ -802,8 +802,8 @@ export default function ActionQueue() {
                         {row.target_metric ?? row.target_device}
                       </span>
                     </div>
-                    <p className="text-sm mt-1">{row.suggested_change}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{stripBackPointerTokens(row.reason)}</p>
+                    <p className="text-sm mt-1">{sanitizeActionCopy(row.suggested_change)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{sanitizeActionCopy(stripBackPointerTokens(row.reason))}</p>
                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                       <AiDoctorSessionLink row={row} />
                       <LinkedAlertLink row={row} />
@@ -923,7 +923,7 @@ export default function ActionQueue() {
                   )}
 
 
-                  <span className="truncate flex-1">{row.suggested_change}</span>
+                  <span className="truncate flex-1">{sanitizeActionCopy(row.suggested_change)}</span>
                   <h3 id={titleId} className="text-xs text-muted-foreground m-0 font-normal">{row.action_type}</h3>
                   {(() => {
                     const disabled = busyId === row.id;

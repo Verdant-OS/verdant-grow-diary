@@ -35,6 +35,7 @@ import DashboardPendingOutcomeReviewsCard from "@/components/DashboardPendingOut
 import SafeByDesignNotice from "@/components/SafeByDesignNotice";
 import DashboardSensorHealthSummary from "@/components/DashboardSensorHealthSummary";
 import { buildDashboardSensorHealthSummary } from "@/lib/dashboardSensorHealthViewModel";
+import { sanitizeActionCopy } from "@/lib/actionQueueRowView";
 import {
   APPROVAL_QUEUE_EMPTY_COPY,
   mapRiskToSeverity,
@@ -1358,7 +1359,7 @@ export default function Dashboard() {
                           {a.risk_level} risk
                         </Badge>
                         <span className="text-xs font-medium truncate">
-                          {a.suggested_change}
+                          {sanitizeActionCopy(a.suggested_change)}
                         </span>
                         <span className="ml-auto text-xs text-muted-foreground">
                           {formatDistanceToNow(new Date(a.created_at), {
@@ -1395,7 +1396,7 @@ export default function Dashboard() {
                       </div>
                       {a.reason && (
                         <p className="text-xs mt-2 italic text-muted-foreground">
-                          {a.reason}
+                          {sanitizeActionCopy(a.reason)}
                         </p>
                       )}
                       <div className="mt-2 flex items-center gap-2 flex-wrap">
@@ -1407,7 +1408,7 @@ export default function Dashboard() {
                         >
                           <Link
                             to={actionDetailPath(a.id)}
-                            aria-label={`Review and approve: ${a.suggested_change}`}
+                            aria-label={`Review and approve: ${sanitizeActionCopy(a.suggested_change)}`}
                             title="Approval-only — no device control is executed"
                           >
                             Review &amp; Approve
@@ -1421,7 +1422,7 @@ export default function Dashboard() {
                         >
                           <Link
                             to={actionDetailPath(a.id)}
-                            aria-label={`Dismiss: ${a.suggested_change}`}
+                            aria-label={`Dismiss: ${sanitizeActionCopy(a.suggested_change)}`}
                             title="Opens the action detail to record a dismissal"
                           >
                             Dismiss

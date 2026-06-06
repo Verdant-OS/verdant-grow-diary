@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
 
       if (plantIds.length) {
         const { data: p } = await supabase
-          .from("plants").select("id,name,strain,stage,health").in("id", plantIds);
+          .from("plants").select("id,name,strain,stage,health,medium,pot_size").in("id", plantIds);
         (p ?? []).forEach((row: Record<string, unknown>) => plantsById.set(row.id as string, row));
       }
       if (tentIds.length) {

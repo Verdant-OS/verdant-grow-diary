@@ -76,6 +76,8 @@ export default function QuickLog({
   const { user } = useAuth();
   const { grows, activeGrow, activeGrowId, setActiveGrowId } = useGrows();
   const { data: plants = [] } = usePlants();
+  const { data: activeTents = [] } = useTents();
+  const tentSetupRequired = shouldRequireFirstTentSetup(activeTents);
   const queryClient = useQueryClient();
   const { save: saveViaRpc } = useQuickLogV2Save();
 

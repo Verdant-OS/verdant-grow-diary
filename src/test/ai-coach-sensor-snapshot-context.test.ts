@@ -217,7 +217,7 @@ describe("ai-coach edge function — static safety + wiring scan", () => {
   });
 });
 
-describe("ai-doctor-review packet shape — regression (must NOT change in this slice)", () => {
+describe("ai-doctor-review packet shape — shared annotation helper", () => {
   const packetSrc = readFileSync(
     resolve(process.cwd(), "src/lib/aiDoctorReviewRequestPacket.ts"),
     "utf8",
@@ -230,8 +230,10 @@ describe("ai-doctor-review packet shape — regression (must NOT change in this 
     expect(packetSrc).toContain("readings");
   });
 
-  it("packet builder file was not modified to import ai-coach helper", () => {
-    expect(packetSrc).not.toContain("aiCoachSensorSnapshotContext");
-    expect(packetSrc).not.toContain("sensorSnapshotContext");
+  it("packet builder now consumes the shared ai-coach annotation helper", () => {
+    expect(packetSrc).toContain("aiCoachSensorSnapshotContext");
+    expect(packetSrc).toContain("buildAiCoachSensorSnapshotContext");
+    expect(packetSrc).toContain("recentSensorSnapshotAnnotation");
   });
 });
+

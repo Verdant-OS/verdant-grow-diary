@@ -1359,7 +1359,7 @@ export default function Dashboard() {
                           {a.risk_level} risk
                         </Badge>
                         <span className="text-xs font-medium truncate">
-                          {a.suggested_change}
+                          {sanitizeActionCopy(a.suggested_change)}
                         </span>
                         <span className="ml-auto text-xs text-muted-foreground">
                           {formatDistanceToNow(new Date(a.created_at), {

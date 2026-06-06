@@ -690,11 +690,13 @@ export default function QuickLog({
             );
           })()}
 
-          <QuickLogSensorSnapshotStrip
-            growId={activeGrowId}
-            tentId={selectedPlant?.tent_id ?? null}
-            attached={snapshot && !!selectedPlant}
-          />
+          {!tentSetupRequired && (
+            <QuickLogSensorSnapshotStrip
+              growId={activeGrowId}
+              tentId={selectedPlant?.tent_id ?? null}
+              attached={snapshot && !!selectedPlant}
+            />
+          )}
 
           <Button
             type="submit"

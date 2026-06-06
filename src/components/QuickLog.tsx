@@ -641,7 +641,12 @@ export default function QuickLog({
             attached={snapshot && !!selectedPlant}
           />
 
-          <Button type="submit" disabled={busy} className="gradient-leaf text-primary-foreground">
+          <Button
+            type="submit"
+            disabled={busy || !selectedPlant}
+            data-testid="quick-log-save"
+            className="gradient-leaf text-primary-foreground"
+          >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save entry"}
           </Button>
         </form>

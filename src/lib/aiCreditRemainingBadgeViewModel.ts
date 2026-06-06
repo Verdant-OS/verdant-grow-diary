@@ -50,8 +50,24 @@ function clampNonNegative(n: number): number {
   return n < 0 ? 0 : Math.floor(n);
 }
 
+export type AiCreditRemainingSurface = "doctor" | "coach";
+
+export interface AiCreditRemainingBadgeOptions {
+  /**
+   * Calling surface. Switches the noun in the label only — never changes
+   * gating, denial handling, or transport behavior. Default: "doctor"
+   * (preserves the original S3.1 copy).
+   */
+  surface?: AiCreditRemainingSurface;
+}
+
+function nounFor(surface: AiCreditRemainingSurface): string {
+  return surface === "coach" ? "AI credits" : "AI Doctor checks";
+}
+
 export function buildAiCreditRemainingBadgeViewModel(
   input: AiCreditRemainingInput | null | undefined,
+  options?: AiCreditRemainingBadgeOptions,
 ): AiCreditRemainingBadgeViewModel {
   if (!input || typeof input !== "object") return HIDDEN;
 
@@ -63,11 +79,12 @@ export function buildAiCreditRemainingBadgeViewModel(
 
   const remainingClamped = clampNonNegative(remaining);
   const limitClamped = clampNonNegative(scopeLimit);
+  const noun = nounFor(options?.surface ?? "doctor");
 
   if (scope === "per_grow") {
     return {
       visible: true,
-      label: `${remainingClamped} of ${limitClamped} AI Doctor checks left for this grow`,
+      label: `${remainingClamped} of ${limitClamped} ${noun} left for this grow`,
       scope: "per_grow",
       remaining: remainingClamped,
       scopeLimit: limitClamped,
@@ -76,7 +93,7 @@ export function buildAiCreditRemainingBadgeViewModel(
 
   return {
     visible: true,
-    label: `${remainingClamped} of ${limitClamped} AI Doctor checks left this month`,
+    label: `${remainingClamped} of ${limitClamped} ${noun} left this month`,
     helper: PER_MONTH_HELPER,
     scope: "per_month",
     remaining: remainingClamped,

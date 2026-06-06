@@ -1145,7 +1145,7 @@ export function buildSensorIngestNetworkDiagnostics(
   const evidence: string[] = [];
   evidence.push(`HTTP status: ${httpStatus}`);
   evidence.push(`classification: ${classification}`);
-  if (errorMessage) evidence.push(`error message: ${errorMessage}`);
+  if (safeErrorMessage) evidence.push(`error message: ${safeErrorMessage}`);
   if (requestMethod) evidence.push(`request method: ${requestMethod}`);
   evidence.push(`resolved ingest URL: ${resolvedEndpoint}`);
   evidence.push(`browser origin: ${appOriginDisplay}`);

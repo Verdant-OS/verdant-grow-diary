@@ -63,6 +63,7 @@ export default function PlantQuickLog({
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const libraryFileRef = useRef<HTMLInputElement | null>(null);
   const { data: logs } = usePlantManualSensorLogs(open ? plantId : null);
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -92,6 +93,7 @@ export default function PlantQuickLog({
     setSensors(EMPTY_SENSORS);
     setError(null);
     if (fileRef.current) fileRef.current.value = "";
+    if (libraryFileRef.current) libraryFileRef.current.value = "";
   }
 
   function handleOpenChange(next: boolean) {
@@ -108,6 +110,7 @@ export default function PlantQuickLog({
   function clearPhoto() {
     handleFileSelected(null);
     if (fileRef.current) fileRef.current.value = "";
+    if (libraryFileRef.current) libraryFileRef.current.value = "";
   }
 
   const canSave = note.trim().length > 0 && !busy && !!growId;
@@ -215,41 +218,52 @@ export default function PlantQuickLog({
 
         <form onSubmit={handleSave} className="grid gap-4 mt-4">
           {/* 1. Photo */}
-          <div
-            className="relative aspect-[4/3] w-full rounded-xl border-2 border-dashed border-border/60 overflow-hidden bg-secondary/30 hover:border-primary/60 transition"
-            data-testid="plant-quick-log-photo-zone"
-          >
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="absolute inset-0 h-full w-full flex flex-col items-center justify-center gap-2 text-muted-foreground"
-              aria-label="Tap to add photo"
-            >
-              {photoPreview ? (
+          <div className="grid gap-2" data-testid="plant-quick-log-photo-zone">
+            {photoPreview ? (
+              <div className="relative aspect-[4/3] w-full rounded-xl border-2 border-dashed border-border/60 overflow-hidden bg-secondary/30">
                 <img
                   src={photoPreview}
                   alt="Selected"
                   className="h-full w-full object-cover"
                   data-testid="plant-quick-log-photo-preview"
                 />
-              ) : (
-                <>
-                  <Camera className="h-10 w-10" />
-                  <span className="text-sm">Tap to Add Photo</span>
-                  <span className="text-xs text-muted-foreground/70">Optional</span>
-                </>
-              )}
-            </button>
-            {photoPreview && (
-              <button
-                type="button"
-                onClick={clearPhoto}
-                aria-label="Remove photo"
-                data-testid="plant-quick-log-photo-remove"
-                className="absolute top-2 right-2 z-10 rounded-full bg-background/85 backdrop-blur p-1.5 border border-border/60 hover:bg-background"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
+                <button
+                  type="button"
+                  onClick={clearPhoto}
+                  aria-label="Remove photo"
+                  data-testid="plant-quick-log-photo-remove"
+                  className="absolute top-2 right-2 z-10 rounded-full bg-background/85 backdrop-blur p-1.5 border border-border/60 hover:bg-background"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : (
+              <div className="grid gap-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => fileRef.current?.click()}
+                    data-testid="plant-quick-log-take-photo-button"
+                    className="h-12"
+                  >
+                    <Camera className="h-4 w-4 mr-2" aria-hidden="true" />
+                    Take Photo
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => libraryFileRef.current?.click()}
+                    data-testid="plant-quick-log-choose-library-button"
+                    className="h-12"
+                  >
+                    Choose from Library
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Add a new photo or pick one already on your phone. Optional.
+                </p>
+              </div>
             )}
             <input
               ref={fileRef}
@@ -257,10 +271,23 @@ export default function PlantQuickLog({
               accept="image/*"
               capture="environment"
               className="hidden"
+              aria-hidden="true"
+              tabIndex={-1}
               onChange={(e) => handleFileSelected(e.target.files?.[0] ?? null)}
               data-testid="plant-quick-log-photo-input"
             />
+            <input
+              ref={libraryFileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              aria-hidden="true"
+              tabIndex={-1}
+              onChange={(e) => handleFileSelected(e.target.files?.[0] ?? null)}
+              data-testid="plant-quick-log-photo-library-input"
+            />
           </div>
+
 
           {/* 2. Grower Notes (required) */}
           <div className="grid gap-1.5">

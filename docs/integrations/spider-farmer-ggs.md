@@ -2,7 +2,7 @@
 
 **Status:** Experimental read-only GGS-compatible bridge contract.
 Mapping rules + documentation only. No transport connection, no UI,
-no writes, no device control. **Not production-ready.**
+no writes, no device control. **Not for production use.**
 
 Verdant's Spider Farmer GGS support is **strictly read-only**. We
 ingest sensor readings that arrive through a local bridge and turn

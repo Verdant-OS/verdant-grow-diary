@@ -23,6 +23,7 @@ import { buildAiDoctorReviewRequestPacket } from "@/lib/aiDoctorReviewRequestPac
 import { useAiDoctorLiveReview } from "@/hooks/useAiDoctorLiveReview";
 import AiDoctorReviewResultPreview from "@/components/AiDoctorReviewResultPreview";
 import AiCreditLimitNotice from "@/components/AiCreditLimitNotice";
+import AiCreditRemainingBadge from "@/components/AiCreditRemainingBadge";
 import { useSensorBridgeHealth } from "@/hooks/useSensorBridgeHealth";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import {
@@ -219,6 +220,12 @@ export default function PlantDetailAiDoctorLiveReview({
           >
             {AI_DOCTOR_LIVE_REVIEW_VALIDATED_LABEL}
           </p>
+          {review.creditRemaining ? (
+            <AiCreditRemainingBadge
+              credit={review.creditRemaining}
+              data-testid="plant-ai-doctor-live-review-credit-remaining"
+            />
+          ) : null}
           <AiDoctorReviewResultPreview
             result={review.result}
             testIdPrefix="plant-detail-live"

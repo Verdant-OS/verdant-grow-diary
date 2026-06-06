@@ -33,7 +33,11 @@
     "test:quicklog-rpc-ownership": "vitest run src/test/quicklog-save-manual-rpc-ownership.test.ts src/test/quicklog-save-manual-rpc-reason-codes.test.ts src/test/quicklog-save-manual-rpc-mixed-boundary.test.ts src/test/quicklog-save-manual-rpc-ci-script.test.ts",
     "test:sensor-intelligence-safety": "node scripts/assert-sensor-intelligence-safety.mjs && vitest run src/test/sensor-intelligence-safety.test.ts",
     "test:one-tent-loop-smoke": "node scripts/run-one-tent-loop-smoke-test-audit.mjs",
-    "test:vpd-stage-normalization-ownership": "node scripts/assert-vpd-stage-normalization-ownership.mjs"
+    "test:vpd-stage-normalization-ownership": "node scripts/assert-vpd-stage-normalization-ownership.mjs",
+    "check:gamification-rls": "node scripts/check-gamification-rls.mjs",
+    "scan:gamification-direct-inserts": "node scripts/scan-gamification-direct-inserts.mjs",
+    "smoke:award-nugs": "bun run scripts/smoke-award-nugs.ts",
+    "test:security-gamification": "node scripts/scan-gamification-direct-inserts.mjs && vitest run src/test/scan-gamification-direct-inserts.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

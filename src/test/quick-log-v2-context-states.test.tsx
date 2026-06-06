@@ -193,7 +193,7 @@ describe("QuickLogV2Sheet — photo gate (not enabled)", () => {
     expect(document.querySelector('input[type="file"]')).toBeNull();
   });
 
-  it("Save is disabled when Photo action is selected", () => {
+  it("Save shows gate error and does not dispatch RPC when Photo action is selected", () => {
     plantsState.data = [
       { id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" },
     ];
@@ -201,8 +201,10 @@ describe("QuickLogV2Sheet — photo gate (not enabled)", () => {
     renderSheet();
     fireEvent.click(screen.getByRole("button", { name: /photo/i }));
     const save = screen.getByTestId("qlv2-save") as HTMLButtonElement;
-    expect(save.disabled).toBe(true);
     fireEvent.click(save);
     expect(rpcMock).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert").textContent).toMatch(
+      /Photo saving is not enabled yet/i,
+    );
   });
 });

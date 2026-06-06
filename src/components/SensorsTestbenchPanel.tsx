@@ -558,21 +558,6 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     await safeCopy(powershell, "PowerShell snippet");
   }
 
-  function downloadBlob(filename: string, mime: string, contents: string) {
-    try {
-      const blob = new Blob([contents], { type: mime });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch {
-      toast({ title: "Download failed", variant: "destructive" });
-    }
-  }
 
   function downloadNetworkDiagnosticsJson() {
     if (!networkDiagnostics) return;

@@ -180,4 +180,102 @@ describe("buildAiDoctorReviewRequestPacket", () => {
     });
     expect(packet.readiness.state).toBe("partial");
   });
+
+  it("adds source-aware annotation for a fresh manual snapshot (trust=medium, source preserved)", () => {
+    const NOW = new Date("2026-06-01T10:00:00Z");
+    const items: TimelineMemoryItem[] = [snapshot("2026-06-01T09:55:00Z")];
+    const packet = buildAiDoctorReviewRequestPacket({
+      plant: null,
+      timelineItems: items,
+      context: ctx(),
+      now: NOW,
+    });
+    const ann = packet.recentSensorSnapshotAnnotation!;
+    expect(ann).toBeTruthy();
+    expect(ann.source).toBe("manual");
+    expect(ann.stale).toBe(false);
+    expect(ann.trust).toBe("medium");
+    expect(ann.includesValues).toBe(true);
+    expect(ann.line).toContain("[source=manual");
+    expect(ann.line).toContain("trust=medium");
+  });
+
+  it("downgrades stale snapshots and emits a safety note (provenance preserved)", () => {
+    const NOW = new Date("2026-06-01T12:00:00Z");
+    // Captured 2 hours ago → stale
+    const items: TimelineMemoryItem[] = [snapshot("2026-06-01T10:00:00Z")];
+    const packet = buildAiDoctorReviewRequestPacket({
+      plant: null,
+      timelineItems: items,
+      context: ctx(),
+      now: NOW,
+    });
+    const ann = packet.recentSensorSnapshotAnnotation!;
+    expect(ann.stale).toBe(true);
+    expect(ann.trust).toBe("low");
+    expect(ann.source).toBe("manual"); // never relabeled to "stale"
+    expect(ann.safetyNotes.join(" ")).toMatch(/may not reflect current/i);
+  });
+
+  it("invalid-severity snapshots: values omitted and safety note added", () => {
+    const NOW = new Date("2026-06-01T10:00:00Z");
+    const card = snapshotCard("2026-06-01T09:55:00Z");
+    (card as { severity: string }).severity = "invalid";
+    const items: TimelineMemoryItem[] = [
+      { kind: "manual_sensor_snapshot", key: "s", occurredAt: card.capturedAt, card } as TimelineMemoryItem,
+    ];
+    const packet = buildAiDoctorReviewRequestPacket({
+      plant: null,
+      timelineItems: items,
+      context: ctx(),
+      now: NOW,
+    });
+    const ann = packet.recentSensorSnapshotAnnotation!;
+    expect(ann.source).toBe("invalid");
+    expect(ann.includesValues).toBe(false);
+    expect(ann.trust).toBe("low");
+    expect(ann.safetyNotes.length).toBeGreaterThan(0);
+    expect(ann.missingInformationHints.length).toBeGreaterThan(0);
+  });
+
+  it("no snapshot present → recentSensorSnapshotAnnotation is null", () => {
+    const packet = buildAiDoctorReviewRequestPacket({
+      plant: null,
+      timelineItems: [],
+      context: ctx(),
+    });
+    expect(packet.recentSensorSnapshotAnnotation).toBeNull();
+    expect(packet.recentSensorSnapshot).toBeNull();
+  });
+
+  it("annotation never leaks secrets / tokens / device-control wording", () => {
+    const NOW = new Date("2026-06-01T10:00:00Z");
+    const items: TimelineMemoryItem[] = [snapshot("2026-06-01T09:55:00Z")];
+    const packet = buildAiDoctorReviewRequestPacket({
+      plant: null,
+      timelineItems: items,
+      context: ctx(),
+      now: NOW,
+    });
+    const dump = JSON.stringify(packet.recentSensorSnapshotAnnotation);
+    expect(dump).not.toMatch(/service_role/i);
+    expect(dump).not.toMatch(/bearer /i);
+    expect(dump).not.toMatch(/vbt_/);
+    expect(dump).not.toMatch(/api[_-]?key/i);
+    expect(dump).not.toMatch(/\bturn (on|off)\b/i);
+    expect(dump).not.toMatch(/\bactuate\b/i);
+    expect(dump).not.toMatch(/\bautopilot\b/i);
+  });
+
+  it("deterministic: same input + same now produces byte-identical packet", () => {
+    const NOW = new Date("2026-06-01T10:00:00Z");
+    const items: TimelineMemoryItem[] = [
+      snapshot("2026-06-01T09:55:00Z"),
+      diary(0, "2026-06-01T09:50:00Z"),
+    ];
+    const a = buildAiDoctorReviewRequestPacket({ plant: null, timelineItems: items, context: ctx(), now: NOW });
+    const b = buildAiDoctorReviewRequestPacket({ plant: null, timelineItems: items, context: ctx(), now: NOW });
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+  });
 });
+

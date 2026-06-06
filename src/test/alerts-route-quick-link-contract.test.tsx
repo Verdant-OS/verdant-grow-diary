@@ -11,12 +11,22 @@
  *     the page-level scaffolding.
  *  3. Safe degradation copy is present for the unavailable/empty branches.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { alertsPath } from "@/lib/routes";
+import {
+  alertsPath,
+  alertDetailPath,
+  actionQueueAlertContextPath,
+} from "@/lib/routes";
 import { buildPlantQuickStatusView } from "@/lib/plantQuickStatusRules";
+import { APP_ROUTES } from "@/lib/appRouteManifest";
+import {
+  scanForLeakedTerms,
+  DEFAULT_FORBIDDEN_LEAK_TERMS,
+  DEFAULT_ALLOWED_LEAK_IDENTIFIERS,
+} from "./helpers/sourceLeakScanTestHelper";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
@@ -25,6 +35,23 @@ const APP = read("src/App.tsx");
 const ALERTS = read("src/pages/Alerts.tsx");
 
 vi.mock("@/components/AlertsAutoPersistForGrow", () => ({ default: () => null }));
+
+/**
+ * Reduce a concrete href (possibly with query string + concrete ids) to the
+ * manifest-shaped pattern. Examples:
+ *   /alerts?growId=grow-1        → /alerts
+ *   /alerts/abc-123              → /alerts/:alertId
+ *   /actions?alert=abc           → /actions
+ *
+ * We do NOT invent params; we map any path segment that follows
+ * `/alerts/` or `/actions/` to its manifest segment name.
+ */
+function toManifestPattern(href: string): string {
+  const base = href.split("?")[0].split("#")[0];
+  if (/^\/alerts\/[^/]+$/.test(base)) return "/alerts/:alertId";
+  if (/^\/actions\/[^/]+$/.test(base)) return "/actions/:actionId";
+  return base;
+}
 
 describe("Alerts route — quick link contract", () => {
   it("Plant Detail quick-status Alerts link target matches alertsPath helper", () => {

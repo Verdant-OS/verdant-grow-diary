@@ -94,9 +94,9 @@ describe("QuickLog compact Stage + Current Setup row", () => {
 
   it("preserves the existing stage value from the active grow", () => {
     renderWithClient(<QuickLog open onOpenChange={vi.fn()} />);
-    const dialog = screen.getByRole("dialog");
-    // Stage default = activeGrow.stage = "flower" → label rendered.
-    expect(within(dialog).getByText(/flower/i)).toBeInTheDocument();
+    const row = screen.getByTestId("quicklog-context-row");
+    // Stage default = activeGrow.stage = "flower" → trigger reflects it.
+    expect(within(row).getAllByText(/flower/i).length).toBeGreaterThan(0);
   });
 
   it("does not introduce fake live/sensor copy in the context row", () => {

@@ -134,7 +134,12 @@ export function useAiDoctorLiveReview(
         });
         return;
       }
-      setState({ status: "result", result: outcome.result, reason: null });
+      setState({
+        status: "result",
+        result: outcome.result,
+        reason: null,
+        creditRemaining: outcome.credit,
+      });
 
       // Audit-trail: explicit successful run only. Best-effort, non-blocking.
       // Skipped when there is no scope (growId is required for an

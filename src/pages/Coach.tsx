@@ -30,6 +30,7 @@ import { persistAiDoctorSession } from "@/lib/aiDoctorSessionPersistence";
 import { harmonizeDiagnosisConfidence } from "@/lib/aiDoctorConfidenceRules";
 import { actionsPath } from "@/lib/routes";
 import AiCreditLimitNotice from "@/components/AiCreditLimitNotice";
+import AiCreditRemainingBadge from "@/components/AiCreditRemainingBadge";
 import { parseAiCoachCreditDenial } from "@/lib/aiCoachCreditDenialAdapter";
 import type { AiCreditDenial } from "@/lib/aiCreditLimitNoticeViewModel";
 

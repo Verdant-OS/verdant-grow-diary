@@ -77,9 +77,16 @@ export default function AppShell() {
                     <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-background" />
                   )}
                 </Button>
-                <Button variant="ghost" size="icon" onClick={() => signOut().then(() => nav("/auth"))} aria-label="Sign out">
-                  <LogOut className="h-4 w-4" />
-                </Button>
+                <AuthStatusIndicator className="hidden sm:inline-flex" />
+                <SignOutConfirmDialog
+                  trigger={
+                    <Button variant="ghost" size="icon" aria-label="Sign out">
+                      <LogOut className="h-4 w-4" />
+                    </Button>
+                  }
+                />
+                {/* _signOut retained via useAuth for typed access; sign-out flows through SignOutConfirmDialog */}
+                {void _signOut}
               </div>
             </div>
           </header>

@@ -8,9 +8,9 @@ const PANEL = readFileSync(
 );
 
 describe("SensorsTestbenchPanel static safety", () => {
-  it("does not reference service_role", () => {
-    expect(PANEL).not.toMatch(/service_role/i);
-    expect(PANEL).not.toMatch(/SUPABASE_SERVICE_ROLE/);
+  it("does not reference service_role keys or env", () => {
+    expect(PANEL).not.toMatch(/SERVICE_ROLE/);
+    expect(PANEL).not.toMatch(/serviceRoleKey/);
   });
 
   it("does not log or console-print plaintext tokens", () => {

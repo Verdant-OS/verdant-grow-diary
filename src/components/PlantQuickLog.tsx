@@ -66,6 +66,11 @@ export default function PlantQuickLog({
   const fileRef = useRef<HTMLInputElement | null>(null);
   const libraryFileRef = useRef<HTMLInputElement | null>(null);
   const { data: logs } = usePlantManualSensorLogs(open ? plantId : null);
+  // Shared photo gate state — single source of truth for picker labels,
+  // helper copy, and input aria-labels. PlantQuickLog is not gated by
+  // gate.supported (it ships its own working diary-photos upload path);
+  // only the visible strings are sourced from the helper.
+  const photoGate = useMemo(() => buildQuickLogPhotoGateState(), []);
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);

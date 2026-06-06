@@ -1046,7 +1046,9 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
                   size="sm"
                   variant="outline"
                   onClick={copyHistoryJson}
+                  disabled={!canonicalReady}
                   data-testid="sensors-testbench-history-copy-json"
+                  title={canonicalDisabledHint ?? undefined}
                 >
                   <FileJson className="size-3 mr-1" /> Copy JSON
                 </Button>
@@ -1054,10 +1056,13 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
                   size="sm"
                   variant="outline"
                   onClick={downloadHistoryJson}
+                  disabled={!canonicalReady}
                   data-testid="sensors-testbench-history-download-json"
+                  title={canonicalDisabledHint ?? undefined}
                 >
                   <Download className="size-3 mr-1" /> Download
                 </Button>
+
                 <Button
                   size="sm"
                   variant="ghost"

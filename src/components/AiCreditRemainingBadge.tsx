@@ -8,18 +8,22 @@
 import {
   buildAiCreditRemainingBadgeViewModel,
   type AiCreditRemainingInput,
+  type AiCreditRemainingSurface,
 } from "@/lib/aiCreditRemainingBadgeViewModel";
 
 export interface AiCreditRemainingBadgeProps {
   credit: AiCreditRemainingInput | null | undefined;
+  /** Surface noun: "doctor" (default) → "AI Doctor checks"; "coach" → "AI credits". */
+  surface?: AiCreditRemainingSurface;
   "data-testid"?: string;
 }
 
 export default function AiCreditRemainingBadge({
   credit,
+  surface,
   "data-testid": testId = "ai-credit-remaining-badge",
 }: AiCreditRemainingBadgeProps) {
-  const vm = buildAiCreditRemainingBadgeViewModel(credit);
+  const vm = buildAiCreditRemainingBadgeViewModel(credit, { surface });
   if (!vm.visible) return null;
 
   return (

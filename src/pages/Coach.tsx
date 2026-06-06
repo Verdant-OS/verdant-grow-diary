@@ -30,6 +30,7 @@ import { persistAiDoctorSession } from "@/lib/aiDoctorSessionPersistence";
 import { harmonizeDiagnosisConfidence } from "@/lib/aiDoctorConfidenceRules";
 import { actionsPath } from "@/lib/routes";
 import AiCreditLimitNotice from "@/components/AiCreditLimitNotice";
+import AiCreditRemainingBadge from "@/components/AiCreditRemainingBadge";
 import { parseAiCoachCreditDenial } from "@/lib/aiCoachCreditDenialAdapter";
 import type { AiCreditDenial } from "@/lib/aiCreditLimitNoticeViewModel";
 
@@ -55,6 +56,13 @@ interface CoachResponse {
   sparse?: boolean;
   empty?: boolean;
   error?: string;
+  /** Post-success credit envelope (S3.1 Coach parity). Optional + defensive. */
+  credit?: {
+    remaining?: number | null;
+    scope?: string | null;
+    scope_limit?: number | null;
+    period_key?: string | null;
+  };
 }
 
 export default function Coach() {
@@ -399,6 +407,18 @@ export default function Coach() {
           />
         </div>
       )}
+
+      {!creditDenial && result?.credit ? (
+        <div className="mt-3" data-testid="coach-credit-remaining-wrap">
+          <AiCreditRemainingBadge
+            credit={result.credit}
+            surface="coach"
+            data-testid="coach-credit-remaining-badge"
+          />
+        </div>
+      ) : null}
+
+
 
 
 

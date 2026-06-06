@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
     .eq("user_id", userId)
     .select("id")
     .maybeSingle();
-  if (updErr) return json({ error: "update_failed", detail: updErr.message }, 400);
+  if (updErr) { console.error("revoke-bridge-token update_failed", updErr); return json({ error: "update_failed" }, 400); }
   if (!data) return json({ error: "not_found" }, 404);
   return json({ ok: true }, 200);
 });

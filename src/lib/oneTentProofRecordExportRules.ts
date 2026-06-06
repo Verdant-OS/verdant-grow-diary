@@ -242,13 +242,14 @@ export function buildOneTentProofRecord(input: ProofRecordInput | undefined | nu
       "Review only. No live data unless explicitly source-labeled 'live'.",
     assembledAt: s(safe.assembledAt),
     scope: {
-      growId: s(scope.growId) ?? ("" as string),
-      growName: s(scope.growName) ?? ("" as string),
-      tentId: s(scope.tentId) ?? ("" as string),
-      tentName: s(scope.tentName) ?? ("" as string),
-      plantId: s(scope.plantId) ?? ("" as string),
-      plantName: s(scope.plantName) ?? ("" as string),
-      stage: s(scope.stage) ?? ("" as string),
+      growId: s(scope.growId),
+      growName: s(scope.growName),
+      tentId: s(scope.tentId),
+      tentName: s(scope.tentName),
+      plantId: s(scope.plantId),
+      plantName: s(scope.plantName),
+      stage: s(scope.stage),
+
     },
     reading: {
       metric: s(reading.metric),

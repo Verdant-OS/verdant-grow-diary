@@ -120,8 +120,10 @@ describe("QuickLog component wiring", () => {
   });
 
   it("does not gate save on validation warnings (submit not blocked)", () => {
-    // The submit Button's disabled prop should only depend on busy state.
-    expect(QUICKLOG).toMatch(/disabled=\{busy\}/);
+    // Save is gated on busy and on missing required plant context (Gate 1
+    // bug fix: visible picker and save validator must agree). It must NOT
+    // be gated on soft preview/validation warnings.
+    expect(QUICKLOG).toMatch(/disabled=\{busy\s*\|\|\s*!selectedPlant\}/);
     expect(QUICKLOG).not.toMatch(/disabled=\{[^}]*preview[^}]*\}/);
     expect(QUICKLOG).not.toMatch(/disabled=\{[^}]*hasIssues[^}]*\}/);
   });

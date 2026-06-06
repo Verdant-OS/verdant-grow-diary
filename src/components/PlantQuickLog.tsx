@@ -245,6 +245,7 @@ export default function PlantQuickLog({
                     variant="outline"
                     onClick={() => fileRef.current?.click()}
                     data-testid="plant-quick-log-take-photo-button"
+                    aria-controls="plant-quick-log-photo-input"
                     className="h-12"
                   >
                     <Camera className="h-4 w-4 mr-2" aria-hidden="true" />
@@ -255,6 +256,7 @@ export default function PlantQuickLog({
                     variant="outline"
                     onClick={() => libraryFileRef.current?.click()}
                     data-testid="plant-quick-log-choose-library-button"
+                    aria-controls="plant-quick-log-photo-library-input"
                     className="h-12"
                   >
                     Choose from Library
@@ -267,25 +269,30 @@ export default function PlantQuickLog({
             )}
             <input
               ref={fileRef}
+              id="plant-quick-log-photo-input"
+              name="plant-quick-log-photo-camera"
               type="file"
               accept="image/*"
               capture="environment"
               className="hidden"
-              aria-hidden="true"
+              aria-label="Take a new photo with your camera"
               tabIndex={-1}
               onChange={(e) => handleFileSelected(e.target.files?.[0] ?? null)}
               data-testid="plant-quick-log-photo-input"
             />
             <input
               ref={libraryFileRef}
+              id="plant-quick-log-photo-library-input"
+              name="plant-quick-log-photo-library"
               type="file"
               accept="image/*"
               className="hidden"
-              aria-hidden="true"
+              aria-label="Choose a photo from your library"
               tabIndex={-1}
               onChange={(e) => handleFileSelected(e.target.files?.[0] ?? null)}
               data-testid="plant-quick-log-photo-library-input"
             />
+
           </div>
 
 

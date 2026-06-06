@@ -12,8 +12,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   normalizeWebhookIngestPayload,
   type WebhookIngestPayload,
-} from "../../../src/lib/sensorWebhookIngestRules.ts";
-import { buildIngestAuditRecord } from "../../../src/lib/sensorIngestAuditRules.ts";
+} from "./webhookIngest.ts";
+import { buildIngestAuditRecord } from "./ingestAudit.ts";
 import {
   authenticateBearer,
   tentScopeMatches,

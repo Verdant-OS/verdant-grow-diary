@@ -282,17 +282,26 @@ export default function QuickLogV2Sheet({
           )}
 
           {form.action === "photo" && (
-            <div className="rounded-md border border-border bg-muted/30 p-3 text-sm">
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handlePhotoPick}
-                aria-label="Photo picker"
-              />
-              <p className="mt-2 text-muted-foreground">
-                Photo saving is not enabled yet.
+            <div
+              className="rounded-md border border-border bg-muted/30 p-3 text-sm"
+              role="status"
+              aria-label={buildQuickLogPhotoGateState().ariaLabel}
+              data-testid="qlv2-photo-gate"
+            >
+              <p className="font-medium text-foreground">
+                {buildQuickLogPhotoGateState().disabledTitle}
               </p>
+              <p className="mt-1 text-muted-foreground">
+                {buildQuickLogPhotoGateState().disabledCopy}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {buildQuickLogPhotoGateState().helperText}
+              </p>
+              {/*
+                TODO: Future picker should use the same two-source pattern as
+                PlantQuickLog (Take Photo + Choose from Library) once
+                QuickLogV2 photo saving is enabled.
+              */}
             </div>
           )}
 

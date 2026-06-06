@@ -80,10 +80,16 @@ function coerceCreditRemaining(v: unknown): AiCreditRemainingInput | undefined {
  * result (legacy / pre-envelope responses). On a bare success the
  * `validate` callback decides whether the payload is acceptable.
  */
-export function adaptCreditedAiResponse<T>(
+export function adaptCreditedAiResponse<T = unknown>(
   input: unknown,
-  validate: CreditedResultValidator<T>,
+  validate?: CreditedResultValidator<T>,
 ): AiCreditedOutcome<T> {
+  const validator: CreditedResultValidator<T> =
+    validate ??
+    ((c) =>
+      isPlainObject(c)
+        ? { ok: true, result: c as T }
+        : { ok: false, reason: "shape" });
   if (input == null) return { ok: false, reason: "empty" };
   if (!isPlainObject(input)) return { ok: false, reason: "shape" };
 

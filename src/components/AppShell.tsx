@@ -4,17 +4,22 @@ import { Bell, LogOut, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/store/auth";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import AppSidebar from "./AppSidebar";
 import MobileNav from "./MobileNav";
 import QuickLog, { type QuickLogPrefill } from "./QuickLog";
 import BrandLogo from "./BrandLogo";
 import GlobalFastAddButton from "./GlobalFastAddButton";
+import AuthStatusIndicator from "./AuthStatusIndicator";
+import SignOutConfirmDialog from "./SignOutConfirmDialog";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 
 
 export default function AppShell() {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading } = useAuth();
+  // Protected-route boundary: re-validate session against the auth server.
+  useRequireAuth("/auth");
   // Real persisted alerts (open only). RLS-scoped to the signed-in user.
   // Replaces the prior mock badge to remove the demo-vs-live mismatch.
   const { alerts: openAlerts } = useAlertsList({ status: "open" });
@@ -72,9 +77,15 @@ export default function AppShell() {
                     <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-background" />
                   )}
                 </Button>
-                <Button variant="ghost" size="icon" onClick={() => signOut().then(() => nav("/auth"))} aria-label="Sign out">
-                  <LogOut className="h-4 w-4" />
-                </Button>
+                <AuthStatusIndicator className="hidden sm:inline-flex" />
+                <SignOutConfirmDialog
+                  trigger={
+                    <Button variant="ghost" size="icon" aria-label="Sign out">
+                      <LogOut className="h-4 w-4" />
+                    </Button>
+                  }
+                />
+
               </div>
             </div>
           </header>

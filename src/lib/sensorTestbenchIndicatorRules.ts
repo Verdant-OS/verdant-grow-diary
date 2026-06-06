@@ -46,7 +46,6 @@ export interface SensorTestbenchClassification {
 
 const LIVE_SOURCES = new Set([
   "ecowitt",
-  "mqtt",
   "webhook",
   "webhook_generic",
   "pi_bridge",
@@ -57,6 +56,7 @@ const LIVE_SOURCES = new Set([
   "esp32_arduino_sht31",
   "esp32_esphome",
   "esp32_mqtt_bridge",
+  "mqtt",
 ]);
 
 function toDate(v: string | Date | null | undefined): Date | null {

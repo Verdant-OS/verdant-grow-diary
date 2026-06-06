@@ -1408,7 +1408,7 @@ export default function Dashboard() {
                         >
                           <Link
                             to={actionDetailPath(a.id)}
-                            aria-label={`Review and approve: ${a.suggested_change}`}
+                            aria-label={`Review and approve: ${sanitizeActionCopy(a.suggested_change)}`}
                             title="Approval-only — no device control is executed"
                           >
                             Review &amp; Approve

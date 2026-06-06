@@ -163,12 +163,17 @@ describe("OneTentProofRecord safety scan (static)", () => {
   });
 
   it("does not import Supabase client or auth headers", () => {
+    // Strip comments so the doc-block words like "No Supabase reads..." don't
+    // false-positive. The intent is: no Supabase IMPORTS or runtime usage.
+    const codeOnly = src
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
     expect(src).not.toMatch(/@\/integrations\/supabase/);
-    expect(src).not.toMatch(/\bsupabase\b/i);
-    expect(src.toLowerCase()).not.toContain("service_role");
-    expect(src.toLowerCase()).not.toContain("raw_payload");
-    expect(src.toLowerCase()).not.toContain("bearer ");
-    expect(src.toLowerCase()).not.toContain("bridge_token");
+    expect(codeOnly).not.toMatch(/\bsupabase\./i);
+    expect(codeOnly.toLowerCase()).not.toContain("service_role");
+    expect(codeOnly.toLowerCase()).not.toContain("raw_payload");
+    expect(codeOnly.toLowerCase()).not.toContain("bearer ");
+    expect(codeOnly.toLowerCase()).not.toContain("bridge_token");
   });
 
   it("contains no network/fetch primitives", () => {

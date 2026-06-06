@@ -1422,7 +1422,7 @@ export default function Dashboard() {
                         >
                           <Link
                             to={actionDetailPath(a.id)}
-                            aria-label={`Dismiss: ${a.suggested_change}`}
+                            aria-label={`Dismiss: ${sanitizeActionCopy(a.suggested_change)}`}
                             title="Opens the action detail to record a dismissal"
                           >
                             Dismiss

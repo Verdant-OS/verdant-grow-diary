@@ -284,7 +284,8 @@ Rules for diagnosis (structured view, approval-first):
     }
     if (r.status === 402) {
       await refund("upstream_402");
-      return json({ error: "AI credits exhausted. Add credits in workspace settings." }, 402);
+      console.log("ai-coach status=upstream_credit_exhausted http=200");
+      return json({ ok: false, reason: "upstream_credit_exhausted" }, 200);
     }
     if (!r.ok) {
       await refund(`upstream_${r.status}`);

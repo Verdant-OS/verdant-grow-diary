@@ -33,9 +33,9 @@ export interface RecentSensorSnapshot {
   rh: number | null;
   vpd: number | null;
   co2: number | null;
-  /** Optional device-specific label (e.g. "Shelly H&T Gen4"). Null when
-   *  unknown. Always derived through the shared pure helper — never a
-   *  duplicated mapping table. */
+  /** Optional device-specific label (e.g. an EcoWitt gateway label).
+   *  Null when unknown. Always derived through the shared pure helper —
+   *  never a duplicated mapping table. */
   deviceDetail: string | null;
 }
 

@@ -142,13 +142,13 @@ function buildAnnotationFromCard(
       projected[r.field] = r.value;
     }
   }
-  const ctx = buildAiCoachSensorSnapshotContext(projected, { now });
+  const ctx = buildAiSensorSnapshotContext(projected, { now });
   return {
-    line: ctx.line,
-    source: ctx.source,
+    line: ctx.annotationLine,
+    source: ctx.sourceLabel,
     stale: ctx.stale,
-    trust: ctx.trust,
-    includesValues: ctx.includesValues,
+    trust: ctx.trustLevel,
+    includesValues: ctx.valuesForModel !== null,
     safetyNotes: [...ctx.safetyNotes],
     missingInformationHints: [...ctx.missingInformationHints],
   };

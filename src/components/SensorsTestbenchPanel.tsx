@@ -558,6 +558,63 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     await safeCopy(powershell, "PowerShell snippet");
   }
 
+  function downloadBlob(filename: string, mime: string, contents: string) {
+    try {
+      const blob = new Blob([contents], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: "Download failed", variant: "destructive" });
+    }
+  }
+
+  function downloadNetworkDiagnosticsJson() {
+    if (!networkDiagnostics) return;
+    const now = new Date();
+    const json = buildNetworkDiagnosticsExportJson({
+      generatedAt: now.toISOString(),
+      diagnostics: networkDiagnostics,
+      lastTestResult:
+        result && resultClass
+          ? { http_status: result.status, classification: resultClass.category }
+          : null,
+    });
+    downloadBlob(
+      buildNetworkDiagnosticsDownloadFilename(now),
+      "application/json",
+      json,
+    );
+    toast({
+      title: "Downloaded network diagnostics JSON",
+      description: "Sensitive values were redacted.",
+    });
+  }
+
+  function downloadDiagnosticsRunHistoryJson() {
+    if (diagnosticsHistory.length === 0) return;
+    const now = new Date();
+    const json = sensorDiagnosticsRunHistoryToJson(
+      diagnosticsHistory,
+      now.toISOString(),
+    );
+    downloadBlob(
+      buildSensorDiagnosticsRunHistoryFilename(now),
+      "application/json",
+      json,
+    );
+  }
+
+  function clearDiagnosticsHistory() {
+    setDiagnosticsHistory([]);
+  }
+
+
   function buildDiagnosticsPayload() {
     return {
       generated_at: new Date().toISOString(),

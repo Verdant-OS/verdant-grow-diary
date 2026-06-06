@@ -421,18 +421,11 @@ export default function Coach() {
       )}
 
       {upstreamCreditExhausted && (
-        <div
-          className="mt-4 animate-fade-in rounded-md border border-border/60 bg-background/40 px-3 py-2 text-sm text-muted-foreground"
-          data-testid="coach-upstream-credit-exhausted-notice"
-          role="status"
-        >
-          <p className="font-medium text-foreground">
-            AI Coach is briefly unavailable.
-          </p>
-          <p className="mt-1 text-xs">
-            The upstream AI service is temporarily out of capacity. Your
-            request was not charged. Please try again shortly.
-          </p>
+        <div className="mt-4 animate-fade-in">
+          <AiCreditServiceDegradedNotice
+            surface="coach"
+            data-testid="coach-upstream-credit-exhausted-notice"
+          />
         </div>
       )}
 

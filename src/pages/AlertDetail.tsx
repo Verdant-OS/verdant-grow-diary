@@ -201,6 +201,7 @@ export default function AlertDetail() {
   useEffect(() => {
     let cancelled = false;
     setExistingActionId(null);
+    setExistingActionRows([]);
     if (!alert || !alert.grow_id) return;
     (async () => {
       const { data, error: probeErr } = await supabase
@@ -212,13 +213,16 @@ export default function AlertDetail() {
         .like("reason", `%[alert:${alert.id}]%`)
         .limit(1);
       if (cancelled || probeErr) return;
-      const match = (data ?? []).find((r) => actionMatchesAlert(r as never, alert));
+      const rows = (data ?? []) as ActionQueueRowForDedupe[];
+      setExistingActionRows(rows);
+      const match = rows.find((r) => actionMatchesAlert(r as never, alert));
       if (match) setExistingActionId(match.id);
     })();
     return () => {
       cancelled = true;
     };
   }, [alert]);
+
 
   // Read-only reverse provenance: list action_queue rows derived from this alert.
   useEffect(() => {

@@ -46,10 +46,13 @@ describe("adaptCreditedAiResponse", () => {
   });
 
   it("rejects raw imperative device-control content as invalid", () => {
-    const out = adaptCreditedAiResponse({
-      ...validResult(),
-      immediate_action: "Turn on the humidifier.",
-    });
+    const out = adaptCreditedAiResponse(
+      {
+        ...validResult(),
+        immediate_action: "Turn on the humidifier.",
+      },
+      validateAiDoctorReviewResult,
+    );
     expect(out.ok).toBe(false);
     if (out.ok === false) expect(out.reason).toBe("invalid");
   });

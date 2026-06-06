@@ -155,10 +155,13 @@ Deno.serve(async (req) => {
     if (grow) {
       ctxLines.push(`GROW: ${grow.name} | type=${grow.grow_type} | stage=${grow.stage} | started=${grow.started_at}`);
     }
-    if (latestSnapshot) {
-      ctxLines.push(`LATEST_SENSOR_SNAPSHOT: ${JSON.stringify(latestSnapshot)}`);
-    } else {
-      ctxLines.push("LATEST_SENSOR_SNAPSHOT: none");
+    const snapshotCtx = buildAiCoachSensorSnapshotContext(latestSnapshot);
+    ctxLines.push(snapshotCtx.line);
+    for (const note of snapshotCtx.safetyNotes) {
+      ctxLines.push(`SENSOR_SAFETY_NOTE: ${note}`);
+    }
+    for (const hint of snapshotCtx.missingInformationHints) {
+      ctxLines.push(`MISSING_INFORMATION_HINT: ${hint}`);
     }
     ctxLines.push(`ENTRY_COUNT: ${entries.length}${sparse ? " (sparse)" : ""}`);
     ctxLines.push("");
@@ -166,11 +169,16 @@ Deno.serve(async (req) => {
     for (const [i, row] of entries.entries()) {
       const plant = row.plant_id ? plantsById.get(row.plant_id) : null;
       const tent = row.tent_id ? tentsById.get(row.tent_id) : null;
+      const plantStr = plant
+        ? `plant=${plant.name}/${plant.strain ?? "?"} stage=${plant.stage} health=${plant.health}` +
+          (plant.medium ? ` medium=${plant.medium}` : "") +
+          (plant.pot_size ? ` pot_size=${plant.pot_size}` : "")
+        : null;
       const parts = [
         `#${i + 1}`,
         new Date(row.entry_at).toISOString(),
         row.stage ? `stage=${row.stage}` : null,
-        plant ? `plant=${plant.name}/${plant.strain ?? "?"} stage=${plant.stage} health=${plant.health}` : null,
+        plantStr,
         tent ? `tent=${tent.name} stage=${tent.stage} size=${tent.size ?? "?"}` : null,
         row.photo_url ? "photo=yes" : null,
         row.note ? `note="${String(row.note).slice(0, 240)}"` : null,

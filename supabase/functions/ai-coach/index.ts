@@ -242,7 +242,20 @@ Rules for diagnosis (structured view, approval-first):
 `;
 
     const userContent: Array<Record<string, unknown>> = [];
-    if (body.photoUrl) userContent.push({ type: "image_url", image_url: { url: body.photoUrl } });
+    // Only forward a photoUrl when it is a Supabase Storage signed URL on
+    // this project. Prevents arbitrary external image submission that would
+    // burn AI credits on attacker-controlled URLs.
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const allowedPhotoPrefix = supabaseUrl
+      ? `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/sign/`
+      : "";
+    const safePhotoUrl =
+      typeof body.photoUrl === "string" &&
+      allowedPhotoPrefix &&
+      body.photoUrl.startsWith(allowedPhotoPrefix)
+        ? body.photoUrl
+        : null;
+    if (safePhotoUrl) userContent.push({ type: "image_url", image_url: { url: safePhotoUrl } });
     const text = (body.question ? `QUESTION: ${body.question}\n\n` : "") + context;
     userContent.push({ type: "text", text });
 

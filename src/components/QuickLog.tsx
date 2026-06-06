@@ -436,8 +436,11 @@ export default function QuickLog({
             />
           </label>
           {snapshot && !selectedPlant && (
-            <p className="text-[11px] text-muted-foreground -mt-2">
-              Pick a plant to capture its tent's latest readings.
+            <p
+              className="text-[11px] text-muted-foreground -mt-2"
+              data-testid="quick-log-snapshot-plant-warning"
+            >
+              Choose a plant before attaching plant-specific readings.
             </p>
           )}
 

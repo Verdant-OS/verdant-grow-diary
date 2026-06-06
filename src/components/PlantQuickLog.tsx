@@ -293,7 +293,7 @@ export default function PlantQuickLog({
               type="file"
               accept="image/*"
               className="hidden"
-              aria-label="Choose a photo from your library"
+              aria-label={photoGate.libraryInputAriaLabel}
               tabIndex={-1}
               onChange={(e) => handleFileSelected(e.target.files?.[0] ?? null)}
               data-testid="plant-quick-log-photo-library-input"

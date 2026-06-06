@@ -14,9 +14,15 @@ import type { AiDoctorContextResult } from "@/lib/aiDoctorContextRules";
 import type { TimelineMemoryItem } from "@/lib/timelineFilterRules";
 import { classifyTimelineMemoryItem } from "@/lib/timelineFilterRules";
 import type { AiDoctorContextPlantSource } from "@/lib/aiDoctorContextViewModel";
+import {
+  buildAiCoachSensorSnapshotContext,
+  type AiCoachSnapshotSource,
+  type AiCoachSnapshotTrust,
+} from "@/lib/aiCoachSensorSnapshotContext";
 
 export const AI_DOCTOR_REVIEW_PACKET_EVENT_CAP = 20;
-export const AI_DOCTOR_REVIEW_PACKET_SCHEMA_VERSION = 1 as const;
+export const AI_DOCTOR_REVIEW_PACKET_SCHEMA_VERSION = 2 as const;
+
 
 export interface AiDoctorReviewRequestPlantProfile {
   strain: string | null;

@@ -911,3 +911,127 @@ export function formatSafeResponseInspectorPlainText(
   }
   return redactTokens(lines.join("\n"));
 }
+
+// ---------------------------------------------------------------------------
+// Accessibility label for the canonical readiness badge
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a screen-reader-friendly label for the readiness badge.
+ * Always prefixed with "Canonical payload validation:" so the assistive
+ * announcement is unambiguous regardless of surrounding context.
+ */
+export function buildCanonicalValidationA11yLabel(input: {
+  status: ValidationUiStatus;
+}): string {
+  switch (input.status) {
+    case "ready":
+      return "Canonical payload validation: Ready";
+    case "not_ready":
+      return "Canonical payload validation: Not ready";
+    case "no_test_yet":
+    default:
+      return "Canonical payload validation: No test yet";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Diagnostics share modal — pure helpers
+// ---------------------------------------------------------------------------
+
+export interface BuildDiagnosticsShareSummaryInput {
+  bundleFilename: string;
+  validationUi: SensorTestbenchValidationUiState;
+  lastTestResult: {
+    http_status: number;
+    classification: string;
+  } | null;
+  inspectorPlainText: string | null;
+}
+
+/**
+ * Build a single support-ready plain-text summary. Composes existing
+ * already-redacted helper outputs only (validation view-model labels +
+ * inspector plain text). Defensive token-redaction is applied at the end as
+ * belt-and-suspenders so no upstream slip can leak a plaintext token.
+ *
+ * Never includes: raw response body, Authorization headers, bridge token,
+ * service_role/anon_key/api_key/secret values. Sensitive keys in the
+ * inspector are already masked at source.
+ */
+export function buildDiagnosticsShareSummary(
+  input: BuildDiagnosticsShareSummaryInput,
+): string {
+  const { bundleFilename, validationUi, lastTestResult, inspectorPlainText } = input;
+  const lines: string[] = [];
+  lines.push("Verdant sensor diagnostics — share summary");
+  lines.push(`bundle filename: ${bundleFilename}`);
+  lines.push(
+    `canonical validation: ${validationUi.statusLabel} (${validationUi.status})`,
+  );
+  if (lastTestResult) {
+    lines.push(`last test HTTP status: ${lastTestResult.http_status}`);
+    lines.push(`classification: ${lastTestResult.classification}`);
+  } else {
+    lines.push("last test: none");
+  }
+  const missing = validationUi.summary.missing;
+  lines.push(
+    `missing fields: ${
+      missing.length === 0
+        ? "—"
+        : missing.map((m) => `${m.label} (${m.reason})`).join(", ")
+    }`,
+  );
+  const invalid = validationUi.summary.invalid;
+  lines.push(
+    `invalid fields: ${
+      invalid.length === 0
+        ? "—"
+        : invalid.map((i) => `${i.label}: ${i.reason}`).join("; ")
+    }`,
+  );
+  lines.push("");
+  lines.push("response inspector (redacted):");
+  lines.push(inspectorPlainText ?? "  (no test yet)");
+  return redactTokens(lines.join("\n"));
+}
+
+export interface DiagnosticsShareModalState {
+  bundleFilename: string;
+  statusLabel: string;
+  status: ValidationUiStatus;
+  badgeTone: "ready" | "warn" | "muted";
+  ariaLabel: string;
+  supportSummary: string;
+  redactedInspectorText: string | null;
+  canDownloadBundle: boolean;
+}
+
+/**
+ * View-model for the share-diagnostics modal. UI renders this output only.
+ */
+export function buildDiagnosticsShareModalState(input: {
+  bundleFilename: string;
+  validationUi: SensorTestbenchValidationUiState;
+  lastTestResult: { http_status: number; classification: string } | null;
+  inspectorPlainText: string | null;
+}): DiagnosticsShareModalState {
+  return {
+    bundleFilename: input.bundleFilename,
+    statusLabel: input.validationUi.statusLabel,
+    status: input.validationUi.status,
+    badgeTone: input.validationUi.badgeTone,
+    ariaLabel: buildCanonicalValidationA11yLabel({
+      status: input.validationUi.status,
+    }),
+    supportSummary: buildDiagnosticsShareSummary({
+      bundleFilename: input.bundleFilename,
+      validationUi: input.validationUi,
+      lastTestResult: input.lastTestResult,
+      inspectorPlainText: input.inspectorPlainText,
+    }),
+    redactedInspectorText: input.inspectorPlainText,
+    canDownloadBundle: !input.validationUi.actionsDisabled,
+  };
+}

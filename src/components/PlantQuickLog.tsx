@@ -93,6 +93,7 @@ export default function PlantQuickLog({
     setSensors(EMPTY_SENSORS);
     setError(null);
     if (fileRef.current) fileRef.current.value = "";
+    if (libraryFileRef.current) libraryFileRef.current.value = "";
   }
 
   function handleOpenChange(next: boolean) {

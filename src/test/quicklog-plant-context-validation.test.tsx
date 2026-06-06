@@ -26,6 +26,7 @@ vi.mock("@/store/auth", () => ({
 const grows = [{ id: "g1", name: "Tent 1", stage: "veg" }];
 const plantsData = [
   { id: "p1", name: "Blue Dream", strain: "BD", tent_id: "t1", grow_id: "g1" },
+  { id: "p2", name: "OG Kush", strain: "OG", tent_id: "t1", grow_id: "g1" },
 ];
 vi.mock("@/store/grows", () => ({
   useGrows: () => ({

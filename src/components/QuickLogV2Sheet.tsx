@@ -22,13 +22,16 @@ import {
   buildQuickLogV2TargetOptions,
   resolveQuickLogV2Target,
   shouldShowVolumeField,
-  isPhotoSavingSupported,
   EMPTY_QUICKLOG_V2_FORM,
   type QuickLogV2FormState,
   type QuickLogV2Action,
 } from "@/lib/quickLogV2Rules";
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
+import {
+  buildQuickLogPhotoGateState,
+  isQuickLogPhotoSavingSupported,
+} from "@/lib/quickLogPhotoGateRules";
 
 interface Props {
   open: boolean;

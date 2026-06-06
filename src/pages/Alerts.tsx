@@ -463,6 +463,15 @@ function AlertCard({
           >
             {sourceLabel}
           </span>
+          {(() => {
+            const derived = deriveAlertReadingSource(a);
+            return derived ? (
+              <SensorSourceProvenanceBadge
+                source={derived}
+                testId="alert-row-sensor-source-badge"
+              />
+            ) : null;
+          })()}
           <time
             className="ml-auto text-[11px] text-muted-foreground"
             dateTime={seenIso}

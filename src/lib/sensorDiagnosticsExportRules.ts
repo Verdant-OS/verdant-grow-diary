@@ -362,7 +362,7 @@ export function historyExportToJson(input: BuildHistoryExportInput): string {
  */
 export function buildDownloadFilename(
   prefix: string,
-  ext: "json" | "txt",
+  ext: "json" | "txt" | "zip",
   date: Date,
 ): string {
   const safePrefix = prefix.replace(/[^a-zA-Z0-9-_]/g, "-").replace(/-+/g, "-");
@@ -371,4 +371,345 @@ export function buildDownloadFilename(
     `${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}` +
     `-${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}${pad(date.getUTCSeconds())}`;
   return `${safePrefix}-${stamp}.${ext}`;
+}
+
+// ---------------------------------------------------------------------------
+// PowerShell copy warning state
+// ---------------------------------------------------------------------------
+
+export interface PowerShellCopyWarningState {
+  requiresConfirmation: boolean;
+  message: string;
+}
+
+/**
+ * When the one-time token reveal is in memory the PowerShell ingest script
+ * will embed it. Operators must explicitly confirm before copying so the
+ * snippet does not get pasted into tickets, chats, screenshots, or git.
+ */
+export function buildPowerShellCopyWarningState(input: {
+  hasTokenReveal: boolean;
+}): PowerShellCopyWarningState {
+  if (input.hasTokenReveal) {
+    return {
+      requiresConfirmation: true,
+      message:
+        "This PowerShell script includes a one-time bridge token. Do not paste it into tickets, chats, screenshots, or shared docs. Continue copying?",
+    };
+  }
+  return { requiresConfirmation: false, message: "" };
+}
+
+// ---------------------------------------------------------------------------
+// Diagnostics bundle files (used by client-side zip download)
+// ---------------------------------------------------------------------------
+
+export interface DiagnosticsBundleFile {
+  name: string;
+  content: string;
+}
+
+export interface BuildDiagnosticsBundleFilesInput {
+  diagnosticsJson: string;
+  diagnosticsText: string;
+  historyJson: string;
+}
+
+/**
+ * Build the file list that gets zipped into a single diagnostics bundle.
+ * Pure: assembles already-redacted strings from the existing export builders.
+ */
+export function buildDiagnosticsBundleFiles(
+  input: BuildDiagnosticsBundleFilesInput,
+): DiagnosticsBundleFile[] {
+  return [
+    { name: "diagnostics.json", content: input.diagnosticsJson },
+    { name: "diagnostics.txt", content: input.diagnosticsText },
+    { name: "history.json", content: input.historyJson },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Safe response inspector
+// ---------------------------------------------------------------------------
+
+const SENSITIVE_KEY_RE =
+  /(token|authorization|bearer|api[_-]?key|secret|password|service[_-]?role|anon[_-]?key|bridge[_-]?token)/i;
+
+export interface SafeResponseField {
+  path: string;
+  type: string;
+  preview: string;
+  redacted: boolean;
+}
+
+export interface SafeResponseInspector {
+  http_status: number;
+  classification: string;
+  kind: "json" | "text" | "empty";
+  note: string | null;
+  fields: SafeResponseField[];
+}
+
+export interface BuildSafeResponseInspectorInput {
+  status: number;
+  classification: string;
+  body: unknown;
+}
+
+/**
+ * Produce a safely-redacted, structure-only view of a response body. Keys
+ * matching token/authorization/bearer/api_key/secret/password/service_role/
+ * anon_key/bridge_token are masked at any depth. String previews are token-
+ * redacted and length-clamped. Handles JSON, non-JSON, and empty bodies.
+ */
+export function buildSafeResponseInspector(
+  input: BuildSafeResponseInspectorInput,
+): SafeResponseInspector {
+  const { status, classification, body } = input;
+  if (body === null || body === undefined) {
+    return {
+      http_status: status,
+      classification,
+      kind: "empty",
+      note: "empty response body",
+      fields: [],
+    };
+  }
+  if (typeof body === "string") {
+    const safe = redactTokens(body);
+    return {
+      http_status: status,
+      classification,
+      kind: "text",
+      note: "non-JSON response — preview only",
+      fields: [
+        {
+          path: "$",
+          type: "string",
+          preview: safe.length > 200 ? safe.slice(0, 200) + "…" : safe,
+          redacted: safe !== body,
+        },
+      ],
+    };
+  }
+  if (typeof body !== "object") {
+    return {
+      http_status: status,
+      classification,
+      kind: "text",
+      note: null,
+      fields: [
+        {
+          path: "$",
+          type: typeof body,
+          preview: String(body),
+          redacted: false,
+        },
+      ],
+    };
+  }
+  const fields: SafeResponseField[] = [];
+  const seen = new WeakSet<object>();
+  function walk(v: unknown, path: string, depth: number) {
+    if (depth > 6) {
+      fields.push({ path, type: "truncated", preview: "…", redacted: false });
+      return;
+    }
+    if (v === null) {
+      fields.push({ path, type: "null", preview: "null", redacted: false });
+      return;
+    }
+    if (Array.isArray(v)) {
+      fields.push({
+        path,
+        type: "array",
+        preview: `[${v.length}]`,
+        redacted: false,
+      });
+      v.slice(0, 10).forEach((x, i) => walk(x, `${path}[${i}]`, depth + 1));
+      return;
+    }
+    if (typeof v === "object") {
+      if (seen.has(v as object)) {
+        fields.push({ path, type: "circular", preview: "…", redacted: false });
+        return;
+      }
+      seen.add(v as object);
+      const entries = Object.entries(v as Record<string, unknown>);
+      fields.push({
+        path,
+        type: "object",
+        preview: `{${entries.length}}`,
+        redacted: false,
+      });
+      for (const [k, val] of entries) {
+        const childPath = path === "$" ? k : `${path}.${k}`;
+        if (SENSITIVE_KEY_RE.test(k)) {
+          fields.push({
+            path: childPath,
+            type: typeof val,
+            preview: "<redacted>",
+            redacted: true,
+          });
+        } else {
+          walk(val, childPath, depth + 1);
+        }
+      }
+      return;
+    }
+    if (typeof v === "string") {
+      const safe = redactTokens(v);
+      fields.push({
+        path,
+        type: "string",
+        preview: safe.length > 80 ? safe.slice(0, 80) + "…" : safe,
+        redacted: safe !== v,
+      });
+      return;
+    }
+    fields.push({
+      path,
+      type: typeof v,
+      preview: String(v),
+      redacted: false,
+    });
+  }
+  walk(body, "$", 0);
+  return {
+    http_status: status,
+    classification,
+    kind: "json",
+    note: null,
+    fields,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Canonical ingest payload validation
+// ---------------------------------------------------------------------------
+
+export type CanonicalIngestField =
+  | "source"
+  | "captured_at"
+  | "tent_id"
+  | "confidence"
+  | "readings";
+
+export interface CanonicalIngestInvalid {
+  field: CanonicalIngestField | "raw_payload";
+  reason: string;
+}
+
+export interface CanonicalIngestValidation {
+  ready: boolean;
+  present: CanonicalIngestField[];
+  missing: CanonicalIngestField[];
+  invalid: CanonicalIngestInvalid[];
+  readingsCount: number;
+}
+
+/**
+ * Validate the canonical ingest payload. Required: source, captured_at|
+ * timestamp, tent_id, confidence (top-level or under metadata), and a
+ * readings/metrics object with at least one valid numeric or string value.
+ * raw_payload is optional — flagged invalid only if present and not an
+ * object.
+ */
+export function buildCanonicalIngestPayloadValidation(
+  payload: unknown,
+): CanonicalIngestValidation {
+  const present: CanonicalIngestField[] = [];
+  const missing: CanonicalIngestField[] = [];
+  const invalid: CanonicalIngestInvalid[] = [];
+  let readingsCount = 0;
+
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return {
+      ready: false,
+      present: [],
+      missing: ["source", "captured_at", "tent_id", "confidence", "readings"],
+      invalid: [],
+      readingsCount: 0,
+    };
+  }
+  const p = payload as Record<string, unknown>;
+  const meta =
+    p.metadata && typeof p.metadata === "object" && !Array.isArray(p.metadata)
+      ? (p.metadata as Record<string, unknown>)
+      : {};
+
+  if (typeof p.source === "string" && p.source.length > 0) {
+    present.push("source");
+  } else {
+    missing.push("source");
+  }
+
+  const capturedAt =
+    p.captured_at ?? p.timestamp ?? meta.captured_at ?? meta.timestamp;
+  if (typeof capturedAt === "string" && capturedAt.length > 0) {
+    if (Number.isFinite(Date.parse(capturedAt))) {
+      present.push("captured_at");
+    } else {
+      invalid.push({ field: "captured_at", reason: "not a parseable date" });
+    }
+  } else {
+    missing.push("captured_at");
+  }
+
+  if (typeof p.tent_id === "string" && p.tent_id.length > 0) {
+    present.push("tent_id");
+  } else {
+    missing.push("tent_id");
+  }
+
+  const confidence = p.confidence ?? meta.confidence;
+  if (typeof confidence === "string" && confidence.length > 0) {
+    present.push("confidence");
+  } else {
+    missing.push("confidence");
+  }
+
+  const readings = (p.readings ?? p.metrics) as unknown;
+  if (readings && typeof readings === "object" && !Array.isArray(readings)) {
+    const entries = Object.entries(readings as Record<string, unknown>);
+    const validOnes = entries.filter(
+      ([, v]) =>
+        (typeof v === "number" && Number.isFinite(v)) ||
+        (typeof v === "string" && v.length > 0),
+    );
+    readingsCount = validOnes.length;
+    if (validOnes.length > 0) {
+      present.push("readings");
+    } else {
+      invalid.push({ field: "readings", reason: "no valid reading values" });
+    }
+  } else {
+    missing.push("readings");
+  }
+
+  const rawTop = p.raw_payload;
+  if (rawTop !== undefined && rawTop !== null) {
+    if (typeof rawTop !== "object" || Array.isArray(rawTop)) {
+      invalid.push({
+        field: "raw_payload",
+        reason: "must be an object when present",
+      });
+    }
+  } else {
+    const rawMeta = meta.raw_payload;
+    if (
+      rawMeta !== undefined &&
+      rawMeta !== null &&
+      (typeof rawMeta !== "object" || Array.isArray(rawMeta))
+    ) {
+      invalid.push({
+        field: "raw_payload",
+        reason: "must be an object when present",
+      });
+    }
+  }
+
+  const ready = missing.length === 0 && invalid.length === 0;
+  return { ready, present, missing, invalid, readingsCount };
 }

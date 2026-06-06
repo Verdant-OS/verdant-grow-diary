@@ -263,40 +263,23 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     setSending(true);
     setResult(null);
     const capturedAt = new Date().toISOString();
-    const payload = {
-      tent_id: tentId,
-      source: "ecowitt",
-      vendor: "ecowitt_windows_testbench",
-      captured_at: capturedAt,
-      metrics: {
-        temp_f: 77.4,
-        humidity_percent: 58,
-        soil_moisture_pct: 33,
-        co2_ppm: 721,
-      },
-      metadata: {
-        device_id: "verdant-ui-ingest-test",
-        confidence: "test",
-        raw_payload: {
-          temp1f: "77.4",
-          humidity1: "58",
-          soilmoisture1: "33",
-          co2: "721",
-          source: "sensors_ui_test_button",
-        },
-      },
-    };
+    const payload = buildSensorIngestTestPayload({
+      tentId,
+      capturedAtIso: capturedAt,
+    });
+    const idempotencyKey = `testbench-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     let res: Response | null = null;
     let body: unknown = null;
     let status = 0;
+    let networkError = false;
     try {
       res = await fetch(INGEST_URL, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${reveal}`,
           "Content-Type": "application/json",
-          "Idempotency-Key": `testbench-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          "Idempotency-Key": idempotencyKey,
         },
         body: JSON.stringify(payload),
       });
@@ -307,11 +290,44 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
         body = { error: "non_json_response" };
       }
     } catch (err) {
+      networkError = true;
       body = { error: "network_error", message: (err as Error).message };
     }
     setSending(false);
     setResult({ status, ok: !!res?.ok, body });
+    // Append to local history (newest first, capped). History items do not
+    // store Authorization headers or plaintext tokens.
+    const classification = classifySensorIngestTestResult({ status, body, networkError });
+    const item = buildSensorIngestHistoryItem({
+      attempted_at: capturedAt,
+      request_url: INGEST_URL,
+      idempotency_key: idempotencyKey,
+      http_status: status,
+      body,
+      classification,
+    });
+    setHistory((prev) => [item, ...prev].slice(0, SENSOR_INGEST_HISTORY_MAX));
   }
+
+  async function safeCopy(text: string, label: string) {
+    try {
+      if (!navigator.clipboard?.writeText) {
+        toast({
+          title: "Clipboard unavailable — select and copy manually.",
+          variant: "destructive",
+        });
+        return;
+      }
+      await navigator.clipboard.writeText(text);
+      toast({ title: `${label} copied` });
+    } catch {
+      toast({
+        title: "Clipboard unavailable — select and copy manually.",
+        variant: "destructive",
+      });
+    }
+  }
+
 
   async function copyPowerShell() {
     await navigator.clipboard.writeText(powershell);

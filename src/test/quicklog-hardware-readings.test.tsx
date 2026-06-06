@@ -169,6 +169,8 @@ describe("QuickLog hardware readings UI", () => {
     const section = screen.getByTestId("quicklog-hardware-readings");
     expect(section).toBeInTheDocument();
     expect(within(section).getByText(/Hardware readings/i)).toBeInTheDocument();
+    // Default collapsed when no values — expand to assert fields.
+    fireEvent.click(screen.getByTestId("quicklog-hardware-toggle"));
     const helper = screen.getByTestId("quicklog-hardware-helper");
     expect(helper.textContent).toMatch(/manual handheld/i);
     expect(helper.textContent).toMatch(/not live sensor data/i);

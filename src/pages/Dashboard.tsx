@@ -35,6 +35,7 @@ import DashboardPendingOutcomeReviewsCard from "@/components/DashboardPendingOut
 import SafeByDesignNotice from "@/components/SafeByDesignNotice";
 import DashboardSensorHealthSummary from "@/components/DashboardSensorHealthSummary";
 import { buildDashboardSensorHealthSummary } from "@/lib/dashboardSensorHealthViewModel";
+import { sanitizeActionCopy } from "@/lib/actionQueueRowView";
 import {
   APPROVAL_QUEUE_EMPTY_COPY,
   mapRiskToSeverity,

@@ -201,6 +201,11 @@ export default function PlantDetailAiDoctorLiveReview({
             currentPlanLabel={currentPlanLabel}
             data-testid="plant-ai-doctor-live-review-credit-denied"
           />
+        ) : review.reason === "upstream_credit_exhausted" ? (
+          <AiCreditServiceDegradedNotice
+            surface="doctor"
+            data-testid="plant-ai-doctor-live-review-upstream-credit-exhausted"
+          />
         ) : (
           <p
             className="text-xs text-amber-200"

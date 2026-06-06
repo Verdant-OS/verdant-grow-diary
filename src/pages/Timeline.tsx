@@ -31,6 +31,11 @@ import { getEventType } from "@/lib/diary";
 import { buildGrowDiaryTimeline } from "@/lib/growDiaryTimelineRules";
 import { MEASUREMENT_DETAIL_KEYS } from "@/lib/timelineEntryClassification";
 import { classifyVpdAgainstStage } from "@/lib/vpdStageTargetRules";
+import {
+  mapGrowEventsToRecentRawEntries,
+  type GrowEventRowForRecent,
+} from "@/lib/growEventToDiaryRawEntry";
+
 
 const TIMELINE_SNAPSHOT_STALE_MS = 30 * 60 * 1000;
 
@@ -114,8 +119,10 @@ export default function Timeline() {
     if (urlGrowId !== storeGrowId) setActiveGrowId(urlGrowId);
   }, [urlGrowId, grows, storeGrowId, setActiveGrowId]);
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [growEvents, setGrowEvents] = useState<GrowEventRowForRecent[]>([]);
   const [actionEvents, setActionEvents] = useState<ActionQueueEvent[]>([]);
   const [alertEvents, setAlertEvents] = useState<AlertEventRow[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
@@ -124,11 +131,13 @@ export default function Timeline() {
   async function load() {
     if (!user || !activeGrowId) {
       setEntries([]);
+      setGrowEvents([]);
       setActionEvents([]);
       setAlertEvents([]);
       setLoading(false);
       return;
     }
+
     setLoading(true);
     const { data } = await supabase.from("diary_entries")
       .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
@@ -141,6 +150,20 @@ export default function Timeline() {
       rows.forEach((r) => { if (r.photo_url && map.has(r.photo_url)) r.photo_url = map.get(r.photo_url)!; });
     }
     setEntries(rows);
+
+    // Quick Log v2 manual saves land in `grow_events`, not `diary_entries`.
+    // Fetch them in parallel for the Recent Quick Logs panel so newly
+    // saved entries appear at the top instead of being invisible until
+    // the legacy diary writer is exercised. RLS scopes to owner.
+    const { data: geData } = await supabase
+      .from("grow_events")
+      .select("id,grow_id,plant_id,tent_id,event_type,occurred_at,note,source,is_deleted")
+      .eq("grow_id", activeGrowId)
+      .eq("is_deleted", false)
+      .order("occurred_at", { ascending: false })
+      .limit(100);
+    setGrowEvents((geData as unknown as GrowEventRowForRecent[]) || []);
+
 
     // Action Queue events for this grow (read-only audit trail).
     // RLS ensures only the owner sees their events.
@@ -190,6 +213,16 @@ export default function Timeline() {
       return true;
     });
   }, [entries, stageFilter, eventFilter]);
+
+  // Merge `grow_events` (Quick Log v2 manual saves) into the raw entries
+  // passed to the Recent Quick Logs panel so just-saved entries surface at
+  // the top. `buildRecentQuickLogActivity` sorts newest-first by entry_at,
+  // so the merged stream is correctly ordered without extra logic.
+  const recentLaneRawEntries = useMemo(
+    () => [...entries, ...mapGrowEventsToRecentRawEntries(growEvents)],
+    [entries, growEvents],
+  );
+
 
   // Pure normalized timeline view-model. Drives per-entry tags/warnings and a
   // future-proof empty/limited disclosure. Includes invalid entries so
@@ -340,7 +373,7 @@ export default function Timeline() {
           lanes. Action Queue / Alert event logs are surfaced at the
           bottom so Quick Log entries are not buried. */}
       <div className="mt-4">
-        <RecentQuickLogActivityPanel rawEntries={entries} limit={10} />
+        <RecentQuickLogActivityPanel rawEntries={recentLaneRawEntries} limit={10} />
       </div>
 
       <div className="mt-4">

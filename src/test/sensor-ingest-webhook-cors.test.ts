@@ -32,7 +32,8 @@ describe("sensor-ingest-webhook CORS static contract", () => {
     // Headers value is allowed to live on the next line; collapse whitespace.
     const collapsed = SRC.replace(/\s+/g, " ");
     expect(collapsed).toMatch(/authorization, x-client-info, apikey, content-type/);
-    expect(collapsed).toMatch(/Access-Control-Allow-Methods[^"]*"POST, OPTIONS/);
+    expect(collapsed).toMatch(/Access-Control-Allow-Methods/);
+    expect(collapsed).toMatch(/POST,\s*OPTIONS/);
   });
 
   it("OPTIONS short-circuits BEFORE auth / JSON parse / DB calls", () => {

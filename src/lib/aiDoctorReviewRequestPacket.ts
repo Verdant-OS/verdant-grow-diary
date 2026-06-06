@@ -21,7 +21,7 @@ import {
 } from "@/lib/aiCoachSensorSnapshotContext";
 
 export const AI_DOCTOR_REVIEW_PACKET_EVENT_CAP = 20;
-export const AI_DOCTOR_REVIEW_PACKET_SCHEMA_VERSION = 2 as const;
+export const AI_DOCTOR_REVIEW_PACKET_SCHEMA_VERSION = 1 as const;
 
 
 export interface AiDoctorReviewRequestPlantProfile {

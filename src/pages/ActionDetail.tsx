@@ -550,8 +550,8 @@ export default function ActionDetail() {
             {getActionQueueSourceLabel(row)}
           </Badge>
         </div>
-        <h1 className="text-xl font-display font-bold">{row.suggested_change}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{stripBackPointerTokens(row.reason)}</p>
+        <h1 className="text-xl font-display font-bold">{sanitizeActionCopy(row.suggested_change)}</h1>
+        <p className="text-sm text-muted-foreground mt-1">{sanitizeActionCopy(stripBackPointerTokens(row.reason))}</p>
         {isAiDoctorDerived(row) &&
           (() => {
             const headerSessionId = extractSourceAiDoctorSessionId(row.reason);

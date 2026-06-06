@@ -24,7 +24,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Copy, KeyRound, Send, ShieldAlert, Activity } from "lucide-react";
+import { Copy, KeyRound, Send, ShieldAlert, Activity, CheckCircle2, XCircle, Server } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import {
@@ -34,12 +34,20 @@ import {
 } from "@/lib/sensorTestbenchIndicatorRules";
 import {
   BRIDGE_TOKEN_DEFAULT_TTL_DAYS,
+  bridgeTokenStatus,
   clampTtlDays,
+  formatIngestCount,
   looksLikeBridgeToken,
   sanitizeTokenName,
+  type BridgeTokenRow,
 } from "@/lib/bridgeTokenRules";
+import {
+  buildEnvMatchChecklist,
+  classifySensorIngestTestResult,
+} from "@/lib/sensorIngestTestResultRules";
 
-const INGEST_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sensor-ingest-webhook`;
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const INGEST_URL = `${SUPABASE_URL}/functions/v1/sensor-ingest-webhook`;
 
 interface Props {
   tentId: string | null;
@@ -48,6 +56,7 @@ interface Props {
 
 interface TestPayloadResult {
   status: number;
+
   ok: boolean;
   body: unknown;
 }
@@ -122,6 +131,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
   const [minting, setMinting] = useState(false);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<TestPayloadResult | null>(null);
+  const [tokens, setTokens] = useState<BridgeTokenRow[]>([]);
 
   // Reset reveal/result when tent changes — plaintext token must never
   // be reused across tents.
@@ -135,10 +145,11 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     if (!tentId) {
       setRows([]);
       setIngestCount(0);
+      setTokens([]);
       return;
     }
     (async () => {
-      const [{ data: latest }, { count }] = await Promise.all([
+      const [{ data: latest }, { count }, { data: tokenRows }] = await Promise.all([
         supabase
           .from("sensor_readings")
           .select("source, captured_at, created_at, raw_payload")
@@ -149,20 +160,56 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
           .from("sensor_readings")
           .select("id", { count: "exact", head: true })
           .eq("tent_id", tentId),
+        supabase
+          .from("bridge_tokens")
+          .select(
+            "id, name, token_prefix, expires_at, last_used_at, first_used_at, ingest_count, revoked_at, created_at",
+          )
+          .eq("tent_id", tentId)
+          .order("created_at", { ascending: false }),
       ]);
       if (cancelled) return;
       setRows((latest ?? []) as typeof rows);
       setIngestCount(count ?? 0);
+      setTokens((tokenRows ?? []) as BridgeTokenRow[]);
     })();
     return () => {
       cancelled = true;
     };
-  }, [tentId, result]);
+  }, [tentId, result, minting]);
 
   const classification = useMemo(
     () => classifySensorTestbench({ rows }),
     [rows],
   );
+
+  const activeToken = useMemo<BridgeTokenRow | null>(() => {
+    const active = tokens.find((t) => bridgeTokenStatus(t) === "active");
+    return active ?? tokens[0] ?? null;
+  }, [tokens]);
+
+  const envMatch = useMemo(
+    () =>
+      buildEnvMatchChecklist({
+        supabaseUrl: SUPABASE_URL,
+        ingestUrl: INGEST_URL,
+        tentId,
+        hasActiveToken: !!activeToken && bridgeTokenStatus(activeToken) === "active",
+        tokenTentScoped: true, // tokens query is filtered by tent_id
+        lastIngestAtIso: activeToken?.last_used_at ?? classification.latestAtIso,
+      }),
+    [tentId, activeToken, classification.latestAtIso],
+  );
+
+  const resultClass = useMemo(() => {
+    if (!result) return null;
+    return classifySensorIngestTestResult({
+      status: result.status,
+      body: result.body,
+      networkError: result.status === 0,
+    });
+  }, [result]);
+
 
   const powershell = useMemo(
     () =>
@@ -209,20 +256,24 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
       vendor: "ecowitt_windows_testbench",
       captured_at: capturedAt,
       metrics: {
-        temp_f: 76.4,
+        temp_f: 77.4,
         humidity_percent: 58,
+        soil_moisture_pct: 33,
+        co2_ppm: 721,
       },
       metadata: {
-        device_id: "ecowitt-testbench-device",
+        device_id: "verdant-ui-ingest-test",
         confidence: "test",
         raw_payload: {
-          PASSKEY: "TESTBENCH",
-          stationtype: "EasyWeatherV1.6.4",
-          tempf: "76.4",
-          humidity: "58",
+          temp1f: "77.4",
+          humidity1: "58",
+          soilmoisture1: "33",
+          co2: "721",
+          source: "sensors_ui_test_button",
         },
       },
     };
+
     let res: Response | null = null;
     let body: unknown = null;
     let status = 0;
@@ -289,6 +340,104 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
         sensor state. Promote to live by minting a production bridge token and
         pointing your real EcoWitt gateway at this tent.
       </p>
+
+      {/* Environment diagnostics — proves the app, endpoint, tent, and token
+          are all scoped to the same Lovable Cloud project. */}
+      <div
+        className="rounded-lg border border-border/60 p-3 mb-3"
+        data-testid="sensors-diagnostics"
+      >
+        <div className="flex items-center gap-2 mb-2">
+          <Server className="size-4 text-muted-foreground" />
+          <div className="text-sm font-medium">Environment diagnostics</div>
+        </div>
+        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
+          <dt className="text-muted-foreground">App Supabase URL</dt>
+          <dd
+            className="font-mono break-all"
+            data-testid="sensors-diag-supabase-url"
+          >
+            {SUPABASE_URL || "—"}
+          </dd>
+          <dt className="text-muted-foreground">Ingest endpoint</dt>
+          <dd
+            className="font-mono break-all"
+            data-testid="sensors-diag-ingest-url"
+          >
+            {INGEST_URL}
+          </dd>
+          <dt className="text-muted-foreground">Selected tent</dt>
+          <dd
+            className="font-mono break-all"
+            data-testid="sensors-diag-tent-uuid"
+          >
+            {tentName ? `${tentName} · ` : ""}
+            {tentId}
+          </dd>
+          <dt className="text-muted-foreground">Bridge token</dt>
+          <dd data-testid="sensors-diag-token-identity">
+            {activeToken ? (
+              <span>
+                <span className="font-mono">{activeToken.token_prefix}…</span>{" "}
+                <span className="text-muted-foreground">
+                  ({activeToken.name})
+                </span>{" "}
+                <Badge
+                  variant="outline"
+                  className="ml-1 text-[10px]"
+                  data-testid="sensors-diag-token-status"
+                  data-state={bridgeTokenStatus(activeToken)}
+                >
+                  {bridgeTokenStatus(activeToken)}
+                </Badge>
+              </span>
+            ) : (
+              <span className="text-amber-600 dark:text-amber-400">
+                No bridge token minted for this tent
+              </span>
+            )}
+          </dd>
+          <dt className="text-muted-foreground">Token last used</dt>
+          <dd data-testid="sensors-diag-token-last-used">
+            {activeToken?.last_used_at
+              ? `${relativeFromIso(activeToken.last_used_at)} (${activeToken.last_used_at})`
+              : "—"}
+          </dd>
+          <dt className="text-muted-foreground">Token ingest count</dt>
+          <dd data-testid="sensors-diag-token-ingest-count">
+            {activeToken ? formatIngestCount(activeToken.ingest_count) : "—"}
+          </dd>
+        </dl>
+
+        <div className="mt-3 border-t border-border/40 pt-2">
+          <div className="text-xs font-medium mb-1">Environment match</div>
+          <ul className="space-y-1" data-testid="sensors-diag-env-match">
+            {envMatch.map((item) => (
+              <li
+                key={item.key}
+                className="flex items-start gap-1.5 text-[11px]"
+                data-testid={`sensors-diag-env-match-${item.key}`}
+                data-ok={item.ok ? "true" : "false"}
+              >
+                {item.ok ? (
+                  <CheckCircle2 className="size-3 mt-0.5 shrink-0 text-emerald-600" />
+                ) : (
+                  <XCircle className="size-3 mt-0.5 shrink-0 text-amber-600" />
+                )}
+                <span>
+                  <span className={item.ok ? "" : "text-amber-700 dark:text-amber-300"}>
+                    {item.label}
+                  </span>
+                  {item.hint && (
+                    <span className="text-muted-foreground"> — {item.hint}</span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
 
       <div className="rounded-lg border border-border/60 p-3 mb-3">
         <div className="flex items-center gap-2 mb-2">
@@ -378,21 +527,32 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
             appear as testbench, not live.
           </p>
         )}
-        {result && (
+        {result && resultClass && (
           <div
             className="mt-2 text-xs"
             data-testid="sensors-testbench-result"
             data-status={result.status}
             data-ok={result.ok ? "true" : "false"}
+            data-category={resultClass.category}
           >
-            <div className="font-medium mb-1">
-              HTTP {result.status} · {result.ok ? "ok" : "error"}
+            <div
+              className={`font-medium mb-1 ${resultClass.isSuccess ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"}`}
+              data-testid="sensors-testbench-result-headline"
+            >
+              {resultClass.headline}
+            </div>
+            <div
+              className="text-muted-foreground mb-2"
+              data-testid="sensors-testbench-result-detail"
+            >
+              {resultClass.detail}
             </div>
             <pre className="bg-muted/40 rounded p-2 overflow-x-auto whitespace-pre-wrap break-words">
 {JSON.stringify(result.body, null, 2)}
             </pre>
           </div>
         )}
+
       </div>
     </div>
   );

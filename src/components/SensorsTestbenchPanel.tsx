@@ -256,20 +256,24 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
       vendor: "ecowitt_windows_testbench",
       captured_at: capturedAt,
       metrics: {
-        temp_f: 76.4,
+        temp_f: 77.4,
         humidity_percent: 58,
+        soil_moisture_pct: 33,
+        co2_ppm: 721,
       },
       metadata: {
-        device_id: "ecowitt-testbench-device",
+        device_id: "verdant-ui-ingest-test",
         confidence: "test",
         raw_payload: {
-          PASSKEY: "TESTBENCH",
-          stationtype: "EasyWeatherV1.6.4",
-          tempf: "76.4",
-          humidity: "58",
+          temp1f: "77.4",
+          humidity1: "58",
+          soilmoisture1: "33",
+          co2: "721",
+          source: "sensors_ui_test_button",
         },
       },
     };
+
     let res: Response | null = null;
     let body: unknown = null;
     let status = 0;

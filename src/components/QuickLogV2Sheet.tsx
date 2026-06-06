@@ -96,7 +96,7 @@ export default function QuickLogV2Sheet({
   };
 
   const handlePhotoPick = () => {
-    if (!isPhotoSavingSupported()) {
+    if (!isQuickLogPhotoSavingSupported()) {
       setLocalError("Photo saving is not enabled yet.");
       return;
     }

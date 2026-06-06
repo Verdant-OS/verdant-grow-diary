@@ -4,12 +4,15 @@ import { Bell, LogOut, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/store/auth";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import AppSidebar from "./AppSidebar";
 import MobileNav from "./MobileNav";
 import QuickLog, { type QuickLogPrefill } from "./QuickLog";
 import BrandLogo from "./BrandLogo";
 import GlobalFastAddButton from "./GlobalFastAddButton";
+import AuthStatusIndicator from "./AuthStatusIndicator";
+import SignOutConfirmDialog from "./SignOutConfirmDialog";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 
 

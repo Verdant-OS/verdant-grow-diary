@@ -5,13 +5,20 @@ import { join, resolve } from "node:path";
 const ROOT = resolve(__dirname, "../..");
 const MIGRATIONS_DIR = resolve(ROOT, "supabase/migrations");
 
+function stripSqlComments(sql: string): string {
+  // Remove -- line comments and /* ... */ block comments so descriptive prose
+  // in migration headers cannot trigger structural policy assertions.
+  return sql.replace(/\/\*[\s\S]*?\*\//g, "").replace(/--[^\n]*/g, "");
+}
+
 function allMigrations(): string {
   return readdirSync(MIGRATIONS_DIR)
     .filter((name) => name.endsWith(".sql"))
     .sort()
-    .map((name) => readFileSync(join(MIGRATIONS_DIR, name), "utf8"))
+    .map((name) => stripSqlComments(readFileSync(join(MIGRATIONS_DIR, name), "utf8")))
     .join("\n\n");
 }
+
 
 function allActionQueueMigrations(): string {
   return readdirSync(MIGRATIONS_DIR)

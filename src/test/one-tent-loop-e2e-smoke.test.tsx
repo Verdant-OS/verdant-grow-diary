@@ -68,7 +68,12 @@ const GROW_TARGETS = {
   rh: { min: 40, max: 65 }, // 78% manual reading breaches max=65
 };
 
-const QUALITY_GOOD = { quality: "good" as const, reasons: [] as string[] };
+const QUALITY_GOOD = {
+  quality: "good" as const,
+  headline: "Sensor data looks usable",
+  reasons: [] as string[],
+  suspiciousFields: [] as string[],
+};
 
 describe("One-Tent Loop E2E smoke", () => {
   // --- Step 1: manual reading -> latest snapshot ---------------------------

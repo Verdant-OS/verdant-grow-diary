@@ -75,6 +75,7 @@ import {
   formatSafeResponseInspectorPlainText,
   historyExportToJson,
   SENSOR_INGEST_HISTORY_MAX,
+  SENSOR_DIAGNOSTICS_RUN_HISTORY_MAX,
   buildNetworkDiagnosticsDownloadFilename,
   buildNetworkDiagnosticsExportJson,
   buildSensorDiagnosticsRunHistoryEntry,

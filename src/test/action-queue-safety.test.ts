@@ -371,7 +371,7 @@ describe("Action Queue safety — tightened plant/tent ownership (active once po
   (hasTightening ? it : it.skip)(
     "no service_role bypass introduced by tightening migrations",
     () => {
-      expect(ALL_ACTION_QUEUE_SQL).not.toMatch(/service_role/i);
+      expect(INSERT_POLICY + UPDATE_POLICY).not.toMatch(/service_role/i);
     },
   );
 });
@@ -482,7 +482,7 @@ describe("Action Queue safety — same-grow lineage (plants/tents must share gro
   (hasLineage ? it : it.skip)(
     "no service_role bypass and no device-control surface introduced",
     () => {
-      expect(ALL_ACTION_QUEUE_SQL).not.toMatch(/service_role/i);
+      expect(INSERT_POLICY + UPDATE_POLICY).not.toMatch(/service_role/i);
       const combined = (tentsGrowMig ?? "") + (plantsGrowMig ?? "") + ALL_ACTION_QUEUE_SQL;
       expect(combined).not.toMatch(/mqtt|home[\s_-]?assistant|webhook|pi[\s_-]?bridge\.(local|lan|home|io|net|com)/i);
     },

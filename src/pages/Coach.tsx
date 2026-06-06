@@ -29,6 +29,9 @@ import { ACTION_QUEUE_SOURCE_VALUES } from "@/lib/actionQueueProvenanceRules";
 import { persistAiDoctorSession } from "@/lib/aiDoctorSessionPersistence";
 import { harmonizeDiagnosisConfidence } from "@/lib/aiDoctorConfidenceRules";
 import { actionsPath } from "@/lib/routes";
+import AiCreditLimitNotice from "@/components/AiCreditLimitNotice";
+import { parseAiCoachCreditDenial } from "@/lib/aiCoachCreditDenialAdapter";
+import type { AiCreditDenial } from "@/lib/aiCreditLimitNoticeViewModel";
 
 type Mode = "diagnose" | "next_steps";
 
@@ -70,6 +73,7 @@ export default function Coach() {
   // Reset whenever a new ask() starts; only applied if the persistence
   // result still belongs to the most recent diagnosis (race-safe).
   const [persistedSessionId, setPersistedSessionId] = useState<string | null>(null);
+  const [creditDenial, setCreditDenial] = useState<AiCreditDenial | null>(null);
   const diagnosisSeqRef = useRef(0);
 
   // --- Real grow context for AI sufficiency evaluation (presenter only) ---
@@ -239,7 +243,7 @@ export default function Coach() {
   async function ask(mode: Mode) {
     if (!user) return;
     const seq = ++diagnosisSeqRef.current;
-    setBusy(true); setResult(null); setPersistedSessionId(null);
+    setBusy(true); setResult(null); setPersistedSessionId(null); setCreditDenial(null);
     try {
       let photoUrl: string | undefined;
       if (mode === "diagnose" && photoFile) {
@@ -254,7 +258,17 @@ export default function Coach() {
       const { data, error } = await supabase.functions.invoke("ai-coach", {
         body: { mode, growId: activeGrowId, photoUrl, question: question.trim() || undefined },
       });
-      if (error) throw error;
+      if (error) {
+        // S3.2: HTTP 402 credit denial surfaces here as FunctionsHttpError.
+        // Parse it before falling through to the generic failure toast so
+        // the grower sees a calm, branch-correct credit-limit notice.
+        const denial = await parseAiCoachCreditDenial(error);
+        if (denial) {
+          setCreditDenial(denial.credit);
+          return;
+        }
+        throw error;
+      }
       const d = data as CoachResponse | null;
       if (d?.error) throw new Error(d.error);
       setResult(d ?? null);
@@ -309,6 +323,7 @@ export default function Coach() {
       toast.error(e instanceof Error ? e.message : "Coach failed");
     } finally { setBusy(false); }
   }
+
 
   function handleFile(f: File | null) {
     setPhotoFile(f);
@@ -374,6 +389,18 @@ export default function Coach() {
           </Button>
         </div>
       </div>
+
+      {creditDenial && (
+        <div className="mt-4 animate-fade-in">
+          <AiCreditLimitNotice
+            credit={creditDenial}
+            surface="coach"
+            data-testid="coach-credit-limit-notice"
+          />
+        </div>
+      )}
+
+
 
       {diagnosis && (
         <div className="mt-4 animate-fade-in">

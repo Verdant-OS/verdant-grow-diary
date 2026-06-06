@@ -1,27 +1,33 @@
 /**
- * AiCreditLimitNotice — presenter-only component for AI Doctor credit
- * denials. Branches on view-model kind (which itself branches on the
- * server-supplied credit.plan_id). No fetching, no entitlements logic.
+ * AiCreditLimitNotice — presenter-only component for AI credit denials.
+ * Shared by AI Doctor (S3.0) and AI Coach (S3.2); branches on view-model
+ * kind (which itself branches on the server-supplied credit.plan_id).
+ * No fetching, no entitlements logic.
  */
 import PaywallCta from "@/components/PaywallCta";
 import {
   buildAiCreditLimitNoticeViewModel,
   type AiCreditDenial,
+  type AiCreditLimitNoticeSurface,
 } from "@/lib/aiCreditLimitNoticeViewModel";
 
 export interface AiCreditLimitNoticeProps {
   credit: AiCreditDenial;
   currentPlanLabel?: string;
+  /** Defaults to "doctor". Pass "coach" for AI Coach surface copy. */
+  surface?: AiCreditLimitNoticeSurface;
   "data-testid"?: string;
 }
 
 export default function AiCreditLimitNotice({
   credit,
   currentPlanLabel,
+  surface,
   ...rest
 }: AiCreditLimitNoticeProps) {
   const testId = rest["data-testid"] ?? "ai-credit-limit-notice";
-  const vm = buildAiCreditLimitNoticeViewModel({ credit, currentPlanLabel });
+  const vm = buildAiCreditLimitNoticeViewModel({ credit, currentPlanLabel, surface });
+
 
   if (vm.kind === "upsell" && vm.paywallVm) {
     return (

@@ -83,8 +83,8 @@ Deno.serve(async (req) => {
     }
     const spendObj = spend as Record<string, unknown>;
     if (spendObj.ok !== true) {
-      console.log(`ai-coach status=credit_denied reason=${String(spendObj.reason ?? "")}`);
-      return json({ error: "credit_denied", credit: spendObj }, 402);
+      console.log(`ai-coach status=credit_denied http=200 reason=${String(spendObj.reason ?? "")}`);
+      return json({ ok: false, reason: "credit_denied", credit: spendObj }, 200);
     }
     const spendId = typeof spendObj.spend_id === "string" ? spendObj.spend_id : null;
     const refundKey = "refund:" + (spendId ?? idempotencyKey);

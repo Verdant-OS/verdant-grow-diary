@@ -436,10 +436,45 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
         className="rounded-lg border border-border/60 p-3 mb-3"
         data-testid="sensors-diagnostics"
       >
-        <div className="flex items-center gap-2 mb-2">
-          <Server className="size-4 text-muted-foreground" />
-          <div className="text-sm font-medium">Environment diagnostics</div>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <div className="flex items-center gap-2">
+            <Server className="size-4 text-muted-foreground" />
+            <div className="text-sm font-medium">Environment diagnostics</div>
+          </div>
+          <div className="flex gap-1">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={copyDiagnosticsJson}
+              data-testid="sensors-diag-copy-json"
+            >
+              <FileJson className="size-3 mr-1" /> JSON
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={copyDiagnosticsText}
+              data-testid="sensors-diag-copy-text"
+            >
+              <Copy className="size-3 mr-1" /> Text
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={copyCurl}
+              data-testid="sensors-diag-copy-curl"
+              title="Contains token if copied during reveal. Do not paste into chat, screenshots, or git."
+            >
+              <Terminal className="size-3 mr-1" /> curl
+            </Button>
+          </div>
         </div>
+        <p className="text-[11px] text-muted-foreground mb-2">
+          Exports contain safe identity only. The curl button includes the
+          bridge token only while the one-time reveal is in memory — do not
+          paste it into chat, screenshots, or git. Revoke any token that leaks.
+        </p>
+
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
           <dt className="text-muted-foreground">App Supabase URL</dt>
           <dd

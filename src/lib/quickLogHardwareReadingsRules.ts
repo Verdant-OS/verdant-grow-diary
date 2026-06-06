@@ -43,6 +43,18 @@ export function hasAnyHardwareReading(
 }
 
 /**
+ * Default open/collapsed state for the QuickLog Hardware readings section.
+ * Pure & deterministic. Expanded only when at least one hardware/sensor
+ * field already has a value. Used by QuickLog.tsx on open/reset so the
+ * default is reproducible and keeps presenter logic out of JSX.
+ */
+export function computeQuickLogHardwareDefaultOpen(
+  readings: QuickLogHardwareReadings | null | undefined,
+): boolean {
+  return hasAnyHardwareReading(readings);
+}
+
+/**
  * Returns the deterministic, multi-line formatted block, or an empty
  * string if nothing was entered.
  */

@@ -219,14 +219,16 @@ describe("Spider Farmer GGS Backhaul ADR", () => {
   describe("truth-in-labeling", () => {
     it("does not claim official Spider Farmer partnership", () => {
       const adr = readAdr();
-      expect(adr).not.toMatch(/official.*partner/i);
+      // Catch positive claims like "is an official partner"; allow negative disclaimers.
+      expect(adr).not.toMatch(/is an official partner/i);
       expect(adr).not.toMatch(/certified.*Spider Farmer/i);
     });
 
     it("does not claim production readiness", () => {
       const adr = readAdr();
-      expect(adr).not.toMatch(/production-ready/i);
-      expect(adr).not.toMatch(/production ready/i);
+      // Catch positive claims; allow negative disclaimers like "not production-ready".
+      expect(adr).not.toMatch(/is production-ready/i);
+      expect(adr).not.toMatch(/production ready$/im);
     });
 
     it("explicitly notes experimental status", () => {

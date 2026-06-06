@@ -111,7 +111,7 @@ describe("One-Tent Loop E2E smoke", () => {
   it("target comparison flags the manual reading as breaching humidity max", () => {
     const rh = targets.metrics.find((m) => m.metric === "rh");
     expect(rh?.state).toBe("high");
-    expect(targets.status === "out_of_range" || targets.status === "warning").toBe(true);
+    expect(targets.status).toBe("out_of_range");
   });
 
   it("derives at least one real environment alert from the manual breach", () => {

@@ -131,11 +131,13 @@ export default function Timeline() {
   async function load() {
     if (!user || !activeGrowId) {
       setEntries([]);
+      setGrowEvents([]);
       setActionEvents([]);
       setAlertEvents([]);
       setLoading(false);
       return;
     }
+
     setLoading(true);
     const { data } = await supabase.from("diary_entries")
       .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")

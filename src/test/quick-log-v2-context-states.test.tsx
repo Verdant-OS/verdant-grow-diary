@@ -200,6 +200,9 @@ describe("QuickLogV2Sheet — photo gate (not enabled)", () => {
     tentsState.data = [{ id: "tent-1", name: "Tent 1", grow_id: "grow-1" }];
     renderSheet();
     fireEvent.click(screen.getByRole("button", { name: /photo/i }));
+    // Select a target first so the gate error (not target error) surfaces.
+    fireEvent.click(screen.getByLabelText(/target/i));
+    fireEvent.click(screen.getByText(/Plant 1/));
     const save = screen.getByTestId("qlv2-save") as HTMLButtonElement;
     fireEvent.click(save);
     expect(rpcMock).not.toHaveBeenCalled();

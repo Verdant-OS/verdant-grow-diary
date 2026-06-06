@@ -13,7 +13,7 @@ import {
 
 export interface AiCreditRemainingBadgeProps {
   credit: AiCreditRemainingInput | null | undefined;
-  /** Surface noun: "doctor" (default) → "AI Doctor checks"; "coach" → "AI credits". */
+  /** Surface noun: "doctor" (default) → "AI Doctor credits"; "coach" → "AI Coach credits". */
   surface?: AiCreditRemainingSurface;
   "data-testid"?: string;
 }

@@ -24,6 +24,7 @@ import { useAiDoctorLiveReview } from "@/hooks/useAiDoctorLiveReview";
 import AiDoctorReviewResultPreview from "@/components/AiDoctorReviewResultPreview";
 import AiCreditLimitNotice from "@/components/AiCreditLimitNotice";
 import AiCreditRemainingBadge from "@/components/AiCreditRemainingBadge";
+import AiCreditServiceDegradedNotice from "@/components/AiCreditServiceDegradedNotice";
 import { useSensorBridgeHealth } from "@/hooks/useSensorBridgeHealth";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import {
@@ -199,6 +200,11 @@ export default function PlantDetailAiDoctorLiveReview({
             credit={review.credit}
             currentPlanLabel={currentPlanLabel}
             data-testid="plant-ai-doctor-live-review-credit-denied"
+          />
+        ) : review.reason === "upstream_credit_exhausted" ? (
+          <AiCreditServiceDegradedNotice
+            surface="doctor"
+            data-testid="plant-ai-doctor-live-review-upstream-credit-exhausted"
           />
         ) : (
           <p

@@ -27,7 +27,7 @@ describe("<AiCreditRemainingBadge />", () => {
       />,
     );
     expect(getByTestId("ai-credit-remaining-badge-label").textContent).toBe(
-      "2 of 3 AI Doctor checks left for this grow",
+      "2 of 3 AI Doctor credits left for this grow",
     );
     expect(queryByTestId("ai-credit-remaining-badge-helper")).toBeNull();
     expect(queryByRole("link")).toBeNull();
@@ -49,7 +49,7 @@ describe("<AiCreditRemainingBadge />", () => {
       />,
     );
     expect(getByTestId("ai-credit-remaining-badge-label").textContent).toBe(
-      "100 of 100 AI Doctor checks left this month",
+      "100 of 100 AI Doctor credits left this month",
     );
     expect(getByTestId("ai-credit-remaining-badge-helper").textContent).toBe(
       "Resets on the 1st of the month (UTC).",

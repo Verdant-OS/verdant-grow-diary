@@ -53,7 +53,7 @@ describe("buildAiCreditRemainingBadgeViewModel", () => {
       scope_limit: 3,
     });
     expect(vm.visible).toBe(true);
-    expect(vm.label).toBe("2 of 3 AI Doctor checks left for this grow");
+    expect(vm.label).toBe("2 of 3 AI Doctor credits left for this grow");
     expect(vm.helper).toBeUndefined();
     expect(vm.scope).toBe("per_grow");
   });
@@ -66,7 +66,7 @@ describe("buildAiCreditRemainingBadgeViewModel", () => {
       period_key: "2026-06",
     });
     expect(vm.visible).toBe(true);
-    expect(vm.label).toBe("97 of 100 AI Doctor checks left this month");
+    expect(vm.label).toBe("97 of 100 AI Doctor credits left this month");
     expect(vm.helper).toBe("Resets on the 1st of the month (UTC).");
     expect(vm.scope).toBe("per_month");
   });
@@ -77,7 +77,7 @@ describe("buildAiCreditRemainingBadgeViewModel", () => {
       scope: "per_month",
       scope_limit: 100,
     });
-    expect(vm.label).toBe("0 of 100 AI Doctor checks left this month");
+    expect(vm.label).toBe("0 of 100 AI Doctor credits left this month");
   });
 
   it("copy passes banned-word scan", () => {

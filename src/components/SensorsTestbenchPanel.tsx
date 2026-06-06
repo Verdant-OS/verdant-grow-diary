@@ -397,9 +397,80 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     await safeCopy(cmd, "curl command");
   }
 
+  async function copyPowerShellIngest() {
+    const cmd = buildPowerShellIngestTestScript({
+      ingestUrl: INGEST_URL,
+      tentId,
+      bridgeTokenPlaintext: reveal,
+      idempotencyKey: `testbench-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      capturedAtIso: new Date().toISOString(),
+    });
+    await safeCopy(cmd, "PowerShell ingest test");
+  }
+
+  function buildHistoryPayload() {
+    return {
+      generated_at: new Date().toISOString(),
+      tent_id: tentId,
+      tent_name: tentName ?? null,
+      ingest_url: INGEST_URL,
+      items: history,
+    };
+  }
+
+  async function copyHistoryJson() {
+    await safeCopy(historyExportToJson(buildHistoryPayload()), "History JSON");
+  }
+
+  function downloadBlob(content: string, mime: string, filename: string) {
+    if (typeof window === "undefined") return;
+    try {
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      // Revoke after the click handler microtask so the download starts.
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch {
+      toast({
+        title: "Download unavailable — copy the content instead.",
+        variant: "destructive",
+      });
+    }
+  }
+
+  function downloadDiagnosticsJson() {
+    downloadBlob(
+      diagnosticsExportToJson(buildDiagnosticsPayload()),
+      "application/json",
+      buildDownloadFilename("verdant-sensor-diagnostics", "json", new Date()),
+    );
+  }
+
+  function downloadDiagnosticsText() {
+    downloadBlob(
+      diagnosticsExportToText(buildDiagnosticsPayload()),
+      "text/plain",
+      buildDownloadFilename("verdant-sensor-diagnostics", "txt", new Date()),
+    );
+  }
+
+  function downloadHistoryJson() {
+    downloadBlob(
+      historyExportToJson(buildHistoryPayload()),
+      "application/json",
+      buildDownloadFilename("verdant-sensor-ingest-history", "json", new Date()),
+    );
+  }
+
   function clearHistory() {
     setHistory([]);
   }
+
 
 
   if (!tentId) {

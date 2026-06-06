@@ -30,6 +30,7 @@ import {
 } from "@/lib/quickLogHardwareReadingsRules";
 import {
   filterQuickLogPlantOptions,
+  pickDefaultQuickLogPlant,
   quickLogPlantHelperText,
 } from "@/lib/quickLogPlantOptionRules";
 import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";

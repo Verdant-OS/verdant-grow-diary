@@ -46,10 +46,14 @@ import {
   classifySensorIngestTestResult,
 } from "@/lib/sensorIngestTestResultRules";
 import {
+  buildCanonicalIngestPayloadValidation,
+  buildDiagnosticsBundleFiles,
   buildDownloadFilename,
   buildHistoryExport,
+  buildPowerShellCopyWarningState,
   buildPowerShellIngestTestScript,
   buildRedactedPayloadPreview,
+  buildSafeResponseInspector,
   buildSensorIngestCurl,
   buildSensorIngestHistoryItem,
   buildSensorIngestTestPayload,
@@ -59,6 +63,7 @@ import {
   SENSOR_INGEST_HISTORY_MAX,
   type SensorIngestHistoryItem,
 } from "@/lib/sensorDiagnosticsExportRules";
+import JSZip from "jszip";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const INGEST_URL = `${SUPABASE_URL}/functions/v1/sensor-ingest-webhook`;

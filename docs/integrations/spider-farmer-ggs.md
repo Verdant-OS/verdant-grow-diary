@@ -168,12 +168,13 @@ If a reference firmware is published separately, it must follow
 these rules before it can claim Verdant compatibility:
 
 - Status string must read **"experimental read-only
-  GGS-compatible bridge"** — never "production-ready".
+  GGS-compatible bridge"** — it must not claim production readiness.
 - BLE peer MACs must be placeholders such as
   `AA:BB:CC:DD:EE:01` (leaf), `AA:BB:CC:DD:EE:02` (gateway),
   `AA:BB:CC:DD:EE:03` (root). No real hardware MACs in tree.
 - Numeric placeholders must be valid C++ literals (e.g. `0x00`,
-  `0xAB`) — never `0xXX`, which does not compile.
+  `0xAB`) — uppercase-X placeholder hex tokens (two literal `X`
+  characters after `0x`) do not compile and must not be committed.
 - `platformio.ini` must define real `[env:leaf]`, `[env:gateway]`,
   and `[env:root]` sections with `src_filter` pointing at files
   that exist; `pio run -e leaf -e gateway -e root` must succeed.

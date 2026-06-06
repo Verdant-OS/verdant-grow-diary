@@ -1264,6 +1264,7 @@ export function buildSensorIngestNetworkDiagnostics(
     appOrigin && appOrigin.length > 0 ? appOrigin : "<unknown>",
   );
   const safeErrorMessage = errorMessage ? redactTokens(errorMessage) : null;
+  const supabaseUrlProvided = Object.prototype.hasOwnProperty.call(input, "supabaseUrl");
   const canonical = classifyCanonical(ingestUrl, supabaseUrl);
 
   if (notApplicable) {

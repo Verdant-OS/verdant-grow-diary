@@ -35,6 +35,7 @@ import {
   quickLogPlantHelperText,
 } from "@/lib/quickLogPlantOptionRules";
 import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
+import EventTypeSelector from "@/components/EventTypeSelector";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { buildQuickLogSnapshotStrip } from "@/lib/quickLogSnapshotStripAdapter";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";

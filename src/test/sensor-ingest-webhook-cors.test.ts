@@ -78,10 +78,11 @@ describe("sensor-ingest-webhook CORS static contract", () => {
       expect(SRC).toMatch(re);
     }
 
-    // The only non-json Response is the OPTIONS short-circuit; any other
-    // `new Response(` would bypass corsHeaders.
+    // Two raw `new Response(` calls are allowed: one inside the `json()`
+    // helper (which always merges corsHeaders) and one OPTIONS short-circuit.
+    // Any additional raw Response would bypass corsHeaders.
     const responseCount = (SRC.match(/new\s+Response\s*\(/g) ?? []).length;
-    expect(responseCount).toBe(1);
+    expect(responseCount).toBe(2);
   });
 
   it("does not leak service role, bridge tokens, or authorization in responses", () => {

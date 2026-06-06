@@ -53,14 +53,19 @@ describe("Spider Farmer GGS Backhaul ADR", () => {
   describe("escalation ladder order", () => {
     it("preserves step 1: placement + antenna + clean power + channel discipline", () => {
       const adr = readAdr();
-      const step1Index = adr.search(
+      // Isolate the escalation ladder table to avoid matching the Decision section
+      const ladderMatch = adr.match(/## Escalation Ladder[\s\S]*?(?=## |\Z)/);
+      expect(ladderMatch).toBeTruthy();
+      const ladder = ladderMatch![0];
+
+      const step1Index = ladder.search(
         /placement.*antenna.*clean power.*channel discipline/i
       );
-      const step2Index = adr.search(/roaming stability tuning/i);
-      const step3Index = adr.search(/Go-Back-N buffering/i);
-      const step4Index = adr.search(/Selective Repeat/i);
-      const step5Index = adr.search(/raw LoRa P2P/i);
-      const step6Index = adr.search(/LoRaWAN only for many gateways/i);
+      const step2Index = ladder.search(/roaming stability tuning/i);
+      const step3Index = ladder.search(/Go-Back-N buffering/i);
+      const step4Index = ladder.search(/Selective Repeat/i);
+      const step5Index = ladder.search(/raw LoRa P2P/i);
+      const step6Index = ladder.search(/LoRaWAN only for many gateways/i);
 
       expect(step1Index).toBeGreaterThan(-1);
       expect(step2Index).toBeGreaterThan(-1);

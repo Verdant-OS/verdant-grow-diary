@@ -245,6 +245,7 @@ export default function PlantQuickLog({
                     variant="outline"
                     onClick={() => fileRef.current?.click()}
                     data-testid="plant-quick-log-take-photo-button"
+                    aria-controls="plant-quick-log-photo-input"
                     className="h-12"
                   >
                     <Camera className="h-4 w-4 mr-2" aria-hidden="true" />
@@ -255,6 +256,7 @@ export default function PlantQuickLog({
                     variant="outline"
                     onClick={() => libraryFileRef.current?.click()}
                     data-testid="plant-quick-log-choose-library-button"
+                    aria-controls="plant-quick-log-photo-library-input"
                     className="h-12"
                   >
                     Choose from Library

@@ -999,56 +999,87 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
         )}
 
 
-        {/* Canonical payload validation summary — gates preview/copy/export. */}
+        {/* Canonical payload validation summary — view-model driven. */}
         <div
           className="mt-3 border-t border-border/40 pt-2 text-xs"
+          id="sensors-testbench-canonical-validation"
           data-testid="sensors-testbench-canonical-validation"
           data-ready={canonicalReady ? "true" : "false"}
+          data-status={validationUi.status}
         >
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <span className="font-medium">Canonical payload</span>
             <Badge
               variant="outline"
               className={
-                canonicalReady
+                validationUi.badgeTone === "ready"
                   ? "text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
-                  : "text-amber-700 dark:text-amber-300 border-amber-500/40"
+                  : validationUi.badgeTone === "warn"
+                    ? "text-amber-700 dark:text-amber-300 border-amber-500/40"
+                    : ""
               }
               data-testid="sensors-testbench-canonical-validation-badge"
+              data-tone={validationUi.badgeTone}
             >
-              {canonicalReady ? "Ready" : "Not ready"}
+              {validationUi.statusLabel}
             </Badge>
             <span className="text-muted-foreground">
               {canonicalValidation.readingsCount} reading
               {canonicalValidation.readingsCount === 1 ? "" : "s"}
             </span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
-            <div data-testid="sensors-testbench-canonical-present">
-              <div className="text-muted-foreground">present</div>
-              <div>{canonicalValidation.present.join(", ") || "—"}</div>
-            </div>
+
+          {validationUi.emptyStateMessage && (
+            <p
+              className="text-muted-foreground mb-2"
+              data-testid="sensors-testbench-canonical-empty"
+            >
+              {validationUi.emptyStateMessage}
+            </p>
+          )}
+
+          {/* Ordered summary: missing → invalid → optional → present. */}
+          <div className="space-y-1 text-[11px]">
             <div data-testid="sensors-testbench-canonical-missing">
-              <div className="text-muted-foreground">missing</div>
-              <div>{canonicalValidation.missing.join(", ") || "—"}</div>
+              <span className="text-muted-foreground">missing: </span>
+              {validationUi.summary.missing.length === 0 ? (
+                <span>—</span>
+              ) : (
+                <span>
+                  {validationUi.summary.missing
+                    .map((m) => `${m.label} (${m.reason})`)
+                    .join(", ")}
+                </span>
+              )}
             </div>
             <div data-testid="sensors-testbench-canonical-invalid">
-              <div className="text-muted-foreground">invalid</div>
-              <div>
-                {canonicalValidation.invalid
-                  .map((i) => `${i.field}: ${i.reason}`)
-                  .join("; ") || "—"}
-              </div>
+              <span className="text-muted-foreground">invalid: </span>
+              {validationUi.summary.invalid.length === 0 ? (
+                <span>—</span>
+              ) : (
+                <span>
+                  {validationUi.summary.invalid
+                    .map((i) => `${i.label}: ${i.reason}`)
+                    .join("; ")}
+                </span>
+              )}
+            </div>
+            <div data-testid="sensors-testbench-canonical-optional">
+              <span className="text-muted-foreground">optional: </span>
+              <span>{validationUi.summary.optional.join(", ") || "—"}</span>
+            </div>
+            <div data-testid="sensors-testbench-canonical-present">
+              <span className="text-muted-foreground">present: </span>
+              <span>{validationUi.summary.present.join(", ") || "—"}</span>
             </div>
           </div>
-          {!canonicalReady && (
+
+          {validationUi.disabledReason && (
             <p
               className="mt-1 text-amber-700 dark:text-amber-300"
               data-testid="sensors-testbench-canonical-helper"
             >
-              Preview, curl, PowerShell, history exports, and bundle download
-              are disabled until source, captured_at, tent_id, confidence, and
-              at least one valid reading are present.
+              {validationUi.disabledReason}
             </p>
           )}
         </div>
@@ -1061,12 +1092,12 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
             <Eye className="size-3" />
             Canonical ingest payload used for last test
           </summary>
-          {!canonicalReady ? (
+          {validationUi.status === "not_ready" ? (
             <p
               className="text-amber-700 dark:text-amber-300 mt-2"
               data-testid="sensors-testbench-payload-preview-blocked"
             >
-              Preview disabled — {canonicalDisabledHint}
+              {validationUi.disabledReason}
             </p>
           ) : lastPayload ? (
             <pre
@@ -1080,11 +1111,13 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
               className="text-muted-foreground mt-2"
               data-testid="sensors-testbench-payload-preview-empty"
             >
-              No test payload sent yet. Mint a token and run “Send test payload”
-              to preview the exact JSON Verdant submits.
+              No test payload sent yet.{" "}
+              {validationUi.emptyStateMessage ??
+                "Mint a token and run “Send test payload” to preview the exact JSON Verdant submits."}
             </p>
           )}
         </details>
+
 
 
         {history.length > 0 && (

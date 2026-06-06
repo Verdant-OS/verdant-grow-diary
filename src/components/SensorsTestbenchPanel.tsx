@@ -235,6 +235,42 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     });
   }, [result]);
 
+  const responseInspector = useMemo(() => {
+    if (!result || !resultClass) return null;
+    return buildSafeResponseInspector({
+      status: result.status,
+      classification: resultClass.category,
+      body: result.body,
+    });
+  }, [result, resultClass]);
+
+  // Validate the canonical payload we *would* send (or last sent). Gates
+  // preview/copy/export buttons so we never invite operators to copy an
+  // incomplete payload.
+  const validationPayload = useMemo(() => {
+    if (lastPayload) return lastPayload;
+    if (!tentId) return null;
+    return buildSensorIngestTestPayload({
+      tentId,
+      capturedAtIso: new Date().toISOString(),
+    });
+  }, [lastPayload, tentId]);
+
+  const canonicalValidation = useMemo(
+    () => buildCanonicalIngestPayloadValidation(validationPayload),
+    [validationPayload],
+  );
+  const canonicalReady = canonicalValidation.ready;
+  const canonicalDisabledHint = canonicalReady
+    ? null
+    : `Payload not ready — missing/invalid: ${
+        [
+          ...canonicalValidation.missing,
+          ...canonicalValidation.invalid.map((i) => i.field),
+        ].join(", ") || "—"
+      }`;
+
+
 
   const powershell = useMemo(
     () =>

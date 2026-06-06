@@ -17,7 +17,7 @@ const read = (p: string) =>
 
 const FRONTEND_FILES = [
   "src/lib/aiDoctorReviewRequestPacket.ts",
-  "src/lib/aiDoctorReviewResponseAdapter.ts",
+  "src/lib/aiCreditedResponseAdapter.ts",
   "src/hooks/useAiDoctorLiveReview.ts",
   "src/components/PlantDetailAiDoctorLiveReview.tsx",
 ];

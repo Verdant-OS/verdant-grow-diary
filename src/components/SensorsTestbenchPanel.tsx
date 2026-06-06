@@ -300,6 +300,27 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     () => buildCanonicalValidationA11yLabel({ status: validationUi.status }),
     [validationUi.status],
   );
+  const networkDiagnostics = useMemo(() => {
+    if (!result || !resultClass) return null;
+    return buildSensorIngestNetworkDiagnostics({
+      ingestUrl: INGEST_URL,
+      appOrigin:
+        typeof window !== "undefined" && window.location
+          ? window.location.origin
+          : null,
+      httpStatus: result.status,
+      classification: resultClass.category,
+      errorMessage:
+        result.body &&
+        typeof result.body === "object" &&
+        "message" in (result.body as Record<string, unknown>)
+          ? String((result.body as Record<string, unknown>).message ?? "")
+          : null,
+      requestMethod: "POST",
+      hasActiveToken: !!reveal,
+    });
+  }, [result, resultClass, reveal]);
+
   const shareModalState = useMemo(
     () =>
       buildDiagnosticsShareModalState({
@@ -310,8 +331,9 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
             ? { http_status: result.status, classification: resultClass.category }
             : null,
         inspectorPlainText,
+        networkDiagnostics,
       }),
-    [bundleFilenamePreview, validationUi, result, resultClass, inspectorPlainText],
+    [bundleFilenamePreview, validationUi, result, resultClass, inspectorPlainText, networkDiagnostics],
   );
 
 

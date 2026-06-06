@@ -281,7 +281,7 @@ export default function PlantQuickLog({
               accept="image/*"
               capture="environment"
               className="hidden"
-              aria-label="Take a new photo with your camera"
+              aria-label={photoGate.cameraInputAriaLabel}
               tabIndex={-1}
               onChange={(e) => handleFileSelected(e.target.files?.[0] ?? null)}
               data-testid="plant-quick-log-photo-input"

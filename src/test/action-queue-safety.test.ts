@@ -312,7 +312,7 @@ describe("Action Queue safety — tightened plant/tent ownership (active once po
     "INSERT WITH CHECK enforces grow_id ownership via grows.user_id = auth.uid()",
     () => {
       expect(INSERT_POLICY).toMatch(
-        /EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.grows[\s\S]*?id\s*=\s*grow_id[\s\S]*?user_id\s*=\s*auth\.uid\(\)/i,
+        /EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.grows[\s\S]*?id\s*=\s*(?:action_queue\.)?grow_id[\s\S]*?user_id\s*=\s*auth\.uid\(\)/i,
       );
     },
   );
@@ -321,7 +321,7 @@ describe("Action Queue safety — tightened plant/tent ownership (active once po
     "INSERT WITH CHECK enforces plant_id ownership when plant_id is not null",
     () => {
       expect(INSERT_POLICY).toMatch(
-        /plant_id\s+IS\s+NULL\s+OR\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.plants[\s\S]*?id\s*=\s*plant_id[\s\S]*?user_id\s*=\s*auth\.uid\(\)/i,
+        /plant_id\s+IS\s+NULL\s+OR\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.plants[\s\S]*?id\s*=\s*(?:action_queue\.)?plant_id[\s\S]*?user_id\s*=\s*auth\.uid\(\)/i,
       );
     },
   );
@@ -330,7 +330,7 @@ describe("Action Queue safety — tightened plant/tent ownership (active once po
     "INSERT WITH CHECK enforces tent_id ownership when tent_id is not null",
     () => {
       expect(INSERT_POLICY).toMatch(
-        /tent_id\s+IS\s+NULL\s+OR\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.tents[\s\S]*?id\s*=\s*tent_id[\s\S]*?user_id\s*=\s*auth\.uid\(\)/i,
+        /tent_id\s+IS\s+NULL\s+OR\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.tents[\s\S]*?id\s*=\s*(?:action_queue\.)?tent_id[\s\S]*?user_id\s*=\s*auth\.uid\(\)/i,
       );
     },
   );
@@ -340,7 +340,7 @@ describe("Action Queue safety — tightened plant/tent ownership (active once po
     () => {
       // plant.tent_id must match the action's tent_id.
       expect(INSERT_POLICY).toMatch(
-        /plant_id\s+IS\s+NULL\s+OR\s+tent_id\s+IS\s+NULL\s+OR\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.plants[\s\S]*?id\s*=\s*plant_id[\s\S]*?tent_id\s*=\s*tent_id/i,
+        /plant_id\s+IS\s+NULL\s+OR\s+tent_id\s+IS\s+NULL\s+OR\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.plants[\s\S]*?id\s*=\s*(?:action_queue\.)?plant_id[\s\S]*?tent_id\s*=\s*(?:action_queue\.)?tent_id/i,
       );
     },
   );
@@ -352,7 +352,7 @@ describe("Action Queue safety — tightened plant/tent ownership (active once po
       expect(UPDATE_POLICY).toMatch(/plant_id\s+IS\s+NULL\s+OR\s+EXISTS/i);
       expect(UPDATE_POLICY).toMatch(/tent_id\s+IS\s+NULL\s+OR\s+EXISTS/i);
       expect(UPDATE_POLICY).toMatch(
-        /EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.grows[\s\S]*?id\s*=\s*grow_id[\s\S]*?user_id\s*=\s*auth\.uid\(\)/i,
+        /EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.grows[\s\S]*?id\s*=\s*(?:action_queue\.)?grow_id[\s\S]*?user_id\s*=\s*auth\.uid\(\)/i,
       );
     },
   );
@@ -404,8 +404,8 @@ describe("Action Queue safety — same-grow lineage (plants/tents must share gro
   const hasLineage =
     !!tentsGrowMig &&
     !!plantsGrowMig &&
-    /t\.grow_id\s*=\s*grow_id/i.test(INSERT_POLICY) &&
-    /p\.grow_id\s*=\s*grow_id/i.test(INSERT_POLICY);
+    /t\.grow_id\s*=\s*(?:action_queue\.)?grow_id/i.test(INSERT_POLICY) &&
+    /p\.grow_id\s*=\s*(?:action_queue\.)?grow_id/i.test(INSERT_POLICY);
 
   it(`detects grow_id lineage on plants+tents and same-grow policy: ${hasLineage ? "YES" : "no"}`, () => {
     expect(typeof hasLineage).toBe("boolean");
@@ -448,7 +448,7 @@ describe("Action Queue safety — same-grow lineage (plants/tents must share gro
     "INSERT enforces tent belongs to the SAME grow (t.grow_id = grow_id)",
     () => {
       expect(INSERT_POLICY).toMatch(
-        /tent_id\s+IS\s+NULL\s+OR\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.tents[\s\S]*?id\s*=\s*tent_id[\s\S]*?user_id\s*=\s*auth\.uid\(\)[\s\S]*?grow_id\s*=\s*grow_id/i,
+        /tent_id\s+IS\s+NULL\s+OR\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.tents[\s\S]*?id\s*=\s*(?:action_queue\.)?tent_id[\s\S]*?user_id\s*=\s*auth\.uid\(\)[\s\S]*?grow_id\s*=\s*(?:action_queue\.)?grow_id/i,
       );
     },
   );
@@ -457,7 +457,7 @@ describe("Action Queue safety — same-grow lineage (plants/tents must share gro
     "INSERT enforces plant belongs to the SAME grow (p.grow_id = grow_id)",
     () => {
       expect(INSERT_POLICY).toMatch(
-        /plant_id\s+IS\s+NULL\s+OR\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.plants[\s\S]*?id\s*=\s*plant_id[\s\S]*?user_id\s*=\s*auth\.uid\(\)[\s\S]*?grow_id\s*=\s*grow_id/i,
+        /plant_id\s+IS\s+NULL\s+OR\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.plants[\s\S]*?id\s*=\s*(?:action_queue\.)?plant_id[\s\S]*?user_id\s*=\s*auth\.uid\(\)[\s\S]*?grow_id\s*=\s*(?:action_queue\.)?grow_id/i,
       );
     },
   );
@@ -465,8 +465,8 @@ describe("Action Queue safety — same-grow lineage (plants/tents must share gro
   (hasLineage ? it : it.skip)(
     "UPDATE mirrors the same-grow lineage checks for both plant and tent",
     () => {
-      expect(UPDATE_POLICY).toMatch(/t\.grow_id\s*=\s*grow_id/i);
-      expect(UPDATE_POLICY).toMatch(/p\.grow_id\s*=\s*grow_id/i);
+      expect(UPDATE_POLICY).toMatch(/t\.grow_id\s*=\s*(?:action_queue\.)?grow_id/i);
+      expect(UPDATE_POLICY).toMatch(/p\.grow_id\s*=\s*(?:action_queue\.)?grow_id/i);
     },
   );
 
@@ -474,7 +474,7 @@ describe("Action Queue safety — same-grow lineage (plants/tents must share gro
     "plant-in-tent consistency still enforced when both are set",
     () => {
       expect(INSERT_POLICY).toMatch(
-        /plant_id\s+IS\s+NULL\s+OR\s+tent_id\s+IS\s+NULL\s+OR\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.plants[\s\S]*?tent_id\s*=\s*tent_id/i,
+        /plant_id\s+IS\s+NULL\s+OR\s+tent_id\s+IS\s+NULL\s+OR\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.plants[\s\S]*?tent_id\s*=\s*(?:action_queue\.)?tent_id/i,
       );
     },
   );

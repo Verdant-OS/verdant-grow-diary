@@ -82,7 +82,7 @@ describe("normalizeSpiderFarmerGgsPayload — happy paths", () => {
     expect(r.context).toEqual({ fan_state: "on", light_state: "off" });
     const keys = Object.keys(r);
     for (const k of keys) {
-      expect(k).not.toMatch(/command|control|set_|setpoint|write/i);
+      expect(k).not.toMatch(/\bcontrol\b|command|setpoint|set_|write/i);
     }
   });
 

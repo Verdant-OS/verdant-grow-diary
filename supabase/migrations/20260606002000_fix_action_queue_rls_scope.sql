@@ -17,28 +17,36 @@ CREATE POLICY "Users insert own action_queue"
         AND g.user_id = auth.uid()
     )
     AND (
-      action_queue.tent_id IS NULL OR EXISTS (
-        SELECT 1 FROM public.tents t
-        WHERE t.id = action_queue.tent_id
-          AND t.user_id = auth.uid()
-          AND t.grow_id = action_queue.grow_id
+      action_queue.tent_id IS NULL OR (
+        action_queue.tent_id IS NOT NULL AND EXISTS (
+          SELECT 1 FROM public.tents t
+          WHERE t.id = action_queue.tent_id
+            AND t.user_id = auth.uid()
+            AND t.grow_id = action_queue.grow_id
+        )
       )
     )
     AND (
-      action_queue.plant_id IS NULL OR EXISTS (
-        SELECT 1 FROM public.plants p
-        WHERE p.id = action_queue.plant_id
-          AND p.user_id = auth.uid()
-          AND p.grow_id = action_queue.grow_id
+      action_queue.plant_id IS NULL OR (
+        action_queue.plant_id IS NOT NULL AND EXISTS (
+          SELECT 1 FROM public.plants p
+          WHERE p.id = action_queue.plant_id
+            AND p.user_id = auth.uid()
+            AND p.grow_id = action_queue.grow_id
+        )
       )
     )
     AND (
-      action_queue.plant_id IS NULL OR action_queue.tent_id IS NULL OR EXISTS (
-        SELECT 1 FROM public.plants p
-        WHERE p.id = action_queue.plant_id
-          AND p.user_id = auth.uid()
-          AND p.grow_id = action_queue.grow_id
-          AND p.tent_id = action_queue.tent_id
+      action_queue.plant_id IS NULL OR action_queue.tent_id IS NULL OR (
+        action_queue.plant_id IS NOT NULL
+        AND action_queue.tent_id IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM public.plants p
+          WHERE p.id = action_queue.plant_id
+            AND p.user_id = auth.uid()
+            AND p.grow_id = action_queue.grow_id
+            AND p.tent_id = action_queue.tent_id
+        )
       )
     )
   );
@@ -56,28 +64,36 @@ CREATE POLICY "Users update own action_queue"
         AND g.user_id = auth.uid()
     )
     AND (
-      action_queue.tent_id IS NULL OR EXISTS (
-        SELECT 1 FROM public.tents t
-        WHERE t.id = action_queue.tent_id
-          AND t.user_id = auth.uid()
-          AND t.grow_id = action_queue.grow_id
+      action_queue.tent_id IS NULL OR (
+        action_queue.tent_id IS NOT NULL AND EXISTS (
+          SELECT 1 FROM public.tents t
+          WHERE t.id = action_queue.tent_id
+            AND t.user_id = auth.uid()
+            AND t.grow_id = action_queue.grow_id
+        )
       )
     )
     AND (
-      action_queue.plant_id IS NULL OR EXISTS (
-        SELECT 1 FROM public.plants p
-        WHERE p.id = action_queue.plant_id
-          AND p.user_id = auth.uid()
-          AND p.grow_id = action_queue.grow_id
+      action_queue.plant_id IS NULL OR (
+        action_queue.plant_id IS NOT NULL AND EXISTS (
+          SELECT 1 FROM public.plants p
+          WHERE p.id = action_queue.plant_id
+            AND p.user_id = auth.uid()
+            AND p.grow_id = action_queue.grow_id
+        )
       )
     )
     AND (
-      action_queue.plant_id IS NULL OR action_queue.tent_id IS NULL OR EXISTS (
-        SELECT 1 FROM public.plants p
-        WHERE p.id = action_queue.plant_id
-          AND p.user_id = auth.uid()
-          AND p.grow_id = action_queue.grow_id
-          AND p.tent_id = action_queue.tent_id
+      action_queue.plant_id IS NULL OR action_queue.tent_id IS NULL OR (
+        action_queue.plant_id IS NOT NULL
+        AND action_queue.tent_id IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM public.plants p
+          WHERE p.id = action_queue.plant_id
+            AND p.user_id = auth.uid()
+            AND p.grow_id = action_queue.grow_id
+            AND p.tent_id = action_queue.tent_id
+        )
       )
     )
   );

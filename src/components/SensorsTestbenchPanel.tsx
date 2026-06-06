@@ -47,6 +47,7 @@ import {
 } from "@/lib/sensorIngestTestResultRules";
 import {
   buildCanonicalIngestPayloadValidation,
+  buildDiagnosticsBundleFilenamePreview,
   buildDiagnosticsBundleFiles,
   buildDownloadFilename,
   buildPowerShellCopyWarningState,
@@ -56,8 +57,10 @@ import {
   buildSensorIngestCurl,
   buildSensorIngestHistoryItem,
   buildSensorIngestTestPayload,
+  buildSensorTestbenchValidationUiState,
   diagnosticsExportToJson,
   diagnosticsExportToText,
+  formatSafeResponseInspectorPlainText,
   historyExportToJson,
   SENSOR_INGEST_HISTORY_MAX,
   type SensorIngestHistoryItem,

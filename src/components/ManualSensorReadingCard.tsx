@@ -129,6 +129,10 @@ export default function ManualSensorReadingCard({
     await doSave();
   }
 
+  const tentSetupRequired = shouldRequireFirstTentSetup(
+    tents.map((t) => ({ id: t.id, is_archived: false })),
+  );
+
   return (
     <Card className="glass" data-testid="manual-sensor-reading-card">
       <CardHeader className="pb-3">
@@ -138,6 +142,14 @@ export default function ManualSensorReadingCard({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {tentSetupRequired ? (
+          <FirstTentSetupEmptyState
+            surface="manual_sensor"
+            testId="manual-reading-first-tent-setup"
+          />
+        ) : (
+          <>
+
         <div
           className="flex items-start gap-2 rounded-md border border-border/50 bg-muted/40 p-2 text-xs text-muted-foreground"
           data-testid="manual-reading-helper"

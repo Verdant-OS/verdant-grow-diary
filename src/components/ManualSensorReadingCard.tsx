@@ -25,6 +25,8 @@ import {
 } from "@/lib/manualSensorSourceLabel";
 import { evaluateManualSnapshotAdvisor } from "@/lib/manualSensorSnapshotAdvisorRules";
 import DerivedVpdStatus from "@/components/DerivedVpdStatus";
+import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
+import { shouldRequireFirstTentSetup } from "@/lib/firstTentSetupRules";
 
 interface TentOption {
   id: string;

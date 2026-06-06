@@ -25,6 +25,7 @@ import { usePlants } from "@/hooks/use-plants";
 import { evaluateQuickLogPreview } from "@/lib/quickLogPreviewRules";
 import {
   appendHardwareReadingsToNote,
+  computeQuickLogHardwareDefaultOpen,
   hasAnyHardwareReading,
   type QuickLogHardwareReadings,
 } from "@/lib/quickLogHardwareReadingsRules";

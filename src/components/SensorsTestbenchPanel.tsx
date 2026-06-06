@@ -322,6 +322,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
           : null,
       requestMethod: "POST",
       hasActiveToken: !!reveal,
+      supabaseUrl: SUPABASE_URL,
     });
   }, [result, resultClass, reveal]);
 

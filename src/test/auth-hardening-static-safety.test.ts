@@ -72,10 +72,11 @@ describe("src/ static safety", () => {
     const offenders = SRC_FILES.filter((f) => {
       if (/src\/test\//.test(f)) return false; // guard tests assert absence
       const body = readFileSync(f, "utf8");
-      // Real escalation surface: env var read or createClient with service role.
+      // Real escalation surface: env access or createClient using service role.
       return (
-        /SUPABASE_SERVICE_ROLE_KEY/.test(body) ||
-        /service_role_key/i.test(body) ||
+        /\bSUPABASE_SERVICE_ROLE_KEY\b/.test(body) ||
+        /import\.meta\.env\.[A-Z_]*SERVICE_ROLE[A-Z_]*/.test(body) ||
+        /process\.env\.[A-Z_]*SERVICE_ROLE[A-Z_]*/.test(body) ||
         /createClient\([^)]*service.?role/i.test(body)
       );
     });

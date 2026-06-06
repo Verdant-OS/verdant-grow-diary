@@ -29,6 +29,7 @@ import {
 import type { AiDoctorReviewResult } from "@/lib/aiDoctorReviewResultContract";
 import type { Classification } from "@/lib/sensorSnapshotStatusContract";
 import type { AiCreditDenial } from "@/lib/aiCreditLimitNoticeViewModel";
+import type { AiCreditRemainingInput } from "@/lib/aiCreditRemainingBadgeViewModel";
 import {
   persistAiDoctorSession,
   type AiDoctorSessionInput,
@@ -47,7 +48,10 @@ export interface AiDoctorLiveReviewState {
   reason: AiDoctorLiveReviewFailureReason | null;
   /** Only populated when reason === 'credit_denied'. */
   credit?: AiCreditDenial;
+  /** Only populated on successful runs when the server returned a credit payload. */
+  creditRemaining?: AiCreditRemainingInput;
 }
+
 
 export interface UseAiDoctorLiveReviewOptions {
   /** Hook is inert until a packet is provided AND `enabled` is true. */

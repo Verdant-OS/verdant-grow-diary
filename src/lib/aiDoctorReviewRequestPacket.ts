@@ -70,11 +70,13 @@ export interface AiDoctorReviewRequestPacket {
   recentSensorSnapshot: AiDoctorReviewRequestSnapshot | null;
   /**
    * Additive: source-aware annotation built from the same shared helper
-   * used by ai-coach. Preserves provenance (live/manual/csv/demo/stale/
-   * invalid/unknown), surfaces safety notes, and never relabels.
+   * used by ai-coach. Optional so older fixtures stay valid. Preserves
+   * provenance (live/manual/csv/demo/stale/invalid/unknown), surfaces
+   * safety notes, and never relabels.
    */
-  recentSensorSnapshotAnnotation: AiDoctorReviewRequestSnapshotAnnotation | null;
+  recentSensorSnapshotAnnotation?: AiDoctorReviewRequestSnapshotAnnotation | null;
 }
+
 
 
 export interface BuildAiDoctorReviewPacketArgs {

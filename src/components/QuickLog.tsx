@@ -118,20 +118,22 @@ export default function QuickLog({
   // the latest snapshot classifies as `usable` (Gate 1 trust rule).
   const snapshotUserTouchedRef = useRef(false);
 
-  // Apply prefill when the dialog opens. Does NOT submit — grower still
-  // chooses to save the entry.
+  // Apply page-context prefill when the dialog opens. Does NOT submit —
+  // grower still chooses to save the entry. NOTE: plant resolution is NOT
+  // applied directly here. It is centralized in the
+  // `pickDefaultQuickLogPlant` effect below so that out-of-scope, archived,
+  // or merged plant ids in `prefill.plantId` are ignored and an existing
+  // grower selection is never overwritten on reopen.
   useEffect(() => {
     if (!open || !prefill) return;
     if (prefill.growId && prefill.growId !== activeGrowId) {
       setActiveGrowId(prefill.growId);
     }
-    if (prefill.plantId) setPlantId(prefill.plantId);
     if (prefill.eventType) setEventType(prefill.eventType);
     if (prefill.suggestSnapshot && prefill.tentId) setSnapshot(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     open,
-    prefill?.plantId,
     prefill?.growId,
     prefill?.tentId,
     prefill?.eventType,

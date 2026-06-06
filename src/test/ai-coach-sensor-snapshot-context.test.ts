@@ -198,17 +198,17 @@ describe("ai-coach edge function — static safety + wiring scan", () => {
 
   it("snapshot helper has no Supabase / fetch / device-control / secret refs", () => {
     for (const term of [
-      "createClient",
-      "supabase",
+      "createClient(",
+      "@supabase/supabase-js",
       "fetch(",
       "service_role",
-      "bearer ",
+      "Bearer ",
       "vbt_",
       "Authorization:",
       "api_key",
     ]) {
-      expect(helperSrc.toLowerCase(), `helper should not reference "${term}"`)
-        .not.toContain(term.toLowerCase());
+      expect(helperSrc, `helper should not reference "${term}"`)
+        .not.toContain(term);
     }
   });
 

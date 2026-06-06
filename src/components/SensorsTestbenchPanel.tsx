@@ -274,6 +274,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
       tentId,
       capturedAtIso: capturedAt,
     });
+    setLastPayload(payload);
     const idempotencyKey = `testbench-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     let res: Response | null = null;

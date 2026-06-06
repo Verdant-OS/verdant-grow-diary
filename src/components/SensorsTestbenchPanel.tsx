@@ -439,6 +439,17 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
   }
 
   async function copyPowerShellIngest() {
+    // Warn-and-confirm only when the one-time token reveal is in memory —
+    // the script will embed the real token. If reveal is absent the
+    // snippet is already token-free and copies without prompting.
+    const warning = buildPowerShellCopyWarningState({ hasTokenReveal: !!reveal });
+    if (warning.requiresConfirmation) {
+      const confirmFn =
+        typeof window !== "undefined" && typeof window.confirm === "function"
+          ? window.confirm.bind(window)
+          : null;
+      if (!confirmFn || !confirmFn(warning.message)) return;
+    }
     const cmd = buildPowerShellIngestTestScript({
       ingestUrl: INGEST_URL,
       tentId,
@@ -448,6 +459,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     });
     await safeCopy(cmd, "PowerShell ingest test");
   }
+
 
   function buildHistoryPayload() {
     return {

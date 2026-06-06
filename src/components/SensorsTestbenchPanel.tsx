@@ -677,7 +677,74 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
           </div>
         )}
 
+        {history.length > 0 && (
+          <div
+            className="mt-3 border-t border-border/40 pt-2"
+            data-testid="sensors-testbench-history"
+          >
+            <div className="flex items-center justify-between mb-1 gap-2">
+              <div className="text-xs font-medium flex items-center gap-1">
+                <History className="size-3" />
+                Local test history — clears on refresh
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={clearHistory}
+                data-testid="sensors-testbench-history-clear"
+              >
+                <Trash2 className="size-3 mr-1" /> Clear
+              </Button>
+            </div>
+            <ul className="space-y-1">
+              {history.map((h) => (
+                <li
+                  key={h.id}
+                  className="rounded border border-border/50 p-2 text-[11px]"
+                  data-testid="sensors-testbench-history-item"
+                  data-status={h.http_status}
+                  data-category={h.classification}
+                >
+                  <div className="flex flex-wrap items-center gap-1">
+                    <span className="font-mono">{h.attempted_at}</span>
+                    <span>·</span>
+                    <span className="font-medium">HTTP {h.http_status}</span>
+                    <span>·</span>
+                    <span>{h.classification}</span>
+                    {h.inserted !== null && (
+                      <span className="text-muted-foreground">
+                        · inserted {h.inserted}
+                      </span>
+                    )}
+                    {h.skipped_duplicate !== null && (
+                      <span className="text-muted-foreground">
+                        · dup {h.skipped_duplicate}
+                      </span>
+                    )}
+                    {h.rejected_count !== null && (
+                      <span className="text-muted-foreground">
+                        · rejected {h.rejected_count}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-muted-foreground break-all">
+                    key: {h.idempotency_key}
+                  </div>
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-muted-foreground">
+                      response body
+                    </summary>
+                    <pre className="bg-muted/40 rounded p-2 mt-1 overflow-x-auto whitespace-pre-wrap break-words">
+{JSON.stringify(h.body, null, 2)}
+                    </pre>
+                  </details>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );
 }
+

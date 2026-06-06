@@ -110,6 +110,7 @@ export default function PlantQuickLog({
   function clearPhoto() {
     handleFileSelected(null);
     if (fileRef.current) fileRef.current.value = "";
+    if (libraryFileRef.current) libraryFileRef.current.value = "";
   }
 
   const canSave = note.trim().length > 0 && !busy && !!growId;

@@ -3,7 +3,7 @@
  *
  * Verifies:
  *  - View model emits Coach-noun copy when surface="coach".
- *  - Presenter renders calm "X AI credits left" copy and hides on
+ *  - Presenter renders calm "X AI Coach credits left" copy and hides on
  *    missing/invalid `remaining`.
  *  - Doctor (default) copy is unchanged — no regression.
  */
@@ -14,22 +14,22 @@ import AiCreditRemainingBadge from "@/components/AiCreditRemainingBadge";
 import { paywallCtaHasBannedWords } from "@/lib/paywallCtaViewModel";
 
 describe("AI credit remaining badge — Coach surface (S3.1)", () => {
-  it("view model: coach per_grow label says 'AI credits left'", () => {
+  it("view model: coach per_grow label says 'AI Coach credits left'", () => {
     const vm = buildAiCreditRemainingBadgeViewModel(
       { remaining: 2, scope: "per_grow", scope_limit: 3 },
       { surface: "coach" },
     );
     expect(vm.visible).toBe(true);
-    expect(vm.label).toBe("2 of 3 AI credits left for this grow");
-    expect(vm.label).not.toMatch(/AI Doctor checks/i);
+    expect(vm.label).toBe("2 of 3 AI Coach credits left for this grow");
+    expect(vm.label).not.toMatch(/AI Doctor credits/i);
   });
 
-  it("view model: coach per_month label says 'AI credits left this month'", () => {
+  it("view model: coach per_month label says 'AI Coach credits left this month'", () => {
     const vm = buildAiCreditRemainingBadgeViewModel(
       { remaining: 97, scope: "per_month", scope_limit: 100 },
       { surface: "coach" },
     );
-    expect(vm.label).toBe("97 of 100 AI credits left this month");
+    expect(vm.label).toBe("97 of 100 AI Coach credits left this month");
     expect(vm.helper).toBe("Resets on the 1st of the month (UTC).");
   });
 
@@ -39,7 +39,7 @@ describe("AI credit remaining badge — Coach surface (S3.1)", () => {
       scope: "per_grow",
       scope_limit: 3,
     });
-    expect(vm.label).toBe("2 of 3 AI Doctor checks left for this grow");
+    expect(vm.label).toBe("2 of 3 AI Doctor credits left for this grow");
   });
 
   it("view model: missing remaining → hidden (both surfaces)", () => {
@@ -69,7 +69,7 @@ describe("AI credit remaining badge — Coach surface (S3.1)", () => {
       />,
     );
     const label = screen.getByTestId("coach-credit-remaining-badge-label");
-    expect(label.textContent).toBe("4 of 100 AI credits left this month");
+    expect(label.textContent).toBe("4 of 100 AI Coach credits left this month");
   });
 
   it("presenter: hides on null credit", () => {

@@ -97,6 +97,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/login", access: "redirect", description: "→ /auth" },
   { path: "/logs", access: "auth" },
   { path: "/operator/ecowitt", access: "operator", description: "Cloud Canary preview." },
+  { path: "/operator/one-tent-proof-record", access: "operator", description: "One-tent proof record export." },
   { path: "/partners/csv-preview", access: "public" },
   { path: "/pi-ingest-status", access: "operator" },
   { path: "/plants", access: "auth" },

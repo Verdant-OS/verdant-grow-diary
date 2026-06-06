@@ -111,6 +111,7 @@ describe("QuickLog plant/context accessibility", () => {
     renderQL();
     const hw = screen.getByTestId("quicklog-hardware-readings");
     expect(hw).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("quicklog-hardware-toggle"));
     const inputs = hw.querySelectorAll("input");
     fireEvent.change(inputs[0], { target: { value: "6.2" } });
     const btn = screen.getByTestId("quick-log-save") as HTMLButtonElement;

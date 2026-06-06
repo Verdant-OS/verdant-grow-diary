@@ -25,6 +25,7 @@ import { usePlants } from "@/hooks/use-plants";
 import { evaluateQuickLogPreview } from "@/lib/quickLogPreviewRules";
 import {
   appendHardwareReadingsToNote,
+  computeQuickLogHardwareDefaultOpen,
   hasAnyHardwareReading,
   type QuickLogHardwareReadings,
 } from "@/lib/quickLogHardwareReadingsRules";
@@ -106,7 +107,12 @@ export default function QuickLog({
     lightDistance: "",
   });
   const [busy, setBusy] = useState(false);
-  
+  // Hardware readings collapse state. Default is recomputed via a pure
+  // helper whenever the dialog opens/resets, and remains under grower
+  // control once they toggle it in-session.
+  const [hardwareOpen, setHardwareOpen] = useState(false);
+  const hardwareUserTouchedRef = useRef(false);
+
   // Tracks whether the grower has manually changed the attach toggle in
   // this session. Until they do, we may auto-default it based on whether
   // the latest snapshot classifies as `usable` (Gate 1 trust rule).
@@ -188,6 +194,17 @@ export default function QuickLog({
     }
   }, [open, stripView.status, selectedPlant?.tent_id, snapshot]);
 
+  // On open/reset, recompute the Hardware readings default from current
+  // values unless the grower already toggled it in this session.
+  useEffect(() => {
+    if (!open) {
+      hardwareUserTouchedRef.current = false;
+      return;
+    }
+    if (hardwareUserTouchedRef.current) return;
+    setHardwareOpen(computeQuickLogHardwareDefaultOpen(hardware));
+  }, [open, hardware]);
+
   function reset() {
     setNote("");
     setShowMore(false);
@@ -205,6 +222,8 @@ export default function QuickLog({
       ppfdCanopy: "",
       lightDistance: "",
     });
+    hardwareUserTouchedRef.current = false;
+    setHardwareOpen(false);
   }
 
   async function submit(e: React.FormEvent) {
@@ -540,78 +559,94 @@ export default function QuickLog({
           <section
             data-testid="quicklog-hardware-readings"
             data-has-readings={String(hasAnyHardwareReading(hardware))}
+            data-open={String(hardwareOpen)}
             className="rounded-lg border border-border/60 p-3 space-y-2"
           >
-            <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              data-testid="quicklog-hardware-toggle"
+              aria-expanded={hardwareOpen}
+              aria-controls="quicklog-hardware-body"
+              onClick={() => {
+                hardwareUserTouchedRef.current = true;
+                setHardwareOpen((v) => !v);
+              }}
+              className="flex w-full items-center justify-between gap-2 text-left"
+            >
               <span className="text-sm font-medium">Hardware readings</span>
               <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                Optional
+                {hardwareOpen ? "Optional" : "Tap to add"}
               </span>
-            </div>
-            <p
-              data-testid="quicklog-hardware-helper"
-              className="text-[11px] text-muted-foreground leading-snug"
-            >
-              Manual handheld readings — not live sensor data. e.g. Spider Farmer pH/EC combo pen or
-              PAR/PPFD meter. Leave blank if not measured.
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-xs">Feed/Input pH</Label>
-                <Input
-                  inputMode="decimal"
-                  value={hardware.inputPh ?? ""}
-                  onChange={(e) => setHardware({ ...hardware, inputPh: e.target.value })}
-                  placeholder="6.2"
-                />
+            </button>
+            {hardwareOpen && (
+              <div id="quicklog-hardware-body" className="space-y-2">
+                <p
+                  data-testid="quicklog-hardware-helper"
+                  className="text-[11px] text-muted-foreground leading-snug"
+                >
+                  Manual handheld readings — not live sensor data. e.g. Spider Farmer pH/EC combo pen or
+                  PAR/PPFD meter. Leave blank if not measured.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs">Feed/Input pH</Label>
+                    <Input
+                      inputMode="decimal"
+                      value={hardware.inputPh ?? ""}
+                      onChange={(e) => setHardware({ ...hardware, inputPh: e.target.value })}
+                      placeholder="6.2"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Feed/Input EC (mS/cm)</Label>
+                    <Input
+                      inputMode="decimal"
+                      value={hardware.inputEc ?? ""}
+                      onChange={(e) => setHardware({ ...hardware, inputEc: e.target.value })}
+                      placeholder="1.4"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Runoff pH</Label>
+                    <Input
+                      inputMode="decimal"
+                      value={hardware.runoffPh ?? ""}
+                      onChange={(e) => setHardware({ ...hardware, runoffPh: e.target.value })}
+                      placeholder="6.0"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Runoff EC (mS/cm)</Label>
+                    <Input
+                      inputMode="decimal"
+                      value={hardware.runoffEc ?? ""}
+                      onChange={(e) => setHardware({ ...hardware, runoffEc: e.target.value })}
+                      placeholder="1.6"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">PPFD canopy (µmol)</Label>
+                    <Input
+                      inputMode="decimal"
+                      value={hardware.ppfdCanopy ?? ""}
+                      onChange={(e) => setHardware({ ...hardware, ppfdCanopy: e.target.value })}
+                      placeholder="650"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Light distance (cm)</Label>
+                    <Input
+                      inputMode="decimal"
+                      value={hardware.lightDistance ?? ""}
+                      onChange={(e) => setHardware({ ...hardware, lightDistance: e.target.value })}
+                      placeholder="45"
+                    />
+                  </div>
+                </div>
               </div>
-              <div>
-                <Label className="text-xs">Feed/Input EC (mS/cm)</Label>
-                <Input
-                  inputMode="decimal"
-                  value={hardware.inputEc ?? ""}
-                  onChange={(e) => setHardware({ ...hardware, inputEc: e.target.value })}
-                  placeholder="1.4"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Runoff pH</Label>
-                <Input
-                  inputMode="decimal"
-                  value={hardware.runoffPh ?? ""}
-                  onChange={(e) => setHardware({ ...hardware, runoffPh: e.target.value })}
-                  placeholder="6.0"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Runoff EC (mS/cm)</Label>
-                <Input
-                  inputMode="decimal"
-                  value={hardware.runoffEc ?? ""}
-                  onChange={(e) => setHardware({ ...hardware, runoffEc: e.target.value })}
-                  placeholder="1.6"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">PPFD canopy (µmol)</Label>
-                <Input
-                  inputMode="decimal"
-                  value={hardware.ppfdCanopy ?? ""}
-                  onChange={(e) => setHardware({ ...hardware, ppfdCanopy: e.target.value })}
-                  placeholder="650"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Light distance (cm)</Label>
-                <Input
-                  inputMode="decimal"
-                  value={hardware.lightDistance ?? ""}
-                  onChange={(e) => setHardware({ ...hardware, lightDistance: e.target.value })}
-                  placeholder="45"
-                />
-              </div>
-            </div>
+            )}
           </section>
+
 
           {(() => {
             const preview = evaluateQuickLogPreview({

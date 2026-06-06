@@ -169,6 +169,8 @@ describe("QuickLog hardware readings UI", () => {
     const section = screen.getByTestId("quicklog-hardware-readings");
     expect(section).toBeInTheDocument();
     expect(within(section).getByText(/Hardware readings/i)).toBeInTheDocument();
+    // Default collapsed when no values — expand to assert fields.
+    fireEvent.click(screen.getByTestId("quicklog-hardware-toggle"));
     const helper = screen.getByTestId("quicklog-hardware-helper");
     expect(helper.textContent).toMatch(/manual handheld/i);
     expect(helper.textContent).toMatch(/not live sensor data/i);
@@ -215,6 +217,7 @@ describe("QuickLog hardware readings UI", () => {
     fireEvent.change(dialog.querySelector("textarea") as HTMLTextAreaElement, {
       target: { value: "Watered today" },
     });
+    fireEvent.click(screen.getByTestId("quicklog-hardware-toggle"));
     const section = screen.getByTestId("quicklog-hardware-readings");
     const inputs = section.querySelectorAll("input");
     fireEvent.change(inputs[0], { target: { value: "6.2" } });
@@ -249,6 +252,7 @@ describe("QuickLog hardware readings UI", () => {
     fireEvent.change(dialog.querySelector("textarea") as HTMLTextAreaElement, {
       target: { value: "Reading" },
     });
+    fireEvent.click(screen.getByTestId("quicklog-hardware-toggle"));
     const section = screen.getByTestId("quicklog-hardware-readings");
     const inputs = section.querySelectorAll("input");
     fireEvent.change(inputs[0], { target: { value: "6.2" } });

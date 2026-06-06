@@ -60,7 +60,7 @@ import {
   shouldWarnPendingActionHasClosedSourceAlert,
   stripBackPointerTokens,
 } from "@/lib/actionQueueProvenanceRules";
-import { buildActionButtonAriaLabel, buildStatusBadgeAriaLabel } from "@/lib/actionQueueRowView";
+import { buildActionButtonAriaLabel, buildStatusBadgeAriaLabel, sanitizeActionCopy } from "@/lib/actionQueueRowView";
 
 import {
   ACTION_FOLLOWUP_EVENT_TYPE,

@@ -915,7 +915,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
             data-status={responseInspector.http_status}
             data-classification={responseInspector.classification}
           >
-            <div className="font-medium mb-1 flex items-center gap-2">
+            <div className="font-medium mb-1 flex flex-wrap items-center gap-2">
               <Eye className="size-3" />
               Response inspector
               <Badge variant="outline" className="text-[10px]">
@@ -927,6 +927,24 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
               <Badge variant="outline" className="text-[10px]">
                 {responseInspector.kind}
               </Badge>
+              <Button
+                size="sm"
+                variant="outline"
+                className="ml-auto h-7"
+                onClick={() =>
+                  inspectorPlainText &&
+                  safeCopy(inspectorPlainText, "Response inspector (redacted)")
+                }
+                disabled={!inspectorPlainText}
+                data-testid="sensors-testbench-response-inspector-copy"
+                title={
+                  inspectorPlainText
+                    ? "Copy the redacted inspector output for support."
+                    : "Run a test to enable inspector copy."
+                }
+              >
+                <Copy className="size-3 mr-1" /> Copy redacted
+              </Button>
             </div>
             {responseInspector.note && (
               <div className="text-muted-foreground mb-1">
@@ -955,8 +973,31 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
                 ))}
               </ul>
             )}
+            <div className="mt-2">
+              <a
+                href="#sensors-testbench-canonical-validation"
+                className="text-[11px] underline text-muted-foreground"
+                data-testid="sensors-testbench-result-readiness-badge"
+                data-status={validationUi.status}
+              >
+                Canonical payload:{" "}
+                <Badge
+                  variant="outline"
+                  className={
+                    validationUi.badgeTone === "ready"
+                      ? "ml-1 text-[10px] text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
+                      : validationUi.badgeTone === "warn"
+                        ? "ml-1 text-[10px] text-amber-700 dark:text-amber-300 border-amber-500/40"
+                        : "ml-1 text-[10px]"
+                  }
+                >
+                  {validationUi.statusLabel}
+                </Badge>
+              </a>
+            </div>
           </div>
         )}
+
 
         {/* Canonical payload validation summary — gates preview/copy/export. */}
         <div

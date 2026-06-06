@@ -49,7 +49,7 @@ import {
   buildCanonicalIngestPayloadValidation,
   buildDiagnosticsBundleFiles,
   buildDownloadFilename,
-  buildHistoryExport,
+  buildDownloadFilename,
   buildPowerShellCopyWarningState,
   buildPowerShellIngestTestScript,
   buildRedactedPayloadPreview,

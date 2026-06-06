@@ -156,8 +156,8 @@ Deno.serve(async (req) => {
     if (grow) {
       ctxLines.push(`GROW: ${grow.name} | type=${grow.grow_type} | stage=${grow.stage} | started=${grow.started_at}`);
     }
-    const snapshotCtx = buildAiCoachSensorSnapshotContext(latestSnapshot);
-    ctxLines.push(snapshotCtx.line);
+    const snapshotCtx = buildAiSensorSnapshotContext(latestSnapshot);
+    ctxLines.push(snapshotCtx.annotationLine);
     for (const note of snapshotCtx.safetyNotes) {
       ctxLines.push(`SENSOR_SAFETY_NOTE: ${note}`);
     }

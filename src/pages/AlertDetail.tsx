@@ -47,6 +47,13 @@ import {
 } from "@/lib/routes";
 import { actionMatchesAlert, buildActionQueueDraftFromAlert } from "@/lib/alertToActionQueueRules";
 import {
+  decideAddButtonState,
+  shouldBlockInsert,
+  type ActionQueueRowForDedupe,
+} from "@/lib/alertActionQueueDedupeRules";
+import { deriveAlertReadingSource } from "@/lib/alertReadingSourceRules";
+import SensorSourceProvenanceBadge from "@/components/SensorSourceProvenanceBadge";
+import {
   ACTION_QUEUE_SOURCE_VALUES,
   extractSourceAiDoctorSessionId,
   getActionQueueSourceLabel,
@@ -59,6 +66,7 @@ import {
   type RawOutcomeDiaryRow,
 } from "@/lib/relatedActionOutcomeRules";
 import { ACTION_OUTCOME_EVENT_TYPE } from "@/lib/actionOutcomeRules";
+
 
 import { supabase } from "@/integrations/supabase/client";
 

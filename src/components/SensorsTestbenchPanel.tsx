@@ -1089,7 +1089,69 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
                   </li>
                 ))}
               </ul>
+        )}
+
+        {networkDiagnostics && networkDiagnostics.status !== "not_applicable" && (
+          <div
+            className="mt-3 border border-amber-500/40 bg-amber-50/40 dark:bg-amber-900/10 rounded p-2 text-xs"
+            data-testid="sensors-testbench-network-diagnostics"
+            data-status={networkDiagnostics.status}
+          >
+            <div className="font-medium mb-1 flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="text-[10px]">
+                Network diagnostics
+              </Badge>
+              <span data-testid="sensors-testbench-network-diagnostics-title">
+                {networkDiagnostics.title}
+              </span>
+            </div>
+            <p
+              className="text-muted-foreground mb-2"
+              data-testid="sensors-testbench-network-diagnostics-summary"
+            >
+              {networkDiagnostics.summary}
+            </p>
+            <div className="grid gap-1 mb-2 font-mono text-[11px]">
+              <div>
+                <span className="text-muted-foreground">resolved ingest URL:</span>{" "}
+                <span data-testid="sensors-testbench-network-diagnostics-endpoint">
+                  {networkDiagnostics.resolvedEndpoint}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">browser origin:</span>{" "}
+                <span data-testid="sensors-testbench-network-diagnostics-origin">
+                  {networkDiagnostics.appOrigin}
+                </span>
+              </div>
+            </div>
+            {networkDiagnostics.evidence.length > 0 && (
+              <div className="mb-2">
+                <div className="text-muted-foreground mb-1">Evidence</div>
+                <ul
+                  className="list-disc pl-4 space-y-0.5"
+                  data-testid="sensors-testbench-network-diagnostics-evidence"
+                >
+                  {networkDiagnostics.evidence.map((e, i) => (
+                    <li key={i}>{e}</li>
+                  ))}
+                </ul>
+              </div>
             )}
+            {networkDiagnostics.recommendedChecks.length > 0 && (
+              <div>
+                <div className="text-muted-foreground mb-1">Recommended checks</div>
+                <ul
+                  className="list-disc pl-4 space-y-0.5"
+                  data-testid="sensors-testbench-network-diagnostics-checks"
+                >
+                  {networkDiagnostics.recommendedChecks.map((c, i) => (
+                    <li key={i}>{c}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
             <div className="mt-2">
               <a
                 href="#canonical-ingest-validation-details"

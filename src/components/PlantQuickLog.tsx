@@ -255,7 +255,7 @@ export default function PlantQuickLog({
                     className="h-12"
                   >
                     <Camera className="h-4 w-4 mr-2" aria-hidden="true" />
-                    Take Photo
+                    {photoGate.takePhotoLabel}
                   </Button>
                   <Button
                     type="button"
@@ -265,11 +265,11 @@ export default function PlantQuickLog({
                     aria-controls="plant-quick-log-photo-library-input"
                     className="h-12"
                   >
-                    Choose from Library
+                    {photoGate.chooseLibraryLabel}
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Add a new photo or pick one already on your phone. Optional.
+                  {photoGate.pickerHelperText}
                 </p>
               </div>
             )}

@@ -286,9 +286,9 @@ export default function OneTentProofRecord() {
         <CardHeader>
           <CardTitle className="text-base">Preview &amp; download</CardTitle>
           <CardDescription>
-            JSON is generated entirely client-side. PDF export is deferred — the
-            project does not yet have a general-purpose PDF helper outside the
-            CSV preview module.
+            JSON is generated entirely client-side. A printable export is
+            deferred until the project ships a shared safe export helper for
+            this surface.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">

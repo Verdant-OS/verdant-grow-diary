@@ -106,7 +106,8 @@ describe("ai-coach edge function — security shape", () => {
     // The context block is assembled from server-queried variables, not from body fields.
     expect(CODE).toMatch(/const\s+context\s*=\s*ctxLines\.join/);
     expect(CODE).not.toMatch(/ctxLines\.push\([^)]*body\.(plant|tent|user)/i);
-    // latestSnapshot is read off the already-RLS-filtered diary entry row.
-    expect(CODE).toMatch(/row\.details[\s\S]{0,80}sensor_snapshot/);
+    // latestSnapshot is selected from the already-RLS-filtered diary
+    // entries via the dedicated picker helper.
+    expect(CODE).toMatch(/pickLatestSensorSnapshotByCapturedAt\(\s*entries\s*\)/);
   });
 });

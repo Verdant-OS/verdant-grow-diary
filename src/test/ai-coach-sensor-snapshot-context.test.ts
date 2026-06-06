@@ -191,9 +191,9 @@ describe("ai-coach edge function — static safety + wiring scan", () => {
     expect(indexSrc).not.toMatch(/JSON\.stringify\(\s*latestSnapshot\s*\)/);
   });
 
-  it("imports and uses buildAiCoachSensorSnapshotContext", () => {
-    expect(indexSrc).toContain('from "./sensorSnapshotContext.ts"');
-    expect(indexSrc).toContain("buildAiCoachSensorSnapshotContext(latestSnapshot");
+  it("imports and uses the shared buildAiSensorSnapshotContext helper", () => {
+    expect(indexSrc).toContain('from "./sensorSnapshotContextRules.ts"');
+    expect(indexSrc).toContain("buildAiSensorSnapshotContext(latestSnapshot");
   });
 
   it("snapshot helper has no Supabase / fetch / device-control / secret refs", () => {
@@ -230,9 +230,9 @@ describe("ai-doctor-review packet shape — shared annotation helper", () => {
     expect(packetSrc).toContain("readings");
   });
 
-  it("packet builder now consumes the shared ai-coach annotation helper", () => {
-    expect(packetSrc).toContain("aiCoachSensorSnapshotContext");
-    expect(packetSrc).toContain("buildAiCoachSensorSnapshotContext");
+  it("packet builder now consumes the shared sensor-snapshot rules helper", () => {
+    expect(packetSrc).toContain("aiSensorSnapshotContextRules");
+    expect(packetSrc).toContain("buildAiSensorSnapshotContext");
     expect(packetSrc).toContain("recentSensorSnapshotAnnotation");
   });
 });

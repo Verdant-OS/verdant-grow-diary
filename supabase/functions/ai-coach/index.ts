@@ -1,6 +1,7 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { buildAiCoachSensorSnapshotContext } from "./sensorSnapshotContext.ts";
+import { buildAiSensorSnapshotContext } from "./sensorSnapshotContextRules.ts";
+import { pickLatestSensorSnapshotByCapturedAt } from "./latestSensorSnapshot.ts";
 
 type Mode = "diagnose" | "next_steps";
 interface Body {
@@ -135,10 +136,10 @@ Deno.serve(async (req) => {
         (t ?? []).forEach((row: Record<string, unknown>) => tentsById.set(row.id as string, row));
       }
 
-      for (const row of entries) {
-        const snap = (row.details as Record<string, unknown> | null)?.sensor_snapshot;
-        if (snap && typeof snap === "object") { latestSnapshot = snap as Record<string, unknown>; break; }
-      }
+      // Select the freshest snapshot by its own captured_at (not by
+      // diary entry_at order). Missing/invalid timestamps cannot
+      // outrank a valid current reading.
+      latestSnapshot = pickLatestSensorSnapshotByCapturedAt(entries);
     }
 
     const sparse = entries.length < 2;
@@ -155,8 +156,8 @@ Deno.serve(async (req) => {
     if (grow) {
       ctxLines.push(`GROW: ${grow.name} | type=${grow.grow_type} | stage=${grow.stage} | started=${grow.started_at}`);
     }
-    const snapshotCtx = buildAiCoachSensorSnapshotContext(latestSnapshot);
-    ctxLines.push(snapshotCtx.line);
+    const snapshotCtx = buildAiSensorSnapshotContext(latestSnapshot);
+    ctxLines.push(snapshotCtx.annotationLine);
     for (const note of snapshotCtx.safetyNotes) {
       ctxLines.push(`SENSOR_SAFETY_NOTE: ${note}`);
     }

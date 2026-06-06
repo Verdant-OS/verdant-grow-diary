@@ -1,6 +1,7 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { buildAiCoachSensorSnapshotContext } from "./sensorSnapshotContext.ts";
+import { buildAiSensorSnapshotContext } from "./sensorSnapshotContextRules.ts";
+import { pickLatestSensorSnapshotByCapturedAt } from "./latestSensorSnapshot.ts";
 
 type Mode = "diagnose" | "next_steps";
 interface Body {

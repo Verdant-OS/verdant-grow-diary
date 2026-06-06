@@ -28,8 +28,8 @@ function renderPage() {
 describe("OneTentProofRecord screen", () => {
   it("labels itself as Proof Record / Review only", () => {
     renderPage();
-    expect(screen.getByText(/Proof Record/i)).toBeTruthy();
-    expect(screen.getByText(/Review only/i)).toBeTruthy();
+    expect(screen.getByTestId("chip-proof-record").textContent).toMatch(/Proof Record/i);
+    expect(screen.getByTestId("chip-review-only").textContent).toMatch(/Review only/i);
     expect(screen.getByRole("heading", { name: /One-Tent Proof Record/i })).toBeTruthy();
   });
 

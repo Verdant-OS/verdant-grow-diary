@@ -55,6 +55,13 @@ interface CoachResponse {
   sparse?: boolean;
   empty?: boolean;
   error?: string;
+  /** Post-success credit envelope (S3.1 Coach parity). Optional + defensive. */
+  credit?: {
+    remaining?: number | null;
+    scope?: string | null;
+    scope_limit?: number | null;
+    period_key?: string | null;
+  };
 }
 
 export default function Coach() {

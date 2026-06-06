@@ -179,3 +179,190 @@ describe("buildCanonicalIngestPayloadValidation", () => {
     expect(v.ready).toBe(true);
   });
 });
+
+import {
+  buildDiagnosticsBundleFilenamePreview,
+  buildDownloadFilename,
+  buildSensorTestbenchValidationUiState,
+  formatSafeResponseInspectorPlainText,
+} from "@/lib/sensorDiagnosticsExportRules";
+
+describe("buildSensorTestbenchValidationUiState", () => {
+  function v(payload: unknown) {
+    return buildCanonicalIngestPayloadValidation(payload);
+  }
+  const goodPayload = buildSensorIngestTestPayload({
+    tentId: "tent-1",
+    capturedAtIso: "2026-06-06T18:00:00Z",
+  });
+
+  it("returns no_test_yet when ready but no last test (calm empty state, actions enabled)", () => {
+    const ui = buildSensorTestbenchValidationUiState({
+      validation: v(goodPayload),
+      hasLastTest: false,
+    });
+    expect(ui.status).toBe("no_test_yet");
+    expect(ui.statusLabel).toBe("No test yet");
+    expect(ui.actionsDisabled).toBe(false);
+    expect(ui.disabledReason).toBeNull();
+    expect(ui.emptyStateMessage).toMatch(/Run a test to generate/i);
+    // No scary invalid copy
+    expect(ui.emptyStateMessage).not.toMatch(/invalid/i);
+  });
+
+  it("returns ready when payload valid and last test exists", () => {
+    const ui = buildSensorTestbenchValidationUiState({
+      validation: v(goodPayload),
+      hasLastTest: true,
+    });
+    expect(ui.status).toBe("ready");
+    expect(ui.actionsDisabled).toBe(false);
+    expect(ui.badgeTone).toBe("ready");
+  });
+
+  it("names exactly the single missing field in disabled reason", () => {
+    const partial = { ...goodPayload, source: undefined } as unknown;
+    const ui = buildSensorTestbenchValidationUiState({
+      validation: v(partial),
+      hasLastTest: false,
+    });
+    expect(ui.status).toBe("not_ready");
+    expect(ui.actionsDisabled).toBe(true);
+    expect(ui.disabledReason).toMatch(/Disabled until canonical payload includes source\.?$/);
+    // No comma when only one field
+    expect(ui.disabledReason).not.toMatch(/,/);
+  });
+
+  it("lists all missing required fields when several missing", () => {
+    const ui = buildSensorTestbenchValidationUiState({
+      validation: v({}),
+      hasLastTest: false,
+    });
+    expect(ui.disabledReason).toMatch(/source/);
+    expect(ui.disabledReason).toMatch(/captured_at/);
+    expect(ui.disabledReason).toMatch(/tent_id/);
+    expect(ui.disabledReason).toMatch(/confidence/);
+    expect(ui.disabledReason).toMatch(/readings/);
+  });
+
+  it("invalid readings object produces clear reason and disables actions", () => {
+    const ui = buildSensorTestbenchValidationUiState({
+      validation: v({
+        tent_id: "t",
+        source: "ecowitt",
+        captured_at: "2026-06-06T18:00:00Z",
+        confidence: "test",
+        readings: {},
+      }),
+      hasLastTest: true,
+    });
+    expect(ui.status).toBe("not_ready");
+    expect(ui.actionsDisabled).toBe(true);
+    expect(
+      ui.summary.invalid.some(
+        (i) => i.field === "readings" && /empty readings object/i.test(i.reason),
+      ),
+    ).toBe(true);
+    expect(ui.disabledReason).toMatch(/readings/);
+  });
+
+  it("malformed captured_at flagged as invalid with specific reason", () => {
+    const ui = buildSensorTestbenchValidationUiState({
+      validation: v({
+        tent_id: "t",
+        source: "ecowitt",
+        captured_at: "not-a-date",
+        confidence: "test",
+        readings: { temp_f: 70 },
+      }),
+      hasLastTest: true,
+    });
+    expect(
+      ui.summary.invalid.some(
+        (i) => i.field === "captured_at" && /malformed timestamp/i.test(i.reason),
+      ),
+    ).toBe(true);
+  });
+
+  it("missing source/tent_id/confidence carry field-specific reasons", () => {
+    const ui = buildSensorTestbenchValidationUiState({
+      validation: v({
+        readings: { x: 1 },
+        captured_at: "2026-06-06T18:00:00Z",
+      }),
+      hasLastTest: true,
+    });
+    const missingByField = Object.fromEntries(
+      ui.summary.missing.map((m) => [m.field, m.reason]),
+    );
+    expect(missingByField.source).toMatch(/source/i);
+    expect(missingByField.tent_id).toMatch(/tent/i);
+    expect(missingByField.confidence).toMatch(/confidence|invalid/i);
+  });
+
+  it("raw_payload is in optional summary, not required", () => {
+    const ui = buildSensorTestbenchValidationUiState({
+      validation: v(goodPayload),
+      hasLastTest: true,
+    });
+    expect(ui.summary.optional).toContain("raw_payload");
+    expect(ui.summary.missing.map((m) => m.field)).not.toContain(
+      "raw_payload" as never,
+    );
+  });
+});
+
+describe("buildDiagnosticsBundleFilenamePreview", () => {
+  it("uses buildDownloadFilename with the bundle prefix and .zip extension", () => {
+    const d = new Date(Date.UTC(2026, 5, 6, 18, 0, 0));
+    const preview = buildDiagnosticsBundleFilenamePreview(d);
+    const expected = buildDownloadFilename(
+      "verdant-sensor-diagnostics-bundle",
+      "zip",
+      d,
+    );
+    expect(preview).toBe(expected);
+    expect(preview).toBe(
+      "verdant-sensor-diagnostics-bundle-20260606-180000.zip",
+    );
+  });
+});
+
+describe("formatSafeResponseInspectorPlainText", () => {
+  it("includes HTTP status, classification, and redacted breakdown", () => {
+    const insp = buildSafeResponseInspector({
+      status: 200,
+      classification: "accepted",
+      body: { ok: true, token: PLAINTEXT, nested: { authorization: PLAINTEXT, ok: false } },
+    });
+    const text = formatSafeResponseInspectorPlainText(insp);
+    expect(text).toMatch(/HTTP 200/);
+    expect(text).toMatch(/classification: accepted/);
+    expect(text).toMatch(/breakdown:/);
+    // Sensitive keys appear marked redacted, never raw plaintext.
+    expect(text).not.toContain(PLAINTEXT);
+    expect(text).toMatch(/\[redacted\]/);
+  });
+
+  it("handles non-JSON and empty bodies safely", () => {
+    const nonJson = formatSafeResponseInspectorPlainText(
+      buildSafeResponseInspector({
+        status: 500,
+        classification: "server_error",
+        body: `oops ${PLAINTEXT}`,
+      }),
+    );
+    expect(nonJson).toMatch(/HTTP 500/);
+    expect(nonJson).not.toContain(PLAINTEXT);
+
+    const empty = formatSafeResponseInspectorPlainText(
+      buildSafeResponseInspector({
+        status: 204,
+        classification: "accepted",
+        body: null,
+      }),
+    );
+    expect(empty).toMatch(/HTTP 204/);
+    expect(empty).toMatch(/\(empty\)/);
+  });
+});

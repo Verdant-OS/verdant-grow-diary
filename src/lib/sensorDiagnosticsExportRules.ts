@@ -1006,6 +1006,7 @@ export interface DiagnosticsShareModalState {
   supportSummary: string;
   redactedInspectorText: string | null;
   canDownloadBundle: boolean;
+  networkDiagnostics: SensorIngestNetworkDiagnostics | null;
 }
 
 /**
@@ -1016,7 +1017,19 @@ export function buildDiagnosticsShareModalState(input: {
   validationUi: SensorTestbenchValidationUiState;
   lastTestResult: { http_status: number; classification: string } | null;
   inspectorPlainText: string | null;
+  networkDiagnostics?: SensorIngestNetworkDiagnostics | null;
 }): DiagnosticsShareModalState {
+  const network = input.networkDiagnostics ?? null;
+  const baseSummary = buildDiagnosticsShareSummary({
+    bundleFilename: input.bundleFilename,
+    validationUi: input.validationUi,
+    lastTestResult: input.lastTestResult,
+    inspectorPlainText: input.inspectorPlainText,
+  });
+  const supportSummary =
+    network && network.status !== "not_applicable"
+      ? redactTokens(`${baseSummary}\n\n${network.safeSupportSummary}`)
+      : baseSummary;
   return {
     bundleFilename: input.bundleFilename,
     statusLabel: input.validationUi.statusLabel,
@@ -1025,13 +1038,182 @@ export function buildDiagnosticsShareModalState(input: {
     ariaLabel: buildCanonicalValidationA11yLabel({
       status: input.validationUi.status,
     }),
-    supportSummary: buildDiagnosticsShareSummary({
-      bundleFilename: input.bundleFilename,
-      validationUi: input.validationUi,
-      lastTestResult: input.lastTestResult,
-      inspectorPlainText: input.inspectorPlainText,
-    }),
+    supportSummary,
     redactedInspectorText: input.inspectorPlainText,
     canDownloadBundle: !input.validationUi.actionsDisabled,
+    networkDiagnostics: network,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Network diagnostics — pure helper for HTTP 0 / network_error cases
+// ---------------------------------------------------------------------------
+
+export type SensorIngestNetworkDiagnosticsStatus =
+  | "not_applicable"
+  | "likely_network_blocked"
+  | "likely_cors_or_preflight"
+  | "likely_mixed_content"
+  | "likely_endpoint_unreachable"
+  | "likely_endpoint_misconfigured"
+  | "needs_network_inspection";
+
+export interface SensorIngestNetworkDiagnostics {
+  status: SensorIngestNetworkDiagnosticsStatus;
+  title: string;
+  summary: string;
+  evidence: string[];
+  recommendedChecks: string[];
+  safeSupportSummary: string;
+  resolvedEndpoint: string;
+  appOrigin: string;
+}
+
+export interface SensorIngestNetworkDiagnosticsInput {
+  ingestUrl: string | null | undefined;
+  appOrigin: string | null | undefined;
+  httpStatus: number;
+  classification: string;
+  errorMessage?: string | null;
+  requestMethod?: string | null;
+  hasActiveToken?: boolean;
+}
+
+function parseUrlSafe(u: string | null | undefined): URL | null {
+  if (!u) return null;
+  try {
+    return new URL(u);
+  } catch {
+    return null;
+  }
+}
+
+function isPrivateHost(host: string): boolean {
+  if (!host) return false;
+  const h = host.toLowerCase();
+  if (h === "localhost" || h === "127.0.0.1" || h === "0.0.0.0" || h === "::1") return true;
+  if (/^10\./.test(h)) return true;
+  if (/^192\.168\./.test(h)) return true;
+  if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(h)) return true;
+  if (/\.local$/.test(h)) return true;
+  return false;
+}
+
+/**
+ * Build operator-friendly diagnostics for HTTP 0 / network_error cases.
+ * Pure function. Never reads tokens; only accepts a boolean indicator.
+ * Output is defensively token-redacted.
+ */
+export function buildSensorIngestNetworkDiagnostics(
+  input: SensorIngestNetworkDiagnosticsInput,
+): SensorIngestNetworkDiagnostics {
+  const {
+    ingestUrl,
+    appOrigin,
+    httpStatus,
+    classification,
+    errorMessage,
+    requestMethod,
+    hasActiveToken,
+  } = input;
+
+  const notApplicable = httpStatus !== 0 && classification !== "network_error";
+  const ingest = parseUrlSafe(ingestUrl ?? null);
+  const origin = parseUrlSafe(appOrigin ?? null);
+  const resolvedEndpoint = ingestUrl && ingestUrl.length > 0 ? ingestUrl : "<missing>";
+  const appOriginDisplay = appOrigin && appOrigin.length > 0 ? appOrigin : "<unknown>";
+
+  if (notApplicable) {
+    return {
+      status: "not_applicable",
+      title: "Network diagnostics not applicable",
+      summary:
+        "The last response was an HTTP error, not a network failure. Use the response inspector for payload/auth diagnostics.",
+      evidence: [],
+      recommendedChecks: [],
+      safeSupportSummary: "",
+      resolvedEndpoint,
+      appOrigin: appOriginDisplay,
+    };
+  }
+
+  const evidence: string[] = [];
+  evidence.push(`HTTP status: ${httpStatus}`);
+  evidence.push(`classification: ${classification}`);
+  if (errorMessage) evidence.push(`error message: ${errorMessage}`);
+  if (requestMethod) evidence.push(`request method: ${requestMethod}`);
+  evidence.push(`resolved ingest URL: ${resolvedEndpoint}`);
+  evidence.push(`browser origin: ${appOriginDisplay}`);
+  if (typeof hasActiveToken === "boolean") {
+    evidence.push(`bridge token present: ${hasActiveToken ? "yes" : "no"}`);
+  }
+
+  let status: SensorIngestNetworkDiagnosticsStatus;
+  let title: string;
+  let summary: string;
+  const checks: string[] = [];
+
+  if (!ingest) {
+    status = "likely_endpoint_misconfigured";
+    title = "Ingest endpoint URL missing or malformed";
+    summary =
+      "The browser could not request the ingest endpoint because the URL is missing or invalid.";
+    checks.push("Confirm the Supabase URL is set and the ingest path resolves to a valid URL.");
+    checks.push("Reload the app after fixing the environment configuration.");
+  } else if (origin && origin.protocol === "https:" && ingest.protocol === "http:") {
+    status = "likely_mixed_content";
+    title = "Likely mixed-content block (HTTPS app calling HTTP endpoint)";
+    summary =
+      "Browsers block HTTP requests from HTTPS pages. The ingest endpoint must be served over HTTPS.";
+    checks.push("Serve the ingest endpoint over HTTPS, or run the app over HTTP for local testing only.");
+    checks.push("Verify the ingest URL scheme in your environment configuration.");
+  } else if (isPrivateHost(ingest.hostname) && origin && !isPrivateHost(origin.hostname)) {
+    status = "likely_endpoint_unreachable";
+    title = "Local/private ingest endpoint not reachable from this browser";
+    summary =
+      "The ingest URL points at a localhost or private-network address that this browser likely cannot reach from the current origin.";
+    checks.push(`Confirm the device serving ${ingest.host} is reachable from this machine and network.`);
+    checks.push("If using a Pi/PC bridge, verify the listener is running and the firewall allows the port.");
+    checks.push("Open the ingest URL directly in a new browser tab to confirm reachability.");
+  } else if (origin && origin.origin !== ingest.origin) {
+    status = "likely_cors_or_preflight";
+    title = "Likely CORS or preflight failure (cross-origin Failed to fetch)";
+    summary =
+      "The browser blocked the request before a response arrived. This usually means an OPTIONS preflight failed or CORS headers are missing.";
+    checks.push("Open DevTools → Network and look for a failed OPTIONS preflight request to the ingest URL.");
+    checks.push("Confirm the Edge Function returns Access-Control-Allow-Origin and Access-Control-Allow-Headers on OPTIONS and error responses.");
+    checks.push("Verify the Edge Function is deployed and reachable at the configured URL.");
+  } else {
+    status = "needs_network_inspection";
+    title = "Network failure — inspect browser network tab";
+    summary =
+      "The browser did not receive an HTTP response. Inspect the network tab to identify whether the request was blocked, timed out, or never sent.";
+    checks.push("Open DevTools → Network and re-run the test to see the failed request.");
+    checks.push("Confirm the Edge Function is deployed and responding to a manual curl/PowerShell request.");
+    checks.push("Check for browser extensions, VPNs, or ad-blockers that may block the request.");
+  }
+
+  checks.push("Verify the ingest URL and path match the deployed Edge Function.");
+  checks.push("Confirm the HTTPS app is not calling an HTTP endpoint.");
+
+  const lines: string[] = [];
+  lines.push("Verdant sensor ingest — network diagnostics");
+  lines.push(`status: ${status}`);
+  lines.push(`title: ${title}`);
+  lines.push(`summary: ${summary}`);
+  lines.push("evidence:");
+  for (const e of evidence) lines.push(`  - ${e}`);
+  lines.push("recommended checks:");
+  for (const c of checks) lines.push(`  - ${c}`);
+
+  return {
+    status,
+    title,
+    summary,
+    evidence,
+    recommendedChecks: checks,
+    safeSupportSummary: redactTokens(lines.join("\n")),
+    resolvedEndpoint,
+    appOrigin: appOriginDisplay,
   };
 }

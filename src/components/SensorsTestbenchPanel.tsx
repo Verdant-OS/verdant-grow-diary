@@ -453,6 +453,33 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
       classification,
     });
     setHistory((prev) => [item, ...prev].slice(0, SENSOR_INGEST_HISTORY_MAX));
+
+    // Append a redacted diagnostics-run entry alongside the ingest history.
+    const diagForHistory = buildSensorIngestNetworkDiagnostics({
+      ingestUrl: INGEST_URL,
+      appOrigin:
+        typeof window !== "undefined" && window.location
+          ? window.location.origin
+          : null,
+      httpStatus: status,
+      classification: classification.category,
+      errorMessage:
+        body && typeof body === "object" && "message" in (body as Record<string, unknown>)
+          ? String((body as Record<string, unknown>).message ?? "")
+          : null,
+      requestMethod: "POST",
+      hasActiveToken: !!reveal,
+      supabaseUrl: SUPABASE_URL,
+    });
+    const diagEntry = buildSensorDiagnosticsRunHistoryEntry({
+      attemptedAt: capturedAt,
+      httpStatus: status,
+      classification: classification.category,
+      diagnostics: diagForHistory,
+    });
+    setDiagnosticsHistory((prev) =>
+      trimSensorDiagnosticsRunHistory([diagEntry, ...prev]),
+    );
   }
 
   async function safeCopy(text: string, label: string) {

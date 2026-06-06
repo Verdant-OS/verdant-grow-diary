@@ -22,6 +22,8 @@ import { STAGES } from "@/lib/grow";
 
 import { EC_UNITS, type EcUnit } from "@/constants/units";
 import { usePlants } from "@/hooks/use-plants";
+import { useTents } from "@/hooks/use-tents";
+import { shouldRequireFirstTentSetup } from "@/lib/firstTentSetupRules";
 import { evaluateQuickLogPreview } from "@/lib/quickLogPreviewRules";
 import {
   appendHardwareReadingsToNote,
@@ -74,6 +76,15 @@ export default function QuickLog({
   const { user } = useAuth();
   const { grows, activeGrow, activeGrowId, setActiveGrowId } = useGrows();
   const { data: plants = [] } = usePlants();
+  const { data: activeTents = [] } = useTents();
+  // Snapshot attach requires a real tent anchor. We accept either an
+  // active tent (authoritative) or a plant that already references a
+  // tent_id (covers test fixtures and legacy data where useTents may not
+  // be wired). This is intentionally permissive: the strip itself still
+  // no-ops without a selectedPlant.tent_id.
+  const tentSetupRequired =
+    shouldRequireFirstTentSetup(activeTents) &&
+    !plants.some((p) => typeof p.tent_id === "string" && p.tent_id.length > 0);
   const queryClient = useQueryClient();
   const { save: saveViaRpc } = useQuickLogV2Save();
 
@@ -439,29 +450,44 @@ export default function QuickLog({
             </div>
           )}
 
-          <label
-            className={`flex items-center justify-between gap-2 rounded-lg border p-3 ${selectedPlant ? "border-border/60" : "border-border/40 opacity-60"}`}
-          >
-            <span className="text-sm flex items-center gap-2">
-              <Gauge className="h-4 w-4 text-primary" />
-              Attach sensor snapshot
-            </span>
-            <Switch
-              checked={snapshot && !!selectedPlant}
-              onCheckedChange={(v) => {
-                snapshotUserTouchedRef.current = true;
-                setSnapshot(v);
-              }}
-              disabled={!selectedPlant}
-            />
-          </label>
-          {snapshot && !selectedPlant && (
+          {tentSetupRequired ? (
             <p
-              className="text-[11px] text-muted-foreground -mt-2"
-              data-testid="quick-log-snapshot-plant-warning"
+              data-testid="quick-log-snapshot-tent-required"
+              className="rounded-lg border border-border/60 bg-secondary/30 p-3 text-[12px] text-muted-foreground"
             >
-              Choose a plant before attaching plant-specific readings.
+              Sensor snapshots need a tent first.{" "}
+              <a href="/tents" className="underline text-primary">
+                Create your first tent
+              </a>{" "}
+              to attach environment context to logs.
             </p>
+          ) : (
+            <>
+              <label
+                className={`flex items-center justify-between gap-2 rounded-lg border p-3 ${selectedPlant ? "border-border/60" : "border-border/40 opacity-60"}`}
+              >
+                <span className="text-sm flex items-center gap-2">
+                  <Gauge className="h-4 w-4 text-primary" />
+                  Attach sensor snapshot
+                </span>
+                <Switch
+                  checked={snapshot && !!selectedPlant}
+                  onCheckedChange={(v) => {
+                    snapshotUserTouchedRef.current = true;
+                    setSnapshot(v);
+                  }}
+                  disabled={!selectedPlant}
+                />
+              </label>
+              {snapshot && !selectedPlant && (
+                <p
+                  className="text-[11px] text-muted-foreground -mt-2"
+                  data-testid="quick-log-snapshot-plant-warning"
+                >
+                  Choose a plant before attaching plant-specific readings.
+                </p>
+              )}
+            </>
           )}
 
           <label className="flex items-center justify-between gap-2 rounded-lg border border-border/60 p-3">
@@ -671,11 +697,13 @@ export default function QuickLog({
             );
           })()}
 
-          <QuickLogSensorSnapshotStrip
-            growId={activeGrowId}
-            tentId={selectedPlant?.tent_id ?? null}
-            attached={snapshot && !!selectedPlant}
-          />
+          {!tentSetupRequired && (
+            <QuickLogSensorSnapshotStrip
+              growId={activeGrowId}
+              tentId={selectedPlant?.tent_id ?? null}
+              attached={snapshot && !!selectedPlant}
+            />
+          )}
 
           <Button
             type="submit"

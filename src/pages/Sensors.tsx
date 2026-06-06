@@ -10,6 +10,7 @@ import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
 import SensorBridgeHealthCard from "@/components/SensorBridgeHealthCard";
 import TentCsvImportCard from "@/components/TentCsvImportCard";
 import EnvironmentCsvImportLauncher from "@/components/EnvironmentCsvImportLauncher";
+import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
 import { useGrowTents, useGrowSensorReadings } from "@/hooks/useGrowData";
 import { useTents as useTentRows } from "@/hooks/use-tents";
 import { classifyGrowDataSource } from "@/lib/growDataSourceLabelRules";
@@ -163,11 +164,16 @@ export default function Sensors() {
           );
         })}
       </div>
-      {manualTents.length > 0 && (
-        <div id="manual-reading" className="mt-4 max-w-xl scroll-mt-24" data-testid="sensors-manual-reading-anchor">
+      <div id="manual-reading" className="mt-4 max-w-xl scroll-mt-24" data-testid="sensors-manual-reading-anchor">
+        {manualTents.length === 0 ? (
+          <FirstTentSetupEmptyState
+            surface="sensor_pairing"
+            testId="sensors-first-tent-setup"
+          />
+        ) : (
           <ManualSensorReadingCard tents={manualTents} defaultTentId={defaultManualTentId} />
-        </div>
-      )}
+        )}
+      </div>
       {manualTents.length > 0 && selectedTent && (
         <div id="import-sensor-data" className="mt-4 max-w-xl scroll-mt-24" data-testid="sensors-import-sensor-data-anchor">
           <TentCsvImportCard

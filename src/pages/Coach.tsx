@@ -252,7 +252,8 @@ export default function Coach() {
   async function ask(mode: Mode) {
     if (!user) return;
     const seq = ++diagnosisSeqRef.current;
-    setBusy(true); setResult(null); setPersistedSessionId(null); setCreditDenial(null);
+    setBusy(true); setResult(null); setPersistedSessionId(null);
+    setCreditDenial(null); setUpstreamCreditExhausted(false);
     try {
       let photoUrl: string | undefined;
       if (mode === "diagnose" && photoFile) {
@@ -268,19 +269,29 @@ export default function Coach() {
         body: { mode, growId: activeGrowId, photoUrl, question: question.trim() || undefined },
       });
       if (error) {
-        // S3.2: HTTP 402 credit denial surfaces here as FunctionsHttpError.
-        // Parse it before falling through to the generic failure toast so
-        // the grower sees a calm, branch-correct credit-limit notice.
-        const denial = await parseAiCoachCreditDenial(error);
-        if (denial) {
-          setCreditDenial(denial.credit);
-          return;
-        }
+        // Credit denials are now HTTP 200 business envelopes (handled
+        // below by the shared adapter). Any `error` here is a real
+        // transport / auth / config failure.
         throw error;
       }
-      const d = data as CoachResponse | null;
+      // Shared credited-AI envelope adapter. Coach success payload is
+      // pass-through (Coach has its own sanitizers downstream).
+      const outcome = adaptCreditedAiResponse<CoachResponse>(data);
+      if (outcome.ok === false) {
+        if (outcome.reason === "credit_denied") {
+          if (outcome.credit) setCreditDenial(outcome.credit);
+          return;
+        }
+        if (outcome.reason === "upstream_credit_exhausted") {
+          setUpstreamCreditExhausted(true);
+          return;
+        }
+        throw new Error(outcome.reason);
+      }
+      const d = outcome.result as CoachResponse | null;
       if (d?.error) throw new Error(d.error);
       setResult(d ?? null);
+
 
       // Persist a read-only snapshot of the completed AI Doctor response.
       // SECURITY: never include user_id (DB default auth.uid()). Only the

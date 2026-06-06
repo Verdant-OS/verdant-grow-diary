@@ -91,6 +91,8 @@ describe("QuickLog plant/context validation", () => {
   it("does not introduce fake live/sensor copy", () => {
     renderQL();
     const body = document.body.textContent ?? "";
-    expect(body).not.toMatch(/live data|live sensor|guaranteed/i);
+    // Strip the existing "not live sensor data" disclaimer before scanning.
+    const scrubbed = body.replace(/not live sensor data/gi, "");
+    expect(scrubbed).not.toMatch(/\blive data\b|\blive sensor\b|guaranteed/i);
   });
 });

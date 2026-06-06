@@ -230,9 +230,9 @@ describe("ai-doctor-review packet shape — shared annotation helper", () => {
     expect(packetSrc).toContain("readings");
   });
 
-  it("packet builder now consumes the shared ai-coach annotation helper", () => {
-    expect(packetSrc).toContain("aiCoachSensorSnapshotContext");
-    expect(packetSrc).toContain("buildAiCoachSensorSnapshotContext");
+  it("packet builder now consumes the shared sensor-snapshot rules helper", () => {
+    expect(packetSrc).toContain("aiSensorSnapshotContextRules");
+    expect(packetSrc).toContain("buildAiSensorSnapshotContext");
     expect(packetSrc).toContain("recentSensorSnapshotAnnotation");
   });
 });

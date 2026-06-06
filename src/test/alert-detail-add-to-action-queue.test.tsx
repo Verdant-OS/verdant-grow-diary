@@ -14,7 +14,22 @@
  * No new write paths, no schema changes, no automation, no device control.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { act, render, screen, waitFor, fireEvent } from "@testing-library/react";
+
+// Flush pending async state updates inside React's act() boundary so async
+// effects in AlertDetail (e.g. linked-action-count queries) don't trigger
+// "not wrapped in act(...)" warnings during tests.
+async function flushAsync(ms = 30) {
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, ms));
+  });
+}
+
+async function clickAct(el: Element) {
+  await act(async () => {
+    fireEvent.click(el);
+  });
+}
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import AlertDetail from "@/pages/AlertDetail";
 
@@ -177,7 +192,7 @@ describe("AlertDetail — Add to Action Queue (render-level)", () => {
     expect(btn).toBeInTheDocument();
     expect(btn).not.toBeDisabled();
     // Give effects a moment to settle.
-    await new Promise((r) => setTimeout(r, 30));
+    await flushAsync();
     expect(actionQueueInserts()).toHaveLength(0);
   });
 
@@ -185,7 +200,7 @@ describe("AlertDetail — Add to Action Queue (render-level)", () => {
     
     renderDetail();
     const btn = await screen.findByTestId("alert-handoff-add-button");
-    fireEvent.click(btn);
+    await clickAct(btn);
 
     await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
     const aqInserts = actionQueueInserts();
@@ -219,7 +234,7 @@ describe("AlertDetail — Add to Action Queue (render-level)", () => {
   it("also writes an audit event row (action_queue_events) without client user_id", async () => {
     
     renderDetail();
-    fireEvent.click(await screen.findByTestId("alert-handoff-add-button"));
+    await clickAct(await screen.findByTestId("alert-handoff-add-button"));
     await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
 
     const auditInserts = inserts.filter((i) => i.table === "action_queue_events");
@@ -256,7 +271,7 @@ describe("AlertDetail — Add to Action Queue (render-level)", () => {
     
     renderDetail();
     const btn = await screen.findByTestId("alert-handoff-add-button");
-    fireEvent.click(btn);
+    await clickAct(btn);
 
     await waitFor(() => expect(toastError).toHaveBeenCalled());
     expect(toastSuccess).not.toHaveBeenCalled();
@@ -271,7 +286,7 @@ describe("AlertDetail — Add to Action Queue (render-level)", () => {
     currentAlert = { ...OPEN_ALERT, status: "resolved" };
     renderDetail();
     await screen.findByText(OPEN_ALERT.title);
-    await new Promise((r) => setTimeout(r, 30));
+    await flushAsync();
     expect(screen.queryByTestId("alert-handoff-add-button")).toBeNull();
     expect(screen.queryByTestId("alert-handoff-region")).toBeNull();
   });

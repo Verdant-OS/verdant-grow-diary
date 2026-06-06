@@ -124,14 +124,17 @@ export function useAiDoctorLiveReview(
         setState({ status: "error", result: null, reason: "http" });
         return;
       }
-      const outcome = adaptAiDoctorReviewResponse(data);
+      const outcome = adaptCreditedAiResponse(data, validateAiDoctorReviewResult);
       if (outcome.ok === false) {
         setState({
           status: "error",
           result: null,
           reason: outcome.reason,
           credit:
-            outcome.reason === "credit_denied" ? outcome.credit : undefined,
+            outcome.reason === "credit_denied" ||
+            outcome.reason === "upstream_credit_exhausted"
+              ? outcome.credit
+              : undefined,
         });
         return;
       }

@@ -337,6 +337,104 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
         pointing your real EcoWitt gateway at this tent.
       </p>
 
+      {/* Environment diagnostics — proves the app, endpoint, tent, and token
+          are all scoped to the same Lovable Cloud project. */}
+      <div
+        className="rounded-lg border border-border/60 p-3 mb-3"
+        data-testid="sensors-diagnostics"
+      >
+        <div className="flex items-center gap-2 mb-2">
+          <Server className="size-4 text-muted-foreground" />
+          <div className="text-sm font-medium">Environment diagnostics</div>
+        </div>
+        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
+          <dt className="text-muted-foreground">App Supabase URL</dt>
+          <dd
+            className="font-mono break-all"
+            data-testid="sensors-diag-supabase-url"
+          >
+            {SUPABASE_URL || "—"}
+          </dd>
+          <dt className="text-muted-foreground">Ingest endpoint</dt>
+          <dd
+            className="font-mono break-all"
+            data-testid="sensors-diag-ingest-url"
+          >
+            {INGEST_URL}
+          </dd>
+          <dt className="text-muted-foreground">Selected tent</dt>
+          <dd
+            className="font-mono break-all"
+            data-testid="sensors-diag-tent-uuid"
+          >
+            {tentName ? `${tentName} · ` : ""}
+            {tentId}
+          </dd>
+          <dt className="text-muted-foreground">Bridge token</dt>
+          <dd data-testid="sensors-diag-token-identity">
+            {activeToken ? (
+              <span>
+                <span className="font-mono">{activeToken.token_prefix}…</span>{" "}
+                <span className="text-muted-foreground">
+                  ({activeToken.name})
+                </span>{" "}
+                <Badge
+                  variant="outline"
+                  className="ml-1 text-[10px]"
+                  data-testid="sensors-diag-token-status"
+                  data-state={bridgeTokenStatus(activeToken)}
+                >
+                  {bridgeTokenStatus(activeToken)}
+                </Badge>
+              </span>
+            ) : (
+              <span className="text-amber-600 dark:text-amber-400">
+                No bridge token minted for this tent
+              </span>
+            )}
+          </dd>
+          <dt className="text-muted-foreground">Token last used</dt>
+          <dd data-testid="sensors-diag-token-last-used">
+            {activeToken?.last_used_at
+              ? `${relativeFromIso(activeToken.last_used_at)} (${activeToken.last_used_at})`
+              : "—"}
+          </dd>
+          <dt className="text-muted-foreground">Token ingest count</dt>
+          <dd data-testid="sensors-diag-token-ingest-count">
+            {activeToken ? formatIngestCount(activeToken.ingest_count) : "—"}
+          </dd>
+        </dl>
+
+        <div className="mt-3 border-t border-border/40 pt-2">
+          <div className="text-xs font-medium mb-1">Environment match</div>
+          <ul className="space-y-1" data-testid="sensors-diag-env-match">
+            {envMatch.map((item) => (
+              <li
+                key={item.key}
+                className="flex items-start gap-1.5 text-[11px]"
+                data-testid={`sensors-diag-env-match-${item.key}`}
+                data-ok={item.ok ? "true" : "false"}
+              >
+                {item.ok ? (
+                  <CheckCircle2 className="size-3 mt-0.5 shrink-0 text-emerald-600" />
+                ) : (
+                  <XCircle className="size-3 mt-0.5 shrink-0 text-amber-600" />
+                )}
+                <span>
+                  <span className={item.ok ? "" : "text-amber-700 dark:text-amber-300"}>
+                    {item.label}
+                  </span>
+                  {item.hint && (
+                    <span className="text-muted-foreground"> — {item.hint}</span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+
       <div className="rounded-lg border border-border/60 p-3 mb-3">
         <div className="flex items-center gap-2 mb-2">
           <KeyRound className="size-4 text-muted-foreground" />

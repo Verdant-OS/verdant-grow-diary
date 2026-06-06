@@ -782,24 +782,68 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
           </div>
         )}
 
+        <details
+          className="mt-3 border-t border-border/40 pt-2 text-xs"
+          data-testid="sensors-testbench-payload-preview"
+        >
+          <summary className="cursor-pointer font-medium flex items-center gap-1">
+            <Eye className="size-3" />
+            Canonical ingest payload used for last test
+          </summary>
+          {lastPayload ? (
+            <pre
+              className="bg-muted/40 rounded p-2 mt-2 overflow-x-auto whitespace-pre-wrap break-words"
+              data-testid="sensors-testbench-payload-preview-body"
+            >
+{buildRedactedPayloadPreview(lastPayload)}
+            </pre>
+          ) : (
+            <p
+              className="text-muted-foreground mt-2"
+              data-testid="sensors-testbench-payload-preview-empty"
+            >
+              No test payload sent yet. Mint a token and run “Send test payload”
+              to preview the exact JSON Verdant submits.
+            </p>
+          )}
+        </details>
+
         {history.length > 0 && (
           <div
             className="mt-3 border-t border-border/40 pt-2"
             data-testid="sensors-testbench-history"
           >
-            <div className="flex items-center justify-between mb-1 gap-2">
+            <div className="flex flex-wrap items-center justify-between mb-1 gap-2">
               <div className="text-xs font-medium flex items-center gap-1">
                 <History className="size-3" />
                 Local test history — clears on refresh
               </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={clearHistory}
-                data-testid="sensors-testbench-history-clear"
-              >
-                <Trash2 className="size-3 mr-1" /> Clear
-              </Button>
+              <div className="flex gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={copyHistoryJson}
+                  data-testid="sensors-testbench-history-copy-json"
+                >
+                  <FileJson className="size-3 mr-1" /> Copy JSON
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={downloadHistoryJson}
+                  data-testid="sensors-testbench-history-download-json"
+                >
+                  <Download className="size-3 mr-1" /> Download
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={clearHistory}
+                  data-testid="sensors-testbench-history-clear"
+                >
+                  <Trash2 className="size-3 mr-1" /> Clear
+                </Button>
+              </div>
             </div>
             <ul className="space-y-1">
               {history.map((h) => (

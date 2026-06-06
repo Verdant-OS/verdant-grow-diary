@@ -243,7 +243,7 @@ export default function Coach() {
   async function ask(mode: Mode) {
     if (!user) return;
     const seq = ++diagnosisSeqRef.current;
-    setBusy(true); setResult(null); setPersistedSessionId(null);
+    setBusy(true); setResult(null); setPersistedSessionId(null); setCreditDenial(null);
     try {
       let photoUrl: string | undefined;
       if (mode === "diagnose" && photoFile) {
@@ -258,7 +258,17 @@ export default function Coach() {
       const { data, error } = await supabase.functions.invoke("ai-coach", {
         body: { mode, growId: activeGrowId, photoUrl, question: question.trim() || undefined },
       });
-      if (error) throw error;
+      if (error) {
+        // S3.2: HTTP 402 credit denial surfaces here as FunctionsHttpError.
+        // Parse it before falling through to the generic failure toast so
+        // the grower sees a calm, branch-correct credit-limit notice.
+        const denial = await parseAiCoachCreditDenial(error);
+        if (denial) {
+          setCreditDenial(denial.credit);
+          return;
+        }
+        throw error;
+      }
       const d = data as CoachResponse | null;
       if (d?.error) throw new Error(d.error);
       setResult(d ?? null);
@@ -313,6 +323,7 @@ export default function Coach() {
       toast.error(e instanceof Error ? e.message : "Coach failed");
     } finally { setBusy(false); }
   }
+
 
   function handleFile(f: File | null) {
     setPhotoFile(f);

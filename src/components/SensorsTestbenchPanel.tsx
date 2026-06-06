@@ -24,7 +24,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Copy, KeyRound, Send, ShieldAlert, Activity } from "lucide-react";
+import { Copy, KeyRound, Send, ShieldAlert, Activity, CheckCircle2, XCircle, Server } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import {
@@ -34,12 +34,20 @@ import {
 } from "@/lib/sensorTestbenchIndicatorRules";
 import {
   BRIDGE_TOKEN_DEFAULT_TTL_DAYS,
+  bridgeTokenStatus,
   clampTtlDays,
+  formatIngestCount,
   looksLikeBridgeToken,
   sanitizeTokenName,
+  type BridgeTokenRow,
 } from "@/lib/bridgeTokenRules";
+import {
+  buildEnvMatchChecklist,
+  classifySensorIngestTestResult,
+} from "@/lib/sensorIngestTestResultRules";
 
-const INGEST_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sensor-ingest-webhook`;
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const INGEST_URL = `${SUPABASE_URL}/functions/v1/sensor-ingest-webhook`;
 
 interface Props {
   tentId: string | null;
@@ -48,6 +56,7 @@ interface Props {
 
 interface TestPayloadResult {
   status: number;
+
   ok: boolean;
   body: unknown;
 }

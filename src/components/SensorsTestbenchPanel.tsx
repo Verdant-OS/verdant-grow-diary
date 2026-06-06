@@ -1321,6 +1321,116 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
           </div>
         )}
       </div>
+
+      <Dialog open={shareOpen} onOpenChange={setShareOpen}>
+        <DialogContent
+          className="max-w-2xl"
+          data-testid="sensors-testbench-share-modal"
+        >
+          <DialogHeader>
+            <DialogTitle>Share diagnostics</DialogTitle>
+            <DialogDescription>
+              Support-ready summary. Sensitive values (tokens, authorization,
+              secrets, service_role) are redacted before they leave this panel.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 text-xs">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-muted-foreground">bundle filename:</span>
+              <code
+                className="font-mono break-all"
+                data-testid="sensors-testbench-share-bundle-filename"
+              >
+                {shareModalState.bundleFilename}
+              </code>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-muted-foreground">canonical readiness:</span>
+              <Badge
+                variant="outline"
+                className={
+                  shareModalState.badgeTone === "ready"
+                    ? "text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
+                    : shareModalState.badgeTone === "warn"
+                      ? "text-amber-700 dark:text-amber-300 border-amber-500/40"
+                      : ""
+                }
+                aria-label={shareModalState.ariaLabel}
+                data-testid="sensors-testbench-share-readiness"
+                data-status={shareModalState.status}
+              >
+                {shareModalState.statusLabel}
+              </Badge>
+            </div>
+            <div>
+              <div className="text-muted-foreground mb-1">
+                support-ready summary
+              </div>
+              <pre
+                className="bg-muted/40 rounded p-2 max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px]"
+                data-testid="sensors-testbench-share-summary"
+              >
+{shareModalState.supportSummary}
+              </pre>
+            </div>
+            {shareModalState.redactedInspectorText && (
+              <div>
+                <div className="text-muted-foreground mb-1">
+                  redacted response inspector
+                </div>
+                <pre
+                  className="bg-muted/40 rounded p-2 max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px]"
+                  data-testid="sensors-testbench-share-inspector"
+                >
+{shareModalState.redactedInspectorText}
+                </pre>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={copyShareSummary}
+              data-testid="sensors-testbench-share-copy-summary"
+              aria-label="Copy support-ready diagnostics summary"
+            >
+              <Copy className="size-3 mr-1" /> Copy summary
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={copyRedactedInspector}
+              disabled={!shareModalState.redactedInspectorText}
+              data-testid="sensors-testbench-share-copy-inspector"
+              aria-label="Copy redacted response inspector"
+            >
+              <Copy className="size-3 mr-1" /> Copy inspector
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={downloadDiagnosticsBundle}
+              disabled={!shareModalState.canDownloadBundle}
+              data-testid="sensors-testbench-share-download-bundle"
+              aria-label="Download diagnostics bundle"
+            >
+              <Download className="size-3 mr-1" /> Download bundle
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShareOpen(false)}
+              data-testid="sensors-testbench-share-close"
+              aria-label="Close share diagnostics modal"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

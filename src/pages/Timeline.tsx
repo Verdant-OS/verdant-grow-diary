@@ -31,6 +31,11 @@ import { getEventType } from "@/lib/diary";
 import { buildGrowDiaryTimeline } from "@/lib/growDiaryTimelineRules";
 import { MEASUREMENT_DETAIL_KEYS } from "@/lib/timelineEntryClassification";
 import { classifyVpdAgainstStage } from "@/lib/vpdStageTargetRules";
+import {
+  mapGrowEventsToRecentRawEntries,
+  type GrowEventRowForRecent,
+} from "@/lib/growEventToDiaryRawEntry";
+
 
 const TIMELINE_SNAPSHOT_STALE_MS = 30 * 60 * 1000;
 

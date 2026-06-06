@@ -923,7 +923,7 @@ export default function ActionQueue() {
                   )}
 
 
-                  <span className="truncate flex-1">{row.suggested_change}</span>
+                  <span className="truncate flex-1">{sanitizeActionCopy(row.suggested_change)}</span>
                   <h3 id={titleId} className="text-xs text-muted-foreground m-0 font-normal">{row.action_type}</h3>
                   {(() => {
                     const disabled = busyId === row.id;

@@ -1399,3 +1399,219 @@ export function buildSensorIngestNetworkDiagnostics(
     cors,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Network diagnostics — JSON export, verify commands, run history
+// ---------------------------------------------------------------------------
+
+export interface BuildNetworkDiagnosticsExportInput {
+  generatedAt: string;
+  diagnostics: SensorIngestNetworkDiagnostics;
+  lastTestResult?: { http_status: number; classification: string } | null;
+}
+
+/**
+ * Build a support-safe JSON blob describing the current Sensors testbench
+ * network diagnostics panel. Never includes tokens, Authorization headers,
+ * service-role keys, anon keys, or raw response bodies. Defensively
+ * token-redacted before serialization.
+ */
+export function buildNetworkDiagnosticsExportJson(
+  input: BuildNetworkDiagnosticsExportInput,
+): string {
+  const d = input.diagnostics;
+  const obj = {
+    generated_at: input.generatedAt,
+    browser_origin: d.appOrigin,
+    configured_ingest_url: d.resolvedEndpoint,
+    expected_canonical_url: d.canonicalIngestUrl,
+    canonical_url_match: d.canonicalUrlMatch,
+    canonical_mismatch_explanation: d.canonicalMismatchExplanation,
+    diagnostics_status: d.status,
+    diagnostics_title: d.title,
+    diagnostics_summary: d.summary,
+    evidence: [...d.evidence],
+    recommended_checks: [...d.recommendedChecks],
+    cors: {
+      options_headers: d.cors.optionsHeaders,
+      post_headers: d.cors.postHeaders,
+      explanation: d.cors.explanation,
+    },
+    last_test_result: input.lastTestResult
+      ? {
+          http_status: input.lastTestResult.http_status,
+          classification: input.lastTestResult.classification,
+        }
+      : null,
+  };
+  return redactTokens(JSON.stringify(obj, null, 2));
+}
+
+/** Filename for the diagnostics JSON download. */
+export function buildNetworkDiagnosticsDownloadFilename(date: Date): string {
+  return buildDownloadFilename(
+    "verdant-sensor-network-diagnostics",
+    "json",
+    date,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Safe "How to verify" curl commands
+// ---------------------------------------------------------------------------
+
+export interface SensorIngestVerifyCommands {
+  available: boolean;
+  ingestUrl: string;
+  options: string;
+  post: string;
+  note: string;
+}
+
+export const VERIFY_COMMANDS_TOKEN_PLACEHOLDER = "<BRIDGE_TOKEN>";
+export const VERIFY_COMMANDS_TENT_PLACEHOLDER = "<TENT_ID>";
+export const VERIFY_COMMANDS_NOTE =
+  "Do not paste real tokens into shared screenshots or support tickets.";
+
+export interface BuildSensorIngestVerifyCommandsInput {
+  /** Canonical ingest URL (use buildCanonicalSensorIngestUrl). */
+  ingestUrl: string | null | undefined;
+  /** Browser/app origin for the OPTIONS preflight Origin header. */
+  appOrigin: string | null | undefined;
+}
+
+/**
+ * Build a pair of safe curl commands for operators to verify the Edge
+ * Function from the command line. Uses canonical ingest URL only; never
+ * embeds real bridge tokens, Authorization headers, or secrets — only the
+ * `<BRIDGE_TOKEN>` placeholder.
+ */
+export function buildSensorIngestVerifyCommands(
+  input: BuildSensorIngestVerifyCommandsInput,
+): SensorIngestVerifyCommands {
+  const ingestUrl =
+    typeof input.ingestUrl === "string" && input.ingestUrl.length > 0
+      ? input.ingestUrl
+      : "";
+  const origin =
+    typeof input.appOrigin === "string" && input.appOrigin.length > 0
+      ? input.appOrigin
+      : "https://app.example";
+  if (!ingestUrl) {
+    return {
+      available: false,
+      ingestUrl: "",
+      options: "",
+      post: "",
+      note: VERIFY_COMMANDS_NOTE,
+    };
+  }
+  // Defensive redaction: callers should already pass the canonical URL,
+  // but never trust strings flowing into copy-to-clipboard.
+  const safeUrl = redactTokens(ingestUrl);
+  const safeOrigin = redactTokens(origin);
+
+  const options = [
+    `curl -i -X OPTIONS '${safeUrl}' \\`,
+    `  -H 'Origin: ${safeOrigin}' \\`,
+    `  -H 'Access-Control-Request-Method: POST' \\`,
+    `  -H 'Access-Control-Request-Headers: authorization, x-client-info, apikey, content-type'`,
+  ].join("\n");
+
+  const postBody = JSON.stringify({
+    tent_id: VERIFY_COMMANDS_TENT_PLACEHOLDER,
+    source: "ecowitt",
+    captured_at: "2026-06-06T18:00:00Z",
+    metrics: { temp_f: 77.4 },
+  });
+  const post = [
+    `curl -i -X POST '${safeUrl}' \\`,
+    `  -H 'Authorization: Bearer ${VERIFY_COMMANDS_TOKEN_PLACEHOLDER}' \\`,
+    `  -H 'Content-Type: application/json' \\`,
+    `  -d '${postBody}'`,
+  ].join("\n");
+
+  return {
+    available: true,
+    ingestUrl: safeUrl,
+    options,
+    post,
+    note: VERIFY_COMMANDS_NOTE,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Sensors diagnostics run history (client-side, redacted)
+// ---------------------------------------------------------------------------
+
+export const SENSOR_DIAGNOSTICS_RUN_HISTORY_MAX = 10;
+
+export interface SensorDiagnosticsRunHistoryEntry {
+  attempted_at: string;
+  http_status: number;
+  classification: string;
+  canonical_url_match: CanonicalIngestUrlMatch;
+  diagnostics_status: SensorIngestNetworkDiagnosticsStatus;
+  cors_options: CorsHeaderObservation;
+  cors_post: CorsHeaderObservation;
+}
+
+export interface BuildSensorDiagnosticsRunHistoryEntryInput {
+  attemptedAt: string;
+  httpStatus: number;
+  classification: string;
+  diagnostics: SensorIngestNetworkDiagnostics;
+}
+
+/** Build a redacted, support-safe history entry for the diagnostics run log. */
+export function buildSensorDiagnosticsRunHistoryEntry(
+  input: BuildSensorDiagnosticsRunHistoryEntryInput,
+): SensorDiagnosticsRunHistoryEntry {
+  const d = input.diagnostics;
+  return {
+    attempted_at: input.attemptedAt,
+    http_status: input.httpStatus,
+    classification: input.classification,
+    canonical_url_match: d.canonicalUrlMatch,
+    diagnostics_status: d.status,
+    cors_options: d.cors.optionsHeaders,
+    cors_post: d.cors.postHeaders,
+  };
+}
+
+/** Keep only the most recent N entries (default 10). Newest first. */
+export function trimSensorDiagnosticsRunHistory(
+  entries: SensorDiagnosticsRunHistoryEntry[],
+  max: number = SENSOR_DIAGNOSTICS_RUN_HISTORY_MAX,
+): SensorDiagnosticsRunHistoryEntry[] {
+  if (!Array.isArray(entries)) return [];
+  const safeMax = Number.isFinite(max) && max > 0 ? Math.floor(max) : SENSOR_DIAGNOSTICS_RUN_HISTORY_MAX;
+  return entries.slice(0, safeMax);
+}
+
+/** Serialize the run history as redacted JSON for one-click download. */
+export function sensorDiagnosticsRunHistoryToJson(
+  entries: SensorDiagnosticsRunHistoryEntry[],
+  generatedAt: string,
+): string {
+  return redactTokens(
+    JSON.stringify(
+      {
+        generated_at: generatedAt,
+        count: entries.length,
+        entries: entries.map((e) => ({ ...e })),
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+/** Filename for the run history JSON download. */
+export function buildSensorDiagnosticsRunHistoryFilename(date: Date): string {
+  return buildDownloadFilename(
+    "verdant-sensor-network-diagnostics-history",
+    "json",
+    date,
+  );
+}

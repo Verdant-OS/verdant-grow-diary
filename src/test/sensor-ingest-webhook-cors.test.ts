@@ -28,12 +28,11 @@ const SRC = readFileSync(
 describe("sensor-ingest-webhook CORS static contract", () => {
   it("defines corsHeaders with required headers", () => {
     expect(SRC).toMatch(/Access-Control-Allow-Origin/);
-    expect(SRC).toMatch(/Access-Control-Allow-Headers[^\n]*authorization/i);
-    expect(SRC).toMatch(/Access-Control-Allow-Headers[^\n]*x-client-info/);
-    expect(SRC).toMatch(/Access-Control-Allow-Headers[^\n]*apikey/);
-    expect(SRC).toMatch(/Access-Control-Allow-Headers[^\n]*content-type/);
-    expect(SRC).toMatch(/Access-Control-Allow-Methods[^\n]*POST/);
-    expect(SRC).toMatch(/Access-Control-Allow-Methods[^\n]*OPTIONS/);
+    expect(SRC).toMatch(/Access-Control-Allow-Headers/);
+    // Headers value is allowed to live on the next line; collapse whitespace.
+    const collapsed = SRC.replace(/\s+/g, " ");
+    expect(collapsed).toMatch(/authorization, x-client-info, apikey, content-type/);
+    expect(collapsed).toMatch(/Access-Control-Allow-Methods[^"]*"POST, OPTIONS/);
   });
 
   it("OPTIONS short-circuits BEFORE auth / JSON parse / DB calls", () => {

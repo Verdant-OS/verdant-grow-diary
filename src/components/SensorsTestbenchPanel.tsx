@@ -549,11 +549,8 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = buildDownloadFilename(
-        "verdant-sensor-diagnostics-bundle",
-        "zip",
-        new Date(),
-      );
+      a.download = buildDiagnosticsBundleFilenamePreview(new Date());
+
       document.body.appendChild(a);
       a.click();
       a.remove();

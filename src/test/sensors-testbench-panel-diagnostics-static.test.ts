@@ -27,12 +27,19 @@ describe("SensorsTestbenchPanel diagnostics static safety", () => {
   });
 
   it("test payload matches the operator-specified contract", () => {
-    expect(PANEL).toMatch(/temp_f: 77\.4/);
-    expect(PANEL).toMatch(/soil_moisture_pct: 33/);
-    expect(PANEL).toMatch(/co2_ppm: 721/);
-    expect(PANEL).toMatch(/verdant-ui-ingest-test/);
-    expect(PANEL).toMatch(/sensors_ui_test_button/);
+    const RULES = readFileSync(
+      resolve(__dirname, "../lib/sensorDiagnosticsExportRules.ts"),
+      "utf8",
+    );
+    expect(RULES).toMatch(/temp_f: 77\.4/);
+    expect(RULES).toMatch(/soil_moisture_pct: 33/);
+    expect(RULES).toMatch(/co2_ppm: 721/);
+    expect(RULES).toMatch(/verdant-ui-ingest-test/);
+    expect(RULES).toMatch(/sensors_ui_test_button/);
+    // Panel imports and uses the canonical builder.
+    expect(PANEL).toMatch(/buildSensorIngestTestPayload/);
   });
+
 
   it("never persists token plaintext to storage", () => {
     expect(PANEL).not.toMatch(/localStorage[\s\S]{0,40}reveal/);

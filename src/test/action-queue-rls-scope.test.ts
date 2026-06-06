@@ -60,7 +60,7 @@ describe("action_queue RLS scope regression", () => {
   });
 
   it("latest INSERT policy rejects tents from another grow", () => {
-    expect(INSERT_POLICY).toMatch(/action_queue\.tent_id\s+IS\s+NULL\s+OR\s*\(/i);
+    expect(INSERT_POLICY).toMatch(/action_queue\.tent_id\s+IS\s+NULL\s+OR\s+(?:\(|EXISTS\b)/i);
     expect(INSERT_POLICY).toMatch(/t\.id\s*=\s*action_queue\.tent_id/i);
     expect(INSERT_POLICY).toMatch(/t\.user_id\s*=\s*auth\.uid\(\)/i);
     expect(INSERT_POLICY).toMatch(/t\.grow_id\s*=\s*action_queue\.grow_id/i);
@@ -68,7 +68,7 @@ describe("action_queue RLS scope regression", () => {
   });
 
   it("latest INSERT policy rejects plants from another grow", () => {
-    expect(INSERT_POLICY).toMatch(/action_queue\.plant_id\s+IS\s+NULL\s+OR\s*\(/i);
+    expect(INSERT_POLICY).toMatch(/action_queue\.plant_id\s+IS\s+NULL\s+OR\s+(?:\(|EXISTS\b)/i);
     expect(INSERT_POLICY).toMatch(/p\.id\s*=\s*action_queue\.plant_id/i);
     expect(INSERT_POLICY).toMatch(/p\.user_id\s*=\s*auth\.uid\(\)/i);
     expect(INSERT_POLICY).toMatch(/p\.grow_id\s*=\s*action_queue\.grow_id/i);
@@ -77,7 +77,7 @@ describe("action_queue RLS scope regression", () => {
 
   it("latest INSERT policy rejects plant/tent mismatches when both are present", () => {
     expect(INSERT_POLICY).toMatch(
-      /action_queue\.plant_id\s+IS\s+NULL\s+OR\s+action_queue\.tent_id\s+IS\s+NULL\s+OR\s*\(/i,
+      /action_queue\.plant_id\s+IS\s+NULL\s+OR\s+action_queue\.tent_id\s+IS\s+NULL\s+OR\s+(?:\(|EXISTS\b)/i,
     );
     expect(INSERT_POLICY).toMatch(/p\.tent_id\s*=\s*action_queue\.tent_id/i);
     expect(INSERT_POLICY).not.toMatch(/p\.tent_id\s*=\s*tent_id/i);

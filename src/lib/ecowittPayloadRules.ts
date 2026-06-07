@@ -31,9 +31,11 @@ export type EcowittFreshness = "fresh" | "stale" | "missing";
 
 export type EcowittNormalizedMetric =
   | "temperature_c"
+  | "temp_f"
   | "humidity_pct"
   | "soil_moisture_pct"
-  | "co2_ppm";
+  | "co2_ppm"
+  | "vpd_kpa";
 
 export interface EcowittNormalizedReading {
   metric: EcowittNormalizedMetric;

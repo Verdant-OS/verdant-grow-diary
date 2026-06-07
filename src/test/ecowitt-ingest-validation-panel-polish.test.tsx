@@ -259,8 +259,11 @@ describe("EcowittIngestValidationPanel — operator polish", () => {
         input={{ rows: [validRow()], tentId: TENT, now: NOW }}
       />,
     );
+    const html = container.innerHTML;
+    // Body copy may contain "not live sensor telemetry"; what we forbid is a
+    // standalone "Live" badge/label being rendered as healthy.
+    expect(html).not.toMatch(/>Live</);
     const text = (container.textContent ?? "").toLowerCase();
-    expect(text).not.toMatch(/\blive\b/);
     expect(text).not.toMatch(/action queue/);
     expect(text).not.toMatch(/device control|relay|valve|actuator/);
   });

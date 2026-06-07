@@ -110,6 +110,25 @@ export default function TentManualSnapshotHistoryList({
                 </div>
               )}
 
+              {e.invalidChips.length > 0 && (
+                <div
+                  className="mt-2 flex flex-wrap items-center gap-1.5"
+                  data-testid="tent-manual-snapshot-history-invalid"
+                >
+                  {e.invalidChips.map((c) => (
+                    <span
+                      key={`invalid-${c.key}`}
+                      data-testid="tent-manual-snapshot-history-invalid-chip"
+                      data-metric={c.key}
+                      className="inline-flex items-center gap-1 rounded-full border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-[11px] text-destructive"
+                    >
+                      <span className="font-medium">{c.label}</span>
+                      <span>{c.chip}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+
               {e.firstSnapshot ? (
                 <div
                   className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-border/50 bg-secondary/40 px-2 py-0.5 text-[11px] text-muted-foreground"

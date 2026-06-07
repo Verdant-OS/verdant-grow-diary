@@ -50,19 +50,6 @@ const METRIC_KEY: Record<string, keyof Omit<TentSensorChartPoint, "ts">> = {
  * Unknown metrics are ignored. Returns [] for empty/null input. Never
  * upgrades, rewrites, or invents source labels.
  */
-
-/**
- * Group rows by timestamp into chart points, sorted ascending by ts.
- *
- * Truth filtering (presentation-side only):
- *   - per-metric realism guards null out impossible values so the chart
- *     never plots impossible spikes;
- *   - if temp or rh at a given ts is invalid, the derived vpd at that ts
- *     is also nulled (matches the snapshot-level VPD dependency rule).
- *
- * Unknown metrics are ignored. Returns [] for empty/null input. Never
- * upgrades, rewrites, or invents source labels.
- */
 export function buildTentSensorChartSeries(
   rows: SensorReadingLike[] | null | undefined,
 ): TentSensorChartPoint[] {

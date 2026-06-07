@@ -98,9 +98,7 @@ describe("EcowittLatestSnapshotCard — proof card behavior", () => {
       wrapper: wrap(),
     });
     await waitFor(() =>
-      expect(
-        screen.getByTestId("ecowitt-latest-snapshot-card"),
-      ).toBeInTheDocument(),
+      expect(screen.getByTestId("ecowitt-metric-temp_f")).toBeInTheDocument(),
     );
     expect(screen.getByTestId("ecowitt-metric-temp_f").textContent).toBe(
       "78.6 °F",

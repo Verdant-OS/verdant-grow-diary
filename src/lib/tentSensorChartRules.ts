@@ -68,7 +68,15 @@ export interface TentSensorHeaderView {
   capturedAt: string | null;
   sourceLabel: string | null;
   stale: boolean;
+  /**
+   * Truth-filtered snapshot: fields that failed grow-room realism guards
+   * are nulled. Use this for headers, KPIs and gauges. The raw,
+   * unfiltered snapshot is intentionally not exposed — invalid values
+   * must not appear as healthy numerics on user-facing surfaces.
+   */
   snapshot: SensorSnapshot | null;
+  /** Per-field invalid/suspicious classification and short reason chips. */
+  truth: SensorTruthAssessment | null;
 }
 
 export function buildTentSensorHeaderView(
@@ -76,12 +84,13 @@ export function buildTentSensorHeaderView(
   now: number = Date.now(),
 ): TentSensorHeaderView {
   if (!rows || rows.length === 0) {
-    return { hasReadings: false, capturedAt: null, sourceLabel: null, stale: false, snapshot: null };
+    return { hasReadings: false, capturedAt: null, sourceLabel: null, stale: false, snapshot: null, truth: null };
   }
   const snap = snapshotFromReadings(rows);
   if (!snap) {
-    return { hasReadings: false, capturedAt: null, sourceLabel: null, stale: false, snapshot: null };
+    return { hasReadings: false, capturedAt: null, sourceLabel: null, stale: false, snapshot: null, truth: null };
   }
+  const truth = classifySnapshotTruth(snap, now);
   return {
     hasReadings: true,
     capturedAt: snap.ts,
@@ -90,6 +99,7 @@ export function buildTentSensorHeaderView(
       deviceId: snap.device_id ?? null,
     }),
     stale: isStale(snap.ts, now),
-    snapshot: snap,
+    snapshot: truth.snapshot,
+    truth,
   };
 }

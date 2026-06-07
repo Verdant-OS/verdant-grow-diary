@@ -62,7 +62,9 @@ describe("ecowittLatestSnapshotFilter", () => {
     ];
     const vm = buildEcowittLatestSnapshot(rows, { tentId: TENT_A }, { now: NOW });
     expect(vm.hasReading).toBe(false);
-    expect(vm.emptyStateMessage).toBe("No EcoWitt readings received yet.");
+    expect(vm.emptyStateMessage).toBe(
+      "No EcoWitt readings yet. Send a local test payload to verify the integration.",
+    );
   });
 
   it("treats source=ecowitt + fresh as Live and labels Ecowitt", () => {

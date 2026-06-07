@@ -14,6 +14,11 @@ import {
   type SensorSnapshot,
 } from "@/lib/sensorSnapshot";
 import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
+import {
+  classifySnapshotTruth,
+  type SensorTruthAssessment,
+} from "@/lib/sensorTruthRules";
+
 
 export interface TentSensorChartPoint {
   ts: string;

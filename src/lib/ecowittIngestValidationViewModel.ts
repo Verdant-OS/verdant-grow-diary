@@ -263,7 +263,7 @@ export function buildEcowittIngestValidationViewModel(
   let status: EcowittValidationStatus = "accepted";
   let statusLabel = "Accepted by ingest webhook";
   let statusMessage =
-    "Local EcoWitt test sender payload was accepted by the ingest webhook. This is test data, not live sensor telemetry.";
+    "Local EcoWitt test sender payload was accepted by the ingest webhook. This is test data, not real sensor telemetry.";
   if (invalidTest) {
     // Invalid payloads should be rejected by the webhook. If we still see
     // a row tagged invalid_test, surface it for the operator instead of

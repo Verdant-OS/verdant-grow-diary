@@ -268,8 +268,7 @@ export function normalizeEcowittMqttPayload(
   let co2: number | null = toNumber(payload.co2 ?? payload.co2_in ?? null);
   if (co2 !== null && !isCo2PpmRealistic(co2)) {
     co2 = null;
-    reasons.push("invalid_vpd"); // placeholder code — replaced below
-    reasons.pop();
+    reasons.push("invalid_co2");
     chips.push("Invalid CO₂");
   }
 

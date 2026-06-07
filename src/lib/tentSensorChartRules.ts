@@ -57,6 +57,10 @@ export function buildTentSensorChartSeries(
 ): TentSensorChartPoint[] {
   if (!rows || rows.length === 0) return [];
   const byTs = new Map<string, TentSensorChartPoint>();
+  // Track per-ts whether temp/rh were *invalid* (not merely missing) so we
+  // can null out a derived vpd at the same ts without dropping vpd when the
+  // chart simply doesn't carry temp/rh on that timestamp.
+  const tempOrRhInvalidAt = new Set<string>();
   for (const r of rows) {
     const key = METRIC_KEY[r.metric];
     if (!key) continue;
@@ -67,16 +71,19 @@ export function buildTentSensorChartSeries(
       pt = { ts: r.ts, temp: null, rh: null, vpd: null, co2: null, soil: null };
       byTs.set(r.ts, pt);
     }
-    // Per-metric realism guard. Invalid → leave field null so the chart
-    // line breaks instead of spiking.
     const truth = classifyManualMetric(r.metric, v);
-    if (!truth.valid) continue;
+    if (!truth.valid) {
+      if (r.metric === "temperature_c" || r.metric === "humidity_pct") {
+        tempOrRhInvalidAt.add(r.ts);
+      }
+      continue;
+    }
     pt[key] = v;
   }
   // VPD depends on temp + rh — null out vpd at any ts where either input
-  // is missing/invalid for that same point.
+  // is *invalid* for that same point (missing inputs do not drop vpd).
   for (const pt of byTs.values()) {
-    if (pt.vpd !== null && (pt.temp === null || pt.rh === null)) {
+    if (pt.vpd !== null && tempOrRhInvalidAt.has(pt.ts)) {
       pt.vpd = null;
     }
   }

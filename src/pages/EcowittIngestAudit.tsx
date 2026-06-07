@@ -18,6 +18,7 @@ import {
   ECOWITT_AUDIT_EMPTY_MESSAGE,
 } from "@/lib/ecowittRawPayloadAuditViewModel";
 import type { EcowittSensorReadingRow } from "@/lib/ecowittLatestSnapshotFilter";
+import { EcowittIngestValidationPanel } from "@/components/EcowittIngestValidationPanel";
 
 interface AuditRow extends EcowittSensorReadingRow {
   metric?: string | null;
@@ -99,6 +100,13 @@ export default function EcowittIngestAudit() {
           ))}
         </select>
       </section>
+
+      <EcowittIngestValidationPanel
+        input={{
+          rows: query.data ?? [],
+          tentId: effectiveTentId,
+        }}
+      />
 
       {query.isLoading ? (
         <p

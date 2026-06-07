@@ -169,10 +169,8 @@ describe("normalizeEcowittMqttPayload", () => {
     ]);
   });
 
-  it("normalizer is pure and writes nothing to action_queue", () => {
-    // Smoke: function returns a plain object; no imports of supabase client
-    // or action_queue helpers exist in the module under test.
-    const mod = require("@/lib/ecowittMqttIngestRules");
+  it("normalizer is pure and writes nothing to action_queue", async () => {
+    const mod = await import("@/lib/ecowittMqttIngestRules");
     expect(Object.keys(mod)).not.toContain("supabase");
     expect(JSON.stringify(mod)).not.toMatch(/action_queue/i);
   });

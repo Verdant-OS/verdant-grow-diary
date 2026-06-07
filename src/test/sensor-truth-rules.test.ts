@@ -175,11 +175,11 @@ describe("classifySnapshotTruth", () => {
 
 describe("applySensorTruth", () => {
   it("strips invalid metrics and excludes them from the latest snapshot", () => {
-    const cleaned = applySensorTruth(snap({ temp: 75, rh: -3, vpd: 1.2 }), NOW);
+    const cleaned = applySensorTruth(snap({ temp: 24, rh: -3, vpd: 1.2 }), NOW);
     expect(cleaned.rh).toBeNull();
     // VPD dropped because RH invalid
     expect(cleaned.vpd).toBeNull();
-    expect(cleaned.temp).toBe(75); // wait: 75°C ≈ 167°F → invalid
+    expect(cleaned.temp).toBe(24); // realistic temp preserved
   });
 
   it("excludes impossible temp from the latest healthy snapshot", () => {

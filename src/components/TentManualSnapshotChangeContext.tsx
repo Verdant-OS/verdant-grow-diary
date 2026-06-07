@@ -53,7 +53,7 @@ export default function TentManualSnapshotChangeContext({ tentId, readings }: Pr
     );
   }
 
-  if (ctx.deltas.length === 0) return null;
+  if (ctx.deltas.length === 0 && ctx.suppressedDeltas.length === 0) return null;
 
   return (
     <div
@@ -75,6 +75,17 @@ export default function TentManualSnapshotChangeContext({ tentId, readings }: Pr
         >
           <span className="font-medium text-foreground/80">{d.label}</span>
           <span>{d.formatted}</span>
+        </span>
+      ))}
+      {ctx.suppressedDeltas.map((d) => (
+        <span
+          key={`suppressed-${d.key}`}
+          data-testid="tent-manual-snapshot-change-context-delta-suppressed"
+          data-metric={d.key}
+          className="inline-flex items-center gap-1 rounded-full border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-[11px] text-destructive"
+        >
+          <span className="font-medium">{d.label}</span>
+          <span>{d.reasonChip}</span>
         </span>
       ))}
     </div>

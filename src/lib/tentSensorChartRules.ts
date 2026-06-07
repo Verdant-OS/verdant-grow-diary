@@ -15,9 +15,12 @@ import {
 } from "@/lib/sensorSnapshot";
 import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
 import {
+  classifyManualMetric,
   classifySnapshotTruth,
   type SensorTruthAssessment,
 } from "@/lib/sensorTruthRules";
+
+
 
 
 export interface TentSensorChartPoint {
@@ -39,13 +42,25 @@ const METRIC_KEY: Record<string, keyof Omit<TentSensorChartPoint, "ts">> = {
 
 /**
  * Group rows by timestamp into chart points, sorted ascending by ts.
- * Unknown metrics are ignored. Returns [] for empty/null input.
+ *
+ * Truth filtering (presentation-side only):
+ *   - per-metric realism guards null out impossible values so the chart
+ *     never plots impossible spikes;
+ *   - if temp or rh at a given ts is invalid, the derived vpd at that ts
+ *     is also nulled (matches the snapshot-level VPD dependency rule).
+ *
+ * Unknown metrics are ignored. Returns [] for empty/null input. Never
+ * upgrades, rewrites, or invents source labels.
  */
 export function buildTentSensorChartSeries(
   rows: SensorReadingLike[] | null | undefined,
 ): TentSensorChartPoint[] {
   if (!rows || rows.length === 0) return [];
   const byTs = new Map<string, TentSensorChartPoint>();
+  // Track per-ts whether temp/rh were *invalid* (not merely missing) so we
+  // can null out a derived vpd at the same ts without dropping vpd when the
+  // chart simply doesn't carry temp/rh on that timestamp.
+  const tempOrRhInvalidAt = new Set<string>();
   for (const r of rows) {
     const key = METRIC_KEY[r.metric];
     if (!key) continue;
@@ -56,7 +71,21 @@ export function buildTentSensorChartSeries(
       pt = { ts: r.ts, temp: null, rh: null, vpd: null, co2: null, soil: null };
       byTs.set(r.ts, pt);
     }
+    const truth = classifyManualMetric(r.metric, v);
+    if (!truth.valid) {
+      if (r.metric === "temperature_c" || r.metric === "humidity_pct") {
+        tempOrRhInvalidAt.add(r.ts);
+      }
+      continue;
+    }
     pt[key] = v;
+  }
+  // VPD depends on temp + rh — null out vpd at any ts where either input
+  // is *invalid* for that same point (missing inputs do not drop vpd).
+  for (const pt of byTs.values()) {
+    if (pt.vpd !== null && tempOrRhInvalidAt.has(pt.ts)) {
+      pt.vpd = null;
+    }
   }
   return Array.from(byTs.values()).sort(
     (a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime(),

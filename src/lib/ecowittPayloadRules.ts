@@ -177,6 +177,12 @@ export function normalizeEcowittPayload(
       ? computeVpdKpa(tempC as number, rhPct as number)
       : null;
 
+  // Surface derived VPD as a metric so the presenter can read it from
+  // the same metrics map as the raw sensor values.
+  if (typeof derivedVpdKpa === "number" && Number.isFinite(derivedVpdKpa)) {
+    readings.push({ metric: "vpd_kpa", value: derivedVpdKpa, unit: "kPa" });
+  }
+
   return {
     ok: adapter.ok && readings.length > 0 && !suspicion.hasInvalid,
     vendor: "ecowitt",

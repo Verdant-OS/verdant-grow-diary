@@ -1,13 +1,20 @@
+import { useCallback, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   buildEcowittIngestValidationViewModel,
+  ECOWITT_VALIDATION_COPY_COMMANDS,
   type EcowittIngestValidationInput,
+  type EcowittValidationMetricStatus,
   type EcowittValidationStatus,
 } from "@/lib/ecowittIngestValidationViewModel";
 
 interface Props {
   input: EcowittIngestValidationInput;
+  /** Existing audit refetch from useEcowittAuditRows; never triggers writes. */
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
 function statusVariant(
@@ -26,7 +33,72 @@ function statusVariant(
   }
 }
 
-export function EcowittIngestValidationPanel({ input }: Props) {
+function metricVariant(
+  status: EcowittValidationMetricStatus,
+): "default" | "secondary" | "destructive" | "outline" {
+  switch (status) {
+    case "accepted":
+      return "default";
+    case "rejected":
+      return "destructive";
+    case "missing":
+      return "outline";
+    case "not_checked":
+    default:
+      return "secondary";
+  }
+}
+
+const METRIC_STATUS_LABEL: Record<EcowittValidationMetricStatus, string> = {
+  accepted: "accepted",
+  rejected: "rejected",
+  missing: "missing",
+  not_checked: "not_checked",
+};
+
+interface CopyButtonProps {
+  label: string;
+  command: string;
+  testId: string;
+}
+
+function CopyButton({ label, command, testId }: CopyButtonProps) {
+  const [copied, setCopied] = useState(false);
+  const onClick = useCallback(async () => {
+    try {
+      const clipboard =
+        typeof navigator !== "undefined" ? navigator.clipboard : undefined;
+      if (clipboard?.writeText) {
+        await clipboard.writeText(command);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard unavailable; still flash confirmation so operator sees feedback.
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [command]);
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      onClick={onClick}
+      data-testid={testId}
+      aria-label={label}
+      className="h-7 text-xs"
+    >
+      {copied ? "Copied" : label}
+    </Button>
+  );
+}
+
+export function EcowittIngestValidationPanel({
+  input,
+  onRefresh,
+  isRefreshing,
+}: Props) {
   const vm = buildEcowittIngestValidationViewModel(input);
   return (
     <Card data-testid="ecowitt-ingest-validation-panel">
@@ -36,8 +108,8 @@ export function EcowittIngestValidationPanel({ input }: Props) {
             EcoWitt ingest validation
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            Read-only evidence from the latest local test sender payload for
-            this tent.
+            Read-only local validation evidence for this tent (test data, not
+            live sensor telemetry).
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -61,6 +133,36 @@ export function EcowittIngestValidationPanel({ input }: Props) {
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         <p data-testid="validation-status-message">{vm.statusMessage}</p>
+
+        <div
+          data-testid="validation-action-bar"
+          className="flex flex-wrap items-center gap-2"
+        >
+          <CopyButton
+            label="Copy accepted test command"
+            command={ECOWITT_VALIDATION_COPY_COMMANDS.accepted}
+            testId="copy-accepted-command-button"
+          />
+          <CopyButton
+            label="Copy invalid test command"
+            command={ECOWITT_VALIDATION_COPY_COMMANDS.invalid}
+            testId="copy-invalid-command-button"
+          />
+          {onRefresh ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              data-testid="refresh-validation-button"
+              aria-label="Refresh local validation evidence"
+              className="h-7 text-xs"
+            >
+              {isRefreshing ? "Refreshing…" : "Refresh evidence"}
+            </Button>
+          ) : null}
+        </div>
 
         {vm.hasEvidence ? (
           <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -100,6 +202,107 @@ export function EcowittIngestValidationPanel({ input }: Props) {
           </div>
         ) : null}
 
+        {vm.hasEvidence ? (
+          <div data-testid="validation-metric-rows" className="space-y-1">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Per-metric validation
+            </h3>
+            <ul className="divide-y divide-border rounded-md border border-border">
+              {vm.metricRows.map((row) => (
+                <li
+                  key={row.key}
+                  data-testid={`metric-row-${row.key}`}
+                  data-status={row.status}
+                  data-present={row.present ? "true" : "false"}
+                  className="flex flex-wrap items-center justify-between gap-2 px-2 py-1 text-xs"
+                >
+                  <span className="font-mono">{row.label}</span>
+                  <span className="flex items-center gap-2">
+                    {row.value !== null ? (
+                      <span
+                        data-testid={`metric-value-${row.key}`}
+                        className="text-muted-foreground"
+                      >
+                        {row.value}
+                      </span>
+                    ) : null}
+                    <Badge
+                      variant={metricVariant(row.status)}
+                      data-testid={`metric-status-${row.key}`}
+                      className="text-[10px]"
+                    >
+                      {METRIC_STATUS_LABEL[row.status]}
+                    </Badge>
+                  </span>
+                  {row.reason ? (
+                    <span
+                      data-testid={`metric-reason-${row.key}`}
+                      className="basis-full text-[10px] text-muted-foreground"
+                    >
+                      {row.reason}
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {vm.timeline.length > 0 ? (
+          <div data-testid="validation-timeline" className="space-y-1">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Last {vm.timeline.length} local validation attempts
+            </h3>
+            <ol className="divide-y divide-border rounded-md border border-border">
+              {vm.timeline.map((entry) => (
+                <li
+                  key={entry.key}
+                  data-testid={`timeline-entry-${entry.key}`}
+                  data-status={entry.status}
+                  data-invalid={entry.invalidTest ? "true" : "false"}
+                  data-stale={entry.stale ? "true" : "false"}
+                  className="flex flex-wrap items-center justify-between gap-2 px-2 py-1 text-xs"
+                >
+                  <span className="font-mono text-muted-foreground">
+                    {entry.capturedAtLabel}
+                    <span className="ml-1 opacity-70">({entry.ageLabel})</span>
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Badge
+                      variant={statusVariant(entry.status)}
+                      className="text-[10px]"
+                      data-testid={`timeline-status-${entry.key}`}
+                    >
+                      {entry.statusLabel}
+                    </Badge>
+                    {entry.invalidTest ? (
+                      <Badge
+                        variant="destructive"
+                        className="text-[10px]"
+                        data-testid={`timeline-invalid-${entry.key}`}
+                      >
+                        invalid
+                      </Badge>
+                    ) : null}
+                    {entry.stale ? (
+                      <Badge
+                        variant="secondary"
+                        className="text-[10px]"
+                        data-testid={`timeline-stale-${entry.key}`}
+                      >
+                        stale
+                      </Badge>
+                    ) : null}
+                  </span>
+                  <span className="basis-full text-[10px] text-muted-foreground">
+                    {entry.metricSummary}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        ) : null}
+
         {vm.nextSteps.length > 0 ? (
           <ul
             data-testid="validation-next-steps"
@@ -111,24 +314,22 @@ export function EcowittIngestValidationPanel({ input }: Props) {
           </ul>
         ) : null}
 
-        {!vm.hasEvidence ? (
-          <div
-            data-testid="validation-cli-hints"
-            className="rounded-md border border-dashed border-border p-3 text-xs"
-          >
-            <p className="mb-1 font-medium">Run the local test sender:</p>
-            <ul className="space-y-1">
-              {vm.cliHints.map((hint) => (
-                <li key={hint.command}>
-                  <span className="text-muted-foreground">{hint.label}:</span>{" "}
-                  <code className="rounded bg-muted px-1 py-0.5">
-                    {hint.command}
-                  </code>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
+        <div
+          data-testid="validation-cli-hints"
+          className="rounded-md border border-dashed border-border p-3 text-xs"
+        >
+          <p className="mb-1 font-medium">Local test sender commands:</p>
+          <ul className="space-y-1">
+            {vm.cliHints.map((hint) => (
+              <li key={hint.command}>
+                <span className="text-muted-foreground">{hint.label}:</span>{" "}
+                <code className="rounded bg-muted px-1 py-0.5">
+                  {hint.command}
+                </code>
+              </li>
+            ))}
+          </ul>
+        </div>
       </CardContent>
     </Card>
   );

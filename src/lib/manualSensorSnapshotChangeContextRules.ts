@@ -83,6 +83,16 @@ const DISPLAY_ORDER: ChangeContextMetric[] = [
   "reservoir_ph",
 ];
 
+const METRIC_LABEL: Record<ChangeContextMetric, string> = {
+  temperature_c: "Temp",
+  humidity_pct: "RH",
+  vpd_kpa: "VPD",
+  co2_ppm: "CO₂",
+  soil_moisture_pct: "Soil",
+  soil_ec_ms_cm: "Soil EC",
+  reservoir_ph: "pH",
+};
+
 const KNOWN_METRICS: ReadonlySet<string> = new Set(DISPLAY_ORDER);
 
 function toFiniteNumber(v: unknown): number | null {

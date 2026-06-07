@@ -153,6 +153,15 @@ export function buildEcowittSnapshotViewModel(
 
   const metrics: EcowittSnapshotViewModel["metrics"] = {};
   for (const r of chosen.snap.readings) metrics[r.metric] = r.value;
+  // Derived VPD is not a sensor reading — surface it on the metrics map
+  // separately so the presenter can read it alongside raw values without
+  // having it labeled as a live reading.
+  if (
+    typeof chosen.snap.derivedVpdKpa === "number" &&
+    Number.isFinite(chosen.snap.derivedVpdKpa)
+  ) {
+    metrics.vpd_kpa = chosen.snap.derivedVpdKpa;
+  }
 
   return {
     hasReading: true,

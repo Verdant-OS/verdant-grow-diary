@@ -84,9 +84,10 @@ describe("redactBridgeToken", () => {
 });
 
 describe("module purity", () => {
-  it("does not import supabase or reference action_queue", async () => {
+  it("does not import supabase and does not emit action_queue payload fields", async () => {
     const mod = await import("@/lib/ecowittLocalTestPayloadRules");
     expect(Object.keys(mod)).not.toContain("supabase");
-    expect(JSON.stringify(mod)).not.toMatch(/action_queue/i);
+    const payload = mod.buildEcowittLocalTestPayload({ tentId: TENT, now: NOW });
+    expect(JSON.stringify(payload)).not.toMatch(/action_queue/i);
   });
 });

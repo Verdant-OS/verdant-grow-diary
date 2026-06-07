@@ -106,6 +106,10 @@ export default function EcowittIngestAudit() {
           rows: query.data ?? [],
           tentId: effectiveTentId,
         }}
+        onRefresh={() => {
+          void query.refetch();
+        }}
+        isRefreshing={query.isFetching}
       />
 
       {query.isLoading ? (

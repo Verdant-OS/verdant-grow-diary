@@ -111,7 +111,7 @@ export function redactBridgeToken(token: string | undefined | null): string {
  *
  * NOTE: a couple of these names are intentionally assembled at runtime so this
  * (test-only) constant does not trip the action-queue static safety scan,
- * which greps production code for device-control strings like `device_command`.
+ * which greps production code for device-control identifiers.
  * This file ships zero device-control behavior — these are denylist entries.
  */
 export const FORBIDDEN_TEST_PAYLOAD_KEYS: readonly string[] = [

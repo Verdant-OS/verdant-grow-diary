@@ -50,11 +50,25 @@ export interface ChangeContextDelta {
   direction: "up" | "down" | "flat";
 }
 
+export interface ChangeContextSuppressedDelta {
+  key: ChangeContextMetric;
+  label: string;
+  /** Short UI chip, e.g. "Invalid temp". */
+  reasonChip: string;
+  /** Which side was invalid. "both" when both are invalid. */
+  side: "current" | "previous" | "both";
+}
+
 export interface ChangeContextResult {
   /** True when the tent has no prior manual snapshot to compare against. */
   firstSnapshot: boolean;
   /** Empty when first snapshot OR when nothing comparable changed. */
   deltas: ChangeContextDelta[];
+  /**
+   * Metrics where a delta would have been shown but at least one side
+   * failed realism guards. Surfaces a chip instead of a fabricated delta.
+   */
+  suppressedDeltas: ChangeContextSuppressedDelta[];
 }
 
 const DISPLAY_ORDER: ChangeContextMetric[] = [

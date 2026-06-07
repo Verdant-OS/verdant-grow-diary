@@ -15,10 +15,12 @@ import {
 } from "@/lib/sensorSnapshot";
 import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
 import {
+  classifyManualMetric,
   classifySnapshotTruth,
   type SensorTruthAssessment,
 } from "@/lib/sensorTruthRules";
-import { classifyManualMetric } from "@/lib/sensorTruthRules";
+
+
 
 
 export interface TentSensorChartPoint {

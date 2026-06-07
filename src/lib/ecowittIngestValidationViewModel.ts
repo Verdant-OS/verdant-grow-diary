@@ -22,7 +22,7 @@ export type EcowittValidationStatus =
   | "stale";
 
 export interface EcowittIngestValidationRow {
-  id: string;
+  id?: string | null;
   source?: string | null;
   captured_at?: string | null;
   ts?: string | null;

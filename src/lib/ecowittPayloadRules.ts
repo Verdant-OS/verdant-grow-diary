@@ -145,6 +145,7 @@ export function normalizeEcowittPayload(
   if (typeof rawTempF === "number" && Number.isFinite(rawTempF)) {
     readings.push({ metric: "temp_f", value: rawTempF, unit: "F" });
   }
+  const capturedAtRaw = adapter.input.captured_at;
   const capturedAt =
     typeof capturedAtRaw === "string" && capturedAtRaw.length > 0
       ? capturedAtRaw
@@ -155,7 +156,6 @@ export function normalizeEcowittPayload(
   const tempC = readings.find((r) => r.metric === "temperature_c")?.value;
   const rhPct = readings.find((r) => r.metric === "humidity_pct")?.value;
   const soilPct = readings.find((r) => r.metric === "soil_moisture_pct")?.value;
-  const rawTempF = readPayloadTempF(payload);
 
   const suspicion = evaluateEcowittSuspicion({
     temperatureC: typeof tempC === "number" ? tempC : null,

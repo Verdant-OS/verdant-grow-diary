@@ -177,11 +177,10 @@ export function normalizeEcowittPayload(
       ? computeVpdKpa(tempC as number, rhPct as number)
       : null;
 
-  // Surface derived VPD as a metric so the presenter can read it from
-  // the same metrics map as the raw sensor values.
-  if (typeof derivedVpdKpa === "number" && Number.isFinite(derivedVpdKpa)) {
-    readings.push({ metric: "vpd_kpa", value: derivedVpdKpa, unit: "kPa" });
-  }
+  // NOTE: derived VPD is intentionally NOT appended to `readings`. Readings
+  // represent sensor-sourced values (so they inherit the live/manual/stale
+  // source label); a derived metric pushed into that list would be mislabeled
+  // as a live reading. Consumers should read `derivedVpdKpa` instead.
 
   return {
     ok: adapter.ok && readings.length > 0 && !suspicion.hasInvalid,

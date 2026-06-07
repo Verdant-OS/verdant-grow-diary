@@ -50,13 +50,25 @@ export interface HistoryMetricChip {
   formatted: string;
 }
 
+export interface HistoryInvalidChip {
+  key: ChangeContextMetric;
+  label: string;
+  /** Short UI chip, e.g. "Invalid temp", "Unit mismatch suspected". */
+  chip: string;
+}
+
 export interface ManualSnapshotHistoryEntry {
   ts: string;
+  /** Valid (realism-passing) metric chips only. */
   metrics: HistoryMetricChip[];
+  /** Per-snapshot invalid/suspicious chips. Empty when nothing flagged. */
+  invalidChips: HistoryInvalidChip[];
   /** True when this entry has no comparable previous manual snapshot. */
   firstSnapshot: boolean;
   /** Deterministically ordered deltas vs previous manual snapshot. */
   deltas: ChangeContextDelta[];
+  /** Deltas suppressed because either side failed realism guards. */
+  suppressedDeltas: ChangeContextSuppressedDelta[];
 }
 
 function clampLimit(n: number | undefined): number {
@@ -65,6 +77,16 @@ function clampLimit(n: number | undefined): number {
   if (v > MAX_HISTORY_LIMIT) return MAX_HISTORY_LIMIT;
   return v;
 }
+
+const METRIC_LABEL: Record<ChangeContextMetric, string> = {
+  temperature_c: "Temp",
+  humidity_pct: "RH",
+  vpd_kpa: "VPD",
+  co2_ppm: "CO₂",
+  soil_moisture_pct: "Soil",
+  soil_ec_ms_cm: "Soil EC",
+  reservoir_ph: "pH",
+};
 
 function formatMetricChip(
   key: ChangeContextMetric,
@@ -92,15 +114,43 @@ function formatMetricChip(
   }
 }
 
-function chipsFromSnapshot(s: ChangeContextSnapshot): HistoryMetricChip[] {
-  const out: HistoryMetricChip[] = [];
+interface ChipsBreakdown {
+  metrics: HistoryMetricChip[];
+  invalidChips: HistoryInvalidChip[];
+}
+
+function chipsFromSnapshot(s: ChangeContextSnapshot): ChipsBreakdown {
+  const metrics: HistoryMetricChip[] = [];
+  const invalidChips: HistoryInvalidChip[] = [];
+  const invalidKeys = new Set<ChangeContextMetric>();
   for (const key of HISTORY_METRIC_DISPLAY_ORDER) {
     const v = s.metrics[key];
     if (v === undefined) continue;
+    const truth = classifyManualMetric(key, v);
+    if (!truth.valid) {
+      invalidKeys.add(key);
+      invalidChips.push({
+        key,
+        label: METRIC_LABEL[key],
+        chip: truth.chip ?? "Invalid value",
+      });
+      continue;
+    }
     const chip = formatMetricChip(key, v);
-    if (chip) out.push(chip);
+    if (chip) metrics.push(chip);
   }
-  return out;
+  // VPD depends on temp + rh; if either was invalid, also flag VPD as
+  // invalid so we don't surface a derived "ghost" reading.
+  if (
+    (invalidKeys.has("temperature_c") || invalidKeys.has("humidity_pct")) &&
+    s.metrics.vpd_kpa !== undefined &&
+    !invalidKeys.has("vpd_kpa")
+  ) {
+    const idx = metrics.findIndex((m) => m.key === "vpd_kpa");
+    if (idx !== -1) metrics.splice(idx, 1);
+    invalidChips.push({ key: "vpd_kpa", label: "VPD", chip: "Invalid VPD" });
+  }
+  return { metrics, invalidChips };
 }
 
 /**
@@ -123,11 +173,14 @@ export function buildManualSnapshotHistoryList(
     const snap = sliced[i];
     const prev = snapshots[i + 1] ?? null;
     const ctx = buildManualSnapshotChangeContext({ latest: snap, previous: prev });
+    const { metrics, invalidChips } = chipsFromSnapshot(snap);
     out.push({
       ts: snap.ts,
-      metrics: chipsFromSnapshot(snap),
+      metrics,
+      invalidChips,
       firstSnapshot: ctx.firstSnapshot,
       deltas: ctx.deltas,
+      suppressedDeltas: ctx.suppressedDeltas,
     });
   }
   return out;

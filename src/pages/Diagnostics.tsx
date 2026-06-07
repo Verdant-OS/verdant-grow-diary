@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { verifySupabaseEnv } from "@/lib/verifyEnv";
 import { Link } from "react-router-dom";
+import { DevOpsBackupEncryptionCard } from "@/components/DevOpsBackupEncryptionCard";
 
 type CheckStatus = "pending" | "running" | "pass" | "fail" | "skip";
 
@@ -207,6 +208,22 @@ export default function Diagnostics() {
           </Card>
         ))}
       </div>
+
+      <section aria-labelledby="devops-monitor-heading" className="space-y-3">
+        <h2 id="devops-monitor-heading" className="text-lg font-semibold">
+          DevOps monitor
+        </h2>
+        <DevOpsBackupEncryptionCard
+          input={{
+            // No live status source wired yet — report unknown rather than
+            // assume healthy. Replace with a real read once a backup status
+            // source is available.
+            state: "unknown",
+            provider: "supabase_storage",
+            lastCheckedAt: null,
+          }}
+        />
+      </section>
     </div>
   );
 }

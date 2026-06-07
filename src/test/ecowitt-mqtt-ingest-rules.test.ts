@@ -113,8 +113,10 @@ describe("normalizeEcowittMqttPayload", () => {
   });
 
   it("malformed payload returns ok:false with no draft", () => {
-    // @ts-expect-error intentional bad input
-    const r = normalizeEcowittMqttPayload({ payload: null, now: NOW });
+    const r = normalizeEcowittMqttPayload({
+      payload: null as unknown as EcowittMqttPayload,
+      now: NOW,
+    });
     expect(r.ok).toBe(false);
     expect(r.draft).toBeNull();
     expect(r.reasons).toContain("malformed_payload");

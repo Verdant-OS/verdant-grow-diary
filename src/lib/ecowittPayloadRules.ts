@@ -78,9 +78,11 @@ export interface NormalizeEcowittOptions extends EcoWittAdapterOptions {
 
 const ALLOWED_METRICS = new Set<EcowittNormalizedMetric>([
   "temperature_c",
+  "temp_f",
   "humidity_pct",
   "soil_moisture_pct",
   "co2_ppm",
+  "vpd_kpa",
 ]);
 
 function freshnessFromAge(

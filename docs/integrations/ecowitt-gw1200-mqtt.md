@@ -161,3 +161,61 @@ jitter — a synchronized fleet hammering the broker is a self-DDoS.
 - malformed / missing captured_at rejected
 - canonical draft has no device-control fields
 - module never imports supabase or references `action_queue`
+
+---
+
+## 8. Local test sender (developer loop)
+
+For end-to-end validation against the deployed
+`sensor-ingest-webhook` Edge Function without wiring the full MQTT
+subscriber yet:
+
+```bash
+export VERDANT_INGEST_URL="https://<project-ref>.supabase.co/functions/v1/sensor-ingest-webhook"
+export VERDANT_BRIDGE_TOKEN="vbt_..."         # mint via Settings → Bridge Tokens
+export VERDANT_TENT_ID="<tent-uuid>"
+# optional:
+export VERDANT_PLANT_ID="<plant-uuid>"
+
+# Valid EcoWitt-shaped payload (should insert one row per metric):
+bun run dev:send-ecowitt
+
+# Intentionally impossible values (should be rejected by the route's
+# sensor truth rules; script exits 0 because rejection is expected):
+bun run dev:send-ecowitt:invalid
+```
+
+What the sender does:
+
+- Builds a canonical webhook payload via
+  `src/lib/ecowittLocalTestPayloadRules.ts` with `source: "ecowitt"`,
+  `vendor: "ecowitt"`, `transport: "mqtt_local_test"`, and the metric
+  aliases (`temp_f`, `humidity_pct`, `vpd_kpa`, `soil_moisture_pct`,
+  `co2_ppm`) already accepted by `webhookIngest.ts`.
+- Sends `Authorization: Bearer <token>` and an `Idempotency-Key` derived
+  from `captured_at` so repeat runs are deduped by the existing
+  `sensor_readings_dedupe_uidx` index.
+- Prints request target, redacted token (`vbt_…(redacted, len=N)`),
+  payload summary, HTTP status, and response body.
+- Exits non-zero on unexpected failure.
+
+Safety guarantees (sender):
+
+- Read-only ingest path — no Action Queue, no automation, no device
+  control, no `service_role`.
+- Bridge token is never logged in plaintext.
+- `--invalid` mode is clearly marked (`metadata.invalid_test: true`,
+  `metadata.test_sender: true`) so a leaked row can never be mistaken
+  for live operator data.
+
+### Local Mosquitto check
+
+You can still verify the broker independently of Verdant:
+
+```bash
+mosquitto_sub -t "ecowitt/#" -v
+```
+
+A long-running MQTT-to-Verdant subscriber is intentionally out of scope
+for this slice — only the single-shot HTTP test sender is provided.
+

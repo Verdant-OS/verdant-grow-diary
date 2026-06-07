@@ -318,3 +318,99 @@ export function applySensorTruth(
 ): SensorSnapshot {
   return classifySnapshotTruth(snapshot, now).snapshot;
 }
+
+// ---------------------------------------------------------------------------
+// Per-metric truth helpers (used by chart series + manual snapshot history /
+// change context). These reuse the existing realism predicates so the rule
+// table stays single-sourced.
+// ---------------------------------------------------------------------------
+
+/** CO₂ ppm sanity for indoor grow rooms (ambient ~400, supplemented ≤2000). */
+export const CO2_PPM_RANGE = { min: 0, max: 10000 } as const;
+
+export function isCo2PpmRealistic(v: number | null | undefined): boolean {
+  if (v === null || v === undefined) return true;
+  return finite(v) && v >= CO2_PPM_RANGE.min && v <= CO2_PPM_RANGE.max;
+}
+
+export interface ManualMetricTruth {
+  valid: boolean;
+  /** Short UI chip when invalid (e.g. "Invalid temp"). Undefined when valid. */
+  chip?: string;
+  reasonCode?: TruthReasonCode;
+}
+
+const VALID_TRUTH: ManualMetricTruth = { valid: true };
+
+/**
+ * Classify a single long-format metric value. Used to filter chart points
+ * and history chips without re-implementing realism logic.
+ *
+ * Does NOT enforce the VPD ↔ temp/RH dependency — callers that have access
+ * to the sibling metrics must apply that rule themselves.
+ */
+export function classifyManualMetric(
+  metric: string,
+  value: number | null | undefined,
+): ManualMetricTruth {
+  if (value === null || value === undefined) return VALID_TRUTH;
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return { valid: false, chip: "Invalid value" };
+  }
+  switch (metric) {
+    case "temperature_c":
+      return isAirTempCRealistic(value)
+        ? VALID_TRUTH
+        : { valid: false, chip: TRUTH_REASON_CHIP.invalid_temp, reasonCode: "invalid_temp" };
+    case "humidity_pct":
+      return isHumidityRealistic(value)
+        ? VALID_TRUTH
+        : { valid: false, chip: TRUTH_REASON_CHIP.invalid_rh, reasonCode: "invalid_rh" };
+    case "vpd_kpa":
+      return isVpdRealistic(value)
+        ? VALID_TRUTH
+        : { valid: false, chip: TRUTH_REASON_CHIP.invalid_vpd, reasonCode: "invalid_vpd" };
+    case "co2_ppm":
+      return isCo2PpmRealistic(value)
+        ? VALID_TRUTH
+        : { valid: false, chip: "Invalid CO₂" };
+    case "soil_moisture_pct":
+      return isSoilMoistureRealistic(value)
+        ? VALID_TRUTH
+        : {
+            valid: false,
+            chip: TRUTH_REASON_CHIP.invalid_soil_moisture,
+            reasonCode: "invalid_soil_moisture",
+          };
+    case "soil_ec_ms_cm":
+    case "soil_ec":
+      if (isSoilEcMscmRealistic(value)) return VALID_TRUTH;
+      if (isSoilEcUnitMismatchSuspected(value)) {
+        return {
+          valid: false,
+          chip: TRUTH_REASON_CHIP.unit_mismatch_suspected,
+          reasonCode: "unit_mismatch_suspected",
+        };
+      }
+      return {
+        valid: false,
+        chip: TRUTH_REASON_CHIP.invalid_soil_ec,
+        reasonCode: "invalid_soil_ec",
+      };
+    case "soil_temp_c":
+      return isSoilTempCRealistic(value)
+        ? VALID_TRUTH
+        : {
+            valid: false,
+            chip: TRUTH_REASON_CHIP.invalid_soil_temp,
+            reasonCode: "invalid_soil_temp",
+          };
+    case "reservoir_ph":
+    case "ph":
+      return isPhRealistic(value)
+        ? VALID_TRUTH
+        : { valid: false, chip: TRUTH_REASON_CHIP.invalid_ph, reasonCode: "invalid_ph" };
+    default:
+      return VALID_TRUTH;
+  }
+}

@@ -38,13 +38,18 @@ const METRIC_KEY: Record<string, keyof Omit<TentSensorChartPoint, "ts">> = {
   soil_moisture_pct: "soil",
 };
 
-const METRIC_NAME_FOR_KEY: Record<keyof Omit<TentSensorChartPoint, "ts">, string> = {
-  temp: "temperature_c",
-  rh: "humidity_pct",
-  vpd: "vpd_kpa",
-  co2: "co2_ppm",
-  soil: "soil_moisture_pct",
-};
+/**
+ * Group rows by timestamp into chart points, sorted ascending by ts.
+ *
+ * Truth filtering (presentation-side only):
+ *   - per-metric realism guards null out impossible values so the chart
+ *     never plots impossible spikes;
+ *   - if temp or rh at a given ts is invalid, the derived vpd at that ts
+ *     is also nulled (matches the snapshot-level VPD dependency rule).
+ *
+ * Unknown metrics are ignored. Returns [] for empty/null input. Never
+ * upgrades, rewrites, or invents source labels.
+ */
 
 /**
  * Group rows by timestamp into chart points, sorted ascending by ts.

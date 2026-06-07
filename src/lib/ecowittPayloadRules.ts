@@ -139,7 +139,12 @@ export function normalizeEcowittPayload(
     });
   }
 
-  const capturedAtRaw = adapter.input.captured_at;
+  // Emit temp_f directly from the raw payload so the presenter can show
+  // Fahrenheit without a lossy C→F→C round-trip.
+  const rawTempF = readPayloadTempF(payload);
+  if (typeof rawTempF === "number" && Number.isFinite(rawTempF)) {
+    readings.push({ metric: "temp_f", value: rawTempF, unit: "F" });
+  }
   const capturedAt =
     typeof capturedAtRaw === "string" && capturedAtRaw.length > 0
       ? capturedAtRaw

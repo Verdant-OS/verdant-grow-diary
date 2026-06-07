@@ -61,7 +61,8 @@ export interface EcowittSnapshotViewModel {
 }
 
 
-const EMPTY_STATE_MESSAGE = "No EcoWitt readings received yet.";
+const EMPTY_STATE_MESSAGE =
+  "No EcoWitt readings yet. Send a local test payload to verify the integration.";
 
 /**
  * Demote a "live" source to "stale" when the snapshot has aged past the

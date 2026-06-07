@@ -302,6 +302,7 @@ export default function TentDetail() {
         </div>
         <EcowittLatestSnapshotCard
           tentId={id ?? null}
+          tentName={tent?.name}
           title="Latest EcoWitt Snapshot"
         />
       </section>

@@ -80,11 +80,12 @@ describe("ecowittReadingViewModel.buildEcowittSnapshotViewModel", () => {
       { now: NOW },
     );
     expect(vm.derivedVpdKpa).not.toBeNull();
-    // VPD must not appear as a "live" reading row.
+    // VPD is now explicitly surfaced in the metrics map for presenter convenience.
+    expect(vm.metrics.vpd_kpa).not.toBeNull();
     expect(
       vm.snapshot?.readings.some(
         (r) => (r as { metric: string }).metric === "vpd_kpa",
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 });

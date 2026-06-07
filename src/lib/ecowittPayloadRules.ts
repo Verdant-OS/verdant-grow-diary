@@ -31,9 +31,11 @@ export type EcowittFreshness = "fresh" | "stale" | "missing";
 
 export type EcowittNormalizedMetric =
   | "temperature_c"
+  | "temp_f"
   | "humidity_pct"
   | "soil_moisture_pct"
-  | "co2_ppm";
+  | "co2_ppm"
+  | "vpd_kpa";
 
 export interface EcowittNormalizedReading {
   metric: EcowittNormalizedMetric;
@@ -76,9 +78,11 @@ export interface NormalizeEcowittOptions extends EcoWittAdapterOptions {
 
 const ALLOWED_METRICS = new Set<EcowittNormalizedMetric>([
   "temperature_c",
+  "temp_f",
   "humidity_pct",
   "soil_moisture_pct",
   "co2_ppm",
+  "vpd_kpa",
 ]);
 
 function freshnessFromAge(
@@ -135,6 +139,12 @@ export function normalizeEcowittPayload(
     });
   }
 
+  // Emit temp_f directly from the raw payload so the presenter can show
+  // Fahrenheit without a lossy C→F→C round-trip.
+  const rawTempF = readPayloadTempF(payload);
+  if (typeof rawTempF === "number" && Number.isFinite(rawTempF)) {
+    readings.push({ metric: "temp_f", value: rawTempF, unit: "F" });
+  }
   const capturedAtRaw = adapter.input.captured_at;
   const capturedAt =
     typeof capturedAtRaw === "string" && capturedAtRaw.length > 0
@@ -146,7 +156,6 @@ export function normalizeEcowittPayload(
   const tempC = readings.find((r) => r.metric === "temperature_c")?.value;
   const rhPct = readings.find((r) => r.metric === "humidity_pct")?.value;
   const soilPct = readings.find((r) => r.metric === "soil_moisture_pct")?.value;
-  const rawTempF = readPayloadTempF(payload);
 
   const suspicion = evaluateEcowittSuspicion({
     temperatureC: typeof tempC === "number" ? tempC : null,
@@ -167,6 +176,12 @@ export function normalizeEcowittPayload(
     rhValidForVpd && tempValidForVpd && !suspicion.hasInvalid
       ? computeVpdKpa(tempC as number, rhPct as number)
       : null;
+
+  // Surface derived VPD as a metric so the presenter can read it from
+  // the same metrics map as the raw sensor values.
+  if (typeof derivedVpdKpa === "number" && Number.isFinite(derivedVpdKpa)) {
+    readings.push({ metric: "vpd_kpa", value: derivedVpdKpa, unit: "kPa" });
+  }
 
   return {
     ok: adapter.ok && readings.length > 0 && !suspicion.hasInvalid,

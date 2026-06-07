@@ -791,6 +791,9 @@ export default function Dashboard() {
           ) : (
             <EcowittLatestSnapshotCard
               tentId={tentSelection}
+              tentName={
+                selectableTents.find((t) => t.id === tentSelection)?.name
+              }
               title="Latest EcoWitt Snapshot"
             />
           )}

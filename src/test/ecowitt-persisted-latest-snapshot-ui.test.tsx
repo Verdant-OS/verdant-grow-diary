@@ -95,7 +95,7 @@ describe("buildEcowittSnapshotFromRows — pure wiring", () => {
       { tentId: TENT_A, now: NOW },
     );
     expect(vm?.hasReading).toBe(true);
-    expect(vm?.metrics.temperature_c).toBeCloseTo(25, 0);
+    expect(vm?.metrics.temp_f).toBeCloseTo(77, 0);
     expect(vm?.metrics.humidity_pct).toBe(55);
     expect(vm?.derivedVpdKpa).not.toBeNull();
   });
@@ -155,7 +155,9 @@ describe("buildEcowittSnapshotFromRows — pure wiring", () => {
       now: NOW,
     });
     expect(vm?.hasReading).toBe(false);
-    expect(vm?.emptyStateMessage).toBe("No EcoWitt readings received yet.");
+    expect(vm?.emptyStateMessage).toBe(
+      "No EcoWitt readings yet. Send a local test payload to verify the integration.",
+    );
   });
 
   it("manual EcoWitt row stays Manual, never Live", () => {
@@ -216,7 +218,9 @@ describe("EcowittLatestSnapshotCard — render", () => {
       expect(screen.getByTestId("ecowitt-snapshot-empty")).toBeInTheDocument(),
     );
     expect(
-      screen.getByText("No EcoWitt readings received yet."),
+      screen.getByText(
+        "No EcoWitt readings yet. Send a local test payload to verify the integration.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -242,7 +246,7 @@ describe("EcowittLatestSnapshotCard — render", () => {
     expect(screen.getByTestId("ecowitt-source-badge").textContent).toBe(
       "Ecowitt",
     );
-    expect(screen.getByTestId("ecowitt-metric-derived-vpd").textContent).toMatch(
+    expect(screen.getByTestId("ecowitt-metric-vpd_kpa").textContent).toMatch(
       /kPa/,
     );
     expect(screen.getByText("Derived VPD")).toBeInTheDocument();
@@ -291,7 +295,7 @@ describe("EcowittLatestSnapshotCard — render", () => {
       ).toBeInTheDocument(),
     );
     expect(
-      screen.getByTestId("ecowitt-metric-derived-vpd").textContent,
+      screen.getByTestId("ecowitt-metric-vpd_kpa").textContent,
     ).toBe("Unavailable");
   });
 

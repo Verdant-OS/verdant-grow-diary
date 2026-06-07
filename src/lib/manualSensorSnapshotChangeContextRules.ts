@@ -16,6 +16,8 @@
  *    future / pen-entered snapshots benefit without a schema change.
  */
 
+import { classifyManualMetric } from "@/lib/sensorTruthRules";
+
 export type ChangeContextMetric =
   | "temperature_c"
   | "humidity_pct"

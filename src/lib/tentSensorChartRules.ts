@@ -18,6 +18,7 @@ import {
   classifySnapshotTruth,
   type SensorTruthAssessment,
 } from "@/lib/sensorTruthRules";
+import { classifyManualMetric } from "@/lib/sensorTruthRules";
 
 
 export interface TentSensorChartPoint {
@@ -37,9 +38,25 @@ const METRIC_KEY: Record<string, keyof Omit<TentSensorChartPoint, "ts">> = {
   soil_moisture_pct: "soil",
 };
 
+const METRIC_NAME_FOR_KEY: Record<keyof Omit<TentSensorChartPoint, "ts">, string> = {
+  temp: "temperature_c",
+  rh: "humidity_pct",
+  vpd: "vpd_kpa",
+  co2: "co2_ppm",
+  soil: "soil_moisture_pct",
+};
+
 /**
  * Group rows by timestamp into chart points, sorted ascending by ts.
- * Unknown metrics are ignored. Returns [] for empty/null input.
+ *
+ * Truth filtering (presentation-side only):
+ *   - per-metric realism guards null out impossible values so the chart
+ *     never plots impossible spikes;
+ *   - if temp or rh at a given ts is invalid, the derived vpd at that ts
+ *     is also nulled (matches the snapshot-level VPD dependency rule).
+ *
+ * Unknown metrics are ignored. Returns [] for empty/null input. Never
+ * upgrades, rewrites, or invents source labels.
  */
 export function buildTentSensorChartSeries(
   rows: SensorReadingLike[] | null | undefined,
@@ -56,7 +73,18 @@ export function buildTentSensorChartSeries(
       pt = { ts: r.ts, temp: null, rh: null, vpd: null, co2: null, soil: null };
       byTs.set(r.ts, pt);
     }
+    // Per-metric realism guard. Invalid → leave field null so the chart
+    // line breaks instead of spiking.
+    const truth = classifyManualMetric(r.metric, v);
+    if (!truth.valid) continue;
     pt[key] = v;
+  }
+  // VPD depends on temp + rh — null out vpd at any ts where either input
+  // is missing/invalid for that same point.
+  for (const pt of byTs.values()) {
+    if (pt.vpd !== null && (pt.temp === null || pt.rh === null)) {
+      pt.vpd = null;
+    }
   }
   return Array.from(byTs.values()).sort(
     (a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime(),

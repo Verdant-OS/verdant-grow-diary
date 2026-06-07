@@ -95,7 +95,7 @@ describe("buildEcowittSnapshotFromRows — pure wiring", () => {
       { tentId: TENT_A, now: NOW },
     );
     expect(vm?.hasReading).toBe(true);
-    expect(vm?.metrics.temperature_c).toBeCloseTo(25, 0);
+    expect(vm?.metrics.temp_f).toBeCloseTo(77, 0);
     expect(vm?.metrics.humidity_pct).toBe(55);
     expect(vm?.derivedVpdKpa).not.toBeNull();
   });

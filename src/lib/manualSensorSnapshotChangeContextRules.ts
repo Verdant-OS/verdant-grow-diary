@@ -200,19 +200,39 @@ export function buildManualSnapshotChangeContext(input: {
   previous: ChangeContextSnapshot | null | undefined;
 }): ChangeContextResult {
   const { latest, previous } = input;
-  if (!latest) return { firstSnapshot: true, deltas: [] };
-  if (!previous) return { firstSnapshot: true, deltas: [] };
+  if (!latest) return { firstSnapshot: true, deltas: [], suppressedDeltas: [] };
+  if (!previous) return { firstSnapshot: true, deltas: [], suppressedDeltas: [] };
 
   const deltas: ChangeContextDelta[] = [];
+  const suppressedDeltas: ChangeContextSuppressedDelta[] = [];
   for (const key of DISPLAY_ORDER) {
     const a = latest.metrics[key];
     const b = previous.metrics[key];
     if (a === undefined || b === undefined) continue;
     if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+    // Per-metric truth filter: if either side is impossible, suppress the
+    // delta and emit a reason chip instead of a fabricated swing.
+    const aTruth = classifyManualMetric(key, a);
+    const bTruth = classifyManualMetric(key, b);
+    if (!aTruth.valid || !bTruth.valid) {
+      const chip = (aTruth.chip ?? bTruth.chip) as string;
+      const side: ChangeContextSuppressedDelta["side"] = !aTruth.valid && !bTruth.valid
+        ? "both"
+        : !aTruth.valid
+          ? "current"
+          : "previous";
+      suppressedDeltas.push({
+        key,
+        label: METRIC_LABEL[key],
+        reasonChip: chip,
+        side,
+      });
+      continue;
+    }
     const d = formatDelta(key, a, b);
     if (d) deltas.push(d);
   }
-  return { firstSnapshot: false, deltas };
+  return { firstSnapshot: false, deltas, suppressedDeltas };
 }
 
 /**

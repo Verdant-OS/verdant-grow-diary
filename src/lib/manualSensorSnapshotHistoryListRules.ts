@@ -24,7 +24,9 @@ import {
   type ChangeContextMetric,
   type ChangeContextReading,
   type ChangeContextSnapshot,
+  type ChangeContextSuppressedDelta,
 } from "@/lib/manualSensorSnapshotChangeContextRules";
+import { classifyManualMetric } from "@/lib/sensorTruthRules";
 import { tempFFromC } from "@/lib/temperatureUnits";
 
 /** Deterministic display order for the per-snapshot metric chips. */

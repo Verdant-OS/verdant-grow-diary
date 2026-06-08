@@ -159,12 +159,17 @@ export default function EcowittIngestAudit() {
         input={{
           rows: query.data ?? [],
           tentId: effectiveTentId,
+          loggedCapturedAts: mergedLogged,
         }}
         onRefresh={() => {
           void query.refetch();
+          void loggedEventsQuery.refetch();
         }}
-        isRefreshing={query.isFetching}
+        isRefreshing={query.isFetching || loggedEventsQuery.isFetching}
+        onLogEnvironmentCheck={handleLogEnvironmentCheck}
+        isLogging={isLogging}
       />
+
 
       {query.isLoading ? (
         <p

@@ -411,3 +411,45 @@ function Section({
     </div>
   );
 }
+
+function CitedSection({
+  title,
+  items,
+  testId,
+}: {
+  title: string;
+  items: ReadonlyArray<{
+    text: string;
+    citation: EvidenceCitation;
+  }>;
+  testId: string;
+}) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div className="text-xs" data-testid={testId}>
+      <h3 className="font-semibold mb-1">{title}</h3>
+      <ul className="list-disc pl-4 space-y-1">
+        {items.map((it, i) => (
+          <li key={`${i}-${it.text}`} data-testid={`${testId}-item-${i}`}>
+            <span>{it.text}</span>{" "}
+            <a
+              href={`#${it.citation.targetId}`}
+              data-testid={`${testId}-citation-${i}`}
+              data-citation-kind={it.citation.kind}
+              data-citation-healthy={it.citation.healthy ? "true" : "false"}
+              aria-label={it.citation.ariaLabel}
+              className={
+                "inline-flex items-center rounded border px-1 py-0 text-[10px] font-medium align-middle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 " +
+                (it.citation.healthy
+                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+                  : "border-amber-500/40 bg-amber-500/10 text-amber-200")
+              }
+            >
+              [{it.citation.label}]
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}

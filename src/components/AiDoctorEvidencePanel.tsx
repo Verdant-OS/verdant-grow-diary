@@ -135,11 +135,19 @@ function GroupView({ group }: { group: EvidenceGroupVM }) {
   );
 }
 
+function safeSlug(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+}
+
 export function AiDoctorEvidencePanel({ vm }: Props) {
   if (!vm) return null;
   const missingGroup = vm.groups.find((g) => g.key === "missing");
   return (
-    <Card data-testid="ai-doctor-evidence-panel">
+    <Card id="ai-doctor-evidence-panel" data-testid="ai-doctor-evidence-panel" tabIndex={-1}>
       <CardHeader>
         <CardTitle className="text-base">Evidence used</CardTitle>
       </CardHeader>

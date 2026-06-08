@@ -5,8 +5,8 @@
  *
  * Boundaries (stop-ship if violated):
  *  - Pure: no React, no Supabase, no fetch, no timers, no auth.
- *  - Read-only: never writes sensor_readings / grow_events / action_queue /
- *    alerts / ai_doctor_sessions and never returns a device-control hint.
+ *  - Read-only: never writes sensor readings, grow events, the approval
+ *    queue, alerts, or AI sessions, and never returns a device-control hint.
  *  - Never marks stale / manual / csv / demo as Live.
  *  - Never invents data: missing metrics stay missing, never zero.
  *  - Never infers plant identity from a tent snapshot.

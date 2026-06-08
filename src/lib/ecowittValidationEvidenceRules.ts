@@ -127,3 +127,32 @@ export function serializeEvidenceForClipboard(
 ): string {
   return JSON.stringify(snap, null, 2);
 }
+
+export const COPY_EVIDENCE_REDACTION_NOTICE =
+  "Tokens, bridge tokens, authorization/bearer/JWT, service_role, signatures, api keys, raw user_id, and internal IDs are redacted before clipboard. Test/local data only — never sent.";
+
+export interface EcowittEvidencePreview {
+  label: string;
+  source: string;
+  tent: string;
+  captured_at: string | null;
+  metric_summary: { key: string; label: string; status: string }[];
+  redaction_notice: string;
+}
+
+export function buildEvidencePreview(
+  snap: EcowittEvidenceSnapshot,
+): EcowittEvidencePreview {
+  return {
+    label: snap.label,
+    source: snap.source,
+    tent: snap.tent,
+    captured_at: snap.captured_at,
+    metric_summary: snap.metrics.map((m) => ({
+      key: m.key,
+      label: m.label,
+      status: m.status,
+    })),
+    redaction_notice: COPY_EVIDENCE_REDACTION_NOTICE,
+  };
+}

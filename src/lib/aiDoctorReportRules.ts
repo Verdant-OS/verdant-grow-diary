@@ -313,7 +313,7 @@ function buildContentStream(lines: string[]): string {
 
 /**
  * Trigger a client-side download of a Uint8Array as application/pdf.
- * Must be called from a user gesture. No fetch, no network.
+ * Must be called from a user gesture. No network call.
  */
 export function downloadAiDoctorReportPdf(
   bytes: Uint8Array,

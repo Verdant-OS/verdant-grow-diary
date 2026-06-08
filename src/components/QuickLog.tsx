@@ -296,6 +296,40 @@ export default function QuickLog({
     setSavedTarget(null);
   }
 
+  /**
+   * Reset everything EXCEPT the currently selected plant. Used by the
+   * "Log another for {plant}" post-save action so growers can keep
+   * logging against the same target without re-picking it. Sensor
+   * attach defaults are re-evaluated normally via the existing effects
+   * (usable → ON, stale/non-usable → OFF/disabled).
+   */
+  function resetForAnother() {
+    const keepPlantId = savedTarget?.id ?? plantId;
+    setNote("");
+    setShowMore(false);
+    setEventType("observation");
+    setSnapshot(false);
+    snapshotUserTouchedRef.current = false;
+    setRemindAt("");
+    setDetails({ ec: "", ecUnit: "mS/cm", nutrients: "", training: "", watering: "" });
+    setHardware({
+      inputPh: "",
+      inputEc: "",
+      runoffPh: "",
+      runoffEc: "",
+      ppfdCanopy: "",
+      lightDistance: "",
+    });
+    hardwareUserTouchedRef.current = false;
+    setHardwareOpen(false);
+    setWateringError(null);
+    setSavedTarget(null);
+    // Preserve current plant selection
+    if (keepPlantId) setPlantId(keepPlantId);
+    // Focus the first logical form input for the new entry.
+    setTimeout(() => noteRef.current?.focus(), 0);
+
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!user || !activeGrowId) {

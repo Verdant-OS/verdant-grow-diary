@@ -37,7 +37,6 @@ import {
   quickLogPlantHelperText,
 } from "@/lib/quickLogPlantOptionRules";
 import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
-import QuickLogSensorMiniChart from "@/components/QuickLogSensorMiniChart";
 import EventTypeSelector from "@/components/EventTypeSelector";
 import { useLatestTentSensorSnapshot } from "@/lib/sensor";
 import { buildQuickLogStripFromTentState } from "@/lib/quickLogSnapshotStripAdapter";
@@ -48,11 +47,7 @@ import {
   UNSUPPORTED_EVENT_TYPE_COPY,
 } from "@/lib/legacyQuickLogUnifiedSave";
 import { buildSensorSnapshotSavePayload } from "@/lib/latestSensorSnapshotRules";
-import {
-  hasQuickLogSensorAttachPreference,
-  loadQuickLogSensorAttachPreference,
-  saveQuickLogSensorAttachPreference,
-} from "@/lib/quickLogSensorAttachPreference";
+
 
 import { AlertTriangle, Info } from "lucide-react";
 import { toast } from "sonner";

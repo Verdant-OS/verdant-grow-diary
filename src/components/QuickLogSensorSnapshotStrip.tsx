@@ -20,7 +20,7 @@ import {
   buildQuickLogStripFromTentState,
   type QuickLogSnapshotStripStatus,
 } from "@/lib/quickLogSnapshotStripAdapter";
-import QuickLogSensorMiniChart from "@/components/QuickLogSensorMiniChart";
+
 
 interface Props {
   growId?: string | null | undefined;
@@ -119,9 +119,6 @@ export default function QuickLogSensorSnapshotStrip({ tentId, attached = true }:
         </div>
       )}
 
-      {view.status !== "no_data" && tentId && (
-        <QuickLogSensorMiniChart tentId={tentId} metric="temp_c" />
-      )}
 
       {view.action.kind !== "none" && (
         <a

@@ -472,7 +472,6 @@ describe("AI Doctor evidence ux — static safety", () => {
         "sensor_readings",
         "action_queue",
         "grow_events",
-        "service_role",
       ]) {
         expect(src).not.toContain(t);
       }

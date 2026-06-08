@@ -136,11 +136,15 @@ describe("QuickLog watering required field", () => {
       onOpenChange: () => {},
       prefill: { plantId: "p2", growId: "g1", eventType: "watering" },
     });
-    // Make sure the field is mounted before clicking save.
+    // Make sure the field is mounted before submitting.
     await screen.findByTestId("quicklog-watering-ml");
-    fireEvent.click(screen.getByTestId("quick-log-save"));
-    const err = await screen.findByTestId("quicklog-watering-error");
-    expect(err.textContent ?? "").toMatch(/watering volume/i);
+    const saveBtn = screen.getByTestId("quick-log-save") as HTMLButtonElement;
+    expect(saveBtn.disabled).toBe(false);
+    fireEvent.click(saveBtn);
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(screen.getByTestId("quicklog-watering-error").textContent ?? "").toMatch(
+      /watering volume/i,
+    );
     expect(rpcMock).not.toHaveBeenCalled();
   });
 });

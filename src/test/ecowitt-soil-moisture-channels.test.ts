@@ -1,189 +1,173 @@
 /**
  * Targeted tests verifying EcoWitt soil moisture support across:
- *  - payload-rules channel detection (channels 1–16)
- *  - payload-adapter channel detection
+ *  - cloud-readings normalization (channels 1–16)
  *  - validation view-model alias coverage for soilmoistureN
  *
  * Pure tests — no I/O, no network.
  */
 import { describe, it, expect } from "vitest";
-import { extractEcowittReadings } from "@/lib/ecowittPayloadRules";
-import { adaptEcowittPayload } from "@/lib/ecowittPayloadAdapter";
+import { normalizeEcowittCloudReadings } from "@/lib/ecowittPayloadRules";
 import { buildEcowittIngestValidationViewModel } from "@/lib/ecowittIngestValidationViewModel";
 
-const MAC = "AA:BB:CC:DD:EE:FF";
-const NOW = "2026-06-08T12:00:00.000Z";
+const NOW = new Date("2026-06-08T12:30:00Z");
+const FRESH = "2026-06-08 12:20:00";
+const MAC = "AA:BB:CC:DD:EE:01";
+const TENT = "11111111-1111-1111-1111-111111111111";
 
-function payload(extra: Record<string, unknown>) {
-  return {
-    PASSKEY: "x",
-    stationtype: "GW1100A_V2.3.0",
-    dateutc: "2026-06-08 12:00:00",
-    freq: "868M",
-    model: "GW1100A",
-    mac: MAC,
-    ...extra,
-  };
-}
-
-const tentMap = {
-  perMac: {
-    [MAC.toLowerCase()]: {
+const mapping = {
+  byMac: {
+    [MAC]: {
       air: {},
       soil: {
-        1: "tent-1",
-        9: "tent-1",
-        16: "tent-1",
+        1: TENT,
+        9: TENT,
+        12: TENT,
+        16: TENT,
       },
     },
   },
 };
 
-describe("EcoWitt soil moisture — payload-rules channel coverage 1–16", () => {
-  it("maps soilmoisture1=33 → soil_moisture_pct: 33 (accepted)", () => {
-    const out = extractEcowittReadings(
-      payload({ soilmoisture1: "33" }),
-      "ecowitt",
-      { now: NOW, ...tentMap },
+function soilReading(rows: ReturnType<typeof normalizeEcowittCloudReadings>["rows"]) {
+  return rows.find((r) => "soil_moisture_pct" in r.reading);
+}
+
+describe("EcoWitt soil moisture — cloud normalization channels 1–16", () => {
+  it("soilmoisture1=33 → soil_moisture_pct: 33 (live)", () => {
+    const res = normalizeEcowittCloudReadings(
+      { MAC, dateutc: FRESH, soilmoisture1: 33 },
+      mapping,
+      { now: NOW },
     );
-    const r = out.readings.find((x) => x.metric === "soil_moisture_pct");
+    const r = soilReading(res.rows);
     expect(r).toBeDefined();
-    expect(r!.value).toBe(33);
-    expect(r!.raw_payload?.channel).toBe(1);
-    expect(r!.raw_payload?.raw_key).toBe("soilmoisture1");
-    expect(r!.source).toBe("live");
+    expect(r!.reading.soil_moisture_pct).toBe(33);
+    expect(r!.reading.source).toBe("live");
+    expect(r!.channel).toBe(1);
   });
 
-  it("maps soilmoisture9 (>8) → soil_moisture_pct, channel preserved", () => {
-    const out = extractEcowittReadings(
-      payload({ soilmoisture9: "42" }),
-      "ecowitt",
-      { now: NOW, ...tentMap },
+  it("soilmoisture9 (>8) maps and preserves channel", () => {
+    const res = normalizeEcowittCloudReadings(
+      { MAC, dateutc: FRESH, soilmoisture9: 42 },
+      mapping,
+      { now: NOW },
     );
-    const r = out.readings.find((x) => x.metric === "soil_moisture_pct");
+    const r = soilReading(res.rows);
     expect(r).toBeDefined();
-    expect(r!.value).toBe(42);
-    expect(r!.raw_payload?.channel).toBe(9);
-    expect(r!.raw_payload?.raw_key).toBe("soilmoisture9");
+    expect(r!.reading.soil_moisture_pct).toBe(42);
+    expect(r!.channel).toBe(9);
   });
 
-  it("maps soilmoisture16 → soil_moisture_pct (top of supported range)", () => {
-    const out = extractEcowittReadings(
-      payload({ soilmoisture16: "55" }),
-      "ecowitt",
-      { now: NOW, ...tentMap },
+  it("soilmoisture16 maps (top of supported range)", () => {
+    const res = normalizeEcowittCloudReadings(
+      { MAC, dateutc: FRESH, soilmoisture16: 55 },
+      mapping,
+      { now: NOW },
     );
-    const r = out.readings.find((x) => x.metric === "soil_moisture_pct");
+    const r = soilReading(res.rows);
     expect(r).toBeDefined();
-    expect(r!.value).toBe(55);
-    expect(r!.raw_payload?.channel).toBe(16);
+    expect(r!.reading.soil_moisture_pct).toBe(55);
+    expect(r!.channel).toBe(16);
+  });
+
+  it("soilmoisture12 maps", () => {
+    const res = normalizeEcowittCloudReadings(
+      { MAC, dateutc: FRESH, soilmoisture12: 47 },
+      mapping,
+      { now: NOW },
+    );
+    const r = soilReading(res.rows);
+    expect(r).toBeDefined();
+    expect(r!.reading.soil_moisture_pct).toBe(47);
+    expect(r!.channel).toBe(12);
   });
 
   it("soilmoisture1=-1 is invalid / not healthy", () => {
-    const out = extractEcowittReadings(
-      payload({ soilmoisture1: "-1" }),
-      "ecowitt",
-      { now: NOW, ...tentMap },
+    const res = normalizeEcowittCloudReadings(
+      { MAC, dateutc: FRESH, soilmoisture1: -1 },
+      mapping,
+      { now: NOW },
     );
-    const r = out.readings.find((x) => x.metric === "soil_moisture_pct");
+    const r = soilReading(res.rows);
     expect(r).toBeDefined();
-    expect(r!.source).toBe("invalid");
+    expect(r!.reading.source).toBe("invalid");
   });
 
   it("soilmoisture1=101 is invalid / not healthy", () => {
-    const out = extractEcowittReadings(
-      payload({ soilmoisture1: "101" }),
-      "ecowitt",
-      { now: NOW, ...tentMap },
+    const res = normalizeEcowittCloudReadings(
+      { MAC, dateutc: FRESH, soilmoisture1: 101 },
+      mapping,
+      { now: NOW },
     );
-    const r = out.readings.find((x) => x.metric === "soil_moisture_pct");
+    const r = soilReading(res.rows);
     expect(r).toBeDefined();
-    expect(r!.source).toBe("invalid");
+    expect(r!.reading.source).toBe("invalid");
   });
 
-  it("soilmoisture1=0 is preserved but flagged invalid (stuck-extreme rule)", () => {
-    const out = extractEcowittReadings(
-      payload({ soilmoisture1: "0" }),
-      "ecowitt",
-      { now: NOW, ...tentMap },
+  it("soilmoisture1=0 is preserved but flagged invalid (stuck-extreme)", () => {
+    const res = normalizeEcowittCloudReadings(
+      { MAC, dateutc: FRESH, soilmoisture1: 0 },
+      mapping,
+      { now: NOW },
     );
-    const r = out.readings.find((x) => x.metric === "soil_moisture_pct");
+    const r = soilReading(res.rows);
     expect(r).toBeDefined();
-    expect(r!.value).toBe(0);
-    // stuck-at-extreme is forced to invalid by existing payload rules.
-    expect(r!.source).toBe("invalid");
+    expect(r!.reading.soil_moisture_pct).toBe(0);
+    expect(r!.reading.source).toBe("invalid");
   });
 
-  it("soilmoisture1=100 is preserved but flagged invalid (stuck-extreme rule)", () => {
-    const out = extractEcowittReadings(
-      payload({ soilmoisture1: "100" }),
-      "ecowitt",
-      { now: NOW, ...tentMap },
+  it("soilmoisture1=100 is preserved but flagged invalid (stuck-extreme)", () => {
+    const res = normalizeEcowittCloudReadings(
+      { MAC, dateutc: FRESH, soilmoisture1: 100 },
+      mapping,
+      { now: NOW },
     );
-    const r = out.readings.find((x) => x.metric === "soil_moisture_pct");
+    const r = soilReading(res.rows);
     expect(r).toBeDefined();
-    expect(r!.value).toBe(100);
-    expect(r!.source).toBe("invalid");
+    expect(r!.reading.soil_moisture_pct).toBe(100);
+    expect(r!.reading.source).toBe("invalid");
   });
 
-  it("payload without any soilmoistureN emits no soil_moisture_pct reading", () => {
-    const out = extractEcowittReadings(
-      payload({ tempf: "72.4" }),
-      "ecowitt",
-      { now: NOW, ...tentMap },
+  it("payload without soilmoistureN emits no soil_moisture_pct reading", () => {
+    const res = normalizeEcowittCloudReadings(
+      { MAC, dateutc: FRESH, tempf: 72.4 },
+      mapping,
+      { now: NOW },
     );
-    const r = out.readings.find((x) => x.metric === "soil_moisture_pct");
-    expect(r).toBeUndefined();
-  });
-});
-
-describe("EcoWitt soil moisture — payload-adapter channel coverage 1–16", () => {
-  it("adapts soilmoisture12 → soil_moisture_pct reading", () => {
-    const result = adaptEcowittPayload({
-      payload: payload({ soilmoisture12: "47" }),
-      sourceLabel: "ecowitt",
-      receivedAt: NOW,
-    });
-    const r = result.readings.find(
-      (x: { metric: string }) => x.metric === "soil_moisture_pct",
-    );
-    expect(r).toBeDefined();
-    expect(r!.value).toBe(47);
+    expect(soilReading(res.rows)).toBeUndefined();
   });
 
-  it("still adapts legacy soilmoisture1 → soil_moisture_pct reading", () => {
-    const result = adaptEcowittPayload({
-      payload: payload({ soilmoisture1: "33" }),
-      sourceLabel: "ecowitt",
-      receivedAt: NOW,
-    });
-    const r = result.readings.find(
-      (x: { metric: string }) => x.metric === "soil_moisture_pct",
+  it("soil moisture is never live unless the source is actually live (stale ts)", () => {
+    const res = normalizeEcowittCloudReadings(
+      { MAC, dateutc: "2026-06-08 10:00:00", soilmoisture1: 33 },
+      mapping,
+      { now: NOW },
     );
+    const r = soilReading(res.rows);
     expect(r).toBeDefined();
-    expect(r!.value).toBe(33);
+    expect(r!.reading.source).toBe("stale");
   });
 });
 
 describe("EcoWitt validation view-model — soil_moisture_pct alias coverage", () => {
-  function row(rawPayload: Record<string, unknown>) {
+  function vRow(rawPayload: Record<string, unknown>) {
     return {
       metric: "soil_moisture_pct",
       value: null,
-      captured_at: NOW,
-      ts: NOW,
+      captured_at: NOW.toISOString(),
+      ts: NOW.toISOString(),
       source: "ecowitt",
       raw_payload: {
         ...rawPayload,
         metadata: { test_sender: true, transport: "webhook" },
       },
-    };
+    } as unknown as Parameters<typeof buildEcowittIngestValidationViewModel>[0]["rows"][number];
   }
 
-  it("soilmoisture1=33 in raw payload → metric row Accepted", () => {
+  it("soilmoisture1=33 → metric row Accepted", () => {
     const vm = buildEcowittIngestValidationViewModel({
-      rows: [row({ soilmoisture1: 33 })],
-      now: new Date(NOW),
+      rows: [vRow({ soilmoisture1: 33 })],
+      now: NOW,
     });
     const m = vm.metricRows.find((r) => r.key === "soil_moisture_pct");
     expect(m).toBeDefined();
@@ -191,10 +175,10 @@ describe("EcoWitt validation view-model — soil_moisture_pct alias coverage", (
     expect(m!.value).toBe(33);
   });
 
-  it("soilmoisture9 (channel >8) is recognized as the soil_moisture_pct alias", () => {
+  it("soilmoisture9 (>8) is recognized as the soil_moisture_pct alias", () => {
     const vm = buildEcowittIngestValidationViewModel({
-      rows: [row({ soilmoisture9: 41 })],
-      now: new Date(NOW),
+      rows: [vRow({ soilmoisture9: 41 })],
+      now: NOW,
     });
     const m = vm.metricRows.find((r) => r.key === "soil_moisture_pct");
     expect(m!.present).toBe(true);
@@ -204,8 +188,8 @@ describe("EcoWitt validation view-model — soil_moisture_pct alias coverage", (
 
   it("soilmoisture16 is recognized as the soil_moisture_pct alias", () => {
     const vm = buildEcowittIngestValidationViewModel({
-      rows: [row({ soilmoisture16: 22 })],
-      now: new Date(NOW),
+      rows: [vRow({ soilmoisture16: 22 })],
+      now: NOW,
     });
     const m = vm.metricRows.find((r) => r.key === "soil_moisture_pct");
     expect(m!.present).toBe(true);
@@ -214,8 +198,8 @@ describe("EcoWitt validation view-model — soil_moisture_pct alias coverage", (
 
   it("soilmoisture1=-1 rejects (outside 0–100)", () => {
     const vm = buildEcowittIngestValidationViewModel({
-      rows: [row({ soilmoisture1: -1 })],
-      now: new Date(NOW),
+      rows: [vRow({ soilmoisture1: -1 })],
+      now: NOW,
     });
     const m = vm.metricRows.find((r) => r.key === "soil_moisture_pct");
     expect(m!.status).toBe("rejected");
@@ -223,8 +207,8 @@ describe("EcoWitt validation view-model — soil_moisture_pct alias coverage", (
 
   it("soilmoisture1=101 rejects (outside 0–100)", () => {
     const vm = buildEcowittIngestValidationViewModel({
-      rows: [row({ soilmoisture1: 101 })],
-      now: new Date(NOW),
+      rows: [vRow({ soilmoisture1: 101 })],
+      now: NOW,
     });
     const m = vm.metricRows.find((r) => r.key === "soil_moisture_pct");
     expect(m!.status).toBe("rejected");
@@ -232,12 +216,31 @@ describe("EcoWitt validation view-model — soil_moisture_pct alias coverage", (
 
   it("missing soil moisture stays missing, never auto-accepted", () => {
     const vm = buildEcowittIngestValidationViewModel({
-      rows: [row({ tempf: 72 })],
-      now: new Date(NOW),
+      rows: [vRow({ tempf: 72 })],
+      now: NOW,
     });
     const m = vm.metricRows.find((r) => r.key === "soil_moisture_pct");
     expect(m!.present).toBe(false);
     expect(m!.status).toBe("missing");
     expect(m!.value).toBeNull();
+  });
+});
+
+describe("static safety scan — soil moisture changes", () => {
+  it("no new writes / functions invoke / device-control strings", async () => {
+    const fs = await import("node:fs/promises");
+    const files = [
+      "src/lib/ecowittPayloadRules.ts",
+      "src/lib/ecowittPayloadAdapter.ts",
+      "src/lib/ecowittIngestValidationViewModel.ts",
+    ];
+    for (const f of files) {
+      const src = await fs.readFile(f, "utf8");
+      expect(src).not.toMatch(/action_queue/);
+      expect(src).not.toMatch(/grow_events/);
+      expect(src).not.toMatch(
+        /turn_on|turn_off|device_control|toggleDevice|setOutletState|autopilot/i,
+      );
+    }
   });
 });

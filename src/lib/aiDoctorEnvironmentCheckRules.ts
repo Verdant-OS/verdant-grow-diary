@@ -41,6 +41,7 @@ export interface EnvironmentCheckEventInput {
 }
 
 export interface AiDoctorEnvironmentCheckContext {
+  kind: "present";
   present: true;
   capturedAt: string;
   /** Honest source label — never "live". */
@@ -64,6 +65,7 @@ export interface AiDoctorEnvironmentCheckContext {
 }
 
 export interface AiDoctorEnvironmentCheckAbsent {
+  kind: "absent";
   present: false;
   reason:
     | "no_event"

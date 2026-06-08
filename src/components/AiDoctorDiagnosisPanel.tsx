@@ -10,13 +10,23 @@
  *  - Raw model confidence appears only in the audit/debug subsection.
  *  - Missing / malformed input must not crash — empty state is preserved.
  */
-import { useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
 import type { DiagnosisResult } from "@/lib/aiDoctorEngine";
 import {
   adaptDiagnosisResultToViewModel,
   type DiagnosisDisplayConfidence,
 } from "@/lib/aiDoctorDiagnosisViewModel";
 import type { DiagnosisEvidenceAlignmentVM } from "@/lib/aiDoctorDiagnosisEvidenceAlignmentRules";
+import {
+  citeRecommendations,
+  type CitationContext,
+  type EvidenceCitation,
+} from "@/lib/aiDoctorEvidenceCitationRules";
+import {
+  buildAiDoctorReportPdfBytes,
+  downloadAiDoctorReportPdf,
+  type AiDoctorReportInput,
+} from "@/lib/aiDoctorReportRules";
 
 export const AI_DOCTOR_DIAGNOSIS_EMPTY_COPY =
   "No AI Doctor 2.0 diagnosis available yet.";
@@ -28,13 +38,19 @@ export const AI_DOCTOR_DIAGNOSIS_REVIEW_FIRST_COPY =
   "Review these signals before taking any action.";
 
 export interface AiDoctorDiagnosisPanelProps {
-  /** AI Doctor 2.0 engine output. Null/undefined → empty state. */
   diagnosis?: DiagnosisResult | null;
   isLoading?: boolean;
   className?: string;
   testIdPrefix?: string;
-  /** Optional evidence-alignment VM (from buildAiDoctorDiagnosisEvidenceAlignmentVM). */
   evidenceAlignment?: DiagnosisEvidenceAlignmentVM | null;
+  /** Optional citation context for inline recommendation citations. */
+  citationContext?: CitationContext | null;
+  /**
+   * Optional partial report input (without recommendations — those are
+   * derived from the diagnosis + citationContext). When provided alongside
+   * a diagnosis a "Download report" action is rendered.
+   */
+  reportInput?: Omit<AiDoctorReportInput, "recommendations"> | null;
 }
 
 function isFallbackConfidence(c: DiagnosisDisplayConfidence): boolean {

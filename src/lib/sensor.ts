@@ -47,7 +47,7 @@ export function useLatestTentSensorSnapshot(
     typeof tentId === "string" && tentId.length > 0;
 
   const query = useQuery<RawSensorRow[]>({
-    queryKey: ["latest-tent-sensor-snapshot", tentId ?? "none"],
+    queryKey: ["sensor", "latest", tentId ?? "none"],
     enabled,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -62,6 +62,11 @@ export function useLatestTentSensorSnapshot(
       if (error) throw new Error("latest_tent_snapshot_failed");
       return (data ?? []) as RawSensorRow[];
     },
+    staleTime: 1000 * 25,
+    gcTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    retry: 1,
   });
 
   if (!enabled) return { status: "idle", snapshot: EMPTY_SENSOR_SNAPSHOT };

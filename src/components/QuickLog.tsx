@@ -263,12 +263,10 @@ export default function QuickLog({
     setBusy(true);
     try {
       const noteWithHardware = appendHardwareReadingsToNote(note, hardware);
-      const sensorAttachPayload = buildQuickLogSensorAttachPayload({
-        snapshot: sensorState.snapshot,
-        stripStatus: stripView.status,
-        attach: snapshot && !!selectedPlant?.tent_id,
-        tentId: selectedPlant?.tent_id ?? null,
-      });
+      const sensorAttachPayload =
+        snapshot && sensorTentId && stripView.status === "usable"
+          ? buildSensorSnapshotSavePayload(sensorState.snapshot)
+          : null;
       const built = buildLegacyQuickLogUnifiedPayload({
         eventType,
         noteWithHardware,

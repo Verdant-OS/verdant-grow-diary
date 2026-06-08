@@ -112,9 +112,9 @@ const PROVIDER_LABEL_MAX = 32;
 
 function titleCase(token: string): string {
   if (!token) return token;
-  if (/^[a-z]{2,5}$/.test(token) && token.length <= 4) return token.toUpperCase();
   return token.charAt(0).toUpperCase() + token.slice(1);
 }
+
 
 /**
  * Format a source/provider string into a short, presenter-safe display

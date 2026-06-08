@@ -477,6 +477,7 @@ function CitedSection({
   title,
   items,
   testId,
+  onOpenCitation,
 }: {
   title: string;
   items: ReadonlyArray<{
@@ -484,6 +485,10 @@ function CitedSection({
     citation: EvidenceCitation;
   }>;
   testId: string;
+  onOpenCitation: (
+    c: EvidenceCitation,
+    trigger: HTMLButtonElement | null,
+  ) => void;
 }) {
   if (!items || items.length === 0) return null;
   return (
@@ -493,12 +498,20 @@ function CitedSection({
         {items.map((it, i) => (
           <li key={`${i}-${it.text}`} data-testid={`${testId}-item-${i}`}>
             <span>{it.text}</span>{" "}
-            <a
-              href={`#${it.citation.targetId}`}
+            <button
+              type="button"
               data-testid={`${testId}-citation-${i}`}
               data-citation-kind={it.citation.kind}
               data-citation-healthy={it.citation.healthy ? "true" : "false"}
+              data-citation-target={it.citation.targetId}
               aria-label={it.citation.ariaLabel}
+              aria-haspopup="dialog"
+              onClick={(e) =>
+                onOpenCitation(
+                  it.citation,
+                  e.currentTarget as HTMLButtonElement,
+                )
+              }
               className={
                 "inline-flex items-center rounded border px-1 py-0 text-[10px] font-medium align-middle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 " +
                 (it.citation.healthy
@@ -507,7 +520,7 @@ function CitedSection({
               }
             >
               [{it.citation.label}]
-            </a>
+            </button>
           </li>
         ))}
       </ul>

@@ -373,9 +373,15 @@ export default function QuickLog({
           : `Logged ${verb} for ${plantLabel}`;
       toast.success(finalMessage);
 
-      reset();
-      onOpenChange(false);
+      // Surface a post-save action so growers can jump to the target
+      // plant they just logged against. We intentionally keep the dialog
+      // open instead of auto-closing — the grower decides whether to
+      // navigate, log another entry, or dismiss.
+      setSavedTarget({ id: selectedPlant.id, name: plantLabel });
       onCreated?.();
+      // Defer focus to the View {plant} action so keyboard flow lands
+      // on the just-revealed primary action.
+      setTimeout(() => viewPlantBtnRef.current?.focus(), 0);
       // Refresh both legacy and unified timeline readers so the just-saved
       // entry appears without a hard refresh.
       queryClient.invalidateQueries({ queryKey: ["plant_recent_activity"] });

@@ -629,7 +629,10 @@ export default function QuickLog({
                 return (
                   <>
                     <label
-                      className={`flex items-center justify-between gap-2 rounded-lg border p-3 ${attachDisabled ? "border-border/40 opacity-60" : "border-border/60"}`}
+                      ref={attachWrapperRef}
+                      tabIndex={-1}
+                      data-testid="quick-log-snapshot-attach-section"
+                      className={`flex items-center justify-between gap-2 rounded-lg border p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${attachDisabled ? "border-border/40 opacity-60" : "border-border/60"}`}
                     >
                       <span className="text-sm flex items-center gap-2">
                         <Gauge className="h-4 w-4 text-primary" />

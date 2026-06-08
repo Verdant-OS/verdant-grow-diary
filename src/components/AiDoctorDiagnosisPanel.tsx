@@ -222,17 +222,34 @@ export default function AiDoctorDiagnosisPanel({
           className="rounded-md border border-border/60 bg-background/30 p-3 text-xs space-y-2"
           data-testid={tid("ai-doctor-diagnosis-evidence-alignment")}
           data-posture={evidenceAlignment.posture}
-          aria-label="Evidence basis"
+          aria-labelledby={tid("ai-doctor-diagnosis-evidence-heading")}
+          role="region"
         >
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-xs font-semibold">Evidence basis</h3>
+            <h3
+              id={tid("ai-doctor-diagnosis-evidence-heading")}
+              className="text-xs font-semibold"
+            >
+              Evidence basis
+            </h3>
             <span
               className="inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2 py-0.5 text-[11px] font-medium"
               data-testid={tid("ai-doctor-diagnosis-posture-label")}
               data-posture={evidenceAlignment.posture}
+              aria-label={`Recommendation posture: ${evidenceAlignment.postureLabel}`}
             >
               {evidenceAlignment.postureLabel}
             </span>
+            <button
+              type="button"
+              onClick={() => setBasisOpen((v) => !v)}
+              aria-expanded={basisOpen}
+              aria-controls={tid("ai-doctor-diagnosis-evidence-body")}
+              data-testid={tid("ai-doctor-diagnosis-evidence-toggle")}
+              className="ml-auto inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2 py-0.5 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+            >
+              {basisOpen ? "Hide details" : "Show details"}
+            </button>
           </div>
           <p
             className="text-[11px] text-muted-foreground"
@@ -240,46 +257,73 @@ export default function AiDoctorDiagnosisPanel({
           >
             {evidenceAlignment.postureCopy}
           </p>
-          {evidenceAlignment.basisCopy.length > 0 ? (
-            <ul
-              className="list-disc pl-4 space-y-0.5"
-              data-testid={tid("ai-doctor-diagnosis-basis-copy")}
-            >
-              {evidenceAlignment.basisCopy.map((b, i) => (
-                <li key={`${i}-${b}`} className="text-[11px]">
-                  {b}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {evidenceAlignment.guardrailWarning ? (
-            <p
-              className="text-[11px] text-amber-300"
-              data-testid={tid("ai-doctor-diagnosis-guardrail-warning")}
-              role="note"
-            >
-              {evidenceAlignment.guardrailWarning}
-            </p>
-          ) : null}
-          {evidenceAlignment.moreDataReminder ? (
+          {!basisOpen && evidenceAlignment.moreDataReminder ? (
             <p
               className="text-[11px] text-amber-200"
-              data-testid={tid("ai-doctor-diagnosis-more-data-reminder")}
+              data-testid={tid("ai-doctor-diagnosis-more-data-summary")}
             >
-              {evidenceAlignment.moreDataReminder}{" "}
-              <a
-                href="#ai-doctor-evidence-panel"
-                className="underline"
-                aria-label="Jump to Evidence used panel"
-              >
-                See Evidence used.
-              </a>
+              {evidenceAlignment.moreDataReminder}
             </p>
           ) : null}
+          <div
+            id={tid("ai-doctor-diagnosis-evidence-body")}
+            hidden={!basisOpen}
+            data-state={basisOpen ? "open" : "collapsed"}
+            className="space-y-2"
+          >
+            {evidenceAlignment.basisCopy.length > 0 ? (
+              <ul
+                className="list-disc pl-4 space-y-0.5"
+                data-testid={tid("ai-doctor-diagnosis-basis-copy")}
+              >
+                {evidenceAlignment.basisCopy.map((b, i) => (
+                  <li key={`${i}-${b}`} className="text-[11px]">
+                    {b}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {evidenceAlignment.guardrailWarning ? (
+              <p
+                className="text-[11px] text-amber-300"
+                data-testid={tid("ai-doctor-diagnosis-guardrail-warning")}
+                role="note"
+              >
+                {evidenceAlignment.guardrailWarning}
+              </p>
+            ) : null}
+            {evidenceAlignment.moreDataReminder ? (
+              <p
+                className="text-[11px] text-amber-200"
+                data-testid={tid("ai-doctor-diagnosis-more-data-reminder")}
+              >
+                {evidenceAlignment.moreDataReminder}{" "}
+                <a
+                  href="#ai-doctor-evidence-panel"
+                  className="underline"
+                  aria-label="Jump to Evidence used panel"
+                >
+                  See Evidence used.
+                </a>
+              </p>
+            ) : null}
+          </div>
         </section>
       ) : null}
 
-
+      {reportInput ? (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={handleDownloadReport}
+            data-testid={tid("ai-doctor-diagnosis-download-report")}
+            className="inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+            aria-label="Download AI Doctor Report as PDF"
+          >
+            Download AI Doctor Report
+          </button>
+        </div>
+      ) : null}
 
       <Section
         title="Key observations"
@@ -291,11 +335,19 @@ export default function AiDoctorDiagnosisPanel({
         items={view.contributing_factors}
         testId={tid("ai-doctor-diagnosis-contributing-factors")}
       />
-      <Section
-        title="Recommended actions"
-        items={view.recommended_actions}
-        testId={tid("ai-doctor-diagnosis-recommended-actions")}
-      />
+      {citedRecs ? (
+        <CitedSection
+          title="Recommended actions"
+          items={citedRecs}
+          testId={tid("ai-doctor-diagnosis-recommended-actions")}
+        />
+      ) : (
+        <Section
+          title="Recommended actions"
+          items={view.recommended_actions}
+          testId={tid("ai-doctor-diagnosis-recommended-actions")}
+        />
+      )}
       <Section
         title="What not to do"
         items={view.what_not_to_do}

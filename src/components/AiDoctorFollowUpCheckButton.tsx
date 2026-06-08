@@ -78,7 +78,7 @@ export default function AiDoctorFollowUpCheckButton({
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!eligibility.ok) {
+  if (eligibility.ok === false) {
     const reason = eligibility.reason;
     return (
       <p

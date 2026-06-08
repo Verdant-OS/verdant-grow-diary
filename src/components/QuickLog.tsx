@@ -183,17 +183,17 @@ export default function QuickLog({
   // contract-derived status the strip uses. We call the loader here so the
   // parent can react to status transitions without duplicating any
   // classification logic in this .tsx.
-  const sensorTentIds = selectedPlant?.tent_id ? [selectedPlant.tent_id] : [];
-  const sensorState = useLatestSensorSnapshot(activeGrowId, sensorTentIds);
+  const sensorTentId = selectedPlant?.tent_id ?? null;
+  const sensorState = useLatestTentSensorSnapshot(sensorTentId);
   const stripView = useMemo(
     () =>
-      buildQuickLogSnapshotStrip({
+      buildQuickLogStripFromTentState({
+        status: sensorState.status,
         snapshot: sensorState.snapshot,
-        loading: sensorState.status === "loading",
-        hasTent: !!selectedPlant?.tent_id,
+        hasTent: !!sensorTentId,
         attached: snapshot,
       }),
-    [sensorState.snapshot, sensorState.status, selectedPlant?.tent_id, snapshot],
+    [sensorState.status, sensorState.snapshot, sensorTentId, snapshot],
   );
 
   // When the snapshot becomes `usable` and the grower has NOT manually

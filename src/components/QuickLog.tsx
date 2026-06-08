@@ -126,11 +126,15 @@ export default function QuickLog({
   // control once they toggle it in-session.
   const [hardwareOpen, setHardwareOpen] = useState(false);
   const hardwareUserTouchedRef = useRef(false);
+  // Inline validation for required Watering (ml) when event=watering.
+  const [wateringError, setWateringError] = useState<string | null>(null);
+  const wateringInputRef = useRef<HTMLInputElement | null>(null);
 
   // Tracks whether the grower has manually changed the attach toggle in
   // this session. Until they do, we may auto-default it based on whether
   // the latest snapshot classifies as `usable` (Gate 1 trust rule).
   const snapshotUserTouchedRef = useRef(false);
+
 
   // Apply page-context prefill when the dialog opens. Does NOT submit —
   // grower still chooses to save the entry. NOTE: plant resolution is NOT

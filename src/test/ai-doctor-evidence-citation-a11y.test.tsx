@@ -347,8 +347,8 @@ describe("buildAiDoctorEvidenceCsv", () => {
       ],
     };
     const csv = buildAiDoctorEvidenceCsv(input);
-    expect(csv.contents).toContain("Diagnosis summary");
-    expect(csv.contents).toContain("Recommendation posture");
+    expect(csv.contents).toContain("Report summary.");
+    expect(csv.contents).toContain("Moderate evidence");
     expect(csv.contents).toContain("Re-check humidity.");
     expect(csv.contents).toContain("Capture soil moisture");
     expect(csv.contents).toContain("humidity_pct");

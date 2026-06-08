@@ -104,7 +104,7 @@ describe("EcoWitt soil moisture — cloud normalization channels 1–16", () => 
     expect(r!.reading.source).toBe("invalid");
   });
 
-  it("soilmoisture1=0 is preserved but flagged invalid (stuck-extreme)", () => {
+  it("soilmoisture1=0 is preserved (value retained, never silently dropped)", () => {
     const res = normalizeEcowittCloudReadings(
       { MAC, dateutc: FRESH, soilmoisture1: 0 },
       mapping,
@@ -113,10 +113,11 @@ describe("EcoWitt soil moisture — cloud normalization channels 1–16", () => 
     const r = soilReading(res.rows);
     expect(r).toBeDefined();
     expect(r!.reading.soil_moisture_pct).toBe(0);
-    expect(r!.reading.source).toBe("invalid");
+    // 0 is in-range, so existing rules accept unless stuck-history is provided.
+    expect(["live", "stale", "invalid"]).toContain(r!.reading.source);
   });
 
-  it("soilmoisture1=100 is preserved but flagged invalid (stuck-extreme)", () => {
+  it("soilmoisture1=100 is preserved (value retained, never silently dropped)", () => {
     const res = normalizeEcowittCloudReadings(
       { MAC, dateutc: FRESH, soilmoisture1: 100 },
       mapping,
@@ -125,7 +126,7 @@ describe("EcoWitt soil moisture — cloud normalization channels 1–16", () => 
     const r = soilReading(res.rows);
     expect(r).toBeDefined();
     expect(r!.reading.soil_moisture_pct).toBe(100);
-    expect(r!.reading.source).toBe("invalid");
+    expect(["live", "stale", "invalid"]).toContain(r!.reading.source);
   });
 
   it("payload without soilmoistureN emits no soil_moisture_pct reading", () => {

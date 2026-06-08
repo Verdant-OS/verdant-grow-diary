@@ -43,6 +43,8 @@ export interface EcowittIngestValidationInput {
   now?: Date;
   /** Staleness threshold in ms. Defaults to 24h. */
   staleAfterMs?: number;
+  /** Captured_at values that have already been logged to diary (idempotency). */
+  loggedCapturedAts?: readonly string[];
 }
 
 export interface EcowittValidationMetricChip {

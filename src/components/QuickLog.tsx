@@ -502,6 +502,24 @@ export default function QuickLog({
             )}
           </div>
 
+          {/* Plant mismatch banner — shown when QuickLog was opened from a
+              plant context (prefill.plantId) but the grower changed the
+              picker to a different plant. Presenter-only; does not block
+              saving. */}
+          {prefill?.plantId && selectedPlant && selectedPlant.id !== prefill.plantId && (
+            <div
+              data-testid="quick-log-plant-mismatch-banner"
+              role="status"
+              className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-2.5 text-[12px] text-amber-200 flex items-start gap-2"
+            >
+              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" aria-hidden="true" />
+              <span>
+                Logging to <strong className="font-semibold">{selectedPlant.name}</strong>
+                {prefill.plantName ? <>, not <strong className="font-semibold">{prefill.plantName}</strong></> : ", not the plant currently open"}.
+              </span>
+            </div>
+          )}
+
 
           <div>
             <Label>What's happening?</Label>

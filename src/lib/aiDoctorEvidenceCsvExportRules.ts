@@ -65,8 +65,9 @@ interface RowFields {
 }
 
 function row(fields: RowFields): string {
+  const rec = fields as unknown as Record<string, CsvCell>;
   return AI_DOCTOR_EVIDENCE_CSV_COLUMNS
-    .map((col) => csvEscape((fields as Record<string, CsvCell>)[col] ?? ""))
+    .map((col) => csvEscape(rec[col] ?? ""))
     .join(",");
 }
 

@@ -117,8 +117,100 @@ export function EcowittIngestValidationPanel({
   input,
   onRefresh,
   isRefreshing,
+  onLogEnvironmentCheck,
+  isLogging,
 }: Props) {
   const vm = buildEcowittIngestValidationViewModel(input);
+  const now = input.now ?? new Date();
+
+  const diaryDraft = useMemo(
+    () =>
+      buildDiaryEnvironmentCheckDraft({
+        tentId: input.tentId ?? null,
+        capturedAt: vm.latestCapturedAt,
+        status: vm.status,
+        isTestSender: vm.isTestSender,
+        invalidTest: vm.invalidTest,
+        stale: vm.stale,
+        sourceLabel: vm.sourceLabel,
+        metricRows: vm.metricRows,
+      }),
+    [
+      input.tentId,
+      vm.latestCapturedAt,
+      vm.status,
+      vm.isTestSender,
+      vm.invalidTest,
+      vm.stale,
+      vm.sourceLabel,
+      vm.metricRows,
+    ],
+  );
+
+  const handleLog = useCallback(() => {
+    if (!onLogEnvironmentCheck) return;
+    if (!diaryDraft.eligible) return;
+    if (vm.alreadyLogged) return;
+    onLogEnvironmentCheck(diaryDraft);
+  }, [onLogEnvironmentCheck, diaryDraft, vm.alreadyLogged]);
+
+  const [evidenceCopied, setEvidenceCopied] = useState(false);
+  const [exported, setExported] = useState(false);
+
+  const handleCopyEvidence = useCallback(async () => {
+    const snap = buildLatestEvidenceSnapshot({
+      hasEvidence: vm.hasEvidence,
+      status: vm.status,
+      statusMessage: vm.statusMessage,
+      sourceLabel: vm.sourceLabel,
+      tentScopedLabel: vm.tentScopedLabel,
+      capturedAtLabel: vm.capturedAtLabel,
+      isTestSender: vm.isTestSender,
+      invalidTest: vm.invalidTest,
+      stale: vm.stale,
+      metricRows: vm.metricRows,
+      rawPayload: vm.latestRawPayload,
+      derivedReadingWarnings: vm.derivedReadingWarnings,
+    });
+    if (!snap) return;
+    const text = serializeEvidenceForClipboard(snap);
+    try {
+      const clipboard =
+        typeof navigator !== "undefined" ? navigator.clipboard : undefined;
+      if (clipboard?.writeText) await clipboard.writeText(text);
+    } catch {
+      /* clipboard unavailable */
+    }
+    setEvidenceCopied(true);
+    setTimeout(() => setEvidenceCopied(false), 2000);
+  }, [vm]);
+
+  const handleExport = useCallback(() => {
+    const payload = buildEcowittValidationExport({
+      tentScopedLabel: vm.tentScopedLabel,
+      sourceLabel: vm.sourceLabel,
+      now,
+      thresholds: vm.thresholds,
+      attempts: vm.exportAttempts,
+    });
+    const text = serializeExport(payload);
+    try {
+      const blob = new Blob([text], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ecowitt-validation-${now.toISOString()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      /* download unsupported; still flash feedback */
+    }
+    setExported(true);
+    setTimeout(() => setExported(false), 2000);
+  }, [vm.tentScopedLabel, vm.sourceLabel, vm.thresholds, vm.exportAttempts, now]);
+
   return (
     <Card data-testid="ecowitt-ingest-validation-panel">
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-2">
@@ -153,6 +245,19 @@ export function EcowittIngestValidationPanel({
       <CardContent className="space-y-3 text-sm">
         <p data-testid="validation-status-message">{vm.statusMessage}</p>
 
+        {vm.derivedReadingWarnings.length > 0 ? (
+          <ul
+            data-testid="validation-derived-warnings"
+            className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive"
+          >
+            {vm.derivedReadingWarnings.map((w, i) => (
+              <li key={i} data-testid={`derived-warning-${i}`}>
+                {w}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
         <div
           data-testid="validation-action-bar"
           className="flex flex-wrap items-center gap-2"
@@ -181,7 +286,56 @@ export function EcowittIngestValidationPanel({
               {isRefreshing ? "Refreshing…" : "Refresh evidence"}
             </Button>
           ) : null}
+          {vm.hasEvidence && onLogEnvironmentCheck ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handleLog}
+              disabled={
+                !diaryDraft.eligible || vm.alreadyLogged || !!isLogging
+              }
+              data-testid="log-environment-check-button"
+              data-eligible={diaryDraft.eligible ? "true" : "false"}
+              data-already-logged={vm.alreadyLogged ? "true" : "false"}
+              aria-label="Log Environment Check to diary"
+              className="h-7 text-xs"
+            >
+              {vm.alreadyLogged
+                ? "Already logged"
+                : isLogging
+                  ? "Logging…"
+                  : "Log Environment Check"}
+            </Button>
+          ) : null}
+          {vm.hasEvidence ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handleExport}
+              data-testid="export-validation-button"
+              aria-label="Export last 10 validation attempts as JSON"
+              className="h-7 text-xs"
+            >
+              {exported ? "Exported" : "Export validation"}
+            </Button>
+          ) : null}
+          {vm.hasEvidence ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handleCopyEvidence}
+              data-testid="copy-latest-evidence-button"
+              aria-label="Copy latest evidence as redacted JSON"
+              className="h-7 text-xs"
+            >
+              {evidenceCopied ? "Copied" : "Copy latest evidence"}
+            </Button>
+          ) : null}
         </div>
+
 
         {vm.hasEvidence ? (
           <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs text-muted-foreground">

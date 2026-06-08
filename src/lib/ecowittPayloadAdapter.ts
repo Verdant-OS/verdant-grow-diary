@@ -147,7 +147,7 @@ const DEVICE_STATE_KEYS = new Set<string>([
 
 const TEMP_F_CHANNEL_RE = /^temp([1-8])f$/i;
 const HUMIDITY_CHANNEL_RE = /^humidity([1-8])$/i;
-const SOIL_MOISTURE_CHANNEL_RE = /^soilmoisture([1-8])$/i;
+const SOIL_MOISTURE_CHANNEL_RE = /^soilmoisture(1[0-6]|[1-9])$/i;
 
 // CO2 is broadly "ppm in Earth atmosphere": ambient ~400, indoor common <2000,
 // hard cap well below industrial sensor max. Anything outside is flagged.

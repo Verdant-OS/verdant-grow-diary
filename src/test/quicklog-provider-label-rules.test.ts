@@ -5,7 +5,7 @@
  * Live, never change the strict resolver, never widen trust.
  */
 import { describe, it, expect } from "vitest";
-import { deriveProviderLabel } from "@/lib/quickLogSnapshotStripAdapter";
+import { deriveProviderLabel } from "@/constants/sensorProviderLabels";
 
 describe("deriveProviderLabel", () => {
   it("hides the chip for null / empty / live / unavailable", () => {

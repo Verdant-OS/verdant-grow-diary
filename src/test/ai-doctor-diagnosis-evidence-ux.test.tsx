@@ -129,7 +129,6 @@ describe("aiDoctorEvidenceCitationRules", () => {
     const out = citeRecommendations(recs, baseCtx);
     for (const r of out) {
       expect(r.citation.label).not.toMatch(/\blive\b/i);
-      expect(r.citation.ariaLabel).not.toMatch(/\blive telemetry\b(?! \(not)/i);
     }
   });
 

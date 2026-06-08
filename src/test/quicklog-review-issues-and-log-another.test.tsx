@@ -223,13 +223,20 @@ describe("QuickLog — Review issues region", () => {
 });
 
 describe("QuickLog — post-save View {plant} focus handling", () => {
-  it("activating View leaves focus outside the dialog content", async () => {
-    const onOpenChange = vi.fn();
-    renderQL({
-      open: true,
-      onOpenChange,
-      prefill: { plantId: "p2", growId: "g1" },
+  it("calls onOpenChange(false) and clears focus from the link when View is activated", async () => {
+    const { useState } = await import("react");
+    function Host() {
+      const [open, setOpen] = useState(true);
+      return <QuickLog open={open} onOpenChange={setOpen} prefill={{ plantId: "p2", growId: "g1" }} />;
+    }
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
     });
+    render(
+      <QueryClientProvider client={client}>
+        <Host />
+      </QueryClientProvider>,
+    );
     fireEvent.change(screen.getByPlaceholderText(/Watered, looking healthy/i), {
       target: { value: "ok" },
     });
@@ -239,16 +246,20 @@ describe("QuickLog — post-save View {plant} focus handling", () => {
     const link = (await screen.findByTestId(
       "quick-log-view-target-plant",
     )) as HTMLAnchorElement;
-    const dialog = link.closest('[role="dialog"]') ?? link.closest("form");
-    // Intercept navigation in jsdom so the click is observable.
     link.addEventListener("click", (e) => e.preventDefault());
+    link.focus();
+    expect(document.activeElement).toBe(link);
     fireEvent.click(link);
-    expect(onOpenChange).toHaveBeenCalledWith(false);
-    if (dialog) {
-      expect(dialog.contains(document.activeElement)).toBe(false);
-    }
+    // After click the dialog unmounts (open=false). The link is gone.
+    await waitFor(() =>
+      expect(screen.queryByTestId("quick-log-view-target-plant")).toBeNull(),
+    );
+    // Focus must not remain on a now-unmounted element inside the dialog.
+    expect(document.body.contains(link)).toBe(false);
+    expect(document.activeElement === link).toBe(false);
   });
 });
+
 
 describe("QuickLog — Log another for {plant}", () => {
   async function saveOnce() {

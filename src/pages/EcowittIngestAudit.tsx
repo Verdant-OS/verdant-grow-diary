@@ -56,6 +56,39 @@ export default function EcowittIngestAudit() {
     tentId ?? (tents.length > 0 ? (tents[0] as { id: string }).id : null);
 
   const query = useEcowittAuditRows(effectiveTentId);
+  const { save: saveQuickLog, saving: isLogging } = useQuickLogV2Save();
+  const [loggedCapturedAts, setLoggedCapturedAts] = useState<string[]>([]);
+
+  // Query existing EcoWitt-validation environment events for idempotency.
+  const loggedEventsQuery = useQuery<string[]>({
+    queryKey: ["ecowitt-validation-logged", effectiveTentId ?? "none"],
+    enabled: !!effectiveTentId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("grow_events")
+        .select("occurred_at,note")
+        .eq("tent_id", effectiveTentId!)
+        .eq("event_type", "environment")
+        .order("occurred_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return (data ?? [])
+        .filter(
+          (r) =>
+            typeof r.note === "string" &&
+            r.note.includes("EcoWitt Environment Check"),
+        )
+        .map((r) => r.occurred_at as string);
+    },
+  });
+
+  const mergedLogged = useMemo(
+    () =>
+      Array.from(
+        new Set([...(loggedEventsQuery.data ?? []), ...loggedCapturedAts]),
+      ),
+    [loggedEventsQuery.data, loggedCapturedAts],
+  );
 
   const vm = useMemo(
     () =>
@@ -65,6 +98,25 @@ export default function EcowittIngestAudit() {
       }),
     [query.data, effectiveTentId],
   );
+
+  const handleLogEnvironmentCheck = async (
+    draft: DiaryEnvironmentCheckDraft,
+  ) => {
+    if (!draft.eligible || !draft.rpcPayload.p_target_id) return;
+    if (mergedLogged.includes(draft.occurredAt)) return;
+    setLoggedCapturedAts((prev) =>
+      prev.includes(draft.occurredAt) ? prev : [...prev, draft.occurredAt],
+    );
+    const result = await saveQuickLog(draft.rpcPayload);
+    if (!result.ok) {
+      setLoggedCapturedAts((prev) =>
+        prev.filter((x) => x !== draft.occurredAt),
+      );
+      return;
+    }
+    void loggedEventsQuery.refetch();
+  };
+
 
   return (
     <main

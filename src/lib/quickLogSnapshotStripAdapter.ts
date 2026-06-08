@@ -48,6 +48,13 @@ export interface QuickLogSnapshotStripViewModel {
   action: QuickLogSnapshotStripAction;
   /** Underlying contract classification (for tests / observability). */
   classification: Classification;
+  /**
+   * Optional non-Live provider/source label (e.g. "ecowitt",
+   * "home_assistant"). Null when no source exists or when source is
+   * "live" — Live is communicated by the resolver-driven badge, never
+   * by this chip. Pure presentation; never widens trust.
+   */
+  providerLabel: string | null;
 }
 
 const TITLES: Record<QuickLogSnapshotStripStatus, string> = {

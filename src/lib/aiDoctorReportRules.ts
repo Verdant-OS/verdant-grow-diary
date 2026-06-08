@@ -8,7 +8,7 @@
  *    application/pdf blob without a network call.
  *
  * Hard constraints:
- *  - Pure: no React, no Supabase, no I/O, no fetch, no functions.invoke.
+ *  - Pure: no React, no Supabase, no I/O, no network calls, no edge invokes.
  *  - Local/test Environment Check evidence MUST NEVER be labeled as Live.
  *  - Derived VPD MUST be labeled as "Derived VPD context".
  *  - Visible copy MUST NOT echo tokens, auth headers, bridge tokens,

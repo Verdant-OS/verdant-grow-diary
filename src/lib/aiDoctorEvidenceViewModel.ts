@@ -523,18 +523,18 @@ export function buildAiDoctorEvidencePanelVM(
   if (!hasAnyEvidence) {
     conservativeCopy = CONSERVATIVE_COPY_NONE;
   } else if (
+    compiled.environmentCheck.kind === "present" &&
+    (compiled.environmentCheck.rejectedCount > 0 ||
+      compiled.environmentCheck.notCheckedCount > 0)
+  ) {
+    conservativeCopy = CONSERVATIVE_COPY_WEAK;
+  } else if (
     !hasLiveSensor &&
     manualGroup.isEmpty &&
     csvGroup.isEmpty &&
     hasEnvCheck
   ) {
     conservativeCopy = CONSERVATIVE_COPY_ENVCHECK_ONLY;
-  } else if (
-    compiled.environmentCheck.kind === "present" &&
-    (compiled.environmentCheck.rejectedCount > 0 ||
-      compiled.environmentCheck.notCheckedCount > 0)
-  ) {
-    conservativeCopy = CONSERVATIVE_COPY_WEAK;
   }
 
   const missing = buildMissingList({

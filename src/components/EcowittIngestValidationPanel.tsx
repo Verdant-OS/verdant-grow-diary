@@ -1,7 +1,16 @@
 import { useCallback, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   buildEcowittIngestValidationViewModel,
   ECOWITT_VALIDATION_COPY_COMMANDS,
@@ -12,13 +21,19 @@ import {
 import {
   buildLatestEvidenceSnapshot,
   serializeEvidenceForClipboard,
+  buildEvidencePreview,
 } from "@/lib/ecowittValidationEvidenceRules";
 import {
   buildEcowittValidationExport,
   serializeExport,
+  serializeExportCsv,
+  buildExportPreview,
+  EXPORT_CSV_AVAILABLE,
 } from "@/lib/ecowittValidationExportRules";
 import {
   buildDiaryEnvironmentCheckDraft,
+  buildAlreadyLoggedEventInfo,
+  DIARY_ENVIRONMENT_CHECK_TITLE,
   type DiaryEnvironmentCheckDraft,
 } from "@/lib/ecowittDiaryEnvironmentCheckRules";
 
@@ -34,6 +49,8 @@ interface Props {
    */
   onLogEnvironmentCheck?: (draft: DiaryEnvironmentCheckDraft) => void;
   isLogging?: boolean;
+  /** Optional grow scope used to build the timeline link href. */
+  growId?: string | null;
 }
 
 function statusVariant(

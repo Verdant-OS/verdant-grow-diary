@@ -82,10 +82,11 @@ describe("ecowittReadingViewModel.buildEcowittSnapshotViewModel", () => {
     expect(vm.derivedVpdKpa).not.toBeNull();
     // VPD is now explicitly surfaced in the metrics map for presenter convenience.
     expect(vm.metrics.vpd_kpa).not.toBeNull();
+    // Derived VPD lives in metrics.vpd_kpa and derivedVpdKpa, not inside snapshot.readings.
     expect(
       vm.snapshot?.readings.some(
         (r) => (r as { metric: string }).metric === "vpd_kpa",
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 });

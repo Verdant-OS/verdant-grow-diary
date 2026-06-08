@@ -12,7 +12,7 @@ import path from "node:path";
  *      real /auth UI to sign in, then persist storageState.
  *   3. Otherwise, skip — Playwright tests downstream will skip with a clear
  *      message. There is NO auth bypass, NO hardcoded credentials, NO
- *      service_role usage, and NO token injection.
+ *      elevated DB role usage, and NO token injection.
  */
 const STORAGE_PATH = path.resolve("e2e/.auth/user.json");
 

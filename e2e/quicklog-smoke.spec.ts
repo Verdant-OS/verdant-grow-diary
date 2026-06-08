@@ -20,7 +20,7 @@ import { SmokeChecklistReporter } from "./lib/smokeChecklistReporter";
  *                               (default "505 Headbanger")
  *
  * SAFETY:
- *   - No auth bypass. No hardcoded credentials. No service_role.
+ *   - No auth bypass. No hardcoded credentials. No elevated DB role.
  *   - Reads/writes only what an authenticated user could do via the UI.
  *   - Does not attach stale/non-usable snapshots.
  */

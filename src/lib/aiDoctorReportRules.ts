@@ -320,7 +320,11 @@ export function downloadAiDoctorReportPdf(
   filename: string,
 ): void {
   if (typeof document === "undefined" || typeof URL === "undefined") return;
-  const blob = new Blob([bytes], { type: "application/pdf" });
+  const ab = bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength,
+  ) as ArrayBuffer;
+  const blob = new Blob([ab], { type: "application/pdf" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

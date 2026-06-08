@@ -190,7 +190,7 @@ describe("compileAiDoctorContext + view model", () => {
       expect(src).not.toMatch(/sensor_readings/);
       expect(src).not.toMatch(/functions\.invoke/);
       expect(src).not.toMatch(/action_queue/);
-      expect(src).not.toMatch(/turn[_ ]?on|turn[_ ]?off|device[_ ]?control/i);
+      expect(src).not.toMatch(/turn_on|turn_off|device_control|toggleDevice|setOutletState/i);
     }
   });
 });

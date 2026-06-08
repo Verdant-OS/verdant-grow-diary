@@ -47,9 +47,11 @@ import {
   UNSUPPORTED_EVENT_TYPE_COPY,
 } from "@/lib/legacyQuickLogUnifiedSave";
 import { buildSensorSnapshotSavePayload } from "@/lib/latestSensorSnapshotRules";
+import { buildStaleSnapshotHelperCopy } from "@/lib/quickLogStaleSnapshotHelperCopy";
+import { plantDetailPath } from "@/lib/routes";
 
 
-import { AlertTriangle, Info } from "lucide-react";
+import { AlertTriangle, Info, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
 export interface QuickLogPrefill {
@@ -130,6 +132,11 @@ export default function QuickLog({
   // Inline validation for required Watering (ml) when event=watering.
   const [wateringError, setWateringError] = useState<string | null>(null);
   const wateringInputRef = useRef<HTMLInputElement | null>(null);
+  // Post-save success state — when set, the dialog keeps open and shows
+  // a "View {plant}" action pointing at the saved target plant. Cleared
+  // on dialog close or when the grower starts a new entry.
+  const [savedTarget, setSavedTarget] = useState<{ id: string; name: string } | null>(null);
+  const viewPlantBtnRef = useRef<HTMLAnchorElement | null>(null);
 
   // Tracks whether the grower has manually changed the attach toggle in
   // this session. Until they do, we may auto-default it based on whether
@@ -281,6 +288,8 @@ export default function QuickLog({
     });
     hardwareUserTouchedRef.current = false;
     setHardwareOpen(false);
+    setWateringError(null);
+    setSavedTarget(null);
   }
 
   async function submit(e: React.FormEvent) {
@@ -366,9 +375,15 @@ export default function QuickLog({
           : `Logged ${verb} for ${plantLabel}`;
       toast.success(finalMessage);
 
-      reset();
-      onOpenChange(false);
+      // Surface a post-save action so growers can jump to the target
+      // plant they just logged against. We intentionally keep the dialog
+      // open instead of auto-closing — the grower decides whether to
+      // navigate, log another entry, or dismiss.
+      setSavedTarget({ id: selectedPlant.id, name: plantLabel });
       onCreated?.();
+      // Defer focus to the View {plant} action so keyboard flow lands
+      // on the just-revealed primary action.
+      setTimeout(() => viewPlantBtnRef.current?.focus(), 0);
       // Refresh both legacy and unified timeline readers so the just-saved
       // entry appears without a hard refresh.
       queryClient.invalidateQueries({ queryKey: ["plant_recent_activity"] });
@@ -513,6 +528,8 @@ export default function QuickLog({
             <div
               data-testid="quick-log-plant-mismatch-banner"
               role="status"
+              aria-live="polite"
+              tabIndex={-1}
               className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-2.5 text-[12px] text-amber-200 flex items-start gap-2"
             >
               <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" aria-hidden="true" />
@@ -594,7 +611,7 @@ export default function QuickLog({
                     >
                       {selectedPlant && !snapshotUsable && stripView.status !== "no_data" ? (
                         <span data-testid="quick-log-snapshot-stale-helper">
-                          Refresh before attaching this snapshot. Stale or unverified readings are not saved as current sensor context.
+                          {buildStaleSnapshotHelperCopy(stripView.capturedAt)}
                         </span>
                       ) : (
                         "Applies to this log only. Closing Quick Log resets this choice."
@@ -852,12 +869,62 @@ export default function QuickLog({
 
           <Button
             type="submit"
-            disabled={busy || !selectedPlant}
+            disabled={busy || !selectedPlant || !!savedTarget}
             data-testid="quick-log-save"
             className="gradient-leaf text-primary-foreground"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save entry"}
           </Button>
+
+          {savedTarget && (
+            <div
+              data-testid="quick-log-post-save"
+              role="status"
+              aria-live="polite"
+              className="rounded-lg border border-primary/40 bg-primary/5 p-3 flex flex-col gap-2"
+            >
+              <p className="text-[12px] text-muted-foreground">
+                Saved to{" "}
+                <strong className="text-foreground font-semibold">
+                  {savedTarget.name}
+                </strong>
+                .
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <a
+                  ref={viewPlantBtnRef}
+                  href={plantDetailPath(savedTarget.id)}
+                  data-testid="quick-log-view-target-plant"
+                  data-target-plant-id={savedTarget.id}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  onClick={() => {
+                    onOpenChange(false);
+                  }}
+                >
+                  View {savedTarget.name}
+                  <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                </a>
+                <Button
+                  type="button"
+                  variant="outline"
+                  data-testid="quick-log-post-save-another"
+                  onClick={() => {
+                    reset();
+                  }}
+                >
+                  Log another
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  data-testid="quick-log-post-save-close"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
         </form>
       </DialogContent>
     </Dialog>

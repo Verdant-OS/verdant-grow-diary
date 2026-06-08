@@ -154,7 +154,11 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
     expect(uploadMock).not.toHaveBeenCalled();
     expect(insertMock).not.toHaveBeenCalled();
 
-    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    // Post-save behavior changed: the dialog stays open and reveals a
+    // "View {plant}" target action. onOpenChange is no longer auto-fired.
+    await waitFor(() =>
+      expect(document.querySelector('[data-testid="quick-log-view-target-plant"]')).not.toBeNull(),
+    );
     expect(onCreated).toHaveBeenCalled();
     expect(toastSuccess).toHaveBeenCalledWith(expect.stringMatching(/Logged note for|Logged observation for/));
     expect(toastError).not.toHaveBeenCalled();

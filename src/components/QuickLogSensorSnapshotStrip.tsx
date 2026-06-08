@@ -20,6 +20,7 @@ import {
   buildQuickLogStripFromTentState,
   type QuickLogSnapshotStripStatus,
 } from "@/lib/quickLogSnapshotStripAdapter";
+import QuickLogSensorMiniChart from "@/components/QuickLogSensorMiniChart";
 
 interface Props {
   growId?: string | null | undefined;
@@ -52,6 +53,13 @@ const PILL_LABEL: Record<QuickLogSnapshotStripStatus, string> = {
   no_data: "No data",
 };
 
+const PILL_ARIA: Record<QuickLogSnapshotStripStatus, string> = {
+  usable: "Sensor snapshot status: usable",
+  stale: "Sensor snapshot status: stale",
+  invalid: "Sensor snapshot status: invalid",
+  no_data: "Sensor snapshot status: no data",
+};
+
 export default function QuickLogSensorSnapshotStrip({ tentId, attached = true }: Props) {
   const state = useLatestTentSensorSnapshot(tentId ?? null);
   const view = buildQuickLogStripFromTentState({
@@ -65,19 +73,34 @@ export default function QuickLogSensorSnapshotStrip({ tentId, attached = true }:
     <section
       data-testid="quicklog-sensor-snapshot-strip"
       data-status={view.status}
+      aria-label="Sensor snapshot summary"
       className={`rounded-lg border p-3 space-y-2 ${TONE[view.status]}`}
     >
       <div className="flex items-center justify-between gap-2">
         <span className="inline-flex items-center gap-1.5 text-sm font-medium">
-          <Gauge className="h-3.5 w-3.5" />
+          <Gauge className="h-3.5 w-3.5" aria-hidden="true" />
           {view.title}
         </span>
-        <span
-          data-testid="quicklog-sensor-snapshot-pill"
-          className={`text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5 ${PILL_TONE[view.status]}`}
-        >
-          {PILL_LABEL[view.status]}
-        </span>
+        <div className="flex items-center gap-1.5">
+          {view.providerLabel && (
+            <span
+              data-testid="quicklog-sensor-snapshot-source"
+              data-source={view.providerLabel}
+              aria-label={`Sensor source: ${view.providerLabel}`}
+              className="text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5 bg-muted/60 text-muted-foreground"
+            >
+              {view.providerLabel}
+            </span>
+          )}
+          <span
+            data-testid="quicklog-sensor-snapshot-pill"
+            role="status"
+            aria-label={PILL_ARIA[view.status]}
+            className={`text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5 ${PILL_TONE[view.status]}`}
+          >
+            {PILL_LABEL[view.status]}
+          </span>
+        </div>
       </div>
 
       <p className="text-[12px] text-muted-foreground leading-snug">{view.description}</p>
@@ -96,12 +119,17 @@ export default function QuickLogSensorSnapshotStrip({ tentId, attached = true }:
         </div>
       )}
 
+      {view.status !== "no_data" && tentId && (
+        <QuickLogSensorMiniChart tentId={tentId} metric="temp_c" />
+      )}
+
       {view.action.kind !== "none" && (
         <a
           href={view.action.href}
           data-testid="quicklog-sensor-snapshot-action"
           data-action-kind={view.action.kind}
-          className="inline-flex items-center text-[12px] font-medium text-primary hover:underline"
+          aria-label={`${view.action.label} — opens sensors page`}
+          className="inline-flex items-center text-[12px] font-medium text-primary hover:underline rounded-sm focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           {view.action.label}
         </a>

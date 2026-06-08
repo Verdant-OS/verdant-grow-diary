@@ -10,13 +10,23 @@
  *  - Raw model confidence appears only in the audit/debug subsection.
  *  - Missing / malformed input must not crash — empty state is preserved.
  */
-import { useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
 import type { DiagnosisResult } from "@/lib/aiDoctorEngine";
 import {
   adaptDiagnosisResultToViewModel,
   type DiagnosisDisplayConfidence,
 } from "@/lib/aiDoctorDiagnosisViewModel";
 import type { DiagnosisEvidenceAlignmentVM } from "@/lib/aiDoctorDiagnosisEvidenceAlignmentRules";
+import {
+  citeRecommendations,
+  type CitationContext,
+  type EvidenceCitation,
+} from "@/lib/aiDoctorEvidenceCitationRules";
+import {
+  buildAiDoctorReportPdfBytes,
+  downloadAiDoctorReportPdf,
+  type AiDoctorReportInput,
+} from "@/lib/aiDoctorReportRules";
 
 export const AI_DOCTOR_DIAGNOSIS_EMPTY_COPY =
   "No AI Doctor 2.0 diagnosis available yet.";
@@ -28,13 +38,19 @@ export const AI_DOCTOR_DIAGNOSIS_REVIEW_FIRST_COPY =
   "Review these signals before taking any action.";
 
 export interface AiDoctorDiagnosisPanelProps {
-  /** AI Doctor 2.0 engine output. Null/undefined → empty state. */
   diagnosis?: DiagnosisResult | null;
   isLoading?: boolean;
   className?: string;
   testIdPrefix?: string;
-  /** Optional evidence-alignment VM (from buildAiDoctorDiagnosisEvidenceAlignmentVM). */
   evidenceAlignment?: DiagnosisEvidenceAlignmentVM | null;
+  /** Optional citation context for inline recommendation citations. */
+  citationContext?: CitationContext | null;
+  /**
+   * Optional partial report input (without recommendations — those are
+   * derived from the diagnosis + citationContext). When provided alongside
+   * a diagnosis a "Download report" action is rendered.
+   */
+  reportInput?: Omit<AiDoctorReportInput, "recommendations"> | null;
 }
 
 function isFallbackConfidence(c: DiagnosisDisplayConfidence): boolean {
@@ -47,6 +63,8 @@ export default function AiDoctorDiagnosisPanel({
   className,
   testIdPrefix,
   evidenceAlignment,
+  citationContext,
+  reportInput,
 }: AiDoctorDiagnosisPanelProps) {
   const tid = (s: string) => (testIdPrefix ? `${testIdPrefix}-${s}` : s);
   const hasDiagnosis = diagnosis != null;
@@ -54,6 +72,39 @@ export default function AiDoctorDiagnosisPanel({
     () => (hasDiagnosis ? adaptDiagnosisResultToViewModel(diagnosis) : null),
     [hasDiagnosis, diagnosis],
   );
+
+  const citedRecs = useMemo(() => {
+    if (!view || !citationContext) return null;
+    return citeRecommendations(view.recommended_actions, citationContext);
+  }, [view, citationContext]);
+
+  const postureDefaultsOpen =
+    !evidenceAlignment ||
+    evidenceAlignment.posture === "weak_context" ||
+    evidenceAlignment.posture === "insufficient_context";
+  const [basisOpen, setBasisOpen] = useState<boolean>(postureDefaultsOpen);
+
+  const handleDownloadReport = useCallback(() => {
+    if (!view || !reportInput) return;
+    const recs =
+      citedRecs ??
+      view.recommended_actions.map((r) => ({
+        text: r,
+        citation: {
+          label: "Needs more evidence",
+          kind: "none" as const,
+          healthy: false,
+          targetId: "evidence-missing-general",
+          ariaLabel: "No direct evidence supports this recommendation yet.",
+        } as EvidenceCitation,
+      }));
+    const bytes = buildAiDoctorReportPdfBytes({
+      ...reportInput,
+      summary: reportInput.summary || view.summary,
+      recommendations: recs,
+    });
+    downloadAiDoctorReportPdf(bytes, "ai-doctor-report.pdf");
+  }, [view, citedRecs, reportInput]);
 
   if (!view) {
     return (
@@ -171,17 +222,34 @@ export default function AiDoctorDiagnosisPanel({
           className="rounded-md border border-border/60 bg-background/30 p-3 text-xs space-y-2"
           data-testid={tid("ai-doctor-diagnosis-evidence-alignment")}
           data-posture={evidenceAlignment.posture}
-          aria-label="Evidence basis"
+          aria-labelledby={tid("ai-doctor-diagnosis-evidence-heading")}
+          role="region"
         >
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-xs font-semibold">Evidence basis</h3>
+            <h3
+              id={tid("ai-doctor-diagnosis-evidence-heading")}
+              className="text-xs font-semibold"
+            >
+              Evidence basis
+            </h3>
             <span
               className="inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2 py-0.5 text-[11px] font-medium"
               data-testid={tid("ai-doctor-diagnosis-posture-label")}
               data-posture={evidenceAlignment.posture}
+              aria-label={`Recommendation posture: ${evidenceAlignment.postureLabel}`}
             >
               {evidenceAlignment.postureLabel}
             </span>
+            <button
+              type="button"
+              onClick={() => setBasisOpen((v) => !v)}
+              aria-expanded={basisOpen}
+              aria-controls={tid("ai-doctor-diagnosis-evidence-body")}
+              data-testid={tid("ai-doctor-diagnosis-evidence-toggle")}
+              className="ml-auto inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2 py-0.5 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+            >
+              {basisOpen ? "Hide details" : "Show details"}
+            </button>
           </div>
           <p
             className="text-[11px] text-muted-foreground"
@@ -189,46 +257,73 @@ export default function AiDoctorDiagnosisPanel({
           >
             {evidenceAlignment.postureCopy}
           </p>
-          {evidenceAlignment.basisCopy.length > 0 ? (
-            <ul
-              className="list-disc pl-4 space-y-0.5"
-              data-testid={tid("ai-doctor-diagnosis-basis-copy")}
-            >
-              {evidenceAlignment.basisCopy.map((b, i) => (
-                <li key={`${i}-${b}`} className="text-[11px]">
-                  {b}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {evidenceAlignment.guardrailWarning ? (
-            <p
-              className="text-[11px] text-amber-300"
-              data-testid={tid("ai-doctor-diagnosis-guardrail-warning")}
-              role="note"
-            >
-              {evidenceAlignment.guardrailWarning}
-            </p>
-          ) : null}
-          {evidenceAlignment.moreDataReminder ? (
+          {!basisOpen && evidenceAlignment.moreDataReminder ? (
             <p
               className="text-[11px] text-amber-200"
-              data-testid={tid("ai-doctor-diagnosis-more-data-reminder")}
+              data-testid={tid("ai-doctor-diagnosis-more-data-summary")}
             >
-              {evidenceAlignment.moreDataReminder}{" "}
-              <a
-                href="#ai-doctor-evidence-panel"
-                className="underline"
-                aria-label="Jump to Evidence used panel"
-              >
-                See Evidence used.
-              </a>
+              {evidenceAlignment.moreDataReminder}
             </p>
           ) : null}
+          <div
+            id={tid("ai-doctor-diagnosis-evidence-body")}
+            hidden={!basisOpen}
+            data-state={basisOpen ? "open" : "collapsed"}
+            className="space-y-2"
+          >
+            {evidenceAlignment.basisCopy.length > 0 ? (
+              <ul
+                className="list-disc pl-4 space-y-0.5"
+                data-testid={tid("ai-doctor-diagnosis-basis-copy")}
+              >
+                {evidenceAlignment.basisCopy.map((b, i) => (
+                  <li key={`${i}-${b}`} className="text-[11px]">
+                    {b}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {evidenceAlignment.guardrailWarning ? (
+              <p
+                className="text-[11px] text-amber-300"
+                data-testid={tid("ai-doctor-diagnosis-guardrail-warning")}
+                role="note"
+              >
+                {evidenceAlignment.guardrailWarning}
+              </p>
+            ) : null}
+            {evidenceAlignment.moreDataReminder ? (
+              <p
+                className="text-[11px] text-amber-200"
+                data-testid={tid("ai-doctor-diagnosis-more-data-reminder")}
+              >
+                {evidenceAlignment.moreDataReminder}{" "}
+                <a
+                  href="#ai-doctor-evidence-panel"
+                  className="underline"
+                  aria-label="Jump to Evidence used panel"
+                >
+                  See Evidence used.
+                </a>
+              </p>
+            ) : null}
+          </div>
         </section>
       ) : null}
 
-
+      {reportInput ? (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={handleDownloadReport}
+            data-testid={tid("ai-doctor-diagnosis-download-report")}
+            className="inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+            aria-label="Download AI Doctor Report as PDF"
+          >
+            Download AI Doctor Report
+          </button>
+        </div>
+      ) : null}
 
       <Section
         title="Key observations"
@@ -240,11 +335,19 @@ export default function AiDoctorDiagnosisPanel({
         items={view.contributing_factors}
         testId={tid("ai-doctor-diagnosis-contributing-factors")}
       />
-      <Section
-        title="Recommended actions"
-        items={view.recommended_actions}
-        testId={tid("ai-doctor-diagnosis-recommended-actions")}
-      />
+      {citedRecs ? (
+        <CitedSection
+          title="Recommended actions"
+          items={citedRecs}
+          testId={tid("ai-doctor-diagnosis-recommended-actions")}
+        />
+      ) : (
+        <Section
+          title="Recommended actions"
+          items={view.recommended_actions}
+          testId={tid("ai-doctor-diagnosis-recommended-actions")}
+        />
+      )}
       <Section
         title="What not to do"
         items={view.what_not_to_do}
@@ -303,6 +406,48 @@ function Section({
       <ul className="list-disc pl-4 space-y-0.5">
         {items.map((it, i) => (
           <li key={`${i}-${it}`}>{it}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function CitedSection({
+  title,
+  items,
+  testId,
+}: {
+  title: string;
+  items: ReadonlyArray<{
+    text: string;
+    citation: EvidenceCitation;
+  }>;
+  testId: string;
+}) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div className="text-xs" data-testid={testId}>
+      <h3 className="font-semibold mb-1">{title}</h3>
+      <ul className="list-disc pl-4 space-y-1">
+        {items.map((it, i) => (
+          <li key={`${i}-${it.text}`} data-testid={`${testId}-item-${i}`}>
+            <span>{it.text}</span>{" "}
+            <a
+              href={`#${it.citation.targetId}`}
+              data-testid={`${testId}-citation-${i}`}
+              data-citation-kind={it.citation.kind}
+              data-citation-healthy={it.citation.healthy ? "true" : "false"}
+              aria-label={it.citation.ariaLabel}
+              className={
+                "inline-flex items-center rounded border px-1 py-0 text-[10px] font-medium align-middle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 " +
+                (it.citation.healthy
+                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+                  : "border-amber-500/40 bg-amber-500/10 text-amber-200")
+              }
+            >
+              [{it.citation.label}]
+            </a>
+          </li>
         ))}
       </ul>
     </div>

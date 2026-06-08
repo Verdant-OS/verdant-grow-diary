@@ -105,12 +105,6 @@ export default function AiDoctorDiagnosisPanel({
     });
     downloadAiDoctorReportPdf(bytes, "ai-doctor-report.pdf");
   }, [view, citedRecs, reportInput]);
-  const tid = (s: string) => (testIdPrefix ? `${testIdPrefix}-${s}` : s);
-  const hasDiagnosis = diagnosis != null;
-  const view = useMemo(
-    () => (hasDiagnosis ? adaptDiagnosisResultToViewModel(diagnosis) : null),
-    [hasDiagnosis, diagnosis],
-  );
 
   if (!view) {
     return (

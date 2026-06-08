@@ -67,6 +67,13 @@ export interface LegacyQuickLogFormInput {
   plantId: string | null;
   plantTentId: string | null;
   details: LegacyQuickLogDetails;
+  /**
+   * Optional redacted sensor envelope from buildSensorSnapshotSavePayload.
+   * When non-null, emitted as `p_details: { sensor: ... }` on the RPC
+   * payload. Null/undefined → `p_details` is omitted from the RPC call,
+   * preserving the existing no-details behavior.
+   */
+  sensorAttachPayload?: SensorAttachPayload;
 }
 
 export type LegacyUnifiedBuildResult =

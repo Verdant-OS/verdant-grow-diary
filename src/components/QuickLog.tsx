@@ -132,11 +132,15 @@ export default function QuickLog({
   // Inline validation for required Watering (ml) when event=watering.
   const [wateringError, setWateringError] = useState<string | null>(null);
   const wateringInputRef = useRef<HTMLInputElement | null>(null);
+  const plantSelectTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const attachWrapperRef = useRef<HTMLLabelElement | null>(null);
+  const noteRef = useRef<HTMLTextAreaElement | null>(null);
   // Post-save success state — when set, the dialog keeps open and shows
   // a "View {plant}" action pointing at the saved target plant. Cleared
   // on dialog close or when the grower starts a new entry.
   const [savedTarget, setSavedTarget] = useState<{ id: string; name: string } | null>(null);
   const viewPlantBtnRef = useRef<HTMLAnchorElement | null>(null);
+
 
   // Tracks whether the grower has manually changed the attach toggle in
   // this session. Until they do, we may auto-default it based on whether
@@ -292,6 +296,43 @@ export default function QuickLog({
     setSavedTarget(null);
   }
 
+  /**
+   * Reset everything EXCEPT the currently selected plant. Used by the
+   * "Log another for {plant}" post-save action so growers can keep
+   * logging against the same target without re-picking it. Sensor
+   * attach defaults are re-evaluated normally via the existing effects
+   * (usable → ON, stale/non-usable → OFF/disabled).
+   */
+  function resetForAnother() {
+    const keepPlantId = savedTarget?.id ?? plantId;
+    setNote("");
+    setShowMore(false);
+    setEventType("observation");
+    setSnapshot(false);
+    snapshotUserTouchedRef.current = false;
+    setRemindAt("");
+    setDetails({ ec: "", ecUnit: "mS/cm", nutrients: "", training: "", watering: "" });
+    setHardware({
+      inputPh: "",
+      inputEc: "",
+      runoffPh: "",
+      runoffEc: "",
+      ppfdCanopy: "",
+      lightDistance: "",
+    });
+    hardwareUserTouchedRef.current = false;
+    setHardwareOpen(false);
+    setWateringError(null);
+    setSavedTarget(null);
+    // Preserve current plant selection
+    if (keepPlantId) setPlantId(keepPlantId);
+    // Focus the first logical form input for the new entry.
+    setTimeout(() => noteRef.current?.focus(), 0);
+  }
+
+
+
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!user || !activeGrowId) {
@@ -418,6 +459,88 @@ export default function QuickLog({
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-4">
+          {(() => {
+            const showMismatch = !!(
+              prefill?.plantId &&
+              selectedPlant &&
+              selectedPlant.id !== prefill.plantId
+            );
+            const snapshotUsable = stripView.status === "usable";
+            const showStaleHelper = !!(
+              selectedPlant &&
+              !snapshotUsable &&
+              stripView.status !== "no_data" &&
+              !tentSetupRequired
+            );
+            const showWateringErr = !!wateringError;
+            if (!showMismatch && !showStaleHelper && !showWateringErr) return null;
+            const focusPlant = () => {
+              plantSelectTriggerRef.current?.focus();
+              plantSelectTriggerRef.current?.scrollIntoView?.({ block: "center" });
+            };
+            const focusAttach = () => {
+              attachWrapperRef.current?.focus();
+              attachWrapperRef.current?.scrollIntoView?.({ block: "center" });
+            };
+            const focusWatering = () => {
+              setShowMore(true);
+              setTimeout(() => {
+                wateringInputRef.current?.focus();
+                wateringInputRef.current?.scrollIntoView?.({ block: "center" });
+              }, 0);
+            };
+            return (
+              <div
+                data-testid="quick-log-review-issues"
+                role="group"
+                aria-label="Review Quick Log issues"
+                className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-2.5 space-y-1"
+              >
+                <p className="text-[11px] uppercase tracking-wide text-amber-200/80">
+                  Review Quick Log issues
+                </p>
+                <ul className="flex flex-wrap gap-x-3 gap-y-1">
+                  {showMismatch && (
+                    <li>
+                      <button
+                        type="button"
+                        data-testid="quick-log-review-jump-mismatch"
+                        onClick={focusPlant}
+                        className="text-[12px] underline text-amber-200 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        Jump to plant mismatch
+                      </button>
+                    </li>
+                  )}
+                  {showStaleHelper && (
+                    <li>
+                      <button
+                        type="button"
+                        data-testid="quick-log-review-jump-snapshot"
+                        onClick={focusAttach}
+                        className="text-[12px] underline text-amber-200 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        Jump to sensor snapshot
+                      </button>
+                    </li>
+                  )}
+                  {showWateringErr && (
+                    <li>
+                      <button
+                        type="button"
+                        data-testid="quick-log-review-jump-watering"
+                        onClick={focusWatering}
+                        className="text-[12px] underline text-amber-200 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        Jump to Watering (ml)
+                      </button>
+                    </li>
+                  )}
+                </ul>
+              </div>
+            );
+          })()}
+
           {/* Photo attach is temporarily disabled in the unified Quick
               Log slice. Copy stays grower-facing — never references
               internal table or writer names. */}
@@ -485,6 +608,7 @@ export default function QuickLog({
               onValueChange={(v) => setPlantId(v === "__none" ? "" : v)}
             >
               <SelectTrigger
+                ref={plantSelectTriggerRef}
                 data-testid="quick-log-plant-select"
                 aria-invalid={!selectedPlant}
                 aria-describedby={!selectedPlant ? "quick-log-plant-error" : undefined}
@@ -544,6 +668,8 @@ export default function QuickLog({
           <div>
             <Label>What's happening?</Label>
             <Textarea
+              ref={noteRef}
+              data-testid="quicklog-note"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Watered, looking healthy, slight yellowing on a fan leaf…"
@@ -585,7 +711,10 @@ export default function QuickLog({
                 return (
                   <>
                     <label
-                      className={`flex items-center justify-between gap-2 rounded-lg border p-3 ${attachDisabled ? "border-border/40 opacity-60" : "border-border/60"}`}
+                      ref={attachWrapperRef}
+                      tabIndex={-1}
+                      data-testid="quick-log-snapshot-attach-section"
+                      className={`flex items-center justify-between gap-2 rounded-lg border p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${attachDisabled ? "border-border/40 opacity-60" : "border-border/60"}`}
                     >
                       <span className="text-sm flex items-center gap-2">
                         <Gauge className="h-4 w-4 text-primary" />
@@ -898,6 +1027,14 @@ export default function QuickLog({
                   data-target-plant-id={savedTarget.id}
                   className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   onClick={() => {
+                    // Move focus out of the dialog before it unmounts so
+                    // focus is never stranded inside a closed dialog. If
+                    // the original opener is mounted, Radix Dialog will
+                    // restore focus to it on close. Otherwise focus
+                    // lands on <body> until the destination route mounts.
+                    if (typeof document !== "undefined") {
+                      (document.activeElement as HTMLElement | null)?.blur?.();
+                    }
                     onOpenChange(false);
                   }}
                 >
@@ -909,11 +1046,12 @@ export default function QuickLog({
                   variant="outline"
                   data-testid="quick-log-post-save-another"
                   onClick={() => {
-                    reset();
+                    resetForAnother();
                   }}
                 >
-                  Log another
+                  Log another for {savedTarget.name}
                 </Button>
+
                 <Button
                   type="button"
                   variant="ghost"

@@ -16,6 +16,7 @@ import {
   adaptDiagnosisResultToViewModel,
   type DiagnosisDisplayConfidence,
 } from "@/lib/aiDoctorDiagnosisViewModel";
+import type { DiagnosisEvidenceAlignmentVM } from "@/lib/aiDoctorDiagnosisEvidenceAlignmentRules";
 
 export const AI_DOCTOR_DIAGNOSIS_EMPTY_COPY =
   "No AI Doctor 2.0 diagnosis available yet.";
@@ -32,6 +33,8 @@ export interface AiDoctorDiagnosisPanelProps {
   isLoading?: boolean;
   className?: string;
   testIdPrefix?: string;
+  /** Optional evidence-alignment VM (from buildAiDoctorDiagnosisEvidenceAlignmentVM). */
+  evidenceAlignment?: DiagnosisEvidenceAlignmentVM | null;
 }
 
 function isFallbackConfidence(c: DiagnosisDisplayConfidence): boolean {
@@ -43,6 +46,7 @@ export default function AiDoctorDiagnosisPanel({
   isLoading,
   className,
   testIdPrefix,
+  evidenceAlignment,
 }: AiDoctorDiagnosisPanelProps) {
   const tid = (s: string) => (testIdPrefix ? `${testIdPrefix}-${s}` : s);
   const hasDiagnosis = diagnosis != null;
@@ -161,6 +165,70 @@ export default function AiDoctorDiagnosisPanel({
           </p>
         </div>
       ) : null}
+
+      {evidenceAlignment ? (
+        <section
+          className="rounded-md border border-border/60 bg-background/30 p-3 text-xs space-y-2"
+          data-testid={tid("ai-doctor-diagnosis-evidence-alignment")}
+          data-posture={evidenceAlignment.posture}
+          aria-label="Evidence basis"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-xs font-semibold">Evidence basis</h3>
+            <span
+              className="inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2 py-0.5 text-[11px] font-medium"
+              data-testid={tid("ai-doctor-diagnosis-posture-label")}
+              data-posture={evidenceAlignment.posture}
+            >
+              {evidenceAlignment.postureLabel}
+            </span>
+          </div>
+          <p
+            className="text-[11px] text-muted-foreground"
+            data-testid={tid("ai-doctor-diagnosis-posture-copy")}
+          >
+            {evidenceAlignment.postureCopy}
+          </p>
+          {evidenceAlignment.basisCopy.length > 0 ? (
+            <ul
+              className="list-disc pl-4 space-y-0.5"
+              data-testid={tid("ai-doctor-diagnosis-basis-copy")}
+            >
+              {evidenceAlignment.basisCopy.map((b, i) => (
+                <li key={`${i}-${b}`} className="text-[11px]">
+                  {b}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {evidenceAlignment.guardrailWarning ? (
+            <p
+              className="text-[11px] text-amber-300"
+              data-testid={tid("ai-doctor-diagnosis-guardrail-warning")}
+              role="note"
+            >
+              {evidenceAlignment.guardrailWarning}
+            </p>
+          ) : null}
+          {evidenceAlignment.moreDataReminder ? (
+            <p
+              className="text-[11px] text-amber-200"
+              data-testid={tid("ai-doctor-diagnosis-more-data-reminder")}
+            >
+              {evidenceAlignment.moreDataReminder}{" "}
+              <a
+                href="#ai-doctor-evidence-panel"
+                className="underline"
+                aria-label="Jump to Evidence used panel"
+              >
+                See Evidence used.
+              </a>
+            </p>
+          ) : null}
+        </section>
+      ) : null}
+
+
 
       <Section
         title="Key observations"

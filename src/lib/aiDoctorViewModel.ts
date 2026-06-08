@@ -12,7 +12,67 @@ import {
   type CompileAiDoctorContextInput,
   type CompiledAiDoctorContext,
 } from "./aiDoctorContextCompiler";
-import type { AiDoctorEnvironmentCheckResult } from "./aiDoctorEnvironmentCheckRules";
+import {
+  buildEnvironmentCheckChecklist,
+  type AiDoctorEnvironmentCheckResult,
+} from "./aiDoctorEnvironmentCheckRules";
+import {
+  buildDiagnosisEvidenceAlignmentVM,
+  type DiagnosisEvidenceAlignmentInput,
+  type DiagnosisEvidenceAlignmentVM,
+} from "./aiDoctorDiagnosisEvidenceAlignmentRules";
+
+export type {
+  DiagnosisEvidenceAlignmentVM,
+  RecommendationPosture,
+} from "./aiDoctorDiagnosisEvidenceAlignmentRules";
+
+export interface BuildDiagnosisAlignmentInput extends CompileAiDoctorContextInput {
+  hasRecentDiary?: boolean;
+  hasRecentPhotos?: boolean;
+}
+
+export function buildAiDoctorDiagnosisEvidenceAlignmentVM(
+  input: BuildDiagnosisAlignmentInput,
+): DiagnosisEvidenceAlignmentVM {
+  const compiled = compileAiDoctorContext({
+    sensorContext: input.sensorContext ?? null,
+    environmentCheckEvents: input.environmentCheckEvents ?? null,
+  });
+  const liveSensorUsable =
+    !!compiled.sensor &&
+    compiled.sensor.sourceState === "live" &&
+    compiled.sensor.usableMetrics.length > 0 &&
+    !compiled.sensor.isStale &&
+    !compiled.sensor.isInvalid;
+  const ec = compiled.environmentCheck;
+  const envCheckPresent = ec.kind === "present";
+  const acceptedCount = envCheckPresent ? ec.acceptedCount : 0;
+  const rejectedCount = envCheckPresent ? ec.rejectedCount : 0;
+  const notCheckedCount = envCheckPresent ? ec.notCheckedCount : 0;
+  const derivedVpd =
+    envCheckPresent && ec.metrics.some((m) => m.derived && m.key === "vpd_kpa");
+  const checklist = buildEnvironmentCheckChecklist({
+    event: compiled.environmentCheckSelection.selected,
+    hasLiveSensorContext: liveSensorUsable,
+  });
+  const moreDataNeededCount = checklist.items.filter(
+    (i) => i.state === "needed",
+  ).length;
+  const alignmentInput: DiagnosisEvidenceAlignmentInput = {
+    hasLiveSensor: !!compiled.sensor,
+    liveSensorUsable,
+    envCheckPresent,
+    envCheckAcceptedCount: acceptedCount,
+    envCheckRejectedCount: rejectedCount,
+    envCheckNotCheckedCount: notCheckedCount,
+    envCheckHasDerivedVpd: derivedVpd,
+    hasRecentDiary: input.hasRecentDiary === true,
+    hasRecentPhotos: input.hasRecentPhotos === true,
+    moreDataNeededCount,
+  };
+  return buildDiagnosisEvidenceAlignmentVM(alignmentInput);
+}
 
 export interface AiDoctorEnvironmentCheckBlockVM {
   show: boolean;

@@ -1,7 +1,16 @@
 import { useCallback, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   buildEcowittIngestValidationViewModel,
   ECOWITT_VALIDATION_COPY_COMMANDS,
@@ -12,13 +21,19 @@ import {
 import {
   buildLatestEvidenceSnapshot,
   serializeEvidenceForClipboard,
+  buildEvidencePreview,
 } from "@/lib/ecowittValidationEvidenceRules";
 import {
   buildEcowittValidationExport,
   serializeExport,
+  serializeExportCsv,
+  buildExportPreview,
+  EXPORT_CSV_AVAILABLE,
 } from "@/lib/ecowittValidationExportRules";
 import {
   buildDiaryEnvironmentCheckDraft,
+  buildAlreadyLoggedEventInfo,
+  DIARY_ENVIRONMENT_CHECK_TITLE,
   type DiaryEnvironmentCheckDraft,
 } from "@/lib/ecowittDiaryEnvironmentCheckRules";
 
@@ -34,6 +49,8 @@ interface Props {
    */
   onLogEnvironmentCheck?: (draft: DiaryEnvironmentCheckDraft) => void;
   isLogging?: boolean;
+  /** Optional grow scope used to build the timeline link href. */
+  growId?: string | null;
 }
 
 function statusVariant(
@@ -119,6 +136,7 @@ export function EcowittIngestValidationPanel({
   isRefreshing,
   onLogEnvironmentCheck,
   isLogging,
+  growId,
 }: Props) {
   const vm = buildEcowittIngestValidationViewModel(input);
   const now = input.now ?? new Date();
@@ -147,33 +165,114 @@ export function EcowittIngestValidationPanel({
     ],
   );
 
+  // Track captured_at of the most recent locally-initiated log click so we
+  // can surface a success block with the View link even before the
+  // grow_events query roundtrips.
+  const [justLoggedCapturedAt, setJustLoggedCapturedAt] = useState<
+    string | null
+  >(null);
+
   const handleLog = useCallback(() => {
     if (!onLogEnvironmentCheck) return;
     if (!diaryDraft.eligible) return;
     if (vm.alreadyLogged) return;
+    setJustLoggedCapturedAt(vm.latestCapturedAt);
     onLogEnvironmentCheck(diaryDraft);
-  }, [onLogEnvironmentCheck, diaryDraft, vm.alreadyLogged]);
+  }, [onLogEnvironmentCheck, diaryDraft, vm.alreadyLogged, vm.latestCapturedAt]);
 
-  const [evidenceCopied, setEvidenceCopied] = useState(false);
-  const [exported, setExported] = useState(false);
+  const loggedInfo = useMemo(
+    () =>
+      vm.alreadyLogged
+        ? buildAlreadyLoggedEventInfo(vm.latestCapturedAt, growId ?? null)
+        : justLoggedCapturedAt
+          ? buildAlreadyLoggedEventInfo(justLoggedCapturedAt, growId ?? null)
+          : null,
+    [vm.alreadyLogged, vm.latestCapturedAt, justLoggedCapturedAt, growId],
+  );
 
-  const handleCopyEvidence = useCallback(async () => {
-    const snap = buildLatestEvidenceSnapshot({
-      hasEvidence: vm.hasEvidence,
-      status: vm.status,
-      statusMessage: vm.statusMessage,
-      sourceLabel: vm.sourceLabel,
-      tentScopedLabel: vm.tentScopedLabel,
-      capturedAtLabel: vm.capturedAtLabel,
-      isTestSender: vm.isTestSender,
-      invalidTest: vm.invalidTest,
-      stale: vm.stale,
-      metricRows: vm.metricRows,
-      rawPayload: vm.latestRawPayload,
-      derivedReadingWarnings: vm.derivedReadingWarnings,
-    });
-    if (!snap) return;
-    const text = serializeEvidenceForClipboard(snap);
+  // Modal state.
+  const [exportOpen, setExportOpen] = useState(false);
+  const [copyOpen, setCopyOpen] = useState(false);
+
+  const evidenceSnapshot = useMemo(
+    () =>
+      buildLatestEvidenceSnapshot({
+        hasEvidence: vm.hasEvidence,
+        status: vm.status,
+        statusMessage: vm.statusMessage,
+        sourceLabel: vm.sourceLabel,
+        tentScopedLabel: vm.tentScopedLabel,
+        capturedAtLabel: vm.capturedAtLabel,
+        isTestSender: vm.isTestSender,
+        invalidTest: vm.invalidTest,
+        stale: vm.stale,
+        metricRows: vm.metricRows,
+        rawPayload: vm.latestRawPayload,
+        derivedReadingWarnings: vm.derivedReadingWarnings,
+      }),
+    [vm],
+  );
+
+  const exportPayload = useMemo(
+    () =>
+      buildEcowittValidationExport({
+        tentScopedLabel: vm.tentScopedLabel,
+        sourceLabel: vm.sourceLabel,
+        now,
+        thresholds: vm.thresholds,
+        attempts: vm.exportAttempts,
+      }),
+    [vm.tentScopedLabel, vm.sourceLabel, vm.thresholds, vm.exportAttempts, now],
+  );
+
+  const exportPreview = useMemo(
+    () => buildExportPreview(exportPayload),
+    [exportPayload],
+  );
+
+  const evidencePreview = useMemo(
+    () => (evidenceSnapshot ? buildEvidencePreview(evidenceSnapshot) : null),
+    [evidenceSnapshot],
+  );
+
+  const triggerDownload = useCallback(
+    (text: string, ext: "json" | "csv") => {
+      try {
+        const mime = ext === "json" ? "application/json" : "text/csv";
+        const blob = new Blob([text], { type: mime });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `ecowitt-validation-${now.toISOString()}.${ext}`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch {
+        /* download unsupported in this environment */
+      }
+    },
+    [now],
+  );
+
+  const handleConfirmExportJson = useCallback(() => {
+    triggerDownload(serializeExport(exportPayload), "json");
+    setExportOpen(false);
+    toast.success("Validation JSON downloaded");
+  }, [exportPayload, triggerDownload]);
+
+  const handleConfirmExportCsv = useCallback(() => {
+    triggerDownload(serializeExportCsv(exportPayload), "csv");
+    setExportOpen(false);
+    toast.success("Validation CSV downloaded");
+  }, [exportPayload, triggerDownload]);
+
+  const handleConfirmCopyEvidence = useCallback(async () => {
+    if (!evidenceSnapshot) {
+      setCopyOpen(false);
+      return;
+    }
+    const text = serializeEvidenceForClipboard(evidenceSnapshot);
     try {
       const clipboard =
         typeof navigator !== "undefined" ? navigator.clipboard : undefined;
@@ -181,35 +280,10 @@ export function EcowittIngestValidationPanel({
     } catch {
       /* clipboard unavailable */
     }
-    setEvidenceCopied(true);
-    setTimeout(() => setEvidenceCopied(false), 2000);
-  }, [vm]);
+    setCopyOpen(false);
+    toast.success("Redacted evidence copied");
+  }, [evidenceSnapshot]);
 
-  const handleExport = useCallback(() => {
-    const payload = buildEcowittValidationExport({
-      tentScopedLabel: vm.tentScopedLabel,
-      sourceLabel: vm.sourceLabel,
-      now,
-      thresholds: vm.thresholds,
-      attempts: vm.exportAttempts,
-    });
-    const text = serializeExport(payload);
-    try {
-      const blob = new Blob([text], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `ecowitt-validation-${now.toISOString()}.json`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch {
-      /* download unsupported; still flash feedback */
-    }
-    setExported(true);
-    setTimeout(() => setExported(false), 2000);
-  }, [vm.tentScopedLabel, vm.sourceLabel, vm.thresholds, vm.exportAttempts, now]);
 
   return (
     <Card data-testid="ecowitt-ingest-validation-panel">
@@ -313,12 +387,12 @@ export function EcowittIngestValidationPanel({
               type="button"
               size="sm"
               variant="outline"
-              onClick={handleExport}
+              onClick={() => setExportOpen(true)}
               data-testid="export-validation-button"
-              aria-label="Export last 10 validation attempts as JSON"
+              aria-label="Export last 10 validation attempts"
               className="h-7 text-xs"
             >
-              {exported ? "Exported" : "Export validation"}
+              Export validation
             </Button>
           ) : null}
           {vm.hasEvidence ? (
@@ -326,15 +400,50 @@ export function EcowittIngestValidationPanel({
               type="button"
               size="sm"
               variant="outline"
-              onClick={handleCopyEvidence}
+              onClick={() => setCopyOpen(true)}
               data-testid="copy-latest-evidence-button"
               aria-label="Copy latest evidence as redacted JSON"
               className="h-7 text-xs"
             >
-              {evidenceCopied ? "Copied" : "Copy latest evidence"}
+              Copy latest evidence
             </Button>
           ) : null}
         </div>
+
+        {loggedInfo ? (
+          <div
+            data-testid="environment-check-logged-block"
+            data-already-logged={vm.alreadyLogged ? "true" : "false"}
+            className="rounded-md border border-border bg-muted/30 p-2 text-xs"
+          >
+            <p className="font-medium" data-testid="logged-event-title">
+              {loggedInfo.title}
+            </p>
+            <p
+              className="text-muted-foreground"
+              data-testid="logged-event-captured-at"
+            >
+              Captured at: {loggedInfo.capturedAt}
+            </p>
+            <p
+              className="text-muted-foreground"
+              data-testid="logged-event-status"
+            >
+              {vm.alreadyLogged
+                ? "Already logged to diary"
+                : "Logged to diary"}
+            </p>
+            <a
+              href={loggedInfo.href}
+              data-testid="view-environment-check-link"
+              className="mt-1 inline-block text-primary underline"
+            >
+              View Environment Check
+            </a>
+          </div>
+        ) : null}
+
+
 
 
         {vm.hasEvidence ? (
@@ -504,8 +613,134 @@ export function EcowittIngestValidationPanel({
           </ul>
         </div>
       </CardContent>
+
+      <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+        <DialogContent data-testid="export-preview-dialog">
+          <DialogHeader>
+            <DialogTitle>Export validation evidence</DialogTitle>
+            <DialogDescription data-testid="export-preview-label">
+              {exportPreview.label}
+            </DialogDescription>
+          </DialogHeader>
+          <dl
+            data-testid="export-preview-summary"
+            className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs text-muted-foreground"
+          >
+            <dt className="font-medium">Tent</dt>
+            <dd>{exportPreview.tent}</dd>
+            <dt className="font-medium">Source</dt>
+            <dd>{exportPreview.source_label}</dd>
+            <dt className="font-medium">Attempts</dt>
+            <dd data-testid="export-preview-attempt-count">
+              {exportPreview.attempt_count}
+            </dd>
+            <dt className="font-medium">Latest captured</dt>
+            <dd>{exportPreview.latest_captured_at ?? "—"}</dd>
+            <dt className="font-medium">Earliest captured</dt>
+            <dd>{exportPreview.earliest_captured_at ?? "—"}</dd>
+            <dt className="font-medium">Metrics</dt>
+            <dd data-testid="export-preview-metrics">
+              {exportPreview.metric_labels.join(", ") || "—"}
+            </dd>
+          </dl>
+          <p
+            data-testid="export-preview-redaction-notice"
+            className="rounded-md border border-border bg-muted/40 p-2 text-[11px] text-muted-foreground"
+          >
+            {exportPreview.redaction_notice}
+          </p>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setExportOpen(false)}
+              data-testid="export-cancel-button"
+            >
+              Cancel
+            </Button>
+            {EXPORT_CSV_AVAILABLE ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleConfirmExportCsv}
+                data-testid="export-download-csv-button"
+              >
+                Download CSV
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleConfirmExportJson}
+              data-testid="export-download-json-button"
+            >
+              Download JSON
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={copyOpen} onOpenChange={setCopyOpen}>
+        <DialogContent data-testid="copy-preview-dialog">
+          <DialogHeader>
+            <DialogTitle>Copy latest evidence</DialogTitle>
+            <DialogDescription data-testid="copy-preview-label">
+              {evidencePreview?.label ?? ""}
+            </DialogDescription>
+          </DialogHeader>
+          {evidencePreview ? (
+            <dl
+              data-testid="copy-preview-summary"
+              className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs text-muted-foreground"
+            >
+              <dt className="font-medium">Tent</dt>
+              <dd>{evidencePreview.tent}</dd>
+              <dt className="font-medium">Source</dt>
+              <dd>{evidencePreview.source}</dd>
+              <dt className="font-medium">Captured at</dt>
+              <dd>{evidencePreview.captured_at ?? "—"}</dd>
+              <dt className="font-medium">Metrics</dt>
+              <dd data-testid="copy-preview-metrics">
+                {evidencePreview.metric_summary
+                  .map((m) => `${m.label}:${m.status}`)
+                  .join(", ") || "—"}
+              </dd>
+            </dl>
+          ) : null}
+          <p
+            data-testid="copy-preview-redaction-notice"
+            className="rounded-md border border-border bg-muted/40 p-2 text-[11px] text-muted-foreground"
+          >
+            {evidencePreview?.redaction_notice ?? ""}
+          </p>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setCopyOpen(false)}
+              data-testid="copy-cancel-button"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleConfirmCopyEvidence}
+              data-testid="copy-confirm-button"
+            >
+              Copy redacted evidence
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
+
+// Keep imports referenced.
+void DIARY_ENVIRONMENT_CHECK_TITLE;
 
 export default EcowittIngestValidationPanel;

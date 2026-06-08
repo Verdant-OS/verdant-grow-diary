@@ -387,12 +387,12 @@ export function EcowittIngestValidationPanel({
               type="button"
               size="sm"
               variant="outline"
-              onClick={handleExport}
+              onClick={() => setExportOpen(true)}
               data-testid="export-validation-button"
-              aria-label="Export last 10 validation attempts as JSON"
+              aria-label="Export last 10 validation attempts"
               className="h-7 text-xs"
             >
-              {exported ? "Exported" : "Export validation"}
+              Export validation
             </Button>
           ) : null}
           {vm.hasEvidence ? (
@@ -400,15 +400,50 @@ export function EcowittIngestValidationPanel({
               type="button"
               size="sm"
               variant="outline"
-              onClick={handleCopyEvidence}
+              onClick={() => setCopyOpen(true)}
               data-testid="copy-latest-evidence-button"
               aria-label="Copy latest evidence as redacted JSON"
               className="h-7 text-xs"
             >
-              {evidenceCopied ? "Copied" : "Copy latest evidence"}
+              Copy latest evidence
             </Button>
           ) : null}
         </div>
+
+        {loggedInfo ? (
+          <div
+            data-testid="environment-check-logged-block"
+            data-already-logged={vm.alreadyLogged ? "true" : "false"}
+            className="rounded-md border border-border bg-muted/30 p-2 text-xs"
+          >
+            <p className="font-medium" data-testid="logged-event-title">
+              {loggedInfo.title}
+            </p>
+            <p
+              className="text-muted-foreground"
+              data-testid="logged-event-captured-at"
+            >
+              Captured at: {loggedInfo.capturedAt}
+            </p>
+            <p
+              className="text-muted-foreground"
+              data-testid="logged-event-status"
+            >
+              {vm.alreadyLogged
+                ? "Already logged to diary"
+                : "Logged to diary"}
+            </p>
+            <a
+              href={loggedInfo.href}
+              data-testid="view-environment-check-link"
+              className="mt-1 inline-block text-primary underline"
+            >
+              View Environment Check
+            </a>
+          </div>
+        ) : null}
+
+
 
 
         {vm.hasEvidence ? (

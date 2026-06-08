@@ -61,10 +61,27 @@ const SCAN_PATHS = [
   ...walk(resolve(ROOT, "supabase/functions")),
 ].filter((p) => !p.includes("/test/") && !p.endsWith(".test.ts") && !p.endsWith(".test.tsx"));
 
-function readAll(): string {
-  return SCAN_PATHS.map((p) => readFileSync(p, "utf8")).join("\n\n//FILE\n\n");
+function readAll(): { text: string; boundaries: Array<{ start: number; end: number; path: string }> } {
+  const boundaries: Array<{ start: number; end: number; path: string }> = [];
+  let text = "";
+  const sep = "\n\n//FILE\n\n";
+  for (const p of SCAN_PATHS) {
+    const content = readFileSync(p, "utf8");
+    const start = text.length;
+    text += content;
+    boundaries.push({ start, end: text.length, path: p });
+    text += sep;
+  }
+  return { text, boundaries };
 }
-const ALL_PROD_CODE = readAll();
+const { text: ALL_PROD_CODE, boundaries: FILE_BOUNDARIES } = readAll();
+
+function fileAtIndex(idx: number): string {
+  for (const b of FILE_BOUNDARIES) {
+    if (idx >= b.start && idx < b.end) return b.path;
+  }
+  return "";
+}
 
 // Find the migration that introduces the action_queue TABLE (for table-shape checks).
 function findActionQueueMigration(): string | null {

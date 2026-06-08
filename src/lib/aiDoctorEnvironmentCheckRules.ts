@@ -138,7 +138,8 @@ function parseValue(raw: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function parseStatusLine(noteBody: string): EnvCheckOverallStatus {
+function parseStatusLine(noteBody: string | null | undefined): EnvCheckOverallStatus {
+  if (typeof noteBody !== "string") return "unknown";
   const m = noteBody.match(/Validation status:\s*(\w+)/i);
   if (!m) return "unknown";
   const s = m[1].toLowerCase();

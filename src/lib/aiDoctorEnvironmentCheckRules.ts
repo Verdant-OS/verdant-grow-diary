@@ -237,6 +237,7 @@ export function buildAiDoctorEnvironmentCheckContext(
 ): AiDoctorEnvironmentCheckResult {
   if (!event || !isEcowittEnvironmentCheckNote(event.noteBody)) {
     return {
+      kind: "absent",
       present: false,
       reason: "no_event",
       cautionCopy:
@@ -245,6 +246,7 @@ export function buildAiDoctorEnvironmentCheckContext(
   }
   if (!event.occurredAt) {
     return {
+      kind: "absent",
       present: false,
       reason: "missing_captured_at",
       cautionCopy:
@@ -255,6 +257,7 @@ export function buildAiDoctorEnvironmentCheckContext(
   const parsed = parseEnvironmentCheckNote(event.noteBody as string);
   if (parsed.metrics.length === 0) {
     return {
+      kind: "absent",
       present: false,
       reason: "unparseable",
       cautionCopy:
@@ -276,6 +279,7 @@ export function buildAiDoctorEnvironmentCheckContext(
   if (accepted === 0) warnings.push("No accepted metrics in this Environment Check.");
 
   return {
+    kind: "present",
     present: true,
     capturedAt: event.occurredAt,
     sourceLabel: AI_DOCTOR_ENV_CHECK_SOURCE_LABEL,

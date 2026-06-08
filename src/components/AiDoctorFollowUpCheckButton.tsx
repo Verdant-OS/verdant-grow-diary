@@ -10,7 +10,7 @@
  *      1. `onCreate` callback provided  → calls it (caller wires safe write).
  *      2. No `onCreate`                  → draft-only: Copy to clipboard +
  *         local "Mark created" toggle (no DB / no Action Queue).
- *  - Never calls fetch / supabase / functions.invoke / device control.
+ *  - Never calls fetch / supabase / edge-function invokes / device control.
  *  - Duplicate detection via deterministic idempotency key against
  *    `existingFollowUpKeys` supplied by the caller.
  */

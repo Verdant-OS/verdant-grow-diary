@@ -27,13 +27,25 @@ import {
 import {
   buildAiDoctorReportPdfBytes,
   downloadAiDoctorReportPdf,
+  buildPerMetricStatusTable,
   type AiDoctorReportInput,
+  type PerMetricReportRow,
 } from "@/lib/aiDoctorReportRules";
 import {
   buildAiDoctorEvidenceCsv,
   downloadAiDoctorEvidenceCsv,
 } from "@/lib/aiDoctorEvidenceCsvExportRules";
 import { navigateToEvidenceTarget } from "@/lib/aiDoctorEvidenceNavigationRules";
+import {
+  downloadAiDoctorReportPackage,
+  buildPackageFilenames,
+} from "@/lib/aiDoctorReportPackageRules";
+import {
+  filterEvidenceSearchItems,
+  EVIDENCE_SEARCH_EMPTY_COPY,
+  EVIDENCE_SEARCH_INPUT_LABEL,
+  type EvidenceSearchItem,
+} from "@/lib/aiDoctorEvidenceSearchRules";
 
 export const AI_DOCTOR_DIAGNOSIS_EMPTY_COPY =
   "No AI Doctor 2.0 diagnosis available yet.";
@@ -156,6 +168,82 @@ export default function AiDoctorDiagnosisPanel({
     });
     downloadAiDoctorEvidenceCsv(csv);
   }, [view, reportInput, buildRecsForReport]);
+
+  const buildFullReportInput = useCallback((): AiDoctorReportInput | null => {
+    if (!view || !reportInput) return null;
+    return {
+      ...reportInput,
+      summary: reportInput.summary || view.summary,
+      recommendations: buildRecsForReport(),
+    };
+  }, [view, reportInput, buildRecsForReport]);
+
+  const [packageMessage, setPackageMessage] = useState<string | null>(null);
+  const handleDownloadPackage = useCallback(async () => {
+    const full = buildFullReportInput();
+    if (!full) return;
+    let zipCtor: any = null;
+    try {
+      const mod = await import("jszip");
+      zipCtor = (mod as any).default ?? (mod as any).JSZip ?? null;
+    } catch {
+      zipCtor = null;
+    }
+    const r = await downloadAiDoctorReportPackage(full, { zipCtor });
+    setPackageMessage(r.message);
+  }, [buildFullReportInput]);
+
+  const [previewOpen, setPreviewOpen] = useState<boolean>(false);
+  const previewInput = useMemo(
+    () => (previewOpen ? buildFullReportInput() : null),
+    [previewOpen, buildFullReportInput],
+  );
+
+  // Citation modal — search items + active selection
+  const recommendationIndexByCitation = useMemo(() => {
+    const m = new Map<string, number>();
+    (citedRecs ?? []).forEach((r, i) => {
+      m.set(r.citation.targetId + "::" + r.citation.label, i);
+    });
+    return m;
+  }, [citedRecs]);
+
+  const searchItems: EvidenceSearchItem[] = useMemo(() => {
+    if (!citationContext) return [];
+    const items: EvidenceSearchItem[] = [];
+    citationContext.availableMetrics.forEach((m) => {
+      const isDerivedVpd = m.derived && m.key === "vpd_kpa";
+      items.push({
+        id: `envcheck-${m.key}`,
+        label: isDerivedVpd
+          ? "Derived VPD context"
+          : m.statusLabel === "Accepted"
+          ? `Env Check: ${m.key}`
+          : `Env Check (weak): ${m.key}`,
+        metricKey: m.key,
+        status: m.statusLabel,
+        sourceLabel: "Test/Local validation",
+        reason: m.reason ?? null,
+        citationKind: isDerivedVpd
+          ? "env_metric_derived"
+          : m.statusLabel === "Accepted"
+          ? "env_metric"
+          : "env_metric_weak",
+      });
+    });
+    citationContext.missingMetrics.forEach((k) => {
+      items.push({
+        id: `missing-${k}`,
+        label: `Missing: ${k}`,
+        metricKey: k,
+        status: "Missing",
+        sourceLabel: "Not captured",
+        reason: null,
+        citationKind: "missing_metric",
+      });
+    });
+    return items;
+  }, [citationContext]);
 
   if (!view) {
     return (
@@ -363,7 +451,19 @@ export default function AiDoctorDiagnosisPanel({
       ) : null}
 
       {reportInput ? (
-        <div className="flex flex-wrap justify-end gap-2">
+        <div
+          className="flex flex-wrap justify-end gap-2"
+          data-testid={tid("ai-doctor-diagnosis-export-bar")}
+        >
+          <button
+            type="button"
+            onClick={() => setPreviewOpen(true)}
+            data-testid={tid("ai-doctor-diagnosis-preview-report")}
+            className="inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+            aria-label="Preview AI Doctor Report"
+          >
+            Preview report
+          </button>
           <button
             type="button"
             onClick={handleDownloadReport}
@@ -382,6 +482,25 @@ export default function AiDoctorDiagnosisPanel({
           >
             Download Evidence CSV
           </button>
+          <button
+            type="button"
+            onClick={handleDownloadPackage}
+            data-testid={tid("ai-doctor-diagnosis-download-package")}
+            className="inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+            aria-label="Download AI Doctor PDF and Evidence CSV package"
+          >
+            Download package
+          </button>
+          {packageMessage ? (
+            <span
+              className="text-[11px] text-muted-foreground"
+              role="status"
+              aria-live="polite"
+              data-testid={tid("ai-doctor-diagnosis-package-message")}
+            >
+              {packageMessage}
+            </span>
+          ) : null}
         </div>
       ) : null}
 
@@ -454,7 +573,24 @@ export default function AiDoctorDiagnosisPanel({
           ctx={citationContext}
           onClose={handleCloseCitation}
           onJump={handleJumpToEvidence}
+          postureLabel={evidenceAlignment?.postureLabel ?? "Unknown evidence"}
+          recommendationIndex={
+            recommendationIndexByCitation.get(
+              activeCitation.targetId + "::" + activeCitation.label,
+            ) ?? null
+          }
+          searchItems={searchItems}
           testId={tid("ai-doctor-diagnosis-citation-modal")}
+        />
+      ) : null}
+
+      {previewOpen && previewInput ? (
+        <ReportPreviewPanel
+          input={previewInput}
+          onClose={() => setPreviewOpen(false)}
+          onDownloadPdf={handleDownloadReport}
+          onDownloadCsv={handleDownloadCsv}
+          testId={tid("ai-doctor-diagnosis-preview")}
         />
       ) : null}
     </section>
@@ -466,21 +602,33 @@ function CitationDetailModal({
   ctx,
   onClose,
   onJump,
+  postureLabel,
+  recommendationIndex,
+  searchItems,
   testId,
 }: {
   citation: EvidenceCitation;
   ctx: CitationContext;
   onClose: () => void;
   onJump: () => void;
+  postureLabel: string;
+  recommendationIndex: number | null;
+  searchItems: readonly EvidenceSearchItem[];
   testId: string;
 }) {
+  const [selectedCitation, setSelectedCitation] =
+    useState<EvidenceCitation>(citation);
+  // Reset selection when triggering citation changes (new open).
+  useEffect(() => setSelectedCitation(citation), [citation]);
+
   const detail: CitationDetail = useMemo(
-    () => buildCitationDetail(citation, ctx),
-    [citation, ctx],
+    () => buildCitationDetail(selectedCitation, ctx),
+    [selectedCitation, ctx],
   );
   const closeRef = useRef<HTMLButtonElement | null>(null);
+  const [query, setQuery] = useState<string>(detail.metricKey ?? "");
+
   useEffect(() => {
-    // Initial focus into the dialog.
     try {
       closeRef.current?.focus();
     } catch {
@@ -496,6 +644,32 @@ function CitationDetailModal({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  const filtered = useMemo(
+    () => filterEvidenceSearchItems(searchItems, query),
+    [searchItems, query],
+  );
+
+  const breadcrumb =
+    `AI Doctor › ${postureLabel}` +
+    (recommendationIndex != null
+      ? ` › Recommendation ${recommendationIndex + 1}`
+      : "") +
+    ` › ${detail.citation.label}`;
+
+  function handleSelectSearchItem(item: EvidenceSearchItem) {
+    const targetId =
+      item.citationKind === "missing_metric"
+        ? `evidence-missing-${safeSlug(item.metricKey ?? "")}`
+        : `evidence-envcheck-${safeSlug(item.metricKey ?? "")}`;
+    setSelectedCitation({
+      label: item.label,
+      kind: item.citationKind as EvidenceCitation["kind"],
+      healthy: item.citationKind === "env_metric",
+      targetId,
+      ariaLabel: `Evidence details for ${item.label}`,
+    });
+  }
+
   return (
     <div
       role="dialog"
@@ -506,9 +680,16 @@ function CitationDetailModal({
       onClick={onClose}
     >
       <div
-        className="max-w-md w-full rounded-lg bg-background border border-border p-4 space-y-2 text-xs"
+        className="max-w-lg w-full rounded-lg bg-background border border-border p-4 space-y-2 text-xs"
         onClick={(e) => e.stopPropagation()}
       >
+        <nav
+          aria-label="Evidence breadcrumb"
+          data-testid={`${testId}-breadcrumb`}
+          className="text-[11px] text-muted-foreground"
+        >
+          {breadcrumb}
+        </nav>
         <div className="flex items-start justify-between gap-2">
           <h3
             className="text-sm font-semibold"
@@ -516,17 +697,90 @@ function CitationDetailModal({
           >
             {detail.citation.label}
           </h3>
-          <button
-            ref={closeRef}
-            type="button"
-            onClick={onClose}
-            aria-label="Close evidence details"
-            data-testid={`${testId}-close`}
-            className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          >
-            Close
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={onClose}
+              data-testid={`${testId}-back`}
+              aria-label="Back to recommendation"
+              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              Back to recommendation
+            </button>
+            <button
+              ref={closeRef}
+              type="button"
+              onClick={onClose}
+              aria-label="Close evidence details"
+              data-testid={`${testId}-close`}
+              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              Close
+            </button>
+          </div>
         </div>
+
+        <label
+          htmlFor={`${testId}-search`}
+          className="block text-[11px] font-medium"
+        >
+          {EVIDENCE_SEARCH_INPUT_LABEL}
+        </label>
+        <input
+          id={`${testId}-search`}
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Filter by metric, status, source…"
+          aria-label={EVIDENCE_SEARCH_INPUT_LABEL}
+          data-testid={`${testId}-search`}
+          className="w-full rounded-md border border-border/60 bg-background/40 px-2 py-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        />
+        <ul
+          data-testid={`${testId}-search-results`}
+          className="max-h-32 overflow-auto border border-border/40 rounded-md divide-y divide-border/40"
+        >
+          {filtered.length === 0 ? (
+            <li
+              className="px-2 py-1 text-[11px] text-muted-foreground"
+              data-testid={`${testId}-search-empty`}
+            >
+              {EVIDENCE_SEARCH_EMPTY_COPY}
+            </li>
+          ) : (
+            filtered.map((it) => (
+              <li key={it.id}>
+                <button
+                  type="button"
+                  onClick={() => handleSelectSearchItem(it)}
+                  data-testid={`${testId}-search-item-${it.id}`}
+                  className="block w-full text-left px-2 py-1 text-[11px] hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <span className="font-medium">{it.label}</span>
+                  {it.metricKey ? (
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · {it.metricKey}
+                    </span>
+                  ) : null}
+                  {it.status ? (
+                    <span className="text-muted-foreground"> · {it.status}</span>
+                  ) : null}
+                  {it.sourceLabel ? (
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · {it.sourceLabel}
+                    </span>
+                  ) : null}
+                  {it.reason ? (
+                    <span className="text-muted-foreground"> — {it.reason}</span>
+                  ) : null}
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+
         <dl
           className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1"
           data-testid={`${testId}-details`}
@@ -583,6 +837,232 @@ function CitationDetailModal({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function safeSlug(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+}
+
+function ReportPreviewPanel({
+  input,
+  onClose,
+  onDownloadPdf,
+  onDownloadCsv,
+  testId,
+}: {
+  input: AiDoctorReportInput;
+  onClose: () => void;
+  onDownloadPdf: () => void;
+  onDownloadCsv: () => void;
+  testId: string;
+}) {
+  const metricRows: PerMetricReportRow[] = useMemo(
+    () => buildPerMetricStatusTable(input),
+    [input],
+  );
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  function handlePrint() {
+    if (typeof window === "undefined") return;
+    try {
+      window.print();
+    } catch {
+      /* ignore — print is best-effort, client-side only */
+    }
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="AI Doctor report preview"
+      data-testid={testId}
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 overflow-auto"
+      onClick={onClose}
+    >
+      <article
+        onClick={(e) => e.stopPropagation()}
+        className="max-w-2xl w-full bg-background text-foreground border border-border rounded-lg p-6 space-y-4 print:max-w-none print:border-0 print:p-0"
+        data-testid={`${testId}-body`}
+      >
+        <header className="flex items-start justify-between gap-2 print:hidden">
+          <h2 className="text-base font-semibold">AI Doctor — Report preview</h2>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handlePrint}
+              data-testid={`${testId}-print`}
+              aria-label="Print AI Doctor Report"
+              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              Print
+            </button>
+            <button
+              type="button"
+              onClick={onDownloadPdf}
+              data-testid={`${testId}-pdf`}
+              aria-label="Download PDF"
+              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              Download PDF
+            </button>
+            <button
+              type="button"
+              onClick={onDownloadCsv}
+              data-testid={`${testId}-csv`}
+              aria-label="Download Evidence CSV"
+              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              Download Evidence CSV
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              data-testid={`${testId}-close`}
+              aria-label="Close preview"
+              className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              Close
+            </button>
+          </div>
+        </header>
+
+        <section>
+          <h3 className="text-sm font-semibold">Diagnosis summary</h3>
+          <p
+            className="text-sm"
+            data-testid={`${testId}-summary`}
+          >
+            {input.summary || "(no summary)"}
+          </p>
+        </section>
+
+        {input.alignment ? (
+          <section>
+            <h3 className="text-sm font-semibold">
+              Recommendation posture: {input.alignment.postureLabel}
+            </h3>
+            <p className="text-xs">{input.alignment.postureCopy}</p>
+            <h4 className="text-xs font-semibold mt-2">Evidence basis</h4>
+            <ul
+              className="list-disc pl-4 text-xs"
+              data-testid={`${testId}-basis`}
+            >
+              {input.alignment.basisCopy.length === 0 ? (
+                <li>(no basis lines)</li>
+              ) : (
+                input.alignment.basisCopy.map((b, i) => (
+                  <li key={`${i}-${b}`}>{b}</li>
+                ))
+              )}
+            </ul>
+          </section>
+        ) : null}
+
+        <section>
+          <h3 className="text-sm font-semibold">Recommendations</h3>
+          <ol
+            className="list-decimal pl-4 text-xs space-y-1"
+            data-testid={`${testId}-recommendations`}
+          >
+            {input.recommendations.length === 0 ? (
+              <li>(none)</li>
+            ) : (
+              input.recommendations.map((r, i) => (
+                <li key={i}>
+                  <span>{r.text}</span>{" "}
+                  <span className="text-muted-foreground">
+                    [{r.citation.label}]
+                  </span>
+                </li>
+              ))
+            )}
+          </ol>
+        </section>
+
+        <section>
+          <h3 className="text-sm font-semibold">Per-metric status</h3>
+          <table
+            className="w-full text-[11px] border border-border/60"
+            data-testid={`${testId}-metric-table`}
+          >
+            <thead>
+              <tr className="bg-muted/30">
+                <th className="text-left px-2 py-1">Metric</th>
+                <th className="text-left px-2 py-1">Status</th>
+                <th className="text-left px-2 py-1">Citation type</th>
+                <th className="text-left px-2 py-1">Value</th>
+                <th className="text-left px-2 py-1">Source label</th>
+                <th className="text-left px-2 py-1">Note</th>
+              </tr>
+            </thead>
+            <tbody>
+              {metricRows.map((r) => (
+                <tr
+                  key={r.metric}
+                  data-testid={`${testId}-metric-row-${r.metric}`}
+                >
+                  <td className="px-2 py-1">{r.metric}</td>
+                  <td className="px-2 py-1">{r.status}</td>
+                  <td className="px-2 py-1">{r.citationType}</td>
+                  <td className="px-2 py-1">{r.value}</td>
+                  <td className="px-2 py-1">{r.source}</td>
+                  <td className="px-2 py-1">{r.note}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+
+        {input.checklist.length > 0 ? (
+          <section>
+            <h3 className="text-sm font-semibold">More Data Needed</h3>
+            <ul
+              className="text-xs space-y-0.5"
+              data-testid={`${testId}-checklist`}
+            >
+              {input.checklist.map((c) => (
+                <li key={c.key}>
+                  {c.state === "complete" ? "[x] " : "[ ] "}
+                  {c.label}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        <footer
+          className="text-[11px] text-muted-foreground border-t border-border/60 pt-2 space-y-0.5"
+          data-testid={`${testId}-honesty`}
+        >
+          <p>
+            Source honesty: Local Environment Check evidence is not live
+            telemetry.
+          </p>
+          <p>Derived VPD is context only — not a raw sensor reading.</p>
+          <p>
+            Weak evidence should not drive aggressive nutrient, irrigation, or
+            equipment changes.
+          </p>
+          <p>Generated: {input.generatedAt}</p>
+        </footer>
+      </article>
     </div>
   );
 }

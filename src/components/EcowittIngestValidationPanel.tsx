@@ -613,8 +613,134 @@ export function EcowittIngestValidationPanel({
           </ul>
         </div>
       </CardContent>
+
+      <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+        <DialogContent data-testid="export-preview-dialog">
+          <DialogHeader>
+            <DialogTitle>Export validation evidence</DialogTitle>
+            <DialogDescription data-testid="export-preview-label">
+              {exportPreview.label}
+            </DialogDescription>
+          </DialogHeader>
+          <dl
+            data-testid="export-preview-summary"
+            className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs text-muted-foreground"
+          >
+            <dt className="font-medium">Tent</dt>
+            <dd>{exportPreview.tent}</dd>
+            <dt className="font-medium">Source</dt>
+            <dd>{exportPreview.source_label}</dd>
+            <dt className="font-medium">Attempts</dt>
+            <dd data-testid="export-preview-attempt-count">
+              {exportPreview.attempt_count}
+            </dd>
+            <dt className="font-medium">Latest captured</dt>
+            <dd>{exportPreview.latest_captured_at ?? "—"}</dd>
+            <dt className="font-medium">Earliest captured</dt>
+            <dd>{exportPreview.earliest_captured_at ?? "—"}</dd>
+            <dt className="font-medium">Metrics</dt>
+            <dd data-testid="export-preview-metrics">
+              {exportPreview.metric_labels.join(", ") || "—"}
+            </dd>
+          </dl>
+          <p
+            data-testid="export-preview-redaction-notice"
+            className="rounded-md border border-border bg-muted/40 p-2 text-[11px] text-muted-foreground"
+          >
+            {exportPreview.redaction_notice}
+          </p>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setExportOpen(false)}
+              data-testid="export-cancel-button"
+            >
+              Cancel
+            </Button>
+            {EXPORT_CSV_AVAILABLE ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleConfirmExportCsv}
+                data-testid="export-download-csv-button"
+              >
+                Download CSV
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleConfirmExportJson}
+              data-testid="export-download-json-button"
+            >
+              Download JSON
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={copyOpen} onOpenChange={setCopyOpen}>
+        <DialogContent data-testid="copy-preview-dialog">
+          <DialogHeader>
+            <DialogTitle>Copy latest evidence</DialogTitle>
+            <DialogDescription data-testid="copy-preview-label">
+              {evidencePreview?.label ?? ""}
+            </DialogDescription>
+          </DialogHeader>
+          {evidencePreview ? (
+            <dl
+              data-testid="copy-preview-summary"
+              className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs text-muted-foreground"
+            >
+              <dt className="font-medium">Tent</dt>
+              <dd>{evidencePreview.tent}</dd>
+              <dt className="font-medium">Source</dt>
+              <dd>{evidencePreview.source}</dd>
+              <dt className="font-medium">Captured at</dt>
+              <dd>{evidencePreview.captured_at ?? "—"}</dd>
+              <dt className="font-medium">Metrics</dt>
+              <dd data-testid="copy-preview-metrics">
+                {evidencePreview.metric_summary
+                  .map((m) => `${m.label}:${m.status}`)
+                  .join(", ") || "—"}
+              </dd>
+            </dl>
+          ) : null}
+          <p
+            data-testid="copy-preview-redaction-notice"
+            className="rounded-md border border-border bg-muted/40 p-2 text-[11px] text-muted-foreground"
+          >
+            {evidencePreview?.redaction_notice ?? ""}
+          </p>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setCopyOpen(false)}
+              data-testid="copy-cancel-button"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleConfirmCopyEvidence}
+              data-testid="copy-confirm-button"
+            >
+              Copy redacted evidence
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
+
+// Keep imports referenced.
+void DIARY_ENVIRONMENT_CHECK_TITLE;
 
 export default EcowittIngestValidationPanel;

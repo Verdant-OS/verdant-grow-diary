@@ -298,9 +298,11 @@ export function AiDoctorEvidencePanel({ vm }: Props) {
         </div>
         {missingGroup ? (
           <section
+            id="evidence-missing-general"
             aria-label="Missing context"
             data-testid="evidence-missing-section"
-            className="space-y-1 border-t pt-2"
+            tabIndex={-1}
+            className="space-y-1 border-t pt-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <h4 className="text-sm font-semibold">{missingGroup.title}</h4>
             {vm.missing.length === 0 ? (
@@ -312,8 +314,10 @@ export function AiDoctorEvidencePanel({ vm }: Props) {
                 {vm.missing.map((m) => (
                   <li
                     key={m.code}
+                    id={`evidence-missing-${safeSlug(m.code)}`}
+                    tabIndex={-1}
                     data-testid={`evidence-missing-${m.code}`}
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
                     <Badge variant="outline" aria-label="Missing">
                       Missing

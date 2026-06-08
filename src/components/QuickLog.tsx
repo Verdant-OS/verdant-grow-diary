@@ -215,6 +215,17 @@ export default function QuickLog({
     }
   }, [open, stripView.status, selectedPlant?.tent_id, snapshot]);
 
+  // When snapshot is not usable (stale/invalid/no_data) the attach toggle
+  // must be OFF and disabled — saving stale/manual readings as attached
+  // context would imply they are current evidence. The save payload
+  // already drops non-usable snapshots; this aligns the toggle truth.
+  useEffect(() => {
+    if (!open) return;
+    if (stripView.status !== "usable" && snapshot) {
+      setSnapshot(false);
+    }
+  }, [open, stripView.status, snapshot]);
+
   // Reset the session "user touched" flag when the active tent changes,
   // so the auto-default ON effect can re-evaluate for the new tent.
   useEffect(() => {
@@ -222,6 +233,21 @@ export default function QuickLog({
     snapshotUserTouchedRef.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, selectedPlant?.tent_id]);
+
+  // Auto-expand the details section when event becomes "watering" so the
+  // required Watering (ml) field is visible without hunting for it.
+  useEffect(() => {
+    if (!open) return;
+    if (eventType === "watering") setShowMore(true);
+  }, [open, eventType]);
+
+  // Clear the inline watering error when the value changes or event flips.
+  useEffect(() => {
+    if (eventType !== "watering" || details.watering.trim()) {
+      setWateringError(null);
+    }
+  }, [eventType, details.watering]);
+
 
 
   // On open/reset, recompute the Hardware readings default from current

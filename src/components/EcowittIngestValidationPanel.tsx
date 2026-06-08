@@ -136,6 +136,7 @@ export function EcowittIngestValidationPanel({
   isRefreshing,
   onLogEnvironmentCheck,
   isLogging,
+  growId,
 }: Props) {
   const vm = buildEcowittIngestValidationViewModel(input);
   const now = input.now ?? new Date();
@@ -164,33 +165,114 @@ export function EcowittIngestValidationPanel({
     ],
   );
 
+  // Track captured_at of the most recent locally-initiated log click so we
+  // can surface a success block with the View link even before the
+  // grow_events query roundtrips.
+  const [justLoggedCapturedAt, setJustLoggedCapturedAt] = useState<
+    string | null
+  >(null);
+
   const handleLog = useCallback(() => {
     if (!onLogEnvironmentCheck) return;
     if (!diaryDraft.eligible) return;
     if (vm.alreadyLogged) return;
+    setJustLoggedCapturedAt(vm.latestCapturedAt);
     onLogEnvironmentCheck(diaryDraft);
-  }, [onLogEnvironmentCheck, diaryDraft, vm.alreadyLogged]);
+  }, [onLogEnvironmentCheck, diaryDraft, vm.alreadyLogged, vm.latestCapturedAt]);
 
-  const [evidenceCopied, setEvidenceCopied] = useState(false);
-  const [exported, setExported] = useState(false);
+  const loggedInfo = useMemo(
+    () =>
+      vm.alreadyLogged
+        ? buildAlreadyLoggedEventInfo(vm.latestCapturedAt, growId ?? null)
+        : justLoggedCapturedAt
+          ? buildAlreadyLoggedEventInfo(justLoggedCapturedAt, growId ?? null)
+          : null,
+    [vm.alreadyLogged, vm.latestCapturedAt, justLoggedCapturedAt, growId],
+  );
 
-  const handleCopyEvidence = useCallback(async () => {
-    const snap = buildLatestEvidenceSnapshot({
-      hasEvidence: vm.hasEvidence,
-      status: vm.status,
-      statusMessage: vm.statusMessage,
-      sourceLabel: vm.sourceLabel,
-      tentScopedLabel: vm.tentScopedLabel,
-      capturedAtLabel: vm.capturedAtLabel,
-      isTestSender: vm.isTestSender,
-      invalidTest: vm.invalidTest,
-      stale: vm.stale,
-      metricRows: vm.metricRows,
-      rawPayload: vm.latestRawPayload,
-      derivedReadingWarnings: vm.derivedReadingWarnings,
-    });
-    if (!snap) return;
-    const text = serializeEvidenceForClipboard(snap);
+  // Modal state.
+  const [exportOpen, setExportOpen] = useState(false);
+  const [copyOpen, setCopyOpen] = useState(false);
+
+  const evidenceSnapshot = useMemo(
+    () =>
+      buildLatestEvidenceSnapshot({
+        hasEvidence: vm.hasEvidence,
+        status: vm.status,
+        statusMessage: vm.statusMessage,
+        sourceLabel: vm.sourceLabel,
+        tentScopedLabel: vm.tentScopedLabel,
+        capturedAtLabel: vm.capturedAtLabel,
+        isTestSender: vm.isTestSender,
+        invalidTest: vm.invalidTest,
+        stale: vm.stale,
+        metricRows: vm.metricRows,
+        rawPayload: vm.latestRawPayload,
+        derivedReadingWarnings: vm.derivedReadingWarnings,
+      }),
+    [vm],
+  );
+
+  const exportPayload = useMemo(
+    () =>
+      buildEcowittValidationExport({
+        tentScopedLabel: vm.tentScopedLabel,
+        sourceLabel: vm.sourceLabel,
+        now,
+        thresholds: vm.thresholds,
+        attempts: vm.exportAttempts,
+      }),
+    [vm.tentScopedLabel, vm.sourceLabel, vm.thresholds, vm.exportAttempts, now],
+  );
+
+  const exportPreview = useMemo(
+    () => buildExportPreview(exportPayload),
+    [exportPayload],
+  );
+
+  const evidencePreview = useMemo(
+    () => (evidenceSnapshot ? buildEvidencePreview(evidenceSnapshot) : null),
+    [evidenceSnapshot],
+  );
+
+  const triggerDownload = useCallback(
+    (text: string, ext: "json" | "csv") => {
+      try {
+        const mime = ext === "json" ? "application/json" : "text/csv";
+        const blob = new Blob([text], { type: mime });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `ecowitt-validation-${now.toISOString()}.${ext}`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch {
+        /* download unsupported in this environment */
+      }
+    },
+    [now],
+  );
+
+  const handleConfirmExportJson = useCallback(() => {
+    triggerDownload(serializeExport(exportPayload), "json");
+    setExportOpen(false);
+    toast.success("Validation JSON downloaded");
+  }, [exportPayload, triggerDownload]);
+
+  const handleConfirmExportCsv = useCallback(() => {
+    triggerDownload(serializeExportCsv(exportPayload), "csv");
+    setExportOpen(false);
+    toast.success("Validation CSV downloaded");
+  }, [exportPayload, triggerDownload]);
+
+  const handleConfirmCopyEvidence = useCallback(async () => {
+    if (!evidenceSnapshot) {
+      setCopyOpen(false);
+      return;
+    }
+    const text = serializeEvidenceForClipboard(evidenceSnapshot);
     try {
       const clipboard =
         typeof navigator !== "undefined" ? navigator.clipboard : undefined;
@@ -198,35 +280,10 @@ export function EcowittIngestValidationPanel({
     } catch {
       /* clipboard unavailable */
     }
-    setEvidenceCopied(true);
-    setTimeout(() => setEvidenceCopied(false), 2000);
-  }, [vm]);
+    setCopyOpen(false);
+    toast.success("Redacted evidence copied");
+  }, [evidenceSnapshot]);
 
-  const handleExport = useCallback(() => {
-    const payload = buildEcowittValidationExport({
-      tentScopedLabel: vm.tentScopedLabel,
-      sourceLabel: vm.sourceLabel,
-      now,
-      thresholds: vm.thresholds,
-      attempts: vm.exportAttempts,
-    });
-    const text = serializeExport(payload);
-    try {
-      const blob = new Blob([text], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `ecowitt-validation-${now.toISOString()}.json`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch {
-      /* download unsupported; still flash feedback */
-    }
-    setExported(true);
-    setTimeout(() => setExported(false), 2000);
-  }, [vm.tentScopedLabel, vm.sourceLabel, vm.thresholds, vm.exportAttempts, now]);
 
   return (
     <Card data-testid="ecowitt-ingest-validation-panel">

@@ -18,6 +18,17 @@ export const AI_DOCTOR_ENV_CHECK_SOURCE_LABEL =
 
 export type EnvCheckMetricStatus = "accepted" | "rejected" | "not_checked";
 
+/** Metrics the AI Doctor "more data needed" checklist enforces. */
+export const REQUIRED_ENVIRONMENT_METRICS = [
+  "temp_f",
+  "humidity_pct",
+  "vpd_kpa",
+  "co2_ppm",
+  "soil_moisture_pct",
+] as const;
+export type RequiredEnvironmentMetric =
+  (typeof REQUIRED_ENVIRONMENT_METRICS)[number];
+
 export interface EnvCheckMetric {
   key: string;
   label: string;
@@ -25,6 +36,8 @@ export interface EnvCheckMetric {
   value: number | null;
   reason: string;
   derived: boolean;
+  /** False when the metric label is not in the known/required vocabulary. */
+  supported: boolean;
 }
 
 export type EnvCheckOverallStatus = "accepted" | "rejected" | "unknown";

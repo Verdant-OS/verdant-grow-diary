@@ -12,8 +12,9 @@
 
 import {
   buildAiDoctorEnvironmentCheckContext,
-  selectLatestEnvironmentCheckEvent,
+  selectBestEnvironmentCheckEvent,
   type AiDoctorEnvironmentCheckResult,
+  type BestEnvironmentCheckSelection,
   type EnvironmentCheckEventInput,
 } from "./aiDoctorEnvironmentCheckRules";
 import type { AiDoctorSensorContext } from "./aiDoctorSensorContextRules";
@@ -30,6 +31,8 @@ export interface CompiledAiDoctorContext {
   sensor: AiDoctorSensorContext | null;
   /** Local/test Environment Check evidence, kept SEPARATE from live. */
   environmentCheck: AiDoctorEnvironmentCheckResult;
+  /** Selection metadata for the chosen Environment Check, if any. */
+  environmentCheckSelection: BestEnvironmentCheckSelection;
   /** Combined safety notes (sensor + environment-check). Deterministic. */
   combinedSafetyNotes: string[];
   /** True only when caller has at least one usable evidence source. */
@@ -40,25 +43,32 @@ export function compileAiDoctorContext(
   input: CompileAiDoctorContextInput,
 ): CompiledAiDoctorContext {
   const sensor = input.sensorContext ?? null;
-  const latestEvent = selectLatestEnvironmentCheckEvent(
+  const selection = selectBestEnvironmentCheckEvent(
     input.environmentCheckEvents ?? [],
   );
-  const environmentCheck = buildAiDoctorEnvironmentCheckContext(latestEvent);
+  const environmentCheck = buildAiDoctorEnvironmentCheckContext(selection.selected);
 
   const combined: string[] = [];
   const push = (n: string) => {
     if (!combined.includes(n)) combined.push(n);
   };
   if (sensor) for (const n of sensor.safetyNotes) push(n);
-  if (environmentCheck.present) for (const n of environmentCheck.safetyNotes) push(n);
+  if (environmentCheck.kind === "present")
+    for (const n of environmentCheck.safetyNotes) push(n);
+  if (selection.isFallback && environmentCheck.kind === "present") {
+    push(
+      "Selected Environment Check is a weak fallback — no accepted required metric. Treat as untrusted.",
+    );
+  }
 
   const hasAnyEvidence =
     (sensor !== null && sensor.usableMetrics.length > 0) ||
-    environmentCheck.present;
+    environmentCheck.kind === "present";
 
   return {
     sensor,
     environmentCheck,
+    environmentCheckSelection: selection,
     combinedSafetyNotes: combined,
     hasAnyEvidence,
   };

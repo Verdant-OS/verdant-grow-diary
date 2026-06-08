@@ -153,6 +153,132 @@ export function AiDoctorEvidencePanel({ vm }: Props) {
             {vm.conservativeRecommendationCopy}
           </p>
         ) : null}
+
+        {/* Latest EcoWitt Environment Check (always shown — even when missing) */}
+        <section
+          aria-label="Latest EcoWitt Environment Check"
+          data-testid="latest-environment-check-section"
+          className="rounded border p-2 space-y-1"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-sm font-semibold">
+              {vm.latestEnvironmentCheck.title}
+            </h3>
+            <Badge aria-label={`Source: ${vm.latestEnvironmentCheck.sourceLabel}`}>
+              {vm.latestEnvironmentCheck.sourceLabel}
+            </Badge>
+            <Badge
+              variant="outline"
+              aria-label={`Selected status: ${vm.latestEnvironmentCheck.selectedStatusLabel}`}
+              data-testid="latest-env-check-status"
+            >
+              {vm.latestEnvironmentCheck.selectedStatusLabel}
+            </Badge>
+            {vm.latestEnvironmentCheck.isFallback ? (
+              <Badge variant="outline" aria-label="Weak fallback">
+                Weak fallback
+              </Badge>
+            ) : null}
+            {vm.latestEnvironmentCheck.capturedAt ? (
+              <time
+                className="text-xs text-muted-foreground"
+                dateTime={vm.latestEnvironmentCheck.capturedAt}
+              >
+                {vm.latestEnvironmentCheck.capturedAt}
+              </time>
+            ) : null}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {vm.latestEnvironmentCheck.eventTitle}
+          </p>
+          <ul className="space-y-1">
+            {vm.latestEnvironmentCheck.metricRows.map((row) => (
+              <li
+                key={row.key}
+                className="flex flex-wrap items-center gap-2 text-xs"
+                data-testid={`latest-env-check-row-${row.key}`}
+              >
+                <span className="font-medium">{row.label}</span>
+                <Badge variant="outline" aria-label={`Status: ${row.statusLabel}`}>
+                  {row.statusLabel}
+                </Badge>
+                <Badge variant="secondary" aria-label={`Context: ${row.contextLabel}`}>
+                  {row.contextLabel}
+                </Badge>
+                <span className="text-muted-foreground">
+                  value:&nbsp;{row.displayValue ?? "—"}
+                </span>
+                {row.notHealthy ? (
+                  <span className="text-amber-600" role="note">
+                    not healthy
+                  </span>
+                ) : null}
+                {row.reason ? (
+                  <span className="text-muted-foreground">— {row.reason}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+          {vm.latestEnvironmentCheck.cautionCopy ? (
+            <p
+              className="text-xs text-amber-700"
+              data-testid="latest-env-check-caution"
+            >
+              {vm.latestEnvironmentCheck.cautionCopy}
+            </p>
+          ) : null}
+          {vm.latestEnvironmentCheck.timelineHref ? (
+            <a
+              href={vm.latestEnvironmentCheck.timelineHref}
+              className="text-xs underline"
+              aria-label="View Latest EcoWitt Environment Check in timeline"
+            >
+              View in timeline
+            </a>
+          ) : null}
+        </section>
+
+        {/* More data needed checklist */}
+        {vm.moreDataNeeded.show ? (
+          <section
+            aria-label="More data needed"
+            data-testid="more-data-needed-section"
+            className="rounded border p-2 space-y-1"
+          >
+            <h3 className="text-sm font-semibold">
+              {vm.moreDataNeeded.title}
+            </h3>
+            <ul className="space-y-1 text-xs">
+              {vm.moreDataNeeded.items.map((i) => (
+                <li
+                  key={i.key}
+                  data-testid={`more-data-item-${i.key}`}
+                  className="flex flex-wrap items-center gap-2"
+                >
+                  <Badge
+                    variant={i.state === "complete" ? "secondary" : "outline"}
+                    aria-label={`Checklist state: ${i.state}`}
+                  >
+                    {i.state === "complete" ? "Complete" : "Needed"}
+                  </Badge>
+                  <span>{i.label}</span>
+                  {i.reason ? (
+                    <span className="text-muted-foreground">— {i.reason}</span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+            {vm.moreDataNeeded.cautionCopy ? (
+              <p
+                className="text-xs text-amber-700"
+                data-testid="more-data-needed-caution"
+              >
+                {vm.moreDataNeeded.cautionCopy}
+              </p>
+            ) : null}
+          </section>
+        ) : null}
+
         <div className="space-y-2">
           {vm.groups
             .filter((g) => g.key !== "missing")

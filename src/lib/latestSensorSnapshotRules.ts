@@ -516,3 +516,38 @@ export function buildSensorSnapshotDetails(
     warnings: snapshot.warnings,
   };
 }
+
+/**
+ * Spec alias: `resolveLatestSensorSnapshot(row, nowIso)` — single-row entry
+ * point that wraps a (possibly null) row in the long-format pivot. Accepts
+ * either a single row or an array of rows. `nowIso` is optional for tests.
+ */
+export function resolveLatestSensorSnapshot(
+  row: RawSensorRow | readonly RawSensorRow[] | null | undefined,
+  nowIso?: string | null,
+  options: Omit<BuildSnapshotOptions, "now"> = {},
+): SensorSnapshot {
+  const rows: readonly RawSensorRow[] = Array.isArray(row)
+    ? (row as readonly RawSensorRow[])
+    : row
+      ? [row as RawSensorRow]
+      : [];
+  let now: Date | undefined;
+  if (typeof nowIso === "string" && nowIso.length > 0) {
+    const t = Date.parse(nowIso);
+    if (Number.isFinite(t)) now = new Date(t);
+  }
+  return buildSensorSnapshot(rows, { ...options, now });
+}
+
+/**
+ * Spec alias: `buildSensorSnapshotSavePayload(snapshot)` — returns the
+ * exact `details.sensor` shape Quick Log persists. Returns null when the
+ * snapshot is not safe to attach.
+ */
+export function buildSensorSnapshotSavePayload(
+  snapshot: SensorSnapshot | null | undefined,
+) {
+  return buildSensorSnapshotDetails(snapshot, true);
+}
+

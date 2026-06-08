@@ -494,11 +494,18 @@ export default function QuickLog({
                     snapshotUserTouchedRef.current = true;
                     setSnapshot(v);
                   }}
-
                   disabled={!selectedPlant}
                   aria-label="Attach sensor snapshot to this log"
+                  aria-describedby="quick-log-snapshot-session-helper"
                 />
               </label>
+              <p
+                id="quick-log-snapshot-session-helper"
+                data-testid="quick-log-snapshot-session-helper"
+                className="text-[11px] text-muted-foreground -mt-2"
+              >
+                Applies to this log only. Closing Quick Log resets this choice.
+              </p>
               {snapshot && !selectedPlant && (
                 <p
                   className="text-[11px] text-muted-foreground -mt-2"
@@ -509,6 +516,7 @@ export default function QuickLog({
               )}
             </>
           )}
+
 
           <label className="flex items-center justify-between gap-2 rounded-lg border border-border/60 p-3">
             <span className="text-sm">Add more details</span>

@@ -89,9 +89,10 @@ export default function QuickLogSensorSnapshotStrip({ tentId, attached = true }:
               aria-label={`Sensor source: ${view.providerLabel}`}
               className="text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5 bg-muted/60 text-muted-foreground"
             >
-              {view.providerLabel}
+              source: {view.providerLabel}
             </span>
           )}
+
           <span
             data-testid="quicklog-sensor-snapshot-pill"
             role="status"

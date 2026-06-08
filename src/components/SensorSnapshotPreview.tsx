@@ -125,6 +125,16 @@ export function SensorSnapshotPreview({
         ) : null}
       </header>
 
+      <p
+        className="text-[11px] text-muted-foreground"
+        data-testid="sensor-snapshot-preview-last-updated"
+        aria-live="polite"
+      >
+        {lastUpdatedLabel}
+      </p>
+
+
+
       {status === "loading" ? (
         <p
           className="text-xs text-muted-foreground"

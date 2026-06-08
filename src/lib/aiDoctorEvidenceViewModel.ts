@@ -610,6 +610,16 @@ export function buildAiDoctorEvidencePanelVM(
     emptyCopy: "No missing context detected.",
   };
 
+  const latestEnvironmentCheck = buildLatestEnvironmentCheckSection({
+    compiled,
+    timelineHref: input.environmentCheckTimelineHref,
+  });
+  const moreDataNeeded = buildMoreDataNeededVM({
+    event: compiled.environmentCheckSelection.selected,
+    hasLiveSensorContext: hasLiveSensor,
+    envCheckPresent: hasEnvCheck,
+  });
+
   return {
     groups: [
       liveGroup,
@@ -623,5 +633,7 @@ export function buildAiDoctorEvidencePanelVM(
     missing,
     conservativeRecommendationCopy: conservativeCopy,
     hasAnyEvidence,
+    latestEnvironmentCheck,
+    moreDataNeeded,
   };
 }

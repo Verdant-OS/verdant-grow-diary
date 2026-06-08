@@ -213,7 +213,7 @@ describe("Diagnosis panel — Evidence basis toggle a11y", () => {
           postureLabel: "Moderate evidence",
           postureCopy: "Moderate context available.",
           basisCopy: ["b1"],
-          guardrailWarning: null,
+          guardrailWarning: null, preferredVerbs: [],
           moreDataReminder: null,
         }}
       />,
@@ -336,7 +336,7 @@ describe("buildAiDoctorEvidenceCsv", () => {
         postureLabel: "Moderate evidence",
         postureCopy: "OK.",
         basisCopy: ["humidity_pct accepted"],
-        guardrailWarning: null,
+        guardrailWarning: null, preferredVerbs: [],
         moreDataReminder: "Capture soil moisture.",
       },
       recommendations: [

@@ -123,7 +123,7 @@ describe("QuickLog component wiring", () => {
     // Save is gated on busy and on missing required plant context (Gate 1
     // bug fix: visible picker and save validator must agree). It must NOT
     // be gated on soft preview/validation warnings.
-    expect(QUICKLOG).toMatch(/disabled=\{busy\s*\|\|\s*!selectedPlant\}/);
+    expect(QUICKLOG).toMatch(/disabled=\{busy\s*\|\|\s*!selectedPlant\s*\|\|\s*!!savedTarget\}/);
     expect(QUICKLOG).not.toMatch(/disabled=\{[^}]*preview[^}]*\}/);
     expect(QUICKLOG).not.toMatch(/disabled=\{[^}]*hasIssues[^}]*\}/);
   });

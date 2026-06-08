@@ -869,12 +869,62 @@ export default function QuickLog({
 
           <Button
             type="submit"
-            disabled={busy || !selectedPlant}
+            disabled={busy || !selectedPlant || !!savedTarget}
             data-testid="quick-log-save"
             className="gradient-leaf text-primary-foreground"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save entry"}
           </Button>
+
+          {savedTarget && (
+            <div
+              data-testid="quick-log-post-save"
+              role="status"
+              aria-live="polite"
+              className="rounded-lg border border-primary/40 bg-primary/5 p-3 flex flex-col gap-2"
+            >
+              <p className="text-[12px] text-muted-foreground">
+                Saved to{" "}
+                <strong className="text-foreground font-semibold">
+                  {savedTarget.name}
+                </strong>
+                .
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <a
+                  ref={viewPlantBtnRef}
+                  href={plantDetailPath(savedTarget.id)}
+                  data-testid="quick-log-view-target-plant"
+                  data-target-plant-id={savedTarget.id}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  onClick={() => {
+                    onOpenChange(false);
+                  }}
+                >
+                  View {savedTarget.name}
+                  <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                </a>
+                <Button
+                  type="button"
+                  variant="outline"
+                  data-testid="quick-log-post-save-another"
+                  onClick={() => {
+                    reset();
+                  }}
+                >
+                  Log another
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  data-testid="quick-log-post-save-close"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
         </form>
       </DialogContent>
     </Dialog>

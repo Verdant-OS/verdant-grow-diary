@@ -62,7 +62,7 @@ describe("aiDoctorEnvironmentCheckRules", () => {
       noteBody: ACCEPTED_NOTE,
     });
     expect(ctx.present).toBe(true);
-    if (!ctx.present) return;
+    if (ctx.kind !== "present") return;
     expect(ctx.capturedAt).toBe("2026-06-08T12:00:00.000Z");
     expect(ctx.sourceLabel).toBe(AI_DOCTOR_ENV_CHECK_SOURCE_LABEL);
     expect(ctx.isLive).toBe(false);
@@ -76,7 +76,7 @@ describe("aiDoctorEnvironmentCheckRules", () => {
       occurredAt: "2026-06-08T12:00:00.000Z",
       noteBody: ACCEPTED_NOTE,
     });
-    if (!ctx.present) throw new Error("expected present");
+    if (ctx.kind !== "present") throw new Error("expected present");
     const blob = JSON.stringify(ctx).toLowerCase();
     expect(blob).not.toMatch(/"islive":\s*true/);
     expect(ctx.sourceLabel.toLowerCase()).not.toContain("live");
@@ -87,7 +87,7 @@ describe("aiDoctorEnvironmentCheckRules", () => {
       occurredAt: "2026-06-08T12:00:00.000Z",
       noteBody: REJECTED_NOTE,
     });
-    if (!ctx.present) throw new Error("expected present");
+    if (ctx.kind !== "present") throw new Error("expected present");
     expect(ctx.confidenceImpact === "severely-reduced" || ctx.confidenceImpact === "untrusted").toBe(true);
     expect(ctx.safetyNotes.some((n) => /reject/i.test(n))).toBe(true);
     expect(ctx.safetyNotes.some((n) => /not_checked/i.test(n))).toBe(true);
@@ -98,7 +98,7 @@ describe("aiDoctorEnvironmentCheckRules", () => {
       occurredAt: "2026-06-08T12:00:00.000Z",
       noteBody: ACCEPTED_NOTE,
     });
-    if (!ctx.present) throw new Error("expected present");
+    if (ctx.kind !== "present") throw new Error("expected present");
     const vpd = ctx.metrics.find((m) => m.key === "vpd_kpa");
     expect(vpd?.derived).toBe(true);
     expect(ctx.derivedNotes.some((n) => /derived/i.test(n))).toBe(true);
@@ -108,7 +108,7 @@ describe("aiDoctorEnvironmentCheckRules", () => {
   it("returns absent + cautious copy for missing/unparseable evidence", () => {
     const a = buildAiDoctorEnvironmentCheckContext(null);
     expect(a.present).toBe(false);
-    if (a.present) return;
+    if (a.kind !== "absent") return;
     expect(a.cautionCopy.toLowerCase()).toContain("more data is needed");
 
     const b = buildAiDoctorEnvironmentCheckContext({

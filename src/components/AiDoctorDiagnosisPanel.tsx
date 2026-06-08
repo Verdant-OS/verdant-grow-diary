@@ -400,6 +400,7 @@ export default function AiDoctorDiagnosisPanel({
           title="Recommended actions"
           items={citedRecs}
           testId={tid("ai-doctor-diagnosis-recommended-actions")}
+          onOpenCitation={handleOpenCitation}
         />
       ) : (
         <Section

@@ -209,3 +209,139 @@ export function buildQuickLogSnapshotStrip(
     classification,
   };
 }
+
+// ---------------------------------------------------------------------------
+// New tent-scoped adapter — consumes the strict-resolver SensorSnapshot
+// produced by `useLatestTentSensorSnapshot` (src/lib/sensor.ts) and emits
+// the same presenter view-model the strip already renders. Classification
+// is delegated to the strict resolver: NO 30-min stale heuristic, NO
+// rewrite of source labels, NO fake-live promotion.
+// ---------------------------------------------------------------------------
+import type {
+  SensorSnapshot as StrictSensorSnapshot,
+  SensorSnapshotStatus as StrictSnapshotStatus,
+} from "@/lib/latestSensorSnapshotRules";
+import type { LatestTentSensorSnapshotStatus } from "@/lib/sensor";
+
+export interface BuildQuickLogStripFromTentStateArgs {
+  status: LatestTentSensorSnapshotStatus;
+  snapshot: StrictSensorSnapshot;
+  hasTent: boolean;
+  attached?: boolean;
+  now?: Date;
+}
+
+function narrowStrict(s: StrictSnapshotStatus): QuickLogSnapshotStripStatus {
+  switch (s) {
+    case "fresh_live":
+    case "fresh_non_live":
+      return "usable";
+    case "stale":
+      return "stale";
+    case "invalid":
+      return "invalid";
+    case "empty":
+    default:
+      return "no_data";
+  }
+}
+
+function synthClassification(
+  status: QuickLogSnapshotStripStatus,
+  label: string,
+): Classification {
+  const reason =
+    status === "usable"
+      ? "fresh_accepted"
+      : status === "stale"
+        ? "outside_stale_window"
+        : status === "invalid"
+          ? "malformed_reading"
+          : "no_rows";
+  return {
+    status,
+    reason,
+    isHealthyEvidence: status === "usable",
+    label,
+  };
+}
+
+function fToC(f: number): number {
+  return ((f - 32) * 5) / 9;
+}
+
+function buildStrictMetrics(
+  snap: StrictSensorSnapshot,
+): ReadonlyArray<{ label: string; value: string }> {
+  const out: { label: string; value: string }[] = [];
+  const tempF = snap.metrics.temp_f;
+  if (typeof tempF === "number" && Number.isFinite(tempF)) {
+    out.push({ label: "Temp", value: `${fToC(tempF).toFixed(1)}°C` });
+  }
+  const rh = snap.metrics.humidity_pct;
+  if (typeof rh === "number" && Number.isFinite(rh)) {
+    out.push({ label: "RH", value: `${rh.toFixed(0)}%` });
+  }
+  const vpd = snap.metrics.vpd_kpa;
+  if (typeof vpd === "number" && Number.isFinite(vpd)) {
+    out.push({ label: "VPD", value: `${vpd.toFixed(2)} kPa` });
+  }
+  return out;
+}
+
+export function buildQuickLogStripFromTentState(
+  args: BuildQuickLogStripFromTentStateArgs,
+): QuickLogSnapshotStripViewModel {
+  const { status: loaderStatus, snapshot, hasTent, attached = true, now = new Date() } = args;
+
+  // Treat idle/loading/empty/error/no-tent as no_data (UI parity with the
+  // legacy dashboard-shape adapter). The strict resolver never invents
+  // healthy data when the loader is not in `ready`.
+  const isEmpty =
+    !hasTent ||
+    loaderStatus === "idle" ||
+    loaderStatus === "loading" ||
+    loaderStatus === "empty" ||
+    loaderStatus === "error" ||
+    snapshot.status === "empty" ||
+    !snapshot.captured_at;
+
+  if (isEmpty) {
+    return {
+      status: "no_data",
+      title: TITLES.no_data,
+      description: DESCRIPTIONS.no_data,
+      capturedAt: null,
+      ageLabel: null,
+      metrics: [],
+      action: actionFor("no_data"),
+      classification: synthClassification("no_data", "No sensor data yet"),
+    };
+  }
+
+  const status = narrowStrict(snapshot.status);
+  const capturedMs = Date.parse(snapshot.captured_at);
+  const ageLabel = Number.isFinite(capturedMs)
+    ? formatAge(capturedMs, now.getTime())
+    : null;
+
+  const usableButDetached = status === "usable" && !attached;
+  const title = usableButDetached ? "Sensor snapshot available" : TITLES[status];
+  const description = usableButDetached
+    ? "Toggle “Attach sensor snapshot” to include it in this log."
+    : DESCRIPTIONS[status];
+  const action: QuickLogSnapshotStripAction = usableButDetached
+    ? { kind: "none" }
+    : actionFor(status);
+
+  return {
+    status,
+    title,
+    description,
+    capturedAt: snapshot.captured_at,
+    ageLabel,
+    metrics: buildStrictMetrics(snapshot),
+    action,
+    classification: synthClassification(status, snapshot.badge_label),
+  };
+}

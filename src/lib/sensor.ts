@@ -92,8 +92,7 @@ export function useLatestTentSensorSnapshot(
       channel = supabase
         .channel(`sensor-readings-latest:${activeTentId}`)
         .on(
-          // @ts-expect-error postgres_changes payload typing
-          "postgres_changes",
+          "postgres_changes" as never,
           {
             event: "INSERT",
             schema: "public",

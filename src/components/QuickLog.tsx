@@ -328,6 +328,9 @@ export default function QuickLog({
     if (keepPlantId) setPlantId(keepPlantId);
     // Focus the first logical form input for the new entry.
     setTimeout(() => noteRef.current?.focus(), 0);
+  }
+
+
 
 
   async function submit(e: React.FormEvent) {

@@ -10,7 +10,7 @@
  *  - Raw model confidence appears only in the audit/debug subsection.
  *  - Missing / malformed input must not crash — empty state is preserved.
  */
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import type { DiagnosisResult } from "@/lib/aiDoctorEngine";
 import {
   adaptDiagnosisResultToViewModel,
@@ -19,14 +19,21 @@ import {
 import type { DiagnosisEvidenceAlignmentVM } from "@/lib/aiDoctorDiagnosisEvidenceAlignmentRules";
 import {
   citeRecommendations,
+  buildCitationDetail,
   type CitationContext,
   type EvidenceCitation,
+  type CitationDetail,
 } from "@/lib/aiDoctorEvidenceCitationRules";
 import {
   buildAiDoctorReportPdfBytes,
   downloadAiDoctorReportPdf,
   type AiDoctorReportInput,
 } from "@/lib/aiDoctorReportRules";
+import {
+  buildAiDoctorEvidenceCsv,
+  downloadAiDoctorEvidenceCsv,
+} from "@/lib/aiDoctorEvidenceCsvExportRules";
+import { navigateToEvidenceTarget } from "@/lib/aiDoctorEvidenceNavigationRules";
 
 export const AI_DOCTOR_DIAGNOSIS_EMPTY_COPY =
   "No AI Doctor 2.0 diagnosis available yet.";

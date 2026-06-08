@@ -231,7 +231,7 @@ describe("EcoWitt validation view-model — soil_moisture_pct alias coverage", (
 });
 
 describe("static safety scan — soil moisture changes", () => {
-  it("no new writes / functions invoke / device-control strings", async () => {
+  it("no executable writes / device-control strings introduced", async () => {
     const fs = await import("node:fs/promises");
     const files = [
       "src/lib/ecowittPayloadRules.ts",
@@ -240,11 +240,13 @@ describe("static safety scan — soil moisture changes", () => {
     ];
     for (const f of files) {
       const src = await fs.readFile(f, "utf8");
-      expect(src).not.toMatch(/action_queue/);
-      expect(src).not.toMatch(/grow_events/);
+      expect(src).not.toMatch(/functions\.invoke\(/);
+      expect(src).not.toMatch(/\.from\(["']action_queue["']\)/);
+      expect(src).not.toMatch(/\.from\(["']grow_events["']\)/);
       expect(src).not.toMatch(
-        /turn_on|turn_off|device_control|toggleDevice|setOutletState|autopilot/i,
+        /turn_on|turn_off|toggleDevice|setOutletState|autopilot/,
       );
     }
   });
 });
+

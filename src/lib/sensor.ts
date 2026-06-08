@@ -10,7 +10,8 @@
  *  - No service role, no privileged query.
  *  - No fake live / demo fallback. Empty / loading / error never block save.
  */
-import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   buildSensorSnapshot,
@@ -34,11 +35,23 @@ export interface LatestTentSensorSnapshotState {
 /** Pull recent long-format rows so we can pivot to a single snapshot. */
 const ROW_FETCH_LIMIT = 50;
 
+/** Stable React Query key for the latest single-tent sensor snapshot. */
+export function latestTentSensorSnapshotQueryKey(
+  tentId: string | null | undefined,
+): readonly [string, string, string] {
+  return ["sensor", "latest", tentId ?? "none"] as const;
+}
+
 /**
  * Read-only loader that returns the freshest sensor snapshot for a single
  * tent, pivoted from the long-format `sensor_readings` table. Quick Log
  * uses this to auto-attach the latest conditions when plant/tent context
  * exists. Idle when there is no tentId.
+ *
+ * Subscribes to Supabase Realtime INSERTs on `sensor_readings` filtered by
+ * the active `tent_id`. A matching insert only invalidates the React Query
+ * cache; freshness/source/status resolution stays in
+ * `latestSensorSnapshotRules.ts`. Realtime errors never break the query.
  */
 export function useLatestTentSensorSnapshot(
   tentId: string | null | undefined,
@@ -46,8 +59,10 @@ export function useLatestTentSensorSnapshot(
   const enabled =
     typeof tentId === "string" && tentId.length > 0;
 
+  const queryClient = useQueryClient();
+
   const query = useQuery<RawSensorRow[]>({
-    queryKey: ["sensor", "latest", tentId ?? "none"],
+    queryKey: latestTentSensorSnapshotQueryKey(tentId),
     enabled,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -68,6 +83,43 @@ export function useLatestTentSensorSnapshot(
     refetchOnReconnect: true,
     retry: 1,
   });
+
+  useEffect(() => {
+    if (!enabled) return;
+    const activeTentId = tentId as string;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      channel = supabase
+        .channel(`sensor-readings-latest:${activeTentId}`)
+        .on(
+          // @ts-expect-error postgres_changes payload typing
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "sensor_readings",
+            filter: `tent_id=eq.${activeTentId}`,
+          },
+          () => {
+            queryClient.invalidateQueries({
+              queryKey: latestTentSensorSnapshotQueryKey(activeTentId),
+            });
+          },
+        )
+        .subscribe();
+    } catch {
+      channel = null;
+    }
+    return () => {
+      if (channel) {
+        try {
+          supabase.removeChannel(channel);
+        } catch {
+          /* no-op: realtime failure must never break query */
+        }
+      }
+    };
+  }, [enabled, tentId, queryClient]);
 
   if (!enabled) return { status: "idle", snapshot: EMPTY_SENSOR_SNAPSHOT };
   if (query.isLoading) return { status: "loading", snapshot: EMPTY_SENSOR_SNAPSHOT };

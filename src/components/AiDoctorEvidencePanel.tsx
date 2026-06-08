@@ -203,7 +203,9 @@ export function AiDoctorEvidencePanel({ vm }: Props) {
             {vm.latestEnvironmentCheck.metricRows.map((row) => (
               <li
                 key={row.key}
-                className="flex flex-wrap items-center gap-2 text-xs"
+                id={`evidence-envcheck-${safeSlug(row.key)}`}
+                tabIndex={-1}
+                className="flex flex-wrap items-center gap-2 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 data-testid={`latest-env-check-row-${row.key}`}
               >
                 <span className="font-medium">{row.label}</span>

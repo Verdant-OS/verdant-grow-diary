@@ -637,3 +637,166 @@ export function buildAiDoctorEvidencePanelVM(
     moreDataNeeded,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Latest EcoWitt Environment Check section + checklist
+// ---------------------------------------------------------------------------
+
+import {
+  buildEnvironmentCheckChecklist,
+  classifyEnvironmentCheckQuality,
+  REQUIRED_ENVIRONMENT_METRICS,
+  type EnvCheckSelectedStatus,
+  type RequiredEnvironmentMetric,
+} from "./aiDoctorEnvironmentCheckRules";
+
+const SELECTED_STATUS_LABELS: Record<EnvCheckSelectedStatus, string> = {
+  accepted: "Accepted",
+  mixed: "Mixed",
+  weak: "Weak",
+  rejected: "Rejected",
+  not_checked: "Not checked",
+  missing: "Missing",
+};
+
+const REQUIRED_METRIC_LABELS: Record<RequiredEnvironmentMetric, string> = {
+  temp_f: "Air temperature (temp_f)",
+  humidity_pct: "Humidity (humidity_pct)",
+  vpd_kpa: "VPD (vpd_kpa)",
+  co2_ppm: "CO₂ (co2_ppm)",
+  soil_moisture_pct: "Soil moisture (soil_moisture_pct)",
+};
+
+const DERIVED_REQUIRED: ReadonlySet<RequiredEnvironmentMetric> = new Set([
+  "vpd_kpa",
+]);
+
+function buildLatestEnvironmentCheckSection(args: {
+  compiled: ReturnType<typeof compileAiDoctorContext>;
+  timelineHref: string | null | undefined;
+}): LatestEnvironmentCheckSectionVM {
+  const ec = args.compiled.environmentCheck;
+  const sel = args.compiled.environmentCheckSelection;
+  const href =
+    typeof args.timelineHref === "string" && args.timelineHref.length > 0
+      ? args.timelineHref
+      : null;
+
+  // Build per-required-metric rows from the selected event.
+  const parsedByKey = new Map<string, { status: string; value: number | null; reason: string; derived: boolean }>();
+  if (ec.kind === "present") {
+    for (const m of ec.metrics) {
+      if (!parsedByKey.has(m.key)) {
+        parsedByKey.set(m.key, {
+          status: m.status,
+          value: m.value,
+          reason: m.reason,
+          derived: m.derived,
+        });
+      }
+    }
+  }
+
+  const rows = REQUIRED_ENVIRONMENT_METRICS.map((key) => {
+    const m = parsedByKey.get(key);
+    const isDerived = DERIVED_REQUIRED.has(key);
+    if (!m) {
+      return {
+        key,
+        label: REQUIRED_METRIC_LABELS[key],
+        statusLabel: "Missing" as const,
+        contextLabel: isDerived
+          ? ("Derived context" as const)
+          : ("Missing" as const),
+        notHealthy: true,
+        displayValue: null,
+        reason: "Not captured.",
+      };
+    }
+    const statusLabel =
+      m.status === "accepted"
+        ? ("Accepted" as const)
+        : m.status === "rejected"
+          ? ("Rejected" as const)
+          : ("Not checked" as const);
+    const contextLabel = isDerived || m.derived
+      ? ("Derived context" as const)
+      : ("Test/Local validation" as const);
+    return {
+      key,
+      label: REQUIRED_METRIC_LABELS[key],
+      statusLabel,
+      contextLabel,
+      notHealthy: m.status !== "accepted",
+      displayValue:
+        m.value === null || !Number.isFinite(m.value) ? null : String(m.value),
+      reason: m.reason,
+    };
+  });
+
+  if (ec.kind !== "present") {
+    return {
+      show: false,
+      title: "Latest EcoWitt Environment Check",
+      sourceLabel: "Test/Local validation",
+      isLive: false,
+      eventTitle: "EcoWitt Environment Check",
+      capturedAt: null,
+      selectedStatus: "missing",
+      selectedStatusLabel: SELECTED_STATUS_LABELS.missing,
+      isFallback: false,
+      timelineHref: null,
+      metricRows: rows,
+      cautionCopy: "No recent Environment Check from local EcoWitt validation.",
+    };
+  }
+
+  const quality = classifyEnvironmentCheckQuality(sel.selected);
+  const status = sel.selectedStatus !== "missing" ? sel.selectedStatus : quality.selectedStatus;
+  const caution =
+    status === "rejected" || status === "not_checked"
+      ? "Some metrics were rejected or not checked and should not be treated as healthy."
+      : sel.isFallback
+        ? "Weak fallback — treat as untrusted until accepted evidence exists."
+        : "Test/Local validation evidence — not live telemetry.";
+
+  return {
+    show: true,
+    title: "Latest EcoWitt Environment Check",
+    sourceLabel: "Test/Local validation",
+    isLive: false,
+    eventTitle: "EcoWitt Environment Check",
+    capturedAt: ec.capturedAt,
+    selectedStatus: status,
+    selectedStatusLabel: SELECTED_STATUS_LABELS[status],
+    isFallback: sel.isFallback,
+    timelineHref: href,
+    metricRows: rows,
+    cautionCopy: caution,
+  };
+}
+
+function buildMoreDataNeededVM(args: {
+  event: ReturnType<typeof compileAiDoctorContext>["environmentCheckSelection"]["selected"];
+  hasLiveSensorContext: boolean;
+  envCheckPresent: boolean;
+}): MoreDataNeededChecklistVM {
+  const checklist = buildEnvironmentCheckChecklist({
+    event: args.event,
+    hasLiveSensorContext: args.hasLiveSensorContext,
+  });
+  // Show the checklist when env-check is missing OR when at least one
+  // required metric still needs capture.
+  const show = !args.envCheckPresent || checklist.hasNeeded || !args.hasLiveSensorContext;
+  return {
+    show,
+    title: "More data needed",
+    items: checklist.items.map((i) => ({
+      key: i.key,
+      label: i.label,
+      state: i.state,
+      reason: i.reason,
+    })),
+    cautionCopy: checklist.cautionCopy,
+  };
+}

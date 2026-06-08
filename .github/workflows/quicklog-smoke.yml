@@ -5,7 +5,7 @@ name: Quick Log Playwright smoke
 # SAFETY:
 #  - No auth bypass.
 #  - No hardcoded credentials in the workflow.
-#  - No service_role usage.
+#  - No elevated DB role usage.
 #  - No checked-in storageState; the setup project signs in via the real /auth UI
 #    using repository secrets, or skips with a clear message.
 #  - Uploads Playwright report + smoke JSON/text report as artifacts on every run.

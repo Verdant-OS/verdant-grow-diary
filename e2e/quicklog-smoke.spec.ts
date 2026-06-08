@@ -27,6 +27,10 @@ import { SmokeChecklistReporter } from "./lib/smokeChecklistReporter";
 const PLANT_URL = process.env.E2E_GROW_1_PLANT_URL;
 const TARGET_NAME = process.env.E2E_GROW_2_PLANT_NAME ?? "505 Headbanger";
 
+const RESULTS_DIR = path.resolve(process.cwd(), "e2e/results");
+const REPORT_JSON = path.join(RESULTS_DIR, "quicklog-smoke-report.json");
+const REPORT_TXT = path.join(RESULTS_DIR, "quicklog-smoke-report.txt");
+
 test.describe("Quick Log smoke checklist", () => {
   test.skip(
     !PLANT_URL,
@@ -39,7 +43,6 @@ test.describe("Quick Log smoke checklist", () => {
     try {
       await page.goto(PLANT_URL!);
 
-      // Open Quick Log
       await page
         .getByRole("button", { name: /quick log|log entry|\+ log/i })
         .first()
@@ -47,7 +50,6 @@ test.describe("Quick Log smoke checklist", () => {
       const dialog = page.getByRole("dialog");
       await expect(dialog).toBeVisible();
 
-      // Step: select Grow #2 plant
       const plantSelect = dialog.getByTestId("quick-log-plant-select");
       await plantSelect.click();
       await page
@@ -68,7 +70,6 @@ test.describe("Quick Log smoke checklist", () => {
 
       await report.run(6, "Tab reaches issue links", async () => {
         await dialog.getByTestId("quick-log-plant-select").focus();
-        // Tab forward until a review jump link is focused (bounded).
         for (let i = 0; i < 12; i++) {
           await page.keyboard.press("Tab");
           const id = await page.evaluate(
@@ -172,7 +173,6 @@ test.describe("Quick Log smoke checklist", () => {
       });
 
       await report.run(21, "Same target plant remains selected", async () => {
-        // post-save block goes away; plant select should still show target name
         await expect(dialog.getByTestId("quick-log-post-save")).toHaveCount(0);
         await expect(dialog.getByTestId("quick-log-plant-select")).toContainText(
           new RegExp(TARGET_NAME, "i"),
@@ -213,15 +213,39 @@ test.describe("Quick Log smoke checklist", () => {
         return "clean dialog";
       });
     } finally {
+      // Always write the smoke report to a stable path so CI can upload it
+      // even when a step fails. Mirrored copy into testInfo.outputDir for
+      // Playwright's per-test artifact bundle.
+      fs.mkdirSync(RESULTS_DIR, { recursive: true });
+      const json = JSON.stringify(report.toJSON(), null, 2);
       const text = report.toText();
+      fs.writeFileSync(REPORT_JSON, json);
+      fs.writeFileSync(REPORT_TXT, text);
+
+      // eslint-disable-next-line no-console
       console.log(`\n${text}\n`);
-      const out = path.join(testInfo.outputDir, "quicklog-smoke-report.json");
-      fs.mkdirSync(testInfo.outputDir, { recursive: true });
-      fs.writeFileSync(out, JSON.stringify(report.toJSON(), null, 2));
-      await testInfo.attach("quicklog-smoke-report", {
-        path: out,
-        contentType: "application/json",
-      });
+      // eslint-disable-next-line no-console
+      console.log(`Quick Log smoke report: ${path.relative(process.cwd(), REPORT_JSON)}`);
+
+      const fail = report.firstFailure();
+      if (fail) {
+        // eslint-disable-next-line no-console
+        console.log(
+          `FAILED step ${fail.step}: ${fail.label}\n  evidence: ${fail.evidence}\n  report: ${path.relative(process.cwd(), REPORT_JSON)}`,
+        );
+      }
+
+      try {
+        fs.mkdirSync(testInfo.outputDir, { recursive: true });
+        const mirrored = path.join(testInfo.outputDir, "quicklog-smoke-report.json");
+        fs.writeFileSync(mirrored, json);
+        await testInfo.attach("quicklog-smoke-report", {
+          path: mirrored,
+          contentType: "application/json",
+        });
+      } catch {
+        // best-effort attach; stable file is already on disk
+      }
     }
   });
 });

@@ -1,0 +1,100 @@
+name: Quick Log Playwright smoke
+
+# Authenticated Quick Log Playwright smoke harness.
+#
+# SAFETY:
+#  - No auth bypass.
+#  - No hardcoded credentials in the workflow.
+#  - No elevated DB role usage.
+#  - No checked-in storageState; the setup project signs in via the real /auth UI
+#    using repository secrets, or skips with a clear message.
+#  - Uploads Playwright report + smoke JSON/text report as artifacts on every run.
+#
+# Triggers:
+#  - workflow_dispatch: manual run; fails fast if required secrets/URL are missing.
+#  - push to main: best-effort; skips cleanly if secrets are unavailable.
+#
+# Required repository secrets / vars (configure in GitHub → Settings):
+#   secrets.E2E_TEST_EMAIL
+#   secrets.E2E_TEST_PASSWORD
+#   vars.E2E_BASE_URL              (e.g. https://<preview-or-staging>.example)
+#   vars.E2E_GROW_1_PLANT_URL      (full URL of a Grow #1 plant page)
+#   vars.E2E_GROW_2_PLANT_NAME     (optional; defaults to "505 Headbanger")
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "e2e/**"
+      - "playwright.config.ts"
+      - ".github/workflows/quicklog-smoke.yml"
+
+jobs:
+  quicklog-smoke:
+    name: Quick Log Playwright smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      E2E_BASE_URL: ${{ vars.E2E_BASE_URL }}
+      E2E_GROW_1_PLANT_URL: ${{ vars.E2E_GROW_1_PLANT_URL }}
+      E2E_GROW_2_PLANT_NAME: ${{ vars.E2E_GROW_2_PLANT_NAME }}
+      E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+      E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify required configuration
+        id: precheck
+        shell: bash
+        run: |
+          missing=()
+          [ -n "$E2E_BASE_URL" ] || missing+=("vars.E2E_BASE_URL")
+          [ -n "$E2E_GROW_1_PLANT_URL" ] || missing+=("vars.E2E_GROW_1_PLANT_URL")
+          [ -n "$E2E_TEST_EMAIL" ] || missing+=("secrets.E2E_TEST_EMAIL")
+          [ -n "$E2E_TEST_PASSWORD" ] || missing+=("secrets.E2E_TEST_PASSWORD")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "Missing required configuration: ${missing[*]}"
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              echo "Manually dispatched run requires all secrets/vars. Failing." >&2
+              exit 1
+            else
+              echo "Skipping smoke run on non-dispatch event."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Bun
+        if: steps.precheck.outputs.skip != 'true'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        if: steps.precheck.outputs.skip != 'true'
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright Chromium (with OS deps)
+        if: steps.precheck.outputs.skip != 'true'
+        run: bun run e2e:install:ci
+
+      - name: Run Quick Log Playwright smoke
+        if: steps.precheck.outputs.skip != 'true'
+        run: bun run e2e:quicklog-smoke
+
+      - name: Upload smoke artifacts
+        if: always() && steps.precheck.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: quicklog-smoke-artifacts
+          if-no-files-found: warn
+          path: |
+            e2e/results/quicklog-smoke-report.json
+            e2e/results/quicklog-smoke-report.txt
+            playwright-report/
+            test-results/

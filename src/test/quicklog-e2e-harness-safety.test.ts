@@ -24,7 +24,7 @@ function readAll(): { file: string; body: string }[] {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const p = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (entry.name === ".auth" || entry.name === "test-results") continue;
+        if (entry.name === ".auth" || entry.name === "test-results" || entry.name === "results") continue;
         walk(p);
         continue;
       }

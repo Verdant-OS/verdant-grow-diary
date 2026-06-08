@@ -13,12 +13,14 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTents } from "@/hooks/use-tents";
+import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 import {
   buildEcowittAuditPageViewModel,
   ECOWITT_AUDIT_EMPTY_MESSAGE,
 } from "@/lib/ecowittRawPayloadAuditViewModel";
 import type { EcowittSensorReadingRow } from "@/lib/ecowittLatestSnapshotFilter";
 import { EcowittIngestValidationPanel } from "@/components/EcowittIngestValidationPanel";
+import type { DiaryEnvironmentCheckDraft } from "@/lib/ecowittDiaryEnvironmentCheckRules";
 
 interface AuditRow extends EcowittSensorReadingRow {
   metric?: string | null;

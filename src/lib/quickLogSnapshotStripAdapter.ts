@@ -83,6 +83,7 @@ function actionFor(status: QuickLogSnapshotStripStatus): QuickLogSnapshotStripAc
       return { kind: "review", label: "Review sensor intake", href: SENSORS_HREF };
     case "no_data":
       return { kind: "add", label: "Add snapshot", href: SENSORS_HREF };
+  }
 }
 
 /**
@@ -98,7 +99,6 @@ function deriveProviderLabel(source: string | null | undefined): string | null {
   const lower = trimmed.toLowerCase();
   if (lower === "live" || lower === "unavailable") return null;
   return lower.replace(/_+/g, " ");
-}
 }
 
 function formatAge(capturedMs: number, nowMs: number): string {

@@ -637,12 +637,31 @@ export default function QuickLog({
                 </Select>
               </div>
               <div>
-                <Label className="text-xs">Watering (ml)</Label>
+                <Label className="text-xs" htmlFor="quicklog-watering-ml">
+                  Watering (ml){eventType === "watering" ? <span aria-hidden="true" className="text-destructive"> *</span> : null}
+                </Label>
                 <Input
+                  id="quicklog-watering-ml"
+                  ref={wateringInputRef}
+                  data-testid="quicklog-watering-ml"
                   inputMode="decimal"
                   value={details.watering}
                   onChange={(e) => setDetails({ ...details, watering: e.target.value })}
+                  required={eventType === "watering"}
+                  aria-required={eventType === "watering"}
+                  aria-invalid={!!wateringError}
+                  aria-describedby={wateringError ? "quicklog-watering-error" : undefined}
                 />
+                {wateringError && (
+                  <p
+                    id="quicklog-watering-error"
+                    role="alert"
+                    data-testid="quicklog-watering-error"
+                    className="text-[11px] text-destructive mt-1"
+                  >
+                    {wateringError}
+                  </p>
+                )}
               </div>
               <div className="col-span-2">
                 <Label className="text-xs">Nutrients</Label>

@@ -153,7 +153,10 @@ describe("EcoWitt soil moisture — cloud normalization channels 1–16", () => 
 describe("EcoWitt validation view-model — soil_moisture_pct alias coverage", () => {
   function vRow(rawPayload: Record<string, unknown>) {
     return {
-      metric: "soil_moisture_pct",
+      // Use a neutral metric label so soil_moisture_pct isn't auto-listed by
+      // the row.metric path; only the raw_payload aliases should drive
+      // detection here.
+      metric: "tempf",
       value: null,
       captured_at: NOW.toISOString(),
       ts: NOW.toISOString(),

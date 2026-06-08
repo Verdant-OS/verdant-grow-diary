@@ -70,6 +70,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 import {
   useLatestTentSensorSnapshot,
   latestTentSensorSnapshotQueryKey,
+  LATEST_SENSOR_REALTIME_INVALIDATE_DEBOUNCE_MS as DEBOUNCE_MS,
 } from "@/lib/sensor";
 
 function wrapper(client: QueryClient) {

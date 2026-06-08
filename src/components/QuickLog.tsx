@@ -288,6 +288,8 @@ export default function QuickLog({
     });
     hardwareUserTouchedRef.current = false;
     setHardwareOpen(false);
+    setWateringError(null);
+    setSavedTarget(null);
   }
 
   async function submit(e: React.FormEvent) {

@@ -451,7 +451,19 @@ export default function AiDoctorDiagnosisPanel({
       ) : null}
 
       {reportInput ? (
-        <div className="flex flex-wrap justify-end gap-2">
+        <div
+          className="flex flex-wrap justify-end gap-2"
+          data-testid={tid("ai-doctor-diagnosis-export-bar")}
+        >
+          <button
+            type="button"
+            onClick={() => setPreviewOpen(true)}
+            data-testid={tid("ai-doctor-diagnosis-preview-report")}
+            className="inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+            aria-label="Preview AI Doctor Report"
+          >
+            Preview report
+          </button>
           <button
             type="button"
             onClick={handleDownloadReport}
@@ -470,6 +482,25 @@ export default function AiDoctorDiagnosisPanel({
           >
             Download Evidence CSV
           </button>
+          <button
+            type="button"
+            onClick={handleDownloadPackage}
+            data-testid={tid("ai-doctor-diagnosis-download-package")}
+            className="inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+            aria-label="Download AI Doctor PDF and Evidence CSV package"
+          >
+            Download package
+          </button>
+          {packageMessage ? (
+            <span
+              className="text-[11px] text-muted-foreground"
+              role="status"
+              aria-live="polite"
+              data-testid={tid("ai-doctor-diagnosis-package-message")}
+            >
+              {packageMessage}
+            </span>
+          ) : null}
         </div>
       ) : null}
 

@@ -65,7 +65,7 @@ function statusLabel(status: string): string {
 function envCheckBlock(
   ec: AiDoctorEnvironmentCheckResult,
 ): AiDoctorEnvironmentCheckBlockVM {
-  if (!ec.present) {
+  if (ec.present === false) {
     return {
       show: false,
       sourceLabel: "local EcoWitt validation / test-local evidence",

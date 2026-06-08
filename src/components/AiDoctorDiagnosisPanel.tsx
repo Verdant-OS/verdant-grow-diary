@@ -63,7 +63,48 @@ export default function AiDoctorDiagnosisPanel({
   className,
   testIdPrefix,
   evidenceAlignment,
+  citationContext,
+  reportInput,
 }: AiDoctorDiagnosisPanelProps) {
+  const tid = (s: string) => (testIdPrefix ? `${testIdPrefix}-${s}` : s);
+  const hasDiagnosis = diagnosis != null;
+  const view = useMemo(
+    () => (hasDiagnosis ? adaptDiagnosisResultToViewModel(diagnosis) : null),
+    [hasDiagnosis, diagnosis],
+  );
+
+  const citedRecs = useMemo(() => {
+    if (!view || !citationContext) return null;
+    return citeRecommendations(view.recommended_actions, citationContext);
+  }, [view, citationContext]);
+
+  const postureDefaultsOpen =
+    !evidenceAlignment ||
+    evidenceAlignment.posture === "weak_context" ||
+    evidenceAlignment.posture === "insufficient_context";
+  const [basisOpen, setBasisOpen] = useState<boolean>(postureDefaultsOpen);
+
+  const handleDownloadReport = useCallback(() => {
+    if (!view || !reportInput) return;
+    const recs =
+      citedRecs ??
+      view.recommended_actions.map((r) => ({
+        text: r,
+        citation: {
+          label: "Needs more evidence",
+          kind: "none" as const,
+          healthy: false,
+          targetId: "evidence-missing-general",
+          ariaLabel: "No direct evidence supports this recommendation yet.",
+        } as EvidenceCitation,
+      }));
+    const bytes = buildAiDoctorReportPdfBytes({
+      ...reportInput,
+      summary: reportInput.summary || view.summary,
+      recommendations: recs,
+    });
+    downloadAiDoctorReportPdf(bytes, "ai-doctor-report.pdf");
+  }, [view, citedRecs, reportInput]);
   const tid = (s: string) => (testIdPrefix ? `${testIdPrefix}-${s}` : s);
   const hasDiagnosis = diagnosis != null;
   const view = useMemo(

@@ -166,6 +166,7 @@ export function buildQuickLogSnapshotStrip(
       metrics: [],
       action: actionFor("no_data"),
       classification,
+      providerLabel: null,
     };
   }
 
@@ -214,6 +215,7 @@ export function buildQuickLogSnapshotStrip(
     metrics: buildMetrics(snapshot),
     action: finalAction,
     classification,
+    providerLabel: deriveProviderLabel(src),
   };
 }
 

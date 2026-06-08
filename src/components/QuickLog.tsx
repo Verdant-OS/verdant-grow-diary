@@ -526,6 +526,7 @@ export default function QuickLog({
               onValueChange={(v) => setPlantId(v === "__none" ? "" : v)}
             >
               <SelectTrigger
+                ref={plantSelectTriggerRef}
                 data-testid="quick-log-plant-select"
                 aria-invalid={!selectedPlant}
                 aria-describedby={!selectedPlant ? "quick-log-plant-error" : undefined}

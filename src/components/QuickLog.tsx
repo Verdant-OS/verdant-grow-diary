@@ -611,7 +611,7 @@ export default function QuickLog({
                     >
                       {selectedPlant && !snapshotUsable && stripView.status !== "no_data" ? (
                         <span data-testid="quick-log-snapshot-stale-helper">
-                          Refresh before attaching this snapshot. Stale or unverified readings are not saved as current sensor context.
+                          {buildStaleSnapshotHelperCopy(stripView.capturedAt)}
                         </span>
                       ) : (
                         "Applies to this log only. Closing Quick Log resets this choice."

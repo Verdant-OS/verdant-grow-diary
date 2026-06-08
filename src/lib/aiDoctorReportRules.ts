@@ -75,6 +75,93 @@ export function redactReportLine(line: string): string {
 // Text report
 // ---------------------------------------------------------------------------
 
+const TRACKED_METRICS: ReadonlyArray<string> = [
+  "temp_f",
+  "humidity_pct",
+  "vpd_kpa",
+  "co2_ppm",
+  "soil_moisture_pct",
+];
+
+function pad(s: string, n: number): string {
+  const t = (s ?? "").toString();
+  if (t.length >= n) return t.slice(0, n);
+  return t + " ".repeat(n - t.length);
+}
+
+export interface PerMetricReportRow {
+  metric: string;
+  status: string;
+  citationType: string;
+  value: string;
+  source: string;
+  note: string;
+}
+
+/**
+ * Deterministic per-metric status table. Walks the TRACKED_METRICS list in
+ * fixed order so the report stays byte-identical for the same input.
+ */
+export function buildPerMetricStatusTable(
+  input: AiDoctorReportInput,
+): PerMetricReportRow[] {
+  const rows: PerMetricReportRow[] = [];
+  const envRows = input.environmentCheck.show
+    ? input.environmentCheck.metricRows
+    : [];
+  for (const key of TRACKED_METRICS) {
+    const m = envRows.find((r) => r.key === key) ?? null;
+    if (m) {
+      const derivedVpd = m.derived && key === "vpd_kpa";
+      let status: string;
+      let citationType: string;
+      let note = "";
+      if (derivedVpd) {
+        status = "Derived VPD context";
+        citationType = "env_metric_derived";
+        note = "Derived VPD context";
+      } else if (m.statusLabel === "Accepted") {
+        status = "Supported";
+        citationType = "env_metric";
+      } else if (m.statusLabel === "Rejected") {
+        status = "Rejected";
+        citationType = "env_metric_weak";
+        note = "not healthy";
+      } else if (m.statusLabel === "Not checked") {
+        status = "Not checked";
+        citationType = "env_metric_weak";
+        note = "not checked";
+      } else {
+        status = "Weak";
+        citationType = "env_metric_weak";
+        note = "weak evidence";
+      }
+      const value =
+        m.value == null || !Number.isFinite(m.value) ? "—" : String(m.value);
+      rows.push({
+        metric: key,
+        status,
+        citationType,
+        value,
+        source: "Test/Local validation",
+        note,
+      });
+    } else {
+      rows.push({
+        metric: key,
+        status: "Missing",
+        citationType: "missing_metric",
+        value: "—",
+        source: "Not captured",
+        note: "needed",
+      });
+    }
+  }
+  return rows;
+}
+
+
+
 export function buildAiDoctorReportText(input: AiDoctorReportInput): string {
   const lines: string[] = [];
   lines.push("AI Doctor Report");
@@ -140,6 +227,24 @@ export function buildAiDoctorReportText(input: AiDoctorReportInput): string {
     }
     lines.push("");
   }
+
+  // Compact per-metric status table — always render so weak/missing/
+  // not_checked metrics never look healthy by omission.
+  {
+    const tableRows = buildPerMetricStatusTable(input);
+    lines.push("Per-metric status (compact):");
+    lines.push(
+      "  Metric             | Status            | Citation type        | Value     | Source label             | Note",
+    );
+    for (const r of tableRows) {
+      lines.push(
+        `  ${pad(r.metric, 18)} | ${pad(r.status, 17)} | ${pad(r.citationType, 20)} | ${pad(r.value, 9)} | ${pad(r.source, 24)} | ${r.note}`,
+      );
+    }
+    lines.push("");
+  }
+
+
 
   if (input.checklist.length > 0) {
     lines.push("More data needed (checklist):");

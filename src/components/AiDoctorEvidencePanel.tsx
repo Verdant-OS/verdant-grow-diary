@@ -135,11 +135,19 @@ function GroupView({ group }: { group: EvidenceGroupVM }) {
   );
 }
 
+function safeSlug(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+}
+
 export function AiDoctorEvidencePanel({ vm }: Props) {
   if (!vm) return null;
   const missingGroup = vm.groups.find((g) => g.key === "missing");
   return (
-    <Card data-testid="ai-doctor-evidence-panel">
+    <Card id="ai-doctor-evidence-panel" data-testid="ai-doctor-evidence-panel" tabIndex={-1}>
       <CardHeader>
         <CardTitle className="text-base">Evidence used</CardTitle>
       </CardHeader>
@@ -195,7 +203,9 @@ export function AiDoctorEvidencePanel({ vm }: Props) {
             {vm.latestEnvironmentCheck.metricRows.map((row) => (
               <li
                 key={row.key}
-                className="flex flex-wrap items-center gap-2 text-xs"
+                id={`evidence-envcheck-${safeSlug(row.key)}`}
+                tabIndex={-1}
+                className="flex flex-wrap items-center gap-2 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 data-testid={`latest-env-check-row-${row.key}`}
               >
                 <span className="font-medium">{row.label}</span>
@@ -288,9 +298,11 @@ export function AiDoctorEvidencePanel({ vm }: Props) {
         </div>
         {missingGroup ? (
           <section
+            id="evidence-missing-general"
             aria-label="Missing context"
             data-testid="evidence-missing-section"
-            className="space-y-1 border-t pt-2"
+            tabIndex={-1}
+            className="space-y-1 border-t pt-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <h4 className="text-sm font-semibold">{missingGroup.title}</h4>
             {vm.missing.length === 0 ? (
@@ -302,8 +314,10 @@ export function AiDoctorEvidencePanel({ vm }: Props) {
                 {vm.missing.map((m) => (
                   <li
                     key={m.code}
+                    id={`evidence-missing-${safeSlug(m.code)}`}
+                    tabIndex={-1}
                     data-testid={`evidence-missing-${m.code}`}
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
                     <Badge variant="outline" aria-label="Missing">
                       Missing

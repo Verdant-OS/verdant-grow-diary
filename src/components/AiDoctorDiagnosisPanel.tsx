@@ -10,7 +10,7 @@
  *  - Raw model confidence appears only in the audit/debug subsection.
  *  - Missing / malformed input must not crash — empty state is preserved.
  */
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import type { DiagnosisResult } from "@/lib/aiDoctorEngine";
 import {
   adaptDiagnosisResultToViewModel,
@@ -19,14 +19,21 @@ import {
 import type { DiagnosisEvidenceAlignmentVM } from "@/lib/aiDoctorDiagnosisEvidenceAlignmentRules";
 import {
   citeRecommendations,
+  buildCitationDetail,
   type CitationContext,
   type EvidenceCitation,
+  type CitationDetail,
 } from "@/lib/aiDoctorEvidenceCitationRules";
 import {
   buildAiDoctorReportPdfBytes,
   downloadAiDoctorReportPdf,
   type AiDoctorReportInput,
 } from "@/lib/aiDoctorReportRules";
+import {
+  buildAiDoctorEvidenceCsv,
+  downloadAiDoctorEvidenceCsv,
+} from "@/lib/aiDoctorEvidenceCsvExportRules";
+import { navigateToEvidenceTarget } from "@/lib/aiDoctorEvidenceNavigationRules";
 
 export const AI_DOCTOR_DIAGNOSIS_EMPTY_COPY =
   "No AI Doctor 2.0 diagnosis available yet.";
@@ -84,9 +91,38 @@ export default function AiDoctorDiagnosisPanel({
     evidenceAlignment.posture === "insufficient_context";
   const [basisOpen, setBasisOpen] = useState<boolean>(postureDefaultsOpen);
 
-  const handleDownloadReport = useCallback(() => {
-    if (!view || !reportInput) return;
-    const recs =
+  const [activeCitation, setActiveCitation] = useState<EvidenceCitation | null>(
+    null,
+  );
+  const citationTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const handleOpenCitation = useCallback(
+    (c: EvidenceCitation, trigger: HTMLButtonElement | null) => {
+      citationTriggerRef.current = trigger;
+      setActiveCitation(c);
+    },
+    [],
+  );
+  const handleCloseCitation = useCallback(() => {
+    setActiveCitation(null);
+    // Return focus to the trigger on next tick (after dialog unmounts).
+    queueMicrotask(() => {
+      try {
+        citationTriggerRef.current?.focus();
+      } catch {
+        /* ignore */
+      }
+    });
+  }, []);
+  const handleJumpToEvidence = useCallback(() => {
+    if (activeCitation) {
+      navigateToEvidenceTarget(activeCitation.targetId);
+    }
+    setActiveCitation(null);
+  }, [activeCitation]);
+
+  const buildRecsForReport = useCallback(() => {
+    if (!view) return [];
+    return (
       citedRecs ??
       view.recommended_actions.map((r) => ({
         text: r,
@@ -97,14 +133,29 @@ export default function AiDoctorDiagnosisPanel({
           targetId: "evidence-missing-general",
           ariaLabel: "No direct evidence supports this recommendation yet.",
         } as EvidenceCitation,
-      }));
+      }))
+    );
+  }, [view, citedRecs]);
+
+  const handleDownloadReport = useCallback(() => {
+    if (!view || !reportInput) return;
     const bytes = buildAiDoctorReportPdfBytes({
       ...reportInput,
       summary: reportInput.summary || view.summary,
-      recommendations: recs,
+      recommendations: buildRecsForReport(),
     });
     downloadAiDoctorReportPdf(bytes, "ai-doctor-report.pdf");
-  }, [view, citedRecs, reportInput]);
+  }, [view, reportInput, buildRecsForReport]);
+
+  const handleDownloadCsv = useCallback(() => {
+    if (!view || !reportInput) return;
+    const csv = buildAiDoctorEvidenceCsv({
+      ...reportInput,
+      summary: reportInput.summary || view.summary,
+      recommendations: buildRecsForReport(),
+    });
+    downloadAiDoctorEvidenceCsv(csv);
+  }, [view, reportInput, buildRecsForReport]);
 
   if (!view) {
     return (
@@ -312,7 +363,7 @@ export default function AiDoctorDiagnosisPanel({
       ) : null}
 
       {reportInput ? (
-        <div className="flex justify-end">
+        <div className="flex flex-wrap justify-end gap-2">
           <button
             type="button"
             onClick={handleDownloadReport}
@@ -321,6 +372,15 @@ export default function AiDoctorDiagnosisPanel({
             aria-label="Download AI Doctor Report as PDF"
           >
             Download AI Doctor Report
+          </button>
+          <button
+            type="button"
+            onClick={handleDownloadCsv}
+            data-testid={tid("ai-doctor-diagnosis-download-csv")}
+            className="inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+            aria-label="Download AI Doctor Evidence CSV"
+          >
+            Download Evidence CSV
           </button>
         </div>
       ) : null}
@@ -340,6 +400,7 @@ export default function AiDoctorDiagnosisPanel({
           title="Recommended actions"
           items={citedRecs}
           testId={tid("ai-doctor-diagnosis-recommended-actions")}
+          onOpenCitation={handleOpenCitation}
         />
       ) : (
         <Section
@@ -386,7 +447,143 @@ export default function AiDoctorDiagnosisPanel({
           </p>
         ) : null}
       </details>
+
+      {activeCitation && citationContext ? (
+        <CitationDetailModal
+          citation={activeCitation}
+          ctx={citationContext}
+          onClose={handleCloseCitation}
+          onJump={handleJumpToEvidence}
+          testId={tid("ai-doctor-diagnosis-citation-modal")}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function CitationDetailModal({
+  citation,
+  ctx,
+  onClose,
+  onJump,
+  testId,
+}: {
+  citation: EvidenceCitation;
+  ctx: CitationContext;
+  onClose: () => void;
+  onJump: () => void;
+  testId: string;
+}) {
+  const detail: CitationDetail = useMemo(
+    () => buildCitationDetail(citation, ctx),
+    [citation, ctx],
+  );
+  const closeRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    // Initial focus into the dialog.
+    try {
+      closeRef.current?.focus();
+    } catch {
+      /* ignore */
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Evidence details: ${detail.citation.label}`}
+      data-testid={testId}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="max-w-md w-full rounded-lg bg-background border border-border p-4 space-y-2 text-xs"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <h3
+            className="text-sm font-semibold"
+            data-testid={`${testId}-label`}
+          >
+            {detail.citation.label}
+          </h3>
+          <button
+            ref={closeRef}
+            type="button"
+            onClick={onClose}
+            aria-label="Close evidence details"
+            data-testid={`${testId}-close`}
+            className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            Close
+          </button>
+        </div>
+        <dl
+          className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1"
+          data-testid={`${testId}-details`}
+        >
+          <dt className="text-muted-foreground">Evidence type</dt>
+          <dd data-testid={`${testId}-kind`}>{detail.kindLabel}</dd>
+          <dt className="text-muted-foreground">Source</dt>
+          <dd data-testid={`${testId}-source`}>{detail.sourceLabel}</dd>
+          {detail.metricKey ? (
+            <>
+              <dt className="text-muted-foreground">Metric</dt>
+              <dd data-testid={`${testId}-metric`}>{detail.metricKey}</dd>
+            </>
+          ) : null}
+          {detail.value != null ? (
+            <>
+              <dt className="text-muted-foreground">Value</dt>
+              <dd data-testid={`${testId}-value`}>{detail.value}</dd>
+            </>
+          ) : null}
+          {detail.statusLabel ? (
+            <>
+              <dt className="text-muted-foreground">Status</dt>
+              <dd data-testid={`${testId}-status`}>{detail.statusLabel}</dd>
+            </>
+          ) : null}
+          {detail.reason ? (
+            <>
+              <dt className="text-muted-foreground">Reason</dt>
+              <dd>{detail.reason}</dd>
+            </>
+          ) : null}
+          {detail.capturedAt ? (
+            <>
+              <dt className="text-muted-foreground">Captured at</dt>
+              <dd>{detail.capturedAt}</dd>
+            </>
+          ) : null}
+        </dl>
+        <p
+          className="text-[11px] text-muted-foreground"
+          data-testid={`${testId}-honesty`}
+        >
+          {detail.sourceHonestyNote}
+        </p>
+        <div className="flex justify-end gap-2 pt-1">
+          <button
+            type="button"
+            onClick={onJump}
+            data-testid={`${testId}-jump`}
+            className="rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            Jump to Evidence used
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -416,6 +613,7 @@ function CitedSection({
   title,
   items,
   testId,
+  onOpenCitation,
 }: {
   title: string;
   items: ReadonlyArray<{
@@ -423,6 +621,10 @@ function CitedSection({
     citation: EvidenceCitation;
   }>;
   testId: string;
+  onOpenCitation: (
+    c: EvidenceCitation,
+    trigger: HTMLButtonElement | null,
+  ) => void;
 }) {
   if (!items || items.length === 0) return null;
   return (
@@ -432,12 +634,20 @@ function CitedSection({
         {items.map((it, i) => (
           <li key={`${i}-${it.text}`} data-testid={`${testId}-item-${i}`}>
             <span>{it.text}</span>{" "}
-            <a
-              href={`#${it.citation.targetId}`}
+            <button
+              type="button"
               data-testid={`${testId}-citation-${i}`}
               data-citation-kind={it.citation.kind}
               data-citation-healthy={it.citation.healthy ? "true" : "false"}
+              data-citation-target={it.citation.targetId}
               aria-label={it.citation.ariaLabel}
+              aria-haspopup="dialog"
+              onClick={(e) =>
+                onOpenCitation(
+                  it.citation,
+                  e.currentTarget as HTMLButtonElement,
+                )
+              }
               className={
                 "inline-flex items-center rounded border px-1 py-0 text-[10px] font-medium align-middle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 " +
                 (it.citation.healthy
@@ -446,7 +656,7 @@ function CitedSection({
               }
             >
               [{it.citation.label}]
-            </a>
+            </button>
           </li>
         ))}
       </ul>

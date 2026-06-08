@@ -39,6 +39,10 @@ export interface CitationAvailableMetric {
   statusLabel: string;
   /** True when this metric came from a derived source (e.g. VPD). */
   derived: boolean;
+  /** Optional last value (display only). */
+  value?: number | string | null;
+  /** Optional rejection / status reason for weak metrics. */
+  reason?: string | null;
 }
 
 export interface CitationContext {
@@ -48,6 +52,8 @@ export interface CitationContext {
   missingMetrics: readonly string[];
   hasRecentDiary: boolean;
   hasRecentPhotos: boolean;
+  /** Optional captured_at for the latest Environment Check. */
+  envCheckCapturedAt?: string | null;
 }
 
 const METRIC_KEYWORDS: Array<{ key: string; re: RegExp }> = [
@@ -182,3 +188,98 @@ export function citeRecommendations(
 }
 
 export const NO_EVIDENCE_CITATION_LABEL = NO_EVIDENCE_LABEL;
+
+// ---------------------------------------------------------------------------
+// Citation detail (used by the inline-citation modal)
+// ---------------------------------------------------------------------------
+
+export interface CitationDetail {
+  citation: EvidenceCitation;
+  /** Human-readable label for the citation kind. */
+  kindLabel: string;
+  /** Source label — never "Live" for local Environment Check evidence. */
+  sourceLabel: string;
+  metricKey: string | null;
+  value: string | null;
+  statusLabel: string | null;
+  reason: string | null;
+  capturedAt: string | null;
+  sourceHonestyNote: string;
+}
+
+const KIND_LABELS: Record<CitationKind, string> = {
+  env_metric: "Accepted Environment Check metric",
+  env_metric_derived: "Derived VPD context",
+  env_metric_weak: "Weak Environment Check metric",
+  missing_metric: "Missing Environment Check metric",
+  diary_photo_missing: "Diary / photo evidence missing",
+  none: "Needs more evidence",
+};
+
+const SOURCE_HONESTY_BY_KIND: Record<CitationKind, string> = {
+  env_metric:
+    "Local Test/Local validation evidence — not live telemetry.",
+  env_metric_derived:
+    "Derived VPD context only — not a raw sensor reading.",
+  env_metric_weak:
+    "Local Test/Local validation evidence — not healthy and not live.",
+  missing_metric:
+    "Metric is not present in the latest Environment Check.",
+  diary_photo_missing:
+    "No recent diary or photo evidence is available.",
+  none:
+    "No direct evidence supports this recommendation yet.",
+};
+
+function findMetricKeyFromCitation(c: EvidenceCitation): string | null {
+  // targetId shape: evidence-envcheck-<slug> or evidence-missing-<slug>
+  const m = /^evidence-(?:envcheck|missing)-(.+)$/.exec(c.targetId);
+  if (!m) return null;
+  return m[1].replace(/-/g, "_");
+}
+
+export function buildCitationDetail(
+  citation: EvidenceCitation,
+  ctx: CitationContext,
+): CitationDetail {
+  const metricKey = findMetricKeyFromCitation(citation);
+  let value: string | null = null;
+  let statusLabel: string | null = null;
+  let reason: string | null = null;
+  let sourceLabel = "—";
+
+  if (metricKey) {
+    const avail = ctx.availableMetrics.find((m) => m.key === metricKey);
+    if (avail) {
+      statusLabel = avail.statusLabel;
+      if (avail.value != null && avail.value !== "") value = String(avail.value);
+      if (avail.reason) reason = avail.reason;
+    } else if (ctx.missingMetrics.includes(metricKey)) {
+      statusLabel = "Missing";
+    }
+  }
+
+  if (
+    citation.kind === "env_metric" ||
+    citation.kind === "env_metric_derived" ||
+    citation.kind === "env_metric_weak"
+  ) {
+    sourceLabel = "Test/Local validation";
+  } else if (citation.kind === "missing_metric") {
+    sourceLabel = "Not captured";
+  } else if (citation.kind === "diary_photo_missing") {
+    sourceLabel = "Not captured";
+  }
+
+  return {
+    citation,
+    kindLabel: KIND_LABELS[citation.kind],
+    sourceLabel,
+    metricKey,
+    value,
+    statusLabel,
+    reason,
+    capturedAt: ctx.envCheckCapturedAt ?? null,
+    sourceHonestyNote: SOURCE_HONESTY_BY_KIND[citation.kind],
+  };
+}

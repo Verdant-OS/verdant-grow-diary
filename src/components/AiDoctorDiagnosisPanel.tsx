@@ -447,7 +447,143 @@ export default function AiDoctorDiagnosisPanel({
           </p>
         ) : null}
       </details>
+
+      {activeCitation && citationContext ? (
+        <CitationDetailModal
+          citation={activeCitation}
+          ctx={citationContext}
+          onClose={handleCloseCitation}
+          onJump={handleJumpToEvidence}
+          testId={tid("ai-doctor-diagnosis-citation-modal")}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function CitationDetailModal({
+  citation,
+  ctx,
+  onClose,
+  onJump,
+  testId,
+}: {
+  citation: EvidenceCitation;
+  ctx: CitationContext;
+  onClose: () => void;
+  onJump: () => void;
+  testId: string;
+}) {
+  const detail: CitationDetail = useMemo(
+    () => buildCitationDetail(citation, ctx),
+    [citation, ctx],
+  );
+  const closeRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    // Initial focus into the dialog.
+    try {
+      closeRef.current?.focus();
+    } catch {
+      /* ignore */
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Evidence details: ${detail.citation.label}`}
+      data-testid={testId}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="max-w-md w-full rounded-lg bg-background border border-border p-4 space-y-2 text-xs"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <h3
+            className="text-sm font-semibold"
+            data-testid={`${testId}-label`}
+          >
+            {detail.citation.label}
+          </h3>
+          <button
+            ref={closeRef}
+            type="button"
+            onClick={onClose}
+            aria-label="Close evidence details"
+            data-testid={`${testId}-close`}
+            className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            Close
+          </button>
+        </div>
+        <dl
+          className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1"
+          data-testid={`${testId}-details`}
+        >
+          <dt className="text-muted-foreground">Evidence type</dt>
+          <dd data-testid={`${testId}-kind`}>{detail.kindLabel}</dd>
+          <dt className="text-muted-foreground">Source</dt>
+          <dd data-testid={`${testId}-source`}>{detail.sourceLabel}</dd>
+          {detail.metricKey ? (
+            <>
+              <dt className="text-muted-foreground">Metric</dt>
+              <dd data-testid={`${testId}-metric`}>{detail.metricKey}</dd>
+            </>
+          ) : null}
+          {detail.value != null ? (
+            <>
+              <dt className="text-muted-foreground">Value</dt>
+              <dd data-testid={`${testId}-value`}>{detail.value}</dd>
+            </>
+          ) : null}
+          {detail.statusLabel ? (
+            <>
+              <dt className="text-muted-foreground">Status</dt>
+              <dd data-testid={`${testId}-status`}>{detail.statusLabel}</dd>
+            </>
+          ) : null}
+          {detail.reason ? (
+            <>
+              <dt className="text-muted-foreground">Reason</dt>
+              <dd>{detail.reason}</dd>
+            </>
+          ) : null}
+          {detail.capturedAt ? (
+            <>
+              <dt className="text-muted-foreground">Captured at</dt>
+              <dd>{detail.capturedAt}</dd>
+            </>
+          ) : null}
+        </dl>
+        <p
+          className="text-[11px] text-muted-foreground"
+          data-testid={`${testId}-honesty`}
+        >
+          {detail.sourceHonestyNote}
+        </p>
+        <div className="flex justify-end gap-2 pt-1">
+          <button
+            type="button"
+            onClick={onJump}
+            data-testid={`${testId}-jump`}
+            className="rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            Jump to Evidence used
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

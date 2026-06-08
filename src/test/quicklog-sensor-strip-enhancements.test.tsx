@@ -1,11 +1,10 @@
 /**
- * Render tests for the new Quick Log sensor strip features:
+ * Render tests for the Quick Log sensor strip enhancements:
  *  - Provider source label chip (non-Live)
  *  - ARIA attributes on pill + action
- *  - Mini-chart mount when tent + non-empty status
  *
- * Mocks both the snapshot hook and the recent-series hook so the
- * component renders deterministically without Supabase.
+ * The mini-chart lives in `QuickLog.tsx` (not the strip), so it's
+ * covered by its own pure-helper test file.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
@@ -32,10 +31,6 @@ vi.mock("@/lib/sensor", async (orig) => {
   };
 });
 
-vi.mock("@/hooks/useRecentTentSensorSeries", () => ({
-  useRecentTentSensorSeries: (...a: unknown[]) =>
-    mockUseRecentTentSensorSeries(...a),
-}));
 
 function ready(partial: Partial<StrictSensorSnapshot> = {}): LatestTentSensorSnapshotState {
   const snap: StrictSensorSnapshot = {

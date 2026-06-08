@@ -718,20 +718,13 @@ export default function QuickLog({
           })()}
 
           {!tentSetupRequired && (
-            <>
-              <QuickLogSensorSnapshotStrip
-                growId={activeGrowId}
-                tentId={selectedPlant?.tent_id ?? null}
-                attached={snapshot && !!selectedPlant}
-              />
-              {stripView.status !== "no_data" && selectedPlant?.tent_id && (
-                <QuickLogSensorMiniChart
-                  tentId={selectedPlant.tent_id}
-                  metric="temp_c"
-                />
-              )}
-            </>
+            <QuickLogSensorSnapshotStrip
+              growId={activeGrowId}
+              tentId={selectedPlant?.tent_id ?? null}
+              attached={snapshot && !!selectedPlant}
+            />
           )}
+
 
           <Button
             type="submit"

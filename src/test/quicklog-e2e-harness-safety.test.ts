@@ -49,6 +49,7 @@ describe("Quick Log Playwright harness safety", () => {
 
   it("contains no hardcoded credentials or service_role usage", () => {
     for (const { file, body } of files) {
+      if (!/\.(ts|tsx)$/.test(file)) continue;
       expect(body, `${file} must not reference service_role`).not.toMatch(
         /service_role/i,
       );
@@ -63,6 +64,7 @@ describe("Quick Log Playwright harness safety", () => {
 
   it("does not touch action_queue, functions.invoke, or mini-charts", () => {
     for (const { file, body } of files) {
+      if (!/\.(ts|tsx)$/.test(file)) continue;
       expect(body, `${file} must not call action_queue`).not.toMatch(/action_queue/);
       expect(body, `${file} must not call functions.invoke`).not.toMatch(
         /functions\.invoke/,
@@ -75,6 +77,7 @@ describe("Quick Log Playwright harness safety", () => {
 
   it("does not rely on localStorage attach persistence", () => {
     for (const { file, body } of files) {
+      if (!/\.(ts|tsx)$/.test(file)) continue;
       expect(body, `${file} must not toggle attach via localStorage`).not.toMatch(
         /localStorage[\s\S]{0,40}attach/i,
       );

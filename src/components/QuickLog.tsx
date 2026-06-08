@@ -46,6 +46,7 @@ import {
   isSupportedLegacyEventType,
   UNSUPPORTED_EVENT_TYPE_COPY,
 } from "@/lib/legacyQuickLogUnifiedSave";
+import { buildQuickLogSensorAttachPayload } from "@/lib/quickLogSensorAttachAdapter";
 
 import { AlertTriangle, Info } from "lucide-react";
 import { toast } from "sonner";

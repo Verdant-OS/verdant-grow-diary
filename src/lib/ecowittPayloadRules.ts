@@ -324,7 +324,7 @@ export interface EcowittCloudNormalizationResult {
 
 const ECOWITT_TEMP_F_RE = /^temp([1-8])f$/i;
 const ECOWITT_HUMIDITY_CH_RE = /^humidity([1-8])$/i;
-const ECOWITT_SOIL_CH_RE = /^soilmoisture([1-8])$/i;
+const ECOWITT_SOIL_CH_RE = /^soilmoisture(1[0-6]|[1-9])$/i;
 const ECOWITT_PRESSURE_KEYS = new Set([
   "baromrelin",
   "baromabsin",

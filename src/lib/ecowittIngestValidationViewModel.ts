@@ -99,6 +99,38 @@ export interface EcowittIngestValidationViewModel {
   nextSteps: string[];
   /** Empty-state CLI hints. */
   cliHints: { label: string; command: string }[];
+  /** Explicit warnings about derived metrics appearing in raw readings. */
+  derivedReadingWarnings: string[];
+  /** Eligible to log latest validated snapshot to diary. */
+  eligibleForDiaryLog: boolean;
+  /** Reason ineligible if !eligibleForDiaryLog. */
+  ineligibleReason: string | null;
+  /** True when captured_at is already in the loggedCapturedAts input set. */
+  alreadyLogged: boolean;
+  /** Latest validated captured_at for idempotency keys. */
+  latestCapturedAt: string | null;
+  /** Latest accepted raw payload echo (safe object). */
+  latestRawPayload: unknown;
+  /** Per-attempt export rows for the last N validation attempts. */
+  exportAttempts: Array<{
+    capturedAt: string | null;
+    ageLabel: string;
+    status: string;
+    statusLabel: string;
+    invalidTest: boolean;
+    stale: boolean;
+    metricSummary: string;
+    metrics: EcowittValidationMetricRow[];
+    rawPayload: unknown;
+  }>;
+  /** Active metric thresholds for export. */
+  thresholds: Array<{
+    key: string;
+    label: string;
+    min: number;
+    max: number;
+    unit: string;
+  }>;
 }
 
 const DEFAULT_STALE_AFTER_MS = 24 * 60 * 60 * 1000;

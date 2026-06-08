@@ -363,7 +363,7 @@ export default function AiDoctorDiagnosisPanel({
       ) : null}
 
       {reportInput ? (
-        <div className="flex justify-end">
+        <div className="flex flex-wrap justify-end gap-2">
           <button
             type="button"
             onClick={handleDownloadReport}
@@ -372,6 +372,15 @@ export default function AiDoctorDiagnosisPanel({
             aria-label="Download AI Doctor Report as PDF"
           >
             Download AI Doctor Report
+          </button>
+          <button
+            type="button"
+            onClick={handleDownloadCsv}
+            data-testid={tid("ai-doctor-diagnosis-download-csv")}
+            className="inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+            aria-label="Download AI Doctor Evidence CSV"
+          >
+            Download Evidence CSV
           </button>
         </div>
       ) : null}

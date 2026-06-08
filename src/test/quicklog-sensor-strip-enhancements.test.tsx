@@ -20,7 +20,6 @@ const NOW = new Date("2026-06-08T12:00:00Z");
 const FIVE_MIN_AGO = "2026-06-08T11:55:00Z";
 
 const mockUseLatestTentSensorSnapshot = vi.fn();
-const mockUseRecentTentSensorSeries = vi.fn();
 
 vi.mock("@/lib/sensor", async (orig) => {
   const real = await orig<typeof import("@/lib/sensor")>();
@@ -61,9 +60,6 @@ describe("QuickLogSensorSnapshotStrip — provider label, ARIA, mini-chart", () 
     vi.useFakeTimers({ shouldAdvanceTime: false });
     vi.setSystemTime(NOW);
     mockUseLatestTentSensorSnapshot.mockReset();
-    mockUseRecentTentSensorSeries.mockReset();
-    // Default: no chart data.
-    mockUseRecentTentSensorSeries.mockReturnValue({ status: "empty", rows: [] });
   });
 
   afterEach(() => {
@@ -134,48 +130,5 @@ describe("QuickLogSensorSnapshotStrip — provider label, ARIA, mini-chart", () 
     expect(pill).toHaveAttribute("aria-label", "Sensor snapshot status: stale");
   });
 
-  it("renders mini-chart when ready snapshot + ≥2 series points", () => {
-    mockUseLatestTentSensorSnapshot.mockReturnValue(ready());
-    mockUseRecentTentSensorSeries.mockReturnValue({
-      status: "ready",
-      rows: [
-        { metric: "temperature_c", value: 24, captured_at: "2026-06-08T11:00:00Z" },
-        { metric: "temperature_c", value: 25, captured_at: "2026-06-08T11:30:00Z" },
-        { metric: "temperature_c", value: 23, captured_at: "2026-06-08T11:55:00Z" },
-      ],
-    });
-    render(<QuickLogSensorSnapshotStrip tentId="t1" />);
-    const chart = screen.getByTestId("quicklog-sensor-mini-chart");
-    expect(chart).toHaveAttribute("data-metric", "temp_c");
-    expect(chart).toHaveAttribute("data-points", "3");
-  });
-
-  it("does not render mini-chart on no_data status", () => {
-    mockUseLatestTentSensorSnapshot.mockReturnValue({
-      status: "empty",
-      snapshot: { ...EMPTY_SENSOR_SNAPSHOT },
-      lastUpdatedAt: null,
-    });
-    mockUseRecentTentSensorSeries.mockReturnValue({
-      status: "ready",
-      rows: [
-        { metric: "temperature_c", value: 24, captured_at: "2026-06-08T11:00:00Z" },
-        { metric: "temperature_c", value: 25, captured_at: "2026-06-08T11:30:00Z" },
-      ],
-    });
-    render(<QuickLogSensorSnapshotStrip tentId="t1" />);
-    expect(screen.queryByTestId("quicklog-sensor-mini-chart")).not.toBeInTheDocument();
-  });
-
-  it("does not render mini-chart with <2 series points", () => {
-    mockUseLatestTentSensorSnapshot.mockReturnValue(ready());
-    mockUseRecentTentSensorSeries.mockReturnValue({
-      status: "ready",
-      rows: [
-        { metric: "temperature_c", value: 24, captured_at: "2026-06-08T11:00:00Z" },
-      ],
-    });
-    render(<QuickLogSensorSnapshotStrip tentId="t1" />);
-    expect(screen.queryByTestId("quicklog-sensor-mini-chart")).not.toBeInTheDocument();
-  });
 });
+

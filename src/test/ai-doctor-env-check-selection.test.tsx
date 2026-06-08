@@ -48,7 +48,6 @@ const MIXED_NOTE = (capturedAt: string) =>
 describe("aiDoctorEnvironmentCheckRules — parser hardening", () => {
   it("does not throw on malformed / empty / null note bodies", () => {
     expect(() => parseEnvironmentCheckNote("")).not.toThrow();
-    // @ts-expect-error – intentionally passing nullish
     expect(() => parseEnvironmentCheckNote(null)).not.toThrow();
     expect(() => parseEnvironmentCheckNote("\u0000\n• broken")).not.toThrow();
   });
@@ -136,7 +135,6 @@ describe("selectBestEnvironmentCheckEvent", () => {
     expect(() => selectBestEnvironmentCheckEvent(null)).not.toThrow();
     expect(() =>
       selectBestEnvironmentCheckEvent([
-        // @ts-expect-error – intentionally malformed entry
         null,
         { occurredAt: null, noteBody: undefined },
       ]),

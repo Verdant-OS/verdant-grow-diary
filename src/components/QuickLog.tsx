@@ -493,11 +493,8 @@ export default function QuickLog({
                   onCheckedChange={(v) => {
                     snapshotUserTouchedRef.current = true;
                     setSnapshot(v);
-                    saveQuickLogSensorAttachPreference(
-                      selectedPlant?.tent_id ?? null,
-                      v,
-                    );
                   }}
+
                   disabled={!selectedPlant}
                   aria-label="Attach sensor snapshot to this log"
                 />

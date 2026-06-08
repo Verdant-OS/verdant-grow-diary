@@ -92,7 +92,13 @@ export function SensorSnapshotPreview({
   attach,
   canToggle,
   onToggleAttach,
+  lastUpdatedAt = null,
+  nowMs,
 }: Props) {
+  const lastUpdatedLabel = formatLastUpdatedAgo(
+    lastUpdatedAt,
+    typeof nowMs === "number" ? nowMs : Date.now(),
+  );
   return (
     <section
       aria-labelledby="sensor-snapshot-preview-heading"

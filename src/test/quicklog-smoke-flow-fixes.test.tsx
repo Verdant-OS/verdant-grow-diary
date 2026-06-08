@@ -137,11 +137,13 @@ describe("QuickLog watering required field", () => {
       prefill: { plantId: "p2", growId: "g1", eventType: "watering" },
     });
     // Make sure the field is mounted before submitting.
-    await screen.findByTestId("quicklog-watering-ml");
-    const saveBtn = screen.getByTestId("quick-log-save") as HTMLButtonElement;
-    expect(saveBtn.disabled).toBe(false);
-    fireEvent.click(saveBtn);
-    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    const wateringInput = await screen.findByTestId("quicklog-watering-ml");
+    const form = wateringInput.closest("form") as HTMLFormElement;
+    expect(form).not.toBeNull();
+    fireEvent.submit(form);
+    await waitFor(() =>
+      expect(screen.queryByTestId("quicklog-watering-error")).not.toBeNull(),
+    );
     expect(screen.getByTestId("quicklog-watering-error").textContent ?? "").toMatch(
       /watering volume/i,
     );

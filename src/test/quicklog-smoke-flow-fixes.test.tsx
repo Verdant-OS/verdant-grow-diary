@@ -85,8 +85,8 @@ beforeEach(() => {
   rpcMock.mockClear();
   toastSuccess.mockClear();
   toastError.mockClear();
-  snapshotStatus = "ready";
-  snapshotPayload = {
+  snapshotState.status = "ready";
+  snapshotState.payload = {
     status: "stale",
     source: "manual",
     captured_at: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),

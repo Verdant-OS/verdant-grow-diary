@@ -43,6 +43,8 @@ export interface EcowittIngestValidationInput {
   now?: Date;
   /** Staleness threshold in ms. Defaults to 24h. */
   staleAfterMs?: number;
+  /** Captured_at values that have already been logged to diary (idempotency). */
+  loggedCapturedAts?: readonly string[];
 }
 
 export interface EcowittValidationMetricChip {
@@ -99,6 +101,38 @@ export interface EcowittIngestValidationViewModel {
   nextSteps: string[];
   /** Empty-state CLI hints. */
   cliHints: { label: string; command: string }[];
+  /** Explicit warnings about derived metrics appearing in raw readings. */
+  derivedReadingWarnings: string[];
+  /** Eligible to log latest validated snapshot to diary. */
+  eligibleForDiaryLog: boolean;
+  /** Reason ineligible if !eligibleForDiaryLog. */
+  ineligibleReason: string | null;
+  /** True when captured_at is already in the loggedCapturedAts input set. */
+  alreadyLogged: boolean;
+  /** Latest validated captured_at for idempotency keys. */
+  latestCapturedAt: string | null;
+  /** Latest accepted raw payload echo (safe object). */
+  latestRawPayload: unknown;
+  /** Per-attempt export rows for the last N validation attempts. */
+  exportAttempts: Array<{
+    capturedAt: string | null;
+    ageLabel: string;
+    status: string;
+    statusLabel: string;
+    invalidTest: boolean;
+    stale: boolean;
+    metricSummary: string;
+    metrics: EcowittValidationMetricRow[];
+    rawPayload: unknown;
+  }>;
+  /** Active metric thresholds for export. */
+  thresholds: Array<{
+    key: string;
+    label: string;
+    min: number;
+    max: number;
+    unit: string;
+  }>;
 }
 
 const DEFAULT_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
@@ -279,6 +313,20 @@ const EMPTY_VM: Omit<
     "Run `bun run dev:send-ecowitt` against this tent.",
     "Reload this page to confirm the ingest webhook accepted the payload.",
   ],
+  derivedReadingWarnings: [],
+  eligibleForDiaryLog: false,
+  ineligibleReason: "no_evidence",
+  alreadyLogged: false,
+  latestCapturedAt: null,
+  latestRawPayload: null,
+  exportAttempts: [],
+  thresholds: METRIC_SPECS.map((m) => ({
+    key: m.key,
+    label: m.label,
+    min: m.min,
+    max: m.max,
+    unit: m.unit,
+  })),
 };
 
 interface BatchValues {
@@ -543,6 +591,79 @@ export function buildEcowittIngestValidationViewModel(
 
   const timeline = buildTimeline(allTestSenderRows, now, staleAfterMs);
 
+  // Derived/raw-boundary warning: vpd_kpa must not appear inside
+  // raw_payload.snapshot.readings — it should live in metrics.vpd_kpa /
+  // derivedVpdKpa instead.
+  const derivedReadingWarnings: string[] = [];
+  for (const r of sameBatch) {
+    const raw = safeObject(r.raw_payload);
+    const snap = safeObject((raw as Record<string, unknown>).snapshot);
+    const readings = snap.readings;
+    if (Array.isArray(readings)) {
+      const offending = readings.some((item) => {
+        if (!item || typeof item !== "object") return false;
+        const metricKey = (item as Record<string, unknown>).metric;
+        return typeof metricKey === "string" && metricKey.toLowerCase() === "vpd_kpa";
+      });
+      if (offending) {
+        derivedReadingWarnings.push(
+          "VPD is derived context and must not appear as a raw sensor reading inside snapshot.readings. It should be surfaced through metrics.vpd_kpa / derivedVpdKpa instead.",
+        );
+        break;
+      }
+    }
+  }
+
+  // Build export attempts from timeline + per-batch raw payloads.
+  const batchByKey = new Map<string, EcowittIngestValidationRow[]>();
+  for (const r of allTestSenderRows) {
+    const key = (r.captured_at ?? r.ts ?? r.id ?? "") + "";
+    const list = batchByKey.get(key);
+    if (list) list.push(r);
+    else batchByKey.set(key, [r]);
+  }
+  const exportAttempts = timeline.map((entry) => {
+    const rowsForKey = batchByKey.get(entry.key) ?? [];
+    const metricsForKey = buildMetricRows(rowsForKey, entry.invalidTest);
+    const rawSamples = rowsForKey.map((r) => safeObject(r.raw_payload));
+    return {
+      capturedAt: entry.capturedAt,
+      ageLabel: entry.ageLabel,
+      status: entry.status,
+      statusLabel: entry.statusLabel,
+      invalidTest: entry.invalidTest,
+      stale: entry.stale,
+      metricSummary: entry.metricSummary,
+      metrics: metricsForKey,
+      rawPayload: rawSamples.length === 1 ? rawSamples[0] : rawSamples,
+    };
+  });
+
+  const latestRawPayload = safeObject(testSenderRow.raw_payload);
+
+  // Eligibility for diary Environment Check log.
+  const loggedSet = new Set(input.loggedCapturedAts ?? []);
+  const alreadyLogged = capturedAt ? loggedSet.has(capturedAt) : false;
+  const acceptedCount = metricRows.filter((m) => m.status === "accepted").length;
+
+  let eligibleForDiaryLog = false;
+  let ineligibleReason: string | null = null;
+  if (!input.tentId) ineligibleReason = "missing_tent";
+  else if (!capturedAt) ineligibleReason = "missing_captured_at";
+  else if (status !== "accepted") ineligibleReason = "not_accepted";
+  else if (invalidTest) ineligibleReason = "invalid_test";
+  else if (acceptedCount === 0) ineligibleReason = "no_accepted_metrics";
+  else if (alreadyLogged) ineligibleReason = "already_logged";
+  else eligibleForDiaryLog = true;
+
+  const thresholds = METRIC_SPECS.map((m) => ({
+    key: m.key,
+    label: m.label,
+    min: m.min,
+    max: m.max,
+    unit: m.unit,
+  }));
+
   return {
     hasEvidence: true,
     status,
@@ -565,6 +686,14 @@ export function buildEcowittIngestValidationViewModel(
     timeline,
     nextSteps,
     cliHints: CLI_HINTS,
+    derivedReadingWarnings,
+    eligibleForDiaryLog,
+    ineligibleReason,
+    alreadyLogged,
+    latestCapturedAt: capturedAt,
+    latestRawPayload,
+    exportAttempts,
+    thresholds,
   };
 }
 

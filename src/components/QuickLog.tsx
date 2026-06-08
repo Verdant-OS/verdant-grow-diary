@@ -132,6 +132,11 @@ export default function QuickLog({
   // Inline validation for required Watering (ml) when event=watering.
   const [wateringError, setWateringError] = useState<string | null>(null);
   const wateringInputRef = useRef<HTMLInputElement | null>(null);
+  // Post-save success state — when set, the dialog keeps open and shows
+  // a "View {plant}" action pointing at the saved target plant. Cleared
+  // on dialog close or when the grower starts a new entry.
+  const [savedTarget, setSavedTarget] = useState<{ id: string; name: string } | null>(null);
+  const viewPlantBtnRef = useRef<HTMLAnchorElement | null>(null);
 
   // Tracks whether the grower has manually changed the attach toggle in
   // this session. Until they do, we may auto-default it based on whether

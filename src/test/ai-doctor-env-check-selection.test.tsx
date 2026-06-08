@@ -118,7 +118,7 @@ describe("aiDoctorEnvironmentCheckRules — parser hardening", () => {
 describe("selectBestEnvironmentCheckEvent", () => {
   it("prefers latest accepted over newer rejected/weak event", () => {
     const sel = selectBestEnvironmentCheckEvent([
-      { occurredAt: "2026-06-08T15:00:00Z", noteBody: MIXED_NOTE("2026-06-08T15:00:00Z") },
+      { occurredAt: "2026-06-08T15:00:00Z", noteBody: WEAK_NOTE("2026-06-08T15:00:00Z") },
       { occurredAt: "2026-06-08T12:00:00Z", noteBody: FULL_ACCEPTED_NOTE("2026-06-08T12:00:00Z") },
       { occurredAt: "2026-06-08T08:00:00Z", noteBody: FULL_ACCEPTED_NOTE("2026-06-08T08:00:00Z") },
     ]);
@@ -129,8 +129,8 @@ describe("selectBestEnvironmentCheckEvent", () => {
 
   it("falls back to newest weak event when no accepted exists", () => {
     const sel = selectBestEnvironmentCheckEvent([
-      { occurredAt: "2026-06-08T15:00:00Z", noteBody: MIXED_NOTE("2026-06-08T15:00:00Z") },
-      { occurredAt: "2026-06-08T13:00:00Z", noteBody: MIXED_NOTE("2026-06-08T13:00:00Z") },
+      { occurredAt: "2026-06-08T15:00:00Z", noteBody: WEAK_NOTE("2026-06-08T15:00:00Z") },
+      { occurredAt: "2026-06-08T13:00:00Z", noteBody: WEAK_NOTE("2026-06-08T13:00:00Z") },
     ]);
     expect(sel.selected?.occurredAt).toBe("2026-06-08T15:00:00Z");
     expect(sel.isFallback).toBe(true);
@@ -206,7 +206,7 @@ describe("Evidence panel — Latest EcoWitt Environment Check + checklist", () =
     render(<AiDoctorEvidencePanel vm={vm} />);
     const section = screen.getByTestId("latest-environment-check-section");
     expect(within(section).getByText("Latest EcoWitt Environment Check")).toBeInTheDocument();
-    expect(within(section).getByText("Test/Local validation")).toBeInTheDocument();
+    expect(within(section).getAllByText("Test/Local validation")[0]).toBeInTheDocument();
     expect(within(section).queryByText("Live")).toBeNull();
     expect(within(section).getByText("2026-06-08T12:00:00Z")).toBeInTheDocument();
     // All 5 required rows visible

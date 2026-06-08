@@ -54,6 +54,7 @@ import { toast } from "sonner";
 
 export interface QuickLogPrefill {
   plantId?: string | null;
+  plantName?: string | null;
   growId?: string | null;
   tentId?: string | null;
   eventType?: string | null;

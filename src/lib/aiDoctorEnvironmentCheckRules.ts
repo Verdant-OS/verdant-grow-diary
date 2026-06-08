@@ -153,16 +153,33 @@ interface ParsedNote {
 }
 
 export function parseEnvironmentCheckNote(noteBody: string): ParsedNote {
-  const lines = noteBody.split(/\r?\n/);
+  let lines: string[];
+  try {
+    lines = String(noteBody ?? "").split(/\r?\n/);
+  } catch {
+    return { status: "unknown", metrics: [] };
+  }
   const metrics: EnvCheckMetric[] = [];
+  const seenKeys = new Set<string>();
+  const supportedKeys = new Set<string>(REQUIRED_ENVIRONMENT_METRICS);
   for (const line of lines) {
-    const m = line.match(METRIC_LINE_RE);
+    let m: RegExpMatchArray | null = null;
+    try {
+      m = line.match(METRIC_LINE_RE);
+    } catch {
+      m = null;
+    }
     if (!m) continue;
-    const label = m[1].trim();
+    const label = (m[1] ?? "").trim();
+    if (!label) continue;
     const status = m[2] as EnvCheckMetricStatus;
-    const value = parseValue(m[3]);
+    const value = parseValue(m[3] ?? "");
     const reason = (m[4] ?? "").trim();
     const key = normalizeKey(label);
+    if (!key) continue;
+    // Deterministic dedupe: first occurrence wins.
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
     metrics.push({
       key,
       label,
@@ -170,6 +187,7 @@ export function parseEnvironmentCheckNote(noteBody: string): ParsedNote {
       value,
       reason,
       derived: DERIVED_KEY_HINTS.has(key),
+      supported: supportedKeys.has(key),
     });
   }
   return { status: parseStatusLine(noteBody), metrics };

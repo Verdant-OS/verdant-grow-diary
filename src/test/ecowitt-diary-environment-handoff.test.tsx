@@ -312,10 +312,23 @@ describe("EcowittIngestValidationPanel — copy + export", () => {
     if (originalRevokeObjectURL) URL.revokeObjectURL = originalRevokeObjectURL;
   });
 
-  it("Copy latest evidence writes redacted JSON to clipboard only", async () => {
+  it("Copy latest evidence opens preview modal, then writes redacted JSON to clipboard on confirm", async () => {
     render(<EcowittIngestValidationPanel input={acceptedInput()} />);
     await act(async () => {
       fireEvent.click(screen.getByTestId("copy-latest-evidence-button"));
+    });
+    // Preview modal renders and never shows secrets
+    const dialog = screen.getByTestId("copy-preview-dialog");
+    expect(dialog.textContent).toContain("Local EcoWitt validation evidence");
+    expect(dialog.textContent).not.toContain("SECRET-TOKEN");
+    expect(dialog.textContent).not.toContain("Bearer zzz");
+    expect(dialog.textContent).not.toContain("srv-key");
+    expect(dialog.textContent).not.toContain("ak-123");
+    expect(dialog.textContent).not.toContain("uuid-of-user");
+    expect(dialog.textContent).not.toContain("internal-row-id-12345");
+    // Confirm
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("copy-confirm-button"));
     });
     expect(writeText).toHaveBeenCalledTimes(1);
     const text = writeText.mock.calls[0][0] as string;
@@ -329,19 +342,191 @@ describe("EcowittIngestValidationPanel — copy + export", () => {
     expect(text).not.toContain("internal-row-id-12345");
   });
 
-  it("Export validation triggers a client-side download (no fetch/network)", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation(() => {
-      throw new Error("export must not perform network calls");
+  it("Copy cancel button closes modal without writing to clipboard", async () => {
+    render(<EcowittIngestValidationPanel input={acceptedInput()} />);
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("copy-latest-evidence-button"));
     });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("copy-cancel-button"));
+    });
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it("Export validation opens preview modal and confirms JSON download (no fetch)", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch" as never)
+      .mockImplementation(() => {
+        throw new Error("export must not perform network calls");
+      });
     render(<EcowittIngestValidationPanel input={acceptedInput()} />);
     await act(async () => {
       fireEvent.click(screen.getByTestId("export-validation-button"));
+    });
+    const dialog = screen.getByTestId("export-preview-dialog");
+    expect(dialog.textContent).toContain(
+      "Local EcoWitt validation — last 10 attempts",
+    );
+    expect(screen.getByTestId("export-preview-attempt-count").textContent).toBe(
+      "1",
+    );
+    // Confirm JSON
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("export-download-json-button"));
     });
     expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });
+
+  it("Export preview surfaces CSV download when helper available", async () => {
+    render(<EcowittIngestValidationPanel input={acceptedInput()} />);
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("export-validation-button"));
+    });
+    expect(screen.getByTestId("export-download-csv-button")).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("export-download-csv-button"));
+    });
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+  });
+
+  it("Export and Copy preview modals never render secrets/tokens/auth/user_id/internal IDs", async () => {
+    render(<EcowittIngestValidationPanel input={acceptedInput()} />);
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("export-validation-button"));
+    });
+    const exportDialog = screen.getByTestId("export-preview-dialog");
+    for (const secret of [
+      "SECRET-TOKEN",
+      "BRIDGE-yyy",
+      "Bearer zzz",
+      "srv-key",
+      "sig-abc",
+      "ak-123",
+      "uuid-of-user",
+      "internal-row-id-12345",
+    ]) {
+      expect(exportDialog.textContent).not.toContain(secret);
+    }
+  });
 });
+
+describe("CSV serializer", () => {
+  it("emits one row per (attempt × metric), capped to last 10 attempts, with redacted output", async () => {
+    const { buildEcowittValidationExport, serializeExportCsv } = await import(
+      "@/lib/ecowittValidationExportRules"
+    );
+    const { buildEcowittIngestValidationViewModel } = await import(
+      "@/lib/ecowittIngestValidationViewModel"
+    );
+    const rows = Array.from({ length: 25 }, (_, i) => ({
+      id: `r${i}`,
+      source: "ecowitt",
+      captured_at: new Date(NOW.getTime() - i * 60_000).toISOString(),
+      ts: new Date(NOW.getTime() - i * 60_000).toISOString(),
+      metric: "temp_f",
+      value: 70 + i,
+      raw_payload: {
+        test_sender: true,
+        invalid_test: false,
+        token: "SECRET-CSV",
+        authorization: "Bearer csv",
+        api_key: "ak-csv",
+        user_id: "uuid-csv",
+        id: "internal-csv",
+        signature: "sig-csv",
+        metrics: { temp_f: 70 + i, humidity_pct: 50 },
+        metadata: { test_sender: true },
+      },
+    }));
+    const vm = buildEcowittIngestValidationViewModel({
+      tentId: TENT,
+      now: NOW,
+      rows,
+    });
+    const payload = buildEcowittValidationExport({
+      tentScopedLabel: vm.tentScopedLabel,
+      sourceLabel: vm.sourceLabel,
+      now: NOW,
+      thresholds: vm.thresholds,
+      attempts: vm.exportAttempts,
+    });
+    const csv = serializeExportCsv(payload);
+    const lines = csv.split("\n");
+    expect(lines[0]).toBe(
+      "captured_at,validation_status,metric,value,metric_status,reason,source_label",
+    );
+    // 10 attempts × 5 metric rows = 50 + header = 51
+    expect(lines.length).toBe(1 + 10 * 5);
+    expect(csv).not.toContain("SECRET-CSV");
+    expect(csv).not.toContain("Bearer csv");
+    expect(csv).not.toContain("ak-csv");
+    expect(csv).not.toContain("uuid-csv");
+    expect(csv).not.toContain("internal-csv");
+    expect(csv).not.toContain("sig-csv");
+  });
+});
+
+describe("Diary Environment Check link / View affordance", () => {
+  it("renders View Environment Check link when alreadyLogged is true", () => {
+    render(
+      <EcowittIngestValidationPanel
+        input={acceptedInput({
+          loggedCapturedAts: ["2026-06-07T11:58:00Z"],
+        })}
+        growId="grow-123"
+      />,
+    );
+    const link = screen.getByTestId(
+      "view-environment-check-link",
+    ) as HTMLAnchorElement;
+    expect(link).toBeInTheDocument();
+    expect(link.getAttribute("href")).toMatch(/^\/timeline/);
+    expect(link.getAttribute("href")).toContain("growId=grow-123");
+    expect(link.getAttribute("href")).toContain(
+      "ecowitt-environment-check-2026-06-07T11",
+    );
+    expect(screen.getByTestId("logged-event-title").textContent).toContain(
+      "EcoWitt Environment Check",
+    );
+    expect(
+      screen.getByTestId("logged-event-captured-at").textContent,
+    ).toContain("2026-06-07T11:58:00Z");
+  });
+
+  it("renders View link after a fresh Log click even if grow_events query hasn't refetched", () => {
+    const onLog = vi.fn();
+    render(
+      <EcowittIngestValidationPanel
+        input={acceptedInput()}
+        onLogEnvironmentCheck={onLog}
+      />,
+    );
+    expect(screen.queryByTestId("view-environment-check-link")).toBeNull();
+    fireEvent.click(screen.getByTestId("log-environment-check-button"));
+    expect(onLog).toHaveBeenCalledTimes(1);
+    const link = screen.getByTestId("view-environment-check-link");
+    expect(link.getAttribute("href")).toContain("ecowitt-environment-check-");
+    expect(screen.getByTestId("logged-event-title").textContent).toContain(
+      "EcoWitt Environment Check",
+    );
+  });
+
+  it("does not expose raw UUID-style internal IDs in user-facing copy", () => {
+    const { container } = render(
+      <EcowittIngestValidationPanel
+        input={acceptedInput({
+          loggedCapturedAts: ["2026-06-07T11:58:00Z"],
+        })}
+        growId="grow-123"
+      />,
+    );
+    // The fake row id internal-row-id-12345 must never appear in visible copy.
+    expect(container.textContent).not.toContain("internal-row-id-12345");
+  });
+});
+
 
 describe("export rules — last 10 attempts + redaction", () => {
   function manyRows(n: number) {

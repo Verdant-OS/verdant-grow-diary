@@ -124,6 +124,14 @@ export function buildLegacyQuickLogUnifiedPayload(
 
   const note = appendLegacyDetailsToNote(input.noteWithHardware, input.details);
 
+  // Only build the `p_details` envelope when the caller passed a non-null
+  // redacted sensor payload. We never invent details, never persist
+  // raw_payload, and never re-key the envelope as `sensor_snapshot`.
+  const detailsEnvelope: Record<string, unknown> | null =
+    input.sensorAttachPayload != null
+      ? { sensor: input.sensorAttachPayload }
+      : null;
+
   if (input.eventType === "watering") {
     const raw = trimStr(input.details.watering);
     const volume = Number(raw);
@@ -146,6 +154,7 @@ export function buildLegacyQuickLogUnifiedPayload(
         p_humidity_pct: null,
         p_vpd_kpa: null,
         p_occurred_at: null,
+        p_details: detailsEnvelope,
       },
     };
   }
@@ -170,6 +179,7 @@ export function buildLegacyQuickLogUnifiedPayload(
       p_humidity_pct: null,
       p_vpd_kpa: null,
       p_occurred_at: null,
+      p_details: detailsEnvelope,
     },
   };
 }

@@ -38,15 +38,15 @@ import {
 } from "@/lib/quickLogPlantOptionRules";
 import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
 import EventTypeSelector from "@/components/EventTypeSelector";
-import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
-import { buildQuickLogSnapshotStrip } from "@/lib/quickLogSnapshotStripAdapter";
+import { useLatestTentSensorSnapshot } from "@/lib/sensor";
+import { buildQuickLogStripFromTentState } from "@/lib/quickLogSnapshotStripAdapter";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 import {
   buildLegacyQuickLogUnifiedPayload,
   isSupportedLegacyEventType,
   UNSUPPORTED_EVENT_TYPE_COPY,
 } from "@/lib/legacyQuickLogUnifiedSave";
-import { buildQuickLogSensorAttachPayload } from "@/lib/quickLogSensorAttachAdapter";
+import { buildSensorSnapshotSavePayload } from "@/lib/latestSensorSnapshotRules";
 
 import { AlertTriangle, Info } from "lucide-react";
 import { toast } from "sonner";
@@ -183,17 +183,17 @@ export default function QuickLog({
   // contract-derived status the strip uses. We call the loader here so the
   // parent can react to status transitions without duplicating any
   // classification logic in this .tsx.
-  const sensorTentIds = selectedPlant?.tent_id ? [selectedPlant.tent_id] : [];
-  const sensorState = useLatestSensorSnapshot(activeGrowId, sensorTentIds);
+  const sensorTentId = selectedPlant?.tent_id ?? null;
+  const sensorState = useLatestTentSensorSnapshot(sensorTentId);
   const stripView = useMemo(
     () =>
-      buildQuickLogSnapshotStrip({
+      buildQuickLogStripFromTentState({
+        status: sensorState.status,
         snapshot: sensorState.snapshot,
-        loading: sensorState.status === "loading",
-        hasTent: !!selectedPlant?.tent_id,
+        hasTent: !!sensorTentId,
         attached: snapshot,
       }),
-    [sensorState.snapshot, sensorState.status, selectedPlant?.tent_id, snapshot],
+    [sensorState.status, sensorState.snapshot, sensorTentId, snapshot],
   );
 
   // When the snapshot becomes `usable` and the grower has NOT manually
@@ -263,12 +263,10 @@ export default function QuickLog({
     setBusy(true);
     try {
       const noteWithHardware = appendHardwareReadingsToNote(note, hardware);
-      const sensorAttachPayload = buildQuickLogSensorAttachPayload({
-        snapshot: sensorState.snapshot,
-        stripStatus: stripView.status,
-        attach: snapshot && !!selectedPlant?.tent_id,
-        tentId: selectedPlant?.tent_id ?? null,
-      });
+      const sensorAttachPayload =
+        snapshot && sensorTentId && stripView.status === "usable"
+          ? buildSensorSnapshotSavePayload(sensorState.snapshot)
+          : null;
       const built = buildLegacyQuickLogUnifiedPayload({
         eventType,
         noteWithHardware,

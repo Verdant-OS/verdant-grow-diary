@@ -3,23 +3,26 @@
  * strip for the Quick Log dialog.
  *
  * Reads the latest sensor snapshot for the selected plant's tent via
- * `useLatestSensorSnapshot` and renders a compact status strip derived
- * from `buildQuickLogSnapshotStrip` (which delegates to the canonical
- * `sensorSnapshotStatusContract`).
+ * the realtime-aware `useLatestTentSensorSnapshot(tentId)` hook
+ * (`src/lib/sensor.ts`) and renders a compact status strip derived from
+ * the strict resolver in `latestSensorSnapshotRules.ts` via the
+ * `buildQuickLogStripFromTentState` adapter.
  *
  * No classification rules live in this file. No writes. No automation.
- * Action buttons are navigation-only and point at /sensors.
+ * Action buttons are navigation-only and point at /sensors. The strip
+ * never promotes provider labels (ecowitt, home_assistant, ...) to Live —
+ * only the strict resolver's `fresh_live` status counts as Live.
  */
 
 import { Gauge } from "lucide-react";
-import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
+import { useLatestTentSensorSnapshot } from "@/lib/sensor";
 import {
-  buildQuickLogSnapshotStrip,
+  buildQuickLogStripFromTentState,
   type QuickLogSnapshotStripStatus,
 } from "@/lib/quickLogSnapshotStripAdapter";
 
 interface Props {
-  growId: string | null | undefined;
+  growId?: string | null | undefined;
   tentId: string | null | undefined;
   /**
    * Whether the grower's "Attach sensor snapshot" toggle is on. When
@@ -49,12 +52,11 @@ const PILL_LABEL: Record<QuickLogSnapshotStripStatus, string> = {
   no_data: "No data",
 };
 
-export default function QuickLogSensorSnapshotStrip({ growId, tentId, attached = true }: Props) {
-  const tentIds = tentId ? [tentId] : [];
-  const state = useLatestSensorSnapshot(growId ?? null, tentIds);
-  const view = buildQuickLogSnapshotStrip({
+export default function QuickLogSensorSnapshotStrip({ tentId, attached = true }: Props) {
+  const state = useLatestTentSensorSnapshot(tentId ?? null);
+  const view = buildQuickLogStripFromTentState({
+    status: state.status,
     snapshot: state.snapshot,
-    loading: state.status === "loading",
     hasTent: !!tentId,
     attached,
   });

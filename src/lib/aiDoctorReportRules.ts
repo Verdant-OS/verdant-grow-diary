@@ -155,6 +155,9 @@ export function buildAiDoctorReportText(input: AiDoctorReportInput): string {
       );
     }
     lines.push("");
+  }
+
+
 
   if (input.checklist.length > 0) {
     lines.push("More data needed (checklist):");

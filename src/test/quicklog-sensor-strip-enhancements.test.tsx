@@ -76,13 +76,13 @@ describe("QuickLogSensorSnapshotStrip — provider label, ARIA, mini-chart", () 
     );
     render(<QuickLogSensorSnapshotStrip tentId="t1" />);
     const src = screen.getByTestId("quicklog-sensor-snapshot-source");
-    expect(src).toHaveTextContent("ecowitt");
-    expect(src).toHaveAttribute("aria-label", "Sensor source: ecowitt");
+    expect(src).toHaveTextContent("source: EcoWitt");
+    expect(src).toHaveAttribute("aria-label", "Sensor source: EcoWitt");
     // Pill is still Usable, never Live.
     expect(screen.getByTestId("quicklog-sensor-snapshot-pill")).toHaveTextContent("Usable");
   });
 
-  it("normalizes underscore source labels (home_assistant → home assistant)", () => {
+  it("renders friendly label for home_assistant", () => {
     mockUseLatestTentSensorSnapshot.mockReturnValue(
       ready({
         source: "home_assistant",
@@ -91,9 +91,10 @@ describe("QuickLogSensorSnapshotStrip — provider label, ARIA, mini-chart", () 
     );
     render(<QuickLogSensorSnapshotStrip tentId="t1" />);
     expect(screen.getByTestId("quicklog-sensor-snapshot-source")).toHaveTextContent(
-      "home assistant",
+      "source: Home Assistant",
     );
   });
+
 
   it("hides provider chip when source is 'live'", () => {
     mockUseLatestTentSensorSnapshot.mockReturnValue(ready({ source: "live" }));

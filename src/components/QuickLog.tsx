@@ -459,6 +459,88 @@ export default function QuickLog({
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-4">
+          {(() => {
+            const showMismatch = !!(
+              prefill?.plantId &&
+              selectedPlant &&
+              selectedPlant.id !== prefill.plantId
+            );
+            const snapshotUsable = stripView.status === "usable";
+            const showStaleHelper = !!(
+              selectedPlant &&
+              !snapshotUsable &&
+              stripView.status !== "no_data" &&
+              !tentSetupRequired
+            );
+            const showWateringErr = !!wateringError;
+            if (!showMismatch && !showStaleHelper && !showWateringErr) return null;
+            const focusPlant = () => {
+              plantSelectTriggerRef.current?.focus();
+              plantSelectTriggerRef.current?.scrollIntoView?.({ block: "center" });
+            };
+            const focusAttach = () => {
+              attachWrapperRef.current?.focus();
+              attachWrapperRef.current?.scrollIntoView?.({ block: "center" });
+            };
+            const focusWatering = () => {
+              setShowMore(true);
+              setTimeout(() => {
+                wateringInputRef.current?.focus();
+                wateringInputRef.current?.scrollIntoView?.({ block: "center" });
+              }, 0);
+            };
+            return (
+              <div
+                data-testid="quick-log-review-issues"
+                role="group"
+                aria-label="Review Quick Log issues"
+                className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-2.5 space-y-1"
+              >
+                <p className="text-[11px] uppercase tracking-wide text-amber-200/80">
+                  Review Quick Log issues
+                </p>
+                <ul className="flex flex-wrap gap-x-3 gap-y-1">
+                  {showMismatch && (
+                    <li>
+                      <button
+                        type="button"
+                        data-testid="quick-log-review-jump-mismatch"
+                        onClick={focusPlant}
+                        className="text-[12px] underline text-amber-200 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        Jump to plant mismatch
+                      </button>
+                    </li>
+                  )}
+                  {showStaleHelper && (
+                    <li>
+                      <button
+                        type="button"
+                        data-testid="quick-log-review-jump-snapshot"
+                        onClick={focusAttach}
+                        className="text-[12px] underline text-amber-200 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        Jump to sensor snapshot
+                      </button>
+                    </li>
+                  )}
+                  {showWateringErr && (
+                    <li>
+                      <button
+                        type="button"
+                        data-testid="quick-log-review-jump-watering"
+                        onClick={focusWatering}
+                        className="text-[12px] underline text-amber-200 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        Jump to Watering (ml)
+                      </button>
+                    </li>
+                  )}
+                </ul>
+              </div>
+            );
+          })()}
+
           {/* Photo attach is temporarily disabled in the unified Quick
               Log slice. Copy stays grower-facing — never references
               internal table or writer names. */}

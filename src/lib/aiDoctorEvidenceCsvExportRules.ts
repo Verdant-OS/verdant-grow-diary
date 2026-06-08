@@ -155,7 +155,7 @@ export function buildAiDoctorEvidenceCsv(
     row({
       section: "evidence_summary",
       status: input.evidenceSummary.liveSensorUsable ? "yes" : "no",
-      recommendation: "Live sensor usable",
+      recommendation: "Sensor usable as live evidence",
       generated_at: input.generatedAt,
     }),
   );

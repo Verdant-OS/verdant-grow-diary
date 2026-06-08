@@ -256,6 +256,3 @@ describe("SensorSnapshotPreview", () => {
     ).toBeInTheDocument();
   });
 });
-
-// Required so afterEach is in-scope.
-import { afterEach } from "vitest";

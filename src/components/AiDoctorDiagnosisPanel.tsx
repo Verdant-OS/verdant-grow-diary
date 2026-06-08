@@ -169,6 +169,82 @@ export default function AiDoctorDiagnosisPanel({
     downloadAiDoctorEvidenceCsv(csv);
   }, [view, reportInput, buildRecsForReport]);
 
+  const buildFullReportInput = useCallback((): AiDoctorReportInput | null => {
+    if (!view || !reportInput) return null;
+    return {
+      ...reportInput,
+      summary: reportInput.summary || view.summary,
+      recommendations: buildRecsForReport(),
+    };
+  }, [view, reportInput, buildRecsForReport]);
+
+  const [packageMessage, setPackageMessage] = useState<string | null>(null);
+  const handleDownloadPackage = useCallback(async () => {
+    const full = buildFullReportInput();
+    if (!full) return;
+    let zipCtor: any = null;
+    try {
+      const mod = await import("jszip");
+      zipCtor = (mod as any).default ?? (mod as any).JSZip ?? null;
+    } catch {
+      zipCtor = null;
+    }
+    const r = await downloadAiDoctorReportPackage(full, { zipCtor });
+    setPackageMessage(r.message);
+  }, [buildFullReportInput]);
+
+  const [previewOpen, setPreviewOpen] = useState<boolean>(false);
+  const previewInput = useMemo(
+    () => (previewOpen ? buildFullReportInput() : null),
+    [previewOpen, buildFullReportInput],
+  );
+
+  // Citation modal — search items + active selection
+  const recommendationIndexByCitation = useMemo(() => {
+    const m = new Map<string, number>();
+    (citedRecs ?? []).forEach((r, i) => {
+      m.set(r.citation.targetId + "::" + r.citation.label, i);
+    });
+    return m;
+  }, [citedRecs]);
+
+  const searchItems: EvidenceSearchItem[] = useMemo(() => {
+    if (!citationContext) return [];
+    const items: EvidenceSearchItem[] = [];
+    citationContext.availableMetrics.forEach((m) => {
+      const isDerivedVpd = m.derived && m.key === "vpd_kpa";
+      items.push({
+        id: `envcheck-${m.key}`,
+        label: isDerivedVpd
+          ? "Derived VPD context"
+          : m.statusLabel === "Accepted"
+          ? `Env Check: ${m.key}`
+          : `Env Check (weak): ${m.key}`,
+        metricKey: m.key,
+        status: m.statusLabel,
+        sourceLabel: "Test/Local validation",
+        reason: m.reason ?? null,
+        citationKind: isDerivedVpd
+          ? "env_metric_derived"
+          : m.statusLabel === "Accepted"
+          ? "env_metric"
+          : "env_metric_weak",
+      });
+    });
+    citationContext.missingMetrics.forEach((k) => {
+      items.push({
+        id: `missing-${k}`,
+        label: `Missing: ${k}`,
+        metricKey: k,
+        status: "Missing",
+        sourceLabel: "Not captured",
+        reason: null,
+        citationKind: "missing_metric",
+      });
+    });
+    return items;
+  }, [citationContext]);
+
   if (!view) {
     return (
       <section

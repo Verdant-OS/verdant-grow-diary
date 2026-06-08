@@ -111,6 +111,49 @@ export interface MissingContextItem {
   label: string;
 }
 
+export interface LatestEnvironmentCheckSectionVM {
+  show: boolean;
+  title: "Latest EcoWitt Environment Check";
+  sourceLabel: "Test/Local validation";
+  isLive: false;
+  eventTitle: string;
+  capturedAt: string | null;
+  selectedStatus:
+    | "accepted"
+    | "mixed"
+    | "weak"
+    | "rejected"
+    | "not_checked"
+    | "missing";
+  selectedStatusLabel: string;
+  isFallback: boolean;
+  timelineHref: string | null;
+  /** Always 5 rows, one per required metric (missing rows shown as Missing). */
+  metricRows: Array<{
+    key: string;
+    label: string;
+    statusLabel: "Accepted" | "Rejected" | "Not checked" | "Missing";
+    /** "Derived context" for VPD, otherwise "Test/Local validation" / "Missing". */
+    contextLabel: "Test/Local validation" | "Derived context" | "Missing";
+    notHealthy: boolean;
+    displayValue: string | null;
+    reason: string;
+  }>;
+  cautionCopy: string;
+}
+
+export interface MoreDataNeededChecklistVM {
+  show: boolean;
+  title: "More data needed";
+  items: Array<{
+    key: string;
+    label: string;
+    state: "complete" | "needed";
+    reason: string;
+  }>;
+  cautionCopy: string;
+}
+
 export interface AiDoctorEvidencePanelVM {
   /** Ordered groups for rendering. */
   groups: EvidenceGroupVM[];
@@ -120,6 +163,10 @@ export interface AiDoctorEvidencePanelVM {
   conservativeRecommendationCopy: string;
   /** True when at least one usable evidence item exists. */
   hasAnyEvidence: boolean;
+  /** Compact "Latest EcoWitt Environment Check" section. */
+  latestEnvironmentCheck: LatestEnvironmentCheckSectionVM;
+  /** "More data needed" checklist (shown when env-check missing or weak). */
+  moreDataNeeded: MoreDataNeededChecklistVM;
 }
 
 // ---------------------------------------------------------------------------

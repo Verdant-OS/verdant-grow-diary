@@ -106,3 +106,88 @@ export function buildEcowittValidationExport(
 export function serializeExport(payload: EcowittExportPayload): string {
   return JSON.stringify(payload, null, 2);
 }
+
+/**
+ * Minimal CSV serializer (RFC4180-ish). Reuses the already-redacted
+ * attempts from `buildEcowittValidationExport`, so every secret-y key
+ * stripped by `redactEvidenceValue` is also absent here. Emits one row
+ * per (attempt × metric).
+ */
+const CSV_HEADER = [
+  "captured_at",
+  "validation_status",
+  "metric",
+  "value",
+  "metric_status",
+  "reason",
+  "source_label",
+] as const;
+
+function csvEscape(v: string | number | boolean | null | undefined): string {
+  if (v === null || v === undefined) return "";
+  const s = String(v);
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+export function serializeExportCsv(payload: EcowittExportPayload): string {
+  const lines: string[] = [CSV_HEADER.join(",")];
+  for (const attempt of payload.attempts) {
+    for (const m of attempt.metrics) {
+      lines.push(
+        [
+          attempt.captured_at ?? "",
+          attempt.status,
+          m.label,
+          m.value ?? "",
+          m.status,
+          m.reason ?? "",
+          payload.source_label,
+        ]
+          .map(csvEscape)
+          .join(","),
+      );
+    }
+  }
+  return lines.join("\n");
+}
+
+/** Project ships a safe CSV serializer for validation exports. */
+export const EXPORT_CSV_AVAILABLE = true;
+
+export interface EcowittExportPreview {
+  label: string;
+  source_label: string;
+  tent: string;
+  attempt_count: number;
+  latest_captured_at: string | null;
+  earliest_captured_at: string | null;
+  metric_labels: string[];
+  redaction_notice: string;
+}
+
+export const EXPORT_REDACTION_NOTICE =
+  "Tokens, bridge tokens, authorization/bearer/JWT, service_role, signatures, api keys, raw user_id, and internal IDs are redacted before export. Test/local data only — never sent.";
+
+export function buildExportPreview(
+  payload: EcowittExportPayload,
+): EcowittExportPreview {
+  const captured = payload.attempts
+    .map((a) => a.captured_at)
+    .filter((x): x is string => typeof x === "string" && x.length > 0)
+    .sort();
+  const metricLabels = new Set<string>();
+  for (const a of payload.attempts)
+    for (const m of a.metrics) metricLabels.add(m.label);
+  return {
+    label: payload.label,
+    source_label: payload.source_label,
+    tent: payload.tent,
+    attempt_count: payload.attempts.length,
+    latest_captured_at:
+      captured.length > 0 ? captured[captured.length - 1] : null,
+    earliest_captured_at: captured.length > 0 ? captured[0] : null,
+    metric_labels: Array.from(metricLabels),
+    redaction_notice: EXPORT_REDACTION_NOTICE,
+  };
+}

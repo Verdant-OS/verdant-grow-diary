@@ -23,6 +23,14 @@
  */
 
 import type { QuickLogV2SavePayload } from "./quickLogV2SavePayload";
+import type { buildSensorSnapshotSavePayload } from "./latestSensorSnapshotRules";
+
+/**
+ * Redacted sensor envelope produced by `buildSensorSnapshotSavePayload`.
+ * Always either `null` (no attach / not safe to attach) or the structured
+ * sensor object. Never includes raw_payload, tokens, or auth strings.
+ */
+export type SensorAttachPayload = ReturnType<typeof buildSensorSnapshotSavePayload>;
 
 export const SUPPORTED_LEGACY_EVENT_TYPES = [
   "watering",

@@ -17,6 +17,41 @@ export const DIARY_ENVIRONMENT_CHECK_EVENT_TYPE = "environment_check";
 /** Closest enum already supported by quicklog_save_manual. */
 export const DIARY_ENVIRONMENT_CHECK_FALLBACK_EVENT_TYPE = "environment";
 
+/**
+ * Build a safe diary/timeline link for a previously-logged Environment
+ * Check event. Uses the existing `/timeline` route plus a captured_at
+ * hash anchor — no internal grow_event UUIDs leak into user-facing copy.
+ */
+export function environmentCheckTimelineHref(
+  capturedAt: string | null | undefined,
+  growId?: string | null,
+): string {
+  const base = growId
+    ? `/timeline?growId=${encodeURIComponent(growId)}`
+    : "/timeline";
+  if (!capturedAt) return base;
+  const anchor = `#ecowitt-environment-check-${encodeURIComponent(capturedAt)}`;
+  return `${base}${anchor}`;
+}
+
+export interface AlreadyLoggedEventInfo {
+  title: string;
+  capturedAt: string;
+  href: string;
+}
+
+export function buildAlreadyLoggedEventInfo(
+  capturedAt: string | null | undefined,
+  growId?: string | null,
+): AlreadyLoggedEventInfo | null {
+  if (!capturedAt) return null;
+  return {
+    title: DIARY_ENVIRONMENT_CHECK_TITLE,
+    capturedAt,
+    href: environmentCheckTimelineHref(capturedAt, growId),
+  };
+}
+
 export interface DiaryDraftMetric {
   key: string;
   label: string;

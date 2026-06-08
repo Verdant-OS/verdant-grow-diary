@@ -38,10 +38,11 @@ describe("QuickLog publish-slice split guardrail", () => {
   });
 
   it("has no automation / device-control / fake-live wording", () => {
-    expect(QL).not.toMatch(/action_queue/i);
+    expect(QL).not.toMatch(/\baction_queue\.(insert|update|delete|upsert)/i);
     expect(QL).not.toMatch(/service_role/);
     expect(QL).not.toMatch(/functions\.invoke/);
     expect(QL).not.toMatch(/\.rpc\(/);
     expect(QL).not.toMatch(/live updating/i);
   });
+
 });

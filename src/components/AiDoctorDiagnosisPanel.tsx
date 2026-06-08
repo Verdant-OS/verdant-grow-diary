@@ -46,6 +46,7 @@ export default function AiDoctorDiagnosisPanel({
   isLoading,
   className,
   testIdPrefix,
+  evidenceAlignment,
 }: AiDoctorDiagnosisPanelProps) {
   const tid = (s: string) => (testIdPrefix ? `${testIdPrefix}-${s}` : s);
   const hasDiagnosis = diagnosis != null;

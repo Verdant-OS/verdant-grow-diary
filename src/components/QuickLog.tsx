@@ -560,39 +560,55 @@ export default function QuickLog({
             </p>
           ) : (
             <>
-              <label
-                className={`flex items-center justify-between gap-2 rounded-lg border p-3 ${selectedPlant ? "border-border/60" : "border-border/40 opacity-60"}`}
-              >
-                <span className="text-sm flex items-center gap-2">
-                  <Gauge className="h-4 w-4 text-primary" />
-                  Attach sensor snapshot
-                </span>
-                <Switch
-                  checked={snapshot && !!selectedPlant}
-                  onCheckedChange={(v) => {
-                    snapshotUserTouchedRef.current = true;
-                    setSnapshot(v);
-                  }}
-                  disabled={!selectedPlant}
-                  aria-label="Attach sensor snapshot to this log"
-                  aria-describedby="quick-log-snapshot-session-helper"
-                />
-              </label>
-              <p
-                id="quick-log-snapshot-session-helper"
-                data-testid="quick-log-snapshot-session-helper"
-                className="text-[11px] text-muted-foreground -mt-2"
-              >
-                Applies to this log only. Closing Quick Log resets this choice.
-              </p>
-              {snapshot && !selectedPlant && (
-                <p
-                  className="text-[11px] text-muted-foreground -mt-2"
-                  data-testid="quick-log-snapshot-plant-warning"
-                >
-                  Choose a plant before attaching plant-specific readings.
-                </p>
-              )}
+              {(() => {
+                const snapshotUsable = stripView.status === "usable";
+                const attachDisabled = !selectedPlant || !snapshotUsable;
+                return (
+                  <>
+                    <label
+                      className={`flex items-center justify-between gap-2 rounded-lg border p-3 ${attachDisabled ? "border-border/40 opacity-60" : "border-border/60"}`}
+                    >
+                      <span className="text-sm flex items-center gap-2">
+                        <Gauge className="h-4 w-4 text-primary" />
+                        Attach sensor snapshot
+                      </span>
+                      <Switch
+                        data-testid="quick-log-snapshot-toggle"
+                        data-snapshot-status={stripView.status}
+                        checked={snapshot && !!selectedPlant && snapshotUsable}
+                        onCheckedChange={(v) => {
+                          snapshotUserTouchedRef.current = true;
+                          setSnapshot(v);
+                        }}
+                        disabled={attachDisabled}
+                        aria-label="Attach sensor snapshot to this log"
+                        aria-describedby="quick-log-snapshot-session-helper"
+                      />
+                    </label>
+                    <p
+                      id="quick-log-snapshot-session-helper"
+                      data-testid="quick-log-snapshot-session-helper"
+                      className="text-[11px] text-muted-foreground -mt-2"
+                    >
+                      {selectedPlant && !snapshotUsable && stripView.status !== "no_data" ? (
+                        <span data-testid="quick-log-snapshot-stale-helper">
+                          Refresh before attaching this snapshot. Stale or unverified readings are not saved as current sensor context.
+                        </span>
+                      ) : (
+                        "Applies to this log only. Closing Quick Log resets this choice."
+                      )}
+                    </p>
+                    {snapshot && !selectedPlant && (
+                      <p
+                        className="text-[11px] text-muted-foreground -mt-2"
+                        data-testid="quick-log-snapshot-plant-warning"
+                      >
+                        Choose a plant before attaching plant-specific readings.
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
             </>
           )}
 

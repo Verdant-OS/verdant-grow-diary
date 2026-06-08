@@ -528,6 +528,8 @@ export default function QuickLog({
             <div
               data-testid="quick-log-plant-mismatch-banner"
               role="status"
+              aria-live="polite"
+              tabIndex={-1}
               className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-2.5 text-[12px] text-amber-200 flex items-start gap-2"
             >
               <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" aria-hidden="true" />

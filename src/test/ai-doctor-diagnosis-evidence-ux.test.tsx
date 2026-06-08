@@ -134,8 +134,7 @@ describe("aiDoctorEvidenceCitationRules", () => {
   });
 
   it("handles non-string input safely", () => {
-    // @ts-expect-error testing runtime safety
-    const c = resolveEvidenceCitation(undefined, baseCtx);
+    const c = resolveEvidenceCitation(undefined as unknown as string, baseCtx);
     expect(c.kind).toBe("none");
   });
 });

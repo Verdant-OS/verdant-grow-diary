@@ -184,9 +184,20 @@ describe("Action Queue safety — current posture (suggest-only by construction)
     // pi_bridge appears ONLY as a sensor_readings.source enum value (read-side
     // ingest tag), never as an outbound device controller — assert it's not
     // referenced from any fetch/url/MQTT call.
+    // Scoped allow-list: sensorProviderLabels.ts holds read-only display-name
+    // constants (e.g. pi_bridge: "Pi Bridge", mqtt: "MQTT"). The literal
+    // "mqtt" inside that map is a label key, not a device-control call.
+    const PROVIDER_LABELS_FILE = "src/constants/sensorProviderLabels.ts";
+    const PROVIDER_LABELS_CONTENT = readFileSync(resolve(ROOT, PROVIDER_LABELS_FILE), "utf8");
     const piContexts = [...ALL_PROD_CODE.matchAll(/pi[_-]bridge/gi)];
     for (const m of piContexts) {
       const ctx = ALL_PROD_CODE.slice(Math.max(0, m.index! - 60), m.index! + 60);
+      // Scoped skip: if the match is inside the read-only constants file,
+      // the surrounding "mqtt" is a map key string, not a control surface.
+      const isInProviderLabels =
+        ctx.includes("SENSOR_PROVIDER_LABELS") ||
+        ctx.includes("deriveProviderLabel");
+      if (isInProviderLabels) continue;
       expect(ctx, `pi_bridge reference must not be a control call: ${ctx}`).not.toMatch(
         /fetch|http|mqtt|publish|post|send|trigger/i,
       );

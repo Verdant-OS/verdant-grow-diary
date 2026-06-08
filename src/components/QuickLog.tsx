@@ -1027,6 +1027,14 @@ export default function QuickLog({
                   data-target-plant-id={savedTarget.id}
                   className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   onClick={() => {
+                    // Move focus out of the dialog before it unmounts so
+                    // focus is never stranded inside a closed dialog. If
+                    // the original opener is mounted, Radix Dialog will
+                    // restore focus to it on close. Otherwise focus
+                    // lands on <body> until the destination route mounts.
+                    if (typeof document !== "undefined") {
+                      (document.activeElement as HTMLElement | null)?.blur?.();
+                    }
                     onOpenChange(false);
                   }}
                 >
@@ -1038,11 +1046,12 @@ export default function QuickLog({
                   variant="outline"
                   data-testid="quick-log-post-save-another"
                   onClick={() => {
-                    reset();
+                    resetForAnother();
                   }}
                 >
-                  Log another
+                  Log another for {savedTarget.name}
                 </Button>
+
                 <Button
                   type="button"
                   variant="ghost"

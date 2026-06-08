@@ -626,7 +626,7 @@ function CitationDetailModal({
     [selectedCitation, ctx],
   );
   const closeRef = useRef<HTMLButtonElement | null>(null);
-  const [query, setQuery] = useState<string>(detail.metricKey ?? "");
+  const [query, setQuery] = useState<string>("");
 
   useEffect(() => {
     try {

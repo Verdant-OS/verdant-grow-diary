@@ -313,6 +313,20 @@ const EMPTY_VM: Omit<
     "Run `bun run dev:send-ecowitt` against this tent.",
     "Reload this page to confirm the ingest webhook accepted the payload.",
   ],
+  derivedReadingWarnings: [],
+  eligibleForDiaryLog: false,
+  ineligibleReason: "no_evidence",
+  alreadyLogged: false,
+  latestCapturedAt: null,
+  latestRawPayload: null,
+  exportAttempts: [],
+  thresholds: METRIC_SPECS.map((m) => ({
+    key: m.key,
+    label: m.label,
+    min: m.min,
+    max: m.max,
+    unit: m.unit,
+  })),
 };
 
 interface BatchValues {

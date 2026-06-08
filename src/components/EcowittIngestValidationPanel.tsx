@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,12 +9,31 @@ import {
   type EcowittValidationMetricStatus,
   type EcowittValidationStatus,
 } from "@/lib/ecowittIngestValidationViewModel";
+import {
+  buildLatestEvidenceSnapshot,
+  serializeEvidenceForClipboard,
+} from "@/lib/ecowittValidationEvidenceRules";
+import {
+  buildEcowittValidationExport,
+  serializeExport,
+} from "@/lib/ecowittValidationExportRules";
+import {
+  buildDiaryEnvironmentCheckDraft,
+  type DiaryEnvironmentCheckDraft,
+} from "@/lib/ecowittDiaryEnvironmentCheckRules";
 
 interface Props {
   input: EcowittIngestValidationInput;
   /** Existing audit refetch from useEcowittAuditRows; never triggers writes. */
   onRefresh?: () => void;
   isRefreshing?: boolean;
+  /**
+   * Operator-initiated diary log handler. Receives a pure draft built from
+   * the latest accepted validation evidence. Caller wires this to the
+   * existing diary/grow_events insert helper (e.g. quicklog_save_manual).
+   */
+  onLogEnvironmentCheck?: (draft: DiaryEnvironmentCheckDraft) => void;
+  isLogging?: boolean;
 }
 
 function statusVariant(

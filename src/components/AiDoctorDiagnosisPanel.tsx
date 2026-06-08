@@ -27,13 +27,25 @@ import {
 import {
   buildAiDoctorReportPdfBytes,
   downloadAiDoctorReportPdf,
+  buildPerMetricStatusTable,
   type AiDoctorReportInput,
+  type PerMetricReportRow,
 } from "@/lib/aiDoctorReportRules";
 import {
   buildAiDoctorEvidenceCsv,
   downloadAiDoctorEvidenceCsv,
 } from "@/lib/aiDoctorEvidenceCsvExportRules";
 import { navigateToEvidenceTarget } from "@/lib/aiDoctorEvidenceNavigationRules";
+import {
+  downloadAiDoctorReportPackage,
+  buildPackageFilenames,
+} from "@/lib/aiDoctorReportPackageRules";
+import {
+  filterEvidenceSearchItems,
+  EVIDENCE_SEARCH_EMPTY_COPY,
+  EVIDENCE_SEARCH_INPUT_LABEL,
+  type EvidenceSearchItem,
+} from "@/lib/aiDoctorEvidenceSearchRules";
 
 export const AI_DOCTOR_DIAGNOSIS_EMPTY_COPY =
   "No AI Doctor 2.0 diagnosis available yet.";

@@ -141,6 +141,21 @@ export function buildAiDoctorReportText(input: AiDoctorReportInput): string {
     lines.push("");
   }
 
+  // Compact per-metric status table — always render so weak/missing/
+  // not_checked metrics never look healthy by omission.
+  {
+    const tableRows = buildPerMetricStatusTable(input);
+    lines.push("Per-metric status (compact):");
+    lines.push(
+      "  Metric             | Status            | Citation type        | Value     | Source label             | Note",
+    );
+    for (const r of tableRows) {
+      lines.push(
+        `  ${pad(r.metric, 18)} | ${pad(r.status, 17)} | ${pad(r.citationType, 20)} | ${pad(r.value, 9)} | ${pad(r.source, 24)} | ${r.note}`,
+      );
+    }
+    lines.push("");
+
   if (input.checklist.length > 0) {
     lines.push("More data needed (checklist):");
     for (const c of input.checklist) {

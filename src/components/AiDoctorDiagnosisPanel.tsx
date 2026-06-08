@@ -91,9 +91,38 @@ export default function AiDoctorDiagnosisPanel({
     evidenceAlignment.posture === "insufficient_context";
   const [basisOpen, setBasisOpen] = useState<boolean>(postureDefaultsOpen);
 
-  const handleDownloadReport = useCallback(() => {
-    if (!view || !reportInput) return;
-    const recs =
+  const [activeCitation, setActiveCitation] = useState<EvidenceCitation | null>(
+    null,
+  );
+  const citationTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const handleOpenCitation = useCallback(
+    (c: EvidenceCitation, trigger: HTMLButtonElement | null) => {
+      citationTriggerRef.current = trigger;
+      setActiveCitation(c);
+    },
+    [],
+  );
+  const handleCloseCitation = useCallback(() => {
+    setActiveCitation(null);
+    // Return focus to the trigger on next tick (after dialog unmounts).
+    queueMicrotask(() => {
+      try {
+        citationTriggerRef.current?.focus();
+      } catch {
+        /* ignore */
+      }
+    });
+  }, []);
+  const handleJumpToEvidence = useCallback(() => {
+    if (activeCitation) {
+      navigateToEvidenceTarget(activeCitation.targetId);
+    }
+    setActiveCitation(null);
+  }, [activeCitation]);
+
+  const buildRecsForReport = useCallback(() => {
+    if (!view) return [];
+    return (
       citedRecs ??
       view.recommended_actions.map((r) => ({
         text: r,
@@ -104,14 +133,29 @@ export default function AiDoctorDiagnosisPanel({
           targetId: "evidence-missing-general",
           ariaLabel: "No direct evidence supports this recommendation yet.",
         } as EvidenceCitation,
-      }));
+      }))
+    );
+  }, [view, citedRecs]);
+
+  const handleDownloadReport = useCallback(() => {
+    if (!view || !reportInput) return;
     const bytes = buildAiDoctorReportPdfBytes({
       ...reportInput,
       summary: reportInput.summary || view.summary,
-      recommendations: recs,
+      recommendations: buildRecsForReport(),
     });
     downloadAiDoctorReportPdf(bytes, "ai-doctor-report.pdf");
-  }, [view, citedRecs, reportInput]);
+  }, [view, reportInput, buildRecsForReport]);
+
+  const handleDownloadCsv = useCallback(() => {
+    if (!view || !reportInput) return;
+    const csv = buildAiDoctorEvidenceCsv({
+      ...reportInput,
+      summary: reportInput.summary || view.summary,
+      recommendations: buildRecsForReport(),
+    });
+    downloadAiDoctorEvidenceCsv(csv);
+  }, [view, reportInput, buildRecsForReport]);
 
   if (!view) {
     return (

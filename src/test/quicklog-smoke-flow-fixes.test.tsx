@@ -40,33 +40,33 @@ vi.mock("@/hooks/use-tents", () => ({
   useTents: () => ({ data: [{ id: "t1", name: "Tent 1" }] }),
 }));
 
-const toastSuccess = vi.fn();
-const toastError = vi.fn();
+const { toastSuccess, toastError, snapshotState } = vi.hoisted(() => ({
+  toastSuccess: vi.fn(),
+  toastError: vi.fn(),
+  snapshotState: {
+    status: "ready" as "ready" | "loading" | "empty",
+    payload: {
+      status: "stale" as "fresh_live" | "fresh_non_live" | "stale" | "invalid" | "empty",
+      source: "manual" as string | null,
+      captured_at: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString() as string | null,
+    },
+  },
+}));
 vi.mock("sonner", () => ({
   toast: { success: toastSuccess, error: toastError, message: vi.fn() },
 }));
 
-// Drive the strip via a controllable mock for the underlying loader hook.
-let snapshotStatus: "ready" | "loading" | "empty" = "ready";
-let snapshotPayload: {
-  status: "fresh_live" | "fresh_non_live" | "stale" | "invalid" | "empty";
-  source: string | null;
-  captured_at: string | null;
-} = {
-  status: "stale",
-  source: "manual",
-  captured_at: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
-};
 vi.mock("@/lib/sensor", () => ({
   useLatestTentSensorSnapshot: () => ({
-    status: snapshotStatus,
+    status: snapshotState.status,
     snapshot: {
-      ...snapshotPayload,
+      ...snapshotState.payload,
       metrics: { temp_f: 75, humidity_pct: 55, vpd_kpa: 1.1 },
       badge_label: "stale",
     },
   }),
 }));
+
 
 vi.mock("@/components/QuickLogSensorSnapshotStrip", () => ({ default: () => null }));
 

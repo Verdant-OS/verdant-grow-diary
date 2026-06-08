@@ -47,9 +47,11 @@ import {
   UNSUPPORTED_EVENT_TYPE_COPY,
 } from "@/lib/legacyQuickLogUnifiedSave";
 import { buildSensorSnapshotSavePayload } from "@/lib/latestSensorSnapshotRules";
+import { buildStaleSnapshotHelperCopy } from "@/lib/quickLogStaleSnapshotHelperCopy";
+import { plantDetailPath } from "@/lib/routes";
 
 
-import { AlertTriangle, Info } from "lucide-react";
+import { AlertTriangle, Info, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
 export interface QuickLogPrefill {

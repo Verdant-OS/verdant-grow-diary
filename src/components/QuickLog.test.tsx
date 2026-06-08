@@ -156,7 +156,7 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
 
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
     expect(onCreated).toHaveBeenCalled();
-    expect(toastSuccess).toHaveBeenCalledWith("Logged 🌱");
+    expect(toastSuccess).toHaveBeenCalledWith(expect.stringMatching(/Logged note for|Logged observation for/));
     expect(toastError).not.toHaveBeenCalled();
   });
 

@@ -16,6 +16,7 @@ import {
   adaptDiagnosisResultToViewModel,
   type DiagnosisDisplayConfidence,
 } from "@/lib/aiDoctorDiagnosisViewModel";
+import type { DiagnosisEvidenceAlignmentVM } from "@/lib/aiDoctorDiagnosisEvidenceAlignmentRules";
 
 export const AI_DOCTOR_DIAGNOSIS_EMPTY_COPY =
   "No AI Doctor 2.0 diagnosis available yet.";
@@ -32,6 +33,8 @@ export interface AiDoctorDiagnosisPanelProps {
   isLoading?: boolean;
   className?: string;
   testIdPrefix?: string;
+  /** Optional evidence-alignment VM (from buildAiDoctorDiagnosisEvidenceAlignmentVM). */
+  evidenceAlignment?: DiagnosisEvidenceAlignmentVM | null;
 }
 
 function isFallbackConfidence(c: DiagnosisDisplayConfidence): boolean {

@@ -310,7 +310,9 @@ export default function QuickLog({
         // Defer focus so the field is mounted after auto-expand.
         setTimeout(() => {
           wateringInputRef.current?.focus();
-          wateringInputRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+          if (typeof wateringInputRef.current?.scrollIntoView === "function") {
+            wateringInputRef.current.scrollIntoView({ block: "center", behavior: "smooth" });
+          }
         }, 0);
         toast.error("Add a watering volume (ml) to save.");
         return;

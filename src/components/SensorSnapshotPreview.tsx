@@ -15,6 +15,7 @@ import {
   type SensorSnapshot,
   type SensorSnapshotStatus,
 } from "@/lib/latestSensorSnapshotRules";
+import { formatLastUpdatedAgo } from "@/lib/lastUpdatedAgo";
 
 export type SensorSnapshotPreviewStatus =
   | "idle"
@@ -29,6 +30,14 @@ interface Props {
   attach: boolean;
   canToggle: boolean;
   onToggleAttach?: (next: boolean) => void;
+  /**
+   * Wall-clock ms epoch of the last successful query refresh. Drives the
+   * "Last updated" line. Never implies the data itself is Live — Live /
+   * stale / invalid stays on the existing freshness badge.
+   */
+  lastUpdatedAt?: number | null;
+  /** Injected for tests; defaults to Date.now(). */
+  nowMs?: number;
 }
 
 const STATUS_BADGE_VARIANT: Record<
@@ -83,7 +92,13 @@ export function SensorSnapshotPreview({
   attach,
   canToggle,
   onToggleAttach,
+  lastUpdatedAt = null,
+  nowMs,
 }: Props) {
+  const lastUpdatedLabel = formatLastUpdatedAgo(
+    lastUpdatedAt,
+    typeof nowMs === "number" ? nowMs : Date.now(),
+  );
   return (
     <section
       aria-labelledby="sensor-snapshot-preview-heading"
@@ -109,6 +124,16 @@ export function SensorSnapshotPreview({
           </Badge>
         ) : null}
       </header>
+
+      <p
+        className="text-[11px] text-muted-foreground"
+        data-testid="sensor-snapshot-preview-last-updated"
+        aria-live="polite"
+      >
+        {lastUpdatedLabel}
+      </p>
+
+
 
       {status === "loading" ? (
         <p

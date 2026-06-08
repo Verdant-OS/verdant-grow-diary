@@ -70,6 +70,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 import {
   useLatestTentSensorSnapshot,
   latestTentSensorSnapshotQueryKey,
+  LATEST_SENSOR_REALTIME_INVALIDATE_DEBOUNCE_MS as DEBOUNCE_MS,
 } from "@/lib/sensor";
 
 function wrapper(client: QueryClient) {
@@ -97,30 +98,80 @@ describe("useLatestTentSensorSnapshot — realtime cache invalidation", () => {
     expect(created).toHaveLength(0);
   });
 
-  it("subscribes to sensor_readings filtered by tent_id and invalidates on INSERT", async () => {
-    const client = newClient();
-    const spy = vi.spyOn(client, "invalidateQueries");
-    renderHook(() => useLatestTentSensorSnapshot("tent-A"), {
-      wrapper: wrapper(client),
-    });
+  it("subscribes to sensor_readings filtered by tent_id and debounces INSERT into one invalidation", async () => {
+    vi.useFakeTimers();
+    try {
+      const client = newClient();
+      const spy = vi.spyOn(client, "invalidateQueries");
+      renderHook(() => useLatestTentSensorSnapshot("tent-A"), {
+        wrapper: wrapper(client),
+      });
 
-    expect(created).toHaveLength(1);
-    const ch = created[0];
-    expect(ch.subscribed).toBe(true);
-    expect(ch.filter).toMatchObject({
-      event: "INSERT",
-      schema: "public",
-      table: "sensor_readings",
-      filter: "tent_id=eq.tent-A",
-    });
+      expect(created).toHaveLength(1);
+      const ch = created[0];
+      expect(ch.subscribed).toBe(true);
+      expect(ch.filter).toMatchObject({
+        event: "INSERT",
+        schema: "public",
+        table: "sensor_readings",
+        filter: "tent_id=eq.tent-A",
+      });
 
-    await act(async () => {
-      ch.handler?.({ new: { tent_id: "tent-A" } });
-    });
+      const before = spy.mock.calls.length;
+      // Burst of inserts within debounce window
+      act(() => {
+        ch.handler?.({ new: { tent_id: "tent-A" } });
+        ch.handler?.({ new: { tent_id: "tent-A" } });
+        ch.handler?.({ new: { tent_id: "tent-A" } });
+      });
+      // Nothing fires immediately
+      expect(spy.mock.calls.length).toBe(before);
+      // After debounce window, exactly one invalidation
+      await act(async () => {
+        vi.advanceTimersByTime(DEBOUNCE_MS + 1);
+      });
+      const burstCalls = spy.mock.calls.length - before;
+      expect(burstCalls).toBe(1);
+      expect(spy).toHaveBeenLastCalledWith({
+        queryKey: latestTentSensorSnapshotQueryKey("tent-A"),
+      });
 
-    expect(spy).toHaveBeenCalledWith({
-      queryKey: latestTentSensorSnapshotQueryKey("tent-A"),
-    });
+      // A subsequent insert after the window schedules a new invalidation
+      const between = spy.mock.calls.length;
+      act(() => {
+        ch.handler?.({ new: { tent_id: "tent-A" } });
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(DEBOUNCE_MS + 1);
+      });
+      expect(spy.mock.calls.length - between).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("clears pending debounce timer on unmount (no invalidation after unmount)", async () => {
+    vi.useFakeTimers();
+    try {
+      const client = newClient();
+      const spy = vi.spyOn(client, "invalidateQueries");
+      const { unmount } = renderHook(
+        () => useLatestTentSensorSnapshot("tent-A"),
+        { wrapper: wrapper(client) },
+      );
+      const ch = created[0];
+      const before = spy.mock.calls.length;
+      act(() => {
+        ch.handler?.({ new: { tent_id: "tent-A" } });
+      });
+      unmount();
+      await act(async () => {
+        vi.advanceTimersByTime(DEBOUNCE_MS + 50);
+      });
+      expect(spy.mock.calls.length).toBe(before);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("removes the channel on unmount", () => {

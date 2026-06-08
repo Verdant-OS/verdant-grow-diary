@@ -10,7 +10,7 @@
  *  - No service role, no privileged query.
  *  - No fake live / demo fallback. Empty / loading / error never block save.
  */
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -30,10 +30,22 @@ export type LatestTentSensorSnapshotStatus =
 export interface LatestTentSensorSnapshotState {
   status: LatestTentSensorSnapshotStatus;
   snapshot: SensorSnapshot;
+  /**
+   * Wall-clock timestamp (ms epoch) of the most recent successful query
+   * resolution from React Query — surface as "Last updated" UI only.
+   * Does NOT imply the underlying data is Live. Null until first result.
+   */
+  lastUpdatedAt: number | null;
 }
 
 /** Pull recent long-format rows so we can pivot to a single snapshot. */
 const ROW_FETCH_LIMIT = 50;
+
+/**
+ * Debounce window for realtime-triggered React Query invalidations.
+ * Coalesces bursts of `sensor_readings` INSERTs into a single refetch.
+ */
+export const LATEST_SENSOR_REALTIME_INVALIDATE_DEBOUNCE_MS = 500;
 
 /** Stable React Query key for the latest single-tent sensor snapshot. */
 export function latestTentSensorSnapshotQueryKey(
@@ -44,14 +56,12 @@ export function latestTentSensorSnapshotQueryKey(
 
 /**
  * Read-only loader that returns the freshest sensor snapshot for a single
- * tent, pivoted from the long-format `sensor_readings` table. Quick Log
- * uses this to auto-attach the latest conditions when plant/tent context
- * exists. Idle when there is no tentId.
+ * tent, pivoted from the long-format `sensor_readings` table.
  *
- * Subscribes to Supabase Realtime INSERTs on `sensor_readings` filtered by
- * the active `tent_id`. A matching insert only invalidates the React Query
- * cache; freshness/source/status resolution stays in
- * `latestSensorSnapshotRules.ts`. Realtime errors never break the query.
+ * Subscribes to Supabase Realtime INSERTs filtered by the active `tent_id`
+ * and schedules a debounced React Query invalidation. Freshness / source /
+ * status resolution stays in `latestSensorSnapshotRules.ts`. Realtime
+ * errors never break the query.
  */
 export function useLatestTentSensorSnapshot(
   tentId: string | null | undefined,
@@ -84,10 +94,30 @@ export function useLatestTentSensorSnapshot(
     retry: 1,
   });
 
+  const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (!enabled) return;
     const activeTentId = tentId as string;
     let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    const clearPendingTimer = () => {
+      if (pendingTimerRef.current !== null) {
+        clearTimeout(pendingTimerRef.current);
+        pendingTimerRef.current = null;
+      }
+    };
+
+    const scheduleInvalidate = () => {
+      if (pendingTimerRef.current !== null) return; // already pending — coalesce
+      pendingTimerRef.current = setTimeout(() => {
+        pendingTimerRef.current = null;
+        queryClient.invalidateQueries({
+          queryKey: latestTentSensorSnapshotQueryKey(activeTentId),
+        });
+      }, LATEST_SENSOR_REALTIME_INVALIDATE_DEBOUNCE_MS);
+    };
+
     try {
       channel = supabase
         .channel(`sensor-readings-latest:${activeTentId}`)
@@ -99,17 +129,14 @@ export function useLatestTentSensorSnapshot(
             table: "sensor_readings",
             filter: `tent_id=eq.${activeTentId}`,
           },
-          () => {
-            queryClient.invalidateQueries({
-              queryKey: latestTentSensorSnapshotQueryKey(activeTentId),
-            });
-          },
+          () => scheduleInvalidate(),
         )
         .subscribe();
     } catch {
       channel = null;
     }
     return () => {
+      clearPendingTimer();
       if (channel) {
         try {
           supabase.removeChannel(channel);
@@ -120,16 +147,29 @@ export function useLatestTentSensorSnapshot(
     };
   }, [enabled, tentId, queryClient]);
 
-  if (!enabled) return { status: "idle", snapshot: EMPTY_SENSOR_SNAPSHOT };
-  if (query.isLoading) return { status: "loading", snapshot: EMPTY_SENSOR_SNAPSHOT };
-  if (query.isError) return { status: "error", snapshot: EMPTY_SENSOR_SNAPSHOT };
+  const lastUpdatedAt =
+    enabled && query.dataUpdatedAt && query.dataUpdatedAt > 0
+      ? query.dataUpdatedAt
+      : null;
+
+  if (!enabled)
+    return { status: "idle", snapshot: EMPTY_SENSOR_SNAPSHOT, lastUpdatedAt: null };
+  if (query.isLoading)
+    return { status: "loading", snapshot: EMPTY_SENSOR_SNAPSHOT, lastUpdatedAt };
+  if (query.isError)
+    return { status: "error", snapshot: EMPTY_SENSOR_SNAPSHOT, lastUpdatedAt };
   const rows = query.data ?? [];
   if (rows.length === 0) {
-    return { status: "empty", snapshot: { ...EMPTY_SENSOR_SNAPSHOT, tent_id: tentId ?? null } };
+    return {
+      status: "empty",
+      snapshot: { ...EMPTY_SENSOR_SNAPSHOT, tent_id: tentId ?? null },
+      lastUpdatedAt,
+    };
   }
   return {
     status: "ready",
     snapshot: buildSensorSnapshot(rows, { tentId: tentId ?? null }),
+    lastUpdatedAt,
   };
 }
 

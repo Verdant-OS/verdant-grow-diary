@@ -40,7 +40,13 @@
     "test:security-gamification": "node scripts/scan-gamification-direct-inserts.mjs && vitest run src/test/scan-gamification-direct-inserts.test.ts",
     "check:shelly-ht-edge-sources": "bun scripts/assert-shelly-ht-edge-sources-present.ts",
     "dev:send-ecowitt": "bun run scripts/send-ecowitt-test-payload.ts",
-    "dev:send-ecowitt:invalid": "bun run scripts/send-ecowitt-test-payload.ts --invalid"
+    "dev:send-ecowitt:invalid": "bun run scripts/send-ecowitt-test-payload.ts --invalid",
+    "e2e:install": "playwright install chromium",
+    "e2e:install:ci": "playwright install --with-deps chromium",
+    "e2e:setup": "playwright test --project=setup",
+    "e2e:quicklog-smoke": "playwright test e2e/quicklog-smoke.spec.ts --project=chromium-authed",
+    "e2e:quicklog-smoke:headed": "playwright test e2e/quicklog-smoke.spec.ts --project=chromium-authed --headed",
+    "e2e:report": "playwright show-report"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

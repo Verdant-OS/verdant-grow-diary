@@ -573,7 +573,24 @@ export default function AiDoctorDiagnosisPanel({
           ctx={citationContext}
           onClose={handleCloseCitation}
           onJump={handleJumpToEvidence}
+          postureLabel={evidenceAlignment?.postureLabel ?? "Unknown evidence"}
+          recommendationIndex={
+            recommendationIndexByCitation.get(
+              activeCitation.targetId + "::" + activeCitation.label,
+            ) ?? null
+          }
+          searchItems={searchItems}
           testId={tid("ai-doctor-diagnosis-citation-modal")}
+        />
+      ) : null}
+
+      {previewOpen && previewInput ? (
+        <ReportPreviewPanel
+          input={previewInput}
+          onClose={() => setPreviewOpen(false)}
+          onDownloadPdf={handleDownloadReport}
+          onDownloadCsv={handleDownloadCsv}
+          testId={tid("ai-doctor-diagnosis-preview")}
         />
       ) : null}
     </section>

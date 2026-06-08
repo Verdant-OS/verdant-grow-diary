@@ -26,7 +26,8 @@ export class SmokeChecklistReporter {
     fn: () => Promise<string | void>,
   ): Promise<void> {
     try {
-      const evidence = (await fn()) ?? "ok";
+      const result = await fn();
+      const evidence = typeof result === "string" && result.length > 0 ? result : "ok";
       this.record(step, label, "pass", evidence);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

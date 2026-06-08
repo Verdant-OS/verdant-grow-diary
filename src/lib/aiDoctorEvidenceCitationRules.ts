@@ -39,6 +39,10 @@ export interface CitationAvailableMetric {
   statusLabel: string;
   /** True when this metric came from a derived source (e.g. VPD). */
   derived: boolean;
+  /** Optional last value (display only). */
+  value?: number | string | null;
+  /** Optional rejection / status reason for weak metrics. */
+  reason?: string | null;
 }
 
 export interface CitationContext {
@@ -48,6 +52,8 @@ export interface CitationContext {
   missingMetrics: readonly string[];
   hasRecentDiary: boolean;
   hasRecentPhotos: boolean;
+  /** Optional captured_at for the latest Environment Check. */
+  envCheckCapturedAt?: string | null;
 }
 
 const METRIC_KEYWORDS: Array<{ key: string; re: RegExp }> = [

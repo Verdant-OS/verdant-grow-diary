@@ -46,6 +46,7 @@ import {
   isSupportedLegacyEventType,
   UNSUPPORTED_EVENT_TYPE_COPY,
 } from "@/lib/legacyQuickLogUnifiedSave";
+import { buildQuickLogSensorAttachPayload } from "@/lib/quickLogSensorAttachAdapter";
 
 import { AlertTriangle, Info } from "lucide-react";
 import { toast } from "sonner";
@@ -262,12 +263,19 @@ export default function QuickLog({
     setBusy(true);
     try {
       const noteWithHardware = appendHardwareReadingsToNote(note, hardware);
+      const sensorAttachPayload = buildQuickLogSensorAttachPayload({
+        snapshot: sensorState.snapshot,
+        stripStatus: stripView.status,
+        attach: snapshot && !!selectedPlant?.tent_id,
+        tentId: selectedPlant?.tent_id ?? null,
+      });
       const built = buildLegacyQuickLogUnifiedPayload({
         eventType,
         noteWithHardware,
         plantId: selectedPlant.id,
         plantTentId: selectedPlant.tent_id ?? null,
         details,
+        sensorAttachPayload,
       });
       if (built.ok !== true) {
         toast.error(built.message);

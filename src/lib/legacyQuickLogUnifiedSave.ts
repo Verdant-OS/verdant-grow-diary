@@ -23,6 +23,14 @@
  */
 
 import type { QuickLogV2SavePayload } from "./quickLogV2SavePayload";
+import type { buildSensorSnapshotSavePayload } from "./latestSensorSnapshotRules";
+
+/**
+ * Redacted sensor envelope produced by `buildSensorSnapshotSavePayload`.
+ * Always either `null` (no attach / not safe to attach) or the structured
+ * sensor object. Never includes raw_payload, tokens, or auth strings.
+ */
+export type SensorAttachPayload = ReturnType<typeof buildSensorSnapshotSavePayload>;
 
 export const SUPPORTED_LEGACY_EVENT_TYPES = [
   "watering",
@@ -59,6 +67,13 @@ export interface LegacyQuickLogFormInput {
   plantId: string | null;
   plantTentId: string | null;
   details: LegacyQuickLogDetails;
+  /**
+   * Optional redacted sensor envelope from buildSensorSnapshotSavePayload.
+   * When non-null, emitted as `p_details: { sensor: ... }` on the RPC
+   * payload. Null/undefined → `p_details` is omitted from the RPC call,
+   * preserving the existing no-details behavior.
+   */
+  sensorAttachPayload?: SensorAttachPayload;
 }
 
 export type LegacyUnifiedBuildResult =
@@ -109,6 +124,14 @@ export function buildLegacyQuickLogUnifiedPayload(
 
   const note = appendLegacyDetailsToNote(input.noteWithHardware, input.details);
 
+  // Only build the `p_details` envelope when the caller passed a non-null
+  // redacted sensor payload. We never invent details, never persist
+  // raw_payload, and never re-key the envelope as `sensor_snapshot`.
+  const detailsEnvelope: Record<string, unknown> | null =
+    input.sensorAttachPayload != null
+      ? { sensor: input.sensorAttachPayload }
+      : null;
+
   if (input.eventType === "watering") {
     const raw = trimStr(input.details.watering);
     const volume = Number(raw);
@@ -131,6 +154,7 @@ export function buildLegacyQuickLogUnifiedPayload(
         p_humidity_pct: null,
         p_vpd_kpa: null,
         p_occurred_at: null,
+        p_details: detailsEnvelope,
       },
     };
   }
@@ -155,6 +179,7 @@ export function buildLegacyQuickLogUnifiedPayload(
       p_humidity_pct: null,
       p_vpd_kpa: null,
       p_occurred_at: null,
+      p_details: detailsEnvelope,
     },
   };
 }

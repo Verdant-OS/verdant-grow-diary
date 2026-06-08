@@ -1729,6 +1729,7 @@ export type Database = {
       quicklog_save_manual: {
         Args: {
           p_action: string
+          p_details?: Json
           p_humidity_pct?: number
           p_note?: string
           p_occurred_at?: string

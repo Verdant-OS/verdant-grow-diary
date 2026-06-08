@@ -16,6 +16,15 @@ export interface QuickLogV2SavePayload {
   p_humidity_pct: number | null;
   p_vpd_kpa: number | null;
   p_occurred_at: string | null;
+  /**
+   * Optional structured details persisted to `diary_entries.details` by
+   * `quicklog_save_manual`. When provided, MUST be a JSON object (not an
+   * array). Server-side, ownership-scoped keys (`user_id`, `grow_id`,
+   * `tent_id`, `plant_id`, `auth_uid`) are stripped before persist.
+   * Quick Log uses this to attach the redacted sensor snapshot envelope
+   * produced by `buildSensorSnapshotSavePayload`.
+   */
+  p_details?: Record<string, unknown> | null;
 }
 
 export interface BuildQuickLogV2PayloadInput {

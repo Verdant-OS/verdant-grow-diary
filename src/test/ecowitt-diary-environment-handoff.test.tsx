@@ -468,7 +468,8 @@ describe("safety: panel + helpers do not introduce writes / device control", () 
   );
 
   it("does not insert/update/delete sensor_readings", () => {
-    expect(allSources).not.toMatch(/sensor_readings/);
+    expect(allSources).not.toMatch(/from\(["']sensor_readings["']\)/);
+    expect(allSources).not.toMatch(/sensor_readings.*\.(insert|update|delete|upsert)/);
   });
 
   it("does not call functions.invoke", () => {

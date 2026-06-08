@@ -586,6 +586,8 @@ export default function QuickLog({
           <div>
             <Label>What's happening?</Label>
             <Textarea
+              ref={noteRef}
+              data-testid="quicklog-note"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Watered, looking healthy, slight yellowing on a fan leaf…"

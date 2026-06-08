@@ -37,6 +37,7 @@ import {
   quickLogPlantHelperText,
 } from "@/lib/quickLogPlantOptionRules";
 import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
+import QuickLogSensorMiniChart from "@/components/QuickLogSensorMiniChart";
 import EventTypeSelector from "@/components/EventTypeSelector";
 import { useLatestTentSensorSnapshot } from "@/lib/sensor";
 import { buildQuickLogStripFromTentState } from "@/lib/quickLogSnapshotStripAdapter";
@@ -736,11 +737,19 @@ export default function QuickLog({
           })()}
 
           {!tentSetupRequired && (
-            <QuickLogSensorSnapshotStrip
-              growId={activeGrowId}
-              tentId={selectedPlant?.tent_id ?? null}
-              attached={snapshot && !!selectedPlant}
-            />
+            <>
+              <QuickLogSensorSnapshotStrip
+                growId={activeGrowId}
+                tentId={selectedPlant?.tent_id ?? null}
+                attached={snapshot && !!selectedPlant}
+              />
+              {stripView.status !== "no_data" && selectedPlant?.tent_id && (
+                <QuickLogSensorMiniChart
+                  tentId={selectedPlant.tent_id}
+                  metric="temp_c"
+                />
+              )}
+            </>
           )}
 
           <Button

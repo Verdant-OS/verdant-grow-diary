@@ -300,6 +300,21 @@ export default function QuickLog({
       toast.error("Add a quick note");
       return;
     }
+    if (eventType === "watering") {
+      const raw = details.watering.trim();
+      const vol = Number(raw);
+      if (!raw || !Number.isFinite(vol) || vol <= 0) {
+        setShowMore(true);
+        setWateringError("Add a watering volume (ml) to save.");
+        // Defer focus so the field is mounted after auto-expand.
+        setTimeout(() => {
+          wateringInputRef.current?.focus();
+          wateringInputRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+        }, 0);
+        toast.error("Add a watering volume (ml) to save.");
+        return;
+      }
+    }
 
     setBusy(true);
     try {
@@ -332,7 +347,22 @@ export default function QuickLog({
         await supabase.from("grows").update({ stage }).eq("id", activeGrowId);
       }
 
-      toast.success(successMessage);
+      // Enrich the toast with the actual target plant name so growers can
+      // verify the log landed where they intended (especially when the
+      // selected plant differs from the page they opened QuickLog from).
+      const plantLabel = selectedPlant.name;
+      const verb =
+        eventType === "watering"
+          ? "watering"
+          : eventType === "observation"
+            ? "observation"
+            : "note";
+      const finalMessage =
+        successMessage && successMessage !== "Logged 🌱"
+          ? successMessage
+          : `Logged ${verb} for ${plantLabel}`;
+      toast.success(finalMessage);
+
       reset();
       onOpenChange(false);
       onCreated?.();

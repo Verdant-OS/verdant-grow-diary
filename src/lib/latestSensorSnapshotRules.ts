@@ -282,21 +282,11 @@ export function classifyFreshness(
   return { freshness: "stale", ageMinutes, capturedAt, reason: null };
 }
 
-const LIVE_SOURCES = new Set<string>([
-  "live",
-  "pi_bridge",
-  "ecowitt",
-  "mqtt",
-  "webhook",
-  "webhook_generic",
-  "home_assistant_bridge",
-  "ha_forwarded",
-  "node_red_bridge",
-  "esp32_arduino",
-  "esp32_arduino_sht31",
-  "esp32_esphome",
-  "esp32_mqtt_bridge",
-]);
+// Per Verdant safety rules, only the canonical "live" source label is treated
+// as live. Bridge/provider identifiers (ecowitt, home assistant, esp32, etc.)
+// are transport metadata, not source-of-truth labels, and must not promote a
+// reading to Live by themselves.
+const LIVE_SOURCES = new Set<string>(["live"]);
 
 function isLiveSource(source: string | null): boolean {
   if (!source) return false;

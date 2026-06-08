@@ -83,7 +83,22 @@ function actionFor(status: QuickLogSnapshotStripStatus): QuickLogSnapshotStripAc
       return { kind: "review", label: "Review sensor intake", href: SENSORS_HREF };
     case "no_data":
       return { kind: "add", label: "Add snapshot", href: SENSORS_HREF };
-  }
+}
+
+/**
+ * Format a non-Live source string into a short, presenter-safe label.
+ * Returns null when the source is missing, "live", or "unavailable" —
+ * the Live state is communicated by the resolver-driven badge, never
+ * by this chip. Underscores → spaces, lowercased.
+ */
+function deriveProviderLabel(source: string | null | undefined): string | null {
+  if (typeof source !== "string") return null;
+  const trimmed = source.trim();
+  if (!trimmed) return null;
+  const lower = trimmed.toLowerCase();
+  if (lower === "live" || lower === "unavailable") return null;
+  return lower.replace(/_+/g, " ");
+}
 }
 
 function formatAge(capturedMs: number, nowMs: number): string {
@@ -325,6 +340,7 @@ export function buildQuickLogStripFromTentState(
       metrics: [],
       action: actionFor("no_data"),
       classification: synthClassification("no_data", "No sensor data yet"),
+      providerLabel: null,
     };
   }
 
@@ -352,5 +368,6 @@ export function buildQuickLogStripFromTentState(
     metrics: buildStrictMetrics(snapshot),
     action,
     classification: synthClassification(status, snapshot.badge_label),
+    providerLabel: deriveProviderLabel(snapshot.source),
   };
 }

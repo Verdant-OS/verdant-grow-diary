@@ -79,13 +79,14 @@ export default function AiDoctorFollowUpCheckButton({
   const [error, setError] = useState<string | null>(null);
 
   if (!eligibility.ok) {
+    const reason = eligibility.reason;
     return (
       <p
         className="text-xs text-muted-foreground"
         data-testid={tid("ai-doctor-follow-up-disabled")}
-        data-reason={eligibility.reason}
+        data-reason={reason}
       >
-        {FOLLOWUP_INELIGIBLE_COPY[eligibility.reason]}
+        {FOLLOWUP_INELIGIBLE_COPY[reason]}
       </p>
     );
   }

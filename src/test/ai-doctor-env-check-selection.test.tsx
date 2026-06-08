@@ -45,6 +45,20 @@ const MIXED_NOTE = (capturedAt: string) =>
     "  • mystery_metric: accepted (value=1)",
   ].join("\n");
 
+const WEAK_NOTE = (capturedAt: string) =>
+  [
+    "EcoWitt Environment Check",
+    "Source: local EcoWitt validation (test/local data, not live device control).",
+    `Captured at: ${capturedAt}`,
+    "Validation status: rejected",
+    "Accepted metrics: 0 · Rejected metrics: 2",
+    "",
+    "Per-metric results:",
+    "  • temp_f: rejected (value=999) — out of range",
+    "  • humidity_pct: not_checked (value=—)",
+  ].join("\n");
+
+
 describe("aiDoctorEnvironmentCheckRules — parser hardening", () => {
   it("does not throw on malformed / empty / null note bodies", () => {
     expect(() => parseEnvironmentCheckNote("")).not.toThrow();

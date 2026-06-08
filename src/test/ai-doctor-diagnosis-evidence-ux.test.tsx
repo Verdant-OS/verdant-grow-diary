@@ -339,7 +339,7 @@ describe("AiDoctorDiagnosisPanel — inline recommendation citations", () => {
     expect(c0.textContent ?? "").not.toMatch(/\blive\b/i);
   });
 
-  it("citation anchor href points at the Evidence used target id", () => {
+  it("citation button points at the Evidence used target id", () => {
     render(
       <AiDoctorDiagnosisPanel
         diagnosis={baseDiagnosis}
@@ -349,7 +349,9 @@ describe("AiDoctorDiagnosisPanel — inline recommendation citations", () => {
     const c1 = screen.getByTestId(
       "ai-doctor-diagnosis-recommended-actions-citation-1",
     );
-    expect(c1.getAttribute("href")).toBe("#evidence-missing-soil-moisture-pct");
+    expect(c1.getAttribute("data-citation-target")).toBe(
+      "evidence-missing-soil-moisture-pct",
+    );
   });
 });
 

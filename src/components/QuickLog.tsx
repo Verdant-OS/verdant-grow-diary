@@ -47,6 +47,11 @@ import {
   UNSUPPORTED_EVENT_TYPE_COPY,
 } from "@/lib/legacyQuickLogUnifiedSave";
 import { buildSensorSnapshotSavePayload } from "@/lib/latestSensorSnapshotRules";
+import {
+  hasQuickLogSensorAttachPreference,
+  loadQuickLogSensorAttachPreference,
+  saveQuickLogSensorAttachPreference,
+} from "@/lib/quickLogSensorAttachPreference";
 
 import { AlertTriangle, Info } from "lucide-react";
 import { toast } from "sonner";
@@ -197,17 +202,38 @@ export default function QuickLog({
   );
 
   // When the snapshot becomes `usable` and the grower has NOT manually
-  // toggled the attach switch in this session, default it to ON so the
-  // strip's "this log will include current sensor context" copy matches
-  // what the save payload will actually include.
+  // toggled the attach switch in this session AND no per-tent stored
+  // preference exists, default it to ON so the strip's
+  // "this log will include current sensor context" copy matches what the
+  // save payload will actually include.
   useEffect(() => {
     if (!open) return;
     if (snapshotUserTouchedRef.current) return;
     if (!selectedPlant?.tent_id) return;
+    if (hasQuickLogSensorAttachPreference(selectedPlant.tent_id)) return;
     if (stripView.status === "usable" && !snapshot) {
       setSnapshot(true);
     }
   }, [open, stripView.status, selectedPlant?.tent_id, snapshot]);
+
+  // Restore persisted attach preference whenever the dialog opens or the
+  // active tent changes. Per-tent key — moving between tents loads each
+  // tent's last grower choice. Always honored over auto-default. Resets
+  // the session "user touched" flag so the auto-default effect can still
+  // fire for tents without a stored preference.
+  useEffect(() => {
+    if (!open) return;
+    const tid = selectedPlant?.tent_id ?? null;
+    if (!tid) return;
+    if (hasQuickLogSensorAttachPreference(tid)) {
+      const stored = loadQuickLogSensorAttachPreference(tid, false);
+      snapshotUserTouchedRef.current = true;
+      setSnapshot(stored);
+    } else {
+      snapshotUserTouchedRef.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, selectedPlant?.tent_id]);
 
   // On open/reset, recompute the Hardware readings default from current
   // values unless the grower already toggled it in this session.
@@ -482,8 +508,13 @@ export default function QuickLog({
                   onCheckedChange={(v) => {
                     snapshotUserTouchedRef.current = true;
                     setSnapshot(v);
+                    saveQuickLogSensorAttachPreference(
+                      selectedPlant?.tent_id ?? null,
+                      v,
+                    );
                   }}
                   disabled={!selectedPlant}
+                  aria-label="Attach sensor snapshot to this log"
                 />
               </label>
               {snapshot && !selectedPlant && (

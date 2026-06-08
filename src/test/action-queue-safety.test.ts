@@ -61,10 +61,27 @@ const SCAN_PATHS = [
   ...walk(resolve(ROOT, "supabase/functions")),
 ].filter((p) => !p.includes("/test/") && !p.endsWith(".test.ts") && !p.endsWith(".test.tsx"));
 
-function readAll(): string {
-  return SCAN_PATHS.map((p) => readFileSync(p, "utf8")).join("\n\n//FILE\n\n");
+function readAll(): { text: string; boundaries: Array<{ start: number; end: number; path: string }> } {
+  const boundaries: Array<{ start: number; end: number; path: string }> = [];
+  let text = "";
+  const sep = "\n\n//FILE\n\n";
+  for (const p of SCAN_PATHS) {
+    const content = readFileSync(p, "utf8");
+    const start = text.length;
+    text += content;
+    boundaries.push({ start, end: text.length, path: p });
+    text += sep;
+  }
+  return { text, boundaries };
 }
-const ALL_PROD_CODE = readAll();
+const { text: ALL_PROD_CODE, boundaries: FILE_BOUNDARIES } = readAll();
+
+function fileAtIndex(idx: number): string {
+  for (const b of FILE_BOUNDARIES) {
+    if (idx >= b.start && idx < b.end) return b.path;
+  }
+  return "";
+}
 
 // Find the migration that introduces the action_queue TABLE (for table-shape checks).
 function findActionQueueMigration(): string | null {
@@ -184,9 +201,16 @@ describe("Action Queue safety — current posture (suggest-only by construction)
     // pi_bridge appears ONLY as a sensor_readings.source enum value (read-side
     // ingest tag), never as an outbound device controller — assert it's not
     // referenced from any fetch/url/MQTT call.
+    // Scoped allow-list: src/constants/sensorProviderLabels.ts holds read-only
+    // display-name constants (e.g. pi_bridge: "Pi Bridge", mqtt: "MQTT"). The
+    // literal "mqtt" inside that map is a label key, not a device-control call.
+    const PROVIDER_LABELS_PATH = resolve(ROOT, "src/constants/sensorProviderLabels.ts");
     const piContexts = [...ALL_PROD_CODE.matchAll(/pi[_-]bridge/gi)];
     for (const m of piContexts) {
       const ctx = ALL_PROD_CODE.slice(Math.max(0, m.index! - 60), m.index! + 60);
+      // Scoped skip: if the match is inside the read-only constants file,
+      // the surrounding "mqtt" is a map key string, not a control surface.
+      if (fileAtIndex(m.index!) === PROVIDER_LABELS_PATH) continue;
       expect(ctx, `pi_bridge reference must not be a control call: ${ctx}`).not.toMatch(
         /fetch|http|mqtt|publish|post|send|trigger/i,
       );

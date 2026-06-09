@@ -117,8 +117,8 @@ describe("Quick Log Playwright CI surface", () => {
       'playwright.config.ts',
       '.github/workflows/quicklog-smoke.yml',
     ];
-    // Extract every paths: block in the file and assert the three exact entries appear
-    const pathBlocks = Array.from(wf.matchAll(/paths:\s*\|\n((?:\s+-\s+".+"\n)+)/g));
+    // Extract paths: blocks that use list items (not the pipe block used by upload-artifact)
+    const pathBlocks = Array.from(wf.matchAll(/paths:\s*\n((?:\s+-\s+".+"\n)+)/g));
     expect(pathBlocks.length).toBeGreaterThanOrEqual(2); // push + pull_request
     for (const [, block] of pathBlocks) {
       for (const p of expectedPaths) {

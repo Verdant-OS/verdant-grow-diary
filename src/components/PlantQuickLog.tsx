@@ -4,7 +4,7 @@
  * Opens from Plant Detail. Slide-up bottom sheet on mobile / centered modal on
  * desktop. Single scrolling view:
  *   1) Tap-to-add photo (optional)
- *   2) Grower Notes (required)
+ *   2) Grower Notes (optional when photo or readings are present)
  *   3) 2x2 grid: Temp °F, Humidity %, pH, EC (all optional, decimals allowed)
  *   4) Full-width "Save to Timeline" button
  *
@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import {
+  buildManualSensorSnapshot,
   buildQuickLogInsertDraft,
   parseOptionalNumber,
   type QuickLogSensorInput,
@@ -51,6 +52,14 @@ interface Props {
 }
 
 const EMPTY_SENSORS: QuickLogSensorInput = { temp: "", humidity: "", ph: "", ec: "" };
+
+function buildTimelineNote(rawNote: string, hasPhoto: boolean, hasManualReadings: boolean): string {
+  const note = rawNote.trim();
+  if (note) return note;
+  if (hasPhoto) return "Photo attached from Quick Log.";
+  if (hasManualReadings) return "Manual readings captured from Quick Log.";
+  return "";
+}
 
 export default function PlantQuickLog({
   open,
@@ -87,6 +96,11 @@ export default function PlantQuickLog({
     [open, logs],
   );
 
+  const hasManualReadings = !!buildManualSensorSnapshot(sensors);
+  const hasPhoto = !!photoFile;
+  const timelineNote = buildTimelineNote(note, hasPhoto, hasManualReadings);
+  const hasAnyContent = timelineNote.trim().length > 0;
+
   function deltaFor(metric: ManualSensorMetric, raw: string): ChronologyDelta | null {
     const current = parseOptionalNumber(raw);
     return computeChronologyDelta(metric, current, currentCapturedAt, logs ?? []);
@@ -111,6 +125,7 @@ export default function PlantQuickLog({
   function handleFileSelected(file: File | null) {
     setPhotoFile(file);
     setPhotoPreview(file ? URL.createObjectURL(file) : null);
+    setError(null);
   }
 
   function handlePhotoInputChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -128,7 +143,7 @@ export default function PlantQuickLog({
     if (libraryFileRef.current) libraryFileRef.current.value = "";
   }
 
-  const canSave = note.trim().length > 0 && !busy && !!growId;
+  const canSave = hasAnyContent && !busy && !!growId;
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -139,16 +154,21 @@ export default function PlantQuickLog({
       return;
     }
 
+    if (!hasAnyContent) {
+      setError("Add a note, photo, or manual reading before saving.");
+      return;
+    }
+
     const result = buildQuickLogInsertDraft({
       plantId,
       plantName,
       growId,
       tentId: tentId ?? null,
-      note,
+      note: timelineNote,
       sensors,
     });
     if (!result.ok) {
-      setError("Grower notes are required.");
+      setError("Add a note, photo, or manual reading before saving.");
       return;
     }
 
@@ -238,7 +258,7 @@ export default function PlantQuickLog({
               <div className="relative aspect-[4/3] w-full rounded-xl border-2 border-dashed border-border/60 overflow-hidden bg-secondary/30">
                 <img
                   src={photoPreview}
-                  alt="Selected"
+                  alt="Selected Quick Log photo preview"
                   className="h-full w-full object-cover"
                   data-testid="plant-quick-log-photo-preview"
                 />
@@ -311,22 +331,27 @@ export default function PlantQuickLog({
           </div>
 
 
-          {/* 2. Grower Notes (required) */}
+          {/* 2. Grower Notes */}
           <div className="grid gap-1.5">
             <Label htmlFor="plant-quick-log-note" className="text-sm">
-              Grower Notes (Required)
+              Grower Notes (optional if you add a photo or reading)
             </Label>
             <Textarea
               id="plant-quick-log-note"
               data-testid="plant-quick-log-note"
               value={note}
-              onChange={(e) => setNote(e.target.value)}
+              onChange={(e) => {
+                setNote(e.target.value);
+                setError(null);
+              }}
               placeholder="Watered 1 gallon, raised lights 2 inches..."
               rows={4}
               autoFocus
-              required
               className="text-base"
             />
+            <p className="text-xs text-muted-foreground">
+              Save a note, photo, or manual reading to add it to the timeline.
+            </p>
           </div>
 
           {/* 3. Manual Sensor Snapshot — 2x2 grid, all optional */}
@@ -336,7 +361,10 @@ export default function PlantQuickLog({
               id="plant-quick-log-temp"
               label="Temp (°F)"
               value={sensors.temp}
-              onChange={(v) => setSensors((s) => ({ ...s, temp: v }))}
+              onChange={(v) => {
+                setSensors((s) => ({ ...s, temp: v }));
+                setError(null);
+              }}
               inputMode="decimal"
               step="any"
               delta={deltaFor("temp_f", sensors.temp)}
@@ -345,7 +373,10 @@ export default function PlantQuickLog({
               id="plant-quick-log-humidity"
               label="Humidity (%)"
               value={sensors.humidity}
-              onChange={(v) => setSensors((s) => ({ ...s, humidity: v }))}
+              onChange={(v) => {
+                setSensors((s) => ({ ...s, humidity: v }));
+                setError(null);
+              }}
               inputMode="decimal"
               step="any"
               delta={deltaFor("humidity_percent", sensors.humidity)}
@@ -354,7 +385,10 @@ export default function PlantQuickLog({
               id="plant-quick-log-ph"
               label="pH"
               value={sensors.ph}
-              onChange={(v) => setSensors((s) => ({ ...s, ph: v }))}
+              onChange={(v) => {
+                setSensors((s) => ({ ...s, ph: v }));
+                setError(null);
+              }}
               inputMode="decimal"
               step="0.1"
               delta={deltaFor("ph", sensors.ph)}
@@ -363,7 +397,10 @@ export default function PlantQuickLog({
               id="plant-quick-log-ec"
               label="EC"
               value={sensors.ec}
-              onChange={(v) => setSensors((s) => ({ ...s, ec: v }))}
+              onChange={(v) => {
+                setSensors((s) => ({ ...s, ec: v }));
+                setError(null);
+              }}
               inputMode="decimal"
               step="0.01"
               delta={deltaFor("ec", sensors.ec)}
@@ -385,6 +422,7 @@ export default function PlantQuickLog({
             type="submit"
             disabled={!canSave}
             data-testid="plant-quick-log-save"
+            aria-label="Save Quick Log to timeline"
             className={cn(
               "w-full h-12 text-base font-medium",
               "bg-primary text-primary-foreground hover:bg-primary/90",

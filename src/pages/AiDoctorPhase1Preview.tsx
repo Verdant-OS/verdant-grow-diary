@@ -12,6 +12,7 @@
  * presenter-only with zero action surface.
  */
 import * as React from "react";
+import { Link } from "react-router-dom";
 import { AiDoctorPhase1PreviewPanel } from "@/components/AiDoctorPhase1PreviewPanel";
 import {
   AI_DOCTOR_PHASE1_PREVIEW_CASES,
@@ -38,6 +39,43 @@ export default function AiDoctorPhase1Preview(): JSX.Element {
           run diagnosis, does not score confidence, does not write alerts, and
           does not create Action Queue items.
         </p>
+      </div>
+
+      <div
+        data-testid="ai-doctor-confidence-audit-link-card"
+        className="rounded-md border border-border bg-card p-4 space-y-2"
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <h2
+            data-testid="ai-doctor-confidence-audit-link-title"
+            className="text-sm font-semibold"
+          >
+            View confidence audit
+          </h2>
+          <span className="rounded border border-border bg-background px-2 py-0.5 text-xs text-muted-foreground">
+            Internal
+          </span>
+          <span className="rounded border border-border bg-background px-2 py-0.5 text-xs text-muted-foreground">
+            Static reference
+          </span>
+          <span className="rounded border border-border bg-background px-2 py-0.5 text-xs text-muted-foreground">
+            Read-only
+          </span>
+        </div>
+        <p
+          data-testid="ai-doctor-confidence-audit-link-description"
+          className="text-xs text-muted-foreground"
+        >
+          Review the hard caps, source-quality rules, and safety flags that
+          keep weak AI Doctor context from becoming overconfident.
+        </p>
+        <Link
+          to="/internal/ai-doctor-confidence-audit"
+          data-testid="ai-doctor-confidence-audit-link"
+          className="inline-block text-sm text-primary underline-offset-2 hover:underline"
+        >
+          Open AI Doctor Confidence Audit
+        </Link>
       </div>
 
       <div

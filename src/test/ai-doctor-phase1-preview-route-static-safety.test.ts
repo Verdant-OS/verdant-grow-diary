@@ -96,9 +96,15 @@ describe("ai-doctor-phase1-preview — static safety (page + fixtures)", () => {
     expect(src).not.toMatch(/gpt-/i);
   });
 
-  it("page imports only the preview panel, view-model type, and fixtures library", () => {
+  it("page imports only react, react-router-dom, preview panel, and fixtures library", () => {
+    expect(pageSrc).toMatch(/from\s+["']react["']/);
+    expect(pageSrc).toMatch(/from\s+["']react-router-dom["']/);
     expect(pageSrc).toMatch(/from\s+["']@\/components\/AiDoctorPhase1PreviewPanel["']/);
     expect(pageSrc).toMatch(/from\s+["']@\/lib\/aiDoctorPhase1PreviewFixtures["']/);
+  });
+
+  it("page does not import confidence audit view model (no cross-page model dependency)", () => {
+    expect(pageSrc).not.toMatch(/aiDoctorConfidenceAuditViewModel/);
   });
 
   it("fixtures file only imports the view-model type", () => {

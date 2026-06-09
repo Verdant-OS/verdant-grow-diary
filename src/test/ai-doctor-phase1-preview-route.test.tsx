@@ -97,6 +97,30 @@ describe("AiDoctorPhase1Preview page — base render", () => {
     expect(screen.getByTestId("ai-doctor-phase1-preview-debug")).toBeTruthy();
   });
 
+  it("renders the confidence audit link card", () => {
+    renderAtRoute("/internal/ai-doctor-phase1-preview");
+    expect(
+      screen.getByTestId("ai-doctor-confidence-audit-link-card"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("ai-doctor-confidence-audit-link-title"),
+    ).toHaveTextContent("View confidence audit");
+    expect(
+      screen.getByTestId("ai-doctor-confidence-audit-link-description"),
+    ).toHaveTextContent(/hard caps/);
+    const link = screen.getByTestId("ai-doctor-confidence-audit-link");
+    expect(link).toHaveAttribute("href", "/internal/ai-doctor-confidence-audit");
+  });
+
+  it("confidence audit link shows internal/static/read-only badges", () => {
+    renderAtRoute("/internal/ai-doctor-phase1-preview");
+    const card = screen.getByTestId("ai-doctor-confidence-audit-link-card");
+    const text = card.textContent ?? "";
+    expect(text).toMatch(/Internal/);
+    expect(text).toMatch(/Static reference/);
+    expect(text).toMatch(/Read-only/);
+  });
+
   it("Action Queue panel says approval is required and has a disabled reason", () => {
     renderAtRoute("/internal/ai-doctor-phase1-preview");
     const panel = screen.getByTestId("ai-doctor-phase1-preview-action-queue");

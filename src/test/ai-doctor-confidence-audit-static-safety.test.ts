@@ -55,6 +55,12 @@ const FORBIDDEN_COPY = [
   "Certainly",
 ];
 
+const FORBIDDEN_IMPORTS = [
+  "calculateAiDoctorConfidence",
+  "generateMultimodalDiagnosisPhase1",
+  "compilePlantContextFromRows",
+];
+
 describe("AI Doctor Confidence Audit — static safety", () => {
   for (const filePath of [PAGE_PATH, VM_PATH]) {
     it(`${filePath} does not import from Supabase`, () => {
@@ -95,6 +101,13 @@ describe("AI Doctor Confidence Audit — static safety", () => {
       }
     });
 
+    it(`${filePath} does not import scoring/model/compiler adapters`, () => {
+      const src = readFile(filePath);
+      for (const name of FORBIDDEN_IMPORTS) {
+        expect(src).not.toContain(name);
+      }
+    });
+
     it(`${filePath} (excluding comments) has no forbidden execution copy`, () => {
       const src = stripComments(readFile(filePath));
       for (const phrase of FORBIDDEN_COPY) {
@@ -103,13 +116,14 @@ describe("AI Doctor Confidence Audit — static safety", () => {
     });
   }
 
-  it("page only imports from react and the local view model", () => {
+  it("page only imports from react, react-router-dom, and the local view model", () => {
     const src = readFile(PAGE_PATH);
     const fromMatches = src.match(/from\s+["'][^"']+["']/g) || [];
     for (const match of fromMatches) {
       const isReact = match.includes('"react"');
+      const isRouter = match.includes('"react-router-dom"');
       const isViewModel = match.includes("aiDoctorConfidenceAuditViewModel");
-      expect(isReact || isViewModel).toBe(true);
+      expect(isReact || isRouter || isViewModel).toBe(true);
     }
   });
 
@@ -124,6 +138,8 @@ describe("AI Doctor Confidence Audit — static safety", () => {
     const fromMatches = src.match(/from\s+["'][^"']+["']/g) || [];
     for (const match of fromMatches) {
       if (match.includes("aiDoctorConfidenceAuditViewModel")) continue;
+      if (match.includes('"react"')) continue;
+      if (match.includes('"react-router-dom"')) continue;
       expect(match).not.toMatch(/model|edge|ingest|alert|action/i);
     }
   });

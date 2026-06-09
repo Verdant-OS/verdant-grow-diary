@@ -109,4 +109,83 @@ describe("aiDoctorConfidenceAuditViewModel", () => {
     expect(Object.isFrozen(vm.rules)).toBe(true);
     expect(Object.isFrozen(vm.hard_caps)).toBe(true);
   });
+
+  // -------------------------------------------------------------------------
+  // Scenario tests
+  // -------------------------------------------------------------------------
+  it("includes 6 scenarios in deterministic order", () => {
+    const vm = buildAiDoctorConfidenceAuditViewModel();
+    expect(vm.scenarios.length).toBe(6);
+    expect(vm.scenarios.map((s) => s.id)).toEqual([
+      "demo-csv-only",
+      "stale-invalid-only",
+      "major-missing-information",
+      "poor-visual-weak-context",
+      "no-trustworthy-no-events",
+      "conflicting-weak-signals",
+    ]);
+  });
+
+  it("demo-csv-only scenario has cap 40 and expected flags", () => {
+    const vm = buildAiDoctorConfidenceAuditViewModel();
+    const s = vm.scenarios.find((x) => x.id === "demo-csv-only");
+    expect(s).toBeDefined();
+    expect(s!.confidence_ceiling).toBe(40);
+    expect(s!.applies_safety_flags).toContain("demo_or_csv_only");
+    expect(s!.applies_safety_flags).toContain("weak_context");
+    expect(s!.applies_safety_flags).toContain("avoid_overdiagnosis");
+  });
+
+  it("stale-invalid-only scenario has cap 30 and expected flags", () => {
+    const vm = buildAiDoctorConfidenceAuditViewModel();
+    const s = vm.scenarios.find((x) => x.id === "stale-invalid-only");
+    expect(s).toBeDefined();
+    expect(s!.confidence_ceiling).toBe(30);
+    expect(s!.applies_safety_flags).toContain("stale_or_invalid_readings_present");
+    expect(s!.applies_safety_flags).toContain("no_trustworthy_sensor_data");
+  });
+
+  it("major-missing-information scenario has cap 45", () => {
+    const vm = buildAiDoctorConfidenceAuditViewModel();
+    const s = vm.scenarios.find((x) => x.id === "major-missing-information");
+    expect(s).toBeDefined();
+    expect(s!.confidence_ceiling).toBe(45);
+    expect(s!.applies_safety_flags).toContain("major_missing_information");
+  });
+
+  it("poor-visual-weak-context scenario has cap 35", () => {
+    const vm = buildAiDoctorConfidenceAuditViewModel();
+    const s = vm.scenarios.find((x) => x.id === "poor-visual-weak-context");
+    expect(s).toBeDefined();
+    expect(s!.confidence_ceiling).toBe(35);
+    expect(s!.applies_safety_flags).toContain("poor_visual_quality");
+  });
+
+  it("no-trustworthy-no-events scenario has cap 35", () => {
+    const vm = buildAiDoctorConfidenceAuditViewModel();
+    const s = vm.scenarios.find((x) => x.id === "no-trustworthy-no-events");
+    expect(s).toBeDefined();
+    expect(s!.confidence_ceiling).toBe(35);
+    expect(s!.applies_safety_flags).toContain("no_trustworthy_sensor_data");
+    expect(s!.applies_safety_flags).toContain("no_recent_grow_events");
+  });
+
+  it("conflicting-weak-signals scenario does not imply certainty", () => {
+    const vm = buildAiDoctorConfidenceAuditViewModel();
+    const s = vm.scenarios.find((x) => x.id === "conflicting-weak-signals");
+    expect(s).toBeDefined();
+    expect(s!.confidence_ceiling).toBe(-1);
+    expect(s!.applies_safety_flags).toContain("weak_context");
+    expect(s!.applies_safety_flags).toContain("avoid_overdiagnosis");
+    const takeaway = s!.operator_takeaway.toLowerCase();
+    expect(takeaway).toMatch(/not a single certain diagnosis/);
+  });
+
+  it("scenarios are frozen", () => {
+    const vm = buildAiDoctorConfidenceAuditViewModel();
+    expect(Object.isFrozen(vm.scenarios)).toBe(true);
+    for (const s of vm.scenarios) {
+      expect(Object.isFrozen(s)).toBe(true);
+    }
+  });
 });

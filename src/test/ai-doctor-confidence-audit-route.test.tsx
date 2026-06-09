@@ -2,9 +2,25 @@
  * AI Doctor Confidence Audit — Route Tests.
  */
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import AiDoctorConfidenceAudit from "@/pages/AiDoctorConfidenceAudit";
 import { AI_DOCTOR_CONFIDENCE_RULE_IDS } from "@/lib/aiDoctorConfidenceAuditViewModel";
+
+function selectScenario(id: string) {
+  const select = screen.getByTestId(
+    "ai-doctor-confidence-scenario-select",
+  ) as HTMLSelectElement;
+  fireEvent.change(select, { target: { value: id } });
+}
+
+const SCENARIO_IDS = [
+  "demo-csv-only",
+  "stale-invalid-only",
+  "major-missing-information",
+  "poor-visual-weak-context",
+  "no-trustworthy-no-events",
+  "conflicting-weak-signals",
+];
 
 describe("AiDoctorConfidenceAudit route page", () => {
   it("renders the page", () => {
@@ -135,5 +151,99 @@ describe("AiDoctorConfidenceAudit route page", () => {
     for (const phrase of forbidden) {
       expect(text).not.toMatch(new RegExp(phrase, "i"));
     }
+  });
+
+  // -------------------------------------------------------------------------
+  // Scenario selector tests
+  // -------------------------------------------------------------------------
+  it("renders scenario selector with all 6 options", () => {
+    render(<AiDoctorConfidenceAudit />);
+    expect(
+      screen.getByTestId("ai-doctor-confidence-scenario-select"),
+    ).toBeInTheDocument();
+    for (const id of SCENARIO_IDS) {
+      expect(
+        screen.getByTestId(`ai-doctor-confidence-scenario-option-${id}`),
+      ).toBeInTheDocument();
+    }
+  });
+
+  it("default scenario is demo-csv-only", () => {
+    render(<AiDoctorConfidenceAudit />);
+    const select = screen.getByTestId(
+      "ai-doctor-confidence-scenario-select",
+    ) as HTMLSelectElement;
+    expect(select.value).toBe("demo-csv-only");
+  });
+
+  it.each(SCENARIO_IDS.map((id) => [id]))(
+    "selecting scenario %s updates displayed cap/flags/takeaway",
+    (id) => {
+      render(<AiDoctorConfidenceAudit />);
+      selectScenario(id);
+      expect(
+        screen.getByTestId("ai-doctor-confidence-scenario-panel"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId("ai-doctor-confidence-scenario-label"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId("ai-doctor-confidence-scenario-context-type"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId("ai-doctor-confidence-scenario-ceiling"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId("ai-doctor-confidence-scenario-takeaway"),
+      ).toBeInTheDocument();
+      // hard caps and safety flags should also be present
+      expect(
+        screen.getByTestId("ai-doctor-confidence-scenario-safety-flags"),
+      ).toBeInTheDocument();
+    },
+  );
+
+  it("demo-csv-only scenario shows ceiling 40", () => {
+    render(<AiDoctorConfidenceAudit />);
+    selectScenario("demo-csv-only");
+    expect(
+      screen.getByTestId("ai-doctor-confidence-scenario-ceiling"),
+    ).toHaveTextContent("40");
+  });
+
+  it("stale-invalid-only scenario shows ceiling 30", () => {
+    render(<AiDoctorConfidenceAudit />);
+    selectScenario("stale-invalid-only");
+    expect(
+      screen.getByTestId("ai-doctor-confidence-scenario-ceiling"),
+    ).toHaveTextContent("30");
+  });
+
+  it("major-missing-information scenario shows ceiling 45", () => {
+    render(<AiDoctorConfidenceAudit />);
+    selectScenario("major-missing-information");
+    expect(
+      screen.getByTestId("ai-doctor-confidence-scenario-ceiling"),
+    ).toHaveTextContent("45");
+  });
+
+  it("conflicting-weak-signals scenario shows conservative/low ceiling", () => {
+    render(<AiDoctorConfidenceAudit />);
+    selectScenario("conflicting-weak-signals");
+    expect(
+      screen.getByTestId("ai-doctor-confidence-scenario-ceiling"),
+    ).toHaveTextContent(/Conservative/);
+  });
+
+  it("page still shows internal/static/no-live/no-write/no-model/no-device labels after scenario selection", () => {
+    render(<AiDoctorConfidenceAudit />);
+    selectScenario("no-trustworthy-no-events");
+    const text = document.body.textContent ?? "";
+    expect(text).toMatch(/Internal audit/);
+    expect(text).toMatch(/Static reference/);
+    expect(text).toMatch(/No live data queries/);
+    expect(text).toMatch(/No database writes/);
+    expect(text).toMatch(/No model calls/);
+    expect(text).toMatch(/No device control/);
   });
 });

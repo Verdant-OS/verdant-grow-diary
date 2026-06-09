@@ -15,6 +15,17 @@
 // Public types
 // ---------------------------------------------------------------------------
 
+export interface AiDoctorConfidenceAuditScenario {
+  id: string;
+  label: string;
+  description: string;
+  context_type: string;
+  applies_hard_caps: readonly string[];
+  applies_safety_flags: readonly string[];
+  confidence_ceiling: number;
+  operator_takeaway: string;
+}
+
 export interface AiDoctorConfidenceAuditRule {
   id: string;
   label: string;
@@ -44,6 +55,7 @@ export interface AiDoctorConfidenceAuditViewModel {
   source_quality_notes: readonly string[];
   safety_flags: readonly string[];
   forbidden_behavior: readonly string[];
+  scenarios: readonly AiDoctorConfidenceAuditScenario[];
   generated_at: string;
 }
 
@@ -296,6 +308,106 @@ const HARD_CAPS: readonly AiDoctorConfidenceHardCap[] = [
   },
 ];
 
+const SCENARIOS: readonly AiDoctorConfidenceAuditScenario[] = [
+  {
+    id: "demo-csv-only",
+    label: "Demo / CSV-only context",
+    description:
+      "The only available context is demo fixtures or historical CSV imports. No live or manual sensor readings.",
+    context_type: "demo-csv-only",
+    applies_hard_caps: Object.freeze(["demo-or-csv-only"]),
+    applies_safety_flags: Object.freeze([
+      "demo_or_csv_only",
+      "weak_context",
+      "avoid_overdiagnosis",
+    ]),
+    confidence_ceiling: 40,
+    operator_takeaway:
+      "Imported or sample context can inform review but must not act like live support.",
+  },
+  {
+    id: "stale-invalid-only",
+    label: "Stale / invalid-only context",
+    description:
+      "The only available readings are stale (out of date) or invalid (malformed or out of range).",
+    context_type: "stale-invalid-only",
+    applies_hard_caps: Object.freeze(["stale-or-invalid-only"]),
+    applies_safety_flags: Object.freeze([
+      "stale_or_invalid_readings_present",
+      "no_trustworthy_sensor_data",
+      "weak_context",
+      "avoid_overdiagnosis",
+    ]),
+    confidence_ceiling: 30,
+    operator_takeaway:
+      "Stale or invalid data is a limitation, not current truth.",
+  },
+  {
+    id: "major-missing-information",
+    label: "Major missing information",
+    description:
+      "Critical context is missing: stage, medium, pot size, recent watering, or recent feeding.",
+    context_type: "major-missing-information",
+    applies_hard_caps: Object.freeze(["major-missing-information"]),
+    applies_safety_flags: Object.freeze([
+      "major_missing_information",
+      "weak_context",
+      "avoid_overdiagnosis",
+    ]),
+    confidence_ceiling: 45,
+    operator_takeaway:
+      "Missing pH/EC/watering/feed/history blocks confident diagnosis.",
+  },
+  {
+    id: "poor-visual-weak-context",
+    label: "Poor visual quality + weak context",
+    description:
+      "The only photo is blurry, dark, distant, or otherwise low quality, and other context is weak.",
+    context_type: "poor-visual-weak-context",
+    applies_hard_caps: Object.freeze(["poor-visual-quality-weak-context"]),
+    applies_safety_flags: Object.freeze([
+      "poor_visual_quality",
+      "weak_context",
+      "avoid_overdiagnosis",
+    ]),
+    confidence_ceiling: 35,
+    operator_takeaway:
+      "Blurry or low-quality visual context cannot support strong conclusions.",
+  },
+  {
+    id: "no-trustworthy-no-events",
+    label: "No trustworthy sensors + no events",
+    description:
+      "There is no recent trustworthy sensor data and no recent grow events.",
+    context_type: "no-trustworthy-no-events",
+    applies_hard_caps: Object.freeze(["no-trustworthy-sensors-no-events"]),
+    applies_safety_flags: Object.freeze([
+      "no_trustworthy_sensor_data",
+      "no_recent_grow_events",
+      "weak_context",
+      "avoid_overdiagnosis",
+    ]),
+    confidence_ceiling: 35,
+    operator_takeaway:
+      "Without trusted readings or recent grow history, AI Doctor must stay conservative.",
+  },
+  {
+    id: "conflicting-weak-signals",
+    label: "Conflicting weak signals",
+    description:
+      "Available signals point in different directions and none are strong on their own.",
+    context_type: "conflicting-weak-signals",
+    applies_hard_caps: Object.freeze([]),
+    applies_safety_flags: Object.freeze([
+      "weak_context",
+      "avoid_overdiagnosis",
+    ]),
+    confidence_ceiling: -1,
+    operator_takeaway:
+      "Conflicting weak signals should produce multiple possible causes, not a single certain diagnosis.",
+  },
+];
+
 const HIGH_CONFIDENCE_REQUIREMENTS: readonly string[] = [
   "Recent live or manual trustworthy sensor data for the relevant tent or plant.",
   "Recent grow events such as watering, feeding, or stage notes.",
@@ -364,6 +476,9 @@ export function buildAiDoctorConfidenceAuditViewModel(
     source_quality_notes: Object.freeze([...SOURCE_QUALITY_NOTES]),
     safety_flags: Object.freeze([...SAFETY_FLAGS]),
     forbidden_behavior: Object.freeze([...FORBIDDEN_BEHAVIOR]),
+    scenarios: Object.freeze(
+      SCENARIOS.map((s) => Object.freeze({ ...s })),
+    ),
     generated_at: normalizeNow(now),
   };
   return Object.freeze(vm);

@@ -96,3 +96,24 @@ describe("Auth redirect-safety spec — safety", () => {
     expect(redirectSpec).toMatch(/evil\.example/);
   });
 });
+
+describe("Auth desktop spec — safety", () => {
+  it("uses 1280x800 viewport", () => {
+    expect(desktopSpec).toMatch(/viewport:\s*\{\s*width:\s*1280,\s*height:\s*800\s*\}/);
+  });
+  it("intercepts /auth/v1/** via page.route", () => {
+    expect(desktopSpec).toMatch(/page\.route\(\s*\/\\\/auth\\\/v1\\\//);
+  });
+  it("uses .invalid email + no real secrets/service_role", () => {
+    expect(desktopSpec).toMatch(/@example\.invalid/);
+    expect(desktopSpec).not.toMatch(/service_role/i);
+    expect(desktopSpec).not.toMatch(
+      /process\.env\.(E2E_TEST_PASSWORD|E2E_TEST_EMAIL|SUPABASE_SERVICE_ROLE)/,
+    );
+  });
+  it("never logs password/token/session/recovery/email", () => {
+    expect(desktopSpec).not.toMatch(
+      /console\.(log|warn|error|info|debug)\s*\([^)]*\b(password|token|session|recovery|email|hash)\b/i,
+    );
+  });
+});

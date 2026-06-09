@@ -107,6 +107,7 @@ describe("buildEcowittLiveEvidenceSnapshotExport — shape & metadata", () => {
       "warning",
       "operator_disclaimer",
       "form_state",
+      "tonight_mode",
       "overall_result",
       "plant_results",
       "unit_warnings",
@@ -115,6 +116,16 @@ describe("buildEcowittLiveEvidenceSnapshotExport — shape & metadata", () => {
       "source_truth_summary",
       "safety_flags",
     ]);
+  });
+
+  it("includes tonight_mode payload with status and gates", () => {
+    const snap = buildEcowittLiveEvidenceSnapshotExport(makeInput(baseFormState()));
+    expect(typeof snap.tonight_mode.status).toBe("string");
+    expect(typeof snap.tonight_mode.can_export_snapshot).toBe("boolean");
+    expect(typeof snap.tonight_mode.can_claim_live_proof).toBe("boolean");
+    expect(snap.source_truth_summary.tonight_mode_status).toBe(
+      snap.tonight_mode.status,
+    );
   });
 
   it("includes every safety flag", () => {

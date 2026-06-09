@@ -548,7 +548,15 @@ export function evaluateLiveSourceTruth(
   } else if (isNonLiveProofSource) {
     verdict = "not_live_proof";
   } else if (source === "live") {
-    if (operatorCompared && hasComparedMetric && comparedMatchCount > 0) {
+    const payloadsPresent =
+      evidence?.raw_payload_present === true &&
+      evidence?.normalized_payload_present === true;
+    if (
+      operatorCompared &&
+      hasComparedMetric &&
+      comparedMatchCount > 0 &&
+      payloadsPresent
+    ) {
       verdict = "verified_live";
     } else {
       verdict = "unverified_live";

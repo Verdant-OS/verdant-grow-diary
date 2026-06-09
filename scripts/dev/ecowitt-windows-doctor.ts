@@ -23,8 +23,8 @@
  */
 
 import { networkInterfaces } from "node:os";
-import { mkdirSync, writeFileSync, existsSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { mkdirSync, writeFileSync, existsSync, realpathSync } from "node:fs";
+import { resolve, join, dirname, basename, sep, isAbsolute } from "node:path";
 
 export interface IpCandidate {
   iface: string;
@@ -183,22 +183,56 @@ export function buildLauncherFiles(repoRoot: string): Record<string, string> {
   };
 }
 
+/**
+ * Resolve to an absolute path, dereferencing symlinks for any ancestor that
+ * already exists. Non-existent leaf segments are appended as-is. This lets
+ * the launcher path guard catch symlink escapes without requiring the
+ * destination directory to exist yet.
+ */
+function realResolve(p: string): string {
+  const abs = resolve(p);
+  if (existsSync(abs)) {
+    try { return realpathSync(abs); } catch { return abs; }
+  }
+  const parent = dirname(abs);
+  if (parent === abs) return abs;
+  return join(realResolve(parent), basename(abs));
+}
+
 export function writeLaunchers(
   outDir: string,
   repoRoot: string,
 ): { written: string[]; outDir: string } {
-  // Safety: only ever write under tmp/ecowitt-windows/
-  const normalized = resolve(outDir);
-  const expectedSuffix = resolve(repoRoot, "tmp/ecowitt-windows");
-  if (normalized !== expectedSuffix) {
+  // Safety: only ever write under <repo-root>/tmp/ecowitt-windows/.
+  if (!isAbsolute(repoRoot)) {
+    throw new Error(`refusing to write launchers: repoRoot must be absolute (got: ${repoRoot})`);
+  }
+  // Reject any traversal segment in the raw input (defense-in-depth).
+  const segments = outDir.split(/[\\/]+/);
+  if (segments.includes("..")) {
+    throw new Error(`refusing to write launchers: path traversal not allowed (got: ${outDir})`);
+  }
+  const normalized = realResolve(outDir);
+  const expected = realResolve(join(repoRoot, "tmp", "ecowitt-windows"));
+  const repoReal = realResolve(repoRoot);
+  if (normalized !== expected) {
     throw new Error(
       `refusing to write launchers outside tmp/ecowitt-windows/ (got: ${normalized})`,
+    );
+  }
+  if (!(normalized === repoReal || normalized.startsWith(repoReal + sep))) {
+    throw new Error(
+      `refusing to write launchers outside repo root (got: ${normalized}, repo: ${repoReal})`,
     );
   }
   mkdirSync(normalized, { recursive: true });
   const files = buildLauncherFiles(repoRoot);
   const written: string[] = [];
   for (const [name, content] of Object.entries(files)) {
+    // Refuse any filename that escapes the target dir.
+    if (name.includes("/") || name.includes("\\") || name.includes("..")) {
+      throw new Error(`refusing to write launcher with unsafe filename: ${name}`);
+    }
     const p = join(normalized, name);
     writeFileSync(p, content, "utf8");
     written.push(p);

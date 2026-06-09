@@ -56,6 +56,11 @@ jobs:
       E2E_FIXTURE_EXPECTED_GROW_NAME: ${{ vars.E2E_FIXTURE_EXPECTED_GROW_NAME }}
       E2E_FIXTURE_EXPECTED_TENT_NAME: ${{ vars.E2E_FIXTURE_EXPECTED_TENT_NAME }}
       E2E_FIXTURE_EXPECTED_PLANT_NAME: ${{ vars.E2E_FIXTURE_EXPECTED_PLANT_NAME }}
+      # Optional safe label (e.g. "E2E") used by the fixture validator if the
+      # app visibly exposes account identity. NEVER a password or token.
+      E2E_FIXTURE_EXPECTED_ACCOUNT_HINT: ${{ vars.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT }}
+      # Optional, off by default. Enables the UI-only fixture bootstrap step.
+      E2E_ALLOW_FIXTURE_BOOTSTRAP: ${{ vars.E2E_ALLOW_FIXTURE_BOOTSTRAP }}
 
     steps:
       - name: Checkout

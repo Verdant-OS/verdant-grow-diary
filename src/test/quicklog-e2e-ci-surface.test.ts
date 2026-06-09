@@ -90,8 +90,10 @@ describe("Quick Log Playwright CI surface", () => {
 
   it("CI workflow skips cleanly on PR without secrets and fails fast on dispatch", () => {
     const wf = read(".github/workflows/quicklog-smoke.yml");
-    // pull_request trigger present, scoped to main
-    expect(wf).toMatch(/pull_request:\s*\n\s*branches:\s*\[main\]/);
+    // pull_request trigger present, scoped to verdant-grow-diary
+    expect(wf).toMatch(/pull_request:\s*\n\s*branches:\s*\[verdant-grow-diary\]/);
+    // Must never use the unsafe pull_request_target event
+    expect(wf).not.toMatch(/pull_request_target/);
     // Precheck step id used to gate later steps
     expect(wf).toMatch(/id:\s*e2e_config/);
     expect(wf).toMatch(/steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/);
@@ -106,6 +108,28 @@ describe("Quick Log Playwright CI surface", () => {
     // Precheck distinguishes the two event kinds
     expect(wf).toMatch(/github\.event_name/);
     expect(wf).toMatch(/workflow_dispatch[\s\S]{0,400}pull_request/);
+  });
+
+  it("CI workflow path filters are exact for push and pull_request", () => {
+    const wf = read(".github/workflows/quicklog-smoke.yml");
+    const expectedPaths = [
+      'e2e/**',
+      'playwright.config.ts',
+      '.github/workflows/quicklog-smoke.yml',
+    ];
+    // Extract every paths: block in the file and assert the three exact entries appear
+    const pathBlocks = Array.from(wf.matchAll(/paths:\s*\|\n((?:\s+-\s+".+"\n)+)/g));
+    expect(pathBlocks.length).toBeGreaterThanOrEqual(2); // push + pull_request
+    for (const [, block] of pathBlocks) {
+      for (const p of expectedPaths) {
+        expect(block).toContain(`- "${p}"`);
+      }
+      // Must not contain unexpected extra paths
+      const lines = block.split('\n').filter(l => l.trim().startsWith('-'));
+      expect(lines.map(l => l.trim())).toEqual(
+        expectedPaths.map(p => `- "${p}"`),
+      );
+    }
   });
 
   it("smoke spec writes report to a stable path", () => {

@@ -41,6 +41,7 @@ export interface BridgeFlags {
   topic: string;
   dryRun: boolean;
   once: boolean;
+  showRaw: boolean;
   mqttUsername: string | null;
   mqttPassword: string | null;
 }
@@ -63,9 +64,25 @@ export function parseFlags(
     topic: get("--topic") ?? env.ECOWITT_MQTT_TOPIC ?? DEFAULT_MQTT_TOPIC,
     dryRun: argv.includes("--dry-run"),
     once: argv.includes("--once"),
+    showRaw: argv.includes("--show-raw"),
     mqttUsername: env.ECOWITT_MQTT_USERNAME ?? null,
     mqttPassword: env.ECOWITT_MQTT_PASSWORD ?? null,
   };
+}
+
+/** Strip userinfo from an mqtt:// URL so logs never leak credentials. */
+export function redactBrokerUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    if (u.username || u.password) {
+      u.username = "";
+      u.password = "";
+      return u.toString();
+    }
+    return url;
+  } catch {
+    return url;
+  }
 }
 
 /** Normalize trailing slash: /data/report and /data/report/ both match. */
@@ -201,12 +218,13 @@ export interface HandleResult {
  * provided publisher. Never touches Supabase, never calls fetch().
  */
 export async function handleRequest(
-  req: { method?: string; url?: string; headers: Record<string, string | string[] | undefined>; body: string },
+  req: { method?: string; url?: string; headers: Record<string, string | string[] | undefined>; body: string; sourceIp?: string },
   flags: BridgeFlags,
   publisher: MqttPublisher | null,
   now: Date = new Date(),
 ): Promise<HandleResult> {
-  if ((req.method ?? "").toUpperCase() !== "POST") {
+  const method = (req.method ?? "").toUpperCase();
+  if (method !== "POST") {
     return { status: 405, body: "method_not_allowed", published: false, metricKeys: [] };
   }
   const path = req.url ?? "/";
@@ -221,14 +239,25 @@ export async function handleRequest(
   }
   const msg = buildMqttMessage(parsed, flags.topic, now);
 
+  if (flags.showRaw) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[ecowitt-http-bridge] WARNING --show-raw is enabled. Raw payload may contain device identifiers. Local debugging only.",
+    );
+    safeLog("raw", { path, source_ip: req.sourceIp ?? "?", raw: parsed });
+  }
+
   if (flags.dryRun || !publisher) {
     safeLog("dry-run parsed", {
+      method,
       path,
+      source_ip: req.sourceIp ?? "?",
       topic: flags.topic,
       metric_keys: msg.metricKeys,
       published: false,
     });
-    return { status: 200, body: "dry_run_ok", published: false, metricKeys: msg.metricKeys };
+    // Always return a small ack body so Ecowitt gateways do not retry.
+    return { status: 200, body: "ok", published: false, metricKeys: msg.metricKeys };
   }
 
   try {
@@ -238,7 +267,9 @@ export async function handleRequest(
     return { status: 502, body: "mqtt_publish_failed", published: false, metricKeys: msg.metricKeys };
   }
   safeLog("published", {
+    method,
     path,
+    source_ip: req.sourceIp ?? "?",
     topic: flags.topic,
     metric_keys: msg.metricKeys,
     published: true,
@@ -281,6 +312,7 @@ export async function startServer(
         url: req.url,
         headers: req.headers as Record<string, string | string[] | undefined>,
         body,
+        sourceIp: req.socket?.remoteAddress ?? "?",
       },
       flags,
       publisher,
@@ -301,12 +333,14 @@ export async function startServer(
 
   await new Promise<void>((resolve) => server.listen(flags.port, "0.0.0.0", () => resolve()));
   safeLog("listening", {
-    port: flags.port,
-    endpoint: flags.endpoint,
+    url: `http://0.0.0.0:${flags.port}`,
+    accepted_paths: [flags.endpoint, `${flags.endpoint.replace(/\/+$/, "")}/`],
     topic: flags.topic,
-    broker: flags.mqttUrl,
+    broker: redactBrokerUrl(flags.mqttUrl),
     dry_run: flags.dryRun,
+    show_raw: flags.showRaw,
     mqtt_password: flags.mqttPassword ? "(redacted)" : "(none)",
+    ecowitt_app_hint: `Protocol: Ecowitt | Port: ${flags.port} | Path: ${flags.endpoint} | Interval: 60s`,
   });
 
   return {

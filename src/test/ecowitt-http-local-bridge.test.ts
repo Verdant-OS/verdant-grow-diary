@@ -19,6 +19,7 @@ const baseFlags = (overrides: Partial<BridgeFlags> = {}): BridgeFlags => ({
   topic: "ecowitt/grow",
   dryRun: false,
   once: false,
+  showRaw: false,
   mqttUsername: null,
   mqttPassword: null,
   ...overrides,

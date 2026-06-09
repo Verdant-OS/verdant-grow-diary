@@ -15,6 +15,9 @@ const ROOT = resolve(__dirname, "../..");
 const PAGE_PATH = "src/pages/EcowittLiveBringup.tsx";
 const VM_PATH = "src/lib/ecowittLiveBringupViewModel.ts";
 const FORM_PATH = "src/lib/ecowittLiveEvidenceFormRules.ts";
+const TEMPLATES_PATH = "src/lib/ecowittLiveEvidenceTemplates.ts";
+const UNIT_WARN_PATH = "src/lib/ecowittLiveEvidenceUnitWarningRules.ts";
+const MULTI_PLANT_PATH = "src/lib/ecowittLiveEvidenceMultiPlantRules.ts";
 
 function read(p: string): string {
   return readFileSync(resolve(ROOT, p), "utf8");
@@ -29,15 +32,26 @@ function stripComments(src: string): string {
 const pageSrc = read(PAGE_PATH);
 const vmSrc = read(VM_PATH);
 const formSrc = read(FORM_PATH);
+const templatesSrc = read(TEMPLATES_PATH);
+const unitWarnSrc = read(UNIT_WARN_PATH);
+const multiPlantSrc = read(MULTI_PLANT_PATH);
 const pageNoComments = stripComments(pageSrc);
 const vmNoComments = stripComments(vmSrc);
 const formNoComments = stripComments(formSrc);
+const templatesNoComments = stripComments(templatesSrc);
+const unitWarnNoComments = stripComments(unitWarnSrc);
+const multiPlantNoComments = stripComments(multiPlantSrc);
+
 
 const targets: Array<[string, string]> = [
   ["page", pageNoComments],
   ["view model", vmNoComments],
   ["form rules", formNoComments],
+  ["templates", templatesNoComments],
+  ["unit warning rules", unitWarnNoComments],
+  ["multi-plant rules", multiPlantNoComments],
 ];
+
 
 const FORBIDDEN_DEVICE_NAMES = [
   "controlDevice",
@@ -131,17 +145,21 @@ describe("ecowitt-live-bringup — static safety", () => {
     }
   });
 
-  it("page imports only react, the local view model, the gate rules, and the form rules", () => {
+  it("page imports only react and local lib helpers", () => {
     const fromMatches = pageSrc.match(/from\s+["'][^"']+["']/g) || [];
     for (const m of fromMatches) {
       const ok =
         m.includes('"react"') ||
         m.includes("ecowittLiveBringupViewModel") ||
         m.includes("liveSourceTruthGateRules") ||
-        m.includes("ecowittLiveEvidenceFormRules");
+        m.includes("ecowittLiveEvidenceFormRules") ||
+        m.includes("ecowittLiveEvidenceTemplates") ||
+        m.includes("ecowittLiveEvidenceUnitWarningRules") ||
+        m.includes("ecowittLiveEvidenceMultiPlantRules");
       expect(ok).toBe(true);
     }
   });
+
 
   it("view model has no external imports", () => {
     const fromMatches = vmSrc.match(/from\s+["'][^"']+["']/g) || [];
@@ -158,4 +176,24 @@ describe("ecowitt-live-bringup — static safety", () => {
   it("form rules do not call Date.now", () => {
     expect(formNoComments).not.toMatch(/Date\.now\s*\(/);
   });
+
+  it("templates / unit-warning / multi-plant rules do not call Date.now", () => {
+    expect(templatesNoComments).not.toMatch(/Date\.now\s*\(/);
+    expect(unitWarnNoComments).not.toMatch(/Date\.now\s*\(/);
+    expect(multiPlantNoComments).not.toMatch(/Date\.now\s*\(/);
+  });
+
+  it("new lib files import only from the local helper modules", () => {
+    for (const src of [templatesSrc, unitWarnSrc, multiPlantSrc]) {
+      const fromMatches = src.match(/from\s+["'][^"']+["']/g) || [];
+      for (const m of fromMatches) {
+        expect(
+          /ecowittLiveEvidenceFormRules|liveSourceTruthGateRules|ecowittLiveEvidenceUnitWarningRules/.test(
+            m,
+          ),
+        ).toBe(true);
+      }
+    }
+  });
 });
+

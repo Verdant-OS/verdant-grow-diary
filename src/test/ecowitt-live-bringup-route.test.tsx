@@ -319,3 +319,122 @@ describe("Live Evidence Evaluator", () => {
     lsSet.mockRestore();
   });
 });
+
+describe("Live Evidence Evaluator — templates, units, multi-plant", () => {
+  it("renders quick-fill template buttons and helper copy", () => {
+    renderRoute();
+    expect(
+      screen.getByTestId("ecowitt-evaluator-templates"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("ecowitt-evaluator-templates-helper").textContent ?? "",
+    ).toMatch(/local examples/i);
+    expect(
+      screen.getByTestId("ecowitt-evaluator-template-live_verified_example"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId(
+        "ecowitt-evaluator-template-manual_comparison_example",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("ecowitt-evaluator-template-stale_evidence_example"),
+    ).toBeInTheDocument();
+  });
+
+  it("live template fills form and yields verified_live verdict", () => {
+    renderRoute();
+    fireEvent.click(
+      screen.getByTestId("ecowitt-evaluator-template-live_verified_example"),
+    );
+    clickEvaluate();
+    expect(
+      screen.getByTestId("ecowitt-evaluator-verdict"),
+    ).toHaveTextContent("verified_live");
+  });
+
+  it("manual template yields not_live_proof", () => {
+    renderRoute();
+    fireEvent.click(
+      screen.getByTestId(
+        "ecowitt-evaluator-template-manual_comparison_example",
+      ),
+    );
+    clickEvaluate();
+    expect(
+      screen.getByTestId("ecowitt-evaluator-verdict"),
+    ).toHaveTextContent("not_live_proof");
+  });
+
+  it("stale template yields stale verdict", () => {
+    renderRoute();
+    fireEvent.click(
+      screen.getByTestId("ecowitt-evaluator-template-stale_evidence_example"),
+    );
+    clickEvaluate();
+    expect(
+      screen.getByTestId("ecowitt-evaluator-verdict"),
+    ).toHaveTextContent("stale");
+  });
+
+  it("renders backend/controller unit fields and surfaces unit mismatch warning", () => {
+    renderRoute();
+    fillLiveBaseline();
+    enableMetric("temp_f", "72", "22");
+    setText("ecowitt-evaluator-metric-temp_f-backend-unit", "F");
+    setText("ecowitt-evaluator-metric-temp_f-controller-unit", "C");
+    expect(
+      screen.getByTestId("ecowitt-evaluator-unit-warnings").textContent ?? "",
+    ).toMatch(/fahrenheit|celsius/i);
+  });
+
+  it("multi-plant field renders and produces per-plant verdict rows", () => {
+    renderRoute();
+    fireEvent.click(
+      screen.getByTestId("ecowitt-evaluator-template-live_verified_example"),
+    );
+    setText("ecowitt-evaluator-plant-ids", "p-1, p-2");
+    clickEvaluate();
+    expect(
+      screen.getByTestId("ecowitt-evaluator-per-plant-row-0"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("ecowitt-evaluator-per-plant-row-1"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("ecowitt-evaluator-overall-verdict"),
+    ).toHaveTextContent("verified_live");
+  });
+
+  it("combined required next steps section renders after evaluation", () => {
+    renderRoute();
+    clickEvaluate();
+    expect(
+      screen.getByTestId("ecowitt-evaluator-combined-next-steps"),
+    ).toBeInTheDocument();
+  });
+
+  it("Live Evidence details show units, tolerance origin, and difference", () => {
+    renderRoute();
+    fireEvent.click(
+      screen.getByTestId("ecowitt-evaluator-template-live_verified_example"),
+    );
+    clickEvaluate();
+    const details = screen.getByTestId(
+      "ecowitt-evaluator-live-evidence-details",
+    );
+    const mr = within(details).getByTestId(
+      "ecowitt-evaluator-metric-result-temp_f",
+    );
+    expect(mr.textContent ?? "").toMatch(/F/);
+    expect(mr.textContent ?? "").toMatch(/default|overridden/);
+  });
+
+  it("plant_ids helper copy clarifies tent-level evidence", () => {
+    renderRoute();
+    expect(
+      screen.getByTestId("ecowitt-evaluator-plant-ids-helper").textContent ?? "",
+    ).toMatch(/tent-level/i);
+  });
+});
+

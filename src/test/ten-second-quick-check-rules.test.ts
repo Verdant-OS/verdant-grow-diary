@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
+  QUICK_LOG_ACTION_CHIPS,
+  RESPONSE_CHECK_STATUSES,
+  applyQuickLogActionChip,
+  applyResponseCheck,
+  buildResponseCheckLine,
+  hasResponseCheck,
+  // Legacy exports stay supported while the UI moves to grower-framed copy.
   TEN_SECOND_QUICK_CHECK_STATUSES,
   QUICK_CHECK_DETAIL_CHIPS,
   applyQuickCheckDetailChip,
@@ -8,66 +15,87 @@ import {
   hasTenSecondQuickCheck,
 } from "@/lib/tenSecondQuickCheckRules";
 
-describe("tenSecondQuickCheckRules", () => {
-  it("exposes the three primary quick check statuses", () => {
-    expect(TEN_SECOND_QUICK_CHECK_STATUSES).toEqual(["Better", "Same", "Worse"]);
-  });
-
-  it("exposes lightweight detail chips", () => {
-    expect(QUICK_CHECK_DETAIL_CHIPS).toEqual([
+describe("Quick Log action + response rules", () => {
+  it("exposes action-first Quick Log chips", () => {
+    expect(QUICK_LOG_ACTION_CHIPS).toEqual([
       "Watered",
       "Fed",
-      "Spotted issue",
       "Photo only",
+      "Issue spotted",
+      "Environment changed",
+      "Training / pruning",
+      "Note",
     ]);
   });
 
-  it("builds a stable quick check line", () => {
-    expect(buildQuickCheckLine("Better")).toBe("Quick check: Better.");
-    expect(buildQuickCheckLine("Same")).toBe("Quick check: Same.");
-    expect(buildQuickCheckLine("Worse")).toBe("Quick check: Worse.");
+  it("exposes Better/Same/Worse as response checks", () => {
+    expect(RESPONSE_CHECK_STATUSES).toEqual(["Better", "Same", "Worse"]);
   });
 
-  it("applies a quick check to an empty note", () => {
-    expect(applyTenSecondQuickCheck("", "Better")).toBe("Quick check: Better.");
+  it("builds a stable response check line", () => {
+    expect(buildResponseCheckLine("Better")).toBe("Response check: Better.");
+    expect(buildResponseCheckLine("Same")).toBe("Response check: Same.");
+    expect(buildResponseCheckLine("Worse")).toBe("Response check: Worse.");
   });
 
-  it("keeps existing typed note detail after the quick check line", () => {
-    expect(applyTenSecondQuickCheck("Lower leaves perked up", "Better")).toBe(
-      "Quick check: Better.\nLower leaves perked up",
-    );
+  it("applies a grow action chip to an empty note", () => {
+    expect(applyQuickLogActionChip("", "Watered")).toBe("Watered.");
   });
 
-  it("replaces an existing quick check instead of stacking contradictory status", () => {
-    const note = "Quick check: Worse.\nLower leaf issue";
-    expect(applyTenSecondQuickCheck(note, "Same")).toBe(
-      "Quick check: Same.\nLower leaf issue",
-    );
-  });
-
-  it("detects whether a note contains a quick check line", () => {
-    expect(hasTenSecondQuickCheck("Quick check: Same.")).toBe(true);
-    expect(hasTenSecondQuickCheck("Same")).toBe(false);
-  });
-
-  it("adds detail chips without duplicates", () => {
-    const one = applyQuickCheckDetailChip("Quick check: Same.", "Watered");
-    const two = applyQuickCheckDetailChip(one, "Watered");
-    expect(one).toBe("Quick check: Same.\nWatered");
+  it("adds action chips without duplicates", () => {
+    const one = applyQuickLogActionChip("Watered.", "Fed");
+    const two = applyQuickLogActionChip(one, "Fed");
+    expect(one).toBe("Watered.\nFed.");
     expect(two).toBe(one);
   });
 
-  it("formats Photo only as a sentence", () => {
-    expect(applyQuickCheckDetailChip("Quick check: Same.", "Photo only")).toBe(
-      "Quick check: Same.\nPhoto only.",
+  it("formats action chips as grow-room notes", () => {
+    expect(applyQuickLogActionChip("", "Photo only")).toBe("Photo only.");
+    expect(applyQuickLogActionChip("", "Issue spotted")).toBe("Issue spotted.");
+    expect(applyQuickLogActionChip("", "Environment changed")).toBe("Environment changed.");
+    expect(applyQuickLogActionChip("", "Training / pruning")).toBe("Training / pruning.");
+  });
+
+  it("applies response checks without removing action detail", () => {
+    expect(applyResponseCheck("Watered.\nRaised light.", "Better")).toBe(
+      "Response check: Better.\nWatered.\nRaised light.",
     );
   });
 
+  it("replaces an existing response check instead of stacking contradictions", () => {
+    const note = "Response check: Worse.\nWatered.";
+    expect(applyResponseCheck(note, "Same")).toBe("Response check: Same.\nWatered.");
+  });
+
+  it("treats legacy Quick check lines as response checks", () => {
+    const note = "Quick check: Worse.\nWatered.";
+    expect(applyResponseCheck(note, "Better")).toBe("Response check: Better.\nWatered.");
+    expect(hasResponseCheck("Quick check: Same.")).toBe(true);
+  });
+
+  it("detects response checks", () => {
+    expect(hasResponseCheck("Response check: Same.")).toBe(true);
+    expect(hasResponseCheck("Watered.")).toBe(false);
+  });
+
   it("is deterministic and does not mutate inputs", () => {
-    const input = "Original note";
-    const a = applyTenSecondQuickCheck(input, "Worse");
-    const b = applyTenSecondQuickCheck(input, "Worse");
+    const input = "Watered.";
+    const a = applyResponseCheck(input, "Worse");
+    const b = applyResponseCheck(input, "Worse");
     expect(a).toBe(b);
-    expect(input).toBe("Original note");
+    expect(input).toBe("Watered.");
+  });
+});
+
+describe("legacy ten-second quick check exports", () => {
+  it("keeps old exports available as response-check aliases", () => {
+    expect(TEN_SECOND_QUICK_CHECK_STATUSES).toEqual(["Better", "Same", "Worse"]);
+    expect(QUICK_CHECK_DETAIL_CHIPS).toEqual(QUICK_LOG_ACTION_CHIPS);
+    expect(buildQuickCheckLine("Better")).toBe("Response check: Better.");
+    expect(applyTenSecondQuickCheck("Watered.", "Same")).toBe(
+      "Response check: Same.\nWatered.",
+    );
+    expect(applyQuickCheckDetailChip("", "Watered")).toBe("Watered.");
+    expect(hasTenSecondQuickCheck("Response check: Worse.")).toBe(true);
   });
 });

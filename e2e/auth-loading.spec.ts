@@ -266,7 +266,7 @@ test.describe("Mobile auth loading/disabled smoke (mocked)", () => {
     await page.goto("/auth");
     await page.getByRole("tab", { name: /create account/i }).tap();
     await page.getByLabel(/^email$/i).fill(SAFE_EMAIL);
-    await page.getByLabel(/^password$/i).fill(SAFE_PASSWORD);
+    await page.getByLabel(/^password$/i).fill(SAFE_PWD);
     await page.getByRole("button", { name: /^create account$/i }).tap();
     const loading = page.getByRole("button", { name: /creating account…/i });
     await expect(loading).toBeDisabled();

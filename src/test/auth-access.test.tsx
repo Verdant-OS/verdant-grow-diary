@@ -88,7 +88,7 @@ describe("Auth page essentials", () => {
 describe("Forgot password flow", () => {
   it("validates blank email", async () => {
     renderAuth();
-    fireEvent.click(screen.getByRole("tab", { name: /forgot password/i }));
+    activateTab(/forgot password/i);
     fireEvent.click(screen.getByRole("button", { name: /send reset link/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/enter the email/i);
     expect(resetForEmailMock).not.toHaveBeenCalled();
@@ -96,7 +96,7 @@ describe("Forgot password flow", () => {
 
   it("validates invalid email", async () => {
     renderAuth();
-    fireEvent.click(screen.getByRole("tab", { name: /forgot password/i }));
+    activateTab(/forgot password/i);
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "nope" } });
     fireEvent.click(screen.getByRole("button", { name: /send reset link/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/valid email/i);
@@ -106,7 +106,7 @@ describe("Forgot password flow", () => {
   it("calls resetPasswordForEmail with /reset-password redirect and shows generic success", async () => {
     resetForEmailMock.mockClear();
     renderAuth();
-    fireEvent.click(screen.getByRole("tab", { name: /forgot password/i }));
+    activateTab(/forgot password/i);
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "grower@verdant.app" },
     });

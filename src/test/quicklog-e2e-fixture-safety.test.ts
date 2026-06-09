@@ -53,9 +53,8 @@ describe("Disposable E2E fixture safety helpers", () => {
     }
   });
 
-  it("requires non-blank expected grow/tent/plant names with E2E or Test markers", () => {
+  it("requires non-blank tent + plant expected names with E2E or Test markers; grow is optional", () => {
     for (const key of [
-      "E2E_FIXTURE_EXPECTED_GROW_NAME",
       "E2E_FIXTURE_EXPECTED_TENT_NAME",
       "E2E_FIXTURE_EXPECTED_PLANT_NAME",
     ] as const) {
@@ -70,6 +69,22 @@ describe("Disposable E2E fixture safety helpers", () => {
       expect(realLooking.ok).toBe(false);
       expect(realLooking.errors.join("\n")).toMatch(/E2E.*Test/);
     }
+
+    // Grow is OPTIONAL — blank must NOT fail.
+    const blankGrow = validateFixtureEnv({
+      ...VALID_ENV,
+      E2E_FIXTURE_EXPECTED_GROW_NAME: "",
+    });
+    expect(blankGrow.ok).toBe(true);
+    expect(blankGrow.expected.grow).toBe("");
+
+    // …but a supplied non-E2E grow name still fails.
+    const badGrow = validateFixtureEnv({
+      ...VALID_ENV,
+      E2E_FIXTURE_EXPECTED_GROW_NAME: "Granddaddy Purple",
+    });
+    expect(badGrow.ok).toBe(false);
+    expect(badGrow.errors.join("\n")).toMatch(/E2E.*Test/);
   });
 
   it("refuses blank or known-real plant URLs", () => {

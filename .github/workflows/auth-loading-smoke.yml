@@ -9,7 +9,7 @@ name: Auth loading smoke (mocked)
 #  - No real accounts are created.
 #  - No real reset emails are sent.
 #  - No real grow data is touched (the spec never navigates into a grow).
-#  - No real E2E credentials, no service_role, no secrets are read.
+#  - No real E2E credentials, no elevated DB role, no secrets are read.
 #  - Uses the SAFE pull_request event only — never the elevated PR target event.
 #  - No schedule/cron trigger.
 

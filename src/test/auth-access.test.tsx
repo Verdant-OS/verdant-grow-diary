@@ -16,11 +16,11 @@ const onAuthStateChangeMock = vi.fn(() => ({
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     auth: {
-      resetPasswordForEmail: (...a: unknown[]) => resetForEmailMock(...a),
-      signInWithPassword: (...a: unknown[]) => signInMock(...a),
-      signUp: (...a: unknown[]) => signUpMock(...a),
+      resetPasswordForEmail: (a?: any, b?: any) => resetForEmailMock(a, b),
+      signInWithPassword: (a?: any, b?: any) => signInMock(a, b),
+      signUp: (a?: any, b?: any) => signUpMock(a, b),
       getSession: () => getSessionMock(),
-      onAuthStateChange: (...a: unknown[]) => onAuthStateChangeMock(...a),
+      onAuthStateChange: (a?: any, b?: any) => onAuthStateChangeMock(a, b),
     },
   },
 }));

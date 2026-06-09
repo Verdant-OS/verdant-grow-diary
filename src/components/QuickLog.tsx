@@ -811,6 +811,12 @@ export default function QuickLog({
           )}
 
 
+          <h3
+            data-testid="quick-log-section-optional"
+            className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+          >
+            3. Optional details
+          </h3>
           <label className="flex items-center justify-between gap-2 rounded-lg border border-border/60 p-3">
             <span className="text-sm">Add more details</span>
             <Switch checked={showMore} onCheckedChange={setShowMore} />

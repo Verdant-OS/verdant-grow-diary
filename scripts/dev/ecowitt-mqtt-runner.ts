@@ -48,7 +48,10 @@ interface CliFlags {
   once: boolean;
   sample: boolean;
   invalid: boolean;
+  writeReport: boolean;
 }
+
+export const DEFAULT_REPORT_PATH = "./tmp/ecowitt-last-ingest-report.json";
 
 export function parseFlags(argv: readonly string[]): CliFlags {
   return {
@@ -56,6 +59,7 @@ export function parseFlags(argv: readonly string[]): CliFlags {
     once: argv.includes("--once"),
     sample: argv.includes("--sample"),
     invalid: argv.includes("--invalid"),
+    writeReport: argv.includes("--write-report"),
   };
 }
 

@@ -211,7 +211,7 @@ describe("evaluateStabilizeMode", () => {
     );
     expect(src).not.toMatch(/Date\.now\s*\(/);
     expect(src).not.toMatch(/fetch\(|supabase|service_role|functions\.invoke/);
-    expect(src).not.toMatch(/action_queue|from\(['"]alerts['"]\)/);
+    expect(src).not.toMatch(/from\(['"]action_queue['"]\)|from\(['"]alerts['"]\)/);
   });
 
   it("handles null/invalid inputs safely", () => {

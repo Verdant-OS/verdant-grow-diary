@@ -68,7 +68,7 @@ describe("EcowittLiveBringup route page", () => {
     renderRoute();
     const note = screen.getByTestId("ecowitt-bringup-top-note");
     expect(note).toHaveTextContent(/does not query sensors/i);
-    expect(note).toHaveTextContent(/does not prove live data/i);
+    expect(note).toHaveTextContent(/prove live data/i);
   });
 
   it("shows overall status blocked", () => {

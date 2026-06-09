@@ -342,9 +342,9 @@ export const GOLDEN_CASE_DEMO_AND_CSV_ONLY: GoldenCaseWithExpectation = {
     likelyIssueMustBeEmpty: true,
     forbiddenSubstrings: [
       ...UNIVERSAL_FORBIDDEN_PHRASES,
-      "live reading",
-      "live sensor",
-      "currently live",
+      "data is live",
+      "based on live",
+      "shown as live",
     ],
     actionQueueSuggestion: "must_be_null",
     notes:

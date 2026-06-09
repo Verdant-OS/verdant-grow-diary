@@ -39,10 +39,13 @@ const token = process.env.VERDANT_BRIDGE_TOKEN;
 const tentId = process.env.VERDANT_TENT_ID;
 const plantId = process.env.VERDANT_PLANT_ID || null;
 const invalid = process.argv.includes("--invalid");
+const dryRun = process.argv.includes("--dry-run");
 
-if (!url) fail("missing VERDANT_INGEST_URL");
-if (!token) fail("missing VERDANT_BRIDGE_TOKEN");
-if (!tentId) fail("missing VERDANT_TENT_ID");
+if (!dryRun) {
+  if (!url) fail("missing VERDANT_INGEST_URL");
+  if (!token) fail("missing VERDANT_BRIDGE_TOKEN");
+  if (!tentId) fail("missing VERDANT_TENT_ID");
+}
 
 const payload = buildEcowittLocalTestPayload({
   tentId: tentId!,

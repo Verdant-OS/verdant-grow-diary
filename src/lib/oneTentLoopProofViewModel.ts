@@ -95,7 +95,7 @@ const STEP_SEEDS: readonly StepSeed[] = [
     ],
     missing_pieces: [],
     safety_notes: [
-      "Client never writes service_role; ownership enforced server-side.",
+      "Client never holds privileged credentials; ownership enforced server-side.",
     ],
     next_fix: "No fix needed for V0 loop coverage.",
   },
@@ -203,7 +203,7 @@ const STEP_SEEDS: readonly StepSeed[] = [
     ],
     missing_pieces: [
       "End-to-end alert generation from verified live sensor breach.",
-      "Grower-confirmed handoff from alert into a suggested (not executed) action.",
+      "Grower-confirmed handoff from alert into a suggested (not auto-run) action.",
     ],
     safety_notes: [
       "Alerts must not auto-create Action Queue items.",
@@ -225,11 +225,11 @@ const STEP_SEEDS: readonly StepSeed[] = [
       "Audit trail for approve/dismiss decisions tied to grow/tent/plant context.",
     ],
     safety_notes: [
-      "Action Queue is approval-required — grower decides, Verdant does not execute.",
+      "Action Queue is approval-required — grower decides, Verdant does not perform changes.",
       "No device control. No automation. No background command dispatch.",
     ],
     next_fix:
-      "Keep Action Queue strictly approval-required; never wire a background executor without an explicit, tested safety phase.",
+      "Keep Action Queue strictly approval-required; never wire a background runner without an explicit, tested safety phase.",
   },
 ];
 
@@ -273,7 +273,7 @@ export function buildOneTentLoopProofViewModel(
   const vm: OneTentLoopProofViewModel = {
     title: "One-Tent Loop — Internal Proof Checklist",
     subtitle:
-      "This page documents readiness. It does not validate live sensor data, run AI diagnosis, create alerts, create Action Queue items, or execute actions.",
+      "This page documents readiness. It does not validate live sensor data, run AI diagnosis, create alerts, create Action Queue items, or perform actions.",
     badges: Object.freeze([...BADGES]) as unknown as string[],
     steps: Object.freeze(steps) as unknown as OneTentLoopProofStep[],
     blocked_summary: Object.freeze([...BLOCKED_SUMMARY]) as unknown as string[],

@@ -178,7 +178,8 @@ describe("ecowitt-live-bringup — static safety", () => {
         m.includes("ecowittLiveEvidenceTemplates") ||
         m.includes("ecowittLiveEvidenceUnitWarningRules") ||
         m.includes("ecowittLiveEvidenceMultiPlantRules") ||
-        m.includes("ecowittLiveEvidenceExportRules");
+        m.includes("ecowittLiveEvidenceExportRules") ||
+        m.includes("ecowittTonightModeViewModel");
       expect(ok).toBe(true);
     }
   });

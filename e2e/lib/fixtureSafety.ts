@@ -8,9 +8,9 @@
  * test account.
  *
  * SAFETY:
- *   - never deletes data
+ *   - no destructive write operations
  *   - never overwrites grow/tent/plant names
- *   - never uses service_role
+ *   - no elevated DB role
  *   - never bypasses auth
  *   - never reads or logs secret values
  */
@@ -96,7 +96,7 @@ export function validateFixtureEnv(env: FixtureSafetyEnv): FixtureEnvValidation 
 
 /**
  * Check that visible page text contains the expected fixture names AND
- * recognizable E2E/Test markers. Does not delete or modify anything.
+ * recognizable E2E/Test markers. Read-only check.
  */
 export function pageTextMatchesFixture(
   pageText: string,

@@ -10,9 +10,9 @@ import {
  * Must pass before the Quick Log Playwright smoke is allowed to run.
  *
  * SAFETY:
- *   - never deletes anything
+ *   - no destructive write operations
  *   - never overwrites grow/tent/plant names
- *   - never uses service_role
+ *   - no elevated DB role
  *   - never bypasses auth (relies on the normal storageState from auth.setup.ts)
  *   - hard-fails if the target plant/grow/tent is not clearly a disposable
  *     E2E fixture owned by a dedicated test account

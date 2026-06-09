@@ -66,15 +66,16 @@ describe("Quick Log Playwright CI surface", () => {
 
   it("CI workflow uploads exactly the expected artifact paths and excludes storageState", () => {
     const wf = read(".github/workflows/quicklog-smoke.yml");
-    // Locate the upload step's path: block.
+    // Locate the upload step's path: block, stopping at the next step or EOF.
     const uploadMatch = wf.match(
-      /name:\s*quicklog-smoke-artifacts[\s\S]*?path:\s*\|\n([\s\S]*?)(?:\n[^\s-]|\n\s*$|$)/,
+      /name:\s*quicklog-smoke-artifacts[\s\S]*?path:\s*\|\n([\s\S]*?)(?=\n\s*-\s*name:|\n[^\s-]|\n\s*$|$)/,
     );
     expect(uploadMatch, "could not locate quicklog-smoke-artifacts path block").toBeTruthy();
     const pathBlock = uploadMatch![1];
     const paths = pathBlock
       .split("\n")
       .map((l) => l.trim())
+      .filter((l) => l.length > 0 && !l.startsWith("-") /* skip nothing */ || l.length > 0)
       .filter((l) => l.length > 0);
     const expected = [
       "e2e/results/quicklog-smoke-report.json",

@@ -12,7 +12,7 @@ describe("validateResetEmail", () => {
   it("rejects empty", () => {
     const r = validateResetEmail("");
     expect(r.ok).toBe(false);
-    if (r.ok === false) expect(r.reason).toBe("empty");
+    if ('reason' in r) expect(r.reason).toBe("empty");
   });
   it("rejects invalid", () => {
     expect(validateResetEmail("nope").ok).toBe(false);
@@ -21,7 +21,7 @@ describe("validateResetEmail", () => {
   it("accepts a valid trimmed email", () => {
     const r = validateResetEmail("  grower@verdant.app  ");
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.email).toBe("grower@verdant.app");
+    if ('email' in r) expect(r.email).toBe("grower@verdant.app");
   });
 });
 
@@ -33,12 +33,12 @@ describe("validateNewPassword", () => {
     const short = "a".repeat(MIN_PASSWORD_LENGTH - 1);
     const r = validateNewPassword(short, short);
     expect(r.ok).toBe(false);
-    if (r.ok === false) expect(r.reason).toBe("too_short");
+    if ('reason' in r) expect(r.reason).toBe("too_short");
   });
   it("rejects mismatched confirmation", () => {
     const r = validateNewPassword("longenough1", "longenough2");
     expect(r.ok).toBe(false);
-    if (r.ok === false) expect(r.reason).toBe("mismatch");
+    if ('reason' in r) expect(r.reason).toBe("mismatch");
   });
   it("accepts a valid pair", () => {
     const r = validateNewPassword("longenough!", "longenough!");

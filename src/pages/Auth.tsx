@@ -309,12 +309,21 @@ export default function Auth() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      disabled={resendBusy}
+                      disabled={resendDisabled}
                       aria-busy={resendBusy}
                       onClick={resendVerification}
                     >
-                      {resendBusy ? "Sending verification email…" : "Resend verification email"}
+                      {resendLabel}
                     </Button>
+                    {resendCooldownActive && !resendBusy ? (
+                      <p
+                        role="status"
+                        aria-live="polite"
+                        className="text-[11px] text-muted-foreground"
+                      >
+                        {VERIFICATION_COOLDOWN_HINT}
+                      </p>
+                    ) : null}
                     {resendNotice ? (
                       <p role="status" aria-live="polite" className="text-xs text-muted-foreground">
                         {resendNotice}

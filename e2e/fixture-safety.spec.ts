@@ -45,7 +45,9 @@ test("disposable E2E fixture is configured and visible on the target plant page"
     .not.toContain("/auth");
 
   const bodyText = (await page.locator("body").innerText()).slice(0, 50_000);
-  const pageCheck = pageTextMatchesFixture(bodyText, envCheck.expected);
+  const pageCheck = pageTextMatchesFixture(bodyText, envCheck.expected, {
+    accountHint: process.env.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT,
+  });
   expect(
     pageCheck.ok,
     `Target page does not look like a disposable E2E fixture:\n - ${pageCheck.errors.join("\n - ")}`,

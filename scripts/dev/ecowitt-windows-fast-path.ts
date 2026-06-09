@@ -380,7 +380,7 @@ export async function runFastPath(
     exitCode: 0,
     doctor: { status: "ok", recommendedIp: report.recommendedIp },
     launchers,
-    smoke: { status: "ok", reason: smoke.reason },
+    smoke: { status: "ok", reason: trackLine(smoke.reason) },
     logs,
     nextCommand: NEXT_DRY_RUN_COMMAND,
   });

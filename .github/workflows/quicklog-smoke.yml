@@ -395,6 +395,9 @@ jobs:
           SMOKE_REPORT_TXT_ARTIFACT_URL: ${{ steps.upload_smoke_report_txt.outputs.artifact-url }}
           FIXTURE_STEP_OUTCOME: ${{ steps.verify_fixture.outcome }}
           FIXTURE_STEP_CONCLUSION: ${{ steps.verify_fixture.conclusion }}
+          BOOTSTRAP_ALLOW: ${{ vars.E2E_ALLOW_FIXTURE_BOOTSTRAP }}
+          BOOTSTRAP_STEP_OUTCOME: ${{ steps.bootstrap_fixture.outcome }}
+          BOOTSTRAP_STEP_CONCLUSION: ${{ steps.bootstrap_fixture.conclusion }}
         run: |
           # Never echo secret values. Only references to secret NAMES are written.
           fallback="${ARTIFACTS_URL}"

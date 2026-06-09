@@ -56,6 +56,11 @@ jobs:
       E2E_FIXTURE_EXPECTED_GROW_NAME: ${{ vars.E2E_FIXTURE_EXPECTED_GROW_NAME }}
       E2E_FIXTURE_EXPECTED_TENT_NAME: ${{ vars.E2E_FIXTURE_EXPECTED_TENT_NAME }}
       E2E_FIXTURE_EXPECTED_PLANT_NAME: ${{ vars.E2E_FIXTURE_EXPECTED_PLANT_NAME }}
+      # Optional safe label (e.g. "E2E") used by the fixture validator if the
+      # app visibly exposes account identity. NEVER a password or token.
+      E2E_FIXTURE_EXPECTED_ACCOUNT_HINT: ${{ vars.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT }}
+      # Optional, off by default. Enables the UI-only fixture bootstrap step.
+      E2E_ALLOW_FIXTURE_BOOTSTRAP: ${{ vars.E2E_ALLOW_FIXTURE_BOOTSTRAP }}
 
     steps:
       - name: Checkout
@@ -143,6 +148,16 @@ jobs:
       - name: Install Playwright Chromium (with OS deps)
         if: steps.e2e_config.outputs.should_run == 'true'
         run: bun run e2e:install:ci
+
+      # Optional UI-only disposable E2E fixture bootstrap. OFF by default.
+      # Only runs when vars.E2E_ALLOW_FIXTURE_BOOTSTRAP == 'true'.
+      # Never deletes, renames, or modifies existing grow data. Refuses to
+      # run against any account that does not look disposable. Bootstrap is
+      # NOT required — fixture verification still runs and gates the smoke.
+      - name: Bootstrap disposable E2E fixture
+        id: bootstrap_fixture
+        if: steps.e2e_config.outputs.should_run == 'true' && vars.E2E_ALLOW_FIXTURE_BOOTSTRAP == 'true'
+        run: bun run e2e:bootstrap-fixture
 
       - name: Verify disposable E2E fixture
         id: verify_fixture
@@ -320,6 +335,9 @@ jobs:
           name: quicklog-playwright-media
           path: |
             test-results/**/*.png
+            test-results/**/*.jpg
+            test-results/**/*.jpeg
+            test-results/**/*.gif
             test-results/**/*.webm
             test-results/**/*.mp4
             playwright-report/data/**
@@ -377,6 +395,9 @@ jobs:
           SMOKE_REPORT_TXT_ARTIFACT_URL: ${{ steps.upload_smoke_report_txt.outputs.artifact-url }}
           FIXTURE_STEP_OUTCOME: ${{ steps.verify_fixture.outcome }}
           FIXTURE_STEP_CONCLUSION: ${{ steps.verify_fixture.conclusion }}
+          BOOTSTRAP_ALLOW: ${{ vars.E2E_ALLOW_FIXTURE_BOOTSTRAP }}
+          BOOTSTRAP_STEP_OUTCOME: ${{ steps.bootstrap_fixture.outcome }}
+          BOOTSTRAP_STEP_CONCLUSION: ${{ steps.bootstrap_fixture.conclusion }}
         run: |
           # Never echo secret values. Only references to secret NAMES are written.
           fallback="${ARTIFACTS_URL}"
@@ -395,6 +416,19 @@ jobs:
             fixture_status="passed"
           else
             fixture_status="failed"
+          fi
+
+          # Bootstrap status for the summary.
+          if [ "${SHOULD_RUN}" != "true" ]; then
+            bootstrap_status="skipped due missing config"
+          elif [ "${BOOTSTRAP_ALLOW}" != "true" ]; then
+            bootstrap_status="not enabled"
+          elif [ "${BOOTSTRAP_STEP_OUTCOME}" = "success" ]; then
+            bootstrap_status="passed"
+          elif [ -z "${BOOTSTRAP_STEP_OUTCOME}" ] || [ "${BOOTSTRAP_STEP_OUTCOME}" = "skipped" ]; then
+            bootstrap_status="skipped"
+          else
+            bootstrap_status="failed"
           fi
 
           {
@@ -417,6 +451,9 @@ jobs:
             echo ""
             echo "- Fixture validation: \`${fixture_status}\`"
             echo "- Fixture step outcome: \`${FIXTURE_STEP_OUTCOME:-unknown}\` (conclusion: \`${FIXTURE_STEP_CONCLUSION:-unknown}\`)"
+            echo "- Bootstrap status: \`${bootstrap_status}\` (outcome: \`${BOOTSTRAP_STEP_OUTCOME:-unknown}\`, conclusion: \`${BOOTSTRAP_STEP_CONCLUSION:-unknown}\`)"
+            echo ""
+            echo "  GitHub artifacts are downloads — open files locally; no direct raw URLs are produced."
             echo ""
             if [ "${fixture_status}" = "failed" ]; then
               echo "Fixture verification failed: smoke was not allowed to run because the target plant/grow/tent did not match the expected disposable E2E fixture. No diary entries were written."

@@ -86,12 +86,15 @@ Sign in as the disposable test account and open
 `E2E_GROW_1_PLANT_URL`. Confirm the page visibly shows **all** of:
 
 - `E2E` or `Test` markers
-- the expected grow name (`E2E Test Grow`)
 - the expected tent name (`E2E Test Tent`)
 - the expected plant name (`E2E Test Plant`)
+- the expected grow name (`E2E Test Grow`) — **only** required when
+  `E2E_FIXTURE_EXPECTED_GROW_NAME` is set. The current setup flow does
+  not surface a Grow page, so a missing grow name does not block smoke.
 
 The CI step `Verify disposable E2E fixture` will hard-fail and block
-the smoke if any of these are missing.
+the smoke if the required tent/plant names are missing, or if the
+optional grow name is supplied but not visible.
 
 ## 5. Screenshots for maintainers
 
@@ -102,9 +105,9 @@ identifying value before sharing or committing.
 | Screenshot | Purpose |
 |------------|---------|
 | Account after login | confirm dedicated test account is signed in |
-| `E2E Test Grow` page | confirm grow name visible |
 | `E2E Test Tent` page | confirm tent name visible |
 | `E2E Test Plant` detail page | confirm plant name + E2E/Test markers |
+| `E2E Test Grow` page (optional) | only when the UI exposes a grow name |
 | GitHub Actions Variables page (values redacted) | confirm variables set |
 
 Rules for committed screenshots:

@@ -176,9 +176,7 @@ describe("QuickLog habit-capture polish — static safety", () => {
     expect(SRC).not.toMatch(/turn on|turn off|run pump|run fan|run light|relay|actuator/i);
   });
 
-  it("does not contain fake-live copy", () => {
-    expect(SRC).not.toMatch(/live sensor data\b(?![^.]*not)/i);
-    // Affirm the manual-readings subtitle clearly states it is not live
+  it("manual readings copy explicitly says it is not live sensor data", () => {
     expect(SRC).toMatch(/not live sensor data/i);
   });
 

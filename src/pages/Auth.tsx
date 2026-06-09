@@ -254,6 +254,28 @@ export default function Auth() {
                     {signInError}
                   </p>
                 ) : null}
+                {verifyRequired ? (
+                  <div className="grid gap-2 rounded-md border border-border/50 p-3 bg-secondary/30">
+                    <p role="alert" className="text-xs text-foreground">
+                      {EMAIL_VERIFICATION_REQUIRED_MESSAGE}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={resendBusy}
+                      aria-busy={resendBusy}
+                      onClick={resendVerification}
+                    >
+                      {resendBusy ? "Sending verification email…" : "Resend verification email"}
+                    </Button>
+                    {resendNotice ? (
+                      <p role="status" aria-live="polite" className="text-xs text-muted-foreground">
+                        {resendNotice}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
                 <Button
                   type="submit"
                   disabled={busy}

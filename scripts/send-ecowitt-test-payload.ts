@@ -14,6 +14,7 @@
  *
  * Flags:
  *   --invalid     Send intentionally impossible values (safety test).
+ *   --dry-run     Build, redact, and print the payload. Do NOT POST anywhere.
  *
  * Safety:
  *   - Read-only sensor ingest; never writes Action Queue or device commands.
@@ -38,23 +39,29 @@ const token = process.env.VERDANT_BRIDGE_TOKEN;
 const tentId = process.env.VERDANT_TENT_ID;
 const plantId = process.env.VERDANT_PLANT_ID || null;
 const invalid = process.argv.includes("--invalid");
+const dryRun = process.argv.includes("--dry-run");
 
-if (!url) fail("missing VERDANT_INGEST_URL");
-if (!token) fail("missing VERDANT_BRIDGE_TOKEN");
-if (!tentId) fail("missing VERDANT_TENT_ID");
+if (!dryRun) {
+  if (!url) fail("missing VERDANT_INGEST_URL");
+  if (!token) fail("missing VERDANT_BRIDGE_TOKEN");
+  if (!tentId) fail("missing VERDANT_TENT_ID");
+}
 
 const payload = buildEcowittLocalTestPayload({
-  tentId: tentId!,
+  tentId: (tentId || "00000000-0000-4000-8000-000000000000")!,
   plantId,
   invalid,
 });
 
 // eslint-disable-next-line no-console
-console.log("[ecowitt-test-sender] target:", url);
+console.log("[ecowitt-test-sender] target:", url ?? "(dry-run, no URL)");
 // eslint-disable-next-line no-console
 console.log("[ecowitt-test-sender] auth:", redactBridgeToken(token));
 // eslint-disable-next-line no-console
-console.log("[ecowitt-test-sender] mode:", invalid ? "INVALID (safety test)" : "valid");
+console.log(
+  "[ecowitt-test-sender] mode:",
+  dryRun ? "DRY-RUN (no POST)" : invalid ? "INVALID (safety test)" : "valid",
+);
 // eslint-disable-next-line no-console
 console.log("[ecowitt-test-sender] payload summary:", {
   tent_id: payload.tent_id,
@@ -63,6 +70,12 @@ console.log("[ecowitt-test-sender] payload summary:", {
   captured_at: payload.captured_at,
   metric_keys: Object.keys(payload.metrics),
 });
+
+if (dryRun) {
+  // eslint-disable-next-line no-console
+  console.log("[ecowitt-test-sender] dry-run complete — no network call made.");
+  process.exit(0);
+}
 
 const res = await fetch(url!, {
   method: "POST",

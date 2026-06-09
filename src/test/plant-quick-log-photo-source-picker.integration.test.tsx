@@ -9,6 +9,7 @@
  *   2. Reach the same diary-photos upload + diary_entries insert path.
  *   3. Produce equivalent insert payloads.
  *   4. Have accessible names + ARIA wiring for screen readers.
+ *   5. Support mobile-safe photo-only and manual-reading-only saves.
  *
  * No real Supabase calls — uses the same mock-supabase-client pattern
  * already used by other component integration tests in this repo.
@@ -61,11 +62,18 @@ vi.mock("sonner", () => ({
 beforeEach(() => {
   uploadCalls.length = 0;
   insertCalls.length = 0;
+  vi.restoreAllMocks();
   if (typeof URL.createObjectURL !== "function") {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (URL as any).createObjectURL = vi.fn(() => "blob:mock-preview");
   } else {
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock-preview");
+  }
+  if (typeof URL.revokeObjectURL !== "function") {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (URL as any).revokeObjectURL = vi.fn();
+  } else {
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
   }
 });
 
@@ -131,6 +139,16 @@ describe("PlantQuickLog photo source picker — accessible names + ARIA wiring",
     expect(camera.className).not.toContain("hidden");
     expect(library.className).not.toContain("hidden");
   });
+
+  it("renders a mobile-visible save helper and sticky save action", () => {
+    renderSheet();
+    expect(screen.getByTestId("plant-quick-log-save-helper").textContent).toMatch(
+      /add a note, photo, or manual reading/i,
+    );
+    const save = screen.getByTestId("plant-quick-log-save");
+    expect(save.getAttribute("aria-describedby")).toBe("plant-quick-log-save-helper");
+    expect(save.closest("div")?.className).toContain("sticky");
+  });
 });
 
 describe("PlantQuickLog photo source picker — both sources reach same preview + save", () => {
@@ -146,7 +164,7 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
     fireEvent.change(screen.getByTestId("plant-quick-log-note"), {
       target: { value: "Logged from camera path" },
     });
-    fireEvent.submit(screen.getByTestId("plant-quick-log-note").closest("form")!);
+    fireEvent.click(screen.getByTestId("plant-quick-log-save"));
 
     await waitFor(() => {
       expect(uploadCalls).toHaveLength(1);
@@ -171,7 +189,7 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
     fireEvent.change(screen.getByTestId("plant-quick-log-note"), {
       target: { value: "Logged from library path" },
     });
-    fireEvent.submit(screen.getByTestId("plant-quick-log-note").closest("form")!);
+    fireEvent.click(screen.getByTestId("plant-quick-log-save"));
 
     await waitFor(() => {
       expect(uploadCalls).toHaveLength(1);
@@ -182,6 +200,59 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
     expect(insertCalls[0].__table).toBe("diary_entries");
     expect(typeof insertCalls[0].photo_url).toBe("string");
     expect("user_id" in insertCalls[0]).toBe(false);
+  });
+
+  it("saves a library photo without requiring typed notes", async () => {
+    renderSheet();
+    const library = document.getElementById("plant-quick-log-photo-library-input") as HTMLInputElement;
+    await pickFile(library, makeImage("photo-only.jpg"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("plant-quick-log-photo-preview")).toBeTruthy();
+    });
+    expect(screen.getByTestId("plant-quick-log-save")).not.toBeDisabled();
+
+    fireEvent.click(screen.getByTestId("plant-quick-log-save"));
+
+    await waitFor(() => {
+      expect(uploadCalls).toHaveLength(1);
+      expect(insertCalls).toHaveLength(1);
+    });
+    expect(insertCalls[0].note).toBe("Photo attached from Quick Log.");
+    expect(typeof insertCalls[0].photo_url).toBe("string");
+  });
+
+  it("saves manual readings without requiring typed notes or a photo", async () => {
+    renderSheet();
+    fireEvent.change(screen.getByTestId("plant-quick-log-temp"), {
+      target: { value: "78" },
+    });
+    expect(screen.getByTestId("plant-quick-log-save")).not.toBeDisabled();
+
+    fireEvent.click(screen.getByTestId("plant-quick-log-save"));
+
+    await waitFor(() => {
+      expect(uploadCalls).toHaveLength(0);
+      expect(insertCalls).toHaveLength(1);
+    });
+    expect(insertCalls[0].note).toBe("Manual readings captured from Quick Log.");
+    expect(insertCalls[0].details).toMatchObject({
+      manual_sensor_snapshot: {
+        temp_f: 78,
+        source: "manual",
+      },
+    });
+  });
+
+  it("shows an inline error when saving with no content", async () => {
+    renderSheet();
+    const save = screen.getByTestId("plant-quick-log-save");
+    expect(save).toBeDisabled();
+    fireEvent.submit(screen.getByTestId("plant-quick-log-note").closest("form")!);
+    expect(screen.getByTestId("plant-quick-log-error").textContent).toMatch(
+      /add a note, photo, or manual reading/i,
+    );
+    expect(insertCalls).toHaveLength(0);
   });
 
   it("resets the library input value after selection so the same photo can be picked again", async () => {
@@ -225,7 +296,7 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
     fireEvent.change(screen.getByTestId("plant-quick-log-note"), {
       target: { value: "Same note both ways" },
     });
-    fireEvent.submit(screen.getByTestId("plant-quick-log-note").closest("form")!);
+    fireEvent.click(screen.getByTestId("plant-quick-log-save"));
     await waitFor(() => expect(insertCalls).toHaveLength(1));
     const fromCamera = { ...insertCalls[0] };
     first.unmount();
@@ -242,7 +313,7 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
     fireEvent.change(screen.getByTestId("plant-quick-log-note"), {
       target: { value: "Same note both ways" },
     });
-    fireEvent.submit(screen.getByTestId("plant-quick-log-note").closest("form")!);
+    fireEvent.click(screen.getByTestId("plant-quick-log-save"));
     await waitFor(() => expect(insertCalls).toHaveLength(1));
     const fromLibrary = { ...insertCalls[0] };
 
@@ -257,9 +328,9 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
   });
 });
 
-describe("QuickLogV2Sheet — photo saving remains gated (not prematurely enabled)", () => {
-  it("isPhotoSavingSupported() still returns false", async () => {
+describe("QuickLogV2Sheet — photo saving remains enabled", () => {
+  it("isPhotoSavingSupported() returns true", async () => {
     const { isPhotoSavingSupported } = await import("@/lib/quickLogV2Rules");
-    expect(isPhotoSavingSupported()).toBe(false);
+    expect(isPhotoSavingSupported()).toBe(true);
   });
 });

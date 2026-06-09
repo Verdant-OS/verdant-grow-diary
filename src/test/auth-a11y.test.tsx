@@ -135,20 +135,20 @@ describe("Auth tabs — ARIA & keyboard", () => {
     expect(screen.getByRole("tabpanel")).toBeInTheDocument();
   });
 
-  it("ArrowRight / ArrowLeft / Home / End move between tabs", () => {
+  it("ArrowRight / ArrowLeft / Home / End move focus between tabs", async () => {
     renderAuth();
     const tabs = screen.getAllByRole("tab");
     tabs[0].focus();
     fireEvent.keyDown(tabs[0], { key: "ArrowRight" });
-    expect(document.activeElement).toBe(tabs[1]);
+    await waitFor(() => expect(document.activeElement).toBe(tabs[1]));
     fireEvent.keyDown(tabs[1], { key: "ArrowRight" });
-    expect(document.activeElement).toBe(tabs[2]);
+    await waitFor(() => expect(document.activeElement).toBe(tabs[2]));
     fireEvent.keyDown(tabs[2], { key: "ArrowLeft" });
-    expect(document.activeElement).toBe(tabs[1]);
+    await waitFor(() => expect(document.activeElement).toBe(tabs[1]));
     fireEvent.keyDown(tabs[1], { key: "End" });
-    expect(document.activeElement).toBe(tabs[2]);
+    await waitFor(() => expect(document.activeElement).toBe(tabs[2]));
     fireEvent.keyDown(tabs[2], { key: "Home" });
-    expect(document.activeElement).toBe(tabs[0]);
+    await waitFor(() => expect(document.activeElement).toBe(tabs[0]));
   });
 });
 

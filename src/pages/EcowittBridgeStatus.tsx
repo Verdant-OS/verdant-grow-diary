@@ -62,8 +62,8 @@ export default function EcowittBridgeStatus() {
 
   const handleImport = useCallback(() => {
     const result = importRunnerReport(pasted);
-    if (!result.ok) {
-      const reason = result.reason;
+    if (result.ok !== true) {
+      const reason: string = (result as { ok: false; reason: string }).reason;
       toast({
         title: "Could not import report",
         description:

@@ -14,6 +14,7 @@
  *
  * Flags:
  *   --invalid     Send intentionally impossible values (safety test).
+ *   --dry-run     Build, redact, and print the payload. Do NOT POST anywhere.
  *
  * Safety:
  *   - Read-only sensor ingest; never writes Action Queue or device commands.

@@ -51,6 +51,7 @@ import NotFound from "./pages/NotFound";
 import RepresentativeCsvPreview from "./pages/RepresentativeCsvPreview";
 import SensorCsvPreview from "./pages/SensorCsvPreview";
 import PartnerCsvPreviewLanding from "./pages/PartnerCsvPreviewLanding";
+import AiDoctorPhase1Preview from "./pages/AiDoctorPhase1Preview";
 
 
 
@@ -128,7 +129,9 @@ const App = () => (
                 <Route path="/ingest-inspector" element={<IngestInspector />} />
                 <Route path="/imports/representative-csv" element={<RepresentativeCsvPreview />} />
                 <Route path="/sensors/csv-preview" element={<SensorCsvPreview />} />
+                <Route path="/internal/ai-doctor-phase1-preview" element={<AiDoctorPhase1Preview />} />
                 {/* Leads is an internal admin/operator module, intentionally not
+
                     surfaced in grower-facing navigation. Primary route is
                     /admin/leads; /leads is retained as a back-compat alias. */}
                 <Route path="/admin/leads" element={<Leads />} />

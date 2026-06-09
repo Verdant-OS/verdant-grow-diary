@@ -56,10 +56,18 @@ describe("ai-doctor-phase1-preview route — static safety", () => {
     expect(src).not.toMatch(/from\(["']alerts["']\)/);
   });
 
-  it("does not reference service_role, bridge token, or device control", () => {
+  it("does not reference service_role or bridge token", () => {
     expect(src).not.toMatch(/service_role/);
     expect(src).not.toMatch(/bridge token/);
-    expect(src).not.toMatch(/device control/);
+  });
+
+  it("does not contain executable device-control function/variable names", () => {
+    expect(src).not.toMatch(/controlDevice/i);
+    expect(src).not.toMatch(/sendCommand/i);
+    expect(src).not.toMatch(/turnOn/i);
+    expect(src).not.toMatch(/turnOff/i);
+    expect(src).not.toMatch(/setFan/i);
+    expect(src).not.toMatch(/setLight/i);
   });
 
   it("does not import model/API clients", () => {

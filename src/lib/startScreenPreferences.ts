@@ -12,7 +12,12 @@
  */
 import { sanitizeAuthRedirect } from "@/lib/authRedirectRules";
 
-export type StartScreenChoice = "quickLog" | "timeline" | "dashboard";
+export type StartScreenChoice =
+  | "quickLog"
+  | "timeline"
+  | "dashboard"
+  | "onboarding"
+  | "welcome";
 
 export const DEFAULT_START_SCREEN: StartScreenChoice = "quickLog";
 
@@ -30,16 +35,17 @@ export const START_SCREEN_OPTIONS: ReadonlyArray<{
   },
   { key: "timeline", label: "Timeline", description: "Open the diary timeline first." },
   { key: "dashboard", label: "Dashboard", description: "Open the main dashboard first." },
+  { key: "onboarding", label: "Onboarding", description: "Re-open the onboarding walkthrough." },
+  { key: "welcome", label: "Welcome", description: "Open the welcome / landing page." },
 ];
 
 // Internal routes only. All values must pass sanitizeAuthRedirect.
 const ROUTE_FOR: Record<StartScreenChoice, string> = {
-  // Dashboard is the host of Quick Log; choosing "quickLog" lands on
-  // the dashboard so the Quick Log entry point is one tap away. This avoids
-  // inventing a broken route.
   quickLog: "/",
   timeline: "/timeline",
   dashboard: "/",
+  onboarding: "/onboarding",
+  welcome: "/welcome",
 };
 
 export function routeForStartScreen(choice: StartScreenChoice): string {
@@ -49,7 +55,6 @@ export function routeForStartScreen(choice: StartScreenChoice): string {
 
 function storageKey(userId: string): string | null {
   if (!userId || typeof userId !== "string") return null;
-  // Constrain to a small character set to keep the key safe.
   if (!/^[A-Za-z0-9_\-:.]{1,128}$/.test(userId)) return null;
   return `verdant:startScreen:${userId}`;
 }
@@ -64,7 +69,13 @@ function safeStorage(): Storage | null {
 }
 
 function isValid(value: unknown): value is StartScreenChoice {
-  return value === "quickLog" || value === "timeline" || value === "dashboard";
+  return (
+    value === "quickLog" ||
+    value === "timeline" ||
+    value === "dashboard" ||
+    value === "onboarding" ||
+    value === "welcome"
+  );
 }
 
 export function getStartScreenChoice(userId: string): StartScreenChoice | null {
@@ -77,6 +88,11 @@ export function getStartScreenChoice(userId: string): StartScreenChoice | null {
   } catch {
     return null;
   }
+}
+
+// Same as get, but always returns a usable choice (falls back to diary-first).
+export function getStartScreenChoiceOrDefault(userId: string): StartScreenChoice {
+  return getStartScreenChoice(userId) ?? DEFAULT_START_SCREEN;
 }
 
 export function setStartScreenChoice(userId: string, choice: StartScreenChoice): void {

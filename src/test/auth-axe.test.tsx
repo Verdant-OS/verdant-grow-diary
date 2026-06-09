@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { axe } from "vitest-axe";
-import "vitest-axe/extend-expect";
+
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -49,7 +49,7 @@ describe("Axe — /auth", () => {
         <Auth />
       </MemoryRouter>,
     );
-    expect(await axe(container)).toHaveNoViolations();
+    expect((await axe(container)).violations).toEqual([]);
   });
 
   it("Create account panel has no detectable a11y violations", async () => {
@@ -59,7 +59,7 @@ describe("Axe — /auth", () => {
       </MemoryRouter>,
     );
     activateTab(/create account/i);
-    expect(await axe(container)).toHaveNoViolations();
+    expect((await axe(container)).violations).toEqual([]);
   });
 
   it("Forgot password panel has no detectable a11y violations", async () => {
@@ -69,7 +69,7 @@ describe("Axe — /auth", () => {
       </MemoryRouter>,
     );
     activateTab(/forgot password/i);
-    expect(await axe(container)).toHaveNoViolations();
+    expect((await axe(container)).violations).toEqual([]);
   });
 });
 
@@ -86,7 +86,7 @@ describe("Axe — /reset-password", () => {
     await waitFor(() =>
       expect(screen.getByLabelText(/^new password$/i)).toBeInTheDocument(),
     );
-    expect(await axe(container)).toHaveNoViolations();
+    expect((await axe(container)).violations).toEqual([]);
   });
 
   it("Reset password with confirm-mismatch has no detectable a11y violations", async () => {
@@ -107,6 +107,6 @@ describe("Axe — /reset-password", () => {
     fireEvent.change(screen.getByLabelText(/^confirm new password$/i), {
       target: { value: "differen2" },
     });
-    expect(await axe(container)).toHaveNoViolations();
+    expect((await axe(container)).violations).toEqual([]);
   });
 });

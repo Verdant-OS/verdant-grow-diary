@@ -197,7 +197,11 @@ describe("AiDoctorPhase1Preview page — case selector", () => {
       screen.getByTestId("ai-doctor-phase1-preview-source-truth-warning").textContent,
     ).toMatch(/demo or imported/i);
     const summary = screen.getByTestId("ai-doctor-phase1-preview-summary");
-    expect((summary.textContent ?? "").toLowerCase()).not.toMatch(/\blive\b.*data/);
+    // Must not positively claim live data (e.g. "live data", "live sensor", "real-time data")
+    const summaryLower = (summary.textContent ?? "").toLowerCase();
+    expect(summaryLower).not.toMatch(/\blive data\b/);
+    expect(summaryLower).not.toMatch(/\blive sensor\b/);
+    expect(summaryLower).not.toMatch(/\breal-time data\b/);
   });
 
   it("stale/invalid case does not claim healthy/stable data", () => {

@@ -104,12 +104,16 @@ describe("AiDoctorPhase1Preview page — base render", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByTestId("ai-doctor-confidence-audit-link-title"),
-    ).toHaveTextContent("View confidence audit");
+    ).toHaveTextContent("View matching confidence audit");
     expect(
       screen.getByTestId("ai-doctor-confidence-audit-link-description"),
     ).toHaveTextContent(/hard caps/);
     const link = screen.getByTestId("ai-doctor-confidence-audit-link");
-    expect(link).toHaveAttribute("href", "/internal/ai-doctor-confidence-audit");
+    // Default case maps to its matching scenario id
+    expect(link).toHaveAttribute(
+      "href",
+      expect.stringContaining("/internal/ai-doctor-confidence-audit?scenario="),
+    );
   });
 
   it("confidence audit link shows internal/static/read-only badges", () => {
@@ -262,4 +266,60 @@ describe("AiDoctorPhase1Preview page — case selector", () => {
       expect(document.querySelectorAll("button").length).toBe(0);
     },
   );
+});
+
+describe("AiDoctorPhase1Preview page — confidence audit scenario mapping", () => {
+  const EXPECTED_MAPPING: Record<string, string> = {
+    "blurry-photo-only": "poor-visual-weak-context",
+    "yellowing-no-history": "major-missing-information",
+    "drooping-no-rootzone": "major-missing-information",
+    "spotting-no-closeups": "major-missing-information",
+    "stale-invalid-only": "stale-invalid-only",
+    "demo-csv-only": "demo-csv-only",
+    "conflicting-weak-signals": "conflicting-weak-signals",
+  };
+
+  it("covers all seven preview cases in the mapping", () => {
+    const fixtureIds = AI_DOCTOR_PHASE1_PREVIEW_CASES.map((c) => c.id).sort();
+    const mappingIds = Object.keys(EXPECTED_MAPPING).sort();
+    expect(mappingIds).toEqual(fixtureIds);
+  });
+
+  it.each(Object.entries(EXPECTED_MAPPING))(
+    "case %s links to confidence audit scenario %s",
+    (caseId, scenarioId) => {
+      renderAtRoute("/internal/ai-doctor-phase1-preview");
+      selectCase(caseId);
+      const link = screen.getByTestId("ai-doctor-confidence-audit-link");
+      expect(link).toHaveAttribute(
+        "href",
+        `/internal/ai-doctor-confidence-audit?scenario=${scenarioId}`,
+      );
+      expect(
+        screen.getByTestId("ai-doctor-confidence-audit-link-mapped-scenario"),
+      ).toHaveTextContent(scenarioId);
+    },
+  );
+
+  it("switching preview case updates the confidence audit link href", () => {
+    renderAtRoute("/internal/ai-doctor-phase1-preview");
+    selectCase("demo-csv-only");
+    let link = screen.getByTestId("ai-doctor-confidence-audit-link");
+    expect(link).toHaveAttribute(
+      "href",
+      "/internal/ai-doctor-confidence-audit?scenario=demo-csv-only",
+    );
+    selectCase("blurry-photo-only");
+    link = screen.getByTestId("ai-doctor-confidence-audit-link");
+    expect(link).toHaveAttribute(
+      "href",
+      "/internal/ai-doctor-confidence-audit?scenario=poor-visual-weak-context",
+    );
+  });
+
+  it("renders no buttons when switching cases", () => {
+    renderAtRoute("/internal/ai-doctor-phase1-preview");
+    selectCase("conflicting-weak-signals");
+    expect(document.querySelectorAll("button").length).toBe(0);
+  });
 });

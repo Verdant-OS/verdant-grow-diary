@@ -73,6 +73,8 @@ export interface IngestAttemptInput {
   } | null;
   /** Caught exception message if the fetch threw. */
   networkError?: string | null;
+  /** Optional redacted evidence built from the consumed MQTT payload. */
+  evidence?: EcowittIngestEvidence | null;
 }
 
 export interface IngestAttemptReport {

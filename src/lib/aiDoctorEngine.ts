@@ -1,18 +1,29 @@
 /**
- * AI Doctor 2.0 — Engine (Phase 1).
+ * AI Doctor Engine.
  *
- * Pure, deterministic engine foundation:
- *   1. Vision observations (descriptive only, stubbed)
- *   2. Reasoning diagnosis (cautious, stubbed)
- *   3. Automated confidence (deterministic, from approved Edge Function)
+ * Two layers live here:
  *
- * Safety:
- *   - No Supabase writes, no alerts, no Action Queue, no device control.
- *   - No privileged service keys, no bridge credentials.
- *   - No external model/API calls in this phase — all model steps are
- *     deterministic stubs that return cautious low-confidence output.
- *   - Final user-facing confidence comes from the automated
- *     ConfidenceResult, not the raw model.
+ *  1. Legacy engine (pre-existing, consumed by view models and tests):
+ *       - executeVisionAnalysis
+ *       - compilePlantContextFromRows  (returns legacy PlantContextPayload)
+ *       - generateMultimodalDiagnosis  (returns legacy DiagnosisResult,
+ *         includes optional automated confidence from the edge function)
+ *
+ *  2. Phase 1 engine surface (new typed contract, additive):
+ *       - executeVisionAnalysisPhase1
+ *       - compilePlantContextRowsPhase1
+ *       - generateMultimodalDiagnosisPhase1
+ *
+ *     Phase 1 types are exported with distinct names
+ *     (Phase1VisionAnalysisResult, Phase1PlantContextPayload,
+ *     Phase1DiagnosisResult) so that we do not break the legacy callers
+ *     that depend on the older shapes.
+ *
+ * Safety (both layers):
+ *   - No Supabase reads/writes, no alerts, no Action Queue writes.
+ *   - No external model/API calls in this engine file.
+ *   - No device control.
+ *   - No privileged Supabase keys or bridge tokens referenced anywhere.
  */
 
 import {
@@ -21,6 +32,36 @@ import {
   type ConfidenceResult,
   type ConfidenceEdgeClientOptions,
 } from "./aiDoctorConfidenceEdgeClient";
+import {
+  compilePlantContextFromRows as compilePlantContextRowsPhase1Impl,
+  type PlantContextPayload as Phase1PlantContextPayloadImpl,
+  type SensorSourceTag as Phase1SensorSourceTag,
+} from "./aiDoctorContextCompiler";
+
+// ---------------------------------------------------------------------------
+// Phase 1 re-exports (new, additive)
+// ---------------------------------------------------------------------------
+
+export type Phase1PlantContextPayload = Phase1PlantContextPayloadImpl;
+export type {
+  SensorSourceTag as Phase1SensorSourceTag,
+  RecentGrowEvent as Phase1RecentGrowEvent,
+  RecentSensorReading as Phase1RecentSensorReading,
+  SensorRollingAverages as Phase1SensorRollingAverages,
+  SensorSourceGroup as Phase1SensorSourceGroup,
+  CompilePlantContextFromRowsInput as CompilePlantContextRowsPhase1Input,
+} from "./aiDoctorContextCompiler";
+
+/** Phase 1 wrapper — pure pass-through to the typed row compiler. */
+export function compilePlantContextRowsPhase1(
+  ...args: Parameters<typeof compilePlantContextRowsPhase1Impl>
+): Phase1PlantContextPayload {
+  return compilePlantContextRowsPhase1Impl(...args);
+}
+
+// ---------------------------------------------------------------------------
+// Legacy types (unchanged contract)
+// ---------------------------------------------------------------------------
 
 export type SensorSourceTag =
   | "live"
@@ -55,7 +96,7 @@ export interface PlantContextSensorBucket {
 }
 
 export interface RecentActionEntry {
-  occurred_at: string; // ISO
+  occurred_at: string;
   event_type: string;
   source_tag: string;
   note?: string | null;
@@ -116,10 +157,10 @@ export async function executeVisionAnalysis(
 }
 
 // ---------------------------------------------------------------------------
-// Context compiler (pure helper + thin wrapper)
+// Legacy context compiler (pure helper + thin wrapper)
 // ---------------------------------------------------------------------------
 
-interface PlantRowLike {
+interface PlantRowLikeLegacy {
   id?: string | null;
   grow_id?: string | null;
   tent_id?: string | null;
@@ -127,14 +168,14 @@ interface PlantRowLike {
   growth_stage?: string | null;
 }
 
-interface GrowEventRowLike {
+interface GrowEventRowLikeLegacy {
   occurred_at?: string | null;
   event_type?: string | null;
   source?: string | null;
   note?: string | null;
 }
 
-interface SensorReadingRowLike {
+interface SensorReadingRowLikeLegacy {
   metric?: string | null;
   value?: number | null;
   captured_at?: string | null;
@@ -164,9 +205,9 @@ function avg(nums: number[]): number | null {
 }
 
 export interface CompileFromRowsInput {
-  plant: PlantRowLike | null;
-  growEvents: readonly GrowEventRowLike[];
-  sensorReadings: readonly SensorReadingRowLike[];
+  plant: PlantRowLikeLegacy | null;
+  growEvents: readonly GrowEventRowLikeLegacy[];
+  sensorReadings: readonly SensorReadingRowLikeLegacy[];
   now?: Date;
 }
 
@@ -194,7 +235,6 @@ export function compilePlantContextFromRows(
     a.occurred_at < b.occurred_at ? 1 : a.occurred_at > b.occurred_at ? -1 : 0,
   );
 
-  // Bucket sensor readings by source classification.
   const buckets = new Map<
     SensorSourceTag,
     { vpd: number[]; t: number[]; h: number[]; co2: number[]; n: number }
@@ -211,7 +251,8 @@ export function compilePlantContextFromRows(
       buckets.set(tag, b);
     }
     b.n += 1;
-    const v = typeof r.value === "number" && Number.isFinite(r.value) ? r.value : null;
+    const v =
+      typeof r.value === "number" && Number.isFinite(r.value) ? r.value : null;
     if (v === null) continue;
     switch (r.metric) {
       case "vpd_kpa":
@@ -277,11 +318,6 @@ export function compilePlantContextFromRows(
   };
 }
 
-/**
- * Thin wrapper. In this engine-only phase, callers that already have RLS-safe
- * rows should prefer `compilePlantContextFromRows`. This stub returns a
- * minimal payload so the pipeline contract is callable end-to-end.
- */
 export async function compilePlantContext(
   plantId: string,
   tentId: string,
@@ -294,7 +330,7 @@ export async function compilePlantContext(
 }
 
 // ---------------------------------------------------------------------------
-// Diagnosis step (stubbed) + automated confidence injection
+// Legacy diagnosis step (stubbed) + automated confidence injection
 // ---------------------------------------------------------------------------
 
 const STUB_MODEL_CONFIDENCE: "Low" | "Medium" | "High" = "Low";
@@ -304,8 +340,6 @@ export async function generateMultimodalDiagnosis(
   context: PlantContextPayload,
   options?: AiDoctorEngineOptions,
 ): Promise<DiagnosisResult> {
-  // Stubbed reasoning output. Cautious copy, no nutrient/irrigation/device
-  // recommendations. Real model wiring lands in a later phase.
   const key_observations: string[] = [];
   if (visionData.visual_summary) {
     key_observations.push(visionData.visual_summary);
@@ -356,5 +390,243 @@ export async function generateMultimodalDiagnosis(
       "What changed in the last 24 hours?",
       "Are sensor labels (live, csv, manual) accurate for this tent?",
     ]),
+  });
+}
+
+// ===========================================================================
+// Phase 1 engine — new additive surface
+// ===========================================================================
+
+export interface Phase1VisionAnalysisResult {
+  visual_summary: string;
+  leaf_observations: readonly string[];
+  structural_observations: readonly string[];
+  color_and_pigmentation: readonly string[];
+  pest_disease_indicators: readonly string[];
+  growth_stage_visual_cues: readonly string[];
+  image_quality_notes: readonly string[];
+  /** 0..1 image-quality estimate (0 when not actually analyzed). */
+  image_quality_score: number;
+  /** 0..1 raw self-reported confidence (0 in stub mode). */
+  confidence: number;
+}
+
+export type Phase1RiskLevel = "low" | "medium" | "high";
+
+export interface Phase1ActionQueueSuggestion {
+  /** Always advisory in Phase 1 — never an executable device command. */
+  action_type: "advisory";
+  /** Always pending approval — Action Queue stays approval-required. */
+  status: "pending_approval";
+  reason: string;
+  risk_level: Phase1RiskLevel;
+}
+
+export interface Phase1DiagnosisResult {
+  summary: string;
+  likely_issue: string;
+  /** 0..1 calibrated confidence. */
+  confidence: number;
+  evidence: readonly string[];
+  missing_information: readonly string[];
+  possible_causes: readonly string[];
+  immediate_action: string;
+  what_not_to_do: readonly string[];
+  twenty_four_hour_follow_up: string;
+  three_day_recovery_plan: string;
+  risk_level: Phase1RiskLevel;
+  action_queue_suggestion: Phase1ActionQueueSuggestion | null;
+}
+
+/**
+ * Phase 1 vision stub. Validates input, returns deterministic
+ * low-confidence placeholder. Never calls a model.
+ */
+export async function executeVisionAnalysisPhase1(
+  imageFile: File,
+): Promise<Phase1VisionAnalysisResult> {
+  if (!imageFile || typeof (imageFile as File).size !== "number") {
+    throw new Error("executeVisionAnalysisPhase1: image file is required");
+  }
+  if (imageFile.size <= 0) {
+    throw new Error("executeVisionAnalysisPhase1: image file is empty");
+  }
+  return Object.freeze({
+    visual_summary:
+      "Stub vision pass — image received but not inspected. No visual claims produced.",
+    leaf_observations: Object.freeze([]) as readonly string[],
+    structural_observations: Object.freeze([]) as readonly string[],
+    color_and_pigmentation: Object.freeze([]) as readonly string[],
+    pest_disease_indicators: Object.freeze([]) as readonly string[],
+    growth_stage_visual_cues: Object.freeze([]) as readonly string[],
+    image_quality_notes: Object.freeze([
+      "Stub pass: image not inspected by any model.",
+    ]) as readonly string[],
+    image_quality_score: 0,
+    confidence: 0,
+  });
+}
+
+const TRUSTWORTHY_SOURCES: ReadonlySet<Phase1SensorSourceTag> = new Set<
+  Phase1SensorSourceTag
+>(["live", "manual"]);
+
+interface ContextStrength {
+  hasTrustworthySensors: boolean;
+  hasRecentEvents: boolean;
+  hasStaleOrInvalid: boolean;
+  hasDemoOnly: boolean;
+}
+
+function assessPhase1Context(
+  context: Phase1PlantContextPayload,
+): ContextStrength {
+  const trustworthyGroups = context.sensor_groups.filter((g) =>
+    TRUSTWORTHY_SOURCES.has(g.source),
+  );
+  const hasTrustworthySensors = trustworthyGroups.some(
+    (g) => g.sample_count > 0,
+  );
+  const hasRecentEvents = context.recent_grow_events.length > 0;
+  const hasStaleOrInvalid = context.sensor_groups.some(
+    (g) => g.source === "stale" || g.source === "invalid",
+  );
+  const hasDemoOnly =
+    !hasTrustworthySensors &&
+    context.sensor_groups.some((g) => g.source === "demo");
+  return {
+    hasTrustworthySensors,
+    hasRecentEvents,
+    hasStaleOrInvalid,
+    hasDemoOnly,
+  };
+}
+
+/**
+ * Phase 1 diagnosis stub. Deterministic, cautious, never recommends
+ * nutrient/irrigation/equipment changes. Never emits device commands.
+ */
+export async function generateMultimodalDiagnosisPhase1(
+  visionData: Phase1VisionAnalysisResult,
+  context: Phase1PlantContextPayload,
+): Promise<Phase1DiagnosisResult> {
+  const strength = assessPhase1Context(context);
+
+  const evidence: string[] = [];
+  if (context.plant_id) {
+    evidence.push(
+      `Plant context: id=${context.plant_id}${
+        context.stage ? `, stage=${context.stage}` : ""
+      }${context.strain ? `, strain=${context.strain}` : ""}`,
+    );
+  }
+  for (const group of context.sensor_groups) {
+    evidence.push(
+      `Sensor group ${group.source}: ${group.sample_count} reading(s) in last 7d`,
+    );
+  }
+  for (const dev of context.notable_deviations) {
+    evidence.push(`Deviation: ${dev}`);
+  }
+  if (strength.hasRecentEvents) {
+    evidence.push(
+      `Recent grow events (14d): ${context.recent_grow_events.length}`,
+    );
+  }
+  evidence.push(
+    `Vision pass: stub (image_quality_score=${visionData.image_quality_score})`,
+  );
+
+  const missing_information: string[] = [];
+  if (!strength.hasTrustworthySensors) {
+    missing_information.push(
+      "No live or manual sensor readings in the last 7 days.",
+    );
+  }
+  if (strength.hasStaleOrInvalid) {
+    missing_information.push(
+      "Some recent sensor readings are stale or invalid — fresh confirmation needed.",
+    );
+  }
+  if (!strength.hasRecentEvents) {
+    missing_information.push(
+      "No grow events logged in the last 14 days for context.",
+    );
+  }
+  if (strength.hasDemoOnly) {
+    missing_information.push(
+      "Only demo sensor data available — not usable for a real diagnosis.",
+    );
+  }
+  if (visionData.image_quality_score <= 0) {
+    missing_information.push(
+      "Image was not analyzed in this stub pass — no visual evidence available.",
+    );
+  }
+  if (!context.stage) {
+    missing_information.push("Plant stage is not recorded.");
+  }
+
+  const confidence =
+    strength.hasTrustworthySensors && strength.hasRecentEvents ? 0.3 : 0.1;
+
+  const risk_level: Phase1RiskLevel = strength.hasStaleOrInvalid
+    ? "medium"
+    : "low";
+
+  const summary = strength.hasTrustworthySensors
+    ? "Engine Phase 1 stub: observation-only summary based on supplied context."
+    : "Engine Phase 1 stub: insufficient trustworthy context for a real diagnosis.";
+
+  const possible_causes: string[] = [];
+  if (context.notable_deviations.length > 0) {
+    possible_causes.push(
+      "Environmental drift consistent with the listed 7-day deviations.",
+    );
+  }
+  if (strength.hasStaleOrInvalid) {
+    possible_causes.push(
+      "Sensor pipeline issue (stale/invalid readings) — diagnosis cannot rely on these.",
+    );
+  }
+  if (possible_causes.length === 0) {
+    possible_causes.push(
+      "Insufficient evidence to enumerate likely causes; observe and re-check.",
+    );
+  }
+
+  const action_queue_suggestion: Phase1ActionQueueSuggestion | null =
+    strength.hasStaleOrInvalid
+      ? {
+          action_type: "advisory",
+          status: "pending_approval",
+          reason:
+            "Some recent sensor readings are stale or invalid. Suggest a manual recheck before any further changes.",
+          risk_level: "medium",
+        }
+      : null;
+
+  return Object.freeze({
+    summary,
+    likely_issue: "",
+    confidence,
+    evidence: Object.freeze(evidence),
+    missing_information: Object.freeze(missing_information),
+    possible_causes: Object.freeze(possible_causes),
+    immediate_action:
+      "Observe and re-check. Do not change inputs based on this stub pass.",
+    what_not_to_do: Object.freeze([
+      "Do not adjust nutrient strength based on this output.",
+      "Do not change irrigation schedule based on this output.",
+      "Do not change equipment (lights, fans, heaters, humidifiers, pumps) based on this output.",
+      "Do not defoliate or transplant based on this output.",
+      "Do not treat stale or invalid sensor readings as current truth.",
+    ]),
+    twenty_four_hour_follow_up:
+      "Re-confirm sensor freshness and source labels; log one fresh manual snapshot if no live readings are present.",
+    three_day_recovery_plan:
+      "Maintain stable conditions, log daily diary entries, and capture a fresh photo and manual snapshot each day so the next pass has trustworthy context.",
+    risk_level,
+    action_queue_suggestion,
   });
 }

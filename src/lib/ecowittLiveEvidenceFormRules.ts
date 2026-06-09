@@ -42,9 +42,18 @@ export interface EcowittLiveEvidenceMetricRow {
   readonly enabled: boolean;
   readonly backend_value: string;
   readonly controller_value: string;
+  /**
+   * Shared/effective unit used by the evaluator. Kept for backward
+   * compatibility; UI may also fill backend_unit/controller_unit. When
+   * backend_unit is set and unit is blank, backend_unit is used as the
+   * effective unit for evaluator metric evidence.
+   */
   readonly unit: string;
+  readonly backend_unit?: string;
+  readonly controller_unit?: string;
   readonly tolerance: string;
 }
+
 
 export interface EcowittLiveEvidenceFormState {
   readonly source: string;

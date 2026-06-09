@@ -63,20 +63,22 @@ export default function EcowittBridgeStatus() {
   const handleImport = useCallback(() => {
     const result = importRunnerReport(pasted);
     if (!result.ok) {
+      const reason = result.reason;
       toast({
         title: "Could not import report",
         description:
-          result.reason === "invalid_json"
+          reason === "invalid_json"
             ? "Pasted text is not valid JSON."
-            : result.reason === "token_leak_blocked"
+            : reason === "token_leak_blocked"
               ? "Report contained token-shaped values; blocked for safety."
               : "Report shape is invalid.",
         variant: "destructive",
       });
       return;
     }
+    const attempt = result.attempt;
     setAttempts((prev) => {
-      const next = [result.attempt, ...prev];
+      const next = [attempt, ...prev];
       if (typeof window !== "undefined") {
         persistAttempts(window.localStorage, next);
       }

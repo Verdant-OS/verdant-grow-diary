@@ -96,8 +96,10 @@ jobs:
         with:
           name: quicklog-smoke-artifacts
           if-no-files-found: warn
+          retention-days: 30
           path: |
             e2e/results/quicklog-smoke-report.json
             e2e/results/quicklog-smoke-report.txt
             playwright-report/
             test-results/
+

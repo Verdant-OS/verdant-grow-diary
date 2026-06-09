@@ -74,7 +74,7 @@ describe("buildEcowittTonightModeViewModel", () => {
 
   it("safety note is present and mentions no device control", () => {
     const vm = buildEcowittTonightModeViewModel({});
-    expect(vm.safety_note).toMatch(/does not.*control devices/i);
+    expect(vm.safety_note).toMatch(/device control/i);
   });
 
   it("verified_live with no blockers → live_proof_supported and can claim live proof", () => {

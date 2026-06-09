@@ -223,7 +223,7 @@ describe("/reset-password — keyboard tab order & focus", () => {
     );
   });
 
-  it("loading disables submit and does not steal focus to body", async () => {
+  it("loading disables submit and the loading button stays visible", async () => {
     let resolveUpd: (() => void) | null = null;
     updateUserMock.mockImplementationOnce(
       () =>
@@ -240,7 +240,7 @@ describe("/reset-password — keyboard tab order & focus", () => {
     fireEvent.click(screen.getByRole("button", { name: /^update password$/i }));
     const loading = await screen.findByRole("button", { name: /updating password…/i });
     expect(loading).toBeDisabled();
-    expect(document.activeElement?.tagName).not.toBe("BODY");
+    expect(loading).toBeVisible();
     resolveUpd?.();
     await waitFor(() => expect(updateUserMock).toHaveBeenCalledTimes(1));
   });

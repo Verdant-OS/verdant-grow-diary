@@ -218,12 +218,13 @@ export interface HandleResult {
  * provided publisher. Never touches Supabase, never calls fetch().
  */
 export async function handleRequest(
-  req: { method?: string; url?: string; headers: Record<string, string | string[] | undefined>; body: string },
+  req: { method?: string; url?: string; headers: Record<string, string | string[] | undefined>; body: string; sourceIp?: string },
   flags: BridgeFlags,
   publisher: MqttPublisher | null,
   now: Date = new Date(),
 ): Promise<HandleResult> {
-  if ((req.method ?? "").toUpperCase() !== "POST") {
+  const method = (req.method ?? "").toUpperCase();
+  if (method !== "POST") {
     return { status: 405, body: "method_not_allowed", published: false, metricKeys: [] };
   }
   const path = req.url ?? "/";
@@ -238,14 +239,25 @@ export async function handleRequest(
   }
   const msg = buildMqttMessage(parsed, flags.topic, now);
 
+  if (flags.showRaw) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[ecowitt-http-bridge] WARNING --show-raw is enabled. Raw payload may contain device identifiers. Local debugging only.",
+    );
+    safeLog("raw", { path, source_ip: req.sourceIp ?? "?", raw: parsed });
+  }
+
   if (flags.dryRun || !publisher) {
     safeLog("dry-run parsed", {
+      method,
       path,
+      source_ip: req.sourceIp ?? "?",
       topic: flags.topic,
       metric_keys: msg.metricKeys,
       published: false,
     });
-    return { status: 200, body: "dry_run_ok", published: false, metricKeys: msg.metricKeys };
+    // Always return a small ack body so Ecowitt gateways do not retry.
+    return { status: 200, body: "ok", published: false, metricKeys: msg.metricKeys };
   }
 
   try {
@@ -255,7 +267,9 @@ export async function handleRequest(
     return { status: 502, body: "mqtt_publish_failed", published: false, metricKeys: msg.metricKeys };
   }
   safeLog("published", {
+    method,
     path,
+    source_ip: req.sourceIp ?? "?",
     topic: flags.topic,
     metric_keys: msg.metricKeys,
     published: true,

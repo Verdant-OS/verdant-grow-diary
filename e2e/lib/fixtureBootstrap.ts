@@ -2,9 +2,9 @@
  * Optional, UI-only disposable E2E fixture bootstrap.
  *
  * SAFETY (non-negotiable):
- *   - never deletes any record
+ *   - never removes any record
  *   - never renames or overwrites existing grows/tents/plants
- *   - never uses service_role, admin APIs, or auth bypass
+ *   - never uses an elevated DB role, admin APIs, or auth bypass
  *   - never reads, logs, or echoes secret values
  *   - never creates non-E2E names
  *   - never runs unless both E2E_FIXTURE_MODE=true AND

@@ -119,6 +119,32 @@ Interval:   60 seconds
 
 ---
 
+## One-command fast path
+
+```powershell
+bun run dev:ecowitt-fast-path -- --write-launchers
+```
+
+This single command:
+
+- Runs the Windows doctor (LAN IPv4 detection, Mosquitto hints, next-step
+  list).
+- With `--write-launchers`, writes the safe `.cmd` files under
+  `tmp/ecowitt-windows/`.
+- Runs the HTTP→MQTT smoke check with a clearly-labeled
+  `FAKE LOCAL TEST` payload.
+- On **PASS**, prints the exact MQTT dry-run command to run next.
+- On bridge down, prints how to start `dev:ecowitt-http-bridge` and
+  exits non-zero.
+- On MQTT unreachable, prints the Mosquitto check command and exits
+  non-zero.
+
+The HTTP bridge must already be running in another terminal
+(`bun run dev:ecowitt-http-bridge`). The fast path **never** runs live
+ingest, never reads `VERDANT_BRIDGE_TOKEN`, never calls the Verdant
+ingest webhook, and never writes to the database. Live webhook send
+remains manual and gated after the dry-run report has been reviewed.
+
 ## Fast Windows path
 
 One command generates safe `.cmd` launchers under `tmp/ecowitt-windows/`:

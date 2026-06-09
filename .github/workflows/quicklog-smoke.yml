@@ -451,6 +451,9 @@ jobs:
             echo ""
             echo "- Fixture validation: \`${fixture_status}\`"
             echo "- Fixture step outcome: \`${FIXTURE_STEP_OUTCOME:-unknown}\` (conclusion: \`${FIXTURE_STEP_CONCLUSION:-unknown}\`)"
+            echo "- Bootstrap status: \`${bootstrap_status}\` (outcome: \`${BOOTSTRAP_STEP_OUTCOME:-unknown}\`, conclusion: \`${BOOTSTRAP_STEP_CONCLUSION:-unknown}\`)"
+            echo ""
+            echo "  GitHub artifacts are downloads — open files locally; no direct raw URLs are produced."
             echo ""
             if [ "${fixture_status}" = "failed" ]; then
               echo "Fixture verification failed: smoke was not allowed to run because the target plant/grow/tent did not match the expected disposable E2E fixture. No diary entries were written."

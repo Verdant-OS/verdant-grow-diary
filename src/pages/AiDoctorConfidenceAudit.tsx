@@ -155,7 +155,7 @@ export default function AiDoctorConfidenceAudit(): JSX.Element {
         >
           This page documents AI Doctor confidence safety rules. It does not run
           diagnosis, score live confidence, query sensors, create alerts, create
-          Action Queue items, or control devices.
+          Action Queue items, or perform device control.
         </p>
       </header>
 

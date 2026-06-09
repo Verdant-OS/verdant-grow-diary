@@ -68,3 +68,28 @@ describe("Auth loading smoke spec — safety", () => {
     );
   });
 });
+
+describe("Auth redirect-safety spec — safety", () => {
+  it("intercepts /auth/v1/** via page.route", () => {
+    expect(redirectSpec).toMatch(/page\.route\(/);
+    expect(redirectSpec).toMatch(/\/auth\\\/v1\\\//);
+  });
+  it("uses a .invalid email so accidental real submissions cannot resolve DNS", () => {
+    expect(redirectSpec).toMatch(/@example\.invalid/);
+  });
+  it("does not use service_role or real auth secrets", () => {
+    expect(redirectSpec).not.toMatch(/service_role/i);
+    expect(redirectSpec).not.toMatch(
+      /process\.env\.(E2E_TEST_PASSWORD|E2E_TEST_EMAIL|SUPABASE_SERVICE_ROLE)/,
+    );
+  });
+  it("never logs password/token/session/recovery/email", () => {
+    expect(redirectSpec).not.toMatch(
+      /console\.(log|warn|error|info|debug)\s*\([^)]*\b(password|token|session|recovery|email|hash)\b/i,
+    );
+  });
+  it("asserts app origin is preserved (no open redirect)", () => {
+    expect(redirectSpec).toMatch(/baseURL/);
+    expect(redirectSpec).toMatch(/evil\.example/);
+  });
+});

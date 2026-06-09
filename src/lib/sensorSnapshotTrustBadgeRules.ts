@@ -87,8 +87,7 @@ const ATTACHABLE: Record<SnapshotTrustBadge, boolean> = {
 /**
  * Classify a snapshot's trust badge. Resolver status (when present)
  * dominates: only `fresh_live` ever resolves to Live. Provider/vendor
- * identity (ecowitt, ecowitt_mqtt, mqtt, home_assistant, pi_bridge, ...)
- * is rendered as the provider chip and never as a trust label.
+ * identity strings are rendered as the provider chip and never as a trust label.
  */
 export function classifySnapshotTrustBadge(
   input: SnapshotTrustInput,

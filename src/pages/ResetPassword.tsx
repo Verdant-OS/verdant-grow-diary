@@ -9,9 +9,9 @@ import BrandLogo from "@/components/BrandLogo";
 import {
   MIN_PASSWORD_LENGTH,
   PASSWORD_REQUIREMENTS_HELPER_COPY,
-  RESET_FAILED_ERROR,
   getPasswordRequirementStatus,
 } from "@/lib/passwordResetRules";
+import { sanitizeAuthError } from "@/lib/authErrorRules";
 
 type Status = "checking" | "ready" | "no_session" | "saving" | "done";
 
@@ -76,7 +76,7 @@ export default function ResetPassword() {
     const { error: err } = await supabase.auth.updateUser({ password });
     if (err) {
       setStatus("ready");
-      setError(RESET_FAILED_ERROR);
+      setError(sanitizeAuthError("resetPassword", err));
       passwordRef.current?.focus();
       return;
     }

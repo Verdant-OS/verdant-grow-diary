@@ -41,6 +41,14 @@ function renderAuth() {
   );
 }
 
+function activateTab(name: RegExp) {
+  const tab = screen.getByRole("tab", { name });
+  // Radix Tabs listens for pointer events; jsdom needs explicit pointer flow.
+  fireEvent.pointerDown(tab, { button: 0, pointerType: "mouse" });
+  fireEvent.mouseDown(tab, { button: 0 });
+  fireEvent.click(tab);
+}
+
 describe("Auth page essentials", () => {
   it("shows Sign in, Create account, Forgot password, and Back to home", () => {
     renderAuth();

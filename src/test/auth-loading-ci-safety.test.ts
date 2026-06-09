@@ -27,8 +27,9 @@ describe("Auth loading smoke workflow — safety", () => {
   it("targets the verdant-grow-diary branch only", () => {
     expect(wf).toMatch(/branches:\s*\[verdant-grow-diary\]/);
   });
-  it("runs only the mocked auth-loading spec", () => {
+  it("runs only the mocked auth-loading + redirect-safety specs", () => {
     expect(wf).toMatch(/playwright test e2e\/auth-loading\.spec\.ts/);
+    expect(wf).toMatch(/e2e\/auth-redirect-safety\.spec\.ts/);
     expect(wf).not.toMatch(/quicklog-smoke\.spec\.ts/);
     expect(wf).not.toMatch(/fixture-bootstrap\.spec\.ts/);
   });

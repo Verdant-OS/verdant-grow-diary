@@ -7,7 +7,7 @@
  * not write, call RPC, call AI, create alerts, or schedule anything.
  */
 import { useMemo } from "react";
-import { Activity, ArrowDown, RotateCcw, ShieldCheck, Zap } from "lucide-react";
+import { Activity, ArrowDown, Link2, RotateCcw, ShieldCheck, Zap } from "lucide-react";
 
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
@@ -17,6 +17,7 @@ import {
 } from "@/lib/plantRecentActivityRecap";
 import { buildNoRecentLogRecovery } from "@/lib/noRecentLogRecoveryRules";
 import { buildOutcomeFollowUp } from "@/lib/outcomeFollowUpRules";
+import { buildActionResponsePairing } from "@/lib/actionResponsePairingRules";
 import {
   buildPlantStabilizeModeViewModel,
   shouldShowPlantStabilizeMode,
@@ -81,6 +82,11 @@ export default function PlantDetailRecentActivityRecap({
         rows,
         now: Date.now(),
       }),
+    [rows],
+  );
+
+  const actionResponsePair = useMemo(
+    () => buildActionResponsePairing({ rows }),
     [rows],
   );
 
@@ -194,6 +200,35 @@ export default function PlantDetailRecentActivityRecap({
                   <p className="text-amber-100/80">{stabilize.why_now[0]}</p>
                   <p className="font-medium text-amber-50">{stabilize.what_not_to_do[0]}</p>
                   <p className="text-amber-100/80">{stabilize.safe_next_log_prompt}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {actionResponsePair.show && (
+            <div
+              data-testid="plant-detail-action-response-pair"
+              data-reason={actionResponsePair.reason}
+              data-response-status={actionResponsePair.responseStatus ?? "pending"}
+              className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-4 text-sm"
+            >
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 rounded-full border border-emerald-400/35 bg-background/40 p-2 text-emerald-200">
+                  <Link2 className="h-4 w-4" aria-hidden="true" />
+                </span>
+                <div className="min-w-0 flex-1 space-y-2">
+                  <p className="font-medium text-emerald-50">{actionResponsePair.title}</p>
+                  <div className="grid gap-1 text-emerald-50/85">
+                    <p>
+                      <span className="font-medium">What changed:</span>{" "}
+                      {actionResponsePair.actionLabel}
+                    </p>
+                    <p>
+                      <span className="font-medium">Response:</span>{" "}
+                      {actionResponsePair.responseLabel}
+                    </p>
+                  </div>
+                  <p className="text-emerald-50/75">{actionResponsePair.helper}</p>
                 </div>
               </div>
             </div>

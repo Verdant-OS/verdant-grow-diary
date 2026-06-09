@@ -14,8 +14,15 @@ import {
   GENERIC_RESET_REQUEST_SUCCESS,
   MIN_PASSWORD_LENGTH,
 } from "@/lib/passwordResetRules";
-import { sanitizeAuthError } from "@/lib/authErrorRules";
+import {
+  sanitizeAuthError,
+  classifyAuthError,
+  EMAIL_VERIFICATION_REQUIRED_MESSAGE,
+  RESEND_VERIFICATION_GENERIC_SUCCESS,
+  RESEND_VERIFICATION_GENERIC_FAILURE,
+} from "@/lib/authErrorRules";
 import { sanitizeAuthRedirect } from "@/lib/authRedirectRules";
+import { getStartScreenChoice, routeForStartScreen } from "@/lib/startScreenPreferences";
 
 type AuthMode = "signin" | "signup" | "forgot";
 
@@ -34,6 +41,9 @@ export default function Auth() {
   const [busy, setBusy] = useState(false);
 
   const [signInError, setSignInError] = useState<string | null>(null);
+  const [verifyRequired, setVerifyRequired] = useState(false);
+  const [resendBusy, setResendBusy] = useState(false);
+  const [resendNotice, setResendNotice] = useState<string | null>(null);
   const [signUpError, setSignUpError] = useState<string | null>(null);
   const [signUpSuccess, setSignUpSuccess] = useState<string | null>(null);
 

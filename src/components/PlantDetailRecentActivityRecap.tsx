@@ -2,16 +2,12 @@
  * PlantDetailRecentActivityRecap — presentation-only mini-recap of the
  * latest plant timeline items for Plant Detail.
  *
- * Read-only. Uses the existing `usePlantRecentActivity` read hook and the
- * pure `plantRecentActivityRules` + `plantRecentActivityRecap` view-models
- * to render up to 3 newest items with category label, short summary, and
- * timestamp fallback. Includes a "View full timeline" affordance that
- * scrolls and focuses the existing Plant Relative Timeline anchor.
- *
- * No writes, RPC, or scheduling.
+ * Read-only except for the optional `onAddQuickCheck` callback, which only
+ * opens the existing Quick Log sheet owned by PlantDetail. This component does
+ * not write, call RPC, call AI, create alerts, or schedule anything.
  */
 import { useMemo } from "react";
-import { Activity, ArrowDown } from "lucide-react";
+import { Activity, ArrowDown, Zap } from "lucide-react";
 
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
@@ -19,12 +15,14 @@ import {
   buildPlantRecentActivityRecap,
   PLANT_RECENT_ACTIVITY_RECAP_DEFAULT_LIMIT,
 } from "@/lib/plantRecentActivityRecap";
+import { buildNoRecentLogRecovery } from "@/lib/noRecentLogRecoveryRules";
 import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 interface PlantDetailRecentActivityRecapProps {
   plantId: string | null | undefined;
+  onAddQuickCheck?: () => void;
 }
 
 const HEADING_ID = "plant-detail-recent-activity-recap-heading";
@@ -47,20 +45,35 @@ function scrollToTimeline() {
 
 export default function PlantDetailRecentActivityRecap({
   plantId,
+  onAddQuickCheck,
 }: PlantDetailRecentActivityRecapProps) {
   const { data: rawRows, isLoading } = usePlantRecentActivity(plantId ?? null);
 
-  const items = useMemo(() => {
+  const rows = useMemo(() => {
     if (!plantId) return [];
-    const rows = buildPlantRecentActivity(rawRows ?? [], {
+    return buildPlantRecentActivity(rawRows ?? [], {
       plantId,
       limit: PLANT_RECENT_ACTIVITY_RECAP_DEFAULT_LIMIT,
     });
-    return buildPlantRecentActivityRecap({
-      rows,
-      limit: PLANT_RECENT_ACTIVITY_RECAP_DEFAULT_LIMIT,
-    });
   }, [plantId, rawRows]);
+
+  const items = useMemo(
+    () =>
+      buildPlantRecentActivityRecap({
+        rows,
+        limit: PLANT_RECENT_ACTIVITY_RECAP_DEFAULT_LIMIT,
+      }),
+    [rows],
+  );
+
+  const recovery = useMemo(
+    () =>
+      buildNoRecentLogRecovery({
+        rows,
+        now: Date.now(),
+      }),
+    [rows],
+  );
 
   return (
     <section
@@ -104,6 +117,33 @@ export default function PlantDetailRecentActivityRecap({
           ))}
           <span className="sr-only">Loading recent activity…</span>
         </ul>
+      ) : recovery.showPrompt && onAddQuickCheck ? (
+        <div
+          data-testid="plant-detail-no-recent-log-recovery"
+          data-reason={recovery.reason}
+          className="rounded-xl border border-dashed border-border/50 bg-secondary/20 p-4"
+        >
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 rounded-full border border-primary/30 bg-primary/10 p-2 text-primary">
+              <Zap className="h-4 w-4" aria-hidden="true" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-foreground">{recovery.headline}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{recovery.body}</p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={onAddQuickCheck}
+                aria-label={recovery.ariaLabel}
+                data-testid="plant-detail-add-quick-check"
+                className="mt-3 min-h-10"
+              >
+                {recovery.ctaLabel}
+              </Button>
+            </div>
+          </div>
+        </div>
       ) : items.length === 0 ? (
         <div
           data-testid="plant-detail-recent-activity-recap-empty"

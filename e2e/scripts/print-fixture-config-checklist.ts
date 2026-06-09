@@ -6,7 +6,7 @@
  * SAFETY:
  *   - never reads, prints, or echoes any secret value
  *   - never calls Supabase, admin APIs, or any network
- *   - never creates, modifies, or deletes any data
+ *   - never creates, modifies, or removes any data
  *   - prints NAMES and instructions only
  */
 

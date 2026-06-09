@@ -304,7 +304,7 @@ export default function AiDoctorConfidenceAudit(): JSX.Element {
       <Section id="scenario-selector" title="Scenario selector">
         <label
           htmlFor="ai-doctor-confidence-scenario-select"
-          data-testid="ai-doctor-confidence-scenario-label"
+          data-testid="ai-doctor-confidence-scenario-select-label"
           className="text-sm font-medium text-foreground"
         >
           Select a weak-context scenario

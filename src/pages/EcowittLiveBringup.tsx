@@ -957,6 +957,7 @@ function LiveEvidenceEvaluator() {
       <SnapshotExportPanel
         evaluated={evaluated}
         form={form}
+        tonight={tonight}
         overall={result}
         plantResults={multi.per_plant}
         unitWarnings={unitWarnings}

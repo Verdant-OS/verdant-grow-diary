@@ -64,6 +64,7 @@ const App = () => (
           <GrowsProvider>
             <Routes>
               <Route path="/auth" element={<Auth />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               {/* Deprecated auth entry points — redirect to canonical /auth to
                   prevent funnel leaks from old bookmarks, emails, ads, and
                   creator posts that still point to /login /signup /register. */}

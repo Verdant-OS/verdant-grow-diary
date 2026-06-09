@@ -24,16 +24,19 @@ export default function ResetPassword() {
   const [error, setError] = useState<string | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
+  const confirmRef = useRef<HTMLInputElement>(null);
 
   const reqStatus = useMemo(
     () => getPasswordRequirementStatus(password, confirm),
     [password, confirm],
   );
 
+  // Inline confirm mismatch — only show once user has typed in both fields
+  // and they differ. Local-only check; no server certainty implied.
+  const confirmMismatch =
+    password.length > 0 && confirm.length > 0 && password !== confirm;
+
   useEffect(() => {
-    // Supabase's detectSessionInUrl parses the recovery hash automatically
-    // on client load. We just check whether a session is present. We never
-    // read, store, or log the hash/token/url directly.
     let cancelled = false;
     supabase.auth.getSession().then(({ data }) => {
       if (cancelled) return;
@@ -44,8 +47,6 @@ export default function ResetPassword() {
     };
   }, []);
 
-  // Move focus to the page heading on mount so screen readers announce
-  // context. After failed submit, focus jumps to the first invalid field.
   useEffect(() => {
     headingRef.current?.focus();
   }, []);
@@ -55,20 +56,25 @@ export default function ResetPassword() {
     if (status === "saving") return;
     setError(null);
     if (!reqStatus.allMet) {
-      // Find the first unmet requirement to drive focus.
       const firstUnmet = reqStatus.requirements.find((r) => !r.met);
+      const mismatchOnly = firstUnmet?.key === "matchesConfirm";
       setError(
-        firstUnmet?.key === "matchesConfirm"
+        mismatchOnly
           ? "Passwords do not match."
           : `Password must meet all requirements (${firstUnmet?.label.toLowerCase() ?? "see list"}).`,
       );
-      passwordRef.current?.focus();
+      // Mismatch → focus Confirm (the field the user fixes for this error).
+      // Other rule failures → focus New password.
+      if (mismatchOnly) {
+        confirmRef.current?.focus();
+      } else {
+        passwordRef.current?.focus();
+      }
       return;
     }
     setStatus("saving");
     const { error: err } = await supabase.auth.updateUser({ password });
     if (err) {
-      // Do not surface raw auth errors — they can leak token/session state.
       setStatus("ready");
       setError(RESET_FAILED_ERROR);
       passwordRef.current?.focus();
@@ -158,15 +164,32 @@ export default function ResetPassword() {
                 <Label htmlFor="reset-confirm">Confirm new password</Label>
                 <Input
                   id="reset-confirm"
+                  ref={confirmRef}
                   type={show ? "text" : "password"}
                   autoComplete="new-password"
                   minLength={MIN_PASSWORD_LENGTH}
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
-                  aria-describedby="password-requirements"
+                  aria-invalid={confirmMismatch ? true : undefined}
+                  aria-describedby={
+                    confirmMismatch
+                      ? "reset-confirm-mismatch password-requirements"
+                      : "password-requirements"
+                  }
                   required
                 />
+                {confirmMismatch ? (
+                  <p
+                    id="reset-confirm-mismatch"
+                    role="status"
+                    aria-live="polite"
+                    className="text-xs text-destructive mt-1"
+                  >
+                    Passwords do not match yet.
+                  </p>
+                ) : null}
               </div>
+
 
               <div
                 id="password-requirements"

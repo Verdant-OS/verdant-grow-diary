@@ -1,10 +1,11 @@
 /**
  * EcoWitt Live Bring-Up — static safety scan.
  *
- * Asserts the page and view model do not import/call Supabase, fetch,
- * functions.invoke, model clients, Edge Function helpers, ingest write
- * helpers, alert/Action Queue writers, device-control names, secrets,
- * env values, or browser persistence/clipboard APIs.
+ * Asserts the page, view model, and live-evidence form rules do not
+ * import/call Supabase, fetch, functions.invoke, model clients, Edge
+ * Function helpers, ingest write helpers, alert/Action Queue writers,
+ * device-control names, secrets, env values, or browser persistence/
+ * clipboard APIs.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -13,6 +14,7 @@ import { resolve } from "node:path";
 const ROOT = resolve(__dirname, "../..");
 const PAGE_PATH = "src/pages/EcowittLiveBringup.tsx";
 const VM_PATH = "src/lib/ecowittLiveBringupViewModel.ts";
+const FORM_PATH = "src/lib/ecowittLiveEvidenceFormRules.ts";
 
 function read(p: string): string {
   return readFileSync(resolve(ROOT, p), "utf8");
@@ -26,12 +28,15 @@ function stripComments(src: string): string {
 
 const pageSrc = read(PAGE_PATH);
 const vmSrc = read(VM_PATH);
+const formSrc = read(FORM_PATH);
 const pageNoComments = stripComments(pageSrc);
 const vmNoComments = stripComments(vmSrc);
+const formNoComments = stripComments(formSrc);
 
 const targets: Array<[string, string]> = [
   ["page", pageNoComments],
   ["view model", vmNoComments],
+  ["form rules", formNoComments],
 ];
 
 const FORBIDDEN_DEVICE_NAMES = [
@@ -126,12 +131,14 @@ describe("ecowitt-live-bringup — static safety", () => {
     }
   });
 
-  it("page imports only react and the local view model", () => {
+  it("page imports only react, the local view model, the gate rules, and the form rules", () => {
     const fromMatches = pageSrc.match(/from\s+["'][^"']+["']/g) || [];
     for (const m of fromMatches) {
       const ok =
         m.includes('"react"') ||
-        m.includes("ecowittLiveBringupViewModel");
+        m.includes("ecowittLiveBringupViewModel") ||
+        m.includes("liveSourceTruthGateRules") ||
+        m.includes("ecowittLiveEvidenceFormRules");
       expect(ok).toBe(true);
     }
   });
@@ -139,5 +146,16 @@ describe("ecowitt-live-bringup — static safety", () => {
   it("view model has no external imports", () => {
     const fromMatches = vmSrc.match(/from\s+["'][^"']+["']/g) || [];
     expect(fromMatches.length).toBe(0);
+  });
+
+  it("form rules only import from liveSourceTruthGateRules", () => {
+    const fromMatches = formSrc.match(/from\s+["'][^"']+["']/g) || [];
+    for (const m of fromMatches) {
+      expect(m).toMatch(/liveSourceTruthGateRules/);
+    }
+  });
+
+  it("form rules do not call Date.now", () => {
+    expect(formNoComments).not.toMatch(/Date\.now\s*\(/);
   });
 });

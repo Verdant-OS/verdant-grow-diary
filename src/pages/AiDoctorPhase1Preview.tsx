@@ -20,11 +20,28 @@ import {
   getAiDoctorPhase1PreviewCase,
 } from "@/lib/aiDoctorPhase1PreviewFixtures";
 
+/**
+ * Maps each preview case id to the matching confidence audit scenario id.
+ * Static lookup only — no scoring, no model calls, no writes.
+ */
+const PREVIEW_CASE_TO_CONFIDENCE_SCENARIO: Record<string, string> = {
+  "blurry-photo-only": "poor-visual-weak-context",
+  "yellowing-no-history": "major-missing-information",
+  "drooping-no-rootzone": "major-missing-information",
+  "spotting-no-closeups": "major-missing-information",
+  "stale-invalid-only": "stale-invalid-only",
+  "demo-csv-only": "demo-csv-only",
+  "conflicting-weak-signals": "conflicting-weak-signals",
+};
+
 export default function AiDoctorPhase1Preview(): JSX.Element {
   const [selectedId, setSelectedId] = React.useState<string>(
     AI_DOCTOR_PHASE1_PREVIEW_DEFAULT_CASE_ID,
   );
   const current = getAiDoctorPhase1PreviewCase(selectedId);
+  const mappedScenarioId =
+    PREVIEW_CASE_TO_CONFIDENCE_SCENARIO[selectedId] ?? "demo-csv-only";
+  const confidenceAuditHref = `/internal/ai-doctor-confidence-audit?scenario=${mappedScenarioId}`;
 
   return (
     <div className="mx-auto max-w-3xl p-4 space-y-6">
@@ -50,7 +67,7 @@ export default function AiDoctorPhase1Preview(): JSX.Element {
             data-testid="ai-doctor-confidence-audit-link-title"
             className="text-sm font-semibold"
           >
-            View confidence audit
+            View matching confidence audit
           </h2>
           <span className="rounded border border-border bg-background px-2 py-0.5 text-xs text-muted-foreground">
             Internal
@@ -66,15 +83,21 @@ export default function AiDoctorPhase1Preview(): JSX.Element {
           data-testid="ai-doctor-confidence-audit-link-description"
           className="text-xs text-muted-foreground"
         >
-          Review the hard caps, source-quality rules, and safety flags that
-          keep weak AI Doctor context from becoming overconfident.
+          Review the hard caps and safety flags that apply to this preview
+          scenario.
+        </p>
+        <p
+          data-testid="ai-doctor-confidence-audit-link-mapped-scenario"
+          className="text-xs text-muted-foreground"
+        >
+          Mapped confidence scenario: {mappedScenarioId}
         </p>
         <Link
-          to="/internal/ai-doctor-confidence-audit"
+          to={confidenceAuditHref}
           data-testid="ai-doctor-confidence-audit-link"
           className="inline-block text-sm text-primary underline-offset-2 hover:underline"
         >
-          Open AI Doctor Confidence Audit
+          Open matching AI Doctor Confidence Audit scenario
         </Link>
       </div>
 

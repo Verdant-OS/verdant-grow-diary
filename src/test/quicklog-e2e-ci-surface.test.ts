@@ -190,4 +190,80 @@ describe("Quick Log Playwright CI surface", () => {
       expect(readme, `README missing troubleshooting phrase: ${phrase}`).toContain(phrase);
     }
   });
+
+  it("README documents local Quick Log smoke reproduction commands", () => {
+    const readme = read("e2e/README.md");
+    expect(readme).toMatch(/##\s+Run the Quick Log smoke locally/);
+    // Required scripts referenced verbatim
+    for (const cmd of [
+      "bun run e2e:install",
+      "bun run e2e:setup",
+      "bun run e2e:quicklog-smoke",
+      "bun run e2e:quicklog-smoke:headed",
+    ]) {
+      expect(readme, `README missing local command: ${cmd}`).toContain(cmd);
+    }
+    // PowerShell env var examples
+    expect(readme).toMatch(/\$env:E2E_BASE_URL\s*=\s*"/);
+    expect(readme).toMatch(/\$env:E2E_GROW_1_PLANT_URL\s*=\s*"/);
+    expect(readme).toMatch(/\$env:E2E_TEST_EMAIL\s*=\s*"/);
+    expect(readme).toMatch(/\$env:E2E_TEST_PASSWORD\s*=\s*"/);
+    // Bash env var examples
+    expect(readme).toMatch(/export E2E_BASE_URL="/);
+    expect(readme).toMatch(/export E2E_GROW_1_PLANT_URL="/);
+    expect(readme).toMatch(/export E2E_TEST_EMAIL="/);
+    expect(readme).toMatch(/export E2E_TEST_PASSWORD="/);
+    // Safety reminders
+    expect(readme).toContain("e2e/.auth/user.json");
+    expect(readme.toLowerCase()).toContain("test account");
+  });
+
+  it("CI workflow writes a GitHub Actions step summary with artifact + report pointers", () => {
+    const wf = read(".github/workflows/quicklog-smoke.yml");
+    // Summary step exists and always runs
+    const summaryStep = wf.match(
+      /-\s*name:\s*Write Quick Log smoke run summary[\s\S]*?(?=\n {6}- name:|\n*$)/,
+    );
+    expect(summaryStep, "summary step missing").toBeTruthy();
+    const block = summaryStep![0];
+    expect(block).toMatch(/if:\s*always\(\)/);
+    expect(block).toMatch(/\$GITHUB_STEP_SUMMARY/);
+    expect(block).toContain("quicklog-smoke-artifacts");
+    expect(block).toContain("e2e/results/quicklog-smoke-report.json");
+    expect(block).toContain("e2e/results/quicklog-smoke-report.txt");
+    expect(block).toContain("playwright-report/");
+    expect(block).toContain("test-results/");
+    expect(block).toMatch(/30 days/);
+    expect(block).toMatch(/should_run/);
+    // Must not echo or expand secret values into the summary
+    expect(block).not.toMatch(/secrets\.E2E_TEST_PASSWORD/);
+    expect(block).not.toMatch(/secrets\.E2E_TEST_EMAIL/);
+    expect(block).not.toMatch(/\$E2E_TEST_PASSWORD\b/);
+    expect(block).not.toMatch(/\$E2E_TEST_EMAIL\b/);
+  });
+
+  it("changelog entry for branch alignment lives in a single canonical file", () => {
+    // No pre-existing release-notes file existed in the repo, so the entry
+    // lives in root CHANGELOG.md. If/when a canonical release-notes file is
+    // adopted, move the entry there and update this guardrail.
+    const canonicalCandidates = [
+      "docs/CHANGELOG.md",
+      "RELEASE_NOTES.md",
+      "docs/RELEASE_NOTES.md",
+      "docs/release-notes.md",
+    ];
+    const existingCanonical = canonicalCandidates.filter((p) =>
+      fs.existsSync(path.join(ROOT, p)),
+    );
+    const rootChangelogExists = fs.existsSync(path.join(ROOT, "CHANGELOG.md"));
+    expect(
+      existingCanonical.length > 0 || rootChangelogExists,
+      "expected a changelog/release-notes file to host the branch-alignment entry",
+    ).toBe(true);
+    const target = existingCanonical[0]
+      ? read(existingCanonical[0])
+      : read("CHANGELOG.md");
+    expect(target).toMatch(/verdant-grow-diary/);
+    expect(target.toLowerCase()).toContain("quick log");
+  });
 });

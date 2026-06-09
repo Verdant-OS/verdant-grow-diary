@@ -255,7 +255,7 @@ describe("ecowitt-windows-tooling workflow — static safety", () => {
     );
   });
   it("artifact generation step uses || true to allow log collection without masking test failures", () => {
-    expect(WF).toMatch(/dev:ecowitt-fast-path[^\n]*\|\| true/);
+    expect(WF).toMatch(/dev:ecowitt-fast-path[\s\S]*?\|\| true/);
     // The test step itself must NOT have || true.
     const testStep = WF.split("Vitest")[1]?.split("- name:")[0] ?? "";
     expect(testStep).not.toMatch(/\|\| true/);

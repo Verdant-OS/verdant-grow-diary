@@ -9,7 +9,7 @@
  *   - No I/O. No React. No Supabase. No fetch.
  *   - No AI / model calls. No Edge Function calls.
  *   - No alerts. No Action Queue writes. No automation. No device control.
- *   - No Date.now(); caller supplies `now`.
+ *   - No wall-clock reads; caller supplies `now`.
  *   - Deterministic for the same input.
  */
 

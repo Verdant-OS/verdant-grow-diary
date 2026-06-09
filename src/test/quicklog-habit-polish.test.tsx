@@ -144,7 +144,10 @@ describe("QuickLog habit-capture polish — presentation", () => {
     const section = screen.getByTestId("quicklog-hardware-readings");
     expect(section.getAttribute("data-open")).toBe("false");
     expect(screen.getByTestId("quicklog-hardware-manual-subtitle").textContent).toMatch(
-      /not live sensor data/i,
+      /Manual readings/i,
+    );
+    expect(screen.getByTestId("quicklog-hardware-manual-subtitle").textContent).toMatch(
+      /not telemetry/i,
     );
   });
 

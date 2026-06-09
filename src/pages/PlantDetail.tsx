@@ -351,7 +351,7 @@ export default function PlantDetail() {
           </div>
           <div>
             <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
-              Last note
+              Last activity
             </div>
             <p className="text-sm">{plant.lastNote}</p>
             <p className="text-xs text-muted-foreground mt-1">

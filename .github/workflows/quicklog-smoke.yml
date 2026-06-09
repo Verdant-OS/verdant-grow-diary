@@ -61,7 +61,8 @@ jobs:
         id: e2e_config
         shell: bash
         run: |
-          # Track presence (never echo values).
+          # Track presence (never echo values). Only NAMES of missing config
+          # are emitted — never the values of any var or secret.
           missing=()
           [ -n "$E2E_BASE_URL" ] || missing+=("vars.E2E_BASE_URL")
           [ -n "$E2E_GROW_1_PLANT_URL" ] || missing+=("vars.E2E_GROW_1_PLANT_URL")
@@ -70,10 +71,18 @@ jobs:
 
           event="${{ github.event_name }}"
 
+          # Sanitized, comma-separated list of missing config NAMES.
+          missing_csv=""
+          if [ ${#missing[@]} -gt 0 ]; then
+            missing_csv=$(IFS=, ; echo "${missing[*]}")
+          fi
+          echo "missing_config=${missing_csv}" >> "$GITHUB_OUTPUT"
+
           if [ ${#missing[@]} -gt 0 ]; then
             echo "Missing required Quick Log smoke configuration: ${missing[*]}"
             if [ "$event" = "workflow_dispatch" ]; then
               echo "Missing required Quick Log smoke configuration. Configure Actions vars/secrets." >&2
+              echo "should_run=false" >> "$GITHUB_OUTPUT"
               exit 1
             elif [ "$event" = "pull_request" ]; then
               echo "Skipping Quick Log smoke: E2E vars/secrets are unavailable for this PR context."
@@ -105,6 +114,44 @@ jobs:
         if: steps.e2e_config.outputs.should_run == 'true'
         run: bun run e2e:quicklog-smoke
 
+      - name: Verify Quick Log smoke artifacts
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        shell: bash
+        run: |
+          # After a real smoke execution the JSON report + Playwright HTML
+          # report must exist. If either is missing the run is not a usable
+          # smoke result — fail the job so we never publish a green run that
+          # produced no evidence. Never echoes secret values.
+          status=0
+
+          if [ -f "e2e/results/quicklog-smoke-report.json" ]; then
+            echo "OK: e2e/results/quicklog-smoke-report.json present"
+          else
+            echo "MISSING (required): e2e/results/quicklog-smoke-report.json" >&2
+            status=1
+          fi
+
+          if [ -d "playwright-report" ]; then
+            echo "OK: playwright-report/ present"
+          else
+            echo "MISSING (required): playwright-report/ directory" >&2
+            status=1
+          fi
+
+          if [ -f "e2e/results/quicklog-smoke-report.txt" ]; then
+            echo "OK: e2e/results/quicklog-smoke-report.txt present"
+          else
+            echo "WARN: e2e/results/quicklog-smoke-report.txt missing (non-fatal)"
+          fi
+
+          if [ -d "test-results" ]; then
+            echo "OK: test-results/ present"
+          else
+            echo "WARN: test-results/ missing (non-fatal; may be empty on full pass)"
+          fi
+
+          exit "$status"
+
       - name: Upload smoke artifacts
         if: always() && steps.e2e_config.outputs.should_run == 'true'
         uses: actions/upload-artifact@v4
@@ -123,7 +170,9 @@ jobs:
         shell: bash
         env:
           SHOULD_RUN: ${{ steps.e2e_config.outputs.should_run }}
+          MISSING_CONFIG: ${{ steps.e2e_config.outputs.missing_config }}
           JOB_STATUS: ${{ job.status }}
+          EVENT_NAME: ${{ github.event_name }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           # Never echo secret values. Only references to secret NAMES are written.
@@ -131,28 +180,57 @@ jobs:
             echo "## Quick Log Playwright smoke"
             echo ""
             echo "- Workflow result: \`${JOB_STATUS}\`"
-            echo "- Event: \`${{ github.event_name }}\`"
+            echo "- Event: \`${EVENT_NAME}\`"
             echo "- Branch/ref: \`${{ github.ref }}\`"
             if [ "${SHOULD_RUN}" = "true" ]; then
               echo "- Smoke executed: yes"
+              echo ""
+              echo "### Artifacts"
+              echo ""
+              echo "- Artifact name: \`quicklog-smoke-artifacts\`"
+              echo "- Retention: 30 days"
+              echo "- Run artifacts page: ${RUN_URL}#artifacts"
+              echo ""
+              echo "Contents:"
+              echo ""
+              echo "- \`e2e/results/quicklog-smoke-report.json\`"
+              echo "- \`e2e/results/quicklog-smoke-report.txt\`"
+              echo "- \`playwright-report/\`"
+              echo "- \`test-results/\`"
+              echo ""
+              echo "### Troubleshooting"
+              echo ""
+              echo "Open \`quicklog-smoke-report.txt\` first (then the JSON sibling) and find the first \`✗\` line. Then inspect the matching Playwright trace, screenshots, and video under \`playwright-report/\` and \`test-results/\`."
             else
-              echo "- Smoke executed: no (skipped — required E2E configuration was unavailable for this event; see the \`Verify required configuration\` step)"
+              echo "- Smoke executed: no (skipped)"
+              echo ""
+              echo "### Skipped: required Quick Log smoke configuration was unavailable"
+              echo ""
+              echo "Missing required Quick Log smoke configuration prevented execution."
+              echo ""
+              echo "Required configuration (names only — values are never printed):"
+              echo ""
+              echo "- \`vars.E2E_BASE_URL\`"
+              echo "- \`vars.E2E_GROW_1_PLANT_URL\`"
+              echo "- \`secrets.E2E_TEST_EMAIL\`"
+              echo "- \`secrets.E2E_TEST_PASSWORD\`"
+              echo ""
+              if [ -n "${MISSING_CONFIG}" ]; then
+                echo "Missing in this run:"
+                echo ""
+                # MISSING_CONFIG is a comma-separated list of NAMES only.
+                IFS=',' read -ra _names <<< "${MISSING_CONFIG}"
+                for n in "${_names[@]}"; do
+                  echo "- \`${n}\`"
+                done
+                echo ""
+              fi
+              if [ "${EVENT_NAME}" = "pull_request" ] || [ "${EVENT_NAME}" = "push" ]; then
+                echo "This is a clean skip for the \`${EVENT_NAME}\` event — forks and branch contexts without access to E2E vars/secrets are expected to skip without failing."
+              elif [ "${EVENT_NAME}" = "workflow_dispatch" ]; then
+                echo "On \`workflow_dispatch\`, missing required configuration fails fast in the \`Verify required configuration\` step before later steps run. Configure the Actions vars/secrets above and re-dispatch."
+              fi
+              echo ""
+              echo "No smoke artifacts were produced because the smoke did not execute."
             fi
-            echo ""
-            echo "### Artifacts"
-            echo ""
-            echo "- Artifact name: \`quicklog-smoke-artifacts\`"
-            echo "- Retention: 30 days"
-            echo "- Run artifacts page: ${RUN_URL}#artifacts"
-            echo ""
-            echo "Contents:"
-            echo ""
-            echo "- \`e2e/results/quicklog-smoke-report.json\`"
-            echo "- \`e2e/results/quicklog-smoke-report.txt\`"
-            echo "- \`playwright-report/\`"
-            echo "- \`test-results/\`"
-            echo ""
-            echo "### Troubleshooting"
-            echo ""
-            echo "Open \`quicklog-smoke-report.txt\` first (then the JSON sibling) and find the first \`✗\` line. Then inspect the matching Playwright trace, screenshots, and video under \`playwright-report/\` and \`test-results/\`."
           } >> "$GITHUB_STEP_SUMMARY"

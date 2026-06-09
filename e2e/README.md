@@ -70,6 +70,68 @@ bun run e2e:quicklog-smoke:headed
 bun run e2e:report           # open last HTML report
 ```
 
+## Run the Quick Log smoke locally
+
+Exact reproduction steps for the same smoke that runs in CI.
+
+Prerequisites:
+
+- A real checkout of `Verdant-OS/verdant-grow-diary`.
+- [Bun](https://bun.sh) installed.
+- Dependencies installed (`bun install`).
+- Playwright Chromium installed (`bun run e2e:install`).
+- A reachable app URL (production preview or a local `bun run dev`).
+- A test plant URL on Grow #1 you control via the test account.
+- A dedicated **test account** (email + password). Never use production
+  grower credentials — the smoke creates real diary entries.
+
+### Windows PowerShell
+
+```powershell
+bun install
+bun run e2e:install
+
+$env:E2E_BASE_URL="https://verdantgrowdiary-com.lovable.app"
+$env:E2E_GROW_1_PLANT_URL="https://verdantgrowdiary-com.lovable.app/plants/YOUR_TEST_PLANT_ID"
+$env:E2E_GROW_2_PLANT_NAME="505 Headbanger"
+$env:E2E_TEST_EMAIL="your-test-email"
+$env:E2E_TEST_PASSWORD="your-test-password"
+
+bun run e2e:setup
+bun run e2e:quicklog-smoke
+```
+
+### Bash / macOS / Linux
+
+```bash
+bun install
+bun run e2e:install
+
+export E2E_BASE_URL="https://verdantgrowdiary-com.lovable.app"
+export E2E_GROW_1_PLANT_URL="https://verdantgrowdiary-com.lovable.app/plants/YOUR_TEST_PLANT_ID"
+export E2E_GROW_2_PLANT_NAME="505 Headbanger"
+export E2E_TEST_EMAIL="your-test-email"
+export E2E_TEST_PASSWORD="your-test-password"
+
+bun run e2e:setup
+bun run e2e:quicklog-smoke
+```
+
+### Debugging a local failure
+
+- `bun run e2e:quicklog-smoke:headed` — run with a visible browser.
+- `bun run e2e:report` — open the last HTML report.
+- Inspect `e2e/results/quicklog-smoke-report.txt` first — that is the
+  first file to open when triaging any smoke failure. Then open the
+  matching trace/screenshots/video under `playwright-report/` and
+  `test-results/`.
+
+Reminders:
+
+- `e2e/.auth/user.json` is generated locally and **must not be committed**.
+- The smoke creates real test diary entries. Use only a dedicated
+  **test plant** and **test account**, never production grower data.
+
 ## storageState lifecycle
 
 `e2e/.auth/user.json` is created by `bun run e2e:setup`, which drives the

@@ -47,7 +47,11 @@ const targets: Array<[string, string]> = [
   ["page", pageNoComments],
   ["view model", vmNoComments],
   ["form rules", formNoComments],
+  ["templates", templatesNoComments],
+  ["unit warning rules", unitWarnNoComments],
+  ["multi-plant rules", multiPlantNoComments],
 ];
+
 
 const FORBIDDEN_DEVICE_NAMES = [
   "controlDevice",

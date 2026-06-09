@@ -457,6 +457,12 @@ export default function QuickLog({
             <Sparkles className="h-4 w-4 text-primary" />
             Quick Log
           </DialogTitle>
+          <p
+            data-testid="quick-log-subtitle"
+            className="text-[12px] text-muted-foreground leading-snug"
+          >
+            Capture what changed. Add detail only if it helps.
+          </p>
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-4">
           {(() => {
@@ -602,7 +608,13 @@ export default function QuickLog({
           {/* Plant — full-width row so the validation alert + helper text
               have room to read on narrow viewports. */}
           <div>
-            <Label className="text-xs">Plant</Label>
+            <h3
+              data-testid="quick-log-section-plant"
+              className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1"
+            >
+              1. Plant
+            </h3>
+            <Label className="text-xs" htmlFor="quick-log-plant-select-label">Plant</Label>
             <Select
               value={plantId || "__none"}
               onValueChange={(v) => setPlantId(v === "__none" ? "" : v)}
@@ -665,21 +677,59 @@ export default function QuickLog({
           )}
 
 
-          <div>
-            <Label>What's happening?</Label>
+          <div className="space-y-2">
+            <h3
+              data-testid="quick-log-section-observation"
+              className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+            >
+              2. Observation
+            </h3>
+            <div
+              data-testid="quick-log-prompt-chips"
+              role="group"
+              aria-label="Quick observation prompts"
+              className="flex flex-wrap gap-1.5"
+            >
+              {[
+                { label: "Better", text: "Better than yesterday." },
+                { label: "Same", text: "About the same as yesterday." },
+                { label: "Worse", text: "Looking worse than yesterday." },
+                { label: "Watered", text: "Watered today." },
+                { label: "Fed", text: "Fed today." },
+                { label: "Spotted issue", text: "Spotted an issue — see photo or notes." },
+                { label: "Photo only", text: "Photo only — no other changes today." },
+              ].map((chip) => (
+                <button
+                  key={chip.label}
+                  type="button"
+                  data-testid={`quick-log-chip-${chip.label.toLowerCase().replace(/\s+/g, "-")}`}
+                  aria-label={`Insert observation: ${chip.label}`}
+                  onClick={() =>
+                    setNote((prev) => (prev.trim() ? `${prev.trim()} ${chip.text}` : chip.text))
+                  }
+                  className="rounded-full border border-border/60 bg-secondary/30 px-2.5 py-1 text-[11px] text-foreground hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+            <Label htmlFor="quicklog-note-textarea">What's happening?</Label>
             <Textarea
+              id="quicklog-note-textarea"
               ref={noteRef}
               data-testid="quicklog-note"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Watered, looking healthy, slight yellowing on a fan leaf…"
               rows={3}
+              aria-label="Quick log observation note"
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="sentences"
               spellCheck={true}
             />
           </div>
+
 
           {eventType === "reminder" && (
             <div>
@@ -761,6 +811,12 @@ export default function QuickLog({
           )}
 
 
+          <h3
+            data-testid="quick-log-section-optional"
+            className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+          >
+            3. Optional details
+          </h3>
           <label className="flex items-center justify-between gap-2 rounded-lg border border-border/60 p-3">
             <span className="text-sm">Add more details</span>
             <Switch checked={showMore} onCheckedChange={setShowMore} />
@@ -873,7 +929,15 @@ export default function QuickLog({
               }}
               className="flex w-full items-center justify-between gap-2 text-left"
             >
-              <span className="text-sm font-medium">Hardware readings</span>
+              <span className="text-sm font-medium">
+                Hardware readings
+                <span
+                  data-testid="quicklog-hardware-manual-subtitle"
+                  className="ml-2 text-[10px] font-normal uppercase tracking-wide text-muted-foreground"
+                >
+                  Manual readings · handheld only, not telemetry
+                </span>
+              </span>
               <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
                 {hardwareOpen ? "Optional" : "Tap to add"}
               </span>
@@ -1004,6 +1068,12 @@ export default function QuickLog({
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save entry"}
           </Button>
+          <p
+            data-testid="quick-log-save-helper"
+            className="text-[11px] text-muted-foreground -mt-2"
+          >
+            You can add more detail later from the timeline.
+          </p>
 
           {savedTarget && (
             <div

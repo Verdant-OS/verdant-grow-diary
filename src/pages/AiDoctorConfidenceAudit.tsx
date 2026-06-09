@@ -2,10 +2,12 @@
  * AI Doctor Confidence Audit — internal read-only page.
  *
  * Renders the static AiDoctorConfidenceAuditViewModel with a scenario selector.
+ * Supports a shareable URL parameter (?scenario=<id>) via React Router.
  * Does NOT query live data, call Supabase, write data, create alerts,
  * create Action Queue items, call models, or control devices.
  */
 import * as React from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   buildAiDoctorConfidenceAuditViewModel,
   type AiDoctorConfidenceAuditRule,
@@ -132,7 +134,8 @@ function ScenarioPanel({ scenario }: { scenario: AiDoctorConfidenceAuditScenario
       : "Conservative / low";
   return (
     <article
-      data-testid={`ai-doctor-confidence-scenario-panel`}
+      id="confidence-scenario-detail"
+      data-testid="ai-doctor-confidence-scenario-panel"
       className="space-y-3 rounded-md border border-border bg-background p-3 text-sm"
     >
       <header className="space-y-1">
@@ -233,13 +236,40 @@ export default function AiDoctorConfidenceAudit(): JSX.Element {
     () => buildAiDoctorConfidenceAuditViewModel(),
     [],
   );
-  const [selectedScenarioId, setSelectedScenarioId] = React.useState<string>(
-    "demo-csv-only",
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const validScenarioIds = React.useMemo(
+    () => new Set(vm.scenarios.map((s) => s.id)),
+    [vm.scenarios],
   );
+
+  const selectedScenarioId = React.useMemo(() => {
+    const fromUrl = searchParams.get("scenario");
+    if (fromUrl && validScenarioIds.has(fromUrl)) {
+      return fromUrl;
+    }
+    return "demo-csv-only";
+  }, [searchParams, validScenarioIds]);
+
   const selectedScenario = React.useMemo(
     () =>
       vm.scenarios.find((s) => s.id === selectedScenarioId) ?? vm.scenarios[0],
     [vm.scenarios, selectedScenarioId],
+  );
+
+  const handleSelectChange = React.useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const next = e.target.value;
+      setSearchParams(
+        (prev) => {
+          const params = new URLSearchParams(prev);
+          params.set("scenario", next);
+          return params;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
   );
 
   return (
@@ -274,16 +304,27 @@ export default function AiDoctorConfidenceAudit(): JSX.Element {
       <Section id="scenario-selector" title="Scenario selector">
         <label
           htmlFor="ai-doctor-confidence-scenario-select"
+          data-testid="ai-doctor-confidence-scenario-label"
           className="text-sm font-medium text-foreground"
         >
           Select a weak-context scenario
         </label>
+        <p
+          id="scenario-helper-text"
+          data-testid="ai-doctor-confidence-scenario-helper-text"
+          className="text-xs text-muted-foreground"
+        >
+          Choose a static confidence scenario. This does not run scoring or write
+          data.
+        </p>
         <select
           id="ai-doctor-confidence-scenario-select"
           data-testid="ai-doctor-confidence-scenario-select"
           className="w-full rounded border border-border bg-background px-2 py-1 text-sm text-foreground"
           value={selectedScenarioId}
-          onChange={(e) => setSelectedScenarioId(e.target.value)}
+          onChange={handleSelectChange}
+          aria-describedby="scenario-helper-text"
+          aria-controls="confidence-scenario-detail"
         >
           {vm.scenarios.map((s) => (
             <option

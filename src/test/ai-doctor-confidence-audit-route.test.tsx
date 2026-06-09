@@ -328,4 +328,82 @@ describe("AiDoctorConfidenceAudit route page", () => {
     expect(text).toMatch(/No model calls/);
     expect(text).toMatch(/No device control/);
   });
+
+  // -------------------------------------------------------------------------
+  // Scenario deep-link list tests
+  // -------------------------------------------------------------------------
+  it("renders the Scenario deep links section with helper copy", () => {
+    renderAt("/internal/ai-doctor-confidence-audit");
+    expect(
+      screen.getByTestId("ai-doctor-confidence-audit-section-scenario-deep-links"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("ai-doctor-confidence-scenario-deep-links-helper"),
+    ).toHaveTextContent(/Use these internal links/i);
+  });
+
+  it("renders one deep link per scenario with correct href", () => {
+    renderAt("/internal/ai-doctor-confidence-audit");
+    const list = screen.getByTestId("ai-doctor-confidence-scenario-deep-links");
+    const items = list.querySelectorAll("li");
+    expect(items.length).toBe(SCENARIO_IDS.length);
+    for (const id of SCENARIO_IDS) {
+      const link = screen.getByTestId(
+        `ai-doctor-confidence-scenario-deep-link-${id}`,
+      );
+      expect(link).toHaveAttribute(
+        "href",
+        `/internal/ai-doctor-confidence-audit?scenario=${id}`,
+      );
+    }
+  });
+
+  it("each deep link item shows context type, ceiling, and safety flag count", () => {
+    renderAt("/internal/ai-doctor-confidence-audit");
+    for (const id of SCENARIO_IDS) {
+      expect(
+        screen.getByTestId(`ai-doctor-confidence-scenario-deep-link-context-${id}`),
+      ).toHaveTextContent(/Context:/);
+      expect(
+        screen.getByTestId(`ai-doctor-confidence-scenario-deep-link-ceiling-${id}`),
+      ).toHaveTextContent(/Ceiling:/);
+      expect(
+        screen.getByTestId(`ai-doctor-confidence-scenario-deep-link-flags-${id}`),
+      ).toHaveTextContent(/Safety flags:/);
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // Deep-link refresh / direct-entry tests
+  // -------------------------------------------------------------------------
+  it.each(SCENARIO_IDS.map((id) => [id]))(
+    "direct load ?scenario=%s renders the correct scenario detail",
+    (id) => {
+      renderAt(`/internal/ai-doctor-confidence-audit?scenario=${id}`);
+      const select = screen.getByTestId(
+        "ai-doctor-confidence-scenario-select",
+      ) as HTMLSelectElement;
+      expect(select.value).toBe(id);
+      expect(
+        screen.getByTestId("ai-doctor-confidence-scenario-panel"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId("ai-doctor-confidence-scenario-ceiling"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId("ai-doctor-confidence-scenario-takeaway"),
+      ).toBeInTheDocument();
+    },
+  );
+
+  it("invalid deep-link query param falls back to demo-csv-only detail", () => {
+    renderAt("/internal/ai-doctor-confidence-audit?scenario=not-real");
+    const select = screen.getByTestId(
+      "ai-doctor-confidence-scenario-select",
+    ) as HTMLSelectElement;
+    expect(select.value).toBe("demo-csv-only");
+    expect(
+      screen.getByTestId("ai-doctor-confidence-scenario-ceiling"),
+    ).toHaveTextContent("40");
+  });
 });

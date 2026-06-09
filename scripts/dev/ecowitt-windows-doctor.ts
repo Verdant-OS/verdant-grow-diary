@@ -178,7 +178,7 @@ export function buildLauncherFiles(repoRoot: string): Record<string, string> {
       "8. Review the dry-run report BEFORE any live send.\r\n\r\n" +
       "WARNINGS\r\n" +
       "  - Never paste bridge tokens into these launchers.\r\n" +
-      "  - Never paste service_role keys anywhere.\r\n" +
+      "  - Never paste service-role keys anywhere.\r\n" +
       "  - Live send is NOT part of this fast path.\r\n",
   };
 }

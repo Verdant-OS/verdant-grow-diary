@@ -1,20 +1,102 @@
 /**
- * AI Doctor Engine — Phase 1 context compiler.
+ * AI Doctor context compiler.
  *
- * Pure, deterministic helper that turns RLS-safe rows (already fetched by
- * the caller) into a compact `PlantContextPayload` for the AI Doctor
- * pipeline.
+ * Contains two layers, both pure / deterministic:
  *
- * Hard constraints:
+ *  1. `compileAiDoctorContext` — assembles AI Doctor context sources,
+ *     keeping Environment Check evidence (local EcoWitt validation)
+ *     SEPARATE from live sensor context.
+ *
+ *  2. `compilePlantContextFromRows` (Phase 1 engine) — turns RLS-safe
+ *     rows (already fetched by the caller) into a compact
+ *     `PlantContextPayload` for the AI Doctor pipeline.
+ *
+ * Hard constraints (both layers):
  *  - No I/O. No Supabase calls. No React.
  *  - No automation, no Action Queue writes, no alerts.
- *  - Source labels are preserved verbatim. We NEVER merge csv/manual/demo
- *    into the `live` bucket.
+ *  - Source labels are preserved verbatim. We NEVER merge
+ *    csv/manual/demo into the `live` bucket.
  *  - Readings tagged `stale` or `invalid` are surfaced as their own
  *    buckets and never feed the "healthy" view of the plant.
  *  - Only the last 14 days of grow events and the last 7 days of sensor
- *    readings are included.
+ *    readings are included by the Phase 1 row compiler.
  */
+
+import {
+  buildAiDoctorEnvironmentCheckContext,
+  selectBestEnvironmentCheckEvent,
+  type AiDoctorEnvironmentCheckResult,
+  type BestEnvironmentCheckSelection,
+  type EnvironmentCheckEventInput,
+} from "./aiDoctorEnvironmentCheckRules";
+import type { AiDoctorSensorContext } from "./aiDoctorSensorContextRules";
+
+// ---------------------------------------------------------------------------
+// Layer 1 — environment-check aware context compiler (existing behavior).
+// ---------------------------------------------------------------------------
+
+export interface CompileAiDoctorContextInput {
+  /** Live sensor context from NEX-6 mapping (if any). */
+  sensorContext?: AiDoctorSensorContext | null;
+  /** Recent diary/grow_events candidates (already fetched by caller). */
+  environmentCheckEvents?: readonly EnvironmentCheckEventInput[] | null;
+}
+
+export interface CompiledAiDoctorContext {
+  /** Live sensor evidence (unchanged from existing behavior). */
+  sensor: AiDoctorSensorContext | null;
+  /** Local/test Environment Check evidence, kept SEPARATE from live. */
+  environmentCheck: AiDoctorEnvironmentCheckResult;
+  /** Selection metadata for the chosen Environment Check, if any. */
+  environmentCheckSelection: BestEnvironmentCheckSelection;
+  /** Combined safety notes (sensor + environment-check). Deterministic. */
+  combinedSafetyNotes: string[];
+  /** True only when caller has at least one usable evidence source. */
+  hasAnyEvidence: boolean;
+}
+
+export function compileAiDoctorContext(
+  input: CompileAiDoctorContextInput,
+): CompiledAiDoctorContext {
+  const sensor = input.sensorContext ?? null;
+  const selection = selectBestEnvironmentCheckEvent(
+    input.environmentCheckEvents ?? [],
+  );
+  const environmentCheck = buildAiDoctorEnvironmentCheckContext(
+    selection.selected,
+  );
+
+  const combined: string[] = [];
+  const push = (n: string) => {
+    if (!combined.includes(n)) combined.push(n);
+  };
+  if (sensor) for (const n of sensor.safetyNotes) push(n);
+  if (environmentCheck.kind === "present")
+    for (const n of environmentCheck.safetyNotes) push(n);
+  if (selection.isFallback && environmentCheck.kind === "present") {
+    push(
+      "Selected Environment Check is a weak fallback — no accepted required metric. Treat as untrusted.",
+    );
+  }
+
+  const hasAnyEvidence =
+    (sensor !== null && sensor.usableMetrics.length > 0) ||
+    environmentCheck.kind === "present";
+
+  return {
+    sensor,
+    environmentCheck,
+    environmentCheckSelection: selection,
+    combinedSafetyNotes: combined,
+    hasAnyEvidence,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Layer 2 — Phase 1 row-based plant context compiler.
+// ---------------------------------------------------------------------------
+
+
 
 export type SensorSourceTag =
   | "live"

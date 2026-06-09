@@ -46,7 +46,7 @@ export interface SensorSourceBadge {
   label: string;
   /** Visual tone for styling. */
   tone: SourceBadgeTone;
-  /** True when the reading must NOT be treated as healthy live data. */
+  /** True when the source itself must be displayed as degraded. */
   isDegraded: boolean;
   /** True for grower-entered readings. */
   isManual: boolean;
@@ -177,7 +177,7 @@ export function buildSensorSourceBadge(
   return {
     label,
     tone,
-    isDegraded: DEGRADED_TONES.has(tone) || truthCopyGuard.canDescribeAsHealthyLive === false,
+    isDegraded: DEGRADED_TONES.has(tone),
     isManual: tone === "manual",
     vendor: resolved.vendor,
     manualDeviceNote,

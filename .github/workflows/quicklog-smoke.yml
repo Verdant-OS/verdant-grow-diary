@@ -9,10 +9,14 @@ name: Quick Log Playwright smoke
 #  - No checked-in storageState; the setup project signs in via the real /auth UI
 #    using repository secrets, or skips with a clear message.
 #  - Uploads Playwright report + smoke JSON/text report as artifacts on every run.
+#  - Never uses pull_request_target — only the safe pull_request event.
 #
 # Triggers:
 #  - workflow_dispatch: manual run; fails fast if required secrets/URL are missing.
 #  - push to main: best-effort; skips cleanly if secrets are unavailable.
+#  - pull_request to main: best-effort; PRs without access to E2E vars/secrets
+#    (e.g. forked PRs) skip cleanly with a clear non-secret message and the job
+#    completes successfully.
 #
 # Required repository secrets / vars (configure in GitHub → Settings):
 #   secrets.E2E_TEST_EMAIL
@@ -24,6 +28,12 @@ name: Quick Log Playwright smoke
 on:
   workflow_dispatch:
   push:
+    branches: [main]
+    paths:
+      - "e2e/**"
+      - "playwright.config.ts"
+      - ".github/workflows/quicklog-smoke.yml"
+  pull_request:
     branches: [main]
     paths:
       - "e2e/**"
@@ -48,51 +58,60 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Verify required configuration
-        id: precheck
+        id: e2e_config
         shell: bash
         run: |
+          # Track presence (never echo values).
           missing=()
           [ -n "$E2E_BASE_URL" ] || missing+=("vars.E2E_BASE_URL")
           [ -n "$E2E_GROW_1_PLANT_URL" ] || missing+=("vars.E2E_GROW_1_PLANT_URL")
           [ -n "$E2E_TEST_EMAIL" ] || missing+=("secrets.E2E_TEST_EMAIL")
           [ -n "$E2E_TEST_PASSWORD" ] || missing+=("secrets.E2E_TEST_PASSWORD")
+
+          event="${{ github.event_name }}"
+
           if [ ${#missing[@]} -gt 0 ]; then
-            echo "Missing required configuration: ${missing[*]}"
-            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-              echo "Manually dispatched run requires all secrets/vars. Failing." >&2
+            echo "Missing required Quick Log smoke configuration: ${missing[*]}"
+            if [ "$event" = "workflow_dispatch" ]; then
+              echo "Missing required Quick Log smoke configuration. Configure Actions vars/secrets." >&2
               exit 1
+            elif [ "$event" = "pull_request" ]; then
+              echo "Skipping Quick Log smoke: E2E vars/secrets are unavailable for this PR context."
+              echo "should_run=false" >> "$GITHUB_OUTPUT"
             else
-              echo "Skipping smoke run on non-dispatch event."
-              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "Skipping Quick Log smoke: E2E vars/secrets are unavailable for this event."
+              echo "should_run=false" >> "$GITHUB_OUTPUT"
             fi
           else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "Quick Log smoke configuration present. Proceeding."
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Setup Bun
-        if: steps.precheck.outputs.skip != 'true'
+        if: steps.e2e_config.outputs.should_run == 'true'
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
       - name: Install dependencies
-        if: steps.precheck.outputs.skip != 'true'
+        if: steps.e2e_config.outputs.should_run == 'true'
         run: bun install --frozen-lockfile
 
       - name: Install Playwright Chromium (with OS deps)
-        if: steps.precheck.outputs.skip != 'true'
+        if: steps.e2e_config.outputs.should_run == 'true'
         run: bun run e2e:install:ci
 
       - name: Run Quick Log Playwright smoke
-        if: steps.precheck.outputs.skip != 'true'
+        if: steps.e2e_config.outputs.should_run == 'true'
         run: bun run e2e:quicklog-smoke
 
       - name: Upload smoke artifacts
-        if: always() && steps.precheck.outputs.skip != 'true'
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: quicklog-smoke-artifacts
           if-no-files-found: warn
+          retention-days: 30
           path: |
             e2e/results/quicklog-smoke-report.json
             e2e/results/quicklog-smoke-report.txt

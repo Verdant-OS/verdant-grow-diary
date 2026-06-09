@@ -55,7 +55,7 @@ export default function Auth() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (error) {
-      setSignInError(SIGN_IN_FRIENDLY_ERROR);
+      setSignInError(sanitizeAuthError("signIn", error));
       signInEmailRef.current?.focus();
       return;
     }
@@ -79,7 +79,7 @@ export default function Auth() {
     });
     setBusy(false);
     if (error) {
-      setSignUpError(SIGN_UP_FRIENDLY_ERROR);
+      setSignUpError(sanitizeAuthError("signUp", error));
       signUpEmailRef.current?.focus();
       return;
     }
@@ -106,7 +106,7 @@ export default function Auth() {
     });
     setBusy(false);
     if (error) {
-      setForgotError(FORGOT_RATE_LIMIT_ERROR);
+      setForgotError(sanitizeAuthError("forgotPassword", error));
       forgotEmailRef.current?.focus();
       return;
     }

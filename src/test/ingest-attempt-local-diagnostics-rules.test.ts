@@ -109,7 +109,7 @@ describe("summarizeAttempts", () => {
     ]);
     expect(s.lastClassification).toBe("stale_reading");
     expect(s.lastRejectionReason).toBe("stale_timestamp");
-    expect(s.lastProvider).toBe("ecowitt");
+    expect(s.lastProvider).toBe("mqtt_local_bridge");
   });
 
   it("empty list returns zeros and nulls", () => {

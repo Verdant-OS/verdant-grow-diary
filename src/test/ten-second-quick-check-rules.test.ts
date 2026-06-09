@@ -47,7 +47,7 @@ describe("tenSecondQuickCheckRules", () => {
 
   it("detects whether a note contains a quick check line", () => {
     expect(hasTenSecondQuickCheck("Quick check: Same.")).toBe(true);
-    expect(hasTenSecondQuickCheck("Same")) .toBe(false);
+    expect(hasTenSecondQuickCheck("Same")).toBe(false);
   });
 
   it("adds detail chips without duplicates", () => {

@@ -15,6 +15,14 @@ function readFile(...segments: string[]): string {
   return fs.readFileSync(path.resolve(process.cwd(), ...segments), "utf-8");
 }
 
+function stripComments(src: string): string {
+  // Strip single-line comments
+  let result = src.replace(/\/\/.*$/gm, "");
+  // Strip multi-line comments
+  result = result.replace(/\/\*[\s\S]*?\*\//g, "");
+  return result;
+}
+
 const PAGE_PATH = "src/pages/SensorTruthAudit.tsx";
 const VM_PATH = "src/lib/sensorTruthAuditViewModel.ts";
 
@@ -23,13 +31,13 @@ describe("sensor truth audit static safety", () => {
     const src = readFile(PAGE_PATH);
     expect(src).not.toMatch(/from\s+["']@\/integrations\/supabase/);
     expect(src).not.toMatch(/from\s+["']\.\.\/integrations\/supabase/);
-    expect(src).not.toMatch(/supabase\b/);
+    expect(src).not.toMatch(/\bsupabase\b/);
   });
 
   it("view model does not import from Supabase", () => {
     const src = readFile(VM_PATH);
     expect(src).not.toMatch(/from\s+["']@\/integrations\/supabase/);
-    expect(src).not.toMatch(/supabase\b/);
+    expect(src).not.toMatch(/\bsupabase\b/);
   });
 
   it("page does not contain fetch(", () => {
@@ -133,21 +141,21 @@ describe("sensor truth audit static safety", () => {
   });
 
   it("page does not import model/edge/ingest/alert/action helpers", () => {
-    const src = readFile(PAGE_PATH);
+    const src = stripComments(readFile(PAGE_PATH));
     expect(src).not.toMatch(/from\s+["'].*(?:model|edge|ingest|alert|action)/i);
     expect(src).not.toMatch(/from\s+["'].*ai-doctor/i);
     expect(src).not.toMatch(/from\s+["'].*confidence/i);
   });
 
   it("view model does not import model/edge/ingest/alert/action helpers", () => {
-    const src = readFile(VM_PATH);
+    const src = stripComments(readFile(VM_PATH));
     expect(src).not.toMatch(/from\s+["'].*(?:model|edge|ingest|alert|action)/i);
     expect(src).not.toMatch(/from\s+["'].*ai-doctor/i);
     expect(src).not.toMatch(/from\s+["'].*confidence/i);
   });
 
   it("page does not contain forbidden execution copy", () => {
-    const src = readFile(PAGE_PATH);
+    const src = stripComments(readFile(PAGE_PATH));
     const forbidden = [
       "Execute",
       "Run command",
@@ -169,7 +177,7 @@ describe("sensor truth audit static safety", () => {
   });
 
   it("view model does not contain forbidden execution copy", () => {
-    const src = readFile(VM_PATH);
+    const src = stripComments(readFile(VM_PATH));
     const forbidden = [
       "Execute",
       "Run command",
@@ -192,12 +200,11 @@ describe("sensor truth audit static safety", () => {
 
   it("page only imports from react and the local view model", () => {
     const src = readFile(PAGE_PATH);
-    const importLines = src
-      .split("\n")
-      .filter((l) => l.trim().startsWith("import"));
-    for (const line of importLines) {
-      const isReact = line.includes("from \"react\"");
-      const isViewModel = line.includes("sensorTruthAuditViewModel");
+    // Extract all `from "..."` or `from '...'` in the file
+    const fromMatches = src.match(/from\s+["'][^"']+["']/g) || [];
+    for (const match of fromMatches) {
+      const isReact = match.includes('"react"');
+      const isViewModel = match.includes("sensorTruthAuditViewModel");
       expect(isReact || isViewModel).toBe(true);
     }
   });

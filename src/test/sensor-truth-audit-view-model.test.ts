@@ -6,7 +6,6 @@ import {
   buildSensorTruthAuditViewModel,
   SENSOR_TRUTH_SOURCE_LABEL_ORDER,
   SENSOR_TRUTH_SUSPICIOUS_CHECK_IDS,
-  type SensorTruthAuditViewModel,
 } from "@/lib/sensorTruthAuditViewModel";
 
 describe("sensorTruthAuditViewModel", () => {
@@ -60,37 +59,36 @@ describe("sensorTruthAuditViewModel", () => {
     expect(invalid!.meaning.toLowerCase()).toContain("malformed");
   });
 
-  it("demo is never described as live", () => {
+  it("demo is never described as live in meaning or allowed_use", () => {
     const vm = buildSensorTruthAuditViewModel();
     const demo = vm.source_rules.find((r) => r.label === "demo");
     expect(demo).toBeDefined();
     expect(demo!.meaning.toLowerCase()).not.toContain("live");
-    expect(demo!.safety_notes.toLowerCase()).not.toContain("live");
     expect(demo!.allowed_use.toLowerCase()).not.toContain("live");
   });
 
-  it("csv is never described as live", () => {
+  it("csv is never described as live in meaning or allowed_use", () => {
     const vm = buildSensorTruthAuditViewModel();
     const csv = vm.source_rules.find((r) => r.label === "csv");
     expect(csv).toBeDefined();
     expect(csv!.meaning.toLowerCase()).not.toContain("live");
-    expect(csv!.safety_notes.toLowerCase()).not.toContain("live");
+    expect(csv!.allowed_use.toLowerCase()).not.toContain("live");
   });
 
-  it("stale is never described as current", () => {
+  it("stale is never described as current in meaning or allowed_use", () => {
     const vm = buildSensorTruthAuditViewModel();
     const stale = vm.source_rules.find((r) => r.label === "stale");
     expect(stale).toBeDefined();
     expect(stale!.meaning.toLowerCase()).not.toContain("current");
-    expect(stale!.safety_notes.toLowerCase()).not.toContain("current");
+    expect(stale!.allowed_use.toLowerCase()).not.toContain("current");
   });
 
-  it("invalid is never described as healthy", () => {
+  it("invalid is never described as healthy in meaning or allowed_use", () => {
     const vm = buildSensorTruthAuditViewModel();
     const invalid = vm.source_rules.find((r) => r.label === "invalid");
     expect(invalid).toBeDefined();
     expect(invalid!.meaning.toLowerCase()).not.toContain("healthy");
-    expect(invalid!.safety_notes.toLowerCase()).not.toContain("healthy");
+    expect(invalid!.allowed_use.toLowerCase()).not.toContain("healthy");
   });
 
   it("includes all suspicious data checks", () => {

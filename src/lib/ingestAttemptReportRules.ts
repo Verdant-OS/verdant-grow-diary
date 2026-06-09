@@ -285,6 +285,7 @@ export function buildIngestAttemptReport(
     description: DESCRIPTION[status],
     storageNotice: STORAGE_NOTICE,
     trustedLive,
+    evidence: input.evidence ?? null,
   };
 }
 

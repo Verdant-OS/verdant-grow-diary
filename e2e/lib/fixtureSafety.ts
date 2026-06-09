@@ -4,8 +4,14 @@
  * The Quick Log Playwright smoke is write-producing: it creates real diary
  * entries through the normal authenticated UI. To keep it from ever
  * touching a real active grow, every smoke run must first verify that the
- * target plant/grow/tent is a disposable E2E fixture owned by a dedicated
+ * target tent/plant is a disposable E2E fixture owned by a dedicated
  * test account.
+ *
+ * The current setup flow has no Grow page surfaced in the UI — growers
+ * Add Tent from the dashboard, open the tent, then Add Plant. So the
+ * validator REQUIRES visible E2E tent + plant names, and only checks the
+ * grow name when one is explicitly supplied via
+ * `E2E_FIXTURE_EXPECTED_GROW_NAME`.
  *
  * SAFETY:
  *   - no destructive write operations
@@ -27,6 +33,7 @@ export interface FixtureEnvValidation {
   ok: boolean;
   errors: string[];
   expected: {
+    /** Optional. Only enforced when an expected grow name is provided. */
     grow: string;
     tent: string;
     plant: string;
@@ -50,6 +57,9 @@ export function isLikelyRealPlantUrl(url: string): boolean {
 /**
  * Pure env-level fixture validation. No network, no I/O.
  * Returns a structured result; callers decide whether to throw.
+ *
+ * REQUIRED: tent + plant expected names (with E2E/Test markers).
+ * OPTIONAL: grow expected name. Only validated when provided.
  */
 export function validateFixtureEnv(env: FixtureSafetyEnv): FixtureEnvValidation {
   const errors: string[] = [];
@@ -73,8 +83,8 @@ export function validateFixtureEnv(env: FixtureSafetyEnv): FixtureEnvValidation 
   const tent = (env.E2E_FIXTURE_EXPECTED_TENT_NAME ?? "").trim();
   const plant = (env.E2E_FIXTURE_EXPECTED_PLANT_NAME ?? "").trim();
 
+  // Required names.
   for (const [name, value] of [
-    ["E2E_FIXTURE_EXPECTED_GROW_NAME", grow],
     ["E2E_FIXTURE_EXPECTED_TENT_NAME", tent],
     ["E2E_FIXTURE_EXPECTED_PLANT_NAME", plant],
   ] as const) {
@@ -87,6 +97,14 @@ export function validateFixtureEnv(env: FixtureSafetyEnv): FixtureEnvValidation 
     }
   }
 
+  // Optional grow name. Validated only when provided — the current UI has
+  // no Grow page in the setup flow (Dashboard → Add Tent → Add Plant).
+  if (grow && !/e2e|test/i.test(grow)) {
+    errors.push(
+      `E2E_FIXTURE_EXPECTED_GROW_NAME='${grow}' does not look like an E2E fixture name (must include 'E2E' or 'Test').`,
+    );
+  }
+
   return {
     ok: errors.length === 0,
     errors,
@@ -97,6 +115,9 @@ export function validateFixtureEnv(env: FixtureSafetyEnv): FixtureEnvValidation 
 /**
  * Check that visible page text contains the expected fixture names AND
  * recognizable E2E/Test markers. Read-only check.
+ *
+ * Required: visible tent + plant names.
+ * Optional: grow name is only required when `expected.grow` is non-empty.
  *
  * If `accountHint` is provided AND the page visibly exposes an account
  * label (email or display name), the visible text must contain the hint.
@@ -116,16 +137,26 @@ export function pageTextMatchesFixture(
       "Target page does not contain 'E2E' or 'Test' markers — refusing to treat as fixture data.",
     );
   }
-  for (const [label, value] of [
-    ["grow", expected.grow],
+
+  const required: Array<[string, string]> = [
     ["tent", expected.tent],
     ["plant", expected.plant],
-  ] as const) {
+  ];
+  for (const [label, value] of required) {
     if (value && !text.includes(value)) {
       errors.push(
         `Expected ${label} name '${value}' not visible on the target page.`,
       );
     }
+  }
+
+  // Grow is only checked when an expected grow name was explicitly
+  // supplied. The current UI does not expose a Grow page in the setup
+  // flow, so a missing grow name must not fail fixture verification.
+  if (expected.grow && !text.includes(expected.grow)) {
+    errors.push(
+      `Expected grow name '${expected.grow}' not visible on the target page.`,
+    );
   }
 
   const hint = (options.accountHint ?? "").trim();

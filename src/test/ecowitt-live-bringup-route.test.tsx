@@ -485,18 +485,20 @@ describe("Evidence Snapshot Export", () => {
       }
     } as unknown as typeof Blob;
     (globalThis as { Blob: typeof Blob }).Blob = BlobSpy;
-    const createSpy = vi
-      .spyOn(URL, "createObjectURL")
-      .mockImplementation(() => {
+    const originalCreate = (URL as unknown as { createObjectURL?: unknown })
+      .createObjectURL;
+    const originalRevoke = (URL as unknown as { revokeObjectURL?: unknown })
+      .revokeObjectURL;
+    (URL as unknown as { createObjectURL: (b: Blob) => string }).createObjectURL =
+      () => {
         const u = `blob:test-${created.length}`;
         created.push(u);
         return u;
-      });
-    const revokeSpy = vi
-      .spyOn(URL, "revokeObjectURL")
-      .mockImplementation((u) => {
+      };
+    (URL as unknown as { revokeObjectURL: (u: string) => void }).revokeObjectURL =
+      (u: string) => {
         revoked.push(u);
-      });
+      };
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
       .mockImplementation(() => {

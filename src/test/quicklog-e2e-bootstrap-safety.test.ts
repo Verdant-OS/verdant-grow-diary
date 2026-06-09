@@ -342,10 +342,16 @@ describe("Docs: rotation + fixture setup + screenshots", () => {
     expect(readme).not.toMatch(/Grow\s+named\s+exactly/i);
 
     // Checklist marks grow as optional, not required.
-    expect(checklist).toMatch(/OPTIONAL_VARS[\s\S]*E2E_FIXTURE_EXPECTED_GROW_NAME/);
-    expect(checklist).not.toMatch(
-      /REQUIRED_VARS[\s\S]*E2E_FIXTURE_EXPECTED_GROW_NAME[\s\S]*\] as const/,
+    const requiredBlock = checklist.match(
+      /const REQUIRED_VARS = \[([\s\S]*?)\] as const/,
     );
+    const optionalBlock = checklist.match(
+      /const OPTIONAL_VARS = \[([\s\S]*?)\] as const/,
+    );
+    expect(requiredBlock).toBeTruthy();
+    expect(optionalBlock).toBeTruthy();
+    expect(requiredBlock![1]).not.toMatch(/E2E_FIXTURE_EXPECTED_GROW_NAME/);
+    expect(optionalBlock![1]).toMatch(/E2E_FIXTURE_EXPECTED_GROW_NAME/);
     expect(checklist).toMatch(/optional\/future|optional.*Grow/i);
   });
 

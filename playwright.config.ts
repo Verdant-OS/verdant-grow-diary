@@ -28,6 +28,20 @@ export default defineConfig({
     trace: "retain-on-failure",
     video: "retain-on-failure",
   },
+  // Mocked, non-destructive specs navigate to relative routes
+  // (e.g. page.goto("/auth")), so baseURL must be backed by a running app.
+  // When E2E_BASE_URL points at a real deployment (authenticated smoke), we
+  // skip the local server and use that deployment instead. The local dev
+  // server reads the committed public client config from `.env` and needs no
+  // login secrets — all Supabase traffic is intercepted in the specs.
+  webServer: process.env.E2E_BASE_URL
+    ? undefined
+    : {
+        command: "bunx vite --port 5173 --strictPort",
+        url: "http://localhost:5173",
+        reuseExistingServer: !process.env.CI,
+        timeout: 120_000,
+      },
   projects: [
     {
       name: "setup",
@@ -40,6 +54,17 @@ export default defineConfig({
         storageState: "e2e/.auth/user.json",
       },
       dependencies: ["setup"],
+      testIgnore: /auth\.setup\.ts/,
+    },
+    {
+      // Mocked, non-destructive specs (auth-loading and friends) that
+      // intercept all /auth/v1/** + /rest/v1/** traffic via page.route().
+      // They must NOT use real saved auth state or the `setup` login flow, so
+      // they require no E2E_TEST_EMAIL / E2E_TEST_PASSWORD secrets.
+      name: "chromium-mocked",
+      use: {
+        ...devices["Desktop Chrome"],
+      },
       testIgnore: /auth\.setup\.ts/,
     },
   ],

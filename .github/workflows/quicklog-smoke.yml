@@ -78,8 +78,9 @@ jobs:
           [ -n "$E2E_TEST_EMAIL" ] || missing+=("secrets.E2E_TEST_EMAIL")
           [ -n "$E2E_TEST_PASSWORD" ] || missing+=("secrets.E2E_TEST_PASSWORD")
           # Disposable E2E fixture safety: required before write-producing smoke.
+          # Grow name is OPTIONAL — the current UI has no Grow page in the
+          # setup flow (Dashboard → Add Tent → Add Plant).
           [ -n "$E2E_FIXTURE_MODE" ] || missing+=("vars.E2E_FIXTURE_MODE")
-          [ -n "$E2E_FIXTURE_EXPECTED_GROW_NAME" ] || missing+=("vars.E2E_FIXTURE_EXPECTED_GROW_NAME")
           [ -n "$E2E_FIXTURE_EXPECTED_TENT_NAME" ] || missing+=("vars.E2E_FIXTURE_EXPECTED_TENT_NAME")
           [ -n "$E2E_FIXTURE_EXPECTED_PLANT_NAME" ] || missing+=("vars.E2E_FIXTURE_EXPECTED_PLANT_NAME")
 

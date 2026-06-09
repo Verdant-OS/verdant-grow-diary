@@ -104,10 +104,100 @@ The smoke writes real diary entries into the E2E fixture. No automatic
 cleanup is performed; periodically prune the E2E Test Plant's diary
 manually if desired. There is no scheduled or nightly smoke trigger.
 
-Automated bootstrap of the fixture is **deferred** — create the
-disposable grow/tent/plant manually through the normal authenticated
-UI for now. See `E2E_ALLOW_FIXTURE_BOOTSTRAP` in the rollout plan for
-future work.
+An **optional** UI-only bootstrap is available behind an explicit
+opt-in flag (`E2E_ALLOW_FIXTURE_BOOTSTRAP=true`). It is **off by
+default**, never deletes/renames/overwrites data, never uses
+`service_role`, and refuses to "force" creation when stable selectors
+are missing. Bootstrap remains **deferred** for general use — see the
+full checklist in [`e2e/FIXTURE_SETUP.md`](./FIXTURE_SETUP.md) and the
+"Rotate or recreate the disposable E2E account" section below.
+
+> For the end-to-end fixture setup, screenshot guidance, and account
+> rotation steps, see [`e2e/FIXTURE_SETUP.md`](./FIXTURE_SETUP.md).
+
+## Rotate or recreate the disposable E2E account
+
+There are **no hardcoded credentials** in this repository. The test
+account's email and password live only in
+`secrets.E2E_TEST_EMAIL` and `secrets.E2E_TEST_PASSWORD`.
+
+To rotate the disposable test account safely:
+
+1. Create a **new** dedicated test account through the normal `/auth`
+   UI. Do not use a personal or production grower account.
+2. Create or bootstrap **only** the expected E2E fixture data on the
+   new account (see `e2e/FIXTURE_SETUP.md`).
+3. Update GitHub Actions **secrets**:
+   - `E2E_TEST_EMAIL`
+   - `E2E_TEST_PASSWORD`
+4. Update GitHub Actions **variables**:
+   - `E2E_GROW_1_PLANT_URL` (new plant URL on the new account)
+   - `E2E_FIXTURE_MODE=true`
+   - expected grow/tent/plant names
+   - optional `E2E_FIXTURE_EXPECTED_ACCOUNT_HINT` (a short safe label
+     such as `E2E`; **never** a password or token)
+5. Trigger the workflow manually via `workflow_dispatch`.
+6. Confirm the `Verify disposable E2E fixture` step passes **before**
+   the smoke writes occur.
+7. Deactivate or stop using the old test account externally. Do
+   **not** add in-app deletion automation.
+
+Run `bun run e2e:fixture-checklist` locally to print the required
+variable/secret names and the manual setup checklist. The script
+never reads or prints any secret value, never calls Supabase or
+admin APIs, and never creates or deletes data.
+
+## Optional UI-only bootstrap
+
+The bootstrap spec (`e2e/fixture-bootstrap.spec.ts`) is **off by
+default**. It runs only when:
+
+- `E2E_FIXTURE_MODE=true`, **and**
+- `E2E_ALLOW_FIXTURE_BOOTSTRAP=true`
+
+Behavior:
+
+- Signs in via the normal storageState — no auth bypass, no
+  `service_role`.
+- If the exact E2E grow/tent/plant names are already present, makes
+  **no UI changes** (idempotent no-op).
+- If selectors are not stable, returns **blocked** with the exact
+  `data-testid` selectors required. It will never "force" creation.
+- Never deletes, renames, or modifies existing grows/tents/plants.
+- Never creates non-E2E names.
+
+Local:
+
+```bash
+bun run e2e:bootstrap-fixture
+```
+
+CI: a `Bootstrap disposable E2E fixture` step runs only when
+`vars.E2E_ALLOW_FIXTURE_BOOTSTRAP == 'true'`. Fixture verification
+still runs afterwards; smoke is still gated on verification success.
+The run summary reports bootstrap status as one of `not enabled`,
+`passed`, `failed`, or `skipped`.
+
+## Media artifacts (.png/.jpg/.jpeg/.gif/.webm/.mp4)
+
+The `quicklog-playwright-media` artifact bundles screenshots and
+videos captured by Playwright. Patterns:
+
+- `test-results/**/*.png`
+- `test-results/**/*.jpg`
+- `test-results/**/*.jpeg`
+- `test-results/**/*.gif`
+- `test-results/**/*.webm`
+- `test-results/**/*.mp4`
+- `playwright-report/data/**`
+
+GitHub artifacts are **downloads, not hosted HTML pages** — download
+the artifact and open files locally. The run summary links to each
+dedicated artifact via the upload action's `artifact-url` output
+(with a fallback to the run's `#artifacts` section); no invented
+direct raw URLs are produced.
+
+
 
 
 

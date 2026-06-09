@@ -49,9 +49,67 @@ Because of this:
 | `E2E_TEST_EMAIL`        | Login email for the smoke account                    |
 | `E2E_TEST_PASSWORD`     | Login password for the smoke account                 |
 | `E2E_GROW_2_PLANT_NAME` | Optional. Defaults to `505 Headbanger`               |
+| `E2E_FIXTURE_MODE` | Must be exactly `"true"` for any write-producing smoke run |
+| `E2E_FIXTURE_EXPECTED_GROW_NAME` | Expected disposable E2E grow name (e.g. `E2E Test Grow`) |
+| `E2E_FIXTURE_EXPECTED_TENT_NAME` | Expected disposable E2E tent name (e.g. `E2E Test Tent`) |
+| `E2E_FIXTURE_EXPECTED_PLANT_NAME` | Expected disposable E2E plant name (e.g. `E2E Test Plant`) |
 
 `E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD` are only required to (re)generate
 `e2e/.auth/user.json`. Once that file exists, the smoke run reuses it.
+
+## Disposable E2E fixture
+
+The Quick Log smoke is write-producing and must **never** run against a
+real active grow. Before the smoke is allowed to run, the workflow
+executes `bun run e2e:verify-fixture`, which signs in with the
+dedicated test account, opens `E2E_GROW_1_PLANT_URL`, and hard-fails
+unless the visible page is clearly a disposable E2E fixture.
+
+Required setup before enabling CI smoke:
+
+1. Create a dedicated test account that owns **no real grower data**.
+2. Sign in as that account through the normal UI and create:
+   - Grow named exactly **`E2E Test Grow`**
+   - Tent named exactly **`E2E Test Tent`**
+   - Plant named exactly **`E2E Test Plant`**
+   - Optional second plant **`505 Headbanger`** if the smoke step that
+     references it is in scope.
+3. Set the GitHub Actions variables:
+   - `E2E_FIXTURE_MODE=true`
+   - `E2E_FIXTURE_EXPECTED_GROW_NAME=E2E Test Grow`
+   - `E2E_FIXTURE_EXPECTED_TENT_NAME=E2E Test Tent`
+   - `E2E_FIXTURE_EXPECTED_PLANT_NAME=E2E Test Plant`
+4. Point `E2E_GROW_1_PLANT_URL` at the E2E Test Plant page on the
+   disposable test account — **never** at a real/production grow.
+
+Fixture verification will hard-fail if:
+
+- `E2E_FIXTURE_MODE` is not exactly `"true"`.
+- Any of the `E2E_FIXTURE_EXPECTED_*` names are blank or do not look
+  like E2E/Test names.
+- `E2E_GROW_1_PLANT_URL` is blank or matches a known real/production
+  grow URL pattern (e.g. `verdantgrowdiary.com`).
+- The opened page does not contain `E2E` / `Test` markers and the
+  expected grow/tent/plant names.
+
+The fixture validator:
+
+- never deletes data
+- never overwrites grow/tent/plant names
+- never uses `service_role`
+- never bypasses auth (relies on the normal storageState produced by
+  `auth.setup.ts`)
+
+The smoke writes real diary entries into the E2E fixture. No automatic
+cleanup is performed; periodically prune the E2E Test Plant's diary
+manually if desired. There is no scheduled or nightly smoke trigger.
+
+Automated bootstrap of the fixture is **deferred** — create the
+disposable grow/tent/plant manually through the normal authenticated
+UI for now. See `E2E_ALLOW_FIXTURE_BOOTSTRAP` in the rollout plan for
+future work.
+
+
 
 ## Local setup
 
@@ -326,11 +384,26 @@ The summary links to:
 - The bundled `quicklog-smoke-artifacts` artifact.
 - A dedicated `quicklog-playwright-report` artifact (Playwright HTML
   report only), via
-  `steps.upload_playwright_report.outputs.artifact-url`. If that URL is
-  unavailable the link falls back to the run's `#artifacts` section.
+  `steps.upload_playwright_report.outputs.artifact-url`.
+- A dedicated `quicklog-playwright-traces` artifact (Playwright trace
+  zips from `test-results/**/*.zip`).
+- A dedicated `quicklog-playwright-media` artifact (screenshots / videos
+  from `test-results/**/*.{png,webm,mp4}` and `playwright-report/data/**`).
+- A dedicated `quicklog-smoke-report-json` artifact
+  (`e2e/results/quicklog-smoke-report.json`).
+- A dedicated `quicklog-smoke-report-txt` artifact
+  (`e2e/results/quicklog-smoke-report.txt`).
+
+If any per-artifact URL is unavailable the link falls back to the run's
+`#artifacts` section. No direct file URLs inside a zipped artifact are
+invented and no run/artifact IDs are hardcoded.
 
 GitHub artifacts are downloads, not hosted HTML pages — download the
-artifact and open `index.html` from the unzipped folder.
+artifact and open `index.html` (HTML report) or the report files
+locally. For JSON/TXT report artifacts, download and open the file
+directly.
+
+
 
 There is no scheduled or nightly Quick Log smoke. Write-producing smoke
 must only run against a disposable test account/test plant, so the

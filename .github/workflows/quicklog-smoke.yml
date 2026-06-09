@@ -52,6 +52,10 @@ jobs:
       E2E_GROW_2_PLANT_NAME: ${{ vars.E2E_GROW_2_PLANT_NAME }}
       E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
       E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+      E2E_FIXTURE_MODE: ${{ vars.E2E_FIXTURE_MODE }}
+      E2E_FIXTURE_EXPECTED_GROW_NAME: ${{ vars.E2E_FIXTURE_EXPECTED_GROW_NAME }}
+      E2E_FIXTURE_EXPECTED_TENT_NAME: ${{ vars.E2E_FIXTURE_EXPECTED_TENT_NAME }}
+      E2E_FIXTURE_EXPECTED_PLANT_NAME: ${{ vars.E2E_FIXTURE_EXPECTED_PLANT_NAME }}
 
     steps:
       - name: Checkout
@@ -68,6 +72,11 @@ jobs:
           [ -n "$E2E_GROW_1_PLANT_URL" ] || missing+=("vars.E2E_GROW_1_PLANT_URL")
           [ -n "$E2E_TEST_EMAIL" ] || missing+=("secrets.E2E_TEST_EMAIL")
           [ -n "$E2E_TEST_PASSWORD" ] || missing+=("secrets.E2E_TEST_PASSWORD")
+          # Disposable E2E fixture safety: required before write-producing smoke.
+          [ -n "$E2E_FIXTURE_MODE" ] || missing+=("vars.E2E_FIXTURE_MODE")
+          [ -n "$E2E_FIXTURE_EXPECTED_GROW_NAME" ] || missing+=("vars.E2E_FIXTURE_EXPECTED_GROW_NAME")
+          [ -n "$E2E_FIXTURE_EXPECTED_TENT_NAME" ] || missing+=("vars.E2E_FIXTURE_EXPECTED_TENT_NAME")
+          [ -n "$E2E_FIXTURE_EXPECTED_PLANT_NAME" ] || missing+=("vars.E2E_FIXTURE_EXPECTED_PLANT_NAME")
 
           event="${{ github.event_name }}"
 
@@ -95,6 +104,7 @@ jobs:
             echo "Quick Log smoke configuration present. Proceeding."
             echo "should_run=true" >> "$GITHUB_OUTPUT"
           fi
+
 
       - name: Setup Bun
         if: steps.e2e_config.outputs.should_run == 'true'
@@ -134,10 +144,16 @@ jobs:
         if: steps.e2e_config.outputs.should_run == 'true'
         run: bun run e2e:install:ci
 
+      - name: Verify disposable E2E fixture
+        id: verify_fixture
+        if: steps.e2e_config.outputs.should_run == 'true'
+        run: bun run e2e:verify-fixture
+
       - name: Run Quick Log Playwright smoke
         id: quicklog_smoke
-        if: steps.e2e_config.outputs.should_run == 'true'
+        if: steps.e2e_config.outputs.should_run == 'true' && steps.verify_fixture.outcome == 'success'
         run: bun run e2e:quicklog-smoke
+
 
       - name: Verify Quick Log smoke artifacts
         if: always() && steps.e2e_config.outputs.should_run == 'true'
@@ -285,6 +301,53 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
+      - name: Upload Playwright traces
+        id: upload_playwright_traces
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: quicklog-playwright-traces
+          path: |
+            test-results/**/*.zip
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Upload Playwright media (screenshots/videos)
+        id: upload_playwright_media
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: quicklog-playwright-media
+          path: |
+            test-results/**/*.png
+            test-results/**/*.webm
+            test-results/**/*.mp4
+            playwright-report/data/**
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Upload smoke report JSON
+        id: upload_smoke_report_json
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: quicklog-smoke-report-json
+          path: e2e/results/quicklog-smoke-report.json
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Upload smoke report TXT
+        id: upload_smoke_report_txt
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: quicklog-smoke-report-txt
+          path: e2e/results/quicklog-smoke-report.txt
+          retention-days: 30
+          if-no-files-found: warn
+
+
+
 
       - name: Write Quick Log smoke run summary
         if: always()
@@ -308,12 +371,32 @@ jobs:
           SMOKE_STEP_OUTCOME: ${{ steps.quicklog_smoke.outcome }}
           SMOKE_STEP_CONCLUSION: ${{ steps.quicklog_smoke.conclusion }}
           PLAYWRIGHT_REPORT_ARTIFACT_URL: ${{ steps.upload_playwright_report.outputs.artifact-url }}
+          PLAYWRIGHT_TRACES_ARTIFACT_URL: ${{ steps.upload_playwright_traces.outputs.artifact-url }}
+          PLAYWRIGHT_MEDIA_ARTIFACT_URL: ${{ steps.upload_playwright_media.outputs.artifact-url }}
+          SMOKE_REPORT_JSON_ARTIFACT_URL: ${{ steps.upload_smoke_report_json.outputs.artifact-url }}
+          SMOKE_REPORT_TXT_ARTIFACT_URL: ${{ steps.upload_smoke_report_txt.outputs.artifact-url }}
+          FIXTURE_STEP_OUTCOME: ${{ steps.verify_fixture.outcome }}
+          FIXTURE_STEP_CONCLUSION: ${{ steps.verify_fixture.conclusion }}
         run: |
           # Never echo secret values. Only references to secret NAMES are written.
-          pw_report_url="${PLAYWRIGHT_REPORT_ARTIFACT_URL}"
-          if [ -z "${pw_report_url}" ]; then
-            pw_report_url="${ARTIFACTS_URL}"
+          fallback="${ARTIFACTS_URL}"
+          pw_report_url="${PLAYWRIGHT_REPORT_ARTIFACT_URL:-$fallback}"
+          pw_traces_url="${PLAYWRIGHT_TRACES_ARTIFACT_URL:-$fallback}"
+          pw_media_url="${PLAYWRIGHT_MEDIA_ARTIFACT_URL:-$fallback}"
+          smoke_json_url="${SMOKE_REPORT_JSON_ARTIFACT_URL:-$fallback}"
+          smoke_txt_url="${SMOKE_REPORT_TXT_ARTIFACT_URL:-$fallback}"
+
+          # Fixture validation status for the summary.
+          if [ "${SHOULD_RUN}" != "true" ]; then
+            fixture_status="skipped due missing config"
+          elif [ -z "${FIXTURE_STEP_OUTCOME}" ] || [ "${FIXTURE_STEP_OUTCOME}" = "skipped" ]; then
+            fixture_status="not run"
+          elif [ "${FIXTURE_STEP_OUTCOME}" = "success" ]; then
+            fixture_status="passed"
+          else
+            fixture_status="failed"
           fi
+
           {
             echo "## Quick Log Playwright smoke"
             echo ""
@@ -323,8 +406,21 @@ jobs:
             echo "- [Workflow run](${RUN_URL})"
             echo "- [Artifacts](${ARTIFACTS_URL})"
             echo "- [Playwright HTML report](${pw_report_url})"
+            echo "- [Playwright traces](${pw_traces_url})"
+            echo "- [Playwright media (screenshots/videos)](${pw_media_url})"
+            echo "- [Smoke report JSON](${smoke_json_url})"
+            echo "- [Smoke report TXT](${smoke_txt_url})"
             echo ""
-            echo "  GitHub artifacts are downloads, not hosted HTML pages — download and open \`index.html\` from the artifact."
+            echo "  GitHub artifacts are downloads, not hosted HTML pages — download the artifact and open \`index.html\` (HTML report) or the report files locally."
+            echo ""
+            echo "### Disposable E2E fixture validation"
+            echo ""
+            echo "- Fixture validation: \`${fixture_status}\`"
+            echo "- Fixture step outcome: \`${FIXTURE_STEP_OUTCOME:-unknown}\` (conclusion: \`${FIXTURE_STEP_CONCLUSION:-unknown}\`)"
+            echo ""
+            if [ "${fixture_status}" = "failed" ]; then
+              echo "Fixture verification failed: smoke was not allowed to run because the target plant/grow/tent did not match the expected disposable E2E fixture. No diary entries were written."
+            fi
             if [ "${SHOULD_RUN}" = "true" ]; then
               echo "- Smoke executed: yes"
               echo "- Smoke step outcome: \`${SMOKE_STEP_OUTCOME:-unknown}\` (conclusion: \`${SMOKE_STEP_CONCLUSION:-unknown}\`)"
@@ -377,7 +473,11 @@ jobs:
               echo "### Artifacts"
               echo ""
               echo "- Bundled artifact: \`quicklog-smoke-artifacts\` (retention: 30 days)"
-              echo "- Dedicated Playwright report artifact: \`quicklog-playwright-report\` (retention: 30 days)"
+              echo "- Playwright HTML report artifact: \`quicklog-playwright-report\` (retention: 30 days)"
+              echo "- Playwright traces artifact: \`quicklog-playwright-traces\` (retention: 30 days)"
+              echo "- Playwright media artifact: \`quicklog-playwright-media\` (retention: 30 days)"
+              echo "- Smoke report JSON artifact: \`quicklog-smoke-report-json\` (retention: 30 days)"
+              echo "- Smoke report TXT artifact: \`quicklog-smoke-report-txt\` (retention: 30 days)"
               echo "- Run artifacts page: ${ARTIFACTS_URL}"
               echo ""
               echo "Bundled contents:"
@@ -404,7 +504,12 @@ jobs:
               echo "- \`vars.E2E_GROW_1_PLANT_URL\`"
               echo "- \`secrets.E2E_TEST_EMAIL\`"
               echo "- \`secrets.E2E_TEST_PASSWORD\`"
+              echo "- \`vars.E2E_FIXTURE_MODE\`"
+              echo "- \`vars.E2E_FIXTURE_EXPECTED_GROW_NAME\`"
+              echo "- \`vars.E2E_FIXTURE_EXPECTED_TENT_NAME\`"
+              echo "- \`vars.E2E_FIXTURE_EXPECTED_PLANT_NAME\`"
               echo ""
+
               if [ -n "${MISSING_CONFIG}" ]; then
                 echo "Missing in this run:"
                 echo ""

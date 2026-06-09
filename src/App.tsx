@@ -8,6 +8,7 @@ import { GrowsProvider } from "@/store/grows";
 import AppShell from "@/components/AppShell";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
+import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import Tents from "./pages/Tents";
 import TentDetail from "./pages/TentDetail";
@@ -85,6 +86,7 @@ const App = () => (
 
               <Route element={<AppShell />}>
                 <Route path="/" element={<Dashboard />} />
+                <Route path="/onboarding" element={<Onboarding />} />
                 {/* Legacy Live Dashboard route — consolidated into the
                     main Dashboard. Redirect preserves old bookmarks. */}
                 <Route path="/grow-room" element={<Navigate to="/" replace />} />

@@ -14,8 +14,15 @@ import {
   GENERIC_RESET_REQUEST_SUCCESS,
   MIN_PASSWORD_LENGTH,
 } from "@/lib/passwordResetRules";
-import { sanitizeAuthError } from "@/lib/authErrorRules";
+import {
+  sanitizeAuthError,
+  classifyAuthError,
+  EMAIL_VERIFICATION_REQUIRED_MESSAGE,
+  RESEND_VERIFICATION_GENERIC_SUCCESS,
+  RESEND_VERIFICATION_GENERIC_FAILURE,
+} from "@/lib/authErrorRules";
 import { sanitizeAuthRedirect } from "@/lib/authRedirectRules";
+import { getStartScreenChoice, routeForStartScreen } from "@/lib/startScreenPreferences";
 
 type AuthMode = "signin" | "signup" | "forgot";
 
@@ -23,10 +30,11 @@ export default function Auth() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
   const [search] = useSearchParams();
-  const redirectTo = useMemo(
-    () => sanitizeAuthRedirect(search.get("redirectTo")),
-    [search],
-  );
+  const explicitRedirect = useMemo(() => {
+    const raw = search.get("redirectTo");
+    return raw ? sanitizeAuthRedirect(raw) : null;
+  }, [search]);
+  const redirectTo = explicitRedirect ?? "/";
   const [mode, setMode] = useState<AuthMode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,6 +42,9 @@ export default function Auth() {
   const [busy, setBusy] = useState(false);
 
   const [signInError, setSignInError] = useState<string | null>(null);
+  const [verifyRequired, setVerifyRequired] = useState(false);
+  const [resendBusy, setResendBusy] = useState(false);
+  const [resendNotice, setResendNotice] = useState<string | null>(null);
   const [signUpError, setSignUpError] = useState<string | null>(null);
   const [signUpSuccess, setSignUpSuccess] = useState<string | null>(null);
 
@@ -45,27 +56,60 @@ export default function Auth() {
   const signUpEmailRef = useRef<HTMLInputElement>(null);
   const forgotEmailRef = useRef<HTMLInputElement>(null);
 
+  function postSignInTarget(): string {
+    if (explicitRedirect) return explicitRedirect;
+    if (!user) return "/onboarding";
+    const saved = getStartScreenChoice(user.id);
+    return saved ? routeForStartScreen(saved) : "/onboarding";
+  }
+
   useEffect(() => {
-    if (user) nav(redirectTo, { replace: true });
-  }, [user, nav, redirectTo]);
+    if (user) nav(postSignInTarget(), { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, nav]);
   if (loading) return null;
-  if (user) return <Navigate to={redirectTo} replace />;
+  if (user) return <Navigate to={postSignInTarget()} replace />;
+
+  async function resendVerification() {
+    if (resendBusy) return;
+    setResendBusy(true);
+    setResendNotice(null);
+    try {
+      const supaAny = supabase.auth as unknown as {
+        resend?: (args: { type: "signup"; email: string }) => Promise<{ error: unknown }>;
+      };
+      if (typeof supaAny.resend === "function") {
+        await supaAny.resend({ type: "signup", email });
+      }
+      setResendNotice(RESEND_VERIFICATION_GENERIC_SUCCESS);
+    } catch {
+      setResendNotice(RESEND_VERIFICATION_GENERIC_FAILURE);
+    } finally {
+      setResendBusy(false);
+    }
+  }
 
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
     setSignInError(null);
+    setVerifyRequired(false);
+    setResendNotice(null);
     setBusy(true);
     // We never log the raw Supabase error — it can leak rate-limit timing
     // or other account-state hints. Always show the friendly copy.
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (error) {
+      if (classifyAuthError(error) === "emailNotConfirmed") {
+        setVerifyRequired(true);
+        return;
+      }
       setSignInError(sanitizeAuthError("signIn", error));
       signInEmailRef.current?.focus();
       return;
     }
-    nav(redirectTo, { replace: true });
+    nav(postSignInTarget(), { replace: true });
   }
 
   async function signUp(e: React.FormEvent) {
@@ -90,7 +134,7 @@ export default function Auth() {
       return;
     }
     setSignUpSuccess("Welcome to Verdant. Check your inbox if confirmation is required.");
-    nav(redirectTo, { replace: true });
+    nav(postSignInTarget(), { replace: true });
   }
 
   async function requestReset(e: React.FormEvent) {
@@ -209,6 +253,28 @@ export default function Auth() {
                   <p id="signin-error" role="alert" className="text-xs text-destructive">
                     {signInError}
                   </p>
+                ) : null}
+                {verifyRequired ? (
+                  <div className="grid gap-2 rounded-md border border-border/50 p-3 bg-secondary/30">
+                    <p role="alert" className="text-xs text-foreground">
+                      {EMAIL_VERIFICATION_REQUIRED_MESSAGE}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={resendBusy}
+                      aria-busy={resendBusy}
+                      onClick={resendVerification}
+                    >
+                      {resendBusy ? "Sending verification email…" : "Resend verification email"}
+                    </Button>
+                    {resendNotice ? (
+                      <p role="status" aria-live="polite" className="text-xs text-muted-foreground">
+                        {resendNotice}
+                      </p>
+                    ) : null}
+                  </div>
                 ) : null}
                 <Button
                   type="submit"

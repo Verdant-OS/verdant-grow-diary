@@ -24,6 +24,16 @@ export type AuthErrorContext =
 
 export const UNKNOWN_AUTH_ERROR = "Something went wrong. Try again in a moment.";
 
+// Friendly verification-required copy. Surfaced only after a sign-in attempt
+// — never on its own — so it does not enumerate account existence outside
+// the attempted-login context.
+export const EMAIL_VERIFICATION_REQUIRED_MESSAGE =
+  "Please verify your email before signing in. Check your inbox for the verification link.";
+export const RESEND_VERIFICATION_GENERIC_SUCCESS =
+  "If that email is eligible, we'll send a new verification link.";
+export const RESEND_VERIFICATION_GENERIC_FAILURE =
+  "We couldn't send the verification email right now. Try again in a few minutes.";
+
 const COPY: Record<AuthErrorContext, string> = {
   signIn: SIGN_IN_FRIENDLY_ERROR,
   signUp: SIGN_UP_FRIENDLY_ERROR,
@@ -48,6 +58,35 @@ export const FORBIDDEN_AUTH_ERROR_FRAGMENTS: RegExp[] = [
   /auth ?hash/i,
   /AuthApiError/i,
 ];
+
+export type AuthErrorClass = "emailNotConfirmed" | "unknown";
+
+/**
+ * Internal classifier for auth errors. Looks at the underlying error
+ * shape/strings to decide which friendly UI branch to render. The classifier
+ * itself never returns the raw string — only an opaque tag. UI must still
+ * source all visible copy from sanitizeAuthError / approved constants.
+ */
+export function classifyAuthError(error: unknown): AuthErrorClass {
+  if (!error || typeof error !== "object") return "unknown";
+  const anyErr = error as { message?: unknown; code?: unknown; error_description?: unknown; name?: unknown };
+  const parts: string[] = [];
+  for (const v of [anyErr.message, anyErr.code, anyErr.error_description, anyErr.name]) {
+    if (typeof v === "string") parts.push(v);
+  }
+  const blob = parts.join(" | ").toLowerCase();
+  if (!blob) return "unknown";
+  if (
+    blob.includes("email not confirmed") ||
+    blob.includes("email_not_confirmed") ||
+    blob.includes("not confirmed") ||
+    blob.includes("email-not-confirmed")
+  ) {
+    return "emailNotConfirmed";
+  }
+  return "unknown";
+}
+
 
 /**
  * Map any error (Supabase AuthError, generic Error, unknown object, null) to

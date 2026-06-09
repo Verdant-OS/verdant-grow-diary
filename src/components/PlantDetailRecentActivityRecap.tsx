@@ -7,7 +7,7 @@
  * not write, call RPC, call AI, create alerts, or schedule anything.
  */
 import { useMemo } from "react";
-import { Activity, ArrowDown, ShieldCheck, Zap } from "lucide-react";
+import { Activity, ArrowDown, RotateCcw, ShieldCheck, Zap } from "lucide-react";
 
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
@@ -16,6 +16,7 @@ import {
   PLANT_RECENT_ACTIVITY_RECAP_DEFAULT_LIMIT,
 } from "@/lib/plantRecentActivityRecap";
 import { buildNoRecentLogRecovery } from "@/lib/noRecentLogRecoveryRules";
+import { buildOutcomeFollowUp } from "@/lib/outcomeFollowUpRules";
 import {
   buildPlantStabilizeModeViewModel,
   shouldShowPlantStabilizeMode,
@@ -77,6 +78,15 @@ export default function PlantDetailRecentActivityRecap({
   const recovery = useMemo(
     () =>
       buildNoRecentLogRecovery({
+        rows,
+        now: Date.now(),
+      }),
+    [rows],
+  );
+
+  const followUp = useMemo(
+    () =>
+      buildOutcomeFollowUp({
         rows,
         now: Date.now(),
       }),
@@ -184,6 +194,38 @@ export default function PlantDetailRecentActivityRecap({
                   <p className="text-amber-100/80">{stabilize.why_now[0]}</p>
                   <p className="font-medium text-amber-50">{stabilize.what_not_to_do[0]}</p>
                   <p className="text-amber-100/80">{stabilize.safe_next_log_prompt}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {followUp.showPrompt && onAddQuickCheck && (
+            <div
+              data-testid="plant-detail-outcome-follow-up"
+              data-reason={followUp.reason}
+              className="rounded-xl border border-primary/25 bg-primary/10 p-4 text-sm"
+            >
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 rounded-full border border-primary/30 bg-background/40 p-2 text-primary">
+                  <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-foreground">{followUp.headline}</p>
+                  <p className="mt-1 text-muted-foreground">{followUp.body}</p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Last change: {followUp.actionSummary}
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={onAddQuickCheck}
+                    aria-label={followUp.ariaLabel}
+                    data-testid="plant-detail-add-follow-up-check"
+                    className="mt-3 min-h-10"
+                  >
+                    {followUp.ctaLabel}
+                  </Button>
                 </div>
               </div>
             </div>

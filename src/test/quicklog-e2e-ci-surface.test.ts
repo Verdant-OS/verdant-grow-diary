@@ -46,7 +46,7 @@ describe("Quick Log Playwright CI surface", () => {
     expect(readme.toLowerCase()).toContain("dedicated test account");
     expect(readme.toLowerCase()).toContain("test plant");
     // Manual-only until a disposable test fixture exists
-    expect(readme).toMatch(/manual(ly)? only|run the workflow manually only/i);
+    expect(readme).toMatch(/manual(ly)?\s+only|run the workflow\s+manually\s+only/i);
     expect(readme.toLowerCase()).toContain("disposable test fixture");
     // No scheduled/nightly trigger is enabled
     expect(readme).toMatch(/no\s+(scheduled|nightly)/i);

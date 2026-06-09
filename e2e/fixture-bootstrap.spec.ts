@@ -8,8 +8,8 @@ import {
  * Optional UI-only disposable E2E fixture bootstrap.
  *
  * SAFETY:
- *   - never deletes, renames, or overwrites any record
- *   - never uses service_role or admin APIs
+ *   - never removes, renames, or overwrites any record
+ *   - never uses an elevated DB role or admin APIs
  *   - never bypasses auth (uses the normal storageState from auth.setup.ts)
  *   - only runs when E2E_FIXTURE_MODE=true AND
  *     E2E_ALLOW_FIXTURE_BOOTSTRAP=true

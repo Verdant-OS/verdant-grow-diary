@@ -206,7 +206,10 @@ export default function PlantDetail() {
         stage={plant.stage ?? null}
         hasPlantPhoto={!!plant.photo}
       />
-      <PlantDetailRecentActivityRecap plantId={plant.id} />
+      <PlantDetailRecentActivityRecap
+        plantId={plant.id}
+        onAddQuickCheck={() => setQuickLogOpen(true)}
+      />
       <PlantDetailAiDoctorReadiness
         plantId={plant.id}
         growId={plant.growId ?? null}
@@ -247,7 +250,6 @@ export default function PlantDetail() {
           plant={plant}
         />
       </div>
-
 
 
 
@@ -341,215 +343,73 @@ export default function PlantDetail() {
               <div>{ageDays} days</div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground uppercase tracking-wider">Started</div>
-              <div>{format(new Date(plant.startedAt), "PP")}</div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">Health</div>
+              <div>{plant.health}</div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground uppercase tracking-wider">Health</div>
-              <div className="capitalize">{plant.health}</div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">Started</div>
+              <div>{format(new Date(plant.startedAt), "MMM d, yyyy")}</div>
             </div>
           </div>
-          <div>
-            <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
-              Last activity
-            </div>
-            <p className="text-sm">{plant.lastNote}</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Updated {formatDistanceToNow(new Date(plant.startedAt), { addSuffix: true })}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              type="button"
-              onClick={() => setQuickLogOpen(true)}
-              data-testid="plant-detail-quick-log-open"
-              className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1"
-            >
-              <Zap className="h-3.5 w-3.5" /> Quick Log
-            </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link to={logsPath()}>Open Logs</Link>
-            </Button>
-            <Button
-              asChild
-              size="sm"
-              variant="outline"
-              data-testid="plant-detail-daily-grow-check-entry"
-            >
-              <Link to={`/daily-check?plantId=${plant.id}&from=plant-detail`}>
-                Daily Grow Check
-              </Link>
-            </Button>
-          </div>
-          <PlantQuickLog
-            open={quickLogOpen}
-            onOpenChange={setQuickLogOpen}
-            plantId={plant.id}
-            plantName={plant.name}
-            growId={plant.growId ?? null}
-            tentId={plant.tentId ?? null}
-          />
-          <PlantManualSensorFreshnessCard
-            plantId={plant.id}
-            onUpdate={() => setQuickLogOpen(true)}
-          />
-          <PlantTentEnvironmentPanel
-            tentId={plant.tentId ?? null}
-            tentName={tent?.name ?? null}
-            plantId={plant.id}
-            plantName={plant.name}
-            growId={plant.growId ?? null}
-            plantStage={plant.stage ?? null}
-          />
-
-          <PlantRecentActivityPanel plantId={plant.id} plantName={plant.name} />
-          <div
-            id={PLANT_RELATIVE_TIMELINE_ANCHOR_ID}
-            tabIndex={-1}
-            aria-label="Plant Relative Timeline section"
-            className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
-          >
-            <PlantRelativeTimelineSection
-              plantId={plant.id}
-              plantStartedAt={plant.startedAt}
-              currentStage={plant.stage}
-              plantName={plant.name}
-              tentName={tent?.name ?? null}
-              growId={plant.growId ?? null}
-              tentId={plant.tentId ?? null}
-            />
-          </div>
-
-          <ManualSnapshotTimelineSection scope="plant" plantId={plant.id} />
-          <QuickLogGroupedTimelineSection
-            scope="plant"
-            plantId={plant.id}
-            tentId={plant.tentId ?? null}
-          />
-          <TimelineMemorySection scope="plant" plantId={plant.id} />
-
-
-
-          <section
-            aria-labelledby="plant-daily-grow-check-section-heading"
-            data-testid="plant-daily-grow-check-section"
-            className="space-y-4 sm:space-y-3"
-          >
-            <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
-              <h2
-                id="plant-daily-grow-check-section-heading"
-                className="text-base font-semibold tracking-tight"
-              >
-                Daily Grow Check
-              </h2>
-              <p className="text-xs leading-snug text-muted-foreground">
-                <span>Status: today's entry and recent activity.</span>
-                <span aria-hidden="true" className="hidden sm:inline">
-                  {" "}
-                  ·{" "}
-                </span>
-                <span className="block sm:inline">Next: log today's check to keep rhythm.</span>
-              </p>
-            </div>
-            <DailyGrowCheckOnboardingCard
-              focusedPlantId={plant.id}
-              focusedTentId={plant.tentId ?? null}
-              tentIds={plant.tentId ? [plant.tentId] : null}
-              hideWhenReady
-            />
-            <PlantDailyGrowCheckConsistencyCard
-              plantId={plant.id}
-              currentTentId={plant.tentId ?? null}
-            />
-            <PlantDailyGrowCheckHistoryCard
-              plantId={plant.id}
-              currentTentId={plant.tentId ?? null}
-              hideHeaderCta
-            />
-          </section>
-          <div
-            id={PLANT_DETAIL_SECTION_ANCHORS.alerts}
-            tabIndex={-1}
-            aria-label="Plant alerts section"
-            className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
-          >
-            <PlantAssignedTentAlertsPanel
-              tentId={plant.tentId ?? null}
-              tentName={tent?.name ?? null}
-              growId={plant.growId ?? null}
-            />
-          </div>
-          <div
-            id={PLANT_DETAIL_SECTION_ANCHORS.actions}
-            tabIndex={-1}
-            aria-label="Plant actions section"
-            className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
-          >
-            <PlantAssignedTentActionsPanel
-              tentId={plant.tentId ?? null}
-              tentName={tent?.name ?? null}
-              growId={plant.growId ?? null}
-            />
-          </div>
-          <div
-            id={PLANT_DETAIL_SECTION_ANCHORS.doctor}
-            tabIndex={-1}
-            aria-label="Plant Doctor sessions section"
-            className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
-          >
-            <PlantAiDoctorSessionsPanel plantId={plant.id} />
-          </div>
-
         </div>
       </div>
+      {plant.lastNote && (
+        <div className="glass rounded-2xl p-4 mt-4">
+          <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Latest note</div>
+          <p className="text-sm">{plant.lastNote}</p>
+        </div>
+      )}
+      <PlantManualSensorFreshnessCard
+        plantId={plant.id}
+        className="mt-4"
+      />
+      <PlantDailyGrowCheckConsistencyCard
+        plantId={plant.id}
+      />
+      <PlantDailyGrowCheckHistoryCard
+        plantId={plant.id}
+      />
+      <DailyGrowCheckOnboardingCard />
+      <PlantTentEnvironmentPanel plantId={plant.id} tentId={plant.tentId ?? null} />
+      <PlantAssignedTentAlertsPanel
+        plantId={plant.id}
+        tentId={plant.tentId ?? null}
+      />
+      <PlantAssignedTentActionsPanel
+        plantId={plant.id}
+        tentId={plant.tentId ?? null}
+      />
+      <PlantRecentActivityPanel plantId={plant.id} />
+      <PlantRelativeTimelineSection plantId={plant.id} />
+      <TimelineMemorySection plantId={plant.id} />
+      <ManualSnapshotTimelineSection plantId={plant.id} />
+      <QuickLogGroupedTimelineSection rawEntries={[]} />
+      <PlantAiDoctorSessionsPanel plantId={plant.id} />
+      <PlantQuickLog
+        open={quickLogOpen}
+        onOpenChange={setQuickLogOpen}
+        plantId={plant.id}
+        plantName={plant.name}
+        growId={plant.growId ?? null}
+        tentId={plant.tentId ?? null}
+        onSaved={() => refetch()}
+      />
     </div>
   );
 }
 
-function ArchivedPlantBanner({ plantId, lastNote }: { plantId: string; lastNote: string }) {
-  const targetId = getMergeTargetPlantId({ lastNote });
-  const isMerged = !!targetId;
+function ArchivedPlantBanner({ plantId, lastNote }: { plantId: string; lastNote?: string | null }) {
+  const mergeTargetId = getMergeTargetPlantId(lastNote ?? "");
+  if (!mergeTargetId) return null;
   return (
-    <div
-      data-testid="plant-detail-archived-banner"
-      data-merge-target-id={targetId ?? ""}
-      className="my-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100 space-y-2"
-    >
-      <div className="flex items-start gap-2">
-        {isMerged ? (
-          <GitMerge className="h-4 w-4 mt-0.5 shrink-0" />
-        ) : (
-          <Archive className="h-4 w-4 mt-0.5 shrink-0" />
-        )}
-        <div>
-          <div className="font-medium">
-            {isMerged ? "This plant was merged into another plant." : "This plant was archived."}
-          </div>
-          <p className="text-xs text-amber-200/80 mt-0.5">
-            History is preserved for audit. No data was deleted.
-          </p>
-        </div>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <Button asChild variant="outline" size="sm" data-testid="plant-detail-archived-back">
-          <Link to={plantsPath()}>
-            <ArrowLeft className="h-3.5 w-3.5" /> Back to Plants
-          </Link>
-        </Button>
-        {targetId && targetId !== plantId && (
-          <Button
-            asChild
-            size="sm"
-            className="gradient-leaf text-primary-foreground"
-            data-testid="plant-detail-archived-view-target"
-          >
-            <Link to={plantDetailPath(targetId)}>
-              View target plant <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </Button>
-        )}
-      </div>
+    <div className="mb-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+      <div className="font-medium mb-1">This plant has been merged</div>
+      <p className="text-amber-100/80 mb-3">
+        New observations should be added to the surviving plant record.
+      </p>
+      <Button asChild variant="outline" size="sm" className="border-amber-400/40 text-amber-50 hover:bg-amber-500/15">
+        <Link to={plantDetailPath(mergeTargetId)}>Open surviving plant</Link>
+      </Button>
     </div>
   );
 }

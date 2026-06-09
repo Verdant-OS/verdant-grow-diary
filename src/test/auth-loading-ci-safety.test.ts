@@ -165,3 +165,39 @@ describe("Auth route-protection spec — safety", () => {
     }
   });
 });
+
+describe("Auth route-protection MOBILE spec — safety", () => {
+  it("uses 390x844 mobile viewport with isMobile + hasTouch", () => {
+    expect(routeProtectionMobileSpec).toMatch(/viewport:\s*\{\s*width:\s*390,\s*height:\s*844\s*\}/);
+    expect(routeProtectionMobileSpec).toMatch(/isMobile:\s*true/);
+    expect(routeProtectionMobileSpec).toMatch(/hasTouch:\s*true/);
+  });
+  it("intercepts /auth/v1/** and /rest/v1/** via page.route", () => {
+    expect(routeProtectionMobileSpec).toMatch(/page\.route\(\s*\/\\\/auth\\\/v1\\\//);
+    expect(routeProtectionMobileSpec).toMatch(/page\.route\(\s*\/\\\/rest\\\/v1\\\//);
+  });
+  it("uses .invalid email + no real secrets/service_role", () => {
+    expect(routeProtectionMobileSpec).toMatch(/@example\.invalid/);
+    expect(routeProtectionMobileSpec).not.toMatch(/service_role/i);
+    expect(routeProtectionMobileSpec).not.toMatch(
+      /process\.env\.(E2E_TEST_PASSWORD|E2E_TEST_EMAIL|SUPABASE_SERVICE_ROLE)/,
+    );
+  });
+  it("never logs password/token/session/recovery/email", () => {
+    expect(routeProtectionMobileSpec).not.toMatch(
+      /console\.(log|warn|error|info|debug)\s*\([^)]*\b(password|token|session|recovery|email|hash)\b/i,
+    );
+  });
+  it("declares the private grow tables it guards", () => {
+    for (const t of [
+      "grows",
+      "tents",
+      "plants",
+      "diary_entries",
+      "sensor_readings",
+      "action_queue",
+    ]) {
+      expect(routeProtectionMobileSpec).toContain(`"${t}"`);
+    }
+  });
+});

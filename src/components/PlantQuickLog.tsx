@@ -113,6 +113,15 @@ export default function PlantQuickLog({
     setPhotoPreview(file ? URL.createObjectURL(file) : null);
   }
 
+  function handlePhotoInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.currentTarget.files?.[0] ?? null;
+    if (!file) return;
+    handleFileSelected(file);
+    // Important for mobile/library pickers: choosing the same image twice often
+    // does not fire a new change event unless the input value is cleared.
+    e.currentTarget.value = "";
+  }
+
   function clearPhoto() {
     handleFileSelected(null);
     if (fileRef.current) fileRef.current.value = "";
@@ -280,10 +289,10 @@ export default function PlantQuickLog({
               type="file"
               accept="image/*"
               capture="environment"
-              className="hidden"
+              className="sr-only"
               aria-label={photoGate.cameraInputAriaLabel}
               tabIndex={-1}
-              onChange={(e) => handleFileSelected(e.target.files?.[0] ?? null)}
+              onChange={handlePhotoInputChange}
               data-testid="plant-quick-log-photo-input"
             />
             <input
@@ -292,10 +301,10 @@ export default function PlantQuickLog({
               name="plant-quick-log-photo-library"
               type="file"
               accept="image/*"
-              className="hidden"
+              className="sr-only"
               aria-label={photoGate.libraryInputAriaLabel}
               tabIndex={-1}
-              onChange={(e) => handleFileSelected(e.target.files?.[0] ?? null)}
+              onChange={handlePhotoInputChange}
               data-testid="plant-quick-log-photo-library-input"
             />
 

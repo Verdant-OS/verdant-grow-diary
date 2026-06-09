@@ -13,16 +13,20 @@
  *  - static safety: no supabase SDK, no live sender, no DB writes, etc.
  *  - workflow uploads only the documented artifact paths via pinned SHA
  */
-import { describe, expect, it, vi } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import {
   BRIDGE_DOWN_LINES,
   MQTT_DOWN_LINES,
   NEXT_DRY_RUN_COMMAND,
   NEXT_DRY_RUN_LINES,
+  formatRedactionAuditLines,
+  redactLine,
   redactVerboseLine,
   runFastPath,
+  scanForbidden,
 } from "../../scripts/dev/ecowitt-windows-fast-path";
 
 const SCRIPT_PATH = resolve(__dirname, "../../scripts/dev/ecowitt-windows-fast-path.ts");

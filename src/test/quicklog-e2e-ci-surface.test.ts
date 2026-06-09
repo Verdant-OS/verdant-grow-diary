@@ -243,6 +243,138 @@ describe("Quick Log Playwright CI surface", () => {
     expect(block).not.toMatch(/\$E2E_TEST_EMAIL\b/);
   });
 
+  it("CI workflow summary clearly describes skipped runs with required config names", () => {
+    const wf = read(".github/workflows/quicklog-smoke.yml");
+    const summaryStep = wf.match(
+      /-\s*name:\s*Write Quick Log smoke run summary[\s\S]*?(?=\n {6}- name:|\n*$)/,
+    );
+    expect(summaryStep, "summary step missing").toBeTruthy();
+    const block = summaryStep![0];
+    // Skip-path branch present
+    expect(block).toMatch(/Smoke executed: no \(skipped\)/);
+    expect(block).toMatch(/Missing required Quick Log smoke configuration prevented execution/);
+    // Required config NAMES listed (never values)
+    for (const name of [
+      "vars.E2E_BASE_URL",
+      "vars.E2E_GROW_1_PLANT_URL",
+      "secrets.E2E_TEST_EMAIL",
+      "secrets.E2E_TEST_PASSWORD",
+    ]) {
+      expect(block, `summary missing required config name: ${name}`).toContain(name);
+    }
+    // Event-specific skip wording
+    expect(block).toMatch(/pull_request/);
+    expect(block).toMatch(/clean skip/);
+    expect(block).toMatch(/workflow_dispatch[\s\S]*fails fast/);
+    // Sanitized per-run missing list is consumed (names only)
+    expect(block).toContain("MISSING_CONFIG");
+    // Never expand secret VALUES into the summary
+    expect(block).not.toMatch(/\$\{\{\s*secrets\.E2E_TEST_(EMAIL|PASSWORD)\s*\}\}/);
+    expect(block).not.toMatch(/\$E2E_TEST_PASSWORD\b/);
+    expect(block).not.toMatch(/\$E2E_TEST_EMAIL\b/);
+  });
+
+  it("CI workflow precheck exposes sanitized missing_config names only", () => {
+    const wf = read(".github/workflows/quicklog-smoke.yml");
+    const precheck = wf.match(
+      /-\s*name:\s*Verify required configuration[\s\S]*?(?=\n {6}- name:)/,
+    );
+    expect(precheck, "precheck step missing").toBeTruthy();
+    const block = precheck![0];
+    expect(block).toMatch(/missing_config=.*>>\s*"\$GITHUB_OUTPUT"/);
+    // Only NAMES (vars.*/secrets.*) appear in the missing array, never values
+    expect(block).toContain('"vars.E2E_BASE_URL"');
+    expect(block).toContain('"vars.E2E_GROW_1_PLANT_URL"');
+    expect(block).toContain('"secrets.E2E_TEST_EMAIL"');
+    expect(block).toContain('"secrets.E2E_TEST_PASSWORD"');
+    // Must not echo secret VALUES
+    expect(block).not.toMatch(/echo[^\n]*\$E2E_TEST_(EMAIL|PASSWORD)\b/);
+    expect(block).not.toMatch(/echo[^\n]*\$\{\{\s*secrets\./);
+  });
+
+  it("CI workflow has a Verify Quick Log smoke artifacts guard that fails on missing required outputs", () => {
+    const wf = read(".github/workflows/quicklog-smoke.yml");
+    const verifyStep = wf.match(
+      /-\s*name:\s*Verify Quick Log smoke artifacts[\s\S]*?(?=\n {6}- name:)/,
+    );
+    expect(verifyStep, "Verify Quick Log smoke artifacts step missing").toBeTruthy();
+    const block = verifyStep![0];
+    // Runs only when smoke actually executed, but on always() so post-failure still verifies
+    expect(block).toMatch(/if:\s*always\(\)\s*&&\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/);
+    // Required artifact checks
+    expect(block).toContain("e2e/results/quicklog-smoke-report.json");
+    expect(block).toContain("playwright-report");
+    // Must be able to fail the job
+    expect(block).toMatch(/exit\s+"?\$?\{?status\}?"?|exit\s+1/);
+    expect(block).toMatch(/status=1/);
+    // Optional warnings, not failures
+    expect(block).toMatch(/WARN:[\s\S]*quicklog-smoke-report\.txt/);
+    expect(block).toMatch(/WARN:[\s\S]*test-results/);
+  });
+
+  it("CI workflow upload step still uses if: always() && should_run == 'true' and retains 30-day retention", () => {
+    const wf = read(".github/workflows/quicklog-smoke.yml");
+    const uploadStep = wf.match(
+      /-\s*name:\s*Upload smoke artifacts[\s\S]*?(?=\n {6}- name:)/,
+    );
+    expect(uploadStep, "upload step missing").toBeTruthy();
+    const block = uploadStep![0];
+    expect(block).toMatch(/if:\s*always\(\)\s*&&\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/);
+    expect(block).toMatch(/retention-days:\s*30/);
+    expect(block).toContain("quicklog-smoke-artifacts");
+  });
+
+  it("README documents manual workflow_dispatch run from GitHub Actions", () => {
+    const readme = read("e2e/README.md");
+    expect(readme).toMatch(/##\s+Run from GitHub Actions manually/);
+    // Exact required steps
+    expect(readme).toContain("Verdant-OS/verdant-grow-diary");
+    expect(readme).toMatch(/Actions/);
+    expect(readme).toMatch(/Quick Log Playwright smoke/);
+    expect(readme).toMatch(/Run workflow/);
+    expect(readme).toContain("verdant-grow-diary");
+    // Required config names listed near dispatch docs
+    for (const token of [
+      "E2E_BASE_URL",
+      "E2E_GROW_1_PLANT_URL",
+      "E2E_TEST_EMAIL",
+      "E2E_TEST_PASSWORD",
+    ]) {
+      expect(readme, `README dispatch docs missing: ${token}`).toContain(token);
+    }
+    // Summary + artifact location documentation
+    expect(readme.toLowerCase()).toContain("github_step_summary".replace("_", "_"));
+    expect(readme).toContain("$GITHUB_STEP_SUMMARY");
+    expect(readme).toContain("quicklog-smoke-artifacts");
+    // First file to inspect explicitly called out
+    expect(readme).toMatch(/First file to inspect[\s\S]{0,80}quicklog-smoke-report\.txt/);
+    // Fail-fast message for dispatch is documented
+    expect(readme).toContain(
+      "Missing required Quick Log smoke configuration. Configure Actions vars/secrets.",
+    );
+  });
+
+  it("root README has Quick Log smoke badge with Workflow + Latest run quick links and no fake artifact URL", () => {
+    const readme = read("README.md");
+    expect(readme).toMatch(
+      /actions\/workflows\/quicklog-smoke\.yml\/badge\.svg\?branch=verdant-grow-diary/,
+    );
+    // Workflow link
+    expect(readme).toMatch(
+      /\[Workflow\]\(https:\/\/github\.com\/Verdant-OS\/verdant-grow-diary\/actions\/workflows\/quicklog-smoke\.yml\)/,
+    );
+    // Latest run link, branch-filtered
+    expect(readme).toMatch(
+      /\[Latest run\]\(https:\/\/github\.com\/Verdant-OS\/verdant-grow-diary\/actions\/workflows\/quicklog-smoke\.yml\?query=branch%3Averdant-grow-diary\)/,
+    );
+    // Mentions where artifacts live
+    expect(readme).toContain("quicklog-smoke-artifacts");
+    // Must NOT hardcode a fake direct artifact download URL
+    expect(readme).not.toMatch(/\/actions\/runs\/\d+\/artifacts\/\d+/);
+    expect(readme).not.toMatch(/artifact[s]?\/[A-Fa-f0-9-]{8,}/);
+  });
+});
+
   it("changelog entry for branch alignment lives in a single canonical file", () => {
     // No pre-existing release-notes file existed in the repo, so the entry
     // lives in root CHANGELOG.md. If/when a canonical release-notes file is

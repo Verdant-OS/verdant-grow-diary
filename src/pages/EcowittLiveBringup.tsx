@@ -463,6 +463,7 @@ function LiveEvidenceEvaluator() {
 
   return (
     <Section id="live-evidence-evaluator" title="Live Evidence Evaluator">
+      <TonightModePanel vm={tonight} />
       <p
         data-testid="ecowitt-evaluator-helper"
         className="text-xs text-muted-foreground"
@@ -471,6 +472,7 @@ function LiveEvidenceEvaluator() {
         backend response. This evaluator runs locally in the browser and does
         not query sensors or write data.
       </p>
+
 
       <div
         data-testid="ecowitt-evaluator-templates"

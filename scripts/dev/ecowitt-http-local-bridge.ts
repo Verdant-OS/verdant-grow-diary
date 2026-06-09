@@ -312,6 +312,7 @@ export async function startServer(
         url: req.url,
         headers: req.headers as Record<string, string | string[] | undefined>,
         body,
+        sourceIp: req.socket?.remoteAddress ?? "?",
       },
       flags,
       publisher,
@@ -332,12 +333,14 @@ export async function startServer(
 
   await new Promise<void>((resolve) => server.listen(flags.port, "0.0.0.0", () => resolve()));
   safeLog("listening", {
-    port: flags.port,
-    endpoint: flags.endpoint,
+    url: `http://0.0.0.0:${flags.port}`,
+    accepted_paths: [flags.endpoint, `${flags.endpoint.replace(/\/+$/, "")}/`],
     topic: flags.topic,
-    broker: flags.mqttUrl,
+    broker: redactBrokerUrl(flags.mqttUrl),
     dry_run: flags.dryRun,
+    show_raw: flags.showRaw,
     mqtt_password: flags.mqttPassword ? "(redacted)" : "(none)",
+    ecowitt_app_hint: `Protocol: Ecowitt | Port: ${flags.port} | Path: ${flags.endpoint} | Interval: 60s`,
   });
 
   return {

@@ -249,15 +249,17 @@ function evaluateMetric(m: LiveSourceTruthMetricEvidence): MetricEval {
     }
   }
 
-  // Unit mismatch heuristics on backend value
-  if (backend !== null && !is_invalid) {
+  // Unit mismatch heuristics on backend value — emit warnings even when the
+  // value also fails the suspicious-range check so operators see both signals.
+  if (backend !== null) {
     const unit = (m.unit ?? "").toString();
     if (key === "temp_f" || key === "soil_temp_f") {
       const unitLooksF = unit === "" || /^f$/i.test(unit);
       if (unitLooksF && backend >= 10 && backend <= 45) {
         has_unit_warning = true;
-        const w = `${key} backend value ${backend} with unit '${unit || "missing"}' may be Celsius shown as Fahrenheit.`;
-        warnings.push(w);
+        warnings.push(
+          `${key} backend value ${backend} with unit '${unit || "missing"}' may be Celsius shown as Fahrenheit.`,
+        );
       }
     }
     if (key === "soil_ec_ms_cm" && backend > 20) {

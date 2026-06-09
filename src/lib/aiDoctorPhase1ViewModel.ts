@@ -169,7 +169,7 @@ function describeSourceCounts(
   if (sq.stale_count > 0)
     items.push(`Stale readings (not current): ${sq.stale_count}`);
   if (sq.invalid_count > 0)
-    items.push(`Invalid readings (not healthy): ${sq.invalid_count}`);
+    items.push(`Invalid readings (rejected): ${sq.invalid_count}`);
   if (items.length === 0) items.push("No recent sensor readings available.");
   return items;
 }

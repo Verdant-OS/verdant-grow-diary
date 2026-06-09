@@ -116,21 +116,35 @@ Workflow: `.github/workflows/quicklog-smoke.yml`
 
 Triggers:
 
-- `workflow_dispatch` — manual run. Fails fast with a clear message if any
-  required secret/var is missing.
-- `push` to `main` touching `e2e/**`, `playwright.config.ts`, or the
+- `workflow_dispatch` — manual run from branch `verdant-grow-diary`. Fails fast
+  with a clear message if any required secret/var is missing:
+  ```
+  Missing required Quick Log smoke configuration. Configure Actions vars/secrets.
+  ```
+- `push` to `verdant-grow-diary` touching `e2e/**`, `playwright.config.ts`, or the
   workflow itself — runs the same job, but skips cleanly if secrets are
-  unavailable so forked-repo pushes never leak or fail mysteriously.
-- `pull_request` to `main` (safe `pull_request` event, never
+  unavailable so forked-repo pushes never leak or fail mysteriously:
+  ```
+  Skipping Quick Log smoke: E2E vars/secrets are unavailable for this event.
+  ```
+- `pull_request` to `verdant-grow-diary` (safe `pull_request` event, never
   `pull_request_target`) — PRs without access to E2E vars/secrets
   (e.g. forked PRs) skip cleanly with the message
-  `Skipping Quick Log smoke: E2E vars/secrets are unavailable for this PR context.`
+  ```
+  Skipping Quick Log smoke: E2E vars/secrets are unavailable for this PR context.
+  ```
   and the job completes successfully.
 
 Required GitHub configuration:
 
-- Secrets: `E2E_TEST_EMAIL`, `E2E_TEST_PASSWORD`
-- Vars: `E2E_BASE_URL`, `E2E_GROW_1_PLANT_URL`, optional `E2E_GROW_2_PLANT_NAME`
+- Secrets:
+  - `E2E_TEST_EMAIL`
+  - `E2E_TEST_PASSWORD`
+- Variables:
+  - `E2E_BASE_URL`
+  - `E2E_GROW_1_PLANT_URL`
+- Optional variable:
+  - `E2E_GROW_2_PLANT_NAME` (defaults to `"505 Headbanger"`)
 
 Artifacts (uploaded with `if: always()` under the name
 `quicklog-smoke-artifacts`, retained for 30 days):

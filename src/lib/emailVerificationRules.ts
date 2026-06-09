@@ -53,3 +53,37 @@ export function formatVerificationCooldown(msRemaining: unknown): string {
   const seconds = Math.max(0, Math.ceil(ms / 1000));
   return `Resend available in ${seconds}s`;
 }
+
+/**
+ * Returns true when the given user object exists but appears to have an
+ * unverified email. Safe with mocked/partial user shapes. Never throws,
+ * never reads tokens/sessions. Fails CLOSED (treats unknown as pending) so
+ * UI errs on the side of showing the verification banner rather than
+ * exposing private grow data to a not-yet-verified account.
+ *
+ * Verified signal sources accepted (any one is enough):
+ *   user.email_confirmed_at  — Supabase canonical
+ *   user.confirmed_at        — legacy
+ *   user.user_metadata.email_verified === true
+ */
+export function isEmailVerificationPending(user: unknown): boolean {
+  if (!user || typeof user !== "object") return false;
+  const u = user as {
+    email?: unknown;
+    email_confirmed_at?: unknown;
+    confirmed_at?: unknown;
+    user_metadata?: { email_verified?: unknown } | null;
+  };
+  // No email at all → can't be "pending verification of an email".
+  if (typeof u.email !== "string" || u.email.length === 0) return false;
+  if (typeof u.email_confirmed_at === "string" && u.email_confirmed_at.length > 0) return false;
+  if (typeof u.confirmed_at === "string" && u.confirmed_at.length > 0) return false;
+  if (u.user_metadata && u.user_metadata.email_verified === true) return false;
+  return true;
+}
+
+// Banner copy shown on protected pages when the signed-in user still needs
+// to verify their email. Generic; never reveals server-side rate-limit state
+// or whether the email exists elsewhere.
+export const VERIFICATION_PENDING_BANNER_MESSAGE =
+  "Verify your email to finish setting up Verdant. Some protected grow-room tools stay limited until verification is complete.";

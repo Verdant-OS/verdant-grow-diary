@@ -9,12 +9,17 @@ const SPEC_PATH = "e2e/auth-loading.spec.ts";
 const REDIRECT_SPEC_PATH = "e2e/auth-redirect-safety.spec.ts";
 const DESKTOP_SPEC_PATH = "e2e/auth-desktop.spec.ts";
 const ROUTE_PROTECTION_SPEC_PATH = "e2e/auth-route-protection.spec.ts";
+const ROUTE_PROTECTION_MOBILE_SPEC_PATH = "e2e/auth-route-protection-mobile.spec.ts";
 const wf = fs.readFileSync(path.join(ROOT, WF_PATH), "utf8");
 const spec = fs.readFileSync(path.join(ROOT, SPEC_PATH), "utf8");
 const redirectSpec = fs.readFileSync(path.join(ROOT, REDIRECT_SPEC_PATH), "utf8");
 const desktopSpec = fs.readFileSync(path.join(ROOT, DESKTOP_SPEC_PATH), "utf8");
 const routeProtectionSpec = fs.readFileSync(
   path.join(ROOT, ROUTE_PROTECTION_SPEC_PATH),
+  "utf8",
+);
+const routeProtectionMobileSpec = fs.readFileSync(
+  path.join(ROOT, ROUTE_PROTECTION_MOBILE_SPEC_PATH),
   "utf8",
 );
 
@@ -36,11 +41,12 @@ describe("Auth loading smoke workflow — safety", () => {
   it("targets the verdant-grow-diary branch only", () => {
     expect(wf).toMatch(/branches:\s*\[verdant-grow-diary\]/);
   });
-  it("runs only the mocked auth specs (loading + redirect + desktop + route-protection)", () => {
+  it("runs only the mocked auth specs (loading + redirect + desktop + route-protection desktop+mobile)", () => {
     expect(wf).toMatch(/playwright test e2e\/auth-loading\.spec\.ts/);
     expect(wf).toMatch(/e2e\/auth-redirect-safety\.spec\.ts/);
     expect(wf).toMatch(/e2e\/auth-desktop\.spec\.ts/);
     expect(wf).toMatch(/e2e\/auth-route-protection\.spec\.ts/);
+    expect(wf).toMatch(/e2e\/auth-route-protection-mobile\.spec\.ts/);
     expect(wf).not.toMatch(/quicklog-smoke\.spec\.ts/);
     expect(wf).not.toMatch(/fixture-bootstrap\.spec\.ts/);
   });
@@ -156,6 +162,42 @@ describe("Auth route-protection spec — safety", () => {
       "action_queue",
     ]) {
       expect(routeProtectionSpec).toContain(`"${t}"`);
+    }
+  });
+});
+
+describe("Auth route-protection MOBILE spec — safety", () => {
+  it("uses 390x844 mobile viewport with isMobile + hasTouch", () => {
+    expect(routeProtectionMobileSpec).toMatch(/viewport:\s*\{\s*width:\s*390,\s*height:\s*844\s*\}/);
+    expect(routeProtectionMobileSpec).toMatch(/isMobile:\s*true/);
+    expect(routeProtectionMobileSpec).toMatch(/hasTouch:\s*true/);
+  });
+  it("intercepts /auth/v1/** and /rest/v1/** via page.route", () => {
+    expect(routeProtectionMobileSpec).toMatch(/page\.route\(\s*\/\\\/auth\\\/v1\\\//);
+    expect(routeProtectionMobileSpec).toMatch(/page\.route\(\s*\/\\\/rest\\\/v1\\\//);
+  });
+  it("uses .invalid email + no real secrets/service_role", () => {
+    expect(routeProtectionMobileSpec).toMatch(/@example\.invalid/);
+    expect(routeProtectionMobileSpec).not.toMatch(/service_role/i);
+    expect(routeProtectionMobileSpec).not.toMatch(
+      /process\.env\.(E2E_TEST_PASSWORD|E2E_TEST_EMAIL|SUPABASE_SERVICE_ROLE)/,
+    );
+  });
+  it("never logs password/token/session/recovery/email", () => {
+    expect(routeProtectionMobileSpec).not.toMatch(
+      /console\.(log|warn|error|info|debug)\s*\([^)]*\b(password|token|session|recovery|email|hash)\b/i,
+    );
+  });
+  it("declares the private grow tables it guards", () => {
+    for (const t of [
+      "grows",
+      "tents",
+      "plants",
+      "diary_entries",
+      "sensor_readings",
+      "action_queue",
+    ]) {
+      expect(routeProtectionMobileSpec).toContain(`"${t}"`);
     }
   });
 });

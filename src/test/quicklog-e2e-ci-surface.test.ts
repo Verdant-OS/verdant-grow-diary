@@ -743,7 +743,7 @@ describe("Quick Log Playwright CI surface", () => {
     expect(block).toMatch(
       /PLAYWRIGHT_REPORT_ARTIFACT_URL:\s*\$\{\{\s*steps\.upload_playwright_report\.outputs\.artifact-url\s*\}\}/,
     );
-    expect(block).toMatch(/pw_report_url="\$\{ARTIFACTS_URL\}"/);
+    expect(block).toMatch(/PLAYWRIGHT_REPORT_ARTIFACT_URL:-\$fallback/);
     expect(block).toContain("[Playwright HTML report](${pw_report_url})");
     expect(block).toMatch(/downloads,?\s*not hosted HTML pages/i);
     expect(block).toContain("index.html");

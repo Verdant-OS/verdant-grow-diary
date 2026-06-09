@@ -9,9 +9,9 @@ import BrandLogo from "@/components/BrandLogo";
 import {
   MIN_PASSWORD_LENGTH,
   PASSWORD_REQUIREMENTS_HELPER_COPY,
-  RESET_FAILED_ERROR,
   getPasswordRequirementStatus,
 } from "@/lib/passwordResetRules";
+import { sanitizeAuthError } from "@/lib/authErrorRules";
 
 type Status = "checking" | "ready" | "no_session" | "saving" | "done";
 

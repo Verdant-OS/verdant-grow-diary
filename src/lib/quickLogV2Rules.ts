@@ -4,7 +4,7 @@
  */
 
 export type QuickLogV2TargetType = "tent" | "plant";
-export type QuickLogV2Action = "water" | "note" | "photo";
+export type QuickLogV2Action = "water" | "note";
 
 export interface QuickLogV2TargetOption {
   type: QuickLogV2TargetType;
@@ -65,6 +65,7 @@ export interface ResolvedQuickLogV2Target {
   targetId?: string;
   tentId?: string | null;
   plantId?: string | null;
+  growId?: string | null;
 }
 
 /**
@@ -85,6 +86,7 @@ export function resolveQuickLogV2Target(
       targetId: match.id,
       tentId: match.tentId ?? null,
       plantId: match.id,
+      growId: match.growId ?? null,
     };
   }
   return {
@@ -93,6 +95,7 @@ export function resolveQuickLogV2Target(
     targetId: match.id,
     tentId: match.id,
     plantId: null,
+    growId: match.growId ?? null,
   };
 }
 
@@ -121,6 +124,5 @@ export function shouldShowVolumeField(action: QuickLogV2Action): boolean {
 }
 
 export function isPhotoSavingSupported(): boolean {
-  // Photo persistence not enabled in Gate 1 (out of atomic-RPC scope).
-  return false;
+  return true;
 }

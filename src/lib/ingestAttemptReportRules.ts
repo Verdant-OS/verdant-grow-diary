@@ -13,6 +13,7 @@
  */
 
 import { redactBridgeToken } from "@/lib/ecowittLocalTestPayloadRules";
+import type { EcowittIngestEvidence } from "@/lib/ecowittMqttIngestRules";
 
 export type IngestAttemptStatus =
   | "accepted"

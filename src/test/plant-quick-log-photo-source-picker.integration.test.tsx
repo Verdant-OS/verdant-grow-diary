@@ -121,6 +121,16 @@ describe("PlantQuickLog photo source picker — accessible names + ARIA wiring",
     expect(camera.getAttribute("capture")).toBe("environment");
     expect(library.hasAttribute("capture")).toBe(false);
   });
+
+  it("keeps file inputs visually hidden instead of display-none for mobile picker reliability", () => {
+    renderSheet();
+    const camera = document.getElementById("plant-quick-log-photo-input") as HTMLInputElement;
+    const library = document.getElementById("plant-quick-log-photo-library-input") as HTMLInputElement;
+    expect(camera.className).toContain("sr-only");
+    expect(library.className).toContain("sr-only");
+    expect(camera.className).not.toContain("hidden");
+    expect(library.className).not.toContain("hidden");
+  });
 });
 
 describe("PlantQuickLog photo source picker — both sources reach same preview + save", () => {
@@ -172,6 +182,37 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
     expect(insertCalls[0].__table).toBe("diary_entries");
     expect(typeof insertCalls[0].photo_url).toBe("string");
     expect("user_id" in insertCalls[0]).toBe(false);
+  });
+
+  it("resets the library input value after selection so the same photo can be picked again", async () => {
+    renderSheet();
+    const library = document.getElementById("plant-quick-log-photo-library-input") as HTMLInputElement;
+    const galleryFile = makeImage("same-gallery-photo.jpg");
+
+    await pickFile(library, galleryFile);
+    await waitFor(() => {
+      expect(screen.getByTestId("plant-quick-log-photo-preview")).toBeTruthy();
+    });
+    expect(library.value).toBe("");
+
+    fireEvent.click(screen.getByTestId("plant-quick-log-photo-remove"));
+    await pickFile(library, galleryFile);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("plant-quick-log-photo-preview")).toBeTruthy();
+    });
+    expect(library.value).toBe("");
+  });
+
+  it("resets the camera input value after selection too", async () => {
+    renderSheet();
+    const camera = document.getElementById("plant-quick-log-photo-input") as HTMLInputElement;
+    await pickFile(camera, makeImage("same-camera-photo.jpg"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("plant-quick-log-photo-preview")).toBeTruthy();
+    });
+    expect(camera.value).toBe("");
   });
 
   it("both sources produce structurally equivalent insert payloads", async () => {

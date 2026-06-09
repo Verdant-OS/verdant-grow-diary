@@ -23,6 +23,13 @@ import {
 } from "@/lib/authErrorRules";
 import { sanitizeAuthRedirect } from "@/lib/authRedirectRules";
 import { getStartScreenChoice, routeForStartScreen } from "@/lib/startScreenPreferences";
+import {
+  DEFAULT_VERIFICATION_COOLDOWN_MS,
+  VERIFICATION_COOLDOWN_HINT,
+  canResendVerification,
+  formatVerificationCooldown,
+  verificationCooldownRemainingMs,
+} from "@/lib/emailVerificationRules";
 
 type AuthMode = "signin" | "signup" | "forgot";
 

@@ -47,10 +47,25 @@ describe("Bootstrap gate (pure)", () => {
     expect(r.allowed).toBe(false);
     expect(r.errors.join("\n")).toMatch(/E2E_FIXTURE_MODE/);
   });
-  it("refuses names without E2E or Test markers", () => {
+  it("refuses tent/plant names without E2E or Test markers", () => {
     const r = evaluateBootstrapGate({
       ...VALID_GATE_ENV,
       E2E_FIXTURE_EXPECTED_PLANT_NAME: "Granddaddy Purple",
+    });
+    expect(r.allowed).toBe(false);
+    expect(r.errors.join("\n")).toMatch(/E2E.*Test/);
+  });
+  it("allows bootstrap when grow name is omitted (current UI has no Grow page)", () => {
+    const r = evaluateBootstrapGate({
+      ...VALID_GATE_ENV,
+      E2E_FIXTURE_EXPECTED_GROW_NAME: "",
+    });
+    expect(r.allowed).toBe(true);
+  });
+  it("refuses a supplied non-E2E grow name", () => {
+    const r = evaluateBootstrapGate({
+      ...VALID_GATE_ENV,
+      E2E_FIXTURE_EXPECTED_GROW_NAME: "Granddaddy Purple",
     });
     expect(r.allowed).toBe(false);
     expect(r.errors.join("\n")).toMatch(/E2E.*Test/);

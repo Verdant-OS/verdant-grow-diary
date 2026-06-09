@@ -93,7 +93,11 @@ export default function AppShell() {
           </header>
 
           <main className="flex-1 px-4 md:px-6 lg:px-8 py-5 pb-28 md:pb-8 max-w-[1400px] w-full mx-auto">
-            <Outlet />
+            {isEmailVerificationPending(user) ? (
+              <VerificationPendingBanner email={user.email ?? ""} />
+            ) : (
+              <Outlet />
+            )}
           </main>
         </div>
 

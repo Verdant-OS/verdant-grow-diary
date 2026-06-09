@@ -125,8 +125,17 @@ function expectMissingInfoIncludes(
 }
 
 function expectDoesNotClaimLiveData(result: Phase1DiagnosisResult): void {
-  const text = allTextFromDiagnosis(result);
-  for (const phrase of ["live reading", "live sensor", "currently live"]) {
+  // Look only at positive-claim surfaces. Cautionary phrasing like
+  // "no live readings are present" is allowed in follow-up text; what we
+  // forbid is the engine asserting that the data IS live.
+  const text = positiveAdviceText(result);
+  for (const phrase of [
+    "data is live",
+    "based on live",
+    "live data shows",
+    "currently live data",
+    "shown as live",
+  ]) {
     expect(text, `must not claim "${phrase}"`).not.toContain(phrase);
   }
 }

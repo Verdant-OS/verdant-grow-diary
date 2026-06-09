@@ -149,6 +149,16 @@ jobs:
         if: steps.e2e_config.outputs.should_run == 'true'
         run: bun run e2e:install:ci
 
+      # Optional UI-only disposable E2E fixture bootstrap. OFF by default.
+      # Only runs when vars.E2E_ALLOW_FIXTURE_BOOTSTRAP == 'true'.
+      # Never deletes, renames, or modifies existing grow data. Refuses to
+      # run against any account that does not look disposable. Bootstrap is
+      # NOT required — fixture verification still runs and gates the smoke.
+      - name: Bootstrap disposable E2E fixture
+        id: bootstrap_fixture
+        if: steps.e2e_config.outputs.should_run == 'true' && vars.E2E_ALLOW_FIXTURE_BOOTSTRAP == 'true'
+        run: bun run e2e:bootstrap-fixture
+
       - name: Verify disposable E2E fixture
         id: verify_fixture
         if: steps.e2e_config.outputs.should_run == 'true'

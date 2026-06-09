@@ -67,10 +67,15 @@ export const ECOWITT_LIVE_EVIDENCE_EXPORT_STATIC_FILENAME =
 // ---------------------------------------------------------------------------
 
 export interface EcowittLiveEvidenceSourceTruthSummary {
+  readonly tonight_mode_status: string;
+  readonly can_export_snapshot: boolean;
+  readonly can_claim_live_proof: boolean;
   readonly overall_verdict: string;
   readonly overall_is_live_proof: boolean;
   readonly overall_summary: string;
   readonly per_plant_count: number;
+  readonly unit_warning_count: number;
+  readonly form_warning_count: number;
 }
 
 export interface EcowittLiveEvidenceSnapshotExport {
@@ -81,6 +86,7 @@ export interface EcowittLiveEvidenceSnapshotExport {
   readonly warning: typeof ECOWITT_LIVE_EVIDENCE_EXPORT_WARNING;
   readonly operator_disclaimer: typeof ECOWITT_LIVE_EVIDENCE_EXPORT_DISCLAIMER;
   readonly form_state: EcowittLiveEvidenceFormState;
+  readonly tonight_mode: EcowittTonightModeViewModel;
   readonly overall_result: LiveSourceTruthGateResult;
   readonly plant_results: readonly EcowittPerPlantResult[];
   readonly unit_warnings: readonly EcowittEvidenceUnitWarning[];
@@ -93,6 +99,7 @@ export interface EcowittLiveEvidenceSnapshotExport {
 export interface EcowittLiveEvidenceExportInput {
   readonly generated_at: string;
   readonly form_state: EcowittLiveEvidenceFormState;
+  readonly tonight_mode: EcowittTonightModeViewModel;
   readonly overall_result: LiveSourceTruthGateResult;
   readonly plant_results: readonly EcowittPerPlantResult[];
   readonly unit_warnings: readonly EcowittEvidenceUnitWarning[];

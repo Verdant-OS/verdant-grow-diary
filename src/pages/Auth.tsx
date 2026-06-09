@@ -1,13 +1,16 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Navigate, useNavigate, useSearchParams, Link } from "react-router-dom";
-import { Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BrandLogo from "@/components/BrandLogo";
+import {
+  AuthInlineMessage,
+  AuthPasswordField,
+  AuthTextField,
+} from "@/components/AuthFormField";
 import {
   validateResetEmail,
   buildResetRedirectUrl,
@@ -138,7 +141,6 @@ export default function Auth() {
     }
   }
 
-
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
@@ -268,48 +270,32 @@ export default function Auth() {
                 Use the email and password you used to create your Verdant account.
               </p>
               <form onSubmit={signIn} noValidate className="grid gap-3" aria-label="Sign in">
-                <div>
-                  <Label htmlFor="signin-email">Email</Label>
-                  <Input
-                    id="signin-email"
-                    ref={signInEmailRef}
-                    type="email"
-                    autoComplete="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    aria-invalid={signInError ? true : undefined}
-                    aria-describedby={signInError ? "signin-error" : undefined}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="signin-password">Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="signin-password"
-                      type={showPassword ? "text" : "password"}
-                      autoComplete="current-password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      aria-invalid={signInError ? true : undefined}
-                      aria-describedby={signInError ? "signin-error" : undefined}
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((v) => !v)}
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                      aria-pressed={showPassword}
-                      className="absolute inset-y-0 right-2 inline-flex items-center text-muted-foreground hover:text-foreground"
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
+                <AuthTextField
+                  id="signin-email"
+                  label="Email"
+                  inputRef={signInEmailRef}
+                  value={email}
+                  onChange={setEmail}
+                  ariaInvalid={!!signInError}
+                  ariaDescribedBy={signInError ? "signin-error" : undefined}
+                  required
+                />
+                <AuthPasswordField
+                  id="signin-password"
+                  label="Password"
+                  value={password}
+                  onChange={setPassword}
+                  showPassword={showPassword}
+                  onToggleShowPassword={() => setShowPassword((v) => !v)}
+                  autoComplete="current-password"
+                  ariaInvalid={!!signInError}
+                  ariaDescribedBy={signInError ? "signin-error" : undefined}
+                  required
+                />
                 {signInError ? (
-                  <p id="signin-error" role="alert" className="text-xs text-destructive">
+                  <AuthInlineMessage id="signin-error" role="alert" tone="error">
                     {signInError}
-                  </p>
+                  </AuthInlineMessage>
                 ) : null}
                 {verifyRequired ? (
                   <div className="grid gap-2 rounded-md border border-border/50 p-3 bg-secondary/30">
@@ -336,9 +322,7 @@ export default function Auth() {
                       </p>
                     ) : null}
                     {resendNotice ? (
-                      <p role="status" aria-live="polite" className="text-xs text-muted-foreground">
-                        {resendNotice}
-                      </p>
+                      <AuthInlineMessage>{resendNotice}</AuthInlineMessage>
                     ) : null}
                   </div>
                 ) : null}
@@ -358,45 +342,35 @@ export default function Auth() {
                 New here? Create an account to start your grow diary.
               </p>
               <form onSubmit={signUp} noValidate className="grid gap-3" aria-label="Create account">
-                <div>
-                  <Label htmlFor="signup-email">Email</Label>
-                  <Input
-                    id="signup-email"
-                    ref={signUpEmailRef}
-                    type="email"
-                    autoComplete="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    aria-invalid={signUpError ? true : undefined}
-                    aria-describedby={signUpError ? "signup-error" : undefined}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="signup-password">Password</Label>
-                  <Input
-                    id="signup-password"
-                    type={showPassword ? "text" : "password"}
-                    autoComplete="new-password"
-                    minLength={MIN_PASSWORD_LENGTH}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    aria-describedby="signup-password-hint"
-                    required
-                  />
-                  <p id="signup-password-hint" className="text-xs text-muted-foreground mt-1">
-                    Minimum {MIN_PASSWORD_LENGTH} characters.
-                  </p>
-                </div>
+                <AuthTextField
+                  id="signup-email"
+                  label="Email"
+                  inputRef={signUpEmailRef}
+                  value={email}
+                  onChange={setEmail}
+                  ariaInvalid={!!signUpError}
+                  ariaDescribedBy={signUpError ? "signup-error" : undefined}
+                  required
+                />
+                <AuthPasswordField
+                  id="signup-password"
+                  label="Password"
+                  value={password}
+                  onChange={setPassword}
+                  showPassword={showPassword}
+                  autoComplete="new-password"
+                  minLength={MIN_PASSWORD_LENGTH}
+                  hintId="signup-password-hint"
+                  hint={`Minimum ${MIN_PASSWORD_LENGTH} characters.`}
+                  required
+                />
                 {signUpError ? (
-                  <p id="signup-error" role="alert" className="text-xs text-destructive">
+                  <AuthInlineMessage id="signup-error" role="alert" tone="error">
                     {signUpError}
-                  </p>
+                  </AuthInlineMessage>
                 ) : null}
                 {signUpSuccess ? (
-                  <p role="status" aria-live="polite" className="text-xs text-muted-foreground">
-                    {signUpSuccess}
-                  </p>
+                  <AuthInlineMessage>{signUpSuccess}</AuthInlineMessage>
                 ) : null}
                 <Button
                   type="submit"
@@ -423,31 +397,23 @@ export default function Auth() {
                 </div>
               ) : (
                 <form onSubmit={requestReset} noValidate className="grid gap-3" aria-label="Forgot password">
-                  <div>
-                    <Label htmlFor="forgot-email">Email</Label>
-                    <Input
-                      id="forgot-email"
-                      ref={forgotEmailRef}
-                      type="email"
-                      autoComplete="email"
-                      value={forgotEmail}
-                      onChange={(e) => {
-                        setForgotEmail(e.target.value);
-                        if (forgotError) setForgotError(null);
-                      }}
-                      aria-invalid={forgotError ? true : undefined}
-                      aria-describedby={forgotError ? "forgot-email-error" : undefined}
-                    />
-                    {forgotError ? (
-                      <p
-                        id="forgot-email-error"
-                        role="alert"
-                        className="text-xs text-destructive mt-1"
-                      >
-                        {forgotError}
-                      </p>
-                    ) : null}
-                  </div>
+                  <AuthTextField
+                    id="forgot-email"
+                    label="Email"
+                    inputRef={forgotEmailRef}
+                    value={forgotEmail}
+                    onChange={(next) => {
+                      setForgotEmail(next);
+                      if (forgotError) setForgotError(null);
+                    }}
+                    ariaInvalid={!!forgotError}
+                    ariaDescribedBy={forgotError ? "forgot-email-error" : undefined}
+                  />
+                  {forgotError ? (
+                    <AuthInlineMessage id="forgot-email-error" role="alert" tone="error">
+                      {forgotError}
+                    </AuthInlineMessage>
+                  ) : null}
                   <Button
                     type="submit"
                     disabled={busy}

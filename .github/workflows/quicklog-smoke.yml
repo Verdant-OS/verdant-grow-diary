@@ -144,10 +144,16 @@ jobs:
         if: steps.e2e_config.outputs.should_run == 'true'
         run: bun run e2e:install:ci
 
+      - name: Verify disposable E2E fixture
+        id: verify_fixture
+        if: steps.e2e_config.outputs.should_run == 'true'
+        run: bun run e2e:verify-fixture
+
       - name: Run Quick Log Playwright smoke
         id: quicklog_smoke
-        if: steps.e2e_config.outputs.should_run == 'true'
+        if: steps.e2e_config.outputs.should_run == 'true' && steps.verify_fixture.outcome == 'success'
         run: bun run e2e:quicklog-smoke
+
 
       - name: Verify Quick Log smoke artifacts
         if: always() && steps.e2e_config.outputs.should_run == 'true'

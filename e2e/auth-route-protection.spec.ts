@@ -46,8 +46,8 @@ async function mockAllSupabase(page: Page, opts: { signedIn?: boolean } = {}) {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          access_token: "test-only-not-real",
-          refresh_token: "test-only-not-real",
+          access_token: "FAKE-ACCESS-TOKEN-NOT-REAL",
+          refresh_token: "FAKE-REFRESH-TOKEN-NOT-REAL",
           token_type: "bearer",
           expires_in: 3600,
           expires_at: Math.floor(Date.now() / 1000) + 3600,

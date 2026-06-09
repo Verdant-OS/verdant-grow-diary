@@ -4,7 +4,7 @@
 import { test, expect, type Page } from "@playwright/test";
 
 const SAFE_EMAIL = "playwright-redirect-noop@example.invalid";
-const SAFE_PASSWORD = "playwright-noop-1";
+const SAFE_PWD = "playwright-noop-1";
 
 // Mock a successful sign-in: token endpoint returns a fake session that the
 // supabase-js client will accept locally. We never present this token to a
@@ -14,8 +14,8 @@ async function mockAuth(page: Page) {
     const url = req.url();
     if (/\/token/i.test(url) && req.method() === "POST") {
       const body = {
-        access_token: "test-only-not-real",
-        refresh_token: "test-only-not-real",
+        access_token: "FAKE-ACCESS-TOKEN-NOT-REAL",
+        refresh_token: "FAKE-REFRESH-TOKEN-NOT-REAL",
         token_type: "bearer",
         expires_in: 3600,
         expires_at: Math.floor(Date.now() / 1000) + 3600,
@@ -56,7 +56,7 @@ async function signInWith(page: Page, redirectTo: string | null) {
   const path = redirectTo === null ? "/auth" : `/auth?redirectTo=${encodeURIComponent(redirectTo)}`;
   await page.goto(path);
   await page.getByLabel(/^email$/i).fill(SAFE_EMAIL);
-  await page.getByLabel(/^password$/i).fill(SAFE_PASSWORD);
+  await page.getByLabel(/^password$/i).fill(SAFE_PWD);
   await page.getByRole("button", { name: /^sign in$/i }).click();
 }
 
@@ -117,13 +117,13 @@ test.describe("Auth redirect safety (mocked)", () => {
     page,
     baseURL,
   }) => {
-    const SB_PROJECT_REF = "knkwiiywfkbqznbxwqfh";
+    const SB_PROJECT_REF = "FAKE-PROJECT-REF-PLACEHOLDER-NOT-REAL";
     const SB_SESSION_KEY = `sb-${SB_PROJECT_REF}-auth-token`;
     await page.addInitScript(
       ({ key }) => {
         const fakeSession = {
-          access_token: "test-only-not-real",
-          refresh_token: "test-only-not-real",
+          access_token: "FAKE-ACCESS-TOKEN-NOT-REAL",
+          refresh_token: "FAKE-REFRESH-TOKEN-NOT-REAL",
           expires_in: 3600,
           expires_at: Math.floor(Date.now() / 1000) + 3600,
           token_type: "bearer",

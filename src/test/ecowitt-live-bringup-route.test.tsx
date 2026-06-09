@@ -515,8 +515,8 @@ describe("Evidence Snapshot Export", () => {
 
       expect(created.length).toBeGreaterThan(0);
       expect(revoked).toContain(created[created.length - 1]);
-      expect(blobs.length).toBeGreaterThan(0);
-      const text = await blobs[blobs.length - 1].text();
+      expect(blobTexts.length).toBeGreaterThan(0);
+      const text = blobTexts[blobTexts.length - 1];
       const parsed = JSON.parse(text);
       expect(parsed.schema_version).toBe(
         "ecowitt-live-evidence-snapshot.v1",

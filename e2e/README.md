@@ -384,11 +384,26 @@ The summary links to:
 - The bundled `quicklog-smoke-artifacts` artifact.
 - A dedicated `quicklog-playwright-report` artifact (Playwright HTML
   report only), via
-  `steps.upload_playwright_report.outputs.artifact-url`. If that URL is
-  unavailable the link falls back to the run's `#artifacts` section.
+  `steps.upload_playwright_report.outputs.artifact-url`.
+- A dedicated `quicklog-playwright-traces` artifact (Playwright trace
+  zips from `test-results/**/*.zip`).
+- A dedicated `quicklog-playwright-media` artifact (screenshots / videos
+  from `test-results/**/*.{png,webm,mp4}` and `playwright-report/data/**`).
+- A dedicated `quicklog-smoke-report-json` artifact
+  (`e2e/results/quicklog-smoke-report.json`).
+- A dedicated `quicklog-smoke-report-txt` artifact
+  (`e2e/results/quicklog-smoke-report.txt`).
+
+If any per-artifact URL is unavailable the link falls back to the run's
+`#artifacts` section. No direct file URLs inside a zipped artifact are
+invented and no run/artifact IDs are hardcoded.
 
 GitHub artifacts are downloads, not hosted HTML pages — download the
-artifact and open `index.html` from the unzipped folder.
+artifact and open `index.html` (HTML report) or the report files
+locally. For JSON/TXT report artifacts, download and open the file
+directly.
+
+
 
 There is no scheduled or nightly Quick Log smoke. Write-producing smoke
 must only run against a disposable test account/test plant, so the

@@ -121,7 +121,7 @@ export default function DashboardDataSourceDisclosure({
         data-label={label}
         className="text-[10px] uppercase tracking-wide"
       >
-        {label} data
+        {BADGE_TEXT[label]}
       </Badge>
       <span className="text-xs text-muted-foreground">{DESCRIPTION[label]}</span>
       {isSimulated && (

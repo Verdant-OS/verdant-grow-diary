@@ -55,7 +55,7 @@ export default function SignOutConfirmDialog({
     );
     setBusy(false);
     if (result.ok === false) {
-      setError(result.message);
+      setError((result as { ok: false; message: string }).message);
     }
     setOpen(false);
     nav(result.redirectTo, { replace: true });

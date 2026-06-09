@@ -173,7 +173,7 @@ describe("buildOneTentLoopProofViewModel", () => {
     expect(s).toMatch(/does not.*run ai diagnosis/);
     expect(s).toMatch(/does not.*create alerts/);
     expect(s).toMatch(/does not.*create action queue items/);
-    expect(s).toMatch(/does not.*execute actions/);
+    expect(s).toMatch(/does not.*perform actions/);
   });
 
   it("no view model text uses fake-live or overconfident language", () => {

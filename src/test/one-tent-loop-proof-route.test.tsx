@@ -70,7 +70,7 @@ describe("OneTentLoopProof page", () => {
     expect(lower).toMatch(/run ai diagnosis/);
     expect(lower).toMatch(/create alerts/);
     expect(lower).toMatch(/create action queue items/);
-    expect(lower).toMatch(/execute actions/);
+    expect(lower).toMatch(/perform actions/);
   });
 
   it("renders all 9 loop steps", () => {

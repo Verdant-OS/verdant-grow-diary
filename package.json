@@ -44,6 +44,8 @@
     "dev:ecowitt-mqtt": "bun run scripts/dev/ecowitt-mqtt-runner.ts",
     "dev:ecowitt-mqtt:dry-run": "bun run scripts/dev/ecowitt-mqtt-runner.ts --dry-run",
     "dev:ecowitt-mqtt:publish-sample": "bun run scripts/dev/ecowitt-mqtt-runner.ts --sample --once",
+    "dev:ecowitt-http-bridge": "bun run scripts/dev/ecowitt-http-local-bridge.ts",
+    "dev:ecowitt-http-bridge:dry-run": "bun run scripts/dev/ecowitt-http-local-bridge.ts --dry-run",
     "e2e:install": "playwright install chromium",
     "e2e:install:ci": "playwright install --with-deps chromium",
     "e2e:setup": "playwright test --project=setup",

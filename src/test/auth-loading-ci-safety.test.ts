@@ -200,4 +200,19 @@ describe("Auth route-protection MOBILE spec — safety", () => {
       expect(routeProtectionMobileSpec).toContain(`"${t}"`);
     }
   });
+  it("declares a PROTECTED_MOBILE_ROUTES list covering operator + internal surfaces", () => {
+    expect(routeProtectionMobileSpec).toMatch(/PROTECTED_MOBILE_ROUTES/);
+    for (const p of [
+      "/diagnostics",
+      "/ingest-inspector",
+      "/operator/ecowitt",
+      "/pi-ingest-status",
+      "/sensors/ecowitt-audit",
+      "/admin/leads",
+      "/leads",
+      "/settings",
+    ]) {
+      expect(routeProtectionMobileSpec).toContain(`"${p}"`);
+    }
+  });
 });

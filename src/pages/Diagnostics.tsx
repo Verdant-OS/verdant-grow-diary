@@ -258,6 +258,52 @@ export default function Diagnostics() {
             </Button>
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader className="space-y-2 pb-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-base">
+                Sensor Truth Audit
+              </CardTitle>
+              <Badge variant="outline">Internal</Badge>
+              <Badge variant="secondary">Static</Badge>
+              <Badge variant="outline">Read-only</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground space-y-2">
+            <p>
+              Static internal reference for live/manual/csv/demo/stale/invalid
+              source rules.
+            </p>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/internal/sensor-truth-audit">
+                Open audit
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="space-y-2 pb-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-base">
+                AI Doctor Confidence Audit
+              </CardTitle>
+              <Badge variant="outline">Internal</Badge>
+              <Badge variant="secondary">Static</Badge>
+              <Badge variant="outline">Read-only</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground space-y-2">
+            <p>
+              Static internal reference for confidence caps, source quality
+              rules, and overdiagnosis guards.
+            </p>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/internal/ai-doctor-confidence-audit">
+                Open audit
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
       </section>
     </div>
   );

@@ -60,6 +60,13 @@ export interface QuickLogSnapshotStripViewModel {
    * by this chip. Pure presentation; never widens trust.
    */
   providerLabel: string | null;
+  /**
+   * Trust badge view (Live/Stale/Invalid/Manual/Demo/CSV) derived from
+   * `sensorSnapshotTrustBadgeRules`. Provider/vendor identity is rendered
+   * separately and never substituted for trust. Stale/invalid/unknown
+   * snapshots are never attachable as Live context.
+   */
+  trustBadge: SnapshotTrustBadgeView;
 }
 
 const TITLES: Record<QuickLogSnapshotStripStatus, string> = {

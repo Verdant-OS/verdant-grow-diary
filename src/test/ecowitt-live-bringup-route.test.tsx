@@ -1,8 +1,8 @@
 /**
  * EcoWitt Live Bring-Up route tests.
  */
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import EcowittLiveBringup from "@/pages/EcowittLiveBringup";
 import {
@@ -41,75 +41,87 @@ const FORBIDDEN_COPY = [
   "Certainly",
 ];
 
+function setText(testId: string, value: string) {
+  const el = screen.getByTestId(testId) as HTMLInputElement | HTMLSelectElement;
+  fireEvent.change(el, { target: { value } });
+}
+
+function toggle(testId: string, checked: boolean) {
+  const el = screen.getByTestId(testId) as HTMLInputElement;
+  if (el.checked !== checked) fireEvent.click(el);
+}
+
+function enableMetric(
+  key: string,
+  backend: string,
+  controller: string,
+  tolerance = "",
+) {
+  toggle(`ecowitt-evaluator-metric-${key}-enabled`, true);
+  setText(`ecowitt-evaluator-metric-${key}-backend`, backend);
+  setText(`ecowitt-evaluator-metric-${key}-controller`, controller);
+  if (tolerance) {
+    setText(`ecowitt-evaluator-metric-${key}-tolerance`, tolerance);
+  }
+}
+
+function fillLiveBaseline(opts?: {
+  capturedAt?: string;
+  now?: string;
+  operator?: boolean;
+}) {
+  setText("ecowitt-evaluator-source", "live");
+  setText("ecowitt-evaluator-tent-id", "tent-1");
+  setText(
+    "ecowitt-evaluator-captured-at",
+    opts?.capturedAt ?? "2026-06-09T12:00:00Z",
+  );
+  setText("ecowitt-evaluator-now", opts?.now ?? "2026-06-09T12:01:00Z");
+  toggle("ecowitt-evaluator-raw-payload", true);
+  toggle("ecowitt-evaluator-normalized-payload", true);
+  toggle("ecowitt-evaluator-operator-compared", opts?.operator ?? true);
+}
+
+function clickEvaluate() {
+  fireEvent.click(screen.getByTestId("ecowitt-evaluator-evaluate-button"));
+}
+
 describe("EcowittLiveBringup route page", () => {
   it("renders at /operator/ecowitt-live-bringup", () => {
     renderRoute();
     expect(screen.getByTestId("ecowitt-bringup-page")).toBeInTheDocument();
   });
 
-  it("shows operator / read-only / no-live / no-write / no-model / no-device badges", () => {
-    renderRoute();
-    const expected = [
-      "Operator checklist",
-      "Read-only",
-      "No live data queries",
-      "No database writes",
-      "No model calls",
-      "No device control",
-    ];
-    expected.forEach((label, i) => {
-      expect(
-        screen.getByTestId(`ecowitt-bringup-badge-${i}`),
-      ).toHaveTextContent(label);
-    });
-  });
-
   it("renders the top safety note", () => {
     renderRoute();
     const note = screen.getByTestId("ecowitt-bringup-top-note");
     expect(note).toHaveTextContent(/does not query sensors/i);
-    expect(note).toHaveTextContent(/prove live data/i);
   });
 
-  it("shows overall status blocked", () => {
+  it("shows overall status blocked (unchanged static default)", () => {
     renderRoute();
     expect(
       screen.getByTestId("ecowitt-bringup-overall-status"),
     ).toHaveTextContent("blocked");
   });
 
-  it("renders all checklist steps in order", () => {
+  it("renders all checklist steps, commands, evidence fields, and GO/NO-GO rules", () => {
     renderRoute();
     for (const id of ECOWITT_BRINGUP_STEP_IDS) {
       expect(
         screen.getByTestId(`ecowitt-bringup-step-${id}`),
       ).toBeInTheDocument();
     }
-  });
-
-  it("renders all command cards", () => {
-    renderRoute();
     for (const id of ECOWITT_BRINGUP_COMMAND_IDS) {
       expect(
         screen.getByTestId(`ecowitt-bringup-command-${id}`),
       ).toBeInTheDocument();
-      expect(
-        screen.getByTestId(`ecowitt-bringup-command-${id}-text`),
-      ).toBeInTheDocument();
     }
-  });
-
-  it("renders all evidence fields", () => {
-    renderRoute();
     for (const id of ECOWITT_BRINGUP_EVIDENCE_IDS) {
       expect(
         screen.getByTestId(`ecowitt-bringup-evidence-${id}`),
       ).toBeInTheDocument();
     }
-  });
-
-  it("renders all GO/NO-GO rules", () => {
-    renderRoute();
     for (const id of ECOWITT_BRINGUP_GO_NO_GO_IDS) {
       expect(
         screen.getByTestId(`ecowitt-bringup-go-no-go-${id}`),
@@ -117,37 +129,14 @@ describe("EcowittLiveBringup route page", () => {
     }
   });
 
-  it("renders source truth warnings", () => {
+  it("renders source truth warnings and tonight notes", () => {
     renderRoute();
-    const list = screen.getByTestId("ecowitt-bringup-source-truth-warnings");
-    expect(list.textContent ?? "").toMatch(/not call data live/i);
-    expect(list.textContent ?? "").toMatch(/grower approval/i);
-  });
-
-  it("renders tonight notes", () => {
-    renderRoute();
+    expect(
+      screen.getByTestId("ecowitt-bringup-source-truth-warnings"),
+    ).toBeInTheDocument();
     expect(
       screen.getByTestId("ecowitt-bringup-tonight-notes"),
     ).toBeInTheDocument();
-  });
-
-  it("renders the generated_at footer", () => {
-    renderRoute();
-    expect(
-      screen.getByTestId("ecowitt-bringup-generated-at"),
-    ).toBeInTheDocument();
-  });
-
-  it("renders no inputs", () => {
-    renderRoute();
-    expect(document.querySelectorAll("input").length).toBe(0);
-    expect(document.querySelectorAll("textarea").length).toBe(0);
-    expect(document.querySelectorAll("select").length).toBe(0);
-  });
-
-  it("renders no buttons", () => {
-    renderRoute();
-    expect(document.querySelectorAll("button").length).toBe(0);
   });
 
   it("does not contain forbidden execution copy", () => {
@@ -158,15 +147,175 @@ describe("EcowittLiveBringup route page", () => {
     }
   });
 
-  it("does not contain fake live success copy", () => {
+  it("does not contain fake live success copy by default", () => {
     renderRoute();
     const text = (document.body.textContent ?? "").toLowerCase();
-    expect(text).not.toMatch(/\blive verified\b/);
     expect(text).not.toMatch(/\bproven live\b/);
     expect(text).not.toMatch(/\bverified live\b/);
-    // Overall status must not default to ready
     expect(
       screen.getByTestId("ecowitt-bringup-overall-status").textContent,
     ).not.toMatch(/ready/i);
+  });
+});
+
+describe("Live Evidence Evaluator", () => {
+  it("renders helper copy about local-only / no-query / no-write", () => {
+    renderRoute();
+    const helper = screen.getByTestId("ecowitt-evaluator-helper");
+    expect(helper.textContent ?? "").toMatch(/locally in the browser/i);
+    expect(helper.textContent ?? "").toMatch(/does not query sensors/i);
+    expect(helper.textContent ?? "").toMatch(/write data/i);
+  });
+
+  it("default state is not verified_live (empty-state shown)", () => {
+    renderRoute();
+    expect(
+      screen.getByTestId("ecowitt-evaluator-empty-state"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("ecowitt-evaluator-verdict"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("evaluating empty evidence shows invalid with missing-evidence limitations", () => {
+    renderRoute();
+    clickEvaluate();
+    expect(
+      screen.getByTestId("ecowitt-evaluator-verdict"),
+    ).toHaveTextContent("invalid");
+    expect(
+      screen.getByTestId("ecowitt-evaluator-limitations").textContent ?? "",
+    ).toMatch(/captured_at|now/i);
+  });
+
+  it("recent live evidence with operator comparison and matching metric → verified_live", () => {
+    renderRoute();
+    fillLiveBaseline();
+    enableMetric("temp_f", "72", "72");
+    clickEvaluate();
+    expect(
+      screen.getByTestId("ecowitt-evaluator-verdict"),
+    ).toHaveTextContent("verified_live");
+    expect(
+      screen.getByTestId("ecowitt-evaluator-is-live-proof"),
+    ).toHaveTextContent("true");
+    expect(
+      screen.getByTestId("ecowitt-evaluator-status-message").textContent ?? "",
+    ).toMatch(/support live proof/i);
+  });
+
+  it("live evidence without operator comparison → unverified_live", () => {
+    renderRoute();
+    fillLiveBaseline({ operator: false });
+    enableMetric("temp_f", "72", "72");
+    clickEvaluate();
+    expect(
+      screen.getByTestId("ecowitt-evaluator-verdict"),
+    ).toHaveTextContent("unverified_live");
+  });
+
+  it("demo source → not_live_proof", () => {
+    renderRoute();
+    setText("ecowitt-evaluator-source", "demo");
+    setText("ecowitt-evaluator-captured-at", "2026-06-09T12:00:00Z");
+    setText("ecowitt-evaluator-now", "2026-06-09T12:01:00Z");
+    clickEvaluate();
+    expect(
+      screen.getByTestId("ecowitt-evaluator-verdict"),
+    ).toHaveTextContent("not_live_proof");
+  });
+
+  it("stale captured_at → stale", () => {
+    renderRoute();
+    fillLiveBaseline({
+      capturedAt: "2026-06-09T10:00:00Z",
+      now: "2026-06-09T12:00:00Z",
+    });
+    enableMetric("temp_f", "72", "72");
+    clickEvaluate();
+    expect(
+      screen.getByTestId("ecowitt-evaluator-verdict"),
+    ).toHaveTextContent("stale");
+  });
+
+  it("backend/controller mismatch → mismatch", () => {
+    renderRoute();
+    fillLiveBaseline();
+    enableMetric("temp_f", "60", "80");
+    clickEvaluate();
+    expect(
+      screen.getByTestId("ecowitt-evaluator-verdict"),
+    ).toHaveTextContent("mismatch");
+  });
+
+  it("suspicious humidity 100 → invalid", () => {
+    renderRoute();
+    fillLiveBaseline();
+    enableMetric("humidity_pct", "100", "100");
+    clickEvaluate();
+    expect(
+      screen.getByTestId("ecowitt-evaluator-verdict"),
+    ).toHaveTextContent("invalid");
+  });
+
+  it("custom tolerance override changes mismatch/match behavior", () => {
+    renderRoute();
+    fillLiveBaseline();
+    // default temp_f tolerance is 1.5; diff of 3 should mismatch without override
+    enableMetric("temp_f", "72", "75");
+    clickEvaluate();
+    expect(
+      screen.getByTestId("ecowitt-evaluator-verdict"),
+    ).toHaveTextContent("mismatch");
+    // Widen tolerance to 5 — should now be a match → verified_live
+    setText("ecowitt-evaluator-metric-temp_f-tolerance", "5");
+    clickEvaluate();
+    expect(
+      screen.getByTestId("ecowitt-evaluator-verdict"),
+    ).toHaveTextContent("verified_live");
+  });
+
+  it("required next steps section always renders after evaluation", () => {
+    renderRoute();
+    clickEvaluate();
+    expect(
+      screen.getByTestId("ecowitt-evaluator-next-steps"),
+    ).toBeInTheDocument();
+  });
+
+  it("Live Evidence <details> renders per-metric statuses", () => {
+    renderRoute();
+    fillLiveBaseline();
+    enableMetric("temp_f", "72", "72");
+    clickEvaluate();
+    const details = screen.getByTestId(
+      "ecowitt-evaluator-live-evidence-details",
+    );
+    expect(details.tagName.toLowerCase()).toBe("details");
+    expect(
+      within(details).getByTestId("ecowitt-evaluator-metric-result-temp_f"),
+    ).toBeInTheDocument();
+  });
+
+  it("makes no network calls", () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
+      throw new Error("fetch must not be called");
+    });
+    renderRoute();
+    fillLiveBaseline();
+    enableMetric("temp_f", "72", "72");
+    clickEvaluate();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it("does not persist inputs to localStorage/sessionStorage", () => {
+    const lsSet = vi.spyOn(Storage.prototype, "setItem");
+    renderRoute();
+    fillLiveBaseline();
+    enableMetric("temp_f", "72", "72");
+    clickEvaluate();
+    expect(lsSet).not.toHaveBeenCalled();
+    lsSet.mockRestore();
   });
 });

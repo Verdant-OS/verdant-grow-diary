@@ -77,7 +77,7 @@ export interface EcowittTonightModeViewModel {
 // ============================================================
 
 const SAFETY_NOTE =
-  "Tonight Mode summarizes local operator evidence only. It does not query sensors, write data, prove calibration, create alerts, create Action Queue items, or control devices.";
+  "Tonight Mode summarizes local operator evidence only. It does not query sensors, write data, prove calibration, create alerts, create Action Queue items, or perform device control.";
 
 const VERDICT_NEXT_ACTION: Readonly<Record<LiveSourceTruthVerdict, string>> = {
   verified_live:

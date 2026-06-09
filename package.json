@@ -49,7 +49,8 @@
     "e2e:fixture-checklist": "bun run e2e/scripts/print-fixture-config-checklist.ts",
     "e2e:quicklog-smoke": "playwright test e2e/quicklog-smoke.spec.ts --project=chromium-authed",
     "e2e:quicklog-smoke:headed": "playwright test e2e/quicklog-smoke.spec.ts --project=chromium-authed --headed",
-    "e2e:report": "playwright show-report"
+    "e2e:report": "playwright show-report",
+    "e2e:auth-loading": "playwright test e2e/auth-loading.spec.ts --project=chromium-authed"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

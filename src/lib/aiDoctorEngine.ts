@@ -453,7 +453,7 @@ export async function executeVisionAnalysisPhase1(
   }
   return Object.freeze({
     visual_summary:
-      "Stub vision pass — image received but not analyzed. No visual diagnosis produced.",
+      "Stub vision pass — image received but not inspected. No visual claims produced.",
     leaf_observations: Object.freeze([]) as readonly string[],
     structural_observations: Object.freeze([]) as readonly string[],
     color_and_pigmentation: Object.freeze([]) as readonly string[],

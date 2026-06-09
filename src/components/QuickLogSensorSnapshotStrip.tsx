@@ -20,6 +20,7 @@ import {
   buildQuickLogStripFromTentState,
   type QuickLogSnapshotStripStatus,
 } from "@/lib/quickLogSnapshotStripAdapter";
+import SnapshotTrustBadge from "@/components/SnapshotTrustBadge";
 
 
 interface Props {

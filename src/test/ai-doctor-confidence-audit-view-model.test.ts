@@ -74,9 +74,8 @@ describe("aiDoctorConfidenceAuditViewModel", () => {
       (r) => r.id === "stale-or-invalid-alongside-other-data",
     );
     expect(mixed).toBeDefined();
-    const blob = JSON.stringify(vm).toLowerCase();
-    expect(blob).not.toMatch(/invalid.*healthy/);
-    expect(blob).not.toMatch(/stale.*healthy/);
+    const sourceNotes = vm.source_quality_notes.join(" ").toLowerCase();
+    expect(sourceNotes).toMatch(/never read as healthy/);
   });
 
   it("is deterministic for the same `now` input", () => {

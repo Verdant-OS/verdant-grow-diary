@@ -48,6 +48,7 @@
     "dev:ecowitt-http-bridge:dry-run": "bun run scripts/dev/ecowitt-http-local-bridge.ts --dry-run",
     "dev:ecowitt-doctor": "bun run scripts/dev/ecowitt-windows-doctor.ts",
     "dev:ecowitt-bridge-smoke": "bun run scripts/dev/ecowitt-local-bridge-smoke.ts",
+    "dev:ecowitt-fast-path": "bun run scripts/dev/ecowitt-windows-fast-path.ts",
     "e2e:install": "playwright install chromium",
     "e2e:install:ci": "playwright install --with-deps chromium",
     "e2e:setup": "playwright test --project=setup",

@@ -145,17 +145,21 @@ describe("ecowitt-live-bringup — static safety", () => {
     }
   });
 
-  it("page imports only react, the local view model, the gate rules, and the form rules", () => {
+  it("page imports only react and local lib helpers", () => {
     const fromMatches = pageSrc.match(/from\s+["'][^"']+["']/g) || [];
     for (const m of fromMatches) {
       const ok =
         m.includes('"react"') ||
         m.includes("ecowittLiveBringupViewModel") ||
         m.includes("liveSourceTruthGateRules") ||
-        m.includes("ecowittLiveEvidenceFormRules");
+        m.includes("ecowittLiveEvidenceFormRules") ||
+        m.includes("ecowittLiveEvidenceTemplates") ||
+        m.includes("ecowittLiveEvidenceUnitWarningRules") ||
+        m.includes("ecowittLiveEvidenceMultiPlantRules");
       expect(ok).toBe(true);
     }
   });
+
 
   it("view model has no external imports", () => {
     const fromMatches = vmSrc.match(/from\s+["'][^"']+["']/g) || [];

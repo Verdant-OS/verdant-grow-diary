@@ -22,6 +22,11 @@ type AuthMode = "signin" | "signup" | "forgot";
 export default function Auth() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
+  const [search] = useSearchParams();
+  const redirectTo = useMemo(
+    () => sanitizeAuthRedirect(search.get("redirectTo")),
+    [search],
+  );
   const [mode, setMode] = useState<AuthMode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,10 +46,10 @@ export default function Auth() {
   const forgotEmailRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (user) nav("/", { replace: true });
-  }, [user, nav]);
+    if (user) nav(redirectTo, { replace: true });
+  }, [user, nav, redirectTo]);
   if (loading) return null;
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to={redirectTo} replace />;
 
   async function signIn(e: React.FormEvent) {
     e.preventDefault();

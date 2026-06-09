@@ -196,21 +196,20 @@ describe("ecowitt-live-bringup — static safety", () => {
     expect(formNoComments).not.toMatch(/Date\.now\s*\(/);
   });
 
-  it("templates / unit-warning / multi-plant rules do not call Date.now", () => {
+  it("templates / unit-warning / multi-plant / export rules do not call Date.now", () => {
     expect(templatesNoComments).not.toMatch(/Date\.now\s*\(/);
     expect(unitWarnNoComments).not.toMatch(/Date\.now\s*\(/);
     expect(multiPlantNoComments).not.toMatch(/Date\.now\s*\(/);
+    expect(exportNoComments).not.toMatch(/Date\.now\s*\(/);
   });
 
   it("new lib files import only from the local helper modules", () => {
-    for (const src of [templatesSrc, unitWarnSrc, multiPlantSrc]) {
+    const ALLOWED =
+      /ecowittLiveEvidenceFormRules|liveSourceTruthGateRules|ecowittLiveEvidenceUnitWarningRules|ecowittLiveEvidenceMultiPlantRules/;
+    for (const src of [templatesSrc, unitWarnSrc, multiPlantSrc, exportSrc]) {
       const fromMatches = src.match(/from\s+["'][^"']+["']/g) || [];
       for (const m of fromMatches) {
-        expect(
-          /ecowittLiveEvidenceFormRules|liveSourceTruthGateRules|ecowittLiveEvidenceUnitWarningRules/.test(
-            m,
-          ),
-        ).toBe(true);
+        expect(ALLOWED.test(m)).toBe(true);
       }
     }
   });

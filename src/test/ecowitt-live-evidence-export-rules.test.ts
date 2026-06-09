@@ -63,9 +63,19 @@ function makeInput(
   overrides: Partial<EcowittLiveEvidenceExportInput> = {},
 ): EcowittLiveEvidenceExportInput {
   const { overall, plants } = evaluate(form);
+  const tonight = buildEcowittTonightModeViewModel({
+    evaluator_result: overall,
+    overall_verdict: plants.overall_verdict,
+    plant_results: plants.per_plant,
+    unit_warnings: plants.unit_warnings,
+    form_warnings: plants.form_warnings,
+    required_next_steps: plants.combined_next_steps,
+    export_ready: true,
+  });
   return {
     generated_at: "2026-06-09T12:34:56Z",
     form_state: form,
+    tonight_mode: tonight,
     overall_result: overall,
     plant_results: plants.per_plant,
     unit_warnings: plants.unit_warnings,

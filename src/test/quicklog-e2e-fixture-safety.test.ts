@@ -18,6 +18,7 @@ import path from "node:path";
 import {
   validateFixtureEnv,
   pageTextMatchesFixture,
+  validateQuickLogFixturePage,
   isLikelyRealPlantUrl,
 } from "../../e2e/lib/fixtureSafety";
 
@@ -143,13 +144,15 @@ describe("Disposable E2E fixture safety helpers", () => {
     expect(noGrowExpected.ok).toBe(true);
 
     // Grow optional: when grow IS expected and missing from the page,
-    // verification must fail.
+    // verification should warn but not fail because the current UI has no
+    // Grow page in the setup flow.
     const missingGrow = pageTextMatchesFixture(
       "E2E Test Tent — E2E Test Plant detail",
       expected,
     );
-    expect(missingGrow.ok).toBe(false);
-    expect(missingGrow.errors.join("\n")).toContain("E2E Test Grow");
+    expect(missingGrow.ok).toBe(true);
+    expect(missingGrow.errors).toHaveLength(0);
+    expect(missingGrow.warnings.join("\n")).toContain("E2E Test Grow");
 
     // Fails on generic "Test" / "Test" without expected names visible.
     const genericTest = pageTextMatchesFixture(
@@ -157,6 +160,28 @@ describe("Disposable E2E fixture safety helpers", () => {
       expected,
     );
     expect(genericTest.ok).toBe(false);
+  });
+
+  it("validateQuickLogFixturePage reports missing grow as a warning but blocks missing tent or plant", () => {
+    const missingGrow = validateQuickLogFixturePage({
+      env: VALID_ENV,
+      visibleText: "E2E Test Tent — E2E Test Plant detail",
+      currentUrl: VALID_ENV.E2E_GROW_1_PLANT_URL,
+    });
+    expect(missingGrow.ok).toBe(true);
+    expect(missingGrow.warnings.map((w) => w.message).join("\n")).toContain(
+      "E2E Test Grow",
+    );
+
+    const missingTent = validateQuickLogFixturePage({
+      env: VALID_ENV,
+      visibleText: "E2E Test Plant detail",
+      currentUrl: VALID_ENV.E2E_GROW_1_PLANT_URL,
+    });
+    expect(missingTent.ok).toBe(false);
+    expect(missingTent.errors.map((e) => e.message).join("\n")).toMatch(
+      /tent/i,
+    );
   });
 });
 
@@ -209,7 +234,7 @@ describe("Workflow: fixture verification gates smoke", () => {
 
   it("precheck requires the fixture safety vars by sanitized name (grow optional)", () => {
     for (const name of [
-      '"vars.E2E_FIXTURE_MODE"',
+      '"vars.E2E_FIXTURE_MODE=true"',
       '"vars.E2E_FIXTURE_EXPECTED_TENT_NAME"',
       '"vars.E2E_FIXTURE_EXPECTED_PLANT_NAME"',
     ]) {
@@ -265,6 +290,22 @@ describe("Workflow: fixture verification gates smoke", () => {
     expect(wf).not.toMatch(/pull_request_target/);
     expect(wf).not.toMatch(/service_role/i);
     expect(fs.existsSync(path.join(ROOT, "e2e/.auth/user.json"))).toBe(false);
+  });
+
+  it("workflow is manual-only and runs fixture checks before smoke", () => {
+    expect(wf).toMatch(/on:\s*\n\s*workflow_dispatch:/);
+    expect(wf).not.toMatch(/^\s*push\s*:/m);
+    expect(wf).not.toMatch(/^\s*pull_request\s*:/m);
+
+    const checklistIndex = wf.indexOf("bun run e2e:fixture-checklist -- --ci");
+    const verifyIndex = wf.indexOf("bun run e2e:verify-fixture");
+    const smokeIndex = wf.indexOf("bun run e2e:quicklog-smoke");
+
+    expect(checklistIndex).toBeGreaterThan(-1);
+    expect(verifyIndex).toBeGreaterThan(-1);
+    expect(smokeIndex).toBeGreaterThan(-1);
+    expect(checklistIndex).toBeLessThan(verifyIndex);
+    expect(verifyIndex).toBeLessThan(smokeIndex);
   });
 });
 

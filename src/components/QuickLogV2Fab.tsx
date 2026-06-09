@@ -15,7 +15,7 @@ export default function QuickLogV2Fab({ defaultTargetKey, label = "Quick Log" }:
       <Button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-40 shadow-lg"
+        className="hidden md:inline-flex fixed bottom-6 right-6 z-40 shadow-lg"
         size="lg"
         aria-label={label}
       >

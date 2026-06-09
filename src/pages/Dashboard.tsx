@@ -241,7 +241,7 @@ export default function Dashboard() {
   const recentAlerts = persistedAlertsState.alerts.slice(0, 3);
 
   return (
-    <div>
+    <div className="min-w-0">
       <QuickLogV2Fab />
       <GrowBreadcrumbs
         growId={urlGrowId}
@@ -254,12 +254,12 @@ export default function Dashboard() {
         description="Track your tents, plants, sensors, and grow activity in one place."
         icon={<Sparkles className="h-5 w-5" />}
         actions={
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex w-full items-center gap-2 flex-wrap sm:w-auto">
             <OnboardingProgressPill vm={onboardingVm} />
-            <Button asChild variant="outline" data-testid="dashboard-daily-grow-check-entry">
+            <Button asChild variant="outline" data-testid="dashboard-daily-grow-check-entry" className="flex-1 sm:flex-none">
               <Link to="/daily-check">Daily Grow Check</Link>
             </Button>
-            <Button asChild className="gradient-leaf text-primary-foreground"><Link to={tentsPath()}>Open tents</Link></Button>
+            <Button asChild className="gradient-leaf text-primary-foreground flex-1 sm:flex-none"><Link to={tentsPath()}>Open tents</Link></Button>
           </div>
         }
       />
@@ -310,7 +310,7 @@ export default function Dashboard() {
         className="mb-6"
       />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6 min-w-0">
 
         <KpiCard label="Active tents" value={tents.length} icon={<Box className="h-3.5 w-3.5" />} />
         <KpiCard label="Plants" value={plants.length} icon={<Sprout className="h-3.5 w-3.5" />} hint={`${plants.filter((p) => p.health === "healthy").length} healthy`} accent="success" />
@@ -416,10 +416,10 @@ export default function Dashboard() {
                     : "Latest reading is stale (older than 30 minutes) — not shown as current."}
                 </div>
               )}
-        <div className="grid lg:grid-cols-3 gap-4">
+        <div className="grid lg:grid-cols-3 gap-4 min-w-0">
 
 
-          <div className="lg:col-span-2 glass rounded-2xl p-4">
+          <div className="lg:col-span-2 glass rounded-2xl p-4 min-w-0 overflow-hidden">
             <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap">
                 <div>
@@ -445,7 +445,7 @@ export default function Dashboard() {
             <SensorChart data={readings.filter((r) => r.tentId === (tents[0]?.id ?? "")) as unknown as SensorReading[]} metric="temp" height={200} />
           </div>
 
-          <div className="glass rounded-2xl p-4">
+          <div className="glass rounded-2xl p-4 min-w-0 overflow-hidden">
             <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="font-display font-semibold">Environment strip</h2>
@@ -579,7 +579,7 @@ export default function Dashboard() {
 
 
 
-      <div className="grid lg:grid-cols-2 gap-4">
+      <div className="grid lg:grid-cols-2 gap-4 min-w-0">
         <div className="glass rounded-2xl p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-display font-semibold">Needs attention</h2>

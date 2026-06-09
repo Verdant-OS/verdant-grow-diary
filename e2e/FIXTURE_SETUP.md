@@ -7,7 +7,7 @@ diary entries through the normal authenticated UI. It must therefore
 
 This document is the end-to-end checklist for creating, verifying, and
 rotating that disposable fixture. There is **no in-app automation**
-that creates or deletes accounts — every step is manual and uses the
+that manages accounts — every step is manual and uses the
 normal authenticated UI.
 
 > See also: `e2e/README.md`, `e2e/lib/fixtureSafety.ts`,
@@ -133,15 +133,14 @@ Requirements:
 
 Behavior:
 
-- Signs in via the normal storageState (no auth bypass, no
-  `service_role`).
+- Signs in via the normal storageState.
 - Inspects the current UI for the exact expected E2E names.
 - If all three are present, makes **no** UI changes (idempotent
   no-op).
 - If any are missing and stable selectors are not wired, returns
   **blocked** with the exact `data-testid` selectors required. It will
   **never** force creation using fragile selectors.
-- **Never** deletes, renames, or modifies any existing grow/tent/plant.
+- **Never** renames or modifies any existing grow/tent/plant.
 - **Never** creates non-E2E names.
 
 Run locally:

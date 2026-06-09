@@ -22,11 +22,13 @@
  */
 
 export type FixtureSafetyEnv = Readonly<{
+  E2E_BASE_URL?: string;
   E2E_FIXTURE_MODE?: string;
   E2E_GROW_1_PLANT_URL?: string;
   E2E_FIXTURE_EXPECTED_GROW_NAME?: string;
   E2E_FIXTURE_EXPECTED_TENT_NAME?: string;
   E2E_FIXTURE_EXPECTED_PLANT_NAME?: string;
+  E2E_FIXTURE_EXPECTED_ACCOUNT_HINT?: string;
 }>;
 
 export interface FixtureEnvValidation {
@@ -128,8 +130,9 @@ export function pageTextMatchesFixture(
   pageText: string,
   expected: FixtureEnvValidation["expected"],
   options: { accountHint?: string } = {},
-): { ok: boolean; errors: string[] } {
+): { ok: boolean; errors: string[]; warnings: string[] } {
   const errors: string[] = [];
+  const warnings: string[] = [];
   const text = pageText ?? "";
 
   if (!/E2E|Test/i.test(text)) {
@@ -152,10 +155,10 @@ export function pageTextMatchesFixture(
 
   // Grow is only checked when an expected grow name was explicitly
   // supplied. The current UI does not expose a Grow page in the setup
-  // flow, so a missing grow name must not fail fixture verification.
+  // flow, so a missing grow name is reported as a warning only.
   if (expected.grow && !text.includes(expected.grow)) {
-    errors.push(
-      `Expected grow name '${expected.grow}' not visible on the target page.`,
+    warnings.push(
+      `Expected grow name '${expected.grow}' not visible on the target page; continuing because the current UI has no Grow page in setup.`,
     );
   }
 
@@ -172,5 +175,48 @@ export function pageTextMatchesFixture(
     }
   }
 
-  return { ok: errors.length === 0, errors };
+  return { ok: errors.length === 0, errors, warnings };
+}
+
+export type FixtureSafetyIssue = Readonly<{ message: string }>;
+
+export interface QuickLogFixturePageValidation {
+  ok: boolean;
+  errors: FixtureSafetyIssue[];
+  warnings: FixtureSafetyIssue[];
+  expected: FixtureEnvValidation["expected"];
+}
+
+/**
+ * One-call validator for write-producing smoke specs.
+ *
+ * It combines env checks and visible page checks, keeps Tent + Plant as hard
+ * requirements, and downgrades a missing configured Grow name to a warning
+ * because the current setup flow does not surface a Grow page.
+ */
+export function validateQuickLogFixturePage(input: {
+  env: FixtureSafetyEnv;
+  visibleText: string;
+  currentUrl?: string;
+}): QuickLogFixturePageValidation {
+  const envCheck = validateFixtureEnv({
+    ...input.env,
+    E2E_GROW_1_PLANT_URL:
+      input.env.E2E_GROW_1_PLANT_URL ?? input.currentUrl ?? "",
+  });
+  const pageCheck = pageTextMatchesFixture(input.visibleText, envCheck.expected, {
+    accountHint: input.env.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT,
+  });
+
+  const errors = [...envCheck.errors, ...pageCheck.errors].map((message) => ({
+    message,
+  }));
+  const warnings = pageCheck.warnings.map((message) => ({ message }));
+
+  return {
+    ok: errors.length === 0,
+    errors,
+    warnings,
+    expected: envCheck.expected,
+  };
 }

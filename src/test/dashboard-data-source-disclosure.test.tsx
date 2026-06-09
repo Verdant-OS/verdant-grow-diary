@@ -1,7 +1,7 @@
 /**
  * Tests for DashboardDataSourceDisclosure presenter + Dashboard wiring.
  *
- * - Pure render tests verifying Live / Demo / Mixed / Unavailable labelling.
+ * - Pure render tests verifying Saved / Demo / Mixed / Unavailable labelling.
  * - Static contract tests for src/pages/Dashboard.tsx wiring.
  */
 import { describe, it, expect } from "vitest";
@@ -51,7 +51,7 @@ describe("DashboardDataSourceDisclosure (presenter)", () => {
     expect(b.getAttribute("data-label")).toBe("Mixed");
   });
 
-  it("never shows Live for mock-backed metadata", () => {
+  it("never shows Saved for mock-backed metadata", () => {
     render(
       <DashboardDataSourceDisclosure
         hasAnyData
@@ -59,10 +59,10 @@ describe("DashboardDataSourceDisclosure (presenter)", () => {
       />,
     );
     const b = screen.getByTestId("dashboard-data-source-badge");
-    expect(b.getAttribute("data-label")).not.toBe("Live");
+    expect(b.getAttribute("data-label")).not.toBe("Saved");
   });
 
-  it("shows Live badge when every section is supabase-backed", () => {
+  it("shows Saved badge when every section is supabase-backed", () => {
     render(
       <DashboardDataSourceDisclosure
         hasAnyData
@@ -70,7 +70,9 @@ describe("DashboardDataSourceDisclosure (presenter)", () => {
       />,
     );
     const b = screen.getByTestId("dashboard-data-source-badge");
-    expect(b.getAttribute("data-label")).toBe("Live");
+    expect(b.getAttribute("data-label")).toBe("Saved");
+    expect(b).toHaveTextContent(/saved data/i);
+    expect(screen.getByText(/Loaded from your Verdant account\./)).toBeTruthy();
   });
 
   it("shows Unavailable welcome state when there is no usable data", () => {
@@ -108,6 +110,13 @@ describe("Dashboard data-source disclosure wiring", () => {
   it("disclosure presenter delegates classification to useGrowData helpers", () => {
     expect(DISCLOSURE).toMatch(/combineGrowDataMeta/);
     expect(DISCLOSURE).toMatch(/getGrowDataMeta/);
+  });
+
+  it("saved account rows are not described as live telemetry", () => {
+    expect(DISCLOSURE).toContain("Saved");
+    expect(DISCLOSURE).toContain("Loaded from your Verdant account.");
+    expect(DISCLOSURE).not.toContain("LIVE DATA");
+    expect(DISCLOSURE).not.toContain("Live data from your grow backend.");
   });
 
   it("disclosure does not introduce writes, service_role, or device control", () => {

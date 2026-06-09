@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import { SmokeChecklistReporter } from "./lib/smokeChecklistReporter";
+import { validateQuickLogFixturePage } from "./lib/fixtureSafety.ts";
 
 /**
  * Authenticated Quick Log smoke checklist.
@@ -15,12 +16,12 @@ import { SmokeChecklistReporter } from "./lib/smokeChecklistReporter";
  *
  * Optional env:
  *   E2E_BASE_URL                (default http://localhost:5173)
- *   E2E_GROW_1_PLANT_URL        URL of the Grow #1 plant page to open first
- *   E2E_GROW_2_PLANT_NAME       Display name of the target plant in Grow #2
+ *   E2E_GROW_1_PLANT_URL        URL of the disposable plant detail page
+ *   E2E_GROW_2_PLANT_NAME       Display name of the optional target plant
  *                               (default "505 Headbanger")
  *
  * SAFETY:
- *   - No auth bypass. No hardcoded credentials. No elevated DB role.
+ *   - Real /auth UI only. No hardcoded credentials. No elevated DB role.
  *   - Reads/writes only what an authenticated user could do via the UI.
  *   - Does not attach stale/non-usable snapshots.
  */
@@ -34,7 +35,7 @@ const REPORT_TXT = path.join(RESULTS_DIR, "quicklog-smoke-report.txt");
 test.describe("Quick Log smoke checklist", () => {
   test.skip(
     !PLANT_URL,
-    "Set E2E_GROW_1_PLANT_URL to a Grow #1 plant page to run this smoke test.",
+    "Set E2E_GROW_1_PLANT_URL to a disposable plant detail page to run this smoke test.",
   );
 
   test("authenticated end-to-end checklist", async ({ page }, testInfo) => {
@@ -42,6 +43,29 @@ test.describe("Quick Log smoke checklist", () => {
 
     try {
       await page.goto(PLANT_URL!);
+
+      const fixtureValidation = validateQuickLogFixturePage({
+        env: {
+          E2E_FIXTURE_MODE: process.env.E2E_FIXTURE_MODE,
+          E2E_BASE_URL: process.env.E2E_BASE_URL,
+          E2E_GROW_1_PLANT_URL: process.env.E2E_GROW_1_PLANT_URL,
+          E2E_FIXTURE_EXPECTED_TENT_NAME: process.env.E2E_FIXTURE_EXPECTED_TENT_NAME,
+          E2E_FIXTURE_EXPECTED_PLANT_NAME: process.env.E2E_FIXTURE_EXPECTED_PLANT_NAME,
+          E2E_FIXTURE_EXPECTED_GROW_NAME: process.env.E2E_FIXTURE_EXPECTED_GROW_NAME,
+          E2E_FIXTURE_EXPECTED_ACCOUNT_HINT: process.env.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT,
+        },
+        visibleText: await page.locator("body").innerText(),
+        currentUrl: page.url(),
+      });
+
+      if (!fixtureValidation.ok) {
+        throw new Error(
+          [
+            "Quick Log smoke fixture validation failed before any write.",
+            ...fixtureValidation.errors.map((issue) => `- ${issue.message}`),
+          ].join("\n"),
+        );
+      }
 
       await page
         .getByRole("button", { name: /quick log|log entry|\+ log/i })

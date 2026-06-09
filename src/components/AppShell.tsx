@@ -46,7 +46,7 @@ export default function AppShell() {
 
   return (
     <SidebarProvider defaultOpen>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full overflow-x-hidden">
         {/* Desktop sidebar */}
         <div className="hidden md:block">
           <AppSidebar />
@@ -92,7 +92,7 @@ export default function AppShell() {
             </div>
           </header>
 
-          <main className="flex-1 px-4 md:px-6 lg:px-8 py-5 pb-28 md:pb-8 max-w-[1400px] w-full mx-auto">
+          <main className="flex-1 min-w-0 px-4 md:px-6 lg:px-8 py-5 pb-[calc(10rem_+_env(safe-area-inset-bottom))] md:pb-8 max-w-[1400px] w-full mx-auto">
             {isEmailVerificationPending(user) ? (
               <VerificationPendingBanner email={user.email ?? ""} />
             ) : (
@@ -105,7 +105,7 @@ export default function AppShell() {
         <button
           onClick={() => { setPrefill(null); setOpenLog(true); }}
           aria-label="Quick log"
-          className="md:hidden fixed z-40 bottom-20 right-4 h-14 w-14 rounded-full gradient-leaf shadow-elevated flex items-center justify-center text-primary-foreground hover:scale-105 transition active:scale-95 glow-accent"
+          className="md:hidden fixed z-40 bottom-[calc(5.5rem_+_env(safe-area-inset-bottom))] right-4 h-14 w-14 rounded-full gradient-leaf shadow-elevated flex items-center justify-center text-primary-foreground hover:scale-105 transition active:scale-95 glow-accent"
         >
           <Plus className="h-6 w-6" />
         </button>

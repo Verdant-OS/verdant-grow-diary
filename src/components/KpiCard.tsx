@@ -21,9 +21,9 @@ const accentMap = {
 
 export default function KpiCard({ label, value, hint, icon, trend, accent = "primary", className }: Props) {
   return (
-    <div className={cn("glass rounded-2xl p-4 flex flex-col gap-2 animate-fade-in", className)}>
-      <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        <span>{label}</span>
+    <div className={cn("glass rounded-2xl p-4 flex min-w-0 flex-col gap-2 animate-fade-in", className)}>
+      <div className="flex min-w-0 items-center justify-between gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{label}</span>
         {icon && <span className={cn("h-7 w-7 rounded-lg bg-secondary/40 flex items-center justify-center", accentMap[accent])}>{icon}</span>}
       </div>
       <div className="flex items-baseline gap-2">

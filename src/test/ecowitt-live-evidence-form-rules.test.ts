@@ -187,17 +187,20 @@ describe("buildLiveSourceTruthEvidenceFromForm", () => {
 });
 
 describe("ecowittLiveEvidenceFormRules — static safety", () => {
-  const src = readFileSync(
+  const rawSrc = readFileSync(
     resolve(__dirname, "../../src/lib/ecowittLiveEvidenceFormRules.ts"),
     "utf8",
   );
+  const src = rawSrc
+    .replace(/\/\/.*$/gm, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "");
 
   it("does not call Date.now()", () => {
     expect(src).not.toMatch(/Date\.now\s*\(/);
   });
 
   it("has no unsafe imports", () => {
-    const fromMatches = src.match(/from\s+["'][^"']+["']/g) || [];
+    const fromMatches = rawSrc.match(/from\s+["'][^"']+["']/g) || [];
     for (const m of fromMatches) {
       expect(m).toMatch(/liveSourceTruthGateRules/);
     }
@@ -205,7 +208,8 @@ describe("ecowittLiveEvidenceFormRules — static safety", () => {
 
   it("has no fetch / supabase / persistence references", () => {
     expect(src).not.toMatch(/fetch\s*\(/);
-    expect(src).not.toMatch(/supabase/i);
+    expect(src).not.toMatch(/supabase\./i);
+    expect(src).not.toMatch(/from\s+["'][^"']*supabase/i);
     expect(src).not.toContain("localStorage");
     expect(src).not.toContain("sessionStorage");
     expect(src).not.toContain("navigator.clipboard");

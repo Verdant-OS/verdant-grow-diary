@@ -41,6 +41,7 @@ export interface BridgeFlags {
   topic: string;
   dryRun: boolean;
   once: boolean;
+  showRaw: boolean;
   mqttUsername: string | null;
   mqttPassword: string | null;
 }
@@ -63,9 +64,25 @@ export function parseFlags(
     topic: get("--topic") ?? env.ECOWITT_MQTT_TOPIC ?? DEFAULT_MQTT_TOPIC,
     dryRun: argv.includes("--dry-run"),
     once: argv.includes("--once"),
+    showRaw: argv.includes("--show-raw"),
     mqttUsername: env.ECOWITT_MQTT_USERNAME ?? null,
     mqttPassword: env.ECOWITT_MQTT_PASSWORD ?? null,
   };
+}
+
+/** Strip userinfo from an mqtt:// URL so logs never leak credentials. */
+export function redactBrokerUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    if (u.username || u.password) {
+      u.username = "";
+      u.password = "";
+      return u.toString();
+    }
+    return url;
+  } catch {
+    return url;
+  }
 }
 
 /** Normalize trailing slash: /data/report and /data/report/ both match. */

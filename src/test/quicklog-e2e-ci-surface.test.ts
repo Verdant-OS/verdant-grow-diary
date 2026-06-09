@@ -506,14 +506,28 @@ describe("Quick Log Playwright CI surface", () => {
     expect(bunBlock).toMatch(/uses:\s*actions\/cache@v4/);
     expect(bunBlock).toContain("~/.bun/install/cache");
 
-    // Neither cache may include sensitive or output paths
-    for (const block of [pwBlock, bunBlock]) {
-      expect(block).not.toMatch(/e2e\/\.auth/);
-      expect(block).not.toMatch(/e2e\/results/);
-      expect(block).not.toMatch(/test-results/);
-      expect(block).not.toMatch(/playwright-report/);
-      expect(block).not.toMatch(/storageState|user\.json/);
-      expect(block).not.toMatch(/secrets\.E2E_/);
+    // Neither cache's `path:` may include sensitive or output paths.
+    // (The regex blocks above may include trailing comment lines belonging
+    // to the following step, so assert specifically on each step's path
+    // line — that is the actual cache scope.)
+    for (const [label, block] of [["pw", pwBlock], ["bun", bunBlock]] as const) {
+      const pathLineMatch = block.match(/\n\s*path:\s*(.+)/);
+      expect(pathLineMatch, `${label} cache step missing path: line`).toBeTruthy();
+      const pathLine = pathLineMatch![1];
+      for (const forbidden of [
+        "e2e/.auth",
+        "e2e/results",
+        "test-results",
+        "playwright-report",
+        "user.json",
+        "storageState",
+        "secrets.E2E_",
+      ]) {
+        expect(
+          pathLine.includes(forbidden),
+          `${label} cache path must not include ${forbidden}`,
+        ).toBe(false);
+      }
     }
   });
 

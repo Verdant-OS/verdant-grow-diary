@@ -20,6 +20,7 @@ import {
   buildQuickLogStripFromTentState,
   type QuickLogSnapshotStripStatus,
 } from "@/lib/quickLogSnapshotStripAdapter";
+import SnapshotTrustBadge from "@/components/SnapshotTrustBadge";
 
 
 interface Props {
@@ -101,6 +102,10 @@ export default function QuickLogSensorSnapshotStrip({ tentId, attached = true }:
           >
             {PILL_LABEL[view.status]}
           </span>
+
+          <SnapshotTrustBadge view={view.trustBadge} showProvider={false} />
+
+
         </div>
       </div>
 

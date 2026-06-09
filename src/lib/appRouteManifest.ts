@@ -93,7 +93,9 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/hardware-integrations", access: "public" },
   { path: "/imports/representative-csv", access: "operator" },
   { path: "/ingest-inspector", access: "operator" },
+  { path: "/internal/ai-doctor-phase1-preview", access: "internal", description: "Static Phase 1 view model preview." },
   { path: "/leads", access: "internal" },
+
   { path: "/login", access: "redirect", description: "→ /auth" },
   { path: "/logs", access: "auth" },
   { path: "/onboarding", access: "auth", description: "Post-sign-in start-screen choice (diary-first default)." },

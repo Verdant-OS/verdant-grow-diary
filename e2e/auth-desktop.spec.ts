@@ -11,7 +11,7 @@ const SAFE_EMAIL = "playwright-desktop-noop@example.invalid";
 const SAFE_PASSWORD = "playwright-desktop-noop-1";
 const SAFE_NEW_PASSWORD = "playwright-desktop-noop-2";
 
-const SB_PROJECT_REF = "knkwiiywfkbqznbxwqfh";
+const SB_PROJECT_REF = "FAKE-PROJECT-REF-PLACEHOLDER-NOT-REAL";
 const SB_SESSION_KEY = `sb-${SB_PROJECT_REF}-auth-token`;
 
 function holdAndCount(
@@ -121,8 +121,8 @@ test.describe("Desktop auth loading/disabled smoke (mocked, 1280x800)", () => {
     await page.addInitScript(
       ({ key }) => {
         const fakeSession = {
-          access_token: "test-only-not-real",
-          refresh_token: "test-only-not-real",
+          access_token: "FAKE-ACCESS-TOKEN-NOT-REAL",
+          refresh_token: "FAKE-REFRESH-TOKEN-NOT-REAL",
           expires_in: 3600,
           expires_at: Math.floor(Date.now() / 1000) + 3600,
           token_type: "bearer",

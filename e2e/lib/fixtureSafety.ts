@@ -97,10 +97,16 @@ export function validateFixtureEnv(env: FixtureSafetyEnv): FixtureEnvValidation 
 /**
  * Check that visible page text contains the expected fixture names AND
  * recognizable E2E/Test markers. Read-only check.
+ *
+ * If `accountHint` is provided AND the page visibly exposes an account
+ * label (email or display name), the visible text must contain the hint.
+ * The hint is treated as a non-secret label; secrets must never be passed
+ * here.
  */
 export function pageTextMatchesFixture(
   pageText: string,
   expected: FixtureEnvValidation["expected"],
+  options: { accountHint?: string } = {},
 ): { ok: boolean; errors: string[] } {
   const errors: string[] = [];
   const text = pageText ?? "";
@@ -118,6 +124,19 @@ export function pageTextMatchesFixture(
     if (value && !text.includes(value)) {
       errors.push(
         `Expected ${label} name '${value}' not visible on the target page.`,
+      );
+    }
+  }
+
+  const hint = (options.accountHint ?? "").trim();
+  if (hint) {
+    // If the visible UI exposes any account-identity surface (email-like
+    // string or "Signed in as" label), require the hint to be present.
+    const exposesAccount =
+      /signed in as|account:|@/i.test(text);
+    if (exposesAccount && !text.toLowerCase().includes(hint.toLowerCase())) {
+      errors.push(
+        `Account hint '${hint}' not visible on a page that exposes account identity — refusing to assume the dedicated test account is signed in.`,
       );
     }
   }

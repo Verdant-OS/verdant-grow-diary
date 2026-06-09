@@ -16,6 +16,8 @@ import {
 import { getEventType } from "@/lib/diary";
 import { cn } from "@/lib/utils";
 
+import { Activity, Bug, Scissors, Gauge } from "lucide-react";
+
 type Builder = (entries: ReturnType<typeof normalizeDiaryEntries>) => QuickLogHistoryRow[];
 
 interface QuickLogHistorySectionProps {
@@ -76,21 +78,21 @@ function ManualReadingsChips({ row }: { row: QuickLogHistoryRow }) {
   if (items.length === 0) return null;
   return (
     <div
-      className="mt-2 space-y-1.5"
+      className="mt-3 space-y-2 rounded-lg border border-border/40 bg-secondary/20 p-2"
       data-testid="quicklog-history-manual-readings"
     >
       <span
-        className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground"
+        className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground"
         title="Manual handheld readings — not live sensor data"
       >
         <FlaskConical className="h-3 w-3 text-primary" />
-        Manual handheld readings (not live sensor data)
+        Manual readings · not live sensor data
       </span>
       <div className="flex flex-wrap gap-1.5">
         {items.map((it, i) => (
           <span
             key={`${row.id}-mh-${i}`}
-            className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-secondary/40 px-2 py-0.5 text-[11px] text-muted-foreground"
+            className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background/40 px-2 py-1 text-xs text-muted-foreground"
           >
             <span className="font-medium text-foreground/80">{it.label}</span>
             <span>{it.value}</span>
@@ -110,11 +112,11 @@ function Row({ row }: { row: QuickLogHistoryRow }) {
       data-testid="quicklog-history-row"
       data-event-type={row.eventType}
     >
-      <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-        <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+      <div className="flex items-start justify-between gap-2 mb-2 flex-wrap">
+        <div className="inline-flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
           <span
             className={cn(
-              "inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] font-medium",
+              "inline-flex items-center gap-1 px-2 py-1 rounded-full border text-xs font-medium",
               et.tone,
             )}
           >
@@ -127,7 +129,7 @@ function Row({ row }: { row: QuickLogHistoryRow }) {
         </div>
         {row.warnings.length > 0 && (
           <span
-            className="inline-flex items-center gap-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-2 py-0.5 text-[11px] text-yellow-300"
+            className="inline-flex items-center gap-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-2 py-1 text-xs text-yellow-300"
             title={row.warnings.join(" · ")}
           >
             <AlertTriangle className="h-3 w-3" />
@@ -139,17 +141,32 @@ function Row({ row }: { row: QuickLogHistoryRow }) {
       </div>
 
       {row.photoUrl && (
-        <div className="mb-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-          <ImageIcon className="h-3 w-3" />
-          Photo attached
+        <div className="mb-3 overflow-hidden rounded-lg border border-border/40 bg-secondary/20" data-testid="quicklog-history-photo-summary">
+          <img
+            src={row.photoUrl}
+            alt="Quick Log attached photo"
+            loading="lazy"
+            className="aspect-[4/3] w-full object-cover"
+          />
+          <div className="inline-flex items-center gap-1 p-2 text-xs text-muted-foreground">
+            <ImageIcon className="h-3 w-3" />
+            Photo attached
+          </div>
         </div>
       )}
 
-      {row.noteBody && (
-        <p className="text-sm text-foreground/90 whitespace-pre-wrap">
-          {row.noteBody}
+      {row.noteBody ? (
+        <div className="rounded-lg bg-background/30 p-2" data-testid="quicklog-history-note-summary">
+          <p className="text-sm font-medium text-muted-foreground">Note</p>
+          <p className="mt-1 text-sm text-foreground/90 whitespace-pre-wrap">
+            {row.noteBody}
+          </p>
+        </div>
+      ) : row.photoUrl ? (
+        <p className="rounded-lg bg-background/30 p-2 text-sm text-muted-foreground" data-testid="quicklog-history-photo-only-note">
+          Photo-only Quick Log. Add a note later from the timeline if needed.
         </p>
-      )}
+      ) : null}
 
       <ManualReadingsChips row={row} />
     </li>
@@ -184,7 +201,7 @@ function QuickLogHistorySection({
           {icon}
           {title}
         </h2>
-        <span className="text-[11px] text-muted-foreground">
+        <span className="text-xs text-muted-foreground">
           {rows.length === 0
             ? "0"
             : rows.length === 1
@@ -195,7 +212,7 @@ function QuickLogHistorySection({
       {rows.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border/50 bg-secondary/20 p-4 text-center">
           <p className="text-sm text-muted-foreground">{emptyTitle}</p>
-          <p className="text-[11px] text-muted-foreground/80 mt-1">
+          <p className="text-sm text-muted-foreground/80 mt-1">
             {emptyHelp}
           </p>
         </div>
@@ -209,8 +226,6 @@ function QuickLogHistorySection({
     </section>
   );
 }
-
-import { Activity, Bug, Scissors, Gauge } from "lucide-react";
 
 export function RecentQuickLogActivityPanel({
   rawEntries,
@@ -227,7 +242,7 @@ export function RecentQuickLogActivityPanel({
       icon={<Activity className="h-3.5 w-3.5 text-primary" />}
       builder={(entries) => buildRecentQuickLogActivity(entries, limit)}
       emptyTitle="No Quick Log entries yet"
-      emptyHelp="Tap the + button to log your first activity from Quick Log."
+      emptyHelp="Open Quick Log to capture a note, watering, photo, or manual reading."
       limit={limit}
     />
   );
@@ -290,7 +305,7 @@ export function MeasurementHistoryPanel({
       icon={<FlaskConical className="h-3.5 w-3.5 text-primary" />}
       builder={buildMeasurementHistory}
       emptyTitle="No manual handheld readings yet"
-      emptyHelp="Add handheld readings in Quick Log (pH/EC pen, PAR meter) to see them here."
+      emptyHelp="Add manual readings in Quick Log. These are not live sensor data."
       limit={limit}
     />
   );

@@ -935,7 +935,7 @@ export default function QuickLog({
                   data-testid="quicklog-hardware-manual-subtitle"
                   className="ml-2 text-[10px] font-normal uppercase tracking-wide text-muted-foreground"
                 >
-                  Manual readings · not live sensor data
+                  Manual readings · not live data
                 </span>
               </span>
               <span className="text-[10px] uppercase tracking-wide text-muted-foreground">

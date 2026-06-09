@@ -122,6 +122,7 @@ async function handlePayload(
   env: RuntimeEnv,
   flags: CliFlags,
   fetchImpl: typeof fetch = fetch,
+  receivedAt: Date = new Date(),
 ): Promise<HandleResult> {
   const norm = normalizeEcowittMqttPayload({
     payload,
@@ -142,6 +143,13 @@ async function handlePayload(
         .map(([k]) => k)
     : [];
 
+  const evidence = buildEcowittIngestEvidence({
+    payload,
+    draft: norm.draft,
+    topic: env.mqttTopic,
+    receivedAt,
+  });
+
   const cannotPost = flags.dryRun || !norm.ok || !env.url || !env.token || !env.tentId;
 
   if (cannotPost) {
@@ -153,6 +161,7 @@ async function handlePayload(
       dryRun: true,
       normalizerReasons: norm.reasons,
       metricKeys,
+      evidence,
     });
     printReport(report);
     if (flags.writeReport) await writeRedactedReport(report);
@@ -217,6 +226,7 @@ async function handlePayload(
     networkError,
     normalizerReasons: norm.reasons,
     metricKeys,
+    evidence,
   });
   printReport(report);
   if (flags.writeReport) await writeRedactedReport(report);

@@ -29,6 +29,7 @@ import {
 } from "@/lib/liveSourceTruthGateRules";
 import { evaluateLiveEvidenceForPlants } from "@/lib/ecowittLiveEvidenceMultiPlantRules";
 import { ECOWITT_LIVE_EVIDENCE_TEMPLATES } from "@/lib/ecowittLiveEvidenceTemplates";
+import { buildEcowittTonightModeViewModel } from "@/lib/ecowittTonightModeViewModel";
 
 function baseFormState(): EcowittLiveEvidenceFormState {
   return {
@@ -62,9 +63,19 @@ function makeInput(
   overrides: Partial<EcowittLiveEvidenceExportInput> = {},
 ): EcowittLiveEvidenceExportInput {
   const { overall, plants } = evaluate(form);
+  const tonight = buildEcowittTonightModeViewModel({
+    evaluator_result: overall,
+    overall_verdict: plants.overall_verdict,
+    plant_results: plants.per_plant,
+    unit_warnings: plants.unit_warnings,
+    form_warnings: plants.form_warnings,
+    required_next_steps: plants.combined_next_steps,
+    export_ready: true,
+  });
   return {
     generated_at: "2026-06-09T12:34:56Z",
     form_state: form,
+    tonight_mode: tonight,
     overall_result: overall,
     plant_results: plants.per_plant,
     unit_warnings: plants.unit_warnings,
@@ -96,6 +107,7 @@ describe("buildEcowittLiveEvidenceSnapshotExport — shape & metadata", () => {
       "warning",
       "operator_disclaimer",
       "form_state",
+      "tonight_mode",
       "overall_result",
       "plant_results",
       "unit_warnings",
@@ -104,6 +116,16 @@ describe("buildEcowittLiveEvidenceSnapshotExport — shape & metadata", () => {
       "source_truth_summary",
       "safety_flags",
     ]);
+  });
+
+  it("includes tonight_mode payload with status and gates", () => {
+    const snap = buildEcowittLiveEvidenceSnapshotExport(makeInput(baseFormState()));
+    expect(typeof snap.tonight_mode.status).toBe("string");
+    expect(typeof snap.tonight_mode.can_export_snapshot).toBe("boolean");
+    expect(typeof snap.tonight_mode.can_claim_live_proof).toBe("boolean");
+    expect(snap.source_truth_summary.tonight_mode_status).toBe(
+      snap.tonight_mode.status,
+    );
   });
 
   it("includes every safety flag", () => {

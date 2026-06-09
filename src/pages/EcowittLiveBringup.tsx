@@ -957,6 +957,7 @@ function LiveEvidenceEvaluator() {
       <SnapshotExportPanel
         evaluated={evaluated}
         form={form}
+        tonight={tonight}
         overall={result}
         plantResults={multi.per_plant}
         unitWarnings={unitWarnings}
@@ -970,6 +971,7 @@ function LiveEvidenceEvaluator() {
 interface SnapshotExportPanelProps {
   readonly evaluated: boolean;
   readonly form: EcowittLiveEvidenceFormState;
+  readonly tonight: EcowittTonightModeViewModel;
   readonly overall: LiveSourceTruthGateResult;
   readonly plantResults: ReturnType<
     typeof evaluateLiveEvidenceForPlants
@@ -982,6 +984,7 @@ interface SnapshotExportPanelProps {
 function SnapshotExportPanel({
   evaluated,
   form,
+  tonight,
   overall,
   plantResults,
   unitWarnings,
@@ -989,9 +992,6 @@ function SnapshotExportPanel({
   requiredNextSteps,
 }: SnapshotExportPanelProps) {
   const handleDownload = React.useCallback(() => {
-    // Use the form's `now` field as the deterministic generated_at when
-    // available; fall back to the captured_at; otherwise pass an empty
-    // string so the filename helper returns its static fallback.
     const generatedAt =
       (form.now ?? "").trim() ||
       (form.captured_at ?? "").trim() ||
@@ -999,6 +999,7 @@ function SnapshotExportPanel({
     const snapshot = buildEcowittLiveEvidenceSnapshotExport({
       generated_at: generatedAt,
       form_state: form,
+      tonight_mode: tonight,
       overall_result: overall,
       plant_results: plantResults,
       unit_warnings: unitWarnings,
@@ -1016,12 +1017,11 @@ function SnapshotExportPanel({
       a.rel = "noopener";
       a.click();
     } finally {
-      // Revoke immediately; the browser has already captured the URL for
-      // the synchronous download click above.
       URL.revokeObjectURL(url);
     }
   }, [
     form,
+    tonight,
     overall,
     plantResults,
     unitWarnings,

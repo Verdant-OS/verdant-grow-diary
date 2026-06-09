@@ -22,6 +22,7 @@ import type {
 import type { LiveSourceTruthGateResult } from "./liveSourceTruthGateRules";
 import type { EcowittPerPlantResult } from "./ecowittLiveEvidenceMultiPlantRules";
 import type { EcowittEvidenceUnitWarning } from "./ecowittLiveEvidenceUnitWarningRules";
+import type { EcowittTonightModeViewModel } from "./ecowittTonightModeViewModel";
 
 export const ECOWITT_LIVE_EVIDENCE_EXPORT_SCHEMA_VERSION =
   "ecowitt-live-evidence-snapshot.v1" as const;
@@ -43,6 +44,8 @@ export const ECOWITT_LIVE_EVIDENCE_EXPORT_SAFETY_FLAGS: readonly string[] =
     "manual_snapshot_only",
     "not_database_proof",
     "requires_controller_comparison",
+    "requires_device_identity_confirmation",
+    "requires_timestamp_sanity_check",
     "no_device_control",
     "approval_required_for_actions",
     "do_not_use_demo_as_live",
@@ -64,10 +67,15 @@ export const ECOWITT_LIVE_EVIDENCE_EXPORT_STATIC_FILENAME =
 // ---------------------------------------------------------------------------
 
 export interface EcowittLiveEvidenceSourceTruthSummary {
+  readonly tonight_mode_status: string;
+  readonly can_export_snapshot: boolean;
+  readonly can_claim_live_proof: boolean;
   readonly overall_verdict: string;
   readonly overall_is_live_proof: boolean;
   readonly overall_summary: string;
   readonly per_plant_count: number;
+  readonly unit_warning_count: number;
+  readonly form_warning_count: number;
 }
 
 export interface EcowittLiveEvidenceSnapshotExport {
@@ -78,6 +86,7 @@ export interface EcowittLiveEvidenceSnapshotExport {
   readonly warning: typeof ECOWITT_LIVE_EVIDENCE_EXPORT_WARNING;
   readonly operator_disclaimer: typeof ECOWITT_LIVE_EVIDENCE_EXPORT_DISCLAIMER;
   readonly form_state: EcowittLiveEvidenceFormState;
+  readonly tonight_mode: EcowittTonightModeViewModel;
   readonly overall_result: LiveSourceTruthGateResult;
   readonly plant_results: readonly EcowittPerPlantResult[];
   readonly unit_warnings: readonly EcowittEvidenceUnitWarning[];
@@ -90,6 +99,7 @@ export interface EcowittLiveEvidenceSnapshotExport {
 export interface EcowittLiveEvidenceExportInput {
   readonly generated_at: string;
   readonly form_state: EcowittLiveEvidenceFormState;
+  readonly tonight_mode: EcowittTonightModeViewModel;
   readonly overall_result: LiveSourceTruthGateResult;
   readonly plant_results: readonly EcowittPerPlantResult[];
   readonly unit_warnings: readonly EcowittEvidenceUnitWarning[];
@@ -196,14 +206,22 @@ function assembleNextSteps(
 // ---------------------------------------------------------------------------
 
 function buildSourceTruthSummary(
+  tonight: EcowittTonightModeViewModel,
   overall: LiveSourceTruthGateResult,
   plantResults: readonly EcowittPerPlantResult[],
+  unitWarnings: readonly EcowittEvidenceUnitWarning[],
+  formWarnings: readonly string[],
 ): EcowittLiveEvidenceSourceTruthSummary {
   return Object.freeze({
+    tonight_mode_status: tonight.status,
+    can_export_snapshot: tonight.can_export_snapshot === true,
+    can_claim_live_proof: tonight.can_claim_live_proof === true,
     overall_verdict: overall.verdict,
     overall_is_live_proof: overall.is_live_proof === true,
     overall_summary: overall.summary,
     per_plant_count: plantResults.length,
+    unit_warning_count: unitWarnings.length,
+    form_warning_count: formWarnings.length,
   });
 }
 
@@ -216,6 +234,7 @@ export function buildEcowittLiveEvidenceSnapshotExport(
 ): EcowittLiveEvidenceSnapshotExport {
   // Deep-copy + redact every payload section before assembling the snapshot.
   const form_state = redactValue(input.form_state);
+  const tonight_mode = redactValue(input.tonight_mode);
   const overall_result = redactValue(input.overall_result);
   const plant_results = redactValue(input.plant_results);
   const unit_warnings = redactValue(input.unit_warnings);
@@ -226,8 +245,11 @@ export function buildEcowittLiveEvidenceSnapshotExport(
   const required_next_steps = assembleNextSteps(next_raw, isTemplate);
 
   const source_truth_summary = buildSourceTruthSummary(
+    tonight_mode,
     overall_result,
     plant_results,
+    unit_warnings,
+    form_warnings,
   );
 
   const snapshot: EcowittLiveEvidenceSnapshotExport = {
@@ -238,6 +260,7 @@ export function buildEcowittLiveEvidenceSnapshotExport(
     warning: ECOWITT_LIVE_EVIDENCE_EXPORT_WARNING,
     operator_disclaimer: ECOWITT_LIVE_EVIDENCE_EXPORT_DISCLAIMER,
     form_state,
+    tonight_mode,
     overall_result,
     plant_results,
     unit_warnings,

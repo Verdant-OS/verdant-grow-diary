@@ -58,6 +58,7 @@ const libTargets: Array<[string, string]> = [
   ["unit warning rules", unitWarnNoComments],
   ["multi-plant rules", multiPlantNoComments],
   ["export rules", exportNoComments],
+  ["tonight mode view model", tonightNoComments],
 ];
 
 const targets: Array<[string, string]> = [

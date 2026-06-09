@@ -1,138 +1,30 @@
 /**
  * AI Doctor Phase 1 Preview — internal static page.
  *
- * Mounts the read-only AiDoctorPhase1PreviewPanel using a static local fixture.
+ * Renders the read-only AiDoctorPhase1PreviewPanel against a precomputed
+ * library of static view models (see aiDoctorPhase1PreviewFixtures).
+ *
  * Does NOT call Supabase, models, Edge Functions, or any external APIs.
  * Does NOT write to alerts, Action Queue, or any database table.
  * Does NOT trigger automation or device control.
  *
- * This page is for operator/developer inspection only.
+ * Case selection is a native <select> (no buttons) so this page remains
+ * presenter-only with zero action surface.
  */
 import * as React from "react";
+import { AiDoctorPhase1PreviewPanel } from "@/components/AiDoctorPhase1PreviewPanel";
 import {
-  AiDoctorPhase1PreviewPanel,
-  type AiDoctorPhase1PreviewMode,
-} from "@/components/AiDoctorPhase1PreviewPanel";
-import type { AiDoctorPhase1ViewModel } from "@/lib/aiDoctorPhase1ViewModel";
-
-// ---------------------------------------------------------------------------
-// Static local fixture — built inline, NOT via engine/compiler/confidence
-// ---------------------------------------------------------------------------
-
-const STATIC_FIXTURE: AiDoctorPhase1ViewModel = {
-  summaryCard: {
-    title: "AI Doctor — Phase 1 Preview",
-    summary:
-      "This is a static preview demonstrating the Phase 1 view model contract. No diagnosis was run to produce this output.",
-    likely_issue: "N/A (static preview)",
-    risk_level: "low",
-    confidence_label: "Low confidence",
-    confidence_score: 25,
-    confidence_explanation:
-      "Static fixture data only. No live or manual sensor readings, no recent grow events, and no visual context.",
-    status_badges: [
-      "Risk: low",
-      "Confidence: low",
-      "Sample data only",
-      "Stale or invalid readings",
-      "No trustworthy sensor data",
-    ],
-  },
-  evidencePanel: {
-    evidence_items: [
-      "Demo temperature reading: 24 C",
-      "Demo humidity reading: 55 %",
-    ],
-    context_items: [
-      "Plant: demo-plant-1",
-      "Strain: Demo Strain",
-      "Stage: veg",
-      "Recent grow events (14d): 0",
-    ],
-    source_quality_items: [
-      "Demo readings (sample data, not real-time): 2",
-      "Stale readings (not current): 1",
-      "Invalid readings (rejected): 1",
-    ],
-    limitations: [
-      "No live or manual sensor readings in the last 7 days.",
-      "No grow events logged in the last 14 days.",
-      "Only demo or imported (CSV) data is available — not real-time.",
-      "Some readings are stale or invalid — not current and not reliable.",
-      "Multiple key pieces of context are missing.",
-    ],
-  },
-  missingInfoPanel: {
-    has_missing_info: true,
-    items: [
-      "pH reading",
-      "EC reading",
-      "Soil moisture reading",
-      "Recent photo",
-      "Feeding history (last 14 days)",
-    ],
-    severity: "high",
-  },
-  recommendationsPanel: {
-    immediate_action:
-      "This is a static preview. In a real review, the AI Doctor would suggest collecting fresh readings and observations first.",
-    what_not_to_do: [
-      "Do not make changes based on this static preview alone.",
-      "Avoid aggressive nutrient changes without fresh data.",
-    ],
-    twenty_four_hour_follow_up:
-      "If this were a real diagnosis, re-check the plant and environment after 24 hours.",
-    three_day_recovery_plan:
-      "Stabilize environment over 3 days once trustworthy data is available.",
-    monitoring_priorities: [
-      "Capture fresh live or manual sensor readings.",
-      "Log recent watering, feeding, or environment changes.",
-      "Re-check sensors flagged as stale or invalid.",
-      "Fill in missing information before re-running diagnosis.",
-    ],
-  },
-  actionQueuePanel: {
-    should_show: true,
-    status: "pending_approval",
-    action_type: "advisory",
-    label: "Suggested advisory action",
-    reason:
-      "Consider collecting fresh readings. Advisory only. Grower approval is required before any change is made.",
-    disabled_reason:
-      "More context needed before turning this into an action.",
-  },
-  safetyPanel: {
-    safety_flags: ["avoid_overdiagnosis", "weak_context", "static_preview"],
-    overdiagnosis_warning:
-      "Context is limited — avoid treating this as a certain diagnosis. Confirm with fresh readings and observations.",
-    source_truth_warning:
-      "Only demo or imported (CSV) data is available — not real-time sensor data. Some readings are stale or invalid — not current and not reliable.",
-    automation_warning:
-      "Verdant does not control equipment in this view. Any equipment change is up to the grower.",
-  },
-  debugMeta: {
-    source_counts: {
-      live_count: 0,
-      manual_count: 0,
-      csv_count: 0,
-      demo_count: 2,
-      stale_count: 1,
-      invalid_count: 1,
-      has_recent_trustworthy_sensor_data: false,
-      has_recent_grow_events: false,
-      has_visual_context: false,
-    },
-    has_live_data: false,
-    has_manual_data: false,
-    has_demo_or_csv_only: true,
-    has_stale_or_invalid: true,
-    generated_at: "2026-06-04T12:00:00.000Z",
-    raw_confidence_level: "low",
-    displayed_confidence_level: "low",
-  },
-};
+  AI_DOCTOR_PHASE1_PREVIEW_CASES,
+  AI_DOCTOR_PHASE1_PREVIEW_DEFAULT_CASE_ID,
+  getAiDoctorPhase1PreviewCase,
+} from "@/lib/aiDoctorPhase1PreviewFixtures";
 
 export default function AiDoctorPhase1Preview(): JSX.Element {
+  const [selectedId, setSelectedId] = React.useState<string>(
+    AI_DOCTOR_PHASE1_PREVIEW_DEFAULT_CASE_ID,
+  );
+  const current = getAiDoctorPhase1PreviewCase(selectedId);
+
   return (
     <div className="mx-auto max-w-3xl p-4 space-y-6">
       <div className="rounded-md border border-border bg-muted/30 p-4 space-y-2">
@@ -143,14 +35,55 @@ export default function AiDoctorPhase1Preview(): JSX.Element {
         </p>
         <p className="text-xs text-muted-foreground">
           This preview renders a precomputed Phase 1 view model. It does not
-          run diagnosis, score confidence, write alerts, or create Action Queue
-          items.
+          run diagnosis, does not score confidence, does not write alerts, and
+          does not create Action Queue items.
+        </p>
+      </div>
+
+      <div
+        data-testid="ai-doctor-phase1-preview-case-selector"
+        className="rounded-md border border-border bg-card p-4 space-y-2"
+      >
+        <label
+          htmlFor="ai-doctor-phase1-preview-case-select"
+          className="text-sm font-medium text-foreground"
+        >
+          Preview case
+        </label>
+        <select
+          id="ai-doctor-phase1-preview-case-select"
+          data-testid="ai-doctor-phase1-preview-case-select"
+          className="w-full rounded border border-border bg-background px-2 py-1 text-sm text-foreground"
+          value={selectedId}
+          onChange={(e) => setSelectedId(e.target.value)}
+        >
+          {AI_DOCTOR_PHASE1_PREVIEW_CASES.map((c) => (
+            <option
+              key={c.id}
+              value={c.id}
+              data-testid={`ai-doctor-phase1-preview-case-option-${c.id}`}
+            >
+              {c.label}
+            </option>
+          ))}
+        </select>
+        <p
+          data-testid="ai-doctor-phase1-preview-case-description"
+          className="text-xs text-muted-foreground"
+        >
+          {current.description}
+        </p>
+        <p
+          data-testid="ai-doctor-phase1-preview-case-source-mode"
+          className="text-xs text-muted-foreground"
+        >
+          Source mode: {current.sourceMode}
         </p>
       </div>
 
       <AiDoctorPhase1PreviewPanel
-        viewModel={STATIC_FIXTURE}
-        title="AI Doctor Phase 1 — Static Preview"
+        viewModel={current.viewModel}
+        title={current.viewModel.summaryCard.title}
         mode="internal"
       />
     </div>

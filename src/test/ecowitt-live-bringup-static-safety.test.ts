@@ -19,6 +19,7 @@ const TEMPLATES_PATH = "src/lib/ecowittLiveEvidenceTemplates.ts";
 const UNIT_WARN_PATH = "src/lib/ecowittLiveEvidenceUnitWarningRules.ts";
 const MULTI_PLANT_PATH = "src/lib/ecowittLiveEvidenceMultiPlantRules.ts";
 const EXPORT_PATH = "src/lib/ecowittLiveEvidenceExportRules.ts";
+const TONIGHT_PATH = "src/lib/ecowittTonightModeViewModel.ts";
 
 function read(p: string): string {
   return readFileSync(resolve(ROOT, p), "utf8");

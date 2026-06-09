@@ -158,6 +158,65 @@ describe("EcowittLiveBringup route page", () => {
   });
 });
 
+describe("Tonight Mode panel", () => {
+  it("renders with default blocked status before evaluation", () => {
+    renderRoute();
+    expect(screen.getByTestId("ecowitt-tonight-mode")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("ecowitt-tonight-mode-status").textContent ?? "",
+    ).toMatch(/blocked/);
+    expect(
+      screen.getByTestId("ecowitt-tonight-mode-next-best-action").textContent ?? "",
+    ).toMatch(/enter.*evidence.*evaluate/i);
+    expect(
+      screen.getByTestId("ecowitt-tonight-mode-can-claim-live").textContent ?? "",
+    ).toMatch(/false/);
+  });
+
+  it("renders all checklist items in order", () => {
+    renderRoute();
+    const ids = [
+      "network-checked",
+      "evidence-entered",
+      "timestamp-sane",
+      "device-identity-confirmed",
+      "controller-comparison-complete",
+      "unit-warnings-clear",
+      "source-truth-evaluated",
+      "snapshot-exported",
+    ];
+    for (const id of ids) {
+      expect(
+        screen.getByTestId(`ecowitt-tonight-mode-checklist-item-${id}`),
+      ).toBeInTheDocument();
+    }
+  });
+
+  it("verified live evidence enables can_claim_live_proof", () => {
+    renderRoute();
+    fillLiveBaseline();
+    enableMetric("temp_f", "72", "72");
+    clickEvaluate();
+    expect(
+      screen.getByTestId("ecowitt-tonight-mode-status").textContent ?? "",
+    ).toMatch(/live_proof_supported/);
+    expect(
+      screen.getByTestId("ecowitt-tonight-mode-can-claim-live").textContent ?? "",
+    ).toMatch(/true/);
+  });
+
+  it("static overall bring-up status remains blocked even with verified live evidence", () => {
+    renderRoute();
+    fillLiveBaseline();
+    enableMetric("temp_f", "72", "72");
+    clickEvaluate();
+    expect(
+      screen.getByTestId("ecowitt-bringup-overall-status").textContent ?? "",
+    ).toMatch(/blocked/i);
+  });
+});
+
+
 describe("Live Evidence Evaluator", () => {
   it("renders helper copy about local-only / no-query / no-write", () => {
     renderRoute();

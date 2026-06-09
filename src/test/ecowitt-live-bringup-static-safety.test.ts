@@ -149,6 +149,14 @@ describe("ecowitt-live-bringup — static safety", () => {
     expect(src).not.toContain("navigator.clipboard");
   });
 
+  it.each(libTargets)("[%s lib] does not use Blob/URL/document browser APIs", (_, src) => {
+    // Browser download APIs are page-only; helpers must stay pure.
+    expect(src).not.toMatch(/\bnew\s+Blob\b/);
+    expect(src).not.toMatch(/URL\.createObjectURL/);
+    expect(src).not.toMatch(/URL\.revokeObjectURL/);
+    expect(src).not.toMatch(/document\.createElement/);
+  });
+
   it.each(targets)("[%s] has no forbidden execution copy", (_, src) => {
     for (const phrase of FORBIDDEN_COPY) {
       expect(src).not.toMatch(new RegExp(phrase, "i"));

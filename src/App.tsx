@@ -54,6 +54,7 @@ import PartnerCsvPreviewLanding from "./pages/PartnerCsvPreviewLanding";
 import AiDoctorPhase1Preview from "./pages/AiDoctorPhase1Preview";
 import OneTentLoopProof from "./pages/OneTentLoopProof";
 import SensorTruthAudit from "./pages/SensorTruthAudit";
+import AiDoctorConfidenceAudit from "./pages/AiDoctorConfidenceAudit";
 
 
 
@@ -134,6 +135,7 @@ const App = () => (
                 <Route path="/internal/ai-doctor-phase1-preview" element={<AiDoctorPhase1Preview />} />
                 <Route path="/internal/one-tent-loop-proof" element={<OneTentLoopProof />} />
                 <Route path="/internal/sensor-truth-audit" element={<SensorTruthAudit />} />
+                <Route path="/internal/ai-doctor-confidence-audit" element={<AiDoctorConfidenceAudit />} />
                 {/* Leads is an internal admin/operator module, intentionally not
 
                     surfaced in grower-facing navigation. Primary route is

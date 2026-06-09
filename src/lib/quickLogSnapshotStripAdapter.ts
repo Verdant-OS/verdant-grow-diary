@@ -354,6 +354,7 @@ export function buildQuickLogStripFromTentState(
       action: actionFor("no_data"),
       classification: synthClassification("no_data", "No sensor data yet"),
       providerLabel: null,
+      trustBadge: classifySnapshotTrustBadge({ empty: true, source: snapshot.source ?? null }),
     };
   }
 
@@ -382,5 +383,9 @@ export function buildQuickLogStripFromTentState(
     action,
     classification: synthClassification(status, snapshot.badge_label),
     providerLabel: deriveProviderLabel(snapshot.source),
+    trustBadge: classifySnapshotTrustBadge({
+      resolverStatus: snapshot.status,
+      source: snapshot.source,
+    }),
   };
 }

@@ -61,12 +61,15 @@ Configure in `Settings → Secrets and variables → Actions`:
 - `E2E_GROW_1_PLANT_URL` — full URL of the `E2E Test Plant` page on the
   disposable account. Must **not** be on `verdantgrowdiary.com`.
 - `E2E_FIXTURE_MODE=true`
-- `E2E_FIXTURE_EXPECTED_GROW_NAME=E2E Test Grow`
 - `E2E_FIXTURE_EXPECTED_TENT_NAME=E2E Test Tent`
 - `E2E_FIXTURE_EXPECTED_PLANT_NAME=E2E Test Plant`
 
 **Optional variables:**
 
+- `E2E_FIXTURE_EXPECTED_GROW_NAME=E2E Test Grow` — only set if/when the
+  UI visibly exposes a grow name or selector. The current setup flow
+  has no Grow page, so this is **not** required and fixture
+  verification will not fail when it is omitted.
 - `E2E_GROW_2_PLANT_NAME` (default `505 Headbanger`)
 - `E2E_FIXTURE_EXPECTED_ACCOUNT_HINT` — a short safe label (e.g. `E2E`)
   used only if the app visibly exposes the signed-in account identity.

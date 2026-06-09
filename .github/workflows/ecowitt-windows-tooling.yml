@@ -1,0 +1,31 @@
+name: EcoWitt Windows tooling
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ecowitt-windows-tooling:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@f4d14e03ff726c06358e5557344e1da148b56cf7 # v2.0.1
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Vitest — EcoWitt Windows tooling + bridge
+        run: |
+          bunx vitest run \
+            src/test/ecowitt-windows-doctor.test.ts \
+            src/test/ecowitt-windows-launchers-safety.test.ts \
+            src/test/ecowitt-local-bridge-smoke.test.ts \
+            src/test/ecowitt-http-local-bridge.test.ts \
+            src/test/ecowitt-windows-fast-path.test.ts
+      - name: TypeScript app typecheck
+        run: bunx tsc -p tsconfig.app.json --noEmit

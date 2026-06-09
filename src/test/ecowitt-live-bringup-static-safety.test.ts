@@ -18,6 +18,7 @@ const FORM_PATH = "src/lib/ecowittLiveEvidenceFormRules.ts";
 const TEMPLATES_PATH = "src/lib/ecowittLiveEvidenceTemplates.ts";
 const UNIT_WARN_PATH = "src/lib/ecowittLiveEvidenceUnitWarningRules.ts";
 const MULTI_PLANT_PATH = "src/lib/ecowittLiveEvidenceMultiPlantRules.ts";
+const EXPORT_PATH = "src/lib/ecowittLiveEvidenceExportRules.ts";
 
 function read(p: string): string {
   return readFileSync(resolve(ROOT, p), "utf8");
@@ -35,21 +36,30 @@ const formSrc = read(FORM_PATH);
 const templatesSrc = read(TEMPLATES_PATH);
 const unitWarnSrc = read(UNIT_WARN_PATH);
 const multiPlantSrc = read(MULTI_PLANT_PATH);
+const exportSrc = read(EXPORT_PATH);
 const pageNoComments = stripComments(pageSrc);
 const vmNoComments = stripComments(vmSrc);
 const formNoComments = stripComments(formSrc);
 const templatesNoComments = stripComments(templatesSrc);
 const unitWarnNoComments = stripComments(unitWarnSrc);
 const multiPlantNoComments = stripComments(multiPlantSrc);
+const exportNoComments = stripComments(exportSrc);
 
-
-const targets: Array<[string, string]> = [
-  ["page", pageNoComments],
+// Targets for the strict no-browser-API/no-network/etc checks. The page is
+// allowed to use Blob / URL / document for the local snapshot download, so
+// it is handled separately below.
+const libTargets: Array<[string, string]> = [
   ["view model", vmNoComments],
   ["form rules", formNoComments],
   ["templates", templatesNoComments],
   ["unit warning rules", unitWarnNoComments],
   ["multi-plant rules", multiPlantNoComments],
+  ["export rules", exportNoComments],
+];
+
+const targets: Array<[string, string]> = [
+  ["page", pageNoComments],
+  ...libTargets,
 ];
 
 

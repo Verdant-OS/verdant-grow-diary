@@ -8,10 +8,15 @@ const WF_PATH = ".github/workflows/auth-loading-smoke.yml";
 const SPEC_PATH = "e2e/auth-loading.spec.ts";
 const REDIRECT_SPEC_PATH = "e2e/auth-redirect-safety.spec.ts";
 const DESKTOP_SPEC_PATH = "e2e/auth-desktop.spec.ts";
+const ROUTE_PROTECTION_SPEC_PATH = "e2e/auth-route-protection.spec.ts";
 const wf = fs.readFileSync(path.join(ROOT, WF_PATH), "utf8");
 const spec = fs.readFileSync(path.join(ROOT, SPEC_PATH), "utf8");
 const redirectSpec = fs.readFileSync(path.join(ROOT, REDIRECT_SPEC_PATH), "utf8");
 const desktopSpec = fs.readFileSync(path.join(ROOT, DESKTOP_SPEC_PATH), "utf8");
+const routeProtectionSpec = fs.readFileSync(
+  path.join(ROOT, ROUTE_PROTECTION_SPEC_PATH),
+  "utf8",
+);
 
 describe("Auth loading smoke workflow — safety", () => {
   it("uses pull_request (NOT pull_request_target)", () => {

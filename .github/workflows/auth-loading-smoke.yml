@@ -1,0 +1,93 @@
+name: Auth loading smoke (mocked)
+
+# Non-destructive Playwright auth smoke.
+#
+# SAFETY:
+#  - Mocked/non-destructive only. Every Supabase /auth/v1/** request is
+#    intercepted via page.route() inside the spec; no real Supabase auth
+#    endpoint is contacted.
+#  - No real accounts are created.
+#  - No real reset emails are sent.
+#  - No real grow data is touched (the spec never navigates into a grow).
+#  - No real E2E credentials, no service_role, no secrets are read.
+#  - Uses the SAFE pull_request event only — never pull_request_target.
+#  - No schedule/cron trigger.
+
+on:
+  pull_request:
+    branches: [verdant-grow-diary]
+    paths:
+      - "e2e/auth-loading.spec.ts"
+      - "e2e/**"
+      - "src/pages/Auth.tsx"
+      - "src/pages/ResetPassword.tsx"
+      - "src/lib/authErrorRules.ts"
+      - "src/lib/passwordResetRules.ts"
+      - "playwright.config.ts"
+      - ".github/workflows/auth-loading-smoke.yml"
+      - "package.json"
+      - "bun.lock"
+      - "bun.lockb"
+
+jobs:
+  auth-loading-smoke:
+    name: Auth loading smoke (mocked / non-destructive)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('bun.lock', 'bun.lockb', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: Install Chromium only (with deps)
+        run: bunx playwright install chromium --with-deps
+
+      - name: Run mocked auth-loading Playwright smoke
+        run: bunx playwright test e2e/auth-loading.spec.ts --project=chromium
+
+      - name: Upload Playwright report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-loading-playwright-report
+          path: playwright-report
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload Playwright test-results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-loading-test-results
+          path: test-results
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Job summary — mocked/non-destructive
+        if: ${{ always() }}
+        run: |
+          {
+            echo "### Auth loading smoke (mocked / non-destructive)";
+            echo "";
+            echo "- Mocked / non-destructive: **yes**";
+            echo "- No real accounts created";
+            echo "- No real reset emails sent";
+            echo "- No real grow data touched";
+            echo "- All Supabase /auth/v1/** traffic intercepted via page.route()";
+          } >> "$GITHUB_STEP_SUMMARY"

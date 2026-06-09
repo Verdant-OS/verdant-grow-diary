@@ -322,6 +322,33 @@ describe("Docs: rotation + fixture setup + screenshots", () => {
     expect(body).not.toMatch(/\.delete\(/);
   });
 
+  it("docs reflect current UI flow (no Grow page in setup) and mark grow optional", () => {
+    const setup = read("e2e/FIXTURE_SETUP.md");
+    const readme = read("e2e/README.md");
+    const checklist = read("e2e/scripts/print-fixture-config-checklist.ts");
+
+    // Setup doc references Add Tent / Add Plant flow.
+    expect(setup).toMatch(/Add Tent/i);
+    expect(setup).toMatch(/Add Plant/i);
+    expect(setup.toLowerCase()).toMatch(/optional|future/);
+    // Setup doc no longer instructs maintainers to create a Grow page.
+    expect(setup).not.toMatch(/Grow\s+named\s+exactly/i);
+    expect(setup).not.toMatch(/create.*Grow\s*:\s*['"]?E2E Test Grow/i);
+
+    // README documents the current flow and grow as optional.
+    expect(readme).toMatch(/Add Tent/i);
+    expect(readme).toMatch(/Add Plant/i);
+    expect(readme).toMatch(/optional/i);
+    expect(readme).not.toMatch(/Grow\s+named\s+exactly/i);
+
+    // Checklist marks grow as optional, not required.
+    expect(checklist).toMatch(/OPTIONAL_VARS[\s\S]*E2E_FIXTURE_EXPECTED_GROW_NAME/);
+    expect(checklist).not.toMatch(
+      /REQUIRED_VARS[\s\S]*E2E_FIXTURE_EXPECTED_GROW_NAME[\s\S]*\] as const/,
+    );
+    expect(checklist).toMatch(/optional\/future|optional.*Grow/i);
+  });
+
   it("package.json exposes e2e:bootstrap-fixture and e2e:fixture-checklist", () => {
     const pkg = JSON.parse(read("package.json")) as {
       scripts: Record<string, string>;

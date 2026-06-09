@@ -135,6 +135,7 @@ jobs:
         run: bun run e2e:install:ci
 
       - name: Run Quick Log Playwright smoke
+        id: quicklog_smoke
         if: steps.e2e_config.outputs.should_run == 'true'
         run: bun run e2e:quicklog-smoke
 
@@ -185,7 +186,10 @@ jobs:
           # GitHub Actions step summary. Never echoes secret values. Failures
           # here must not mask the real Playwright failure: this step always
           # exits 0 and emits explicit "unavailable" sentinels when fields
-          # cannot be determined.
+          # cannot be determined. Distinguishes:
+          #   report_parse_status=parsed  -> counts successfully extracted
+          #   report_parse_status=missing -> report JSON not produced
+          #   report_parse_status=failed  -> report JSON present but parsing failed
           set +e
 
           pw_version="$(bunx playwright --version 2>/dev/null | tr -d '\r' | head -n1)"
@@ -195,7 +199,9 @@ jobs:
           echo "playwright_version=${pw_version}" >> "$GITHUB_OUTPUT"
 
           report="e2e/results/quicklog-smoke-report.json"
+          report_parse_error=""
           if [ -f "${report}" ]; then
+            echo "report_json_present=true" >> "$GITHUB_OUTPUT"
             counts="$(node -e '
               try {
                 const fs = require("fs");
@@ -222,21 +228,36 @@ jobs:
                 const out = [total, passed, failed, skipped].map(v => (typeof v === "number" ? v : ""));
                 process.stdout.write(out.join("|"));
               } catch (e) {
+                process.stderr.write(String(e && e.message ? e.message : e).slice(0, 200));
                 process.stdout.write("");
               }
-            ' "${report}")"
+            ' "${report}" 2> /tmp/smoke_meta_err.txt)"
             IFS='|' read -r smoke_total smoke_passed smoke_failed smoke_skipped <<< "${counts}"
             if [ -n "${smoke_total}${smoke_passed}${smoke_failed}${smoke_skipped}" ]; then
               echo "smoke_counts_available=true" >> "$GITHUB_OUTPUT"
+              echo "report_parse_status=parsed" >> "$GITHUB_OUTPUT"
               echo "smoke_total=${smoke_total:-unknown}" >> "$GITHUB_OUTPUT"
               echo "smoke_passed=${smoke_passed:-unknown}" >> "$GITHUB_OUTPUT"
               echo "smoke_failed=${smoke_failed:-unknown}" >> "$GITHUB_OUTPUT"
               echo "smoke_skipped=${smoke_skipped:-unknown}" >> "$GITHUB_OUTPUT"
             else
               echo "smoke_counts_available=false" >> "$GITHUB_OUTPUT"
+              echo "report_parse_status=failed" >> "$GITHUB_OUTPUT"
+              if [ -s /tmp/smoke_meta_err.txt ]; then
+                # Sanitize: single line, strip $ and backticks, cap length.
+                report_parse_error="$(tr '\n' ' ' < /tmp/smoke_meta_err.txt | tr -d '`$' | head -c 200)"
+              else
+                report_parse_error="unable to extract counts from report JSON"
+              fi
+              echo "report_parse_error=${report_parse_error}" >> "$GITHUB_OUTPUT"
+              echo "::warning::Quick Log smoke metadata parsing failed: ${report_parse_error}"
             fi
           else
+            echo "report_json_present=false" >> "$GITHUB_OUTPUT"
             echo "smoke_counts_available=false" >> "$GITHUB_OUTPUT"
+            echo "report_parse_status=missing" >> "$GITHUB_OUTPUT"
+            echo "report_parse_error=" >> "$GITHUB_OUTPUT"
+            echo "::warning::Quick Log smoke report JSON missing at ${report}"
           fi
 
           exit 0
@@ -253,6 +274,17 @@ jobs:
             e2e/results/quicklog-smoke-report.txt
             playwright-report/
             test-results/
+
+      - name: Upload Playwright HTML report
+        id: upload_playwright_report
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: quicklog-playwright-report
+          path: playwright-report/
+          retention-days: 30
+          if-no-files-found: warn
+
 
       - name: Write Quick Log smoke run summary
         if: always()

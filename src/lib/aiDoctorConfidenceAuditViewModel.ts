@@ -15,6 +15,17 @@
 // Public types
 // ---------------------------------------------------------------------------
 
+export interface AiDoctorConfidenceAuditScenario {
+  id: string;
+  label: string;
+  description: string;
+  context_type: string;
+  applies_hard_caps: readonly string[];
+  applies_safety_flags: readonly string[];
+  confidence_ceiling: number;
+  operator_takeaway: string;
+}
+
 export interface AiDoctorConfidenceAuditRule {
   id: string;
   label: string;
@@ -44,6 +55,7 @@ export interface AiDoctorConfidenceAuditViewModel {
   source_quality_notes: readonly string[];
   safety_flags: readonly string[];
   forbidden_behavior: readonly string[];
+  scenarios: readonly AiDoctorConfidenceAuditScenario[];
   generated_at: string;
 }
 

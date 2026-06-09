@@ -193,15 +193,18 @@ function GoNoGoCard({ rule }: { rule: EcowittGoNoGoRule }) {
 function MetricRowEditor({
   row,
   onChange,
+  unitWarnings,
 }: {
   row: EcowittLiveEvidenceMetricRow;
   onChange: (next: EcowittLiveEvidenceMetricRow) => void;
+  unitWarnings: readonly EcowittEvidenceUnitWarning[];
 }) {
   const tid = `ecowitt-evaluator-metric-${row.key}`;
+  const rowWarnings = unitWarnings.filter((w) => w.metric_key === row.key);
   return (
     <div
       data-testid={tid}
-      className="grid gap-2 rounded-md border border-border bg-background p-2 text-xs sm:grid-cols-6"
+      className="grid gap-2 rounded-md border border-border bg-background p-2 text-xs sm:grid-cols-8"
     >
       <label className="flex items-center gap-1 sm:col-span-1">
         <input
@@ -226,6 +229,18 @@ function MetricRowEditor({
         />
       </label>
       <label className="flex flex-col sm:col-span-1">
+        <span className="text-muted-foreground">backend unit</span>
+        <input
+          type="text"
+          data-testid={`${tid}-backend-unit`}
+          value={row.backend_unit ?? ""}
+          onChange={(e) =>
+            onChange({ ...row, backend_unit: e.target.value })
+          }
+          className="rounded border border-border bg-background px-1 py-0.5"
+        />
+      </label>
+      <label className="flex flex-col sm:col-span-1">
         <span className="text-muted-foreground">controller</span>
         <input
           type="text"
@@ -239,7 +254,19 @@ function MetricRowEditor({
         />
       </label>
       <label className="flex flex-col sm:col-span-1">
-        <span className="text-muted-foreground">unit</span>
+        <span className="text-muted-foreground">controller unit</span>
+        <input
+          type="text"
+          data-testid={`${tid}-controller-unit`}
+          value={row.controller_unit ?? ""}
+          onChange={(e) =>
+            onChange({ ...row, controller_unit: e.target.value })
+          }
+          className="rounded border border-border bg-background px-1 py-0.5"
+        />
+      </label>
+      <label className="flex flex-col sm:col-span-1">
+        <span className="text-muted-foreground">shared unit</span>
         <input
           type="text"
           data-testid={`${tid}-unit`}
@@ -261,9 +288,22 @@ function MetricRowEditor({
           className="rounded border border-border bg-background px-1 py-0.5"
         />
       </label>
+      {rowWarnings.length > 0 ? (
+        <ul
+          data-testid={`${tid}-unit-warnings`}
+          className="sm:col-span-8 list-disc pl-5 text-amber-600"
+        >
+          {rowWarnings.map((w, i) => (
+            <li key={`uw-${row.key}-${i}`}>
+              [{w.severity}] {w.message} {w.operator_fix}
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }
+
 
 function VerdictCard({
   result,

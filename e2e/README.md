@@ -121,18 +121,68 @@ Triggers:
 - `push` to `main` touching `e2e/**`, `playwright.config.ts`, or the
   workflow itself — runs the same job, but skips cleanly if secrets are
   unavailable so forked-repo pushes never leak or fail mysteriously.
+- `pull_request` targeting `main` — runs on every PR into `main`. Uses
+  the safe `pull_request` event (never `pull_request_target`), so forked-PR
+  runs cannot read repository secrets. When secrets/vars are unavailable
+  (which is the default for forked PRs), the workflow skips cleanly with
+  a non-secret message rather than failing or leaking configuration.
 
-Required GitHub configuration:
+## CI handoff: Quick Log smoke
 
-- Secrets: `E2E_TEST_EMAIL`, `E2E_TEST_PASSWORD`
-- Vars: `E2E_BASE_URL`, `E2E_GROW_1_PLANT_URL`, optional `E2E_GROW_2_PLANT_NAME`
+### Required GitHub Actions Variables
 
-Artifacts (uploaded with `if: always()` under the name
-`quicklog-smoke-artifacts`):
+- `E2E_BASE_URL` — base URL of the running app under test
+- `E2E_GROW_1_PLANT_URL` — full URL of a Grow #1 plant page
+- `E2E_GROW_2_PLANT_NAME` — optional, defaults to `505 Headbanger`
 
-- `e2e/results/quicklog-smoke-report.json`
-- `e2e/results/quicklog-smoke-report.txt`
-- `playwright-report/`
-- `test-results/`
+### Required GitHub Actions Secrets
 
-Find them under the workflow run summary → Artifacts.
+- `E2E_TEST_EMAIL` — login email for the dedicated smoke test account
+- `E2E_TEST_PASSWORD` — login password for the dedicated smoke test account
+
+### Workflow
+
+File: `.github/workflows/quicklog-smoke.yml`
+
+- Manual run: **Actions → Quick Log Playwright smoke → Run workflow**
+- Pull request run: runs automatically on PRs targeting `main`, and skips
+  cleanly if required secrets/vars are unavailable (e.g. forked PRs).
+
+Branch note: PR smoke is configured for `main` per request. If the repo's
+default branch is still `verdant-grow-diary`, this workflow still targets
+`main` for PR/push triggers; the default branch is not renamed here.
+
+### Artifact
+
+- Name: `quicklog-smoke-artifacts`
+- Retention: **30 days**
+- Uploaded with `if: always()` so failures still produce a report.
+- Expected paths:
+  - `e2e/results/quicklog-smoke-report.json`
+  - `e2e/results/quicklog-smoke-report.txt`
+  - `playwright-report/`
+  - `test-results/`
+
+`e2e/.auth/user.json` is gitignored and is **never** uploaded as part of
+the artifact bundle.
+
+### Failure triage
+
+1. Open `e2e/results/quicklog-smoke-report.txt` first — it lists the
+   failed step number, label, and evidence.
+2. Inspect the Playwright HTML report under `playwright-report/`, plus
+   traces, screenshots, and videos under `test-results/`.
+3. Paste the `.txt` report back into the project thread for diagnosis.
+
+### Safety note
+
+- The smoke creates real Quick Log diary entries through the normal
+  authenticated UI.
+- Use a dedicated test account and a dedicated test plant.
+- Do not run against a real grower account.
+- Do not commit `e2e/.auth/user.json`.
+- Do not use service role keys.
+- Do not add auth bypasses.
+
+Find artifacts under the workflow run summary → Artifacts.
+

@@ -231,6 +231,19 @@ export function buildQuickLogSnapshotStrip(
     action: finalAction,
     classification,
     providerLabel: deriveProviderLabel(src),
+    trustBadge: classifySnapshotTrustBadge({
+      resolverStatus:
+        status === "usable"
+          ? src === "live"
+            ? "fresh_live"
+            : "fresh_non_live"
+          : status === "stale"
+            ? "stale"
+            : status === "invalid"
+              ? "invalid"
+              : "empty",
+      source: src,
+    }),
   };
 }
 

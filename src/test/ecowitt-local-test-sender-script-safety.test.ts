@@ -19,9 +19,17 @@ const SCRIPT = readFileSync(
 );
 
 describe("ecowitt local test sender — safety", () => {
-  it("never references service_role", () => {
-    expect(SCRIPT).not.toMatch(/service[_-]?role/i);
-    expect(SCRIPT).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
+  // Strip comments before scanning for forbidden runtime tokens so that
+  // safety-rule documentation (e.g. "never uses service_role") doesn't
+  // create false positives.
+  const CODE = SCRIPT.replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n")
+    .map((l) => l.replace(/\/\/.*$/, ""))
+    .join("\n");
+
+  it("never references service_role in executable code", () => {
+    expect(CODE).not.toMatch(/service[_-]?role/i);
+    expect(CODE).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
   });
 
   it("does not import the supabase client / SDK directly", () => {

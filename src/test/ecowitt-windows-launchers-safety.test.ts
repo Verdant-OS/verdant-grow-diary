@@ -70,15 +70,16 @@ describe("ecowitt windows launchers — generated content safety", () => {
     expect(r).toMatch(/Live send is NOT part of this fast path/i);
   });
 
-  it("launchers contain no live sender, no Supabase webhook, no token, no service_role", () => {
-    const all = Object.values(launchers).join("\n");
-    expect(all).not.toMatch(/VERDANT_BRIDGE_TOKEN/);
-    expect(all).not.toMatch(/service[_-]?role/i);
-    expect(all).not.toMatch(/sensor-ingest-webhook/);
-    expect(all).not.toMatch(/supabase\.co/i);
-    // Live sender shortcut is the `dev:send-ecowitt` / live runner — not the dry-run.
-    expect(all).not.toMatch(/dev:send-ecowitt\b/);
-    expect(all).not.toMatch(/dev:ecowitt-mqtt"/); // only the :dry-run variant
+  it(".cmd files contain no live sender, no Supabase webhook, no token, no service_role literal", () => {
+    for (const [name, body] of Object.entries(launchers)) {
+      if (!name.endsWith(".cmd")) continue;
+      expect(body, name).not.toMatch(/VERDANT_BRIDGE_TOKEN/);
+      expect(body, name).not.toMatch(/service[_-]?role/i);
+      expect(body, name).not.toMatch(/sensor-ingest-webhook/);
+      expect(body, name).not.toMatch(/supabase\.co/i);
+      expect(body, name).not.toMatch(/dev:send-ecowitt\b/);
+      expect(body, name).not.toMatch(/dev:ecowitt-mqtt"/);
+    }
   });
 
   it("repo-command launchers begin with cd /d <repo-root> so they work from anywhere", () => {

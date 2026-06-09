@@ -7,6 +7,7 @@ import { AuthProvider } from "@/store/auth";
 import { GrowsProvider } from "@/store/grows";
 import AppShell from "@/components/AppShell";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Tents from "./pages/Tents";
 import TentDetail from "./pages/TentDetail";

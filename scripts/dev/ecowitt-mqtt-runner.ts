@@ -48,7 +48,7 @@ interface CliFlags {
   once: boolean;
   sample: boolean;
   invalid: boolean;
-  writeReport: boolean;
+  writeReport?: boolean;
 }
 
 export const DEFAULT_REPORT_PATH = "./tmp/ecowitt-last-ingest-report.json";

@@ -40,13 +40,13 @@ describe("importRunnerReport", () => {
   it("rejects malformed JSON", () => {
     const r = importRunnerReport("{not json");
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe("invalid_json");
+    if (r.ok !== true) expect((r as { reason: string }).reason).toBe("invalid_json");
   });
 
   it("rejects invalid shape", () => {
     const r = importRunnerReport(JSON.stringify({ foo: "bar" }));
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe("invalid_shape");
+    if (r.ok !== true) expect((r as { reason: string }).reason).toBe("invalid_shape");
   });
 
   it("blocks report containing token-shaped values outside auth field", () => {
@@ -55,13 +55,13 @@ describe("importRunnerReport", () => {
       classification: "accepted",
       url: "https://x",
       reasons: [],
-      // Token leak placed in a non-auth field.
       note: "leaked vbt_ABCDEFGHIJK123456",
       auth: "Bearer vbt_…(redacted)",
     });
     const r = importRunnerReport(bad);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe("token_leak_blocked");
+    if (r.ok !== true)
+      expect((r as { reason: string }).reason).toBe("token_leak_blocked");
   });
 });
 

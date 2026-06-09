@@ -20,6 +20,7 @@ on:
       - "e2e/auth-loading.spec.ts"
       - "e2e/auth-redirect-safety.spec.ts"
       - "e2e/auth-desktop.spec.ts"
+      - "e2e/auth-route-protection.spec.ts"
       - "e2e/**"
       - "src/pages/Auth.tsx"
       - "src/pages/ResetPassword.tsx"

@@ -559,4 +559,205 @@ describe("Quick Log Playwright CI surface", () => {
     // No scheduled smoke reaffirmation
     expect(readme).toMatch(/no scheduled or nightly/i);
   });
+
+  // ---------- Hardened cache guardrails ----------
+
+  function extractStepBlocks(wf: string): string[] {
+    const re = /^( {6}-\s*name:[\s\S]*?)(?=^ {6}-\s*name:|\Z)/gms;
+    const out: string[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(wf)) !== null) out.push(m[1]);
+    return out;
+  }
+
+  it("every actions/cache@v4 block is gated, has runner.os + hashFiles(lock/package), and excludes forbidden paths", () => {
+    const wf = read(".github/workflows/quicklog-smoke.yml");
+    const blocks = extractStepBlocks(wf).filter((b) =>
+      /uses:\s*actions\/cache@v4/.test(b),
+    );
+    expect(blocks.length, "expected at least 2 cache blocks (Bun + Playwright)").toBeGreaterThanOrEqual(2);
+
+    const forbidden = [
+      "e2e/.auth",
+      "e2e/results",
+      "test-results",
+      "playwright-report",
+      "storageState",
+      "user.json",
+      "secrets.",
+      "E2E_TEST_PASSWORD",
+      "E2E_TEST_EMAIL",
+      "SUPABASE_SERVICE_ROLE",
+      "service_role",
+    ];
+
+    const allowedPaths = new Set([
+      "~/.bun/install/cache",
+      "~/.cache/ms-playwright",
+    ]);
+
+    for (const block of blocks) {
+      expect(block).toMatch(
+        /if:\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/,
+      );
+
+      const keyMatch = block.match(/\n\s*key:\s*(.+)/);
+      expect(keyMatch, "cache step missing key:").toBeTruthy();
+      const keyLine = keyMatch![1];
+      expect(keyLine).toMatch(/\$\{\{\s*runner\.os\s*\}\}/);
+      expect(keyLine).toContain("hashFiles(");
+      expect(keyLine).toMatch(/bun\.lock|bun\.lockb|package\.json/);
+
+      const restoreMatch = block.match(/restore-keys:\s*\|\s*\n([\s\S]*?)(?=\n\s*\S|\n*$)/);
+      expect(restoreMatch, "cache step missing restore-keys:").toBeTruthy();
+      expect(restoreMatch![1]).toMatch(/\$\{\{\s*runner\.os\s*\}\}/);
+
+      const pathMatch = block.match(/\n\s*path:\s*(.+)/);
+      expect(pathMatch, "cache step missing path:").toBeTruthy();
+      const pathValue = pathMatch![1].trim();
+      expect(
+        allowedPaths.has(pathValue),
+        `cache path '${pathValue}' not in allowlist`,
+      ).toBe(true);
+
+      for (const tok of forbidden) {
+        expect(
+          block.includes(tok),
+          `cache block must not reference forbidden token '${tok}'`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it("smoke run step has stable id quicklog_smoke", () => {
+    const wf = read(".github/workflows/quicklog-smoke.yml");
+    const smokeStep = wf.match(
+      /-\s*name:\s*Run Quick Log Playwright smoke[\s\S]*?(?=\n {6}- name:)/,
+    );
+    expect(smokeStep, "Run Quick Log Playwright smoke step missing").toBeTruthy();
+    const block = smokeStep![0];
+    expect(block).toMatch(/id:\s*quicklog_smoke/);
+    expect(block).toContain("bun run e2e:quicklog-smoke");
+  });
+
+  it("metadata step emits report_json_present + report_parse_status and cannot mask Playwright failure", () => {
+    const wf = read(".github/workflows/quicklog-smoke.yml");
+    const metaStep = wf.match(
+      /-\s*name:\s*Capture Quick Log smoke metadata[\s\S]*?(?=\n {6}- name:)/,
+    );
+    expect(metaStep, "metadata step missing").toBeTruthy();
+    const block = metaStep![0];
+    expect(block).toMatch(/report_json_present=(true|false)/);
+    expect(block).toMatch(/report_parse_status=parsed/);
+    expect(block).toMatch(/report_parse_status=missing/);
+    expect(block).toMatch(/report_parse_status=failed/);
+    expect(block).toMatch(/set \+e/);
+    expect(block).toMatch(/exit\s+0/);
+  });
+
+  it("summary has Failure annotation block distinguishing smoke vs metadata problems", () => {
+    const wf = read(".github/workflows/quicklog-smoke.yml");
+    const summaryStep = wf.match(
+      /-\s*name:\s*Write Quick Log smoke run summary[\s\S]*?(?=\n {6}- name:|\n*$)/,
+    );
+    expect(summaryStep).toBeTruthy();
+    const block = summaryStep![0];
+
+    expect(block).toMatch(/steps\.quicklog_smoke\.outcome/);
+    expect(block).toMatch(/steps\.quicklog_smoke\.conclusion/);
+
+    expect(block).toMatch(/###\s+(Failure annotation|Run diagnosis)/);
+
+    expect(block).toContain(
+      "Smoke command failed: the Playwright smoke step did not complete successfully.",
+    );
+    expect(block).toContain(
+      "Report JSON missing: smoke count parsing could not run because the report JSON was not produced.",
+    );
+    expect(block).toContain(
+      "Report parsing failed: smoke counts could not be extracted from",
+    );
+    expect(block).toContain(
+      "Report parsing succeeded: smoke counts were extracted from",
+    );
+
+    expect(block).toContain("REPORT_JSON_PRESENT");
+    expect(block).toContain("REPORT_PARSE_STATUS");
+  });
+
+  it("bundled smoke artifact upload remains unchanged (name + paths + retention)", () => {
+    const wf = read(".github/workflows/quicklog-smoke.yml");
+    const uploadMatch = wf.match(
+      /name:\s*quicklog-smoke-artifacts[\s\S]*?path:\s*\|\n([\s\S]*?)(?=\n\s*-\s*name:|\n[^\s-]|\n\s*$|$)/,
+    );
+    expect(uploadMatch).toBeTruthy();
+    const paths = uploadMatch![1]
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+    expect(paths).toEqual([
+      "e2e/results/quicklog-smoke-report.json",
+      "e2e/results/quicklog-smoke-report.txt",
+      "playwright-report/",
+      "test-results/",
+    ]);
+    const bundled = wf.match(
+      /-\s*name:\s*Upload smoke artifacts[\s\S]*?(?=\n {6}- name:)/,
+    );
+    expect(bundled).toBeTruthy();
+    expect(bundled![0]).toMatch(/retention-days:\s*30/);
+  });
+
+  it("dedicated Playwright HTML report artifact upload exists with stable id and 30d retention", () => {
+    const wf = read(".github/workflows/quicklog-smoke.yml");
+    const step = wf.match(
+      /-\s*name:\s*Upload Playwright HTML report[\s\S]*?(?=\n {6}- name:|\n*$)/,
+    );
+    expect(step, "Upload Playwright HTML report step missing").toBeTruthy();
+    const block = step![0];
+    expect(block).toMatch(/id:\s*upload_playwright_report/);
+    expect(block).toMatch(/uses:\s*actions\/upload-artifact@v4/);
+    expect(block).toMatch(
+      /if:\s*always\(\)\s*&&\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/,
+    );
+    expect(block).toMatch(/name:\s*quicklog-playwright-report/);
+    expect(block).toMatch(/path:\s*playwright-report\//);
+    expect(block).toMatch(/retention-days:\s*30/);
+    expect(block).toMatch(/if-no-files-found:\s*warn/);
+  });
+
+  it("summary links to dedicated Playwright report artifact url with #artifacts fallback and explains downloads", () => {
+    const wf = read(".github/workflows/quicklog-smoke.yml");
+    const summaryStep = wf.match(
+      /-\s*name:\s*Write Quick Log smoke run summary[\s\S]*?(?=\n {6}- name:|\n*$)/,
+    );
+    expect(summaryStep).toBeTruthy();
+    const block = summaryStep![0];
+    expect(block).toMatch(
+      /PLAYWRIGHT_REPORT_ARTIFACT_URL:\s*\$\{\{\s*steps\.upload_playwright_report\.outputs\.artifact-url\s*\}\}/,
+    );
+    expect(block).toMatch(/pw_report_url="\$\{ARTIFACTS_URL\}"/);
+    expect(block).toContain("[Playwright HTML report](${pw_report_url})");
+    expect(block).toMatch(/downloads,?\s*not hosted HTML pages/i);
+    expect(block).toContain("index.html");
+    expect(block).not.toMatch(/runs\/\d{3,}/);
+    expect(block).not.toMatch(/\/artifacts\/\d+/);
+  });
+
+  it("README documents dedicated Playwright report artifact + failure annotation + cache key guardrails", () => {
+    const readme = read("e2e/README.md");
+    expect(readme).toContain("quicklog-playwright-report");
+    expect(readme).toMatch(/###\s+Failure annotation/);
+    expect(readme).toContain("Smoke command failure");
+    expect(readme).toContain("Report JSON missing");
+    expect(readme).toContain("Report parsing failed");
+    expect(readme).toContain("Report parsing succeeded");
+    expect(readme).toContain("report_json_present");
+    expect(readme).toContain("report_parse_status");
+    expect(readme).toMatch(/hashFiles\(/);
+    expect(readme).toContain("runner.os");
+    expect(readme).toMatch(/downloads,?\s*not hosted/i);
+    expect(readme).toContain("index.html");
+    expect(readme).toMatch(/no scheduled or nightly/i);
+  });
 });

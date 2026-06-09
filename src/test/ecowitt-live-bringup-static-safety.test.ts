@@ -15,6 +15,9 @@ const ROOT = resolve(__dirname, "../..");
 const PAGE_PATH = "src/pages/EcowittLiveBringup.tsx";
 const VM_PATH = "src/lib/ecowittLiveBringupViewModel.ts";
 const FORM_PATH = "src/lib/ecowittLiveEvidenceFormRules.ts";
+const TEMPLATES_PATH = "src/lib/ecowittLiveEvidenceTemplates.ts";
+const UNIT_WARN_PATH = "src/lib/ecowittLiveEvidenceUnitWarningRules.ts";
+const MULTI_PLANT_PATH = "src/lib/ecowittLiveEvidenceMultiPlantRules.ts";
 
 function read(p: string): string {
   return readFileSync(resolve(ROOT, p), "utf8");
@@ -29,9 +32,16 @@ function stripComments(src: string): string {
 const pageSrc = read(PAGE_PATH);
 const vmSrc = read(VM_PATH);
 const formSrc = read(FORM_PATH);
+const templatesSrc = read(TEMPLATES_PATH);
+const unitWarnSrc = read(UNIT_WARN_PATH);
+const multiPlantSrc = read(MULTI_PLANT_PATH);
 const pageNoComments = stripComments(pageSrc);
 const vmNoComments = stripComments(vmSrc);
 const formNoComments = stripComments(formSrc);
+const templatesNoComments = stripComments(templatesSrc);
+const unitWarnNoComments = stripComments(unitWarnSrc);
+const multiPlantNoComments = stripComments(multiPlantSrc);
+
 
 const targets: Array<[string, string]> = [
   ["page", pageNoComments],

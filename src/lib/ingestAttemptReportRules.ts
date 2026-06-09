@@ -307,5 +307,6 @@ export function buildRedactedReportForClipboard(
     metric_keys: report.metricKeys,
     auth: report.authPreview,
     note: report.storageNotice,
+    evidence: report.evidence,
   };
 }

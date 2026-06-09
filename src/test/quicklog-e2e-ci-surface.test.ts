@@ -236,9 +236,9 @@ describe("Quick Log Playwright CI surface", () => {
     expect(block).toContain("test-results/");
     expect(block).toMatch(/30 days/);
     expect(block).toMatch(/should_run/);
-    // Must not echo or expand secret values into the summary
-    expect(block).not.toMatch(/secrets\.E2E_TEST_PASSWORD/);
-    expect(block).not.toMatch(/secrets\.E2E_TEST_EMAIL/);
+    // Must not expand secret VALUES into the summary (names-as-documentation are fine)
+    expect(block).not.toMatch(/\$\{\{\s*secrets\.E2E_TEST_PASSWORD\s*\}\}/);
+    expect(block).not.toMatch(/\$\{\{\s*secrets\.E2E_TEST_EMAIL\s*\}\}/);
     expect(block).not.toMatch(/\$E2E_TEST_PASSWORD\b/);
     expect(block).not.toMatch(/\$E2E_TEST_EMAIL\b/);
   });

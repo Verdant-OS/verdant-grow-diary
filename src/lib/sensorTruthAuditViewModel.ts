@@ -133,7 +133,7 @@ const SOURCE_RULE_SEEDS: readonly SourceRuleSeed[] = [
   {
     label: "stale",
     meaning: "Old reading that has exceeded freshness thresholds.",
-    allowed_use: "Historical context only. Do not use for current-state decisions.",
+    allowed_use: "Historical context only. Do not use for present-state decisions.",
     confidence_impact: "Decreases confidence. Stale data is a limitation, not current truth.",
     ui_label_requirement: "Must show 'Stale' with the original captured_at and an age warning.",
     safety_notes: "Never describe stale as current. A reading from yesterday is not today's environment.",

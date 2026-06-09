@@ -13,8 +13,8 @@ name: Quick Log Playwright smoke
 #
 # Triggers:
 #  - workflow_dispatch: manual run; fails fast if required secrets/URL are missing.
-#  - push to main: best-effort; skips cleanly if secrets are unavailable.
-#  - pull_request to main: best-effort; PRs without access to E2E vars/secrets
+#  - push to verdant-grow-diary: best-effort; skips cleanly if secrets are unavailable.
+#  - pull_request to verdant-grow-diary: best-effort; PRs without access to E2E vars/secrets
 #    (e.g. forked PRs) skip cleanly with a clear non-secret message and the job
 #    completes successfully.
 #

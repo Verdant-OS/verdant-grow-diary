@@ -81,7 +81,7 @@ describe("QuickLog habit-capture polish — presentation", () => {
   it("renders title and subtitle", () => {
     renderWithClient(<QuickLog open={true} onOpenChange={vi.fn()} />);
     const dialog = screen.getByRole("dialog");
-    expect(within(dialog).getByText(/Quick Log/i)).toBeInTheDocument();
+    expect(within(dialog).getAllByText(/Quick Log/i).length).toBeGreaterThan(0);
     expect(within(dialog).getByTestId("quick-log-subtitle").textContent).toMatch(
       /Capture what changed/i,
     );

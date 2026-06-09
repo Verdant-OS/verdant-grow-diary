@@ -214,7 +214,7 @@ function buildLimitations(
   if (!sq.has_recent_grow_events)
     limits.push("No grow events logged in the last 14 days.");
   if (sq.stale_count > 0 || sq.invalid_count > 0)
-    limits.push("Some readings are stale or invalid — not treated as healthy.");
+    limits.push("Some readings are stale or invalid — not current and not reliable.");
   if (
     !sq.has_recent_trustworthy_sensor_data &&
     sq.stale_count === 0 &&
@@ -429,7 +429,7 @@ function buildSourceTruthWarning(
     );
   if (hasStaleOrInvalid)
     parts.push(
-      "Some readings are stale or invalid — they are not treated as healthy.",
+      "Some readings are stale or invalid — not current and not reliable.",
     );
   if (!sq.has_recent_trustworthy_sensor_data && !hasDemoOrCsvOnly)
     parts.push("No trustworthy (live or manual) sensor data is available.");

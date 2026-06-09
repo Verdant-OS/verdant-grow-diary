@@ -1,21 +1,8 @@
 /**
- * PlantQuickLog photo source picker — browser-level integration coverage.
+ * PlantQuickLog photo source picker + ten-second quick check integration coverage.
  *
- * Drives the real PlantQuickLog component end-to-end against mocked
- * Supabase storage + diary_entries insert (no real network, no real DB
- * writes). Proves both "Take Photo" and "Choose from Library" inputs:
- *
- *   1. Reach the same selected-photo preview state.
- *   2. Reach the same diary-photos upload + diary_entries insert path.
- *   3. Produce equivalent insert payloads.
- *   4. Have accessible names + ARIA wiring for screen readers.
- *   5. Support mobile-safe photo-only and manual-reading-only saves.
- *   6. Preserve the Gate 1 habit-capture polish without changing payload shape.
- *
- * No real Supabase calls — uses the same mock-supabase-client pattern
- * already used by other component integration tests in this repo.
- * Playwright/Cypress are NOT installed; this is the safest available
- * browser-level harness without introducing a heavy new E2E dependency.
+ * Drives the real PlantQuickLog component end-to-end against mocked Supabase
+ * storage + diary_entries insert (no real network, no real DB writes).
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
@@ -25,27 +12,25 @@ import React from "react";
 const uploadCalls: Array<{ bucket: string; path: string; file: File }> = [];
 const insertCalls: Array<Record<string, unknown>> = [];
 
-vi.mock("@/integrations/supabase/client", () => {
-  return {
-    supabase: {
-      storage: {
-        from: (bucket: string) => ({
-          upload: (path: string, file: File) => {
-            uploadCalls.push({ bucket, path, file });
-            return Promise.resolve({ data: { path }, error: null });
-          },
-          remove: () => Promise.resolve({ data: null, error: null }),
-        }),
-      },
-      from: (table: string) => ({
-        insert: (payload: Record<string, unknown>) => {
-          insertCalls.push({ __table: table, ...payload });
-          return Promise.resolve({ data: null, error: null });
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    storage: {
+      from: (bucket: string) => ({
+        upload: (path: string, file: File) => {
+          uploadCalls.push({ bucket, path, file });
+          return Promise.resolve({ data: { path }, error: null });
         },
+        remove: () => Promise.resolve({ data: null, error: null }),
       }),
     },
-  };
-});
+    from: (table: string) => ({
+      insert: (payload: Record<string, unknown>) => {
+        insertCalls.push({ __table: table, ...payload });
+        return Promise.resolve({ data: null, error: null });
+      },
+    }),
+  },
+}));
 
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: { id: "user-test-1" } }),
@@ -59,7 +44,6 @@ vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-// URL.createObjectURL is not available in jsdom by default.
 beforeEach(() => {
   uploadCalls.length = 0;
   insertCalls.length = 0;
@@ -106,6 +90,68 @@ async function pickFile(input: HTMLInputElement, file: File) {
   });
 }
 
+describe("PlantQuickLog ten-second quick check", () => {
+  it("renders the tired-grower path as Better, Same, Worse primary buttons", () => {
+    renderSheet();
+    expect(screen.getByText("10-second check: tap how the plant looks right now.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /quick check better/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /quick check same/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /quick check worse/i })).toBeTruthy();
+    expect(screen.getByText("Better, Same, or Worse is enough for a quick check.")).toBeTruthy();
+  });
+
+  it("Better/Same/Worse updates local note state without saving", () => {
+    renderSheet();
+    fireEvent.click(screen.getByRole("button", { name: /quick check better/i }));
+    expect(screen.getByTestId("plant-quick-log-note")).toHaveValue("Quick check: Better.");
+    expect(screen.getByTestId("plant-quick-log-save")).not.toBeDisabled();
+    expect(insertCalls).toHaveLength(0);
+    expect(uploadCalls).toHaveLength(0);
+  });
+
+  it("quick check status replaces previous status instead of stacking contradictions", () => {
+    renderSheet();
+    fireEvent.click(screen.getByRole("button", { name: /quick check worse/i }));
+    fireEvent.click(screen.getByRole("button", { name: /quick check same/i }));
+    expect(screen.getByTestId("plant-quick-log-note")).toHaveValue("Quick check: Same.");
+  });
+
+  it("saves a quick check with unchanged diary_entries payload shape", async () => {
+    renderSheet();
+    fireEvent.click(screen.getByRole("button", { name: /quick check better/i }));
+    fireEvent.click(screen.getByTestId("plant-quick-log-save"));
+
+    await waitFor(() => expect(insertCalls).toHaveLength(1));
+    expect(uploadCalls).toHaveLength(0);
+    expect(insertCalls[0]).toMatchObject({
+      __table: "diary_entries",
+      grow_id: "grow-1",
+      plant_id: "plant-1",
+      tent_id: "tent-1",
+      note: "Quick check: Better.",
+    });
+    expect(insertCalls[0].photo_url).toBeNull();
+    expect("user_id" in insertCalls[0]).toBe(false);
+  });
+
+  it("detail chips append local note detail without saving", () => {
+    renderSheet();
+    fireEvent.click(screen.getByRole("button", { name: /quick check same/i }));
+    fireEvent.click(screen.getByRole("button", { name: /add watered to the quick log note/i }));
+    fireEvent.click(screen.getByRole("button", { name: /add watered to the quick log note/i }));
+    expect(screen.getByTestId("plant-quick-log-note")).toHaveValue("Quick check: Same.\nWatered");
+    expect(insertCalls).toHaveLength(0);
+  });
+
+  it("Photo only chip does not weaken validation when no photo is selected", () => {
+    renderSheet();
+    fireEvent.click(screen.getByRole("button", { name: /add photo only to the quick log note/i }));
+    expect(screen.getByTestId("plant-quick-log-error").textContent).toMatch(/add a photo before/i);
+    expect(screen.getByTestId("plant-quick-log-save")).toBeDisabled();
+    expect(insertCalls).toHaveLength(0);
+  });
+});
+
 describe("PlantQuickLog Gate 1 polish", () => {
   it("renders title, subtitle, section labels, save copy, and helper copy", () => {
     renderSheet();
@@ -116,37 +162,6 @@ describe("PlantQuickLog Gate 1 polish", () => {
     expect(screen.getByText("3. Optional details")).toBeTruthy();
     expect(screen.getByRole("button", { name: /save quick log/i })).toHaveTextContent("Save log");
     expect(screen.getByText("You can add more detail later from the timeline.")).toBeTruthy();
-  });
-
-  it("renders prompt chips and updates local note state without saving", () => {
-    renderSheet();
-    const better = screen.getByRole("button", { name: /add better to the quick log note/i });
-    const same = screen.getByRole("button", { name: /add same to the quick log note/i });
-    const worse = screen.getByRole("button", { name: /add worse to the quick log note/i });
-
-    fireEvent.click(better);
-    fireEvent.click(same);
-    fireEvent.click(worse);
-
-    expect(screen.getByTestId("plant-quick-log-note")).toHaveValue("Better\nSame\nWorse");
-    expect(insertCalls).toHaveLength(0);
-    expect(uploadCalls).toHaveLength(0);
-  });
-
-  it("prompt chips avoid duplicate note text", () => {
-    renderSheet();
-    const better = screen.getByRole("button", { name: /add better to the quick log note/i });
-    fireEvent.click(better);
-    fireEvent.click(better);
-    expect(screen.getByTestId("plant-quick-log-note")).toHaveValue("Better");
-  });
-
-  it("Photo only chip does not weaken validation when no photo is selected", () => {
-    renderSheet();
-    fireEvent.click(screen.getByRole("button", { name: /add photo only to the quick log note/i }));
-    expect(screen.getByTestId("plant-quick-log-error").textContent).toMatch(/add a photo before/i);
-    expect(screen.getByTestId("plant-quick-log-save")).toBeDisabled();
-    expect(insertCalls).toHaveLength(0);
   });
 
   it("renders photo helper and manual readings helper without calling manual readings live", () => {
@@ -175,8 +190,6 @@ describe("PlantQuickLog photo source picker — accessible names + ARIA wiring",
     renderSheet();
     const take = screen.getByRole("button", { name: /^take photo$/i });
     const lib = screen.getByRole("button", { name: /^choose from library$/i });
-    expect(take).toBeTruthy();
-    expect(lib).toBeTruthy();
     expect(take.getAttribute("aria-controls")).toBe("plant-quick-log-photo-input");
     expect(lib.getAttribute("aria-controls")).toBe("plant-quick-log-photo-library-input");
   });
@@ -185,8 +198,6 @@ describe("PlantQuickLog photo source picker — accessible names + ARIA wiring",
     renderSheet();
     const camera = document.getElementById("plant-quick-log-photo-input") as HTMLInputElement;
     const library = document.getElementById("plant-quick-log-photo-library-input") as HTMLInputElement;
-    expect(camera).toBeTruthy();
-    expect(library).toBeTruthy();
     expect(camera.getAttribute("aria-label")).toMatch(/camera/i);
     expect(library.getAttribute("aria-label")).toMatch(/library/i);
     expect(camera.getAttribute("accept")).toBe("image/*");
@@ -208,7 +219,7 @@ describe("PlantQuickLog photo source picker — accessible names + ARIA wiring",
   it("renders a mobile-visible save helper and sticky save action", () => {
     renderSheet();
     expect(screen.getByTestId("plant-quick-log-save-helper").textContent).toMatch(
-      /add a note, photo, or reading/i,
+      /tap better, same, or worse/i,
     );
     const save = screen.getByTestId("plant-quick-log-save");
     expect(save.getAttribute("aria-describedby")).toBe("plant-quick-log-save-helper");
@@ -222,9 +233,7 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
     const camera = document.getElementById("plant-quick-log-photo-input") as HTMLInputElement;
     await pickFile(camera, makeImage("camera.jpg"));
 
-    await waitFor(() => {
-      expect(screen.getByTestId("plant-quick-log-photo-preview")).toBeTruthy();
-    });
+    await waitFor(() => expect(screen.getByTestId("plant-quick-log-photo-preview")).toBeTruthy());
 
     fireEvent.change(screen.getByTestId("plant-quick-log-note"), {
       target: { value: "Logged from camera path" },
@@ -247,9 +256,7 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
     const library = document.getElementById("plant-quick-log-photo-library-input") as HTMLInputElement;
     await pickFile(library, makeImage("gallery.png"));
 
-    await waitFor(() => {
-      expect(screen.getByTestId("plant-quick-log-photo-preview")).toBeTruthy();
-    });
+    await waitFor(() => expect(screen.getByTestId("plant-quick-log-photo-preview")).toBeTruthy());
 
     fireEvent.change(screen.getByTestId("plant-quick-log-note"), {
       target: { value: "Logged from library path" },
@@ -272,9 +279,7 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
     const library = document.getElementById("plant-quick-log-photo-library-input") as HTMLInputElement;
     await pickFile(library, makeImage("photo-only.jpg"));
 
-    await waitFor(() => {
-      expect(screen.getByTestId("plant-quick-log-photo-preview")).toBeTruthy();
-    });
+    await waitFor(() => expect(screen.getByTestId("plant-quick-log-photo-preview")).toBeTruthy());
     expect(screen.getByTestId("plant-quick-log-save")).not.toBeDisabled();
 
     fireEvent.click(screen.getByTestId("plant-quick-log-save"));
@@ -326,17 +331,13 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
     const galleryFile = makeImage("same-gallery-photo.jpg");
 
     await pickFile(library, galleryFile);
-    await waitFor(() => {
-      expect(screen.getByTestId("plant-quick-log-photo-preview")).toBeTruthy();
-    });
+    await waitFor(() => expect(screen.getByTestId("plant-quick-log-photo-preview")).toBeTruthy());
     expect(library.value).toBe("");
 
     fireEvent.click(screen.getByTestId("plant-quick-log-photo-remove"));
     await pickFile(library, galleryFile);
 
-    await waitFor(() => {
-      expect(screen.getByTestId("plant-quick-log-photo-preview")).toBeTruthy();
-    });
+    await waitFor(() => expect(screen.getByTestId("plant-quick-log-photo-preview")).toBeTruthy());
     expect(library.value).toBe("");
   });
 
@@ -345,14 +346,11 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
     const camera = document.getElementById("plant-quick-log-photo-input") as HTMLInputElement;
     await pickFile(camera, makeImage("same-camera-photo.jpg"));
 
-    await waitFor(() => {
-      expect(screen.getByTestId("plant-quick-log-photo-preview")).toBeTruthy();
-    });
+    await waitFor(() => expect(screen.getByTestId("plant-quick-log-photo-preview")).toBeTruthy());
     expect(camera.value).toBe("");
   });
 
   it("both sources produce structurally equivalent insert payloads", async () => {
-    // Camera path
     const first = renderSheet();
     await pickFile(
       document.getElementById("plant-quick-log-photo-input") as HTMLInputElement,
@@ -369,7 +367,6 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
     insertCalls.length = 0;
     uploadCalls.length = 0;
 
-    // Library path
     renderSheet();
     await pickFile(
       document.getElementById("plant-quick-log-photo-library-input") as HTMLInputElement,
@@ -382,7 +379,6 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
     await waitFor(() => expect(insertCalls).toHaveLength(1));
     const fromLibrary = { ...insertCalls[0] };
 
-    // Strip path/photo_url (timestamp differs) and compare the rest of the contract.
     const stripVolatile = (p: Record<string, unknown>) => {
       const { photo_url: _p, ...rest } = p;
       return rest;

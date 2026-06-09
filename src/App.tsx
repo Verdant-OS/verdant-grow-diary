@@ -54,6 +54,7 @@ import PartnerCsvPreviewLanding from "./pages/PartnerCsvPreviewLanding";
 import AiDoctorPhase1Preview from "./pages/AiDoctorPhase1Preview";
 import OneTentLoopProof from "./pages/OneTentLoopProof";
 import SensorTruthAudit from "./pages/SensorTruthAudit";
+import AiDoctorConfidenceAudit from "./pages/AiDoctorConfidenceAudit";
 
 
 

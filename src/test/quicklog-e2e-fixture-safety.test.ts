@@ -207,15 +207,19 @@ describe("E2E fixture safety: source-level guardrails", () => {
 describe("Workflow: fixture verification gates smoke", () => {
   const wf = read(".github/workflows/quicklog-smoke.yml");
 
-  it("precheck requires the fixture safety vars by sanitized name", () => {
+  it("precheck requires the fixture safety vars by sanitized name (grow optional)", () => {
     for (const name of [
       '"vars.E2E_FIXTURE_MODE"',
-      '"vars.E2E_FIXTURE_EXPECTED_GROW_NAME"',
       '"vars.E2E_FIXTURE_EXPECTED_TENT_NAME"',
       '"vars.E2E_FIXTURE_EXPECTED_PLANT_NAME"',
     ]) {
       expect(wf).toContain(name);
     }
+    // Grow name must NOT be in the missing[] precheck — current UI has
+    // no Grow page in the setup flow.
+    expect(wf).not.toMatch(
+      /missing\+=\("vars\.E2E_FIXTURE_EXPECTED_GROW_NAME"\)/,
+    );
     // No secret VALUES are echoed
     expect(wf).not.toMatch(/echo[^\n]*\$E2E_FIXTURE_/);
   });

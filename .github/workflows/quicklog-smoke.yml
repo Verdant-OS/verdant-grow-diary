@@ -335,6 +335,9 @@ jobs:
           name: quicklog-playwright-media
           path: |
             test-results/**/*.png
+            test-results/**/*.jpg
+            test-results/**/*.jpeg
+            test-results/**/*.gif
             test-results/**/*.webm
             test-results/**/*.mp4
             playwright-report/data/**

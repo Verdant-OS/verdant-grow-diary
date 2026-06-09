@@ -164,15 +164,32 @@ export default function ResetPassword() {
                 <Label htmlFor="reset-confirm">Confirm new password</Label>
                 <Input
                   id="reset-confirm"
+                  ref={confirmRef}
                   type={show ? "text" : "password"}
                   autoComplete="new-password"
                   minLength={MIN_PASSWORD_LENGTH}
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
-                  aria-describedby="password-requirements"
+                  aria-invalid={confirmMismatch ? true : undefined}
+                  aria-describedby={
+                    confirmMismatch
+                      ? "reset-confirm-mismatch password-requirements"
+                      : "password-requirements"
+                  }
                   required
                 />
+                {confirmMismatch ? (
+                  <p
+                    id="reset-confirm-mismatch"
+                    role="status"
+                    aria-live="polite"
+                    className="text-xs text-destructive mt-1"
+                  >
+                    Passwords do not match yet.
+                  </p>
+                ) : null}
               </div>
+
 
               <div
                 id="password-requirements"

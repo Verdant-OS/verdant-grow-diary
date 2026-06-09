@@ -76,11 +76,43 @@ export default function Auth() {
     if (user) nav(postSignInTarget(), { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, nav]);
+
+  // While a verification-resend cooldown is active, tick once a second so
+  // the countdown label updates and the button re-enables on its own.
+  useEffect(() => {
+    if (resendLastAttemptAt == null) return;
+    if (canResendVerification(Date.now(), resendLastAttemptAt)) return;
+    const id = window.setInterval(() => {
+      setResendNowTick(Date.now());
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [resendLastAttemptAt, resendNowTick]);
+
   if (loading) return null;
   if (user) return <Navigate to={postSignInTarget()} replace />;
 
+  const resendCooldownActive = !canResendVerification(
+    resendNowTick,
+    resendLastAttemptAt,
+    DEFAULT_VERIFICATION_COOLDOWN_MS,
+  );
+  const resendCooldownRemainingMs = verificationCooldownRemainingMs(
+    resendNowTick,
+    resendLastAttemptAt,
+    DEFAULT_VERIFICATION_COOLDOWN_MS,
+  );
+  const resendDisabled = resendBusy || resendCooldownActive;
+  const resendLabel = resendBusy
+    ? "Sending verification email…"
+    : resendCooldownActive
+      ? formatVerificationCooldown(resendCooldownRemainingMs)
+      : "Resend verification email";
+
   async function resendVerification() {
     if (resendBusy) return;
+    if (!canResendVerification(Date.now(), resendLastAttemptAt, DEFAULT_VERIFICATION_COOLDOWN_MS)) {
+      return;
+    }
     setResendBusy(true);
     setResendNotice(null);
     try {
@@ -94,9 +126,14 @@ export default function Auth() {
     } catch {
       setResendNotice(RESEND_VERIFICATION_GENERIC_FAILURE);
     } finally {
+      // Apply cooldown on both success and failure to discourage hammering.
       setResendBusy(false);
+      const stamp = Date.now();
+      setResendLastAttemptAt(stamp);
+      setResendNowTick(stamp);
     }
   }
+
 
   async function signIn(e: React.FormEvent) {
     e.preventDefault();

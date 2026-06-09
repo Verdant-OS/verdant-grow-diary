@@ -29,6 +29,9 @@ on:
       - "e2e/**"
       - "playwright.config.ts"
       - ".github/workflows/quicklog-smoke.yml"
+  pull_request:
+    branches: [main]
+
 
 jobs:
   quicklog-smoke:

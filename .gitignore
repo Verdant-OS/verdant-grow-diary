@@ -23,3 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 .one-tent-loop-smoke-report.json
+
+# Local Ecowitt dry-run report artifacts
+/tmp/

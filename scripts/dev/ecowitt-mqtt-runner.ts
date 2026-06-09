@@ -327,10 +327,9 @@ async function main(): Promise<void> {
     if (flags.once || flags.dryRun) return;
   }
 
-  if (flags.dryRun && !(flags.sample || flags.invalid)) {
-    await handlePayload(buildSamplePayload(false), env, flags);
-    return;
-  }
+  // NOTE: dry-run without --sample now subscribes to MQTT and consumes a
+  // real message so the dry-run report reflects actual gateway evidence
+  // rather than a built-in sample payload.
 
   // Live MQTT path — dynamic require so dry-run / sample modes do not
   // require the `mqtt` package to be installed and TypeScript does not

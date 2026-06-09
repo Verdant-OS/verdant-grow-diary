@@ -38,6 +38,7 @@ const templatesSrc = read(TEMPLATES_PATH);
 const unitWarnSrc = read(UNIT_WARN_PATH);
 const multiPlantSrc = read(MULTI_PLANT_PATH);
 const exportSrc = read(EXPORT_PATH);
+const tonightSrc = read(TONIGHT_PATH);
 const pageNoComments = stripComments(pageSrc);
 const vmNoComments = stripComments(vmSrc);
 const formNoComments = stripComments(formSrc);
@@ -45,6 +46,7 @@ const templatesNoComments = stripComments(templatesSrc);
 const unitWarnNoComments = stripComments(unitWarnSrc);
 const multiPlantNoComments = stripComments(multiPlantSrc);
 const exportNoComments = stripComments(exportSrc);
+const tonightNoComments = stripComments(tonightSrc);
 
 // Targets for the strict no-browser-API/no-network/etc checks. The page is
 // allowed to use Blob / URL / document for the local snapshot download, so

@@ -254,7 +254,7 @@ describe("Auth — friendly non-enumerating errors", () => {
 describe("ResetPassword — requirements helper, loading, errors", () => {
   it("renders local-only requirements helper without server-certainty claims", async () => {
     renderReset();
-    await waitFor(() => expect(screen.getByLabelText(/new password/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByLabelText(/^new password$/i)).toBeInTheDocument());
     expect(screen.getByText(/checked locally before submit/i)).toBeInTheDocument();
     // None of these claims should appear.
     for (const phrase of [/strong password/i, /secure/i, /server approved/i, /guaranteed/i, /breached/i]) {
@@ -269,13 +269,13 @@ describe("ResetPassword — requirements helper, loading, errors", () => {
 
   it("submit is disabled until all local rules pass", async () => {
     renderReset();
-    await waitFor(() => expect(screen.getByLabelText(/new password/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByLabelText(/^new password$/i)).toBeInTheDocument());
     const submit = screen.getByRole("button", { name: /^update password$/i });
     expect(submit).toBeDisabled();
-    fireEvent.change(screen.getByLabelText(/new password/i), {
+    fireEvent.change(screen.getByLabelText(/^new password$/i), {
       target: { value: "abcdefg1" },
     });
-    fireEvent.change(screen.getByLabelText(/confirm new password/i), {
+    fireEvent.change(screen.getByLabelText(/^confirm new password$/i), {
       target: { value: "abcdefg1" },
     });
     await waitFor(() => expect(submit).not.toBeDisabled());
@@ -283,11 +283,11 @@ describe("ResetPassword — requirements helper, loading, errors", () => {
 
   it("button shows Updating password… and disables during request", async () => {
     renderReset();
-    await waitFor(() => expect(screen.getByLabelText(/new password/i)).toBeInTheDocument());
-    fireEvent.change(screen.getByLabelText(/new password/i), {
+    await waitFor(() => expect(screen.getByLabelText(/^new password$/i)).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText(/^new password$/i), {
       target: { value: "abcdefg1" },
     });
-    fireEvent.change(screen.getByLabelText(/confirm new password/i), {
+    fireEvent.change(screen.getByLabelText(/^confirm new password$/i), {
       target: { value: "abcdefg1" },
     });
     fireEvent.click(screen.getByRole("button", { name: /^update password$/i }));
@@ -301,10 +301,10 @@ describe("ResetPassword — requirements helper, loading, errors", () => {
   it("reset failure shows friendly expired-link copy and refocuses password", async () => {
     updateUserResult = { error: { message: "token expired" } };
     renderReset();
-    await waitFor(() => expect(screen.getByLabelText(/new password/i)).toBeInTheDocument());
-    const pwd = screen.getByLabelText(/new password/i);
+    await waitFor(() => expect(screen.getByLabelText(/^new password$/i)).toBeInTheDocument());
+    const pwd = screen.getByLabelText(/^new password$/i);
     fireEvent.change(pwd, { target: { value: "abcdefg1" } });
-    fireEvent.change(screen.getByLabelText(/confirm new password/i), {
+    fireEvent.change(screen.getByLabelText(/^confirm new password$/i), {
       target: { value: "abcdefg1" },
     });
     fireEvent.click(screen.getByRole("button", { name: /^update password$/i }));

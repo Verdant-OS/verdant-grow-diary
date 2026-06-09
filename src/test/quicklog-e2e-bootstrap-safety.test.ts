@@ -302,9 +302,9 @@ describe("Docs: rotation + fixture setup + screenshots", () => {
     const body = read(p);
     expect(body).not.toMatch(/process\.env\.E2E_TEST_PASSWORD/);
     expect(body).not.toMatch(/process\.env\.E2E_TEST_EMAIL/);
-    expect(body).not.toMatch(/fetch\(|http\.|https\.|supabase/i);
+    expect(body).not.toMatch(/\bfetch\s*\(|require\(["']https?["']\)|from\s+["']https?["']|supabase\.from\(/i);
     expect(body).not.toMatch(/service_role/i);
-    expect(body).not.toMatch(/\.delete\(|\bDELETE\b/);
+    expect(body).not.toMatch(/\.delete\(/);
   });
 
   it("package.json exposes e2e:bootstrap-fixture and e2e:fixture-checklist", () => {

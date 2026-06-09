@@ -104,12 +104,16 @@ describe("AiDoctorPhase1Preview page — base render", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByTestId("ai-doctor-confidence-audit-link-title"),
-    ).toHaveTextContent("View confidence audit");
+    ).toHaveTextContent("View matching confidence audit");
     expect(
       screen.getByTestId("ai-doctor-confidence-audit-link-description"),
     ).toHaveTextContent(/hard caps/);
     const link = screen.getByTestId("ai-doctor-confidence-audit-link");
-    expect(link).toHaveAttribute("href", "/internal/ai-doctor-confidence-audit");
+    // Default case maps to its matching scenario id
+    expect(link).toHaveAttribute(
+      "href",
+      expect.stringContaining("/internal/ai-doctor-confidence-audit?scenario="),
+    );
   });
 
   it("confidence audit link shows internal/static/read-only badges", () => {

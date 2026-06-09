@@ -66,7 +66,7 @@ export default function Auth() {
     e.preventDefault();
     setForgotError(null);
     const v = validateResetEmail(forgotEmail);
-    if (!v.ok) {
+    if (v.ok !== true) {
       setForgotError(v.message);
       return;
     }

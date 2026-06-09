@@ -10,6 +10,7 @@
  *   3. Produce equivalent insert payloads.
  *   4. Have accessible names + ARIA wiring for screen readers.
  *   5. Support mobile-safe photo-only and manual-reading-only saves.
+ *   6. Preserve the Gate 1 habit-capture polish without changing payload shape.
  *
  * No real Supabase calls — uses the same mock-supabase-client pattern
  * already used by other component integration tests in this repo.
@@ -105,11 +106,75 @@ async function pickFile(input: HTMLInputElement, file: File) {
   });
 }
 
+describe("PlantQuickLog Gate 1 polish", () => {
+  it("renders title, subtitle, section labels, save copy, and helper copy", () => {
+    renderSheet();
+    expect(screen.getByRole("heading", { name: "Quick Log" })).toBeTruthy();
+    expect(screen.getByText("Capture what changed. Add detail only if it helps.")).toBeTruthy();
+    expect(screen.getByText("1. Plant")).toBeTruthy();
+    expect(screen.getByText("2. Observation")).toBeTruthy();
+    expect(screen.getByText("3. Optional details")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /save quick log/i })).toHaveTextContent("Save log");
+    expect(screen.getByText("You can add more detail later from the timeline.")).toBeTruthy();
+  });
+
+  it("renders prompt chips and updates local note state without saving", () => {
+    renderSheet();
+    const better = screen.getByRole("button", { name: /add better to the quick log note/i });
+    const same = screen.getByRole("button", { name: /add same to the quick log note/i });
+    const worse = screen.getByRole("button", { name: /add worse to the quick log note/i });
+
+    fireEvent.click(better);
+    fireEvent.click(same);
+    fireEvent.click(worse);
+
+    expect(screen.getByTestId("plant-quick-log-note")).toHaveValue("Better\nSame\nWorse");
+    expect(insertCalls).toHaveLength(0);
+    expect(uploadCalls).toHaveLength(0);
+  });
+
+  it("prompt chips avoid duplicate note text", () => {
+    renderSheet();
+    const better = screen.getByRole("button", { name: /add better to the quick log note/i });
+    fireEvent.click(better);
+    fireEvent.click(better);
+    expect(screen.getByTestId("plant-quick-log-note")).toHaveValue("Better");
+  });
+
+  it("Photo only chip does not weaken validation when no photo is selected", () => {
+    renderSheet();
+    fireEvent.click(screen.getByRole("button", { name: /add photo only to the quick log note/i }));
+    expect(screen.getByTestId("plant-quick-log-error").textContent).toMatch(/add a photo before/i);
+    expect(screen.getByTestId("plant-quick-log-save")).toBeDisabled();
+    expect(insertCalls).toHaveLength(0);
+  });
+
+  it("renders photo helper and manual readings helper without calling manual readings live", () => {
+    renderSheet();
+    expect(screen.getByText("A photo can be enough for today.")).toBeTruthy();
+    expect(screen.getByText("Manual readings")).toBeTruthy();
+    expect(screen.getByText("Optional. Manual readings are not live sensor data.")).toBeTruthy();
+    expect(screen.queryByText(/manual readings are live/i)).toBeNull();
+  });
+
+  it("exposes accessible labels for plant, note, photo buttons, save, and manual readings", () => {
+    renderSheet();
+    expect(screen.getByLabelText("Selected plant for this Quick Log")).toHaveTextContent("Plant 1");
+    expect(screen.getByLabelText("Quick Log observation note")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Take Photo$/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Choose from Library$/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /save quick log/i })).toBeTruthy();
+    expect(screen.getByTestId("plant-quick-log-sensors").getAttribute("aria-describedby")).toBe(
+      "plant-quick-log-manual-readings-helper",
+    );
+  });
+});
+
 describe("PlantQuickLog photo source picker — accessible names + ARIA wiring", () => {
   it("exposes Take Photo and Choose from Library as named buttons", () => {
     renderSheet();
-    const take = screen.getByRole("button", { name: /take photo/i });
-    const lib = screen.getByRole("button", { name: /choose from library/i });
+    const take = screen.getByRole("button", { name: /^take photo$/i });
+    const lib = screen.getByRole("button", { name: /^choose from library$/i });
     expect(take).toBeTruthy();
     expect(lib).toBeTruthy();
     expect(take.getAttribute("aria-controls")).toBe("plant-quick-log-photo-input");
@@ -143,7 +208,7 @@ describe("PlantQuickLog photo source picker — accessible names + ARIA wiring",
   it("renders a mobile-visible save helper and sticky save action", () => {
     renderSheet();
     expect(screen.getByTestId("plant-quick-log-save-helper").textContent).toMatch(
-      /add a note, photo, or manual reading/i,
+      /add a note, photo, or reading/i,
     );
     const save = screen.getByTestId("plant-quick-log-save");
     expect(save.getAttribute("aria-describedby")).toBe("plant-quick-log-save-helper");
@@ -250,7 +315,7 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
     expect(save).toBeDisabled();
     fireEvent.submit(screen.getByTestId("plant-quick-log-note").closest("form")!);
     expect(screen.getByTestId("plant-quick-log-error").textContent).toMatch(
-      /add a note, photo, or manual reading/i,
+      /add a note, photo, or reading/i,
     );
     expect(insertCalls).toHaveLength(0);
   });

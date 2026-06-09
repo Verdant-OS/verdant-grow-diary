@@ -102,6 +102,8 @@ export interface IngestAttemptReport {
   storageNotice: string;
   /** True when the attempt may safely be shown as healthy live evidence. */
   trustedLive: boolean;
+  /** Redacted evidence from the consumed payload, if available. */
+  evidence: EcowittIngestEvidence | null;
 }
 
 const TITLE: Record<IngestAttemptStatus, string> = {

@@ -677,21 +677,59 @@ export default function QuickLog({
           )}
 
 
-          <div>
-            <Label>What's happening?</Label>
+          <div className="space-y-2">
+            <h3
+              data-testid="quick-log-section-observation"
+              className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+            >
+              2. Observation
+            </h3>
+            <div
+              data-testid="quick-log-prompt-chips"
+              role="group"
+              aria-label="Quick observation prompts"
+              className="flex flex-wrap gap-1.5"
+            >
+              {[
+                { label: "Better", text: "Better than yesterday." },
+                { label: "Same", text: "About the same as yesterday." },
+                { label: "Worse", text: "Looking worse than yesterday." },
+                { label: "Watered", text: "Watered today." },
+                { label: "Fed", text: "Fed today." },
+                { label: "Spotted issue", text: "Spotted an issue — see photo or notes." },
+                { label: "Photo only", text: "Photo only — no other changes today." },
+              ].map((chip) => (
+                <button
+                  key={chip.label}
+                  type="button"
+                  data-testid={`quick-log-chip-${chip.label.toLowerCase().replace(/\s+/g, "-")}`}
+                  aria-label={`Insert observation: ${chip.label}`}
+                  onClick={() =>
+                    setNote((prev) => (prev.trim() ? `${prev.trim()} ${chip.text}` : chip.text))
+                  }
+                  className="rounded-full border border-border/60 bg-secondary/30 px-2.5 py-1 text-[11px] text-foreground hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+            <Label htmlFor="quicklog-note-textarea">What's happening?</Label>
             <Textarea
+              id="quicklog-note-textarea"
               ref={noteRef}
               data-testid="quicklog-note"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Watered, looking healthy, slight yellowing on a fan leaf…"
               rows={3}
+              aria-label="Quick log observation note"
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="sentences"
               spellCheck={true}
             />
           </div>
+
 
           {eventType === "reminder" && (
             <div>

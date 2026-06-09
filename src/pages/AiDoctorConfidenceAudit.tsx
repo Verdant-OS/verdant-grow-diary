@@ -301,6 +301,59 @@ export default function AiDoctorConfidenceAudit(): JSX.Element {
         </p>
       </header>
 
+      <Section id="scenario-deep-links" title="Scenario deep links">
+        <p
+          data-testid="ai-doctor-confidence-scenario-deep-links-helper"
+          className="text-xs text-muted-foreground"
+        >
+          Use these internal links to jump directly to a static confidence
+          scenario. They do not run scoring or write data.
+        </p>
+        <ul
+          data-testid="ai-doctor-confidence-scenario-deep-links"
+          className="grid gap-2"
+        >
+          {vm.scenarios.map((s) => (
+            <li
+              key={s.id}
+              data-testid={`ai-doctor-confidence-scenario-deep-link-item-${s.id}`}
+              className="rounded border border-border bg-background p-2 text-sm"
+            >
+              <Link
+                to={`/internal/ai-doctor-confidence-audit?scenario=${s.id}`}
+                data-testid={`ai-doctor-confidence-scenario-deep-link-${s.id}`}
+                className="font-medium text-primary underline-offset-2 hover:underline"
+              >
+                {s.label}
+              </Link>
+              <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <span
+                  data-testid={`ai-doctor-confidence-scenario-deep-link-context-${s.id}`}
+                  className="rounded border border-border px-2 py-0.5"
+                >
+                  Context: {s.context_type}
+                </span>
+                <span
+                  data-testid={`ai-doctor-confidence-scenario-deep-link-ceiling-${s.id}`}
+                  className="rounded border border-border px-2 py-0.5"
+                >
+                  Ceiling:{" "}
+                  {s.confidence_ceiling >= 0
+                    ? s.confidence_ceiling
+                    : "Conservative / low"}
+                </span>
+                <span
+                  data-testid={`ai-doctor-confidence-scenario-deep-link-flags-${s.id}`}
+                  className="rounded border border-border px-2 py-0.5"
+                >
+                  Safety flags: {s.applies_safety_flags.length}
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </Section>
+
       <Section id="scenario-selector" title="Scenario selector">
         <label
           htmlFor="ai-doctor-confidence-scenario-select"

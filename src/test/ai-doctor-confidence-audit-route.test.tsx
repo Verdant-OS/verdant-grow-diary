@@ -212,7 +212,7 @@ describe("AiDoctorConfidenceAudit route page", () => {
   // -------------------------------------------------------------------------
   it("label is visible and associated with select via htmlFor", () => {
     renderAt("/internal/ai-doctor-confidence-audit");
-    const label = screen.getByTestId("ai-doctor-confidence-scenario-label");
+    const label = screen.getByTestId("ai-doctor-confidence-scenario-select-label");
     expect(label).toHaveAttribute("for", "ai-doctor-confidence-scenario-select");
     expect(label).toHaveTextContent("Select a weak-context scenario");
   });

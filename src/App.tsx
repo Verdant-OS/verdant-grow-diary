@@ -135,6 +135,7 @@ const App = () => (
                 <Route path="/internal/ai-doctor-phase1-preview" element={<AiDoctorPhase1Preview />} />
                 <Route path="/internal/one-tent-loop-proof" element={<OneTentLoopProof />} />
                 <Route path="/internal/sensor-truth-audit" element={<SensorTruthAudit />} />
+                <Route path="/internal/ai-doctor-confidence-audit" element={<AiDoctorConfidenceAudit />} />
                 {/* Leads is an internal admin/operator module, intentionally not
 
                     surfaced in grower-facing navigation. Primary route is

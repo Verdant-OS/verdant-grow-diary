@@ -22,6 +22,7 @@ import type {
 import type { LiveSourceTruthGateResult } from "./liveSourceTruthGateRules";
 import type { EcowittPerPlantResult } from "./ecowittLiveEvidenceMultiPlantRules";
 import type { EcowittEvidenceUnitWarning } from "./ecowittLiveEvidenceUnitWarningRules";
+import type { EcowittTonightModeViewModel } from "./ecowittTonightModeViewModel";
 
 export const ECOWITT_LIVE_EVIDENCE_EXPORT_SCHEMA_VERSION =
   "ecowitt-live-evidence-snapshot.v1" as const;

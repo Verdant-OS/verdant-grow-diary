@@ -61,9 +61,9 @@ describe("Quick Log Playwright CI surface", () => {
 
   it("CI workflow pins external actions to full commit SHAs", () => {
     const wf = read(".github/workflows/quicklog-smoke.yml");
-    expect(wf).toMatch(/uses:\s*actions\/checkout@[a-f0-9]{40}/);
-    expect(wf).toMatch(/uses:\s*oven-sh\/setup-bun@[a-f0-9]{40}/);
-    expect(wf).toMatch(/uses:\s*actions\/upload-artifact@[a-f0-9]{40}/);
+    expect(wf).toMatch(/uses:\s*actions\/checkout@[A-Fa-f0-9]{40}/);
+    expect(wf).toMatch(/uses:\s*oven-sh\/setup-bun@[A-Fa-f0-9]{40}/);
+    expect(wf).toMatch(/uses:\s*actions\/upload-artifact@[A-Fa-f0-9]{40}/);
     expect(wf).not.toMatch(/uses:\s*actions\/checkout@v\d+/);
     expect(wf).not.toMatch(/uses:\s*oven-sh\/setup-bun@v\d+/);
     expect(wf).not.toMatch(/uses:\s*actions\/upload-artifact@v\d+/);

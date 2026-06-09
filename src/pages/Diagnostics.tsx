@@ -224,6 +224,41 @@ export default function Diagnostics() {
           }}
         />
       </section>
+
+      <section aria-labelledby="internal-previews-heading" className="space-y-3">
+        <h2 id="internal-previews-heading" className="text-lg font-semibold">
+          Internal previews
+        </h2>
+        <Card>
+          <CardHeader className="space-y-2 pb-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-base">
+                AI Doctor Phase 1 Preview
+              </CardTitle>
+              <Badge variant="outline">Internal</Badge>
+              <Badge variant="secondary">Static demo data</Badge>
+              <Badge variant="outline">Read-only</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground space-y-2">
+            <p>
+              Static read-only preview of the Phase 1 AI Doctor contract. No
+              model calls, no writes, no device control.
+            </p>
+            <p className="text-xs">
+              Contract docs:{" "}
+              <code className="text-xs">
+                docs/ai-doctor-phase1-contract.md
+              </code>
+            </p>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/internal/ai-doctor-phase1-preview">
+                Open preview
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </section>
     </div>
   );
 }

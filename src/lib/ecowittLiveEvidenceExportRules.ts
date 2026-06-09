@@ -206,14 +206,22 @@ function assembleNextSteps(
 // ---------------------------------------------------------------------------
 
 function buildSourceTruthSummary(
+  tonight: EcowittTonightModeViewModel,
   overall: LiveSourceTruthGateResult,
   plantResults: readonly EcowittPerPlantResult[],
+  unitWarnings: readonly EcowittEvidenceUnitWarning[],
+  formWarnings: readonly string[],
 ): EcowittLiveEvidenceSourceTruthSummary {
   return Object.freeze({
+    tonight_mode_status: tonight.status,
+    can_export_snapshot: tonight.can_export_snapshot === true,
+    can_claim_live_proof: tonight.can_claim_live_proof === true,
     overall_verdict: overall.verdict,
     overall_is_live_proof: overall.is_live_proof === true,
     overall_summary: overall.summary,
     per_plant_count: plantResults.length,
+    unit_warning_count: unitWarnings.length,
+    form_warning_count: formWarnings.length,
   });
 }
 
@@ -226,6 +234,7 @@ export function buildEcowittLiveEvidenceSnapshotExport(
 ): EcowittLiveEvidenceSnapshotExport {
   // Deep-copy + redact every payload section before assembling the snapshot.
   const form_state = redactValue(input.form_state);
+  const tonight_mode = redactValue(input.tonight_mode);
   const overall_result = redactValue(input.overall_result);
   const plant_results = redactValue(input.plant_results);
   const unit_warnings = redactValue(input.unit_warnings);
@@ -236,8 +245,11 @@ export function buildEcowittLiveEvidenceSnapshotExport(
   const required_next_steps = assembleNextSteps(next_raw, isTemplate);
 
   const source_truth_summary = buildSourceTruthSummary(
+    tonight_mode,
     overall_result,
     plant_results,
+    unit_warnings,
+    form_warnings,
   );
 
   const snapshot: EcowittLiveEvidenceSnapshotExport = {
@@ -248,6 +260,7 @@ export function buildEcowittLiveEvidenceSnapshotExport(
     warning: ECOWITT_LIVE_EVIDENCE_EXPORT_WARNING,
     operator_disclaimer: ECOWITT_LIVE_EVIDENCE_EXPORT_DISCLAIMER,
     form_state,
+    tonight_mode,
     overall_result,
     plant_results,
     unit_warnings,

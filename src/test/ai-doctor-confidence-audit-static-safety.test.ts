@@ -133,6 +133,13 @@ describe("AI Doctor Confidence Audit — static safety", () => {
     expect(fromMatches.length).toBe(0);
   });
 
+  it("page does not reference localStorage, sessionStorage, or navigator.clipboard", () => {
+    const src = readFile(PAGE_PATH);
+    expect(src).not.toContain("localStorage");
+    expect(src).not.toContain("sessionStorage");
+    expect(src).not.toContain("navigator.clipboard");
+  });
+
   it("page does not import model/edge/ingest/alert/action helpers", () => {
     const src = stripComments(readFile(PAGE_PATH));
     const fromMatches = src.match(/from\s+["'][^"']+["']/g) || [];

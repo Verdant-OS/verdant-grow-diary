@@ -263,11 +263,14 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Live MQTT path — dynamic import so dry-run / sample modes do not
-  // require the `mqtt` package to be installed.
-  let mqtt: typeof import("mqtt");
+  // Live MQTT path — dynamic require so dry-run / sample modes do not
+  // require the `mqtt` package to be installed and TypeScript does not
+  // need types for it at build time.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let mqtt: any;
   try {
-    mqtt = await import("mqtt");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mqtt = await (Function("m", "return import(m)") as any)("mqtt");
   } catch {
     // eslint-disable-next-line no-console
     console.error(

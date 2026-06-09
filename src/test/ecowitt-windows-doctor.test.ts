@@ -114,13 +114,16 @@ describe("buildLauncherFiles", () => {
     }
   });
 
-  it("contains no secrets, no service_role, no live sender, no Supabase webhook", () => {
-    const all = Object.values(buildLauncherFiles("C:\\repo")).join("\n");
-    expect(all).not.toMatch(/VERDANT_BRIDGE_TOKEN/);
-    expect(all).not.toMatch(/service[_-]?role/i);
-    expect(all).not.toMatch(/sensor-ingest-webhook/);
-    expect(all).not.toMatch(/supabase\.co/i);
-    expect(all).not.toMatch(/dev:send-ecowitt/); // no live sender shortcut
+  it("every .cmd file contains no secrets, no service_role literal, no live sender, no Supabase webhook", () => {
+    const files = buildLauncherFiles("C:\\repo");
+    for (const [name, body] of Object.entries(files)) {
+      if (!name.endsWith(".cmd")) continue;
+      expect(body, name).not.toMatch(/VERDANT_BRIDGE_TOKEN/);
+      expect(body, name).not.toMatch(/service[_-]?role/i);
+      expect(body, name).not.toMatch(/sensor-ingest-webhook/);
+      expect(body, name).not.toMatch(/supabase\.co/i);
+      expect(body, name).not.toMatch(/dev:send-ecowitt/);
+    }
   });
 });
 

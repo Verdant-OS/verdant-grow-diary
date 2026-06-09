@@ -52,6 +52,7 @@ import RepresentativeCsvPreview from "./pages/RepresentativeCsvPreview";
 import SensorCsvPreview from "./pages/SensorCsvPreview";
 import PartnerCsvPreviewLanding from "./pages/PartnerCsvPreviewLanding";
 import AiDoctorPhase1Preview from "./pages/AiDoctorPhase1Preview";
+import OneTentLoopProof from "./pages/OneTentLoopProof";
 
 
 
@@ -130,6 +131,7 @@ const App = () => (
                 <Route path="/imports/representative-csv" element={<RepresentativeCsvPreview />} />
                 <Route path="/sensors/csv-preview" element={<SensorCsvPreview />} />
                 <Route path="/internal/ai-doctor-phase1-preview" element={<AiDoctorPhase1Preview />} />
+                <Route path="/internal/one-tent-loop-proof" element={<OneTentLoopProof />} />
                 {/* Leads is an internal admin/operator module, intentionally not
 
                     surfaced in grower-facing navigation. Primary route is

@@ -1,19 +1,22 @@
 /**
  * AI Doctor Phase 1 Preview Route — tests.
  *
- * Verifies the static internal page renders safely:
- *   - Internal / static / read-only labels
- *   - Preview panel renders with all major sections
- *   - Action Queue is advisory + approval-required + disabled
- *   - No buttons anywhere
+ * Verifies the static internal page renders safely with a case selector:
+ *   - Selector lists all 7 precomputed cases
+ *   - Default case is conservative (low confidence, weak context)
+ *   - Selecting each case renders the matching title/summary
+ *   - Read-only / static / no-model / no-write / no-device labels persist
+ *   - Weak-context cases show overdiagnosis warning
+ *   - Demo/CSV case does not claim live data
+ *   - Stale/invalid case does not claim healthy/stable data
+ *   - No buttons anywhere; selector is a native <select>
  *   - No forbidden device/control/certainty copy
- *   - No live-data claim for demo/csv-only/static sources
- *   - No healthy/stable claim for stale/invalid sources
  */
 import { describe, it, expect } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import AiDoctorPhase1Preview from "@/pages/AiDoctorPhase1Preview";
+import { AI_DOCTOR_PHASE1_PREVIEW_CASES } from "@/lib/aiDoctorPhase1PreviewFixtures";
 
 function renderAtRoute(path: string) {
   return render(
@@ -23,6 +26,13 @@ function renderAtRoute(path: string) {
       </Routes>
     </MemoryRouter>,
   );
+}
+
+function selectCase(id: string) {
+  const select = screen.getByTestId(
+    "ai-doctor-phase1-preview-case-select",
+  ) as HTMLSelectElement;
+  fireEvent.change(select, { target: { value: id } });
 }
 
 const FORBIDDEN_COPY = [
@@ -42,12 +52,10 @@ const FORBIDDEN_COPY = [
   "certainly",
 ];
 
-describe("AiDoctorPhase1Preview page", () => {
+describe("AiDoctorPhase1Preview page — base render", () => {
   it("renders at /internal/ai-doctor-phase1-preview", () => {
     renderAtRoute("/internal/ai-doctor-phase1-preview");
-    expect(
-      screen.getByTestId("ai-doctor-phase1-preview-panel"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-phase1-preview-panel")).toBeTruthy();
   });
 
   it("shows internal / static / read-only / no-model / no-write / no-device-control labels", () => {
@@ -66,9 +74,9 @@ describe("AiDoctorPhase1Preview page", () => {
     const text = document.body.textContent ?? "";
     expect(text).toMatch(/precomputed Phase 1 view model/i);
     expect(text).toMatch(/does not run diagnosis/i);
-    expect(text).toMatch(/does not.*score confidence/i);
-    expect(text).toMatch(/does not.*write alerts/i);
-    expect(text).toMatch(/does not.*create Action Queue items/i);
+    expect(text).toMatch(/does not score confidence/i);
+    expect(text).toMatch(/does not write alerts/i);
+    expect(text).toMatch(/does not create Action Queue items/i);
   });
 
   it("renders the preview panel in internal mode", () => {
@@ -78,7 +86,7 @@ describe("AiDoctorPhase1Preview page", () => {
     ).toBe("Internal preview");
   });
 
-  it("renders summary, evidence, missing info, recommendations, safety, and debug sections", () => {
+  it("renders all major sections for the default case", () => {
     renderAtRoute("/internal/ai-doctor-phase1-preview");
     expect(screen.getByTestId("ai-doctor-phase1-preview-summary")).toBeTruthy();
     expect(screen.getByTestId("ai-doctor-phase1-preview-evidence")).toBeTruthy();
@@ -99,38 +107,20 @@ describe("AiDoctorPhase1Preview page", () => {
     ).toMatch(/More context needed/i);
   });
 
-  it("renders no buttons anywhere on the page", () => {
+  it("renders no buttons anywhere on the page (selector is a <select>)", () => {
     renderAtRoute("/internal/ai-doctor-phase1-preview");
     expect(document.querySelectorAll("button").length).toBe(0);
+    expect(document.querySelectorAll("select").length).toBe(1);
   });
 
-  it("does not render forbidden device-control / overconfidence copy", () => {
-    const { container } = renderAtRoute("/internal/ai-doctor-phase1-preview");
-    const text = (container.textContent ?? "").toLowerCase();
-    for (const forbidden of FORBIDDEN_COPY) {
-      expect(text.includes(forbidden)).toBe(false);
-    }
-  });
-
-  it("does not claim live data when demo/csv-only sources are used", () => {
+  it("default case is conservative and low-confidence", () => {
     renderAtRoute("/internal/ai-doctor-phase1-preview");
     const debug = screen.getByTestId("ai-doctor-phase1-preview-debug");
-    const text = debug.textContent ?? "";
-    expect(text).toMatch(/has_live_data: false/);
-    expect(text).toMatch(/has_demo_or_csv_only: true/);
+    expect(debug.textContent ?? "").toMatch(/displayed_confidence_level: low/);
+    expect(debug.textContent ?? "").toMatch(/has_live_data: false/);
   });
 
-  it("does not claim healthy/stable for stale/invalid source data", () => {
-    renderAtRoute("/internal/ai-doctor-phase1-preview");
-    const debug = screen.getByTestId("ai-doctor-phase1-preview-debug");
-    const text = debug.textContent ?? "";
-    expect(text).toMatch(/has_stale_or_invalid: true/);
-    const summary = screen.getByTestId("ai-doctor-phase1-preview-summary");
-    const summaryText = summary.textContent ?? "";
-    expect(summaryText.toLowerCase()).not.toMatch(/stale.*healthy|invalid.*healthy/);
-  });
-
-  it("preserves safety warnings (automation, overdiagnosis, source truth)", () => {
+  it("preserves safety warnings (automation, overdiagnosis) on default case", () => {
     renderAtRoute("/internal/ai-doctor-phase1-preview");
     expect(
       screen.getByTestId("ai-doctor-phase1-preview-automation-warning").textContent,
@@ -138,15 +128,114 @@ describe("AiDoctorPhase1Preview page", () => {
     expect(
       screen.getByTestId("ai-doctor-phase1-preview-overdiagnosis-warning").textContent,
     ).toMatch(/avoid treating this as a certain diagnosis/i);
-    expect(
-      screen.getByTestId("ai-doctor-phase1-preview-source-truth-warning").textContent,
-    ).toMatch(/demo or imported|stale or invalid/i);
+  });
+});
+
+describe("AiDoctorPhase1Preview page — case selector", () => {
+  it("renders all seven precomputed cases as options", () => {
+    renderAtRoute("/internal/ai-doctor-phase1-preview");
+    expect(AI_DOCTOR_PHASE1_PREVIEW_CASES.length).toBe(7);
+    for (const c of AI_DOCTOR_PHASE1_PREVIEW_CASES) {
+      expect(
+        screen.getByTestId(`ai-doctor-phase1-preview-case-option-${c.id}`),
+      ).toBeTruthy();
+    }
   });
 
-  it("shows missing information severity as high with 5 missing items", () => {
+  it.each(AI_DOCTOR_PHASE1_PREVIEW_CASES.map((c) => [c.id, c.viewModel.summaryCard.title] as const))(
+    "selecting case %s renders the matching title",
+    (id, expectedTitle) => {
+      renderAtRoute("/internal/ai-doctor-phase1-preview");
+      selectCase(id);
+      const summary = screen.getByTestId("ai-doctor-phase1-preview-summary");
+      expect(summary.textContent ?? "").toContain(expectedTitle);
+    },
+  );
+
+  it.each(AI_DOCTOR_PHASE1_PREVIEW_CASES.map((c) => [c.id, c.viewModel.summaryCard.summary] as const))(
+    "selecting case %s renders the matching summary",
+    (id, expectedSummary) => {
+      renderAtRoute("/internal/ai-doctor-phase1-preview");
+      selectCase(id);
+      const summary = screen.getByTestId("ai-doctor-phase1-preview-summary");
+      expect(summary.textContent ?? "").toContain(expectedSummary);
+    },
+  );
+
+  it.each(AI_DOCTOR_PHASE1_PREVIEW_CASES.map((c) => [c.id] as const))(
+    "case %s shows read-only / no-model / no-write / no-device labels",
+    (id) => {
+      renderAtRoute("/internal/ai-doctor-phase1-preview");
+      selectCase(id);
+      const text = document.body.textContent ?? "";
+      expect(text).toMatch(/Read-only/i);
+      expect(text).toMatch(/No model calls/i);
+      expect(text).toMatch(/No database writes/i);
+      expect(text).toMatch(/No device control/i);
+    },
+  );
+
+  it.each(AI_DOCTOR_PHASE1_PREVIEW_CASES.map((c) => [c.id] as const))(
+    "case %s shows the overdiagnosis warning (weak context)",
+    (id) => {
+      renderAtRoute("/internal/ai-doctor-phase1-preview");
+      selectCase(id);
+      expect(
+        screen.getByTestId("ai-doctor-phase1-preview-overdiagnosis-warning").textContent,
+      ).toMatch(/avoid treating this as a certain diagnosis/i);
+    },
+  );
+
+  it("demo/csv-only case does not claim live data", () => {
     renderAtRoute("/internal/ai-doctor-phase1-preview");
+    selectCase("demo-csv-only");
+    const debug = screen.getByTestId("ai-doctor-phase1-preview-debug");
+    const text = debug.textContent ?? "";
+    expect(text).toMatch(/has_live_data: false/);
+    expect(text).toMatch(/has_demo_or_csv_only: true/);
     expect(
-      screen.getByTestId("ai-doctor-phase1-preview-missing-severity").textContent,
-    ).toBe("high");
+      screen.getByTestId("ai-doctor-phase1-preview-source-truth-warning").textContent,
+    ).toMatch(/demo or imported/i);
+    const summary = screen.getByTestId("ai-doctor-phase1-preview-summary");
+    // Must not positively claim live data (e.g. "live data", "live sensor", "real-time data")
+    const summaryLower = (summary.textContent ?? "").toLowerCase();
+    expect(summaryLower).not.toMatch(/\blive data\b/);
+    expect(summaryLower).not.toMatch(/\blive sensor\b/);
+    expect(summaryLower).not.toMatch(/\breal-time data\b/);
   });
+
+  it("stale/invalid case does not claim healthy/stable data", () => {
+    renderAtRoute("/internal/ai-doctor-phase1-preview");
+    selectCase("stale-invalid-only");
+    const debug = screen.getByTestId("ai-doctor-phase1-preview-debug");
+    expect(debug.textContent ?? "").toMatch(/has_stale_or_invalid: true/);
+    expect(
+      screen.getByTestId("ai-doctor-phase1-preview-source-truth-warning").textContent,
+    ).toMatch(/stale or invalid/i);
+    const summary = screen.getByTestId("ai-doctor-phase1-preview-summary");
+    const text = (summary.textContent ?? "").toLowerCase();
+    expect(text).not.toMatch(/healthy/);
+    expect(text).not.toMatch(/stable/);
+  });
+
+  it.each(AI_DOCTOR_PHASE1_PREVIEW_CASES.map((c) => [c.id] as const))(
+    "case %s does not render forbidden device-control / overconfidence copy",
+    (id) => {
+      const { container } = renderAtRoute("/internal/ai-doctor-phase1-preview");
+      selectCase(id);
+      const text = (container.textContent ?? "").toLowerCase();
+      for (const forbidden of FORBIDDEN_COPY) {
+        expect(text.includes(forbidden)).toBe(false);
+      }
+    },
+  );
+
+  it.each(AI_DOCTOR_PHASE1_PREVIEW_CASES.map((c) => [c.id] as const))(
+    "case %s renders no approve/execute/create buttons",
+    (id) => {
+      renderAtRoute("/internal/ai-doctor-phase1-preview");
+      selectCase(id);
+      expect(document.querySelectorAll("button").length).toBe(0);
+    },
+  );
 });

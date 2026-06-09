@@ -476,12 +476,12 @@ describe("Evidence Snapshot Export", () => {
   it("clicking download creates a Blob URL, triggers anchor download, and revokes the URL", async () => {
     const created: string[] = [];
     const revoked: string[] = [];
-    const blobs: Blob[] = [];
+    const blobTexts: string[] = [];
     const originalBlob = globalThis.Blob;
     const BlobSpy: typeof Blob = class extends originalBlob {
       constructor(parts?: BlobPart[], options?: BlobPropertyBag) {
         super(parts, options);
-        blobs.push(this);
+        blobTexts.push((parts ?? []).map((p) => String(p)).join(""));
       }
     } as unknown as typeof Blob;
     (globalThis as { Blob: typeof Blob }).Blob = BlobSpy;

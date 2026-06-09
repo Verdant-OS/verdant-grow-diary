@@ -432,6 +432,22 @@ function LiveEvidenceEvaluator() {
     [form, plantIdsInput],
   );
 
+  const tonight = React.useMemo<EcowittTonightModeViewModel>(
+    () =>
+      buildEcowittTonightModeViewModel({
+        evaluator_result: evaluated ? result : null,
+        overall_verdict: evaluated ? multi.overall_verdict : null,
+        plant_results: evaluated ? multi.per_plant : null,
+        unit_warnings: unitWarnings,
+        form_warnings: built.form_warnings,
+        required_next_steps: evaluated ? multi.combined_next_steps : null,
+        export_ready: evaluated,
+        snapshot_exported: false,
+      }),
+    [evaluated, result, multi, unitWarnings, built.form_warnings],
+  );
+
+
   const updateMetric = (key: LiveSourceTruthMetricKey) =>
     (next: EcowittLiveEvidenceMetricRow) =>
       setForm((prev) => ({

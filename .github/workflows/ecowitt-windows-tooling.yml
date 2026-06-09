@@ -7,6 +7,9 @@ on:
 permissions:
   contents: read
 
+env:
+  ECOWITT_ARTIFACT_RETENTION_DAYS: 7
+
 jobs:
   ecowitt-windows-tooling:
     runs-on: ubuntu-latest
@@ -35,7 +38,7 @@ jobs:
           mkdir -p tmp/ecowitt-fast-path tmp/ecowitt-windows
           bun run dev:ecowitt-doctor -- --write-launchers --json \
             > tmp/ecowitt-fast-path/doctor.json 2> tmp/ecowitt-fast-path/doctor.stderr.log || true
-          bun run dev:ecowitt-fast-path -- --verbose --write-launchers \
+          bun run dev:ecowitt-fast-path -- --verbose --write-launchers --save-artifacts \
             > tmp/ecowitt-fast-path/fast-path.log 2>&1 || true
       - name: Upload EcoWitt fast-path artifacts
         if: always()
@@ -47,4 +50,4 @@ jobs:
             tmp/ecowitt-fast-path/
             tmp/ecowitt-last-ingest-report.json
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: ${{ env.ECOWITT_ARTIFACT_RETENTION_DAYS }}

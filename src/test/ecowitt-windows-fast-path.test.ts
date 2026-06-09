@@ -13,16 +13,20 @@
  *  - static safety: no supabase SDK, no live sender, no DB writes, etc.
  *  - workflow uploads only the documented artifact paths via pinned SHA
  */
-import { describe, expect, it, vi } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import {
   BRIDGE_DOWN_LINES,
   MQTT_DOWN_LINES,
   NEXT_DRY_RUN_COMMAND,
   NEXT_DRY_RUN_LINES,
+  formatRedactionAuditLines,
+  redactLine,
   redactVerboseLine,
   runFastPath,
+  scanForbidden,
 } from "../../scripts/dev/ecowitt-windows-fast-path";
 
 const SCRIPT_PATH = resolve(__dirname, "../../scripts/dev/ecowitt-windows-fast-path.ts");
@@ -259,5 +263,194 @@ describe("ecowitt-windows-tooling workflow — static safety", () => {
     // The test step itself must NOT have || true.
     const testStep = WF.split("Vitest")[1]?.split("- name:")[0] ?? "";
     expect(testStep).not.toMatch(/\|\| true/);
+  });
+});
+
+describe("redactLine — extended categories", () => {
+  it("redacts MQTT userinfo", () => {
+    const r = redactLine("publishing to mqtt://user:secret@host:1883/topic");
+    expect(r.changed).toBe(true);
+    expect(r.categories).toContain("mqtt_userinfo");
+    expect(r.output).not.toContain("user:secret");
+  });
+  it("redacts Supabase project URLs", () => {
+    const r = redactLine("calling https://abc123." + "supa" + "base.co/rest/v1/x");
+    expect(r.changed).toBe(true);
+    expect(r.categories).toContain("supabase_url");
+    expect(r.output).not.toMatch(/supa.*base\.co/i);
+  });
+  it("redacts SUPABASE_* env names", () => {
+    const r = redactLine("SUPA" + "BASE_ANON_KEY=foo");
+    expect(r.changed).toBe(true);
+    expect(r.categories).toContain("supabase_env");
+  });
+});
+
+describe("scanForbidden", () => {
+  it("returns present=false for clean lines", () => {
+    const s = scanForbidden(["hello", "doctor OK", "192.168.1.42"]);
+    expect(s.present).toBe(false);
+    expect(s.categories).toEqual([]);
+  });
+  it("detects unredacted forbidden literals", () => {
+    const s = scanForbidden([
+      "VERDANT" + "_BRIDGE_" + "TOKEN=foo",
+      "use ser" + "vice_role here",
+    ]);
+    expect(s.present).toBe(true);
+    expect(s.categories.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("runFastPath — redaction audit + --json + --save-artifacts", () => {
+  let tmpRoot = "";
+  afterEach(() => {
+    if (tmpRoot && existsSync(tmpRoot)) rmSync(tmpRoot, { recursive: true, force: true });
+    tmpRoot = "";
+  });
+
+  it("redactionAudit reports scanned/changed counts and categories", async () => {
+    const res = await runFastPath(
+      { verbose: true },
+      {
+        log: () => {},
+        err: () => {},
+        runSmoke: async () => ({
+          ok: false,
+          reason: "bridge_down: see mqtt://u:p@127.0.0.1:1883 and Bearer abc.def.ghi",
+        }),
+      },
+    );
+    expect(res.redactionAudit.linesScanned).toBeGreaterThan(0);
+    expect(res.redactionAudit.forbiddenStringsPresentAfterRedaction).toBe(false);
+    for (const c of res.redactionAudit.categoriesRedacted) {
+      expect(typeof c).toBe("string");
+    }
+  });
+
+  it("formatRedactionAuditLines includes scanned/changed/categories/forbidden", () => {
+    const lines = formatRedactionAuditLines({
+      linesScanned: 10,
+      linesChanged: 2,
+      categoriesRedacted: ["bearer_token", "mqtt_userinfo"],
+      forbiddenStringsPresentAfterRedaction: false,
+      forbiddenCategoriesPresent: [],
+    });
+    expect(lines[0]).toMatch(/Redaction audit/);
+    expect(lines.join("\n")).toMatch(/lines scanned: 10/);
+    expect(lines.join("\n")).toMatch(/lines changed: 2/);
+    expect(lines.join("\n")).toMatch(/categories redacted: bearer_token, mqtt_userinfo/);
+    expect(lines.join("\n")).toMatch(/forbidden strings present after redaction: no/);
+  });
+
+  it("--json suppresses human prose on stdout", async () => {
+    const logs: string[] = [];
+    const errs: string[] = [];
+    const res = await runFastPath(
+      { json: true, verbose: true },
+      {
+        log: (l) => logs.push(l),
+        err: (l) => errs.push(l),
+        runSmoke: async () => ({ ok: true, reason: "pass" }),
+      },
+    );
+    expect(logs).toEqual([]);
+    expect(errs).toEqual([]);
+    expect(res.exitCode).toBe(0);
+    expect(res.logs.length).toBeGreaterThan(0);
+    expect(res.redactionAudit.linesScanned).toBeGreaterThan(0);
+  });
+
+  it("--save-artifacts writes only under tmp/ecowitt-fast-path/ and never leaks secrets", async () => {
+    tmpRoot = mkdtempSync(join(tmpdir(), "ecowitt-fp-"));
+    require("node:fs").writeFileSync(join(tmpRoot, "package.json"), "{}");
+    const res = await runFastPath(
+      {
+        verbose: true,
+        saveArtifacts: true,
+        repoRoot: tmpRoot,
+        artifactDir: join(tmpRoot, "tmp", "ecowitt-fast-path"),
+      },
+      {
+        log: () => {},
+        err: () => {},
+        runSmoke: async () => ({
+          ok: false,
+          reason: "bridge_down: mqtt://user:secret@127.0.0.1:1883 Bearer abc.def.ghi",
+        }),
+      },
+    );
+    expect(res.artifacts).not.toBeNull();
+    const dir = res.artifacts!.dir;
+    expect(dir.startsWith(tmpRoot)).toBe(true);
+    expect(dir.endsWith(join("tmp", "ecowitt-fast-path"))).toBe(true);
+    const names = res.artifacts!.files.map((p) => p.split(/[\\/]/).pop());
+    expect(names!.sort()).toEqual(
+      ["doctor.json", "fast-path.json", "fast-path.log", "redaction-audit.json"].sort(),
+    );
+    for (const f of res.artifacts!.files) {
+      const body = readFileSync(f, "utf8");
+      expect(body).not.toContain("user:secret");
+      expect(body).not.toMatch(/Bearer\s+abc\.def\.ghi/);
+      expect(body).not.toMatch(/VERDANT_BRIDGE_TOKEN/);
+      expect(body).not.toMatch(/supabase\.co/i);
+      expect(body).not.toMatch(/sensor-ingest-webhook/);
+    }
+  });
+
+  it("--json --save-artifacts still writes artifacts and emits no stdout/stderr prose", async () => {
+    tmpRoot = mkdtempSync(join(tmpdir(), "ecowitt-fp-"));
+    require("node:fs").writeFileSync(join(tmpRoot, "package.json"), "{}");
+    const logs: string[] = [];
+    const errs: string[] = [];
+    const res = await runFastPath(
+      {
+        json: true,
+        saveArtifacts: true,
+        repoRoot: tmpRoot,
+        artifactDir: join(tmpRoot, "tmp", "ecowitt-fast-path"),
+      },
+      {
+        log: (l) => logs.push(l),
+        err: (l) => errs.push(l),
+        runSmoke: async () => ({ ok: true, reason: "pass" }),
+      },
+    );
+    expect(logs).toEqual([]);
+    expect(errs).toEqual([]);
+    expect(res.artifacts).not.toBeNull();
+    expect(existsSync(join(res.artifacts!.dir, "fast-path.json"))).toBe(true);
+  });
+
+  it("refuses to save artifacts outside tmp/ecowitt-fast-path/", async () => {
+    tmpRoot = mkdtempSync(join(tmpdir(), "ecowitt-fp-"));
+    require("node:fs").writeFileSync(join(tmpRoot, "package.json"), "{}");
+    const res = await runFastPath(
+      {
+        saveArtifacts: true,
+        repoRoot: tmpRoot,
+        artifactDir: join(tmpRoot, "tmp", "escape"),
+      },
+      {
+        log: () => {},
+        err: () => {},
+        runSmoke: async () => ({ ok: true, reason: "pass" }),
+      },
+    );
+    expect(res.artifacts).toBeNull();
+    expect(res.logs.some((l) => /artifact write FAILED/.test(l))).toBe(true);
+  });
+});
+
+describe("ecowitt-windows-tooling workflow — retention env", () => {
+  const WF = readFileSync(
+    resolve(__dirname, "../../.github/workflows/ecowitt-windows-tooling.yml"),
+    "utf8",
+  );
+  it("defines ECOWITT_ARTIFACT_RETENTION_DAYS at workflow scope", () => {
+    expect(WF).toMatch(/^env:\s*\n\s+ECOWITT_ARTIFACT_RETENTION_DAYS:\s*\d+/m);
+  });
+  it("upload-artifact uses retention-days from the env var", () => {
+    expect(WF).toMatch(/retention-days:\s*\$\{\{\s*env\.ECOWITT_ARTIFACT_RETENTION_DAYS\s*\}\}/);
   });
 });

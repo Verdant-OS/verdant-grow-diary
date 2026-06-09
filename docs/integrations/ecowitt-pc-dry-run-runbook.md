@@ -189,6 +189,40 @@ live ingest.
    bun run dev:ecowitt-fast-path -- --verbose --write-launchers
    ```
 
+6. **Verbose + saved artifacts** — write redacted local debug files
+   under `tmp/ecowitt-fast-path/` (doctor.json, fast-path.json,
+   fast-path.log, redaction-audit.json):
+
+   ```powershell
+   bun run dev:ecowitt-fast-path -- --verbose --write-launchers --save-artifacts
+   ```
+
+7. **Machine-readable JSON** — emit only the redacted `FastPathResult`
+   to stdout (no human prose); pair with `--save-artifacts` to keep a
+   local log for review:
+
+   ```powershell
+   bun run dev:ecowitt-fast-path -- --json --save-artifacts
+   ```
+
+   - `--verbose` prints human-readable doctor/smoke step logs and a
+     redaction audit summary (lines scanned, lines changed, categories
+     redacted, and whether any forbidden literals remain).
+   - `--json` prints only structured JSON; it wins over `--verbose` for
+     stdout. Verbose-style detail is preserved inside the JSON `logs`
+     array and the saved `fast-path.log` artifact.
+   - `--save-artifacts` writes redacted local files to
+     `tmp/ecowitt-fast-path/`. No raw secrets, no webhook URLs, no
+     bridge tokens are ever written. Launcher writes remain confined to
+     `tmp/ecowitt-windows/` and now report `created/updated/unchanged`
+     counts based on checksum comparison.
+   - The redaction audit confirms no forbidden strings remain in any
+     captured line, including bridge token names, role literals,
+     Supabase env keys, Supabase host names, MQTT userinfo, JWT-shaped
+     strings, and `Bearer` headers.
+   - Live send remains manual and gated behind the existing
+     `dev:ecowitt-mqtt:dry-run` review step.
+
 Notes:
 
 - `bridge_down` means the HTTP bridge is not listening on `8080`.

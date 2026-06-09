@@ -121,6 +121,11 @@ Triggers:
 - `push` to `main` touching `e2e/**`, `playwright.config.ts`, or the
   workflow itself — runs the same job, but skips cleanly if secrets are
   unavailable so forked-repo pushes never leak or fail mysteriously.
+- `pull_request` to `main` (safe `pull_request` event, never
+  `pull_request_target`) — PRs without access to E2E vars/secrets
+  (e.g. forked PRs) skip cleanly with the message
+  `Skipping Quick Log smoke: E2E vars/secrets are unavailable for this PR context.`
+  and the job completes successfully.
 
 Required GitHub configuration:
 
@@ -128,7 +133,7 @@ Required GitHub configuration:
 - Vars: `E2E_BASE_URL`, `E2E_GROW_1_PLANT_URL`, optional `E2E_GROW_2_PLANT_NAME`
 
 Artifacts (uploaded with `if: always()` under the name
-`quicklog-smoke-artifacts`):
+`quicklog-smoke-artifacts`, retained for 30 days):
 
 - `e2e/results/quicklog-smoke-report.json`
 - `e2e/results/quicklog-smoke-report.txt`
@@ -136,3 +141,68 @@ Artifacts (uploaded with `if: always()` under the name
 - `test-results/`
 
 Find them under the workflow run summary → Artifacts.
+
+## Troubleshooting Quick Log smoke failures
+
+Start with `quicklog-smoke-report.txt` (or the JSON sibling). Find the first
+line marked `✗` — that step number, label, and evidence point at the
+failure. Then open the Playwright trace, screenshots, and video for the
+same step inside `playwright-report/` / `test-results/`.
+
+Common failure cases:
+
+- **Missing GitHub variable or secret**
+  - Report / check: workflow precheck logs (`Verify required configuration`).
+  - Fix: add the missing repo Actions vars/secrets
+    (`E2E_BASE_URL`, `E2E_GROW_1_PLANT_URL`, `E2E_TEST_EMAIL`,
+    `E2E_TEST_PASSWORD`). On PRs without access these will skip cleanly.
+
+- **Redirected to `/auth`**
+  - Likely: expired/missing storageState or bad test credentials.
+  - Fix locally: refresh `e2e/.auth/user.json` by removing it and re-running
+    `bun run e2e:setup`. In CI: verify `E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD`
+    still log in via the real `/auth` UI.
+
+- **Cannot find Grow #1 plant page**
+  - Likely: bad `E2E_GROW_1_PLANT_URL`, the test user lacks access, or the
+    plant route changed.
+  - Fix: open the URL as the test user in a browser and update the var.
+
+- **Cannot find Grow #2 / target plant**
+  - Likely: `E2E_GROW_2_PLANT_NAME` does not match an existing plant, or
+    the test fixture is missing.
+  - Fix: update the var or create/rename the test plant for the test
+    account.
+
+- **Stale snapshot helper missing**
+  - Likely: no stale/non-usable snapshot exists in the current fixture,
+    helper copy changed, or the selector moved.
+  - Fix: inspect the failing report step, screenshots, and the current
+    sensor state for the target plant.
+
+- **Watering validation focus failed**
+  - Likely: the Watering (ml) field copy/selector or focus restoration
+    behavior changed.
+  - Fix: inspect the failing step in the report and open the Playwright
+    trace for that step.
+
+- **Report says a later step failed after save**
+  - Likely: save succeeded but post-save UI changed (View {plant} /
+    Log another for {plant} / Close).
+  - Fix: inspect the `View {plant}` and `Log another for {plant}` steps and
+    confirm the post-save route target.
+
+How to read the report:
+
+1. Open `quicklog-smoke-report.txt`.
+2. Find the first `✗` line — that is the first failure.
+3. Use the step number + label + evidence to locate the matching test
+   action.
+4. Open the Playwright trace / screenshots / video for that same step in
+   `playwright-report/` and `test-results/`.
+
+Reminder:
+
+- The smoke creates real diary entries against the configured account.
+- Always use a dedicated test account and test plant. Never point the
+  smoke at production grower data.

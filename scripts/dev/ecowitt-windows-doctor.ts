@@ -341,7 +341,9 @@ async function main(): Promise<void> {
     const outDir = resolve(cwd, "tmp/ecowitt-windows");
     const res = writeLaunchers(outDir, cwd);
     // eslint-disable-next-line no-console
-    console.log("[ecowitt-doctor] launchers written:", res.outDir);
+    console.log(
+      `[ecowitt-doctor] launchers: created=${res.created} updated=${res.updated} unchanged=${res.unchanged} refused=${res.refused} dir=${res.outDir}`,
+    );
     for (const p of res.written) {
       // eslint-disable-next-line no-console
       console.log("  -", p);

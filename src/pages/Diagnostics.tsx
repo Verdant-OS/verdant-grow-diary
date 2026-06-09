@@ -225,6 +225,36 @@ export default function Diagnostics() {
         />
       </section>
 
+      <section aria-labelledby="operator-tools-heading" className="space-y-3">
+        <h2 id="operator-tools-heading" className="text-lg font-semibold">
+          Operator tools
+        </h2>
+        <Card>
+          <CardHeader className="space-y-2 pb-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-base">
+                EcoWitt Live Bring-Up
+              </CardTitle>
+              <Badge variant="outline">Operator</Badge>
+              <Badge variant="secondary">Checklist</Badge>
+              <Badge variant="outline">Read-only</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground space-y-2">
+            <p>
+              Static operator checklist for tonight's manual validation of
+              EcoWitt / MQTT → Verdant ingest. No live data queries, no
+              writes, no model calls, no device control.
+            </p>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/operator/ecowitt-live-bringup">
+                Open checklist
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </section>
+
       <section aria-labelledby="internal-previews-heading" className="space-y-3">
         <h2 id="internal-previews-heading" className="text-lg font-semibold">
           Internal previews

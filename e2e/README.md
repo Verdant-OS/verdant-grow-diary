@@ -218,6 +218,60 @@ Artifacts (uploaded with `if: always()` under the name
 
 Find them under the workflow run summary → Artifacts.
 
+## Run from GitHub Actions manually
+
+Exact steps to dispatch the Quick Log smoke from GitHub:
+
+1. Open the repository: <https://github.com/Verdant-OS/verdant-grow-diary>.
+2. Click the **Actions** tab.
+3. In the left sidebar, select **Quick Log Playwright smoke**.
+4. Click **Run workflow**.
+5. Select branch **`verdant-grow-diary`**.
+6. Click **Run workflow** to dispatch.
+7. Open the new run and watch the **run summary** at the top of the run page.
+8. After completion, scroll to **Artifacts** on the run page and download
+   `quicklog-smoke-artifacts`.
+
+Required repository configuration before dispatching:
+
+- Variables (Settings → Secrets and variables → Actions → Variables):
+  - `E2E_BASE_URL`
+  - `E2E_GROW_1_PLANT_URL`
+  - `E2E_GROW_2_PLANT_NAME` (optional; defaults to `"505 Headbanger"`)
+- Secrets (Settings → Secrets and variables → Actions → Secrets):
+  - `E2E_TEST_EMAIL`
+  - `E2E_TEST_PASSWORD`
+
+Expected behavior:
+
+- If any required config is missing during `workflow_dispatch`, the workflow
+  **fails fast** in the `Verify required configuration` step with the
+  message:
+  ```
+  Missing required Quick Log smoke configuration. Configure Actions vars/secrets.
+  ```
+- If config is present, the workflow installs Bun, installs Playwright
+  Chromium with OS deps, runs `bun run e2e:quicklog-smoke`, writes the
+  smoke reports, verifies required report artifacts exist, and uploads
+  the `quicklog-smoke-artifacts` bundle.
+
+Where outputs appear:
+
+- **GitHub run summary** — at the top of the workflow run page, written
+  via `$GITHUB_STEP_SUMMARY`. Includes whether the smoke executed or was
+  skipped, and (on skip) the names of the missing config keys.
+- **Artifacts** — workflow run page → **Artifacts** →
+  `quicklog-smoke-artifacts`. Expected paths inside:
+  - `e2e/results/quicklog-smoke-report.json`
+  - `e2e/results/quicklog-smoke-report.txt`
+  - `playwright-report/`
+  - `test-results/`
+
+**First file to inspect on any failure:**
+`e2e/results/quicklog-smoke-report.txt`.
+
+
+
 ## Troubleshooting Quick Log smoke failures
 
 Start with `quicklog-smoke-report.txt` (or the JSON sibling). Find the first

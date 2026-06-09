@@ -41,6 +41,12 @@ import {
   buildEcowittLiveEvidenceSnapshotFilename,
   serializeEcowittLiveEvidenceSnapshotExport,
 } from "@/lib/ecowittLiveEvidenceExportRules";
+import {
+  buildEcowittTonightModeViewModel,
+  type EcowittTonightModeViewModel,
+} from "@/lib/ecowittTonightModeViewModel";
+
+
 
 
 function Section({

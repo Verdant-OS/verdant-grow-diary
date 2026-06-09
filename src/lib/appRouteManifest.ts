@@ -95,6 +95,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/ingest-inspector", access: "operator" },
   { path: "/internal/ai-doctor-phase1-preview", access: "internal", description: "Static Phase 1 view model preview." },
   { path: "/internal/one-tent-loop-proof", access: "internal", description: "One-tent loop internal proof checklist." },
+  { path: "/internal/sensor-truth-audit", access: "internal", description: "Sensor truth internal static audit." },
   { path: "/leads", access: "internal" },
 
   { path: "/login", access: "redirect", description: "→ /auth" },

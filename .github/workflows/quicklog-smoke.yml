@@ -52,6 +52,10 @@ jobs:
       E2E_GROW_2_PLANT_NAME: ${{ vars.E2E_GROW_2_PLANT_NAME }}
       E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
       E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+      E2E_FIXTURE_MODE: ${{ vars.E2E_FIXTURE_MODE }}
+      E2E_FIXTURE_EXPECTED_GROW_NAME: ${{ vars.E2E_FIXTURE_EXPECTED_GROW_NAME }}
+      E2E_FIXTURE_EXPECTED_TENT_NAME: ${{ vars.E2E_FIXTURE_EXPECTED_TENT_NAME }}
+      E2E_FIXTURE_EXPECTED_PLANT_NAME: ${{ vars.E2E_FIXTURE_EXPECTED_PLANT_NAME }}
 
     steps:
       - name: Checkout
@@ -68,6 +72,11 @@ jobs:
           [ -n "$E2E_GROW_1_PLANT_URL" ] || missing+=("vars.E2E_GROW_1_PLANT_URL")
           [ -n "$E2E_TEST_EMAIL" ] || missing+=("secrets.E2E_TEST_EMAIL")
           [ -n "$E2E_TEST_PASSWORD" ] || missing+=("secrets.E2E_TEST_PASSWORD")
+          # Disposable E2E fixture safety: required before write-producing smoke.
+          [ -n "$E2E_FIXTURE_MODE" ] || missing+=("vars.E2E_FIXTURE_MODE")
+          [ -n "$E2E_FIXTURE_EXPECTED_GROW_NAME" ] || missing+=("vars.E2E_FIXTURE_EXPECTED_GROW_NAME")
+          [ -n "$E2E_FIXTURE_EXPECTED_TENT_NAME" ] || missing+=("vars.E2E_FIXTURE_EXPECTED_TENT_NAME")
+          [ -n "$E2E_FIXTURE_EXPECTED_PLANT_NAME" ] || missing+=("vars.E2E_FIXTURE_EXPECTED_PLANT_NAME")
 
           event="${{ github.event_name }}"
 
@@ -95,6 +104,7 @@ jobs:
             echo "Quick Log smoke configuration present. Proceeding."
             echo "should_run=true" >> "$GITHUB_OUTPUT"
           fi
+
 
       - name: Setup Bun
         if: steps.e2e_config.outputs.should_run == 'true'

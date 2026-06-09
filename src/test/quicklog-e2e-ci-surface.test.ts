@@ -373,7 +373,6 @@ describe("Quick Log Playwright CI surface", () => {
     expect(readme).not.toMatch(/\/actions\/runs\/\d+\/artifacts\/\d+/);
     expect(readme).not.toMatch(/artifact[s]?\/[A-Fa-f0-9-]{8,}/);
   });
-});
 
   it("changelog entry for branch alignment lives in a single canonical file", () => {
     // No pre-existing release-notes file existed in the repo, so the entry

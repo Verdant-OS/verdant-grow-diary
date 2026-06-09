@@ -165,7 +165,8 @@ export async function bootstrapDisposableFixture(
     );
   }
 
-  const hasGrow = bodyText.includes(expected.grow);
+  // Grow name is optional in the current UI (no Grow page in setup flow).
+  const hasGrow = expected.grow ? bodyText.includes(expected.grow) : true;
   const hasTent = bodyText.includes(expected.tent);
   const hasPlant = bodyText.includes(expected.plant);
 

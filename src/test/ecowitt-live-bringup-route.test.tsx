@@ -554,12 +554,12 @@ describe("Evidence Snapshot Export", () => {
   });
 
   it("export from template form includes the replace-example-values next step", async () => {
-    const blobs: Blob[] = [];
+    const blobTexts: string[] = [];
     const originalBlob = globalThis.Blob;
     (globalThis as { Blob: typeof Blob }).Blob = class extends originalBlob {
       constructor(parts?: BlobPart[], options?: BlobPropertyBag) {
         super(parts, options);
-        blobs.push(this);
+        blobTexts.push((parts ?? []).map((p) => String(p)).join(""));
       }
     } as unknown as typeof Blob;
     const originalCreate = (URL as unknown as { createObjectURL?: unknown })
@@ -578,7 +578,7 @@ describe("Evidence Snapshot Export", () => {
       );
       clickEvaluate();
       fireEvent.click(screen.getByTestId("ecowitt-evaluator-export-button"));
-      const text = await blobs[blobs.length - 1].text();
+      const text = blobTexts[blobTexts.length - 1];
       const parsed = JSON.parse(text);
       expect(parsed.required_next_steps.join("\n")).toMatch(
         /replace example\/template values/i,

@@ -16,7 +16,7 @@ const PRIVATE_TABLES = [
   "plants",
   "diary_entries",
   "sensor_readings",
-  "action_" + "queue",
+  "action_queue",
 ];
 
 // Representative protected/operator/internal mobile coverage. Kept in sync

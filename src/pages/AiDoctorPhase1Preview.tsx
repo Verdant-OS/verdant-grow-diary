@@ -151,7 +151,7 @@ export default function AiDoctorPhase1Preview(): JSX.Element {
       <AiDoctorPhase1PreviewPanel
         viewModel={STATIC_FIXTURE}
         title="AI Doctor Phase 1 — Static Preview"
-        mode="internal" as AiDoctorPhase1PreviewMode
+        mode="internal"
       />
     </div>
   );

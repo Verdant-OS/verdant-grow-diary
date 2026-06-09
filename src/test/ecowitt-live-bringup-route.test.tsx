@@ -562,12 +562,14 @@ describe("Evidence Snapshot Export", () => {
         blobs.push(this);
       }
     } as unknown as typeof Blob;
-    const createSpy = vi
-      .spyOn(URL, "createObjectURL")
-      .mockReturnValue("blob:test");
-    const revokeSpy = vi
-      .spyOn(URL, "revokeObjectURL")
-      .mockImplementation(() => undefined);
+    const originalCreate = (URL as unknown as { createObjectURL?: unknown })
+      .createObjectURL;
+    const originalRevoke = (URL as unknown as { revokeObjectURL?: unknown })
+      .revokeObjectURL;
+    (URL as unknown as { createObjectURL: (b: Blob) => string }).createObjectURL =
+      () => "blob:test";
+    (URL as unknown as { revokeObjectURL: (u: string) => void }).revokeObjectURL =
+      () => undefined;
 
     try {
       renderRoute();
@@ -583,8 +585,10 @@ describe("Evidence Snapshot Export", () => {
       );
     } finally {
       (globalThis as { Blob: typeof Blob }).Blob = originalBlob;
-      createSpy.mockRestore();
-      revokeSpy.mockRestore();
+      (URL as unknown as { createObjectURL: unknown }).createObjectURL =
+        originalCreate as never;
+      (URL as unknown as { revokeObjectURL: unknown }).revokeObjectURL =
+        originalRevoke as never;
     }
   });
 

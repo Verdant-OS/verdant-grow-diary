@@ -31,8 +31,18 @@ const VARIANT_BY_LABEL: Record<Label, "default" | "secondary" | "outline" | "des
   Unavailable: "destructive",
 };
 
+// Visible badge text. We deliberately avoid "LIVE DATA" wording for
+// saved account data — only true real-time sensor telemetry should be
+// labeled "Live". Saved grows/tents/plants are honestly "Saved".
+const BADGE_TEXT: Record<Label, string> = {
+  Live: "Saved data",
+  Demo: "Demo data",
+  Mixed: "Mixed data",
+  Unavailable: "Unavailable",
+};
+
 const DESCRIPTION: Record<Label, string> = {
-  Live: "Live data from your grow backend.",
+  Live: "Loaded from your Verdant account.",
   Demo: "Showing demo data. Connect real tents, plants, and sensors to replace it.",
   Mixed: "Some data is real, some is demo or manual. Add or connect more to replace the demo data.",
   Unavailable: "No grow data available yet.",

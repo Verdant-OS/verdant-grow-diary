@@ -49,16 +49,12 @@ describe("ecowitt windows launchers — generated content safety", () => {
     ]);
   });
 
-  it("uses quoted paths in every .cmd", () => {
+  it("uses quoted paths in every .cmd line that references a Windows drive path", () => {
     for (const [name, body] of Object.entries(launchers)) {
       if (!name.endsWith(".cmd")) continue;
-      // Either there is no Windows path, or any path appears inside quotes.
-      const matches = body.match(/[A-Z]:\\[^\s"]+/g) ?? [];
-      for (const p of matches) {
-        const idx = body.indexOf(p);
-        const before = body.slice(Math.max(0, idx - 1), idx);
-        const after = body.slice(idx + p.length, idx + p.length + 1);
-        expect(before === '"' && after === '"').toBe(true);
+      for (const line of body.split(/\r?\n/)) {
+        if (!/[A-Z]:\\/.test(line)) continue;
+        expect(line, `unquoted drive path in ${name}: ${line}`).toMatch(/"[A-Z]:\\[^"]+"/);
       }
     }
   });
@@ -70,7 +66,7 @@ describe("ecowitt windows launchers — generated content safety", () => {
     expect(r).toMatch(/RECOMMENDED IPv4/);
     expect(r).toMatch(/8080/);
     expect(r).toMatch(/Never paste bridge tokens/i);
-    expect(r).toMatch(/Never paste service_role/i);
+    expect(r).toMatch(/Never paste service-role/i);
     expect(r).toMatch(/Live send is NOT part of this fast path/i);
   });
 

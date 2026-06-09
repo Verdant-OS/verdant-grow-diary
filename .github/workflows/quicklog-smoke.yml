@@ -102,6 +102,30 @@ jobs:
         with:
           bun-version: latest
 
+      # Best-effort cache for Bun's package cache. Never includes auth state,
+      # storageState, smoke reports, traces, screenshots, videos, or secrets.
+      - name: Cache Bun packages
+        if: steps.e2e_config.outputs.should_run == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock', 'bun.lockb', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      # Best-effort cache for Playwright browser binaries. Never includes auth
+      # state, storageState, smoke reports, traces, screenshots, videos, or
+      # secrets. `bun run e2e:install:ci` still runs below to verify Chromium
+      # and OS deps after restore.
+      - name: Cache Playwright browsers
+        if: steps.e2e_config.outputs.should_run == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('bun.lock', 'bun.lockb', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
       - name: Install dependencies
         if: steps.e2e_config.outputs.should_run == 'true'
         run: bun install --frozen-lockfile

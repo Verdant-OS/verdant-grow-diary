@@ -25,17 +25,26 @@ normal authenticated UI.
 
 ## 2. Expected fixture names
 
-Create the following through the normal UI on the dedicated account:
+Follow the current in-app setup flow (no Grow page is surfaced):
+
+1. Sign in to the disposable E2E account.
+2. From the Dashboard, **Add Tent**.
+3. Name the tent exactly `E2E Test Tent`.
+4. Open that tent and **Add Plant**.
+5. Name the plant exactly `E2E Test Plant`.
+6. Copy the plant detail URL — this becomes `E2E_GROW_1_PLANT_URL`.
 
 | Type  | Exact name        | Required |
 |-------|-------------------|----------|
-| Grow  | `E2E Test Grow`   | ✅ |
 | Tent  | `E2E Test Tent`   | ✅ |
 | Plant | `E2E Test Plant`  | ✅ |
 | Plant | `505 Headbanger`  | optional (second plant smoke step) |
+| Grow  | `E2E Test Grow`   | optional / future — only if the UI ever visibly exposes a grow name or selector |
 
-Names must match exactly. The fixture validator refuses to run smoke
-if these names are missing or do not contain `E2E`/`Test` markers.
+Required names must match exactly. The fixture validator refuses to
+run smoke if the tent or plant names are missing or do not contain
+`E2E`/`Test` markers. The grow name is checked only when
+`E2E_FIXTURE_EXPECTED_GROW_NAME` is provided and visible.
 
 ## 3. GitHub Actions secrets and variables
 

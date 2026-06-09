@@ -1,0 +1,143 @@
+/**
+ * EcoWitt Live Bring-Up — static safety scan.
+ *
+ * Asserts the page and view model do not import/call Supabase, fetch,
+ * functions.invoke, model clients, Edge Function helpers, ingest write
+ * helpers, alert/Action Queue writers, device-control names, secrets,
+ * env values, or browser persistence/clipboard APIs.
+ */
+import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+const ROOT = resolve(__dirname, "../..");
+const PAGE_PATH = "src/pages/EcowittLiveBringup.tsx";
+const VM_PATH = "src/lib/ecowittLiveBringupViewModel.ts";
+
+function read(p: string): string {
+  return readFileSync(resolve(ROOT, p), "utf8");
+}
+
+function stripComments(src: string): string {
+  let r = src.replace(/\/\/.*$/gm, "");
+  r = r.replace(/\/\*[\s\S]*?\*\//g, "");
+  return r;
+}
+
+const pageSrc = read(PAGE_PATH);
+const vmSrc = read(VM_PATH);
+const pageNoComments = stripComments(pageSrc);
+const vmNoComments = stripComments(vmSrc);
+
+const targets: Array<[string, string]> = [
+  ["page", pageNoComments],
+  ["view model", vmNoComments],
+];
+
+const FORBIDDEN_DEVICE_NAMES = [
+  "controlDevice",
+  "executeDevice",
+  "sendCommand",
+  "turnOn",
+  "turnOff",
+  "setFan",
+  "setLight",
+  "setPump",
+  "setHeater",
+  "setHumidifier",
+  "doseNutrients",
+  "flushReservoir",
+];
+
+const FORBIDDEN_COPY = [
+  "Execute",
+  "Run command",
+  "Send command",
+  "Control device",
+  "Turn on",
+  "Turn off",
+  "Set fan",
+  "Set light",
+  "Flush immediately",
+  "Guaranteed",
+  "Definitely",
+  "Certainly",
+];
+
+describe("ecowitt-live-bringup — static safety", () => {
+  it.each(targets)("[%s] does not import supabase client", (_, src) => {
+    expect(src).not.toMatch(/@\/integrations\/supabase/);
+    expect(src).not.toMatch(/from\s+["']@supabase/);
+    expect(src).not.toMatch(/supabase\./);
+  });
+
+  it.each(targets)("[%s] does not call fetch or functions.invoke", (_, src) => {
+    expect(src).not.toMatch(/fetch\s*\(/);
+    expect(src).not.toMatch(/functions\.invoke/);
+  });
+
+  it.each(targets)("[%s] does not reference DB write helpers", (_, src) => {
+    expect(src).not.toMatch(/\.insert\(/);
+    expect(src).not.toMatch(/\.upsert\(/);
+    expect(src).not.toMatch(/\.update\(/);
+    expect(src).not.toMatch(/\.delete\(/);
+    expect(src).not.toMatch(/\.rpc\(/);
+  });
+
+  it.each(targets)("[%s] does not reference alerts/action_queue tables", (_, src) => {
+    expect(src).not.toMatch(/from\(["']alerts["']\)/);
+    expect(src).not.toMatch(/from\(["']action_queue["']\)/);
+  });
+
+  it.each(targets)("[%s] does not reference service_role/bridge token/secrets/env", (_, src) => {
+    expect(src).not.toMatch(/service_role/);
+    expect(src).not.toMatch(/bridge[-_ ]?token/i);
+    expect(src).not.toMatch(/OPENAI_API_KEY/);
+    expect(src).not.toMatch(/VITE_/);
+    expect(src).not.toMatch(/process\.env/);
+    expect(src).not.toMatch(/sk-[A-Za-z0-9]/);
+  });
+
+  it.each(targets)("[%s] does not contain executable device-control names", (_, src) => {
+    for (const name of FORBIDDEN_DEVICE_NAMES) {
+      expect(src).not.toContain(name);
+    }
+  });
+
+  it.each(targets)("[%s] does not import model/API clients", (_, src) => {
+    expect(src).not.toMatch(/openai/i);
+    expect(src).not.toMatch(/anthropic/i);
+    expect(src).not.toMatch(/gemini/i);
+    expect(src).not.toMatch(/gpt-/i);
+    expect(src).not.toMatch(/calculateAiDoctorConfidence/);
+    expect(src).not.toMatch(/generateMultimodalDiagnosisPhase1/);
+    expect(src).not.toMatch(/compilePlantContextFromRows/);
+  });
+
+  it.each(targets)("[%s] does not use browser persistence or clipboard", (_, src) => {
+    expect(src).not.toContain("localStorage");
+    expect(src).not.toContain("sessionStorage");
+    expect(src).not.toContain("navigator.clipboard");
+  });
+
+  it.each(targets)("[%s] has no forbidden execution copy", (_, src) => {
+    for (const phrase of FORBIDDEN_COPY) {
+      expect(src).not.toMatch(new RegExp(phrase, "i"));
+    }
+  });
+
+  it("page imports only react and the local view model", () => {
+    const fromMatches = pageSrc.match(/from\s+["'][^"']+["']/g) || [];
+    for (const m of fromMatches) {
+      const ok =
+        m.includes('"react"') ||
+        m.includes("ecowittLiveBringupViewModel");
+      expect(ok).toBe(true);
+    }
+  });
+
+  it("view model has no external imports", () => {
+    const fromMatches = vmSrc.match(/from\s+["'][^"']+["']/g) || [];
+    expect(fromMatches.length).toBe(0);
+  });
+});

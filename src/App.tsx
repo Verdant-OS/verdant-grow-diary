@@ -55,6 +55,7 @@ import AiDoctorPhase1Preview from "./pages/AiDoctorPhase1Preview";
 import OneTentLoopProof from "./pages/OneTentLoopProof";
 import SensorTruthAudit from "./pages/SensorTruthAudit";
 import AiDoctorConfidenceAudit from "./pages/AiDoctorConfidenceAudit";
+import EcowittLiveBringup from "./pages/EcowittLiveBringup";
 
 
 
@@ -128,6 +129,7 @@ const App = () => (
                 <Route path="/operator/ecowitt" element={<OperatorEcowittCanary />} />
                 <Route path="/operator/one-tent-proof-record" element={<OneTentProofRecord />} />
                 <Route path="/operator/ecowitt-bridge-status" element={<EcowittBridgeStatus />} />
+                <Route path="/operator/ecowitt-live-bringup" element={<EcowittLiveBringup />} />
                 <Route path="/pi-ingest-status" element={<PiIngestStatus />} />
                 <Route path="/ingest-inspector" element={<IngestInspector />} />
                 <Route path="/imports/representative-csv" element={<RepresentativeCsvPreview />} />

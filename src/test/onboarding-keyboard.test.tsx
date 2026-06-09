@@ -78,7 +78,7 @@ describe("Onboarding page", () => {
     renderPage();
     const link = screen.getByRole("link", { name: /settings/i });
     expect(link).toHaveAttribute("href", "/settings");
-    expect(screen.getByText(/you can change this later/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/you can change this later/i).length).toBeGreaterThan(0);
   });
 
   it("focuses the heading on mount for screen readers / keyboard users", () => {

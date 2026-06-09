@@ -1,0 +1,53 @@
+name: EcoWitt Windows tooling
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  ECOWITT_ARTIFACT_RETENTION_DAYS: 7
+
+jobs:
+  ecowitt-windows-tooling:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@f4d14e03ff726c06358e5557344e1da148b56cf7 # v2.0.1
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Vitest — EcoWitt Windows tooling + bridge
+        run: |
+          bunx vitest run \
+            src/test/ecowitt-windows-doctor.test.ts \
+            src/test/ecowitt-windows-launchers-safety.test.ts \
+            src/test/ecowitt-local-bridge-smoke.test.ts \
+            src/test/ecowitt-http-local-bridge.test.ts \
+            src/test/ecowitt-windows-fast-path.test.ts
+      - name: TypeScript app typecheck
+        run: bunx tsc -p tsconfig.app.json --noEmit
+      - name: Generate fast-path debug artifacts (non-fatal)
+        if: always()
+        run: |
+          mkdir -p tmp/ecowitt-fast-path tmp/ecowitt-windows
+          bun run dev:ecowitt-doctor -- --write-launchers --json \
+            > tmp/ecowitt-fast-path/doctor.json 2> tmp/ecowitt-fast-path/doctor.stderr.log || true
+          bun run dev:ecowitt-fast-path -- --verbose --write-launchers --save-artifacts \
+            > tmp/ecowitt-fast-path/fast-path.log 2>&1 || true
+      - name: Upload EcoWitt fast-path artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ecowitt-fast-path-debug
+          path: |
+            tmp/ecowitt-windows/
+            tmp/ecowitt-fast-path/
+            tmp/ecowitt-last-ingest-report.json
+          if-no-files-found: ignore
+          retention-days: ${{ env.ECOWITT_ARTIFACT_RETENTION_DAYS }}

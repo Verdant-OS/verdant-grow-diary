@@ -117,3 +117,42 @@ jobs:
             e2e/results/quicklog-smoke-report.txt
             playwright-report/
             test-results/
+
+      - name: Write Quick Log smoke run summary
+        if: always()
+        shell: bash
+        env:
+          SHOULD_RUN: ${{ steps.e2e_config.outputs.should_run }}
+          JOB_STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # Never echo secret values. Only references to secret NAMES are written.
+          {
+            echo "## Quick Log Playwright smoke"
+            echo ""
+            echo "- Workflow result: \`${JOB_STATUS}\`"
+            echo "- Event: \`${{ github.event_name }}\`"
+            echo "- Branch/ref: \`${{ github.ref }}\`"
+            if [ "${SHOULD_RUN}" = "true" ]; then
+              echo "- Smoke executed: yes"
+            else
+              echo "- Smoke executed: no (skipped — required E2E configuration was unavailable for this event; see the \`Verify required configuration\` step)"
+            fi
+            echo ""
+            echo "### Artifacts"
+            echo ""
+            echo "- Artifact name: \`quicklog-smoke-artifacts\`"
+            echo "- Retention: 30 days"
+            echo "- Run artifacts page: ${RUN_URL}#artifacts"
+            echo ""
+            echo "Contents:"
+            echo ""
+            echo "- \`e2e/results/quicklog-smoke-report.json\`"
+            echo "- \`e2e/results/quicklog-smoke-report.txt\`"
+            echo "- \`playwright-report/\`"
+            echo "- \`test-results/\`"
+            echo ""
+            echo "### Troubleshooting"
+            echo ""
+            echo "Open \`quicklog-smoke-report.txt\` first (then the JSON sibling) and find the first \`✗\` line. Then inspect the matching Playwright trace, screenshots, and video under \`playwright-report/\` and \`test-results/\`."
+          } >> "$GITHUB_STEP_SUMMARY"

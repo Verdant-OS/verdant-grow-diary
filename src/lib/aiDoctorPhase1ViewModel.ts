@@ -165,7 +165,7 @@ function describeSourceCounts(
   if (sq.csv_count > 0)
     items.push(`CSV / imported readings (historical): ${sq.csv_count}`);
   if (sq.demo_count > 0)
-    items.push(`Demo readings (sample data, not live): ${sq.demo_count}`);
+    items.push(`Demo readings (sample data, not real-time): ${sq.demo_count}`);
   if (sq.stale_count > 0)
     items.push(`Stale readings (not current): ${sq.stale_count}`);
   if (sq.invalid_count > 0)
@@ -221,7 +221,7 @@ function buildLimitations(
     sq.invalid_count === 0 &&
     (sq.demo_count > 0 || sq.csv_count > 0)
   )
-    limits.push("Only demo or imported (CSV) data is available — not live.");
+    limits.push("Only demo or imported (CSV) data is available — not real-time.");
   if (visionPoor) limits.push("Visual context is weak or low quality.");
   if (diagnosis.missing_information.length >= 5)
     limits.push("Multiple key pieces of context are missing.");
@@ -425,7 +425,7 @@ function buildSourceTruthWarning(
   const parts: string[] = [];
   if (hasDemoOrCsvOnly)
     parts.push(
-      "Only demo or imported (CSV) data is available — it is not live sensor data.",
+      "Only demo or imported (CSV) data is available — not real-time sensor data.",
     );
   if (hasStaleOrInvalid)
     parts.push(

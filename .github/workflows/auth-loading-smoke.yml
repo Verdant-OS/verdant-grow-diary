@@ -60,8 +60,8 @@ jobs:
       - name: Install Chromium only (with deps)
         run: bunx playwright install chromium --with-deps
 
-      - name: Run mocked auth-loading Playwright smoke
-        run: bunx playwright test e2e/auth-loading.spec.ts --project=chromium
+      - name: Run mocked auth-loading + redirect-safety Playwright smoke
+        run: bunx playwright test e2e/auth-loading.spec.ts e2e/auth-redirect-safety.spec.ts --project=chromium
 
       - name: Upload Playwright report
         if: ${{ always() }}

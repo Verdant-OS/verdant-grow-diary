@@ -929,7 +929,15 @@ export default function QuickLog({
               }}
               className="flex w-full items-center justify-between gap-2 text-left"
             >
-              <span className="text-sm font-medium">Hardware readings</span>
+              <span className="text-sm font-medium">
+                Hardware readings
+                <span
+                  data-testid="quicklog-hardware-manual-subtitle"
+                  className="ml-2 text-[10px] font-normal uppercase tracking-wide text-muted-foreground"
+                >
+                  Manual readings · not live sensor data
+                </span>
+              </span>
               <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
                 {hardwareOpen ? "Optional" : "Tap to add"}
               </span>

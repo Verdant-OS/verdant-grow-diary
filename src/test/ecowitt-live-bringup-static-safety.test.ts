@@ -19,6 +19,7 @@ const TEMPLATES_PATH = "src/lib/ecowittLiveEvidenceTemplates.ts";
 const UNIT_WARN_PATH = "src/lib/ecowittLiveEvidenceUnitWarningRules.ts";
 const MULTI_PLANT_PATH = "src/lib/ecowittLiveEvidenceMultiPlantRules.ts";
 const EXPORT_PATH = "src/lib/ecowittLiveEvidenceExportRules.ts";
+const TONIGHT_PATH = "src/lib/ecowittTonightModeViewModel.ts";
 
 function read(p: string): string {
   return readFileSync(resolve(ROOT, p), "utf8");
@@ -37,6 +38,7 @@ const templatesSrc = read(TEMPLATES_PATH);
 const unitWarnSrc = read(UNIT_WARN_PATH);
 const multiPlantSrc = read(MULTI_PLANT_PATH);
 const exportSrc = read(EXPORT_PATH);
+const tonightSrc = read(TONIGHT_PATH);
 const pageNoComments = stripComments(pageSrc);
 const vmNoComments = stripComments(vmSrc);
 const formNoComments = stripComments(formSrc);
@@ -44,6 +46,7 @@ const templatesNoComments = stripComments(templatesSrc);
 const unitWarnNoComments = stripComments(unitWarnSrc);
 const multiPlantNoComments = stripComments(multiPlantSrc);
 const exportNoComments = stripComments(exportSrc);
+const tonightNoComments = stripComments(tonightSrc);
 
 // Targets for the strict no-browser-API/no-network/etc checks. The page is
 // allowed to use Blob / URL / document for the local snapshot download, so
@@ -55,6 +58,7 @@ const libTargets: Array<[string, string]> = [
   ["unit warning rules", unitWarnNoComments],
   ["multi-plant rules", multiPlantNoComments],
   ["export rules", exportNoComments],
+  ["tonight mode view model", tonightNoComments],
 ];
 
 const targets: Array<[string, string]> = [
@@ -174,7 +178,8 @@ describe("ecowitt-live-bringup — static safety", () => {
         m.includes("ecowittLiveEvidenceTemplates") ||
         m.includes("ecowittLiveEvidenceUnitWarningRules") ||
         m.includes("ecowittLiveEvidenceMultiPlantRules") ||
-        m.includes("ecowittLiveEvidenceExportRules");
+        m.includes("ecowittLiveEvidenceExportRules") ||
+        m.includes("ecowittTonightModeViewModel");
       expect(ok).toBe(true);
     }
   });
@@ -196,17 +201,18 @@ describe("ecowitt-live-bringup — static safety", () => {
     expect(formNoComments).not.toMatch(/Date\.now\s*\(/);
   });
 
-  it("templates / unit-warning / multi-plant / export rules do not call Date.now", () => {
+  it("templates / unit-warning / multi-plant / export / tonight rules do not call Date.now", () => {
     expect(templatesNoComments).not.toMatch(/Date\.now\s*\(/);
     expect(unitWarnNoComments).not.toMatch(/Date\.now\s*\(/);
     expect(multiPlantNoComments).not.toMatch(/Date\.now\s*\(/);
     expect(exportNoComments).not.toMatch(/Date\.now\s*\(/);
+    expect(tonightNoComments).not.toMatch(/Date\.now\s*\(/);
   });
 
   it("new lib files import only from the local helper modules", () => {
     const ALLOWED =
       /ecowittLiveEvidenceFormRules|liveSourceTruthGateRules|ecowittLiveEvidenceUnitWarningRules|ecowittLiveEvidenceMultiPlantRules/;
-    for (const src of [templatesSrc, unitWarnSrc, multiPlantSrc, exportSrc]) {
+    for (const src of [templatesSrc, unitWarnSrc, multiPlantSrc, exportSrc, tonightSrc]) {
       const fromMatches = src.match(/from\s+["'][^"']+["']/g) || [];
       for (const m of fromMatches) {
         expect(ALLOWED.test(m)).toBe(true);

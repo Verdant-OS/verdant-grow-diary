@@ -41,6 +41,12 @@ import {
   buildEcowittLiveEvidenceSnapshotFilename,
   serializeEcowittLiveEvidenceSnapshotExport,
 } from "@/lib/ecowittLiveEvidenceExportRules";
+import {
+  buildEcowittTonightModeViewModel,
+  type EcowittTonightModeViewModel,
+} from "@/lib/ecowittTonightModeViewModel";
+
+
 
 
 function Section({
@@ -402,7 +408,106 @@ function VerdictCard({
   );
 }
 
+function TonightModePanel({ vm }: { vm: EcowittTonightModeViewModel }) {
+  return (
+    <section
+      data-testid="ecowitt-tonight-mode"
+      className="space-y-2 rounded-md border border-border bg-background p-3 text-sm"
+    >
+      <header className="flex flex-wrap items-center gap-2">
+        <h3 className="text-sm font-semibold">Tonight Mode</h3>
+        <span
+          data-testid="ecowitt-tonight-mode-status"
+          className="rounded border border-border px-2 py-0.5 text-xs font-mono"
+        >
+          status: {vm.status}
+        </span>
+        <span
+          data-testid="ecowitt-tonight-mode-can-export"
+          className="rounded border border-border px-2 py-0.5 text-xs"
+        >
+          can_export_snapshot: {String(vm.can_export_snapshot)}
+        </span>
+        <span
+          data-testid="ecowitt-tonight-mode-can-claim-live"
+          className="rounded border border-border px-2 py-0.5 text-xs"
+        >
+          can_claim_live_proof: {String(vm.can_claim_live_proof)}
+        </span>
+      </header>
+      <p
+        data-testid="ecowitt-tonight-mode-headline"
+        className="text-sm font-medium"
+      >
+        {vm.headline}
+      </p>
+      <p
+        data-testid="ecowitt-tonight-mode-summary"
+        className="text-xs text-muted-foreground"
+      >
+        {vm.summary}
+      </p>
+      <div>
+        <h4 className="text-xs uppercase text-muted-foreground">
+          Top blockers
+        </h4>
+        <ul
+          data-testid="ecowitt-tonight-mode-top-blockers"
+          className="list-disc space-y-1 pl-5 text-xs"
+        >
+          {vm.top_blockers.length === 0 ? (
+            <li>No blockers detected.</li>
+          ) : (
+            vm.top_blockers.map((b, i) => (
+              <li key={`tm-b-${i}`}>{b}</li>
+            ))
+          )}
+        </ul>
+      </div>
+      <p
+        data-testid="ecowitt-tonight-mode-next-best-action"
+        className="rounded border border-border bg-muted/40 p-2 text-xs"
+      >
+        Next: {vm.next_best_action}
+      </p>
+      <div>
+        <h4 className="text-xs uppercase text-muted-foreground">Checklist</h4>
+        <ul
+          data-testid="ecowitt-tonight-mode-checklist"
+          className="space-y-1 text-xs"
+        >
+          {vm.checklist_items.map((item) => (
+            <li
+              key={item.id}
+              data-testid={`ecowitt-tonight-mode-checklist-item-${item.id}`}
+              className="flex flex-wrap items-center gap-2"
+            >
+              <span className="font-mono">{item.label}</span>
+              <span
+                data-testid={`ecowitt-tonight-mode-checklist-item-${item.id}-status`}
+                className="rounded border border-border px-2 py-0.5"
+              >
+                {item.status}
+              </span>
+              <span className="basis-full text-muted-foreground">
+                {item.helper}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <p
+        data-testid="ecowitt-tonight-mode-safety-note"
+        className="text-xs text-muted-foreground"
+      >
+        {vm.safety_note}
+      </p>
+    </section>
+  );
+}
+
 function LiveEvidenceEvaluator() {
+
   const [form, setForm] = React.useState<EcowittLiveEvidenceFormState>(() =>
     createInitialEcowittLiveEvidenceFormState(),
   );
@@ -426,6 +531,22 @@ function LiveEvidenceEvaluator() {
     [form, plantIdsInput],
   );
 
+  const tonight = React.useMemo<EcowittTonightModeViewModel>(
+    () =>
+      buildEcowittTonightModeViewModel({
+        evaluator_result: evaluated ? result : null,
+        overall_verdict: evaluated ? multi.overall_verdict : null,
+        plant_results: evaluated ? multi.per_plant : null,
+        unit_warnings: unitWarnings,
+        form_warnings: built.form_warnings,
+        required_next_steps: evaluated ? multi.combined_next_steps : null,
+        export_ready: evaluated,
+        snapshot_exported: false,
+      }),
+    [evaluated, result, multi, unitWarnings, built.form_warnings],
+  );
+
+
   const updateMetric = (key: LiveSourceTruthMetricKey) =>
     (next: EcowittLiveEvidenceMetricRow) =>
       setForm((prev) => ({
@@ -441,6 +562,7 @@ function LiveEvidenceEvaluator() {
 
   return (
     <Section id="live-evidence-evaluator" title="Live Evidence Evaluator">
+      <TonightModePanel vm={tonight} />
       <p
         data-testid="ecowitt-evaluator-helper"
         className="text-xs text-muted-foreground"
@@ -449,6 +571,7 @@ function LiveEvidenceEvaluator() {
         backend response. This evaluator runs locally in the browser and does
         not query sensors or write data.
       </p>
+
 
       <div
         data-testid="ecowitt-evaluator-templates"

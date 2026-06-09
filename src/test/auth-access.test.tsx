@@ -27,6 +27,10 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: null, session: null, loading: false, signOut: vi.fn() }),
+}));
+
 import Auth from "@/pages/Auth";
 
 function renderAuth() {

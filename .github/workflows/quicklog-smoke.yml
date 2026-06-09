@@ -28,13 +28,13 @@ name: Quick Log Playwright smoke
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [verdant-grow-diary]
     paths:
       - "e2e/**"
       - "playwright.config.ts"
       - ".github/workflows/quicklog-smoke.yml"
   pull_request:
-    branches: [main]
+    branches: [verdant-grow-diary]
     paths:
       - "e2e/**"
       - "playwright.config.ts"

@@ -61,9 +61,13 @@ describe("ecowitt local test sender — safety", () => {
 
   it("uses Bearer auth and redacts the token in logs", () => {
     expect(SCRIPT).toMatch(/Authorization:\s*`Bearer \$\{token\}`/);
-    expect(SCRIPT).toMatch(/redactBridgeToken/);
-    // The script must never console.log the raw token value.
-    expect(SCRIPT).not.toMatch(/console\.log\([^)]*\btoken\b[^)]*\)/);
+    expect(SCRIPT).toMatch(/redactBridgeToken\(token\)/);
+    // The script must never console.log the raw `token` identifier
+    // unwrapped — only the redacted form is permitted.
+    const rawTokenLogs = (CODE.match(
+      /console\.log\([^)]*\btoken\b[^)]*\)/g,
+    ) ?? []).filter((line) => !line.includes("redactBridgeToken"));
+    expect(rawTokenLogs).toEqual([]);
   });
 
   it("does not request a Supabase user_id from the caller", () => {

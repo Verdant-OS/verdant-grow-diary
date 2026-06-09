@@ -13,10 +13,8 @@ import {
   buildResetRedirectUrl,
   GENERIC_RESET_REQUEST_SUCCESS,
   MIN_PASSWORD_LENGTH,
-  SIGN_IN_FRIENDLY_ERROR,
-  SIGN_UP_FRIENDLY_ERROR,
-  FORGOT_RATE_LIMIT_ERROR,
 } from "@/lib/passwordResetRules";
+import { sanitizeAuthError } from "@/lib/authErrorRules";
 
 type AuthMode = "signin" | "signup" | "forgot";
 

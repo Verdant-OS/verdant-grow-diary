@@ -24,6 +24,35 @@ describe("Quick Log Playwright CI surface", () => {
     expect(fs.existsSync(path.join(ROOT, "e2e/.auth/user.json"))).toBe(false);
   });
 
+  it("CI workflow has NO schedule/cron trigger (no automated writes to a real grow)", () => {
+    const wf = read(".github/workflows/quicklog-smoke.yml");
+    // The smoke creates real diary entries. Until a disposable test fixture
+    // exists, scheduled runs are unsafe and must not be enabled.
+    expect(wf).not.toMatch(/^\s*schedule\s*:/m);
+    expect(wf).not.toMatch(/-\s*cron\s*:/);
+  });
+
+  it("README warns smoke writes real diary entries and requires a dedicated test account/plant", () => {
+    const readme = read("e2e/README.md");
+    // Section header for the warning
+    expect(readme).toMatch(/Test-fixture requirement|real-write warning/i);
+    // Explicit real-write language
+    expect(readme.toLowerCase()).toContain("creates real");
+    expect(readme).toMatch(/diary entries/i);
+    // Must warn against pointing at a real/active production grow
+    expect(readme).toMatch(/real active grow|production grow|active production grow/i);
+    expect(readme).toContain("E2E_GROW_1_PLANT_URL");
+    // Dedicated test account and test plant required
+    expect(readme.toLowerCase()).toContain("dedicated test account");
+    expect(readme.toLowerCase()).toContain("test plant");
+    // Manual-only until a disposable test fixture exists
+    expect(readme).toMatch(/manual(ly)?\s+only|run the workflow\s+manually\s+only/i);
+    expect(readme.toLowerCase()).toContain("disposable test fixture");
+    // No scheduled/nightly trigger is enabled
+    expect(readme).toMatch(/no\s+(scheduled|nightly)/i);
+  });
+
+
   it("ignores .auth/ and results/ in e2e/.gitignore", () => {
     const ig = read("e2e/.gitignore");
     expect(ig).toMatch(/^\.auth\/$/m);

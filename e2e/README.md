@@ -4,6 +4,28 @@ Playwright is the source of truth for browser-level Quick Log keyboard,
 focus, and post-save flows. Vitest covers deterministic component logic in
 jsdom but cannot prove real Tab order or focus restoration.
 
+## ⚠️ Test-fixture requirement (real-write warning)
+
+The Quick Log smoke drives the real authenticated UI and **creates real
+diary entries** on whatever grow/plant the configured account can access.
+There is no app-level write bypass, no fixture rewrite, no automatic
+cleanup, and no teardown. Every Quick Log save the smoke performs is a
+real, persisted diary entry — exactly like a grower clicking Save.
+
+Because of this:
+
+- **Do not point `E2E_GROW_1_PLANT_URL` at a real active grow.** Pointing
+  the smoke at a production grow will pollute that grow's diary with test
+  entries that the app does not roll back.
+- **Use only a dedicated test account and a dedicated test plant.** The
+  account must own the test plant and must not own real grower data you
+  care about.
+- **Until a disposable test fixture exists, run the workflow manually
+  only.** There is intentionally no scheduled/nightly trigger — automated
+  scheduled smoke against a real grow is unsafe and is not enabled.
+- No automatic data cleanup, deletion, or mutation of existing grow data
+  happens outside the intentional Quick Log save flow itself.
+
 ## Safety guarantees
 
 - No app-level auth bypass.
@@ -12,6 +34,9 @@ jsdom but cannot prove real Tab order or focus restoration.
 - No localStorage token injection (unless produced by a real Playwright login).
 - No fake live sensor data; stale/non-usable snapshots are never attached.
 - No Action Queue / device-control writes.
+- No scheduled/nightly trigger in the CI workflow — the smoke runs only on
+  manual `workflow_dispatch` or on `push` / `pull_request` to
+  `verdant-grow-diary`, and skips cleanly when E2E config is unavailable.
 - `e2e/.auth/user.json` is generated locally and is gitignored. Never commit it.
 - `e2e/results/` is gitignored. Never commit it.
 

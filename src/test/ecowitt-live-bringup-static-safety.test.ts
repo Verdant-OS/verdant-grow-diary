@@ -211,7 +211,7 @@ describe("ecowitt-live-bringup — static safety", () => {
 
   it("new lib files import only from the local helper modules", () => {
     const ALLOWED =
-      /ecowittLiveEvidenceFormRules|liveSourceTruthGateRules|ecowittLiveEvidenceUnitWarningRules|ecowittLiveEvidenceMultiPlantRules/;
+      /ecowittLiveEvidenceFormRules|liveSourceTruthGateRules|ecowittLiveEvidenceUnitWarningRules|ecowittLiveEvidenceMultiPlantRules|ecowittTonightModeViewModel/;
     for (const src of [templatesSrc, unitWarnSrc, multiPlantSrc, exportSrc, tonightSrc]) {
       const fromMatches = src.match(/from\s+["'][^"']+["']/g) || [];
       for (const m of fromMatches) {

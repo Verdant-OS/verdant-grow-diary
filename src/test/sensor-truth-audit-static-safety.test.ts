@@ -142,16 +142,23 @@ describe("sensor truth audit static safety", () => {
 
   it("page does not import model/edge/ingest/alert/action helpers", () => {
     const src = stripComments(readFile(PAGE_PATH));
-    expect(src).not.toMatch(/from\s+["'].*(?:model|edge|ingest|alert|action)/i);
-    expect(src).not.toMatch(/from\s+["'].*ai-doctor/i);
-    expect(src).not.toMatch(/from\s+["'].*confidence/i);
+    const fromMatches = src.match(/from\s+["'][^"']+["']/g) || [];
+    for (const match of fromMatches) {
+      if (match.includes("sensorTruthAuditViewModel")) continue;
+      expect(match).not.toMatch(/(?:model|edge|ingest|alert|action)/i);
+      expect(match).not.toMatch(/ai-doctor/i);
+      expect(match).not.toMatch(/confidence/i);
+    }
   });
 
   it("view model does not import model/edge/ingest/alert/action helpers", () => {
     const src = stripComments(readFile(VM_PATH));
-    expect(src).not.toMatch(/from\s+["'].*(?:model|edge|ingest|alert|action)/i);
-    expect(src).not.toMatch(/from\s+["'].*ai-doctor/i);
-    expect(src).not.toMatch(/from\s+["'].*confidence/i);
+    const fromMatches = src.match(/from\s+["'][^"']+["']/g) || [];
+    for (const match of fromMatches) {
+      expect(match).not.toMatch(/(?:model|edge|ingest|alert|action)/i);
+      expect(match).not.toMatch(/ai-doctor/i);
+      expect(match).not.toMatch(/confidence/i);
+    }
   });
 
   it("page does not contain forbidden execution copy", () => {

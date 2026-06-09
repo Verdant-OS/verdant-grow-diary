@@ -1064,10 +1064,17 @@ export default function QuickLog({
             type="submit"
             disabled={busy || !selectedPlant || !!savedTarget}
             data-testid="quick-log-save"
+            aria-label="Save log"
             className="gradient-leaf text-primary-foreground"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save entry"}
           </Button>
+          <p
+            data-testid="quick-log-save-helper"
+            className="text-[11px] text-muted-foreground -mt-2"
+          >
+            You can add more detail later from the timeline.
+          </p>
 
           {savedTarget && (
             <div

@@ -608,7 +608,13 @@ export default function QuickLog({
           {/* Plant — full-width row so the validation alert + helper text
               have room to read on narrow viewports. */}
           <div>
-            <Label className="text-xs">Plant</Label>
+            <h3
+              data-testid="quick-log-section-plant"
+              className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1"
+            >
+              1. Plant
+            </h3>
+            <Label className="text-xs" htmlFor="quick-log-plant-select-label">Plant</Label>
             <Select
               value={plantId || "__none"}
               onValueChange={(v) => setPlantId(v === "__none" ? "" : v)}

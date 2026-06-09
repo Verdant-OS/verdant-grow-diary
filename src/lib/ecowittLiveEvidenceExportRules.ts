@@ -44,6 +44,8 @@ export const ECOWITT_LIVE_EVIDENCE_EXPORT_SAFETY_FLAGS: readonly string[] =
     "manual_snapshot_only",
     "not_database_proof",
     "requires_controller_comparison",
+    "requires_device_identity_confirmation",
+    "requires_timestamp_sanity_check",
     "no_device_control",
     "approval_required_for_actions",
     "do_not_use_demo_as_live",

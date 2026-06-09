@@ -64,5 +64,7 @@ describe("startScreenPreferences", () => {
     expect(routeForStartScreen("quickLog")).toBe("/");
     expect(routeForStartScreen("timeline")).toBe("/timeline");
     expect(routeForStartScreen("dashboard")).toBe("/");
+    expect(routeForStartScreen("onboarding")).toBe("/onboarding");
+    expect(routeForStartScreen("welcome")).toBe("/welcome");
   });
 });

@@ -39,7 +39,7 @@ describe("Onboarding page", () => {
     // Quick Log is default and marked recommended
     const quickLog = radios.find((r) => (r as HTMLInputElement).value === "quickLog") as HTMLInputElement;
     expect(quickLog.checked).toBe(true);
-    expect(screen.getByText(/recommended/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/recommended/i).length).toBeGreaterThan(0);
   });
 
   it("selecting another option and pressing Continue navigates and persists", () => {

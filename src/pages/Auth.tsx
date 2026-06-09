@@ -65,7 +65,7 @@ export default function Auth() {
       signInEmailRef.current?.focus();
       return;
     }
-    nav("/", { replace: true });
+    nav(redirectTo, { replace: true });
   }
 
   async function signUp(e: React.FormEvent) {
@@ -90,7 +90,7 @@ export default function Auth() {
       return;
     }
     setSignUpSuccess("Welcome to Verdant. Check your inbox if confirmation is required.");
-    nav("/", { replace: true });
+    nav(redirectTo, { replace: true });
   }
 
   async function requestReset(e: React.FormEvent) {

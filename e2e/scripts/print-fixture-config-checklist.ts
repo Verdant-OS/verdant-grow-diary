@@ -68,7 +68,7 @@ push("     the 'Verify disposable E2E fixture' step passes before the");
 push("     smoke step runs.");
 push("  7. To rotate the account: create a new disposable account,");
 push("     re-do steps 2–6, then update secrets.E2E_TEST_EMAIL and");
-push("     secrets.E2E_TEST_PASSWORD. Do not delete the old account");
+push("     secrets.E2E_TEST_PASSWORD. Do not remove the old account");
 push("     through any in-app automation — handle externally.");
 push();
 push("See e2e/FIXTURE_SETUP.md for the full checklist including");

@@ -9,7 +9,7 @@ const resetForEmailMock = vi.fn().mockResolvedValue({ data: {}, error: null });
 const signInMock = vi.fn();
 const signUpMock = vi.fn();
 const getSessionMock = vi.fn().mockResolvedValue({ data: { session: null } });
-const onAuthStateChangeMock = vi.fn(() => ({
+const onAuthStateChangeMock = vi.fn((_a?: any, _b?: any) => ({
   data: { subscription: { unsubscribe: () => {} } },
 }));
 

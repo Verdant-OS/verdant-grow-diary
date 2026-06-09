@@ -278,10 +278,9 @@ describe("buildEcowittLiveEvidenceSnapshotFilename", () => {
     expect(buildEcowittLiveEvidenceSnapshotFilename("not-a-date")).toBe(
       ECOWITT_LIVE_EVIDENCE_EXPORT_STATIC_FILENAME,
     );
-    // @ts-expect-error intentional bad input
-    expect(buildEcowittLiveEvidenceSnapshotFilename(null)).toBe(
-      ECOWITT_LIVE_EVIDENCE_EXPORT_STATIC_FILENAME,
-    );
+    expect(
+      buildEcowittLiveEvidenceSnapshotFilename(null as unknown as string),
+    ).toBe(ECOWITT_LIVE_EVIDENCE_EXPORT_STATIC_FILENAME);
   });
 
   it("never includes tent_id or plant_id in the filename", () => {

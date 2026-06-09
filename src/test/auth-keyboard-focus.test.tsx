@@ -69,8 +69,10 @@ function renderReset() {
 // focusable elements in DOM order — the natural tab order for elements
 // without explicit tabIndex.
 function getTabOrder(): HTMLElement[] {
+  // Include disabled buttons — they still occupy a DOM order slot and we
+  // want to assert ordering, not focusability.
   const selector =
-    'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    'a[href], button, input:not([disabled]), [tabindex]:not([tabindex="-1"])';
   return Array.from(document.querySelectorAll<HTMLElement>(selector)).filter(
     (el) => !el.hasAttribute("aria-hidden"),
   );

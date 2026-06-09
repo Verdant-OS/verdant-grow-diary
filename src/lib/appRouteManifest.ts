@@ -100,6 +100,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/logs", access: "auth" },
   { path: "/onboarding", access: "auth", description: "Post-sign-in start-screen choice (diary-first default)." },
   { path: "/operator/ecowitt", access: "operator", description: "Cloud Canary preview." },
+  { path: "/operator/ecowitt-bridge-status", access: "operator", description: "EcoWitt bridge status." },
   { path: "/operator/one-tent-proof-record", access: "operator", description: "One-tent proof record export." },
   { path: "/partners/csv-preview", access: "public" },
   { path: "/pi-ingest-status", access: "operator" },

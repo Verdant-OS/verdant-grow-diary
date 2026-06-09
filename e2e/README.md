@@ -243,6 +243,51 @@ Artifacts (uploaded with `if: always()` under the name
 
 Find them under the workflow run summary → Artifacts.
 
+## Run summary, smoke metadata, and caches
+
+The workflow writes a markdown summary to `$GITHUB_STEP_SUMMARY` (rendered
+at the top of every run page). It includes:
+
+- A `[Workflow run](...)` link to the current run page.
+- An `[Artifacts](...#artifacts)` link that jumps to the run's Artifacts
+  section (`quicklog-smoke-artifacts` is downloaded from there).
+- The exact smoke command: `bun run e2e:quicklog-smoke`.
+- Browser: `chromium`.
+- Playwright version, captured via `bunx playwright --version` (falls back
+  to `unavailable` if it cannot be read).
+- Smoke counts (`total` / `passed` / `failed` / `skipped`) parsed
+  best-effort from `e2e/results/quicklog-smoke-report.json` when present.
+  When the report JSON is absent the summary prints:
+  `Smoke counts unavailable: report JSON was not produced.`
+  Count parsing never masks a real Playwright failure, and the existing
+  artifact-guard step still fails the job when the report JSON or
+  `playwright-report/` is missing after a real smoke attempt.
+
+The workflow uses best-effort GitHub Actions caches to speed up runs:
+
+- Bun package cache: `~/.bun/install/cache`
+- Playwright browser cache: `~/.cache/ms-playwright`
+
+Cache keys are scoped by `runner.os` and a hash of `bun.lock` / `bun.lockb`
+/ `package.json`. `bun install --frozen-lockfile` and
+`bun run e2e:install:ci` always run after restore, so Chromium and OS
+deps are still verified on every run.
+
+Caches intentionally never include:
+
+- `e2e/.auth` (storageState — generated locally, gitignored)
+- `e2e/results` (smoke reports)
+- `test-results` (Playwright traces, screenshots, videos)
+- `playwright-report` (Playwright HTML report)
+- Any secret, Supabase session, or Supabase access/refresh token.
+
+There is no scheduled or nightly Quick Log smoke. Write-producing smoke
+must only run against a disposable test account/test plant, so the
+workflow stays manual-dispatch / PR / push only until such a fixture
+exists. See the real-write warning at the top of this file.
+
+
+
 ## Run from GitHub Actions manually
 
 Exact steps to dispatch the Quick Log smoke from GitHub:

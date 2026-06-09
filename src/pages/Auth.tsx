@@ -30,8 +30,12 @@ import {
   formatVerificationCooldown,
   verificationCooldownRemainingMs,
 } from "@/lib/emailVerificationRules";
-
-type AuthMode = "signin" | "signup" | "forgot";
+import {
+  AUTH_MODE_TABS,
+  AUTH_TAB_LIST_CLASSNAME,
+  getAuthTabTriggerClassName,
+  type AuthMode,
+} from "@/lib/authModeTabRules";
 
 export default function Auth() {
   const { user, loading } = useAuth();
@@ -244,12 +248,19 @@ export default function Auth() {
               setSignInError(null);
               setSignUpError(null);
               setForgotError(null);
+              setForgotSent(false);
             }}
           >
-            <TabsList className="grid grid-cols-3 w-full mb-4">
-              <TabsTrigger value="signin">Sign in</TabsTrigger>
-              <TabsTrigger value="signup">Create account</TabsTrigger>
-              <TabsTrigger value="forgot">Forgot password</TabsTrigger>
+            <TabsList className={AUTH_TAB_LIST_CLASSNAME}>
+              {AUTH_MODE_TABS.map((tab) => (
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  className={getAuthTabTriggerClassName(tab.value)}
+                >
+                  {tab.label}
+                </TabsTrigger>
+              ))}
             </TabsList>
 
             <TabsContent value="signin">

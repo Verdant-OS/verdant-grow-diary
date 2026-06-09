@@ -18,10 +18,12 @@ on:
     branches: [verdant-grow-diary]
     paths:
       - "e2e/auth-loading.spec.ts"
+      - "e2e/auth-redirect-safety.spec.ts"
       - "e2e/**"
       - "src/pages/Auth.tsx"
       - "src/pages/ResetPassword.tsx"
       - "src/lib/authErrorRules.ts"
+      - "src/lib/authRedirectRules.ts"
       - "src/lib/passwordResetRules.ts"
       - "playwright.config.ts"
       - ".github/workflows/auth-loading-smoke.yml"

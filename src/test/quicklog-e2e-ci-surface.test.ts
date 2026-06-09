@@ -620,9 +620,16 @@ describe("Quick Log Playwright CI surface", () => {
         `cache path '${pathValue}' not in allowlist`,
       ).toBe(true);
 
+      // Strip YAML comment lines before checking forbidden tokens —
+      // comments documenting the rule (e.g. "never caches storageState")
+      // are intentional and should not trip the guardrail.
+      const noComments = block
+        .split("\n")
+        .filter((l) => !/^\s*#/.test(l))
+        .join("\n");
       for (const tok of forbidden) {
         expect(
-          block.includes(tok),
+          noComments.includes(tok),
           `cache block must not reference forbidden token '${tok}'`,
         ).toBe(false);
       }

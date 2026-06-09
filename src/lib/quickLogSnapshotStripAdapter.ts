@@ -181,6 +181,7 @@ export function buildQuickLogSnapshotStrip(
       action: actionFor("no_data"),
       classification,
       providerLabel: null,
+      trustBadge: classifySnapshotTrustBadge({ empty: true, source: snapshot?.source ?? null }),
     };
   }
 

@@ -29,6 +29,7 @@ import {
 } from "@/lib/liveSourceTruthGateRules";
 import { evaluateLiveEvidenceForPlants } from "@/lib/ecowittLiveEvidenceMultiPlantRules";
 import { ECOWITT_LIVE_EVIDENCE_TEMPLATES } from "@/lib/ecowittLiveEvidenceTemplates";
+import { buildEcowittTonightModeViewModel } from "@/lib/ecowittTonightModeViewModel";
 
 function baseFormState(): EcowittLiveEvidenceFormState {
   return {

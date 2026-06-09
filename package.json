@@ -45,6 +45,8 @@
     "e2e:install:ci": "playwright install --with-deps chromium",
     "e2e:setup": "playwright test --project=setup",
     "e2e:verify-fixture": "playwright test e2e/fixture-safety.spec.ts --project=chromium-authed",
+    "e2e:bootstrap-fixture": "playwright test e2e/fixture-bootstrap.spec.ts --project=chromium-authed",
+    "e2e:fixture-checklist": "bun run e2e/scripts/print-fixture-config-checklist.ts",
     "e2e:quicklog-smoke": "playwright test e2e/quicklog-smoke.spec.ts --project=chromium-authed",
     "e2e:quicklog-smoke:headed": "playwright test e2e/quicklog-smoke.spec.ts --project=chromium-authed --headed",
     "e2e:report": "playwright show-report"

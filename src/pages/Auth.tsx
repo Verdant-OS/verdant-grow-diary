@@ -210,7 +210,7 @@ export default function Auth() {
                   {GENERIC_RESET_REQUEST_SUCCESS}
                 </div>
               ) : (
-                <form onSubmit={requestReset} className="grid gap-3" aria-label="Forgot password">
+                <form onSubmit={requestReset} noValidate className="grid gap-3" aria-label="Forgot password">
                   <div>
                     <Label htmlFor="forgot-email">Email</Label>
                     <Input

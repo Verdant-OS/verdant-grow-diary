@@ -281,10 +281,63 @@ Caches intentionally never include:
 - `playwright-report` (Playwright HTML report)
 - Any secret, Supabase session, or Supabase access/refresh token.
 
+Cache key guardrails:
+
+- Every `actions/cache@v4` step is gated by
+  `steps.e2e_config.outputs.should_run == 'true'`.
+- Every cache `key:` includes `${{ runner.os }}` plus
+  `hashFiles('bun.lock', 'bun.lockb', 'package.json')` so a lockfile or
+  `package.json` change always busts the cache.
+- `restore-keys:` includes the `${{ runner.os }}-` prefix only.
+- Cache `path:` values are restricted to `~/.bun/install/cache` and
+  `~/.cache/ms-playwright`. Auth state (`e2e/.auth`, `storageState`,
+  `user.json`), smoke reports (`e2e/results`), Playwright outputs
+  (`test-results`, `playwright-report`), and any `secrets.*` reference
+  (including `E2E_TEST_EMAIL`, `E2E_TEST_PASSWORD`,
+  `SUPABASE_SERVICE_ROLE`, `service_role`) are never cached.
+
+### Failure annotation
+
+The summary includes a `### Failure annotation` block that distinguishes:
+
+- **Smoke command failure** — the `quicklog_smoke` step outcome /
+  conclusion is `failure`. Inspect `quicklog-smoke-report.txt`,
+  Playwright trace, screenshots, and videos.
+- **Report JSON missing** — smoke ran but
+  `e2e/results/quicklog-smoke-report.json` was not produced. The
+  artifact guard fails this job after a real smoke attempt.
+- **Report parsing failed** — report JSON exists but smoke counts could
+  not be extracted. This is a metadata problem, not the same as a
+  Playwright smoke failure. The metadata step still exits 0 so it
+  cannot mask the real Playwright failure.
+- **Report parsing succeeded** — smoke counts were extracted from
+  `quicklog-smoke-report.json`.
+
+The metadata step emits `report_json_present` and `report_parse_status`
+outputs and may also emit `::warning::` annotations for the missing /
+failed cases. The job summary is the source of truth.
+
+### Summary links and Playwright report artifact
+
+The summary links to:
+
+- The workflow run (`[Workflow run]`).
+- The run's Artifacts section (`[Artifacts]` → `#artifacts`).
+- The bundled `quicklog-smoke-artifacts` artifact.
+- A dedicated `quicklog-playwright-report` artifact (Playwright HTML
+  report only), via
+  `steps.upload_playwright_report.outputs.artifact-url`. If that URL is
+  unavailable the link falls back to the run's `#artifacts` section.
+
+GitHub artifacts are downloads, not hosted HTML pages — download the
+artifact and open `index.html` from the unzipped folder.
+
 There is no scheduled or nightly Quick Log smoke. Write-producing smoke
 must only run against a disposable test account/test plant, so the
 workflow stays manual-dispatch / PR / push only until such a fixture
 exists. See the real-write warning at the top of this file.
+
+
 
 
 

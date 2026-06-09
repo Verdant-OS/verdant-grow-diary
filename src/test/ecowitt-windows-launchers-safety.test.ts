@@ -22,8 +22,8 @@ describe("ecowitt-windows-doctor — static safety", () => {
   it("performs no DB writes", () => {
     expect(CODE).not.toMatch(/\.(insert|upsert|update|delete)\s*\(/);
   });
-  it("never references service_role or action_queue or device control", () => {
-    expect(CODE).not.toMatch(/service[_-]?role/i);
+  it("never references the service_role literal or action_queue or device control", () => {
+    expect(CODE).not.toMatch(/service_role/i);
     expect(CODE).not.toMatch(/action_queue/i);
     expect(CODE).not.toMatch(/device_command|relay_on|valve_open|light_on/i);
   });

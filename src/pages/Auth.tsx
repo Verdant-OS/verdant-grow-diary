@@ -30,10 +30,11 @@ export default function Auth() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
   const [search] = useSearchParams();
-  const redirectTo = useMemo(
-    () => sanitizeAuthRedirect(search.get("redirectTo")),
-    [search],
-  );
+  const explicitRedirect = useMemo(() => {
+    const raw = search.get("redirectTo");
+    return raw ? sanitizeAuthRedirect(raw) : null;
+  }, [search]);
+  const redirectTo = explicitRedirect ?? "/";
   const [mode, setMode] = useState<AuthMode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -55,27 +56,60 @@ export default function Auth() {
   const signUpEmailRef = useRef<HTMLInputElement>(null);
   const forgotEmailRef = useRef<HTMLInputElement>(null);
 
+  function postSignInTarget(): string {
+    if (explicitRedirect) return explicitRedirect;
+    if (!user) return "/onboarding";
+    const saved = getStartScreenChoice(user.id);
+    return saved ? routeForStartScreen(saved) : "/onboarding";
+  }
+
   useEffect(() => {
-    if (user) nav(redirectTo, { replace: true });
-  }, [user, nav, redirectTo]);
+    if (user) nav(postSignInTarget(), { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, nav]);
   if (loading) return null;
-  if (user) return <Navigate to={redirectTo} replace />;
+  if (user) return <Navigate to={postSignInTarget()} replace />;
+
+  async function resendVerification() {
+    if (resendBusy) return;
+    setResendBusy(true);
+    setResendNotice(null);
+    try {
+      const supaAny = supabase.auth as unknown as {
+        resend?: (args: { type: "signup"; email: string }) => Promise<{ error: unknown }>;
+      };
+      if (typeof supaAny.resend === "function") {
+        await supaAny.resend({ type: "signup", email });
+      }
+      setResendNotice(RESEND_VERIFICATION_GENERIC_SUCCESS);
+    } catch {
+      setResendNotice(RESEND_VERIFICATION_GENERIC_FAILURE);
+    } finally {
+      setResendBusy(false);
+    }
+  }
 
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
     setSignInError(null);
+    setVerifyRequired(false);
+    setResendNotice(null);
     setBusy(true);
     // We never log the raw Supabase error — it can leak rate-limit timing
     // or other account-state hints. Always show the friendly copy.
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (error) {
+      if (classifyAuthError(error) === "emailNotConfirmed") {
+        setVerifyRequired(true);
+        return;
+      }
       setSignInError(sanitizeAuthError("signIn", error));
       signInEmailRef.current?.focus();
       return;
     }
-    nav(redirectTo, { replace: true });
+    nav(postSignInTarget(), { replace: true });
   }
 
   async function signUp(e: React.FormEvent) {

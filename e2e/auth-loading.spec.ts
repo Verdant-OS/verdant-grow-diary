@@ -16,13 +16,12 @@
 import { test, expect, type Page, type Route, type Request } from "@playwright/test";
 
 const SAFE_EMAIL = "playwright-e2e-noop@example.invalid";
-const SAFE_PASSWORD = "playwright-noop-1";
-const SAFE_NEW_PASSWORD = "playwright-noop-2";
+const SAFE_PWD = "playwright-noop-1";
+const SAFE_NEW_PWD = "playwright-noop-2";
 
-// Project ref derived from the Supabase URL the client is built against.
-// Used only to compute the sessionStorage key for the synthetic test
+// Project ref used only to compute the sessionStorage key for the synthetic test
 // session we seed on /reset-password. Not a secret.
-const SB_PROJECT_REF = "knkwiiywfkbqznbxwqfh";
+const SB_PROJECT_REF = "FAKE-PROJECT-REF-PLACEHOLDER-NOT-REAL";
 const SB_SESSION_KEY = `sb-${SB_PROJECT_REF}-auth-token`;
 
 /**
@@ -84,7 +83,7 @@ test.describe("Auth loading/disabled smoke (mocked)", () => {
     );
     await page.goto("/auth");
     await page.getByLabel(/^email$/i).fill(SAFE_EMAIL);
-    await page.getByLabel(/^password$/i).fill(SAFE_PASSWORD);
+    await page.getByLabel(/^password$/i).fill(SAFE_PWD);
 
     const button = page.getByRole("button", { name: /^sign in$/i });
     await button.click();
@@ -117,7 +116,7 @@ test.describe("Auth loading/disabled smoke (mocked)", () => {
     await page.goto("/auth");
     await page.getByRole("tab", { name: /create account/i }).click();
     await page.getByLabel(/^email$/i).fill(SAFE_EMAIL);
-    await page.getByLabel(/^password$/i).fill(SAFE_PASSWORD);
+    await page.getByLabel(/^password$/i).fill(SAFE_PWD);
 
     const button = page.getByRole("button", { name: /^create account$/i });
     await button.click();
@@ -171,8 +170,8 @@ test.describe("Auth loading/disabled smoke (mocked)", () => {
     await page.addInitScript(
       ({ key }) => {
         const fakeSession = {
-          access_token: "test-only-not-real",
-          refresh_token: "test-only-not-real",
+          access_token: "FAKE-ACCESS-TOKEN-NOT-REAL",
+          refresh_token: "FAKE-REFRESH-TOKEN-NOT-REAL",
           expires_in: 3600,
           expires_at: Math.floor(Date.now() / 1000) + 3600,
           token_type: "bearer",
@@ -208,8 +207,8 @@ test.describe("Auth loading/disabled smoke (mocked)", () => {
       "Reset form did not render with synthetic session — covered by Vitest auth-a11y instead.",
     );
 
-    await newPwd.fill(SAFE_NEW_PASSWORD + "a");
-    await page.getByLabel(/^confirm new password$/i).fill(SAFE_NEW_PASSWORD + "a");
+    await newPwd.fill(SAFE_NEW_PWD + "a");
+    await page.getByLabel(/^confirm new password$/i).fill(SAFE_NEW_PWD + "a");
     const button = page.getByRole("button", { name: /^update password$/i });
     await button.click();
     const loading = page.getByRole("button", { name: /updating password…/i });
@@ -244,7 +243,7 @@ test.describe("Mobile auth loading/disabled smoke (mocked)", () => {
     );
     await page.goto("/auth");
     await page.getByLabel(/^email$/i).fill(SAFE_EMAIL);
-    await page.getByLabel(/^password$/i).fill(SAFE_PASSWORD);
+    await page.getByLabel(/^password$/i).fill(SAFE_PWD);
 
     const button = page.getByRole("button", { name: /^sign in$/i });
     await button.tap();
@@ -267,7 +266,7 @@ test.describe("Mobile auth loading/disabled smoke (mocked)", () => {
     await page.goto("/auth");
     await page.getByRole("tab", { name: /create account/i }).tap();
     await page.getByLabel(/^email$/i).fill(SAFE_EMAIL);
-    await page.getByLabel(/^password$/i).fill(SAFE_PASSWORD);
+    await page.getByLabel(/^password$/i).fill(SAFE_PWD);
     await page.getByRole("button", { name: /^create account$/i }).tap();
     const loading = page.getByRole("button", { name: /creating account…/i });
     await expect(loading).toBeDisabled();

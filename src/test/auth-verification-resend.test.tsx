@@ -139,3 +139,52 @@ describe("Sign-in verification-required UI", () => {
     );
   });
 });
+
+describe("Verification resend cooldown", () => {
+  it("after success, button enters cooldown state and is disabled", async () => {
+    signInMock.mockResolvedValue({
+      data: {},
+      error: { message: "Email not confirmed" },
+    });
+    resendMock.mockResolvedValue({ data: {}, error: null });
+    renderAuth();
+    fireEvent.change(screen.getByLabelText(/^email$/i), {
+      target: { value: "noop@example.invalid" },
+    });
+    fireEvent.change(screen.getByLabelText(/^password$/i), {
+      target: { value: "abcd1234" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
+    const btn = await screen.findByRole("button", { name: /resend verification email/i });
+    fireEvent.click(btn);
+    await waitFor(() => expect(resendMock).toHaveBeenCalledTimes(1));
+    // After settle, label should be a cooldown countdown and button disabled.
+    const cooldownBtn = await screen.findByRole("button", { name: /resend available in/i });
+    expect(cooldownBtn).toBeDisabled();
+    // Clicking again during cooldown does not call resend a second time.
+    fireEvent.click(cooldownBtn);
+    expect(resendMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/for safety, wait a moment/i)).toBeInTheDocument();
+  });
+
+  it("after failure, cooldown still applies (does not let users hammer)", async () => {
+    signInMock.mockResolvedValue({
+      data: {},
+      error: { message: "Email not confirmed" },
+    });
+    resendMock.mockRejectedValue(new Error("boom"));
+    renderAuth();
+    fireEvent.change(screen.getByLabelText(/^email$/i), {
+      target: { value: "noop@example.invalid" },
+    });
+    fireEvent.change(screen.getByLabelText(/^password$/i), {
+      target: { value: "abcd1234" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
+    const btn = await screen.findByRole("button", { name: /resend verification email/i });
+    fireEvent.click(btn);
+    await waitFor(() => expect(resendMock).toHaveBeenCalledTimes(1));
+    const cooldownBtn = await screen.findByRole("button", { name: /resend available in/i });
+    expect(cooldownBtn).toBeDisabled();
+  });
+});

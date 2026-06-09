@@ -20,6 +20,7 @@ on:
       - "e2e/auth-loading.spec.ts"
       - "e2e/auth-redirect-safety.spec.ts"
       - "e2e/auth-desktop.spec.ts"
+      - "e2e/auth-route-protection.spec.ts"
       - "e2e/**"
       - "src/pages/Auth.tsx"
       - "src/pages/ResetPassword.tsx"
@@ -61,8 +62,8 @@ jobs:
       - name: Install Chromium only (with deps)
         run: bunx playwright install chromium --with-deps
 
-      - name: Run mocked auth-loading + redirect-safety + desktop Playwright smoke
-        run: bunx playwright test e2e/auth-loading.spec.ts e2e/auth-redirect-safety.spec.ts e2e/auth-desktop.spec.ts --project=chromium
+      - name: Run mocked auth-loading + redirect-safety + desktop + route-protection Playwright smoke
+        run: bunx playwright test e2e/auth-loading.spec.ts e2e/auth-redirect-safety.spec.ts e2e/auth-desktop.spec.ts e2e/auth-route-protection.spec.ts --project=chromium
 
       - name: Upload Playwright report
         if: ${{ always() }}

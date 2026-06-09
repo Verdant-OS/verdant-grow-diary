@@ -4,8 +4,17 @@
 //  - No backend write. No schema change. No grow/sensor mutation.
 //  - All routes pass through sanitizeAuthRedirect.
 //  - Never stores tokens, sessions, hashes, or grow data.
-import { useState } from "react";
-import { useNavigate, Navigate } from "react-router-dom";
+//
+// Accessibility:
+//  - Heading is the default focus target.
+//  - Options are native radios inside a semantic fieldset, exposed as a
+//    radiogroup. Native radios already support arrow-key navigation and
+//    Space/Enter selection.
+//  - "Skip for now" lands on the Quick Log diary-first route without
+//    persisting a preference.
+//  - "Change later" copy points to Settings.
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, Navigate, Link } from "react-router-dom";
 import { useAuth } from "@/store/auth";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +29,13 @@ export default function Onboarding() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
   const [choice, setChoice] = useState<StartScreenChoice>(DEFAULT_START_SCREEN);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    // Land focus on the heading so screen readers announce context first and
+    // keyboard users can tab directly into the radiogroup.
+    headingRef.current?.focus();
+  }, []);
 
   if (loading) return null;
   if (!user) return <Navigate to="/auth" replace />;
@@ -32,7 +48,12 @@ export default function Onboarding() {
   return (
     <div className="min-h-dvh flex flex-col items-center justify-center px-6 py-10">
       <div className="w-full max-w-md glass rounded-2xl p-6">
-        <h1 className="text-2xl font-display font-bold mb-1">
+        <h1
+          ref={headingRef}
+          tabIndex={-1}
+          id="onboarding-heading"
+          className="text-2xl font-display font-bold mb-1 outline-none"
+        >
           Where do you want Verdant to open first?
         </h1>
         <p className="text-sm text-muted-foreground mb-1">
@@ -42,12 +63,16 @@ export default function Onboarding() {
           Verdant works best when logs come first, then sensors, then AI.
         </p>
 
-        <fieldset className="grid gap-2 mb-4">
+        <fieldset
+          role="radiogroup"
+          aria-labelledby="onboarding-heading"
+          className="grid gap-2 mb-4 border-0 p-0"
+        >
           <legend className="sr-only">Choose your start screen</legend>
           {START_SCREEN_OPTIONS.map((opt) => (
             <label
               key={opt.key}
-              className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition ${
+              className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition focus-within:ring-2 focus-within:ring-ring ${
                 choice === opt.key ? "border-primary bg-secondary/40" : "border-border/50"
               }`}
             >
@@ -94,6 +119,17 @@ export default function Onboarding() {
             Continue
           </Button>
         </div>
+
+        <p className="mt-4 text-[11px] text-muted-foreground text-center">
+          You can change this later from{" "}
+          <Link
+            to="/settings"
+            className="underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+          >
+            Settings
+          </Link>
+          .
+        </p>
       </div>
     </div>
   );

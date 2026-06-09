@@ -23,6 +23,13 @@ import {
 } from "@/lib/authErrorRules";
 import { sanitizeAuthRedirect } from "@/lib/authRedirectRules";
 import { getStartScreenChoice, routeForStartScreen } from "@/lib/startScreenPreferences";
+import {
+  DEFAULT_VERIFICATION_COOLDOWN_MS,
+  VERIFICATION_COOLDOWN_HINT,
+  canResendVerification,
+  formatVerificationCooldown,
+  verificationCooldownRemainingMs,
+} from "@/lib/emailVerificationRules";
 
 type AuthMode = "signin" | "signup" | "forgot";
 
@@ -45,6 +52,8 @@ export default function Auth() {
   const [verifyRequired, setVerifyRequired] = useState(false);
   const [resendBusy, setResendBusy] = useState(false);
   const [resendNotice, setResendNotice] = useState<string | null>(null);
+  const [resendLastAttemptAt, setResendLastAttemptAt] = useState<number | null>(null);
+  const [resendNowTick, setResendNowTick] = useState<number>(() => Date.now());
   const [signUpError, setSignUpError] = useState<string | null>(null);
   const [signUpSuccess, setSignUpSuccess] = useState<string | null>(null);
 
@@ -67,11 +76,43 @@ export default function Auth() {
     if (user) nav(postSignInTarget(), { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, nav]);
+
+  // While a verification-resend cooldown is active, tick once a second so
+  // the countdown label updates and the button re-enables on its own.
+  useEffect(() => {
+    if (resendLastAttemptAt == null) return;
+    if (canResendVerification(Date.now(), resendLastAttemptAt)) return;
+    const id = window.setInterval(() => {
+      setResendNowTick(Date.now());
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [resendLastAttemptAt, resendNowTick]);
+
   if (loading) return null;
   if (user) return <Navigate to={postSignInTarget()} replace />;
 
+  const resendCooldownActive = !canResendVerification(
+    resendNowTick,
+    resendLastAttemptAt,
+    DEFAULT_VERIFICATION_COOLDOWN_MS,
+  );
+  const resendCooldownRemainingMs = verificationCooldownRemainingMs(
+    resendNowTick,
+    resendLastAttemptAt,
+    DEFAULT_VERIFICATION_COOLDOWN_MS,
+  );
+  const resendDisabled = resendBusy || resendCooldownActive;
+  const resendLabel = resendBusy
+    ? "Sending verification email…"
+    : resendCooldownActive
+      ? formatVerificationCooldown(resendCooldownRemainingMs)
+      : "Resend verification email";
+
   async function resendVerification() {
     if (resendBusy) return;
+    if (!canResendVerification(Date.now(), resendLastAttemptAt, DEFAULT_VERIFICATION_COOLDOWN_MS)) {
+      return;
+    }
     setResendBusy(true);
     setResendNotice(null);
     try {
@@ -85,9 +126,14 @@ export default function Auth() {
     } catch {
       setResendNotice(RESEND_VERIFICATION_GENERIC_FAILURE);
     } finally {
+      // Apply cooldown on both success and failure to discourage hammering.
       setResendBusy(false);
+      const stamp = Date.now();
+      setResendLastAttemptAt(stamp);
+      setResendNowTick(stamp);
     }
   }
+
 
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
@@ -263,12 +309,21 @@ export default function Auth() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      disabled={resendBusy}
+                      disabled={resendDisabled}
                       aria-busy={resendBusy}
                       onClick={resendVerification}
                     >
-                      {resendBusy ? "Sending verification email…" : "Resend verification email"}
+                      {resendLabel}
                     </Button>
+                    {resendCooldownActive && !resendBusy ? (
+                      <p
+                        role="status"
+                        aria-live="polite"
+                        className="text-[11px] text-muted-foreground"
+                      >
+                        {VERIFICATION_COOLDOWN_HINT}
+                      </p>
+                    ) : null}
                     {resendNotice ? (
                       <p role="status" aria-live="polite" className="text-xs text-muted-foreground">
                         {resendNotice}

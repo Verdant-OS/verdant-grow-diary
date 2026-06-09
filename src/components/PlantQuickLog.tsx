@@ -4,9 +4,10 @@
  * Opens from Plant Detail. Slide-up bottom sheet on mobile / centered modal on
  * desktop. Single scrolling view:
  *   1) Plant context
- *   2) Ten-second Better/Same/Worse check + optional note detail
- *   3) Optional photo + manual readings
- *   4) Sticky mobile-safe "Save log" button
+ *   2) What changed: grow action chips + optional note detail
+ *   3) Response after last change: Better/Same/Worse when this is a follow-up
+ *   4) Optional photo + manual readings
+ *   5) Sticky mobile-safe "Save log" button
  *
  * Safety contract is enforced by src/test/plant-quick-log.test.ts — keep this
  * component a presenter writing only to diary_entries + diary-photos storage.
@@ -41,13 +42,13 @@ import type { ManualSensorMetric } from "@/lib/manualSensorFreshnessRules";
 import { usePlantManualSensorLogs } from "@/hooks/usePlantManualSensorHistory";
 import { buildQuickLogPhotoGateState } from "@/lib/quickLogPhotoGateRules";
 import {
-  QUICK_CHECK_DETAIL_CHIPS,
-  TEN_SECOND_QUICK_CHECK_STATUSES,
-  applyQuickCheckDetailChip,
-  applyTenSecondQuickCheck,
-  hasTenSecondQuickCheck,
-  type QuickCheckDetailChip,
-  type TenSecondQuickCheckStatus,
+  QUICK_LOG_ACTION_CHIPS,
+  RESPONSE_CHECK_STATUSES,
+  applyQuickLogActionChip,
+  applyResponseCheck,
+  hasResponseCheck,
+  type QuickLogActionChip,
+  type ResponseCheckStatus,
 } from "@/lib/tenSecondQuickCheckRules";
 
 interface Props {
@@ -113,7 +114,7 @@ export default function PlantQuickLog({
 
   const hasManualReadings = !!buildManualSensorSnapshot(sensors);
   const hasPhoto = !!photoFile;
-  const hasQuickCheck = hasTenSecondQuickCheck(note);
+  const hasPlantResponseCheck = hasResponseCheck(note);
   const timelineNote = buildTimelineNote(note, hasPhoto, hasManualReadings);
   const hasAnyContent = timelineNote.trim().length > 0;
   const canSave = hasAnyContent && !busy && !!growId;
@@ -123,14 +124,14 @@ export default function PlantQuickLog({
     : busy
       ? "Saving this log to the timeline…"
       : !hasAnyContent
-        ? "Tap Better, Same, or Worse to save a 10-second check."
-        : hasQuickCheck
-          ? "Ready to save this 10-second check."
+        ? "Tap what changed, add a photo, or add a manual reading."
+        : hasPlantResponseCheck
+          ? "Ready to save this plant response follow-up."
           : hasPhoto
             ? "Ready to save this photo and log to the timeline."
             : hasManualReadings
               ? "Ready to save these manual readings to the timeline."
-              : "Ready to save this note to the timeline.";
+              : "Ready to save what changed to the timeline.";
 
   function deltaFor(metric: ManualSensorMetric, raw: string): ChronologyDelta | null {
     const current = parseOptionalNumber(raw);
@@ -172,17 +173,17 @@ export default function PlantQuickLog({
     if (libraryFileRef.current) libraryFileRef.current.value = "";
   }
 
-  function handleQuickCheck(status: TenSecondQuickCheckStatus) {
-    setNote((prev) => applyTenSecondQuickCheck(prev, status));
+  function handleResponseCheck(status: ResponseCheckStatus) {
+    setNote((prev) => applyResponseCheck(prev, status));
     setError(null);
   }
 
-  function handleDetailChip(chip: QuickCheckDetailChip) {
+  function handleActionChip(chip: QuickLogActionChip) {
     if (chip === "Photo only" && !hasPhoto) {
       setError("Add a photo before marking this as photo only.");
       return;
     }
-    setNote((prev) => applyQuickCheckDetailChip(prev, chip));
+    setNote((prev) => applyQuickLogActionChip(prev, chip));
     setError(null);
   }
 
@@ -197,7 +198,7 @@ export default function PlantQuickLog({
     }
 
     if (!hasAnyContent) {
-      setError("Add a note, photo, or reading before saving.");
+      setError("Add what changed, a photo, or a reading before saving.");
       return;
     }
 
@@ -242,7 +243,7 @@ export default function PlantQuickLog({
             .remove([uploadedPath])
             .catch(() => {});
         }
-        setError("Add a note, photo, or reading before saving.");
+        setError("Add what changed, a photo, or a reading before saving.");
         return;
       }
 
@@ -299,7 +300,7 @@ export default function PlantQuickLog({
         <SheetHeader className="text-left">
           <SheetTitle className="font-display text-base">Quick Log</SheetTitle>
           <p id="plant-quick-log-subtitle" className="text-sm text-muted-foreground">
-            Capture what changed. Add detail only if it helps.
+            Capture what changed. Better/Same/Worse is for the plant response afterward.
           </p>
         </SheetHeader>
 
@@ -328,43 +329,27 @@ export default function PlantQuickLog({
 
           <section
             className="grid gap-3"
-            aria-labelledby="plant-quick-log-observation-heading"
+            aria-labelledby="plant-quick-log-action-heading"
             data-testid="plant-quick-log-observation-section"
           >
             <div>
-              <h3 id="plant-quick-log-observation-heading" className="text-sm font-semibold">
-                2. Observation
+              <h3 id="plant-quick-log-action-heading" className="text-sm font-semibold">
+                2. What changed?
               </h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                10-second check: tap how the plant looks right now.
+                Tap the grow action. This is the thing the plant will respond to.
               </p>
             </div>
-            <div className="grid grid-cols-3 gap-2" role="group" aria-label="Ten-second plant status check">
-              {TEN_SECOND_QUICK_CHECK_STATUSES.map((status) => (
-                <Button
-                  key={status}
-                  type="button"
-                  variant="outline"
-                  aria-label={`Quick check ${status}`}
-                  data-testid={`plant-quick-check-${status.toLowerCase()}`}
-                  onClick={() => handleQuickCheck(status)}
-                  className="min-h-12 rounded-xl px-2 text-base font-semibold"
-                >
-                  {status}
-                </Button>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-2" role="group" aria-label="Optional Quick Log detail prompts">
-              {QUICK_CHECK_DETAIL_CHIPS.map((chip) => (
+            <div className="grid grid-cols-2 gap-2" role="group" aria-label="Quick Log grow action">
+              {QUICK_LOG_ACTION_CHIPS.map((chip) => (
                 <Button
                   key={chip}
                   type="button"
                   variant="outline"
-                  size="sm"
-                  aria-label={`Add ${chip} to the Quick Log note`}
-                  data-testid={`plant-quick-log-chip-${chip.toLowerCase().replace(/\s+/g, "-")}`}
-                  onClick={() => handleDetailChip(chip)}
-                  className="min-h-9 rounded-full px-3"
+                  aria-label={`Log action ${chip}`}
+                  data-testid={`plant-quick-log-action-${chip.toLowerCase().replace(/\s*\/\s*/g, "-").replace(/\s+/g, "-")}`}
+                  onClick={() => handleActionChip(chip)}
+                  className="min-h-11 rounded-xl px-2 text-sm font-semibold"
                 >
                   {chip}
                 </Button>
@@ -372,26 +357,58 @@ export default function PlantQuickLog({
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="plant-quick-log-note" className="text-sm">
-                Grower Notes (optional)
+                Grower notes (optional)
               </Label>
               <Textarea
                 id="plant-quick-log-note"
                 data-testid="plant-quick-log-note"
-                aria-label="Quick Log observation note"
+                aria-label="Quick Log grow action note"
                 value={note}
                 onChange={(e) => {
                   setNote(e.target.value);
                   setError(null);
                 }}
-                placeholder="Add detail only if it helps..."
+                placeholder="Example: Watered 1 gal, raised light, spotted yellow tips..."
                 rows={4}
-                autoFocus
                 className="text-base"
               />
               <p className="text-xs text-muted-foreground">
-                Better, Same, or Worse is enough for a quick check.
+                Quick Log captures what changed. Verdant can ask how she responded later.
               </p>
             </div>
+          </section>
+
+          <section
+            className="grid gap-3 rounded-xl border border-border/50 bg-secondary/10 p-3"
+            aria-labelledby="plant-quick-log-response-heading"
+            data-testid="plant-quick-log-response-section"
+          >
+            <div>
+              <h3 id="plant-quick-log-response-heading" className="text-sm font-semibold">
+                3. Response follow-up
+              </h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Use this when you are checking how the plant responded after a previous change.
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-2" role="group" aria-label="Plant response after a previous change">
+              {RESPONSE_CHECK_STATUSES.map((status) => (
+                <Button
+                  key={status}
+                  type="button"
+                  variant="outline"
+                  aria-label={`Response check ${status}`}
+                  data-testid={`plant-response-check-${status.toLowerCase()}`}
+                  onClick={() => handleResponseCheck(status)}
+                  className="min-h-12 rounded-xl px-2 text-base font-semibold"
+                >
+                  {status}
+                </Button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Better/Same/Worse records the plant response, not the grow action.
+            </p>
           </section>
 
           <section
@@ -401,7 +418,7 @@ export default function PlantQuickLog({
           >
             <div>
               <h3 id="plant-quick-log-optional-heading" className="text-sm font-semibold">
-                3. Optional details
+                4. Optional details
               </h3>
               <p className="mt-1 text-xs text-muted-foreground">
                 Add a photo or manual readings only if they help.

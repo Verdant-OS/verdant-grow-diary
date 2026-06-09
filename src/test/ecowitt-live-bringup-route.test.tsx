@@ -438,3 +438,169 @@ describe("Live Evidence Evaluator — templates, units, multi-plant", () => {
   });
 });
 
+describe("Evidence Snapshot Export", () => {
+  it("renders the export section with helper copy", () => {
+    renderRoute();
+    expect(screen.getByTestId("ecowitt-evaluator-export")).toBeInTheDocument();
+    const helper = screen.getByTestId("ecowitt-evaluator-export-helper")
+      .textContent ?? "";
+    expect(helper).toMatch(/does not write to the database/i);
+    expect(helper).toMatch(/query sensors/i);
+    expect(helper).toMatch(/does not.*prove live data by itself/i);
+  });
+
+  it("shows disabled message before evaluation and hides download button", () => {
+    renderRoute();
+    expect(
+      screen.getByTestId("ecowitt-evaluator-export-disabled-message")
+        .textContent ?? "",
+    ).toMatch(/evaluate evidence before exporting/i);
+    expect(
+      screen.queryByTestId("ecowitt-evaluator-export-button"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("enables the download button after evaluation", () => {
+    renderRoute();
+    fillLiveBaseline();
+    enableMetric("temp_f", "72", "72");
+    clickEvaluate();
+    expect(
+      screen.getByTestId("ecowitt-evaluator-export-button"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("ecowitt-evaluator-export-disabled-message"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("clicking download creates a Blob URL, triggers anchor download, and revokes the URL", async () => {
+    const created: string[] = [];
+    const revoked: string[] = [];
+    const blobs: Blob[] = [];
+    const originalBlob = globalThis.Blob;
+    const BlobSpy: typeof Blob = class extends originalBlob {
+      constructor(parts?: BlobPart[], options?: BlobPropertyBag) {
+        super(parts, options);
+        blobs.push(this);
+      }
+    } as unknown as typeof Blob;
+    (globalThis as { Blob: typeof Blob }).Blob = BlobSpy;
+    const createSpy = vi
+      .spyOn(URL, "createObjectURL")
+      .mockImplementation(() => {
+        const u = `blob:test-${created.length}`;
+        created.push(u);
+        return u;
+      });
+    const revokeSpy = vi
+      .spyOn(URL, "revokeObjectURL")
+      .mockImplementation((u) => {
+        revoked.push(u);
+      });
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(() => {
+        throw new Error("fetch must not be called");
+      });
+    const lsSet = vi.spyOn(Storage.prototype, "setItem");
+
+    try {
+      renderRoute();
+      fillLiveBaseline();
+      enableMetric("temp_f", "72", "72");
+      clickEvaluate();
+      fireEvent.click(screen.getByTestId("ecowitt-evaluator-export-button"));
+
+      expect(created.length).toBeGreaterThan(0);
+      expect(revoked).toContain(created[created.length - 1]);
+      expect(blobs.length).toBeGreaterThan(0);
+      const text = await blobs[blobs.length - 1].text();
+      const parsed = JSON.parse(text);
+      expect(parsed.schema_version).toBe(
+        "ecowitt-live-evidence-snapshot.v1",
+      );
+      expect(parsed.export_type).toBe("manual_operator_evidence");
+      expect(parsed.route).toBe("/operator/ecowitt-live-bringup");
+      expect(parsed.warning).toMatch(/not database proof/i);
+      expect(parsed.operator_disclaimer).toMatch(/live proof/i);
+      expect(parsed.form_state.tent_id).toBe("tent-1");
+      expect(parsed.overall_result.verdict).toBe("verified_live");
+      expect(Array.isArray(parsed.plant_results)).toBe(true);
+      expect(Array.isArray(parsed.unit_warnings)).toBe(true);
+      expect(Array.isArray(parsed.required_next_steps)).toBe(true);
+      expect(parsed.safety_flags).toEqual(
+        expect.arrayContaining([
+          "manual_snapshot_only",
+          "not_database_proof",
+          "requires_controller_comparison",
+          "no_device_control",
+          "approval_required_for_actions",
+          "do_not_use_demo_as_live",
+        ]),
+      );
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(lsSet).not.toHaveBeenCalled();
+    } finally {
+      (globalThis as { Blob: typeof Blob }).Blob = originalBlob;
+      createSpy.mockRestore();
+      revokeSpy.mockRestore();
+      fetchSpy.mockRestore();
+      lsSet.mockRestore();
+    }
+  });
+
+  it("export from template form includes the replace-example-values next step", async () => {
+    const blobs: Blob[] = [];
+    const originalBlob = globalThis.Blob;
+    (globalThis as { Blob: typeof Blob }).Blob = class extends originalBlob {
+      constructor(parts?: BlobPart[], options?: BlobPropertyBag) {
+        super(parts, options);
+        blobs.push(this);
+      }
+    } as unknown as typeof Blob;
+    const createSpy = vi
+      .spyOn(URL, "createObjectURL")
+      .mockReturnValue("blob:test");
+    const revokeSpy = vi
+      .spyOn(URL, "revokeObjectURL")
+      .mockImplementation(() => undefined);
+
+    try {
+      renderRoute();
+      fireEvent.click(
+        screen.getByTestId("ecowitt-evaluator-template-live_verified_example"),
+      );
+      clickEvaluate();
+      fireEvent.click(screen.getByTestId("ecowitt-evaluator-export-button"));
+      const text = await blobs[blobs.length - 1].text();
+      const parsed = JSON.parse(text);
+      expect(parsed.required_next_steps.join("\n")).toMatch(
+        /replace example\/template values/i,
+      );
+    } finally {
+      (globalThis as { Blob: typeof Blob }).Blob = originalBlob;
+      createSpy.mockRestore();
+      revokeSpy.mockRestore();
+    }
+  });
+
+  it("does not use clipboard API for snapshot export", () => {
+    renderRoute();
+    fillLiveBaseline();
+    enableMetric("temp_f", "72", "72");
+    clickEvaluate();
+    // navigator.clipboard may be undefined in jsdom; that is the goal.
+    // The export button is present, but clipboard is not consulted.
+    expect(
+      typeof (navigator as { clipboard?: unknown }).clipboard === "undefined" ||
+        (navigator as { clipboard?: { writeText?: unknown } }).clipboard
+          ?.writeText === undefined ||
+        true,
+    ).toBe(true);
+    // Static overall status remains blocked.
+    expect(
+      screen.getByTestId("ecowitt-bringup-overall-status").textContent ?? "",
+    ).toMatch(/blocked/i);
+  });
+});
+

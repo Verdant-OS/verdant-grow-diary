@@ -20,6 +20,10 @@ import {
 } from "@/lib/sensorSnapshotStatusContract";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
 import { deriveProviderLabel } from "@/constants/sensorProviderLabels";
+import {
+  classifySnapshotTrustBadge,
+  type SnapshotTrustBadgeView,
+} from "@/lib/sensorSnapshotTrustBadgeRules";
 
 export type QuickLogSnapshotStripStatus =
   | "usable"

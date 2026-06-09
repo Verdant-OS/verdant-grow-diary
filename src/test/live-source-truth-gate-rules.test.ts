@@ -427,10 +427,15 @@ describe("evaluateLiveSourceTruth — determinism & shape", () => {
 // =========================================================================
 
 describe("liveSourceTruthGateRules — static safety", () => {
-  const src = readFileSync(
+  const rawSrc = readFileSync(
     resolve(__dirname, "../..", "src/lib/liveSourceTruthGateRules.ts"),
     "utf8",
   );
+  // Strip line + block comments so prose mentions of forbidden patterns
+  // (e.g. "No Date.now()" in the file header) do not trigger the scanner.
+  const src = rawSrc
+    .replace(/\/\/.*$/gm, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "");
 
   it("does not import Supabase or model/edge clients", () => {
     expect(src).not.toMatch(/@\/integrations\/supabase/);

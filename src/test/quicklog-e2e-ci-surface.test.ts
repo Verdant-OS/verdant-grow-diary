@@ -427,4 +427,122 @@ describe("Quick Log Playwright CI surface", () => {
     expect(target).toMatch(/verdant-grow-diary/);
     expect(target.toLowerCase()).toContain("quick log");
   });
+
+  it("CI workflow summary includes Workflow run + Artifacts links built from GitHub context", () => {
+    const wf = read(".github/workflows/quicklog-smoke.yml");
+    // RUN_URL/ARTIFACTS_URL must be derived from github context, not hardcoded
+    expect(wf).toMatch(
+      /RUN_URL:\s*\$\{\{\s*github\.server_url\s*\}\}\/\$\{\{\s*github\.repository\s*\}\}\/actions\/runs\/\$\{\{\s*github\.run_id\s*\}\}/,
+    );
+    expect(wf).toMatch(
+      /ARTIFACTS_URL:\s*\$\{\{\s*github\.server_url\s*\}\}\/\$\{\{\s*github\.repository\s*\}\}\/actions\/runs\/\$\{\{\s*github\.run_id\s*\}\}#artifacts/,
+    );
+    const summaryStep = wf.match(
+      /-\s*name:\s*Write Quick Log smoke run summary[\s\S]*?(?=\n {6}- name:|\n*$)/,
+    );
+    expect(summaryStep, "summary step missing").toBeTruthy();
+    const block = summaryStep![0];
+    expect(block).toMatch(/\[Workflow run\]\(\$\{RUN_URL\}\)/);
+    expect(block).toMatch(/\[Artifacts\]\(\$\{ARTIFACTS_URL\}\)/);
+    // No hardcoded run ids or invented direct download URLs
+    expect(block).not.toMatch(/runs\/\d{3,}/);
+    expect(block).not.toMatch(/\/artifacts\/\d+/);
+  });
+
+  it("CI workflow summary includes smoke command, browser, Playwright version, and counts (with fallback)", () => {
+    const wf = read(".github/workflows/quicklog-smoke.yml");
+    const summaryStep = wf.match(
+      /-\s*name:\s*Write Quick Log smoke run summary[\s\S]*?(?=\n {6}- name:|\n*$)/,
+    );
+    const block = summaryStep![0];
+    expect(block).toContain("bun run e2e:quicklog-smoke");
+    expect(block).toMatch(/Browser:\s*\\`chromium\\`/);
+    expect(block).toContain("PLAYWRIGHT_VERSION");
+    // Counts table fields
+    expect(block).toContain("SMOKE_TOTAL");
+    expect(block).toContain("SMOKE_PASSED");
+    expect(block).toContain("SMOKE_FAILED");
+    expect(block).toContain("SMOKE_SKIPPED");
+    // Fallback wording when report JSON is missing
+    expect(block).toContain("Smoke counts unavailable: report JSON was not produced.");
+  });
+
+  it("CI workflow has a metadata-capture step that parses report JSON without masking failures", () => {
+    const wf = read(".github/workflows/quicklog-smoke.yml");
+    const metaStep = wf.match(
+      /-\s*name:\s*Capture Quick Log smoke metadata[\s\S]*?(?=\n {6}- name:)/,
+    );
+    expect(metaStep, "metadata-capture step missing").toBeTruthy();
+    const block = metaStep![0];
+    expect(block).toMatch(/id:\s*smoke_meta/);
+    expect(block).toMatch(/if:\s*always\(\)\s*&&\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/);
+    expect(block).toContain("bunx playwright --version");
+    expect(block).toContain("e2e/results/quicklog-smoke-report.json");
+    expect(block).toMatch(/smoke_counts_available=(true|false)/);
+    // Must not mask Playwright failure: this step always exits 0
+    expect(block).toMatch(/exit\s+0/);
+    expect(block).toMatch(/set \+e/);
+  });
+
+  it("CI workflow has Bun and Playwright browser caches with safe scope", () => {
+    const wf = read(".github/workflows/quicklog-smoke.yml");
+    // Playwright browser cache
+    const pwCache = wf.match(
+      /-\s*name:\s*Cache Playwright browsers[\s\S]*?(?=\n {6}- name:)/,
+    );
+    expect(pwCache, "Playwright browser cache step missing").toBeTruthy();
+    const pwBlock = pwCache![0];
+    expect(pwBlock).toMatch(/uses:\s*actions\/cache@v4/);
+    expect(pwBlock).toContain("~/.cache/ms-playwright");
+    expect(pwBlock).toMatch(/\$\{\{\s*runner\.os\s*\}\}-playwright-/);
+    expect(pwBlock).toMatch(/hashFiles\(\s*'bun\.lock',\s*'bun\.lockb',\s*'package\.json'\s*\)/);
+
+    // Bun cache
+    const bunCache = wf.match(
+      /-\s*name:\s*Cache Bun packages[\s\S]*?(?=\n {6}- name:)/,
+    );
+    expect(bunCache, "Bun cache step missing").toBeTruthy();
+    const bunBlock = bunCache![0];
+    expect(bunBlock).toMatch(/uses:\s*actions\/cache@v4/);
+    expect(bunBlock).toContain("~/.bun/install/cache");
+
+    // Neither cache may include sensitive or output paths
+    for (const block of [pwBlock, bunBlock]) {
+      expect(block).not.toMatch(/e2e\/\.auth/);
+      expect(block).not.toMatch(/e2e\/results/);
+      expect(block).not.toMatch(/test-results/);
+      expect(block).not.toMatch(/playwright-report/);
+      expect(block).not.toMatch(/storageState|user\.json/);
+      expect(block).not.toMatch(/secrets\.E2E_/);
+    }
+  });
+
+  it("CI workflow still has no schedule/cron and no pull_request_target", () => {
+    const wf = read(".github/workflows/quicklog-smoke.yml");
+    expect(wf).not.toMatch(/^\s*schedule\s*:/m);
+    expect(wf).not.toMatch(/-\s*cron\s*:/);
+    expect(wf).not.toMatch(/pull_request_target/);
+  });
+
+  it("README documents summary links, smoke counts, browser/Playwright info, and cache safety", () => {
+    const readme = read("e2e/README.md");
+    expect(readme).toMatch(/##\s+Run summary, smoke metadata, and caches/);
+    expect(readme).toContain("[Workflow run]");
+    expect(readme).toContain("[Artifacts]");
+    expect(readme).toContain("#artifacts");
+    expect(readme).toContain("bun run e2e:quicklog-smoke");
+    expect(readme).toContain("`chromium`");
+    expect(readme).toMatch(/Playwright version/i);
+    expect(readme).toContain("bunx playwright --version");
+    expect(readme).toContain("Smoke counts unavailable: report JSON was not produced.");
+    expect(readme).toContain("~/.cache/ms-playwright");
+    expect(readme).toContain("~/.bun/install/cache");
+    // Cache exclusions documented
+    expect(readme).toContain("e2e/.auth");
+    expect(readme).toContain("e2e/results");
+    expect(readme).toContain("test-results");
+    expect(readme).toContain("playwright-report");
+    // No scheduled smoke reaffirmation
+    expect(readme).toMatch(/no scheduled or nightly/i);
+  });
 });

@@ -23,7 +23,7 @@
  *   - No Supabase reads/writes, no alerts, no Action Queue writes.
  *   - No external model/API calls in this engine file.
  *   - No device control.
- *   - No service_role or bridge tokens referenced anywhere.
+ *   - No privileged Supabase keys or bridge tokens referenced anywhere.
  */
 
 import {

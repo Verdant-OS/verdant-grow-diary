@@ -308,3 +308,179 @@ export function normalizeEcowittMqttPayload(
 
   return { ok, draft, reasons, chips };
 }
+
+// ---------------------------------------------------------------------------
+// Payload-kind classification + evidence (dry-run report)
+// ---------------------------------------------------------------------------
+
+export type EcowittPayloadKind =
+  | "real_ecowitt_gateway"
+  | "fake_local_test"
+  | "unknown";
+
+/**
+ * Identity fields a real EcoWitt gateway POSTs. Presence of two or more, or
+ * any of the strong identity fields (`stationtype`, `PASSKEY`, `model`), is
+ * treated as a gateway-origin signal.
+ */
+export const ECOWITT_GATEWAY_IDENTITY_KEYS: readonly string[] = [
+  "stationtype",
+  "model",
+  "runtime",
+  "heap",
+  "freq",
+  "PASSKEY",
+  "interval",
+];
+
+const STRONG_GATEWAY_KEYS = new Set(["stationtype", "PASSKEY", "model"]);
+
+/** Canonical sensor metric keys Verdant emits on the ingest webhook. */
+export const ECOWITT_CANONICAL_METRIC_KEYS = [
+  "temp_f",
+  "humidity_pct",
+  "vpd_kpa",
+  "soil_moisture_pct",
+  "soil_temp_f",
+  "co2_ppm",
+] as const;
+
+export type EcowittCanonicalMetricKey = (typeof ECOWITT_CANONICAL_METRIC_KEYS)[number];
+
+function isFakeLocalTest(payload: EcowittMqttPayload): boolean {
+  if (payload.test_sender === true) return true;
+  const t = payload.transport;
+  if (typeof t === "string" && /local[_-]?test|mqtt_local_test/i.test(t)) return true;
+  if (
+    payload.source === "local_test_sender" ||
+    payload.invalid_test === true
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export function classifyEcowittPayloadKind(
+  payload: EcowittMqttPayload | null | undefined,
+): EcowittPayloadKind {
+  if (!payload || typeof payload !== "object") return "unknown";
+  if (isFakeLocalTest(payload)) return "fake_local_test";
+
+  const keys = Object.keys(payload);
+  const identityHits = ECOWITT_GATEWAY_IDENTITY_KEYS.filter((k) => k in payload);
+  const hasStrong = identityHits.some((k) => STRONG_GATEWAY_KEYS.has(k));
+  if (hasStrong) return "real_ecowitt_gateway";
+  if (identityHits.length >= 2 && keys.includes("dateutc")) {
+    return "real_ecowitt_gateway";
+  }
+  return "unknown";
+}
+
+export interface EcowittIngestEvidence {
+  payload_kind: EcowittPayloadKind;
+  provider: "Ecowitt" | "unknown";
+  transport: string | null;
+  topic: string;
+  received_at: string | null;
+  dateutc: string | null;
+  raw_keys_redacted: string[];
+  canonical_metrics: string[];
+  missing_metrics: string[];
+  redactions: {
+    passkey_redacted: boolean;
+    forbidden_strings_present_after_redaction: boolean;
+  };
+}
+
+const FORBIDDEN_OUTPUT_PATTERNS: RegExp[] = [
+  /vbt_[a-z0-9]+/i,
+  /bearer\s+[a-z0-9._-]{8,}/i,
+  /service[_-]?role/i,
+  /SUPABASE_[A-Z_]+/,
+  /sensor-ingest-webhook/i,
+];
+
+/**
+ * Build the redacted evidence block for the dry-run report.
+ *
+ * - Lists canonical metric keys ONLY when the corresponding numeric value
+ *   was produced by the normalizer (i.e. raw was present AND valid).
+ * - `missing_metrics` lists canonical keys that were not produced (absent
+ *   in raw or rejected by sensor truth rules).
+ * - `raw_keys_redacted` lists payload KEY NAMES only — never values. The
+ *   key name "PASSKEY" may appear; its value never does.
+ */
+export function buildEcowittIngestEvidence(args: {
+  payload: EcowittMqttPayload | null | undefined;
+  draft: CanonicalSensorReadingDraft | null;
+  topic: string;
+  receivedAt?: Date | null;
+}): EcowittIngestEvidence {
+  const payload = args.payload ?? null;
+  const kind = classifyEcowittPayloadKind(payload);
+  const keys = payload && typeof payload === "object" ? Object.keys(payload).sort() : [];
+  const passkeyPresent = keys.some((k) => k.toLowerCase() === "passkey");
+  const transport =
+    payload && typeof payload.transport === "string" ? payload.transport : null;
+  const dateutc =
+    payload && typeof payload.dateutc === "string" ? payload.dateutc : null;
+
+  const d = args.draft;
+  const canonical: string[] = [];
+  const missing: string[] = [];
+  for (const m of ECOWITT_CANONICAL_METRIC_KEYS) {
+    let val: number | null = null;
+    if (d) {
+      switch (m) {
+        case "temp_f":
+          val = d.air_temp_f;
+          break;
+        case "humidity_pct":
+          val = d.humidity_pct;
+          break;
+        case "vpd_kpa":
+          val = d.vpd_kpa;
+          break;
+        case "soil_moisture_pct":
+          val = d.soil_water_content_pct;
+          break;
+        case "soil_temp_f":
+          val = d.soil_temp_f;
+          break;
+        case "co2_ppm":
+          val = d.co2_ppm;
+          break;
+      }
+    }
+    if (typeof val === "number" && Number.isFinite(val)) canonical.push(m);
+    else missing.push(m);
+  }
+
+  // Defense in depth: scan our own evidence-derived strings for any token
+  // / role / endpoint patterns. raw_keys_redacted contains only KEY NAMES
+  // and transport/topic/dateutc are operator-visible identifiers; if any
+  // of these somehow contain a token-shaped substring, flag it loudly.
+  const haystack = [
+    transport ?? "",
+    args.topic,
+    dateutc ?? "",
+    ...keys,
+  ].join(" | ");
+  const forbiddenLeak = FORBIDDEN_OUTPUT_PATTERNS.some((re) => re.test(haystack));
+
+  return {
+    payload_kind: kind,
+    provider: kind === "real_ecowitt_gateway" ? "Ecowitt" : "unknown",
+    transport,
+    topic: args.topic,
+    received_at: args.receivedAt ? args.receivedAt.toISOString() : null,
+    dateutc,
+    raw_keys_redacted: keys,
+    canonical_metrics: canonical,
+    missing_metrics: missing,
+    redactions: {
+      passkey_redacted: passkeyPresent,
+      forbidden_strings_present_after_redaction: forbiddenLeak,
+    },
+  };
+}

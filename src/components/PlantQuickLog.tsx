@@ -4,7 +4,7 @@
  * Opens from Plant Detail. Slide-up bottom sheet on mobile / centered modal on
  * desktop. Single scrolling view:
  *   1) Plant context
- *   2) Observation notes + local prompt chips
+ *   2) Ten-second Better/Same/Worse check + optional note detail
  *   3) Optional photo + manual readings
  *   4) Sticky mobile-safe "Save log" button
  *
@@ -40,6 +40,15 @@ import {
 import type { ManualSensorMetric } from "@/lib/manualSensorFreshnessRules";
 import { usePlantManualSensorLogs } from "@/hooks/usePlantManualSensorHistory";
 import { buildQuickLogPhotoGateState } from "@/lib/quickLogPhotoGateRules";
+import {
+  QUICK_CHECK_DETAIL_CHIPS,
+  TEN_SECOND_QUICK_CHECK_STATUSES,
+  applyQuickCheckDetailChip,
+  applyTenSecondQuickCheck,
+  hasTenSecondQuickCheck,
+  type QuickCheckDetailChip,
+  type TenSecondQuickCheckStatus,
+} from "@/lib/tenSecondQuickCheckRules";
 
 interface Props {
   open: boolean;
@@ -52,15 +61,6 @@ interface Props {
 }
 
 const EMPTY_SENSORS: QuickLogSensorInput = { temp: "", humidity: "", ph: "", ec: "" };
-const OBSERVATION_CHIPS = [
-  "Better",
-  "Same",
-  "Worse",
-  "Watered",
-  "Fed",
-  "Spotted issue",
-  "Photo only",
-] as const;
 const SAVE_DETAIL_HELPER = "You can add more detail later from the timeline.";
 
 function buildTimelineNote(rawNote: string, hasPhoto: boolean, hasManualReadings: boolean): string {
@@ -77,21 +77,6 @@ function blurActiveElement() {
   if (active instanceof HTMLElement) active.blur();
 }
 
-function normalizeChipText(value: string): string {
-  return value.trim().replace(/[.!]+$/, "").toLowerCase();
-}
-
-function appendPromptChip(previous: string, chip: string): string {
-  const normalizedChip = normalizeChipText(chip);
-  const existing = previous
-    .split(/\n+/)
-    .map(normalizeChipText)
-    .filter(Boolean);
-  if (existing.includes(normalizedChip)) return previous;
-  const line = chip === "Photo only" ? "Photo only." : chip;
-  return previous.trim() ? `${previous.trim()}\n${line}` : line;
-}
-
 export default function PlantQuickLog({
   open,
   onOpenChange,
@@ -106,10 +91,6 @@ export default function PlantQuickLog({
   const fileRef = useRef<HTMLInputElement | null>(null);
   const libraryFileRef = useRef<HTMLInputElement | null>(null);
   const { data: logs } = usePlantManualSensorLogs(open ? plantId : null);
-  // Shared photo gate state — single source of truth for picker labels,
-  // helper copy, and input aria-labels. PlantQuickLog is not gated by
-  // gate.supported (it ships its own working diary-photos upload path);
-  // only the visible strings are sourced from the helper.
   const photoGate = useMemo(() => buildQuickLogPhotoGateState(), []);
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -119,9 +100,6 @@ export default function PlantQuickLog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fixed "current capture time" for the open session so deltas don't jitter
-  // while typing. Recomputes whenever the sheet re-opens or the underlying
-  // history changes (e.g. after a previous save).
   const currentCapturedAt = useMemo(
     () => new Date().toISOString(),
     [open, logs],
@@ -135,6 +113,7 @@ export default function PlantQuickLog({
 
   const hasManualReadings = !!buildManualSensorSnapshot(sensors);
   const hasPhoto = !!photoFile;
+  const hasQuickCheck = hasTenSecondQuickCheck(note);
   const timelineNote = buildTimelineNote(note, hasPhoto, hasManualReadings);
   const hasAnyContent = timelineNote.trim().length > 0;
   const canSave = hasAnyContent && !busy && !!growId;
@@ -144,12 +123,14 @@ export default function PlantQuickLog({
     : busy
       ? "Saving this log to the timeline…"
       : !hasAnyContent
-        ? "Add a note, photo, or reading before saving."
-        : hasPhoto
-          ? "Ready to save this photo and log to the timeline."
-          : hasManualReadings
-            ? "Ready to save these manual readings to the timeline."
-            : "Ready to save this note to the timeline.";
+        ? "Tap Better, Same, or Worse to save a 10-second check."
+        : hasQuickCheck
+          ? "Ready to save this 10-second check."
+          : hasPhoto
+            ? "Ready to save this photo and log to the timeline."
+            : hasManualReadings
+              ? "Ready to save these manual readings to the timeline."
+              : "Ready to save this note to the timeline.";
 
   function deltaFor(metric: ManualSensorMetric, raw: string): ChronologyDelta | null {
     const current = parseOptionalNumber(raw);
@@ -182,8 +163,6 @@ export default function PlantQuickLog({
     const file = e.currentTarget.files?.[0] ?? null;
     if (!file) return;
     handleFileSelected(file);
-    // Important for mobile/library pickers: choosing the same image twice often
-    // does not fire a new change event unless the input value is cleared.
     e.currentTarget.value = "";
   }
 
@@ -193,12 +172,17 @@ export default function PlantQuickLog({
     if (libraryFileRef.current) libraryFileRef.current.value = "";
   }
 
-  function handlePromptChip(chip: (typeof OBSERVATION_CHIPS)[number]) {
+  function handleQuickCheck(status: TenSecondQuickCheckStatus) {
+    setNote((prev) => applyTenSecondQuickCheck(prev, status));
+    setError(null);
+  }
+
+  function handleDetailChip(chip: QuickCheckDetailChip) {
     if (chip === "Photo only" && !hasPhoto) {
       setError("Add a photo before marking this as photo only.");
       return;
     }
-    setNote((prev) => appendPromptChip(prev, chip));
+    setNote((prev) => applyQuickCheckDetailChip(prev, chip));
     setError(null);
   }
 
@@ -262,7 +246,6 @@ export default function PlantQuickLog({
         return;
       }
 
-      // NOTE: no `user_id` in payload — DB default auth.uid() is trusted.
       const { error: insErr } = await supabase
         .from("diary_entries")
         .insert(result.draft as never);
@@ -353,11 +336,26 @@ export default function PlantQuickLog({
                 2. Observation
               </h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                Pick a quick prompt or write your own note.
+                10-second check: tap how the plant looks right now.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2" role="group" aria-label="Quick observation prompts">
-              {OBSERVATION_CHIPS.map((chip) => (
+            <div className="grid grid-cols-3 gap-2" role="group" aria-label="Ten-second plant status check">
+              {TEN_SECOND_QUICK_CHECK_STATUSES.map((status) => (
+                <Button
+                  key={status}
+                  type="button"
+                  variant="outline"
+                  aria-label={`Quick check ${status}`}
+                  data-testid={`plant-quick-check-${status.toLowerCase()}`}
+                  onClick={() => handleQuickCheck(status)}
+                  className="min-h-12 rounded-xl px-2 text-base font-semibold"
+                >
+                  {status}
+                </Button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Optional Quick Log detail prompts">
+              {QUICK_CHECK_DETAIL_CHIPS.map((chip) => (
                 <Button
                   key={chip}
                   type="button"
@@ -365,7 +363,7 @@ export default function PlantQuickLog({
                   size="sm"
                   aria-label={`Add ${chip} to the Quick Log note`}
                   data-testid={`plant-quick-log-chip-${chip.toLowerCase().replace(/\s+/g, "-")}`}
-                  onClick={() => handlePromptChip(chip)}
+                  onClick={() => handleDetailChip(chip)}
                   className="min-h-9 rounded-full px-3"
                 >
                   {chip}
@@ -374,7 +372,7 @@ export default function PlantQuickLog({
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="plant-quick-log-note" className="text-sm">
-                Grower Notes (optional if you add a photo or reading)
+                Grower Notes (optional)
               </Label>
               <Textarea
                 id="plant-quick-log-note"
@@ -385,13 +383,13 @@ export default function PlantQuickLog({
                   setNote(e.target.value);
                   setError(null);
                 }}
-                placeholder="Watered 1 gallon, raised lights 2 inches..."
+                placeholder="Add detail only if it helps..."
                 rows={4}
                 autoFocus
                 className="text-base"
               />
               <p className="text-xs text-muted-foreground">
-                Save a note, photo, or manual reading to add it to the timeline.
+                Better, Same, or Worse is enough for a quick check.
               </p>
             </div>
           </section>

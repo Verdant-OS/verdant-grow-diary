@@ -12,7 +12,7 @@ name: Quick Log Playwright smoke
 #
 # Triggers:
 #  - workflow_dispatch: manual run; fails fast if required secrets/URL are missing.
-#  - push to main: best-effort; skips cleanly if secrets are unavailable.
+#  - push to verdant-grow-diary: best-effort; skips cleanly if secrets are unavailable.
 #
 # Required repository secrets / vars (configure in GitHub → Settings):
 #   secrets.E2E_TEST_EMAIL
@@ -24,13 +24,13 @@ name: Quick Log Playwright smoke
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [verdant-grow-diary]
     paths:
       - "e2e/**"
       - "playwright.config.ts"
       - ".github/workflows/quicklog-smoke.yml"
   pull_request:
-    branches: [main]
+    branches: [verdant-grow-diary]
 
 
 jobs:

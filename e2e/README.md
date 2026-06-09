@@ -118,14 +118,15 @@ Triggers:
 
 - `workflow_dispatch` — manual run. Fails fast with a clear message if any
   required secret/var is missing.
-- `push` to `main` touching `e2e/**`, `playwright.config.ts`, or the
+- `push` to `verdant-grow-diary` touching `e2e/**`, `playwright.config.ts`, or the
   workflow itself — runs the same job, but skips cleanly if secrets are
   unavailable so forked-repo pushes never leak or fail mysteriously.
-- `pull_request` targeting `main` — runs on every PR into `main`. Uses
-  the safe `pull_request` event (never `pull_request_target`), so forked-PR
-  runs cannot read repository secrets. When secrets/vars are unavailable
-  (which is the default for forked PRs), the workflow skips cleanly with
-  a non-secret message rather than failing or leaking configuration.
+- `pull_request` targeting `verdant-grow-diary` — runs on every PR into
+  `verdant-grow-diary`. Uses the safe `pull_request` event (never
+  `pull_request_target`), so forked-PR runs cannot read repository secrets.
+  When secrets/vars are unavailable (which is the default for forked PRs), the
+  workflow skips cleanly with a non-secret message rather than failing or
+  leaking configuration.
 
 ## CI handoff: Quick Log smoke
 
@@ -145,12 +146,12 @@ Triggers:
 File: `.github/workflows/quicklog-smoke.yml`
 
 - Manual run: **Actions → Quick Log Playwright smoke → Run workflow**
-- Pull request run: runs automatically on PRs targeting `main`, and skips
-  cleanly if required secrets/vars are unavailable (e.g. forked PRs).
+- Pull request run: runs automatically on PRs targeting `verdant-grow-diary`,
+  and skips cleanly if required secrets/vars are unavailable (e.g. forked PRs).
 
-Branch note: PR smoke is configured for `main` per request. If the repo's
-default branch is still `verdant-grow-diary`, this workflow still targets
-`main` for PR/push triggers; the default branch is not renamed here.
+Branch note: Lovable currently syncs to `verdant-grow-diary`, so the Quick Log
+smoke workflow targets that branch for `push` and `pull_request` events. If the
+protected branch changes later, update the workflow and this README together.
 
 ### Artifact
 

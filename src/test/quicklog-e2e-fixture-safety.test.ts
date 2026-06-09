@@ -303,7 +303,7 @@ describe("Workflow: deep-link artifact uploads", () => {
       expect(m, `upload step for ${c.name} missing`).toBeTruthy();
       const block = m![0];
       expect(block).toMatch(new RegExp(`id:\\s*${c.id}`));
-      expect(block).toMatch(/uses:\s*actions\/upload-artifact@v4/);
+      expect(block).toMatch(/uses:\s*actions\/upload-artifact@[0-9a-f]{40} # v4/);
       expect(block).toMatch(
         /if:\s*always\(\)\s*&&\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/,
       );

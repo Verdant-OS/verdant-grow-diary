@@ -492,7 +492,7 @@ describe("Quick Log Playwright CI surface", () => {
     );
     expect(pwCache, "Playwright browser cache step missing").toBeTruthy();
     const pwBlock = pwCache![0];
-    expect(pwBlock).toMatch(/uses:\s*actions\/cache@v4/);
+    expect(pwBlock).toMatch(/uses:\s*actions\/cache@[0-9a-f]{40} # v4/);
     expect(pwBlock).toContain("~/.cache/ms-playwright");
     expect(pwBlock).toMatch(/\$\{\{\s*runner\.os\s*\}\}-playwright-/);
     expect(pwBlock).toMatch(/hashFiles\(\s*'bun\.lock',\s*'bun\.lockb',\s*'package\.json'\s*\)/);
@@ -503,7 +503,7 @@ describe("Quick Log Playwright CI surface", () => {
     );
     expect(bunCache, "Bun cache step missing").toBeTruthy();
     const bunBlock = bunCache![0];
-    expect(bunBlock).toMatch(/uses:\s*actions\/cache@v4/);
+    expect(bunBlock).toMatch(/uses:\s*actions\/cache@[0-9a-f]{40} # v4/);
     expect(bunBlock).toContain("~/.bun/install/cache");
 
     // Neither cache's `path:` may include sensitive or output paths.
@@ -570,10 +570,10 @@ describe("Quick Log Playwright CI surface", () => {
     return out;
   }
 
-  it("every actions/cache@v4 block is gated, has runner.os + hashFiles(lock/package), and excludes forbidden paths", () => {
+  it("every actions/cache block is gated, has runner.os + hashFiles(lock/package), and excludes forbidden paths", () => {
     const wf = read(".github/workflows/quicklog-smoke.yml");
     const blocks = extractStepBlocks(wf).filter((b) =>
-      /uses:\s*actions\/cache@v4/.test(b),
+      /uses:\s*actions\/cache@[0-9a-f]{40} # v4/.test(b),
     );
     expect(blocks.length, "expected at least 2 cache blocks (Bun + Playwright)").toBeGreaterThanOrEqual(2);
 
@@ -723,7 +723,7 @@ describe("Quick Log Playwright CI surface", () => {
     expect(step, "Upload Playwright HTML report step missing").toBeTruthy();
     const block = step![0];
     expect(block).toMatch(/id:\s*upload_playwright_report/);
-    expect(block).toMatch(/uses:\s*actions\/upload-artifact@v4/);
+    expect(block).toMatch(/uses:\s*actions\/upload-artifact@[0-9a-f]{40} # v4/);
     expect(block).toMatch(
       /if:\s*always\(\)\s*&&\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/,
     );

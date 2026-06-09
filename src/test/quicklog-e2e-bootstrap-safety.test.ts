@@ -219,8 +219,8 @@ describe("Workflow: bootstrap step + media expansion + summary", () => {
       );
       expect(m, `${id} missing`).toBeTruthy();
       const block = m![0];
-      expect(block, `${id} uses v4`).toMatch(
-        /uses:\s*actions\/upload-artifact@v4/,
+      expect(block, `${id} uses pinned upload-artifact v4`).toMatch(
+        /uses:\s*actions\/upload-artifact@[0-9a-f]{40} # v4/,
       );
       expect(block, `${id} retention 30`).toMatch(/retention-days:\s*30/);
       expect(block, `${id} warn`).toMatch(/if-no-files-found:\s*warn/);

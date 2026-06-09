@@ -167,7 +167,7 @@ describe("compilePlantContextFromRows — windows + determinism", () => {
       now: NOW,
     });
     expect(ctx.sensor_groups).toEqual([]);
-    expect(ctx.recent_sensor_readings).toEqual([]);
+    expect(ctx.recentSensorReadings).toEqual([]);
   });
 
   it("excludes grow events older than 14 days", () => {
@@ -242,7 +242,7 @@ describe("compilePlantContextFromRows — windows + determinism", () => {
       ],
       now: NOW,
     });
-    expect(ctx.recent_sensor_readings.length).toBe(1);
+    expect(ctx.recentSensorReadings.length).toBe(1);
     expect(ctx.averages_7d.vpd_kpa).toBe(1.2);
   });
 });

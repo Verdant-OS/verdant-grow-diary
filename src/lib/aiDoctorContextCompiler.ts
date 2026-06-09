@@ -152,7 +152,7 @@ export interface PlantContextPayload {
   strain: string | null;
   stage: string | null;
   recent_grow_events: readonly RecentGrowEvent[];
-  recent_sensor_readings: readonly RecentSensorReading[];
+  recentSensorReadings: readonly RecentSensorReading[];
   sensor_groups: readonly SensorSourceGroup[];
   averages_7d: SensorRollingAverages;
   notable_deviations: readonly string[];
@@ -261,7 +261,7 @@ export function compilePlantContextFromRows(
   );
 
   // ----- recent sensor readings (last 7 days), classified by source -----
-  const recent_sensor_readings: RecentSensorReading[] = [];
+  const recentSensorReadings: RecentSensorReading[] = [];
   for (const r of input.sensorReadings ?? []) {
     if (!r?.captured_at) continue;
     const ts = Date.parse(r.captured_at);
@@ -271,7 +271,7 @@ export function compilePlantContextFromRows(
     const value = toFiniteNumber(r.value);
     if (value === null) continue;
     if (!r.metric) continue;
-    recent_sensor_readings.push({
+    recentSensorReadings.push({
       captured_at: r.captured_at,
       metric: String(r.metric),
       value,
@@ -279,7 +279,7 @@ export function compilePlantContextFromRows(
       source_tag: classifySource(r),
     });
   }
-  recent_sensor_readings.sort((a, b) =>
+  recentSensorReadings.sort((a, b) =>
     a.captured_at < b.captured_at
       ? 1
       : a.captured_at > b.captured_at
@@ -293,7 +293,7 @@ export function compilePlantContextFromRows(
 
   // ----- bucket by source, compute per-bucket averages -----
   const groupsMap = new Map<SensorSourceTag, RecentSensorReading[]>();
-  for (const r of recent_sensor_readings) {
+  for (const r of recentSensorReadings) {
     const list = groupsMap.get(r.source_tag);
     if (list) list.push(r);
     else groupsMap.set(r.source_tag, [r]);
@@ -315,7 +315,7 @@ export function compilePlantContextFromRows(
   // stale/invalid/demo/csv are deliberately excluded from the "current
   // state" averages so bad/unknown telemetry never produces a "healthy"
   // current value. They remain visible in their own buckets above.
-  const trustworthy = recent_sensor_readings.filter(
+  const trustworthy = recentSensorReadings.filter(
     (r) => r.source_tag === "live" || r.source_tag === "manual",
   );
   const averages_7d: SensorRollingAverages = bucketAverages(trustworthy);
@@ -352,7 +352,7 @@ export function compilePlantContextFromRows(
     strain: plant?.strain ?? null,
     stage: plant?.stage ?? plant?.growth_stage ?? null,
     recent_grow_events: Object.freeze(recent_grow_events),
-    recent_sensor_readings: Object.freeze(recent_sensor_readings),
+    recentSensorReadings: Object.freeze(recentSensorReadings),
     sensor_groups: Object.freeze(sensor_groups),
     averages_7d,
     notable_deviations: Object.freeze(notable_deviations),

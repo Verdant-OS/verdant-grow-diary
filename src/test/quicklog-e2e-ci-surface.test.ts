@@ -39,6 +39,9 @@ describe("Quick Log Playwright CI surface", () => {
     expect(wf).toMatch(/quicklog-smoke-artifacts/);
     expect(wf).toMatch(/e2e\/results\/quicklog-smoke-report\.json/);
     expect(wf).toMatch(/retention-days:\s*30/);
+    // Must target the real Lovable sync branch, not main
+    expect(wf).toMatch(/branches:\s*\[verdant-grow-diary\]/);
+    expect(wf).not.toMatch(/branches:\s*\[main\]/);
   });
 
   it("CI workflow has no hardcoded credentials, tokens, secret echoes, or pull_request_target", () => {

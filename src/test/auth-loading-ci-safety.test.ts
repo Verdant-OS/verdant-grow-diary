@@ -6,8 +6,10 @@ import path from "node:path";
 const ROOT = path.resolve(__dirname, "../..");
 const WF_PATH = ".github/workflows/auth-loading-smoke.yml";
 const SPEC_PATH = "e2e/auth-loading.spec.ts";
+const REDIRECT_SPEC_PATH = "e2e/auth-redirect-safety.spec.ts";
 const wf = fs.readFileSync(path.join(ROOT, WF_PATH), "utf8");
 const spec = fs.readFileSync(path.join(ROOT, SPEC_PATH), "utf8");
+const redirectSpec = fs.readFileSync(path.join(ROOT, REDIRECT_SPEC_PATH), "utf8");
 
 describe("Auth loading smoke workflow — safety", () => {
   it("uses pull_request (NOT pull_request_target)", () => {
@@ -27,8 +29,9 @@ describe("Auth loading smoke workflow — safety", () => {
   it("targets the verdant-grow-diary branch only", () => {
     expect(wf).toMatch(/branches:\s*\[verdant-grow-diary\]/);
   });
-  it("runs only the mocked auth-loading spec", () => {
+  it("runs only the mocked auth-loading + redirect-safety specs", () => {
     expect(wf).toMatch(/playwright test e2e\/auth-loading\.spec\.ts/);
+    expect(wf).toMatch(/e2e\/auth-redirect-safety\.spec\.ts/);
     expect(wf).not.toMatch(/quicklog-smoke\.spec\.ts/);
     expect(wf).not.toMatch(/fixture-bootstrap\.spec\.ts/);
   });
@@ -63,5 +66,30 @@ describe("Auth loading smoke spec — safety", () => {
     expect(spec).not.toMatch(
       /console\.(log|warn|error|info|debug)\s*\([^)]*\b(password|token|session|recovery|email|hash)\b/i,
     );
+  });
+});
+
+describe("Auth redirect-safety spec — safety", () => {
+  it("intercepts /auth/v1/** via page.route", () => {
+    expect(redirectSpec).toMatch(/page\.route\(/);
+    expect(redirectSpec).toMatch(/\/auth\\\/v1\\\//);
+  });
+  it("uses a .invalid email so accidental real submissions cannot resolve DNS", () => {
+    expect(redirectSpec).toMatch(/@example\.invalid/);
+  });
+  it("does not use service_role or real auth secrets", () => {
+    expect(redirectSpec).not.toMatch(/service_role/i);
+    expect(redirectSpec).not.toMatch(
+      /process\.env\.(E2E_TEST_PASSWORD|E2E_TEST_EMAIL|SUPABASE_SERVICE_ROLE)/,
+    );
+  });
+  it("never logs password/token/session/recovery/email", () => {
+    expect(redirectSpec).not.toMatch(
+      /console\.(log|warn|error|info|debug)\s*\([^)]*\b(password|token|session|recovery|email|hash)\b/i,
+    );
+  });
+  it("asserts app origin is preserved (no open redirect)", () => {
+    expect(redirectSpec).toMatch(/baseURL/);
+    expect(redirectSpec).toMatch(/evil\.example/);
   });
 });

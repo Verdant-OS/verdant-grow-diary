@@ -291,3 +291,33 @@ describe("/reset-password — focus on submit by error type", () => {
     );
   });
 });
+
+describe("/auth — announcements do not steal focus during loading/retry", () => {
+  it("forgot-password success announcement (role=status) does not steal focus", async () => {
+    renderAuth();
+    activateTab(/forgot password/i);
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: "grower@verdant.app" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /send reset link/i }));
+    const status = await screen.findByRole("status");
+    expect(document.activeElement).not.toBe(status);
+  });
+
+  it("sign-in retry after failure re-enables submit and focuses email", async () => {
+    signInResult = { error: { message: "Invalid login credentials" } };
+    renderAuth();
+    fireEvent.change(screen.getByLabelText(/^email$/i), {
+      target: { value: "grower@verdant.app" },
+    });
+    fireEvent.change(screen.getByLabelText(/^password$/i), {
+      target: { value: "longenough1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
+    await screen.findByRole("alert");
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /^sign in$/i })).toBeEnabled(),
+    );
+    expect(document.activeElement).toBe(screen.getByLabelText(/^email$/i));
+  });
+});

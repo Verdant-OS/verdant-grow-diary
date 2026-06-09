@@ -226,3 +226,102 @@ test.describe("Auth loading/disabled smoke (mocked)", () => {
     expect(gate.count()).toBe(1);
   });
 });
+
+// Mobile viewport coverage — same mocked, non-destructive contract, but at
+// a phone size to catch tap-target / focus-order regressions on small
+// screens. Uses the iPhone 13 viewport explicitly; no real device frames.
+test.describe("Mobile auth loading/disabled smoke (mocked)", () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+
+  test("mobile sign in: loading label, disable, double-tap blocked, re-enable on error", async ({
+    page,
+  }) => {
+    const gate = holdAndCount(
+      page,
+      /\/token/i,
+      { error: "invalid_grant", error_description: "Invalid login credentials" },
+      400,
+    );
+    await page.goto("/auth");
+    await page.getByLabel(/^email$/i).fill(SAFE_EMAIL);
+    await page.getByLabel(/^password$/i).fill(SAFE_PASSWORD);
+
+    const button = page.getByRole("button", { name: /^sign in$/i });
+    await button.tap();
+    const loading = page.getByRole("button", { name: /signing in…/i });
+    await expect(loading).toBeVisible();
+    await expect(loading).toBeDisabled();
+
+    await loading.tap().catch(() => {});
+    await loading.tap().catch(() => {});
+    expect(gate.count()).toBe(1);
+
+    gate.release();
+    await expect(page.getByRole("button", { name: /^sign in$/i })).toBeEnabled();
+    await expect(page.getByRole("alert")).toContainText(/couldn['’]t sign you in/i);
+    expect(gate.count()).toBe(1);
+  });
+
+  test("mobile create account: loading + double-tap prevention", async ({ page }) => {
+    const gate = holdAndCount(page, /signup/i, { error: "x" }, 400);
+    await page.goto("/auth");
+    await page.getByRole("tab", { name: /create account/i }).tap();
+    await page.getByLabel(/^email$/i).fill(SAFE_EMAIL);
+    await page.getByLabel(/^password$/i).fill(SAFE_PASSWORD);
+    await page.getByRole("button", { name: /^create account$/i }).tap();
+    const loading = page.getByRole("button", { name: /creating account…/i });
+    await expect(loading).toBeDisabled();
+    await loading.tap().catch(() => {});
+    expect(gate.count()).toBe(1);
+    gate.release();
+    await expect(page.getByRole("button", { name: /^create account$/i })).toBeEnabled();
+  });
+
+  test("mobile forgot password: loading + generic success copy in role=status", async ({
+    page,
+  }) => {
+    const gate = holdAndCount(page, /recover/i, {}, 200);
+    await page.goto("/auth");
+    await page.getByRole("tab", { name: /forgot password/i }).tap();
+    await page.getByLabel(/email/i).fill(SAFE_EMAIL);
+    await page.getByRole("button", { name: /send reset link/i }).tap();
+    const loading = page.getByRole("button", { name: /sending reset link…/i });
+    await expect(loading).toBeDisabled();
+    await loading.tap().catch(() => {});
+    expect(gate.count()).toBe(1);
+    gate.release();
+    await expect(page.getByRole("status")).toContainText(
+      /if an account exists for that email/i,
+    );
+  });
+
+  test("mobile tab/focus order on /auth is usable: back-to-home, tabs, email, password, show, submit", async ({
+    page,
+  }) => {
+    await page.goto("/auth");
+    // Walk focus from the top using keyboard Tab. Don't assert exact order
+    // (browser/OS focus quirks); assert every key control is reachable.
+    const reachable: string[] = [];
+    for (let i = 0; i < 20; i++) {
+      await page.keyboard.press("Tab");
+      const tag = await page.evaluate(() => {
+        const a = document.activeElement as HTMLElement | null;
+        return a
+          ? (
+              a.getAttribute("aria-label") ||
+              a.id ||
+              a.textContent?.trim().slice(0, 30) ||
+              a.tagName.toLowerCase()
+            )
+          : "";
+      });
+      if (tag) reachable.push(tag);
+    }
+    const joined = reachable.join("|").toLowerCase();
+    expect(joined).toMatch(/back to home/);
+    expect(joined).toMatch(/sign in/);
+    expect(joined).toMatch(/signin-email|email/);
+    expect(joined).toMatch(/signin-password|password/);
+    expect(joined).toMatch(/show password|hide password/);
+  });
+});

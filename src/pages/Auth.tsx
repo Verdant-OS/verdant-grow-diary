@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { Navigate, useNavigate, Link } from "react-router-dom";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { Navigate, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -15,12 +15,18 @@ import {
   MIN_PASSWORD_LENGTH,
 } from "@/lib/passwordResetRules";
 import { sanitizeAuthError } from "@/lib/authErrorRules";
+import { sanitizeAuthRedirect } from "@/lib/authRedirectRules";
 
 type AuthMode = "signin" | "signup" | "forgot";
 
 export default function Auth() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
+  const [search] = useSearchParams();
+  const redirectTo = useMemo(
+    () => sanitizeAuthRedirect(search.get("redirectTo")),
+    [search],
+  );
   const [mode, setMode] = useState<AuthMode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -40,10 +46,10 @@ export default function Auth() {
   const forgotEmailRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (user) nav("/", { replace: true });
-  }, [user, nav]);
+    if (user) nav(redirectTo, { replace: true });
+  }, [user, nav, redirectTo]);
   if (loading) return null;
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to={redirectTo} replace />;
 
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
@@ -59,7 +65,7 @@ export default function Auth() {
       signInEmailRef.current?.focus();
       return;
     }
-    nav("/", { replace: true });
+    nav(redirectTo, { replace: true });
   }
 
   async function signUp(e: React.FormEvent) {
@@ -84,7 +90,7 @@ export default function Auth() {
       return;
     }
     setSignUpSuccess("Welcome to Verdant. Check your inbox if confirmation is required.");
-    nav("/", { replace: true });
+    nav(redirectTo, { replace: true });
   }
 
   async function requestReset(e: React.FormEvent) {

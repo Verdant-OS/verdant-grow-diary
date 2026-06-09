@@ -48,7 +48,10 @@ interface CliFlags {
   once: boolean;
   sample: boolean;
   invalid: boolean;
+  writeReport?: boolean;
 }
+
+export const DEFAULT_REPORT_PATH = "./tmp/ecowitt-last-ingest-report.json";
 
 export function parseFlags(argv: readonly string[]): CliFlags {
   return {
@@ -56,6 +59,7 @@ export function parseFlags(argv: readonly string[]): CliFlags {
     once: argv.includes("--once"),
     sample: argv.includes("--sample"),
     invalid: argv.includes("--invalid"),
+    writeReport: argv.includes("--write-report"),
   };
 }
 
@@ -149,6 +153,7 @@ async function handlePayload(
       metricKeys,
     });
     printReport(report);
+    if (flags.writeReport) await writeRedactedReport(report);
     return {
       reasons: [...norm.reasons],
       posted: false,
@@ -212,6 +217,7 @@ async function handlePayload(
     metricKeys,
   });
   printReport(report);
+  if (flags.writeReport) await writeRedactedReport(report);
 
   return {
     reasons: [...norm.reasons],
@@ -219,6 +225,41 @@ async function handlePayload(
     classification: report.classification,
     status: report.status,
   };
+}
+
+async function writeRedactedReport(
+  report: ReturnType<typeof buildIngestAttemptReport>,
+): Promise<void> {
+  try {
+    const { mkdir, writeFile } = await import("node:fs/promises");
+    const path = await import("node:path");
+    const out = path.resolve(DEFAULT_REPORT_PATH);
+    await mkdir(path.dirname(out), { recursive: true });
+    const payload = {
+      status: report.status,
+      classification: report.classification,
+      http_status: report.httpStatus,
+      reasons: report.reasons,
+      url: report.url,
+      tent_id: report.tentId,
+      plant_id: report.plantId,
+      metric_keys: report.metricKeys,
+      auth: report.authPreview,
+      transport: "mqtt_local_bridge",
+      topic: "ecowitt/grow",
+      note: report.storageNotice,
+    };
+    await writeFile(out, JSON.stringify(payload, null, 2), "utf8");
+    // eslint-disable-next-line no-console
+    console.log(
+      "[ecowitt-mqtt-runner] redacted report written to",
+      out,
+      "— paste into /operator/ecowitt-bridge-status",
+    );
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn("[ecowitt-mqtt-runner] could not write redacted report:", e);
+  }
 }
 
 function printReport(report: ReturnType<typeof buildIngestAttemptReport>): void {

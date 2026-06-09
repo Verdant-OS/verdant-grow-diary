@@ -195,3 +195,40 @@ Stale or invalid telemetry is **never** promoted to Live.
 - ❌ No `service_role`. No `auth-admin`. No device control.
 - ❌ No Action Queue writes. No alerts. No automation.
 - ❌ No direct `sensor_readings` / `public.*` inserts.
+
+---
+
+## Operator UI: /operator/ecowitt-bridge-status
+
+Read-only operator diagnostics for local Ecowitt bridge runs. Stores
+**only redacted JSON in this browser's localStorage** — never in Supabase.
+
+### Generate a redacted report
+
+```bash
+bun run dev:ecowitt-mqtt:dry-run -- --sample --once --write-report
+# writes ./tmp/ecowitt-last-ingest-report.json
+```
+
+The runner re-redacts the bridge token before writing and prints a
+"paste into /operator/ecowitt-bridge-status" hint.
+
+### View / import in the UI
+
+1. Open `/operator/ecowitt-bridge-status`.
+2. Paste the JSON from `./tmp/ecowitt-last-ingest-report.json` into the
+   "Paste redacted report JSON" textarea.
+3. Click **Import report**. Counts and the latest classification update.
+4. **View latest report** opens a drawer with `IngestAttemptReportPanel`.
+5. **Copy redacted report** copies the redacted JSON only.
+6. **Clear local diagnostics** removes locally-stored attempts.
+
+### Safety
+
+- Imports defensively re-redact `vbt_…` / `sk_…` / JWT-looking tokens
+  anywhere except the dedicated `auth` preview field, and **block**
+  pastes that still carry token-shaped values outside it.
+- Stale / invalid / unknown attempts **never** render as Live.
+- Provider chip (Ecowitt) is rendered separately from the trust badge.
+- No DB writes. No Edge Function calls from the page.
+

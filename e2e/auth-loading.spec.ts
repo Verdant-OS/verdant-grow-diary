@@ -12,7 +12,7 @@
 //    via page.addInitScript so the UI can render the form WITHOUT a real
 //    recovery token exchange. The mocked PUT /auth/v1/user request is what
 //    we actually drive in the test.
-//  - No service_role, no token logging, no auth bypass in the app.
+//  - No elevated DB role, no token logging, no auth bypass in the app.
 import { test, expect, type Page, type Route, type Request } from "@playwright/test";
 
 const SAFE_EMAIL = "playwright-e2e-noop@example.invalid";

@@ -102,6 +102,13 @@ export default function QuickLogSensorSnapshotStrip({ tentId, attached = true }:
           >
             {PILL_LABEL[view.status]}
           </span>
+
+          <SnapshotTrustBadge
+            view={view.trustBadge}
+            showProvider={false}
+            data-testid="quicklog-sensor-snapshot-trust-badge"
+          />
+
         </div>
       </div>
 

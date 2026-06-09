@@ -116,3 +116,47 @@ Interval:   60 seconds
 - If Python `ecowitt2mqtt` crashes on Windows with `NotImplementedError`
   from `loop.add_reader()`, use this Bun bridge instead. Do not attempt
   to patch the Python loop policy in production tooling.
+
+---
+
+## Fast Windows path
+
+One command generates safe `.cmd` launchers under `tmp/ecowitt-windows/`:
+
+```powershell
+bun run dev:ecowitt-doctor -- --write-launchers
+```
+
+Then open `tmp/ecowitt-windows/` and run the `.cmd` files in order:
+
+```text
+01-watch-mqtt.cmd       # subscribe to ecowitt/# via mosquitto_sub
+02-start-http-bridge.cmd # start the Verdant HTTP bridge
+03-test-http-bridge.cmd  # POST a clearly-labeled FAKE LOCAL TEST payload
+04-run-mqtt-dry-run.cmd  # consume MQTT, write redacted dry-run report
+```
+
+A one-shot smoke check is also available once the bridge is running:
+
+```powershell
+bun run dev:ecowitt-bridge-smoke
+```
+
+It POSTs a `FAKE LOCAL TEST` payload, subscribes to `ecowitt/grow`, and
+exits non-zero if the message does not appear on MQTT.
+
+### Troubleshooting
+
+- `1883` in use → broker likely already running; verify with
+  `mosquitto_sub`.
+- Bridge `404` → wrong Ecowitt path; must be `/data/report`.
+- `/data/report/` → accepted and normalized.
+- MQTT Explorer empty → check bridge publish line, confirm Mosquitto is
+  running, subscribe to `ecowitt/#`.
+- Gateway says upload failed but bridge logs the POST → bridge may not
+  be returning `200`; check the ack body (`ok`).
+- Wrong IP picked → rerun `bun run dev:ecowitt-doctor` and use the
+  `RECOMMENDED` address, not the WSL / Hyper-V adapter.
+- Dry-run report says `auth: Bearer (none)` → expected for dry-run.
+- Live send is **not** part of the fast path; only after the redacted
+  report is reviewed.

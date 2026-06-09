@@ -187,3 +187,36 @@ describe("writeLaunchers", () => {
     expect(existsSync(resolve(tmp, "tmp/elsewhere"))).toBe(false);
   });
 });
+
+describe("writeLaunchers — checksum-based summary", () => {
+  let tmp: string;
+  afterEach(() => {
+    if (tmp && existsSync(tmp)) rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it("first run reports created counts; second run reports unchanged for identical content", () => {
+    tmp = mkdtempSync(join(tmpdir(), "ecowitt-doctor-cs-"));
+    const out = resolve(tmp, "tmp/ecowitt-windows");
+    const a = writeLaunchers(out, tmp);
+    expect(a.created).toBeGreaterThan(0);
+    expect(a.unchanged).toBe(0);
+    expect(a.updated).toBe(0);
+    expect(a.refused).toBe(0);
+    const b = writeLaunchers(out, tmp);
+    expect(b.created).toBe(0);
+    expect(b.updated).toBe(0);
+    expect(b.unchanged).toBe(a.written.length);
+  });
+
+  it("marks only the modified file as updated when its content drifts", () => {
+    tmp = mkdtempSync(join(tmpdir(), "ecowitt-doctor-cs-"));
+    const out = resolve(tmp, "tmp/ecowitt-windows");
+    writeLaunchers(out, tmp);
+    const target = join(out, "02-start-http-bridge.cmd");
+    require("node:fs").writeFileSync(target, "modified content\r\n", "utf8");
+    const b = writeLaunchers(out, tmp);
+    expect(b.updated).toBe(1);
+    expect(b.created).toBe(0);
+    expect(b.unchanged).toBe(b.written.length - 1);
+  });
+});

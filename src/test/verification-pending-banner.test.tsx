@@ -91,3 +91,50 @@ describe("VerificationPendingBanner", () => {
     expect(alert.textContent ?? "").toMatch(/couldn't send the verification email/i);
   });
 });
+
+describe("VerificationPendingBanner — a11y", () => {
+  it("uses role=status with aria-live=polite for the banner region", () => {
+    render(<VerificationPendingBanner email="x@example.invalid" />);
+    const banner = screen.getByTestId("verification-pending-banner");
+    expect(banner).toHaveAttribute("role", "status");
+    expect(banner).toHaveAttribute("aria-live", "polite");
+  });
+
+  it("includes an accessible heading 'Verify your email'", () => {
+    render(<VerificationPendingBanner email="x@example.invalid" />);
+    expect(
+      screen.getByRole("heading", { name: /verify your email/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("resend button is keyboard reachable and has an accessible name", () => {
+    render(<VerificationPendingBanner email="x@example.invalid" />);
+    const btn = screen.getByRole("button", { name: /resend verification email/i });
+    btn.focus();
+    expect(document.activeElement).toBe(btn);
+  });
+
+  it("disables button during cooldown without yanking focus", async () => {
+    resendMock.mockResolvedValue({ error: null });
+    render(<VerificationPendingBanner email="x@example.invalid" />);
+    const btn = screen.getByRole("button", { name: /resend verification email/i });
+    btn.focus();
+    fireEvent.click(btn);
+    await waitFor(() => {
+      const post = screen.getByRole("button", { name: /resend available in/i });
+      expect(post).toBeDisabled();
+    });
+    // Focus stays on body or the (now disabled) button — never jumps to a random element.
+    const active = document.activeElement;
+    expect([document.body, screen.getByRole("button", { name: /resend available in/i })]).toContain(
+      active,
+    );
+  });
+
+  it("has no detectable axe violations", async () => {
+    const { container } = render(<VerificationPendingBanner email="x@example.invalid" />);
+    const results = await axe(container);
+    expect(results.violations.map((v) => `${v.id}:${v.help}`)).toEqual([]);
+  });
+});
+

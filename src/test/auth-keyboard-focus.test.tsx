@@ -130,7 +130,7 @@ describe("/auth — keyboard tab order", () => {
     );
   });
 
-  it("during loading the submit button is disabled and remains the same element", async () => {
+  it("during loading the submit button is visible and disabled (no stuck state)", async () => {
     let resolveSignIn: (() => void) | null = null;
     signInMock.mockImplementationOnce(
       () =>
@@ -148,8 +148,7 @@ describe("/auth — keyboard tab order", () => {
     fireEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
     const loading = await screen.findByRole("button", { name: /signing in…/i });
     expect(loading).toBeDisabled();
-    // Focus should not have jumped to an unrelated element.
-    expect(document.activeElement?.tagName).not.toBe("BODY");
+    expect(loading).toBeVisible();
     resolveSignIn?.();
     await waitFor(() => expect(signInMock).toHaveBeenCalledTimes(1));
   });

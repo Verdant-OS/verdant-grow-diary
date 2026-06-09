@@ -92,6 +92,10 @@
 @layer base {
   * { @apply border-border; }
   html, body, #root { @apply min-h-screen; }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -99,6 +103,17 @@
     background-attachment: fixed;
   }
   h1, h2, h3, h4 { font-family: 'Space Grotesk', 'Inter', sans-serif; letter-spacing: -0.02em; }
+
+  @media (max-width: 640px) {
+    input,
+    textarea,
+    select,
+    button,
+    [role="button"],
+    [role="combobox"] {
+      font-size: 16px;
+    }
+  }
 }
 
 @layer components {

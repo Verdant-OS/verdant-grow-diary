@@ -12,7 +12,7 @@ describe("validateResetEmail", () => {
   it("rejects empty", () => {
     const r = validateResetEmail("");
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe("empty");
+    if (r.ok === false) expect(r.reason).toBe("empty");
   });
   it("rejects invalid", () => {
     expect(validateResetEmail("nope").ok).toBe(false);
@@ -33,12 +33,12 @@ describe("validateNewPassword", () => {
     const short = "a".repeat(MIN_PASSWORD_LENGTH - 1);
     const r = validateNewPassword(short, short);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe("too_short");
+    if (r.ok === false) expect(r.reason).toBe("too_short");
   });
   it("rejects mismatched confirmation", () => {
     const r = validateNewPassword("longenough1", "longenough2");
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe("mismatch");
+    if (r.ok === false) expect(r.reason).toBe("mismatch");
   });
   it("accepts a valid pair", () => {
     const r = validateNewPassword("longenough!", "longenough!");

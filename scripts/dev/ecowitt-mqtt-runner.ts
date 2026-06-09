@@ -247,20 +247,7 @@ async function writeRedactedReport(
     const path = await import("node:path");
     const out = path.resolve(DEFAULT_REPORT_PATH);
     await mkdir(path.dirname(out), { recursive: true });
-    const payload = {
-      status: report.status,
-      classification: report.classification,
-      http_status: report.httpStatus,
-      reasons: report.reasons,
-      url: report.url,
-      tent_id: report.tentId,
-      plant_id: report.plantId,
-      metric_keys: report.metricKeys,
-      auth: report.authPreview,
-      transport: "mqtt_local_bridge",
-      topic: "ecowitt/grow",
-      note: report.storageNotice,
-    };
+    const payload = buildRedactedReportJson(report);
     await writeFile(out, JSON.stringify(payload, null, 2), "utf8");
     // eslint-disable-next-line no-console
     console.log(
@@ -274,16 +261,45 @@ async function writeRedactedReport(
   }
 }
 
+export function buildRedactedReportJson(
+  report: ReturnType<typeof buildIngestAttemptReport>,
+): Record<string, unknown> {
+  return {
+    status: report.status,
+    classification: report.classification,
+    http_status: report.httpStatus,
+    reasons: report.reasons,
+    url: report.url,
+    tent_id: report.tentId,
+    plant_id: report.plantId,
+    metric_keys: report.metricKeys,
+    auth: report.authPreview,
+    transport: report.evidence?.transport ?? "mqtt_local_bridge",
+    topic: report.evidence?.topic ?? "ecowitt/grow",
+    evidence: report.evidence,
+    note: report.storageNotice,
+  };
+}
+
 function printReport(report: ReturnType<typeof buildIngestAttemptReport>): void {
+  const e = report.evidence;
   // eslint-disable-next-line no-console
-  console.log("[ecowitt-mqtt-runner]", {
+  console.log("[ecowitt-mqtt-runner] consumed MQTT message", {
     title: report.title,
     status: report.status,
     classification: report.classification,
     http: report.httpStatus,
     auth: report.authPreview,
     tent: report.tentId,
-    metrics: report.metricKeys,
+    payload_kind: e?.payload_kind ?? "unknown",
+    provider: e?.provider ?? "unknown",
+    topic: e?.topic ?? null,
+    received_at: e?.received_at ?? null,
+    dateutc: e?.dateutc ?? null,
+    raw_keys_redacted: e?.raw_keys_redacted ?? [],
+    canonical_metrics: e?.canonical_metrics ?? report.metricKeys,
+    missing_metrics: e?.missing_metrics ?? [],
+    passkey_redacted: e?.redactions.passkey_redacted ?? false,
     reasons: report.reasons,
     note: report.storageNotice,
   });

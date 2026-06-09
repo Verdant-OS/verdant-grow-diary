@@ -6,14 +6,14 @@
  *   1) Tap-to-add photo (optional)
  *   2) Grower Notes (optional when photo or readings are present)
  *   3) 2x2 grid: Temp °F, Humidity %, pH, EC (all optional, decimals allowed)
- *   4) Full-width "Save to Timeline" button
+ *   4) Sticky mobile-safe "Save to Timeline" button
  *
  * Safety contract is enforced by src/test/plant-quick-log.test.ts — keep this
  * component a presenter writing only to diary_entries + diary-photos storage.
  * Manual sensor values are stored under details.manual_sensor_snapshot with
  * source set to "manual" by the pure helper in src/lib/quickLogRules.ts.
  */
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Camera, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -61,6 +61,12 @@ function buildTimelineNote(rawNote: string, hasPhoto: boolean, hasManualReadings
   return "";
 }
 
+function blurActiveElement() {
+  if (typeof document === "undefined") return;
+  const active = document.activeElement;
+  if (active instanceof HTMLElement) active.blur();
+}
+
 export default function PlantQuickLog({
   open,
   onOpenChange,
@@ -96,10 +102,29 @@ export default function PlantQuickLog({
     [open, logs],
   );
 
+  useEffect(() => {
+    return () => {
+      if (photoPreview?.startsWith("blob:")) URL.revokeObjectURL(photoPreview);
+    };
+  }, [photoPreview]);
+
   const hasManualReadings = !!buildManualSensorSnapshot(sensors);
   const hasPhoto = !!photoFile;
   const timelineNote = buildTimelineNote(note, hasPhoto, hasManualReadings);
   const hasAnyContent = timelineNote.trim().length > 0;
+  const canSave = hasAnyContent && !busy && !!growId;
+
+  const saveHelper = !growId
+    ? "Missing grow context. This plant needs a grow before saving."
+    : busy
+      ? "Saving this log to the timeline…"
+      : !hasAnyContent
+        ? "Add a note, photo, or manual reading before saving."
+        : hasPhoto
+          ? "Ready to save this photo and log to the timeline."
+          : hasManualReadings
+            ? "Ready to save these manual readings to the timeline."
+            : "Ready to save this note to the timeline.";
 
   function deltaFor(metric: ManualSensorMetric, raw: string): ChronologyDelta | null {
     const current = parseOptionalNumber(raw);
@@ -143,10 +168,9 @@ export default function PlantQuickLog({
     if (libraryFileRef.current) libraryFileRef.current.value = "";
   }
 
-  const canSave = hasAnyContent && !busy && !!growId;
-
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSave() {
+    if (busy) return;
+    blurActiveElement();
     setError(null);
 
     if (!growId) {
@@ -159,16 +183,8 @@ export default function PlantQuickLog({
       return;
     }
 
-    const result = buildQuickLogInsertDraft({
-      plantId,
-      plantName,
-      growId,
-      tentId: tentId ?? null,
-      note: timelineNote,
-      sensors,
-    });
-    if (!result.ok) {
-      setError("Add a note, photo, or manual reading before saving.");
+    if (photoFile && !user) {
+      setError("Sign in to attach photos.");
       return;
     }
 
@@ -191,15 +207,30 @@ export default function PlantQuickLog({
         uploadedPath = path;
       }
 
-      const draft = {
-        ...result.draft,
-        photo_url: uploadedPath,
-      };
+      const result = buildQuickLogInsertDraft({
+        plantId,
+        plantName,
+        growId,
+        tentId: tentId ?? null,
+        note: timelineNote,
+        photoPath: uploadedPath,
+        sensors,
+      });
+      if (!result.ok) {
+        if (uploadedPath) {
+          await supabase.storage
+            .from("diary-photos")
+            .remove([uploadedPath])
+            .catch(() => {});
+        }
+        setError("Add a note, photo, or manual reading before saving.");
+        return;
+      }
 
       // NOTE: no `user_id` in payload — DB default auth.uid() is trusted.
       const { error: insErr } = await supabase
         .from("diary_entries")
-        .insert(draft as never);
+        .insert(result.draft as never);
 
       if (insErr) {
         if (uploadedPath) {
@@ -208,7 +239,7 @@ export default function PlantQuickLog({
             .remove([uploadedPath])
             .catch(() => {});
         }
-        setError(`Couldn't save entry: ${insErr.message}`);
+        setError(`Could not save this log: ${insErr.message}`);
         return;
       }
 
@@ -241,7 +272,7 @@ export default function PlantQuickLog({
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent
         side="bottom"
-        className="bg-background border-border/60 max-h-[92vh] overflow-y-auto rounded-t-2xl sm:max-w-md sm:mx-auto"
+        className="bg-background border-border/60 max-h-[92vh] overflow-y-auto rounded-t-2xl pb-0 sm:max-w-md sm:mx-auto"
         data-testid="plant-quick-log-sheet"
       >
         <SheetHeader className="text-left">
@@ -251,7 +282,13 @@ export default function PlantQuickLog({
           ) : null}
         </SheetHeader>
 
-        <form onSubmit={handleSave} className="grid gap-4 mt-4">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void handleSave();
+          }}
+          className="grid gap-4 mt-4"
+        >
           {/* 1. Photo */}
           <div className="grid gap-2" data-testid="plant-quick-log-photo-zone">
             {photoPreview ? (
@@ -327,9 +364,7 @@ export default function PlantQuickLog({
               onChange={handlePhotoInputChange}
               data-testid="plant-quick-log-photo-library-input"
             />
-
           </div>
-
 
           {/* 2. Grower Notes */}
           <div className="grid gap-1.5">
@@ -410,33 +445,46 @@ export default function PlantQuickLog({
           {error && (
             <p
               role="alert"
+              aria-live="assertive"
               data-testid="plant-quick-log-error"
-              className="text-sm text-destructive"
+              className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive"
             >
               {error}
             </p>
           )}
 
           {/* 4. Save */}
-          <Button
-            type="submit"
-            disabled={!canSave}
-            data-testid="plant-quick-log-save"
-            aria-label="Save Quick Log to timeline"
-            className={cn(
-              "w-full h-12 text-base font-medium",
-              "bg-primary text-primary-foreground hover:bg-primary/90",
-              "transition-none",
-            )}
-          >
-            {busy ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Saving…
-              </>
-            ) : (
-              "Save to Timeline"
-            )}
-          </Button>
+          <div className="sticky bottom-0 z-10 -mx-6 border-t border-border/50 bg-background/95 px-6 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur">
+            <p
+              id="plant-quick-log-save-helper"
+              data-testid="plant-quick-log-save-helper"
+              className="mb-2 text-xs text-muted-foreground"
+              aria-live="polite"
+            >
+              {saveHelper}
+            </p>
+            <Button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={!canSave}
+              data-testid="plant-quick-log-save"
+              aria-label="Save Quick Log to timeline"
+              aria-describedby="plant-quick-log-save-helper"
+              className={cn(
+                "w-full h-12 text-base font-medium",
+                "bg-primary text-primary-foreground hover:bg-primary/90",
+                "transition-none",
+              )}
+            >
+              {busy ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> Saving…
+                </>
+              ) : (
+                "Save to Timeline"
+              )}
+            </Button>
+          </div>
         </form>
       </SheetContent>
     </Sheet>

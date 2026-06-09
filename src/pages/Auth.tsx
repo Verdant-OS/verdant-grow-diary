@@ -134,7 +134,7 @@ export default function Auth() {
       return;
     }
     setSignUpSuccess("Welcome to Verdant. Check your inbox if confirmation is required.");
-    nav(redirectTo, { replace: true });
+    nav(postSignInTarget(), { replace: true });
   }
 
   async function requestReset(e: React.FormEvent) {

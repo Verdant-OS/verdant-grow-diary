@@ -418,6 +418,19 @@ jobs:
             fixture_status="failed"
           fi
 
+          # Bootstrap status for the summary.
+          if [ "${SHOULD_RUN}" != "true" ]; then
+            bootstrap_status="skipped due missing config"
+          elif [ "${BOOTSTRAP_ALLOW}" != "true" ]; then
+            bootstrap_status="not enabled"
+          elif [ "${BOOTSTRAP_STEP_OUTCOME}" = "success" ]; then
+            bootstrap_status="passed"
+          elif [ -z "${BOOTSTRAP_STEP_OUTCOME}" ] || [ "${BOOTSTRAP_STEP_OUTCOME}" = "skipped" ]; then
+            bootstrap_status="skipped"
+          else
+            bootstrap_status="failed"
+          fi
+
           {
             echo "## Quick Log Playwright smoke"
             echo ""

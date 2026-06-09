@@ -123,3 +123,39 @@ describe("Auth desktop spec — safety", () => {
     );
   });
 });
+
+describe("Auth route-protection spec — safety", () => {
+  it("intercepts /auth/v1/** and /rest/v1/** via page.route", () => {
+    expect(routeProtectionSpec).toMatch(/page\.route\(\s*\/\\\/auth\\\/v1\\\//);
+    expect(routeProtectionSpec).toMatch(/page\.route\(\s*\/\\\/rest\\\/v1\\\//);
+  });
+  it("uses 1280x800 desktop viewport", () => {
+    expect(routeProtectionSpec).toMatch(
+      /viewport:\s*\{\s*width:\s*1280,\s*height:\s*800\s*\}/,
+    );
+  });
+  it("uses .invalid email + no real secrets/service_role", () => {
+    expect(routeProtectionSpec).toMatch(/@example\.invalid/);
+    expect(routeProtectionSpec).not.toMatch(/service_role/i);
+    expect(routeProtectionSpec).not.toMatch(
+      /process\.env\.(E2E_TEST_PASSWORD|E2E_TEST_EMAIL|SUPABASE_SERVICE_ROLE)/,
+    );
+  });
+  it("never logs password/token/session/recovery/email", () => {
+    expect(routeProtectionSpec).not.toMatch(
+      /console\.(log|warn|error|info|debug)\s*\([^)]*\b(password|token|session|recovery|email|hash)\b/i,
+    );
+  });
+  it("declares the private grow tables it guards (no direct hits expected)", () => {
+    for (const t of [
+      "grows",
+      "tents",
+      "plants",
+      "diary_entries",
+      "sensor_readings",
+      "action_queue",
+    ]) {
+      expect(routeProtectionSpec).toContain(`"${t}"`);
+    }
+  });
+});

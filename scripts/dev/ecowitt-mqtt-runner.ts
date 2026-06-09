@@ -36,7 +36,9 @@ import {
 } from "../../src/lib/ecowittLocalTestPayloadRules";
 import {
   normalizeEcowittMqttPayload,
+  buildEcowittIngestEvidence,
   type EcowittMqttPayload,
+  type EcowittIngestEvidence,
 } from "../../src/lib/ecowittMqttIngestRules";
 import { buildIngestAttemptReport } from "../../src/lib/ingestAttemptReportRules";
 

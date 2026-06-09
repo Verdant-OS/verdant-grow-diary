@@ -7,7 +7,7 @@
  * not write, call RPC, call AI, create alerts, or schedule anything.
  */
 import { useMemo } from "react";
-import { Activity, ArrowDown, Zap } from "lucide-react";
+import { Activity, ArrowDown, ShieldCheck, Zap } from "lucide-react";
 
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
@@ -16,12 +16,18 @@ import {
   PLANT_RECENT_ACTIVITY_RECAP_DEFAULT_LIMIT,
 } from "@/lib/plantRecentActivityRecap";
 import { buildNoRecentLogRecovery } from "@/lib/noRecentLogRecoveryRules";
+import {
+  buildPlantStabilizeModeViewModel,
+  shouldShowPlantStabilizeMode,
+} from "@/lib/plantStabilizeModeViewModel";
 import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 interface PlantDetailRecentActivityRecapProps {
   plantId: string | null | undefined;
+  plantStage?: string | null;
+  plantStatus?: string | null;
   onAddQuickCheck?: () => void;
 }
 
@@ -45,6 +51,8 @@ function scrollToTimeline() {
 
 export default function PlantDetailRecentActivityRecap({
   plantId,
+  plantStage,
+  plantStatus,
   onAddQuickCheck,
 }: PlantDetailRecentActivityRecapProps) {
   const { data: rawRows, isLoading } = usePlantRecentActivity(plantId ?? null);
@@ -53,7 +61,7 @@ export default function PlantDetailRecentActivityRecap({
     if (!plantId) return [];
     return buildPlantRecentActivity(rawRows ?? [], {
       plantId,
-      limit: PLANT_RECENT_ACTIVITY_RECAP_DEFAULT_LIMIT,
+      limit: 10,
     });
   }, [plantId, rawRows]);
 
@@ -74,6 +82,18 @@ export default function PlantDetailRecentActivityRecap({
       }),
     [rows],
   );
+
+  const stabilize = useMemo(
+    () =>
+      buildPlantStabilizeModeViewModel({
+        rows,
+        now: Date.now(),
+        plantStage,
+        plantStatus,
+      }),
+    [plantStage, plantStatus, rows],
+  );
+  const showStabilize = shouldShowPlantStabilizeMode(stabilize);
 
   return (
     <section
@@ -144,45 +164,72 @@ export default function PlantDetailRecentActivityRecap({
             </div>
           </div>
         </div>
-      ) : items.length === 0 ? (
-        <div
-          data-testid="plant-detail-recent-activity-recap-empty"
-          className="rounded-xl border border-dashed border-border/50 bg-secondary/20 p-4 text-center"
-        >
-          <p className="text-sm text-muted-foreground">No recent activity yet.</p>
-          <p className="text-[11px] text-muted-foreground/80 mt-1">
-            Use Quick Log, manual sensor snapshots, or photos to start building plant memory.
-          </p>
-        </div>
       ) : (
-        <ul
-          data-testid="plant-detail-recent-activity-recap-list"
-          className="space-y-2"
-        >
-          {items.map((item) => (
-            <li
-              key={item.key}
-              data-testid="plant-detail-recent-activity-recap-item"
-              data-category={item.category}
-              className="flex items-start gap-2 rounded-lg border border-border/40 bg-card/30 p-2"
+        <div className="space-y-3">
+          {showStabilize && (
+            <div
+              data-testid="plant-detail-stabilize-mode"
+              data-level={stabilize.level}
+              className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm"
             >
-              <Badge
-                variant="outline"
-                className="shrink-0 text-[10px] uppercase tracking-wide"
-              >
-                {item.categoryLabel}
-              </Badge>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm text-foreground/90 truncate sm:whitespace-normal sm:line-clamp-2">
-                  {item.summary}
-                </p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  {item.timestampLabel}
-                </p>
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 rounded-full border border-amber-400/40 bg-background/40 p-2 text-amber-200">
+                  <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+                </span>
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div>
+                    <p className="font-medium text-amber-100">{stabilize.headline}</p>
+                    <p className="mt-1 text-amber-100/80">{stabilize.one_thing_to_watch}</p>
+                  </div>
+                  <p className="text-amber-100/80">{stabilize.why_now[0]}</p>
+                  <p className="font-medium text-amber-50">{stabilize.what_not_to_do[0]}</p>
+                  <p className="text-amber-100/80">{stabilize.safe_next_log_prompt}</p>
+                </div>
               </div>
-            </li>
-          ))}
-        </ul>
+            </div>
+          )}
+
+          {items.length === 0 ? (
+            <div
+              data-testid="plant-detail-recent-activity-recap-empty"
+              className="rounded-xl border border-dashed border-border/50 bg-secondary/20 p-4 text-center"
+            >
+              <p className="text-sm text-muted-foreground">No recent activity yet.</p>
+              <p className="text-[11px] text-muted-foreground/80 mt-1">
+                Use Quick Log, manual sensor snapshots, or photos to start building plant memory.
+              </p>
+            </div>
+          ) : (
+            <ul
+              data-testid="plant-detail-recent-activity-recap-list"
+              className="space-y-2"
+            >
+              {items.map((item) => (
+                <li
+                  key={item.key}
+                  data-testid="plant-detail-recent-activity-recap-item"
+                  data-category={item.category}
+                  className="flex items-start gap-2 rounded-lg border border-border/40 bg-card/30 p-2"
+                >
+                  <Badge
+                    variant="outline"
+                    className="shrink-0 text-[10px] uppercase tracking-wide"
+                  >
+                    {item.categoryLabel}
+                  </Badge>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-foreground/90 truncate sm:whitespace-normal sm:line-clamp-2">
+                      {item.summary}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {item.timestampLabel}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </section>
   );

@@ -301,6 +301,53 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
+      - name: Upload Playwright traces
+        id: upload_playwright_traces
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: quicklog-playwright-traces
+          path: |
+            test-results/**/*.zip
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Upload Playwright media (screenshots/videos)
+        id: upload_playwright_media
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: quicklog-playwright-media
+          path: |
+            test-results/**/*.png
+            test-results/**/*.webm
+            test-results/**/*.mp4
+            playwright-report/data/**
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Upload smoke report JSON
+        id: upload_smoke_report_json
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: quicklog-smoke-report-json
+          path: e2e/results/quicklog-smoke-report.json
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Upload smoke report TXT
+        id: upload_smoke_report_txt
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: quicklog-smoke-report-txt
+          path: e2e/results/quicklog-smoke-report.txt
+          retention-days: 30
+          if-no-files-found: warn
+
+
+
 
       - name: Write Quick Log smoke run summary
         if: always()

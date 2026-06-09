@@ -37,7 +37,7 @@ function renderSettings() {
 describe("Settings start-screen control", () => {
   it("renders the start-screen control for a signed-in user", () => {
     renderSettings();
-    expect(screen.getByText(/^start screen$/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^start screen$/i })).toBeInTheDocument();
     expect(screen.getByText(/choose where verdant opens after sign-in/i)).toBeInTheDocument();
     expect(screen.getByTestId("start-screen-option-quickLog")).toBeInTheDocument();
     expect(screen.getByTestId("start-screen-option-onboarding")).toBeInTheDocument();

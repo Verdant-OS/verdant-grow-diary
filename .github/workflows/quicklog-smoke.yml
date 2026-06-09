@@ -9,7 +9,7 @@ name: Quick Log Playwright smoke
 #  - No checked-in storageState; the setup project signs in via the real /auth UI
 #    using repository secrets, or skips with a clear message.
 #  - Uploads Playwright report + smoke JSON/text report as artifacts on every run.
-#  - Never uses pull_request_target — only the safe pull_request event.
+#  - Never uses the elevated PR target event — only the safe pull_request event.
 #
 # Triggers:
 #  - workflow_dispatch: manual run; fails fast if required secrets/URL are missing.

@@ -7,6 +7,7 @@ import { AuthProvider } from "@/store/auth";
 import { GrowsProvider } from "@/store/grows";
 import AppShell from "@/components/AppShell";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Tents from "./pages/Tents";
 import TentDetail from "./pages/TentDetail";
@@ -63,6 +64,7 @@ const App = () => (
           <GrowsProvider>
             <Routes>
               <Route path="/auth" element={<Auth />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               {/* Deprecated auth entry points — redirect to canonical /auth to
                   prevent funnel leaks from old bookmarks, emails, ads, and
                   creator posts that still point to /login /signup /register. */}

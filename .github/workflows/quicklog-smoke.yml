@@ -302,8 +302,18 @@ jobs:
           SMOKE_FAILED: ${{ steps.smoke_meta.outputs.smoke_failed }}
           SMOKE_SKIPPED: ${{ steps.smoke_meta.outputs.smoke_skipped }}
           PLAYWRIGHT_VERSION: ${{ steps.smoke_meta.outputs.playwright_version }}
+          REPORT_JSON_PRESENT: ${{ steps.smoke_meta.outputs.report_json_present }}
+          REPORT_PARSE_STATUS: ${{ steps.smoke_meta.outputs.report_parse_status }}
+          REPORT_PARSE_ERROR: ${{ steps.smoke_meta.outputs.report_parse_error }}
+          SMOKE_STEP_OUTCOME: ${{ steps.quicklog_smoke.outcome }}
+          SMOKE_STEP_CONCLUSION: ${{ steps.quicklog_smoke.conclusion }}
+          PLAYWRIGHT_REPORT_ARTIFACT_URL: ${{ steps.upload_playwright_report.outputs.artifact-url }}
         run: |
           # Never echo secret values. Only references to secret NAMES are written.
+          pw_report_url="${PLAYWRIGHT_REPORT_ARTIFACT_URL}"
+          if [ -z "${pw_report_url}" ]; then
+            pw_report_url="${ARTIFACTS_URL}"
+          fi
           {
             echo "## Quick Log Playwright smoke"
             echo ""
@@ -312,8 +322,12 @@ jobs:
             echo "- Branch/ref: \`${{ github.ref }}\`"
             echo "- [Workflow run](${RUN_URL})"
             echo "- [Artifacts](${ARTIFACTS_URL})"
+            echo "- [Playwright HTML report](${pw_report_url})"
+            echo ""
+            echo "  GitHub artifacts are downloads, not hosted HTML pages — download and open \`index.html\` from the artifact."
             if [ "${SHOULD_RUN}" = "true" ]; then
               echo "- Smoke executed: yes"
+              echo "- Smoke step outcome: \`${SMOKE_STEP_OUTCOME:-unknown}\` (conclusion: \`${SMOKE_STEP_CONCLUSION:-unknown}\`)"
               echo ""
               echo "### Smoke run"
               echo ""
@@ -331,13 +345,42 @@ jobs:
                 echo "Smoke counts unavailable: report JSON was not produced."
               fi
               echo ""
+              echo "### Failure annotation"
+              echo ""
+              echo "- Smoke step outcome: \`${SMOKE_STEP_OUTCOME:-unknown}\`"
+              echo "- Smoke step conclusion: \`${SMOKE_STEP_CONCLUSION:-unknown}\`"
+              echo "- Report JSON present: \`${REPORT_JSON_PRESENT:-unknown}\`"
+              echo "- Report parse status: \`${REPORT_PARSE_STATUS:-unknown}\`"
+              echo ""
+              if [ "${SMOKE_STEP_OUTCOME}" = "failure" ] || [ "${SMOKE_STEP_CONCLUSION}" = "failure" ]; then
+                echo "Smoke command failed: the Playwright smoke step did not complete successfully. Inspect \`quicklog-smoke-report.txt\`, Playwright trace, screenshots, and videos."
+              fi
+              case "${REPORT_PARSE_STATUS}" in
+                parsed)
+                  echo "Report parsing succeeded: smoke counts were extracted from \`quicklog-smoke-report.json\`."
+                  ;;
+                missing)
+                  echo "Report JSON missing: smoke count parsing could not run because the report JSON was not produced. The artifact guard should fail this job after a real smoke attempt."
+                  ;;
+                failed)
+                  echo "Report parsing failed: smoke counts could not be extracted from \`quicklog-smoke-report.json\`. This is a metadata/report parsing problem, not automatically the same as a Playwright smoke failure."
+                  if [ -n "${REPORT_PARSE_ERROR}" ]; then
+                    echo ""
+                    echo "  Sanitized parse error: \`${REPORT_PARSE_ERROR}\`"
+                  fi
+                  ;;
+                *)
+                  echo "Report parse status unknown."
+                  ;;
+              esac
+              echo ""
               echo "### Artifacts"
               echo ""
-              echo "- Artifact name: \`quicklog-smoke-artifacts\`"
-              echo "- Retention: 30 days"
+              echo "- Bundled artifact: \`quicklog-smoke-artifacts\` (retention: 30 days)"
+              echo "- Dedicated Playwright report artifact: \`quicklog-playwright-report\` (retention: 30 days)"
               echo "- Run artifacts page: ${ARTIFACTS_URL}"
               echo ""
-              echo "Contents:"
+              echo "Bundled contents:"
               echo ""
               echo "- \`e2e/results/quicklog-smoke-report.json\`"
               echo "- \`e2e/results/quicklog-smoke-report.txt\`"
@@ -347,6 +390,7 @@ jobs:
               echo "### Troubleshooting"
               echo ""
               echo "Open \`quicklog-smoke-report.txt\` first (then the JSON sibling) and find the first \`✗\` line. Then inspect the matching Playwright trace, screenshots, and video under \`playwright-report/\` and \`test-results/\`."
+
             else
               echo "- Smoke executed: no (skipped)"
               echo ""

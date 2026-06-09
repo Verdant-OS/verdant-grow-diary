@@ -52,6 +52,8 @@ export default function Auth() {
   const [verifyRequired, setVerifyRequired] = useState(false);
   const [resendBusy, setResendBusy] = useState(false);
   const [resendNotice, setResendNotice] = useState<string | null>(null);
+  const [resendLastAttemptAt, setResendLastAttemptAt] = useState<number | null>(null);
+  const [resendNowTick, setResendNowTick] = useState<number>(() => Date.now());
   const [signUpError, setSignUpError] = useState<string | null>(null);
   const [signUpSuccess, setSignUpSuccess] = useState<string | null>(null);
 

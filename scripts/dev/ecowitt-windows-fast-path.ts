@@ -7,6 +7,11 @@
  *   2. Runs the HTTP→MQTT smoke check against the already-running local bridge.
  *   3. Prints the next dry-run command on PASS.
  *
+ * Flags:
+ *   --write-launchers   Write safe .cmd launchers under tmp/ecowitt-windows/.
+ *   --verbose           Print structured step logs (doctor + smoke), still
+ *                       fully redacted, still no live ingest.
+ *
  * Hard safety rules — same as the underlying tools:
  *   - never imports the supabase SDK
  *   - never calls the Verdant ingest webhook
@@ -37,6 +42,7 @@ export const NEXT_DRY_RUN_LINES = [
   '$env:ECOWITT_MQTT_TOPIC="ecowitt/grow"',
   "bun run dev:ecowitt-mqtt:dry-run -- --once --write-report",
 ];
+export const NEXT_DRY_RUN_COMMAND = "bun run dev:ecowitt-mqtt:dry-run -- --once --write-report";
 
 export const BRIDGE_DOWN_LINES = [
   "HTTP bridge is not running.",
@@ -59,12 +65,29 @@ export interface FastPathDeps {
 
 export interface FastPathOptions {
   writeLaunchers?: boolean;
+  verbose?: boolean;
 }
+
+export type StepStatus = "ok" | "failed" | "skipped";
 
 export interface FastPathResult {
   exitCode: 0 | 1 | 2;
-  smoke?: SmokeResult;
-  launchersWritten?: string[];
+  doctor: { status: StepStatus; recommendedIp: string | null };
+  launchers: { status: StepStatus; written: string[]; outDir: string | null };
+  smoke: { status: StepStatus; reason: string | null };
+  logs: string[];
+  nextCommand: string | null;
+}
+
+/**
+ * Redact any accidental token-like strings before logging in verbose mode.
+ * Defense-in-depth — the underlying tools already avoid printing secrets.
+ */
+export function redactVerboseLine(line: string): string {
+  return line
+    .replace(/vbt_[A-Za-z0-9_\-]+/g, "vbt_***REDACTED***")
+    .replace(/(eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]+)/g, "***REDACTED-JWT***")
+    .replace(/(Bearer\s+)[A-Za-z0-9._\-]+/gi, "$1***REDACTED***");
 }
 
 /**
@@ -75,58 +98,112 @@ export async function runFastPath(
   opts: FastPathOptions,
   deps: FastPathDeps,
 ): Promise<FastPathResult> {
+  const logs: string[] = [];
+  const verbose = opts.verbose === true;
+  const emit = (line: string, channel: "log" | "err") => {
+    const safe = redactVerboseLine(line);
+    logs.push(safe);
+    (channel === "log" ? deps.log : deps.err)(safe);
+  };
+  const vlog = (line: string) => {
+    if (verbose) emit(line, "log");
+    else logs.push(redactVerboseLine(line));
+  };
+
   // 1. Doctor (deterministic, in-process — uses the same builder as the CLI).
   const cwd = process.cwd();
   const packageJsonFound = existsSync(resolve(cwd, "package.json"));
   if (!packageJsonFound) {
-    deps.err("[ecowitt-fast-path] preflight FAILED — package.json not found");
-    return { exitCode: 2 };
+    emit("[ecowitt-fast-path] preflight FAILED — package.json not found", "err");
+    return {
+      exitCode: 2,
+      doctor: { status: "failed", recommendedIp: null },
+      launchers: { status: "skipped", written: [], outDir: null },
+      smoke: { status: "skipped", reason: null },
+      logs,
+      nextCommand: null,
+    };
   }
+  vlog("[ecowitt-fast-path] verbose: running doctor…");
   const report = buildDoctorReport({ cwd, packageJsonFound, bunVersion: null });
-  deps.log(`[ecowitt-fast-path] doctor OK — recommended IP: ${report.recommendedIp ?? "(none)"}`);
+  emit(
+    `[ecowitt-fast-path] doctor OK — recommended IP: ${report.recommendedIp ?? "(none)"}`,
+    "log",
+  );
+  if (verbose) {
+    for (const c of report.ips) {
+      vlog(`  - ip: ${c.address} [${c.iface}]${c.recommended ? " RECOMMENDED" : ""}`);
+    }
+    for (const n of report.nextCommands) vlog(`  - next: ${n}`);
+  }
 
   // 2. Optional launcher write (only ever under tmp/ecowitt-windows/).
-  let launchersWritten: string[] | undefined;
+  let launchers: FastPathResult["launchers"] = { status: "skipped", written: [], outDir: null };
   if (opts.writeLaunchers) {
     const write = deps.writeLaunchersFn
-      ?? (() => writeLaunchers(resolve(cwd, "tmp/ecowitt-windows"), cwd));
-    const w = write();
-    launchersWritten = w.written;
-    deps.log(`[ecowitt-fast-path] wrote ${w.written.length} launcher file(s) under ${w.outDir}`);
+      ?? (() => writeLaunchers(resolve(cwd, "tmp", "ecowitt-windows"), cwd));
+    try {
+      const w = write();
+      launchers = { status: "ok", written: w.written, outDir: w.outDir };
+      emit(
+        `[ecowitt-fast-path] wrote ${w.written.length} launcher file(s) under ${w.outDir}`,
+        "log",
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "unknown error";
+      emit(`[ecowitt-fast-path] launcher write FAILED: ${msg}`, "err");
+      launchers = { status: "failed", written: [], outDir: null };
+    }
   }
 
   // 3. Smoke. Strictly AFTER doctor.
+  vlog("[ecowitt-fast-path] verbose: running HTTP→MQTT smoke…");
   const smoke = await deps.runSmoke({});
   if (!smoke.ok) {
     if (/bridge_down|bridge_http_/.test(smoke.reason)) {
-      for (const l of BRIDGE_DOWN_LINES) deps.err(l);
+      for (const l of BRIDGE_DOWN_LINES) emit(l, "err");
     } else if (/mqtt_unreachable/.test(smoke.reason)) {
-      for (const l of MQTT_DOWN_LINES) deps.err(l);
+      for (const l of MQTT_DOWN_LINES) emit(l, "err");
     } else {
-      deps.err(`[ecowitt-fast-path] smoke FAIL: ${smoke.reason}`);
+      emit(`[ecowitt-fast-path] smoke FAIL: ${smoke.reason}`, "err");
     }
-    return { exitCode: 1, smoke, launchersWritten };
+    if (verbose) vlog(`[ecowitt-fast-path] verbose smoke reason: ${smoke.reason}`);
+    return {
+      exitCode: 1,
+      doctor: { status: "ok", recommendedIp: report.recommendedIp },
+      launchers,
+      smoke: { status: "failed", reason: smoke.reason },
+      logs,
+      nextCommand: null,
+    };
   }
 
-  for (const l of NEXT_DRY_RUN_LINES) deps.log(l);
-  return { exitCode: 0, smoke, launchersWritten };
+  if (verbose) vlog(`[ecowitt-fast-path] verbose smoke reason: ${smoke.reason}`);
+  for (const l of NEXT_DRY_RUN_LINES) emit(l, "log");
+  return {
+    exitCode: 0,
+    doctor: { status: "ok", recommendedIp: report.recommendedIp },
+    launchers,
+    smoke: { status: "ok", reason: smoke.reason },
+    logs,
+    nextCommand: NEXT_DRY_RUN_COMMAND,
+  };
 }
 
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   const writeLaunchersFlag = argv.includes("--write-launchers");
+  const verbose = argv.includes("--verbose");
 
   const result = await runFastPath(
-    { writeLaunchers: writeLaunchersFlag },
+    { writeLaunchers: writeLaunchersFlag, verbose },
     {
       // eslint-disable-next-line no-console
       log: (l) => console.log(l),
       // eslint-disable-next-line no-console
       err: (l) => console.error(l),
       runSmoke: async (o) => {
-        // Lazy import default subscribe path to avoid hard mqtt dep at import time.
         const mod = await import("./ecowitt-local-bridge-smoke");
-        // Use the same defaults as the CLI smoke checker.
         return mod.runSmoke(o, {
           fetchImpl: fetch,
           subscribe: async (mqttUrl, topic, onMessage) => {

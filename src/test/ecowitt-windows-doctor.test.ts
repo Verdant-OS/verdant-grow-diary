@@ -151,4 +151,39 @@ describe("writeLaunchers", () => {
       /refusing to write/i,
     );
   });
+
+  it("refuses traversal segments in the requested outDir", () => {
+    tmp = mkdtempSync(join(tmpdir(), "ecowitt-doctor-"));
+    expect(() => writeLaunchers(join(tmp, "tmp/ecowitt-windows/../escape"), tmp)).toThrow(
+      /traversal|refusing/i,
+    );
+  });
+
+  it("refuses to write outside the repo root", () => {
+    tmp = mkdtempSync(join(tmpdir(), "ecowitt-doctor-"));
+    const other = mkdtempSync(join(tmpdir(), "ecowitt-other-"));
+    try {
+      expect(() => writeLaunchers(resolve(other, "tmp/ecowitt-windows"), tmp)).toThrow(
+        /refusing/i,
+      );
+    } finally {
+      rmSync(other, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses non-absolute repoRoot", () => {
+    expect(() => writeLaunchers("tmp/ecowitt-windows", "relative/repo")).toThrow(
+      /absolute/i,
+    );
+  });
+
+  it("does not create files outside tmp/ecowitt-windows/ on a refused call", () => {
+    tmp = mkdtempSync(join(tmpdir(), "ecowitt-doctor-"));
+    try {
+      writeLaunchers(resolve(tmp, "tmp/elsewhere"), tmp);
+    } catch {
+      /* expected */
+    }
+    expect(existsSync(resolve(tmp, "tmp/elsewhere"))).toBe(false);
+  });
 });

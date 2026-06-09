@@ -145,6 +145,61 @@ ingest, never reads `VERDANT_BRIDGE_TOKEN`, never calls the Verdant
 ingest webhook, and never writes to the database. Live webhook send
 remains manual and gated after the dry-run report has been reviewed.
 
+### Fast-path troubleshooting
+
+If `bun run dev:ecowitt-fast-path` fails, walk through these checks in
+order. Every command below is local-only — no secrets, no webhook, no
+live ingest.
+
+1. **Bridge down** — fast-path printed `HTTP bridge is not running`.
+   The Verdant HTTP bridge is not listening on `127.0.0.1:8080`.
+   Start it in a separate terminal:
+
+   ```powershell
+   bun run dev:ecowitt-http-bridge
+   ```
+
+2. **Mosquitto unreachable** — fast-path printed `MQTT broker not
+   reachable on mqtt://127.0.0.1:1883`. Mosquitto is not running or
+   not bound to localhost. Subscribe to confirm:
+
+   ```powershell
+   cd "C:\Program Files\mosquitto"
+   .\mosquitto_sub.exe -h 127.0.0.1 -p 1883 -t "ecowitt/#" -v
+   ```
+
+3. **Check port ownership** — confirm what is using the expected ports:
+
+   ```powershell
+   netstat -ano | findstr :1883
+   netstat -ano | findstr :8080
+   ```
+
+4. **Re-run the doctor** — confirm recommended LAN IPv4 and Mosquitto
+   hints:
+
+   ```powershell
+   bun run dev:ecowitt-doctor
+   ```
+
+5. **Verbose fast path** — print structured doctor + smoke step logs
+   (still redacted, still no live ingest):
+
+   ```powershell
+   bun run dev:ecowitt-fast-path -- --verbose --write-launchers
+   ```
+
+Notes:
+
+- `bridge_down` means the HTTP bridge is not listening on `8080`.
+- `mqtt_unreachable` means the broker is not reachable on `1883`.
+- `auth: Bearer (none)` in the dry-run report is **expected** —
+  dry-run never sends to the webhook.
+- Live send remains manual and is only run after the redacted
+  dry-run report has been reviewed.
+
+
+
 ## Fast Windows path
 
 One command generates safe `.cmd` launchers under `tmp/ecowitt-windows/`:

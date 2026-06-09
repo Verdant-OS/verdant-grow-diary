@@ -37,7 +37,7 @@ export default function ResetPassword() {
     e.preventDefault();
     setError(null);
     const v = validateNewPassword(password, confirm);
-    if (v.ok !== true) {
+    if ("message" in v) {
       setError(v.message);
       return;
     }

@@ -4,9 +4,12 @@
  * Ensures:
  *   - no storageState (e2e/.auth/user.json) is committed
  *   - e2e/.auth/ and e2e/results/ are gitignored
- *   - workflow contains no hardcoded credentials
- *   - workflow uploads the smoke artifacts under a stable name
+ *   - workflow contains no hardcoded credentials or secret echoes
+ *   - workflow uploads the exact, expected smoke artifacts under a stable name
+ *   - workflow has explicit PR skip / workflow_dispatch fail-fast behavior
  *   - smoke spec writes the report to a stable, documented path
+ *   - README documents required vars/secrets, artifact paths/retention, and
+ *     troubleshooting guidance
  *   - package.json exposes the e2e:* scripts
  */
 import { describe, it, expect } from "vitest";
@@ -35,16 +38,71 @@ describe("Quick Log Playwright CI surface", () => {
     expect(wf).toMatch(/if:\s*always\(\)/);
     expect(wf).toMatch(/quicklog-smoke-artifacts/);
     expect(wf).toMatch(/e2e\/results\/quicklog-smoke-report\.json/);
+    expect(wf).toMatch(/retention-days:\s*30/);
   });
 
-  it("CI workflow has no hardcoded credentials, tokens, or service_role", () => {
+  it("CI workflow has no hardcoded credentials, tokens, secret echoes, or pull_request_target", () => {
     const wf = read(".github/workflows/quicklog-smoke.yml");
     expect(wf).not.toMatch(/service_role/i);
     expect(wf).not.toMatch(/password\s*:\s*["'][^"'$]+["']/i);
     expect(wf).not.toMatch(/eyJ[A-Za-z0-9_-]{20,}\./);
+    // Must use the safe pull_request event, never pull_request_target
+    expect(wf).not.toMatch(/pull_request_target/);
+    // No auth bypass language
+    expect(wf).not.toMatch(/skipAuth|bypassAuth|AUTH_BYPASS/);
     // Email/password must come from GitHub secrets, not literals
     expect(wf).toMatch(/\$\{\{\s*secrets\.E2E_TEST_EMAIL\s*\}\}/);
     expect(wf).toMatch(/\$\{\{\s*secrets\.E2E_TEST_PASSWORD\s*\}\}/);
+    // Must not echo secret values to logs
+    expect(wf).not.toMatch(/echo\s+["']?\$\{?\s*E2E_TEST_PASSWORD/);
+    expect(wf).not.toMatch(/echo\s+["']?\$\{?\s*E2E_TEST_EMAIL/);
+    expect(wf).not.toMatch(
+      /echo\s+["']?\$\{\{\s*secrets\.E2E_TEST_(EMAIL|PASSWORD)\s*\}\}/,
+    );
+  });
+
+  it("CI workflow uploads exactly the expected artifact paths and excludes storageState", () => {
+    const wf = read(".github/workflows/quicklog-smoke.yml");
+    // Locate the upload step's path: block.
+    const uploadMatch = wf.match(
+      /name:\s*quicklog-smoke-artifacts[\s\S]*?path:\s*\|\n([\s\S]*?)(?:\n[^\s-]|\n\s*$|$)/,
+    );
+    expect(uploadMatch, "could not locate quicklog-smoke-artifacts path block").toBeTruthy();
+    const pathBlock = uploadMatch![1];
+    const paths = pathBlock
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+    const expected = [
+      "e2e/results/quicklog-smoke-report.json",
+      "e2e/results/quicklog-smoke-report.txt",
+      "playwright-report/",
+      "test-results/",
+    ];
+    expect(paths).toEqual(expected);
+    // Must never publish storageState as an artifact.
+    expect(pathBlock).not.toMatch(/e2e\/\.auth/);
+    expect(pathBlock).not.toMatch(/user\.json/);
+  });
+
+  it("CI workflow skips cleanly on PR without secrets and fails fast on dispatch", () => {
+    const wf = read(".github/workflows/quicklog-smoke.yml");
+    // pull_request trigger present, scoped to main
+    expect(wf).toMatch(/pull_request:\s*\n\s*branches:\s*\[main\]/);
+    // Precheck step id used to gate later steps
+    expect(wf).toMatch(/id:\s*e2e_config/);
+    expect(wf).toMatch(/steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/);
+    // Explicit non-secret skip message for PRs
+    expect(wf).toContain(
+      "Skipping Quick Log smoke: E2E vars/secrets are unavailable for this PR context.",
+    );
+    // Explicit fail-fast message for workflow_dispatch
+    expect(wf).toContain(
+      "Missing required Quick Log smoke configuration. Configure Actions vars/secrets.",
+    );
+    // Precheck distinguishes the two event kinds
+    expect(wf).toMatch(/github\.event_name/);
+    expect(wf).toMatch(/workflow_dispatch[\s\S]{0,400}pull_request/);
   });
 
   it("smoke spec writes report to a stable path", () => {
@@ -71,5 +129,38 @@ describe("Quick Log Playwright CI surface", () => {
       expect(pkg.scripts[s], `missing script ${s}`).toBeTruthy();
     }
     expect(pkg.devDependencies["@playwright/test"]).toBeTruthy();
+  });
+
+  it("README documents required config, artifact paths/retention, and troubleshooting", () => {
+    const readme = read("e2e/README.md");
+    for (const token of [
+      "E2E_BASE_URL",
+      "E2E_GROW_1_PLANT_URL",
+      "E2E_GROW_2_PLANT_NAME",
+      "E2E_TEST_EMAIL",
+      "E2E_TEST_PASSWORD",
+      "quicklog-smoke-artifacts",
+      "e2e/results/quicklog-smoke-report.json",
+      "e2e/results/quicklog-smoke-report.txt",
+      "playwright-report/",
+      "test-results/",
+      "30 days",
+    ]) {
+      expect(readme, `README missing reference: ${token}`).toContain(token);
+    }
+    // Troubleshooting section with the documented failure cases.
+    expect(readme).toMatch(/##\s+Troubleshooting Quick Log smoke failures/);
+    for (const phrase of [
+      "Missing GitHub variable or secret",
+      "Redirected to `/auth`",
+      "Cannot find Grow #1 plant page",
+      "Cannot find Grow #2 / target plant",
+      "Stale snapshot helper missing",
+      "Watering validation focus failed",
+      "Report says a later step failed after save",
+      "How to read the report",
+    ]) {
+      expect(readme, `README missing troubleshooting phrase: ${phrase}`).toContain(phrase);
+    }
   });
 });

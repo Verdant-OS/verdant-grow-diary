@@ -39,6 +39,9 @@ describe("Quick Log Playwright CI surface", () => {
     expect(wf).toMatch(/quicklog-smoke-artifacts/);
     expect(wf).toMatch(/e2e\/results\/quicklog-smoke-report\.json/);
     expect(wf).toMatch(/retention-days:\s*30/);
+    // Must target the real Lovable sync branch, not main
+    expect(wf).toMatch(/branches:\s*\[verdant-grow-diary\]/);
+    expect(wf).not.toMatch(/branches:\s*\[main\]/);
   });
 
   it("CI workflow has no hardcoded credentials, tokens, secret echoes, or pull_request_target", () => {
@@ -87,8 +90,10 @@ describe("Quick Log Playwright CI surface", () => {
 
   it("CI workflow skips cleanly on PR without secrets and fails fast on dispatch", () => {
     const wf = read(".github/workflows/quicklog-smoke.yml");
-    // pull_request trigger present, scoped to main
-    expect(wf).toMatch(/pull_request:\s*\n\s*branches:\s*\[main\]/);
+    // pull_request trigger present, scoped to verdant-grow-diary
+    expect(wf).toMatch(/pull_request:\s*\n\s*branches:\s*\[verdant-grow-diary\]/);
+    // Must never use the unsafe pull_request_target event
+    expect(wf).not.toMatch(/pull_request_target/);
     // Precheck step id used to gate later steps
     expect(wf).toMatch(/id:\s*e2e_config/);
     expect(wf).toMatch(/steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/);
@@ -103,6 +108,28 @@ describe("Quick Log Playwright CI surface", () => {
     // Precheck distinguishes the two event kinds
     expect(wf).toMatch(/github\.event_name/);
     expect(wf).toMatch(/workflow_dispatch[\s\S]{0,400}pull_request/);
+  });
+
+  it("CI workflow path filters are exact for push and pull_request", () => {
+    const wf = read(".github/workflows/quicklog-smoke.yml");
+    const expectedPaths = [
+      'e2e/**',
+      'playwright.config.ts',
+      '.github/workflows/quicklog-smoke.yml',
+    ];
+    // Extract paths: blocks that use list items (not the pipe block used by upload-artifact)
+    const pathBlocks = Array.from(wf.matchAll(/paths:\s*\n((?:\s+-\s+".+"\n)+)/g));
+    expect(pathBlocks.length).toBeGreaterThanOrEqual(2); // push + pull_request
+    for (const [, block] of pathBlocks) {
+      for (const p of expectedPaths) {
+        expect(block).toContain(`- "${p}"`);
+      }
+      // Must not contain unexpected extra paths
+      const lines = block.split('\n').filter(l => l.trim().startsWith('-'));
+      expect(lines.map(l => l.trim())).toEqual(
+        expectedPaths.map(p => `- "${p}"`),
+      );
+    }
   });
 
   it("smoke spec writes report to a stable path", () => {

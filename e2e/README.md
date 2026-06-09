@@ -50,9 +50,9 @@ Because of this:
 | `E2E_TEST_PASSWORD`     | Login password for the smoke account                 |
 | `E2E_GROW_2_PLANT_NAME` | Optional. Defaults to `505 Headbanger`               |
 | `E2E_FIXTURE_MODE` | Must be exactly `"true"` for any write-producing smoke run |
-| `E2E_FIXTURE_EXPECTED_GROW_NAME` | Expected disposable E2E grow name (e.g. `E2E Test Grow`) |
 | `E2E_FIXTURE_EXPECTED_TENT_NAME` | Expected disposable E2E tent name (e.g. `E2E Test Tent`) |
 | `E2E_FIXTURE_EXPECTED_PLANT_NAME` | Expected disposable E2E plant name (e.g. `E2E Test Plant`) |
+| `E2E_FIXTURE_EXPECTED_GROW_NAME` | **Optional.** Only used if the UI visibly exposes a grow name (e.g. `E2E Test Grow`). The current setup flow has no Grow page, so this is not required. |
 
 `E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD` are only required to (re)generate
 `e2e/.auth/user.json`. Once that file exists, the smoke run reuses it.

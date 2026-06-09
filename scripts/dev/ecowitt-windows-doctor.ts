@@ -199,10 +199,19 @@ function realResolve(p: string): string {
   return join(realResolve(parent), basename(abs));
 }
 
+export interface LauncherWriteSummary {
+  written: string[];
+  outDir: string;
+  created: number;
+  updated: number;
+  unchanged: number;
+  refused: number;
+}
+
 export function writeLaunchers(
   outDir: string,
   repoRoot: string,
-): { written: string[]; outDir: string } {
+): LauncherWriteSummary {
   // Safety: only ever write under <repo-root>/tmp/ecowitt-windows/.
   if (!isAbsolute(repoRoot)) {
     throw new Error(`refusing to write launchers: repoRoot must be absolute (got: ${repoRoot})`);
@@ -228,16 +237,36 @@ export function writeLaunchers(
   mkdirSync(normalized, { recursive: true });
   const files = buildLauncherFiles(repoRoot);
   const written: string[] = [];
+  let created = 0;
+  let updated = 0;
+  let unchanged = 0;
+  const refused = 0;
   for (const [name, content] of Object.entries(files)) {
     // Refuse any filename that escapes the target dir.
     if (name.includes("/") || name.includes("\\") || name.includes("..")) {
       throw new Error(`refusing to write launcher with unsafe filename: ${name}`);
     }
     const p = join(normalized, name);
-    writeFileSync(p, content, "utf8");
+    let existing: string | null = null;
+    if (existsSync(p)) {
+      try {
+        existing = readFileSync(p, "utf8");
+      } catch {
+        existing = null;
+      }
+    }
+    if (existing === null) {
+      writeFileSync(p, content, "utf8");
+      created++;
+    } else if (existing !== content) {
+      writeFileSync(p, content, "utf8");
+      updated++;
+    } else {
+      unchanged++;
+    }
     written.push(p);
   }
-  return { written, outDir: normalized };
+  return { written, outDir: normalized, created, updated, unchanged, refused };
 }
 
 function detectBunVersion(): string | null {

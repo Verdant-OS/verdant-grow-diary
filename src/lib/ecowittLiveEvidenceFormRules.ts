@@ -157,15 +157,28 @@ export function buildLiveSourceTruthEvidenceFromForm(
     }
 
     const unit = (row.unit ?? "").trim();
+    const backendUnit = (row.backend_unit ?? "").trim();
+    const controllerUnit = (row.controller_unit ?? "").trim();
+    // Effective unit for evaluator: prefer explicit shared unit, then
+    // backend unit (matches legacy behavior), then controller unit.
+    const effectiveUnit =
+      unit.length > 0
+        ? unit
+        : backendUnit.length > 0
+          ? backendUnit
+          : controllerUnit.length > 0
+            ? controllerUnit
+            : null;
 
     metrics.push({
       key,
       backend_value,
       controller_value,
-      unit: unit.length > 0 ? unit : null,
+      unit: effectiveUnit,
       tolerance,
     });
   }
+
 
   const evidence: LiveSourceTruthEvidence = {
     source: (state.source ?? "") as LiveSourceTruthSource,

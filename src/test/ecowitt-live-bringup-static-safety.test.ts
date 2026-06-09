@@ -18,6 +18,7 @@ const FORM_PATH = "src/lib/ecowittLiveEvidenceFormRules.ts";
 const TEMPLATES_PATH = "src/lib/ecowittLiveEvidenceTemplates.ts";
 const UNIT_WARN_PATH = "src/lib/ecowittLiveEvidenceUnitWarningRules.ts";
 const MULTI_PLANT_PATH = "src/lib/ecowittLiveEvidenceMultiPlantRules.ts";
+const EXPORT_PATH = "src/lib/ecowittLiveEvidenceExportRules.ts";
 
 function read(p: string): string {
   return readFileSync(resolve(ROOT, p), "utf8");
@@ -35,21 +36,30 @@ const formSrc = read(FORM_PATH);
 const templatesSrc = read(TEMPLATES_PATH);
 const unitWarnSrc = read(UNIT_WARN_PATH);
 const multiPlantSrc = read(MULTI_PLANT_PATH);
+const exportSrc = read(EXPORT_PATH);
 const pageNoComments = stripComments(pageSrc);
 const vmNoComments = stripComments(vmSrc);
 const formNoComments = stripComments(formSrc);
 const templatesNoComments = stripComments(templatesSrc);
 const unitWarnNoComments = stripComments(unitWarnSrc);
 const multiPlantNoComments = stripComments(multiPlantSrc);
+const exportNoComments = stripComments(exportSrc);
 
-
-const targets: Array<[string, string]> = [
-  ["page", pageNoComments],
+// Targets for the strict no-browser-API/no-network/etc checks. The page is
+// allowed to use Blob / URL / document for the local snapshot download, so
+// it is handled separately below.
+const libTargets: Array<[string, string]> = [
   ["view model", vmNoComments],
   ["form rules", formNoComments],
   ["templates", templatesNoComments],
   ["unit warning rules", unitWarnNoComments],
   ["multi-plant rules", multiPlantNoComments],
+  ["export rules", exportNoComments],
+];
+
+const targets: Array<[string, string]> = [
+  ["page", pageNoComments],
+  ...libTargets,
 ];
 
 
@@ -139,6 +149,14 @@ describe("ecowitt-live-bringup — static safety", () => {
     expect(src).not.toContain("navigator.clipboard");
   });
 
+  it.each(libTargets)("[%s lib] does not use Blob/URL/document browser APIs", (_, src) => {
+    // Browser download APIs are page-only; helpers must stay pure.
+    expect(src).not.toMatch(/\bnew\s+Blob\b/);
+    expect(src).not.toMatch(/URL\.createObjectURL/);
+    expect(src).not.toMatch(/URL\.revokeObjectURL/);
+    expect(src).not.toMatch(/document\.createElement/);
+  });
+
   it.each(targets)("[%s] has no forbidden execution copy", (_, src) => {
     for (const phrase of FORBIDDEN_COPY) {
       expect(src).not.toMatch(new RegExp(phrase, "i"));
@@ -155,7 +173,8 @@ describe("ecowitt-live-bringup — static safety", () => {
         m.includes("ecowittLiveEvidenceFormRules") ||
         m.includes("ecowittLiveEvidenceTemplates") ||
         m.includes("ecowittLiveEvidenceUnitWarningRules") ||
-        m.includes("ecowittLiveEvidenceMultiPlantRules");
+        m.includes("ecowittLiveEvidenceMultiPlantRules") ||
+        m.includes("ecowittLiveEvidenceExportRules");
       expect(ok).toBe(true);
     }
   });
@@ -177,21 +196,20 @@ describe("ecowitt-live-bringup — static safety", () => {
     expect(formNoComments).not.toMatch(/Date\.now\s*\(/);
   });
 
-  it("templates / unit-warning / multi-plant rules do not call Date.now", () => {
+  it("templates / unit-warning / multi-plant / export rules do not call Date.now", () => {
     expect(templatesNoComments).not.toMatch(/Date\.now\s*\(/);
     expect(unitWarnNoComments).not.toMatch(/Date\.now\s*\(/);
     expect(multiPlantNoComments).not.toMatch(/Date\.now\s*\(/);
+    expect(exportNoComments).not.toMatch(/Date\.now\s*\(/);
   });
 
   it("new lib files import only from the local helper modules", () => {
-    for (const src of [templatesSrc, unitWarnSrc, multiPlantSrc]) {
+    const ALLOWED =
+      /ecowittLiveEvidenceFormRules|liveSourceTruthGateRules|ecowittLiveEvidenceUnitWarningRules|ecowittLiveEvidenceMultiPlantRules/;
+    for (const src of [templatesSrc, unitWarnSrc, multiPlantSrc, exportSrc]) {
       const fromMatches = src.match(/from\s+["'][^"']+["']/g) || [];
       for (const m of fromMatches) {
-        expect(
-          /ecowittLiveEvidenceFormRules|liveSourceTruthGateRules|ecowittLiveEvidenceUnitWarningRules/.test(
-            m,
-          ),
-        ).toBe(true);
+        expect(ALLOWED.test(m)).toBe(true);
       }
     }
   });

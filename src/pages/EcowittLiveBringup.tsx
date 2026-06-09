@@ -36,6 +36,11 @@ import {
   type EcowittEvidenceUnitWarning,
 } from "@/lib/ecowittLiveEvidenceUnitWarningRules";
 import { evaluateLiveEvidenceForPlants } from "@/lib/ecowittLiveEvidenceMultiPlantRules";
+import {
+  buildEcowittLiveEvidenceSnapshotExport,
+  buildEcowittLiveEvidenceSnapshotFilename,
+  serializeEcowittLiveEvidenceSnapshotExport,
+} from "@/lib/ecowittLiveEvidenceExportRules";
 
 
 function Section({
@@ -825,7 +830,114 @@ function LiveEvidenceEvaluator() {
           </details>
         </>
       )}
+
+      <SnapshotExportPanel
+        evaluated={evaluated}
+        form={form}
+        overall={result}
+        plantResults={multi.per_plant}
+        unitWarnings={unitWarnings}
+        formWarnings={built.form_warnings}
+        requiredNextSteps={multi.combined_next_steps}
+      />
     </Section>
+  );
+}
+
+interface SnapshotExportPanelProps {
+  readonly evaluated: boolean;
+  readonly form: EcowittLiveEvidenceFormState;
+  readonly overall: LiveSourceTruthGateResult;
+  readonly plantResults: ReturnType<
+    typeof evaluateLiveEvidenceForPlants
+  >["per_plant"];
+  readonly unitWarnings: readonly EcowittEvidenceUnitWarning[];
+  readonly formWarnings: readonly string[];
+  readonly requiredNextSteps: readonly string[];
+}
+
+function SnapshotExportPanel({
+  evaluated,
+  form,
+  overall,
+  plantResults,
+  unitWarnings,
+  formWarnings,
+  requiredNextSteps,
+}: SnapshotExportPanelProps) {
+  const handleDownload = React.useCallback(() => {
+    // Use the form's `now` field as the deterministic generated_at when
+    // available; fall back to the captured_at; otherwise pass an empty
+    // string so the filename helper returns its static fallback.
+    const generatedAt =
+      (form.now ?? "").trim() ||
+      (form.captured_at ?? "").trim() ||
+      "";
+    const snapshot = buildEcowittLiveEvidenceSnapshotExport({
+      generated_at: generatedAt,
+      form_state: form,
+      overall_result: overall,
+      plant_results: plantResults,
+      unit_warnings: unitWarnings,
+      form_warnings: formWarnings,
+      required_next_steps: requiredNextSteps,
+    });
+    const text = serializeEcowittLiveEvidenceSnapshotExport(snapshot);
+    const filename = buildEcowittLiveEvidenceSnapshotFilename(generatedAt);
+    const blob = new Blob([text], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    try {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.rel = "noopener";
+      a.click();
+    } finally {
+      // Revoke immediately; the browser has already captured the URL for
+      // the synchronous download click above.
+      URL.revokeObjectURL(url);
+    }
+  }, [
+    form,
+    overall,
+    plantResults,
+    unitWarnings,
+    formWarnings,
+    requiredNextSteps,
+  ]);
+
+  return (
+    <div
+      data-testid="ecowitt-evaluator-export"
+      className="space-y-2 rounded-md border border-border bg-background p-3 text-sm"
+    >
+      <h3 className="text-sm font-semibold">Evidence Snapshot Export</h3>
+      <p
+        data-testid="ecowitt-evaluator-export-helper"
+        className="text-xs text-muted-foreground"
+      >
+        Download a local JSON snapshot of the evidence currently entered on
+        this page. This does not write to the database, query sensors, or
+        prove live data by itself.
+      </p>
+      {evaluated ? (
+        <button
+          type="button"
+          data-testid="ecowitt-evaluator-export-button"
+          onClick={handleDownload}
+          className="rounded border border-border bg-background px-3 py-1 text-sm"
+        >
+          Download evidence snapshot
+        </button>
+      ) : (
+        <p
+          data-testid="ecowitt-evaluator-export-disabled-message"
+          className="text-xs text-muted-foreground"
+        >
+          Evaluate evidence before exporting a snapshot.
+        </p>
+      )}
+    </div>
   );
 }
 

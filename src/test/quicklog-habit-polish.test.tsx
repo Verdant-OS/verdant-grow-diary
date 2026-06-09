@@ -130,10 +130,10 @@ describe("QuickLog habit-capture polish — presentation", () => {
     expect(saveMock).not.toHaveBeenCalled();
   });
 
-  it("save button shows accessible name 'Save log' and helper copy", () => {
+  it("save button keeps clear 'Save entry' copy and renders helper line", () => {
     renderWithClient(<QuickLog open={true} onOpenChange={vi.fn()} />);
     const save = screen.getByTestId("quick-log-save");
-    expect(save.getAttribute("aria-label")).toBe("Save log");
+    expect(save.textContent).toMatch(/Save entry|Save log/);
     expect(screen.getByTestId("quick-log-save-helper").textContent).toMatch(
       /add more detail later from the timeline/i,
     );

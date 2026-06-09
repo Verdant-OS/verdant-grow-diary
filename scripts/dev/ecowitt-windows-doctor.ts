@@ -23,7 +23,7 @@
  */
 
 import { networkInterfaces } from "node:os";
-import { mkdirSync, writeFileSync, existsSync, realpathSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, existsSync, realpathSync } from "node:fs";
 import { resolve, join, dirname, basename, sep, isAbsolute } from "node:path";
 
 export interface IpCandidate {

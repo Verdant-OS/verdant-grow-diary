@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Navigate, useNavigate, Link } from "react-router-dom";
 import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,25 +7,39 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { toast } from "sonner";
 import BrandLogo from "@/components/BrandLogo";
 import {
   validateResetEmail,
   buildResetRedirectUrl,
   GENERIC_RESET_REQUEST_SUCCESS,
   MIN_PASSWORD_LENGTH,
+  SIGN_IN_FRIENDLY_ERROR,
+  SIGN_UP_FRIENDLY_ERROR,
+  FORGOT_RATE_LIMIT_ERROR,
 } from "@/lib/passwordResetRules";
+
+type AuthMode = "signin" | "signup" | "forgot";
 
 export default function Auth() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
+  const [mode, setMode] = useState<AuthMode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  const [signInError, setSignInError] = useState<string | null>(null);
+  const [signUpError, setSignUpError] = useState<string | null>(null);
+  const [signUpSuccess, setSignUpSuccess] = useState<string | null>(null);
+
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotError, setForgotError] = useState<string | null>(null);
   const [forgotSent, setForgotSent] = useState(false);
+
+  const signInEmailRef = useRef<HTMLInputElement>(null);
+  const signUpEmailRef = useRef<HTMLInputElement>(null);
+  const forgotEmailRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (user) nav("/", { replace: true });
@@ -35,17 +49,28 @@ export default function Auth() {
 
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) return;
+    setSignInError(null);
     setBusy(true);
+    // We never log the raw Supabase error — it can leak rate-limit timing
+    // or other account-state hints. Always show the friendly copy.
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
-    if (error) toast.error(error.message);
-    else nav("/", { replace: true });
+    if (error) {
+      setSignInError(SIGN_IN_FRIENDLY_ERROR);
+      signInEmailRef.current?.focus();
+      return;
+    }
+    nav("/", { replace: true });
   }
 
   async function signUp(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) return;
+    setSignUpError(null);
+    setSignUpSuccess(null);
     if (password.length < MIN_PASSWORD_LENGTH) {
-      toast.error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+      setSignUpError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
       return;
     }
     setBusy(true);
@@ -55,39 +80,48 @@ export default function Auth() {
       options: { emailRedirectTo: window.location.origin },
     });
     setBusy(false);
-    if (error) toast.error(error.message);
-    else {
-      toast.success("Welcome to Verdant 🌱");
-      nav("/", { replace: true });
+    if (error) {
+      setSignUpError(SIGN_UP_FRIENDLY_ERROR);
+      signUpEmailRef.current?.focus();
+      return;
     }
+    setSignUpSuccess("Welcome to Verdant. Check your inbox if confirmation is required.");
+    nav("/", { replace: true });
   }
 
   async function requestReset(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) return;
     setForgotError(null);
     const v = validateResetEmail(forgotEmail);
     if ("message" in v) {
       setForgotError(v.message);
+      forgotEmailRef.current?.focus();
       return;
     }
     setBusy(true);
-    // Best-effort send. We do NOT branch on the result to avoid leaking
-    // whether an account exists for this email. Errors are swallowed for
-    // the user-facing copy and never logged with email/token/url.
-    await supabase.auth.resetPasswordForEmail(v.email, {
+    // Best-effort send. We do NOT branch on the success/failure shape in a
+    // way that reveals account existence. Network/rate-limit errors get a
+    // generic retry copy; success path uses GENERIC_RESET_REQUEST_SUCCESS.
+    const { error } = await supabase.auth.resetPasswordForEmail(v.email, {
       redirectTo: buildResetRedirectUrl(window.location.origin),
     });
     setBusy(false);
+    if (error) {
+      setForgotError(FORGOT_RATE_LIMIT_ERROR);
+      forgotEmailRef.current?.focus();
+      return;
+    }
     setForgotSent(true);
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 py-10">
+    <div className="min-h-dvh flex flex-col items-center justify-center px-6 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-4">
           <Link
             to="/welcome"
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden /> Back to home
           </Link>
@@ -109,7 +143,15 @@ export default function Auth() {
         </p>
 
         <div className="glass rounded-2xl p-6">
-          <Tabs defaultValue="signin">
+          <Tabs
+            value={mode}
+            onValueChange={(v) => {
+              setMode(v as AuthMode);
+              setSignInError(null);
+              setSignUpError(null);
+              setForgotError(null);
+            }}
+          >
             <TabsList className="grid grid-cols-3 w-full mb-4">
               <TabsTrigger value="signin">Sign in</TabsTrigger>
               <TabsTrigger value="signup">Create account</TabsTrigger>
@@ -120,15 +162,18 @@ export default function Auth() {
               <p className="text-xs text-muted-foreground mb-3">
                 Use the email and password you used to create your Verdant account.
               </p>
-              <form onSubmit={signIn} className="grid gap-3" aria-label="Sign in">
+              <form onSubmit={signIn} noValidate className="grid gap-3" aria-label="Sign in">
                 <div>
                   <Label htmlFor="signin-email">Email</Label>
                   <Input
                     id="signin-email"
+                    ref={signInEmailRef}
                     type="email"
                     autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    aria-invalid={signInError ? true : undefined}
+                    aria-describedby={signInError ? "signin-error" : undefined}
                     required
                   />
                 </div>
@@ -141,6 +186,8 @@ export default function Auth() {
                       autoComplete="current-password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      aria-invalid={signInError ? true : undefined}
+                      aria-describedby={signInError ? "signin-error" : undefined}
                       required
                     />
                     <button
@@ -154,8 +201,18 @@ export default function Auth() {
                     </button>
                   </div>
                 </div>
-                <Button disabled={busy} className="gradient-leaf text-primary-foreground">
-                  Sign in
+                {signInError ? (
+                  <p id="signin-error" role="alert" className="text-xs text-destructive">
+                    {signInError}
+                  </p>
+                ) : null}
+                <Button
+                  type="submit"
+                  disabled={busy}
+                  aria-busy={busy}
+                  className="gradient-leaf text-primary-foreground"
+                >
+                  {busy ? "Signing in…" : "Sign in"}
                 </Button>
               </form>
             </TabsContent>
@@ -164,15 +221,18 @@ export default function Auth() {
               <p className="text-xs text-muted-foreground mb-3">
                 New here? Create an account to start your grow diary.
               </p>
-              <form onSubmit={signUp} className="grid gap-3" aria-label="Create account">
+              <form onSubmit={signUp} noValidate className="grid gap-3" aria-label="Create account">
                 <div>
                   <Label htmlFor="signup-email">Email</Label>
                   <Input
                     id="signup-email"
+                    ref={signUpEmailRef}
                     type="email"
                     autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    aria-invalid={signUpError ? true : undefined}
+                    aria-describedby={signUpError ? "signup-error" : undefined}
                     required
                   />
                 </div>
@@ -185,14 +245,30 @@ export default function Auth() {
                     minLength={MIN_PASSWORD_LENGTH}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    aria-describedby="signup-password-hint"
                     required
                   />
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p id="signup-password-hint" className="text-xs text-muted-foreground mt-1">
                     Minimum {MIN_PASSWORD_LENGTH} characters.
                   </p>
                 </div>
-                <Button disabled={busy} className="gradient-leaf text-primary-foreground">
-                  Create account
+                {signUpError ? (
+                  <p id="signup-error" role="alert" className="text-xs text-destructive">
+                    {signUpError}
+                  </p>
+                ) : null}
+                {signUpSuccess ? (
+                  <p role="status" aria-live="polite" className="text-xs text-muted-foreground">
+                    {signUpSuccess}
+                  </p>
+                ) : null}
+                <Button
+                  type="submit"
+                  disabled={busy}
+                  aria-busy={busy}
+                  className="gradient-leaf text-primary-foreground"
+                >
+                  {busy ? "Creating account…" : "Create account"}
                 </Button>
               </form>
             </TabsContent>
@@ -215,6 +291,7 @@ export default function Auth() {
                     <Label htmlFor="forgot-email">Email</Label>
                     <Input
                       id="forgot-email"
+                      ref={forgotEmailRef}
                       type="email"
                       autoComplete="email"
                       value={forgotEmail}
@@ -235,8 +312,13 @@ export default function Auth() {
                       </p>
                     ) : null}
                   </div>
-                  <Button disabled={busy} className="gradient-leaf text-primary-foreground">
-                    Send reset link
+                  <Button
+                    type="submit"
+                    disabled={busy}
+                    aria-busy={busy}
+                    className="gradient-leaf text-primary-foreground"
+                  >
+                    {busy ? "Sending reset link…" : "Send reset link"}
                   </Button>
                 </form>
               )}

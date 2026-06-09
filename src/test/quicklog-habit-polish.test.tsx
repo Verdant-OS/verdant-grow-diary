@@ -179,8 +179,8 @@ describe("QuickLog habit-capture polish — static safety", () => {
     expect(SRC).not.toMatch(/turn on|turn off|run pump|run fan|run light|relay|actuator/i);
   });
 
-  it("manual readings copy explicitly says it is not live sensor data", () => {
-    expect(SRC).toMatch(/not live sensor data/i);
+  it("manual readings copy explicitly clarifies it is not telemetry", () => {
+    expect(SRC).toMatch(/not telemetry/i);
   });
 
   it("save path still routes through useQuickLogV2Save (no new functions.invoke)", () => {

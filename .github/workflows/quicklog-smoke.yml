@@ -176,6 +176,71 @@ jobs:
 
           exit "$status"
 
+      - name: Capture Quick Log smoke metadata
+        id: smoke_meta
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        shell: bash
+        run: |
+          # Best-effort capture of smoke counts + Playwright version for the
+          # GitHub Actions step summary. Never echoes secret values. Failures
+          # here must not mask the real Playwright failure: this step always
+          # exits 0 and emits explicit "unavailable" sentinels when fields
+          # cannot be determined.
+          set +e
+
+          pw_version="$(bunx playwright --version 2>/dev/null | tr -d '\r' | head -n1)"
+          if [ -z "${pw_version}" ]; then
+            pw_version="unavailable"
+          fi
+          echo "playwright_version=${pw_version}" >> "$GITHUB_OUTPUT"
+
+          report="e2e/results/quicklog-smoke-report.json"
+          if [ -f "${report}" ]; then
+            counts="$(node -e '
+              try {
+                const fs = require("fs");
+                const r = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+                const pick = (...keys) => {
+                  for (const k of keys) {
+                    const v = k.split(".").reduce((o, p) => (o == null ? o : o[p]), r);
+                    if (typeof v === "number") return v;
+                  }
+                  return null;
+                };
+                const steps = Array.isArray(r.steps) ? r.steps : (Array.isArray(r.results) ? r.results : null);
+                let total = pick("total", "stats.total", "counts.total");
+                let passed = pick("passed", "stats.passed", "counts.passed", "ok");
+                let failed = pick("failed", "stats.failed", "counts.failed", "failures");
+                let skipped = pick("skipped", "stats.skipped", "counts.skipped");
+                if (steps) {
+                  const norm = s => String(s ?? "").toLowerCase();
+                  if (total == null) total = steps.length;
+                  if (passed == null) passed = steps.filter(s => ["pass","passed","ok","success"].includes(norm(s.status ?? s.result))).length;
+                  if (failed == null) failed = steps.filter(s => ["fail","failed","error"].includes(norm(s.status ?? s.result))).length;
+                  if (skipped == null) skipped = steps.filter(s => ["skip","skipped"].includes(norm(s.status ?? s.result))).length;
+                }
+                const out = [total, passed, failed, skipped].map(v => (typeof v === "number" ? v : ""));
+                process.stdout.write(out.join("|"));
+              } catch (e) {
+                process.stdout.write("");
+              }
+            ' "${report}")"
+            IFS='|' read -r smoke_total smoke_passed smoke_failed smoke_skipped <<< "${counts}"
+            if [ -n "${smoke_total}${smoke_passed}${smoke_failed}${smoke_skipped}" ]; then
+              echo "smoke_counts_available=true" >> "$GITHUB_OUTPUT"
+              echo "smoke_total=${smoke_total:-unknown}" >> "$GITHUB_OUTPUT"
+              echo "smoke_passed=${smoke_passed:-unknown}" >> "$GITHUB_OUTPUT"
+              echo "smoke_failed=${smoke_failed:-unknown}" >> "$GITHUB_OUTPUT"
+              echo "smoke_skipped=${smoke_skipped:-unknown}" >> "$GITHUB_OUTPUT"
+            else
+              echo "smoke_counts_available=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "smoke_counts_available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          exit 0
+
       - name: Upload smoke artifacts
         if: always() && steps.e2e_config.outputs.should_run == 'true'
         uses: actions/upload-artifact@v4
@@ -198,6 +263,13 @@ jobs:
           JOB_STATUS: ${{ job.status }}
           EVENT_NAME: ${{ github.event_name }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ARTIFACTS_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts
+          SMOKE_COUNTS_AVAILABLE: ${{ steps.smoke_meta.outputs.smoke_counts_available }}
+          SMOKE_TOTAL: ${{ steps.smoke_meta.outputs.smoke_total }}
+          SMOKE_PASSED: ${{ steps.smoke_meta.outputs.smoke_passed }}
+          SMOKE_FAILED: ${{ steps.smoke_meta.outputs.smoke_failed }}
+          SMOKE_SKIPPED: ${{ steps.smoke_meta.outputs.smoke_skipped }}
+          PLAYWRIGHT_VERSION: ${{ steps.smoke_meta.outputs.playwright_version }}
         run: |
           # Never echo secret values. Only references to secret NAMES are written.
           {
@@ -206,14 +278,32 @@ jobs:
             echo "- Workflow result: \`${JOB_STATUS}\`"
             echo "- Event: \`${EVENT_NAME}\`"
             echo "- Branch/ref: \`${{ github.ref }}\`"
+            echo "- [Workflow run](${RUN_URL})"
+            echo "- [Artifacts](${ARTIFACTS_URL})"
             if [ "${SHOULD_RUN}" = "true" ]; then
               echo "- Smoke executed: yes"
+              echo ""
+              echo "### Smoke run"
+              echo ""
+              echo "- Command: \`bun run e2e:quicklog-smoke\`"
+              echo "- Browser: \`chromium\`"
+              echo "- Playwright: \`${PLAYWRIGHT_VERSION:-unavailable}\`"
+              echo ""
+              echo "### Smoke counts"
+              echo ""
+              if [ "${SMOKE_COUNTS_AVAILABLE}" = "true" ]; then
+                echo "| total | passed | failed | skipped |"
+                echo "| ----- | ------ | ------ | ------- |"
+                echo "| ${SMOKE_TOTAL} | ${SMOKE_PASSED} | ${SMOKE_FAILED} | ${SMOKE_SKIPPED} |"
+              else
+                echo "Smoke counts unavailable: report JSON was not produced."
+              fi
               echo ""
               echo "### Artifacts"
               echo ""
               echo "- Artifact name: \`quicklog-smoke-artifacts\`"
               echo "- Retention: 30 days"
-              echo "- Run artifacts page: ${RUN_URL}#artifacts"
+              echo "- Run artifacts page: ${ARTIFACTS_URL}"
               echo ""
               echo "Contents:"
               echo ""

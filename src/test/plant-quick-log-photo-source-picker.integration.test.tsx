@@ -1,5 +1,5 @@
 /**
- * PlantQuickLog photo source picker + ten-second quick check integration coverage.
+ * PlantQuickLog photo source picker + grower-model integration coverage.
  *
  * Drives the real PlantQuickLog component end-to-end against mocked Supabase
  * storage + diary_entries insert (no real network, no real DB writes).
@@ -90,35 +90,50 @@ async function pickFile(input: HTMLInputElement, file: File) {
   });
 }
 
-describe("PlantQuickLog ten-second quick check", () => {
-  it("renders the tired-grower path as Better, Same, Worse primary buttons", () => {
+describe("PlantQuickLog action-first grower model", () => {
+  it("renders action chips first and response checks second", () => {
     renderSheet();
-    expect(screen.getByText("10-second check: tap how the plant looks right now.")).toBeTruthy();
-    expect(screen.getByRole("button", { name: /quick check better/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /quick check same/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /quick check worse/i })).toBeTruthy();
-    expect(screen.getByText("Better, Same, or Worse is enough for a quick check.")).toBeTruthy();
+    expect(screen.getByText("2. What changed?")).toBeTruthy();
+    expect(screen.getByText("Tap the grow action. This is the thing the plant will respond to.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /log action watered/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /log action fed/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /log action issue spotted/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /log action environment changed/i })).toBeTruthy();
+    expect(screen.getByText("3. Response follow-up")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /response check better/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /response check same/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /response check worse/i })).toBeTruthy();
+    expect(screen.getByText("Better/Same/Worse records the plant response, not the grow action.")).toBeTruthy();
   });
 
-  it("Better/Same/Worse updates local note state without saving", () => {
+  it("action chips update local note state without saving", () => {
     renderSheet();
-    fireEvent.click(screen.getByRole("button", { name: /quick check better/i }));
-    expect(screen.getByTestId("plant-quick-log-note")).toHaveValue("Quick check: Better.");
+    fireEvent.click(screen.getByRole("button", { name: /log action watered/i }));
+    expect(screen.getByTestId("plant-quick-log-note")).toHaveValue("Watered.");
     expect(screen.getByTestId("plant-quick-log-save")).not.toBeDisabled();
     expect(insertCalls).toHaveLength(0);
     expect(uploadCalls).toHaveLength(0);
   });
 
-  it("quick check status replaces previous status instead of stacking contradictions", () => {
+  it("response check updates local note state without saving", () => {
     renderSheet();
-    fireEvent.click(screen.getByRole("button", { name: /quick check worse/i }));
-    fireEvent.click(screen.getByRole("button", { name: /quick check same/i }));
-    expect(screen.getByTestId("plant-quick-log-note")).toHaveValue("Quick check: Same.");
+    fireEvent.click(screen.getByRole("button", { name: /response check better/i }));
+    expect(screen.getByTestId("plant-quick-log-note")).toHaveValue("Response check: Better.");
+    expect(screen.getByTestId("plant-quick-log-save")).not.toBeDisabled();
+    expect(insertCalls).toHaveLength(0);
+    expect(uploadCalls).toHaveLength(0);
   });
 
-  it("saves a quick check with unchanged diary_entries payload shape", async () => {
+  it("response check replaces previous response instead of stacking contradictions", () => {
     renderSheet();
-    fireEvent.click(screen.getByRole("button", { name: /quick check better/i }));
+    fireEvent.click(screen.getByRole("button", { name: /response check worse/i }));
+    fireEvent.click(screen.getByRole("button", { name: /response check same/i }));
+    expect(screen.getByTestId("plant-quick-log-note")).toHaveValue("Response check: Same.");
+  });
+
+  it("saves an action with unchanged diary_entries payload shape", async () => {
+    renderSheet();
+    fireEvent.click(screen.getByRole("button", { name: /log action watered/i }));
     fireEvent.click(screen.getByTestId("plant-quick-log-save"));
 
     await waitFor(() => expect(insertCalls).toHaveLength(1));
@@ -128,24 +143,40 @@ describe("PlantQuickLog ten-second quick check", () => {
       grow_id: "grow-1",
       plant_id: "plant-1",
       tent_id: "tent-1",
-      note: "Quick check: Better.",
+      note: "Watered.",
     });
     expect(insertCalls[0].photo_url).toBeNull();
     expect("user_id" in insertCalls[0]).toBe(false);
   });
 
-  it("detail chips append local note detail without saving", () => {
+  it("saves a response follow-up with unchanged diary_entries payload shape", async () => {
     renderSheet();
-    fireEvent.click(screen.getByRole("button", { name: /quick check same/i }));
-    fireEvent.click(screen.getByRole("button", { name: /add watered to the quick log note/i }));
-    fireEvent.click(screen.getByRole("button", { name: /add watered to the quick log note/i }));
-    expect(screen.getByTestId("plant-quick-log-note")).toHaveValue("Quick check: Same.\nWatered");
+    fireEvent.click(screen.getByRole("button", { name: /response check better/i }));
+    fireEvent.click(screen.getByTestId("plant-quick-log-save"));
+
+    await waitFor(() => expect(insertCalls).toHaveLength(1));
+    expect(insertCalls[0]).toMatchObject({
+      __table: "diary_entries",
+      grow_id: "grow-1",
+      plant_id: "plant-1",
+      tent_id: "tent-1",
+      note: "Response check: Better.",
+    });
+    expect("user_id" in insertCalls[0]).toBe(false);
+  });
+
+  it("action chips append local note detail without saving", () => {
+    renderSheet();
+    fireEvent.click(screen.getByRole("button", { name: /log action watered/i }));
+    fireEvent.click(screen.getByRole("button", { name: /log action fed/i }));
+    fireEvent.click(screen.getByRole("button", { name: /log action fed/i }));
+    expect(screen.getByTestId("plant-quick-log-note")).toHaveValue("Watered.\nFed.");
     expect(insertCalls).toHaveLength(0);
   });
 
-  it("Photo only chip does not weaken validation when no photo is selected", () => {
+  it("Photo only action does not weaken validation when no photo is selected", () => {
     renderSheet();
-    fireEvent.click(screen.getByRole("button", { name: /add photo only to the quick log note/i }));
+    fireEvent.click(screen.getByRole("button", { name: /log action photo only/i }));
     expect(screen.getByTestId("plant-quick-log-error").textContent).toMatch(/add a photo before/i);
     expect(screen.getByTestId("plant-quick-log-save")).toBeDisabled();
     expect(insertCalls).toHaveLength(0);
@@ -156,10 +187,11 @@ describe("PlantQuickLog Gate 1 polish", () => {
   it("renders title, subtitle, section labels, save copy, and helper copy", () => {
     renderSheet();
     expect(screen.getByRole("heading", { name: "Quick Log" })).toBeTruthy();
-    expect(screen.getByText("Capture what changed. Add detail only if it helps.")).toBeTruthy();
+    expect(screen.getByText("Capture what changed. Better/Same/Worse is for the plant response afterward.")).toBeTruthy();
     expect(screen.getByText("1. Plant")).toBeTruthy();
-    expect(screen.getByText("2. Observation")).toBeTruthy();
-    expect(screen.getByText("3. Optional details")).toBeTruthy();
+    expect(screen.getByText("2. What changed?")).toBeTruthy();
+    expect(screen.getByText("3. Response follow-up")).toBeTruthy();
+    expect(screen.getByText("4. Optional details")).toBeTruthy();
     expect(screen.getByRole("button", { name: /save quick log/i })).toHaveTextContent("Save log");
     expect(screen.getByText("You can add more detail later from the timeline.")).toBeTruthy();
   });
@@ -175,7 +207,7 @@ describe("PlantQuickLog Gate 1 polish", () => {
   it("exposes accessible labels for plant, note, photo buttons, save, and manual readings", () => {
     renderSheet();
     expect(screen.getByLabelText("Selected plant for this Quick Log")).toHaveTextContent("Plant 1");
-    expect(screen.getByLabelText("Quick Log observation note")).toBeTruthy();
+    expect(screen.getByLabelText("Quick Log grow action note")).toBeTruthy();
     expect(screen.getByRole("button", { name: /^Take Photo$/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /^Choose from Library$/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /save quick log/i })).toBeTruthy();
@@ -219,7 +251,7 @@ describe("PlantQuickLog photo source picker — accessible names + ARIA wiring",
   it("renders a mobile-visible save helper and sticky save action", () => {
     renderSheet();
     expect(screen.getByTestId("plant-quick-log-save-helper").textContent).toMatch(
-      /tap better, same, or worse/i,
+      /tap what changed/i,
     );
     const save = screen.getByTestId("plant-quick-log-save");
     expect(save.getAttribute("aria-describedby")).toBe("plant-quick-log-save-helper");
@@ -257,7 +289,6 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
     await pickFile(library, makeImage("gallery.png"));
 
     await waitFor(() => expect(screen.getByTestId("plant-quick-log-photo-preview")).toBeTruthy());
-
     fireEvent.change(screen.getByTestId("plant-quick-log-note"), {
       target: { value: "Logged from library path" },
     });
@@ -320,7 +351,7 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
     expect(save).toBeDisabled();
     fireEvent.submit(screen.getByTestId("plant-quick-log-note").closest("form")!);
     expect(screen.getByTestId("plant-quick-log-error").textContent).toMatch(
-      /add a note, photo, or reading/i,
+      /add what changed, a photo, or a reading/i,
     );
     expect(insertCalls).toHaveLength(0);
   });

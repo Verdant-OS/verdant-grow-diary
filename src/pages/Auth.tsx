@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { Navigate, useNavigate, Link } from "react-router-dom";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { Navigate, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -15,6 +15,7 @@ import {
   MIN_PASSWORD_LENGTH,
 } from "@/lib/passwordResetRules";
 import { sanitizeAuthError } from "@/lib/authErrorRules";
+import { sanitizeAuthRedirect } from "@/lib/authRedirectRules";
 
 type AuthMode = "signin" | "signup" | "forgot";
 

@@ -3,7 +3,7 @@
 // SAFETY:
 //  - All Supabase /auth/v1/** traffic is intercepted via page.route().
 //  - No real account creation, no real email, no real credentials.
-//  - .invalid emails only. No service_role, no secrets.
+//  - .invalid emails only. No elevated DB role, no secrets.
 //  - No grow/tent/plant/diary/sensor data is touched.
 import { test, expect, type Page, type Route, type Request } from "@playwright/test";
 

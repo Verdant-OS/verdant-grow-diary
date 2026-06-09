@@ -19,6 +19,38 @@ const PRIVATE_TABLES = [
   "action_queue",
 ];
 
+// Representative protected/operator/internal mobile coverage. Kept in sync
+// with src/lib/appRouteManifest.ts via src/test/operator-route-mobile-coverage.test.ts.
+// IMPORTANT: every operator + internal route in APP_ROUTES must be listed here.
+const PROTECTED_MOBILE_ROUTES: string[] = [
+  // operator
+  "/diagnostics",
+  "/imports/representative-csv",
+  "/ingest-inspector",
+  "/operator/ecowitt",
+  "/operator/one-tent-proof-record",
+  "/pi-ingest-status",
+  "/sensors/csv-preview",
+  "/sensors/ecowitt-audit",
+  "/sensors/ingest-normalizer",
+  // internal
+  "/admin/leads",
+  "/grow-lineage",
+  "/leads",
+  // representative auth-gated surfaces
+  "/",
+  "/actions",
+  "/sensors",
+  "/settings",
+];
+
+const PUBLIC_MOBILE_ROUTES: string[] = [
+  "/welcome",
+  "/pricing",
+  "/hardware-integrations",
+  "/partners/csv-preview",
+];
+
 async function mockAllSupabase(page: Page, opts: { signedIn?: boolean } = {}) {
   await page.route(/\/auth\/v1\//, async (route, req) => {
     const url = req.url();
@@ -88,8 +120,23 @@ test.describe("Auth route-protection MOBILE (mocked, 390x844)", () => {
     await mockAllSupabase(page);
   });
 
-  for (const path of ["/sensors", "/actions", "/settings", "/operator/ecowitt"]) {
-    test(`mobile signed-out → ${path} redirects to /auth`, async ({ page, baseURL }) => {
+  for (const path of PROTECTED_MOBILE_ROUTES) {
+    test(`mobile signed-out → ${path} redirects to /auth and makes no private REST hits`, async ({
+      page,
+      baseURL,
+    }) => {
+      const privateHits: string[] = [];
+      await page.route(/\/rest\/v1\//, (route, req) => {
+        const u = req.url();
+        if (PRIVATE_TABLES.some((t) => u.includes(`/rest/v1/${t}`))) {
+          privateHits.push(u);
+        }
+        return route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify([]),
+        });
+      });
       await page.goto(path);
       await page.waitForURL((u) => u.pathname === "/auth", { timeout: 8000 });
       const url = new URL(page.url());
@@ -100,8 +147,14 @@ test.describe("Auth route-protection MOBILE (mocked, 390x844)", () => {
         expect(redirectTo.startsWith("//")).toBe(false);
         expect(redirectTo).not.toMatch(/^https?:/i);
       }
+      expect(
+        privateHits,
+        `Private-table hits while signed out (mobile, ${path}): ${privateHits.join(", ")}`,
+      ).toHaveLength(0);
       const body = ((await page.locator("body").textContent()) ?? "").toLowerCase();
-      for (const word of ["Tent 1", "Plant 1", "Diary", "Last reading"]) {
+      expect(body).not.toContain("live reading");
+      expect(body).not.toContain("latest sensor:");
+      for (const word of ["Tent 1", "Plant 1", "Diary"]) {
         expect(body).not.toContain(`${word.toLowerCase()} for owner`);
       }
     });
@@ -121,12 +174,7 @@ test.describe("Auth route-protection MOBILE (mocked, 390x844)", () => {
     expect(page.url()).not.toContain("evil.example");
   });
 
-  for (const path of [
-    "/welcome",
-    "/pricing",
-    "/hardware-integrations",
-    "/partners/csv-preview",
-  ]) {
+  for (const path of PUBLIC_MOBILE_ROUTES) {
     test(`mobile public ${path} renders signed-out without private fetches`, async ({
       page,
       baseURL,
@@ -149,7 +197,7 @@ test.describe("Auth route-protection MOBILE (mocked, 390x844)", () => {
       expect(origin).toBe(new URL(baseURL!).origin);
       expect(
         privateHits,
-        `Private-table hits while signed out (mobile): ${privateHits.join(", ")}`,
+        `Private-table hits while signed out (mobile public ${path}): ${privateHits.join(", ")}`,
       ).toHaveLength(0);
       const body = ((await page.locator("body").textContent()) ?? "").toLowerCase();
       expect(body).not.toContain("live reading");

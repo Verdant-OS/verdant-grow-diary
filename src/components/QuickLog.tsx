@@ -457,6 +457,12 @@ export default function QuickLog({
             <Sparkles className="h-4 w-4 text-primary" />
             Quick Log
           </DialogTitle>
+          <p
+            data-testid="quick-log-subtitle"
+            className="text-[12px] text-muted-foreground leading-snug"
+          >
+            Capture what changed. Add detail only if it helps.
+          </p>
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-4">
           {(() => {

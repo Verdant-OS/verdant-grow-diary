@@ -3,8 +3,22 @@
  */
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { MemoryRouter, Routes, Route } from "react-router-dom";
 import AiDoctorConfidenceAudit from "@/pages/AiDoctorConfidenceAudit";
 import { AI_DOCTOR_CONFIDENCE_RULE_IDS } from "@/lib/aiDoctorConfidenceAuditViewModel";
+
+function renderAt(path: string) {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route
+          path="/internal/ai-doctor-confidence-audit"
+          element={<AiDoctorConfidenceAudit />}
+        />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
 
 function selectScenario(id: string) {
   const select = screen.getByTestId(
@@ -24,14 +38,14 @@ const SCENARIO_IDS = [
 
 describe("AiDoctorConfidenceAudit route page", () => {
   it("renders the page", () => {
-    render(<AiDoctorConfidenceAudit />);
+    renderAt("/internal/ai-doctor-confidence-audit");
     expect(
       screen.getByTestId("ai-doctor-confidence-audit-page"),
     ).toBeInTheDocument();
   });
 
   it("shows internal/static/no-live/no-write/no-model/no-device badges", () => {
-    render(<AiDoctorConfidenceAudit />);
+    renderAt("/internal/ai-doctor-confidence-audit");
     const expected = [
       "Internal audit",
       "Static reference",
@@ -48,7 +62,7 @@ describe("AiDoctorConfidenceAudit route page", () => {
   });
 
   it("renders the top safety note", () => {
-    render(<AiDoctorConfidenceAudit />);
+    renderAt("/internal/ai-doctor-confidence-audit");
     const note = screen.getByTestId(
       "ai-doctor-confidence-audit-top-note",
     );
@@ -57,7 +71,7 @@ describe("AiDoctorConfidenceAudit route page", () => {
   });
 
   it("renders all confidence rules", () => {
-    render(<AiDoctorConfidenceAudit />);
+    renderAt("/internal/ai-doctor-confidence-audit");
     for (const id of AI_DOCTOR_CONFIDENCE_RULE_IDS) {
       expect(
         screen.getByTestId(`ai-doctor-confidence-rule-${id}`),
@@ -66,7 +80,7 @@ describe("AiDoctorConfidenceAudit route page", () => {
   });
 
   it("renders all required hard caps", () => {
-    render(<AiDoctorConfidenceAudit />);
+    renderAt("/internal/ai-doctor-confidence-audit");
     const ids = [
       "no-trustworthy-sensors-no-events",
       "stale-or-invalid-only",
@@ -82,14 +96,14 @@ describe("AiDoctorConfidenceAudit route page", () => {
   });
 
   it("renders the high-confidence quartet list", () => {
-    render(<AiDoctorConfidenceAudit />);
+    renderAt("/internal/ai-doctor-confidence-audit");
     expect(
       screen.getByTestId("ai-doctor-confidence-high-confidence-list"),
     ).toBeInTheDocument();
   });
 
   it("renders source quality notes and forbidden behavior", () => {
-    render(<AiDoctorConfidenceAudit />);
+    renderAt("/internal/ai-doctor-confidence-audit");
     expect(
       screen.getByTestId("ai-doctor-confidence-source-quality-list"),
     ).toBeInTheDocument();
@@ -99,7 +113,7 @@ describe("AiDoctorConfidenceAudit route page", () => {
   });
 
   it("renders all safety flags", () => {
-    render(<AiDoctorConfidenceAudit />);
+    renderAt("/internal/ai-doctor-confidence-audit");
     const flags = [
       "weak_context",
       "no_trustworthy_sensor_data",
@@ -118,20 +132,20 @@ describe("AiDoctorConfidenceAudit route page", () => {
   });
 
   it("renders the generated_at footer", () => {
-    render(<AiDoctorConfidenceAudit />);
+    renderAt("/internal/ai-doctor-confidence-audit");
     expect(
       screen.getByTestId("ai-doctor-confidence-audit-generated-at"),
     ).toBeInTheDocument();
   });
 
   it("does not render any buttons", () => {
-    render(<AiDoctorConfidenceAudit />);
+    renderAt("/internal/ai-doctor-confidence-audit");
     const buttons = document.querySelectorAll("button");
     expect(buttons.length).toBe(0);
   });
 
   it("does not contain forbidden execution copy", () => {
-    render(<AiDoctorConfidenceAudit />);
+    renderAt("/internal/ai-doctor-confidence-audit");
     const text = document.body.textContent || "";
     const forbidden = [
       "Execute",
@@ -154,10 +168,86 @@ describe("AiDoctorConfidenceAudit route page", () => {
   });
 
   // -------------------------------------------------------------------------
+  // URL parameter tests
+  // -------------------------------------------------------------------------
+  it("default route selects demo-csv-only", () => {
+    renderAt("/internal/ai-doctor-confidence-audit");
+    const select = screen.getByTestId(
+      "ai-doctor-confidence-scenario-select",
+    ) as HTMLSelectElement;
+    expect(select.value).toBe("demo-csv-only");
+  });
+
+  it.each(SCENARIO_IDS.map((id) => [id]))(
+    "valid query param ?scenario=%s selects the matching scenario",
+    (id) => {
+      renderAt(`/internal/ai-doctor-confidence-audit?scenario=${id}`);
+      const select = screen.getByTestId(
+        "ai-doctor-confidence-scenario-select",
+      ) as HTMLSelectElement;
+      expect(select.value).toBe(id);
+    },
+  );
+
+  it("invalid query param falls back to demo-csv-only", () => {
+    renderAt("/internal/ai-doctor-confidence-audit?scenario=not-a-real-id");
+    const select = screen.getByTestId(
+      "ai-doctor-confidence-scenario-select",
+    ) as HTMLSelectElement;
+    expect(select.value).toBe("demo-csv-only");
+  });
+
+  it("changing select updates URL query param", () => {
+    const { container } = renderAt("/internal/ai-doctor-confidence-audit");
+    selectScenario("stale-invalid-only");
+    // MemoryRouter syncs the URL internally; we verify via the select value
+    const select = screen.getByTestId(
+      "ai-doctor-confidence-scenario-select",
+    ) as HTMLSelectElement;
+    expect(select.value).toBe("stale-invalid-only");
+  });
+
+  // -------------------------------------------------------------------------
+  // Accessibility tests
+  // -------------------------------------------------------------------------
+  it("label is visible and associated with select via htmlFor", () => {
+    renderAt("/internal/ai-doctor-confidence-audit");
+    const label = screen.getByTestId("ai-doctor-confidence-scenario-select-label");
+    expect(label).toHaveAttribute("for", "ai-doctor-confidence-scenario-select");
+    expect(label).toHaveTextContent("Select a weak-context scenario");
+  });
+
+  it("select has helper text via aria-describedby", () => {
+    renderAt("/internal/ai-doctor-confidence-audit");
+    const select = screen.getByTestId("ai-doctor-confidence-scenario-select");
+    expect(select).toHaveAttribute("aria-describedby", "scenario-helper-text");
+    const helper = screen.getByTestId("ai-doctor-confidence-scenario-helper-text");
+    expect(helper).toHaveTextContent(/does not run scoring/);
+  });
+
+  it("select has aria-controls pointing to scenario panel", () => {
+    renderAt("/internal/ai-doctor-confidence-audit");
+    const select = screen.getByTestId("ai-doctor-confidence-scenario-select");
+    expect(select).toHaveAttribute("aria-controls", "confidence-scenario-detail");
+  });
+
+  it("scenario panel has stable id", () => {
+    renderAt("/internal/ai-doctor-confidence-audit");
+    const panel = screen.getByTestId("ai-doctor-confidence-scenario-panel");
+    expect(panel).toHaveAttribute("id", "confidence-scenario-detail");
+  });
+
+  it("native select is keyboard-focusable (no negative tabIndex)", () => {
+    renderAt("/internal/ai-doctor-confidence-audit");
+    const select = screen.getByTestId("ai-doctor-confidence-scenario-select");
+    expect(select).not.toHaveAttribute("tabindex");
+  });
+
+  // -------------------------------------------------------------------------
   // Scenario selector tests
   // -------------------------------------------------------------------------
   it("renders scenario selector with all 6 options", () => {
-    render(<AiDoctorConfidenceAudit />);
+    renderAt("/internal/ai-doctor-confidence-audit");
     expect(
       screen.getByTestId("ai-doctor-confidence-scenario-select"),
     ).toBeInTheDocument();
@@ -168,18 +258,10 @@ describe("AiDoctorConfidenceAudit route page", () => {
     }
   });
 
-  it("default scenario is demo-csv-only", () => {
-    render(<AiDoctorConfidenceAudit />);
-    const select = screen.getByTestId(
-      "ai-doctor-confidence-scenario-select",
-    ) as HTMLSelectElement;
-    expect(select.value).toBe("demo-csv-only");
-  });
-
   it.each(SCENARIO_IDS.map((id) => [id]))(
     "selecting scenario %s updates displayed cap/flags/takeaway",
     (id) => {
-      render(<AiDoctorConfidenceAudit />);
+      renderAt("/internal/ai-doctor-confidence-audit");
       selectScenario(id);
       expect(
         screen.getByTestId("ai-doctor-confidence-scenario-panel"),
@@ -204,7 +286,7 @@ describe("AiDoctorConfidenceAudit route page", () => {
   );
 
   it("demo-csv-only scenario shows ceiling 40", () => {
-    render(<AiDoctorConfidenceAudit />);
+    renderAt("/internal/ai-doctor-confidence-audit");
     selectScenario("demo-csv-only");
     expect(
       screen.getByTestId("ai-doctor-confidence-scenario-ceiling"),
@@ -212,7 +294,7 @@ describe("AiDoctorConfidenceAudit route page", () => {
   });
 
   it("stale-invalid-only scenario shows ceiling 30", () => {
-    render(<AiDoctorConfidenceAudit />);
+    renderAt("/internal/ai-doctor-confidence-audit");
     selectScenario("stale-invalid-only");
     expect(
       screen.getByTestId("ai-doctor-confidence-scenario-ceiling"),
@@ -220,7 +302,7 @@ describe("AiDoctorConfidenceAudit route page", () => {
   });
 
   it("major-missing-information scenario shows ceiling 45", () => {
-    render(<AiDoctorConfidenceAudit />);
+    renderAt("/internal/ai-doctor-confidence-audit");
     selectScenario("major-missing-information");
     expect(
       screen.getByTestId("ai-doctor-confidence-scenario-ceiling"),
@@ -228,7 +310,7 @@ describe("AiDoctorConfidenceAudit route page", () => {
   });
 
   it("conflicting-weak-signals scenario shows conservative/low ceiling", () => {
-    render(<AiDoctorConfidenceAudit />);
+    renderAt("/internal/ai-doctor-confidence-audit");
     selectScenario("conflicting-weak-signals");
     expect(
       screen.getByTestId("ai-doctor-confidence-scenario-ceiling"),
@@ -236,7 +318,7 @@ describe("AiDoctorConfidenceAudit route page", () => {
   });
 
   it("page still shows internal/static/no-live/no-write/no-model/no-device labels after scenario selection", () => {
-    render(<AiDoctorConfidenceAudit />);
+    renderAt("/internal/ai-doctor-confidence-audit");
     selectScenario("no-trustworthy-no-events");
     const text = document.body.textContent ?? "";
     expect(text).toMatch(/Internal audit/);

@@ -544,8 +544,10 @@ describe("Evidence Snapshot Export", () => {
       expect(lsSet).not.toHaveBeenCalled();
     } finally {
       (globalThis as { Blob: typeof Blob }).Blob = originalBlob;
-      createSpy.mockRestore();
-      revokeSpy.mockRestore();
+      (URL as unknown as { createObjectURL: unknown }).createObjectURL =
+        originalCreate as never;
+      (URL as unknown as { revokeObjectURL: unknown }).revokeObjectURL =
+        originalRevoke as never;
       fetchSpy.mockRestore();
       lsSet.mockRestore();
     }

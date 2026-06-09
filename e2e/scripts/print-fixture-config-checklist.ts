@@ -19,12 +19,12 @@ const REQUIRED_VARS = [
   "E2E_BASE_URL",
   "E2E_GROW_1_PLANT_URL",
   "E2E_FIXTURE_MODE",
-  "E2E_FIXTURE_EXPECTED_GROW_NAME",
   "E2E_FIXTURE_EXPECTED_TENT_NAME",
   "E2E_FIXTURE_EXPECTED_PLANT_NAME",
 ] as const;
 
 const OPTIONAL_VARS = [
+  "E2E_FIXTURE_EXPECTED_GROW_NAME",
   "E2E_GROW_2_PLANT_NAME",
   "E2E_FIXTURE_EXPECTED_ACCOUNT_HINT",
   "E2E_ALLOW_FIXTURE_BOOTSTRAP",
@@ -48,19 +48,22 @@ push();
 push("Optional variables:");
 for (const v of OPTIONAL_VARS) push(`  - vars.${v}`);
 push();
-push("Manual setup checklist:");
+push("Manual setup checklist (current UI flow — no Grow page):");
 push("  1. Create a NEW dedicated test account through the normal /auth UI.");
 push("     Do not reuse a personal/production grower account.");
-push("  2. Sign in as that account and create through the normal UI:");
-push("       Grow:  'E2E Test Grow'");
-push("       Tent:  'E2E Test Tent'");
-push("       Plant: 'E2E Test Plant'");
-push("       (optional) Second plant: '505 Headbanger'");
-push("  3. Open the E2E Test Plant page and copy its URL into");
-push("     vars.E2E_GROW_1_PLANT_URL. It must NOT point at");
-push("     verdantgrowdiary.com or any real grower data.");
-push("  4. Set vars.E2E_FIXTURE_MODE=true and the expected name vars to");
-push("     match exactly.");
+push("  2. Sign in as that account and follow the in-app flow:");
+push("       a. From the Dashboard, Add Tent.");
+push("       b. Name the tent exactly 'E2E Test Tent'.");
+push("       c. Open that tent and Add Plant.");
+push("       d. Name the plant exactly 'E2E Test Plant'.");
+push("       e. Copy the plant detail URL into vars.E2E_GROW_1_PLANT_URL.");
+push("       f. (optional) Second plant: '505 Headbanger'.");
+push("       g. (optional/future) Grow: 'E2E Test Grow' — only if the UI");
+push("          visibly exposes a grow name or selector.");
+push("  3. The plant URL must NOT point at verdantgrowdiary.com or any");
+push("     real grower data.");
+push("  4. Set vars.E2E_FIXTURE_MODE=true and the required expected name");
+push("     vars (tent + plant) to match exactly. Grow name is optional.");
 push("  5. (Optional) Set vars.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT to a");
 push("     short safe label (e.g. 'E2E'). NEVER use a password or token.");
 push("  6. Run the workflow manually via workflow_dispatch and confirm");

@@ -50,9 +50,9 @@ Because of this:
 | `E2E_TEST_PASSWORD`     | Login password for the smoke account                 |
 | `E2E_GROW_2_PLANT_NAME` | Optional. Defaults to `505 Headbanger`               |
 | `E2E_FIXTURE_MODE` | Must be exactly `"true"` for any write-producing smoke run |
-| `E2E_FIXTURE_EXPECTED_GROW_NAME` | Expected disposable E2E grow name (e.g. `E2E Test Grow`) |
 | `E2E_FIXTURE_EXPECTED_TENT_NAME` | Expected disposable E2E tent name (e.g. `E2E Test Tent`) |
 | `E2E_FIXTURE_EXPECTED_PLANT_NAME` | Expected disposable E2E plant name (e.g. `E2E Test Plant`) |
+| `E2E_FIXTURE_EXPECTED_GROW_NAME` | **Optional.** Only used if the UI visibly exposes a grow name (e.g. `E2E Test Grow`). The current setup flow has no Grow page, so this is not required. |
 
 `E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD` are only required to (re)generate
 `e2e/.auth/user.json`. Once that file exists, the smoke run reuses it.
@@ -65,32 +65,39 @@ executes `bun run e2e:verify-fixture`, which signs in with the
 dedicated test account, opens `E2E_GROW_1_PLANT_URL`, and hard-fails
 unless the visible page is clearly a disposable E2E fixture.
 
-Required setup before enabling CI smoke:
+Required setup before enabling CI smoke (current UI flow — no Grow page):
 
 1. Create a dedicated test account that owns **no real grower data**.
-2. Sign in as that account through the normal UI and create:
-   - Grow named exactly **`E2E Test Grow`**
-   - Tent named exactly **`E2E Test Tent`**
-   - Plant named exactly **`E2E Test Plant`**
-   - Optional second plant **`505 Headbanger`** if the smoke step that
-     references it is in scope.
+2. Sign in as that account and follow the normal in-app flow:
+   1. From the Dashboard, **Add Tent**.
+   2. Name the tent exactly **`E2E Test Tent`**.
+   3. Open that tent and **Add Plant**.
+   4. Name the plant exactly **`E2E Test Plant`**.
+   5. Copy the plant detail URL — this becomes `E2E_GROW_1_PLANT_URL`.
+   6. Optional second plant **`505 Headbanger`** if the smoke step that
+      references it is in scope.
+   7. Optional grow named **`E2E Test Grow`** only if/when the UI
+      visibly exposes a grow name or selector.
 3. Set the GitHub Actions variables:
    - `E2E_FIXTURE_MODE=true`
-   - `E2E_FIXTURE_EXPECTED_GROW_NAME=E2E Test Grow`
    - `E2E_FIXTURE_EXPECTED_TENT_NAME=E2E Test Tent`
    - `E2E_FIXTURE_EXPECTED_PLANT_NAME=E2E Test Plant`
+   - Optional: `E2E_FIXTURE_EXPECTED_GROW_NAME=E2E Test Grow`
 4. Point `E2E_GROW_1_PLANT_URL` at the E2E Test Plant page on the
    disposable test account — **never** at a real/production grow.
 
 Fixture verification will hard-fail if:
 
 - `E2E_FIXTURE_MODE` is not exactly `"true"`.
-- Any of the `E2E_FIXTURE_EXPECTED_*` names are blank or do not look
-  like E2E/Test names.
+- `E2E_FIXTURE_EXPECTED_TENT_NAME` or `E2E_FIXTURE_EXPECTED_PLANT_NAME`
+  is blank or does not look like an E2E/Test name.
+- `E2E_FIXTURE_EXPECTED_GROW_NAME` is supplied but does not look like
+  an E2E/Test name. (A missing grow name is allowed.)
 - `E2E_GROW_1_PLANT_URL` is blank or matches a known real/production
   grow URL pattern (e.g. `verdantgrowdiary.com`).
-- The opened page does not contain `E2E` / `Test` markers and the
-  expected grow/tent/plant names.
+- The opened page does not contain `E2E` / `Test` markers or the
+  expected tent/plant names. A missing grow name on the page is
+  allowed unless `E2E_FIXTURE_EXPECTED_GROW_NAME` is supplied.
 
 The fixture validator:
 

@@ -69,11 +69,22 @@ export function evaluateBootstrapGate(env: BootstrapGate): BootstrapGateResult {
     errors.push(e);
   }
 
-  for (const [key, value] of [
-    ["E2E_FIXTURE_EXPECTED_GROW_NAME", base.expected.grow],
-    ["E2E_FIXTURE_EXPECTED_TENT_NAME", base.expected.tent],
-    ["E2E_FIXTURE_EXPECTED_PLANT_NAME", base.expected.plant],
+  // Required expected names. Grow is optional — the current UI flow has
+  // no Grow page (Dashboard → Add Tent → Add Plant). Bootstrap only
+  // enforces grow-name markers when one is explicitly supplied.
+  for (const [key, value, required] of [
+    ["E2E_FIXTURE_EXPECTED_TENT_NAME", base.expected.tent, true],
+    ["E2E_FIXTURE_EXPECTED_PLANT_NAME", base.expected.plant, true],
+    ["E2E_FIXTURE_EXPECTED_GROW_NAME", base.expected.grow, false],
   ] as const) {
+    if (!value) {
+      if (required) {
+        errors.push(
+          `Bootstrap refused: ${key} is required and must include 'E2E' or 'Test'.`,
+        );
+      }
+      continue;
+    }
     if (!/E2E|Test/i.test(value)) {
       errors.push(
         `Bootstrap refused: ${key}='${value}' must include 'E2E' or 'Test'. Bootstrap will never create non-E2E names.`,
@@ -154,7 +165,8 @@ export async function bootstrapDisposableFixture(
     );
   }
 
-  const hasGrow = bodyText.includes(expected.grow);
+  // Grow name is optional in the current UI (no Grow page in setup flow).
+  const hasGrow = expected.grow ? bodyText.includes(expected.grow) : true;
   const hasTent = bodyText.includes(expected.tent);
   const hasPlant = bodyText.includes(expected.plant);
 

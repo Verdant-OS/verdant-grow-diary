@@ -25,17 +25,26 @@ normal authenticated UI.
 
 ## 2. Expected fixture names
 
-Create the following through the normal UI on the dedicated account:
+Follow the current in-app setup flow (no Grow page is surfaced):
+
+1. Sign in to the disposable E2E account.
+2. From the Dashboard, **Add Tent**.
+3. Name the tent exactly `E2E Test Tent`.
+4. Open that tent and **Add Plant**.
+5. Name the plant exactly `E2E Test Plant`.
+6. Copy the plant detail URL — this becomes `E2E_GROW_1_PLANT_URL`.
 
 | Type  | Exact name        | Required |
 |-------|-------------------|----------|
-| Grow  | `E2E Test Grow`   | ✅ |
 | Tent  | `E2E Test Tent`   | ✅ |
 | Plant | `E2E Test Plant`  | ✅ |
 | Plant | `505 Headbanger`  | optional (second plant smoke step) |
+| Grow  | `E2E Test Grow`   | optional / future — only if the UI ever visibly exposes a grow name or selector |
 
-Names must match exactly. The fixture validator refuses to run smoke
-if these names are missing or do not contain `E2E`/`Test` markers.
+Required names must match exactly. The fixture validator refuses to
+run smoke if the tent or plant names are missing or do not contain
+`E2E`/`Test` markers. The grow name is checked only when
+`E2E_FIXTURE_EXPECTED_GROW_NAME` is provided and visible.
 
 ## 3. GitHub Actions secrets and variables
 
@@ -52,12 +61,15 @@ Configure in `Settings → Secrets and variables → Actions`:
 - `E2E_GROW_1_PLANT_URL` — full URL of the `E2E Test Plant` page on the
   disposable account. Must **not** be on `verdantgrowdiary.com`.
 - `E2E_FIXTURE_MODE=true`
-- `E2E_FIXTURE_EXPECTED_GROW_NAME=E2E Test Grow`
 - `E2E_FIXTURE_EXPECTED_TENT_NAME=E2E Test Tent`
 - `E2E_FIXTURE_EXPECTED_PLANT_NAME=E2E Test Plant`
 
 **Optional variables:**
 
+- `E2E_FIXTURE_EXPECTED_GROW_NAME=E2E Test Grow` — only set if/when the
+  UI visibly exposes a grow name or selector. The current setup flow
+  has no Grow page, so this is **not** required and fixture
+  verification will not fail when it is omitted.
 - `E2E_GROW_2_PLANT_NAME` (default `505 Headbanger`)
 - `E2E_FIXTURE_EXPECTED_ACCOUNT_HINT` — a short safe label (e.g. `E2E`)
   used only if the app visibly exposes the signed-in account identity.
@@ -74,12 +86,15 @@ Sign in as the disposable test account and open
 `E2E_GROW_1_PLANT_URL`. Confirm the page visibly shows **all** of:
 
 - `E2E` or `Test` markers
-- the expected grow name (`E2E Test Grow`)
 - the expected tent name (`E2E Test Tent`)
 - the expected plant name (`E2E Test Plant`)
+- the expected grow name (`E2E Test Grow`) — **only** required when
+  `E2E_FIXTURE_EXPECTED_GROW_NAME` is set. The current setup flow does
+  not surface a Grow page, so a missing grow name does not block smoke.
 
 The CI step `Verify disposable E2E fixture` will hard-fail and block
-the smoke if any of these are missing.
+the smoke if the required tent/plant names are missing, or if the
+optional grow name is supplied but not visible.
 
 ## 5. Screenshots for maintainers
 
@@ -90,9 +105,9 @@ identifying value before sharing or committing.
 | Screenshot | Purpose |
 |------------|---------|
 | Account after login | confirm dedicated test account is signed in |
-| `E2E Test Grow` page | confirm grow name visible |
 | `E2E Test Tent` page | confirm tent name visible |
 | `E2E Test Plant` detail page | confirm plant name + E2E/Test markers |
+| `E2E Test Grow` page (optional) | only when the UI exposes a grow name |
 | GitHub Actions Variables page (values redacted) | confirm variables set |
 
 Rules for committed screenshots:

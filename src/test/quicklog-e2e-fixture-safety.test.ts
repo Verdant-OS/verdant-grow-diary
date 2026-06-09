@@ -53,9 +53,8 @@ describe("Disposable E2E fixture safety helpers", () => {
     }
   });
 
-  it("requires non-blank expected grow/tent/plant names with E2E or Test markers", () => {
+  it("requires non-blank tent + plant expected names with E2E or Test markers; grow is optional", () => {
     for (const key of [
-      "E2E_FIXTURE_EXPECTED_GROW_NAME",
       "E2E_FIXTURE_EXPECTED_TENT_NAME",
       "E2E_FIXTURE_EXPECTED_PLANT_NAME",
     ] as const) {
@@ -70,6 +69,22 @@ describe("Disposable E2E fixture safety helpers", () => {
       expect(realLooking.ok).toBe(false);
       expect(realLooking.errors.join("\n")).toMatch(/E2E.*Test/);
     }
+
+    // Grow is OPTIONAL — blank must NOT fail.
+    const blankGrow = validateFixtureEnv({
+      ...VALID_ENV,
+      E2E_FIXTURE_EXPECTED_GROW_NAME: "",
+    });
+    expect(blankGrow.ok).toBe(true);
+    expect(blankGrow.expected.grow).toBe("");
+
+    // …but a supplied non-E2E grow name still fails.
+    const badGrow = validateFixtureEnv({
+      ...VALID_ENV,
+      E2E_FIXTURE_EXPECTED_GROW_NAME: "Granddaddy Purple",
+    });
+    expect(badGrow.ok).toBe(false);
+    expect(badGrow.errors.join("\n")).toMatch(/E2E.*Test/);
   });
 
   it("refuses blank or known-real plant URLs", () => {
@@ -93,7 +108,7 @@ describe("Disposable E2E fixture safety helpers", () => {
     expect(isLikelyRealPlantUrl("https://staging.example.com/plants/x")).toBe(false);
   });
 
-  it("pageTextMatchesFixture requires E2E/Test markers and expected names", () => {
+  it("pageTextMatchesFixture requires E2E/Test markers and expected tent+plant; grow optional", () => {
     const expected = {
       grow: "E2E Test Grow",
       tent: "E2E Test Tent",
@@ -118,6 +133,30 @@ describe("Disposable E2E fixture safety helpers", () => {
     );
     expect(missingPlant.ok).toBe(false);
     expect(missingPlant.errors.join("\n")).toContain("E2E Test Plant");
+
+    // Grow optional: with no grow expected, a page that only shows
+    // tent + plant must pass.
+    const noGrowExpected = pageTextMatchesFixture(
+      "E2E Test Tent — E2E Test Plant detail",
+      { grow: "", tent: "E2E Test Tent", plant: "E2E Test Plant" },
+    );
+    expect(noGrowExpected.ok).toBe(true);
+
+    // Grow optional: when grow IS expected and missing from the page,
+    // verification must fail.
+    const missingGrow = pageTextMatchesFixture(
+      "E2E Test Tent — E2E Test Plant detail",
+      expected,
+    );
+    expect(missingGrow.ok).toBe(false);
+    expect(missingGrow.errors.join("\n")).toContain("E2E Test Grow");
+
+    // Fails on generic "Test" / "Test" without expected names visible.
+    const genericTest = pageTextMatchesFixture(
+      "Test / Test",
+      expected,
+    );
+    expect(genericTest.ok).toBe(false);
   });
 });
 
@@ -168,15 +207,19 @@ describe("E2E fixture safety: source-level guardrails", () => {
 describe("Workflow: fixture verification gates smoke", () => {
   const wf = read(".github/workflows/quicklog-smoke.yml");
 
-  it("precheck requires the fixture safety vars by sanitized name", () => {
+  it("precheck requires the fixture safety vars by sanitized name (grow optional)", () => {
     for (const name of [
       '"vars.E2E_FIXTURE_MODE"',
-      '"vars.E2E_FIXTURE_EXPECTED_GROW_NAME"',
       '"vars.E2E_FIXTURE_EXPECTED_TENT_NAME"',
       '"vars.E2E_FIXTURE_EXPECTED_PLANT_NAME"',
     ]) {
       expect(wf).toContain(name);
     }
+    // Grow name must NOT be in the missing[] precheck — current UI has
+    // no Grow page in the setup flow.
+    expect(wf).not.toMatch(
+      /missing\+=\("vars\.E2E_FIXTURE_EXPECTED_GROW_NAME"\)/,
+    );
     // No secret VALUES are echoed
     expect(wf).not.toMatch(/echo[^\n]*\$E2E_FIXTURE_/);
   });

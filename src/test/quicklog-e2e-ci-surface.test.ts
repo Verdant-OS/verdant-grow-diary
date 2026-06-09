@@ -63,7 +63,7 @@ describe("Quick Log Playwright CI surface", () => {
     expect(readme).toMatch(/playwright-report\//);
     expect(readme).toMatch(/test-results\//);
     expect(readme).toMatch(/verdant-grow-diary/);
-    expect(readme).toMatch(/targets.*verdant-grow-diary/);
+    expect(readme).toMatch(/branch note.*verdant-grow-diary/);
   });
 
 

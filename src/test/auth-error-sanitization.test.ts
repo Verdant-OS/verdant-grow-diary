@@ -75,7 +75,62 @@ describe("sanitizeAuthError", () => {
     expect(sanitizeAuthError("signIn", { foo: "bar" })).toBe(SIGN_IN_FRIENDLY_ERROR);
     expect(sanitizeAuthError("signIn", "raw string")).toBe(SIGN_IN_FRIENDLY_ERROR);
   });
+
+  describe("edge-case input shapes", () => {
+    const circular: Record<string, unknown> = { message: "Invalid login credentials" };
+    circular.self = circular;
+    const cases: unknown[] = [
+      undefined, null, {}, "", "Invalid login credentials",
+      42, 0, true, false, [], ["Invalid login credentials"],
+      () => "Invalid login credentials",
+      new Error("Invalid login credentials"),
+      { message: "Invalid login credentials" },
+      { error: { message: "User already registered" } },
+      { details: "Email not confirmed" },
+      { description: "JWT expired" },
+      { status: 400 },
+      { code: "user_not_found" },
+      { code: "email_exists" },
+      { error_description: "Email not confirmed" },
+      { name: "AuthApiError", status: 400 },
+      { message: "recovery token invalid" },
+      { message: "JWT expired" },
+      circular,
+    ];
+    const contexts = ["signIn", "signUp", "forgotPassword", "resetPassword", "unknown"] as const;
+    const APPROVED = new Set<string>([
+      SIGN_IN_FRIENDLY_ERROR, SIGN_UP_FRIENDLY_ERROR,
+      FORGOT_RATE_LIMIT_ERROR, RESET_FAILED_ERROR, UNKNOWN_AUTH_ERROR,
+    ]);
+    for (const ctx of contexts) {
+      for (const input of cases) {
+        it(`ctx=${ctx} returns approved friendly copy for ${describeInput(input)}`, () => {
+          let out = "";
+          expect(() => {
+            out = sanitizeAuthError(ctx, input);
+          }).not.toThrow();
+          expect(APPROVED.has(out)).toBe(true);
+          for (const re of FORBIDDEN_AUTH_ERROR_FRAGMENTS) {
+            expect(out).not.toMatch(re);
+          }
+          expect(out).not.toMatch(/user_not_found|email_exists|error_description/i);
+        });
+      }
+    }
+  });
 });
+
+function describeInput(v: unknown): string {
+  if (v === null) return "null";
+  if (v === undefined) return "undefined";
+  if (typeof v === "function") return "function";
+  if (Array.isArray(v)) return `array(${v.length})`;
+  try {
+    return typeof v + ":" + JSON.stringify(v).slice(0, 60);
+  } catch {
+    return typeof v + ":[circular/non-serializable]";
+  }
+}
 
 describe("Source scan — /auth and /reset-password never render raw auth errors", () => {
   const AUTH = readFileSync(resolve(__dirname, "../pages/Auth.tsx"), "utf8");

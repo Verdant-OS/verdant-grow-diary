@@ -56,9 +56,17 @@ describe("Quick Log Playwright CI surface", () => {
     // Must not echo secret values to logs
     expect(wf).not.toMatch(/echo\s+["']?\$\{?\s*E2E_TEST_PASSWORD/);
     expect(wf).not.toMatch(/echo\s+["']?\$\{?\s*E2E_TEST_EMAIL/);
-    expect(wf).not.toMatch(
-      /echo\s+["']?\$\{\{\s*secrets\.E2E_TEST_(EMAIL|PASSWORD)\s*\}\}/,
-    );
+    expect(wf).not.toMatch(/echo\s+["']?\$\{\{\s*secrets\.E2E_TEST_(EMAIL|PASSWORD)\s*\}\}/);
+  });
+
+  it("CI workflow pins external actions to full commit SHAs", () => {
+    const wf = read(".github/workflows/quicklog-smoke.yml");
+    expect(wf).toMatch(/uses:\s*actions\/checkout@[a-f0-9]{40}/);
+    expect(wf).toMatch(/uses:\s*oven-sh\/setup-bun@[a-f0-9]{40}/);
+    expect(wf).toMatch(/uses:\s*actions\/upload-artifact@[a-f0-9]{40}/);
+    expect(wf).not.toMatch(/uses:\s*actions\/checkout@v\d+/);
+    expect(wf).not.toMatch(/uses:\s*oven-sh\/setup-bun@v\d+/);
+    expect(wf).not.toMatch(/uses:\s*actions\/upload-artifact@v\d+/);
   });
 
   it("CI workflow uploads exactly the expected artifact paths and excludes storageState", () => {

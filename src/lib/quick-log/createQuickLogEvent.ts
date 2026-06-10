@@ -17,6 +17,7 @@
  *   atomic server-side and we can drop the compensation delete.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { validateQuickLogSensorSnapshot } from "./quickLogSensorSnapshotValidation";
 
 export type QuickLogEventType = "observe" | "water" | "feed" | "photo" | "note";
 

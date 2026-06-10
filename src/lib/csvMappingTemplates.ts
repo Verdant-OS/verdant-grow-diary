@@ -420,7 +420,10 @@ export function detectCsvMappingTemplate(
       if (!spec) continue;
       if (fieldMatches(field)) matched++;
     }
-    if (matched < required.length) continue;
+    // Require a meaningful overlap before silently auto-picking: at least
+    // 3 canonical fields beyond the bare-minimum required headers. This
+    // keeps weak-evidence templates from being chosen without grower input.
+    if (matched < Math.max(required.length, 3)) continue;
 
     if (!best || matched > best.matchedFieldCount) {
       best = {

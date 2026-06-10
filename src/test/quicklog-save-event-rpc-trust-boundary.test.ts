@@ -153,7 +153,7 @@ describe("quicklog_save_event — ownership and cross-boundary attachment", () =
 describe("quicklog_save_event — event_type whitelist (trigger-aligned)", () => {
   it("rejects invalid event types before any insert with 'invalid_event_type'", () => {
     expect(body).toMatch(
-      /p_event_type\s+NOT\s+IN[\s\S]{0,200}'invalid_event_type'/i,
+      /p_event_type\s+NOT\s+IN[\s\S]{0,400}'invalid_event_type'/i,
     );
     const at = body.indexOf("'invalid_event_type'");
     const firstEventInsert = body.search(

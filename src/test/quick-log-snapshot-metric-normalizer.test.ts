@@ -87,15 +87,57 @@ describe("normalizeQuickLogSnapshotMetrics", () => {
         humidity_pct: null,
         vpd: NaN,
         ppfd: Infinity,
+        co2: -Infinity,
         ph: "not-a-number",
       }),
     ).toEqual({});
   });
 
-  it("exposes a stable canonical metric list", () => {
+  it("drops non-numeric values consistently: strings, objects, arrays, booleans", () => {
+    expect(
+      normalizeQuickLogSnapshotMetrics({
+        temperature: "23.5", // numeric string — drift, drop it
+        humidity: { value: 55 }, // object
+        vpd: [1.1], // array
+        co2: true, // boolean
+        temperature_c: "24", // legacy numeric string — drop
+        soil_temp: 20, // real number — keep
+      }),
+    ).toEqual({ soil_temp: 20 });
+  });
+
+  it("preserves unknown clean-shaped metric keys verbatim", () => {
+    // Future metric not yet in QUICK_LOG_CANONICAL_METRICS. The normalizer
+    // must never silently rename/drop these — only non-finite values are
+    // filtered. Renaming would lose information for downstream consumers.
+    const out = normalizeQuickLogSnapshotMetrics({
+      temperature: 24,
+      leaf_temp: 22.1, // unknown clean-shaped key
+      par: 540, // unknown clean-shaped key
+      par_bogus: "x", // unknown key with bad value — dropped
+    });
+    expect(out).toEqual({ temperature: 24, leaf_temp: 22.1, par: 540 });
+  });
+
+  it("exposes stable canonical and legacy metric vocabularies", () => {
     expect(QUICK_LOG_CANONICAL_METRICS).toContain("temperature");
     expect(QUICK_LOG_CANONICAL_METRICS).toContain("humidity");
     expect(QUICK_LOG_CANONICAL_METRICS).toContain("vpd");
+    // Every legacy mapping must target a known canonical metric so the
+    // type CanonicalQuickLogSensorSnapshotMetrics stays tight.
+    for (const canonical of Object.values(QUICK_LOG_LEGACY_TO_CANONICAL)) {
+      expect(QUICK_LOG_CANONICAL_METRICS).toContain(canonical);
+    }
+  });
+
+  it("returns a CanonicalQuickLogSensorSnapshotMetrics-shaped value", () => {
+    const out: CanonicalQuickLogSensorSnapshotMetrics =
+      normalizeQuickLogSnapshotMetrics({ temperature_c: 23, humidity: 50 });
+    // Known keys are typed as optional numbers — accessing them must not
+    // need a cast at compile time. This call is the actual test: if the
+    // type signature regresses, typecheck fails.
+    expect(out.temperature).toBe(23);
+    expect(out.humidity).toBe(50);
   });
 });
 

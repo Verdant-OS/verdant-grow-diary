@@ -137,7 +137,7 @@ describe("buildQuickLogAiContext", () => {
     expect(entries[0].sensorSnapshot).toEqual({
       source: "csv",
       capturedAt: "2026-06-09T12:00:00Z",
-      metrics: { temperature_c: 24.5, humidity_pct: 55 },
+      metrics: { temperature: 24.5, humidity: 55 },
     });
     expect(entries[0].sensorSnapshotAbsent).toBe(false);
     // Provenance is preserved — never coerced to "live".

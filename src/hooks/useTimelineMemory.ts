@@ -28,6 +28,8 @@ import type {
   TimelineMemoryItem,
 } from "@/lib/timelineFilterRules";
 import { deriveSensorEvidenceMode } from "@/lib/aiDoctorSessionPersistence";
+import { isQuickLogCompanionDiaryRow } from "@/lib/quick-log/quickLogDiaryCompanionRules";
+
 
 export const TIMELINE_MEMORY_DEFAULT_LIMIT = 100;
 
@@ -196,6 +198,11 @@ export function useTimelineMemory(
 
       const out: TimelineMemoryItem[] = [];
       for (const row of rows) {
+        // Quick Log v1 companion rows duplicate a grow_event already
+        // rendered by QuickLogGroupedTimelineSection. Skip them here so
+        // the same event never appears twice on a page that mounts both
+        // sections. The grouped timeline renders the canonical event.
+        if (isQuickLogCompanionDiaryRow(row)) continue;
         const snap = rowToManualSnapshotItem(row);
         if (snap) {
           out.push(snap);
@@ -203,6 +210,7 @@ export function useTimelineMemory(
           out.push(diaryRowToDiaryItem(row));
         }
       }
+
       for (const row of auditRows) {
         const item = auditRowToTimelineItem(row);
         if (item) out.push(item);

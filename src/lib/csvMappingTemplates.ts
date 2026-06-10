@@ -353,3 +353,83 @@ export function buildMappingDownloadPayload(
 export function csvMappingDownloadFileName(): string {
   return "verdant-csv-mapping-preset.json";
 }
+
+// ---------- Auto-detection ----------
+
+export interface CsvTemplateDetection {
+  templateId: CsvMappingTemplateId;
+  templateName: string;
+  confidence: "high" | "medium";
+  matchedFieldCount: number;
+}
+
+/**
+ * Detect the most likely mapping template for a CSV based on its headers.
+ *
+ * Deterministic, pure, no I/O. Used to auto-select a starting template
+ * after the grower picks a file. The grower may still override the
+ * template choice. Detection never labels data as live and never writes.
+ *
+ * Selection rules:
+ *  - A template's `signature.allOf` headers, if present and all matched,
+ *    wins immediately with `confidence: "high"`. First match in template
+ *    list order wins ties.
+ *  - Otherwise, a template qualifies when every `requiredFields` entry
+ *    has at least one matching synonym in the CSV. The qualifying
+ *    template with the highest number of matched canonical fields wins
+ *    with `confidence: "medium"`. Reset templates are ignored. Returns
+ *    `null` when nothing qualifies.
+ */
+export function detectCsvMappingTemplate(
+  headers: ReadonlyArray<string>,
+): CsvTemplateDetection | null {
+  const normalized = new Set(headers.map(normalizeHeader));
+  let best: CsvTemplateDetection | null = null;
+  for (const tpl of CSV_MAPPING_TEMPLATES) {
+    if (tpl.isReset) continue;
+
+    if (tpl.signature && tpl.signature.allOf.length > 0) {
+      const allPresent = tpl.signature.allOf.every((h) =>
+        normalized.has(normalizeHeader(h)),
+      );
+      if (allPresent) {
+        return {
+          templateId: tpl.id,
+          templateName: tpl.name,
+          confidence: "high",
+          matchedFieldCount: tpl.signature.allOf.length,
+        };
+      }
+    }
+
+    const fieldEntries = Object.entries(tpl.fields) as Array<
+      [RepresentativeMappingField, TemplateSynonyms | undefined]
+    >;
+    const fieldMatches = (field: RepresentativeMappingField): boolean => {
+      const spec = tpl.fields[field];
+      if (!spec) return false;
+      return spec.synonyms.some((s) => normalized.has(s));
+    };
+
+    const required = tpl.requiredFields ?? [];
+    if (required.length === 0) continue; // skip generic catch-alls in auto-detect
+    if (!required.every(fieldMatches)) continue;
+
+    let matched = 0;
+    for (const [field, spec] of fieldEntries) {
+      if (!spec) continue;
+      if (fieldMatches(field)) matched++;
+    }
+    if (matched < required.length) continue;
+
+    if (!best || matched > best.matchedFieldCount) {
+      best = {
+        templateId: tpl.id,
+        templateName: tpl.name,
+        confidence: "medium",
+        matchedFieldCount: matched,
+      };
+    }
+  }
+  return best;
+}

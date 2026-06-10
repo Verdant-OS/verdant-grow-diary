@@ -30,6 +30,11 @@ vi.mock("@/lib/quick-log/createQuickLogEvent", () => ({
   },
 }));
 
+const fetchLatestSensorSnapshotMock = vi.fn();
+vi.mock("@/lib/quick-log/fetchLatestSensorSnapshot", () => ({
+  fetchLatestSensorSnapshot: (...a: unknown[]) => fetchLatestSensorSnapshotMock(...a),
+}));
+
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
 vi.mock("sonner", () => ({

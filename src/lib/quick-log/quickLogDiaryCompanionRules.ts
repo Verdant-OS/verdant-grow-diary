@@ -32,7 +32,7 @@ export interface QuickLogDiaryRowLike {
 export interface QuickLogCompanionSnapshot {
   source: string | null;
   capturedAt: string | null;
-  metrics: Record<string, number>;
+  metrics: CanonicalQuickLogSensorSnapshotMetrics;
 }
 
 export interface QuickLogCompanionView {

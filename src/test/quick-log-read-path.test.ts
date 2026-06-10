@@ -72,7 +72,7 @@ describe("quickLogDiaryCompanionRules", () => {
     expect(v.sensorSnapshot).toEqual({
       source: "manual",
       capturedAt: "2026-06-09T12:00:00Z",
-      metrics: { temperature_c: 24 },
+      metrics: { temperature: 24 },
     });
   });
 });

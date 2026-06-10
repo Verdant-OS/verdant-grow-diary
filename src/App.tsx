@@ -51,6 +51,11 @@ import NotFound from "./pages/NotFound";
 import RepresentativeCsvPreview from "./pages/RepresentativeCsvPreview";
 import SensorCsvPreview from "./pages/SensorCsvPreview";
 import PartnerCsvPreviewLanding from "./pages/PartnerCsvPreviewLanding";
+import AiDoctorPhase1Preview from "./pages/AiDoctorPhase1Preview";
+import OneTentLoopProof from "./pages/OneTentLoopProof";
+import SensorTruthAudit from "./pages/SensorTruthAudit";
+import AiDoctorConfidenceAudit from "./pages/AiDoctorConfidenceAudit";
+import EcowittLiveBringup from "./pages/EcowittLiveBringup";
 
 
 
@@ -124,11 +129,17 @@ const App = () => (
                 <Route path="/operator/ecowitt" element={<OperatorEcowittCanary />} />
                 <Route path="/operator/one-tent-proof-record" element={<OneTentProofRecord />} />
                 <Route path="/operator/ecowitt-bridge-status" element={<EcowittBridgeStatus />} />
+                <Route path="/operator/ecowitt-live-bringup" element={<EcowittLiveBringup />} />
                 <Route path="/pi-ingest-status" element={<PiIngestStatus />} />
                 <Route path="/ingest-inspector" element={<IngestInspector />} />
                 <Route path="/imports/representative-csv" element={<RepresentativeCsvPreview />} />
                 <Route path="/sensors/csv-preview" element={<SensorCsvPreview />} />
+                <Route path="/internal/ai-doctor-phase1-preview" element={<AiDoctorPhase1Preview />} />
+                <Route path="/internal/one-tent-loop-proof" element={<OneTentLoopProof />} />
+                <Route path="/internal/sensor-truth-audit" element={<SensorTruthAudit />} />
+                <Route path="/internal/ai-doctor-confidence-audit" element={<AiDoctorConfidenceAudit />} />
                 {/* Leads is an internal admin/operator module, intentionally not
+
                     surfaced in grower-facing navigation. Primary route is
                     /admin/leads; /leads is retained as a back-compat alias. */}
                 <Route path="/admin/leads" element={<Leads />} />

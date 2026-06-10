@@ -224,6 +224,117 @@ export default function Diagnostics() {
           }}
         />
       </section>
+
+      <section aria-labelledby="operator-tools-heading" className="space-y-3">
+        <h2 id="operator-tools-heading" className="text-lg font-semibold">
+          Operator tools
+        </h2>
+        <Card>
+          <CardHeader className="space-y-2 pb-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-base">
+                EcoWitt Live Bring-Up
+              </CardTitle>
+              <Badge variant="outline">Operator</Badge>
+              <Badge variant="secondary">Checklist</Badge>
+              <Badge variant="outline">Read-only</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground space-y-2">
+            <p>
+              Static operator checklist for tonight's manual validation of
+              EcoWitt / MQTT → Verdant ingest. No live data queries, no
+              writes, no model calls, no device control.
+            </p>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/operator/ecowitt-live-bringup">
+                Open checklist
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section aria-labelledby="internal-previews-heading" className="space-y-3">
+        <h2 id="internal-previews-heading" className="text-lg font-semibold">
+          Internal previews
+        </h2>
+        <Card>
+          <CardHeader className="space-y-2 pb-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-base">
+                AI Doctor Phase 1 Preview
+              </CardTitle>
+              <Badge variant="outline">Internal</Badge>
+              <Badge variant="secondary">Static demo data</Badge>
+              <Badge variant="outline">Read-only</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground space-y-2">
+            <p>
+              Static read-only preview of the Phase 1 AI Doctor contract. No
+              model calls, no writes, no device control.
+            </p>
+            <p className="text-xs">
+              Contract docs:{" "}
+              <code className="text-xs">
+                docs/ai-doctor-phase1-contract.md
+              </code>
+            </p>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/internal/ai-doctor-phase1-preview">
+                Open preview
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="space-y-2 pb-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-base">
+                Sensor Truth Audit
+              </CardTitle>
+              <Badge variant="outline">Internal</Badge>
+              <Badge variant="secondary">Static</Badge>
+              <Badge variant="outline">Read-only</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground space-y-2">
+            <p>
+              Static internal reference for live/manual/csv/demo/stale/invalid
+              source rules.
+            </p>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/internal/sensor-truth-audit">
+                Open audit
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="space-y-2 pb-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-base">
+                AI Doctor Confidence Audit
+              </CardTitle>
+              <Badge variant="outline">Internal</Badge>
+              <Badge variant="secondary">Static</Badge>
+              <Badge variant="outline">Read-only</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground space-y-2">
+            <p>
+              Static internal reference for confidence caps, source quality
+              rules, and overdiagnosis guards.
+            </p>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/internal/ai-doctor-confidence-audit">
+                Open audit
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </section>
     </div>
   );
 }

@@ -78,6 +78,7 @@ describe("csv mapping templates — apply", () => {
       "blank_reset",
       "generic_env",
       "generic_sensor_logger",
+      "thp_export",
     ]);
   });
 });

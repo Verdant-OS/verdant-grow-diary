@@ -13,6 +13,7 @@
  */
 
 import { redactBridgeToken } from "@/lib/ecowittLocalTestPayloadRules";
+import type { EcowittIngestEvidence } from "@/lib/ecowittMqttIngestRules";
 
 export type IngestAttemptStatus =
   | "accepted"
@@ -72,6 +73,8 @@ export interface IngestAttemptInput {
   } | null;
   /** Caught exception message if the fetch threw. */
   networkError?: string | null;
+  /** Optional redacted evidence built from the consumed MQTT payload. */
+  evidence?: EcowittIngestEvidence | null;
 }
 
 export interface IngestAttemptReport {
@@ -99,6 +102,8 @@ export interface IngestAttemptReport {
   storageNotice: string;
   /** True when the attempt may safely be shown as healthy live evidence. */
   trustedLive: boolean;
+  /** Redacted evidence from the consumed payload, if available. */
+  evidence: EcowittIngestEvidence | null;
 }
 
 const TITLE: Record<IngestAttemptStatus, string> = {
@@ -280,6 +285,7 @@ export function buildIngestAttemptReport(
     description: DESCRIPTION[status],
     storageNotice: STORAGE_NOTICE,
     trustedLive,
+    evidence: input.evidence ?? null,
   };
 }
 
@@ -301,5 +307,6 @@ export function buildRedactedReportForClipboard(
     metric_keys: report.metricKeys,
     auth: report.authPreview,
     note: report.storageNotice,
+    evidence: report.evidence,
   };
 }

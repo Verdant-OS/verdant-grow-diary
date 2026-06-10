@@ -108,14 +108,17 @@ async function mockAllSupabase(page: Page, opts: { signedIn?: boolean } = {}) {
   );
 }
 
-test.describe("Auth route-protection MOBILE (mocked, 390x844)", () => {
-  test.use({
-    ...devices["Pixel 5"],
-    viewport: { width: 390, height: 844 },
-    isMobile: true,
-    hasTouch: true,
-  });
+// Mobile emulation is worker-scoped (devices["Pixel 5"] sets
+// defaultBrowserType), so it must be configured at the top level of the file
+// rather than inside a describe group.
+test.use({
+  ...devices["Pixel 5"],
+  viewport: { width: 390, height: 844 },
+  isMobile: true,
+  hasTouch: true,
+});
 
+test.describe("Auth route-protection MOBILE (mocked, 390x844)", () => {
   test.beforeEach(async ({ page }) => {
     await mockAllSupabase(page);
   });

@@ -206,7 +206,10 @@ export default function PlantDetail() {
         stage={plant.stage ?? null}
         hasPlantPhoto={!!plant.photo}
       />
-      <PlantDetailRecentActivityRecap plantId={plant.id} />
+      <PlantDetailRecentActivityRecap
+        plantId={plant.id}
+        onAddQuickCheck={() => setQuickLogOpen(true)}
+      />
       <PlantDetailAiDoctorReadiness
         plantId={plant.id}
         growId={plant.growId ?? null}
@@ -247,7 +250,6 @@ export default function PlantDetail() {
           plant={plant}
         />
       </div>
-
 
 
 

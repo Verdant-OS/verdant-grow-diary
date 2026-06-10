@@ -64,7 +64,7 @@ jobs:
         run: bunx playwright install chromium --with-deps
 
       - name: Run mocked auth Playwright smoke (loading + redirect + desktop + route-protection desktop+mobile)
-        run: bunx playwright test e2e/auth-loading.spec.ts e2e/auth-redirect-safety.spec.ts e2e/auth-desktop.spec.ts e2e/auth-route-protection.spec.ts e2e/auth-route-protection-mobile.spec.ts --project=chromium
+        run: bunx playwright test e2e/auth-loading.spec.ts e2e/auth-redirect-safety.spec.ts e2e/auth-desktop.spec.ts e2e/auth-route-protection.spec.ts e2e/auth-route-protection-mobile.spec.ts --project=chromium-mocked
 
       - name: Upload Playwright report
         if: ${{ always() }}

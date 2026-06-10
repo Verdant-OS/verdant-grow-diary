@@ -92,6 +92,10 @@
 @layer base {
   * { @apply border-border; }
   html, body, #root { @apply min-h-screen; }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -99,6 +103,23 @@
     background-attachment: fixed;
   }
   h1, h2, h3, h4 { font-family: 'Space Grotesk', 'Inter', sans-serif; letter-spacing: -0.02em; }
+
+  @media (max-width: 640px) {
+    body {
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    input,
+    textarea,
+    select,
+    button,
+    [role="button"],
+    [role="combobox"] {
+      font-size: 16px;
+      line-height: 1.5;
+    }
+  }
 }
 
 @layer components {
@@ -123,6 +144,20 @@
 @layer utilities {
   .animate-fade-in { animation: fadeIn 0.4s var(--transition-smooth) both; }
   .animate-slide-up { animation: slideUp 0.5s var(--transition-smooth) both; }
+
+  @media (max-width: 640px) {
+    .text-\[10px\],
+    .text-xs {
+      font-size: 0.875rem;
+      line-height: 1.25rem;
+    }
+
+    .text-sm {
+      font-size: 1rem;
+      line-height: 1.5rem;
+    }
+  }
+
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 }

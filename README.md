@@ -155,6 +155,7 @@ regression checklist.
 
 ## Documentation
 
+- [AI Doctor Phase 1 Contract](docs/ai-doctor-phase1-contract.md) — deterministic offline pipeline, source-truth rules, confidence caps, golden cases, and view model contract
 - [BuildOps Kit](docs/buildops-kit/README.md) — product context, safety rules, fixtures, templates
 - [Glossary](docs/glossary.md)
 - [One-Tent Loop](docs/one-tent-loop.md)

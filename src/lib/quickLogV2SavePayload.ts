@@ -16,14 +16,6 @@ export interface QuickLogV2SavePayload {
   p_humidity_pct: number | null;
   p_vpd_kpa: number | null;
   p_occurred_at: string | null;
-  /**
-   * Optional structured details persisted to `diary_entries.details` by
-   * `quicklog_save_manual`. When provided, MUST be a JSON object (not an
-   * array). Server-side, ownership-scoped keys (`user_id`, `grow_id`,
-   * `tent_id`, `plant_id`, `auth_uid`) are stripped before persist.
-   * Quick Log uses this to attach the redacted sensor snapshot envelope
-   * produced by `buildSensorSnapshotSavePayload`.
-   */
   p_details?: Record<string, unknown> | null;
 }
 
@@ -36,6 +28,7 @@ export interface BuildQuickLogV2PayloadInput {
   humidityPct: string;
   vpdKpa: string;
   occurredAt?: string | null;
+  details?: Record<string, unknown> | null;
 }
 
 export type BuildResult =
@@ -56,9 +49,6 @@ export function buildQuickLogV2SavePayload(
   const { resolved, action } = input;
   if (!resolved?.ok || !resolved.targetType || !resolved.targetId) {
     return { ok: false, reason: "target_unresolved" };
-  }
-  if (action === "photo") {
-    return { ok: false, reason: "photo_saving_not_enabled" };
   }
   if (action !== "water" && action !== "note") {
     return { ok: false, reason: "invalid_action" };
@@ -96,6 +86,7 @@ export function buildQuickLogV2SavePayload(
       p_humidity_pct: h,
       p_vpd_kpa: v,
       p_occurred_at: input.occurredAt ?? null,
+      ...(input.details ? { p_details: input.details } : {}),
     },
   };
 }

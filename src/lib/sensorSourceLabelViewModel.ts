@@ -25,6 +25,11 @@ import {
   normalizeManualSourceNote,
   MANUAL_READING_LABEL,
 } from "./manualSensorSourceLabel";
+import {
+  buildSensorTruthCopyGuard,
+  type SensorTruthCopyGuard,
+} from "@/lib/sensorTruthCopyGuardRules";
+import type { SnapshotStatus } from "@/lib/sensorSnapshotStatusContract";
 import type { SensorReadingSource } from "@/mock";
 
 export type SourceBadgeTone =
@@ -41,7 +46,7 @@ export interface SensorSourceBadge {
   label: string;
   /** Visual tone for styling. */
   tone: SourceBadgeTone;
-  /** True when the reading must NOT be treated as healthy live data. */
+  /** True when the source itself must be displayed as degraded. */
   isDegraded: boolean;
   /** True for grower-entered readings. */
   isManual: boolean;
@@ -51,10 +56,14 @@ export interface SensorSourceBadge {
   manualDeviceNote: string | null;
   /** Stable a11y description for screen readers. */
   ariaLabel: string;
+  /** Conservative presenter copy guard. Never promotes bad/unknown telemetry. */
+  truthCopyGuard: SensorTruthCopyGuard;
 }
 
 export interface BuildSensorSourceBadgeInput {
   source: SensorReadingSource | null | undefined;
+  /** Canonical snapshot status when the caller has it. Missing stays conservative. */
+  status?: SnapshotStatus | null;
   /** Vendor lineage tag if known (e.g. raw_payload.metadata.vendor). */
   vendor?: string | null;
   /** Grower-entered manual device note (preferred). */
@@ -106,6 +115,10 @@ export function buildSensorSourceBadge(
 ): SensorSourceBadge {
   const source = input.source ?? null;
   const tone = toneFromSource(source);
+  const truthCopyGuard = buildSensorTruthCopyGuard({
+    sourceTone: tone,
+    status: input.status ?? null,
+  });
   const resolved = resolveSensorSourceLabel({
     source,
     // Suppress vendor promotion for non-live readings so a "manual"
@@ -169,6 +182,7 @@ export function buildSensorSourceBadge(
     vendor: resolved.vendor,
     manualDeviceNote,
     ariaLabel,
+    truthCopyGuard,
   };
 }
 

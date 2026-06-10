@@ -30,6 +30,10 @@ const HELPER = readFileSync(
   resolve(ROOT, "src/lib/plantRecentActivityRecap.ts"),
   "utf8",
 );
+const RECOVERY_HELPER = readFileSync(
+  resolve(ROOT, "src/lib/noRecentLogRecoveryRules.ts"),
+  "utf8",
+);
 const COMPONENT = readFileSync(
   resolve(ROOT, "src/components/PlantDetailRecentActivityRecap.tsx"),
   "utf8",
@@ -216,7 +220,7 @@ describe("PlantDetailRecentActivityRecap render", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders empty state with helper copy", () => {
+  it("renders empty state with helper copy when no recovery callback is supplied", () => {
     useRecentMock.mockReturnValue({ data: [], isLoading: false });
     render(<PlantDetailRecentActivityRecap plantId="p1" />);
     expect(
@@ -227,6 +231,60 @@ describe("PlantDetailRecentActivityRecap render", () => {
         /Use Quick Log, manual sensor snapshots, or photos to start building plant memory\./,
       ),
     ).toBeInTheDocument();
+  });
+
+  it("renders no-recent-log recovery prompt and calls the Quick Log opener", () => {
+    const openQuickLog = vi.fn();
+    useRecentMock.mockReturnValue({ data: [], isLoading: false });
+    render(<PlantDetailRecentActivityRecap plantId="p1" onAddQuickCheck={openQuickLog} />);
+    expect(screen.getByTestId("plant-detail-no-recent-log-recovery")).toHaveAttribute(
+      "data-reason",
+      "no_activity",
+    );
+    expect(screen.getByText("No recent check-in.")).toBeInTheDocument();
+    expect(screen.getByText("Add a 10-second status: Better, Same, or Worse.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /add a ten-second quick log check/i }));
+    expect(openQuickLog).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders no-recent-log recovery prompt for stale latest activity", () => {
+    const openQuickLog = vi.fn();
+    useRecentMock.mockReturnValue({
+      data: [
+        {
+          id: "old",
+          plant_id: "p1",
+          entry_type: "note",
+          entry_at: "2000-01-01T00:00:00.000Z",
+          note: "Old note",
+        },
+      ],
+      isLoading: false,
+    });
+    render(<PlantDetailRecentActivityRecap plantId="p1" onAddQuickCheck={openQuickLog} />);
+    expect(screen.getByTestId("plant-detail-no-recent-log-recovery")).toHaveAttribute(
+      "data-reason",
+      "stale_activity",
+    );
+  });
+
+  it("hides recovery prompt when recent activity exists", () => {
+    const openQuickLog = vi.fn();
+    useRecentMock.mockReturnValue({
+      data: [
+        {
+          id: "x",
+          plant_id: "p1",
+          entry_type: "note",
+          entry_at: new Date().toISOString(),
+          note: "Quick check: Same.",
+        },
+      ],
+      isLoading: false,
+    });
+    render(<PlantDetailRecentActivityRecap plantId="p1" onAddQuickCheck={openQuickLog} />);
+    expect(screen.queryByTestId("plant-detail-no-recent-log-recovery")).toBeNull();
+    expect(screen.getByTestId("plant-detail-recent-activity-recap-list")).toBeInTheDocument();
   });
 
   it("shows latest 3 items in newest-first order", () => {
@@ -328,11 +386,20 @@ describe("Plant Detail recent activity recap — static safety", () => {
     for (const re of FORBIDDEN) expect(HELPER).not.toMatch(re);
   });
 
+  it("recovery helper has no React, fetch, or unsafe paths", () => {
+    expect(RECOVERY_HELPER).not.toMatch(/from\s+["']react["']/);
+    expect(RECOVERY_HELPER).not.toMatch(/\bfetch\(/);
+    expect(RECOVERY_HELPER).not.toMatch(/supabase/i);
+    for (const re of FORBIDDEN) expect(RECOVERY_HELPER).not.toMatch(re);
+  });
+
   it("component avoids writes/RPC/unsafe paths", () => {
     for (const re of FORBIDDEN) expect(COMPONENT).not.toMatch(re);
   });
 
-  it("page wires the recap in", () => {
+  it("page wires the recap to the existing Quick Log opener", () => {
     expect(PAGE).toMatch(/PlantDetailRecentActivityRecap/);
+    expect(PAGE).toMatch(/onAddQuickCheck=\{\(\) => setQuickLogOpen\(true\)\}/);
+    expect(PAGE).toMatch(/<PlantQuickLog/);
   });
 });

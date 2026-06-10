@@ -3,10 +3,9 @@
  *
  * Single source of truth for:
  *   - Whether photo saving is enabled in the current build/context.
- *   - The disabled-state copy/aria/helper text rendered by QuickLogV2Sheet
- *     while photo saving is gated off.
- *   - The active picker labels reused by PlantQuickLog so the two surfaces
- *     don't drift on visible copy.
+ *   - The disabled-state copy/aria/helper text rendered by older gated states.
+ *   - The active picker labels reused by PlantQuickLog and QuickLogV2Sheet so
+ *     the two surfaces don't drift on visible copy.
  *
  * No JSX, no I/O — used by tests + components.
  */
@@ -17,7 +16,7 @@ export interface QuickLogPhotoGateState {
   /** Machine-readable reason when not supported. */
   reason: string;
 
-  // Disabled-state UI (QuickLogV2Sheet today).
+  // Disabled-state UI.
   /** Short heading for the disabled/gated UI block. */
   disabledTitle: string;
   /** Human-readable explanation shown to the grower. */
@@ -29,7 +28,7 @@ export interface QuickLogPhotoGateState {
   /** Label for the future action once enabled (e.g. button text). */
   futureActionLabel: string;
 
-  // Active picker UI (PlantQuickLog today; QuickLogV2Sheet once enabled).
+  // Active picker UI.
   /** "Take Photo" button label. */
   takePhotoLabel: string;
   /** "Choose from Library" button label. */
@@ -43,11 +42,7 @@ export interface QuickLogPhotoGateState {
 }
 
 export function isQuickLogPhotoSavingSupported(): boolean {
-  // Photo persistence not enabled in QuickLogV2Sheet (out of atomic-RPC scope).
-  // PlantQuickLog has its own working diary-photos upload path and does NOT
-  // gate on this flag. When this flips to true, update the gate state copy
-  // below as well.
-  return false;
+  return true;
 }
 
 export function buildQuickLogPhotoGateState(): QuickLogPhotoGateState {

@@ -53,14 +53,6 @@ function nonBlankString(v: unknown): string | null {
   return typeof v === "string" && v.trim().length > 0 ? v : null;
 }
 
-function finiteNumber(v: unknown): number | null {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-  if (typeof v === "string" && v.trim().length > 0) {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
-}
 
 function extractLinkedGrowEventId(details: unknown): string | null {
   const d = asObject(details);
@@ -75,15 +67,13 @@ export function isQuickLogCompanionDiaryRow(
   return extractLinkedGrowEventId(row.details) !== null;
 }
 
+import { normalizeQuickLogSnapshotMetrics } from "./quickLogSnapshotMetricNormalizer";
+
 function normalizeMetrics(raw: unknown): Record<string, number> {
-  const obj = asObject(raw);
-  if (!obj) return {};
-  const out: Record<string, number> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    const n = finiteNumber(v);
-    if (n !== null) out[k] = n;
-  }
-  return out;
+  // Delegates to the shared read-side normalizer so legacy keys
+  // (temperature_c, humidity_pct, …) and clean keys (temperature, humidity, …)
+  // collapse to a single canonical shape. Clean keys win on conflict.
+  return normalizeQuickLogSnapshotMetrics(raw);
 }
 
 function normalizeSnapshot(raw: unknown): QuickLogCompanionSnapshot | null {

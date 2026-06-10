@@ -28,14 +28,37 @@ export interface CreateQuickLogInput {
   idempotencyKey: string;
 }
 
-/** Deterministic mapping from UI event types → canonical grow_events values. */
+/**
+ * Deterministic mapping from UI event types → canonical grow_events values.
+ *
+ * Note about `note`: the V0 grow_events validate trigger only accepts
+ * ('watering','feeding','training','observation','photo','environment').
+ * Quick Log "note" entries are therefore stored as `observation` and the
+ * original intent is preserved in the companion diary row's
+ * `details.kind = 'note'` (see buildQuickLogDetails). The user's note
+ * text is preserved verbatim on grow_events.note and diary_entries.note.
+ */
 export const QUICK_LOG_EVENT_TYPE_MAP: Record<QuickLogEventType, string> = {
   observe: "observation",
   water: "watering",
   feed: "feeding",
   photo: "photo",
-  note: "note",
+  note: "observation",
 };
+
+/** Quick Log UI event types that are stored as observations + kind tag. */
+export const QUICK_LOG_NOTE_LIKE_TYPES: ReadonlySet<QuickLogEventType> =
+  new Set(["note"]);
+
+/** Build the optional `p_details` payload, or null when no tag is needed. */
+export function buildQuickLogDetails(
+  uiEventType: QuickLogEventType,
+): Record<string, string> | null {
+  if (QUICK_LOG_NOTE_LIKE_TYPES.has(uiEventType)) {
+    return { kind: "note", original_event_type: uiEventType };
+  }
+  return null;
+}
 
 export interface QuickLogSensorSnapshot {
   source: string | null;
@@ -72,6 +95,8 @@ export async function createQuickLogEvent(
   }
   const sensorSnapshot = snapshotValidation.snapshot;
 
+  const details = buildQuickLogDetails(input.eventType);
+
   const { data, error } = await supabase.rpc(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     "quicklog_save_event" as any,
@@ -91,6 +116,7 @@ export async function createQuickLogEvent(
           }
         : null,
       p_occurred_at: null,
+      p_details: details,
     } as unknown as Record<string, unknown>,
   );
 

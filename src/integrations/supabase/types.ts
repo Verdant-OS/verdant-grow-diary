@@ -1783,6 +1783,7 @@ export type Database = {
       }
       quicklog_save_event: {
         Args: {
+          p_details?: Json
           p_event_type: string
           p_grow_id: string
           p_idempotency_key: string

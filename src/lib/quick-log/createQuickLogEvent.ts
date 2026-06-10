@@ -133,7 +133,7 @@ export async function createQuickLogEvent(input: CreateQuickLogInput) {
   // diary_entries.details. Invalid payloads block the save outright;
   // absent telemetry is preserved as absent.
   const snapshotValidation = validateQuickLogSensorSnapshot(rawSnapshot);
-  if (!snapshotValidation.ok) {
+  if (snapshotValidation.ok === false) {
     throw new Error(
       `Failed to save quick log: invalid sensor snapshot (${snapshotValidation.error})`,
     );

@@ -97,8 +97,8 @@ function resetState() {
   state.deleteResult = { error: null };
   const clearAll = (obj: any) => {
     for (const val of Object.values(obj)) {
-      if (typeof val === "function" && "mockClear" in val) {
-        val.mockClear();
+      if (typeof val === "function" && typeof (val as any).mockClear === "function") {
+        (val as any).mockClear();
       } else if (val && typeof val === "object") {
         clearAll(val);
       }

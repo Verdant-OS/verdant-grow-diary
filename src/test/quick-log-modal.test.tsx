@@ -127,6 +127,8 @@ function attachPhoto() {
 
 beforeEach(() => {
   createQuickLogEventMock.mockReset();
+  fetchLatestSensorSnapshotMock.mockReset();
+  fetchLatestSensorSnapshotMock.mockResolvedValue(null);
   toastError.mockReset();
   toastSuccess.mockReset();
   storageUpload.mockReset();

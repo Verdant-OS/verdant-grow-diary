@@ -45,6 +45,20 @@ vi.mock("@/components/MetricChip", () => ({
   default: () => null,
 }));
 
+// Radix Select rejects empty-string SelectItem values at render time. The
+// plant picker is not under test here, so stub the primitives to plain
+// divs/selects to keep the DOM mountable.
+vi.mock("@/components/ui/select", () => {
+  const Pass = ({ children }: { children?: React.ReactNode }) => <>{children}</>;
+  return {
+    Select: Pass,
+    SelectTrigger: Pass,
+    SelectValue: Pass,
+    SelectContent: Pass,
+    SelectItem: Pass,
+  };
+});
+
 // Supabase mock: covers
 //   - sensor_readings select chain (snapshot fetch on open)
 //   - storage upload + remove

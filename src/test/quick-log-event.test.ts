@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createQuickLogEvent } from "@/lib/quick-log/createQuickLogEvent";
 
 const mockSingle = vi.fn();
-const mockEq = vi.fn(() => ({ single: mockSingle }));
+const mockEq2 = vi.fn(() => ({ single: mockSingle }));
+const mockEq = vi.fn(() => ({ eq: mockEq2, single: mockSingle }));
 const mockSelect = vi.fn(() => ({ eq: mockEq }));
 const mockGrowInsert = vi.fn(() => ({
   select: vi.fn(() => ({

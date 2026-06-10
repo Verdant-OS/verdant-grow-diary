@@ -32,6 +32,7 @@ export type CsvMappingTemplateId =
   | "ac_infinity"
   | "generic_sensor_logger"
   | "aroya_representative"
+  | "thp_export"
   | "blank_reset";
 
 interface TemplateSynonyms {
@@ -50,6 +51,13 @@ export interface CsvMappingTemplate {
   readonly description: string;
   /** Per canonical field: list of accepted header strings. */
   readonly fields: Partial<Record<RepresentativeMappingField, TemplateSynonyms>>;
+  /**
+   * Optional exact header signature for auto-detection. When every header
+   * in `allOf` (normalized) is present in the CSV, detection returns this
+   * template with high confidence. Order independent. Extra CSV headers
+   * are ignored.
+   */
+  readonly signature?: { readonly allOf: ReadonlyArray<string> };
 }
 
 export const CSV_MAPPING_TEMPLATES: ReadonlyArray<CsvMappingTemplate> = [

@@ -270,8 +270,17 @@ describe("createQuickLogEvent — writes", () => {
   });
 
   it("rolls back the grow_event and throws when diary insert fails", async () => {
-    state.sensorRows = {
-      data: [{ metric: "temperature_c", value: 24, source: "manual", captured_at: "2026-06-09T12:00:00Z" }],
+    state.rpcResult = {
+      data: {
+        captured_at: "2026-06-09T12:00:00Z",
+        source: "manual",
+        temperature: 24,
+        humidity: null,
+        vpd: null,
+        soil_temp: null,
+        soil_ec: null,
+        ppfd: null,
+      },
       error: null,
     };
     state.diaryInsert = { error: { message: "boom" } };

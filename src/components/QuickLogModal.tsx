@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 
 import { createQuickLogEvent, type QuickLogEventType } from "@/lib/quick-log/createQuickLogEvent";
+import { fetchLatestSensorSnapshot } from "@/lib/quick-log/fetchLatestSensorSnapshot";
+import type { QuickLogSensorSnapshot } from "@/lib/quick-log/createQuickLogEvent";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import MetricChip from "@/components/MetricChip";
@@ -75,7 +77,7 @@ export default function QuickLogModal({
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [sensorSnapshot, setSensorSnapshot] = useState<Record<string, unknown> | null>(null);
+  const [sensorSnapshot, setSensorSnapshot] = useState<QuickLogSensorSnapshot | null>(null);
   const [sensorLoading, setSensorLoading] = useState(false);
 
   const resetForm = useCallback(() => {
@@ -96,33 +98,13 @@ export default function QuickLogModal({
       resetForm();
       if (tentId) {
         setSensorLoading(true);
-        supabase
-          .from("sensor_readings")
-          .select("metric, value, source, captured_at")
-          .eq("tent_id", tentId)
-          .order("captured_at", { ascending: false })
-          .order("created_at", { ascending: false })
-          .limit(50)
-          .then(({ data: rows, error }) => {
-            if (error || !rows || rows.length === 0) {
-              setSensorSnapshot(null);
-              setSensorLoading(false);
-              return;
-            }
-            const seen = new Set<string>();
-            const snapshot: Record<string, unknown> = {};
-            for (const row of rows) {
-              if (!seen.has(row.metric)) {
-                seen.add(row.metric);
-                snapshot[row.metric] = row.value;
-              }
-            }
-            const mostRecent = rows[0];
-            setSensorSnapshot({
-              ...snapshot,
-              source: mostRecent.source,
-              captured_at: mostRecent.captured_at,
-            });
+        fetchLatestSensorSnapshot(tentId)
+          .then((snapshot) => {
+            setSensorSnapshot(snapshot);
+            setSensorLoading(false);
+          })
+          .catch(() => {
+            setSensorSnapshot(null);
             setSensorLoading(false);
           });
       }
@@ -208,13 +190,10 @@ export default function QuickLogModal({
   const selectedPlantName = plants.find((p) => p.id === plantId)?.name ?? null;
 
   const metricChips = useMemo(() => {
-    if (!sensorSnapshot) return [];
-    const entries = Object.entries(sensorSnapshot).filter(
-      ([k]) => k !== "source" && k !== "captured_at",
-    );
-    return entries.map(([metric, value]) => ({
+    if (!sensorSnapshot?.metrics) return [];
+    return Object.entries(sensorSnapshot.metrics).map(([metric, value]) => ({
       metric,
-      value: typeof value === "number" ? value.toFixed(1) : String(value),
+      value: value.toFixed(1),
     }));
   }, [sensorSnapshot]);
 

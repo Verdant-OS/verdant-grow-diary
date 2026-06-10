@@ -1702,6 +1702,10 @@ export type Database = {
           sample_count: number
         }[]
       }
+      get_latest_tent_sensor_snapshot: {
+        Args: { _tent_id: string }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

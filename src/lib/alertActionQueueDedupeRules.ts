@@ -6,7 +6,7 @@
  *   - Decide whether an equivalent non-terminal Action Queue item already
  *     exists for a given alert.
  *   - Decide the safe button state (`can_add` / `already_exists` /
- *     `ineligible`) and a safe label text that NEVER leaks internal
+ *     `ineligible`) and safe grower-facing copy that NEVER leaks internal
  *     tokens (alert id, grow id, [alert:...]) into the UI.
  *   - Provide a guard `shouldBlockInsert` for the create handler so that
  *     double-clicks and stale UI cannot create a second pending row.
@@ -70,6 +70,10 @@ export interface DedupeDecision {
   existingActionId: string | null;
   /** Grower-safe button/link label. Never leaks raw ids or tokens. */
   label: string;
+  /** Grower-safe state headline. Never leaks raw ids or tokens. */
+  headline: string;
+  /** Grower-safe helper copy. Never leaks raw ids or tokens. */
+  helper: string;
   /** Stable reason code for logs/tests. */
   reasonCode:
     | "ok_can_add"
@@ -111,6 +115,37 @@ export function findExistingPendingAction(
   return null;
 }
 
+function blockedHelper(alert: AlertLike | null | undefined): Pick<DedupeDecision, "headline" | "helper"> {
+  if (!alert) {
+    return {
+      headline: "No alert loaded",
+      helper: "Load an alert before preparing a suggested action.",
+    };
+  }
+  if (alert.status !== "open") {
+    return {
+      headline: "Cannot queue this alert",
+      helper: "Only open alerts can be queued. Reopen the alert first if follow-up is still needed.",
+    };
+  }
+  if (!alert.grow_id) {
+    return {
+      headline: "Missing grow context",
+      helper: "This alert is missing grow context, so Verdant cannot create a safe approval item.",
+    };
+  }
+  if (!alert.metric || !alert.reason?.trim()) {
+    return {
+      headline: "Missing alert context",
+      helper: "This alert is missing metric or reason context, so Verdant cannot draft a safe action.",
+    };
+  }
+  return {
+    headline: "Cannot queue this alert",
+    helper: "This alert is not eligible for Action Queue handoff.",
+  };
+}
+
 /** Reconcile alert eligibility + existing rows into a button-state decision. */
 export function decideAddButtonState(input: {
   alert: AlertLike | null | undefined;
@@ -118,10 +153,13 @@ export function decideAddButtonState(input: {
 }): DedupeDecision {
   const { alert } = input;
   if (!alert) {
+    const copy = blockedHelper(alert);
     return {
       state: "ineligible",
       existingActionId: null,
       label: "Add to Action Queue",
+      headline: copy.headline,
+      helper: copy.helper,
       reasonCode: "missing_alert",
     };
   }
@@ -131,14 +169,19 @@ export function decideAddButtonState(input: {
       state: "already_exists",
       existingActionId: match.id,
       label: "Action already queued — view details",
+      headline: "Already in Action Queue",
+      helper: "A recommended action for this alert already exists and still needs grower review.",
       reasonCode: "already_pending",
     };
   }
   if (!isAlertEligibleForActionQueue(alert)) {
+    const copy = blockedHelper(alert);
     return {
       state: "ineligible",
       existingActionId: null,
       label: "Add to Action Queue",
+      headline: copy.headline,
+      helper: copy.helper,
       reasonCode: "alert_not_eligible",
     };
   }
@@ -146,6 +189,8 @@ export function decideAddButtonState(input: {
     state: "can_add",
     existingActionId: null,
     label: "Add to Action Queue",
+    headline: "Ready for grower review",
+    helper: "This alert has enough context to prepare a review-only suggested action. Verdant will not execute equipment changes.",
     reasonCode: "ok_can_add",
   };
 }

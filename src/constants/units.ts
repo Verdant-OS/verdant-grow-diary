@@ -24,8 +24,8 @@ export type EcUnit = (typeof EC_UNITS)[number];
 export const DEFAULT_EC_UNIT: EcUnit = "mS/cm";
 
 export const EC_UNIT_LABEL: Record<EcUnit, string> = {
-  "mS/cm": "mS/cm",
-  "µS/cm": "µS/cm",
-  "PPM-500": "PPM (×500)",
-  "PPM-700": "PPM (×700)",
+  "mS/cm": "EC mS/cm",
+  "µS/cm": "EC µS/cm",
+  "PPM-500": "PPM 500 scale",
+  "PPM-700": "PPM 700 scale",
 };

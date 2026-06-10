@@ -15,6 +15,7 @@ import {
 import {
   applyCsvMappingTemplate,
   CSV_MAPPING_TEMPLATES,
+  detectCsvMappingTemplate,
   getCsvMappingTemplate,
   type CsvMappingTemplateId,
 } from "@/lib/csvMappingTemplates";

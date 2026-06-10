@@ -32,7 +32,7 @@ export interface QuickLogDiaryRowLike {
 export interface QuickLogCompanionSnapshot {
   source: string | null;
   capturedAt: string | null;
-  metrics: Record<string, number>;
+  metrics: CanonicalQuickLogSensorSnapshotMetrics;
 }
 
 export interface QuickLogCompanionView {
@@ -67,9 +67,12 @@ export function isQuickLogCompanionDiaryRow(
   return extractLinkedGrowEventId(row.details) !== null;
 }
 
-import { normalizeQuickLogSnapshotMetrics } from "./quickLogSnapshotMetricNormalizer";
+import {
+  normalizeQuickLogSnapshotMetrics,
+  type CanonicalQuickLogSensorSnapshotMetrics,
+} from "./quickLogSnapshotMetricNormalizer";
 
-function normalizeMetrics(raw: unknown): Record<string, number> {
+function normalizeMetrics(raw: unknown): CanonicalQuickLogSensorSnapshotMetrics {
   // Delegates to the shared read-side normalizer so legacy keys
   // (temperature_c, humidity_pct, …) and clean keys (temperature, humidity, …)
   // collapse to a single canonical shape. Clean keys win on conflict.

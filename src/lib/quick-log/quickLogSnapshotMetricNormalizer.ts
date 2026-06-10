@@ -11,13 +11,16 @@
  *
  * Hard rules:
  *   - Pure: no I/O, no React, no Supabase, no time.
- *   - Never invents readings. Non-finite / null / non-numeric values are
- *     dropped.
+ *   - Never invents readings. Only `typeof value === "number"` finite
+ *     numbers are kept. Numeric strings, NaN, Infinity, -Infinity, nulls,
+ *     objects, and arrays are dropped.
  *   - Never relabels source/captured_at — this module only touches metric
  *     keys; provenance is the caller's responsibility.
  *   - When both a legacy and clean key are present, the clean key wins.
  *   - Empty / all-null metric maps return `{}` so the snapshot layer above
  *     can treat them as "no usable snapshot".
+ *   - Unknown clean-shaped keys (e.g. a future `leaf_temp`) pass through
+ *     unchanged, never renamed.
  */
 
 /** Canonical clean metric keys surfaced to all read paths. */
@@ -37,10 +40,22 @@ export type QuickLogCanonicalMetric =
   (typeof QUICK_LOG_CANONICAL_METRICS)[number];
 
 /**
+ * Canonical metric map type reused by Quick Log v1 read paths
+ * (companion view, AI Doctor context, timeline evidence). Unknown
+ * clean-shaped keys are still permitted via the index signature so future
+ * metrics don't fall off; known keys are exposed for type-safe access.
+ */
+export type CanonicalQuickLogSensorSnapshotMetrics = {
+  [K in QuickLogCanonicalMetric]?: number;
+} & Record<string, number>;
+
+/**
  * Legacy → canonical mapping. Mirrors `sensor_readings.metric` values that
  * were embedded in earlier Quick Log companion snapshots.
  */
-const LEGACY_TO_CANONICAL: Readonly<Record<string, QuickLogCanonicalMetric>> = {
+export const QUICK_LOG_LEGACY_TO_CANONICAL: Readonly<
+  Record<string, QuickLogCanonicalMetric>
+> = {
   temperature_c: "temperature",
   humidity_pct: "humidity",
   vpd_kpa: "vpd",
@@ -52,41 +67,41 @@ const LEGACY_TO_CANONICAL: Readonly<Record<string, QuickLogCanonicalMetric>> = {
   soil_ec_ms_cm: "soil_ec",
 };
 
-function finiteNumber(v: unknown): number | null {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-  if (typeof v === "string" && v.trim().length > 0) {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
+/** Strict: only real `number` values that are finite. Numeric strings are
+ *  intentionally dropped — the Quick Log RPC validator already rejects
+ *  non-numeric JSON, so any string here is drift from a legacy/foreign
+ *  shape and should not be silently coerced into telemetry. */
+function strictFiniteNumber(v: unknown): number | null {
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
 /**
  * Normalize a raw metric map (accepting both legacy and clean keys) into
  * a canonical-keyed map of finite numbers. Clean keys win on conflict.
  *
- * Unknown keys pass through unchanged (so future metrics don't silently
- * disappear), but only when their value is a finite number.
+ * Unknown clean-shaped keys pass through unchanged (so future metrics
+ * don't silently disappear), but only when their value is a finite
+ * number.
  */
 export function normalizeQuickLogSnapshotMetrics(
   raw: unknown,
-): Record<string, number> {
+): CanonicalQuickLogSensorSnapshotMetrics {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
   const input = raw as Record<string, unknown>;
   const out: Record<string, number> = {};
 
   // First pass: legacy keys. Clean keys overwrite in the second pass.
   for (const [k, v] of Object.entries(input)) {
-    const canonical = LEGACY_TO_CANONICAL[k];
+    const canonical = QUICK_LOG_LEGACY_TO_CANONICAL[k];
     if (!canonical) continue;
-    const n = finiteNumber(v);
+    const n = strictFiniteNumber(v);
     if (n !== null) out[canonical] = n;
   }
 
   // Second pass: clean / canonical keys + unknown passthrough.
   for (const [k, v] of Object.entries(input)) {
-    if (k in LEGACY_TO_CANONICAL) continue;
-    const n = finiteNumber(v);
+    if (k in QUICK_LOG_LEGACY_TO_CANONICAL) continue;
+    const n = strictFiniteNumber(v);
     if (n !== null) out[k] = n;
   }
 

@@ -1298,6 +1298,57 @@ export type Database = {
         }
         Relationships: []
       }
+      quicklog_audit_events: {
+        Row: {
+          created_at: string
+          grow_event_id: string | null
+          id: string
+          idempotency_key: string | null
+          reason: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          grow_event_id?: string | null
+          id?: string
+          idempotency_key?: string | null
+          reason?: string | null
+          status: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          grow_event_id?: string | null
+          id?: string
+          idempotency_key?: string | null
+          reason?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      quicklog_idempotency: {
+        Row: {
+          created_at: string
+          grow_event_id: string
+          idempotency_key: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          grow_event_id: string
+          idempotency_key: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          grow_event_id?: string
+          idempotency_key?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       sensor_ingest_audit_log: {
         Row: {
           auth_type: string
@@ -1729,6 +1780,20 @@ export type Database = {
           inserted: number
           rejected: number
         }[]
+      }
+      quicklog_save_event: {
+        Args: {
+          p_event_type: string
+          p_grow_id: string
+          p_idempotency_key: string
+          p_note?: string
+          p_occurred_at?: string
+          p_photo_url?: string
+          p_plant_id?: string
+          p_sensor_snapshot?: Json
+          p_tent_id?: string
+        }
+        Returns: Json
       }
       quicklog_save_manual: {
         Args: {

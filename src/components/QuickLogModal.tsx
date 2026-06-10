@@ -143,6 +143,12 @@ export default function QuickLogModal({
     if (saving) return; // belt-and-suspenders against double-submit
     setSaving(true);
     let uploadedPath: string | null = null;
+    // One idempotency key per save attempt; reused implicitly on synchronous
+    // retries via the disabled-button guard.
+    const idempotencyKey =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `ql-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     try {
       if (photoFile) {
         uploadedPath = await uploadPhoto();
@@ -160,6 +166,7 @@ export default function QuickLogModal({
         eventType,
         note: note.trim() || undefined,
         photoUrl: uploadedPath ?? undefined,
+        idempotencyKey,
       });
 
       toast.success("Log saved");

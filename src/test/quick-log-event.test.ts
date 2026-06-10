@@ -1,3 +1,15 @@
+/**
+ * createQuickLogEvent — atomic RPC contract tests.
+ *
+ * The writer is now a thin client over `public.quicklog_save_event`. These
+ * tests assert:
+ *   - sensor snapshot is fetched (via the snapshot RPC) and passed to the
+ *     save RPC verbatim, preserving source + captured_at
+ *   - canonical event type mapping is applied
+ *   - idempotency_key is forwarded
+ *   - reused responses surface the same grow_event_id
+ *   - reason codes are translated to user-meaningful errors
+ */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   createQuickLogEvent,
@@ -5,206 +17,69 @@ import {
   type QuickLogEventType,
 } from "@/lib/quick-log/createQuickLogEvent";
 
-// ---------- per-table mock state ----------
-type Result = { data: any; error: any };
+type Result = { data: unknown; error: unknown };
 
 const state = {
-  grows: { data: { id: "grow-abc" }, error: null } as Result,
-  plants: { data: { id: "plant-1", grow_id: "grow-abc", tent_id: "tent-1" }, error: null } as Result,
-  rpcResult: { data: null, error: null } as Result,
-  growEventInsert: { data: { id: "event-1" }, error: null } as Result,
-  diaryInsert: { error: null } as { error: any },
-  deleteResult: { error: null } as { error: any },
+  saveRpc: {
+    data: { ok: true, grow_event_id: "event-1", reused: false },
+    error: null,
+  } as Result,
+  snapshotRpc: { data: null, error: null } as Result,
 };
 
-const calls = {
-  grows: { select: vi.fn(), eq: vi.fn(), single: vi.fn() },
-  plants: { select: vi.fn(), eq: vi.fn(), single: vi.fn() },
-  rpc: vi.fn(),
-  growEvents: { insert: vi.fn(), select: vi.fn(), single: vi.fn(), delete: vi.fn(), eq: vi.fn() },
-  diary: { insert: vi.fn() },
-};
-
-function growsBuilder() {
-  const b: any = {};
-  b.select = (...a: any[]) => { calls.grows.select(...a); return b; };
-  b.eq = (...a: any[]) => { calls.grows.eq(...a); return b; };
-  b.single = () => { calls.grows.single(); return Promise.resolve(state.grows); };
-  return b;
-}
-function plantsBuilder() {
-  const b: any = {};
-  b.select = (...a: any[]) => { calls.plants.select(...a); return b; };
-  b.eq = (...a: any[]) => { calls.plants.eq(...a); return b; };
-  b.single = () => { calls.plants.single(); return Promise.resolve(state.plants); };
-  return b;
-}
-function rpcMock() {
-  return {
-    rpc: (_fn: string, args: any) => {
-      calls.rpc(args);
-      return Promise.resolve(state.rpcResult);
-    },
-  };
-}
-function growEventsBuilder() {
-  const insertChain: any = {
-    select: (...a: any[]) => { calls.growEvents.select(...a); return insertChain; },
-    single: () => { calls.growEvents.single(); return Promise.resolve(state.growEventInsert); },
-  };
-  const deleteChain: any = {
-    eq: (...a: any[]) => { calls.growEvents.eq(...a); return deleteChain; },
-    then: (resolve: any) => resolve(state.deleteResult),
-  };
-  return {
-    insert: (...a: any[]) => { calls.growEvents.insert(...a); return insertChain; },
-    delete: (...a: any[]) => { calls.growEvents.delete(...a); return deleteChain; },
-  };
-}
-function diaryBuilder() {
-  return {
-    insert: (...a: any[]) => {
-      calls.diary.insert(...a);
-      return Promise.resolve(state.diaryInsert);
-    },
-  };
-}
+const rpcSpy = vi.fn();
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    auth: { getUser: vi.fn() },
-    from: (table: string) => {
-      switch (table) {
-        case "grows": return growsBuilder();
-        case "plants": return plantsBuilder();
-        case "grow_events": return growEventsBuilder();
-        case "diary_entries": return diaryBuilder();
-        default: return {};
-      }
+    rpc: (fn: string, args: Record<string, unknown>) => {
+      rpcSpy(fn, args);
+      if (fn === "quicklog_save_event") return Promise.resolve(state.saveRpc);
+      if (fn === "get_latest_tent_sensor_snapshot")
+        return Promise.resolve(state.snapshotRpc);
+      return Promise.resolve({ data: null, error: null });
     },
-    ...rpcMock(),
   },
 }));
 
-import { supabase } from "@/integrations/supabase/client";
+const baseInput = {
+  growId: "grow-abc",
+  idempotencyKey: "idem-key-abcdef-0001",
+};
 
-function resetState() {
-  state.grows = { data: { id: "grow-abc" }, error: null };
-  state.plants = { data: { id: "plant-1", grow_id: "grow-abc", tent_id: "tent-1" }, error: null };
-  state.rpcResult = { data: null, error: null };
-  state.growEventInsert = { data: { id: "event-1" }, error: null };
-  state.diaryInsert = { error: null };
-  state.deleteResult = { error: null };
-  const clearAll = (obj: any) => {
-    for (const val of Object.values(obj)) {
-      if (typeof val === "function" && typeof (val as any).mockClear === "function") {
-        (val as any).mockClear();
-      } else if (val && typeof val === "object") {
-        clearAll(val);
-      }
-    }
-  };
-  clearAll(calls);
+function getSaveCall() {
+  const call = rpcSpy.mock.calls.find((c) => c[0] === "quicklog_save_event");
+  return call ? (call[1] as Record<string, unknown>) : null;
 }
 
-describe("createQuickLogEvent — auth + ownership", () => {
-  beforeEach(() => {
-    resetState();
-    (supabase.auth.getUser as any).mockResolvedValue({
-      data: { user: { id: "user-123" } },
-    });
-  });
-
-  it("rejects unauthenticated user", async () => {
-    (supabase.auth.getUser as any).mockResolvedValue({ data: { user: null } });
-    await expect(
-      createQuickLogEvent({ growId: "grow-abc", eventType: "note" }),
-    ).rejects.toThrow("Not authenticated");
-    expect(calls.growEvents.insert).not.toHaveBeenCalled();
-  });
-
-  it("rejects grow not owned by user", async () => {
-    state.grows = { data: null, error: { message: "not found" } };
-    await expect(
-      createQuickLogEvent({ growId: "grow-abc", eventType: "note" }),
-    ).rejects.toThrow("Grow not found or not owned by current user");
-    expect(calls.growEvents.insert).not.toHaveBeenCalled();
-  });
-
-  it("rejects plant from another grow", async () => {
-    state.plants = {
-      data: { id: "plant-x", grow_id: "other-grow", tent_id: "tent-1" },
-      error: null,
-    };
-    await expect(
-      createQuickLogEvent({
-        growId: "grow-abc",
-        tentId: "tent-1",
-        plantId: "plant-x",
-        eventType: "observe",
-      }),
-    ).rejects.toThrow("Plant does not belong to this grow");
-    expect(calls.growEvents.insert).not.toHaveBeenCalled();
-  });
-
-  it("rejects plant from another tent", async () => {
-    state.plants = {
-      data: { id: "plant-1", grow_id: "grow-abc", tent_id: "tent-other" },
-      error: null,
-    };
-    await expect(
-      createQuickLogEvent({
-        growId: "grow-abc",
-        tentId: "tent-1",
-        plantId: "plant-1",
-        eventType: "observe",
-      }),
-    ).rejects.toThrow("Plant does not belong to this tent");
-  });
+beforeEach(() => {
+  rpcSpy.mockClear();
+  state.saveRpc = {
+    data: { ok: true, grow_event_id: "event-1", reused: false },
+    error: null,
+  };
+  state.snapshotRpc = { data: null, error: null };
 });
 
-describe("createQuickLogEvent — writes", () => {
-  beforeEach(() => {
-    resetState();
-    (supabase.auth.getUser as any).mockResolvedValue({
-      data: { user: { id: "user-123" } },
-    });
-  });
-
-  it("saves a grow-level observation with no plant_id", async () => {
+describe("createQuickLogEvent — RPC contract", () => {
+  it("forwards canonical event type, ids, note, and idempotency key", async () => {
     const out = await createQuickLogEvent({
-      growId: "grow-abc",
-      eventType: "observe",
-      note: "looking good",
-    });
-    expect(out).toEqual({ id: "event-1" });
-    expect(calls.growEvents.insert).toHaveBeenCalledTimes(1);
-    const arg = (calls.growEvents.insert.mock.calls[0] as any[])[0];
-    expect(arg).toMatchObject({
-      user_id: "user-123",
-      grow_id: "grow-abc",
-      tent_id: null,
-      plant_id: null,
-      event_type: "observation",
-      source: "manual",
-      note: "looking good",
-    });
-    // No tent → no sensor lookup, no diary write.
-    expect(calls.rpc).not.toHaveBeenCalled();
-    expect(calls.diary.insert).not.toHaveBeenCalled();
-  });
-
-  it("saves a plant-linked watering event", async () => {
-    await createQuickLogEvent({
-      growId: "grow-abc",
+      ...baseInput,
       tentId: "tent-1",
       plantId: "plant-1",
       eventType: "water",
+      note: "  half gallon ",
     });
-    const arg = (calls.growEvents.insert.mock.calls[0] as any[])[0];
-    expect(arg.plant_id).toBe("plant-1");
-    expect(arg.tent_id).toBe("tent-1");
-    expect(arg.event_type).toBe("watering");
+    expect(out).toEqual({ id: "event-1", reused: false });
+    const args = getSaveCall();
+    expect(args).toMatchObject({
+      p_idempotency_key: baseInput.idempotencyKey,
+      p_grow_id: "grow-abc",
+      p_tent_id: "tent-1",
+      p_plant_id: "plant-1",
+      p_event_type: "watering",
+      p_note: "  half gallon ",
+      p_photo_url: null,
+    });
   });
 
   it("maps every quick-log event type deterministically", async () => {
@@ -223,30 +98,32 @@ describe("createQuickLogEvent — writes", () => {
       note: "note",
     });
     for (const [ui, canonical] of cases) {
-      resetState();
-      (supabase.auth.getUser as any).mockResolvedValue({
-        data: { user: { id: "user-123" } },
-      });
-      await createQuickLogEvent({ growId: "grow-abc", eventType: ui });
-      const arg = (calls.growEvents.insert.mock.calls[0] as any[])[0];
-      expect(arg.event_type).toBe(canonical);
+      rpcSpy.mockClear();
+      await createQuickLogEvent({ ...baseInput, eventType: ui });
+      expect(getSaveCall()?.p_event_type).toBe(canonical);
     }
   });
 
-  it("does not embed a fake sensor snapshot when readings are absent", async () => {
-    state.rpcResult = { data: null, error: null };
+  it("does not fetch or send a snapshot when tentId is absent", async () => {
+    await createQuickLogEvent({ ...baseInput, eventType: "observe" });
+    expect(
+      rpcSpy.mock.calls.some((c) => c[0] === "get_latest_tent_sensor_snapshot"),
+    ).toBe(false);
+    expect(getSaveCall()?.p_sensor_snapshot).toBeNull();
+  });
+
+  it("omits sensor snapshot when readings are absent (never fakes data)", async () => {
+    state.snapshotRpc = { data: null, error: null };
     await createQuickLogEvent({
-      growId: "grow-abc",
+      ...baseInput,
       tentId: "tent-1",
       eventType: "observe",
     });
-    expect(calls.rpc).toHaveBeenCalledWith({ _tent_id: "tent-1" });
-    // No snapshot + no photo → no diary write at all.
-    expect(calls.diary.insert).not.toHaveBeenCalled();
+    expect(getSaveCall()?.p_sensor_snapshot).toBeNull();
   });
 
-  it("preserves source + captured_at on real snapshots and never relabels as live", async () => {
-    state.rpcResult = {
+  it("preserves snapshot source + captured_at verbatim and never relabels to live", async () => {
+    state.snapshotRpc = {
       data: {
         captured_at: "2026-06-09T12:00:00Z",
         source: "csv",
@@ -260,60 +137,98 @@ describe("createQuickLogEvent — writes", () => {
       error: null,
     };
     await createQuickLogEvent({
-      growId: "grow-abc",
+      ...baseInput,
       tentId: "tent-1",
       eventType: "observe",
     });
-    expect(calls.diary.insert).toHaveBeenCalledTimes(1);
-    const diaryArg = (calls.diary.insert.mock.calls[0] as any[])[0];
-    expect(diaryArg.details.sensor_snapshot).toEqual({
-      source: "csv",
-      captured_at: "2026-06-09T12:00:00Z",
-      metrics: { temperature: 24.3, humidity: 55 },
-    });
-    expect(diaryArg.details.linked_grow_event_id).toBe("event-1");
-    // Source must NOT be upgraded to "live".
-    expect(diaryArg.details.sensor_snapshot.source).not.toBe("live");
+    const snap = getSaveCall()?.p_sensor_snapshot as {
+      source: string;
+      captured_at: string;
+      metrics: Record<string, number>;
+    };
+    expect(snap.source).toBe("csv");
+    expect(snap.source).not.toBe("live");
+    expect(snap.captured_at).toBe("2026-06-09T12:00:00Z");
+    expect(snap.metrics).toEqual({ temperature: 24.3, humidity: 55 });
   });
 
-  it("rolls back the grow_event and throws when diary insert fails", async () => {
-    state.rpcResult = {
-      data: {
-        captured_at: "2026-06-09T12:00:00Z",
-        source: "manual",
-        temperature: 24,
-        humidity: null,
-        vpd: null,
-        soil_temp: null,
-        soil_ec: null,
-        ppfd: null,
-      },
+  it("returns reused=true when the RPC replays a duplicate save", async () => {
+    state.saveRpc = {
+      data: { ok: true, grow_event_id: "event-1", reused: true },
       error: null,
     };
-    state.diaryInsert = { error: { message: "boom" } };
+    const out = await createQuickLogEvent({
+      ...baseInput,
+      eventType: "note",
+    });
+    expect(out).toEqual({ id: "event-1", reused: true });
+  });
+
+  it("translates not_authenticated reason", async () => {
+    state.saveRpc = {
+      data: { ok: false, reason: "not_authenticated" },
+      error: null,
+    };
+    await expect(
+      createQuickLogEvent({ ...baseInput, eventType: "note" }),
+    ).rejects.toThrow("Not authenticated");
+  });
+
+  it("translates grow_not_owned reason", async () => {
+    state.saveRpc = {
+      data: { ok: false, reason: "grow_not_owned" },
+      error: null,
+    };
+    await expect(
+      createQuickLogEvent({ ...baseInput, eventType: "note" }),
+    ).rejects.toThrow("Grow not found or not owned by current user");
+  });
+
+  it("translates plant_not_in_grow reason", async () => {
+    state.saveRpc = {
+      data: { ok: false, reason: "plant_not_in_grow" },
+      error: null,
+    };
+    await expect(
+      createQuickLogEvent({
+        ...baseInput,
+        tentId: "tent-1",
+        plantId: "plant-x",
+        eventType: "observe",
+      }),
+    ).rejects.toThrow("Plant does not belong to this grow");
+  });
+
+  it("translates plant_not_in_tent reason", async () => {
+    state.saveRpc = {
+      data: { ok: false, reason: "plant_not_in_tent" },
+      error: null,
+    };
+    await expect(
+      createQuickLogEvent({
+        ...baseInput,
+        tentId: "tent-1",
+        plantId: "plant-1",
+        eventType: "observe",
+      }),
+    ).rejects.toThrow("Plant does not belong to this tent");
+  });
+
+  it("rejects calls with a missing/short idempotency key", async () => {
     await expect(
       createQuickLogEvent({
         growId: "grow-abc",
-        tentId: "tent-1",
-        eventType: "observe",
+        eventType: "note",
+        idempotencyKey: "short",
       }),
-    ).rejects.toThrow("Failed to save quick log details: boom");
-    // Compensation delete fires with id + user_id scope.
-    expect(calls.growEvents.delete).toHaveBeenCalledTimes(1);
-    const eqCalls = calls.growEvents.eq.mock.calls.map((c) => c.slice(0, 2));
-    expect(eqCalls).toEqual(
-      expect.arrayContaining([
-        ["id", "event-1"],
-        ["user_id", "user-123"],
-      ]),
-    );
+    ).rejects.toThrow(/idempotency key/i);
+    expect(rpcSpy).not.toHaveBeenCalled();
   });
 
-  it("throws and does not write diary when grow_events insert fails", async () => {
-    state.growEventInsert = { data: null, error: { message: "db down" } };
+  it("surfaces the underlying error message when the RPC errors out", async () => {
+    state.saveRpc = { data: null, error: { message: "db down" } };
     await expect(
-      createQuickLogEvent({ growId: "grow-abc", eventType: "note" }),
+      createQuickLogEvent({ ...baseInput, eventType: "note" }),
     ).rejects.toThrow("Failed to save quick log: db down");
-    expect(calls.diary.insert).not.toHaveBeenCalled();
   });
 });

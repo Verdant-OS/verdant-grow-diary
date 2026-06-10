@@ -1,10 +1,10 @@
 /**
  * csvParser — CSV Drop parser for historical environment data.
  *
- * Scope: hardware-neutral environmental CSV (AC Infinity etc.). Pure, no I/O
- * besides reading the supplied File. No alerts, no Action Queue, no device
- * control, no automation. Every parsed row carries the hardcoded
- * source_tag "csv" — CSV data is historical context, NEVER live.
+ * Scope: hardware-neutral environmental CSV (AC Infinity, Spider Farmer, etc.).
+ * Pure, no I/O besides reading the supplied File. No alerts, no Action Queue,
+ * no device control, no automation. Every parsed row carries source_tag "csv" —
+ * CSV data is historical context, NEVER live.
  *
  * Output:
  *  - validRows: canonicalized + raw-preserving rows ready for confirm-insert
@@ -48,6 +48,9 @@ export interface DetectedColumns {
   time: string | null;
   temperature: string | null;
   humidity: string | null;
+  vpd: string | null;
+  co2: string | null;
+  ppfd: string | null;
 }
 
 export interface ParsedEnvironmentRow {
@@ -57,10 +60,13 @@ export interface ParsedEnvironmentRow {
   temperature_c: number | null;
   humidity_pct: number | null;
   vpd_kpa: number | null;
+  co2_ppm: number | null;
+  ppfd: number | null;
   // raw preserved
   raw_temperature: number | null;
   raw_temp_unit: RawTempUnit;
   raw_payload: Record<string, string>;
+  vpd_source: "csv" | "derived" | null;
   // source — hardcoded
   source_tag: typeof CSV_SOURCE_TAG;
 }
@@ -149,7 +155,12 @@ export function parseEnvironmentCSVText(
     detected.timestamp !== null ||
     (detected.date !== null && detected.time !== null) ||
     detected.date !== null;
-  const hasMetricCol = detected.temperature !== null || detected.humidity !== null;
+  const hasMetricCol =
+    detected.temperature !== null ||
+    detected.humidity !== null ||
+    detected.vpd !== null ||
+    detected.co2 !== null ||
+    detected.ppfd !== null;
   if (!hasTimeCol || !hasMetricCol) {
     return withError(
       empty,
@@ -199,8 +210,8 @@ export function parseEnvironmentCSVText(
     if (tempHeader) {
       const cell = (rec[tempHeader] ?? "").trim();
       if (cell !== "") {
-        const n = Number(cell);
-        if (!Number.isFinite(n)) {
+        const n = parseNumber(cell);
+        if (n == null) {
           skipped.push({ rowNumber, reason: "invalid_temperature" });
           return;
         }
@@ -217,8 +228,8 @@ export function parseEnvironmentCSVText(
     if (detected.humidity) {
       const cell = (rec[detected.humidity] ?? "").trim();
       if (cell !== "") {
-        let n = Number(cell.replace(/%$/, ""));
-        if (!Number.isFinite(n)) {
+        let n = parseNumber(cell.replace(/%$/, ""));
+        if (n == null) {
           skipped.push({ rowNumber, reason: "invalid_humidity" });
           return;
         }
@@ -231,15 +242,20 @@ export function parseEnvironmentCSVText(
       }
     }
 
-    if (tempC == null && rh == null) {
+    const csvVpd = detected.vpd ? parseMetric(rec[detected.vpd], 0, 10) : null;
+    const vpd =
+      csvVpd != null
+        ? csvVpd
+        : tempC != null && rh != null && Number.isFinite(tempC) && Number.isFinite(rh)
+          ? computeVpdKpa(tempC, rh)
+          : null;
+    const co2Ppm = detected.co2 ? parseMetric(rec[detected.co2], 0, 10_000) : null;
+    const ppfd = detected.ppfd ? parseMetric(rec[detected.ppfd], 0, 2_500) : null;
+
+    if (tempC == null && rh == null && vpd == null && co2Ppm == null && ppfd == null) {
       skipped.push({ rowNumber, reason: "no_metrics" });
       return;
     }
-
-    const vpd =
-      tempC != null && rh != null && Number.isFinite(tempC) && Number.isFinite(rh)
-        ? computeVpdKpa(tempC, rh)
-        : null;
 
     const tMs = Date.parse(captured);
     if (Number.isFinite(tMs)) {
@@ -253,9 +269,12 @@ export function parseEnvironmentCSVText(
       temperature_c: tempC,
       humidity_pct: rh,
       vpd_kpa: vpd,
+      co2_ppm: co2Ppm,
+      ppfd,
       raw_temperature: rawTemp,
       raw_temp_unit: tempHeader ? inferredUnit : "unknown",
       raw_payload: rec,
+      vpd_source: csvVpd != null ? "csv" : vpd != null ? "derived" : null,
       source_tag: CSV_SOURCE_TAG,
     });
   });
@@ -284,7 +303,8 @@ export function parseEnvironmentCSVText(
 /**
  * Re-normalize a previously parsed result using a user-chosen temperature unit.
  * Used after the ambiguity confirm screen — recomputes temperature_c + vpd_kpa
- * without re-parsing the file.
+ * without re-parsing the file. If a CSV VPD column existed, it remains the
+ * source of truth instead of being overwritten by derived VPD.
  */
 export function renormalizeWithUnit(
   result: ParseEnvironmentCsvResult,
@@ -296,9 +316,11 @@ export function renormalizeWithUnit(
     const tempC =
       unit === "F" ? (r.raw_temperature - 32) * (5 / 9) : r.raw_temperature;
     const vpd =
-      tempC != null && r.humidity_pct != null
-        ? computeVpdKpa(tempC, r.humidity_pct)
-        : null;
+      r.vpd_source === "csv"
+        ? r.vpd_kpa
+        : tempC != null && r.humidity_pct != null
+          ? computeVpdKpa(tempC, r.humidity_pct)
+          : null;
     return {
       ...r,
       temperature_c: tempC,
@@ -332,6 +354,9 @@ function emptyResult(): ParseEnvironmentCsvResult {
       time: null,
       temperature: null,
       humidity: null,
+      vpd: null,
+      co2: null,
+      ppfd: null,
     },
     errors: [],
   };
@@ -395,7 +420,7 @@ function parseCsvText(text: string): { headers: string[]; rows: string[][] } {
   }
   const nonEmpty = all.filter((r) => !(r.length === 1 && r[0].trim() === ""));
   if (nonEmpty.length === 0) return { headers: [], rows: [] };
-  const headers = nonEmpty[0].map((h) => h.trim());
+  const headers = nonEmpty[0].map((h) => h.replace(/^\uFEFF/, "").trim());
   return { headers, rows: nonEmpty.slice(1) };
 }
 
@@ -406,9 +431,15 @@ function detectColumns(headers: string[]): DetectedColumns {
     time: null,
     temperature: null,
     humidity: null,
+    vpd: null,
+    co2: null,
+    ppfd: null,
   };
+
+  const temperatureCandidates: string[] = [];
+
   for (const h of headers) {
-    const k = h.toLowerCase().trim();
+    const k = normalizeHeader(h);
     if (out.timestamp == null && /(^|[^a-z])timestamp([^a-z]|$)|^created.?at$|^recorded.?at$/.test(k)) {
       out.timestamp = h;
       continue;
@@ -421,20 +452,43 @@ function detectColumns(headers: string[]): DetectedColumns {
       out.time = h;
       continue;
     }
-    if (
-      out.temperature == null &&
-      /temp/.test(k) &&
-      !/setpoint|target/.test(k)
-    ) {
-      out.temperature = h;
+    if (/temp/.test(k) && !/setpoint|target/.test(k)) {
+      temperatureCandidates.push(h);
       continue;
     }
     if (out.humidity == null && /(humidity|^rh\b|^rh[^a-z])/.test(k)) {
       out.humidity = h;
       continue;
     }
+    if (out.vpd == null && /(^|[^a-z])vpd([^a-z]|$)/.test(k)) {
+      out.vpd = h;
+      continue;
+    }
+    if (out.co2 == null && /(co2|co₂|carbon.?dioxide)/.test(k)) {
+      out.co2 = h;
+      continue;
+    }
+    if (out.ppfd == null && /(ppfd|par|photosynthetic)/.test(k)) {
+      out.ppfd = h;
+      continue;
+    }
   }
+
+  out.temperature = chooseTemperatureColumn(temperatureCandidates);
   return out;
+}
+
+function normalizeHeader(header: string): string {
+  return header.replace(/^\uFEFF/, "").toLowerCase().trim();
+}
+
+function chooseTemperatureColumn(candidates: readonly string[]): string | null {
+  if (candidates.length === 0) return null;
+  const celsius = candidates.find((h) => unitFromHeader(h) === "C");
+  if (celsius) return celsius;
+  const fahrenheit = candidates.find((h) => unitFromHeader(h) === "F");
+  if (fahrenheit) return fahrenheit;
+  return candidates[0];
 }
 
 function unitFromHeader(header: string): RawTempUnit {
@@ -453,8 +507,8 @@ function collectTemperatureSample(
   if (idx < 0) return [];
   const out: number[] = [];
   for (const r of rows) {
-    const n = Number((r[idx] ?? "").trim());
-    if (Number.isFinite(n)) out.push(n);
+    const n = parseNumber((r[idx] ?? "").trim());
+    if (n != null) out.push(n);
     if (out.length >= 50) break;
   }
   return out;
@@ -495,9 +549,30 @@ function resolveCapturedAt(
 
 function parseFlexibleDate(input: string): string | null {
   if (!input) return null;
-  // Try ISO / native first.
+
+  // Explicit Spider Farmer / common export format: YYYY-MM-DD HH:mm[:ss]
+  const ymd = input.match(
+    /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/,
+  );
+  if (ymd) {
+    const [, yr, mo, da, hh, mm, ss] = ymd;
+    const d = new Date(
+      Date.UTC(
+        Number(yr),
+        Number(mo) - 1,
+        Number(da),
+        Number(hh ?? 0),
+        Number(mm ?? 0),
+        Number(ss ?? 0),
+      ),
+    );
+    return Number.isFinite(d.getTime()) ? d.toISOString() : null;
+  }
+
+  // Try ISO / native for timezone-marked strings.
   const direct = Date.parse(input);
   if (Number.isFinite(direct)) return new Date(direct).toISOString();
+
   // Try MM/DD/YYYY HH:mm[:ss]
   const m = input.match(
     /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/,
@@ -518,4 +593,21 @@ function parseFlexibleDate(input: string): string | null {
     return Number.isFinite(d.getTime()) ? d.toISOString() : null;
   }
   return null;
+}
+
+function parseNumber(input: string): number | null {
+  const cleaned = `${input ?? ""}`.trim().replace(/,/g, "");
+  if (cleaned === "") return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
+function parseMetric(
+  input: string | undefined,
+  min: number,
+  max: number,
+): number | null {
+  const n = parseNumber(input ?? "");
+  if (n == null) return null;
+  return n >= min && n <= max ? n : null;
 }

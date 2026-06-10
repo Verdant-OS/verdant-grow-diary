@@ -132,6 +132,26 @@ export const CSV_MAPPING_TEMPLATES: ReadonlyArray<CsvMappingTemplate> = [
     },
   },
   {
+    id: "thp_export",
+    name: "THP sensor export",
+    description:
+      "Tuya/THP-style export with deviceSerialnum, temperature(°C/°F), humidity, vpd, and optional ppfd.",
+    requiredFields: ["timestamp", "air_temp", "humidity"],
+    signature: {
+      allOf: ["timestamp", "temperature(°c)", "humidity", "vpd"],
+    },
+    fields: {
+      timestamp: { synonyms: ["timestamp"] },
+      air_temp: {
+        synonyms: ["temperature(°c)", "temperature (°c)", "temperature_c"],
+        unit: "C",
+      },
+      humidity: { synonyms: ["humidity"] },
+      vpd: { synonyms: ["vpd"] },
+      ppfd: { synonyms: ["ppfd"] },
+    },
+  },
+  {
     id: "blank_reset",
     name: "Blank (clear mapping)",
     description:

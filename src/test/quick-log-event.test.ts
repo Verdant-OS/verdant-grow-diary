@@ -82,26 +82,72 @@ describe("createQuickLogEvent — RPC contract", () => {
     });
   });
 
-  it("maps every quick-log event type deterministically", async () => {
+  it("maps every quick-log event type deterministically (note → observation)", async () => {
     const cases: [QuickLogEventType, string][] = [
       ["observe", "observation"],
       ["water", "watering"],
       ["feed", "feeding"],
       ["photo", "photo"],
-      ["note", "note"],
+      ["note", "observation"],
     ];
     expect(QUICK_LOG_EVENT_TYPE_MAP).toEqual({
       observe: "observation",
       water: "watering",
       feed: "feeding",
       photo: "photo",
-      note: "note",
+      note: "observation",
     });
     for (const [ui, canonical] of cases) {
       rpcSpy.mockClear();
       await createQuickLogEvent({ ...baseInput, eventType: ui });
       expect(getSaveCall()?.p_event_type).toBe(canonical);
     }
+  });
+
+  it("attaches details.kind='note' (preserving original_event_type) only for note-style logs", async () => {
+    await createQuickLogEvent({
+      ...baseInput,
+      eventType: "note",
+      note: "leaves looking a bit droopy",
+    });
+    const noteCall = getSaveCall();
+    expect(noteCall?.p_event_type).toBe("observation");
+    expect(noteCall?.p_details).toEqual({
+      kind: "note",
+      original_event_type: "note",
+    });
+    // Note text must be preserved verbatim, not lost in mapping.
+    expect(noteCall?.p_note).toBe("leaves looking a bit droopy");
+
+    for (const ui of ["observe", "water", "feed", "photo"] as const) {
+      rpcSpy.mockClear();
+      await createQuickLogEvent({ ...baseInput, eventType: ui });
+      expect(getSaveCall()?.p_details).toBeNull();
+    }
+  });
+
+  it("translates invalid_event_type reason from the RPC", async () => {
+    state.saveRpc = {
+      data: { ok: false, reason: "invalid_event_type" },
+      error: null,
+    };
+    await expect(
+      createQuickLogEvent({ ...baseInput, eventType: "observe" }),
+    ).rejects.toThrow(/invalid_event_type/);
+  });
+
+  it("note-style idempotency replay still returns the original event id", async () => {
+    state.saveRpc = {
+      data: { ok: true, grow_event_id: "event-1", reused: true },
+      error: null,
+    };
+    const out = await createQuickLogEvent({
+      ...baseInput,
+      eventType: "note",
+      note: "second click",
+    });
+    expect(out).toEqual({ id: "event-1", reused: true });
+    expect(getSaveCall()?.p_event_type).toBe("observation");
   });
 
   it("does not fetch or send a snapshot when tentId is absent", async () => {

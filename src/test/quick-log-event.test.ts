@@ -95,9 +95,16 @@ function resetState() {
   state.growEventInsert = { data: { id: "event-1" }, error: null };
   state.diaryInsert = { error: null };
   state.deleteResult = { error: null };
-  for (const group of Object.values(calls)) {
-    for (const fn of Object.values(group)) (fn as any).mockClear();
-  }
+  const clearAll = (obj: any) => {
+    for (const val of Object.values(obj)) {
+      if (typeof val === "function" && "mockClear" in val) {
+        val.mockClear();
+      } else if (val && typeof val === "object") {
+        clearAll(val);
+      }
+    }
+  };
+  clearAll(calls);
 }
 
 describe("createQuickLogEvent — auth + ownership", () => {

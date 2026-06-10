@@ -61,7 +61,9 @@ export function buildAlertActionQueueEvidenceViewModel(
 
   const draftResult = buildActionQueueDraftFromAlert(alert);
   if (!isAlertEligibleForActionQueue(alert) || !draftResult.ok) {
-    const reason = draftResult.ok ? "not_eligible" : draftResult.reason;
+    const reason = draftResult.ok
+      ? "not_eligible"
+      : (draftResult as { reason: string }).reason;
     return {
       eligible: false,
       statusLabel: "Not eligible",

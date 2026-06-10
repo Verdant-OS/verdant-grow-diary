@@ -199,7 +199,7 @@ export default function QuickLogV2Sheet({
       setSaveStatus("Uploading photo…");
       const upload = await uploadQuickLogPhoto(resolved.growId);
       if (!upload.ok) {
-        setLocalError(upload.message);
+        setLocalError((upload as { message: string }).message);
         setSaveStatus("");
         return;
       }
@@ -243,7 +243,7 @@ export default function QuickLogV2Sheet({
         photoPath: uploadedPath,
       });
       if (!photoEntry.ok) {
-        setLocalError(photoEntry.message);
+        setLocalError((photoEntry as { message: string }).message);
         setSaveStatus("");
         return;
       }

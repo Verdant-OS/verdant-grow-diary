@@ -135,12 +135,12 @@ export async function createQuickLogEvent(input: CreateQuickLogInput) {
         plant_id: input.plantId ?? null,
         note: input.note?.trim() || "(quick log)",
         entry_at: new Date().toISOString(),
-        details: {
-          sensor_snapshot: sensorSnapshot,
-          photo_url: input.photoUrl ?? null,
-          quick_log_version: 1,
-          linked_grow_event_id: data?.id,
-        },
+      details: {
+        sensor_snapshot: sensorSnapshot,
+        photo_url: input.photoUrl ?? null,
+        quick_log_version: 1,
+        linked_grow_event_id: data?.id,
+      } as never,
       });
     if (diaryError) {
       // Non-fatal: the grow_event is the primary record.

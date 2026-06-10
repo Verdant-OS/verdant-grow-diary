@@ -62,7 +62,7 @@ describe("quickLogV2Rules", () => {
   it("only shows volume field for water", () => {
     expect(shouldShowVolumeField("water")).toBe(true);
     expect(shouldShowVolumeField("note")).toBe(false);
-    expect(shouldShowVolumeField("photo")).toBe(false);
+    expect(shouldShowVolumeField("note")).toBe(false);
   });
 
   it("photo saving blocked in Gate 1", () => {

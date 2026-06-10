@@ -15,7 +15,8 @@ import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import QuickLogV2Fab from "@/components/QuickLogV2Fab";
-import { ArrowLeft, Box, Lightbulb, Plus, Archive, GitMerge } from "lucide-react";
+import QuickLogModal from "@/components/QuickLogModal";
+import { ArrowLeft, Box, Lightbulb, Plus, Archive, GitMerge, NotebookPen } from "lucide-react";
 import CreatePlantDialog from "@/components/CreatePlantDialog";
 import AddExistingPlantDialog from "@/components/AddExistingPlantDialog";
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
@@ -64,6 +65,7 @@ import { plantDetailPath, tentsPath } from "@/lib/routes";
 export default function TentDetail() {
   const { id } = useParams();
   const [showArchived, setShowArchived] = useState(false);
+  const [quickLogOpen, setQuickLogOpen] = useState(false);
   const { data: tent, isLoading, isError, refetch } = useGrowTent(id);
   const { data: activePlants = [] } = useGrowPlants(id);
   const { data: allPlants = [] } = useGrowPlants(id, undefined, { includeArchived: true });
@@ -149,6 +151,27 @@ export default function TentDetail() {
   return (
     <div>
       <QuickLogV2Fab defaultTargetKey={tent?.id ? `tent:${tent.id}` : null} />
+      <Button
+        type="button"
+        onClick={() => setQuickLogOpen(true)}
+        className="fixed bottom-20 left-4 md:bottom-6 md:left-6 z-40 shadow-lg pb-[env(safe-area-inset-bottom)] md:pb-0 gradient-leaf text-primary-foreground"
+        size="lg"
+        aria-label="Open Quick Log"
+        data-testid="tent-detail-quick-log-fab"
+      >
+        <NotebookPen className="mr-2 h-5 w-5" />
+        Quick Log
+      </Button>
+      {tent && id && (
+        <QuickLogModal
+          open={quickLogOpen}
+          onOpenChange={setQuickLogOpen}
+          tentId={id}
+          growId={tent.growId ?? ""}
+          tentName={tent.name}
+          plants={visiblePlants.map((p) => ({ id: p.id, name: p.name }))}
+        />
+      )}
       <Button asChild variant="ghost" size="sm" className="mb-3"><Link to={tentsPath()}><ArrowLeft className="h-4 w-4" /> Tents</Link></Button>
       <PageHeader
         title={tent.name}

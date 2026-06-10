@@ -35,7 +35,16 @@ describe("environmentCsvImportViewModel", () => {
       skippedRows: [],
       dateRange: null,
       isAmbiguous: false,
-      detectedColumns: { timestamp: null, date: null, time: null, temperature: null, humidity: null },
+      detectedColumns: {
+        timestamp: null,
+        date: null,
+        time: null,
+        temperature: null,
+        humidity: null,
+        vpd: null,
+        co2: null,
+        ppfd: null,
+      },
       errors: [{ code: "empty_file", message: "x" }],
     });
     expect(next.phase).toBe("error");

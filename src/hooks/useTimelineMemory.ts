@@ -28,6 +28,8 @@ import type {
   TimelineMemoryItem,
 } from "@/lib/timelineFilterRules";
 import { deriveSensorEvidenceMode } from "@/lib/aiDoctorSessionPersistence";
+import { isQuickLogCompanionDiaryRow } from "@/lib/quick-log/quickLogDiaryCompanionRules";
+
 
 export const TIMELINE_MEMORY_DEFAULT_LIMIT = 100;
 

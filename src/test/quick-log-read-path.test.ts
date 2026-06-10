@@ -41,7 +41,7 @@ describe("quickLogDiaryCompanionRules", () => {
     expect(v.sensorSnapshot).toEqual({
       source: "csv",
       capturedAt: "2026-06-09T12:00:00Z",
-      metrics: { temperature_c: 24.5, humidity_pct: 55 },
+      metrics: { temperature: 24.5, humidity: 55 },
     });
     expect(v.sensorSnapshot!.source).not.toBe("live");
   });

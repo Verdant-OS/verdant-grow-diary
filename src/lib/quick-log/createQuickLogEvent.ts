@@ -125,9 +125,20 @@ export async function createQuickLogEvent(input: CreateQuickLogInput) {
   }
 
   // 3. Best-effort sensor snapshot. Absence is a real signal — never faked.
-  const sensorSnapshot = input.tentId
+  const rawSnapshot = input.tentId
     ? await fetchLatestSensorSnapshot(input.tentId)
     : null;
+
+  // Strict validation guards against malformed snapshots leaking into
+  // diary_entries.details. Invalid payloads block the save outright;
+  // absent telemetry is preserved as absent.
+  const snapshotValidation = validateQuickLogSensorSnapshot(rawSnapshot);
+  if (!snapshotValidation.ok) {
+    throw new Error(
+      `Failed to save quick log: invalid sensor snapshot (${snapshotValidation.error})`,
+    );
+  }
+  const sensorSnapshot = snapshotValidation.snapshot;
 
   // 4. Primary write: grow_events.
   const { data: eventRow, error: eventError } = await supabase
@@ -151,16 +162,15 @@ export async function createQuickLogEvent(input: CreateQuickLogInput) {
   }
 
   // 5. Optional companion diary_entries row carrying structured details.
-  const hasSnapshot =
-    !!sensorSnapshot && Object.keys(sensorSnapshot.metrics).length > 0;
+  const hasSnapshot = sensorSnapshot !== null;
   const needsDiary = hasSnapshot || !!input.photoUrl;
   if (needsDiary) {
     const details = {
       sensor_snapshot: hasSnapshot
         ? {
-            source: sensorSnapshot!.source,
-            captured_at: sensorSnapshot!.captured_at,
-            metrics: sensorSnapshot!.metrics,
+            source: sensorSnapshot.source,
+            captured_at: sensorSnapshot.captured_at,
+            metrics: sensorSnapshot.metrics,
           }
         : null,
       photo_url: input.photoUrl ?? null,

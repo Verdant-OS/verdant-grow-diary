@@ -158,12 +158,14 @@ export default function QuickLogModal({
   };
 
   const handleSave = async () => {
+    if (saving) return; // belt-and-suspenders against double-submit
     setSaving(true);
+    let uploadedPath: string | null = null;
     try {
-      let photoUrl: string | null = null;
       if (photoFile) {
-        photoUrl = await uploadPhoto();
-        if (!photoUrl) {
+        uploadedPath = await uploadPhoto();
+        if (!uploadedPath) {
+          // uploadPhoto already toasted the failure. Block save cleanly.
           setSaving(false);
           return;
         }
@@ -175,7 +177,7 @@ export default function QuickLogModal({
         plantId: plantId || undefined,
         eventType,
         note: note.trim() || undefined,
-        photoUrl: photoUrl ?? undefined,
+        photoUrl: uploadedPath ?? undefined,
       });
 
       toast.success("Log saved");
@@ -185,12 +187,23 @@ export default function QuickLogModal({
       onOpenChange(false);
       resetForm();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Save failed";
+      // Clean up orphan storage object so a failed save does not leak files.
+      if (uploadedPath) {
+        try {
+          await supabase.storage.from("diary-photos").remove([uploadedPath]);
+        } catch (cleanupErr) {
+          // eslint-disable-next-line no-console
+          console.error("QuickLog photo cleanup failed:", cleanupErr);
+        }
+      }
+      const message =
+        err instanceof Error ? err.message : "Could not save your log. Please try again.";
       toast.error(message);
     } finally {
       setSaving(false);
     }
   };
+
 
   const selectedPlantName = plants.find((p) => p.id === plantId)?.name ?? null;
 

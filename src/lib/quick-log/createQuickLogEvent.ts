@@ -95,6 +95,8 @@ export async function createQuickLogEvent(
   }
   const sensorSnapshot = snapshotValidation.snapshot;
 
+  const details = buildQuickLogDetails(input.eventType);
+
   const { data, error } = await supabase.rpc(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     "quicklog_save_event" as any,
@@ -114,6 +116,7 @@ export async function createQuickLogEvent(
           }
         : null,
       p_occurred_at: null,
+      p_details: details,
     } as unknown as Record<string, unknown>,
   );
 

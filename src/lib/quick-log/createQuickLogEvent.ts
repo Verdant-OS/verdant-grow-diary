@@ -18,6 +18,7 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { validateQuickLogSensorSnapshot } from "./quickLogSensorSnapshotValidation";
+import { fetchLatestSensorSnapshot } from "./fetchLatestSensorSnapshot";
 
 export type QuickLogEventType = "observe" | "water" | "feed" | "photo" | "note";
 
@@ -46,40 +47,6 @@ export interface QuickLogSensorSnapshot {
   captured_at: string | null;
   /** Metric → finite numeric value. Empty object means "no usable readings". */
   metrics: Record<string, number>;
-}
-
-async function fetchLatestSensorSnapshot(
-  tentId: string,
-): Promise<QuickLogSensorSnapshot | null> {
-  const { data: rows, error } = await supabase
-    .from("sensor_readings")
-    .select("metric, value, source, captured_at")
-    .eq("tent_id", tentId)
-    .order("captured_at", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(50);
-
-  if (error || !rows || rows.length === 0) return null;
-
-  const seen = new Set<string>();
-  const metrics: Record<string, number> = {};
-  for (const row of rows) {
-    if (!row?.metric || seen.has(row.metric)) continue;
-    const n = typeof row.value === "number" ? row.value : Number(row.value);
-    if (!Number.isFinite(n)) continue;
-    seen.add(row.metric);
-    metrics[row.metric] = n;
-  }
-
-  if (Object.keys(metrics).length === 0) return null;
-
-  const mostRecent = rows[0];
-  return {
-    source: typeof mostRecent.source === "string" ? mostRecent.source : null,
-    captured_at:
-      typeof mostRecent.captured_at === "string" ? mostRecent.captured_at : null,
-    metrics,
-  };
 }
 
 export async function createQuickLogEvent(input: CreateQuickLogInput) {

@@ -11,7 +11,7 @@ type Result = { data: any; error: any };
 const state = {
   grows: { data: { id: "grow-abc" }, error: null } as Result,
   plants: { data: { id: "plant-1", grow_id: "grow-abc", tent_id: "tent-1" }, error: null } as Result,
-  sensorRows: { data: [] as any[], error: null } as Result,
+  rpcResult: { data: null, error: null } as Result,
   growEventInsert: { data: { id: "event-1" }, error: null } as Result,
   diaryInsert: { error: null } as { error: any },
   deleteResult: { error: null } as { error: any },
@@ -20,7 +20,7 @@ const state = {
 const calls = {
   grows: { select: vi.fn(), eq: vi.fn(), single: vi.fn() },
   plants: { select: vi.fn(), eq: vi.fn(), single: vi.fn() },
-  sensor: { select: vi.fn(), eq: vi.fn(), order: vi.fn(), limit: vi.fn() },
+  rpc: vi.fn(),
   growEvents: { insert: vi.fn(), select: vi.fn(), single: vi.fn(), delete: vi.fn(), eq: vi.fn() },
   diary: { insert: vi.fn() },
 };
@@ -39,13 +39,13 @@ function plantsBuilder() {
   b.single = () => { calls.plants.single(); return Promise.resolve(state.plants); };
   return b;
 }
-function sensorBuilder() {
-  const b: any = {};
-  b.select = (...a: any[]) => { calls.sensor.select(...a); return b; };
-  b.eq = (...a: any[]) => { calls.sensor.eq(...a); return b; };
-  b.order = (...a: any[]) => { calls.sensor.order(...a); return b; };
-  b.limit = (...a: any[]) => { calls.sensor.limit(...a); return Promise.resolve(state.sensorRows); };
-  return b;
+function rpcMock() {
+  return {
+    rpc: (_fn: string, args: any) => {
+      calls.rpc(args);
+      return Promise.resolve(state.rpcResult);
+    },
+  };
 }
 function growEventsBuilder() {
   const insertChain: any = {
@@ -77,12 +77,12 @@ vi.mock("@/integrations/supabase/client", () => ({
       switch (table) {
         case "grows": return growsBuilder();
         case "plants": return plantsBuilder();
-        case "sensor_readings": return sensorBuilder();
         case "grow_events": return growEventsBuilder();
         case "diary_entries": return diaryBuilder();
         default: return {};
       }
     },
+    ...rpcMock(),
   },
 }));
 
@@ -91,7 +91,7 @@ import { supabase } from "@/integrations/supabase/client";
 function resetState() {
   state.grows = { data: { id: "grow-abc" }, error: null };
   state.plants = { data: { id: "plant-1", grow_id: "grow-abc", tent_id: "tent-1" }, error: null };
-  state.sensorRows = { data: [], error: null };
+  state.rpcResult = { data: null, error: null };
   state.growEventInsert = { data: { id: "event-1" }, error: null };
   state.diaryInsert = { error: null };
   state.deleteResult = { error: null };
@@ -183,7 +183,7 @@ describe("createQuickLogEvent — writes", () => {
       note: "looking good",
     });
     // No tent → no sensor lookup, no diary write.
-    expect(calls.sensor.limit).not.toHaveBeenCalled();
+    expect(calls.rpc).not.toHaveBeenCalled();
     expect(calls.diary.insert).not.toHaveBeenCalled();
   });
 
@@ -227,22 +227,29 @@ describe("createQuickLogEvent — writes", () => {
   });
 
   it("does not embed a fake sensor snapshot when readings are absent", async () => {
-    state.sensorRows = { data: [], error: null };
+    state.rpcResult = { data: null, error: null };
     await createQuickLogEvent({
       growId: "grow-abc",
       tentId: "tent-1",
       eventType: "observe",
     });
+    expect(calls.rpc).toHaveBeenCalledWith({ _tent_id: "tent-1" });
     // No snapshot + no photo → no diary write at all.
     expect(calls.diary.insert).not.toHaveBeenCalled();
   });
 
   it("preserves source + captured_at on real snapshots and never relabels as live", async () => {
-    state.sensorRows = {
-      data: [
-        { metric: "temperature_c", value: 24.3, source: "csv", captured_at: "2026-06-09T12:00:00Z" },
-        { metric: "humidity_pct", value: 55, source: "csv", captured_at: "2026-06-09T12:00:00Z" },
-      ],
+    state.rpcResult = {
+      data: {
+        captured_at: "2026-06-09T12:00:00Z",
+        source: "csv",
+        temperature: 24.3,
+        humidity: 55,
+        vpd: null,
+        soil_temp: null,
+        soil_ec: null,
+        ppfd: null,
+      },
       error: null,
     };
     await createQuickLogEvent({
@@ -255,7 +262,7 @@ describe("createQuickLogEvent — writes", () => {
     expect(diaryArg.details.sensor_snapshot).toEqual({
       source: "csv",
       captured_at: "2026-06-09T12:00:00Z",
-      metrics: { temperature_c: 24.3, humidity_pct: 55 },
+      metrics: { temperature: 24.3, humidity: 55 },
     });
     expect(diaryArg.details.linked_grow_event_id).toBe("event-1");
     // Source must NOT be upgraded to "live".

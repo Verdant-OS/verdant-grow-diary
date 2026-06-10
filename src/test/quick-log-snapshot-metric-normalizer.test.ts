@@ -1,11 +1,21 @@
 /**
  * Tests for the shared Quick Log snapshot metric normalizer and its wiring
  * into the diary companion + AI Doctor context read paths.
+ *
+ * Also covers the key-shape drift contract:
+ *   - clean keys win over legacy keys on conflict
+ *   - unknown clean-shaped keys pass through verbatim
+ *   - numeric strings / NaN / Infinity / null / objects / arrays are dropped
+ *   - empty / all-non-finite maps return {} (→ sensorSnapshot = null)
+ *   - mixed legacy + clean rows produce identical canonical metric keys
+ *     in the AI Doctor adapter (the v1 read-side surface)
  */
 import { describe, it, expect } from "vitest";
 import {
   normalizeQuickLogSnapshotMetrics,
   QUICK_LOG_CANONICAL_METRICS,
+  QUICK_LOG_LEGACY_TO_CANONICAL,
+  type CanonicalQuickLogSensorSnapshotMetrics,
 } from "@/lib/quick-log/quickLogSnapshotMetricNormalizer";
 import { extractQuickLogCompanionView } from "@/lib/quick-log/quickLogDiaryCompanionRules";
 import { buildQuickLogAiContext } from "@/lib/quick-log/quickLogAiDoctorContextAdapter";

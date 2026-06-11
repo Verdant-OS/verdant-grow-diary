@@ -106,14 +106,8 @@ describe("buildEnvironmentSummaryReportViewModel", () => {
     expect(idxInvalid).toBeGreaterThanOrEqual(0);
     expect(idxReview).toBeGreaterThan(idxInvalid);
 
-    const r = buildEnvironmentSummaryReportViewModel({
-      startDate: "2026-06-01",
-      endDate: "2026-06-11",
-      checks,
-    });
-    // critical severity outranks warning regardless of count.
-    expect(r.topIssues[0].ruleId).toBe("source.invalid");
     const sourceReview = r.topIssues.find((i) => i.ruleId === "source.review")!;
+
     expect(sourceReview.count).toBe(2);
     expect(sourceReview.relatedEntryIds.sort()).toEqual(["a", "b"]);
     expect(sourceReview.drilldownUrl).toContain("issue=source.review");

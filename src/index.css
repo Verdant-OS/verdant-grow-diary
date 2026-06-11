@@ -161,3 +161,22 @@
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 }
+
+/* Print rules for Environment Summary Report (and any printable section). */
+@media screen {
+  .print-only { display: none !important; }
+}
+@media print {
+  .print-hidden { display: none !important; }
+  .print-only { display: block !important; }
+  body * { visibility: hidden; }
+  [data-print-section="environment-summary-report"],
+  [data-print-section="environment-summary-report"] * { visibility: visible; }
+  [data-print-section="environment-summary-report"] {
+    position: absolute;
+    inset: 0;
+    padding: 16px;
+    background: #fff;
+    color: #000;
+  }
+}

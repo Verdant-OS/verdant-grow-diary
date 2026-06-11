@@ -127,13 +127,58 @@ export function snapshotFromReadings(
 
 /**
  * Build a snapshot from a diary_entries.details.sensor_snapshot blob.
- * Tolerates missing/invalid values (rendered as Unknown).
+ *
+ * Tolerates BOTH shapes:
+ *   1. Legacy flat shape: { ts, temp, rh, vpd, co2, soil, soil_ec,
+ *      soil_temp, ppfd } — written by pre-Quick-Log diary code. Numeric
+ *      strings are coerced (existing contract).
+ *   2. Quick Log v1 companion shape: { source, captured_at, metrics: {
+ *      temperature, humidity, vpd, co2, soil_moisture, soil_temp,
+ *      soil_ec, ppfd, ... } } — written by `createQuickLogEvent` into
+ *      the companion diary row. Routed through the shared
+ *      `normalizeQuickLogSnapshotMetrics` so legacy (`temperature_c`,
+ *      `humidity_pct`, …) and clean canonical keys collapse to the
+ *      same canonical vocabulary the Quick Log timeline / AI Doctor
+ *      adapter consume. Without this, Quick Log writes render correctly
+ *      in the timeline but "Unknown" in the Latest Environment card.
+ *
+ * Source label remains `"diary"` in both shapes so existing source-label
+ * / trust badge behavior is preserved (no legacy/companion blob ever
+ * relabels itself as `live` via this path).
  */
 export function snapshotFromDiary(
   entryAt: string | null,
   snap: Record<string, unknown> | null | undefined,
 ): SensorSnapshot | null {
   if (!snap || typeof snap !== "object") return null;
+
+  const rawMetrics =
+    snap.metrics && typeof snap.metrics === "object" && !Array.isArray(snap.metrics)
+      ? (snap.metrics as Record<string, unknown>)
+      : null;
+
+  if (rawMetrics) {
+    const capturedAt =
+      (typeof snap.captured_at === "string" ? (snap.captured_at as string) : null) ??
+      (typeof snap.ts === "string" ? (snap.ts as string) : null) ??
+      entryAt;
+    if (!capturedAt) return null;
+    const m = normalizeQuickLogSnapshotMetrics(rawMetrics);
+    return {
+      source: "diary",
+      ts: capturedAt,
+      temp: toFiniteNumber(m.temperature),
+      rh: toFiniteNumber(m.humidity),
+      vpd: toFiniteNumber(m.vpd),
+      co2: toFiniteNumber(m.co2),
+      soil: toFiniteNumber(m.soil_moisture),
+      soil_ec: toFiniteNumber(m.soil_ec),
+      soil_temp: toFiniteNumber(m.soil_temp),
+      ppfd: toFiniteNumber(m.ppfd),
+      device_id: null,
+    };
+  }
+
   const ts = (typeof snap.ts === "string" ? snap.ts : null) ?? entryAt;
   if (!ts) return null;
   return {

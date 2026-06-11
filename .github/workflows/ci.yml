@@ -81,6 +81,22 @@ jobs:
       - name: Route manifest + Alerts quick-link drift
         run: bunx vitest run src/test/route-manifest-sync.test.ts src/test/alerts-route-quick-link-contract.test.tsx
 
+      # Stop-ship: QuickLog RPC static trust-boundary guardrails. Always runs.
+      - name: QuickLog RPC static trust-boundary
+        run: bun run test:db:quicklog-rpc-static
+
+      # Optional: QuickLog RPC runtime harnesses. Only runs when staging
+      # Supabase credentials are configured as repo/org secrets. The
+      # orchestrator script also skips cleanly when env is missing, so this
+      # step is safe to leave wired even for forked PRs.
+      - name: QuickLog RPC runtime harnesses (conditional)
+        if: ${{ env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SUPABASE_ANON_KEY != '' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: bun run test:db:quicklog-rpc-runtime
+
       - name: Full test suite
         run: bunx vitest run
 

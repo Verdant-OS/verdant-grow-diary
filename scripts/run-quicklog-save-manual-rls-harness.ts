@@ -293,8 +293,8 @@ async function main() {
       }
     }
 
-    // 8. invalid sensor (would arrive as JSON value through PostgREST; PG
-    //    will reject non-numeric for typed numeric params at the boundary).
+    // 8. Failure-audit path: bad numeric input rejected at typed param
+    //    boundary (PostgREST coerce error) — should not insert any rows.
     {
       const before = await countEvents(uidA);
       const { error } = await call(cA, {
@@ -302,7 +302,6 @@ async function main() {
         p_target_id: seedA.plantId,
         p_action: "note",
         p_note: "bad sensor",
-        // PostgREST will reject this before it reaches the function.
         p_temperature_c: "NaN",
       });
       const after = await countEvents(uidA);
@@ -310,6 +309,68 @@ async function main() {
         "non-numeric sensor input rejected at typed param boundary, no insert",
         Boolean(error) && before === after,
         error?.message ?? "no error",
+      );
+    }
+
+    // 9. Runtime save_failed audit: trigger a DB-side failure AFTER
+    //    save_started by sending a humidity_pct out of range (validate_environment_event
+    //    trigger raises). Assert the latest failure audit row has a
+    //    SQLSTATE-shaped reason, no SQLERRM-like leakage, and zero orphan
+    //    companion rows survive.
+    {
+      const beforeGe = await countEvents(uidA);
+      const { data: beforeWE } = await admin
+        .from("watering_events")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", uidA);
+      const { data: beforeEE } = await admin
+        .from("environment_events")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", uidA);
+      void beforeWE;
+      void beforeEE;
+      const { data } = await call(cA, {
+        p_target_type: "plant",
+        p_target_id: seedA.plantId,
+        p_action: "note",
+        p_note: "trigger humidity range failure",
+        p_humidity_pct: 999, // validate_environment_event raises
+      });
+      const afterGe = await countEvents(uidA);
+      check(
+        "humidity out-of-range returns safe save_failed envelope",
+        (data as { ok?: boolean; reason?: string })?.ok === false &&
+          (data as { reason?: string })?.reason === "save_failed",
+        JSON.stringify(data),
+      );
+      check(
+        "save_failed leaves zero orphan grow_events",
+        afterGe === beforeGe,
+        `delta=${afterGe - beforeGe}`,
+      );
+      const { data: latest } = await admin
+        .from("quicklog_audit_events")
+        .select("status,reason")
+        .eq("user_id", uidA)
+        .eq("status", "save_failed")
+        .order("created_at", { ascending: false })
+        .limit(1);
+      const r = (latest ?? [])[0];
+      const reason = (r?.reason ?? "") as string;
+      check(
+        "latest save_failed audit reason is SQLSTATE-shaped (5 chars [A-Z0-9])",
+        /^[A-Z0-9]{5}$/.test(reason),
+        `reason=${reason}`,
+      );
+      check(
+        "save_failed reason contains no SQLERRM-like leakage",
+        !/select|insert|update|delete|from|where|jwt|bearer|token|secret|public\.|auth\./i.test(
+          reason,
+        ) &&
+          !/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(
+            reason,
+          ),
+        reason,
       );
     }
   } finally {

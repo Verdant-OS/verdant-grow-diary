@@ -66,12 +66,15 @@ describe("quicklog_save_manual — pre-insert rejection invariants", () => {
     "invalid_details",
   ];
 
-  it("every documented rejection code precedes the first INSERT into public.*", () => {
-    const firstInsert = body.search(/INSERT\s+INTO\s+public\./i);
+  it("every documented rejection code precedes the first companion INSERT into public.*", () => {
+    // Skip audit-event inserts (those are how rejections are recorded).
+    const firstInsert = body.search(
+      /INSERT\s+INTO\s+public\.(grow_events|watering_events|environment_events|diary_entries|feeding_events|observation_events|training_events|photo_events)\b/i,
+    );
     expect(firstInsert).toBeGreaterThan(-1);
     for (const code of REJECT_CODES) {
       const at = body.indexOf(`'${code}'`);
-      if (at === -1) continue; // not all codes guaranteed in every revision
+      if (at === -1) continue;
       expect(at, `${code}`).toBeLessThan(firstInsert);
     }
   });
@@ -162,5 +165,82 @@ describe("quicklog_save_manual — grants and surface scope", () => {
     expect(body).not.toMatch(
       /\b(actuator|relay|fan_on|light_on_cmd|pump|dose|valve|switch_on|switch_off|device_control)\b/i,
     );
+  });
+});
+
+describe("quicklog_save_manual — internal audit emissions", () => {
+  it("emits 'validation_failed' on every pre-write rejection branch", () => {
+    expect(body).toMatch(
+      /quicklog_audit_events[\s\S]{0,200}'validation_failed'\s*,\s*'invalid_target_type'/i,
+    );
+    expect(body).toMatch(/'validation_failed'\s*,\s*'missing_target_id'/);
+    expect(body).toMatch(/'validation_failed'\s*,\s*'unsupported_action'/);
+    expect(body).toMatch(/'validation_failed'\s*,\s*'invalid_volume'/);
+    expect(body).toMatch(/'validation_failed'\s*,\s*'invalid_details'/);
+    expect(body).toMatch(/'validation_failed'\s*,\s*'target_not_owned'/);
+  });
+
+  it("emits 'save_started' before the first companion INSERT", () => {
+    const startAt = body.search(/'save_started'/);
+    expect(startAt).toBeGreaterThan(-1);
+    const firstInsert = body.search(
+      /INSERT\s+INTO\s+public\.grow_events\b/i,
+    );
+    expect(startAt).toBeLessThan(firstInsert);
+  });
+
+  it("emits 'save_succeeded' after the companion write block", () => {
+    expect(body).toMatch(
+      /quicklog_audit_events[\s\S]{0,200}'save_succeeded'/i,
+    );
+    const succAt = body.lastIndexOf("'save_succeeded'");
+    const lastInsertMatches = Array.from(
+      body.matchAll(/INSERT\s+INTO\s+public\.(grow_events|watering_events|environment_events|diary_entries)\b/gi),
+    );
+    expect(lastInsertMatches.length).toBeGreaterThan(0);
+    const lastInsert = lastInsertMatches[lastInsertMatches.length - 1].index!;
+    expect(succAt).toBeGreaterThan(lastInsert);
+  });
+
+  it("emits 'save_failed' with SQLSTATE (not SQLERRM) inside one WHEN OTHERS block", () => {
+    const except = body.match(
+      /EXCEPTION\s+WHEN\s+OTHERS\s+THEN[\s\S]*?END\s*;/i,
+    )?.[0] ?? "";
+    expect(except).toMatch(/'save_failed'\s*,\s*SQLSTATE\b/);
+    expect(except).not.toMatch(/\bSQLERRM\b/);
+    expect(except).toMatch(
+      /RETURN\s+jsonb_build_object\(\s*'ok'\s*,\s*false\s*,\s*'reason'\s*,\s*'save_failed'/i,
+    );
+    expect(except).not.toMatch(/\bRAISE\s*;/);
+  });
+
+  it("SQLERRM is never used anywhere in the function body", () => {
+    expect(body).not.toMatch(/\bSQLERRM\b/);
+  });
+
+  it("all four companion writes share ONE BEGIN/EXCEPTION block", () => {
+    const block = body.match(
+      /BEGIN\s+INSERT\s+INTO\s+public\.grow_events[\s\S]*?EXCEPTION\s+WHEN\s+OTHERS\s+THEN[\s\S]*?END\s*;/i,
+    );
+    expect(block).not.toBeNull();
+    const blk = block?.[0] ?? "";
+    expect(blk).toMatch(/INSERT\s+INTO\s+public\.grow_events/i);
+    expect(blk).toMatch(/INSERT\s+INTO\s+public\.watering_events/i);
+    expect(blk).toMatch(/INSERT\s+INTO\s+public\.environment_events/i);
+    expect(blk).toMatch(/INSERT\s+INTO\s+public\.diary_entries/i);
+    const outside = body.replace(blk, "");
+    expect(outside).not.toMatch(/INSERT\s+INTO\s+public\.watering_events/i);
+    expect(outside).not.toMatch(/INSERT\s+INTO\s+public\.environment_events/i);
+    expect(outside).not.toMatch(/INSERT\s+INTO\s+public\.diary_entries/i);
+  });
+
+  it("failure path returns safe JSON envelope (no raw DB error exposure)", () => {
+    // Every WHEN OTHERS branch returns the documented safe envelope.
+    const matches = Array.from(
+      body.matchAll(
+        /WHEN\s+OTHERS\s+THEN[\s\S]*?RETURN\s+jsonb_build_object\(\s*'ok'\s*,\s*false\s*,\s*'reason'\s*,\s*'save_failed'/gi,
+      ),
+    );
+    expect(matches.length).toBeGreaterThan(0);
   });
 });

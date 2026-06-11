@@ -469,6 +469,54 @@ async function main() {
         reasons.join(","),
       );
     }
+
+    // 13. Concurrency race: parallel calls with one idempotency key must
+    //     collapse to exactly one grow_events + one diary_entries row.
+    {
+      const k = key("concurrent");
+      const note = `parallel idempotency ${k}`;
+      const args: RpcArgs = {
+        p_idempotency_key: k,
+        p_grow_id: seedA.growId,
+        p_event_type: "observation",
+        p_note: note,
+        p_details: { kind: "note", concurrency_test: true },
+      };
+      const results = await Promise.all(
+        Array.from({ length: 10 }, () => call(cA, args)),
+      );
+      const allOk = results.every(
+        (r) => !r.error && (r.data as { ok?: boolean })?.ok === true,
+      );
+      const ids = results.map(
+        (r) => (r.data as { grow_event_id?: string })?.grow_event_id,
+      );
+      const allSame = ids.every((id) => id && id === ids[0]);
+      const anyReused = results.some(
+        (r) => (r.data as { reused?: boolean })?.reused === true,
+      );
+      check("parallel idempotent calls all return ok=true", allOk);
+      check("all parallel calls return the same grow_event_id", allSame, ids.join(","));
+      check("at least one parallel call is reused=true", anyReused);
+      const { count: idemCount } = await admin
+        .from("quicklog_idempotency")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", uidA)
+        .eq("idempotency_key", k);
+      const { count: geCount } = await admin
+        .from("grow_events")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", uidA)
+        .eq("note", note);
+      const { count: deCount } = await admin
+        .from("diary_entries")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", uidA)
+        .eq("note", note);
+      check("exactly one quicklog_idempotency row for the racy key", idemCount === 1, `${idemCount}`);
+      check("exactly one grow_events row for the racy key", geCount === 1, `${geCount}`);
+      check("exactly one diary_entries companion row for the racy key", deCount === 1, `${deCount}`);
+    }
   } finally {
     await teardown([uidA, uidB]);
   }

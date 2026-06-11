@@ -180,3 +180,33 @@
     color: #000;
   }
 }
+
+/* Environment Summary Report — improved print rules. */
+@media print {
+  [data-print-card],
+  [data-print-issue-card],
+  [data-print-drilldown-row] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  [data-print-chart] {
+    max-width: 100%;
+    width: 100%;
+    overflow: visible;
+  }
+  .print-cover-page {
+    break-after: page;
+    page-break-after: always;
+  }
+  /* Drilldown print mode: hide the full-report-only block. */
+  [data-print-section="environment-summary-report"][data-print-mode="drilldown"]
+    [data-print-full-report-only] {
+    display: none !important;
+  }
+  /* Make printable tables/cards fit page width. */
+  [data-print-section="environment-summary-report"] table,
+  [data-print-section="environment-summary-report"] [data-print-card] {
+    max-width: 100%;
+    width: 100%;
+  }
+}

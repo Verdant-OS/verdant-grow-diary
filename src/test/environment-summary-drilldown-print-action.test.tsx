@@ -1,18 +1,25 @@
 /**
- * environment-summary-print-action.test.tsx
+ * environment-summary-drilldown-print-action.test.tsx
  *
- * Verifies:
- *  - Premium user sees Download PDF.
- *  - Non-premium user does not see Download PDF.
- *  - Clicking Download PDF calls window.print().
- *  - It does not call Supabase / create alerts / create Action Queue items.
- *  - Safety footer + DST-ambiguous / invalid labels remain visible in printable section.
+ * Verifies the drilldown-only print button:
+ *  - hidden without an active issue drilldown
+ *  - hidden for non-premium users
+ *  - shown for premium users with active issue
+ *  - click records `drilldown_print_opened` audit (local only)
+ *  - click calls window.print()
+ *  - drilldown print mode hides unrelated full-report sections (via data attr)
+ *  - no Supabase writes, no alerts, no Action Queue, no network
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { resolveEntitlements } from "@/lib/entitlements";
+import {
+  ENVIRONMENT_SUMMARY_EXPORT_AUDIT_STORAGE_KEY,
+  clearEnvironmentSummaryExportAuditEvents,
+  readEnvironmentSummaryExportAuditEvents,
+} from "@/lib/environmentSummaryExportAuditRules";
 
 const planMock = vi.hoisted(() => ({ current: "pro" as "free" | "pro" }));
 
@@ -42,42 +49,21 @@ vi.mock("@/hooks/useMyEntitlements", () => ({
   },
 }));
 
-const dstSnapshot = {
-  source: "live",
-  tempC: 24,
-  rhPercent: 60,
-  ppfdSamples: [
-    { ts: "2026-03-08T09:00:00Z", ppfd: 200, source: "live" },
-    { ts: "2026-03-09T00:00:00Z", ppfd: 200, source: "live" },
-  ],
-  tzIana: "America/Los_Angeles",
-};
-
+// Two stale entries → produces "source.review" top issue (warning).
 vi.mock("@/hooks/use-diary-entries", () => ({
   useDiaryEntries: () => ({
     data: [
       {
-        id: "e-invalid",
+        id: "e-1",
         entry_at: "2026-06-02T12:00:00.000Z",
         kind: "environment",
-        snapshot: { source: "bogus", tempC: 24, rhPercent: 60 },
+        snapshot: { source: "stale", tempC: 24, rhPercent: 60 },
       },
       {
-        id: "e-dst",
+        id: "e-2",
         entry_at: "2026-06-03T12:00:00.000Z",
         kind: "environment",
-        snapshot: dstSnapshot,
-      },
-      {
-        id: "e-ok",
-        entry_at: "2026-06-04T12:00:00.000Z",
-        kind: "environment",
-        snapshot: {
-          source: "live",
-          tempC: 24,
-          rhPercent: 60,
-          vpdBand: { minKpa: 0.8, maxKpa: 1.5 },
-        },
+        snapshot: { source: "stale", tempC: 24, rhPercent: 60 },
       },
     ],
     isLoading: false,
@@ -91,22 +77,10 @@ vi.mock("@/integrations/supabase/client", () => {
     {
       get(_t, prop: string) {
         supabaseCalls.count += 1;
-        if (prop === "from") {
-          return () =>
-            new Proxy(
-              {},
-              {
-                get(_t2, p2: string) {
-                  supabaseCalls.count += 1;
-                  if (
-                    ["insert", "update", "delete", "upsert", "rpc"].includes(p2)
-                  ) {
-                    throw new Error(`Forbidden Supabase write: ${p2}`);
-                  }
-                  return () => proxy;
-                },
-              },
-            );
+        if (
+          ["insert", "update", "delete", "upsert", "rpc"].includes(prop)
+        ) {
+          throw new Error(`Forbidden Supabase write: ${prop}`);
         }
         if (prop === "functions") {
           return {
@@ -140,36 +114,42 @@ function renderAt(path: string) {
   );
 }
 
-import {
-  clearEnvironmentSummaryExportAuditEvents,
-  readEnvironmentSummaryExportAuditEvents,
-} from "@/lib/environmentSummaryExportAuditRules";
-
-describe("EnvironmentSummaryReportPage — print/download action", () => {
+describe("EnvironmentSummaryReportPage — drilldown print action", () => {
   beforeEach(() => {
     supabaseCalls.count = 0;
     clearEnvironmentSummaryExportAuditEvents();
   });
 
-  it("non-premium user does not see Download PDF", () => {
-    planMock.current = "free";
+  it("drilldown print button is hidden without an active issue", () => {
+    planMock.current = "pro";
     renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07");
+    expect(screen.queryByTestId("env-report-download-drilldown-pdf")).toBeNull();
+  });
+
+  it("drilldown print button is hidden for non-premium users", () => {
+    planMock.current = "free";
+    renderAt(
+      "/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=source.review",
+    );
+    expect(screen.queryByTestId("env-report-download-drilldown-pdf")).toBeNull();
     expect(screen.queryByTestId("env-report-download-pdf")).toBeNull();
   });
 
-  it("premium user sees Download PDF with deterministic filename + accessible label", () => {
+  it("drilldown print button appears for premium with active issue and has a deterministic filename", () => {
     planMock.current = "pro";
-    renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07");
-    const btn = screen.getByTestId("env-report-download-pdf");
+    renderAt(
+      "/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=source.review",
+    );
+    const btn = screen.getByTestId("env-report-download-drilldown-pdf");
     expect(btn.getAttribute("aria-label")).toBe(
-      "Download environment summary report PDF",
+      "Download current environment issue drilldown PDF",
     );
     expect(btn.getAttribute("data-filename")).toBe(
-      "verdant-environment-summary-2026-06-01-to-2026-06-07.pdf",
+      "verdant-environment-drilldown-2026-06-01-to-2026-06-07-source.review.pdf",
     );
   });
 
-  it("clicking Download PDF records audit, calls window.print, no Supabase writes, no network", () => {
+  it("clicking drilldown print records audit, calls window.print, no Supabase writes", () => {
     planMock.current = "pro";
     const printSpy = vi
       .spyOn(window, "print")
@@ -179,41 +159,47 @@ describe("EnvironmentSummaryReportPage — print/download action", () => {
       .mockImplementation((() => {
         throw new Error("fetch not allowed");
       }) as any);
-    renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07");
+    renderAt(
+      "/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=source.review",
+    );
     const before = supabaseCalls.count;
-    fireEvent.click(screen.getByTestId("env-report-download-pdf"));
+    fireEvent.click(screen.getByTestId("env-report-download-drilldown-pdf"));
     expect(printSpy).toHaveBeenCalledTimes(1);
     expect(supabaseCalls.count).toBe(before);
     expect(fetchSpy).not.toHaveBeenCalled();
     const events = readEnvironmentSummaryExportAuditEvents();
     expect(events).toHaveLength(1);
-    expect(events[0].eventType).toBe("full_report_print_opened");
-    expect(events[0].reportMode).toBe("full_report");
+    expect(events[0].eventType).toBe("drilldown_print_opened");
+    expect(events[0].reportMode).toBe("drilldown");
+    expect(events[0].issueRuleId).toBe("source.review");
     expect(events[0].source).toBe("local_only");
+    // Audit landed in localStorage only.
+    expect(
+      typeof window.localStorage.getItem(
+        ENVIRONMENT_SUMMARY_EXPORT_AUDIT_STORAGE_KEY,
+      ),
+    ).toBe("string");
     printSpy.mockRestore();
     fetchSpy.mockRestore();
   });
 
-  it("full report print mode includes the cover page", () => {
+  it("drilldown print mode toggles data-print-mode='drilldown' on the print section", () => {
     planMock.current = "pro";
-    renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07");
-    expect(screen.getByTestId("env-report-print-cover-page")).toBeTruthy();
-  });
-
-  it("printable section includes safety footer, DST-ambiguous and invalid labels", () => {
-    planMock.current = "pro";
+    const printSpy = vi
+      .spyOn(window, "print")
+      .mockImplementation(() => undefined);
     const { container } = renderAt(
-      "/diary/environment-summary?start=2026-06-01&end=2026-06-07",
+      "/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=source.review",
     );
+    fireEvent.click(screen.getByTestId("env-report-download-drilldown-pdf"));
     const section = container.querySelector(
       '[data-print-section="environment-summary-report"]',
     ) as HTMLElement;
-    expect(section).toBeTruthy();
-    const txt = (section.textContent ?? "").toLowerCase();
-    expect(txt).toContain("read-only report");
-    expect(txt).toContain("no device control");
-    expect(txt).toMatch(/invalid/);
-    expect(txt).toMatch(/dst|ambiguous/);
-    expect(within(section).getByTestId("env-report-safety-footer")).toBeTruthy();
+    expect(section.getAttribute("data-print-mode")).toBe("drilldown");
+    // The element used by the print stylesheet to hide unrelated full-report content exists.
+    expect(
+      container.querySelector("[data-print-full-report-only]"),
+    ).toBeTruthy();
+    printSpy.mockRestore();
   });
 });

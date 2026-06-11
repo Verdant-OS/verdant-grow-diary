@@ -116,6 +116,46 @@ function isValidIanaTz(tz: unknown): tz is string {
   }
 }
 
+/**
+ * Compute the UTC offset (ms) for an instant in the given IANA zone.
+ * Used to detect DST transitions within a window.
+ */
+function tzOffsetMs(instantMs: number, tz: string): number {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const parts = dtf.formatToParts(new Date(instantMs));
+  const map: Record<string, string> = {};
+  for (const p of parts) if (p.type !== "literal") map[p.type] = p.value;
+  const hour = Number(map.hour) === 24 ? 0 : Number(map.hour);
+  const asUTC = Date.UTC(
+    Number(map.year),
+    Number(map.month) - 1,
+    Number(map.day),
+    hour,
+    Number(map.minute),
+    Number(map.second),
+  );
+  return asUTC - instantMs;
+}
+
+/**
+ * True when [startMs, endMs] crosses a DST transition in tz
+ * (UTC offset differs between the endpoints).
+ */
+function windowCrossesDst(startMs: number, endMs: number, tz: string): boolean {
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return false;
+  if (endMs <= startMs) return false;
+  return tzOffsetMs(startMs, tz) !== tzOffsetMs(endMs, tz);
+}
+
 function emptyBreakdown(): Record<GreenhouseSource, number> {
   return { live: 0, manual: 0, csv: 0, demo: 0, stale: 0, invalid: 0 };
 }

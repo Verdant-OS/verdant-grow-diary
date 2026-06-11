@@ -4,8 +4,8 @@
  *
  * Read-only. No Supabase writes. No automation. No device control.
  * Premium-gated: non-premium users see an upgrade prompt instead of the
- * report. Client gating is presentation-only; sensitive surfaces still
- * re-check server-side.
+ * report. Audit logging is local-only (browser localStorage) — no
+ * network, no Supabase, no analytics SDK.
  */
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Download, FileBarChart } from "lucide-react";
 import EnvironmentSummaryReport from "@/components/EnvironmentSummaryReport";
 import EnvironmentIssueDrilldown from "@/components/EnvironmentIssueDrilldown";
+import EnvironmentSummaryPrintCoverPage from "@/components/EnvironmentSummaryPrintCoverPage";
 import PaywallCta from "@/components/PaywallCta";
 import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
@@ -30,10 +31,14 @@ import {
   isValidEnvironmentSummaryRange,
 } from "@/lib/environmentSummaryNavigationRules";
 import {
+  buildEnvironmentSummaryDrilldownPrintFilename,
   buildEnvironmentSummaryPrintFilename,
   buildEnvironmentSummaryPrintMetadata,
   PRINT_SAFETY_FOOTER,
 } from "@/lib/environmentSummaryPrintRules";
+import { recordEnvironmentSummaryExportAuditEvent } from "@/lib/environmentSummaryExportAuditRules";
+
+type PrintMode = "full_report" | "drilldown";
 
 function toViewModel(entry: any): EnvironmentCheckDiaryViewModel | null {
   if (!isEnvironmentCheckKind(entry?.kind)) return null;
@@ -54,6 +59,7 @@ export default function EnvironmentSummaryReportPage() {
 
   const [startDate, setStartDate] = useState(startParam ?? defaults.startDate);
   const [endDate, setEndDate] = useState(endParam ?? defaults.endDate);
+  const [printMode, setPrintMode] = useState<PrintMode>("full_report");
 
   useEffect(() => {
     if (startParam) setStartDate(startParam);
@@ -128,18 +134,70 @@ export default function EnvironmentSummaryReportPage() {
   );
   const pdfFilename = buildEnvironmentSummaryPrintFilename(startDate, endDate);
 
-  const handleDownloadPdf = () => {
+  function triggerPrint(filename: string, mode: PrintMode) {
     if (typeof window === "undefined") return;
+    setPrintMode(mode);
+    if (typeof document !== "undefined") {
+      try {
+        document.body.dataset.environmentSummaryPrintMode = mode;
+      } catch {
+        // ignore
+      }
+    }
     const prevTitle = document.title;
-    document.title = printMeta.filename.replace(/\.pdf$/, "");
+    document.title = filename.replace(/\.pdf$/, "");
     try {
       window.print();
     } finally {
       setTimeout(() => {
         document.title = prevTitle;
+        setPrintMode("full_report");
+        try {
+          if (typeof document !== "undefined") {
+            document.body.dataset.environmentSummaryPrintMode = "full_report";
+          }
+        } catch {
+          // ignore
+        }
       }, 0);
     }
+  }
+
+  const handleDownloadPdf = () => {
+    recordEnvironmentSummaryExportAuditEvent({
+      eventType: "full_report_print_opened",
+      reportMode: "full_report",
+      startDate,
+      endDate,
+    });
+    triggerPrint(printMeta.filename, "full_report");
   };
+
+  const handleDownloadDrilldownPdf = () => {
+    if (!selectedIssue) return;
+    recordEnvironmentSummaryExportAuditEvent({
+      eventType: "drilldown_print_opened",
+      reportMode: "drilldown",
+      startDate,
+      endDate,
+      issueRuleId: selectedIssue.ruleId,
+      issueLabel: selectedIssue.label,
+    });
+    const filename = buildEnvironmentSummaryDrilldownPrintFilename(
+      startDate,
+      endDate,
+      selectedIssue.ruleId,
+    );
+    triggerPrint(filename, "drilldown");
+  };
+
+  const drilldownPdfFilename = selectedIssue
+    ? buildEnvironmentSummaryDrilldownPrintFilename(
+        startDate,
+        endDate,
+        selectedIssue.ruleId,
+      )
+    : null;
 
   // ----- Non-premium upgrade prompt -----
   if (!entitlementLoading && !isPremium) {
@@ -175,24 +233,39 @@ export default function EnvironmentSummaryReportPage() {
     <div
       className="container max-w-4xl py-6 space-y-4"
       data-testid="environment-summary-report-page"
+      data-print-mode={printMode}
     >
       <PageHeader
         title="Environment Summary"
         description="Read-only premium report — aggregated greenhouse rule results over a date range."
         icon={<FileBarChart className="h-5 w-5" />}
         actions={
-          <Button
-            onClick={handleDownloadPdf}
-            variant="outline"
-            size="sm"
-            data-testid="env-report-download-pdf"
-            aria-label="Download environment summary report PDF"
-            data-filename={pdfFilename}
-            className="print-hidden"
-          >
-            <Download className="h-4 w-4" />
-            Download PDF
-          </Button>
+          <div className="flex flex-wrap gap-2 print-hidden">
+            <Button
+              onClick={handleDownloadPdf}
+              variant="outline"
+              size="sm"
+              data-testid="env-report-download-pdf"
+              aria-label="Download environment summary report PDF"
+              data-filename={pdfFilename}
+            >
+              <Download className="h-4 w-4" />
+              Download PDF
+            </Button>
+            {selectedIssue && drilldownPdfFilename ? (
+              <Button
+                onClick={handleDownloadDrilldownPdf}
+                variant="outline"
+                size="sm"
+                data-testid="env-report-download-drilldown-pdf"
+                aria-label="Download current environment issue drilldown PDF"
+                data-filename={drilldownPdfFilename}
+              >
+                <Download className="h-4 w-4" />
+                Download drilldown PDF
+              </Button>
+            ) : null}
+          </div>
         }
       />
 
@@ -240,32 +313,44 @@ export default function EnvironmentSummaryReportPage() {
 
       <div
         data-print-section="environment-summary-report"
+        data-print-mode={printMode}
         data-testid="env-report-print-section"
         className="space-y-4"
       >
+        <EnvironmentSummaryPrintCoverPage
+          dateRangeLabel={printMeta.dateRangeLabel}
+          generatedAtLabel={printMeta.generatedAtLabel}
+          report={report}
+          mode={printMode}
+          selectedIssueLabel={selectedIssue?.label ?? null}
+        />
+
         <div
-          className="print-only text-xs text-muted-foreground space-y-1"
-          data-testid="env-report-print-header"
+          data-print-full-report-only
+          data-testid="env-report-full-section"
+          className="space-y-4"
         >
-          <p className="font-semibold">{printMeta.title}</p>
-          <p>Date range: {printMeta.dateRangeLabel}</p>
-          <p>Generated: {printMeta.generatedAtLabel}</p>
+          {diaryQuery.isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : report.totalChecks === 0 && rangeValid ? (
+            <EmptyState
+              icon={<FileBarChart className="h-5 w-5" />}
+              title="No Environment Check entries"
+              description="No environment checks found in this date range."
+            />
+          ) : (
+            <div data-print-card="full-report">
+              <EnvironmentSummaryReport report={report} />
+            </div>
+          )}
         </div>
 
-        {diaryQuery.isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
-        ) : report.totalChecks === 0 && rangeValid ? (
-          <EmptyState
-            icon={<FileBarChart className="h-5 w-5" />}
-            title="No Environment Check entries"
-            description="No environment checks found in this date range."
-          />
-        ) : (
-          <EnvironmentSummaryReport report={report} />
-        )}
-
         {selectedIssue && (
-          <div className="space-y-2">
+          <div
+            className="space-y-2"
+            data-print-drilldown-section
+            data-testid="env-report-drilldown-section"
+          >
             <div className="flex items-center justify-between">
               <p className="text-xs text-muted-foreground">
                 {selectedIssue.drilldownLabel}
@@ -280,10 +365,12 @@ export default function EnvironmentSummaryReportPage() {
                 Clear drilldown
               </Button>
             </div>
-            <EnvironmentIssueDrilldown
-              issue={selectedIssue}
-              relatedChecks={relatedChecks}
-            />
+            <div data-print-issue-card="selected">
+              <EnvironmentIssueDrilldown
+                issue={selectedIssue}
+                relatedChecks={relatedChecks}
+              />
+            </div>
           </div>
         )}
 

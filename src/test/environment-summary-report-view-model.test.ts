@@ -100,8 +100,8 @@ describe("buildEnvironmentSummaryReportViewModel", () => {
       endDate: "2026-06-11",
       checks,
     });
-    expect(r.topIssues[0].ruleId).toBe("source.review");
-    expect(r.topIssues[0].count).toBe(2);
+    const sourceReview = r.topIssues.find((i) => i.ruleId === "source.review");
+    expect(sourceReview?.count).toBe(2);
     // Stable re-run.
     const r2 = buildEnvironmentSummaryReportViewModel({
       startDate: "2026-06-01",

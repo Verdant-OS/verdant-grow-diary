@@ -58,7 +58,10 @@
     "e2e:quicklog-smoke": "playwright test e2e/quicklog-smoke.spec.ts --project=chromium-authed",
     "e2e:quicklog-smoke:headed": "playwright test e2e/quicklog-smoke.spec.ts --project=chromium-authed --headed",
     "e2e:report": "playwright show-report",
-    "e2e:auth-loading": "playwright test e2e/auth-loading.spec.ts --project=chromium-authed"
+    "e2e:auth-loading": "playwright test e2e/auth-loading.spec.ts --project=chromium-authed",
+    "test:db:quicklog-rpc-static": "vitest run src/test/quicklog-save-event-rpc-trust-boundary.test.ts src/test/quicklog-save-manual-rpc-trust-boundary.test.ts src/test/quicklog-save-manual-rpc-ownership.test.ts src/test/quicklog-save-manual-rpc-reason-codes.test.ts src/test/quicklog-save-manual-rpc-mixed-boundary.test.ts src/test/quicklog-rpc-harness-static-safety.test.ts",
+    "test:db:quicklog-rpc-runtime": "bun run scripts/run-quicklog-rpc-rls-harnesses.ts",
+    "test:db:quicklog-rpc": "bun run test:db:quicklog-rpc-static && bun run test:db:quicklog-rpc-runtime"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

@@ -11,6 +11,9 @@ import type {
   EnvironmentCheckDiaryViewModel,
 } from "./environmentCheckViewModel";
 import type { GreenhouseSource } from "./greenhouseLightRules";
+import { buildEnvironmentSummaryReportUrl } from "./environmentSummaryNavigationRules";
+
+
 
 export type RuleSeverity = "info" | "watch" | "warning" | "critical";
 

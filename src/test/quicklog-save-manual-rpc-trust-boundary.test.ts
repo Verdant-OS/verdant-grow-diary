@@ -80,7 +80,8 @@ describe("quicklog_save_manual — pre-insert rejection invariants", () => {
     for (const code of REJECT_CODES) {
       const at = body.indexOf(`'${code}'`);
       if (at === -1) continue;
-      const window = body.slice(at, Math.min(body.length, at + 400));
+      // RETURN precedes the reason literal on the same statement.
+      const window = body.slice(Math.max(0, at - 200), Math.min(body.length, at + 200));
       expect(window, code).toMatch(/RETURN\s+jsonb_build_object/i);
     }
   });

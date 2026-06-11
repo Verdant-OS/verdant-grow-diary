@@ -524,6 +524,28 @@ export default function Timeline() {
                                 const ni = normalizedById.get(e.id);
                                 return ni ? <DiaryEntryBadges item={ni} /> : null;
                               })()}
+                              {(() => {
+                                const kind = getEventType(e);
+                                if (!isEnvironmentCheckKind(kind)) return null;
+                                const details = (e as { details?: Record<string, unknown> }).details ?? {};
+                                const num = (k: string): number | null => {
+                                  const v = details[k];
+                                  return typeof v === "number" && Number.isFinite(v) ? v : null;
+                                };
+                                const src = typeof details.source === "string" ? details.source : "manual";
+                                const vm = buildEnvironmentCheckDiaryViewModel({
+                                  entryId: e.id,
+                                  occurredAt: String((e as { occurred_at?: string; created_at?: string }).occurred_at ?? (e as { created_at?: string }).created_at ?? ""),
+                                  kind: kind ?? "environment",
+                                  snapshot: {
+                                    source: src,
+                                    tempC: num("temp_c") ?? num("tempC"),
+                                    rhPercent: num("rh_percent") ?? num("humidity"),
+                                    vpdKpa: num("vpd_kpa") ?? num("vpdKpa"),
+                                  },
+                                });
+                                return <EnvironmentCheckTimelineBadge viewModel={vm} />;
+                              })()}
                             </>
                           );
                         })()}

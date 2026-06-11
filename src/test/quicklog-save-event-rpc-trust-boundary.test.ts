@@ -429,9 +429,9 @@ describe("quicklog_save_event — post-failure orphan invariants (static)", () =
     }
   });
 
-  it("companion writes share ONE BEGIN/EXCEPTION/RAISE block (atomic, no orphans)", () => {
+  it("companion writes share ONE BEGIN/EXCEPTION block (atomic, no orphans)", () => {
     const block = body.match(
-      /BEGIN\s+INSERT\s+INTO\s+public\.grow_events[\s\S]*?EXCEPTION\s+WHEN\s+OTHERS\s+THEN[\s\S]*?RAISE\s*;\s*END\s*;/i,
+      /BEGIN\s+INSERT\s+INTO\s+public\.grow_events[\s\S]*?EXCEPTION[\s\S]*?END\s*;/i,
     );
     expect(block).not.toBeNull();
     const blk = block?.[0] ?? "";

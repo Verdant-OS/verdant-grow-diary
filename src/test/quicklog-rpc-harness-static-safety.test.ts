@@ -50,10 +50,15 @@ describe("Quick Log RPC harness — no leaked secrets or tokens", () => {
 });
 
 describe("Quick Log RPC harness — service_role boundary", () => {
-  it("service_role is only sourced from env (never literal)", () => {
+  it("service_role is only sourced from env (never literal token)", () => {
     for (const { rel, src } of sources) {
-      // Only allow the env var read pattern.
-      const stripped = src.replace(/SUPABASE_SERVICE_ROLE_KEY/g, "");
+      // Strip comments and the env var name itself; anything remaining that
+      // mentions service_role would be a literal usage.
+      const noComments = src
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/(^|\n)\s*\/\/.*/g, "$1")
+        .replace(/(^|\n)\s*\*.*/g, "$1");
+      const stripped = noComments.replace(/SUPABASE_SERVICE_ROLE_KEY/g, "");
       expect(
         stripped,
         `${rel} mentions service_role outside env reads`,

@@ -2,6 +2,32 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { resolveEntitlements } from "@/lib/entitlements";
+
+// Premium-gated page: stub entitlements to Pro so the detailed report renders.
+vi.mock("@/hooks/useMyEntitlements", () => ({
+  useMyEntitlements: () => ({
+    loading: false,
+    entitlement: resolveEntitlements(
+      {
+        id: "x",
+        user_id: "u",
+        plan_id: "pro_monthly",
+        status: "active",
+        provider: "paddle",
+        provider_customer_id: null,
+        provider_subscription_id: null,
+        current_period_end: null,
+        cancel_at_period_end: false,
+        founder_number: null,
+        created_at: "",
+        updated_at: "",
+      } as any,
+      new Date("2026-06-08T00:00:00Z"),
+    ),
+  }),
+}));
+
 import EnvironmentSummaryReportPage from "@/pages/EnvironmentSummaryReportPage";
 
 vi.mock("@/integrations/supabase/client", () => {

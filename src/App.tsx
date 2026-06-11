@@ -56,6 +56,7 @@ import OneTentLoopProof from "./pages/OneTentLoopProof";
 import SensorTruthAudit from "./pages/SensorTruthAudit";
 import AiDoctorConfidenceAudit from "./pages/AiDoctorConfidenceAudit";
 import EcowittLiveBringup from "./pages/EcowittLiveBringup";
+import EnvironmentSummaryReportPage from "./pages/EnvironmentSummaryReportPage";
 
 
 

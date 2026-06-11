@@ -12,6 +12,11 @@ import EntryEditDialog from "@/components/EntryEditDialog";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import DiaryEntryBadges from "@/components/DiaryEntryBadges";
+import EnvironmentCheckTimelineBadge from "@/components/EnvironmentCheckTimelineBadge";
+import {
+  buildEnvironmentCheckDiaryViewModel,
+  isEnvironmentCheckKind,
+} from "@/lib/environmentCheckViewModel";
 import WateringHistoryPanel from "@/components/WateringHistoryPanel";
 import FeedingHistoryPanel from "@/components/FeedingHistoryPanel";
 import PhotoHistoryPanel from "@/components/PhotoHistoryPanel";

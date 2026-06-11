@@ -43,9 +43,9 @@ function findLatestRpcSql(): { path: string; sql: string } | null {
 const mig = findLatestRpcSql();
 const sql = mig?.sql ?? "";
 const bodyMatch = sql.match(
-  /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+public\.quicklog_save_manual[\s\S]*?\$function\$([\s\S]*?)\$function\$/i,
+  /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+public\.quicklog_save_manual[\s\S]*?AS\s+(\$function\$|\$\$)([\s\S]*?)\1/i,
 );
-const body = bodyMatch?.[1] ?? "";
+const body = bodyMatch?.[2] ?? "";
 
 describe("quicklog_save_manual — migration discoverable", () => {
   it("migration defines the function", () => {

@@ -5,6 +5,9 @@
  * NOT an AI diagnosis. NOT live device control.
  */
 
+import { normalizeQuickLogSnapshotMetrics } from "@/lib/quick-log/quickLogSnapshotMetricNormalizer";
+
+
 export type SnapshotSource = "live" | "manual" | "sim" | "diary" | "unavailable";
 
 export interface SensorSnapshot {

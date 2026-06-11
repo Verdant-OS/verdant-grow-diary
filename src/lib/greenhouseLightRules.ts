@@ -157,7 +157,11 @@ export function aggregateDli(input: AggregateDliInput): AggregateDliResult {
       excluded += 1;
       continue;
     }
-    const ppfd = typeof s?.ppfd === "number" ? s.ppfd : Number(s?.ppfd);
+    if (s?.ppfd === null || s?.ppfd === undefined) {
+      excluded += 1;
+      continue;
+    }
+    const ppfd = typeof s.ppfd === "number" ? s.ppfd : Number(s.ppfd);
     if (!Number.isFinite(ppfd) || ppfd < 0) {
       excluded += 1;
       continue;

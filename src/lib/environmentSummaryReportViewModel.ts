@@ -22,7 +22,10 @@ export interface EnvironmentSummaryReportInput {
   endDate: string;
   /** Pre-built per-entry view models for the date range. */
   checks: ReadonlyArray<EnvironmentCheckDiaryViewModel>;
+  /** Optional rule id to focus the drilldown on. */
+  selectedIssueId?: string | null;
 }
+
 
 export interface EnvironmentSummaryMetricCoverage {
   metricKey: string;

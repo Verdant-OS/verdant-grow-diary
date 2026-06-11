@@ -536,7 +536,7 @@ export default function Timeline() {
                                 const vm = buildEnvironmentCheckDiaryViewModel({
                                   entryId: e.id,
                                   occurredAt: String((e as { occurred_at?: string; created_at?: string }).occurred_at ?? (e as { created_at?: string }).created_at ?? ""),
-                                  kind: kind ?? "environment",
+                                  kind: kindValue ?? "environment",
                                   snapshot: {
                                     source: src,
                                     tempC: num("temp_c") ?? num("tempC"),

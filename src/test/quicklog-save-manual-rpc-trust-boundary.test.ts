@@ -66,12 +66,15 @@ describe("quicklog_save_manual — pre-insert rejection invariants", () => {
     "invalid_details",
   ];
 
-  it("every documented rejection code precedes the first INSERT into public.*", () => {
-    const firstInsert = body.search(/INSERT\s+INTO\s+public\./i);
+  it("every documented rejection code precedes the first companion INSERT into public.*", () => {
+    // Skip audit-event inserts (those are how rejections are recorded).
+    const firstInsert = body.search(
+      /INSERT\s+INTO\s+public\.(grow_events|watering_events|environment_events|diary_entries|feeding_events|observation_events|training_events|photo_events)\b/i,
+    );
     expect(firstInsert).toBeGreaterThan(-1);
     for (const code of REJECT_CODES) {
       const at = body.indexOf(`'${code}'`);
-      if (at === -1) continue; // not all codes guaranteed in every revision
+      if (at === -1) continue;
       expect(at, `${code}`).toBeLessThan(firstInsert);
     }
   });

@@ -357,7 +357,23 @@ export default function Timeline() {
         </div>
       </div>
 
-      <div className="mb-4 flex items-center justify-end gap-2">
+      <div className="mb-4 flex items-center justify-end gap-2 flex-wrap">
+        <Link
+          to={buildEnvironmentSummaryReportUrl(defaultEnvironmentSummaryRange())}
+          className="hidden sm:inline-flex items-center gap-1 rounded-md border border-border/50 bg-secondary/40 px-3 py-1.5 text-xs font-medium hover:bg-secondary/60"
+          data-testid="timeline-env-summary-link"
+          aria-label="Open environment summary report"
+        >
+          Environment Summary
+        </Link>
+        <Link
+          to={buildEnvironmentSummaryReportUrl(defaultEnvironmentSummaryRange())}
+          className="sm:hidden inline-flex items-center gap-1 rounded-full border border-border/50 bg-secondary/40 px-2.5 py-1 text-[11px] font-medium hover:bg-secondary/60"
+          data-testid="timeline-env-summary-shortcut"
+          aria-label="Open environment summary report"
+        >
+          Summary
+        </Link>
         <EnvironmentCsvImportLauncher
           growId={activeGrowId}
           tentId={entries.find((e) => !!e.tent_id)?.tent_id ?? null}
@@ -366,6 +382,7 @@ export default function Timeline() {
           testIdPrefix="timeline-csv-launcher"
         />
       </div>
+
 
       <TimelineCsvContextPanel
         growId={activeGrowId}

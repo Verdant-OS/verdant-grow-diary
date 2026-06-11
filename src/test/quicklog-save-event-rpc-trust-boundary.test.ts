@@ -264,10 +264,12 @@ describe("quicklog_save_event — idempotency scope", () => {
 
 describe("quicklog_save_event — atomic write + companion diary", () => {
   it("grow_events insert and diary_entries insert share the same BEGIN/EXCEPTION block (atomic)", () => {
-    // Both inserts must live inside the same BEGIN ... EXCEPTION WHEN OTHERS block
-    // so a diary failure rolls back the grow_events row (no orphans).
+    // Both inserts must live inside the same BEGIN ... EXCEPTION block so a
+    // diary failure rolls back the grow_events row (no orphans). The
+    // EXCEPTION handler no longer re-raises — it returns a safe JSON envelope
+    // and logs SQLSTATE — so the block ends with END; without RAISE.
     const block = body.match(
-      /BEGIN\s+INSERT\s+INTO\s+public\.grow_events[\s\S]*?EXCEPTION\s+WHEN\s+OTHERS\s+THEN[\s\S]*?RAISE\s*;\s*END\s*;/i,
+      /BEGIN\s+INSERT\s+INTO\s+public\.grow_events[\s\S]*?EXCEPTION[\s\S]*?END\s*;/i,
     );
     expect(block).not.toBeNull();
     expect(block?.[0] ?? "").toMatch(/INSERT\s+INTO\s+public\.diary_entries/i);
@@ -276,10 +278,40 @@ describe("quicklog_save_event — atomic write + companion diary", () => {
     );
   });
 
-  it("on failure, audits 'save_failed' and re-raises (no swallowed errors)", () => {
-    expect(body).toMatch(
-      /EXCEPTION\s+WHEN\s+OTHERS\s+THEN[\s\S]{0,300}'save_failed'[\s\S]{0,100}RAISE\s*;/i,
+  it("on failure, audits 'save_failed' with SQLSTATE and returns safe JSON (no RAISE)", () => {
+    // The failure handler stores SQLSTATE (a 5-char code) and returns the
+    // safe envelope { ok:false, reason:'save_failed' } instead of re-raising
+    // the raw DB error to the client.
+    const except = body.match(
+      /EXCEPTION[\s\S]*?WHEN\s+OTHERS\s+THEN[\s\S]*?END\s*;/i,
+    )?.[0] ?? "";
+    expect(except).toMatch(/'save_failed'\s*,\s*SQLSTATE\b/);
+    expect(except).toMatch(
+      /RETURN\s+jsonb_build_object\(\s*'ok'\s*,\s*false\s*,\s*'reason'\s*,\s*'save_failed'/i,
     );
+    expect(except).not.toMatch(/\bRAISE\s*;/);
+  });
+
+  it("SQLERRM is never used anywhere in the function body (no raw error leakage)", () => {
+    expect(body).not.toMatch(/\bSQLERRM\b/);
+  });
+
+  it("handles unique_violation as an idempotency race (re-reads + returns reused=true)", () => {
+    // The WHEN unique_violation branch must re-read quicklog_idempotency by
+    // (user_id, idempotency_key) and return the same {ok:true, reused:true,
+    // grow_event_id} envelope the explicit duplicate branch returns, so a
+    // concurrent replay collapses cleanly with no duplicate companion rows.
+    const except = body.match(
+      /EXCEPTION[\s\S]*?WHEN\s+unique_violation\s+THEN([\s\S]*?)WHEN\s+OTHERS\s+THEN/i,
+    )?.[1] ?? "";
+    expect(except.length).toBeGreaterThan(0);
+    expect(except).toMatch(
+      /FROM\s+public\.quicklog_idempotency[\s\S]{0,200}user_id\s*=\s*uid\s+AND\s+idempotency_key\s*=\s*p_idempotency_key/i,
+    );
+    expect(except).toMatch(
+      /RETURN\s+jsonb_build_object\(\s*'ok'\s*,\s*true[\s\S]{0,200}'reused'\s*,\s*true/i,
+    );
+    expect(except).toMatch(/'duplicate_reused'/);
   });
 });
 

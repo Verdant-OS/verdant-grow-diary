@@ -89,12 +89,23 @@ describe("buildEnvironmentSummaryReportViewModel", () => {
     expect(r.sourceCounts.invalid).toBe(1);
   });
 
-  it("orders top issues deterministically (severity desc then count desc) and exposes drilldown fields", () => {
+  it("orders top issues deterministically (severity desc) and exposes drilldown fields", () => {
     const checks = [
       vm({ id: "a", source: "stale" }),
       vm({ id: "b", source: "stale" }),
       vm({ id: "c", source: "bogus" }), // source.invalid (critical, count=1)
     ];
+    const r = buildEnvironmentSummaryReportViewModel({
+      startDate: "2026-06-01",
+      endDate: "2026-06-11",
+      checks,
+    });
+    // Critical severity outranks warning.
+    const idxInvalid = r.topIssues.findIndex((i) => i.ruleId === "source.invalid");
+    const idxReview = r.topIssues.findIndex((i) => i.ruleId === "source.review");
+    expect(idxInvalid).toBeGreaterThanOrEqual(0);
+    expect(idxReview).toBeGreaterThan(idxInvalid);
+
     const r = buildEnvironmentSummaryReportViewModel({
       startDate: "2026-06-01",
       endDate: "2026-06-11",

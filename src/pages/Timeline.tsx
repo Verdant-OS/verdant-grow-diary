@@ -525,8 +525,8 @@ export default function Timeline() {
                                 return ni ? <DiaryEntryBadges item={ni} /> : null;
                               })()}
                               {(() => {
-                                const kind = getEventType(e);
-                                if (!isEnvironmentCheckKind(kind)) return null;
+                                const kindValue = (e.details?.event_type as string | undefined) ?? null;
+                                if (!isEnvironmentCheckKind(kindValue)) return null;
                                 const details = (e as { details?: Record<string, unknown> }).details ?? {};
                                 const num = (k: string): number | null => {
                                   const v = details[k];

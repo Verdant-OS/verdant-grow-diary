@@ -279,17 +279,14 @@ describe("quicklog_save_event — atomic write + companion diary", () => {
   });
 
   it("on failure, audits 'save_failed' with SQLSTATE and returns safe JSON (no RAISE)", () => {
-    // The failure handler stores SQLSTATE (a 5-char code) and returns the
-    // safe envelope { ok:false, reason:'save_failed' } instead of re-raising
-    // the raw DB error to the client.
-    const except = body.match(
-      /EXCEPTION[\s\S]*?WHEN\s+OTHERS\s+THEN[\s\S]*?END\s*;/i,
+    const block = body.match(
+      /BEGIN\s+INSERT\s+INTO\s+public\.grow_events[\s\S]*?EXCEPTION[\s\S]*?END\s*;/i,
     )?.[0] ?? "";
-    expect(except).toMatch(/'save_failed'\s*,\s*SQLSTATE\b/);
-    expect(except).toMatch(
+    expect(block).toMatch(/'save_failed'\s*,\s*SQLSTATE\b/);
+    expect(block).toMatch(
       /RETURN\s+jsonb_build_object\(\s*'ok'\s*,\s*false\s*,\s*'reason'\s*,\s*'save_failed'/i,
     );
-    expect(except).not.toMatch(/\bRAISE\s*;/);
+    expect(block).not.toMatch(/\bRAISE\s*;/);
   });
 
   it("SQLERRM is never used anywhere in the function body (no raw error leakage)", () => {

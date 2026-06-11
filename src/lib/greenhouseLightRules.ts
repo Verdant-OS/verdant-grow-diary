@@ -242,6 +242,23 @@ export function aggregateDli(input: AggregateDliInput): AggregateDliResult {
 
   healthy.sort((a, b) => a.tMs - b.tMs);
 
+  // DST guard: if the covered window crosses a DST transition in the
+  // provided IANA zone, refuse to silently aggregate wall-clock-naive
+  // UTC math. Return dst_ambiguous so the caller can disclose review.
+  const minTs = healthy[0].tMs;
+  const maxTs = healthy[healthy.length - 1].tMs;
+  if (windowCrossesDst(minTs, maxTs, input.tzIana as string)) {
+    return {
+      dliMolM2Day: null,
+      solarMolM2Day: null,
+      ledMolM2Day: null,
+      windowStatus: "dst_ambiguous",
+      usedCount: 0,
+      excludedCount: samples.length,
+      sourceBreakdown: breakdown,
+    };
+  }
+
   // Trapezoidal integration: sum PPFD (µmol/m²/s) * dt (s); convert
   // µmol→mol by /1e6. This produces mol/m² over the covered window,
   // which IS the DLI when the window covers the 24h photoperiod.

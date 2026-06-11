@@ -75,6 +75,7 @@ export interface PpfdSample {
 export type DliWindowStatus =
   | "ok"
   | "invalid_timezone"
+  | "dst_ambiguous"
   | "insufficient_samples"
   | "no_healthy_samples";
 
@@ -113,6 +114,46 @@ function isValidIanaTz(tz: unknown): tz is string {
   } catch {
     return false;
   }
+}
+
+/**
+ * Compute the UTC offset (ms) for an instant in the given IANA zone.
+ * Used to detect DST transitions within a window.
+ */
+function tzOffsetMs(instantMs: number, tz: string): number {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const parts = dtf.formatToParts(new Date(instantMs));
+  const map: Record<string, string> = {};
+  for (const p of parts) if (p.type !== "literal") map[p.type] = p.value;
+  const hour = Number(map.hour) === 24 ? 0 : Number(map.hour);
+  const asUTC = Date.UTC(
+    Number(map.year),
+    Number(map.month) - 1,
+    Number(map.day),
+    hour,
+    Number(map.minute),
+    Number(map.second),
+  );
+  return asUTC - instantMs;
+}
+
+/**
+ * True when [startMs, endMs] crosses a DST transition in tz
+ * (UTC offset differs between the endpoints).
+ */
+function windowCrossesDst(startMs: number, endMs: number, tz: string): boolean {
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return false;
+  if (endMs <= startMs) return false;
+  return tzOffsetMs(startMs, tz) !== tzOffsetMs(endMs, tz);
 }
 
 function emptyBreakdown(): Record<GreenhouseSource, number> {
@@ -201,6 +242,23 @@ export function aggregateDli(input: AggregateDliInput): AggregateDliResult {
 
   healthy.sort((a, b) => a.tMs - b.tMs);
 
+  // DST guard: if the covered window crosses a DST transition in the
+  // provided IANA zone, refuse to silently aggregate wall-clock-naive
+  // UTC math. Return dst_ambiguous so the caller can disclose review.
+  const minTs = healthy[0].tMs;
+  const maxTs = healthy[healthy.length - 1].tMs;
+  if (windowCrossesDst(minTs, maxTs, input.tzIana as string)) {
+    return {
+      dliMolM2Day: null,
+      solarMolM2Day: null,
+      ledMolM2Day: null,
+      windowStatus: "dst_ambiguous",
+      usedCount: 0,
+      excludedCount: samples.length,
+      sourceBreakdown: breakdown,
+    };
+  }
+
   // Trapezoidal integration: sum PPFD (µmol/m²/s) * dt (s); convert
   // µmol→mol by /1e6. This produces mol/m² over the covered window,
   // which IS the DLI when the window covers the 24h photoperiod.
@@ -284,6 +342,17 @@ export function detectDarkCycleLeak(
       inWindowSampleCount: 0,
       suspiciousSampleCount: 0,
       reason: "invalid_dark_window",
+    };
+  }
+  // DST guard: a dark window that crosses a DST transition cannot be
+  // interpreted with certainty — return inspection-only invalid_window
+  // rather than emitting a leak verdict.
+  if (windowCrossesDst(startMs, endMs, input.tzIana as string)) {
+    return {
+      status: "invalid_window",
+      inWindowSampleCount: 0,
+      suspiciousSampleCount: 0,
+      reason: "dst_ambiguous_window_review_only",
     };
   }
   const threshold =

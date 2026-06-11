@@ -118,6 +118,41 @@ describe("aggregateDli", () => {
     expect(r.dliMolM2Day).toBeNull();
     assertNoForbiddenKeys(r);
   });
+
+  it("DST spring-forward 24h window returns dst_ambiguous (not silent UTC math)", () => {
+    // America/Los_Angeles springs forward on 2026-03-08 02:00 local.
+    const samples: PpfdSample[] = [
+      { ts: "2026-03-08T08:00:00Z", ppfd: 1000, source: "live" }, // pre-transition (PST)
+      { ts: "2026-03-08T14:00:00Z", ppfd: 1000, source: "live" }, // post-transition (PDT)
+      { ts: "2026-03-08T20:00:00Z", ppfd: 1000, source: "live" },
+    ];
+    const r = aggregateDli({ samples, tzIana: "America/Los_Angeles" });
+    expect(r.windowStatus).toBe("dst_ambiguous");
+    expect(r.dliMolM2Day).toBeNull();
+    assertNoForbiddenKeys(r);
+  });
+
+  it("DST fall-back 24h window returns dst_ambiguous (not silent UTC math)", () => {
+    // America/Los_Angeles falls back on 2026-11-01 02:00 local.
+    const samples: PpfdSample[] = [
+      { ts: "2026-11-01T07:00:00Z", ppfd: 800, source: "live" }, // pre-transition (PDT)
+      { ts: "2026-11-01T13:00:00Z", ppfd: 800, source: "live" },
+      { ts: "2026-11-01T19:00:00Z", ppfd: 800, source: "live" }, // post-transition (PST)
+    ];
+    const r = aggregateDli({ samples, tzIana: "America/Los_Angeles" });
+    expect(r.windowStatus).toBe("dst_ambiguous");
+    expect(r.dliMolM2Day).toBeNull();
+  });
+
+  it("non-DST 24h window still aggregates DLI correctly", () => {
+    const samples: PpfdSample[] = [
+      { ts: "2026-06-11T06:00:00Z", ppfd: 1000, source: "live" },
+      { ts: "2026-06-11T18:00:00Z", ppfd: 1000, source: "live" },
+    ];
+    const r = aggregateDli({ samples, tzIana: "America/Los_Angeles" });
+    expect(r.windowStatus).toBe("ok");
+    expect(r.dliMolM2Day!).toBeCloseTo(43.2, 2);
+  });
 });
 
 describe("detectDarkCycleLeak", () => {
@@ -194,5 +229,28 @@ describe("detectDarkCycleLeak", () => {
       samples: [{ ts: "2026-06-11T05:00:00Z", ppfd: 100, source: "live" }],
     });
     assertNoForbiddenKeys(r);
+  });
+
+  it("dark window crossing DST spring-forward returns invalid_window (not certainty)", () => {
+    const r = detectDarkCycleLeak({
+      tzIana: "America/Los_Angeles",
+      darkStartIso: "2026-03-08T08:00:00Z", // pre-transition (PST)
+      darkEndIso: "2026-03-08T15:00:00Z", // post-transition (PDT)
+      samples: [{ ts: "2026-03-08T10:00:00Z", ppfd: 500, source: "live" }],
+    });
+    expect(r.status).toBe("invalid_window");
+    expect(r.reason).toMatch(/dst/);
+    expect(r.suspiciousSampleCount).toBe(0);
+  });
+
+  it("dark window crossing DST fall-back returns invalid_window (not certainty)", () => {
+    const r = detectDarkCycleLeak({
+      tzIana: "America/Los_Angeles",
+      darkStartIso: "2026-11-01T07:00:00Z",
+      darkEndIso: "2026-11-01T14:00:00Z",
+      samples: [{ ts: "2026-11-01T09:00:00Z", ppfd: 500, source: "live" }],
+    });
+    expect(r.status).toBe("invalid_window");
+    expect(r.reason).toMatch(/dst/);
   });
 });

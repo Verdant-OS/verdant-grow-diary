@@ -4,55 +4,49 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import EnvironmentSummaryReportPage from "@/pages/EnvironmentSummaryReportPage";
 
-const writeMethods = new Set([
-  "insert",
-  "update",
-  "delete",
-  "upsert",
-  "rpc",
-]);
-
-const supabaseProxy: any = new Proxy(
-  {},
-  {
-    get(_t, prop: string) {
-      if (prop === "from") {
-        return () =>
-          new Proxy(
-            {},
-            {
-              get(_t2, p2: string) {
-                if (writeMethods.has(p2)) {
-                  throw new Error(`Forbidden Supabase write: ${p2}`);
-                }
-                if (p2 === "select")
-                  return () => ({
-                    order: () =>
-                      Promise.resolve({ data: [], error: null }),
-                  });
-                return () => supabaseProxy;
+vi.mock("@/integrations/supabase/client", () => {
+  const writeMethods = new Set(["insert", "update", "delete", "upsert", "rpc"]);
+  const proxy: any = new Proxy(
+    {},
+    {
+      get(_t, prop: string) {
+        if (prop === "from") {
+          return () =>
+            new Proxy(
+              {},
+              {
+                get(_t2, p2: string) {
+                  if (writeMethods.has(p2)) {
+                    throw new Error(`Forbidden Supabase write: ${p2}`);
+                  }
+                  if (p2 === "select")
+                    return () => ({
+                      order: () => Promise.resolve({ data: [], error: null }),
+                    });
+                  return () => proxy;
+                },
               },
+            );
+        }
+        if (writeMethods.has(prop)) {
+          throw new Error(`Forbidden Supabase write: ${prop}`);
+        }
+        if (prop === "functions") {
+          return {
+            invoke: () => {
+              throw new Error("Forbidden functions.invoke");
             },
-          );
-      }
-      if (writeMethods.has(prop)) {
-        throw new Error(`Forbidden Supabase write: ${prop}`);
-      }
-      if (prop === "functions") {
-        return {
-          invoke: () => {
-            throw new Error("Forbidden functions.invoke");
-          },
-        };
-      }
-      if (prop === "auth")
-        return { getUser: () => Promise.resolve({ data: { user: null } }) };
-      return () => supabaseProxy;
+          };
+        }
+        if (prop === "auth")
+          return { getUser: () => Promise.resolve({ data: { user: null } }) };
+        return () => proxy;
+      },
     },
-  },
-);
+  );
+  return { supabase: proxy };
+});
 
-vi.mock("@/integrations/supabase/client", () => ({ supabase: supabaseProxy }));
 
 function renderAt(path: string) {
   const qc = new QueryClient({

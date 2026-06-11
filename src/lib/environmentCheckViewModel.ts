@@ -299,7 +299,7 @@ export function buildEnvironmentCheckDiaryViewModel(
     });
     let dliStatus: EnvironmentCheckDiaryStatus = "valid";
     let msg = `DLI window healthy${
-      typeof dli.dliMolPerM2 === "number" ? ` (${dli.dliMolPerM2.toFixed(1)} mol/m²/day)` : ""
+      typeof dli.dliMolM2Day === "number" ? ` (${dli.dliMolM2Day.toFixed(1)} mol/m²/day)` : ""
     }.`;
     if (dli.windowStatus === "dst_ambiguous") {
       dliStatus = "dst_ambiguous";
@@ -318,11 +318,11 @@ export function buildEnvironmentCheckDiaryViewModel(
       message: msg,
       metricKeys: ["ppfd", "dli"],
     });
-    if (typeof dli.dliMolPerM2 === "number") {
+    if (typeof dli.dliMolM2Day === "number") {
       metrics.push({
         metricKey: "dli",
         label: "DLI",
-        valueLabel: `${dli.dliMolPerM2.toFixed(1)} mol/m²/day`,
+        valueLabel: `${dli.dliMolM2Day.toFixed(1)} mol/m²/day`,
         status: dliStatus,
       });
     }

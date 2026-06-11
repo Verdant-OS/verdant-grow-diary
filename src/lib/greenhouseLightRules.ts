@@ -75,6 +75,7 @@ export interface PpfdSample {
 export type DliWindowStatus =
   | "ok"
   | "invalid_timezone"
+  | "dst_ambiguous"
   | "insufficient_samples"
   | "no_healthy_samples";
 

@@ -89,19 +89,25 @@ describe("buildEnvironmentSummaryReportViewModel", () => {
     expect(r.sourceCounts.invalid).toBe(1);
   });
 
-  it("orders top issues deterministically by count desc then severity then ruleId", () => {
+  it("orders top issues deterministically (severity desc then count desc) and exposes drilldown fields", () => {
     const checks = [
       vm({ id: "a", source: "stale" }),
       vm({ id: "b", source: "stale" }),
-      vm({ id: "c", source: "bogus" }), // source.invalid (1)
+      vm({ id: "c", source: "bogus" }), // source.invalid (critical, count=1)
     ];
     const r = buildEnvironmentSummaryReportViewModel({
       startDate: "2026-06-01",
       endDate: "2026-06-11",
       checks,
     });
-    const sourceReview = r.topIssues.find((i) => i.ruleId === "source.review");
-    expect(sourceReview?.count).toBe(2);
+    // critical severity outranks warning regardless of count.
+    expect(r.topIssues[0].ruleId).toBe("source.invalid");
+    const sourceReview = r.topIssues.find((i) => i.ruleId === "source.review")!;
+    expect(sourceReview.count).toBe(2);
+    expect(sourceReview.relatedEntryIds.sort()).toEqual(["a", "b"]);
+    expect(sourceReview.drilldownUrl).toContain("issue=source.review");
+    expect(sourceReview.drilldownUrl).toContain("start=2026-06-01");
+    expect(sourceReview.drilldownLabel).toBe("View 2 related checks");
     // Stable re-run.
     const r2 = buildEnvironmentSummaryReportViewModel({
       startDate: "2026-06-01",
@@ -110,6 +116,22 @@ describe("buildEnvironmentSummaryReportViewModel", () => {
     });
     expect(r2.topIssues.map((i) => i.ruleId)).toEqual(r.topIssues.map((i) => i.ruleId));
   });
+
+  it("top issues never list unrelated diary entries (only contributing entries)", () => {
+    const checks = [
+      vm({ id: "stale-1", source: "stale" }),
+      vm({ id: "valid-1", source: "live", vpdBand: { minKpa: 0.8, maxKpa: 1.5 } }),
+    ];
+    const r = buildEnvironmentSummaryReportViewModel({
+      startDate: "2026-06-01",
+      endDate: "2026-06-11",
+      checks,
+    });
+    const sourceReview = r.topIssues.find((i) => i.ruleId === "source.review")!;
+    expect(sourceReview.relatedEntryIds).toEqual(["stale-1"]);
+    expect(sourceReview.relatedEntryIds).not.toContain("valid-1");
+  });
+
 
   it("accumulates metric coverage from snapshot metrics", () => {
     const checks = [

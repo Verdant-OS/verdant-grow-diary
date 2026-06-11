@@ -46,6 +46,9 @@ const ALLOWED = new Set([
   "docs/ecowitt-only-sensor-direction.md",
   "src/test/ecowitt-only-sensor-direction.test.ts",
   ".github/workflows/ecowitt-only-safety-scan.yml",
+  // Intentional: the stop-ship checklist *defines* the safety scan and
+  // uses SwitchBot as an example of a retired brand to watch for.
+  "docs/v0-sentinel-stop-ship-checklist.md",
 ]);
 
 const PATTERN = /switch[\s_-]?bot/i;

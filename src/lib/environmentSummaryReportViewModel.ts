@@ -38,7 +38,11 @@ export interface EnvironmentSummaryTopIssue {
   count: number;
   severity: RuleSeverity;
   prompt: string;
+  relatedEntryIds: string[];
+  drilldownUrl: string;
+  drilldownLabel: string;
 }
+
 
 export interface EnvironmentSummaryReportViewModel {
   isPremiumReport: true;

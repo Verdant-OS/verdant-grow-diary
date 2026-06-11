@@ -230,4 +230,27 @@ describe("detectDarkCycleLeak", () => {
     });
     assertNoForbiddenKeys(r);
   });
+
+  it("dark window crossing DST spring-forward returns invalid_window (not certainty)", () => {
+    const r = detectDarkCycleLeak({
+      tzIana: "America/Los_Angeles",
+      darkStartIso: "2026-03-08T08:00:00Z", // pre-transition (PST)
+      darkEndIso: "2026-03-08T15:00:00Z", // post-transition (PDT)
+      samples: [{ ts: "2026-03-08T10:00:00Z", ppfd: 500, source: "live" }],
+    });
+    expect(r.status).toBe("invalid_window");
+    expect(r.reason).toMatch(/dst/);
+    expect(r.suspiciousSampleCount).toBe(0);
+  });
+
+  it("dark window crossing DST fall-back returns invalid_window (not certainty)", () => {
+    const r = detectDarkCycleLeak({
+      tzIana: "America/Los_Angeles",
+      darkStartIso: "2026-11-01T07:00:00Z",
+      darkEndIso: "2026-11-01T14:00:00Z",
+      samples: [{ ts: "2026-11-01T09:00:00Z", ppfd: 500, source: "live" }],
+    });
+    expect(r.status).toBe("invalid_window");
+    expect(r.reason).toMatch(/dst/);
+  });
 });

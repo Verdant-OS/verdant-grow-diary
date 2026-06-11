@@ -344,6 +344,17 @@ export function detectDarkCycleLeak(
       reason: "invalid_dark_window",
     };
   }
+  // DST guard: a dark window that crosses a DST transition cannot be
+  // interpreted with certainty — return inspection-only invalid_window
+  // rather than emitting a leak verdict.
+  if (windowCrossesDst(startMs, endMs, input.tzIana as string)) {
+    return {
+      status: "invalid_window",
+      inWindowSampleCount: 0,
+      suspiciousSampleCount: 0,
+      reason: "dst_ambiguous_window_review_only",
+    };
+  }
   const threshold =
     typeof input?.leakThresholdPpfd === "number" && Number.isFinite(input.leakThresholdPpfd)
       ? input.leakThresholdPpfd

@@ -140,9 +140,15 @@ function renderAt(path: string) {
   );
 }
 
+import {
+  clearEnvironmentSummaryExportAuditEvents,
+  readEnvironmentSummaryExportAuditEvents,
+} from "@/lib/environmentSummaryExportAuditRules";
+
 describe("EnvironmentSummaryReportPage — print/download action", () => {
   beforeEach(() => {
     supabaseCalls.count = 0;
+    clearEnvironmentSummaryExportAuditEvents();
   });
 
   it("non-premium user does not see Download PDF", () => {
@@ -163,18 +169,35 @@ describe("EnvironmentSummaryReportPage — print/download action", () => {
     );
   });
 
-  it("clicking Download PDF calls window.print and does not write to Supabase", () => {
+  it("clicking Download PDF records audit, calls window.print, no Supabase writes, no network", () => {
     planMock.current = "pro";
     const printSpy = vi
       .spyOn(window, "print")
       .mockImplementation(() => undefined);
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch" as any)
+      .mockImplementation((() => {
+        throw new Error("fetch not allowed");
+      }) as any);
     renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07");
     const before = supabaseCalls.count;
     fireEvent.click(screen.getByTestId("env-report-download-pdf"));
     expect(printSpy).toHaveBeenCalledTimes(1);
-    // No Supabase access triggered by the click.
     expect(supabaseCalls.count).toBe(before);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    const events = readEnvironmentSummaryExportAuditEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0].eventType).toBe("full_report_print_opened");
+    expect(events[0].reportMode).toBe("full_report");
+    expect(events[0].source).toBe("local_only");
     printSpy.mockRestore();
+    fetchSpy.mockRestore();
+  });
+
+  it("full report print mode includes the cover page", () => {
+    planMock.current = "pro";
+    renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07");
+    expect(screen.getByTestId("env-report-print-cover-page")).toBeTruthy();
   });
 
   it("printable section includes safety footer, DST-ambiguous and invalid labels", () => {
@@ -191,7 +214,6 @@ describe("EnvironmentSummaryReportPage — print/download action", () => {
     expect(txt).toContain("no device control");
     expect(txt).toMatch(/invalid/);
     expect(txt).toMatch(/dst|ambiguous/);
-    // Safety footer testid is inside the print section.
     expect(within(section).getByTestId("env-report-safety-footer")).toBeTruthy();
   });
 });

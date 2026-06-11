@@ -123,6 +123,8 @@ const App = () => (
                 <Route path="/grows" element={<Grows />} />
                 <Route path="/grows/:growId" element={<GrowDetail />} />
                 <Route path="/reports" element={<Reports />} />
+                <Route path="/diary/environment-summary" element={<EnvironmentSummaryReportPage />} />
+
 
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/diagnostics" element={<Diagnostics />} />

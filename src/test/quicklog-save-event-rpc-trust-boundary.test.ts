@@ -359,3 +359,107 @@ describe("quicklog_save_event — grants and surface scope", () => {
     );
   });
 });
+
+/**
+ * Extended trust-boundary invariants — post-failure orphan guards, duplicate
+ * replay companion-row isolation, and invalid sensor JSON value shapes.
+ * Postgres JSON cannot encode NaN or Infinity as numbers; they can only
+ * arrive as JSON strings, which the strict jsonb_typeof = 'number' check
+ * rejects before any insert.
+ */
+describe("quicklog_save_event — post-failure orphan invariants (static)", () => {
+  const REJECT_CODES = [
+    "grow_not_owned",
+    "tent_not_in_grow",
+    "plant_not_in_grow",
+    "plant_not_in_tent",
+    "invalid_event_type",
+    "invalid_sensor_metric",
+    "invalid_sensor_source",
+    "invalid_sensor_captured_at",
+    "invalid_idempotency_key",
+  ];
+
+  it("every rejection code precedes ALL companion-table inserts", () => {
+    const writeRe =
+      /INSERT\s+INTO\s+public\.(grow_events|diary_entries|quicklog_idempotency|watering_events|feeding_events|observation_events|training_events|photo_events|environment_events)\b/gi;
+    const offsets: number[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = writeRe.exec(body)) !== null) offsets.push(m.index);
+    expect(offsets.length).toBeGreaterThan(0);
+    const earliest = Math.min(...offsets);
+    for (const code of REJECT_CODES) {
+      const at = body.indexOf(`'${code}'`);
+      expect(at, code).toBeGreaterThan(-1);
+      expect(at, `${code} must precede first companion INSERT`).toBeLessThan(
+        earliest,
+      );
+    }
+  });
+
+  it("companion writes share ONE BEGIN/EXCEPTION/RAISE block (atomic, no orphans)", () => {
+    const block = body.match(
+      /BEGIN\s+INSERT\s+INTO\s+public\.grow_events[\s\S]*?EXCEPTION\s+WHEN\s+OTHERS\s+THEN[\s\S]*?RAISE\s*;\s*END\s*;/i,
+    );
+    expect(block).not.toBeNull();
+    const blk = block?.[0] ?? "";
+    expect(blk).toMatch(/INSERT\s+INTO\s+public\.grow_events/i);
+    expect(blk).toMatch(/INSERT\s+INTO\s+public\.diary_entries/i);
+    expect(blk).toMatch(/INSERT\s+INTO\s+public\.quicklog_idempotency/i);
+    // No companion insert exists outside the atomic block.
+    const outside = body.replace(blk, "");
+    expect(outside).not.toMatch(/INSERT\s+INTO\s+public\.diary_entries/i);
+    expect(outside).not.toMatch(
+      /INSERT\s+INTO\s+public\.quicklog_idempotency/i,
+    );
+  });
+
+  it("each rejection branch RETURNs early (never falls through to insert)", () => {
+    for (const code of REJECT_CODES) {
+      const at = body.indexOf(`'${code}'`);
+      const window = body.slice(at, Math.min(body.length, at + 400));
+      expect(window, `${code}`).toMatch(/RETURN\s+jsonb_build_object/i);
+    }
+  });
+});
+
+describe("quicklog_save_event — duplicate replay isolation (static)", () => {
+  it("duplicate branch returns reused=true BEFORE the first insert", () => {
+    const replayAt = body.indexOf("'duplicate_reused'");
+    const firstInsert = body.search(
+      /INSERT\s+INTO\s+public\.grow_events\s*\(\s*user_id/i,
+    );
+    expect(replayAt).toBeGreaterThan(-1);
+    expect(replayAt).toBeLessThan(firstInsert);
+    const window = body.slice(replayAt, firstInsert);
+    expect(window).toMatch(
+      /RETURN\s+jsonb_build_object[\s\S]{0,300}'reused'\s*,\s*true/i,
+    );
+  });
+
+  it("idempotency lookup AND insert are scoped by (user_id, idempotency_key)", () => {
+    expect(body).toMatch(
+      /FROM\s+public\.quicklog_idempotency[\s\S]{0,200}user_id\s*=\s*uid\s+AND\s+idempotency_key\s*=\s*p_idempotency_key/i,
+    );
+    expect(body).toMatch(
+      /INSERT\s+INTO\s+public\.quicklog_idempotency\s*\(\s*user_id\s*,\s*idempotency_key\s*,\s*grow_event_id\s*\)\s*VALUES\s*\(\s*uid\s*,\s*p_idempotency_key\s*,/i,
+    );
+  });
+});
+
+describe("quicklog_save_event — sensor JSON value shape (static)", () => {
+  it("strictly requires jsonb_typeof(value) = 'number' (rejects strings/null/bool/object/array)", () => {
+    // JSON 'NaN'/'Infinity'/'-Infinity' arrive only as strings (jsonb cannot
+    // encode them as numbers); those, plus null/true/false/objects/arrays,
+    // all fail the typeof = 'number' check below.
+    expect(body).toMatch(
+      /FOR\s+k\s*,\s*v_val\s+IN\s+SELECT\s+\*\s+FROM\s+jsonb_each\(v_metrics\)[\s\S]{0,400}jsonb_typeof\(v_val\)\s*<>\s*'number'/i,
+    );
+  });
+
+  it("does not coerce sensor values with ::numeric / to_number / to_jsonb (no masking)", () => {
+    const region =
+      body.match(/v_metrics\s*:=[\s\S]*?END\s+LOOP/i)?.[0] ?? body;
+    expect(region).not.toMatch(/::numeric|to_number\(|to_jsonb\(/i);
+  });
+});

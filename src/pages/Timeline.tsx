@@ -30,6 +30,10 @@ import { hasManualHandheldReadings } from "@/lib/quickLogHistoryRules";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { actionDetailPath, alertDetailPath, logsPath, timelinePath } from "@/lib/routes";
 import EnvironmentCsvImportLauncher from "@/components/EnvironmentCsvImportLauncher";
+import {
+  buildEnvironmentSummaryReportUrl,
+  defaultEnvironmentSummaryRange,
+} from "@/lib/environmentSummaryNavigationRules";
 import TimelineCsvContextPanel from "@/components/TimelineCsvContextPanel";
 import { cn } from "@/lib/utils";
 import { getEventType } from "@/lib/diary";

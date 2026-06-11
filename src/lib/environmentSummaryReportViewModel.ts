@@ -11,6 +11,9 @@ import type {
   EnvironmentCheckDiaryViewModel,
 } from "./environmentCheckViewModel";
 import type { GreenhouseSource } from "./greenhouseLightRules";
+import { buildEnvironmentSummaryReportUrl } from "./environmentSummaryNavigationRules";
+
+
 
 export type RuleSeverity = "info" | "watch" | "warning" | "critical";
 
@@ -19,7 +22,10 @@ export interface EnvironmentSummaryReportInput {
   endDate: string;
   /** Pre-built per-entry view models for the date range. */
   checks: ReadonlyArray<EnvironmentCheckDiaryViewModel>;
+  /** Optional rule id to focus the drilldown on. */
+  selectedIssueId?: string | null;
 }
+
 
 export interface EnvironmentSummaryMetricCoverage {
   metricKey: string;
@@ -35,7 +41,11 @@ export interface EnvironmentSummaryTopIssue {
   count: number;
   severity: RuleSeverity;
   prompt: string;
+  relatedEntryIds: string[];
+  drilldownUrl: string;
+  drilldownLabel: string;
 }
+
 
 export interface EnvironmentSummaryReportViewModel {
   isPremiumReport: true;
@@ -86,7 +96,14 @@ export function buildEnvironmentSummaryReportViewModel(
   const metricMap = new Map<string, EnvironmentSummaryMetricCoverage>();
   const issueMap = new Map<
     string,
-    { ruleId: string; label: string; count: number; severity: RuleSeverity; prompt: string }
+    {
+      ruleId: string;
+      label: string;
+      count: number;
+      severity: RuleSeverity;
+      prompt: string;
+      relatedEntryIds: string[];
+    }
   >();
   const reviewPrompts: string[] = [];
 
@@ -117,6 +134,9 @@ export function buildEnvironmentSummaryReportViewModel(
       if (cur) {
         cur.count += 1;
         cur.severity = bumpSeverity(cur.severity, sev);
+        if (!cur.relatedEntryIds.includes(c.entryId)) {
+          cur.relatedEntryIds.push(c.entryId);
+        }
       } else {
         issueMap.set(a.ruleId, {
           ruleId: a.ruleId,
@@ -124,6 +144,7 @@ export function buildEnvironmentSummaryReportViewModel(
           count: 1,
           severity: sev,
           prompt: a.message,
+          relatedEntryIds: [c.entryId],
         });
       }
     }
@@ -133,7 +154,7 @@ export function buildEnvironmentSummaryReportViewModel(
     }
   }
 
-  // Deterministic ordering: by count desc, then severity desc, then ruleId asc.
+  // Stable sort: severity desc → count desc → label asc → ruleId asc.
   const severityRank: Record<RuleSeverity, number> = {
     info: 0,
     watch: 1,
@@ -142,11 +163,26 @@ export function buildEnvironmentSummaryReportViewModel(
   };
   const topIssues: EnvironmentSummaryTopIssue[] = Array.from(issueMap.values())
     .sort((a, b) => {
-      if (b.count !== a.count) return b.count - a.count;
       const sevDiff = severityRank[b.severity] - severityRank[a.severity];
       if (sevDiff !== 0) return sevDiff;
+      if (b.count !== a.count) return b.count - a.count;
+      if (a.label !== b.label) return a.label < b.label ? -1 : 1;
       return a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : 0;
-    });
+    })
+    .map((i) => ({
+      ruleId: i.ruleId,
+      label: i.label,
+      count: i.count,
+      severity: i.severity,
+      prompt: i.prompt,
+      relatedEntryIds: i.relatedEntryIds.slice(),
+      drilldownUrl: buildEnvironmentSummaryReportUrl({
+        startDate: input.startDate,
+        endDate: input.endDate,
+        issueId: i.ruleId,
+      }),
+      drilldownLabel: `View ${i.count} related check${i.count === 1 ? "" : "s"}`,
+    }));
 
   const metricCoverage = Array.from(metricMap.values()).sort((a, b) =>
     a.metricKey < b.metricKey ? -1 : a.metricKey > b.metricKey ? 1 : 0,
@@ -154,6 +190,7 @@ export function buildEnvironmentSummaryReportViewModel(
 
   const totalChecks = checks.length;
   const emptyState = totalChecks === 0 ? "No environment checks in this date range." : null;
+
 
   const summaryBullets: string[] = [];
   if (totalChecks > 0) {

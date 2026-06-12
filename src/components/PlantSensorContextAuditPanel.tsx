@@ -7,17 +7,32 @@
  *  - Business logic lives in `buildPlantSensorContextAuditView`.
  */
 import { useMemo } from "react";
-import { Activity } from "lucide-react";
+import { Activity, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   buildPlantSensorContextAuditView,
   type PlantSensorContextStatus,
 } from "@/lib/plantSensorContextAuditViewModel";
+import {
+  buildPlantSensorContextAuditCta,
+  type PlantSensorContextCtaView,
+} from "@/lib/plantSensorContextAuditCtaViewModel";
+import type { PlantQuickLogPrefillInput } from "@/lib/plantQuickLogPrefillRules";
 import type { ManualSensorLog } from "@/lib/manualSensorChronologyDeltaRules";
 
 export interface PlantSensorContextAuditPanelProps {
   logs: ReadonlyArray<ManualSensorLog> | null | undefined;
   now?: Date;
+  /** Identity context required to safely prefill manual sensor entry. */
+  identity?: PlantQuickLogPrefillInput | null;
+  /**
+   * Optional handler invoked with the identity-only prefill (no sensor
+   * values). When omitted, the CTA falls back to an inert message.
+   */
+  onOpenManualSensorEntry?: (
+    prefill: NonNullable<PlantSensorContextCtaView["prefill"]>,
+  ) => void;
 }
 
 function statusVariant(
@@ -42,10 +57,22 @@ function statusLabel(s: PlantSensorContextStatus): string {
 export default function PlantSensorContextAuditPanel({
   logs,
   now,
+  identity,
+  onOpenManualSensorEntry,
 }: PlantSensorContextAuditPanelProps) {
   const view = useMemo(
     () => buildPlantSensorContextAuditView(logs, now ?? new Date()),
     [logs, now],
+  );
+
+  const cta = useMemo(
+    () =>
+      buildPlantSensorContextAuditCta({
+        status: view.status,
+        identity: identity ?? null,
+        hasOpenHandler: typeof onOpenManualSensorEntry === "function",
+      }),
+    [view.status, identity, onOpenManualSensorEntry],
   );
 
   return (
@@ -130,6 +157,33 @@ export default function PlantSensorContextAuditPanel({
           ))}
         </div>
       )}
+      {cta.kind === "add" || cta.kind === "refresh" ? (
+        <div data-testid="plant-sensor-context-audit-cta">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            data-testid="plant-sensor-context-audit-cta-button"
+            onClick={() => {
+              if (cta.prefill && onOpenManualSensorEntry) {
+                onOpenManualSensorEntry(cta.prefill);
+              }
+            }}
+          >
+            <Plus className="h-3.5 w-3.5 mr-1" aria-hidden="true" />
+            {cta.label}
+          </Button>
+        </div>
+      ) : null}
+
+      {cta.kind === "inert" ? (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="plant-sensor-context-audit-cta-inert"
+        >
+          {cta.inertMessage}
+        </p>
+      ) : null}
     </section>
   );
 }

@@ -73,10 +73,11 @@ describe("Plant Detail Action → Response pairing card", () => {
     const card = screen.getByTestId("plant-detail-action-response-pair");
     expect(card).toHaveAttribute("data-reason", "awaiting_response");
     expect(card).toHaveAttribute("data-response-status", "pending");
-    expect(screen.getByText("Waiting on plant response")).toBeInTheDocument();
-    expect(screen.getByText(/What changed:/)).toBeInTheDocument();
-    expect(screen.getByText(/Fed\./)).toBeInTheDocument();
-    expect(screen.getByText(/No response check yet/)).toBeInTheDocument();
+    const inCard = within(card);
+    expect(inCard.getByText("Waiting on plant response")).toBeInTheDocument();
+    expect(inCard.getByText(/What changed:/)).toBeInTheDocument();
+    expect(inCard.getByText(/Fed\./)).toBeInTheDocument();
+    expect(inCard.getByText(/No response check yet/)).toBeInTheDocument();
   });
 
   it("does not render when there is only a response check and no action", () => {

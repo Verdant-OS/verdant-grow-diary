@@ -110,11 +110,12 @@ export function buildAiDoctorManualSaveConfirmationView(
         Object.freeze({ code: l.code, message: l.message }),
       ),
     ),
+    idempotencyKey: draft.idempotency_key,
     idempotencyKeyShort: shortKey(draft.idempotency_key),
     copy: AI_DOCTOR_MANUAL_SAVE_CONFIRMATION_COPY,
     buttonLabel: AI_DOCTOR_MANUAL_SAVE_BUTTON_LABEL,
-    confirmDisabled: true,
-    confirmDisabledLabel: AI_DOCTOR_MANUAL_SAVE_DISABLED_LABEL,
+    confirmLabel: AI_DOCTOR_MANUAL_SAVE_CONFIRM_LABEL,
+    savingLabel: AI_DOCTOR_MANUAL_SAVE_SAVING_LABEL,
     cancelLabel: AI_DOCTOR_MANUAL_SAVE_CANCEL_LABEL,
   });
 }

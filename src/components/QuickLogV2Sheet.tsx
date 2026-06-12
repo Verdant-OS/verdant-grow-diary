@@ -76,6 +76,10 @@ export default function QuickLogV2Sheet({
   const { save, saving } = useQuickLogV2Save();
 
   const [form, setForm] = useState<QuickLogV2FormState>(EMPTY_QUICKLOG_V2_FORM);
+  const [feedingForm, setFeedingForm] = useState<QuickLogFeedingFormState>(
+    EMPTY_QUICKLOG_FEEDING_FORM,
+  );
+  const [feedingSaving, setFeedingSaving] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<string>("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);

@@ -125,9 +125,11 @@ describe("static safety guard — no save/RPC/model imports", () => {
     /alertHelpers|usePersistEnvironmentAlerts|alertsList/i,
     /openai|anthropic|aiClient|modelClient|ai-gateway/i,
   ];
-  for (const src of [HELPER_SRC, BADGE_SRC]) {
-    for (const pat of FORBIDDEN) {
-      expect(pat.test(src)).toBe(false);
+  it("helper and presenter contain no forbidden imports", () => {
+    for (const src of [HELPER_SRC, BADGE_SRC]) {
+      for (const pat of FORBIDDEN) {
+        expect(pat.test(src)).toBe(false);
+      }
     }
-  }
+  });
 });

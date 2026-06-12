@@ -4,6 +4,8 @@
 import { describe, it, expect } from "vitest";
 import {
   AI_DOCTOR_MANUAL_SAVE_KIND,
+  isBlockedManualSaveDraft,
+  isOkManualSaveDraft,
   AI_DOCTOR_MANUAL_SAVE_SOURCE,
   buildAiDoctorManualSaveDraft,
   type AiDoctorManualSavePlantIdentity,
@@ -75,7 +77,7 @@ describe("buildAiDoctorManualSaveDraft", () => {
       receiptText: RECEIPT,
       now: NOW,
     });
-    if (!r.ok) throw new Error("expected ok");
+    if (!isOkManualSaveDraft(r)) throw new Error("expected ok");
     const d = r.draft.details;
     expect(d.kind).toBe(AI_DOCTOR_MANUAL_SAVE_KIND);
     expect(d.preview_only).toBe(true);
@@ -94,7 +96,7 @@ describe("buildAiDoctorManualSaveDraft", () => {
       receiptText: RECEIPT,
       now: NOW,
     });
-    if (!r.ok) throw new Error("expected ok");
+    if (!isOkManualSaveDraft(r)) throw new Error("expected ok");
     const eo = r.draft.details.engine_output;
     expect(Object.keys(eo).sort()).toEqual(
       [
@@ -120,7 +122,7 @@ describe("buildAiDoctorManualSaveDraft", () => {
       receiptText: RECEIPT,
       now: NOW,
     });
-    if (!r.ok) throw new Error("expected ok");
+    if (!isOkManualSaveDraft(r)) throw new Error("expected ok");
     const json = JSON.stringify(r.draft);
     expect(json).not.toMatch(/eyJ[\w-]+\.eyJ[\w-]+/);
     expect(json).not.toMatch(/service[_-]?role/i);
@@ -153,7 +155,7 @@ describe("buildAiDoctorManualSaveDraft", () => {
       receiptText: RECEIPT,
       now: NOW,
     });
-    if (!c.ok) throw new Error("expected ok");
+    if (!isOkManualSaveDraft(c)) throw new Error("expected ok");
     expect(c.draft.details.context_hash).not.toBe(a.draft.details.context_hash);
   });
 
@@ -183,7 +185,7 @@ describe("buildAiDoctorManualSaveDraft", () => {
       now: NOW,
     });
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error("expected blocked"); const blocked = r;
+    if (!isBlockedManualSaveDraft(r)) throw new Error("expected blocked"); const blocked = r;
     expect(blocked.reasons).toContain("missing_plant_id");
     expect(blocked.reasons).toContain("missing_tent_id");
     expect(blocked.reasons).toContain("missing_grow_id");
@@ -197,7 +199,7 @@ describe("buildAiDoctorManualSaveDraft", () => {
       now: NOW,
     });
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error("expected blocked"); const blocked = r;
+    if (!isBlockedManualSaveDraft(r)) throw new Error("expected blocked"); const blocked = r;
     expect(blocked.reasons).toContain("missing_note");
   });
 
@@ -213,7 +215,7 @@ describe("buildAiDoctorManualSaveDraft", () => {
       receiptText: RECEIPT,
       now: NOW,
     });
-    if (!r.ok) throw new Error("expected ok");
+    if (!isOkManualSaveDraft(r)) throw new Error("expected ok");
     const codes = r.draft.details.limitations.map((l) => l.code);
     expect(codes).toContain("demo_only");
     expect(codes).toContain("stale_or_invalid");
@@ -233,7 +235,7 @@ describe("buildAiDoctorManualSaveDraft", () => {
       receiptText: RECEIPT,
       now: NOW,
     });
-    if (!r.ok) throw new Error("expected ok");
+    if (!isOkManualSaveDraft(r)) throw new Error("expected ok");
     const eo = r.draft.details.engine_output;
     expect(eo.action_queue_suggestion_status).toBe("pending_approval");
     // No queue row payload leaked
@@ -265,7 +267,7 @@ describe("buildAiDoctorManualSaveDraft", () => {
       receiptText: RECEIPT,
       now: NOW,
     });
-    if (!r.ok) throw new Error("expected ok");
+    if (!isOkManualSaveDraft(r)) throw new Error("expected ok");
     expect(Object.isFrozen(r)).toBe(true);
     expect(Object.isFrozen(r.draft)).toBe(true);
     expect(Object.isFrozen(r.draft.details)).toBe(true);

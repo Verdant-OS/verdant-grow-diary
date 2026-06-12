@@ -145,16 +145,15 @@ describe("AiDoctorCheckInPreviewPanel — manual save confirmation shell", () =>
     ).toBeTruthy();
   });
 
-  it("confirm button is disabled (no-write shell)", () => {
+  it("confirm button is enabled with 'Save to diary' label when draft is ready", () => {
     render(<AiDoctorCheckInPreviewPanel context={ctx()} />);
     openPreview();
     openSaveConfirm();
     const confirm = screen.getByTestId(
       "ai-doctor-manual-save-confirm-button",
     ) as HTMLButtonElement;
-    expect(confirm.disabled).toBe(true);
-    expect(confirm.getAttribute("aria-disabled")).toBe("true");
-    expect(confirm.textContent).toMatch(/Save coming next/);
+    expect(confirm.disabled).toBe(false);
+    expect(confirm.textContent).toMatch(/Save to diary/);
   });
 
   it("blocked draft shows reasons and no enabled save UI", () => {
@@ -189,12 +188,15 @@ describe("AiDoctorCheckInPreviewPanel — manual save confirmation shell", () =>
     ).toBeTruthy();
   });
 
-  it("static guard: panel source has no Supabase/write/model imports", async () => {
+  it("static guard: panel source has no direct Supabase/write/model imports", async () => {
     const { readFileSync } = await import("node:fs");
     const src = readFileSync(
       "src/components/AiDoctorCheckInPreviewPanel.tsx",
       "utf8",
     );
+    // Panel must NOT touch Supabase, fetch, RPC, model APIs, alerts, or
+    // Action Queue mutations directly. The existing safe Quick Log v2 save
+    // hook is the only allowed write path.
     expect(src).not.toMatch(/integrations\/supabase/);
     expect(src).not.toMatch(/\bfetch\s*\(/);
     expect(src).not.toMatch(/\.rpc\s*\(/);
@@ -202,7 +204,6 @@ describe("AiDoctorCheckInPreviewPanel — manual save confirmation shell", () =>
     expect(src).not.toMatch(/\.insert\s*\(/);
     expect(src).not.toMatch(/\.update\s*\(/);
     expect(src).not.toMatch(/\.delete\s*\(/);
-    expect(src).not.toMatch(/useQuickLogV2Save|useMutation/);
     expect(src).not.toMatch(/createAlert|insertAlert|alertMutation/i);
     expect(src).not.toMatch(/actionQueue(Writer|Insert|Create|Mutation|Append)/i);
     expect(src).not.toMatch(/openai|anthropic|gemini|model\.invoke/i);

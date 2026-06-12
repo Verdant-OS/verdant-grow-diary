@@ -4,7 +4,8 @@
 import { describe, it, expect } from "vitest";
 import {
   AI_DOCTOR_MANUAL_SAVE_BUTTON_LABEL,
-  AI_DOCTOR_MANUAL_SAVE_DISABLED_LABEL,
+  AI_DOCTOR_MANUAL_SAVE_CONFIRM_LABEL,
+  AI_DOCTOR_MANUAL_SAVE_SAVING_LABEL,
   AI_DOCTOR_MANUAL_SAVE_CONFIRMATION_COPY,
   buildAiDoctorManualSaveConfirmationView,
 } from "@/lib/aiDoctorManualSaveConfirmationViewModel";
@@ -64,8 +65,9 @@ describe("buildAiDoctorManualSaveConfirmationView", () => {
     expect(v.safetyLabels).toContain("Deterministic engine");
     expect(v.safetyLabels).toContain("No live AI model");
     expect(v.copy).toBe(AI_DOCTOR_MANUAL_SAVE_CONFIRMATION_COPY);
-    expect(v.confirmDisabled).toBe(true);
-    expect(v.confirmDisabledLabel).toBe(AI_DOCTOR_MANUAL_SAVE_DISABLED_LABEL);
+    expect(v.confirmLabel).toBe(AI_DOCTOR_MANUAL_SAVE_CONFIRM_LABEL);
+    expect(v.savingLabel).toBe(AI_DOCTOR_MANUAL_SAVE_SAVING_LABEL);
+    expect(v.idempotencyKey.length).toBeGreaterThan(0);
     expect(v.idempotencyKeyShort.length).toBeGreaterThan(0);
   });
 

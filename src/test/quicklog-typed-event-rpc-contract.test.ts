@@ -46,19 +46,22 @@ describe("typed event RPC contract", () => {
     expect(typeof x).toBe("string");
   });
 
-  it("missing create_* RPCs are not present in generated types", () => {
+  it("only the wired create_* RPCs are present in generated types", () => {
+    // create_feeding_event now exists at the DB layer (mirrors
+    // create_watering_event). UI/Quick Log wiring is intentionally still
+    // pending, so readiness below stays "rpc_missing" until that slice lands.
     type HasFeeding = "create_feeding_event" extends keyof Functions ? true : false;
     type HasPhoto = "create_photo_event" extends keyof Functions ? true : false;
     type HasObs = "create_observation_event" extends keyof Functions ? true : false;
     type HasTraining = "create_training_event" extends keyof Functions ? true : false;
     type HasEnv = "create_environment_event" extends keyof Functions ? true : false;
-    const feeding: HasFeeding = false;
+    const feeding: HasFeeding = true;
     const photo: HasPhoto = false;
     const obs: HasObs = false;
     const training: HasTraining = false;
     const env: HasEnv = false;
     expect([feeding, photo, obs, training, env]).toEqual([
-      false, false, false, false, false,
+      true, false, false, false, false,
     ]);
   });
 });

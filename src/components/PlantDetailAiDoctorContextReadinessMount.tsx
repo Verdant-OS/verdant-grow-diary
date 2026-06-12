@@ -11,6 +11,7 @@
 import { useMemo } from "react";
 import { Activity } from "lucide-react";
 import AiDoctorContextReadinessPanel from "@/components/AiDoctorContextReadinessPanel";
+import AiDoctorCheckInPreviewPanel from "@/components/AiDoctorCheckInPreviewPanel";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { usePlantManualSensorLogs } from "@/hooks/usePlantManualSensorHistory";
 import { usePlantAssignedTentAlerts } from "@/hooks/usePlantAssignedTentAlerts";

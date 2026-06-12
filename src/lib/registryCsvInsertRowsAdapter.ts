@@ -7,7 +7,7 @@
  *   - no React, no Supabase, no fetch, no rpc
  *   - no inserts/updates/deletes/upserts
  *   - no alerts, no Action Queue, no AI, no device control
- *   - does not touch TentCsvImportCard or PREVIEW_PERSISTENCE_ENABLED
+ *   - does not touch the import card or the preview-persistence gate
  *
  * Persistence policy: this slice produces rows shaped for the DB allow-list
  * but does NOT wire them in. Saving for Spider Farmer / Vivosun stays

@@ -31,8 +31,14 @@ import {
 } from "@/lib/aiDoctorCheckInReceiptView";
 import {
   buildAiDoctorManualSaveConfirmationView,
+  AI_DOCTOR_MANUAL_SAVE_SUCCESS_MESSAGE,
+  AI_DOCTOR_MANUAL_SAVE_DUPLICATE_MESSAGE,
+  AI_DOCTOR_MANUAL_SAVE_FAILURE_MESSAGE,
   type AiDoctorManualSaveConfirmationView,
 } from "@/lib/aiDoctorManualSaveConfirmationViewModel";
+import { buildAiDoctorManualSaveDraft, isOkManualSaveDraft } from "@/lib/aiDoctorManualSaveDraft";
+import { buildAiDoctorQuickLogSavePayload } from "@/lib/aiDoctorManualSaveQuickLogAdapter";
+import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 import type { AiDoctorContext } from "@/lib/aiDoctorEngine";
 
 export interface AiDoctorCheckInPreviewPanelProps {

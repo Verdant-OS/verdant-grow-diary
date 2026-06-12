@@ -153,9 +153,10 @@ describe("QuickLogV2Sheet — post-save refresh", () => {
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
   });
 
-  it("photo-blocked save does NOT invalidate any keys", async () => {
-    const { onOpenChange } = renderSheet("plant:plant-1");
-    fireEvent.click(screen.getByRole("button", { name: "Photo" }));
+  it("save without a selected target does NOT invalidate any keys", async () => {
+    // QuickLogV2Sheet has no separate "Photo" action mode; the equivalent
+    // guard is the context block when no plant/tent is selected.
+    const { onOpenChange } = renderSheet("");
     clickSave();
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
     expect(rpcMock).not.toHaveBeenCalled();

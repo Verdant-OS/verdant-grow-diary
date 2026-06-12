@@ -859,7 +859,7 @@ export default function QuickLog({
           {showMore && (
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <Label className="text-xs">EC / PPM value</Label>
+                <Label className="text-xs">EC value</Label>
                 <Input
                   inputMode="decimal"
                   value={details.ec}
@@ -869,7 +869,7 @@ export default function QuickLog({
                 />
               </div>
               <div>
-                <Label className="text-xs">EC / PPM unit</Label>
+                <Label className="text-xs">EC unit</Label>
                 <Select
                   value={details.ecUnit}
                   onValueChange={(v) => setDetails({ ...details, ecUnit: v as EcUnit })}
@@ -975,7 +975,7 @@ export default function QuickLog({
                   data-testid="quicklog-hardware-helper"
                   className="text-[11px] text-muted-foreground leading-snug"
                 >
-                  Manual handheld readings — not live sensor data. EC fields are EC mS/cm only. Use optional EC / PPM above for PPM scales.
+                  Manual handheld readings — not live sensor data. EC fields are EC mS/cm only. Use the optional EC value above to record other scales.
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
@@ -1134,7 +1134,7 @@ export default function QuickLog({
                   data-testid="quick-log-post-save-another"
                   onClick={resetForAnother}
                 >
-                  Log another
+                  Log another for {savedTarget.name}
                 </Button>
                 <Button
                   type="button"

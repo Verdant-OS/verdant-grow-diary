@@ -392,7 +392,6 @@ export default function QuickLogV2Sheet({
               <Button
                 type="button"
                 variant={form.action === "water" ? "default" : "outline"}
-                aria-label="Log watering"
                 onClick={() => handleAction("water")}
               >
                 Water
@@ -400,7 +399,6 @@ export default function QuickLogV2Sheet({
               <Button
                 type="button"
                 variant={form.action === "note" ? "default" : "outline"}
-                aria-label="Log observation note"
                 onClick={() => handleAction("note")}
               >
                 Note
@@ -583,7 +581,6 @@ export default function QuickLogV2Sheet({
                 className="flex-1"
                 onClick={() => onOpenChange(false)}
                 disabled={saving}
-                aria-label="Cancel Quick Log"
               >
                 Cancel
               </Button>
@@ -593,7 +590,6 @@ export default function QuickLogV2Sheet({
                 onClick={handleSave}
                 disabled={saving || contextBlocked}
                 aria-describedby="qlv2-save-helper"
-                aria-label="Save Quick Log"
                 data-testid="qlv2-save"
               >
                 {saving ? "Saving…" : "Save"}

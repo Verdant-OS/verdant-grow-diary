@@ -234,7 +234,7 @@ export async function writeFeedingTypedEvent(
   options: WriteFeedingTypedEventOptions = {},
 ): Promise<WriteFeedingTypedEventResult> {
   const mapped = mapFeedingInputToRpcArgs(input);
-  if (!mapped.ok) {
+  if (mapped.ok !== true) {
     return { ok: false, reason: mapped.reason };
   }
 

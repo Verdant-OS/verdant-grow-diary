@@ -32,6 +32,7 @@ import PlantDetailAiDoctorReadinessGate from "@/components/PlantDetailAiDoctorRe
 import PlantDetailAiDoctorSafeReviewStart from "@/components/PlantDetailAiDoctorSafeReviewStart";
 import AiDoctorReviewResultPreview from "@/components/AiDoctorReviewResultPreview";
 import PlantDetailAiDoctorLiveReview from "@/components/PlantDetailAiDoctorLiveReview";
+import PlantDetailAiDoctorContextReadinessMount from "@/components/PlantDetailAiDoctorContextReadinessMount";
 import PlantDetailAskDoctorHelper from "@/components/PlantDetailAskDoctorHelper";
 import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
 import PlantDetailSectionNav from "@/components/PlantDetailSectionNav";
@@ -215,6 +216,14 @@ export default function PlantDetail() {
         growId={plant.growId ?? null}
         stage={plant.stage ?? null}
         hasPlantPhoto={!!plant.photo}
+      />
+      <PlantDetailAiDoctorContextReadinessMount
+        plantId={plant.id}
+        growId={plant.growId ?? null}
+        tentId={plant.tentId ?? null}
+        plantName={plant.name}
+        strain={plant.strain}
+        stage={plant.stage ?? null}
       />
       <PlantDetailDoctorContextPreview
         plantId={plant.id}

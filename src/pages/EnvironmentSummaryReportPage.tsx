@@ -36,8 +36,13 @@ import {
   buildEnvironmentSummaryPrintMetadata,
   PRINT_SAFETY_FOOTER,
 } from "@/lib/environmentSummaryPrintRules";
-import { recordEnvironmentSummaryExportAuditEvent } from "@/lib/environmentSummaryExportAuditRules";
+import {
+  readEnvironmentSummaryExportAuditEvents,
+  recordEnvironmentSummaryExportAuditEvent,
+} from "@/lib/environmentSummaryExportAuditRules";
 import EnvironmentSummaryPrePrintModal from "@/components/EnvironmentSummaryPrePrintModal";
+import EnvironmentSummaryExportHistoryPanel from "@/components/EnvironmentSummaryExportHistoryPanel";
+
 
 type PrintMode = "full_report" | "drilldown";
 
@@ -64,6 +69,8 @@ export default function EnvironmentSummaryReportPage() {
   const [pendingPrintMode, setPendingPrintMode] = useState<PrintMode | null>(
     null,
   );
+  const [exportHistoryRefreshKey, setExportHistoryRefreshKey] = useState(0);
+
 
   useEffect(() => {
     if (startParam) setStartDate(startParam);
@@ -185,6 +192,7 @@ export default function EnvironmentSummaryReportPage() {
         endDate,
       });
       setPendingPrintMode(null);
+      setExportHistoryRefreshKey((k) => k + 1);
       triggerPrint(printMeta.filename, "full_report");
       return;
     }
@@ -203,9 +211,36 @@ export default function EnvironmentSummaryReportPage() {
         selectedIssue.ruleId,
       );
       setPendingPrintMode(null);
+      setExportHistoryRefreshKey((k) => k + 1);
       triggerPrint(filename, "drilldown");
     }
   };
+
+  const exportHistoryEvents = useMemo(
+    () => readEnvironmentSummaryExportAuditEvents(),
+    // refresh key bumps when we record a new event
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [exportHistoryRefreshKey],
+  );
+
+  const handleReopenFromHistory = (input: {
+    startDate: string;
+    endDate: string;
+    issueRuleId?: string | null;
+  }) => {
+    setStartDate(input.startDate);
+    setEndDate(input.endDate);
+    const next = new URLSearchParams(params);
+    next.set("start", input.startDate);
+    next.set("end", input.endDate);
+    if (input.issueRuleId) {
+      next.set("issue", input.issueRuleId);
+    } else {
+      next.delete("issue");
+    }
+    setParams(next, { replace: true });
+  };
+
 
   const drilldownPdfFilename = selectedIssue
     ? buildEnvironmentSummaryDrilldownPrintFilename(
@@ -368,9 +403,18 @@ export default function EnvironmentSummaryReportPage() {
             data-testid="env-report-drilldown-section"
           >
             <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                {selectedIssue.drilldownLabel}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-muted-foreground">
+                  {selectedIssue.drilldownLabel}
+                </p>
+                <span
+                  className="print-page-indicator print-only text-[10px] uppercase tracking-wider text-muted-foreground"
+                  data-testid="env-report-drilldown-page-indicator"
+                  aria-hidden
+                >
+                  Page · of total
+                </span>
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
@@ -381,6 +425,7 @@ export default function EnvironmentSummaryReportPage() {
                 Clear drilldown
               </Button>
             </div>
+
             <div data-print-issue-card="selected">
               <EnvironmentIssueDrilldown
                 issue={selectedIssue}
@@ -397,6 +442,13 @@ export default function EnvironmentSummaryReportPage() {
           {PRINT_SAFETY_FOOTER}
         </p>
       </div>
+
+      <EnvironmentSummaryExportHistoryPanel
+        events={exportHistoryEvents}
+        onReopen={handleReopenFromHistory}
+      />
+
+
 
       <EnvironmentSummaryPrePrintModal
         open={pendingPrintMode !== null}

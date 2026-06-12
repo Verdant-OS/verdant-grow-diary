@@ -167,7 +167,7 @@ describe("EnvironmentSummaryExportReceiptDetail", () => {
   });
 
   it("detail modal has print-hidden structure", () => {
-    const { container } = render(
+    render(
       <EnvironmentSummaryExportHistoryPanel
         events={[evt({ id: "e1" })]}
         onReopen={() => {}}
@@ -175,10 +175,11 @@ describe("EnvironmentSummaryExportReceiptDetail", () => {
     );
     fireEvent.click(screen.getByTestId("env-report-export-history-details"));
 
-    const dialog = container.querySelector(
+    const dialog = document.querySelector(
       '[data-testid="env-report-receipt-dialog"]',
     );
-    expect(dialog?.className).toMatch(/print-hidden/);
+    expect(dialog).toBeTruthy();
+    expect(dialog?.classList.toString()).toMatch(/print-hidden/);
   });
 
   it("receipt detail code does not import Supabase, fetch, or write helpers", async () => {

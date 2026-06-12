@@ -4,7 +4,8 @@
 import { describe, it, expect } from "vitest";
 import {
   AI_DOCTOR_MANUAL_SAVE_BUTTON_LABEL,
-  AI_DOCTOR_MANUAL_SAVE_DISABLED_LABEL,
+  AI_DOCTOR_MANUAL_SAVE_CONFIRM_LABEL,
+  AI_DOCTOR_MANUAL_SAVE_SAVING_LABEL,
   AI_DOCTOR_MANUAL_SAVE_CONFIRMATION_COPY,
   buildAiDoctorManualSaveConfirmationView,
 } from "@/lib/aiDoctorManualSaveConfirmationViewModel";

@@ -67,15 +67,10 @@ describe("typed event RPC contract", () => {
 });
 
 describe("getTypedEventWriteReadiness", () => {
-  it("returns rpc_available only for watering", () => {
+  it("returns rpc_available for watering and feeding", () => {
     expect(getTypedEventWriteReadiness("watering")).toBe("rpc_available");
-    for (const t of [
-      "feeding",
-      "photo",
-      "observation",
-      "training",
-      "environment",
-    ]) {
+    expect(getTypedEventWriteReadiness("feeding")).toBe("rpc_available");
+    for (const t of ["photo", "observation", "training", "environment"]) {
       expect(getTypedEventWriteReadiness(t)).toBe("rpc_missing");
     }
   });

@@ -31,6 +31,16 @@ import {
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import { buildQuickLogPhotoGateState } from "@/lib/quickLogPhotoGateRules";
+import {
+  EMPTY_QUICKLOG_FEEDING_FORM,
+  FEEDING_SAVE_FAILURE_MESSAGE,
+  FEEDING_SAVE_SUCCESS_MESSAGE,
+  buildFeedingFormPayload,
+  feedingFormReasonToHelper,
+  type QuickLogFeedingFormState,
+} from "@/lib/quickLogFeedingFormViewModel";
+import { writeFeedingTypedEvent } from "@/lib/writeFeedingTypedEvent";
+import QuickLogFeedingForm from "@/components/QuickLogFeedingForm";
 
 interface Props {
   open: boolean;
@@ -66,6 +76,10 @@ export default function QuickLogV2Sheet({
   const { save, saving } = useQuickLogV2Save();
 
   const [form, setForm] = useState<QuickLogV2FormState>(EMPTY_QUICKLOG_V2_FORM);
+  const [feedingForm, setFeedingForm] = useState<QuickLogFeedingFormState>(
+    EMPTY_QUICKLOG_FEEDING_FORM,
+  );
+  const [feedingSaving, setFeedingSaving] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<string>("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -107,6 +121,7 @@ export default function QuickLogV2Sheet({
         ...EMPTY_QUICKLOG_V2_FORM,
         selectedKey: defaultTargetKey ?? null,
       });
+      setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
       setLocalError(null);
       setSaveStatus("");
       resetPhotoSelection();
@@ -189,6 +204,43 @@ export default function QuickLogV2Sheet({
       setLocalError("Choose a plant or tent before saving.");
       return;
     }
+
+    if (form.action === "feed") {
+      if (!resolved.growId) {
+        setLocalError(feedingFormReasonToHelper("grow_id:missing"));
+        return;
+      }
+      const mapped = buildFeedingFormPayload({
+        growId: resolved.growId,
+        tentId: resolved.tentId ?? null,
+        plantId: resolved.plantId ?? null,
+        form: feedingForm,
+      });
+      if (mapped.ok !== true) {
+        setLocalError(feedingFormReasonToHelper(mapped.reason));
+        return;
+      }
+      setFeedingSaving(true);
+      setSaveStatus("Saving feeding…");
+      const result = await writeFeedingTypedEvent(mapped.payload);
+      setFeedingSaving(false);
+      if (result.ok !== true) {
+        setLocalError(FEEDING_SAVE_FAILURE_MESSAGE);
+        toast.error(FEEDING_SAVE_FAILURE_MESSAGE);
+        setSaveStatus("");
+        return;
+      }
+      setSaveStatus(FEEDING_SAVE_SUCCESS_MESSAGE);
+      toast.success(FEEDING_SAVE_SUCCESS_MESSAGE);
+      applyQuickLogV2Refresh(queryClient, {
+        targetType: resolved.targetType as "plant" | "tent",
+        targetId: resolved.targetId as string,
+        tentId: resolved.tentId ?? null,
+      });
+      onOpenChange(false);
+      return;
+    }
+
 
     let uploadedPath: string | null = null;
     if (photoFile) {
@@ -388,13 +440,20 @@ export default function QuickLogV2Sheet({
 
           <div>
             <Label>Action</Label>
-            <div className="mt-1 grid grid-cols-2 gap-2" role="group" aria-label="Quick Log action type">
+            <div className="mt-1 grid grid-cols-3 gap-2" role="group" aria-label="Quick Log action type">
               <Button
                 type="button"
                 variant={form.action === "water" ? "default" : "outline"}
                 onClick={() => handleAction("water")}
               >
                 Water
+              </Button>
+              <Button
+                type="button"
+                variant={form.action === "feed" ? "default" : "outline"}
+                onClick={() => handleAction("feed")}
+              >
+                Feed
               </Button>
               <Button
                 type="button"
@@ -405,6 +464,17 @@ export default function QuickLogV2Sheet({
               </Button>
             </div>
           </div>
+
+          {form.action === "feed" && (
+            <QuickLogFeedingForm
+              value={feedingForm}
+              onChange={(next) => {
+                setFeedingForm(next);
+                setLocalError(null);
+              }}
+              disabled={feedingSaving || saving}
+            />
+          )}
 
           {shouldShowVolumeField(form.action) && (
             <div>
@@ -431,6 +501,7 @@ export default function QuickLogV2Sheet({
             </div>
           )}
 
+          {form.action !== "feed" && (
           <div className="rounded-md border border-border p-3" data-testid="qlv2-photo-attachment">
             <Label>Photo attachment</Label>
             {photoPreview ? (
@@ -500,7 +571,9 @@ export default function QuickLogV2Sheet({
               data-testid="qlv2-photo-library-input"
             />
           </div>
+          )}
 
+          {form.action !== "feed" && (
           <div>
             <Label htmlFor="qlv2-note">Note (optional)</Label>
             <Textarea
@@ -516,7 +589,9 @@ export default function QuickLogV2Sheet({
               <p id="qlv2-note-count" aria-live="polite">{noteLength}/{NOTE_LIMIT}</p>
             </div>
           </div>
+          )}
 
+          {form.action !== "feed" && (
           <details className="rounded-md border border-border p-3">
             <summary className="cursor-pointer text-sm font-medium">
               Manual sensor snapshot (optional)
@@ -554,6 +629,7 @@ export default function QuickLogV2Sheet({
               Source: manual. Leave blank to skip.
             </p>
           </details>
+          )}
 
           {localError && (
             <div
@@ -588,11 +664,11 @@ export default function QuickLogV2Sheet({
                 type="button"
                 className="flex-1"
                 onClick={handleSave}
-                disabled={saving || contextBlocked}
+                disabled={saving || feedingSaving || contextBlocked}
                 aria-describedby="qlv2-save-helper"
                 data-testid="qlv2-save"
               >
-                {saving ? "Saving…" : "Save"}
+                {saving || feedingSaving ? "Saving…" : "Save"}
               </Button>
             </div>
           </div>

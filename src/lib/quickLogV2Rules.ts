@@ -4,7 +4,7 @@
  */
 
 export type QuickLogV2TargetType = "tent" | "plant";
-export type QuickLogV2Action = "water" | "note";
+export type QuickLogV2Action = "water" | "note" | "feed";
 
 export interface QuickLogV2TargetOption {
   type: QuickLogV2TargetType;

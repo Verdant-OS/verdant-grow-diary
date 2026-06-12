@@ -13,6 +13,7 @@ import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import DiaryEntryBadges from "@/components/DiaryEntryBadges";
 import EnvironmentCheckTimelineBadge from "@/components/EnvironmentCheckTimelineBadge";
+import AiDoctorCheckInTimelineBadge from "@/components/AiDoctorCheckInTimelineBadge";
 import {
   buildEnvironmentCheckDiaryViewModel,
   isEnvironmentCheckKind,
@@ -545,6 +546,7 @@ export default function Timeline() {
                                 const ni = normalizedById.get(e.id);
                                 return ni ? <DiaryEntryBadges item={ni} /> : null;
                               })()}
+                              <AiDoctorCheckInTimelineBadge event={e} />
                               {(() => {
                                 const kindValue = (e.details?.event_type as string | undefined) ?? null;
                                 if (!isEnvironmentCheckKind(kindValue)) return null;

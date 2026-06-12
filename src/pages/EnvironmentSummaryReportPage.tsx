@@ -168,31 +168,43 @@ export default function EnvironmentSummaryReportPage() {
   }
 
   const handleDownloadPdf = () => {
-    recordEnvironmentSummaryExportAuditEvent({
-      eventType: "full_report_print_opened",
-      reportMode: "full_report",
-      startDate,
-      endDate,
-    });
-    triggerPrint(printMeta.filename, "full_report");
+    setPendingPrintMode("full_report");
   };
 
   const handleDownloadDrilldownPdf = () => {
     if (!selectedIssue) return;
-    recordEnvironmentSummaryExportAuditEvent({
-      eventType: "drilldown_print_opened",
-      reportMode: "drilldown",
-      startDate,
-      endDate,
-      issueRuleId: selectedIssue.ruleId,
-      issueLabel: selectedIssue.label,
-    });
-    const filename = buildEnvironmentSummaryDrilldownPrintFilename(
-      startDate,
-      endDate,
-      selectedIssue.ruleId,
-    );
-    triggerPrint(filename, "drilldown");
+    setPendingPrintMode("drilldown");
+  };
+
+  const handleConfirmPrint = () => {
+    if (pendingPrintMode === "full_report") {
+      recordEnvironmentSummaryExportAuditEvent({
+        eventType: "full_report_print_opened",
+        reportMode: "full_report",
+        startDate,
+        endDate,
+      });
+      setPendingPrintMode(null);
+      triggerPrint(printMeta.filename, "full_report");
+      return;
+    }
+    if (pendingPrintMode === "drilldown" && selectedIssue) {
+      recordEnvironmentSummaryExportAuditEvent({
+        eventType: "drilldown_print_opened",
+        reportMode: "drilldown",
+        startDate,
+        endDate,
+        issueRuleId: selectedIssue.ruleId,
+        issueLabel: selectedIssue.label,
+      });
+      const filename = buildEnvironmentSummaryDrilldownPrintFilename(
+        startDate,
+        endDate,
+        selectedIssue.ruleId,
+      );
+      setPendingPrintMode(null);
+      triggerPrint(filename, "drilldown");
+    }
   };
 
   const drilldownPdfFilename = selectedIssue

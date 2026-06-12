@@ -142,72 +142,47 @@ describe("QuickLogV2Sheet — happy path still enables Save", () => {
   });
 });
 
-describe("QuickLogV2Sheet — photo gate (not enabled)", () => {
-  it("selecting Photo action shows the gate message with role=status", () => {
+describe("QuickLogV2Sheet — photo action removed, attachment inline", () => {
+  beforeEach(() => {
     plantsState.data = [
       { id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" },
     ];
     tentsState.data = [{ id: "tent-1", name: "Tent 1", grow_id: "grow-1" }];
-    renderSheet();
-    fireEvent.click(screen.getByRole("button", { name: /photo/i }));
-    const gate = screen.getByTestId("qlv2-photo-gate");
-    expect(gate).toBeTruthy();
-    expect(gate.getAttribute("role")).toBe("status");
-    expect(gate.textContent).toMatch(/Photo saving is not enabled yet/i);
   });
 
-  it("Photo gate uses the helper copy and aria-label", () => {
-    plantsState.data = [
-      { id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" },
-    ];
-    tentsState.data = [{ id: "tent-1", name: "Tent 1", grow_id: "grow-1" }];
+  it("no separate Photo action button exists in the action group", () => {
     renderSheet();
-    fireEvent.click(screen.getByRole("button", { name: /photo/i }));
-    const gate = screen.getByTestId("qlv2-photo-gate");
-    expect(gate.getAttribute("aria-label")).toMatch(/unavailable/i);
-    expect(gate.textContent).toMatch(/future update/i);
+    const group = screen.getByRole("group", { name: /quick log action type/i });
+    const buttons = Array.from(group.querySelectorAll("button"));
+    const labels = buttons.map((b) => (b.textContent || "").trim().toLowerCase());
+    expect(labels).toEqual(expect.arrayContaining(["water", "feed", "note"]));
+    expect(labels).not.toContain("photo");
   });
 
-  it("does not render Take Photo or Choose from Library buttons", () => {
-    plantsState.data = [
-      { id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" },
-    ];
-    tentsState.data = [{ id: "tent-1", name: "Tent 1", grow_id: "grow-1" }];
+  it("photo attachment is rendered inline for non-feed actions (default Note)", () => {
     renderSheet();
-    fireEvent.click(screen.getByRole("button", { name: /photo/i }));
+    expect(screen.getByTestId("qlv2-photo-attachment")).toBeTruthy();
+    expect(screen.getByTestId("qlv2-photo-camera-input")).toBeTruthy();
+    expect(screen.getByTestId("qlv2-photo-library-input")).toBeTruthy();
+  });
+
+  it("photo attachment is hidden when Feed action is selected", () => {
+    renderSheet();
+    fireEvent.click(screen.getByRole("button", { name: /^feed$/i }));
+    expect(screen.queryByTestId("qlv2-photo-attachment")).toBeNull();
+  });
+
+  it("no legacy photo gate (qlv2-photo-gate) is rendered — photo saving is supported", () => {
+    renderSheet();
+    expect(screen.queryByTestId("qlv2-photo-gate")).toBeNull();
+  });
+
+  it("Take Photo and Choose from Library buttons are reachable by visible name", () => {
+    renderSheet();
+    expect(screen.getByRole("button", { name: /^take photo$/i })).toBeTruthy();
     expect(
-      screen.queryByRole("button", { name: /take photo/i }),
-    ).toBeNull();
-    expect(
-      screen.queryByRole("button", { name: /choose from library/i }),
-    ).toBeNull();
-  });
-
-  it("does not render any file input when Photo is selected", () => {
-    plantsState.data = [
-      { id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" },
-    ];
-    tentsState.data = [{ id: "tent-1", name: "Tent 1", grow_id: "grow-1" }];
-    renderSheet();
-    fireEvent.click(screen.getByRole("button", { name: /photo/i }));
-    expect(document.querySelector('input[type="file"]')).toBeNull();
-  });
-
-  it("Save shows gate error and does not dispatch RPC when Photo action is selected", () => {
-    plantsState.data = [
-      { id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" },
-    ];
-    tentsState.data = [{ id: "tent-1", name: "Tent 1", grow_id: "grow-1" }];
-    renderSheet();
-    fireEvent.click(screen.getByRole("button", { name: /photo/i }));
-    // Select a target first so the gate error (not target error) surfaces.
-    fireEvent.click(screen.getByLabelText(/target/i));
-    fireEvent.click(screen.getByText(/Plant 1/));
-    const save = screen.getByTestId("qlv2-save") as HTMLButtonElement;
-    fireEvent.click(save);
-    expect(rpcMock).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert").textContent).toMatch(
-      /Photo saving is not enabled yet/i,
-    );
+      screen.getByRole("button", { name: /^choose from library$/i }),
+    ).toBeTruthy();
   });
 });
+

@@ -610,7 +610,6 @@ export default function QuickLogV2Sheet({
                     type="button"
                     variant="outline"
                     aria-controls="qlv2-photo-camera-input"
-                    aria-label={photoGate.cameraInputAriaLabel}
                     onClick={() => cameraInputRef.current?.click()}
                   >
                     {photoGate.takePhotoLabel}
@@ -619,7 +618,6 @@ export default function QuickLogV2Sheet({
                     type="button"
                     variant="outline"
                     aria-controls="qlv2-photo-library-input"
-                    aria-label={photoGate.libraryInputAriaLabel}
                     onClick={() => libraryInputRef.current?.click()}
                   >
                     {photoGate.chooseLibraryLabel}

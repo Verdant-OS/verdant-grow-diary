@@ -158,6 +158,215 @@ function CopyPreviewSummary({
   );
 }
 
+function SavePreviewToDiary({
+  view,
+  context,
+}: {
+  view: AiDoctorCheckInPreviewView;
+  context: AiDoctorContext;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const receiptText = useMemo(() => {
+    const input: AiDoctorCheckInReceiptInput = {
+      view,
+      plantName: context.plant_name,
+      plantId: context.plant_id,
+      stage: context.stage,
+    };
+    return formatAiDoctorCheckInReceipt(input).body;
+  }, [view, context]);
+
+  const confirmation: AiDoctorManualSaveConfirmationView = useMemo(
+    () =>
+      buildAiDoctorManualSaveConfirmationView({
+        view,
+        identity: {
+          plant_id: context.plant_id,
+          tent_id: context.tent_id,
+          grow_id: context.grow_id,
+          plant_name: context.plant_name,
+          stage: context.stage,
+        },
+        receiptText,
+      }),
+    [view, context, receiptText],
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          data-testid="ai-doctor-manual-save-open-button"
+        >
+          <Save className="h-4 w-4 mr-1" aria-hidden="true" />
+          {confirmation.buttonLabel}
+        </Button>
+      </DialogTrigger>
+      <DialogContent
+        className="max-w-lg"
+        data-testid="ai-doctor-manual-save-confirmation-dialog"
+      >
+        <DialogHeader>
+          <DialogTitle>Save preview to diary</DialogTitle>
+          <DialogDescription>{confirmation.copy.intro}</DialogDescription>
+        </DialogHeader>
+
+        {confirmation.status === "blocked" ? (
+          <div
+            className="space-y-2"
+            data-testid="ai-doctor-manual-save-blocked"
+          >
+            <p className="text-xs text-amber-300">
+              Cannot prepare a save draft yet.
+            </p>
+            <ul
+              className="list-disc pl-4 text-xs space-y-0.5"
+              data-testid="ai-doctor-manual-save-blocked-reasons"
+            >
+              {confirmation.reasons.map((r) => (
+                <li
+                  key={r}
+                  data-testid={`ai-doctor-manual-save-blocked-reason-${r}`}
+                >
+                  {r}
+                </li>
+              ))}
+            </ul>
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setOpen(false)}
+                data-testid="ai-doctor-manual-save-cancel-button"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div
+            className="space-y-3 text-xs"
+            data-testid="ai-doctor-manual-save-ready"
+          >
+            <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1">
+              {confirmation.plant.name ? (
+                <>
+                  <dt className="text-muted-foreground">Plant</dt>
+                  <dd data-testid="ai-doctor-manual-save-plant-name">
+                    {confirmation.plant.name}
+                  </dd>
+                </>
+              ) : null}
+              {confirmation.plant.id ? (
+                <>
+                  <dt className="text-muted-foreground">Plant ID</dt>
+                  <dd data-testid="ai-doctor-manual-save-plant-id">
+                    {confirmation.plant.id}
+                  </dd>
+                </>
+              ) : null}
+              {confirmation.plant.stage ? (
+                <>
+                  <dt className="text-muted-foreground">Stage</dt>
+                  <dd data-testid="ai-doctor-manual-save-plant-stage">
+                    {confirmation.plant.stage}
+                  </dd>
+                </>
+              ) : null}
+              <dt className="text-muted-foreground">Event type</dt>
+              <dd data-testid="ai-doctor-manual-save-event-type">
+                {confirmation.eventTypeLabel}
+              </dd>
+              <dt className="text-muted-foreground">Source</dt>
+              <dd data-testid="ai-doctor-manual-save-source">
+                {confirmation.sourceLabel}
+              </dd>
+              <dt className="text-muted-foreground">Idempotency</dt>
+              <dd
+                className="font-mono"
+                data-testid="ai-doctor-manual-save-idempotency"
+              >
+                {confirmation.idempotencyKeyShort}
+              </dd>
+            </dl>
+
+            <div
+              className="flex flex-wrap gap-1"
+              data-testid="ai-doctor-manual-save-safety-labels"
+            >
+              {confirmation.safetyLabels.map((label) => (
+                <span
+                  key={label}
+                  className="inline-flex items-center rounded-md border border-border/60 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground"
+                  data-testid={`ai-doctor-manual-save-safety-${label.replace(/\s+/g, "-").toLowerCase()}`}
+                >
+                  {label}
+                </span>
+              ))}
+            </div>
+
+            {confirmation.limitations.length > 0 ? (
+              <div data-testid="ai-doctor-manual-save-limitations">
+                <p className="text-muted-foreground text-[10px] uppercase tracking-wide">
+                  Data limitations
+                </p>
+                <ul className="list-disc pl-4 space-y-0.5">
+                  {confirmation.limitations.map((l) => (
+                    <li
+                      key={l.code}
+                      data-testid={`ai-doctor-manual-save-limitation-${l.code}`}
+                    >
+                      {l.message}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            <div className="space-y-1 text-muted-foreground">
+              <p data-testid="ai-doctor-manual-save-copy-no-model">
+                {confirmation.copy.noModel}
+              </p>
+              <p data-testid="ai-doctor-manual-save-copy-no-alerts">
+                {confirmation.copy.noAlerts}
+              </p>
+              <p data-testid="ai-doctor-manual-save-copy-cancel">
+                {confirmation.copy.cancel}
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setOpen(false)}
+                data-testid="ai-doctor-manual-save-cancel-button"
+              >
+                {confirmation.cancelLabel}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled
+                aria-disabled="true"
+                data-testid="ai-doctor-manual-save-confirm-button"
+              >
+                {confirmation.confirmDisabledLabel}
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function PreviewBody({
   view,
   context,

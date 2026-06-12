@@ -4,7 +4,7 @@
  * `sensor_readings` insert-row shape used by buildCsvInsertRows.
  *
  * Scope: PURE LOGIC ONLY.
- *   - no React, no Supabase, no fetch, no rpc
+ *   - no React, no DB client, no fetch, no rpc
  *   - no inserts/updates/deletes/upserts
  *   - no alerts, no Action Queue, no AI, no device control
  *   - does not touch the import card or the preview-persistence gate

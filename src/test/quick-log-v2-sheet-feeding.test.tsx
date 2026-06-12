@@ -118,6 +118,33 @@ describe("QuickLogV2Sheet — structured feeding", () => {
     expect(screen.getByTestId("qlv2-feeding-form")).toBeInTheDocument();
   });
 
+  it("renders the review section with needs-input copy when required fields are missing", () => {
+    renderSheet("plant:plant-1");
+    clickFeed();
+    expect(screen.getByTestId("qlv2-feeding-review")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("qlv2-feeding-review-needs-input"),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("qlv2-feeding-review-needs-input").textContent).toMatch(
+      /nutrient line and product/i,
+    );
+    expect(
+      screen.queryByTestId("qlv2-feeding-review-defaults-flag"),
+    ).toBeNull();
+  });
+
+  it("renders a populated review section once required fields are filled", () => {
+    renderSheet("plant:plant-1");
+    clickFeed();
+    fillRequiredFeedingFields();
+    expect(
+      screen.queryByTestId("qlv2-feeding-review-needs-input"),
+    ).toBeNull();
+    const review = screen.getByTestId("qlv2-feeding-review");
+    expect(review.textContent).toMatch(/veg-week-3/);
+    expect(review.textContent).toMatch(/Base A/);
+  });
+
   it("calls writeFeedingTypedEvent exactly once on a valid save", async () => {
     writeFeedingMock.mockResolvedValue({ ok: true, eventId: "evt-1" });
     const { onOpenChange } = renderSheet("plant:plant-1");

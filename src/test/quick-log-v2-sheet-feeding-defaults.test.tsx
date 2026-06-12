@@ -73,6 +73,7 @@ describe("QuickLogV2Sheet — Last Feeding Defaults", () => {
     renderSheet();
     fireEvent.click(screen.getByRole("button", { name: "Feed" }));
     expect(screen.queryByTestId("qlv2-feeding-defaults-label")).toBeNull();
+    expect(screen.queryByTestId("qlv2-feeding-review-defaults-flag")).toBeNull();
     expect((screen.getByLabelText("Nutrient line") as HTMLInputElement).value).toBe("");
     expect((screen.getByLabelText("Product 1 name") as HTMLInputElement).value).toBe("");
   });
@@ -103,6 +104,20 @@ describe("QuickLogV2Sheet — Last Feeding Defaults", () => {
     expect((screen.getByLabelText("Nutrient line") as HTMLInputElement).value).toBe("veg-week-3");
     expect((screen.getByLabelText("Product 1 name") as HTMLInputElement).value).toBe("Base A");
     expect((screen.getByLabelText("Product 1 amount") as HTMLInputElement).value).toBe("2.5");
+
+    // Review section should show the defaults-applied flag and the populated preview.
+    expect(
+      screen.getByTestId("qlv2-feeding-review-defaults-flag"),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("qlv2-feeding-review-defaults-flag").textContent).toMatch(
+      /Includes prefilled feeding defaults/,
+    );
+    expect(
+      screen.queryByTestId("qlv2-feeding-review-needs-input"),
+    ).toBeNull();
+    const review = screen.getByTestId("qlv2-feeding-review");
+    expect(review.textContent).toMatch(/veg-week-3/);
+    expect(review.textContent).toMatch(/Base A/);
   });
 
   it("does NOT prefill measured outcome fields (pH/EC/runoff/water temp)", async () => {

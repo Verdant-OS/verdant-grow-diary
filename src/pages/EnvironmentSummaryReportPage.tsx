@@ -61,6 +61,9 @@ export default function EnvironmentSummaryReportPage() {
   const [startDate, setStartDate] = useState(startParam ?? defaults.startDate);
   const [endDate, setEndDate] = useState(endParam ?? defaults.endDate);
   const [printMode, setPrintMode] = useState<PrintMode>("full_report");
+  const [pendingPrintMode, setPendingPrintMode] = useState<PrintMode | null>(
+    null,
+  );
 
   useEffect(() => {
     if (startParam) setStartDate(startParam);

@@ -54,6 +54,10 @@ vi.mock("@/lib/writeFeedingTypedEvent", () => ({
   writeFeedingTypedEvent: (...a: unknown[]) => writeFeedingMock(...a),
 }));
 
+vi.mock("@/hooks/useRecentFeedingsForDefaults", () => ({
+  useRecentFeedingsForDefaults: () => ({ data: [] }),
+}));
+
 function renderSheet(defaultTargetKey: string) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },

@@ -41,6 +41,12 @@ import {
 } from "@/lib/quickLogFeedingFormViewModel";
 import { writeFeedingTypedEvent } from "@/lib/writeFeedingTypedEvent";
 import QuickLogFeedingForm from "@/components/QuickLogFeedingForm";
+import {
+  buildFeedingDefaults,
+  applyFeedingDefaultsToForm,
+  FEEDING_DEFAULTS_LABEL,
+} from "@/lib/feedingDefaultsViewModel";
+import { useRecentFeedingsForDefaults } from "@/hooks/useRecentFeedingsForDefaults";
 
 interface Props {
   open: boolean;
@@ -84,10 +90,44 @@ export default function QuickLogV2Sheet({
   const [saveStatus, setSaveStatus] = useState<string>("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [feedingDefaultsApplied, setFeedingDefaultsApplied] = useState(false);
 
   const options = useMemo(
     () => buildQuickLogV2TargetOptions(tents, plants),
     [tents, plants],
+  );
+
+  const resolvedTarget = useMemo(
+    () => resolveQuickLogV2Target(options, form.selectedKey),
+    [options, form.selectedKey],
+  );
+  const resolvedContext = resolvedTarget.ok
+    ? {
+        plantId: resolvedTarget.plantId ?? null,
+        tentId: resolvedTarget.tentId ?? null,
+        growId: resolvedTarget.growId ?? null,
+      }
+    : { plantId: null, tentId: null, growId: null };
+
+  const recentFeedingsQ = useRecentFeedingsForDefaults({
+    plantId: resolvedContext.plantId,
+    tentId: resolvedContext.tentId,
+    growId: resolvedContext.growId,
+  }) as { data?: unknown[] };
+  const feedingDefaults = useMemo(
+    () =>
+      buildFeedingDefaults({
+        rawEntries: recentFeedingsQ.data ?? [],
+        plantId: resolvedContext.plantId,
+        tentId: resolvedContext.tentId,
+        growId: resolvedContext.growId,
+      }),
+    [
+      recentFeedingsQ.data,
+      resolvedContext.plantId,
+      resolvedContext.tentId,
+      resolvedContext.growId,
+    ],
   );
 
   const isLoadingContext = Boolean(plantsQ.isLoading || tentsQ.isLoading);
@@ -95,6 +135,7 @@ export default function QuickLogV2Sheet({
   const hasNoTargets =
     !isLoadingContext && !hasFetchError && options.length === 0;
   const contextBlocked = isLoadingContext || hasFetchError || hasNoTargets;
+
   const selectedTargetMissing = !contextBlocked && !form.selectedKey;
   const noteLength = form.note.length;
   const volumeMissing = form.action === "water" && form.volumeMl.trim() === "";
@@ -122,11 +163,39 @@ export default function QuickLogV2Sheet({
         selectedKey: defaultTargetKey ?? null,
       });
       setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
+      setFeedingDefaultsApplied(false);
       setLocalError(null);
       setSaveStatus("");
       resetPhotoSelection();
     }
   }, [open, defaultTargetKey]);
+
+  // One-shot prefill of the feeding form with last-used defaults. Runs only
+  // when the Feed action is active, the form is still pristine, defaults
+  // exist, and we have not yet applied them for this open session.
+  useEffect(() => {
+    if (!open) return;
+    if (form.action !== "feed") return;
+    if (feedingDefaultsApplied) return;
+    if (!feedingDefaults.defaults) return;
+    // Only prefill if the user has not started typing — preserves manual input.
+    if (
+      feedingForm.lineId.trim() !== "" ||
+      feedingForm.products.some((p) => p.name.trim() !== "")
+    ) {
+      return;
+    }
+    setFeedingForm(applyFeedingDefaultsToForm(feedingDefaults));
+    setFeedingDefaultsApplied(true);
+  }, [
+    open,
+    form.action,
+    feedingDefaults,
+    feedingDefaultsApplied,
+    feedingForm.lineId,
+    feedingForm.products,
+  ]);
+
 
   const setField = <K extends keyof QuickLogV2FormState>(
     k: K,
@@ -466,15 +535,27 @@ export default function QuickLogV2Sheet({
           </div>
 
           {form.action === "feed" && (
-            <QuickLogFeedingForm
-              value={feedingForm}
-              onChange={(next) => {
-                setFeedingForm(next);
-                setLocalError(null);
-              }}
-              disabled={feedingSaving || saving}
-            />
+            <div className="space-y-2">
+              {feedingDefaultsApplied && feedingDefaults.label && (
+                <div
+                  data-testid="qlv2-feeding-defaults-label"
+                  className="rounded-md border border-border/60 bg-secondary/30 px-3 py-2 text-sm text-muted-foreground"
+                  role="note"
+                >
+                  {FEEDING_DEFAULTS_LABEL}
+                </div>
+              )}
+              <QuickLogFeedingForm
+                value={feedingForm}
+                onChange={(next) => {
+                  setFeedingForm(next);
+                  setLocalError(null);
+                }}
+                disabled={feedingSaving || saving}
+              />
+            </div>
           )}
+
 
           {shouldShowVolumeField(form.action) && (
             <div>

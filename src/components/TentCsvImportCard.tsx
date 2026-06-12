@@ -60,6 +60,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
   const [preview, setPreview] = useState<NormalizeResult | null>(null);
   const [importing, setImporting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [sourcePreview, setSourcePreview] = useState<PreviewCopy | null>(null);
 
   const supportedApp = CSV_IMPORT_SOURCE_APPS.find((a) => a.id === sourceApp);
   const sourceEnabled = !!supportedApp?.enabled;

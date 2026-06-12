@@ -164,6 +164,12 @@ function CopyPreviewSummary({
   );
 }
 
+type SaveOutcome =
+  | { kind: "idle" }
+  | { kind: "saved" }
+  | { kind: "duplicate" }
+  | { kind: "error" };
+
 function SavePreviewToDiary({
   view,
   context,
@@ -172,6 +178,8 @@ function SavePreviewToDiary({
   context: AiDoctorContext;
 }) {
   const [open, setOpen] = useState(false);
+  const [outcome, setOutcome] = useState<SaveOutcome>({ kind: "idle" });
+  const { save, saving } = useQuickLogV2Save();
 
   const receiptText = useMemo(() => {
     const input: AiDoctorCheckInReceiptInput = {
@@ -183,24 +191,61 @@ function SavePreviewToDiary({
     return formatAiDoctorCheckInReceipt(input).body;
   }, [view, context]);
 
-  const confirmation: AiDoctorManualSaveConfirmationView = useMemo(
-    () =>
-      buildAiDoctorManualSaveConfirmationView({
-        view,
-        identity: {
-          plant_id: context.plant_id,
-          tent_id: context.tent_id,
-          grow_id: context.grow_id,
-          plant_name: context.plant_name,
-          stage: context.stage,
-        },
-        receiptText,
-      }),
+  const draftInput = useMemo(
+    () => ({
+      view,
+      identity: {
+        plant_id: context.plant_id,
+        tent_id: context.tent_id,
+        grow_id: context.grow_id,
+        plant_name: context.plant_name,
+        stage: context.stage,
+      },
+      receiptText,
+    }),
     [view, context, receiptText],
   );
 
+  const confirmation: AiDoctorManualSaveConfirmationView = useMemo(
+    () => buildAiDoctorManualSaveConfirmationView(draftInput),
+    [draftInput],
+  );
+
+  const handleOpenChange = useCallback((next: boolean) => {
+    setOpen(next);
+    if (!next) setOutcome({ kind: "idle" });
+  }, []);
+
+  const handleConfirm = useCallback(async () => {
+    const draft = buildAiDoctorManualSaveDraft(draftInput);
+    if (!isOkManualSaveDraft(draft)) {
+      setOutcome({ kind: "error" });
+      return;
+    }
+    const payload = buildAiDoctorQuickLogSavePayload(draft);
+    try {
+      const res = await save(payload);
+      if (res.ok) {
+        setOutcome({ kind: "saved" });
+        return;
+      }
+      const reason = (res.reason ?? "").toLowerCase();
+      if (
+        reason.includes("duplicate") ||
+        reason.includes("idempotent") ||
+        reason.includes("already")
+      ) {
+        setOutcome({ kind: "duplicate" });
+        return;
+      }
+      setOutcome({ kind: "error" });
+    } catch {
+      setOutcome({ kind: "error" });
+    }
+  }, [draftInput, save]);
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button
           type="button"
@@ -247,7 +292,7 @@ function SavePreviewToDiary({
                 type="button"
                 size="sm"
                 variant="outline"
-                onClick={() => setOpen(false)}
+                onClick={() => handleOpenChange(false)}
                 data-testid="ai-doctor-manual-save-cancel-button"
               >
                 Close
@@ -346,12 +391,37 @@ function SavePreviewToDiary({
               </p>
             </div>
 
+            {outcome.kind === "saved" ? (
+              <p
+                className="text-xs text-emerald-300"
+                data-testid="ai-doctor-manual-save-success"
+              >
+                {AI_DOCTOR_MANUAL_SAVE_SUCCESS_MESSAGE}
+              </p>
+            ) : null}
+            {outcome.kind === "duplicate" ? (
+              <p
+                className="text-xs text-emerald-300"
+                data-testid="ai-doctor-manual-save-duplicate"
+              >
+                {AI_DOCTOR_MANUAL_SAVE_DUPLICATE_MESSAGE}
+              </p>
+            ) : null}
+            {outcome.kind === "error" ? (
+              <p
+                className="text-xs text-amber-300"
+                data-testid="ai-doctor-manual-save-error"
+              >
+                {AI_DOCTOR_MANUAL_SAVE_FAILURE_MESSAGE}
+              </p>
+            ) : null}
+
             <div className="flex justify-end gap-2">
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
-                onClick={() => setOpen(false)}
+                onClick={() => handleOpenChange(false)}
                 data-testid="ai-doctor-manual-save-cancel-button"
               >
                 {confirmation.cancelLabel}
@@ -359,11 +429,15 @@ function SavePreviewToDiary({
               <Button
                 type="button"
                 size="sm"
-                disabled
-                aria-disabled="true"
+                onClick={handleConfirm}
+                disabled={
+                  saving ||
+                  outcome.kind === "saved" ||
+                  outcome.kind === "duplicate"
+                }
                 data-testid="ai-doctor-manual-save-confirm-button"
               >
-                {confirmation.confirmDisabledLabel}
+                {saving ? confirmation.savingLabel : confirmation.confirmLabel}
               </Button>
             </div>
           </div>
@@ -372,6 +446,8 @@ function SavePreviewToDiary({
     </Dialog>
   );
 }
+
+
 
 function PreviewBody({
   view,

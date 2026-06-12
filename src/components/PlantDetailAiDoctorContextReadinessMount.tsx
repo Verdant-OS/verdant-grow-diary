@@ -123,12 +123,13 @@ export default function PlantDetailAiDoctorContextReadinessMount({
   return (
     <div
       data-testid="plant-detail-ai-doctor-context-readiness-mount"
-      className="my-3"
+      className="my-3 space-y-2"
     >
       <AiDoctorContextReadinessPanel
         context={built.context}
         openAlertsCount={alerts.rows.length}
       />
+      <AiDoctorCheckInPreviewPanel context={built.context} />
     </div>
   );
 }

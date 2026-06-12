@@ -124,6 +124,10 @@ describe("PlantDetailAiDoctorContextReadinessMount", () => {
       screen.queryByTestId("ai-doctor-context-readiness-panel-source-live"),
     ).toBeNull();
     expect(fetchSpy).not.toHaveBeenCalled();
+    // Sensor context audit panel is mounted near AI Doctor readiness area
+    expect(
+      screen.getByTestId("plant-sensor-context-audit-panel"),
+    ).toBeTruthy();
   });
 
   it("renders 'Sensor data missing' when no sensor data exists", () => {

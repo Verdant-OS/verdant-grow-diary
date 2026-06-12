@@ -12,6 +12,7 @@ import { useMemo } from "react";
 import { Activity } from "lucide-react";
 import AiDoctorContextReadinessPanel from "@/components/AiDoctorContextReadinessPanel";
 import AiDoctorCheckInPreviewPanel from "@/components/AiDoctorCheckInPreviewPanel";
+import PlantSensorContextAuditPanel from "@/components/PlantSensorContextAuditPanel";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { usePlantManualSensorLogs } from "@/hooks/usePlantManualSensorHistory";
 import { usePlantAssignedTentAlerts } from "@/hooks/usePlantAssignedTentAlerts";
@@ -20,6 +21,7 @@ import {
   type DiaryEntryRowLike,
   type ManualSensorLogLike,
 } from "@/lib/plantAiDoctorContextAdapter";
+import type { ManualSensorLog } from "@/lib/manualSensorChronologyDeltaRules";
 import type { PlantRowLike } from "@/lib/aiDoctorContextCompiler";
 
 export interface PlantDetailAiDoctorContextReadinessMountProps {
@@ -120,6 +122,8 @@ export default function PlantDetailAiDoctorContextReadinessMount({
     );
   }
 
+  const auditLogs = (manualLogs.data ?? []) as ReadonlyArray<ManualSensorLog>;
+
   return (
     <div
       data-testid="plant-detail-ai-doctor-context-readiness-mount"
@@ -129,6 +133,7 @@ export default function PlantDetailAiDoctorContextReadinessMount({
         context={built.context}
         openAlertsCount={alerts.rows.length}
       />
+      <PlantSensorContextAuditPanel logs={auditLogs} />
       <AiDoctorCheckInPreviewPanel context={built.context} />
     </div>
   );

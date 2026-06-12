@@ -392,7 +392,6 @@ export default function QuickLogV2Sheet({
               <Button
                 type="button"
                 variant={form.action === "water" ? "default" : "outline"}
-                aria-label="Log watering"
                 onClick={() => handleAction("water")}
               >
                 Water
@@ -400,7 +399,6 @@ export default function QuickLogV2Sheet({
               <Button
                 type="button"
                 variant={form.action === "note" ? "default" : "outline"}
-                aria-label="Log observation note"
                 onClick={() => handleAction("note")}
               >
                 Note

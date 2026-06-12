@@ -130,22 +130,25 @@ describe("Spider Farmer — primary full fixture", () => {
 
 // ----------------- Spider Farmer sparse -----------------
 
-describe("Spider Farmer — sparse fixture (blank co2/ppfd)", () => {
+describe("Spider Farmer — sparse fixture (mostly blank co2/ppfd)", () => {
   const r = buildRegistryCsvInsertRows(
     baseArgs("spider_farmer", SPIDER_SPARSE),
   );
 
-  it("emits temperature_c, humidity_pct, vpd_kpa", () => {
+  it("emits temperature_c, humidity_pct, vpd_kpa rows", () => {
     const metrics = new Set(r.rows.map((x) => x.metric));
     expect(metrics.has("temperature_c")).toBe(true);
     expect(metrics.has("humidity_pct")).toBe(true);
     expect(metrics.has("vpd_kpa")).toBe(true);
   });
 
-  it("emits no co2_ppm or ppfd rows when columns are blank", () => {
-    const metrics = new Set(r.rows.map((x) => x.metric));
-    expect(metrics.has("co2_ppm")).toBe(false);
-    expect(metrics.has("ppfd")).toBe(false);
+  it("co2_ppm and ppfd row counts are much smaller than core metrics (sparse)", () => {
+    const counts: Record<string, number> = {};
+    for (const row of r.rows) counts[row.metric] = (counts[row.metric] ?? 0) + 1;
+    expect(counts.temperature_c).toBeGreaterThan(1000);
+    // Real fixture has ~189 numeric co2/ppfd cells across 5673 rows.
+    expect(counts.co2_ppm ?? 0).toBeLessThan(counts.temperature_c / 5);
+    expect(counts.ppfd ?? 0).toBeLessThan(counts.temperature_c / 5);
   });
 });
 

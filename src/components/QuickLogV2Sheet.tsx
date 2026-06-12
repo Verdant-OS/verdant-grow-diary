@@ -501,6 +501,7 @@ export default function QuickLogV2Sheet({
             </div>
           )}
 
+          {form.action !== "feed" && (
           <div className="rounded-md border border-border p-3" data-testid="qlv2-photo-attachment">
             <Label>Photo attachment</Label>
             {photoPreview ? (
@@ -570,7 +571,9 @@ export default function QuickLogV2Sheet({
               data-testid="qlv2-photo-library-input"
             />
           </div>
+          )}
 
+          {form.action !== "feed" && (
           <div>
             <Label htmlFor="qlv2-note">Note (optional)</Label>
             <Textarea
@@ -586,7 +589,9 @@ export default function QuickLogV2Sheet({
               <p id="qlv2-note-count" aria-live="polite">{noteLength}/{NOTE_LIMIT}</p>
             </div>
           </div>
+          )}
 
+          {form.action !== "feed" && (
           <details className="rounded-md border border-border p-3">
             <summary className="cursor-pointer text-sm font-medium">
               Manual sensor snapshot (optional)
@@ -624,6 +629,7 @@ export default function QuickLogV2Sheet({
               Source: manual. Leave blank to skip.
             </p>
           </details>
+          )}
 
           {localError && (
             <div

@@ -145,16 +145,15 @@ describe("AiDoctorCheckInPreviewPanel — manual save confirmation shell", () =>
     ).toBeTruthy();
   });
 
-  it("confirm button is disabled (no-write shell)", () => {
+  it("confirm button is enabled with 'Save to diary' label when draft is ready", () => {
     render(<AiDoctorCheckInPreviewPanel context={ctx()} />);
     openPreview();
     openSaveConfirm();
     const confirm = screen.getByTestId(
       "ai-doctor-manual-save-confirm-button",
     ) as HTMLButtonElement;
-    expect(confirm.disabled).toBe(true);
-    expect(confirm.getAttribute("aria-disabled")).toBe("true");
-    expect(confirm.textContent).toMatch(/Save coming next/);
+    expect(confirm.disabled).toBe(false);
+    expect(confirm.textContent).toMatch(/Save to diary/);
   });
 
   it("blocked draft shows reasons and no enabled save UI", () => {

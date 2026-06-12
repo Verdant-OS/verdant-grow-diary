@@ -90,10 +90,44 @@ export default function QuickLogV2Sheet({
   const [saveStatus, setSaveStatus] = useState<string>("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [feedingDefaultsApplied, setFeedingDefaultsApplied] = useState(false);
 
   const options = useMemo(
     () => buildQuickLogV2TargetOptions(tents, plants),
     [tents, plants],
+  );
+
+  const resolvedTarget = useMemo(
+    () => resolveQuickLogV2Target(options, form.selectedKey),
+    [options, form.selectedKey],
+  );
+  const resolvedContext = resolvedTarget.ok
+    ? {
+        plantId: resolvedTarget.plantId ?? null,
+        tentId: resolvedTarget.tentId ?? null,
+        growId: resolvedTarget.growId ?? null,
+      }
+    : { plantId: null, tentId: null, growId: null };
+
+  const recentFeedingsQ = useRecentFeedingsForDefaults({
+    plantId: resolvedContext.plantId,
+    tentId: resolvedContext.tentId,
+    growId: resolvedContext.growId,
+  }) as { data?: unknown[] };
+  const feedingDefaults = useMemo(
+    () =>
+      buildFeedingDefaults({
+        rawEntries: recentFeedingsQ.data ?? [],
+        plantId: resolvedContext.plantId,
+        tentId: resolvedContext.tentId,
+        growId: resolvedContext.growId,
+      }),
+    [
+      recentFeedingsQ.data,
+      resolvedContext.plantId,
+      resolvedContext.tentId,
+      resolvedContext.growId,
+    ],
   );
 
   const isLoadingContext = Boolean(plantsQ.isLoading || tentsQ.isLoading);
@@ -101,6 +135,7 @@ export default function QuickLogV2Sheet({
   const hasNoTargets =
     !isLoadingContext && !hasFetchError && options.length === 0;
   const contextBlocked = isLoadingContext || hasFetchError || hasNoTargets;
+
   const selectedTargetMissing = !contextBlocked && !form.selectedKey;
   const noteLength = form.note.length;
   const volumeMissing = form.action === "water" && form.volumeMl.trim() === "";

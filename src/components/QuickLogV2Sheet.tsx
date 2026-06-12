@@ -31,6 +31,16 @@ import {
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import { buildQuickLogPhotoGateState } from "@/lib/quickLogPhotoGateRules";
+import {
+  EMPTY_QUICKLOG_FEEDING_FORM,
+  FEEDING_SAVE_FAILURE_MESSAGE,
+  FEEDING_SAVE_SUCCESS_MESSAGE,
+  buildFeedingFormPayload,
+  feedingFormReasonToHelper,
+  type QuickLogFeedingFormState,
+} from "@/lib/quickLogFeedingFormViewModel";
+import { writeFeedingTypedEvent } from "@/lib/writeFeedingTypedEvent";
+import QuickLogFeedingForm from "@/components/QuickLogFeedingForm";
 
 interface Props {
   open: boolean;

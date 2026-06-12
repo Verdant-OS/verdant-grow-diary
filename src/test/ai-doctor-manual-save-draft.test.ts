@@ -183,10 +183,10 @@ describe("buildAiDoctorManualSaveDraft", () => {
       now: NOW,
     });
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error("expected blocked");
-    expect(r.reasons).toContain("missing_plant_id");
-    expect(r.reasons).toContain("missing_tent_id");
-    expect(r.reasons).toContain("missing_grow_id");
+    if (r.ok) throw new Error("expected blocked"); const blocked = r;
+    expect(blocked.reasons).toContain("missing_plant_id");
+    expect(blocked.reasons).toContain("missing_tent_id");
+    expect(blocked.reasons).toContain("missing_grow_id");
   });
 
   it("returns blocked when receipt text is empty", () => {
@@ -197,8 +197,8 @@ describe("buildAiDoctorManualSaveDraft", () => {
       now: NOW,
     });
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error("expected blocked");
-    expect(r.reasons).toContain("missing_note");
+    if (r.ok) throw new Error("expected blocked"); const blocked = r;
+    expect(blocked.reasons).toContain("missing_note");
   });
 
   it("preserves demo/stale/invalid limitations in details", () => {

@@ -2,7 +2,7 @@
  * aiDoctorManualSaveDraft — pure draft builder.
  *
  * Produces the exact payload shape a future confirmed save would pass into
- * `useQuickLogV2Save` / `quicklog_save_manual`. THIS FILE NEVER WRITES.
+ * the Quick Log v2 manual-save RPC. THIS FILE NEVER WRITES.
  *
  * Hard constraints:
  *  - Pure. No React, no Supabase, no fetch, no RPC, no invoke.

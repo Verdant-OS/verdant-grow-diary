@@ -376,7 +376,7 @@ export default function AiDoctorCheckInPreviewPanel({
               Action Queue items are created.
             </DialogDescription>
           </DialogHeader>
-          {view ? <PreviewBody view={view} /> : <PreviewFallback />}
+          {view ? <PreviewBody view={view} context={context} /> : <PreviewFallback />}
         </DialogContent>
       </Dialog>
     </div>

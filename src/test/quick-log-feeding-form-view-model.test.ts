@@ -91,7 +91,7 @@ describe("buildFeedingFormPayload — validation", () => {
   it("blocks save when grow id is missing", () => {
     const r = buildFeedingFormPayload({ growId: "", form: withForm({}) });
     expect(r.ok).toBe(false);
-    if (r.ok) return;
+    if (r.ok !== false) throw new Error("expected failure");
     expect(r.reason).toBe("grow_id:missing");
   });
 
@@ -101,7 +101,7 @@ describe("buildFeedingFormPayload — validation", () => {
       form: withForm({ lineId: "  " }),
     });
     expect(r.ok).toBe(false);
-    if (r.ok) return;
+    if (r.ok !== false) throw new Error("expected failure");
     expect(r.reason).toBe("line_id:missing");
   });
 
@@ -111,7 +111,7 @@ describe("buildFeedingFormPayload — validation", () => {
       form: withForm({ products: [] }),
     });
     expect(r.ok).toBe(false);
-    if (r.ok) return;
+    if (r.ok !== false) throw new Error("expected failure");
     expect(r.reason).toBe("products:empty");
   });
 
@@ -123,7 +123,7 @@ describe("buildFeedingFormPayload — validation", () => {
       }),
     });
     expect(r.ok).toBe(false);
-    if (r.ok) return;
+    if (r.ok !== false) throw new Error("expected failure");
     expect(r.reason).toBe("products:empty");
   });
 
@@ -133,7 +133,7 @@ describe("buildFeedingFormPayload — validation", () => {
       form: withForm({ ph: "not-a-number" }),
     });
     expect(r.ok).toBe(false);
-    if (r.ok) return;
+    if (r.ok !== false) throw new Error("expected failure");
     expect(r.reason).toBe("numeric:invalid");
   });
 
@@ -145,7 +145,7 @@ describe("buildFeedingFormPayload — validation", () => {
       }),
     });
     expect(r.ok).toBe(false);
-    if (r.ok) return;
+    if (r.ok !== false) throw new Error("expected failure");
     expect(r.reason).toBe("products:invalid_amount");
   });
 
@@ -159,7 +159,7 @@ describe("buildFeedingFormPayload — validation", () => {
       }),
     });
     expect(r.ok).toBe(false);
-    if (r.ok) return;
+    if (r.ok !== false) throw new Error("expected failure");
     expect(r.reason).toBe("products:contains_secret");
   });
 });

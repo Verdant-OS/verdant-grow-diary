@@ -98,9 +98,9 @@ export function evaluateQuickLogPreview(
   if (!isBlank(d.ec)) {
     const n = num(d.ec);
     if (n == null) {
-      push("ec:invalid", "EC / PPM is not a number.");
+      push("ec:invalid", "EC is not a number.");
     } else if (n < 0) {
-      push("ec:out-of-range", "EC / PPM must be positive.");
+      push("ec:out-of-range", "EC must be positive.");
     } else if (d.ecUnit) {
       const issue = validateEcWithUnit(d.ec, d.ecUnit);
       if (issue) push(issue.code, issue.message, issue.severity);

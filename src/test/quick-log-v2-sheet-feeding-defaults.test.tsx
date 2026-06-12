@@ -73,6 +73,7 @@ describe("QuickLogV2Sheet — Last Feeding Defaults", () => {
     renderSheet();
     fireEvent.click(screen.getByRole("button", { name: "Feed" }));
     expect(screen.queryByTestId("qlv2-feeding-defaults-label")).toBeNull();
+    expect(screen.queryByTestId("qlv2-feeding-review-defaults-flag")).toBeNull();
     expect((screen.getByLabelText("Nutrient line") as HTMLInputElement).value).toBe("");
     expect((screen.getByLabelText("Product 1 name") as HTMLInputElement).value).toBe("");
   });

@@ -626,36 +626,60 @@ export type Database = {
       feeding_events: {
         Row: {
           created_at: string
+          ec_in: number | null
           ec_ms_cm: number | null
+          ec_out: number | null
           event_id: string
+          line_id: string
           nutrient_brand: string | null
           ph: number | null
+          products: Json
           recipe: Json
+          runoff_ec: number | null
+          runoff_ml: number | null
+          runoff_ph: number | null
           schedule_week: number | null
           user_id: string
           volume_ml: number | null
+          water_temp_c: number | null
         }
         Insert: {
           created_at?: string
+          ec_in?: number | null
           ec_ms_cm?: number | null
+          ec_out?: number | null
           event_id: string
+          line_id: string
           nutrient_brand?: string | null
           ph?: number | null
+          products?: Json
           recipe?: Json
+          runoff_ec?: number | null
+          runoff_ml?: number | null
+          runoff_ph?: number | null
           schedule_week?: number | null
           user_id: string
           volume_ml?: number | null
+          water_temp_c?: number | null
         }
         Update: {
           created_at?: string
+          ec_in?: number | null
           ec_ms_cm?: number | null
+          ec_out?: number | null
           event_id?: string
+          line_id?: string
           nutrient_brand?: string | null
           ph?: number | null
+          products?: Json
           recipe?: Json
+          runoff_ec?: number | null
+          runoff_ml?: number | null
+          runoff_ph?: number | null
           schedule_week?: number | null
           user_id?: string
           volume_ml?: number | null
+          water_temp_c?: number | null
         }
         Relationships: [
           {
@@ -1719,6 +1743,25 @@ export type Database = {
           level: number
           tier: string
         }[]
+      }
+      create_feeding_event: {
+        Args: {
+          _ec_in?: number
+          _ec_out?: number
+          _grow_id: string
+          _line_id: string
+          _note?: string
+          _occurred_at?: string
+          _ph?: number
+          _plant_id?: string
+          _products: Json
+          _runoff_ec?: number
+          _runoff_ml?: number
+          _runoff_ph?: number
+          _tent_id?: string
+          _water_temp_c?: number
+        }
+        Returns: string
       }
       create_watering_event: {
         Args: {

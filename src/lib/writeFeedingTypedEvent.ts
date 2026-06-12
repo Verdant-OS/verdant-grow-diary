@@ -212,7 +212,7 @@ export function mapFeedingInputToRpcArgs(
   for (const [appKey, rpcKey] of numericFields) {
     const v = input[appKey];
     if (typeof v === "number" && Number.isFinite(v)) {
-      (args as Record<string, unknown>)[rpcKey] = v;
+      (args as unknown as Record<string, unknown>)[rpcKey] = v;
     }
   }
 

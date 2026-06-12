@@ -37,6 +37,7 @@ import {
   PRINT_SAFETY_FOOTER,
 } from "@/lib/environmentSummaryPrintRules";
 import { recordEnvironmentSummaryExportAuditEvent } from "@/lib/environmentSummaryExportAuditRules";
+import EnvironmentSummaryPrePrintModal from "@/components/EnvironmentSummaryPrePrintModal";
 
 type PrintMode = "full_report" | "drilldown";
 
@@ -60,6 +61,9 @@ export default function EnvironmentSummaryReportPage() {
   const [startDate, setStartDate] = useState(startParam ?? defaults.startDate);
   const [endDate, setEndDate] = useState(endParam ?? defaults.endDate);
   const [printMode, setPrintMode] = useState<PrintMode>("full_report");
+  const [pendingPrintMode, setPendingPrintMode] = useState<PrintMode | null>(
+    null,
+  );
 
   useEffect(() => {
     if (startParam) setStartDate(startParam);
@@ -164,31 +168,43 @@ export default function EnvironmentSummaryReportPage() {
   }
 
   const handleDownloadPdf = () => {
-    recordEnvironmentSummaryExportAuditEvent({
-      eventType: "full_report_print_opened",
-      reportMode: "full_report",
-      startDate,
-      endDate,
-    });
-    triggerPrint(printMeta.filename, "full_report");
+    setPendingPrintMode("full_report");
   };
 
   const handleDownloadDrilldownPdf = () => {
     if (!selectedIssue) return;
-    recordEnvironmentSummaryExportAuditEvent({
-      eventType: "drilldown_print_opened",
-      reportMode: "drilldown",
-      startDate,
-      endDate,
-      issueRuleId: selectedIssue.ruleId,
-      issueLabel: selectedIssue.label,
-    });
-    const filename = buildEnvironmentSummaryDrilldownPrintFilename(
-      startDate,
-      endDate,
-      selectedIssue.ruleId,
-    );
-    triggerPrint(filename, "drilldown");
+    setPendingPrintMode("drilldown");
+  };
+
+  const handleConfirmPrint = () => {
+    if (pendingPrintMode === "full_report") {
+      recordEnvironmentSummaryExportAuditEvent({
+        eventType: "full_report_print_opened",
+        reportMode: "full_report",
+        startDate,
+        endDate,
+      });
+      setPendingPrintMode(null);
+      triggerPrint(printMeta.filename, "full_report");
+      return;
+    }
+    if (pendingPrintMode === "drilldown" && selectedIssue) {
+      recordEnvironmentSummaryExportAuditEvent({
+        eventType: "drilldown_print_opened",
+        reportMode: "drilldown",
+        startDate,
+        endDate,
+        issueRuleId: selectedIssue.ruleId,
+        issueLabel: selectedIssue.label,
+      });
+      const filename = buildEnvironmentSummaryDrilldownPrintFilename(
+        startDate,
+        endDate,
+        selectedIssue.ruleId,
+      );
+      setPendingPrintMode(null);
+      triggerPrint(filename, "drilldown");
+    }
   };
 
   const drilldownPdfFilename = selectedIssue
@@ -381,6 +397,22 @@ export default function EnvironmentSummaryReportPage() {
           {PRINT_SAFETY_FOOTER}
         </p>
       </div>
+
+      <EnvironmentSummaryPrePrintModal
+        open={pendingPrintMode !== null}
+        onOpenChange={(o) => {
+          if (!o) setPendingPrintMode(null);
+        }}
+        mode={pendingPrintMode ?? "full_report"}
+        dateRangeLabel={printMeta.dateRangeLabel}
+        generatedAtLabel={printMeta.generatedAtLabel}
+        selectedIssueLabel={selectedIssue?.label ?? null}
+        selectedIssueRuleId={selectedIssue?.ruleId ?? null}
+        relatedCheckCount={
+          pendingPrintMode === "drilldown" ? relatedChecks.length : undefined
+        }
+        onConfirm={handleConfirmPrint}
+      />
     </div>
   );
 }

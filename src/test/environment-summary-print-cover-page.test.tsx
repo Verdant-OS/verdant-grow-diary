@@ -86,4 +86,37 @@ describe("EnvironmentSummaryPrintCoverPage", () => {
       screen.getByTestId("env-report-print-cover-page-issue").textContent,
     ).toBe("Source review required");
   });
+
+  it("applies print typography classes for cover title/subtitle/meta/safety", () => {
+    const { container } = render(
+      <EnvironmentSummaryPrintCoverPage
+        dateRangeLabel="2026-06-01 — 2026-06-07"
+        generatedAtLabel="2026-06-08T12:00:00.000Z"
+        report={buildReport()}
+      />,
+    );
+    expect(container.querySelector(".print-cover-title")).toBeTruthy();
+    expect(container.querySelector(".print-cover-subtitle")).toBeTruthy();
+    expect(container.querySelector(".print-cover-meta")).toBeTruthy();
+    expect(container.querySelector(".print-cover-safety")).toBeTruthy();
+    expect(container.querySelectorAll(".print-cover-section").length).toBeGreaterThan(0);
+  });
+
+  it("does not render raw payloads or private internal user/tenant IDs", () => {
+    const { container } = render(
+      <EnvironmentSummaryPrintCoverPage
+        growerName="Ada"
+        greenhouseName="Tent A"
+        dateRangeLabel="2026-06-01 — 2026-06-07"
+        generatedAtLabel="2026-06-08T12:00:00.000Z"
+        report={buildReport()}
+      />,
+    );
+    const txt = container.textContent ?? "";
+    expect(txt).not.toMatch(/raw_payload/i);
+    expect(txt).not.toMatch(/user_id/i);
+    expect(txt).not.toMatch(/tenant_id/i);
+    expect(txt).not.toMatch(/service[_-]?role/i);
+    expect(txt).not.toMatch(/access[_-]?token/i);
+  });
 });

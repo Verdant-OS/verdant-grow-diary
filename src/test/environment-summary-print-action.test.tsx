@@ -169,7 +169,7 @@ describe("EnvironmentSummaryReportPage — print/download action", () => {
     );
   });
 
-  it("clicking Download PDF records audit, calls window.print, no Supabase writes, no network", () => {
+  it("clicking Download PDF opens pre-print modal; confirm records audit + calls window.print", () => {
     planMock.current = "pro";
     const printSpy = vi
       .spyOn(window, "print")
@@ -182,6 +182,11 @@ describe("EnvironmentSummaryReportPage — print/download action", () => {
     renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07");
     const before = supabaseCalls.count;
     fireEvent.click(screen.getByTestId("env-report-download-pdf"));
+    // Modal opened; no audit yet, no print yet.
+    expect(screen.getByTestId("env-report-pre-print-modal")).toBeTruthy();
+    expect(printSpy).not.toHaveBeenCalled();
+    expect(readEnvironmentSummaryExportAuditEvents()).toHaveLength(0);
+    fireEvent.click(screen.getByTestId("env-report-pre-print-modal-confirm"));
     expect(printSpy).toHaveBeenCalledTimes(1);
     expect(supabaseCalls.count).toBe(before);
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -192,6 +197,19 @@ describe("EnvironmentSummaryReportPage — print/download action", () => {
     expect(events[0].source).toBe("local_only");
     printSpy.mockRestore();
     fetchSpy.mockRestore();
+  });
+
+  it("cancelling pre-print modal does not record audit or call window.print", () => {
+    planMock.current = "pro";
+    const printSpy = vi
+      .spyOn(window, "print")
+      .mockImplementation(() => undefined);
+    renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07");
+    fireEvent.click(screen.getByTestId("env-report-download-pdf"));
+    fireEvent.click(screen.getByTestId("env-report-pre-print-modal-cancel"));
+    expect(printSpy).not.toHaveBeenCalled();
+    expect(readEnvironmentSummaryExportAuditEvents()).toHaveLength(0);
+    printSpy.mockRestore();
   });
 
   it("full report print mode includes the cover page", () => {

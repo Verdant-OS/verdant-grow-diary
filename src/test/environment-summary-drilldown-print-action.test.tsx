@@ -149,7 +149,7 @@ describe("EnvironmentSummaryReportPage — drilldown print action", () => {
     );
   });
 
-  it("clicking drilldown print records audit, calls window.print, no Supabase writes", () => {
+  it("clicking drilldown print opens modal; confirm records audit + calls window.print", () => {
     planMock.current = "pro";
     const printSpy = vi
       .spyOn(window, "print")
@@ -164,6 +164,10 @@ describe("EnvironmentSummaryReportPage — drilldown print action", () => {
     );
     const before = supabaseCalls.count;
     fireEvent.click(screen.getByTestId("env-report-download-drilldown-pdf"));
+    expect(screen.getByTestId("env-report-pre-print-modal")).toBeTruthy();
+    expect(printSpy).not.toHaveBeenCalled();
+    expect(readEnvironmentSummaryExportAuditEvents()).toHaveLength(0);
+    fireEvent.click(screen.getByTestId("env-report-pre-print-modal-confirm"));
     expect(printSpy).toHaveBeenCalledTimes(1);
     expect(supabaseCalls.count).toBe(before);
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -173,7 +177,6 @@ describe("EnvironmentSummaryReportPage — drilldown print action", () => {
     expect(events[0].reportMode).toBe("drilldown");
     expect(events[0].issueRuleId).toBe("source.review");
     expect(events[0].source).toBe("local_only");
-    // Audit landed in localStorage only.
     expect(
       typeof window.localStorage.getItem(
         ENVIRONMENT_SUMMARY_EXPORT_AUDIT_STORAGE_KEY,
@@ -183,7 +186,7 @@ describe("EnvironmentSummaryReportPage — drilldown print action", () => {
     fetchSpy.mockRestore();
   });
 
-  it("drilldown print mode toggles data-print-mode='drilldown' on the print section", () => {
+  it("drilldown print mode toggles data-print-mode='drilldown' on the print section after confirm", () => {
     planMock.current = "pro";
     const printSpy = vi
       .spyOn(window, "print")
@@ -192,11 +195,11 @@ describe("EnvironmentSummaryReportPage — drilldown print action", () => {
       "/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=source.review",
     );
     fireEvent.click(screen.getByTestId("env-report-download-drilldown-pdf"));
+    fireEvent.click(screen.getByTestId("env-report-pre-print-modal-confirm"));
     const section = container.querySelector(
       '[data-print-section="environment-summary-report"]',
     ) as HTMLElement;
     expect(section.getAttribute("data-print-mode")).toBe("drilldown");
-    // The element used by the print stylesheet to hide unrelated full-report content exists.
     expect(
       container.querySelector("[data-print-full-report-only]"),
     ).toBeTruthy();

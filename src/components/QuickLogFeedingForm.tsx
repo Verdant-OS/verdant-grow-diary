@@ -10,17 +10,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { QuickLogFeedingFormState } from "@/lib/quickLogFeedingFormViewModel";
+import {
+  buildFeedingReview,
+  FEEDING_REVIEW_TITLE,
+  FEEDING_REVIEW_DEFAULTS_FLAG,
+  FEEDING_REVIEW_NEEDS_INPUT,
+} from "@/lib/quickLogFeedingReviewViewModel";
 
 interface Props {
   value: QuickLogFeedingFormState;
   onChange: (next: QuickLogFeedingFormState) => void;
   disabled?: boolean;
+  defaultsApplied?: boolean;
 }
 
 export default function QuickLogFeedingForm({
   value,
   onChange,
   disabled,
+  defaultsApplied = false,
 }: Props) {
   const setField = <K extends keyof QuickLogFeedingFormState>(
     k: K,
@@ -36,6 +44,9 @@ export default function QuickLogFeedingForm({
     );
     onChange({ ...value, products: next });
   };
+
+  const review = buildFeedingReview(value, defaultsApplied);
+
 
   return (
     <div className="space-y-4" data-testid="qlv2-feeding-form">

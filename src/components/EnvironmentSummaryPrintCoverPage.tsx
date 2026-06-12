@@ -52,15 +52,27 @@ export default function EnvironmentSummaryPrintCoverPage({
       className="print-cover-page rounded-xl border border-border/40 bg-card/40 p-5 space-y-4"
     >
       <header className="print-cover-section space-y-1">
-        <h2 className="print-cover-title font-display text-2xl font-semibold tracking-tight">
-          Environment Summary Report
-        </h2>
-        <p className="print-cover-subtitle text-sm text-muted-foreground">
-          {mode === "drilldown"
-            ? "Read-only grow review — selected issue drilldown"
-            : "Read-only grow review"}
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="print-cover-title font-display text-2xl font-semibold tracking-tight">
+              Environment Summary Report
+            </h2>
+            <p className="print-cover-subtitle text-sm text-muted-foreground">
+              {mode === "drilldown"
+                ? "Read-only grow review — selected issue drilldown"
+                : "Read-only grow review"}
+            </p>
+          </div>
+          <span
+            className="print-page-indicator print-only text-[10px] uppercase tracking-wider text-muted-foreground"
+            data-testid={`${testId}-page-indicator`}
+            aria-hidden
+          >
+            Page 1 / total
+          </span>
+        </div>
       </header>
+
 
       <dl className="print-cover-meta print-cover-section grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
         <dt className="text-muted-foreground">Grower</dt>

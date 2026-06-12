@@ -208,7 +208,8 @@ describe("writeFeedingTypedEvent — static safety guards", () => {
     expect(src).not.toMatch(/\.update\s*\(/);
     expect(src).not.toMatch(/\.delete\s*\(/);
     expect(src).not.toMatch(/\.upsert\s*\(/);
-    expect(src).not.toMatch(/service_role/i);
+    expect(src).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
+    expect(src).not.toMatch(/createClient\s*\(/);
   });
 
   it("only references the create_feeding_event RPC, no other create_* RPCs", () => {

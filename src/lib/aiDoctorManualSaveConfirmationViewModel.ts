@@ -17,8 +17,17 @@ import {
 
 export const AI_DOCTOR_MANUAL_SAVE_BUTTON_LABEL =
   "Save preview to diary" as const;
+export const AI_DOCTOR_MANUAL_SAVE_CONFIRM_LABEL = "Save to diary" as const;
+export const AI_DOCTOR_MANUAL_SAVE_SAVING_LABEL = "Saving…" as const;
 export const AI_DOCTOR_MANUAL_SAVE_DISABLED_LABEL = "Save coming next" as const;
 export const AI_DOCTOR_MANUAL_SAVE_CANCEL_LABEL = "Cancel" as const;
+
+export const AI_DOCTOR_MANUAL_SAVE_SUCCESS_MESSAGE =
+  "Saved to diary." as const;
+export const AI_DOCTOR_MANUAL_SAVE_DUPLICATE_MESSAGE =
+  "Already saved to diary." as const;
+export const AI_DOCTOR_MANUAL_SAVE_FAILURE_MESSAGE =
+  "Could not save AI Doctor check-in. Nothing else was changed." as const;
 
 export const AI_DOCTOR_MANUAL_SAVE_CONFIRMATION_COPY = Object.freeze({
   intro: "This will save the AI Doctor preview as a diary observation.",

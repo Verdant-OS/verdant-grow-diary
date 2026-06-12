@@ -65,7 +65,7 @@ export const NEVER_DO_BASELINE: readonly string[] = Object.freeze([
   "Do not change irrigation schedule based on this output.",
   "Do not change equipment (lights, fans, heaters, humidifiers, pumps) based on this output.",
   "Do not treat stale, invalid, or demo sensor readings as current truth.",
-  "No device commands or automation should be issued from this output.",
+  "Output must not be used to control devices or schedule unattended changes.",
 ]);
 
 export const AUTOFLOWER_NEVER_DO: readonly string[] = Object.freeze([

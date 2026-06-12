@@ -36,7 +36,14 @@ import {
   compilePlantContextFromRows as compilePlantContextRowsPhase1Impl,
   type PlantContextPayload as Phase1PlantContextPayloadImpl,
   type SensorSourceTag as Phase1SensorSourceTag,
+  type CompilePlantContextFromRowsInput as CompilePlantContextRowsPhase1InputImpl,
 } from "./aiDoctorContextCompiler";
+import {
+  applyAiDoctorSafetyRules,
+  assessContextStrength,
+  type AiDoctorDraft,
+  type AiDoctorResult,
+} from "./aiDoctorSafetyRules";
 
 // ---------------------------------------------------------------------------
 // Phase 1 re-exports (new, additive)
@@ -52,11 +59,101 @@ export type {
   CompilePlantContextFromRowsInput as CompilePlantContextRowsPhase1Input,
 } from "./aiDoctorContextCompiler";
 
+/** Phase 1 typed alias used by `generateAiDoctorResult`. */
+export type AiDoctorContext = Phase1PlantContextPayloadImpl;
+export type { AiDoctorResult } from "./aiDoctorSafetyRules";
+export type CompileAiDoctorContextFromRowsInput =
+  CompilePlantContextRowsPhase1InputImpl;
+
 /** Phase 1 wrapper — pure pass-through to the typed row compiler. */
 export function compilePlantContextRowsPhase1(
   ...args: Parameters<typeof compilePlantContextRowsPhase1Impl>
 ): Phase1PlantContextPayload {
   return compilePlantContextRowsPhase1Impl(...args);
+}
+
+/**
+ * Public Phase 1 surface — alias for `compilePlantContextRowsPhase1`.
+ * Pure helper. No I/O. Caller supplies already-fetched rows.
+ */
+export function compileAiDoctorContextFromRows(
+  input: CompileAiDoctorContextFromRowsInput,
+): AiDoctorContext {
+  return compilePlantContextRowsPhase1Impl(input);
+}
+
+/**
+ * Deterministic, cautious AI Doctor result built from typed context.
+ * No external model call. Safety rules are always applied.
+ */
+export function generateAiDoctorResult(
+  context: AiDoctorContext,
+): AiDoctorResult {
+  const strength = assessContextStrength(context);
+
+  const evidence: string[] = [];
+  if (context.plant_id) {
+    evidence.push(
+      `Plant context: id=${context.plant_id}${
+        context.stage ? `, stage=${context.stage}` : ""
+      }${context.strain ? `, strain=${context.strain}` : ""}`,
+    );
+  }
+  for (const group of context.sensor_groups) {
+    evidence.push(
+      `Sensor group ${group.source}: ${group.sample_count} reading(s) in last 7d`,
+    );
+  }
+  for (const dev of context.notable_deviations) {
+    evidence.push(`Deviation: ${dev}`);
+  }
+  if (strength.hasRecentEvents) {
+    evidence.push(
+      `Recent grow events (14d): ${context.recent_grow_events.length}`,
+    );
+  }
+
+  const possible_causes: string[] = [];
+  if (context.notable_deviations.length > 0) {
+    possible_causes.push(
+      "Environmental drift consistent with the listed 7-day deviations.",
+    );
+  }
+  if (strength.hasStaleOrInvalid) {
+    possible_causes.push(
+      "Sensor pipeline issue (stale/invalid readings) — diagnosis cannot rely on these.",
+    );
+  }
+  if (possible_causes.length === 0) {
+    possible_causes.push(
+      "Insufficient evidence to enumerate likely causes; observe and re-check.",
+    );
+  }
+
+  const summary = strength.hasTrustworthySensors
+    ? "AI Doctor Phase 1: cautious, observation-only summary based on supplied context."
+    : "AI Doctor Phase 1: insufficient trustworthy context for a real diagnosis — more information is needed.";
+
+  const draft: AiDoctorDraft = {
+    summary,
+    likely_issue: "",
+    confidence:
+      strength.hasTrustworthySensors && strength.hasRecentEvents ? 0.35 : 0.1,
+    evidence,
+    missing_information: [],
+    possible_causes,
+    immediate_action:
+      "Observe and re-check. Do not change inputs based on this output.",
+    what_not_to_do: [],
+    follow_up_24h:
+      "Re-confirm sensor freshness and source labels; log one fresh manual snapshot if no live readings are present.",
+    recovery_plan_3_day:
+      "Maintain stable conditions, log daily diary entries, and capture a fresh photo and manual snapshot each day so the next pass has trustworthy context.",
+    risk_level: strength.hasStaleOrInvalid ? "medium" : "low",
+    action_queue_suggestion: null,
+  };
+
+  return applyAiDoctorSafetyRules(draft, context);
 }
 
 // ---------------------------------------------------------------------------

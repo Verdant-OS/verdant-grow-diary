@@ -71,8 +71,12 @@ describe("PlantQuickLog photo source picker", () => {
     expect(libBlock![0]).not.toMatch(/\bcapture=/);
   });
 
-  it("routes both inputs through the same handleFileSelected path", () => {
-    expect(countMatches(/handleFileSelected\(e\.target\.files\?\.\[0\] \?\? null\)/g)).toBe(2);
+  it("routes both inputs through the same change handler path", () => {
+    // Both file inputs delegate to the shared handler that resolves the
+    // selected file via handleFileSelected. Match the wiring loosely so
+    // the test does not pin the exact call expression.
+    expect(countMatches(/onChange=\{handlePhotoInputChange\}/g)).toBe(2);
+    expect(SRC).toMatch(/handleFileSelected\(/);
   });
 
   it("preserves the diary-photos upload contract (no storage bucket change)", () => {

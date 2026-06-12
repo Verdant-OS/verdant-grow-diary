@@ -183,7 +183,7 @@ describe("buildAiDoctorManualSaveDraft", () => {
       now: NOW,
     });
     expect(r.ok).toBe(false);
-    if (r.ok) return;
+    if (r.ok) throw new Error("expected blocked");
     expect(r.reasons).toContain("missing_plant_id");
     expect(r.reasons).toContain("missing_tent_id");
     expect(r.reasons).toContain("missing_grow_id");
@@ -197,7 +197,7 @@ describe("buildAiDoctorManualSaveDraft", () => {
       now: NOW,
     });
     expect(r.ok).toBe(false);
-    if (r.ok) return;
+    if (r.ok) throw new Error("expected blocked");
     expect(r.reasons).toContain("missing_note");
   });
 

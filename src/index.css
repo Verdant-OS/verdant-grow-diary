@@ -185,6 +185,25 @@
 @media print {
   @page {
     margin: 12mm;
+    @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+        sans-serif;
+      font-size: 10px;
+      color: #555;
+    }
+    @bottom-left {
+      content: "Verdant — Environment Summary";
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+        sans-serif;
+      font-size: 10px;
+      color: #888;
+    }
+  }
+  @page :first {
+    @bottom-right {
+      content: "Page 1 of " counter(pages);
+    }
   }
   [data-print-card],
   [data-print-issue-card],
@@ -220,6 +239,12 @@
   .print-cover-section {
     margin-top: 8mm;
   }
+  .print-page-indicator {
+    font-size: 10px;
+    color: #666;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
   /* Drilldown print mode: hide the full-report-only block. */
   [data-print-section="environment-summary-report"][data-print-mode="drilldown"]
     [data-print-full-report-only] {
@@ -232,3 +257,4 @@
     width: 100%;
   }
 }
+

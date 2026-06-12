@@ -71,11 +71,14 @@ export function buildSourceAppPreviewCopy(
     notices.push(UNKNOWN_SOURCE_COPY);
   }
 
-  if (
+  const isSpiderFarmerMetadataOnly =
     preview.sourceApp === "spider_farmer" &&
     preview.acceptedRowCount === 0 &&
-    preview.warnings.some((w) => w.code === "sensor_only_export")
-  ) {
+    (preview.warnings.some((w) => w.code === "sensor_only_export") ||
+      // Columns may be mapped but every row has empty metric cells —
+      // the export still contains only timestamps + device provenance.
+      (preview.rejectionReasons.empty_metrics ?? 0) > 0);
+  if (isSpiderFarmerMetadataOnly) {
     notices.push(SPIDER_FARMER_SENSOR_ONLY_COPY);
   }
 

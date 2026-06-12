@@ -59,7 +59,7 @@ describe("PlantQuickLog photo source picker", () => {
   it("exposes two hidden file inputs, both accepting image/* only", () => {
     expect(countMatches(/type="file"/g)).toBe(2);
     expect(countMatches(/accept="image\/\*"/g)).toBe(2);
-    expect(countMatches(/className="hidden"/g)).toBeGreaterThanOrEqual(2);
+    expect(countMatches(/className="sr-only"/g)).toBeGreaterThanOrEqual(2);
   });
 
   it("keeps camera capture on the 'Take Photo' input only", () => {

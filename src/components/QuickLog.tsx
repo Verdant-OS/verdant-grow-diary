@@ -859,7 +859,7 @@ export default function QuickLog({
           {showMore && (
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <Label className="text-xs">EC / PPM value</Label>
+                <Label className="text-xs">EC value</Label>
                 <Input
                   inputMode="decimal"
                   value={details.ec}
@@ -869,7 +869,7 @@ export default function QuickLog({
                 />
               </div>
               <div>
-                <Label className="text-xs">EC / PPM unit</Label>
+                <Label className="text-xs">EC unit</Label>
                 <Select
                   value={details.ecUnit}
                   onValueChange={(v) => setDetails({ ...details, ecUnit: v as EcUnit })}

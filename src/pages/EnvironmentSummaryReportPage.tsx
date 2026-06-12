@@ -37,6 +37,7 @@ import {
   PRINT_SAFETY_FOOTER,
 } from "@/lib/environmentSummaryPrintRules";
 import { recordEnvironmentSummaryExportAuditEvent } from "@/lib/environmentSummaryExportAuditRules";
+import EnvironmentSummaryPrePrintModal from "@/components/EnvironmentSummaryPrePrintModal";
 
 type PrintMode = "full_report" | "drilldown";
 

@@ -183,16 +183,56 @@ export default function QuickLogFeedingForm({
         </div>
       </details>
 
-      <div>
-        <Label htmlFor="qlv2-feed-note">Note (optional)</Label>
-        <Textarea
-          id="qlv2-feed-note"
-          value={value.note}
-          disabled={disabled}
-          maxLength={500}
-          onChange={(e) => setField("note", e.target.value)}
-          placeholder="Anything notable about this feed?"
-        />
+      <div
+        className="rounded-md border border-border p-3"
+        data-testid="qlv2-feeding-review"
+      >
+        <h4 className="text-sm font-medium">{FEEDING_REVIEW_TITLE}</h4>
+        {review.defaultsApplied && (
+          <p
+            className="mt-1 text-xs text-muted-foreground"
+            data-testid="qlv2-feeding-review-defaults-flag"
+          >
+            {FEEDING_REVIEW_DEFAULTS_FLAG}
+          </p>
+        )}
+        {review.needsInput ? (
+          <p
+            className="mt-2 text-sm text-muted-foreground"
+            data-testid="qlv2-feeding-review-needs-input"
+          >
+            {FEEDING_REVIEW_NEEDS_INPUT}
+          </p>
+        ) : (
+          <dl className="mt-2 space-y-1 text-sm">
+            {review.lineLabel && (
+              <div className="flex gap-2">
+                <dt className="text-muted-foreground">Line:</dt>
+                <dd className="font-medium">{review.lineLabel}</dd>
+              </div>
+            )}
+            {review.productLabels.length > 0 && (
+              <div className="flex gap-2">
+                <dt className="text-muted-foreground">Products:</dt>
+                <dd className="font-medium">
+                  {review.productLabels.map((p) => p.display).join(", ")}
+                </dd>
+              </div>
+            )}
+            {review.optionalMetrics.map((m) => (
+              <div key={m.label} className="flex gap-2">
+                <dt className="text-muted-foreground">{m.label}:</dt>
+                <dd className="font-medium">{m.value}</dd>
+              </div>
+            ))}
+            {review.note && (
+              <div className="flex gap-2">
+                <dt className="text-muted-foreground">Note:</dt>
+                <dd className="font-medium">{review.note}</dd>
+              </div>
+            )}
+          </dl>
+        )}
       </div>
     </div>
   );

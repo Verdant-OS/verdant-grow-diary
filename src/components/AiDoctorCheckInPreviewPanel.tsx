@@ -171,7 +171,10 @@ function PreviewBody({
       data-testid="ai-doctor-check-in-preview-body"
       data-context-weak={view.contextWeak ? "true" : "false"}
     >
-      <CopyPreviewSummary view={view} context={context} />
+      <div className="flex flex-wrap items-center gap-2">
+        <CopyPreviewSummary view={view} context={context} />
+        <SavePreviewToDiary view={view} context={context} />
+      </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <span

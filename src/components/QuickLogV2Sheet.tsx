@@ -205,6 +205,43 @@ export default function QuickLogV2Sheet({
       return;
     }
 
+    if (form.action === "feed") {
+      if (!resolved.growId) {
+        setLocalError(feedingFormReasonToHelper("grow_id:missing"));
+        return;
+      }
+      const mapped = buildFeedingFormPayload({
+        growId: resolved.growId,
+        tentId: resolved.tentId ?? null,
+        plantId: resolved.plantId ?? null,
+        form: feedingForm,
+      });
+      if (mapped.ok !== true) {
+        setLocalError(feedingFormReasonToHelper(mapped.reason));
+        return;
+      }
+      setFeedingSaving(true);
+      setSaveStatus("Saving feeding…");
+      const result = await writeFeedingTypedEvent(mapped.payload);
+      setFeedingSaving(false);
+      if (result.ok !== true) {
+        setLocalError(FEEDING_SAVE_FAILURE_MESSAGE);
+        toast.error(FEEDING_SAVE_FAILURE_MESSAGE);
+        setSaveStatus("");
+        return;
+      }
+      setSaveStatus(FEEDING_SAVE_SUCCESS_MESSAGE);
+      toast.success(FEEDING_SAVE_SUCCESS_MESSAGE);
+      applyQuickLogV2Refresh(queryClient, {
+        targetType: resolved.targetType as "plant" | "tent",
+        targetId: resolved.targetId as string,
+        tentId: resolved.tentId ?? null,
+      });
+      onOpenChange(false);
+      return;
+    }
+
+
     let uploadedPath: string | null = null;
     if (photoFile) {
       if (!resolved.growId) {

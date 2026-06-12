@@ -147,4 +147,61 @@ describe("AiDoctorCheckInPreviewPanel", () => {
     expect(src).not.toMatch(/createAlert|insertAlert/);
     expect(src).not.toMatch(/openai|anthropic|gemini|model\.invoke/i);
   });
+
+  it("shows 'Copy preview summary' button inside the preview dialog", () => {
+    const context = ctx(
+      [{ occurred_at: ago(HOUR), event_type: "watering", source: "manual" }],
+      [{ metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "live" }],
+    );
+    render(<AiDoctorCheckInPreviewPanel context={context} />);
+    openPreview();
+    expect(
+      screen.getByTestId("ai-doctor-check-in-copy-button"),
+    ).toBeTruthy();
+  });
+
+  it("clicking copy writes receipt text to clipboard and shows success message", async () => {
+    const context = ctx(
+      [{ occurred_at: ago(HOUR), event_type: "watering", source: "manual" }],
+      [{ metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "live" }],
+    );
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+
+    render(<AiDoctorCheckInPreviewPanel context={context} />);
+    openPreview();
+
+    const copyBtn = screen.getByTestId("ai-doctor-check-in-copy-button");
+    fireEvent.click(copyBtn);
+
+    await vi.waitFor(() => {
+      expect(writeText).toHaveBeenCalledTimes(1);
+    });
+
+    const written = writeText.mock.calls[0][0] as string;
+    expect(written).toContain("AI Doctor Check-In Preview");
+    expect(written).toContain("Preview only — not saved.");
+    expect(written).toContain("No live AI model was called.");
+
+    const success = await screen.findByTestId("ai-doctor-check-in-copy-success");
+    expect(success.textContent).toBe("Preview summary copied.");
+  });
+
+  it("clipboard failure shows safe fallback and does not crash", async () => {
+    const context = ctx(
+      [{ occurred_at: ago(HOUR), event_type: "watering", source: "manual" }],
+      [{ metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "live" }],
+    );
+    const writeText = vi.fn().mockRejectedValue(new Error("Clipboard denied"));
+    Object.assign(navigator, { clipboard: { writeText } });
+
+    render(<AiDoctorCheckInPreviewPanel context={context} />);
+    openPreview();
+
+    const copyBtn = screen.getByTestId("ai-doctor-check-in-copy-button");
+    fireEvent.click(copyBtn);
+
+    const error = await screen.findByTestId("ai-doctor-check-in-copy-error");
+    expect(error.textContent).toBe("Copy unavailable. You can manually select the preview text.");
+  });
 });

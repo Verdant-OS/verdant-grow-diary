@@ -10,8 +10,8 @@
  *    "No live AI model was called."
  *  - Failures render a calm fallback message and never crash the page.
  */
-import { useMemo, useState } from "react";
-import { Stethoscope } from "lucide-react";
+import { useMemo, useState, useCallback } from "react";
+import { Stethoscope, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,6 +25,10 @@ import {
   buildAiDoctorCheckInPreviewView,
   type AiDoctorCheckInPreviewView,
 } from "@/lib/aiDoctorCheckInPreviewViewModel";
+import {
+  formatAiDoctorCheckInReceipt,
+  type AiDoctorCheckInReceiptInput,
+} from "@/lib/aiDoctorCheckInReceiptView";
 import type { AiDoctorContext } from "@/lib/aiDoctorEngine";
 
 export interface AiDoctorCheckInPreviewPanelProps {
@@ -85,13 +89,86 @@ function BulletList({
   );
 }
 
-function PreviewBody({ view }: { view: AiDoctorCheckInPreviewView }) {
+function CopyPreviewSummary({
+  view,
+  context,
+}: {
+  view: AiDoctorCheckInPreviewView;
+  context: AiDoctorContext;
+}) {
+  const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    setCopied(false);
+    setCopyError(false);
+    const receiptInput: AiDoctorCheckInReceiptInput = {
+      view,
+      plantName: context.plant_name,
+      plantId: context.plant_id,
+      stage: context.stage,
+    };
+    const receipt = formatAiDoctorCheckInReceipt(receiptInput);
+    try {
+      await navigator.clipboard.writeText(receipt.body);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopyError(true);
+    }
+  }, [view, context]);
+
+  return (
+    <div className="flex items-center gap-2" data-testid="ai-doctor-check-in-copy-section">
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={handleCopy}
+        data-testid="ai-doctor-check-in-copy-button"
+      >
+        {copied ? (
+          <Check className="h-4 w-4 mr-1" aria-hidden="true" />
+        ) : (
+          <Copy className="h-4 w-4 mr-1" aria-hidden="true" />
+        )}
+        {copied ? "Copied" : "Copy preview summary"}
+      </Button>
+      {copied && (
+        <span
+          className="text-xs text-emerald-300"
+          data-testid="ai-doctor-check-in-copy-success"
+        >
+          Preview summary copied.
+        </span>
+      )}
+      {copyError && (
+        <span
+          className="text-xs text-amber-300"
+          data-testid="ai-doctor-check-in-copy-error"
+        >
+          Copy unavailable. You can manually select the preview text.
+        </span>
+      )}
+    </div>
+  );
+}
+
+function PreviewBody({
+  view,
+  context,
+}: {
+  view: AiDoctorCheckInPreviewView;
+  context: AiDoctorContext;
+}) {
   return (
     <div
       className="space-y-3"
       data-testid="ai-doctor-check-in-preview-body"
       data-context-weak={view.contextWeak ? "true" : "false"}
     >
+      <CopyPreviewSummary view={view} context={context} />
+
       <div className="flex flex-wrap items-center gap-2">
         <span
           className="inline-flex items-center rounded-md border border-border/60 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground"
@@ -299,7 +376,7 @@ export default function AiDoctorCheckInPreviewPanel({
               Action Queue items are created.
             </DialogDescription>
           </DialogHeader>
-          {view ? <PreviewBody view={view} /> : <PreviewFallback />}
+          {view ? <PreviewBody view={view} context={context} /> : <PreviewFallback />}
         </DialogContent>
       </Dialog>
     </div>

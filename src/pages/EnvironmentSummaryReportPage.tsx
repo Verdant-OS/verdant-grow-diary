@@ -403,9 +403,18 @@ export default function EnvironmentSummaryReportPage() {
             data-testid="env-report-drilldown-section"
           >
             <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                {selectedIssue.drilldownLabel}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-muted-foreground">
+                  {selectedIssue.drilldownLabel}
+                </p>
+                <span
+                  className="print-page-indicator print-only text-[10px] uppercase tracking-wider text-muted-foreground"
+                  data-testid="env-report-drilldown-page-indicator"
+                  aria-hidden
+                >
+                  Page · of total
+                </span>
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
@@ -416,6 +425,7 @@ export default function EnvironmentSummaryReportPage() {
                 Clear drilldown
               </Button>
             </div>
+
             <div data-print-issue-card="selected">
               <EnvironmentIssueDrilldown
                 issue={selectedIssue}

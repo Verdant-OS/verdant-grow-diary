@@ -162,7 +162,11 @@ export function buildAiDoctorManualSaveDraft(
     reasons.push("missing_summary");
 
   if (reasons.length > 0) {
-    return deepFreeze({ ok: false, reasons: Object.freeze([...reasons]) });
+    const blocked: AiDoctorManualSaveDraftBlocked = {
+      ok: false,
+      reasons: Object.freeze([...reasons]),
+    };
+    return deepFreeze(blocked);
   }
 
   const engineVersion = input.engineVersion ?? AI_DOCTOR_ENGINE_VERSION_DEFAULT;

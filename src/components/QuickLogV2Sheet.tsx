@@ -552,6 +552,7 @@ export default function QuickLogV2Sheet({
                   setLocalError(null);
                 }}
                 disabled={feedingSaving || saving}
+                defaultsApplied={feedingDefaultsApplied}
               />
             </div>
           )}

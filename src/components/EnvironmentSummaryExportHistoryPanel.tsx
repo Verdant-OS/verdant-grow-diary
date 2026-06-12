@@ -3,14 +3,28 @@
  *
  * Renders the last few local-only Environment Summary Report export
  * audit events (browser localStorage). Lets the grower reopen the same
- * date range view via a callback.
+ * date range view via a callback and view a read-only receipt for each
+ * export.
  *
  * Read-only. No network. No Supabase. No writes here — events are
  * recorded by the report page when a print is confirmed.
  */
+import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { History, RotateCcw } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { History, RotateCcw, FileText, Copy, Check } from "lucide-react";
 import type { EnvironmentSummaryExportAuditEvent } from "@/lib/environmentSummaryExportAuditRules";
+import {
+  buildExportReceiptViewModel,
+  formatReceiptPlainText,
+  type ExportReceiptViewModel,
+} from "@/lib/environmentSummaryExportReceiptView";
 
 export interface EnvironmentSummaryExportHistoryPanelProps {
   events: EnvironmentSummaryExportAuditEvent[];
@@ -48,8 +62,45 @@ export default function EnvironmentSummaryExportHistoryPanel({
   ...rest
 }: EnvironmentSummaryExportHistoryPanelProps) {
   const testId = rest["data-testid"] ?? "env-report-export-history";
+  const [selectedReceipt, setSelectedReceipt] =
+    useState<ExportReceiptViewModel | null>(null);
+  const [copyFallback, setCopyFallback] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
   // Most recent first.
   const recent = [...events].reverse().slice(0, Math.max(1, limit));
+
+  const openReceipt = useCallback((evt: EnvironmentSummaryExportAuditEvent) => {
+    setSelectedReceipt(buildExportReceiptViewModel(evt));
+    setCopyFallback(null);
+    setCopied(false);
+  }, []);
+
+  const closeReceipt = useCallback(() => {
+    setSelectedReceipt(null);
+    setCopyFallback(null);
+    setCopied(false);
+  }, []);
+
+  const handleCopy = useCallback(async () => {
+    if (!selectedReceipt) return;
+    const text = formatReceiptPlainText(selectedReceipt);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+        setCopyFallback(null);
+        window.setTimeout(() => setCopied(false), 2000);
+      } else {
+        throw new Error("Clipboard API unavailable");
+      }
+    } catch {
+      setCopyFallback(
+        "Copy unavailable. Select and copy the receipt text manually.",
+      );
+      setCopied(false);
+    }
+  }, [selectedReceipt]);
 
   return (
     <section
@@ -60,7 +111,10 @@ export default function EnvironmentSummaryExportHistoryPanel({
       <header className="flex items-center gap-2 text-sm font-medium">
         <History className="h-4 w-4 text-muted-foreground" aria-hidden />
         <span>Recent exports</span>
-        <span className="text-xs text-muted-foreground" data-testid={`${testId}-count`}>
+        <span
+          className="text-xs text-muted-foreground"
+          data-testid={`${testId}-count`}
+        >
           ({events.length})
         </span>
       </header>
@@ -74,10 +128,7 @@ export default function EnvironmentSummaryExportHistoryPanel({
           here so you can reopen the same date range.
         </p>
       ) : (
-        <ul
-          className="space-y-1 text-xs"
-          data-testid={`${testId}-list`}
-        >
+        <ul className="space-y-1 text-xs" data-testid={`${testId}-list`}>
           {recent.map((evt) => {
             const label = formatEventType(evt.eventType);
             const when = formatOccurredAt(evt.occurredAt);
@@ -98,30 +149,44 @@ export default function EnvironmentSummaryExportHistoryPanel({
                     <span className="font-medium">{label}</span>
                     <span className="text-muted-foreground"> · {range}</span>
                     {issueSuffix ? (
-                      <span className="text-muted-foreground">{issueSuffix}</span>
+                      <span className="text-muted-foreground">
+                        {issueSuffix}
+                      </span>
                     ) : null}
                   </p>
                   <p className="text-[10px] text-muted-foreground">{when}</p>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    onReopen({
-                      startDate: evt.dateRange.startDate,
-                      endDate: evt.dateRange.endDate,
-                      issueRuleId:
-                        evt.reportMode === "drilldown"
-                          ? (evt.issueRuleId ?? null)
-                          : null,
-                    })
-                  }
-                  data-testid={`${testId}-reopen`}
-                  aria-label={`Reopen ${range}`}
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  Reopen
-                </Button>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => openReceipt(evt)}
+                    data-testid={`${testId}-details`}
+                    aria-label={`View receipt for ${range}`}
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    Details
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      onReopen({
+                        startDate: evt.dateRange.startDate,
+                        endDate: evt.dateRange.endDate,
+                        issueRuleId:
+                          evt.reportMode === "drilldown"
+                            ? (evt.issueRuleId ?? null)
+                            : null,
+                      })
+                    }
+                    data-testid={`${testId}-reopen`}
+                    aria-label={`Reopen ${range}`}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Reopen
+                  </Button>
+                </div>
               </li>
             );
           })}
@@ -131,6 +196,94 @@ export default function EnvironmentSummaryExportHistoryPanel({
       <p className="text-[10px] text-muted-foreground">
         Stored locally in your browser only. No data is sent to the server.
       </p>
+
+      {/* Receipt Detail Dialog */}
+      <Dialog open={!!selectedReceipt} onOpenChange={(open) => !open && closeReceipt()}>
+        <DialogContent className="print-hidden max-w-md" data-testid="env-report-receipt-dialog">
+          <DialogHeader>
+            <DialogTitle>Export Receipt</DialogTitle>
+            <DialogDescription>
+              Details for this browser-local export.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedReceipt && (
+            <div className="space-y-3 text-sm" data-testid="env-report-receipt-content">
+              <div className="rounded-md border border-border/40 bg-muted/30 p-3 space-y-2">
+                <ReceiptRow label="Event ID" value={selectedReceipt.eventId} testid="receipt-event-id" />
+                <ReceiptRow label="Exported at" value={selectedReceipt.occurredAtFormatted} testid="receipt-occurred-at" />
+                <ReceiptRow label="Report mode" value={selectedReceipt.reportModeLabel} testid="receipt-mode" />
+                <ReceiptRow label="Date range" value={selectedReceipt.dateRangeFormatted} testid="receipt-range" />
+                {selectedReceipt.issueLabel && (
+                  <ReceiptRow label="Issue filter" value={selectedReceipt.issueLabel} testid="receipt-issue-label" />
+                )}
+                {selectedReceipt.issueRuleId && (
+                  <ReceiptRow label="Issue rule ID" value={selectedReceipt.issueRuleId} testid="receipt-issue-rule-id" />
+                )}
+                <ReceiptRow label="Source" value={selectedReceipt.sourceLabel} testid="receipt-source" />
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                This export receipt is stored locally in this browser.
+              </p>
+
+              {copyFallback && (
+                <p
+                  className="text-xs text-amber-600"
+                  data-testid="env-report-receipt-copy-fallback"
+                  role="status"
+                >
+                  {copyFallback}
+                </p>
+              )}
+
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleCopy}
+                  data-testid="env-report-receipt-copy-btn"
+                  disabled={copied}
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 mr-1" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5 mr-1" />
+                      Copy receipt summary
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </section>
+  );
+}
+
+function ReceiptRow({
+  label,
+  value,
+  testid,
+}: {
+  label: string;
+  value: string;
+  testid: string;
+}) {
+  return (
+    <div className="flex justify-between gap-3">
+      <span className="text-muted-foreground text-xs shrink-0">{label}</span>
+      <span
+        className="font-mono text-xs text-right break-all"
+        data-testid={testid}
+      >
+        {value}
+      </span>
+    </div>
   );
 }

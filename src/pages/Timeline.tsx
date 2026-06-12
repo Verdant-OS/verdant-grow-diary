@@ -546,6 +546,7 @@ export default function Timeline() {
                                 const ni = normalizedById.get(e.id);
                                 return ni ? <DiaryEntryBadges item={ni} /> : null;
                               })()}
+                              <AiDoctorCheckInTimelineBadge event={e} />
                               {(() => {
                                 const kindValue = (e.details?.event_type as string | undefined) ?? null;
                                 if (!isEnvironmentCheckKind(kindValue)) return null;

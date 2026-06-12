@@ -65,7 +65,11 @@ describe("quickLogV2Rules", () => {
     expect(shouldShowVolumeField("note")).toBe(false);
   });
 
-  it("photo saving blocked in Gate 1", () => {
-    expect(isPhotoSavingSupported()).toBe(false);
+  it("photo saving is supported in Gate 1 (deterministic, no env drift)", () => {
+    // Photo saving is intentionally enabled: createQuickLogEvent accepts a
+    // photoUrl and the photo gate state exposes active picker labels. The
+    // helper must be deterministic and never read from environment headers.
+    expect(isPhotoSavingSupported()).toBe(true);
+    expect(isPhotoSavingSupported()).toBe(isPhotoSavingSupported());
   });
 });

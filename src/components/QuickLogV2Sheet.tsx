@@ -41,6 +41,12 @@ import {
 } from "@/lib/quickLogFeedingFormViewModel";
 import { writeFeedingTypedEvent } from "@/lib/writeFeedingTypedEvent";
 import QuickLogFeedingForm from "@/components/QuickLogFeedingForm";
+import {
+  buildFeedingDefaults,
+  applyFeedingDefaultsToForm,
+  FEEDING_DEFAULTS_LABEL,
+} from "@/lib/feedingDefaultsViewModel";
+import { useRecentFeedingsForDefaults } from "@/hooks/useRecentFeedingsForDefaults";
 
 interface Props {
   open: boolean;

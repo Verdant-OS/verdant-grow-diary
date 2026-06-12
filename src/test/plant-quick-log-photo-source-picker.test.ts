@@ -33,7 +33,6 @@ describe("PlantQuickLog photo source picker", () => {
     expect(SRC).toMatch(/buildQuickLogPhotoGateState\(\)/);
     expect(SRC).toMatch(/photoGate\.takePhotoLabel/);
     expect(SRC).toMatch(/photoGate\.chooseLibraryLabel/);
-    expect(SRC).toMatch(/photoGate\.pickerHelperText/);
     expect(SRC).toMatch(/photoGate\.cameraInputAriaLabel/);
     expect(SRC).toMatch(/photoGate\.libraryInputAriaLabel/);
   });

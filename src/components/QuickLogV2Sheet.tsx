@@ -535,15 +535,27 @@ export default function QuickLogV2Sheet({
           </div>
 
           {form.action === "feed" && (
-            <QuickLogFeedingForm
-              value={feedingForm}
-              onChange={(next) => {
-                setFeedingForm(next);
-                setLocalError(null);
-              }}
-              disabled={feedingSaving || saving}
-            />
+            <div className="space-y-2">
+              {feedingDefaultsApplied && feedingDefaults.label && (
+                <div
+                  data-testid="qlv2-feeding-defaults-label"
+                  className="rounded-md border border-border/60 bg-secondary/30 px-3 py-2 text-sm text-muted-foreground"
+                  role="note"
+                >
+                  {FEEDING_DEFAULTS_LABEL}
+                </div>
+              )}
+              <QuickLogFeedingForm
+                value={feedingForm}
+                onChange={(next) => {
+                  setFeedingForm(next);
+                  setLocalError(null);
+                }}
+                disabled={feedingSaving || saving}
+              />
+            </div>
           )}
+
 
           {shouldShowVolumeField(form.action) && (
             <div>

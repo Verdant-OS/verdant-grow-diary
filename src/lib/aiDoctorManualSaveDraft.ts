@@ -100,6 +100,18 @@ export type AiDoctorManualSaveDraftResult =
   | AiDoctorManualSaveDraftOk
   | AiDoctorManualSaveDraftBlocked;
 
+export function isBlockedManualSaveDraft(
+  r: AiDoctorManualSaveDraftResult,
+): r is AiDoctorManualSaveDraftBlocked {
+  return r.ok === false;
+}
+
+export function isOkManualSaveDraft(
+  r: AiDoctorManualSaveDraftResult,
+): r is AiDoctorManualSaveDraftOk {
+  return r.ok === true;
+}
+
 /** Stable, non-cryptographic hash (FNV-1a 32-bit, base36). Deterministic. */
 function stableHash(input: string): string {
   let h = 0x811c9dc5;

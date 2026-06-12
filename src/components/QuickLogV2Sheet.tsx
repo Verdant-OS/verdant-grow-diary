@@ -664,11 +664,11 @@ export default function QuickLogV2Sheet({
                 type="button"
                 className="flex-1"
                 onClick={handleSave}
-                disabled={saving || contextBlocked}
+                disabled={saving || feedingSaving || contextBlocked}
                 aria-describedby="qlv2-save-helper"
                 data-testid="qlv2-save"
               >
-                {saving ? "Saving…" : "Save"}
+                {saving || feedingSaving ? "Saving…" : "Save"}
               </Button>
             </div>
           </div>

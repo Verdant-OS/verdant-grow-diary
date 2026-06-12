@@ -11,7 +11,7 @@
  *  - Failures render a calm fallback message and never crash the page.
  */
 import { useMemo, useState, useCallback } from "react";
-import { Stethoscope, Copy, Check } from "lucide-react";
+import { Stethoscope, Copy, Check, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -29,6 +29,10 @@ import {
   formatAiDoctorCheckInReceipt,
   type AiDoctorCheckInReceiptInput,
 } from "@/lib/aiDoctorCheckInReceiptView";
+import {
+  buildAiDoctorManualSaveConfirmationView,
+  type AiDoctorManualSaveConfirmationView,
+} from "@/lib/aiDoctorManualSaveConfirmationViewModel";
 import type { AiDoctorContext } from "@/lib/aiDoctorEngine";
 
 export interface AiDoctorCheckInPreviewPanelProps {

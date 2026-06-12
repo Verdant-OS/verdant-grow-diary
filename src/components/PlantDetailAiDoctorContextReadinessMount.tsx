@@ -76,8 +76,8 @@ export default function PlantDetailAiDoctorContextReadinessMount({
 
   const built = useMemo(() => {
     try {
-      const diary = ((recentActivity.data ?? []) as readonly DiaryEntryRowLike[]) ?? [];
-      const logs = ((manualLogs.data ?? []) as readonly ManualSensorLogLike[]) ?? [];
+      const diary = (recentActivity.data ?? []) as readonly DiaryEntryRowLike[];
+      const logs = (manualLogs.data ?? []) as readonly ManualSensorLogLike[];
       const context = buildPlantAiDoctorContext({
         plant: plantRow,
         diaryEntries: diary,

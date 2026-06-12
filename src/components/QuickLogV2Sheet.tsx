@@ -121,6 +121,7 @@ export default function QuickLogV2Sheet({
         ...EMPTY_QUICKLOG_V2_FORM,
         selectedKey: defaultTargetKey ?? null,
       });
+      setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
       setLocalError(null);
       setSaveStatus("");
       resetPhotoSelection();

@@ -440,13 +440,20 @@ export default function QuickLogV2Sheet({
 
           <div>
             <Label>Action</Label>
-            <div className="mt-1 grid grid-cols-2 gap-2" role="group" aria-label="Quick Log action type">
+            <div className="mt-1 grid grid-cols-3 gap-2" role="group" aria-label="Quick Log action type">
               <Button
                 type="button"
                 variant={form.action === "water" ? "default" : "outline"}
                 onClick={() => handleAction("water")}
               >
                 Water
+              </Button>
+              <Button
+                type="button"
+                variant={form.action === "feed" ? "default" : "outline"}
+                onClick={() => handleAction("feed")}
+              >
+                Feed
               </Button>
               <Button
                 type="button"
@@ -457,6 +464,17 @@ export default function QuickLogV2Sheet({
               </Button>
             </div>
           </div>
+
+          {form.action === "feed" && (
+            <QuickLogFeedingForm
+              value={feedingForm}
+              onChange={(next) => {
+                setFeedingForm(next);
+                setLocalError(null);
+              }}
+              disabled={feedingSaving || saving}
+            />
+          )}
 
           {shouldShowVolumeField(form.action) && (
             <div>

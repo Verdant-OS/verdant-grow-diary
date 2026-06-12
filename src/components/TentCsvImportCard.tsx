@@ -37,6 +37,11 @@ import {
   type CsvImportSourceApp,
   type NormalizeResult,
 } from "@/lib/csvSensorImportRules";
+import { summarizeImportPreview } from "@/lib/sensorImportSourceApps";
+import {
+  buildSourceAppPreviewCopy,
+  type PreviewCopy,
+} from "@/lib/sensorImportPreviewCopy";
 
 interface Props {
   tentId: string;
@@ -55,6 +60,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
   const [preview, setPreview] = useState<NormalizeResult | null>(null);
   const [importing, setImporting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [sourcePreview, setSourcePreview] = useState<PreviewCopy | null>(null);
 
   const supportedApp = CSV_IMPORT_SOURCE_APPS.find((a) => a.id === sourceApp);
   const sourceEnabled = !!supportedApp?.enabled;
@@ -64,12 +70,14 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
     setFileName(null);
     setParseError(null);
     setPreview(null);
+    setSourcePreview(null);
     if (fileRef.current) fileRef.current.value = "";
   }
 
   async function handleFile(file: File | null) {
     setParseError(null);
     setPreview(null);
+    setSourcePreview(null);
     if (!file) return;
     if (file.size > MAX_CSV_BYTES) {
       setParseError(
@@ -82,6 +90,12 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
     setFileName(file.name);
     const t = await file.text();
     setText(t);
+    // Read-only source-app detection. Never touches the persistence path.
+    try {
+      setSourcePreview(buildSourceAppPreviewCopy(summarizeImportPreview(t)));
+    } catch {
+      setSourcePreview(null);
+    }
   }
 
   function handleParse() {
@@ -275,6 +289,91 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
           {parseError}
         </p>
       )}
+
+      {sourcePreview && (
+        <div
+          className="mt-4 rounded-xl border border-border/60 p-3 grid gap-2 text-xs"
+          data-testid="csv-source-preview"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="secondary" data-testid="csv-source-preview-app">
+              {sourcePreview.sourceAppLabel}
+            </Badge>
+            <span
+              className="text-muted-foreground"
+              data-testid="csv-source-preview-confidence"
+            >
+              {sourcePreview.confidenceLabel}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <Stat
+              label="Accepted rows"
+              value={String(sourcePreview.acceptedRowCount)}
+              testId="csv-source-preview-accepted"
+            />
+            <Stat
+              label="Rejected rows"
+              value={String(sourcePreview.rejectedRowCount)}
+              testId="csv-source-preview-rejected"
+            />
+            <Stat
+              label="Mapped metrics"
+              value={
+                sourcePreview.mappedMetrics.length > 0
+                  ? sourcePreview.mappedMetrics.join(", ")
+                  : "—"
+              }
+              testId="csv-source-preview-metrics"
+            />
+            <Stat
+              label="Unmapped columns"
+              value={String(sourcePreview.unmappedColumns.length)}
+              testId="csv-source-preview-unmapped"
+            />
+          </div>
+
+          {sourcePreview.warnings.length > 0 && (
+            <ul
+              className="grid gap-1 text-amber-200/90"
+              data-testid="csv-source-preview-warnings"
+            >
+              {sourcePreview.warnings.map((w) => (
+                <li key={w.code} data-testid={`csv-source-preview-warning-${w.code}`}>
+                  {w.message}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {sourcePreview.notices.map((n, i) => (
+            <p
+              key={i}
+              className="text-muted-foreground"
+              data-testid="csv-source-preview-notice"
+            >
+              {n}
+            </p>
+          ))}
+
+          <p
+            className="text-muted-foreground"
+            data-testid="csv-source-preview-canonical"
+          >
+            {sourcePreview.canonicalSourceCopy}
+          </p>
+
+          {!sourcePreview.importEnabled && sourcePreview.importDisabledReason && (
+            <p
+              className="text-[11px] text-amber-200/80"
+              data-testid="csv-source-preview-import-blocked"
+            >
+              {sourcePreview.importDisabledReason}
+            </p>
+          )}
+        </div>
+      )}
+
 
       {preview && (
         <div className="mt-4 grid gap-3" data-testid="csv-preview">

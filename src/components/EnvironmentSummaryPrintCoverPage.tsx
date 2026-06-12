@@ -49,20 +49,20 @@ export default function EnvironmentSummaryPrintCoverPage({
     <section
       data-testid={testId}
       data-print-card="cover"
-      className="print-cover-page rounded-xl border border-border/40 bg-card/40 p-5 space-y-3"
+      className="print-cover-page rounded-xl border border-border/40 bg-card/40 p-5 space-y-4"
     >
-      <header className="space-y-1">
-        <h2 className="font-display text-2xl font-semibold tracking-tight">
+      <header className="print-cover-section space-y-1">
+        <h2 className="print-cover-title font-display text-2xl font-semibold tracking-tight">
           Environment Summary Report
         </h2>
-        <p className="text-sm text-muted-foreground">
+        <p className="print-cover-subtitle text-sm text-muted-foreground">
           {mode === "drilldown"
             ? "Read-only grow review — selected issue drilldown"
             : "Read-only grow review"}
         </p>
       </header>
 
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+      <dl className="print-cover-meta print-cover-section grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
         <dt className="text-muted-foreground">Grower</dt>
         <dd data-testid={`${testId}-grower`}>{grower}</dd>
         <dt className="text-muted-foreground">Greenhouse</dt>
@@ -79,7 +79,7 @@ export default function EnvironmentSummaryPrintCoverPage({
         ) : null}
       </dl>
 
-      <div className="text-xs space-y-1">
+      <div className="print-cover-summary print-cover-section text-xs space-y-1">
         <p className="font-medium">Status counts</p>
         <ul
           className="grid grid-cols-2 gap-x-3 gap-y-0.5"
@@ -93,7 +93,7 @@ export default function EnvironmentSummaryPrintCoverPage({
       </div>
 
       {top3.length > 0 ? (
-        <div className="text-xs space-y-1">
+        <div className="print-cover-summary print-cover-section text-xs space-y-1">
           <p className="font-medium">Top issues</p>
           <ul
             className="space-y-0.5"
@@ -109,7 +109,7 @@ export default function EnvironmentSummaryPrintCoverPage({
       ) : null}
 
       <p
-        className="text-[11px] text-muted-foreground"
+        className="print-cover-safety print-cover-section text-[11px] text-muted-foreground"
         data-testid={`${testId}-safety`}
       >
         {PRINT_SAFETY_FOOTER}

@@ -70,12 +70,14 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
     setFileName(null);
     setParseError(null);
     setPreview(null);
+    setSourcePreview(null);
     if (fileRef.current) fileRef.current.value = "";
   }
 
   async function handleFile(file: File | null) {
     setParseError(null);
     setPreview(null);
+    setSourcePreview(null);
     if (!file) return;
     if (file.size > MAX_CSV_BYTES) {
       setParseError(
@@ -88,6 +90,12 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
     setFileName(file.name);
     const t = await file.text();
     setText(t);
+    // Read-only source-app detection. Never touches the persistence path.
+    try {
+      setSourcePreview(buildSourceAppPreviewCopy(summarizeImportPreview(t)));
+    } catch {
+      setSourcePreview(null);
+    }
   }
 
   function handleParse() {

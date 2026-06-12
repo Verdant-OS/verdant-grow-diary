@@ -36,8 +36,13 @@ import {
   buildEnvironmentSummaryPrintMetadata,
   PRINT_SAFETY_FOOTER,
 } from "@/lib/environmentSummaryPrintRules";
-import { recordEnvironmentSummaryExportAuditEvent } from "@/lib/environmentSummaryExportAuditRules";
+import {
+  readEnvironmentSummaryExportAuditEvents,
+  recordEnvironmentSummaryExportAuditEvent,
+} from "@/lib/environmentSummaryExportAuditRules";
 import EnvironmentSummaryPrePrintModal from "@/components/EnvironmentSummaryPrePrintModal";
+import EnvironmentSummaryExportHistoryPanel from "@/components/EnvironmentSummaryExportHistoryPanel";
+
 
 type PrintMode = "full_report" | "drilldown";
 

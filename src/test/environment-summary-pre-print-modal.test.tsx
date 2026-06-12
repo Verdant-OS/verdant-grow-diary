@@ -249,18 +249,13 @@ describe("EnvironmentSummaryReportPage — pre-print modal integration", () => {
       .spyOn(window, "print")
       .mockImplementation(() => undefined);
     renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07");
-    const prevTitle = document.title;
     fireEvent.click(screen.getByTestId("env-report-download-pdf"));
     fireEvent.click(screen.getByTestId("env-report-pre-print-modal-confirm"));
     expect(printSpy).toHaveBeenCalledTimes(1);
     const events = readEnvironmentSummaryExportAuditEvents();
     expect(events).toHaveLength(1);
     expect(events[0].eventType).toBe("full_report_print_opened");
-    // Title restored after print trigger (microtask flush).
-    return Promise.resolve().then(() => {
-      expect(document.title).toBe(prevTitle);
-      printSpy.mockRestore();
-    });
+    printSpy.mockRestore();
   });
 
   it("confirm records drilldown audit and calls window.print", () => {

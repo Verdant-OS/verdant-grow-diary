@@ -163,11 +163,39 @@ export default function QuickLogV2Sheet({
         selectedKey: defaultTargetKey ?? null,
       });
       setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
+      setFeedingDefaultsApplied(false);
       setLocalError(null);
       setSaveStatus("");
       resetPhotoSelection();
     }
   }, [open, defaultTargetKey]);
+
+  // One-shot prefill of the feeding form with last-used defaults. Runs only
+  // when the Feed action is active, the form is still pristine, defaults
+  // exist, and we have not yet applied them for this open session.
+  useEffect(() => {
+    if (!open) return;
+    if (form.action !== "feed") return;
+    if (feedingDefaultsApplied) return;
+    if (!feedingDefaults.defaults) return;
+    // Only prefill if the user has not started typing — preserves manual input.
+    if (
+      feedingForm.lineId.trim() !== "" ||
+      feedingForm.products.some((p) => p.name.trim() !== "")
+    ) {
+      return;
+    }
+    setFeedingForm(applyFeedingDefaultsToForm(feedingDefaults));
+    setFeedingDefaultsApplied(true);
+  }, [
+    open,
+    form.action,
+    feedingDefaults,
+    feedingDefaultsApplied,
+    feedingForm.lineId,
+    feedingForm.products,
+  ]);
+
 
   const setField = <K extends keyof QuickLogV2FormState>(
     k: K,

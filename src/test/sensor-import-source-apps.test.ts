@@ -39,11 +39,14 @@ const AC_INFINITY_CSV = [
 
 describe("BOM + header hygiene", () => {
   it("strips UTF-8 BOM from headers before detection", () => {
-    const headers = parseCsv(SPIDER_FULL).headers;
-    expect(headers[0].charCodeAt(0)).toBe(0xfeff); // raw still has BOM
-    const cleaned = cleanHeaders(headers);
-    expect(cleaned[0]).toBe("deviceSerialnum");
+    // The Spider Farmer fixture file starts with a literal UTF-8 BOM.
+    expect(SPIDER_FULL.charCodeAt(0)).toBe(0xfeff);
+    // Detection survives the BOM (parseCsv + cleanHeaders strip it).
+    const d = detectSourceApp(parseCsv(SPIDER_FULL).headers);
+    expect(d.id).toBe("spider_farmer");
     expect(stripBomAndTrim("\uFEFFTimestamp")).toBe("Timestamp");
+    expect(cleanHeaders(["\uFEFFdeviceSerialnum", " humidity "]))
+      .toEqual(["deviceSerialnum", "humidity"]);
   });
 });
 

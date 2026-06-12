@@ -8,7 +8,7 @@
  *  - Sensor data comes from manual logs already on file; never fabricated.
  *  - Compilation failures degrade to a safe fallback, never crash the page.
  */
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { Activity } from "lucide-react";
 import AiDoctorContextReadinessPanel from "@/components/AiDoctorContextReadinessPanel";
 import AiDoctorCheckInPreviewPanel from "@/components/AiDoctorCheckInPreviewPanel";
@@ -21,6 +21,7 @@ import {
   type DiaryEntryRowLike,
   type ManualSensorLogLike,
 } from "@/lib/plantAiDoctorContextAdapter";
+import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import type { ManualSensorLog } from "@/lib/manualSensorChronologyDeltaRules";
 import type { PlantRowLike } from "@/lib/aiDoctorContextCompiler";
 
@@ -124,6 +125,27 @@ export default function PlantDetailAiDoctorContextReadinessMount({
 
   const auditLogs = (manualLogs.data ?? []) as ReadonlyArray<ManualSensorLog>;
 
+  const auditIdentity = useMemo(
+    () => ({
+      plantId,
+      plantName: plantName ?? null,
+      growId,
+      tentId,
+      tentName: null,
+    }),
+    [plantId, plantName, growId, tentId],
+  );
+
+  const openManualSensorEntry = useCallback(
+    (prefill: { plantId: string; growId: string; tentId: string }) => {
+      if (typeof window === "undefined") return;
+      window.dispatchEvent(
+        new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: prefill }),
+      );
+    },
+    [],
+  );
+
   return (
     <div
       data-testid="plant-detail-ai-doctor-context-readiness-mount"
@@ -133,7 +155,11 @@ export default function PlantDetailAiDoctorContextReadinessMount({
         context={built.context}
         openAlertsCount={alerts.rows.length}
       />
-      <PlantSensorContextAuditPanel logs={auditLogs} />
+      <PlantSensorContextAuditPanel
+        logs={auditLogs}
+        identity={auditIdentity}
+        onOpenManualSensorEntry={openManualSensorEntry}
+      />
       <AiDoctorCheckInPreviewPanel context={built.context} />
     </div>
   );

@@ -47,11 +47,12 @@ export interface AiDoctorManualSaveConfirmationViewOk {
   sourceLabel: "AI Doctor check-in manual save";
   safetyLabels: readonly string[];
   limitations: ReadonlyArray<{ code: string; message: string }>;
+  idempotencyKey: string;
   idempotencyKeyShort: string;
   copy: typeof AI_DOCTOR_MANUAL_SAVE_CONFIRMATION_COPY;
   buttonLabel: typeof AI_DOCTOR_MANUAL_SAVE_BUTTON_LABEL;
-  confirmDisabled: true;
-  confirmDisabledLabel: typeof AI_DOCTOR_MANUAL_SAVE_DISABLED_LABEL;
+  confirmLabel: typeof AI_DOCTOR_MANUAL_SAVE_CONFIRM_LABEL;
+  savingLabel: typeof AI_DOCTOR_MANUAL_SAVE_SAVING_LABEL;
   cancelLabel: typeof AI_DOCTOR_MANUAL_SAVE_CANCEL_LABEL;
 }
 

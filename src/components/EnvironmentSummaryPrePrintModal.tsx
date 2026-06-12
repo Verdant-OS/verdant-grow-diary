@@ -1,7 +1,7 @@
 /**
  * EnvironmentSummaryPrePrintModal — pre-print confirmation modal.
  *
- * Presenter-only. No I/O. No fetch. No Supabase. No analytics.
+ * Presenter-only. No I/O. No fetch. No Supabase. No telemetry SDKs.
  * Audit logging happens only when the consumer confirms via onConfirm —
  * the modal itself records nothing.
  *

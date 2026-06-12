@@ -183,9 +183,8 @@ describe("AiDoctorCheckInPreviewPanel", () => {
     expect(written).toContain("Preview only — not saved.");
     expect(written).toContain("No live AI model was called.");
 
-    expect(
-      screen.getByTestId("ai-doctor-check-in-copy-success").textContent,
-    ).toBe("Preview summary copied.");
+    const success = await screen.findByTestId("ai-doctor-check-in-copy-success");
+    expect(success.textContent).toBe("Preview summary copied.");
   });
 
   it("clipboard failure shows safe fallback and does not crash", async () => {
@@ -202,10 +201,7 @@ describe("AiDoctorCheckInPreviewPanel", () => {
     const copyBtn = screen.getByTestId("ai-doctor-check-in-copy-button");
     fireEvent.click(copyBtn);
 
-    await vi.waitFor(() => {
-      expect(
-        screen.getByTestId("ai-doctor-check-in-copy-error").textContent,
-      ).toBe("Copy unavailable. You can manually select the preview text.");
-    });
+    const error = await screen.findByTestId("ai-doctor-check-in-copy-error");
+    expect(error.textContent).toBe("Copy unavailable. You can manually select the preview text.");
   });
 });

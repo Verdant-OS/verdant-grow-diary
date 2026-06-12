@@ -443,6 +443,13 @@ export default function EnvironmentSummaryReportPage() {
         </p>
       </div>
 
+      <EnvironmentSummaryExportHistoryPanel
+        events={exportHistoryEvents}
+        onReopen={handleReopenFromHistory}
+      />
+
+
+
       <EnvironmentSummaryPrePrintModal
         open={pendingPrintMode !== null}
         onOpenChange={(o) => {

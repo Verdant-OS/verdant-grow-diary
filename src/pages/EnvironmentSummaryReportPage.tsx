@@ -397,6 +397,22 @@ export default function EnvironmentSummaryReportPage() {
           {PRINT_SAFETY_FOOTER}
         </p>
       </div>
+
+      <EnvironmentSummaryPrePrintModal
+        open={pendingPrintMode !== null}
+        onOpenChange={(o) => {
+          if (!o) setPendingPrintMode(null);
+        }}
+        mode={pendingPrintMode ?? "full_report"}
+        dateRangeLabel={printMeta.dateRangeLabel}
+        generatedAtLabel={printMeta.generatedAtLabel}
+        selectedIssueLabel={selectedIssue?.label ?? null}
+        selectedIssueRuleId={selectedIssue?.ruleId ?? null}
+        relatedCheckCount={
+          pendingPrintMode === "drilldown" ? relatedChecks.length : undefined
+        }
+        onConfirm={handleConfirmPrint}
+      />
     </div>
   );
 }

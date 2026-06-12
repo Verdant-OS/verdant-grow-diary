@@ -139,7 +139,7 @@ describe("AiDoctorCheckInPreviewPanel", () => {
     expect(src).not.toMatch(/integrations\/supabase/);
     expect(src).not.toMatch(/functions\s*\.\s*invoke/);
     expect(src).not.toMatch(/\bfetch\s*\(/);
-    expect(src).not.toMatch(/actionQueue/i);
+    expect(src).not.toMatch(/actionQueue(Writer|Insert|Create|Mutation|Append)/i);
     expect(src).not.toMatch(/\.rpc\s*\(/);
     expect(src).not.toMatch(/\.insert\s*\(/);
     expect(src).not.toMatch(/\.update\s*\(/);

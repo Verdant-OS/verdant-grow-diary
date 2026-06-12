@@ -76,7 +76,7 @@ export function buildAiDoctorManualSaveConfirmationView(
   const draft: AiDoctorManualSaveDraftResult =
     buildAiDoctorManualSaveDraft(input);
 
-  if (!draft.ok) {
+  if (isBlockedManualSaveDraft(draft)) {
     return Object.freeze({
       status: "blocked",
       reasons: Object.freeze([...draft.reasons]),

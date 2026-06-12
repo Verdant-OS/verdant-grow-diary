@@ -69,6 +69,8 @@ export default function EnvironmentSummaryReportPage() {
   const [pendingPrintMode, setPendingPrintMode] = useState<PrintMode | null>(
     null,
   );
+  const [exportHistoryRefreshKey, setExportHistoryRefreshKey] = useState(0);
+
 
   useEffect(() => {
     if (startParam) setStartDate(startParam);

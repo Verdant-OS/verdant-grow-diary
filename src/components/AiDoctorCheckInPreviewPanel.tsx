@@ -10,8 +10,8 @@
  *    "No live AI model was called."
  *  - Failures render a calm fallback message and never crash the page.
  */
-import { useMemo, useState } from "react";
-import { Stethoscope } from "lucide-react";
+import { useMemo, useState, useCallback } from "react";
+import { Stethoscope, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,6 +25,10 @@ import {
   buildAiDoctorCheckInPreviewView,
   type AiDoctorCheckInPreviewView,
 } from "@/lib/aiDoctorCheckInPreviewViewModel";
+import {
+  formatAiDoctorCheckInReceipt,
+  type AiDoctorCheckInReceiptInput,
+} from "@/lib/aiDoctorCheckInReceiptView";
 import type { AiDoctorContext } from "@/lib/aiDoctorEngine";
 
 export interface AiDoctorCheckInPreviewPanelProps {

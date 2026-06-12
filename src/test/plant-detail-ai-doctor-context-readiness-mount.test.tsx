@@ -138,15 +138,12 @@ describe("PlantDetailAiDoctorContextReadinessMount", () => {
   });
 
   it("renders safe fallback when compilation throws", () => {
-    // Force the adapter to throw by feeding a freezing trap: replace data
-    // with a getter that throws when iterated.
-    const exploding: unknown[] = [];
-    Object.defineProperty(exploding, "length", {
-      get() {
+    const exploding = {
+      [Symbol.iterator]() {
         throw new Error("boom");
       },
-    });
-    recentActivityState = { data: exploding, isLoading: false };
+    };
+    recentActivityState = { data: exploding as unknown as unknown[], isLoading: false };
     render(<PlantDetailAiDoctorContextReadinessMount {...baseProps} />);
     expect(
       screen.getByTestId("plant-detail-ai-doctor-context-readiness-mount-fallback"),

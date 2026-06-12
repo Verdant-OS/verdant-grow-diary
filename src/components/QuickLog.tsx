@@ -1134,7 +1134,7 @@ export default function QuickLog({
                   data-testid="quick-log-post-save-another"
                   onClick={resetForAnother}
                 >
-                  Log another
+                  Log another for {savedTarget.name}
                 </Button>
                 <Button
                   type="button"

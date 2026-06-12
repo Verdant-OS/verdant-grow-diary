@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 
 const useRecentMock = vi.fn();
 vi.mock("@/hooks/usePlantRecentActivity", () => ({
@@ -46,14 +46,13 @@ describe("Plant Detail Stabilize Mode card", () => {
 
     render(<PlantDetailRecentActivityRecap plantId="p1" />);
 
-    expect(screen.getByTestId("plant-detail-stabilize-mode")).toHaveAttribute(
-      "data-level",
-      "stabilize",
-    );
-    expect(screen.getByText(/Stabilize mode/i)).toBeInTheDocument();
-    expect(screen.getByText(/last 48 hours/i)).toBeInTheDocument();
-    expect(screen.getByText(/Do not change equipment setpoints/i)).toBeInTheDocument();
-    expect(screen.getByText(/better, same, or worse/i)).toBeInTheDocument();
+    const card = screen.getByTestId("plant-detail-stabilize-mode");
+    expect(card).toHaveAttribute("data-level", "stabilize");
+    const inCard = within(card);
+    expect(inCard.getByText(/Stabilize mode/i)).toBeInTheDocument();
+    expect(inCard.getAllByText(/last 48 hours/i).length).toBeGreaterThan(0);
+    expect(inCard.getByText(/Do not change equipment setpoints/i)).toBeInTheDocument();
+    expect(inCard.getByText(/better, same, or worse/i)).toBeInTheDocument();
   });
 
   it("does not render stabilize guidance for one calm recent check", () => {

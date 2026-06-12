@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 
 const useRecentMock = vi.fn();
 vi.mock("@/hooks/usePlantRecentActivity", () => ({
@@ -46,11 +46,12 @@ describe("Plant Detail Action → Response pairing card", () => {
     expect(card).toHaveAttribute("data-reason", "paired");
     expect(card).toHaveAttribute("data-response-status", "Better");
     expect(screen.getByText("Action → response captured")).toBeInTheDocument();
-    expect(screen.getByText(/What changed:/)).toBeInTheDocument();
-    expect(screen.getByText(/Watered\./)).toBeInTheDocument();
-    expect(screen.getByText(/Response:/)).toBeInTheDocument();
-    expect(screen.getByText(/Response check: Better\./)).toBeInTheDocument();
-    expect(screen.getByText(/plant memory/i)).toBeInTheDocument();
+    const inCard = within(card);
+    expect(inCard.getByText(/What changed:/)).toBeInTheDocument();
+    expect(inCard.getByText(/Watered\./)).toBeInTheDocument();
+    expect(inCard.getByText(/Response:/)).toBeInTheDocument();
+    expect(inCard.getByText(/Response check: Better\./)).toBeInTheDocument();
+    expect(inCard.getByText(/plant memory/i)).toBeInTheDocument();
   });
 
   it("renders awaiting response when the latest action has no later response check", () => {
@@ -72,10 +73,11 @@ describe("Plant Detail Action → Response pairing card", () => {
     const card = screen.getByTestId("plant-detail-action-response-pair");
     expect(card).toHaveAttribute("data-reason", "awaiting_response");
     expect(card).toHaveAttribute("data-response-status", "pending");
-    expect(screen.getByText("Waiting on plant response")).toBeInTheDocument();
-    expect(screen.getByText(/What changed:/)).toBeInTheDocument();
-    expect(screen.getByText(/Fed\./)).toBeInTheDocument();
-    expect(screen.getByText(/No response check yet/)).toBeInTheDocument();
+    const inCard = within(card);
+    expect(inCard.getByText("Waiting on plant response")).toBeInTheDocument();
+    expect(inCard.getByText(/What changed:/)).toBeInTheDocument();
+    expect(inCard.getByText(/Fed\./)).toBeInTheDocument();
+    expect(inCard.getByText(/No response check yet/)).toBeInTheDocument();
   });
 
   it("does not render when there is only a response check and no action", () => {

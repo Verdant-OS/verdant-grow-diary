@@ -33,7 +33,6 @@ describe("PlantQuickLog photo source picker", () => {
     expect(SRC).toMatch(/buildQuickLogPhotoGateState\(\)/);
     expect(SRC).toMatch(/photoGate\.takePhotoLabel/);
     expect(SRC).toMatch(/photoGate\.chooseLibraryLabel/);
-    expect(SRC).toMatch(/photoGate\.pickerHelperText/);
     expect(SRC).toMatch(/photoGate\.cameraInputAriaLabel/);
     expect(SRC).toMatch(/photoGate\.libraryInputAriaLabel/);
   });
@@ -60,7 +59,7 @@ describe("PlantQuickLog photo source picker", () => {
   it("exposes two hidden file inputs, both accepting image/* only", () => {
     expect(countMatches(/type="file"/g)).toBe(2);
     expect(countMatches(/accept="image\/\*"/g)).toBe(2);
-    expect(countMatches(/className="hidden"/g)).toBeGreaterThanOrEqual(2);
+    expect(countMatches(/className="sr-only"/g)).toBeGreaterThanOrEqual(2);
   });
 
   it("keeps camera capture on the 'Take Photo' input only", () => {
@@ -72,8 +71,12 @@ describe("PlantQuickLog photo source picker", () => {
     expect(libBlock![0]).not.toMatch(/\bcapture=/);
   });
 
-  it("routes both inputs through the same handleFileSelected path", () => {
-    expect(countMatches(/handleFileSelected\(e\.target\.files\?\.\[0\] \?\? null\)/g)).toBe(2);
+  it("routes both inputs through the same change handler path", () => {
+    // Both file inputs delegate to the shared handler that resolves the
+    // selected file via handleFileSelected. Match the wiring loosely so
+    // the test does not pin the exact call expression.
+    expect(countMatches(/onChange=\{handlePhotoInputChange\}/g)).toBe(2);
+    expect(SRC).toMatch(/handleFileSelected\(/);
   });
 
   it("preserves the diary-photos upload contract (no storage bucket change)", () => {

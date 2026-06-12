@@ -975,7 +975,7 @@ export default function QuickLog({
                   data-testid="quicklog-hardware-helper"
                   className="text-[11px] text-muted-foreground leading-snug"
                 >
-                  Manual handheld readings — not live sensor data. EC fields are EC mS/cm only. Use optional EC / PPM above for PPM scales.
+                  Manual handheld readings — not live sensor data. EC fields are EC mS/cm only. Use the optional EC value above to record other scales.
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   <div>

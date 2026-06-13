@@ -99,6 +99,19 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
       return;
     }
     setFileName(file.name);
+    // XLSX branch — preview-only via the pure Verdant Genetics parser.
+    // Persistence stays disabled. No Supabase, no alerts, no Action Queue.
+    if (/\.xlsx$/i.test(file.name)) {
+      try {
+        const grid = await readXlsxFileToCellGrid(file);
+        setXlsxGrid(grid);
+        setXlsxFileName(file.name);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Couldn't read XLSX.";
+        setParseError(msg);
+      }
+      return;
+    }
     const t = await file.text();
     setText(t);
     // Read-only source-app detection. Never touches the persistence path.

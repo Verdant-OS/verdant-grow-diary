@@ -1,28 +1,28 @@
 /**
  * TentCsvImportCard — Gate 2A "CSV Drop" surface.
  *
- * User-initiated import of historical sensor data from an exported CSV
- * (AC Infinity supported in this PR; TrolMaster + Other shown as
- * "Coming soon"). Presenter only — all parsing, normalization, dedupe and
- * source labeling live in src/lib/csvSensorImportRules.ts.
+ * User-initiated import of historical sensor data from an exported file.
+ * The source app (AC Infinity, Spider Farmer, Vivosun, Verdant Genetics
+ * XLSX) is auto-detected from the file contents — there is no manual
+ * provider dropdown. Presenter only — all parsing, normalization, dedupe
+ * and source labeling live in src/lib/csvSensorImportRules.ts and
+ * src/lib/sensorImportSourceApps.ts.
  *
  * Safety contract is enforced by src/test/csv-sensor-import.test.ts —
  * never auto-assigns plants, never writes alerts/action_queue, never blends
  * imported rows with live/manual readings.
  */
+
 import { useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { FileUp, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+// Source-app picker dropdown removed in favour of auto-detection.
+// Legacy AC Infinity persistence path is still wired through
+// buildCsvInsertRows + normalizeAcInfinityRows below.
+
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -72,6 +72,19 @@ interface Props {
 }
 
 const PREVIEW_ROWS = 15;
+
+/**
+ * Friendly "Detected source: …" labels for the auto-detected source-app
+ * pill. Distinct from SOURCE_APP_LABELS (which carries the longer
+ * "Spider Farmer / THP Data" registry label) so the primary UI line
+ * stays short and grower-readable.
+ */
+const DETECTED_SOURCE_DISPLAY: Record<string, string> = {
+  ac_infinity: "AC Infinity",
+  spider_farmer: "Spider Farmer",
+  vivosun: "Vivosun",
+};
+
 
 export default function TentCsvImportCard({ tentId, growId }: Props) {
   const qc = useQueryClient();
@@ -153,9 +166,10 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
 
   function handleParse() {
     if (!sourceEnabled) {
-      setParseError("This source app is coming soon.");
+      setParseError("Legacy AC Infinity parser is unavailable.");
       return;
     }
+
     if (!text) {
       setParseError("Pick a CSV file first.");
       return;
@@ -406,9 +420,10 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
             <FileUp className="h-4 w-4" /> Import Sensor History (CSV)
           </h2>
           <p className="text-xs text-muted-foreground mt-1 max-w-prose">
-            Bring in exported data from AC Infinity or other grow apps.
-            Imported readings are tagged as CSV data and never treated as live
-            sensor readings.
+            Drop a CSV or XLSX export from AC Infinity, Spider Farmer,
+            Vivosun, or Verdant Genetics. The source app is auto-detected
+            from the file — no manual provider selection needed. Imported
+            readings are tagged as CSV history, not live sensor data.
           </p>
         </div>
         <Badge variant="outline" className="shrink-0 text-[10px]">
@@ -416,32 +431,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         </Badge>
       </header>
 
-      <div className="grid gap-3 sm:grid-cols-[1fr_auto] items-end">
-        <div className="grid gap-1">
-          <label className="text-xs text-muted-foreground" htmlFor="csv-source-app">
-            Source App
-          </label>
-          <Select
-            value={sourceApp}
-            onValueChange={(v) => setSourceApp(v as CsvImportSourceApp)}
-          >
-            <SelectTrigger id="csv-source-app" data-testid="csv-source-app">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {CSV_IMPORT_SOURCE_APPS.map((app) => (
-                <SelectItem
-                  key={app.id}
-                  value={app.id}
-                  disabled={!app.enabled}
-                >
-                  {app.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+
 
       <div
         onDragOver={(e) => {
@@ -510,9 +500,21 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
 
       {xlsxGrid && (
         <div data-testid="csv-xlsx-preview-wrapper">
+          <p
+            className="mt-3 text-xs font-medium"
+            data-testid="csv-xlsx-detected-source"
+          >
+            Detected source: Verdant Genetics XLSX
+          </p>
+          <p
+            className="text-[11px] text-muted-foreground"
+            data-testid="csv-xlsx-canonical"
+          >
+            Imported as CSV history, not live sensor data.
+          </p>
           {xlsxFileName && (
             <p
-              className="mt-3 text-[11px] text-muted-foreground"
+              className="mt-1 text-[11px] text-muted-foreground"
               data-testid="csv-xlsx-filename"
             >
               {xlsxFileName}
@@ -528,11 +530,20 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         </div>
       )}
 
+
       {sourcePreview && (
         <div
           className="mt-4 rounded-xl border border-border/60 p-3 grid gap-2 text-xs"
           data-testid="csv-source-preview"
         >
+          <p
+            className="text-sm font-medium"
+            data-testid="csv-source-preview-detected"
+          >
+            {sourcePreview.sourceAppId === "unknown_source_app"
+              ? "Unknown source. Review mapping before importing."
+              : `Detected source: ${DETECTED_SOURCE_DISPLAY[sourcePreview.sourceAppId] ?? sourcePreview.sourceAppLabel}`}
+          </p>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary" data-testid="csv-source-preview-app">
               {sourcePreview.sourceAppLabel}
@@ -544,6 +555,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
               {sourcePreview.confidenceLabel}
             </span>
           </div>
+
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <Stat
               label="Accepted rows"

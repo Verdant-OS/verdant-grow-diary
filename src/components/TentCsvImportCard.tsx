@@ -55,6 +55,15 @@ import {
   buildRegistryCsvAuditInput,
   buildVerdantGeneticsXlsxAuditInput,
 } from "@/lib/sensorHistoryImportAuditEventBuilders";
+import {
+  buildSensorHistoryImportFingerprint,
+  toFingerprintRows,
+} from "@/lib/sensorHistoryImportFingerprintRules";
+import {
+  SENSOR_HISTORY_IMPORT_DUPLICATE_COPY,
+  hasSensorHistoryImportFingerprint,
+  recordSensorHistoryImportFingerprint,
+} from "@/lib/sensorHistoryImportReplayGuard";
 import SensorHistoryImportAuditLedger from "@/components/SensorHistoryImportAuditLedger";
 
 interface Props {

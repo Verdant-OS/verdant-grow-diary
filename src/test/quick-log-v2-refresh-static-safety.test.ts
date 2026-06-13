@@ -18,7 +18,10 @@ function read(rel: string): string {
 function stripped(rel: string): string {
   return read(rel)
     .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/\/\/.*$/gm, "");
+    .replace(/\/\/.*$/gm, "")
+    // Strip accessibility attributes so words like `aria-live` and
+    // `aria-connected` do not trip the forbidden-word scan.
+    .replace(/\baria-[a-z]+(?:=(?:"[^"]*"|'[^']*'|\{[^}]*\}))?/g, "");
 }
 
 const FORBIDDEN_WORDS = [

@@ -30,6 +30,20 @@ import {
   type EnvironmentCheckEventInput,
 } from "./aiDoctorEnvironmentCheckRules";
 import type { AiDoctorSensorContext } from "./aiDoctorSensorContextRules";
+import {
+  buildAiDoctorCsvHistoryContext,
+  type AiDoctorCsvHistoryContext,
+} from "./aiDoctorCsvHistoryContextRules";
+
+/** Section label rendered for imported CSV/XLSX sensor history. */
+export const AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL =
+  "Imported sensor history";
+
+export interface ImportedSensorHistorySection extends AiDoctorCsvHistoryContext {
+  sectionLabel: typeof AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL;
+  /** Cautionary guidance the AI Doctor consumer renders verbatim. */
+  guidance: readonly string[];
+}
 
 // ---------------------------------------------------------------------------
 // Layer 1 — environment-check aware context compiler (existing behavior).
@@ -157,6 +171,23 @@ export interface PlantContextPayload {
   averages_7d: SensorRollingAverages;
   notable_deviations: readonly string[];
   source_tags: readonly SensorSourceTag[];
+  /**
+   * Safe, read-only summary of imported CSV/XLSX sensor history.
+   * Present only when at least one CSV row contributed. Never used as
+   * a substitute for current/live telemetry.
+   */
+  imported_sensor_history: ImportedSensorHistorySection | null;
+  /**
+   * True only when at least one trustworthy live reading exists in the
+   * compiled context. CSV history NEVER flips this flag to true.
+   */
+  hasLiveSensorReadings: boolean;
+  /**
+   * True when no current/live sensor evidence exists. Stays true even
+   * when CSV history is present, so AI Doctor still surfaces the
+   * missing-live-readings caveat.
+   */
+  missingLiveSensorReadings: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -188,6 +219,7 @@ export interface SensorReadingRowLike {
   source?: string | null;
   quality?: string | null;
   state?: string | null;
+  raw_payload?: unknown;
 }
 
 export interface CompilePlantContextFromRowsInput {
@@ -344,6 +376,28 @@ export function compilePlantContextFromRows(
     }
   }
 
+  // ----- imported CSV/XLSX sensor history (read-only, never live) -----
+  const csvHistory = buildAiDoctorCsvHistoryContext({
+    rows: input.sensorReadings ?? [],
+  });
+  const imported_sensor_history: ImportedSensorHistorySection | null =
+    csvHistory.hasCsvHistory
+      ? {
+          ...csvHistory,
+          sectionLabel: AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL,
+          guidance: Object.freeze([
+            csvHistory.notForLiveDiagnosis,
+            "Imported history may show trends but is not proof of current conditions.",
+          ]),
+        }
+      : null;
+
+  // Live-sensor presence is computed from the trustworthy "live" bucket
+  // only. CSV/manual/demo/stale/invalid never satisfy live-availability.
+  const hasLiveSensorReadings = sensor_groups.some(
+    (g) => g.source === "live" && g.sample_count > 0,
+  );
+
   return {
     grow_id: plant?.grow_id ?? null,
     tent_id: plant?.tent_id ?? null,
@@ -357,6 +411,9 @@ export function compilePlantContextFromRows(
     averages_7d,
     notable_deviations: Object.freeze(notable_deviations),
     source_tags: Object.freeze(sensor_groups.map((g) => g.source)),
+    imported_sensor_history,
+    hasLiveSensorReadings,
+    missingLiveSensorReadings: !hasLiveSensorReadings,
   };
 }
 

@@ -82,20 +82,18 @@ describe("QuickLog habit-capture polish — presentation", () => {
     renderWithClient(<QuickLog open={true} onOpenChange={vi.fn()} />);
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getAllByText(/Quick Log/i).length).toBeGreaterThan(0);
+    // Current intended subtitle copy emphasizes single-target / single-save habit.
     expect(within(dialog).getByTestId("quick-log-subtitle").textContent).toMatch(
-      /Capture what changed/i,
+      /One target\..*One save\./i,
     );
   });
 
-  it("renders 1. Plant, 2. Observation, 3. Optional details section labels", () => {
+  it("renders Plant target card and Observation + Optional details section labels", () => {
     renderWithClient(<QuickLog open={true} onOpenChange={vi.fn()} />);
-    expect(screen.getByTestId("quick-log-section-plant").textContent).toMatch(/1\. Plant/);
-    expect(screen.getByTestId("quick-log-section-observation").textContent).toMatch(
-      /2\. Observation/,
-    );
-    expect(screen.getByTestId("quick-log-section-optional").textContent).toMatch(
-      /3\. Optional details/,
-    );
+    // Plant section is presented as the target card (no numbered prefix).
+    expect(screen.getByTestId("quick-log-target-card")).toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-section-observation")).toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-section-optional")).toBeInTheDocument();
   });
 
   it("renders all 7 prompt chips", () => {

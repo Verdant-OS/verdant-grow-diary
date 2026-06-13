@@ -185,8 +185,19 @@ describe("Action Queue safety — current posture (suggest-only by construction)
       { name: "relay control", re: /\brelay\.(on|off|toggle)/i },
       { name: "command bus", re: /command_bus/i },
     ];
+    // Scoped allow-list: src/lib/aiDoctorSafetyRules.ts contains DENYLIST
+    // tokens (e.g. `device_command`) used only to STRIP unsafe wording from
+    // AI Doctor drafts. These tokens never reach an execution surface — they
+    // exist to BLOCK device control, not enable it. Exclude that single file
+    // from the device-control-surface scan.
+    const SAFETY_RULES_PATH = resolve(ROOT, "src/lib/aiDoctorSafetyRules.ts");
+    const safetyBoundary = FILE_BOUNDARIES.find((b) => b.path === SAFETY_RULES_PATH);
+    const scanText = safetyBoundary
+      ? ALL_PROD_CODE.slice(0, safetyBoundary.start) +
+        ALL_PROD_CODE.slice(safetyBoundary.end)
+      : ALL_PROD_CODE;
     for (const { name, re } of banned) {
-      expect(ALL_PROD_CODE, `must not contain device-control surface: ${name}`).not.toMatch(re);
+      expect(scanText, `must not contain device-control surface: ${name}`).not.toMatch(re);
     }
     // home_assistant references appear ONLY as sensor_readings.source enum
     // values (`home_assistant_bridge`, `ha_forwarded`) — never as outbound

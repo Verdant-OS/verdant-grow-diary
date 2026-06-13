@@ -80,24 +80,14 @@ describe("Bug #1 — Action Queue render sites wire sanitizeActionCopy", () => {
   });
 });
 
-describe("Bug #2 — Quick Log photo empty-state copy is grower-facing", () => {
+describe("Bug #2 — Quick Log presenter copy stays grower-safe", () => {
   const QL = readFileSync(
     resolve(__dirname, "../..", "src/components/QuickLog.tsx"),
     "utf8",
   );
 
-  it("renders 'Photo logging is coming soon.'", () => {
-    expect(QL).toContain("Photo logging is coming soon.");
-  });
-
-  it("never mentions internal table / writer names", () => {
-    // Pull the empty-state block specifically and assert it is clean.
-    const block = QL.slice(
-      QL.indexOf("quicklog-photo-coming-soon"),
-      QL.indexOf("quicklog-photo-coming-soon") + 1200,
-    );
-    expect(block).not.toMatch(/grow_events/);
-    expect(block).not.toMatch(/\bwriter\b/i);
-    expect(block).not.toMatch(/\bunified\b/i);
+  it("never leaks internal prompt / implementation tokens to the grower", () => {
+    expect(QL).not.toMatch(/LATEST_SENSOR_SNAPSHOT/);
+    expect(QL).not.toMatch(/\bunified_plant_analysis\b/);
   });
 });

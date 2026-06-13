@@ -41,6 +41,10 @@ import {
   buildVerdantGeneticsXlsxInsertRows,
   type VerdantGeneticsXlsxInsertRowsResult,
 } from "@/lib/verdantGeneticsXlsxInsertRowsAdapter";
+import {
+  buildVerdantGeneticsXlsxImportEvidenceViewModel,
+  type VerdantGeneticsXlsxImportEvidenceViewModel,
+} from "@/lib/verdantGeneticsXlsxImportEvidenceViewModel";
 import type { CellGrid } from "@/lib/verdantGeneticsXlsxParser";
 
 export interface VerdantGeneticsXlsxSaveArgs {

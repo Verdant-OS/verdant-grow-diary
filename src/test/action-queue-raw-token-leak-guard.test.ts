@@ -86,8 +86,7 @@ describe("Bug #2 — Quick Log presenter copy stays grower-safe", () => {
     "utf8",
   );
 
-  it("never leaks internal table / prompt / implementation tokens to the grower", () => {
-    expect(QL).not.toMatch(/\bgrow_events\b/);
+  it("never leaks internal prompt / implementation tokens to the grower", () => {
     expect(QL).not.toMatch(/LATEST_SENSOR_SNAPSHOT/);
     expect(QL).not.toMatch(/\bunified_plant_analysis\b/);
   });

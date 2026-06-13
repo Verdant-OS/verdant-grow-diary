@@ -406,9 +406,10 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
             <FileUp className="h-4 w-4" /> Import Sensor History (CSV)
           </h2>
           <p className="text-xs text-muted-foreground mt-1 max-w-prose">
-            Bring in exported data from AC Infinity or other grow apps.
-            Imported readings are tagged as CSV data and never treated as live
-            sensor readings.
+            Drop a CSV or XLSX export from AC Infinity, Spider Farmer,
+            Vivosun, or Verdant Genetics. The source app is auto-detected
+            from the file — no manual provider selection needed. Imported
+            readings are tagged as CSV history, not live sensor data.
           </p>
         </div>
         <Badge variant="outline" className="shrink-0 text-[10px]">
@@ -416,32 +417,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         </Badge>
       </header>
 
-      <div className="grid gap-3 sm:grid-cols-[1fr_auto] items-end">
-        <div className="grid gap-1">
-          <label className="text-xs text-muted-foreground" htmlFor="csv-source-app">
-            Source App
-          </label>
-          <Select
-            value={sourceApp}
-            onValueChange={(v) => setSourceApp(v as CsvImportSourceApp)}
-          >
-            <SelectTrigger id="csv-source-app" data-testid="csv-source-app">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {CSV_IMPORT_SOURCE_APPS.map((app) => (
-                <SelectItem
-                  key={app.id}
-                  value={app.id}
-                  disabled={!app.enabled}
-                >
-                  {app.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+
 
       <div
         onDragOver={(e) => {

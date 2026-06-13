@@ -125,9 +125,7 @@ describe("summarizeCsvVendor", () => {
       summarizeCsvVendor([csvRow("temperature_c", 24, "unknown_brand")]),
     ).toBeNull();
     expect(
-      summarizeCsvVendor([
-        { ts: TS, metric: "temperature_c", value: 24, source: "manual" },
-      ]),
+      summarizeCsvVendor([{ source: "manual", raw_payload: {} }]),
     ).toBeNull();
   });
 });

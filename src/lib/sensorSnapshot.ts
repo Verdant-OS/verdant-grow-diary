@@ -29,6 +29,13 @@ export interface SensorSnapshot {
    * a manual row to live.
    */
   device_id?: string | null;
+  /**
+   * CSV vendor lineage hint extracted from `raw_payload.source_app` on
+   * the contributing CSV rows. Presentation-only — NEVER promotes a
+   * reading to "live". `"multiple"` is used when multiple CSV vendors
+   * are present at the latest timestamp.
+   */
+  csvVendor?: import("@/lib/sensorSourceDisplayLabel").CsvVendorSummary;
 }
 
 export const EMPTY_SNAPSHOT: SensorSnapshot = {

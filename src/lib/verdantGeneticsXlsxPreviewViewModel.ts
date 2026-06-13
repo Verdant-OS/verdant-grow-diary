@@ -29,7 +29,7 @@ export const VERDANT_GENETICS_CSV_HISTORY_COPY =
   "This XLSX export will be treated as CSV history, not live sensor data." as const;
 
 export const VERDANT_GENETICS_IMPORT_DISABLED_COPY =
-  "Preview only. Saving rows from this XLSX source is not enabled yet." as const;
+  "XLSX import saving is not enabled yet." as const;
 
 export const UNKNOWN_XLSX_COPY =
   "Unknown XLSX format. Review mapping before importing." as const;

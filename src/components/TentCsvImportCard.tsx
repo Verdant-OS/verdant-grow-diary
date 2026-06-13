@@ -47,6 +47,8 @@ import { buildRegistryCsvInsertRows } from "@/lib/registryCsvInsertRowsAdapter";
 import { readXlsxFileToCellGrid } from "@/lib/verdantGeneticsXlsxFileLoader";
 import VerdantGeneticsXlsxPreviewPanel from "@/components/VerdantGeneticsXlsxPreviewPanel";
 import type { CellGrid } from "@/lib/verdantGeneticsXlsxParser";
+import { useTents } from "@/hooks/use-tents";
+import type { TentOption } from "@/lib/verdantGeneticsXlsxMappingViewModel";
 
 interface Props {
   tentId: string;
@@ -68,6 +70,16 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
   const [sourcePreview, setSourcePreview] = useState<PreviewCopy | null>(null);
   const [xlsxGrid, setXlsxGrid] = useState<CellGrid | null>(null);
   const [xlsxFileName, setXlsxFileName] = useState<string | null>(null);
+
+  const { data: tentsData } = useTents();
+  const tentOptions: TentOption[] = useMemo(
+    () =>
+      (tentsData ?? []).map((t) => ({
+        id: t.id as string,
+        name: (t.name as string) || "Untitled tent",
+      })),
+    [tentsData],
+  );
 
   const supportedApp = CSV_IMPORT_SOURCE_APPS.find((a) => a.id === sourceApp);
   const sourceEnabled = !!supportedApp?.enabled;
@@ -392,7 +404,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
               {xlsxFileName}
             </p>
           )}
-          <VerdantGeneticsXlsxPreviewPanel grid={xlsxGrid} />
+          <VerdantGeneticsXlsxPreviewPanel grid={xlsxGrid} tentOptions={tentOptions} />
         </div>
       )}
 

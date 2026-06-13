@@ -78,6 +78,8 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
     setParseError(null);
     setPreview(null);
     setSourcePreview(null);
+    setXlsxGrid(null);
+    setXlsxFileName(null);
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -85,6 +87,8 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
     setParseError(null);
     setPreview(null);
     setSourcePreview(null);
+    setXlsxGrid(null);
+    setXlsxFileName(null);
     if (!file) return;
     if (file.size > MAX_CSV_BYTES) {
       setParseError(

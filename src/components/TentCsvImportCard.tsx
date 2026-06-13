@@ -382,6 +382,20 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         </p>
       )}
 
+      {xlsxGrid && (
+        <div data-testid="csv-xlsx-preview-wrapper">
+          {xlsxFileName && (
+            <p
+              className="mt-3 text-[11px] text-muted-foreground"
+              data-testid="csv-xlsx-filename"
+            >
+              {xlsxFileName}
+            </p>
+          )}
+          <VerdantGeneticsXlsxPreviewPanel grid={xlsxGrid} />
+        </div>
+      )}
+
       {sourcePreview && (
         <div
           className="mt-4 rounded-xl border border-border/60 p-3 grid gap-2 text-xs"

@@ -27,6 +27,7 @@ import { evaluateManualSnapshotAdvisor } from "@/lib/manualSensorSnapshotAdvisor
 import DerivedVpdStatus from "@/components/DerivedVpdStatus";
 import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
 import { shouldRequireFirstTentSetup } from "@/lib/firstTentSetupRules";
+import { isUuid } from "@/lib/isUuid";
 
 interface TentOption {
   id: string;

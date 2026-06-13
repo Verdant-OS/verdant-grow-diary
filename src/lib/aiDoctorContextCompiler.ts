@@ -202,6 +202,7 @@ export interface SensorReadingRowLike {
   source?: string | null;
   quality?: string | null;
   state?: string | null;
+  raw_payload?: unknown;
 }
 
 export interface CompilePlantContextFromRowsInput {

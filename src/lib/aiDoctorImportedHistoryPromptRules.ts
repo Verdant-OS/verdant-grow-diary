@@ -15,7 +15,7 @@
  *  - Preserves the canonical AI Doctor required output structure.
  */
 
-import type { PlantContextPayload } from "@/lib/aiDoctorContextCompiler";
+import type { PlantContextPayload } from "./aiDoctorContextCompiler";
 
 /** Canonical AI Doctor required-output sections (rendered verbatim). */
 export const AI_DOCTOR_REQUIRED_OUTPUT_SECTIONS: readonly string[] =

@@ -118,7 +118,7 @@ describe("QuickLog compact Stage + Current Setup row", () => {
     fireEvent.change(dialog.querySelector("textarea") as HTMLTextAreaElement, {
       target: { value: "Compact-row save" },
     });
-    fireEvent.click(within(dialog).getByRole("button", { name: /save entry/i }));
+    fireEvent.click(within(dialog).getByRole("button", { name: /save log/i }));
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
     const payload = saveMock.mock.calls[0][0];
     expect(payload.p_action).toBe("note");

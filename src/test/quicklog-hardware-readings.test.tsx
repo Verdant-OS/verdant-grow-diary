@@ -194,7 +194,7 @@ describe("QuickLog hardware readings UI", () => {
     fireEvent.change(dialog.querySelector("textarea") as HTMLTextAreaElement, {
       target: { value: "Looking healthy today" },
     });
-    fireEvent.click(within(dialog).getByRole("button", { name: /save entry/i }));
+    fireEvent.click(within(dialog).getByRole("button", { name: /save log/i }));
 
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
     const payload = saveMock.mock.calls[0][0];
@@ -224,7 +224,7 @@ describe("QuickLog hardware readings UI", () => {
     fireEvent.change(inputs[1], { target: { value: "1.4" } });
     fireEvent.change(inputs[4], { target: { value: "650" } });
 
-    fireEvent.click(within(dialog).getByRole("button", { name: /save entry/i }));
+    fireEvent.click(within(dialog).getByRole("button", { name: /save log/i }));
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
     const payload = saveMock.mock.calls[0][0];
     expect(payload.p_action).toBe("note");
@@ -256,7 +256,7 @@ describe("QuickLog hardware readings UI", () => {
     const section = screen.getByTestId("quicklog-hardware-readings");
     const inputs = section.querySelectorAll("input");
     fireEvent.change(inputs[0], { target: { value: "6.2" } });
-    fireEvent.click(within(dialog).getByRole("button", { name: /save entry/i }));
+    fireEvent.click(within(dialog).getByRole("button", { name: /save log/i }));
     await waitFor(() => expect(saveMock).toHaveBeenCalled());
     // Static guarantee: no `.from("sensor_readings"|"action_queue"|"alerts").insert` exists in QuickLog source.
     expect(QUICKLOG_SRC).not.toMatch(

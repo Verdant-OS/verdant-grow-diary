@@ -27,6 +27,8 @@ vi.mock("@/lib/growRepo", () => ({
   insertSensorReading: (...args: unknown[]) => insertSpy(...args),
 }));
 
+const TENT_ID = "11111111-1111-4111-8111-111111111111";
+
 function renderCard() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -35,8 +37,8 @@ function renderCard() {
     <QueryClientProvider client={client}>
       <MemoryRouter>
         <ManualSensorReadingCard
-          tents={[{ id: "tent-1", name: "Veg Tent" }]}
-          defaultTentId="tent-1"
+          tents={[{ id: TENT_ID, name: "Veg Tent" }]}
+          defaultTentId={TENT_ID}
         />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -103,7 +105,7 @@ describe("ManualSensorReadingCard — review-before-save prompt", () => {
     for (const call of insertSpy.mock.calls) {
       const payload = call[0];
       expect(payload.source).toBe("manual");
-      expect(payload.tent_id).toBe("tent-1");
+      expect(payload.tent_id).toBe(TENT_ID);
       expect("user_id" in payload).toBe(false);
     }
   });

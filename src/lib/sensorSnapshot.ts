@@ -135,10 +135,7 @@ export function snapshotFromReadings(
     latest.find((r) => r.source === source && !!r.device_id) ??
     latest.find((r) => !!r.device_id);
   // Summarise CSV vendor lineage (presentation hint only — never
-  // upgrades the source classification). Imported lazily to avoid a
-  // circular import; the helper is pure.
-  const { summarizeCsvVendor } = require("@/lib/sensorSourceDisplayLabel") as
-    typeof import("@/lib/sensorSourceDisplayLabel");
+  // upgrades the source classification).
   const csvVendor = source === "csv" ? summarizeCsvVendor(latest) : null;
   return {
     source,

@@ -166,9 +166,10 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
 
   function handleParse() {
     if (!sourceEnabled) {
-      setParseError("This source app is coming soon.");
+      setParseError("Legacy AC Infinity parser is unavailable.");
       return;
     }
+
     if (!text) {
       setParseError("Pick a CSV file first.");
       return;

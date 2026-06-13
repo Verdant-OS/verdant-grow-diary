@@ -370,23 +370,95 @@ export function VerdantGeneticsXlsxPreviewPanel({
         className="flex flex-wrap items-center gap-2"
         data-testid="vg-xlsx-import-block"
       >
-        <Button
-          type="button"
-          size="sm"
-          disabled
-          aria-disabled="true"
-          data-testid="vg-xlsx-save-disabled"
-          title={XLSX_IMPORT_SAVING_DISABLED_COPY}
-        >
-          Save XLSX history — coming later
-        </Button>
-        <span
-          className="text-[11px] text-amber-200/80"
-          data-testid="vg-xlsx-import-disabled-reason"
-        >
-          {XLSX_IMPORT_SAVING_DISABLED_COPY}
-        </span>
+        {onSave ? (
+          <>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleSaveClick}
+              disabled={!saveEnabled}
+              aria-disabled={!saveEnabled}
+              data-testid="vg-xlsx-save"
+            >
+              {saveStatus === "saving"
+                ? "Saving…"
+                : `Save XLSX history (${adapterResult.acceptedRowCount} rows)`}
+            </Button>
+            {!readiness.allMapped && (
+              <span
+                className="text-[11px] text-amber-200/80"
+                data-testid="vg-xlsx-save-needs-mapping"
+              >
+                {XLSX_MAPPING_REQUIRED_COPY}
+              </span>
+            )}
+            {readiness.allMapped &&
+              adapterResult.blocked && (
+                <span
+                  className="text-[11px] text-amber-200/80"
+                  data-testid="vg-xlsx-save-blocked"
+                >
+                  No XLSX sensor readings were imported.
+                  {" "}
+                  {adapterResult.blockedReason === "missing_tent_mapping"
+                    ? "Some sensor groups are unmapped."
+                    : "No readable sensor rows found."}
+                </span>
+              )}
+            {readiness.allMapped &&
+              !adapterResult.blocked &&
+              adapterResult.rejectedRowCount > 0 && (
+                <span
+                  className="text-[11px] text-amber-200/80"
+                  data-testid="vg-xlsx-save-partial-rejection"
+                >
+                  {adapterResult.rejectedRowCount} rows rejected (
+                  {Object.entries(adapterResult.rejectionReasons)
+                    .map(([k, v]) => `${k}: ${v}`)
+                    .join(", ")}
+                  ).
+                </span>
+              )}
+            {saveStatus === "success" && (
+              <span
+                className="text-[11px] text-emerald-300/90"
+                data-testid="vg-xlsx-save-success"
+              >
+                {XLSX_SAVE_SUCCESS_PREFIX} {savedCount} rows imported.
+              </span>
+            )}
+            {saveStatus === "error" && saveError && (
+              <span
+                role="alert"
+                className="text-[11px] text-destructive"
+                data-testid="vg-xlsx-save-error"
+              >
+                {saveError}
+              </span>
+            )}
+          </>
+        ) : (
+          <>
+            <Button
+              type="button"
+              size="sm"
+              disabled
+              aria-disabled="true"
+              data-testid="vg-xlsx-save-disabled"
+              title={XLSX_IMPORT_SAVING_DISABLED_COPY}
+            >
+              Save XLSX history — coming later
+            </Button>
+            <span
+              className="text-[11px] text-amber-200/80"
+              data-testid="vg-xlsx-import-disabled-reason"
+            >
+              {XLSX_IMPORT_SAVING_DISABLED_COPY}
+            </span>
+          </>
+        )}
       </div>
+
     </section>
   );
 }

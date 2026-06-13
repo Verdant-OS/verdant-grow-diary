@@ -19,13 +19,10 @@ import { FileUp, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+// Source-app picker dropdown removed in favour of auto-detection.
+// Legacy AC Infinity persistence path is still wired through
+// buildCsvInsertRows + normalizeAcInfinityRows below.
+
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";

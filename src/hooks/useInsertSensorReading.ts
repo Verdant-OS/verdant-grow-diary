@@ -6,6 +6,7 @@
 import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
 import type { TablesInsert } from "@/integrations/supabase/types";
 import { insertSensorReading } from "@/lib/growRepo";
+import { isUuid } from "@/lib/isUuid";
 
 export type InsertSensorReadingPayload = TablesInsert<"sensor_readings">;
 

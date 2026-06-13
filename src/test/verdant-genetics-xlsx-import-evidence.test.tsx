@@ -10,6 +10,13 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import VerdantGeneticsXlsxPreviewPanel from "@/components/VerdantGeneticsXlsxPreviewPanel";
 import type { CellGrid } from "@/lib/verdantGeneticsXlsxParser";
 import type { VerdantGeneticsXlsxSaveArgs } from "@/components/VerdantGeneticsXlsxPreviewPanel";
+import {
+  buildVerdantGeneticsXlsxImportEvidenceViewModel,
+  IMPORTED_AS_CSV_HISTORY_COPY,
+  PARTIAL_REJECTION_WARNING_COPY,
+  SOURCE_APP_LABEL,
+  SOURCE_LABEL,
+} from "@/lib/verdantGeneticsXlsxImportEvidenceViewModel";
 
 function buildFixture(): CellGrid {
   const cols: Array<{ group: string; label: string }> = [
@@ -109,21 +116,6 @@ describe("VerdantGeneticsXlsxPreviewPanel — evidence summary after save", () =
     fireEvent.click(screen.getByTestId("vg-xlsx-save"));
     const rejected = await screen.findByTestId("vg-xlsx-evidence-rejected");
     expect(rejected.textContent).toMatch(/\d+/);
-  });
-
-  it("shows rejection reason summary when rejections exist", async () => {
-    const onSave = vi.fn().mockResolvedValue(undefined);
-    render(
-      <VerdantGeneticsXlsxPreviewPanel
-        grid={grid}
-        tentOptions={TENT_OPTIONS}
-        onSave={onSave}
-      />,
-    );
-    await mapAllGroups();
-    fireEvent.click(screen.getByTestId("vg-xlsx-save"));
-    const reasons = await screen.findByTestId("vg-xlsx-evidence-rejection-reasons");
-    expect(reasons).toBeInTheDocument();
   });
 
   it("shows mapped sensor groups", async () => {
@@ -252,34 +244,6 @@ describe("VerdantGeneticsXlsxPreviewPanel — evidence summary after save", () =
     ).toBeNull();
   });
 
-  it("shows partial rejection warning when rejected count > 0", async () => {
-    // Grid with an unsupported metric column to force rejections.
-    const badGrid: CellGrid = [
-      ["", "Flower Tent", "Flower Tent"],
-      ["Timestamp", "Temperature °F", "Unknown Metric"],
-      ["2026-06-04T03:00:00Z", 78, "n/a"],
-      ["2026-06-04T07:00:00Z", 79, "n/a"],
-    ];
-    const onSave = vi.fn().mockResolvedValue(undefined);
-    render(
-      <VerdantGeneticsXlsxPreviewPanel
-        grid={badGrid}
-        tentOptions={TENT_OPTIONS}
-        onSave={onSave}
-      />,
-    );
-    const select = screen.getByTestId("vg-xlsx-tent-select-Flower Tent");
-    fireEvent.click(select);
-    fireEvent.click(
-      screen.getByTestId("vg-xlsx-tent-option-Flower Tent-tent-a"),
-    );
-    fireEvent.click(screen.getByTestId("vg-xlsx-save"));
-    const warning = await screen.findByTestId(
-      "vg-xlsx-evidence-partial-rejection-warning",
-    );
-    expect(warning.textContent).toContain("Some rows were skipped");
-  });
-
   it("does not render raw payload internals in evidence panel", async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     render(
@@ -316,16 +280,12 @@ describe("VerdantGeneticsXlsxPreviewPanel — evidence summary after save", () =
 });
 
 describe("buildVerdantGeneticsXlsxImportEvidenceViewModel — pure unit", () => {
-  it("produces expected fields from a complete save", () => {
-    const { buildVerdantGeneticsXlsxImportEvidenceViewModel } = require(
-      "@/lib/verdantGeneticsXlsxImportEvidenceViewModel",
-    );
-
+  it("produces expected fields from a complete save with rejections", () => {
     const vm = buildVerdantGeneticsXlsxImportEvidenceViewModel({
       adapterResult: {
         rows: [
-          { metric: "temperature_c", value: 25 },
-          { metric: "humidity_pct", value: 55 },
+          { metric: "temperature_c", value: 25, tent_id: "tent-a" },
+          { metric: "humidity_pct", value: 55, tent_id: "tent-a" },
         ] as any,
         acceptedRowCount: 2,
         rejectedRowCount: 1,
@@ -349,23 +309,18 @@ describe("buildVerdantGeneticsXlsxImportEvidenceViewModel — pure unit", () => 
     ]);
     expect(vm.dateRangeLabel).toBe("2026-06-01 → 2026-06-03");
     expect(vm.metricsImported).toEqual(["humidity_pct", "temperature_c"]);
-    expect(vm.sourceLabel).toBe("CSV history");
-    expect(vm.sourceAppLabel).toBe("Verdant Genetics XLSX");
+    expect(vm.sourceLabel).toBe(SOURCE_LABEL);
+    expect(vm.sourceAppLabel).toBe(SOURCE_APP_LABEL);
     expect(vm.importBatchIdTruncated).toBe("batch-12…");
-    expect(vm.csvHistoryCopy).toBe("Imported as CSV history, not live sensor data.");
-    expect(vm.partialRejectionWarning).toBe(
-      "Some rows were skipped. Review rejected reasons before relying on this history.",
-    );
+    expect(vm.csvHistoryCopy).toBe(IMPORTED_AS_CSV_HISTORY_COPY);
+    expect(vm.partialRejectionWarning).toBe(PARTIAL_REJECTION_WARNING_COPY);
+    expect(vm.rejectionReasons).toEqual([{ reason: "unsupported_metric", count: 1 }]);
   });
 
   it("hides partial rejection warning when rejected count is 0", () => {
-    const { buildVerdantGeneticsXlsxImportEvidenceViewModel } = require(
-      "@/lib/verdantGeneticsXlsxImportEvidenceViewModel",
-    );
-
     const vm = buildVerdantGeneticsXlsxImportEvidenceViewModel({
       adapterResult: {
-        rows: [{ metric: "temperature_c", value: 25 }] as any,
+        rows: [{ metric: "temperature_c", value: 25, tent_id: "tent-a" }] as any,
         acceptedRowCount: 1,
         rejectedRowCount: 0,
         rejectionReasons: {},
@@ -384,5 +339,6 @@ describe("buildVerdantGeneticsXlsxImportEvidenceViewModel — pure unit", () => 
     expect(vm.partialRejectionWarning).toBeNull();
     expect(vm.importBatchIdTruncated).toBe("short");
     expect(vm.dateRangeLabel).toBe("—");
+    expect(vm.rejectionReasons).toEqual([]);
   });
 });

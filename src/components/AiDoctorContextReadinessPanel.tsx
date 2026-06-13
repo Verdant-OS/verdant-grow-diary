@@ -21,6 +21,7 @@ import {
   type AiDoctorReadinessState,
 } from "@/lib/aiDoctorReadinessViewModel";
 import type { AiDoctorContext } from "@/lib/aiDoctorEngine";
+import AiDoctorImportedHistoryDisclosurePanel from "@/components/AiDoctorImportedHistoryDisclosurePanel";
 
 export interface AiDoctorContextReadinessPanelProps {
   context: AiDoctorContext;
@@ -206,6 +207,8 @@ export default function AiDoctorContextReadinessPanel({
           </ul>
         </div>
       ) : null}
+
+      <AiDoctorImportedHistoryDisclosurePanel context={context} />
 
       <div
         className="rounded-lg border border-border/50 bg-background/30 p-3 space-y-2"

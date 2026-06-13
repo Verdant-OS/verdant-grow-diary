@@ -90,7 +90,7 @@ describe("Insert hook invalidates every tent-scoped sensor surface", () => {
       React.createElement(QueryClientProvider, { client }, children);
     const { result } = renderHook(() => useInsertSensorReading(), { wrapper });
     result.current.mutate({
-      tent_id: "seedling-clone-tent-id",
+      tent_id: "22222222-2222-4222-8222-222222222222",
       metric: "temperature_c",
       value: 23.89,
       source: "manual",

@@ -27,6 +27,7 @@ import { evaluateManualSnapshotAdvisor } from "@/lib/manualSensorSnapshotAdvisor
 import DerivedVpdStatus from "@/components/DerivedVpdStatus";
 import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
 import { shouldRequireFirstTentSetup } from "@/lib/firstTentSetupRules";
+import { isUuid } from "@/lib/isUuid";
 
 interface TentOption {
   id: string;
@@ -114,6 +115,10 @@ export default function ManualSensorReadingCard({
   async function onSave() {
     if (!tentId) {
       toast.error("Pick a tent first.");
+      return;
+    }
+    if (!isUuid(tentId)) {
+      toast.error("Select a real tent before saving a manual sensor reading.");
       return;
     }
     if (!validation.ok) {

@@ -6,6 +6,7 @@
 import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
 import type { TablesInsert } from "@/integrations/supabase/types";
 import { insertSensorReading } from "@/lib/growRepo";
+import { isUuid } from "@/lib/isUuid";
 
 export type InsertSensorReadingPayload = TablesInsert<"sensor_readings">;
 
@@ -25,6 +26,11 @@ export function validateSensorReadingPayload(p: InsertSensorReadingPayload): voi
   // it must be a non-empty string.
   if (p.user_id !== undefined && !p.user_id) throw new Error("user_id required");
   if (!p.tent_id) throw new Error("tent_id required");
+  if (!isUuid(p.tent_id)) {
+    throw new Error(
+      "Select a real tent before saving a manual sensor reading.",
+    );
+  }
   if (!(VALID_METRICS as readonly string[]).includes(p.metric)) {
     throw new Error(`invalid metric: ${p.metric}`);
   }

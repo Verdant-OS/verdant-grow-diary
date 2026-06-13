@@ -44,6 +44,9 @@ import {
   type PreviewCopy,
 } from "@/lib/sensorImportPreviewCopy";
 import { buildRegistryCsvInsertRows } from "@/lib/registryCsvInsertRowsAdapter";
+import { readXlsxFileToCellGrid } from "@/lib/verdantGeneticsXlsxFileLoader";
+import VerdantGeneticsXlsxPreviewPanel from "@/components/VerdantGeneticsXlsxPreviewPanel";
+import type { CellGrid } from "@/lib/verdantGeneticsXlsxParser";
 
 interface Props {
   tentId: string;

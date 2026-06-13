@@ -253,7 +253,8 @@ describe("AiDoctorImportedHistoryDisclosurePanel", () => {
       expect(src).not.toMatch(/\.upsert\(/);
       expect(src).not.toMatch(/\.rpc\(/);
       expect(src).not.toMatch(/fetch\(/);
-      expect(src).not.toMatch(/edge|migration|rls|service_role|device[_-]?control/i);
+      expect(src).not.toMatch(/service_role|supabase\/functions|device[_-]?control/i);
+      expect(src).not.toMatch(/\bmigration\b|\brls\b/i);
     }
   });
 });

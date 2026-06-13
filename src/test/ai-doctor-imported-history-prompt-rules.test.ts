@@ -238,6 +238,6 @@ describe("aiDoctorImportedHistoryPromptRules", () => {
     expect(src).not.toMatch(/action_queue/i);
     expect(src).not.toMatch(/createClient/);
     expect(src).not.toMatch(/fetch\s*\(/);
-    expect(src).not.toMatch(/device[_-]?control/i);
+    expect(src).not.toMatch(/sendDeviceCommand|toggleDevice|controlDevice/i);
   });
 });

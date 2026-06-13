@@ -222,10 +222,14 @@ export function VerdantGeneticsXlsxPreviewPanel({
                 </span>
                 {hasTents ? (
                   <Select
-                    value={selectedTentId}
+                    value={selectedTentId || "__none__"}
                     onValueChange={(value) =>
                       setMappingState((prev) =>
-                        setGroupMapping(prev, group, value || null),
+                        setGroupMapping(
+                          prev,
+                          group,
+                          value === "__none__" ? null : value,
+                        ),
                       )
                     }
                   >
@@ -236,7 +240,7 @@ export function VerdantGeneticsXlsxPreviewPanel({
                       <SelectValue placeholder="Select tent…" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">— Unmapped —</SelectItem>
+                      <SelectItem value="__none__">— Unmapped —</SelectItem>
                       {tentOptions.map((t) => (
                         <SelectItem
                           key={t.id}

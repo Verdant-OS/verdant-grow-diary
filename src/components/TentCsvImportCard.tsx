@@ -47,8 +47,15 @@ import { buildRegistryCsvInsertRows } from "@/lib/registryCsvInsertRowsAdapter";
 import { readXlsxFileToCellGrid } from "@/lib/verdantGeneticsXlsxFileLoader";
 import VerdantGeneticsXlsxPreviewPanel from "@/components/VerdantGeneticsXlsxPreviewPanel";
 import type { CellGrid } from "@/lib/verdantGeneticsXlsxParser";
+import { buildVerdantGeneticsXlsxPreviewViewModel } from "@/lib/verdantGeneticsXlsxPreviewViewModel";
 import { useTents } from "@/hooks/use-tents";
 import type { TentOption } from "@/lib/verdantGeneticsXlsxMappingViewModel";
+import { recordSensorHistoryImportAuditEvent } from "@/lib/sensorHistoryImportAuditLog";
+import {
+  buildRegistryCsvAuditInput,
+  buildVerdantGeneticsXlsxAuditInput,
+} from "@/lib/sensorHistoryImportAuditEventBuilders";
+import SensorHistoryImportAuditLedger from "@/components/SensorHistoryImportAuditLedger";
 
 interface Props {
   tentId: string;
@@ -70,6 +77,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
   const [sourcePreview, setSourcePreview] = useState<PreviewCopy | null>(null);
   const [xlsxGrid, setXlsxGrid] = useState<CellGrid | null>(null);
   const [xlsxFileName, setXlsxFileName] = useState<string | null>(null);
+  const [auditRefreshKey, setAuditRefreshKey] = useState(0);
 
   const { data: tentsData } = useTents();
   const tentOptions: TentOption[] = useMemo(
@@ -245,6 +253,16 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
       toast.success(
         `Imported ${result.rows.length} ${sourcePreview.sourceAppLabel} CSV history rows.`,
       );
+      const auditInput = buildRegistryCsvAuditInput({
+        sourceAppId: detected,
+        adapterResult: result,
+        tentId,
+        tentOptions,
+      });
+      if (auditInput) {
+        recordSensorHistoryImportAuditEvent(auditInput);
+        setAuditRefreshKey((k) => k + 1);
+      }
       qc.invalidateQueries({ queryKey: ["sensor_readings"] });
       qc.invalidateQueries({ queryKey: ["grow", "sensors"] });
       qc.invalidateQueries({ queryKey: ["latest-sensor-snapshot"] });
@@ -270,8 +288,9 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
    */
   async function handleXlsxSave(args: {
     adapterResult: import("@/lib/verdantGeneticsXlsxInsertRowsAdapter").VerdantGeneticsXlsxInsertRowsResult;
+    tentIdBySensorGroup?: Record<string, string>;
   }) {
-    const { adapterResult } = args;
+    const { adapterResult, tentIdBySensorGroup = {} } = args;
     if (adapterResult.blocked || adapterResult.rows.length === 0) {
       toast.error("No XLSX sensor readings were imported.");
       throw new Error(
@@ -298,6 +317,23 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
     toast.success(
       `Imported XLSX sensor history as CSV history. ${adapterResult.acceptedRowCount} rows imported.${rejectedSummary}`,
     );
+    if (xlsxGrid) {
+      try {
+        const previewVm = buildVerdantGeneticsXlsxPreviewViewModel(xlsxGrid);
+        const auditInput = buildVerdantGeneticsXlsxAuditInput({
+          previewVm,
+          adapterResult,
+          tentIdBySensorGroup,
+          tentOptions,
+        });
+        if (auditInput) {
+          recordSensorHistoryImportAuditEvent(auditInput);
+          setAuditRefreshKey((k) => k + 1);
+        }
+      } catch {
+        // audit is best-effort; never block the import flow
+      }
+    }
     qc.invalidateQueries({ queryKey: ["sensor_readings"] });
     qc.invalidateQueries({ queryKey: ["grow", "sensors"] });
     qc.invalidateQueries({ queryKey: ["latest-sensor-snapshot"] });
@@ -647,6 +683,9 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
           </Button>
         </div>
       )}
+      <div className="mt-4">
+        <SensorHistoryImportAuditLedger refreshKey={auditRefreshKey} />
+      </div>
     </section>
   );
 }

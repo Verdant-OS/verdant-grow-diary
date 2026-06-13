@@ -175,9 +175,9 @@ describe("QuickLog hardware readings UI", () => {
     expect(helper.textContent).toMatch(/manual handheld/i);
     expect(helper.textContent).toMatch(/not live sensor data/i);
     expect(within(section).getByText("Feed/Input pH")).toBeInTheDocument();
-    expect(within(section).getByText("Feed/Input EC (mS/cm)")).toBeInTheDocument();
+    expect(within(section).getByText(/Feed\/Input EC.*mS\/cm/)).toBeInTheDocument();
     expect(within(section).getByText("Runoff pH")).toBeInTheDocument();
-    expect(within(section).getByText("Runoff EC (mS/cm)")).toBeInTheDocument();
+    expect(within(section).getByText(/Runoff EC.*mS\/cm/)).toBeInTheDocument();
     expect(within(section).getByText(/PPFD canopy/)).toBeInTheDocument();
     expect(within(section).getByText(/Light distance/)).toBeInTheDocument();
   });

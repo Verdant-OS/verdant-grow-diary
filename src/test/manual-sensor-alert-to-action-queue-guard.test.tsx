@@ -115,34 +115,17 @@ describe("manual sensor save & alert persistence — no auto Action Queue writes
 });
 
 /* ──────────────────────────────────────────────────────────────────────
- * End-to-end shape: in-range manual reading → no alert → no handoff
+ * In-range / no-alert shape: with no alert, no handoff can ever exist.
+ * The wider in-range → zero-alerts proof lives in the manual sensor
+ * alert smoke guard suite; this is the action-queue corollary.
  * ────────────────────────────────────────────────────────────────────── */
-describe("in-range manual readings do not expose an Action Queue handoff", () => {
-  it("evaluates to zero alerts, so there is no eligible draft", () => {
-    const input: EnvironmentAlertEvaluationInput = {
-      snapshot: {
-        capturedAt: new Date().toISOString(),
-        source: "manual",
-        temperatureC: 24,
-        humidityPct: 55,
-        vpdKpa: 1.1,
-        co2Ppm: 800,
-      },
-      targets: {
-        temperature: { min: 20, max: 28 },
-        humidity: { min: 40, max: 65 },
-        vpd: { min: 0.8, max: 1.5 },
-        co2: { min: 400, max: 1500 },
-      },
-      tentId: TENT_ID,
-      growId: GROW_ID,
-    };
-    const out = evaluateEnvironmentAlerts(input);
-    expect(out.alerts.length).toBe(0);
-    // With no alert, isAlertEligibleForActionQueue trivially rejects.
+describe("no alert ⇒ no Action Queue handoff is possible", () => {
+  it("isAlertEligibleForActionQueue rejects null / undefined", () => {
     expect(isAlertEligibleForActionQueue(null)).toBe(false);
+    expect(isAlertEligibleForActionQueue(undefined)).toBe(false);
   });
 });
+
 
 /* ──────────────────────────────────────────────────────────────────────
  * Out-of-range manual reading → eligible draft → single insert → dedupe

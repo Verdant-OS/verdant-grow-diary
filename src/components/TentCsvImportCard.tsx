@@ -441,6 +441,24 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
               {sourcePreview.importDisabledReason}
             </p>
           )}
+
+          {registrySaveVisible && (
+            <Button
+              type="button"
+              onClick={handleRegistryImport}
+              disabled={!sourcePreview.importEnabled || importing}
+              data-testid="csv-registry-import"
+              className="w-full"
+            >
+              {importing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> Importing…
+                </>
+              ) : (
+                `Import ${sourcePreview.sourceAppLabel} CSV history`
+              )}
+            </Button>
+          )}
         </div>
       )}
 

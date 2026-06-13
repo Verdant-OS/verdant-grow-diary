@@ -86,9 +86,9 @@ describe("Spider Farmer (primary, full)", () => {
     expect(copy.acceptedRowCount).toBeGreaterThan(0);
   });
 
-  it("does NOT enable the import button (persistence not wired)", () => {
-    expect(copy.importEnabled).toBe(false);
-    expect(copy.importDisabledReason).toBe(IMPORT_BLOCKED_NOT_WIRED_COPY);
+  it("enables import (persistence wired via registry adapter)", () => {
+    expect(copy.importEnabled).toBe(true);
+    expect(copy.importDisabledReason).toBeNull();
   });
 });
 
@@ -98,7 +98,7 @@ describe("Spider Farmer (primary, sparse co2/ppfd)", () => {
   it("still detects spider_farmer and accepts rows", () => {
     expect(copy.sourceAppId).toBe("spider_farmer");
     expect(copy.acceptedRowCount).toBeGreaterThan(0);
-    expect(copy.importEnabled).toBe(false);
+    expect(copy.importEnabled).toBe(true);
   });
 });
 

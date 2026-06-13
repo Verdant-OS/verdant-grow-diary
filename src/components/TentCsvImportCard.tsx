@@ -71,6 +71,16 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
   const [xlsxGrid, setXlsxGrid] = useState<CellGrid | null>(null);
   const [xlsxFileName, setXlsxFileName] = useState<string | null>(null);
 
+  const { data: tentsData } = useTents();
+  const tentOptions: TentOption[] = useMemo(
+    () =>
+      (tentsData ?? []).map((t) => ({
+        id: t.id as string,
+        name: (t.name as string) || "Untitled tent",
+      })),
+    [tentsData],
+  );
+
   const supportedApp = CSV_IMPORT_SOURCE_APPS.find((a) => a.id === sourceApp);
   const sourceEnabled = !!supportedApp?.enabled;
 

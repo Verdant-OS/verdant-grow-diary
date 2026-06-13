@@ -253,6 +253,16 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
       toast.success(
         `Imported ${result.rows.length} ${sourcePreview.sourceAppLabel} CSV history rows.`,
       );
+      const auditInput = buildRegistryCsvAuditInput({
+        sourceAppId: detected,
+        adapterResult: result,
+        tentId,
+        tentOptions,
+      });
+      if (auditInput) {
+        recordSensorHistoryImportAuditEvent(auditInput);
+        setAuditRefreshKey((k) => k + 1);
+      }
       qc.invalidateQueries({ queryKey: ["sensor_readings"] });
       qc.invalidateQueries({ queryKey: ["grow", "sensors"] });
       qc.invalidateQueries({ queryKey: ["latest-sensor-snapshot"] });

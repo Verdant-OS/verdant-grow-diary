@@ -59,8 +59,8 @@ describe("csv source allow-list audit (deployed trigger)", () => {
 
   it("every adapter-emitted metric is in the deployed metric allow-list", () => {
     const csvText = [
-      "Time,Temperature(°F),Humidity(%),VPD(kPa),CO2(ppm),PPFD(umol/m2/s)",
-      "2026-06-12T10:00:00Z,75,55,1.1,850,600",
+      "deviceSerialnum,temperature(°C),humidity,vpd,temperature(°F),co2,Timestamp,ppfd",
+      "80F1B2B8091C,24.6,63.7,1.12,76.3,902,2026-05-31 19:00:00,423",
     ].join("\n");
     const result = buildRegistryCsvInsertRows({
       sourceApp: "spider_farmer",

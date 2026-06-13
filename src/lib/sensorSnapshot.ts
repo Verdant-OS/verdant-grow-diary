@@ -50,6 +50,7 @@ export const EMPTY_SNAPSHOT: SensorSnapshot = {
   soil_temp: null,
   ppfd: null,
   device_id: null,
+  csvVendor: null,
 };
 
 /** Coerce numeric DB values; returns null for null/undefined/NaN/Infinity. */

@@ -133,6 +133,7 @@ export function VerdantGeneticsXlsxPreviewPanel({
     if (!saveEnabled) return;
     setSaveStatus("saving");
     setSaveError(null);
+    setSavedEvidence(null);
     try {
       const importBatchId = newImportBatchId();
       const freshResult = buildVerdantGeneticsXlsxInsertRows({
@@ -147,6 +148,15 @@ export function VerdantGeneticsXlsxPreviewPanel({
         adapterResult: freshResult,
       });
       setSavedCount(freshResult.acceptedRowCount);
+      setSavedEvidence(
+        buildVerdantGeneticsXlsxImportEvidenceViewModel({
+          adapterResult: freshResult,
+          previewVm: vm,
+          tentIdBySensorGroup: mappingState.tentIdBySensorGroup,
+          tentOptions,
+          importBatchId,
+        }),
+      );
       setSaveStatus("success");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Save failed.";

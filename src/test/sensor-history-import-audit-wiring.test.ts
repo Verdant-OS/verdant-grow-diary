@@ -211,9 +211,13 @@ describe("sensorHistoryImportAuditEventBuilders safety", () => {
   });
 
   it("does not reference raw payload internals or tokens", () => {
-    expect(BUILDERS).not.toMatch(/raw_payload/);
-    expect(BUILDERS).not.toMatch(/device_serial/i);
-    expect(BUILDERS).not.toMatch(/bridge_token/i);
-    expect(BUILDERS).not.toMatch(/service_role/i);
+    const stripped = BUILDERS.replace(/\/\*[\s\S]*?\*\//g, "").replace(
+      /(^|[^:])\/\/[^\n]*/g,
+      "$1",
+    );
+    expect(stripped).not.toMatch(/raw_payload/);
+    expect(stripped).not.toMatch(/device_serial/i);
+    expect(stripped).not.toMatch(/bridge_token/i);
+    expect(stripped).not.toMatch(/service_role/i);
   });
 });

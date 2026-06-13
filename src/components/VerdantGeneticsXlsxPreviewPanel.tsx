@@ -11,7 +11,7 @@
  *   - Raw payloads, device serials, bridge tokens, and internal IDs are
  *     never rendered.
  */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,17 +37,49 @@ import {
   XLSX_IMPORT_SAVING_DISABLED_COPY,
   type TentOption,
 } from "@/lib/verdantGeneticsXlsxMappingViewModel";
+import {
+  buildVerdantGeneticsXlsxInsertRows,
+  type VerdantGeneticsXlsxInsertRowsResult,
+} from "@/lib/verdantGeneticsXlsxInsertRowsAdapter";
 import type { CellGrid } from "@/lib/verdantGeneticsXlsxParser";
+
+export interface VerdantGeneticsXlsxSaveArgs {
+  tentIdBySensorGroup: Record<string, string>;
+  importBatchId: string;
+  adapterResult: VerdantGeneticsXlsxInsertRowsResult;
+}
 
 export interface VerdantGeneticsXlsxPreviewPanelProps {
   grid: CellGrid;
   tentOptions?: TentOption[];
+  growId?: string | null;
+  /**
+   * Parent-owned save handler. When omitted the save button stays disabled
+   * with the "coming later" copy (preview-only mode). When provided the
+   * button enables only when mapping is complete and the adapter emits
+   * at least one row that is not blocked.
+   */
+  onSave?: (args: VerdantGeneticsXlsxSaveArgs) => Promise<void> | void;
+}
+
+function newImportBatchId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    try {
+      return crypto.randomUUID();
+    } catch {
+      /* noop */
+    }
+  }
+  return `xlsx-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function fmtDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   return iso.slice(0, 10);
 }
+
+const XLSX_SAVE_SUCCESS_PREFIX =
+  "Imported XLSX sensor history as CSV history." as const;
 
 export function VerdantGeneticsXlsxPreviewPanel({
   grid,

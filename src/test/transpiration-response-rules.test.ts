@@ -186,10 +186,16 @@ describe("evaluateTranspirationWindow", () => {
 });
 
 describe("transpirationResponseRules static safety", () => {
-  const src = readFileSync(
+  const raw = readFileSync(
     "src/lib/transpirationResponseRules.ts",
     "utf8",
   );
+  // Strip block and line comments so prose like "No alerts" / "No device"
+  // does not trip the banned-term scanner.
+  const src = raw
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1")
+    .toLowerCase();
 
   const banned = [
     "react",

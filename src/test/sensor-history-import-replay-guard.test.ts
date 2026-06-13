@@ -48,7 +48,7 @@ function makeMemoryStorage(): Storage {
 }
 
 const SPIDER_FARMER_CSV = [
-  "deviceSerialnum,sensorId,roomId,captureTime,temperature(°F),humidity(%),vpd(kPa)",
+  "deviceSerialnum,sensorId,roomId,timestamp,temperature(°F),humidity,vpd",
   "SF-1,sensorA,room1,2025-01-01 00:00:00,75,55,1.1",
   "SF-1,sensorA,room1,2025-01-01 01:00:00,76,54,1.2",
 ].join("\n");

@@ -44,10 +44,10 @@ const UNKNOWN_CSV = [
 ].join("\n");
 
 describe("persistence policy", () => {
-  it("only ac_infinity is wired for save in this slice", () => {
+  it("ac_infinity, spider_farmer, and vivosun are wired for save", () => {
     expect(PREVIEW_PERSISTENCE_ENABLED.has("ac_infinity")).toBe(true);
-    expect(PREVIEW_PERSISTENCE_ENABLED.has("spider_farmer")).toBe(false);
-    expect(PREVIEW_PERSISTENCE_ENABLED.has("vivosun")).toBe(false);
+    expect(PREVIEW_PERSISTENCE_ENABLED.has("spider_farmer")).toBe(true);
+    expect(PREVIEW_PERSISTENCE_ENABLED.has("vivosun")).toBe(true);
     expect(PREVIEW_PERSISTENCE_ENABLED.has("unknown_source_app")).toBe(false);
   });
 });

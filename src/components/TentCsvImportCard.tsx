@@ -320,6 +320,16 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
           : "No readable sensor rows found.",
       );
     }
+    const fingerprint = buildSensorHistoryImportFingerprint({
+      sourceAppId: "verdant_genetics_xlsx",
+      rows: toFingerprintRows(adapterResult.rows),
+    });
+    if (hasSensorHistoryImportFingerprint(fingerprint)) {
+      toast.error("Duplicate import blocked.", {
+        description: SENSOR_HISTORY_IMPORT_DUPLICATE_COPY,
+      });
+      throw new Error(SENSOR_HISTORY_IMPORT_DUPLICATE_COPY);
+    }
     const { error } = await supabase
       .from("sensor_readings")
       .insert(adapterResult.rows as never);
@@ -338,6 +348,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
     toast.success(
       `Imported XLSX sensor history as CSV history. ${adapterResult.acceptedRowCount} rows imported.${rejectedSummary}`,
     );
+    recordSensorHistoryImportFingerprint(fingerprint);
     if (xlsxGrid) {
       try {
         const previewVm = buildVerdantGeneticsXlsxPreviewViewModel(xlsxGrid);

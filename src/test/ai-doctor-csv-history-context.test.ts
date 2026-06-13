@@ -139,8 +139,9 @@ describe("aiDoctorCsvHistoryContextRules", () => {
     });
     const json = JSON.stringify(ctx).toLowerCase();
     expect(json).not.toContain('"source":"live"');
-    expect(json).not.toContain("latest");
+    expect(json).not.toContain('"live"');
     expect(json).not.toContain("current_reading");
+    expect(ctx.historicalLabel).toBe("CSV history");
   });
 
   it("source module makes no Supabase or write calls and no alerts/action queue", () => {

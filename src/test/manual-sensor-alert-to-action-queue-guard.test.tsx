@@ -27,8 +27,8 @@ import {
   type AlertLike,
 } from "@/lib/alertToActionQueueRules";
 import {
-  evaluateEnvironmentAlerts,
-  type EnvironmentAlertEvaluationInput,
+  buildEnvironmentAlerts,
+  type AlertInputs,
 } from "@/lib/environmentAlerts";
 
 const ROOT = resolve(__dirname, "../..");

@@ -54,21 +54,6 @@ export function buildSensorSourceDisplayLabel(
   return "Unknown";
 }
 
-/**
- * Summarise CSV vendor lineage across a batch of rows. Used by snapshot
- * builders to collapse multi-vendor CSV imports into a single,
- * conservative display hint.
- */
-export function summarizeCsvVendor(
-  rows: ReadonlyArray<{ source?: string | null; raw_payload?: unknown }>,
-): CsvVendorSummary {
-  const seen = new Set<CsvSourceApp>();
-  for (const row of rows) {
-    if (row.source !== "csv") continue;
-    const lineage = getCsvVendorLineage(row);
-    if (lineage) seen.add(lineage.sourceApp);
-  }
-  if (seen.size === 0) return null;
-  if (seen.size === 1) return [...seen][0];
-  return "multiple";
-}
+// `summarizeCsvVendor` lives in `sensorReadingVendorLineage` to avoid a
+// circular import between snapshot helpers and display helpers.
+export { summarizeCsvVendor } from "@/lib/sensorReadingVendorLineage";

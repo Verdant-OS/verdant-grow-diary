@@ -41,6 +41,10 @@ import {
   buildVerdantGeneticsXlsxInsertRows,
   type VerdantGeneticsXlsxInsertRowsResult,
 } from "@/lib/verdantGeneticsXlsxInsertRowsAdapter";
+import {
+  buildVerdantGeneticsXlsxImportEvidenceViewModel,
+  type VerdantGeneticsXlsxImportEvidenceViewModel,
+} from "@/lib/verdantGeneticsXlsxImportEvidenceViewModel";
 import type { CellGrid } from "@/lib/verdantGeneticsXlsxParser";
 
 export interface VerdantGeneticsXlsxSaveArgs {
@@ -96,6 +100,8 @@ export function VerdantGeneticsXlsxPreviewPanel({
   >("idle");
   const [savedCount, setSavedCount] = useState<number>(0);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [savedEvidence, setSavedEvidence] =
+    useState<VerdantGeneticsXlsxImportEvidenceViewModel | null>(null);
 
   const readiness = buildMappingReadiness(
     vm.detectedGroups,
@@ -127,6 +133,7 @@ export function VerdantGeneticsXlsxPreviewPanel({
     if (!saveEnabled) return;
     setSaveStatus("saving");
     setSaveError(null);
+    setSavedEvidence(null);
     try {
       const importBatchId = newImportBatchId();
       const freshResult = buildVerdantGeneticsXlsxInsertRows({
@@ -141,6 +148,15 @@ export function VerdantGeneticsXlsxPreviewPanel({
         adapterResult: freshResult,
       });
       setSavedCount(freshResult.acceptedRowCount);
+      setSavedEvidence(
+        buildVerdantGeneticsXlsxImportEvidenceViewModel({
+          adapterResult: freshResult,
+          previewVm: vm,
+          tentIdBySensorGroup: mappingState.tentIdBySensorGroup,
+          tentOptions,
+          importBatchId,
+        }),
+      );
       setSaveStatus("success");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Save failed.";
@@ -459,6 +475,101 @@ export function VerdantGeneticsXlsxPreviewPanel({
         )}
       </div>
 
+      {/* Evidence summary — read-only post-import proof */}
+      {savedEvidence && (
+        <div
+          className="rounded-md border border-emerald-400/30 bg-emerald-400/5 p-3 grid gap-2"
+          data-testid="vg-xlsx-evidence-panel"
+        >
+          <header className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" data-testid="vg-xlsx-evidence-source-label">
+              {savedEvidence.sourceLabel}
+            </Badge>
+            <Badge variant="secondary" data-testid="vg-xlsx-evidence-source-app-label">
+              {savedEvidence.sourceAppLabel}
+            </Badge>
+            <span
+              className="text-[10px] text-muted-foreground font-mono"
+              data-testid="vg-xlsx-evidence-batch-id"
+            >
+              batch {savedEvidence.importBatchIdTruncated}
+            </span>
+          </header>
+
+          <p
+            className="text-muted-foreground"
+            data-testid="vg-xlsx-evidence-csv-history-copy"
+          >
+            {savedEvidence.csvHistoryCopy}
+          </p>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <Stat
+              label="Accepted rows"
+              value={String(savedEvidence.acceptedRowCount)}
+              testId="vg-xlsx-evidence-accepted"
+            />
+            <Stat
+              label="Rejected rows"
+              value={String(savedEvidence.rejectedRowCount)}
+              testId="vg-xlsx-evidence-rejected"
+            />
+            <Stat
+              label="Date range"
+              value={savedEvidence.dateRangeLabel}
+              testId="vg-xlsx-evidence-date-range"
+            />
+            <Stat
+              label="Metrics"
+              value={
+                savedEvidence.metricsImported.length > 0
+                  ? savedEvidence.metricsImported.join(", ")
+                  : "—"
+              }
+              testId="vg-xlsx-evidence-metrics"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <Stat
+              label="Mapped groups"
+              value={savedEvidence.mappedGroups
+                .map((g) => g.sensorGroup)
+                .join(", ")}
+              testId="vg-xlsx-evidence-mapped-groups"
+            />
+            <Stat
+              label="Mapped tents"
+              value={savedEvidence.mappedGroups
+                .map((g) => g.tentLabel ?? "—")
+                .join(", ")}
+              testId="vg-xlsx-evidence-mapped-tents"
+            />
+          </div>
+
+          {savedEvidence.hasRejections && (
+            <div
+              className="rounded-md border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-amber-200/90"
+              data-testid="vg-xlsx-evidence-partial-rejection-warning"
+            >
+              {savedEvidence.partialRejectionWarning}
+            </div>
+          )}
+
+          {savedEvidence.rejectionReasons.length > 0 && (
+            <ul
+              className="grid gap-1 text-muted-foreground"
+              data-testid="vg-xlsx-evidence-rejection-reasons"
+            >
+              {savedEvidence.rejectionReasons.map((r) => (
+                <li key={r.reason} data-testid={`vg-xlsx-evidence-rejection-${r.reason}`}>
+                  <span className="font-mono">{r.reason}</span> · {r.count}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </section>
   );
 }

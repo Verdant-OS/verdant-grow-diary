@@ -171,6 +171,23 @@ export interface PlantContextPayload {
   averages_7d: SensorRollingAverages;
   notable_deviations: readonly string[];
   source_tags: readonly SensorSourceTag[];
+  /**
+   * Safe, read-only summary of imported CSV/XLSX sensor history.
+   * Present only when at least one CSV row contributed. Never used as
+   * a substitute for current/live telemetry.
+   */
+  imported_sensor_history: ImportedSensorHistorySection | null;
+  /**
+   * True only when at least one trustworthy live reading exists in the
+   * compiled context. CSV history NEVER flips this flag to true.
+   */
+  hasLiveSensorReadings: boolean;
+  /**
+   * True when no current/live sensor evidence exists. Stays true even
+   * when CSV history is present, so AI Doctor still surfaces the
+   * missing-live-readings caveat.
+   */
+  missingLiveSensorReadings: boolean;
 }
 
 // ---------------------------------------------------------------------------

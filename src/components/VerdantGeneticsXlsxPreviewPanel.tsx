@@ -11,8 +11,16 @@
  *   - Raw payloads, device serials, bridge tokens, and internal IDs are
  *     never rendered.
  */
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   buildVerdantGeneticsXlsxPreviewViewModel,
   VERDANT_GENETICS_CSV_HISTORY_COPY,
@@ -20,10 +28,20 @@ import {
   VERDANT_GENETICS_IMPORT_DISABLED_COPY,
   UNKNOWN_XLSX_COPY,
 } from "@/lib/verdantGeneticsXlsxPreviewViewModel";
+import {
+  buildInitialMappingState,
+  setGroupMapping,
+  buildMappingReadiness,
+  XLSX_MAPPING_REQUIRED_COPY,
+  XLSX_NO_TENTS_COPY,
+  XLSX_IMPORT_SAVING_DISABLED_COPY,
+  type TentOption,
+} from "@/lib/verdantGeneticsXlsxMappingViewModel";
 import type { CellGrid } from "@/lib/verdantGeneticsXlsxParser";
 
 export interface VerdantGeneticsXlsxPreviewPanelProps {
   grid: CellGrid;
+  tentOptions?: TentOption[];
 }
 
 function fmtDate(iso: string | null | undefined): string {
@@ -33,8 +51,19 @@ function fmtDate(iso: string | null | undefined): string {
 
 export function VerdantGeneticsXlsxPreviewPanel({
   grid,
+  tentOptions = [],
 }: VerdantGeneticsXlsxPreviewPanelProps) {
   const vm = buildVerdantGeneticsXlsxPreviewViewModel(grid);
+  const [mappingState, setMappingState] = useState(() =>
+    buildInitialMappingState(vm.detectedGroups),
+  );
+
+  const readiness = buildMappingReadiness(
+    vm.detectedGroups,
+    mappingState.tentIdBySensorGroup,
+  );
+
+  const hasTents = tentOptions.length > 0;
 
   return (
     <section
@@ -151,6 +180,103 @@ export function VerdantGeneticsXlsxPreviewPanel({
         </ul>
       )}
 
+      {/* Tent mapping section */}
+      {vm.detectedGroups.length > 0 && (
+        <div
+          className="rounded-md border border-border/60 p-3 grid gap-2"
+          data-testid="vg-xlsx-mapping-section"
+        >
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            Sensor group → Tent mapping
+          </p>
+          <p
+            className="text-muted-foreground"
+            data-testid="vg-xlsx-mapping-required-copy"
+          >
+            {XLSX_MAPPING_REQUIRED_COPY}
+          </p>
+
+          {!hasTents && (
+            <p
+              role="alert"
+              className="rounded-md border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-amber-200"
+              data-testid="vg-xlsx-no-tents"
+            >
+              {XLSX_NO_TENTS_COPY}
+            </p>
+          )}
+
+          {vm.detectedGroups.map((group) => {
+            const selectedTentId = mappingState.tentIdBySensorGroup[group] ?? "";
+            return (
+              <div
+                key={group}
+                className="grid grid-cols-[1fr_auto] items-center gap-2"
+                data-testid={`vg-xlsx-mapping-row-${group}`}
+              >
+                <span
+                  className="font-mono text-xs"
+                  data-testid={`vg-xlsx-group-label-${group}`}
+                >
+                  {group}
+                </span>
+                {hasTents ? (
+                  <Select
+                    value={selectedTentId}
+                    onValueChange={(value) =>
+                      setMappingState((prev) =>
+                        setGroupMapping(prev, group, value || null),
+                      )
+                    }
+                  >
+                    <SelectTrigger
+                      className="h-8 w-48 text-xs"
+                      data-testid={`vg-xlsx-tent-select-${group}`}
+                    >
+                      <SelectValue placeholder="Select tent…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">— Unmapped —</SelectItem>
+                      {tentOptions.map((t) => (
+                        <SelectItem
+                          key={t.id}
+                          value={t.id}
+                          data-testid={`vg-xlsx-tent-option-${group}-${t.id}`}
+                        >
+                          {t.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <span className="text-muted-foreground text-[11px]">
+                    —
+                  </span>
+                )}
+              </div>
+            );
+          })}
+
+          <div className="grid grid-cols-3 gap-2 mt-1">
+            <Stat
+              label="Mapped groups"
+              value={String(readiness.mappedCount)}
+              testId="vg-xlsx-mapped-count"
+            />
+            <Stat
+              label="Unmapped groups"
+              value={String(readiness.unmappedCount)}
+              testId="vg-xlsx-unmapped-count"
+            />
+            <Stat
+              label="All mapped"
+              value={readiness.allMapped ? "Yes" : "No"}
+              testId="vg-xlsx-all-mapped"
+            />
+          </div>
+        </div>
+      )}
+
       <div
         className="flex flex-wrap items-center gap-2"
         data-testid="vg-xlsx-import-block"
@@ -161,7 +287,7 @@ export function VerdantGeneticsXlsxPreviewPanel({
           disabled
           aria-disabled="true"
           data-testid="vg-xlsx-save-disabled"
-          title={VERDANT_GENETICS_IMPORT_DISABLED_COPY}
+          title={XLSX_IMPORT_SAVING_DISABLED_COPY}
         >
           Save XLSX history — coming later
         </Button>
@@ -169,7 +295,7 @@ export function VerdantGeneticsXlsxPreviewPanel({
           className="text-[11px] text-amber-200/80"
           data-testid="vg-xlsx-import-disabled-reason"
         >
-          {vm.importDisabledReason}
+          {XLSX_IMPORT_SAVING_DISABLED_COPY}
         </span>
       </div>
     </section>

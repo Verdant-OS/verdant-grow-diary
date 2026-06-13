@@ -27,7 +27,7 @@ function makeWrapper() {
 
 const goodPayload = {
   user_id: "u1",
-  tent_id: "t1",
+  tent_id: "11111111-1111-4111-8111-111111111111",
   metric: "temperature_c",
   value: 24.5,
 } satisfies InsertSensorReadingPayload;

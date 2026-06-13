@@ -683,6 +683,9 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
           </Button>
         </div>
       )}
+      <div className="mt-4">
+        <SensorHistoryImportAuditLedger refreshKey={auditRefreshKey} />
+      </div>
     </section>
   );
 }

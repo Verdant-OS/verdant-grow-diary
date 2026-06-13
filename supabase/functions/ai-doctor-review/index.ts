@@ -202,14 +202,13 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           model: MODEL,
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            {
-              role: "user",
-              content:
-                "Grower context packet (JSON):\n" + JSON.stringify(packet),
-            },
-          ],
+          messages: (() => {
+            const m = buildAiDoctorPromptMessages(packet);
+            return [
+              { role: "system", content: m.system },
+              { role: "user", content: m.user },
+            ];
+          })(),
           tools: [TOOL_SCHEMA],
           tool_choice: {
             type: "function",

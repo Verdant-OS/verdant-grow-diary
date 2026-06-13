@@ -90,9 +90,10 @@ describe("csv source allow-list audit (deployed trigger)", () => {
     );
   });
 
-  it("keeps Spider Farmer and Vivosun persistence gate disabled", () => {
+  it("Spider Farmer + Vivosun persistence is now enabled (via registry adapter, source='csv')", () => {
     expect(PREVIEW_PERSISTENCE_ENABLED.has("ac_infinity")).toBe(true);
-    expect(PREVIEW_PERSISTENCE_ENABLED.has("spider_farmer")).toBe(false);
-    expect(PREVIEW_PERSISTENCE_ENABLED.has("vivosun")).toBe(false);
+    expect(PREVIEW_PERSISTENCE_ENABLED.has("spider_farmer")).toBe(true);
+    expect(PREVIEW_PERSISTENCE_ENABLED.has("vivosun")).toBe(true);
+    expect(PREVIEW_PERSISTENCE_ENABLED.has("unknown_source_app")).toBe(false);
   });
 });

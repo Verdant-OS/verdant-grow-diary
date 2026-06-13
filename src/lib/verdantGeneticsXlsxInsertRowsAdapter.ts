@@ -4,7 +4,7 @@
  * objects using Verdant's canonical CSV history model.
  *
  * Hard contract:
- *  - Pure. No React, no Supabase, no fetch, no rpc, no insert/update/
+ *  - Pure. No React, no DB client, no fetch, no rpc, no insert/update/
  *    delete/upsert calls, no alerts, no Action Queue writes, no AI, no
  *    device control.
  *  - Canonical source = "csv". raw_payload.source_app = "verdant_genetics_xlsx".

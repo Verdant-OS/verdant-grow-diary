@@ -155,6 +155,129 @@ describe("AiDoctorContextReadinessPanel", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it("shows imported history disclosure when CSV readings are present", () => {
+    const context = ctx(
+      [],
+      [
+        {
+          metric: "temperature_c",
+          value: 24,
+          captured_at: ago(2 * HOUR),
+          source: "csv",
+          raw_payload: { source_app: "spider_farmer" },
+        },
+        {
+          metric: "humidity_pct",
+          value: 55,
+          captured_at: ago(HOUR),
+          source: "csv",
+          raw_payload: { source_app: "spider_farmer" },
+        },
+      ],
+    );
+    render(<AiDoctorContextReadinessPanel context={context} />);
+    expect(
+      screen.getByTestId("ai-doctor-imported-history-disclosure"),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId("ai-doctor-imported-history-source-label").textContent,
+    ).toContain("CSV history");
+    expect(
+      screen.getByTestId("ai-doctor-imported-history-vendors").textContent,
+    ).toContain("Spider Farmer");
+    expect(
+      screen.getByTestId("ai-doctor-imported-history-total-readings").textContent,
+    ).toBe("2");
+  });
+
+  it("hides imported history disclosure when no CSV readings exist", () => {
+    const context = ctx(
+      [],
+      [
+        { metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "live" },
+        { metric: "humidity_pct", value: 55, captured_at: ago(2 * HOUR), source: "manual" },
+      ],
+    );
+    render(<AiDoctorContextReadinessPanel context={context} />);
+    expect(
+      screen.queryByTestId("ai-doctor-imported-history-disclosure"),
+    ).toBeNull();
+  });
+
+  it("shows missing-live warning when no live readings are present", () => {
+    const context = ctx(
+      [],
+      [
+        {
+          metric: "temperature_c",
+          value: 24,
+          captured_at: ago(HOUR),
+          source: "csv",
+        },
+      ],
+    );
+    render(<AiDoctorContextReadinessPanel context={context} />);
+    expect(
+      screen.getByTestId("ai-doctor-imported-history-missing-live-warning"),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId("ai-doctor-imported-history-missing-live-warning").textContent,
+    ).toContain("missing");
+  });
+
+  it("does not show missing-live warning when live readings are present", () => {
+    const context = ctx(
+      [],
+      [
+        { metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "live" },
+        {
+          metric: "humidity_pct",
+          value: 55,
+          captured_at: ago(2 * HOUR),
+          source: "csv",
+        },
+      ],
+    );
+    render(<AiDoctorContextReadinessPanel context={context} />);
+    expect(
+      screen.queryByTestId("ai-doctor-imported-history-missing-live-warning"),
+    ).toBeNull();
+  });
+
+  it("never renders raw payload or private fields in imported history disclosure", () => {
+    const context = ctx(
+      [],
+      [
+        {
+          metric: "temperature_c",
+          value: 24,
+          captured_at: ago(HOUR),
+          source: "csv",
+          raw_payload: {
+            source_app: "spider_farmer",
+            device_serial: "SF-SECRET-123",
+            bridge_token: "btoken_xyz",
+            file_name: "secret.csv",
+            batch_id: "batch-42",
+            internal_id: "int-99",
+            cell_value: "A1",
+          },
+        },
+      ],
+    );
+    render(<AiDoctorContextReadinessPanel context={context} />);
+    const disclosure = screen.getByTestId("ai-doctor-imported-history-disclosure");
+    const text = disclosure.textContent ?? "";
+    expect(text).not.toContain("SF-SECRET-123");
+    expect(text).not.toContain("btoken_xyz");
+    expect(text).not.toContain("secret.csv");
+    expect(text).not.toContain("batch-42");
+    expect(text).not.toContain("int-99");
+    expect(text).not.toContain("A1");
+    expect(text).not.toContain("raw_payload");
+    expect(text).not.toContain("raw_row");
+  });
+
   it("static guard: panel source imports no Supabase/action-queue/write helpers", async () => {
     const { readFileSync } = await import("node:fs");
     const src = readFileSync(

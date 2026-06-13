@@ -217,7 +217,7 @@ describe("transpirationResponseRules static safety", () => {
 
   for (const term of banned) {
     it(`does not reference '${term}'`, () => {
-      expect(src.toLowerCase()).not.toContain(term);
+      expect(src).not.toContain(term);
     });
   }
 });

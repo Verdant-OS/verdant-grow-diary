@@ -8,7 +8,7 @@
 import { normalizeQuickLogSnapshotMetrics } from "@/lib/quick-log/quickLogSnapshotMetricNormalizer";
 
 
-export type SnapshotSource = "live" | "manual" | "sim" | "diary" | "unavailable";
+export type SnapshotSource = "live" | "manual" | "sim" | "diary" | "csv" | "unavailable";
 
 export interface SensorSnapshot {
   source: SnapshotSource;

@@ -30,6 +30,20 @@ import {
   type EnvironmentCheckEventInput,
 } from "./aiDoctorEnvironmentCheckRules";
 import type { AiDoctorSensorContext } from "./aiDoctorSensorContextRules";
+import {
+  buildAiDoctorCsvHistoryContext,
+  type AiDoctorCsvHistoryContext,
+} from "./aiDoctorCsvHistoryContextRules";
+
+/** Section label rendered for imported CSV/XLSX sensor history. */
+export const AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL =
+  "Imported sensor history";
+
+export interface ImportedSensorHistorySection extends AiDoctorCsvHistoryContext {
+  sectionLabel: typeof AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL;
+  /** Cautionary guidance the AI Doctor consumer renders verbatim. */
+  guidance: readonly string[];
+}
 
 // ---------------------------------------------------------------------------
 // Layer 1 — environment-check aware context compiler (existing behavior).

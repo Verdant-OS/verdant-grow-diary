@@ -73,6 +73,19 @@ interface Props {
 
 const PREVIEW_ROWS = 15;
 
+/**
+ * Friendly "Detected source: …" labels for the auto-detected source-app
+ * pill. Distinct from SOURCE_APP_LABELS (which carries the longer
+ * "Spider Farmer / THP Data" registry label) so the primary UI line
+ * stays short and grower-readable.
+ */
+const DETECTED_SOURCE_DISPLAY: Record<string, string> = {
+  ac_infinity: "AC Infinity",
+  spider_farmer: "Spider Farmer",
+  vivosun: "Vivosun",
+};
+
+
 export default function TentCsvImportCard({ tentId, growId }: Props) {
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement | null>(null);

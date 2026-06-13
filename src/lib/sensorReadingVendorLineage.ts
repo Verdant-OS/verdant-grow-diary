@@ -82,3 +82,24 @@ export function getCsvVendorLabel(row: {
 }): string | null {
   return getCsvVendorLineage(row)?.vendorLabel ?? null;
 }
+
+export type CsvVendorSummary = CsvSourceApp | "multiple" | null;
+
+/**
+ * Summarise CSV vendor lineage across a batch of rows. Returns the
+ * single vendor when all CSV rows agree, "multiple" when CSV rows
+ * disagree, or null when no CSV rows carry a known vendor.
+ */
+export function summarizeCsvVendor(
+  rows: ReadonlyArray<{ source?: string | null; raw_payload?: unknown }>,
+): CsvVendorSummary {
+  const seen = new Set<CsvSourceApp>();
+  for (const row of rows) {
+    if (row.source !== "csv") continue;
+    const lineage = getCsvVendorLineage(row);
+    if (lineage) seen.add(lineage.sourceApp);
+  }
+  if (seen.size === 0) return null;
+  if (seen.size === 1) return [...seen][0];
+  return "multiple";
+}

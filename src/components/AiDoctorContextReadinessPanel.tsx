@@ -21,6 +21,7 @@ import {
   type AiDoctorReadinessState,
 } from "@/lib/aiDoctorReadinessViewModel";
 import type { AiDoctorContext } from "@/lib/aiDoctorEngine";
+import AiDoctorImportedHistoryDisclosurePanel from "@/components/AiDoctorImportedHistoryDisclosurePanel";
 
 export interface AiDoctorContextReadinessPanelProps {
   context: AiDoctorContext;

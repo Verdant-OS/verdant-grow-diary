@@ -522,6 +522,14 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
           className="mt-4 rounded-xl border border-border/60 p-3 grid gap-2 text-xs"
           data-testid="csv-source-preview"
         >
+          <p
+            className="text-sm font-medium"
+            data-testid="csv-source-preview-detected"
+          >
+            {sourcePreview.sourceAppId === "unknown_source_app"
+              ? "Unknown source. Review mapping before importing."
+              : `Detected source: ${DETECTED_SOURCE_DISPLAY[sourcePreview.sourceAppId] ?? sourcePreview.sourceAppLabel}`}
+          </p>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary" data-testid="csv-source-preview-app">
               {sourcePreview.sourceAppLabel}
@@ -533,6 +541,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
               {sourcePreview.confidenceLabel}
             </span>
           </div>
+
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <Stat
               label="Accepted rows"

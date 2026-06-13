@@ -6,6 +6,7 @@
  */
 
 import { normalizeQuickLogSnapshotMetrics } from "@/lib/quick-log/quickLogSnapshotMetricNormalizer";
+import { summarizeCsvVendor } from "@/lib/sensorReadingVendorLineage";
 
 
 export type SnapshotSource = "live" | "manual" | "sim" | "diary" | "csv" | "unavailable";

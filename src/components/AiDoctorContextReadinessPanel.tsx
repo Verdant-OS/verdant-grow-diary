@@ -208,6 +208,8 @@ export default function AiDoctorContextReadinessPanel({
         </div>
       ) : null}
 
+      <AiDoctorImportedHistoryDisclosurePanel context={context} />
+
       <div
         className="rounded-lg border border-border/50 bg-background/30 p-3 space-y-2"
         data-testid="ai-doctor-context-readiness-panel-preview"

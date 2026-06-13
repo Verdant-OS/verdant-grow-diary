@@ -84,11 +84,18 @@ const XLSX_SAVE_SUCCESS_PREFIX =
 export function VerdantGeneticsXlsxPreviewPanel({
   grid,
   tentOptions = [],
+  growId,
+  onSave,
 }: VerdantGeneticsXlsxPreviewPanelProps) {
   const vm = buildVerdantGeneticsXlsxPreviewViewModel(grid);
   const [mappingState, setMappingState] = useState(() =>
     buildInitialMappingState(vm.detectedGroups),
   );
+  const [saveStatus, setSaveStatus] = useState<
+    "idle" | "saving" | "success" | "error"
+  >("idle");
+  const [savedCount, setSavedCount] = useState<number>(0);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const readiness = buildMappingReadiness(
     vm.detectedGroups,
@@ -96,6 +103,52 @@ export function VerdantGeneticsXlsxPreviewPanel({
   );
 
   const hasTents = tentOptions.length > 0;
+
+  // Pure adapter run — derives accepted/rejected/blocked for UI decisions.
+  // No I/O. Safe to recompute on each render.
+  const adapterResult = useMemo<VerdantGeneticsXlsxInsertRowsResult>(() => {
+    return buildVerdantGeneticsXlsxInsertRows({
+      preview: vm.raw,
+      tentIdBySensorGroup: mappingState.tentIdBySensorGroup,
+      growId: growId ?? undefined,
+      importBatchId: "preview",
+    });
+  }, [vm.raw, mappingState.tentIdBySensorGroup, growId]);
+
+  const saveEnabled =
+    !!onSave &&
+    readiness.allMapped &&
+    !adapterResult.blocked &&
+    adapterResult.rows.length > 0 &&
+    saveStatus !== "saving";
+
+  async function handleSaveClick() {
+    if (!onSave) return;
+    if (!saveEnabled) return;
+    setSaveStatus("saving");
+    setSaveError(null);
+    try {
+      const importBatchId = newImportBatchId();
+      const freshResult = buildVerdantGeneticsXlsxInsertRows({
+        preview: vm.raw,
+        tentIdBySensorGroup: mappingState.tentIdBySensorGroup,
+        growId: growId ?? undefined,
+        importBatchId,
+      });
+      await onSave({
+        tentIdBySensorGroup: { ...mappingState.tentIdBySensorGroup },
+        importBatchId,
+        adapterResult: freshResult,
+      });
+      setSavedCount(freshResult.acceptedRowCount);
+      setSaveStatus("success");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Save failed.";
+      setSaveError(msg);
+      setSaveStatus("error");
+    }
+  }
+
 
   return (
     <section

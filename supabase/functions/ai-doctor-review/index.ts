@@ -23,14 +23,9 @@ const MODEL = "google/gemini-3-flash-preview";
 const FEATURE = "ai_doctor_review";
 const MODEL_TIER = "standard";
 
-const SYSTEM_PROMPT =
-  "You are a cautious cannabis grow assistant. Reply ONLY through the " +
-  "submit_ai_doctor_review tool. Use grounded, hedged language. Never " +
-  "claim certainty. Never instruct the user to turn on, switch off, " +
-  "toggle, or otherwise control fans, heaters, humidifiers, dehumidifiers, " +
-  "pumps, lights, valves, controllers, or any other equipment. Use " +
-  "advisory phrasing such as 'Avoid…' or 'Do not…' for cautions. Keep all " +
-  "arrays to at most 12 items and at most one short sentence per item.";
+// Base system prompt is composed inside buildAiDoctorPromptMessages so
+// imported CSV/XLSX history guidance and missing-live-readings notes can
+// be appended deterministically without duplicating copy in this file.
 
 const TOOL_SCHEMA = {
   type: "function" as const,

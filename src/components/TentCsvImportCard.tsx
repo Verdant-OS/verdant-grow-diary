@@ -450,7 +450,13 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
               {xlsxFileName}
             </p>
           )}
-          <VerdantGeneticsXlsxPreviewPanel grid={xlsxGrid} tentOptions={tentOptions} />
+          <VerdantGeneticsXlsxPreviewPanel
+            grid={xlsxGrid}
+            tentOptions={tentOptions}
+            growId={growId ?? undefined}
+            onSave={handleXlsxSave}
+          />
+
         </div>
       )}
 

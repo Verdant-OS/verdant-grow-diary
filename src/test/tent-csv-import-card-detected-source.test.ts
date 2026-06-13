@@ -77,8 +77,9 @@ describe("auto-detected 'Detected source: …' copy is wired", () => {
 
   it("keeps the canonical CSV-history copy from the preview module", () => {
     expect(CANONICAL_SOURCE_COPY).toMatch(/CSV history/);
-    expect(CANONICAL_SOURCE_COPY).not.toMatch(/\blive\b/i);
+    expect(CANONICAL_SOURCE_COPY).toMatch(/not live readings/);
   });
+
 });
 
 describe("safety: no schema/RLS/Edge/auth/alerts/AI/device-control surfaces", () => {

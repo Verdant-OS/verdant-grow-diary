@@ -63,12 +63,18 @@ import EnvironmentSummaryReportPage from "./pages/EnvironmentSummaryReportPage";
 
 const queryClient = new QueryClient();
 
+function AnalyticsShell() {
+  useGoogleAnalyticsPageViews();
+  return null;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <AnalyticsShell />
         <AuthProvider>
           <GrowsProvider>
             <Routes>

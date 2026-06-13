@@ -345,7 +345,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         <input
           ref={fileRef}
           type="file"
-          accept=".csv,text/csv"
+          accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           className="hidden"
           onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
           data-testid="csv-file-input"

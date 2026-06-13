@@ -89,6 +89,7 @@ export interface SensorReadingLike {
   value: number | string | null;
   source?: string | null;
   device_id?: string | null;
+  raw_payload?: unknown;
 }
 
 /**

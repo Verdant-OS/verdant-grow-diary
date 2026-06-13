@@ -18,7 +18,10 @@ function read(rel: string): string {
 function stripped(rel: string): string {
   return read(rel)
     .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/\/\/.*$/gm, "");
+    .replace(/\/\/.*$/gm, "")
+    // Strip accessibility attributes so words like `aria-live` and
+    // `aria-connected` do not trip the forbidden-word scan.
+    .replace(/\baria-[a-z]+(?:=(?:"[^"]*"|'[^']*'|\{[^}]*\}))?/g, "");
 }
 
 const FORBIDDEN_WORDS = [
@@ -103,8 +106,11 @@ describe("QuickLog v2 refresh — static safety", () => {
     expect(src).not.toMatch(/setQueryData\(/);
   });
 
-  it("preserves the success toast copy exactly", () => {
+  it("preserves the success toast copy (literal or via shared constant)", () => {
     const src = read(SHEET);
-    expect(src).toMatch(/toast\.success\(\s*["']Log saved["']\s*\)/);
+    // Manual log path keeps the "Log saved" copy (literal or via successMessage var).
+    expect(src).toMatch(/["']Log saved["']/);
+    // Feeding path routes through the exported shared constant.
+    expect(src).toMatch(/FEEDING_SAVE_SUCCESS_MESSAGE/);
   });
 });

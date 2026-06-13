@@ -260,6 +260,52 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
     }
   }
 
+  /**
+   * XLSX save path for Verdant Genetics multi-tent exports. The mapping
+   * UI passes its current adapter result here. We re-insert into
+   * sensor_readings only — never alerts, action_queue, diary_entries,
+   * grow_events, AI tables, or device tables. Rows are canonical
+   * source = "csv" with raw_payload.source_app = "verdant_genetics_xlsx"
+   * (produced by the pure adapter).
+   */
+  async function handleXlsxSave(args: {
+    adapterResult: import("@/lib/verdantGeneticsXlsxInsertRowsAdapter").VerdantGeneticsXlsxInsertRowsResult;
+  }) {
+    const { adapterResult } = args;
+    if (adapterResult.blocked || adapterResult.rows.length === 0) {
+      toast.error("No XLSX sensor readings were imported.");
+      throw new Error(
+        adapterResult.blockedReason === "missing_tent_mapping"
+          ? "Some sensor groups are unmapped."
+          : "No readable sensor rows found.",
+      );
+    }
+    const { error } = await supabase
+      .from("sensor_readings")
+      .insert(adapterResult.rows as never);
+    if (error) {
+      toast.error("Couldn't import XLSX.", { description: error.message });
+      throw error;
+    }
+    const rejectedSummary =
+      adapterResult.rejectedRowCount > 0
+        ? ` ${adapterResult.rejectedRowCount} rows rejected (${Object.entries(
+            adapterResult.rejectionReasons,
+          )
+            .map(([k, v]) => `${k}: ${v}`)
+            .join(", ")}).`
+        : "";
+    toast.success(
+      `Imported XLSX sensor history as CSV history. ${adapterResult.acceptedRowCount} rows imported.${rejectedSummary}`,
+    );
+    qc.invalidateQueries({ queryKey: ["sensor_readings"] });
+    qc.invalidateQueries({ queryKey: ["grow", "sensors"] });
+    qc.invalidateQueries({ queryKey: ["latest-sensor-snapshot"] });
+    qc.invalidateQueries({ queryKey: ["plant-tent-environment"] });
+    qc.invalidateQueries({ queryKey: ["environment-trends"] });
+  }
+
+
   const registrySaveVisible =
     !!sourcePreview &&
     (sourcePreview.sourceAppId === "spider_farmer" ||
@@ -404,7 +450,13 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
               {xlsxFileName}
             </p>
           )}
-          <VerdantGeneticsXlsxPreviewPanel grid={xlsxGrid} tentOptions={tentOptions} />
+          <VerdantGeneticsXlsxPreviewPanel
+            grid={xlsxGrid}
+            tentOptions={tentOptions}
+            growId={growId ?? undefined}
+            onSave={handleXlsxSave}
+          />
+
         </div>
       )}
 

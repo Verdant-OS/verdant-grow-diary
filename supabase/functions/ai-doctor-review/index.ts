@@ -14,6 +14,7 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { validateAiDoctorReviewResult } from "./contract.ts";
+import { buildAiDoctorPromptMessages } from "../../../src/lib/aiDoctorPromptAssembly.ts";
 
 const TIMEOUT_MS = 25_000;
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
@@ -22,14 +23,9 @@ const MODEL = "google/gemini-3-flash-preview";
 const FEATURE = "ai_doctor_review";
 const MODEL_TIER = "standard";
 
-const SYSTEM_PROMPT =
-  "You are a cautious cannabis grow assistant. Reply ONLY through the " +
-  "submit_ai_doctor_review tool. Use grounded, hedged language. Never " +
-  "claim certainty. Never instruct the user to turn on, switch off, " +
-  "toggle, or otherwise control fans, heaters, humidifiers, dehumidifiers, " +
-  "pumps, lights, valves, controllers, or any other equipment. Use " +
-  "advisory phrasing such as 'Avoid…' or 'Do not…' for cautions. Keep all " +
-  "arrays to at most 12 items and at most one short sentence per item.";
+// Base system prompt is composed inside buildAiDoctorPromptMessages so
+// imported CSV/XLSX history guidance and missing-live-readings notes can
+// be appended deterministically without duplicating copy in this file.
 
 const TOOL_SCHEMA = {
   type: "function" as const,
@@ -206,14 +202,13 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           model: MODEL,
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            {
-              role: "user",
-              content:
-                "Grower context packet (JSON):\n" + JSON.stringify(packet),
-            },
-          ],
+          messages: (() => {
+            const m = buildAiDoctorPromptMessages(packet);
+            return [
+              { role: "system", content: m.system },
+              { role: "user", content: m.user },
+            ];
+          })(),
           tools: [TOOL_SCHEMA],
           tool_choice: {
             type: "function",

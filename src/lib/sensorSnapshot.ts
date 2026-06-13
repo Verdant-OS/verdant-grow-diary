@@ -57,6 +57,7 @@ export const SOURCE_LABEL: Record<SnapshotSource, string> = {
   manual: "Manual",
   sim: "Simulated",
   diary: "Diary snapshot",
+  csv: "CSV history",
   unavailable: "Unavailable",
 };
 

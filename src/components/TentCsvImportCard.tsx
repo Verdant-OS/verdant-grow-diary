@@ -40,8 +40,10 @@ import {
 import { summarizeImportPreview } from "@/lib/sensorImportSourceApps";
 import {
   buildSourceAppPreviewCopy,
+  PREVIEW_PERSISTENCE_ENABLED,
   type PreviewCopy,
 } from "@/lib/sensorImportPreviewCopy";
+import { buildRegistryCsvInsertRows } from "@/lib/registryCsvInsertRowsAdapter";
 
 interface Props {
   tentId: string;

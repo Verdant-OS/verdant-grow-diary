@@ -77,14 +77,18 @@ export function toFingerprintRows(
     metric: string;
     captured_at: string;
     value: number;
-    raw_payload?: { sensor_group?: string | null } | null;
+    raw_payload?: { sensor_group?: string | null } | Record<string, unknown> | null;
   }>,
 ): FingerprintRowInput[] {
-  return rows.map((r) => ({
-    tent_id: r.tent_id,
-    metric: r.metric,
-    captured_at: r.captured_at,
-    value: r.value,
-    sensor_group: r.raw_payload?.sensor_group ?? null,
-  }));
+  return rows.map((r) => {
+    const rp = r.raw_payload as { sensor_group?: string | null } | null | undefined;
+    return {
+      tent_id: r.tent_id,
+      metric: r.metric,
+      captured_at: r.captured_at,
+      value: r.value,
+      sensor_group:
+        rp && typeof rp.sensor_group === "string" ? rp.sensor_group : null,
+    };
+  });
 }

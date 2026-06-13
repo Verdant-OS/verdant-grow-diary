@@ -6,6 +6,7 @@
  */
 
 import { normalizeQuickLogSnapshotMetrics } from "@/lib/quick-log/quickLogSnapshotMetricNormalizer";
+import { summarizeCsvVendor } from "@/lib/sensorReadingVendorLineage";
 
 
 export type SnapshotSource = "live" | "manual" | "sim" | "diary" | "csv" | "unavailable";
@@ -29,6 +30,13 @@ export interface SensorSnapshot {
    * a manual row to live.
    */
   device_id?: string | null;
+  /**
+   * CSV vendor lineage hint extracted from `raw_payload.source_app` on
+   * the contributing CSV rows. Presentation-only — NEVER promotes a
+   * reading to "live". `"multiple"` is used when multiple CSV vendors
+   * are present at the latest timestamp.
+   */
+  csvVendor?: import("@/lib/sensorSourceDisplayLabel").CsvVendorSummary;
 }
 
 export const EMPTY_SNAPSHOT: SensorSnapshot = {
@@ -43,6 +51,7 @@ export const EMPTY_SNAPSHOT: SensorSnapshot = {
   soil_temp: null,
   ppfd: null,
   device_id: null,
+  csvVendor: null,
 };
 
 /** Coerce numeric DB values; returns null for null/undefined/NaN/Infinity. */
@@ -81,6 +90,7 @@ export interface SensorReadingLike {
   value: number | string | null;
   source?: string | null;
   device_id?: string | null;
+  raw_payload?: unknown;
 }
 
 /**
@@ -125,6 +135,9 @@ export function snapshotFromReadings(
   const deviceRow =
     latest.find((r) => r.source === source && !!r.device_id) ??
     latest.find((r) => !!r.device_id);
+  // Summarise CSV vendor lineage (presentation hint only — never
+  // upgrades the source classification).
+  const csvVendor = source === "csv" ? summarizeCsvVendor(latest) : null;
   return {
     source,
     ts: latestTs,
@@ -137,6 +150,7 @@ export function snapshotFromReadings(
     soil_temp: get("soil_temp_c"),
     ppfd: get("ppfd"),
     device_id: deviceRow?.device_id ?? null,
+    csvVendor,
   };
 }
 

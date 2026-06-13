@@ -89,6 +89,7 @@ import {
   formatValue,
   isStale,
 } from "@/lib/sensorSnapshot";
+import { buildSensorSourceDisplayLabel } from "@/lib/sensorSourceDisplayLabel";
 import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
 import { evaluateSensorQuality } from "@/lib/sensorQuality";
 import { tempFFromC, formatTempFFromC } from "@/lib/temperatureUnits";
@@ -719,10 +720,15 @@ export default function Dashboard() {
             <div>
               <div className="flex items-center gap-2 flex-wrap mb-2">
                 <Badge variant="outline" className="text-[10px] uppercase">
-                  {formatSensorSourceLabel({
-                    source: sensorState.snapshot.source,
-                    deviceId: sensorState.snapshot.device_id ?? null,
-                  })}
+                  {sensorState.snapshot.source === "csv"
+                    ? buildSensorSourceDisplayLabel({
+                        source: "csv",
+                        csvVendor: sensorState.snapshot.csvVendor,
+                      })
+                    : formatSensorSourceLabel({
+                        source: sensorState.snapshot.source,
+                        deviceId: sensorState.snapshot.device_id ?? null,
+                      })}
                 </Badge>
                 {sensorState.snapshot.ts && (
                   <span className="text-xs text-muted-foreground">

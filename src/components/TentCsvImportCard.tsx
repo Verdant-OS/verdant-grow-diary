@@ -486,9 +486,21 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
 
       {xlsxGrid && (
         <div data-testid="csv-xlsx-preview-wrapper">
+          <p
+            className="mt-3 text-xs font-medium"
+            data-testid="csv-xlsx-detected-source"
+          >
+            Detected source: Verdant Genetics XLSX
+          </p>
+          <p
+            className="text-[11px] text-muted-foreground"
+            data-testid="csv-xlsx-canonical"
+          >
+            Imported as CSV history, not live sensor data.
+          </p>
           {xlsxFileName && (
             <p
-              className="mt-3 text-[11px] text-muted-foreground"
+              className="mt-1 text-[11px] text-muted-foreground"
               data-testid="csv-xlsx-filename"
             >
               {xlsxFileName}
@@ -503,6 +515,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
 
         </div>
       )}
+
 
       {sourcePreview && (
         <div

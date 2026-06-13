@@ -89,6 +89,7 @@ import {
   formatValue,
   isStale,
 } from "@/lib/sensorSnapshot";
+import { buildSensorSourceDisplayLabel } from "@/lib/sensorSourceDisplayLabel";
 import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
 import { evaluateSensorQuality } from "@/lib/sensorQuality";
 import { tempFFromC, formatTempFFromC } from "@/lib/temperatureUnits";

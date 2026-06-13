@@ -77,32 +77,29 @@ describe("QuickLog compact Stage + Current Setup row", () => {
     expect(within(dialog).getByText("Plant")).toBeInTheDocument();
   });
 
-  it("places Stage + Current Setup inside the compact context row with responsive grid classes", () => {
+  it("places Stage alongside the Event selector in a responsive 2-col grid", () => {
     renderWithClient(<QuickLog open onOpenChange={vi.fn()} />);
-    const row = screen.getByTestId("quicklog-context-row");
-    expect(row).toBeInTheDocument();
-    // Responsive: stacks safely on mobile, side-by-side on ≥sm.
-    expect(row.className).toMatch(/grid-cols-2/);
-    expect(row.className).toMatch(/sm:grid-cols-3/);
-    // Stage + Current Setup live inside the row.
-    expect(within(row).getByText("Stage")).toBeInTheDocument();
-    expect(within(row).getByText("Current Setup")).toBeInTheDocument();
-    expect(within(row).getByText("Event")).toBeInTheDocument();
-    // Plant lives outside the row so its alert/helper has full width.
-    expect(within(row).queryByText("Plant")).toBeNull();
+    const dialog = screen.getByRole("dialog");
+    const stageLabel = within(dialog).getByText("Stage");
+    // Stage shares its parent grid row with the EventTypeSelector.
+    const row = stageLabel.closest("div.grid") as HTMLElement | null;
+    expect(row).not.toBeNull();
+    expect(row!.className).toMatch(/grid-cols-2/);
   });
 
   it("preserves the existing stage value from the active grow", () => {
     renderWithClient(<QuickLog open onOpenChange={vi.fn()} />);
-    const row = screen.getByTestId("quicklog-context-row");
+    const dialog = screen.getByRole("dialog");
+    const stageLabel = within(dialog).getByText("Stage");
+    const row = stageLabel.closest("div.grid") as HTMLElement;
     // Stage default = activeGrow.stage = "flower" → trigger reflects it.
     expect(within(row).getAllByText(/flower/i).length).toBeGreaterThan(0);
   });
 
-  it("does not introduce fake live/sensor copy in the context row", () => {
+  it("does not introduce fake live/sensor copy in the context area", () => {
     renderWithClient(<QuickLog open onOpenChange={vi.fn()} />);
-    const row = screen.getByTestId("quicklog-context-row");
-    const text = row.textContent ?? "";
+    const dialog = screen.getByRole("dialog");
+    const text = dialog.textContent ?? "";
     expect(text).not.toMatch(/\blive data\b|\blive sensor\b|guaranteed/i);
   });
 

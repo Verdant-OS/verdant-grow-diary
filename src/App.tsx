@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/store/auth";
 import { GrowsProvider } from "@/store/grows";
+import { useGoogleAnalyticsPageViews } from "@/hooks/useGoogleAnalyticsPageViews";
 import AppShell from "@/components/AppShell";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
@@ -62,12 +63,18 @@ import EnvironmentSummaryReportPage from "./pages/EnvironmentSummaryReportPage";
 
 const queryClient = new QueryClient();
 
+function AnalyticsShell() {
+  useGoogleAnalyticsPageViews();
+  return null;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <AnalyticsShell />
         <AuthProvider>
           <GrowsProvider>
             <Routes>

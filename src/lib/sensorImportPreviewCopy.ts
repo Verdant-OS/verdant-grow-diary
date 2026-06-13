@@ -19,10 +19,17 @@ import {
   type SourceAppPreview,
 } from "@/lib/sensorImportSourceApps";
 
-/** Source apps whose persistence path is wired and safe today. */
+/**
+ * Source apps whose persistence path is wired and safe today.
+ *
+ * - ac_infinity → legacy `buildCsvInsertRows` path (unchanged).
+ * - spider_farmer / vivosun → `buildRegistryCsvInsertRows` adapter, which
+ *   emits source = "csv" (accepted by the deployed validate_sensor_reading
+ *   trigger as confirmed by csv-source-allow-list-audit on 2026-06-13).
+ */
 export const PREVIEW_PERSISTENCE_ENABLED: ReadonlySet<SourceAppId> = new Set<
   SourceAppId
->(["ac_infinity"]);
+>(["ac_infinity", "spider_farmer", "vivosun"]);
 
 export const CANONICAL_SOURCE_COPY =
   "Imported rows will be labeled as CSV history, not live readings." as const;

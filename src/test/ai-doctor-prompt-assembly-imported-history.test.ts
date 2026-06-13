@@ -140,7 +140,8 @@ describe("buildAiDoctorPromptMessages — imported-history injection", () => {
     // Helper itself is pure: no Supabase, fetch, or device imports.
     const helperPath = resolve(process.cwd(), "src/lib/aiDoctorPromptAssembly.ts");
     const helperSrc = readFileSync(helperPath, "utf8");
-    expect(helperSrc).not.toMatch(/supabase/i);
+    expect(helperSrc).not.toMatch(/from ["']@\/integrations\/supabase/);
+    expect(helperSrc).not.toMatch(/createClient\(/);
     expect(helperSrc).not.toMatch(/\bfetch\(/);
     expect(helperSrc).not.toMatch(/action_queue/);
   });

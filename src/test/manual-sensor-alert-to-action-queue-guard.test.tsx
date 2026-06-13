@@ -26,10 +26,8 @@ import {
   isAlertEligibleForActionQueue,
   type AlertLike,
 } from "@/lib/alertToActionQueueRules";
-import {
-  buildEnvironmentAlerts,
-  type AlertInputs,
-} from "@/lib/environmentAlerts";
+
+
 
 const ROOT = resolve(__dirname, "../..");
 const MANUAL_CARD = readFileSync(

@@ -376,6 +376,28 @@ export function compilePlantContextFromRows(
     }
   }
 
+  // ----- imported CSV/XLSX sensor history (read-only, never live) -----
+  const csvHistory = buildAiDoctorCsvHistoryContext({
+    rows: input.sensorReadings ?? [],
+  });
+  const imported_sensor_history: ImportedSensorHistorySection | null =
+    csvHistory.hasCsvHistory
+      ? {
+          ...csvHistory,
+          sectionLabel: AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL,
+          guidance: Object.freeze([
+            csvHistory.notForLiveDiagnosis,
+            "Imported history may show trends but is not proof of current conditions.",
+          ]),
+        }
+      : null;
+
+  // Live-sensor presence is computed from the trustworthy "live" bucket
+  // only. CSV/manual/demo/stale/invalid never satisfy live-availability.
+  const hasLiveSensorReadings = sensor_groups.some(
+    (g) => g.source === "live" && g.sample_count > 0,
+  );
+
   return {
     grow_id: plant?.grow_id ?? null,
     tent_id: plant?.tent_id ?? null,
@@ -389,6 +411,9 @@ export function compilePlantContextFromRows(
     averages_7d,
     notable_deviations: Object.freeze(notable_deviations),
     source_tags: Object.freeze(sensor_groups.map((g) => g.source)),
+    imported_sensor_history,
+    hasLiveSensorReadings,
+    missingLiveSensorReadings: !hasLiveSensorReadings,
   };
 }
 

@@ -44,6 +44,9 @@ import {
   type PreviewCopy,
 } from "@/lib/sensorImportPreviewCopy";
 import { buildRegistryCsvInsertRows } from "@/lib/registryCsvInsertRowsAdapter";
+import { readXlsxFileToCellGrid } from "@/lib/verdantGeneticsXlsxFileLoader";
+import VerdantGeneticsXlsxPreviewPanel from "@/components/VerdantGeneticsXlsxPreviewPanel";
+import type { CellGrid } from "@/lib/verdantGeneticsXlsxParser";
 
 interface Props {
   tentId: string;
@@ -63,6 +66,8 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
   const [importing, setImporting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [sourcePreview, setSourcePreview] = useState<PreviewCopy | null>(null);
+  const [xlsxGrid, setXlsxGrid] = useState<CellGrid | null>(null);
+  const [xlsxFileName, setXlsxFileName] = useState<string | null>(null);
 
   const supportedApp = CSV_IMPORT_SOURCE_APPS.find((a) => a.id === sourceApp);
   const sourceEnabled = !!supportedApp?.enabled;
@@ -73,6 +78,8 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
     setParseError(null);
     setPreview(null);
     setSourcePreview(null);
+    setXlsxGrid(null);
+    setXlsxFileName(null);
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -80,6 +87,8 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
     setParseError(null);
     setPreview(null);
     setSourcePreview(null);
+    setXlsxGrid(null);
+    setXlsxFileName(null);
     if (!file) return;
     if (file.size > MAX_CSV_BYTES) {
       setParseError(
@@ -90,6 +99,19 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
       return;
     }
     setFileName(file.name);
+    // XLSX branch — preview-only via the pure Verdant Genetics parser.
+    // Persistence stays disabled. No Supabase, no alerts, no Action Queue.
+    if (/\.xlsx$/i.test(file.name)) {
+      try {
+        const grid = await readXlsxFileToCellGrid(file);
+        setXlsxGrid(grid);
+        setXlsxFileName(file.name);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Couldn't read XLSX.";
+        setParseError(msg);
+      }
+      return;
+    }
     const t = await file.text();
     setText(t);
     // Read-only source-app detection. Never touches the persistence path.
@@ -323,7 +345,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         <input
           ref={fileRef}
           type="file"
-          accept=".csv,text/csv"
+          accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           className="hidden"
           onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
           data-testid="csv-file-input"
@@ -358,6 +380,20 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         >
           {parseError}
         </p>
+      )}
+
+      {xlsxGrid && (
+        <div data-testid="csv-xlsx-preview-wrapper">
+          {xlsxFileName && (
+            <p
+              className="mt-3 text-[11px] text-muted-foreground"
+              data-testid="csv-xlsx-filename"
+            >
+              {xlsxFileName}
+            </p>
+          )}
+          <VerdantGeneticsXlsxPreviewPanel grid={xlsxGrid} />
+        </div>
       )}
 
       {sourcePreview && (

@@ -61,7 +61,9 @@ describe("useGoogleAnalyticsPageViews — gtag behavior", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    delete (window as any).gtag;
+    if (typeof window !== "undefined") {
+      delete (window as any).gtag;
+    }
   });
 
   it("calls gtag config with the measurement ID when gtag is present", () => {

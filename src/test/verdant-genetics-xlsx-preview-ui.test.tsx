@@ -119,9 +119,9 @@ describe("VerdantGeneticsXlsxPreviewPanel", () => {
 
   it("shows unknown-format copy when grid does not match the Verdant Genetics shape", () => {
     const unknownGrid: CellGrid = [
-      ["foo", "bar"],
-      ["baz", "qux"],
-      ["1", "2"],
+      ["unrelated", "header"],
+      ["mystery_col", "other_col"],
+      ["not-a-date", "not-a-number"],
     ];
     render(<VerdantGeneticsXlsxPreviewPanel grid={unknownGrid} />);
     expect(screen.getByTestId("vg-xlsx-unknown-shape")).toHaveTextContent(

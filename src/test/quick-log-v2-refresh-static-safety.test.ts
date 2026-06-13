@@ -106,8 +106,11 @@ describe("QuickLog v2 refresh — static safety", () => {
     expect(src).not.toMatch(/setQueryData\(/);
   });
 
-  it("preserves the success toast copy exactly", () => {
+  it("preserves the success toast copy (literal or via shared constant)", () => {
     const src = read(SHEET);
-    expect(src).toMatch(/toast\.success\(\s*["']Log saved["']\s*\)/);
+    // Manual log path keeps the "Log saved" copy (literal or via successMessage var).
+    expect(src).toMatch(/["']Log saved["']/);
+    // Feeding path routes through the exported shared constant.
+    expect(src).toMatch(/FEEDING_SAVE_SUCCESS_MESSAGE/);
   });
 });

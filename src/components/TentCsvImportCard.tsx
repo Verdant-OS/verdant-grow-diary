@@ -77,6 +77,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
   const [sourcePreview, setSourcePreview] = useState<PreviewCopy | null>(null);
   const [xlsxGrid, setXlsxGrid] = useState<CellGrid | null>(null);
   const [xlsxFileName, setXlsxFileName] = useState<string | null>(null);
+  const [auditRefreshKey, setAuditRefreshKey] = useState(0);
 
   const { data: tentsData } = useTents();
   const tentOptions: TentOption[] = useMemo(

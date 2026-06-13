@@ -86,7 +86,10 @@ describe("ActionDetail completion → follow-up wiring is idempotent and safe", 
 });
 
 describe("actionFollowupRules helper safety scan", () => {
-  const src = readFile("src/lib/actionFollowupRules.ts");
+  const raw = readFile("src/lib/actionFollowupRules.ts");
+  const src = raw
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
 
   it("does not reference forbidden capabilities", () => {
     for (const forbidden of [

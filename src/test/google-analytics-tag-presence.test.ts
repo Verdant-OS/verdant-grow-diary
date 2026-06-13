@@ -27,6 +27,6 @@ describe("Google Analytics tag presence in index.html", () => {
   });
 
   it("contains the gtag function definition", () => {
-    expect(INDEX_HTML).toContain("function gtag(){dataLayer.push(arguments)}");
+    expect(INDEX_HTML).toContain("function gtag(){dataLayer.push(arguments);}");
   });
 });

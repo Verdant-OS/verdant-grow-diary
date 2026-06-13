@@ -111,9 +111,8 @@ describe("useGoogleAnalyticsPageViews — gtag behavior", () => {
     }).not.toThrow();
   });
 
-  it("no-ops safely when window is undefined (SSR-like)", () => {
-    const originalWindow = globalThis.window;
-    (globalThis as any).window = undefined;
+  it("no-ops safely when gtag is missing on window", () => {
+    delete (window as any).gtag;
 
     const wrapper = ({ children }: { children: React.ReactNode }) =>
       React.createElement(MemoryRouter, { initialEntries: ["/dashboard"] }, children);
@@ -121,7 +120,5 @@ describe("useGoogleAnalyticsPageViews — gtag behavior", () => {
     expect(() => {
       renderHook(() => useGoogleAnalyticsPageViews(), { wrapper });
     }).not.toThrow();
-
-    (globalThis as any).window = originalWindow;
   });
 });

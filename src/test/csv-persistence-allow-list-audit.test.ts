@@ -211,8 +211,13 @@ describe("audit: registry → writer transformation gaps", () => {
   });
 });
 
-describe("safety: UI save remains blocked for Spider Farmer / Vivosun / unknown", () => {
-  it("PREVIEW_PERSISTENCE_ENABLED contains only ac_infinity", () => {
-    expect([...PREVIEW_PERSISTENCE_ENABLED]).toEqual(["ac_infinity"]);
+describe("persistence gate after Spider Farmer / Vivosun enablement", () => {
+  it("PREVIEW_PERSISTENCE_ENABLED includes ac_infinity, spider_farmer, vivosun", () => {
+    const ids = [...PREVIEW_PERSISTENCE_ENABLED].sort();
+    expect(ids).toEqual(["ac_infinity", "spider_farmer", "vivosun"]);
+  });
+
+  it("unknown_source_app is still blocked", () => {
+    expect(PREVIEW_PERSISTENCE_ENABLED.has("unknown_source_app")).toBe(false);
   });
 });

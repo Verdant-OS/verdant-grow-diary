@@ -47,6 +47,8 @@ import { buildRegistryCsvInsertRows } from "@/lib/registryCsvInsertRowsAdapter";
 import { readXlsxFileToCellGrid } from "@/lib/verdantGeneticsXlsxFileLoader";
 import VerdantGeneticsXlsxPreviewPanel from "@/components/VerdantGeneticsXlsxPreviewPanel";
 import type { CellGrid } from "@/lib/verdantGeneticsXlsxParser";
+import { useTents } from "@/hooks/use-tents";
+import type { TentOption } from "@/lib/verdantGeneticsXlsxMappingViewModel";
 
 interface Props {
   tentId: string;

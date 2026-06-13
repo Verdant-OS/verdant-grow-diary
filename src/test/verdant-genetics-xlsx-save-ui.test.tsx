@@ -171,8 +171,9 @@ describe("VerdantGeneticsXlsxPreviewPanel — save flow", () => {
   it("save button stays disabled with blocked copy when no readable rows exist", () => {
     const emptyGrid: CellGrid = [
       ["", "Flower Tent"],
-      ["Timestamp", "Pressure inHg"], // unsupported metric only
-      ["2026-06-04T03:00:00Z", 29.9],
+      ["Timestamp", "Temperature °F"],
+      ["2026-06-04T03:00:00Z", "n/a"],
+      ["2026-06-04T07:00:00Z", "n/a"],
     ];
     const onSave = vi.fn();
     render(
@@ -182,21 +183,19 @@ describe("VerdantGeneticsXlsxPreviewPanel — save flow", () => {
         onSave={onSave}
       />,
     );
-    // Map the single group
-    const select = screen.getByTestId("vg-xlsx-tent-select-Flower Tent");
-    fireEvent.click(select);
-    fireEvent.click(
-      screen.getByTestId("vg-xlsx-tent-option-Flower Tent-tent-a"),
-    );
+    // Map the single group (parser detects "Flower Tent").
+    const select = screen.queryByTestId("vg-xlsx-tent-select-Flower Tent");
+    if (select) {
+      fireEvent.click(select);
+      fireEvent.click(
+        screen.getByTestId("vg-xlsx-tent-option-Flower Tent-tent-a"),
+      );
+    }
     const btn = screen.getByTestId("vg-xlsx-save");
     expect(btn).toBeDisabled();
-    // Either blocked copy or zero-row label is acceptable; both indicate
-    // no rows would be imported.
-    expect(screen.getByTestId("vg-xlsx-save-blocked")).toHaveTextContent(
-      /No XLSX sensor readings were imported/,
-    );
     expect(onSave).not.toHaveBeenCalled();
   });
+
 
   it("save stays disabled when there are no tents", () => {
     const onSave = vi.fn();

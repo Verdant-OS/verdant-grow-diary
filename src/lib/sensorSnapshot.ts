@@ -103,11 +103,22 @@ export function snapshotFromReadings(
   const anyManual = latest.some((r) => r.source === "manual");
   const allSim =
     latest.length > 0 && latest.every((r) => r.source === "sim");
+  const allCsv =
+    latest.length > 0 && latest.every((r) => r.source === "csv");
+  const anyCsv = latest.some((r) => r.source === "csv");
+  // CSV history must never be promoted to "live". If every row at the
+  // latest timestamp is CSV, classify as "csv". If CSV is mixed with
+  // non-live sources but no manual, still prefer csv over live so
+  // imported history never masquerades as a live reading.
   const source: SnapshotSource = anyManual
     ? "manual"
     : allSim
       ? "sim"
-      : "live";
+      : allCsv
+        ? "csv"
+        : anyCsv
+          ? "csv"
+          : "live";
   // Prefer a device_id from a row matching the resolved source so manual
   // device notes (device_id = "manual:...") are surfaced for manual
   // snapshots; otherwise fall back to any device_id at the latest ts.

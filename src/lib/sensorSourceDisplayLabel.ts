@@ -18,11 +18,11 @@
  */
 import { SOURCE_LABEL, type SnapshotSource } from "@/lib/sensorSnapshot";
 import {
-  getCsvVendorLineage,
   type CsvSourceApp,
+  type CsvVendorSummary,
 } from "@/lib/sensorReadingVendorLineage";
 
-export type CsvVendorSummary = CsvSourceApp | "multiple" | null;
+export type { CsvVendorSummary };
 
 export interface SensorSourceDisplayInput {
   source: SnapshotSource | string | null | undefined;

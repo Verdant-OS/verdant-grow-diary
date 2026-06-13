@@ -255,6 +255,17 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         );
         return;
       }
+      const fingerprint = buildSensorHistoryImportFingerprint({
+        sourceAppId: detected,
+        rows: toFingerprintRows(result.rows),
+      });
+      if (hasSensorHistoryImportFingerprint(fingerprint)) {
+        setParseError(SENSOR_HISTORY_IMPORT_DUPLICATE_COPY);
+        toast.error("Duplicate import blocked.", {
+          description: SENSOR_HISTORY_IMPORT_DUPLICATE_COPY,
+        });
+        return;
+      }
       const { error } = await supabase
         .from("sensor_readings")
         .insert(result.rows as never);
@@ -272,6 +283,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         recordSensorHistoryImportAuditEvent(auditInput);
         setAuditRefreshKey((k) => k + 1);
       }
+      recordSensorHistoryImportFingerprint(fingerprint);
       qc.invalidateQueries({ queryKey: ["sensor_readings"] });
       qc.invalidateQueries({ queryKey: ["grow", "sensors"] });
       qc.invalidateQueries({ queryKey: ["latest-sensor-snapshot"] });

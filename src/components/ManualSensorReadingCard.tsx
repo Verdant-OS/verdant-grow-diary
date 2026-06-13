@@ -117,6 +117,10 @@ export default function ManualSensorReadingCard({
       toast.error("Pick a tent first.");
       return;
     }
+    if (!isUuid(tentId)) {
+      toast.error("Select a real tent before saving a manual sensor reading.");
+      return;
+    }
     if (!validation.ok) {
       toast.error(validation.errors[0] ?? "Reading is invalid.");
       return;

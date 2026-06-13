@@ -197,11 +197,18 @@ describe("Action Queue follow-up rules — idempotency matcher", () => {
   });
 });
 
+function stripComments(src: string): string {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+}
+
 describe("Action Queue follow-up rules — static safety of helper module", () => {
-  const src = fs.readFileSync(
+  const raw = fs.readFileSync(
     path.resolve(__dirname, "../lib/actionFollowupRules.ts"),
     "utf8",
   );
+  const src = stripComments(raw);
 
   it("contains no DB / RPC / network / secret references", () => {
     for (const forbidden of [

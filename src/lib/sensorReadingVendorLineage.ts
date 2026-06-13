@@ -91,7 +91,7 @@ export type CsvVendorSummary = CsvSourceApp | "multiple" | null;
  * disagree, or null when no CSV rows carry a known vendor.
  */
 export function summarizeCsvVendor(
-  rows: ReadonlyArray<{ source?: string | null; raw_payload?: unknown }>,
+  rows: ReadonlyArray<{ source?: string | null; raw_payload?: unknown; [k: string]: unknown }>,
 ): CsvVendorSummary {
   const seen = new Set<CsvSourceApp>();
   for (const row of rows) {

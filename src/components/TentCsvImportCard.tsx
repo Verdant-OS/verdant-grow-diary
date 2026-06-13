@@ -1,15 +1,18 @@
 /**
  * TentCsvImportCard — Gate 2A "CSV Drop" surface.
  *
- * User-initiated import of historical sensor data from an exported CSV
- * (AC Infinity supported in this PR; TrolMaster + Other shown as
- * "Coming soon"). Presenter only — all parsing, normalization, dedupe and
- * source labeling live in src/lib/csvSensorImportRules.ts.
+ * User-initiated import of historical sensor data from an exported file.
+ * The source app (AC Infinity, Spider Farmer, Vivosun, Verdant Genetics
+ * XLSX) is auto-detected from the file contents — there is no manual
+ * provider dropdown. Presenter only — all parsing, normalization, dedupe
+ * and source labeling live in src/lib/csvSensorImportRules.ts and
+ * src/lib/sensorImportSourceApps.ts.
  *
  * Safety contract is enforced by src/test/csv-sensor-import.test.ts —
  * never auto-assigns plants, never writes alerts/action_queue, never blends
  * imported rows with live/manual readings.
  */
+
 import { useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { FileUp, Loader2, Upload } from "lucide-react";

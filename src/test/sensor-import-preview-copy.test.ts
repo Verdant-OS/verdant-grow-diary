@@ -44,10 +44,10 @@ const UNKNOWN_CSV = [
 ].join("\n");
 
 describe("persistence policy", () => {
-  it("only ac_infinity is wired for save in this slice", () => {
+  it("ac_infinity, spider_farmer, and vivosun are wired for save", () => {
     expect(PREVIEW_PERSISTENCE_ENABLED.has("ac_infinity")).toBe(true);
-    expect(PREVIEW_PERSISTENCE_ENABLED.has("spider_farmer")).toBe(false);
-    expect(PREVIEW_PERSISTENCE_ENABLED.has("vivosun")).toBe(false);
+    expect(PREVIEW_PERSISTENCE_ENABLED.has("spider_farmer")).toBe(true);
+    expect(PREVIEW_PERSISTENCE_ENABLED.has("vivosun")).toBe(true);
     expect(PREVIEW_PERSISTENCE_ENABLED.has("unknown_source_app")).toBe(false);
   });
 });
@@ -86,9 +86,9 @@ describe("Spider Farmer (primary, full)", () => {
     expect(copy.acceptedRowCount).toBeGreaterThan(0);
   });
 
-  it("does NOT enable the import button (persistence not wired)", () => {
-    expect(copy.importEnabled).toBe(false);
-    expect(copy.importDisabledReason).toBe(IMPORT_BLOCKED_NOT_WIRED_COPY);
+  it("enables import (persistence wired via registry adapter)", () => {
+    expect(copy.importEnabled).toBe(true);
+    expect(copy.importDisabledReason).toBeNull();
   });
 });
 
@@ -98,7 +98,7 @@ describe("Spider Farmer (primary, sparse co2/ppfd)", () => {
   it("still detects spider_farmer and accepts rows", () => {
     expect(copy.sourceAppId).toBe("spider_farmer");
     expect(copy.acceptedRowCount).toBeGreaterThan(0);
-    expect(copy.importEnabled).toBe(false);
+    expect(copy.importEnabled).toBe(true);
   });
 });
 
@@ -139,9 +139,9 @@ describe("Vivosun (GrowHub)", () => {
     expect(copy.notices).toContain(VIVOSUN_CO2_EMPTY_COPY);
   });
 
-  it("does not enable import (persistence not wired)", () => {
-    expect(copy.importEnabled).toBe(false);
-    expect(copy.importDisabledReason).toBe(IMPORT_BLOCKED_NOT_WIRED_COPY);
+  it("enables import (persistence wired via registry adapter)", () => {
+    expect(copy.importEnabled).toBe(true);
+    expect(copy.importDisabledReason).toBeNull();
   });
 });
 

@@ -40,8 +40,10 @@ import {
 import { summarizeImportPreview } from "@/lib/sensorImportSourceApps";
 import {
   buildSourceAppPreviewCopy,
+  PREVIEW_PERSISTENCE_ENABLED,
   type PreviewCopy,
 } from "@/lib/sensorImportPreviewCopy";
+import { buildRegistryCsvInsertRows } from "@/lib/registryCsvInsertRowsAdapter";
 
 interface Props {
   tentId: string;
@@ -125,14 +127,17 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
     setPreview(result);
   }
 
+  function newBatchId(): string {
+    return typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `csv-${Date.now()}`;
+  }
+
   async function handleImport() {
     if (!preview || preview.rows.length === 0) return;
     setImporting(true);
     try {
-      const importBatchId =
-        typeof crypto !== "undefined" && "randomUUID" in crypto
-          ? crypto.randomUUID()
-          : `csv-${Date.now()}`;
+      const importBatchId = newBatchId();
       const rows = buildCsvInsertRows({
         tentId,
         growId,
@@ -160,6 +165,71 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
       setImporting(false);
     }
   }
+
+  /**
+   * Registry-adapter save path for Spider Farmer / Vivosun. AC Infinity is
+   * intentionally excluded here — it continues to use the legacy
+   * `buildCsvInsertRows` path via handleImport so this slice does not
+   * regress its behavior. Adapter emits source = "csv" (the production
+   * trigger's allow-listed canonical), with vendor lineage preserved in
+   * raw_payload.source_app.
+   */
+  async function handleRegistryImport() {
+    if (!sourcePreview || !text) return;
+    const detected = sourcePreview.sourceAppId;
+    if (detected !== "spider_farmer" && detected !== "vivosun") return;
+    if (!PREVIEW_PERSISTENCE_ENABLED.has(detected)) return;
+    if (!sourcePreview.importEnabled) return;
+    setImporting(true);
+    try {
+      const importBatchId = newBatchId();
+      const result = buildRegistryCsvInsertRows({
+        tentId,
+        growId,
+        sourceApp: detected,
+        importBatchId,
+        csvText: text,
+      });
+      if (result.blocked) {
+        setParseError(
+          result.blockedReason === "unknown_source_app"
+            ? "Unknown CSV source. Review mapping before importing."
+            : "This CSV can't be imported.",
+        );
+        return;
+      }
+      if (result.rows.length === 0) {
+        setParseError(
+          "No sensor readings found. This file appears to contain timestamps or device metadata only.",
+        );
+        return;
+      }
+      const { error } = await supabase
+        .from("sensor_readings")
+        .insert(result.rows as never);
+      if (error) throw error;
+      toast.success(
+        `Imported ${result.rows.length} ${sourcePreview.sourceAppLabel} CSV history rows.`,
+      );
+      qc.invalidateQueries({ queryKey: ["sensor_readings"] });
+      qc.invalidateQueries({ queryKey: ["grow", "sensors"] });
+      qc.invalidateQueries({ queryKey: ["latest-sensor-snapshot"] });
+      qc.invalidateQueries({ queryKey: ["plant-tent-environment"] });
+      qc.invalidateQueries({ queryKey: ["environment-trends"] });
+      reset();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Import failed.";
+      setParseError(msg);
+      toast.error("Couldn't import CSV.", { description: msg });
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  const registrySaveVisible =
+    !!sourcePreview &&
+    (sourcePreview.sourceAppId === "spider_farmer" ||
+      sourcePreview.sourceAppId === "vivosun");
 
   const validCount = preview?.rows.reduce((n, r) => n + r.readings.length, 0) ?? 0;
   const skippedCount = preview?.skipped.length ?? 0;
@@ -370,6 +440,24 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
             >
               {sourcePreview.importDisabledReason}
             </p>
+          )}
+
+          {registrySaveVisible && (
+            <Button
+              type="button"
+              onClick={handleRegistryImport}
+              disabled={!sourcePreview.importEnabled || importing}
+              data-testid="csv-registry-import"
+              className="w-full"
+            >
+              {importing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> Importing…
+                </>
+              ) : (
+                `Import ${sourcePreview.sourceAppLabel} CSV history`
+              )}
+            </Button>
           )}
         </div>
       )}

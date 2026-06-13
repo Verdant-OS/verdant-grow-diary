@@ -16,11 +16,26 @@ declare global {
   }
 }
 
+const UUID_RE = /\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+const LONG_TOKEN_RE = /\/[a-zA-Z0-9_-]{20,}/g;
+
+/**
+ * Sanitize a page path before sending to analytics.
+ * Replaces UUIDs and long random token-like segments with :id
+ * to avoid leaking private identifiers.
+ */
+export function sanitizePagePath(path: string): string {
+  return path
+    .replace(UUID_RE, "/:id")
+    .replace(LONG_TOKEN_RE, "/:id");
+}
+
 function trackPageView(path: string, title: string) {
   if (typeof window === "undefined") return;
   if (typeof window.gtag !== "function") return;
+  const safePath = sanitizePagePath(path);
   window.gtag("config", GOOGLE_ANALYTICS_MEASUREMENT_ID, {
-    page_path: path,
+    page_path: safePath,
     page_title: title,
   });
 }
@@ -37,3 +52,4 @@ export function useGoogleAnalyticsPageViews() {
     trackPageView(location.pathname + location.search, document.title);
   }, [location.pathname, location.search]);
 }
+

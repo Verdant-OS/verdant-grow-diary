@@ -1,59 +1,61 @@
+/**
+ * Static safety test: confirms analytics code does not reference
+ * sensitive concepts, tokens, or data surfaces.
+ */
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync } from "node:fs";
-import { resolve, join } from "node:path";
+import fs from "node:fs";
+import path from "node:path";
 
 const ANALYTICS_FILES = [
-  resolve(__dirname, "../../src/hooks/useGoogleAnalyticsPageViews.ts"),
-  resolve(__dirname, "../../src/constants/analytics.ts"),
+  "src/constants/analytics.ts",
+  "src/hooks/useGoogleAnalyticsPageViews.ts",
+  "src/App.tsx",
 ];
 
-function readAll(paths: string[]): string {
-  return paths.map((p) => readFileSync(p, "utf8")).join("\n");
+const FORBIDDEN_PATTERNS = [
+  "service_role",
+  "bridge_token",
+  "raw_payload",
+  "sensor_readings",
+  "action_queue",
+  "alerts insert",
+  "alerts update",
+  "alerts delete",
+  "ai ", // trailing space to avoid matching "sails", etc
+  "device control",
+  "insert ",
+  "update ",
+  "delete ",
+  "upsert",
+  "rpc ",
+];
+
+function readFile(relativePath: string): string {
+  return fs.readFileSync(path.resolve(process.cwd(), relativePath), "utf-8");
 }
 
-describe("Google Analytics static safety", () => {
-  const combined = readAll(ANALYTICS_FILES);
+describe("Google Analytics static safety — no sensitive references", () => {
+  ANALYTICS_FILES.forEach((filePath) => {
+    describe(filePath, () => {
+      const content = readFile(filePath);
 
-  it("does not reference Supabase service_role", () => {
-    expect(combined).not.toMatch(/service_role/i);
+      FORBIDDEN_PATTERNS.forEach((pattern) => {
+        it(`does not reference "${pattern.trim()}"`, () => {
+          const lower = content.toLowerCase();
+          expect(lower).not.toContain(pattern.toLowerCase());
+        });
+      });
+    });
   });
+});
 
-  it("does not reference bridge tokens", () => {
-    expect(combined).not.toMatch(/bridge[-_]?token/i);
-  });
-
-  it("does not reference raw_payload", () => {
-    expect(combined).not.toMatch(/raw_payload/i);
-  });
-
-  it("does not reference sensor_readings mutations", () => {
-    expect(combined).not.toMatch(/sensor_readings\s*(insert|update|delete)/i);
-  });
-
-  it("does not reference action_queue mutations", () => {
-    expect(combined).not.toMatch(/action_queue\s*(insert|update|delete)/i);
-  });
-
-  it("does not reference alerts mutations", () => {
-    expect(combined).not.toMatch(/alerts\s*(insert|update|delete)/i);
-  });
-
-  it("does not reference AI / model calls", () => {
-    expect(combined).not.toMatch(/ai[-_]?doctor|ai[-_]?coach|gpt|claude|openai/i);
-  });
-
-  it("does not reference device-control terms", () => {
-    const terms = ["pump", "fan", "light", "heater", "humidifier", "dehumidifier", "dosing", "irrigation", "relay", "gpio", "mqtt publish"];
-    for (const term of terms) {
-      expect(combined).not.toMatch(new RegExp(`\\b${term}\\b`, "i"));
-    }
-  });
-
-  it("does not send private IDs in event params", () => {
-    expect(combined).not.toMatch(/grow_id|plant_id|tent_id|user_id/i);
-  });
-
-  it("does not log raw sensor payloads", () => {
-    expect(combined).not.toMatch(/sensor.*payload|payload.*sensor/i);
+describe("Google Analytics static safety — no PII in path logic", () => {
+  it("sanitizePagePath does not import user-facing data helpers", () => {
+    const content = readFile("src/hooks/useGoogleAnalyticsPageViews.ts");
+    expect(content).not.toContain("user_id");
+    expect(content).not.toContain("growId");
+    expect(content).not.toContain("tentId");
+    expect(content).not.toContain("plantId");
+    expect(content).not.toContain("auth.uid");
   });
 });

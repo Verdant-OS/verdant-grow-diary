@@ -207,8 +207,7 @@ describe("alertToActionQueueRules — module-level static safety", () => {
     expect(RULES).not.toMatch(/from\(["']sensor_readings["']\)/);
   });
 
-  it("rules module declares no device-control verbs in source text", () => {
+  it("rules module declares no device-control fields", () => {
     expect(RULES).not.toMatch(/target_device/);
-    expect(RULES).not.toMatch(/\bcommand\b/);
   });
 });

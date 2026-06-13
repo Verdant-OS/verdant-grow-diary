@@ -139,9 +139,9 @@ describe("Vivosun (GrowHub)", () => {
     expect(copy.notices).toContain(VIVOSUN_CO2_EMPTY_COPY);
   });
 
-  it("does not enable import (persistence not wired)", () => {
-    expect(copy.importEnabled).toBe(false);
-    expect(copy.importDisabledReason).toBe(IMPORT_BLOCKED_NOT_WIRED_COPY);
+  it("enables import (persistence wired via registry adapter)", () => {
+    expect(copy.importEnabled).toBe(true);
+    expect(copy.importDisabledReason).toBeNull();
   });
 });
 

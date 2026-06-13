@@ -58,25 +58,19 @@ describe("csv source allow-list audit (deployed trigger)", () => {
   });
 
   it("every adapter-emitted metric is in the deployed metric allow-list", () => {
-    const rows = buildRegistryCsvInsertRows({
-      sourceAppId: "spider_farmer",
-      headers: [
-        "Time",
-        "Temperature(°F)",
-        "Humidity(%)",
-        "VPD(kPa)",
-        "CO2(ppm)",
-        "PPFD(umol/m2/s)",
-      ],
-      rows: [
-        ["2026-06-12T10:00:00Z", "75", "55", "1.1", "850", "600"],
-      ],
+    const csvText = [
+      "Time,Temperature(°F),Humidity(%),VPD(kPa),CO2(ppm),PPFD(umol/m2/s)",
+      "2026-06-12T10:00:00Z,75,55,1.1,850,600",
+    ].join("\n");
+    const result = buildRegistryCsvInsertRows({
+      sourceApp: "spider_farmer",
+      csvText,
       tentId: "tent-1",
       growId: null,
       importBatchId: "batch-1",
     });
-    expect(rows.length).toBeGreaterThan(0);
-    for (const r of rows) {
+    expect(result.rows.length).toBeGreaterThan(0);
+    for (const r of result.rows) {
       expect(DEPLOYED_ACCEPTED_METRICS).toContain(r.metric);
       expect(r.source).toBe("csv");
       expect(r.quality).toBe("ok");

@@ -263,10 +263,14 @@ describe("History panels copy + safety", () => {
   it("empty states point growers to Quick Log", () => {
     expect(PANELS).toMatch(/Log a Pest \/ Disease event from Quick Log/);
     expect(PANELS).toMatch(/Log a Training event from Quick Log/);
-    expect(PANELS).toMatch(/handheld readings in Quick Log/);
+    // Measurement empty state directs growers to add manual readings in Quick
+    // Log and explicitly clarifies they are not live sensor data.
+    expect(PANELS).toMatch(/manual readings in Quick Log/);
+    expect(PANELS).toMatch(/not live sensor data/);
   });
 
   it("manual readings are labeled as manual handheld (not live sensor data)", () => {
-    expect(PANELS).toMatch(/Manual handheld readings \(not live sensor data\)/);
+    // Current copy uses an em dash between the label and the disclaimer.
+    expect(PANELS).toMatch(/Manual handheld readings\s+[—-]\s+not live sensor data/);
   });
 });

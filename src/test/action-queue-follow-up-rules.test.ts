@@ -117,7 +117,9 @@ describe("Action Queue follow-up rules — draft builder", () => {
       const r = buildActionFollowupDiaryDraft(completed(v));
       if (!r.ok) throw new Error("expected ok");
       const note = r.draft.note.toLowerCase();
-      expect(note).not.toMatch(/\b(fixed|cured|healed|improved|resolved|healthy now)\b/);
+      // Note must ask the grower to verify; must not assert the plant
+      // is already fixed/cured/healed (those would be unverified claims).
+      expect(note).not.toMatch(/\b(fixed|cured|healed|healthy now|problem solved)\b/i);
       expect(note).toMatch(/re-check|review|note|confirm/);
     }
   });

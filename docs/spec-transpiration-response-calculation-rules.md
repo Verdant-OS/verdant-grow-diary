@@ -112,29 +112,31 @@ Confidence is the **minimum** of (source confidence, boundary clarity, coverage 
 ## Stage Handling
 
 - `stage` must be explicit for every window.
-- If the stage changes inside the window, the window is either:
-  - **Split** at the stage-change timestamp into two sub-windows, or
-  - **Marked** as `mixed-stage` with lower confidence.
-- `mixed-stage` windows cannot be used for stage-comparative analysis without explicit grower review.
-- Unknown or uncanonical stage → `insufficient data`.
+- Future intent: if the stage changes inside the window, the window is either
+  **split** at the stage-change timestamp into two sub-windows, or **marked**
+  `mixed-stage` with lower confidence.
+- **Skeleton status:** mixed-stage handling is **deferred**. The current pure
+  rules module (`src/lib/transpirationResponseRules.ts`) treats each input as a
+  single-stage window and does not split or downgrade on stage changes.
 
 ---
 
 ## Soil Moisture Proxy Rules
 
 1. Soil moisture **cannot** produce `water_loss_rate_per_vpd` directly.
-2. It may produce a separate, explicitly labeled metric: `moisture_response_proxy`.
-3. Any output derived from soil moisture must:
-   - Carry confidence `low`.
-   - Be labeled `proxy`.
-   - Not be compared 1:1 with load-cell-derived `water_loss_rate_per_vpd`.
-4. Suspicious values:
-   - `0 %` or `100 %` → flagged suspicious, marked invalid for that reading, and noted in warnings.
-5. Calibration requirements:
-   - Media type (soil, coco, rockwool).
-   - Pot size / container geometry.
-   - Sensor depth and placement.
-   - Without per-grow calibration, soil-moisture data is treated as uncalibrated and low-confidence.
+2. It may eventually produce a separate, explicitly labeled metric
+   `moisture_response_proxy`.
+3. **Skeleton status:** the soil-moisture proxy path is **parked**. When
+   `weightSource === "soil_moisture_proxy"` the rules module returns
+   `status: "insufficient"`, `confidence: "insufficient"`, all weight-based
+   metrics `null`, and `moistureResponseProxy: null`, with warning
+   `soil_moisture_proxy_low_confidence` and reason
+   `soil_moisture_proxy_not_supported_in_skeleton`.
+4. When this path is later un-parked, any output derived from soil moisture
+   must carry confidence `low`, be labeled `proxy`, and never be compared
+   1:1 with load-cell-derived `water_loss_rate_per_vpd`.
+5. Suspicious values (`0 %` / `100 %`) and calibration requirements (media,
+   pot size, sensor depth) remain documented for the future implementation.
 
 ---
 

@@ -7,7 +7,36 @@
 - `docs/spec-transpiration-response-dashboard.md`
 
 **Status:** Parked — awaiting instrumented-tent data availability and cultivation sign-off.  
-**Scope:** Documentation / calculation contract only. No production code, schema, UI, or automation.
+**Scope:** Documentation / calculation contract. A pure rules **skeleton** exists at
+`src/lib/transpirationResponseRules.ts` with golden fixtures under
+`fixtures/transpiration-response/`. There is still no UI, schema, RLS,
+Edge Function, alert, Action Queue, AI Doctor, or device-control wiring.
+
+---
+
+## Skeleton Implementation Status
+
+The pure rules module implements a deliberately conservative subset of this spec:
+
+- **Authoritative metric hierarchy:**
+  - **Primary:** `waterLossRatePerVpdPerSize` (g/h/kPa/size) — only computed when a
+    qualified `sizeProxyValue > 0` is provided. **Never defaults size proxy to 1.**
+  - **Supporting:** `waterLossRatePerVpd` (g/h/kPa) — computed for any valid
+    weight-based window, with or without a size proxy.
+  - **Soil moisture:** `moistureResponseProxy` — parked. The skeleton always
+    returns `null` for this field and routes soil-moisture inputs to `insufficient`.
+- **Soil-moisture proxy path** is parked as `insufficient` and produces no metrics.
+- **Mixed-stage handling** is deferred — windows are treated as single-stage.
+- **Staleness check** runs **only when `now` is provided** on the input. The
+  default `stalenessThresholdHours = 6` is **provisional** and overridable via
+  `TranspirationRulesOptions`.
+- **Realistic VPD band** is configurable. Current defaults:
+  `minRealisticVpdKpa = 0.05`, `maxRealisticVpdKpa = 4.0`. Average VPD outside
+  this open band returns `insufficient` with reason
+  `average_vpd_outside_realistic_band`.
+- **Static safety boundary** is enforced by tests: the module cannot import
+  React, Supabase, `fetch`, `.rpc`/`.insert`/`.update`/`.delete`/`.upsert`,
+  `action_queue`, `alerts`, OpenAI, AI Doctor, or any device/relay/actuator code.
 
 ---
 

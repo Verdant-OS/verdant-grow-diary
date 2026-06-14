@@ -86,13 +86,13 @@ A dryback window is the bounded period over which water loss is measured.
 
 | Condition | Result |
 |-----------|--------|
-| `end_weight_g >= start_weight_g` | Invalid unless explained by a known irrigation/top-off event inside the window. If unexplained, mark `invalid` with reason. |
+| `end_weight_g >= start_weight_g` | Invalid unless explained by a known irrigation/top-off event inside the window. The skeleton does **not** yet model top-off accounting, so any non-decreasing weight returns `status: "invalid"`. |
 | `duration_hours <= 0` | Invalid. Negative or zero duration makes rate meaningless. |
-| `average_vpd_kpa` missing, zero, or outside realistic range (e.g., < 0.1 kPa or > 5.0 kPa) | Insufficient data. |
-| Fewer than 2 valid weight readings | Insufficient data. |
-| VPD coverage too sparse (e.g., < 1 reading per 4 hours over a 24 h window) | Low confidence or insufficient, depending on policy. |
-| Weight data stale (exceeds configured staleness threshold) | Mark `stale` or `insufficient` depending on threshold. |
-| Soil moisture used as the primary weight proxy | Confidence forced to `low`; metric must carry `proxy` label. |
+| `average_vpd_kpa` missing or outside the configurable realistic band | Insufficient. The skeleton currently treats values `<= minRealisticVpdKpa` or `>= maxRealisticVpdKpa` as unrealistic. Defaults are `minRealisticVpdKpa = 0.05` and `maxRealisticVpdKpa = 4.0` kPa; both are tunable via `TranspirationRulesOptions`. |
+| Fewer than 2 valid weight readings (start + end) | Insufficient. |
+| VPD coverage too sparse (below `minVpdReadings`, default `2`) | Adds `sparse_vpd_coverage` warning and lowers confidence to `low`. |
+| Weight data stale | Stale check runs **only when `now` is provided**. End weight older than `stalenessThresholdHours` (provisional default `6` hours) returns `status: "stale"`, `confidence: "insufficient"`. |
+| Soil moisture used as the primary weight proxy | Parked in the skeleton — see the Soil Moisture Proxy Rules section below. |
 
 ---
 

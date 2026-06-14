@@ -1,0 +1,282 @@
+{
+  "$comment": "Deterministic golden fixtures for src/lib/transpirationResponseRules.ts. See fixtures/transpiration-response/README.md. Synthetic data only — not from any real grow or device.",
+  "cases": [
+    {
+      "id": "valid_load_cell_with_plant_weight_kg",
+      "description": "Happy path: load-cell weights, clear diary boundaries, dense VPD, qualified size proxy.",
+      "input": {
+        "windowId": "golden-1",
+        "plantId": "p1",
+        "tentId": "t1",
+        "stage": "flower_mid",
+        "startTime": "2026-06-13T08:00:00.000Z",
+        "endTime": "2026-06-13T12:00:00.000Z",
+        "startWeightG": 5000,
+        "endWeightG": 4800,
+        "vpdReadings": [
+          { "capturedAt": "2026-06-13T08:00:00.000Z", "valueKpa": 1.0 },
+          { "capturedAt": "2026-06-13T09:00:00.000Z", "valueKpa": 1.2 },
+          { "capturedAt": "2026-06-13T10:00:00.000Z", "valueKpa": 1.4 },
+          { "capturedAt": "2026-06-13T11:00:00.000Z", "valueKpa": 1.4 }
+        ],
+        "sizeBasis": "plant_weight_kg",
+        "sizeProxyValue": 1.2,
+        "weightSource": "load_cell",
+        "boundarySource": "diary_event",
+        "now": "2026-06-13T13:00:00.000Z"
+      },
+      "expected": {
+        "status": "valid",
+        "confidence": "high",
+        "primaryMetricPresent": true,
+        "supportingMetricPresent": true,
+        "moistureProxyPresent": false,
+        "warnings": [],
+        "confidenceReasons": ["load_cell_with_size_and_adequate_vpd"]
+      }
+    },
+    {
+      "id": "valid_manual_with_plant_weight_kg",
+      "description": "Manual weight entry with qualified size proxy and adequate VPD.",
+      "input": {
+        "windowId": "golden-2",
+        "plantId": "p1",
+        "tentId": "t1",
+        "stage": "flower_mid",
+        "startTime": "2026-06-13T08:00:00.000Z",
+        "endTime": "2026-06-13T12:00:00.000Z",
+        "startWeightG": 5000,
+        "endWeightG": 4800,
+        "vpdReadings": [
+          { "capturedAt": "2026-06-13T08:00:00.000Z", "valueKpa": 1.0 },
+          { "capturedAt": "2026-06-13T09:00:00.000Z", "valueKpa": 1.2 },
+          { "capturedAt": "2026-06-13T10:00:00.000Z", "valueKpa": 1.4 },
+          { "capturedAt": "2026-06-13T11:00:00.000Z", "valueKpa": 1.4 }
+        ],
+        "sizeBasis": "plant_weight_kg",
+        "sizeProxyValue": 1.2,
+        "weightSource": "manual",
+        "boundarySource": "manual_baseline",
+        "now": "2026-06-13T13:00:00.000Z"
+      },
+      "expected": {
+        "status": "valid",
+        "confidence": "medium",
+        "primaryMetricPresent": true,
+        "supportingMetricPresent": true,
+        "moistureProxyPresent": false,
+        "warnings": [],
+        "confidenceReasons": ["manual_weight_with_size_and_adequate_vpd"]
+      }
+    },
+    {
+      "id": "valid_weight_no_size_proxy",
+      "description": "Weights present but no qualified size proxy → primary null, supporting present, low confidence.",
+      "input": {
+        "windowId": "golden-3",
+        "stage": "flower_mid",
+        "startTime": "2026-06-13T08:00:00.000Z",
+        "endTime": "2026-06-13T12:00:00.000Z",
+        "startWeightG": 5000,
+        "endWeightG": 4800,
+        "vpdReadings": [
+          { "capturedAt": "2026-06-13T08:00:00.000Z", "valueKpa": 1.0 },
+          { "capturedAt": "2026-06-13T09:00:00.000Z", "valueKpa": 1.2 },
+          { "capturedAt": "2026-06-13T10:00:00.000Z", "valueKpa": 1.4 },
+          { "capturedAt": "2026-06-13T11:00:00.000Z", "valueKpa": 1.4 }
+        ],
+        "sizeBasis": "none",
+        "sizeProxyValue": null,
+        "weightSource": "load_cell",
+        "boundarySource": "diary_event",
+        "now": "2026-06-13T13:00:00.000Z"
+      },
+      "expected": {
+        "status": "valid",
+        "confidence": "low",
+        "primaryMetricPresent": false,
+        "supportingMetricPresent": true,
+        "moistureProxyPresent": false,
+        "warnings": ["size_unnormalized"],
+        "confidenceReasons": ["no_qualified_size_proxy", "size_unnormalized_fallback"]
+      }
+    },
+    {
+      "id": "missing_vpd",
+      "description": "No VPD readings inside the window.",
+      "input": {
+        "windowId": "golden-4",
+        "stage": "flower_mid",
+        "startTime": "2026-06-13T08:00:00.000Z",
+        "endTime": "2026-06-13T12:00:00.000Z",
+        "startWeightG": 5000,
+        "endWeightG": 4800,
+        "vpdReadings": [],
+        "sizeBasis": "plant_weight_kg",
+        "sizeProxyValue": 1.2,
+        "weightSource": "load_cell",
+        "boundarySource": "diary_event",
+        "now": "2026-06-13T13:00:00.000Z"
+      },
+      "expected": {
+        "status": "insufficient",
+        "confidence": "insufficient",
+        "primaryMetricPresent": false,
+        "supportingMetricPresent": false,
+        "moistureProxyPresent": false,
+        "warnings": ["missing_vpd"],
+        "confidenceReasons": ["no_vpd_readings_in_window"]
+      }
+    },
+    {
+      "id": "unrealistic_vpd",
+      "description": "Average VPD outside the realistic configurable band.",
+      "input": {
+        "windowId": "golden-5",
+        "stage": "flower_mid",
+        "startTime": "2026-06-13T08:00:00.000Z",
+        "endTime": "2026-06-13T12:00:00.000Z",
+        "startWeightG": 5000,
+        "endWeightG": 4800,
+        "vpdReadings": [
+          { "capturedAt": "2026-06-13T08:00:00.000Z", "valueKpa": 99 },
+          { "capturedAt": "2026-06-13T09:00:00.000Z", "valueKpa": 99 }
+        ],
+        "sizeBasis": "plant_weight_kg",
+        "sizeProxyValue": 1.2,
+        "weightSource": "load_cell",
+        "boundarySource": "diary_event",
+        "now": "2026-06-13T13:00:00.000Z"
+      },
+      "expected": {
+        "status": "insufficient",
+        "confidence": "insufficient",
+        "primaryMetricPresent": false,
+        "supportingMetricPresent": false,
+        "moistureProxyPresent": false,
+        "warnings": ["unrealistic_vpd"],
+        "confidenceReasons": ["average_vpd_outside_realistic_band"]
+      }
+    },
+    {
+      "id": "stale_load_cell_window",
+      "description": "End weight older than the default 6h staleness threshold relative to `now`.",
+      "input": {
+        "windowId": "golden-6",
+        "stage": "flower_mid",
+        "startTime": "2026-06-13T08:00:00.000Z",
+        "endTime": "2026-06-13T12:00:00.000Z",
+        "startWeightG": 5000,
+        "endWeightG": 4800,
+        "vpdReadings": [
+          { "capturedAt": "2026-06-13T08:00:00.000Z", "valueKpa": 1.0 },
+          { "capturedAt": "2026-06-13T09:00:00.000Z", "valueKpa": 1.2 }
+        ],
+        "sizeBasis": "plant_weight_kg",
+        "sizeProxyValue": 1.2,
+        "weightSource": "load_cell",
+        "boundarySource": "diary_event",
+        "now": "2026-06-15T12:00:00.000Z"
+      },
+      "expected": {
+        "status": "stale",
+        "confidence": "insufficient",
+        "primaryMetricPresent": false,
+        "supportingMetricPresent": false,
+        "moistureProxyPresent": false,
+        "warnings": ["stale_weight"],
+        "confidenceReasons": ["end_weight_exceeds_staleness_threshold"]
+      }
+    },
+    {
+      "id": "weight_jump_only_boundary",
+      "description": "Boundary inferred from weight jumps alone → unreliable, parked as insufficient.",
+      "input": {
+        "windowId": "golden-7",
+        "stage": "flower_mid",
+        "startTime": "2026-06-13T08:00:00.000Z",
+        "endTime": "2026-06-13T12:00:00.000Z",
+        "startWeightG": 5000,
+        "endWeightG": 4800,
+        "vpdReadings": [
+          { "capturedAt": "2026-06-13T08:00:00.000Z", "valueKpa": 1.0 },
+          { "capturedAt": "2026-06-13T09:00:00.000Z", "valueKpa": 1.2 }
+        ],
+        "sizeBasis": "plant_weight_kg",
+        "sizeProxyValue": 1.2,
+        "weightSource": "load_cell",
+        "boundarySource": "weight_jump_only",
+        "now": "2026-06-13T13:00:00.000Z"
+      },
+      "expected": {
+        "status": "insufficient",
+        "confidence": "insufficient",
+        "primaryMetricPresent": false,
+        "supportingMetricPresent": false,
+        "moistureProxyPresent": false,
+        "warnings": ["unreliable_boundary"],
+        "confidenceReasons": ["boundary_source_not_diary_or_manual"]
+      }
+    },
+    {
+      "id": "end_weight_greater_than_start",
+      "description": "End weight ≥ start weight without explained top-off → invalid.",
+      "input": {
+        "windowId": "golden-8",
+        "stage": "flower_mid",
+        "startTime": "2026-06-13T08:00:00.000Z",
+        "endTime": "2026-06-13T12:00:00.000Z",
+        "startWeightG": 4000,
+        "endWeightG": 4200,
+        "vpdReadings": [
+          { "capturedAt": "2026-06-13T08:00:00.000Z", "valueKpa": 1.0 },
+          { "capturedAt": "2026-06-13T09:00:00.000Z", "valueKpa": 1.2 }
+        ],
+        "sizeBasis": "plant_weight_kg",
+        "sizeProxyValue": 1.2,
+        "weightSource": "load_cell",
+        "boundarySource": "diary_event",
+        "now": "2026-06-13T13:00:00.000Z"
+      },
+      "expected": {
+        "status": "invalid",
+        "confidence": "insufficient",
+        "primaryMetricPresent": false,
+        "supportingMetricPresent": false,
+        "moistureProxyPresent": false,
+        "warnings": ["end_weight_not_less_than_start"],
+        "confidenceReasons": ["water_loss_non_positive"]
+      }
+    },
+    {
+      "id": "soil_moisture_proxy_path",
+      "description": "Soil-moisture proxy is parked in the skeleton — never produces weight-based metrics.",
+      "input": {
+        "windowId": "golden-9",
+        "stage": "flower_mid",
+        "startTime": "2026-06-13T08:00:00.000Z",
+        "endTime": "2026-06-13T12:00:00.000Z",
+        "startWeightG": null,
+        "endWeightG": null,
+        "vpdReadings": [
+          { "capturedAt": "2026-06-13T08:00:00.000Z", "valueKpa": 1.0 },
+          { "capturedAt": "2026-06-13T09:00:00.000Z", "valueKpa": 1.2 }
+        ],
+        "sizeBasis": "none",
+        "sizeProxyValue": null,
+        "weightSource": "soil_moisture_proxy",
+        "boundarySource": "diary_event",
+        "now": "2026-06-13T13:00:00.000Z"
+      },
+      "expected": {
+        "status": "insufficient",
+        "confidence": "insufficient",
+        "primaryMetricPresent": false,
+        "supportingMetricPresent": false,
+        "moistureProxyPresent": false,
+        "warnings": ["soil_moisture_proxy_low_confidence"],
+        "confidenceReasons": ["soil_moisture_proxy_not_supported_in_skeleton"]
+      }
+    }
+  ]
+}

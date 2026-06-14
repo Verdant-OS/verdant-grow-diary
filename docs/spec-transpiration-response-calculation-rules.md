@@ -7,7 +7,36 @@
 - `docs/spec-transpiration-response-dashboard.md`
 
 **Status:** Parked — awaiting instrumented-tent data availability and cultivation sign-off.  
-**Scope:** Documentation / calculation contract only. No production code, schema, UI, or automation.
+**Scope:** Documentation / calculation contract. A pure rules **skeleton** exists at
+`src/lib/transpirationResponseRules.ts` with golden fixtures under
+`fixtures/transpiration-response/`. There is still no UI, schema, RLS,
+Edge Function, alert, Action Queue, AI Doctor, or device-control wiring.
+
+---
+
+## Skeleton Implementation Status
+
+The pure rules module implements a deliberately conservative subset of this spec:
+
+- **Authoritative metric hierarchy:**
+  - **Primary:** `waterLossRatePerVpdPerSize` (g/h/kPa/size) — only computed when a
+    qualified `sizeProxyValue > 0` is provided. **Never defaults size proxy to 1.**
+  - **Supporting:** `waterLossRatePerVpd` (g/h/kPa) — computed for any valid
+    weight-based window, with or without a size proxy.
+  - **Soil moisture:** `moistureResponseProxy` — parked. The skeleton always
+    returns `null` for this field and routes soil-moisture inputs to `insufficient`.
+- **Soil-moisture proxy path** is parked as `insufficient` and produces no metrics.
+- **Mixed-stage handling** is deferred — windows are treated as single-stage.
+- **Staleness check** runs **only when `now` is provided** on the input. The
+  default `stalenessThresholdHours = 6` is **provisional** and overridable via
+  `TranspirationRulesOptions`.
+- **Realistic VPD band** is configurable. Current defaults:
+  `minRealisticVpdKpa = 0.05`, `maxRealisticVpdKpa = 4.0`. Average VPD outside
+  this open band returns `insufficient` with reason
+  `average_vpd_outside_realistic_band`.
+- **Static safety boundary** is enforced by tests: the module cannot import
+  React, Supabase, `fetch`, `.rpc`/`.insert`/`.update`/`.delete`/`.upsert`,
+  `action_queue`, `alerts`, OpenAI, AI Doctor, or any device/relay/actuator code.
 
 ---
 
@@ -86,13 +115,13 @@ A dryback window is the bounded period over which water loss is measured.
 
 | Condition | Result |
 |-----------|--------|
-| `end_weight_g >= start_weight_g` | Invalid unless explained by a known irrigation/top-off event inside the window. If unexplained, mark `invalid` with reason. |
+| `end_weight_g >= start_weight_g` | Invalid unless explained by a known irrigation/top-off event inside the window. The skeleton does **not** yet model top-off accounting, so any non-decreasing weight returns `status: "invalid"`. |
 | `duration_hours <= 0` | Invalid. Negative or zero duration makes rate meaningless. |
-| `average_vpd_kpa` missing, zero, or outside realistic range (e.g., < 0.1 kPa or > 5.0 kPa) | Insufficient data. |
-| Fewer than 2 valid weight readings | Insufficient data. |
-| VPD coverage too sparse (e.g., < 1 reading per 4 hours over a 24 h window) | Low confidence or insufficient, depending on policy. |
-| Weight data stale (exceeds configured staleness threshold) | Mark `stale` or `insufficient` depending on threshold. |
-| Soil moisture used as the primary weight proxy | Confidence forced to `low`; metric must carry `proxy` label. |
+| `average_vpd_kpa` missing or outside the configurable realistic band | Insufficient. The skeleton currently treats values `<= minRealisticVpdKpa` or `>= maxRealisticVpdKpa` as unrealistic. Defaults are `minRealisticVpdKpa = 0.05` and `maxRealisticVpdKpa = 4.0` kPa; both are tunable via `TranspirationRulesOptions`. |
+| Fewer than 2 valid weight readings (start + end) | Insufficient. |
+| VPD coverage too sparse (below `minVpdReadings`, default `2`) | Adds `sparse_vpd_coverage` warning and lowers confidence to `low`. |
+| Weight data stale | Stale check runs **only when `now` is provided**. End weight older than `stalenessThresholdHours` (provisional default `6` hours) returns `status: "stale"`, `confidence: "insufficient"`. |
+| Soil moisture used as the primary weight proxy | Parked in the skeleton — see the Soil Moisture Proxy Rules section below. |
 
 ---
 
@@ -112,29 +141,31 @@ Confidence is the **minimum** of (source confidence, boundary clarity, coverage 
 ## Stage Handling
 
 - `stage` must be explicit for every window.
-- If the stage changes inside the window, the window is either:
-  - **Split** at the stage-change timestamp into two sub-windows, or
-  - **Marked** as `mixed-stage` with lower confidence.
-- `mixed-stage` windows cannot be used for stage-comparative analysis without explicit grower review.
-- Unknown or uncanonical stage → `insufficient data`.
+- Future intent: if the stage changes inside the window, the window is either
+  **split** at the stage-change timestamp into two sub-windows, or **marked**
+  `mixed-stage` with lower confidence.
+- **Skeleton status:** mixed-stage handling is **deferred**. The current pure
+  rules module (`src/lib/transpirationResponseRules.ts`) treats each input as a
+  single-stage window and does not split or downgrade on stage changes.
 
 ---
 
 ## Soil Moisture Proxy Rules
 
 1. Soil moisture **cannot** produce `water_loss_rate_per_vpd` directly.
-2. It may produce a separate, explicitly labeled metric: `moisture_response_proxy`.
-3. Any output derived from soil moisture must:
-   - Carry confidence `low`.
-   - Be labeled `proxy`.
-   - Not be compared 1:1 with load-cell-derived `water_loss_rate_per_vpd`.
-4. Suspicious values:
-   - `0 %` or `100 %` → flagged suspicious, marked invalid for that reading, and noted in warnings.
-5. Calibration requirements:
-   - Media type (soil, coco, rockwool).
-   - Pot size / container geometry.
-   - Sensor depth and placement.
-   - Without per-grow calibration, soil-moisture data is treated as uncalibrated and low-confidence.
+2. It may eventually produce a separate, explicitly labeled metric
+   `moisture_response_proxy`.
+3. **Skeleton status:** the soil-moisture proxy path is **parked**. When
+   `weightSource === "soil_moisture_proxy"` the rules module returns
+   `status: "insufficient"`, `confidence: "insufficient"`, all weight-based
+   metrics `null`, and `moistureResponseProxy: null`, with warning
+   `soil_moisture_proxy_low_confidence` and reason
+   `soil_moisture_proxy_not_supported_in_skeleton`.
+4. When this path is later un-parked, any output derived from soil moisture
+   must carry confidence `low`, be labeled `proxy`, and never be compared
+   1:1 with load-cell-derived `water_loss_rate_per_vpd`.
+5. Suspicious values (`0 %` / `100 %`) and calibration requirements (media,
+   pot size, sensor depth) remain documented for the future implementation.
 
 ---
 

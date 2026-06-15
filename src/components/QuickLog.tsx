@@ -136,6 +136,7 @@ function savedVerb(eventType: string): string {
   if (eventType === "feeding") return "feeding";
   if (eventType === "observation") return "observation";
   if (eventType === "photo") return "photo note";
+  if (eventType === "environment") return "environment check";
   return "log";
 }
 

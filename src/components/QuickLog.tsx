@@ -190,6 +190,10 @@ export default function QuickLog({
   const [wateringError, setWateringError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedTarget, setSavedTarget] = useState<SavedTarget | null>(null);
+  const [earlyMilestone, setEarlyMilestone] = useState<EarlyStageMilestone | null>(null);
+  const [earlyVigor, setEarlyVigor] = useState<EarlyStageVigor | null>(null);
+  const [earlyNotes, setEarlyNotes] = useState<string>("");
+  const [earlyManuallyOpen, setEarlyManuallyOpen] = useState(false);
 
   const wateringInputRef = useRef<HTMLInputElement | null>(null);
   const plantSelectTriggerRef = useRef<HTMLButtonElement | null>(null);

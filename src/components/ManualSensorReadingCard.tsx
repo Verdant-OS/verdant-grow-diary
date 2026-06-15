@@ -24,6 +24,11 @@ import {
   MAX_MANUAL_DEVICE_NOTE_LEN,
 } from "@/lib/manualSensorSourceLabel";
 import { evaluateManualSnapshotAdvisor } from "@/lib/manualSensorSnapshotAdvisorRules";
+import {
+  evaluateManualSensorSnapshotQuality,
+  type ManualSensorSnapshotInput,
+} from "@/lib/manualSensorSnapshotQualityRules";
+import ManualSensorSnapshotQualityBadge from "@/components/ManualSensorSnapshotQualityBadge";
 import DerivedVpdStatus from "@/components/DerivedVpdStatus";
 import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
 import { shouldRequireFirstTentSetup } from "@/lib/firstTentSetupRules";
@@ -73,6 +78,24 @@ export default function ManualSensorReadingCard({
 
   const validation = useMemo(() => validateManualEntry(form), [form]);
   const advisor = useMemo(() => evaluateManualSnapshotAdvisor(form), [form]);
+  const snapshotQuality = useMemo(() => {
+    // Build a sanitized snapshot from validated metrics only. No raw_payload,
+    // no vendor metadata, no tokens, no private IDs. captured_at = now since
+    // the grower is entering a current reading right now.
+    const fields: Record<string, number> = {};
+    for (const m of validation.metrics) {
+      if (m.metric === "temperature_c") fields.temperature_c = m.value;
+      else if (m.metric === "humidity_pct") fields.humidity_pct = m.value;
+      else if (m.metric === "vpd_kpa") fields.vpd_kpa = m.value;
+      else if (m.metric === "soil_moisture_pct") fields.soil_moisture_pct = m.value;
+    }
+    const snap: ManualSensorSnapshotInput = {
+      source: "manual",
+      captured_at: new Date().toISOString(),
+      ...fields,
+    };
+    return evaluateManualSensorSnapshotQuality(snap);
+  }, [validation.metrics]);
 
   function update<K extends keyof ManualEntryInput>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -416,6 +439,24 @@ export default function ManualSensorReadingCard({
             </div>
           </div>
         )}
+
+        <section
+          className="rounded-md border border-border/50 bg-muted/30 p-3 space-y-2"
+          data-testid="manual-reading-snapshot-quality"
+          aria-label="Snapshot quality"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Snapshot quality
+            </h3>
+          </div>
+          <ManualSensorSnapshotQualityBadge evaluation={snapshotQuality} />
+          <p className="text-[11px] text-muted-foreground">
+            This check helps AI Doctor decide whether the reading can support
+            current-room guidance.
+          </p>
+        </section>
+
 
         <div className="flex items-center justify-between gap-2 pt-1">
           <p className="text-[11px] text-muted-foreground">

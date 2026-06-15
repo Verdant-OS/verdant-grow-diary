@@ -29,6 +29,7 @@ import type {
 } from "@/lib/timelineFilterRules";
 import { deriveSensorEvidenceMode } from "@/lib/aiDoctorSessionPersistence";
 import { isQuickLogCompanionDiaryRow } from "@/lib/quick-log/quickLogDiaryCompanionRules";
+import { buildEarlyStageTimelineViewModel } from "@/lib/earlyStageTimelineViewModel";
 
 
 export const TIMELINE_MEMORY_DEFAULT_LIMIT = 100;

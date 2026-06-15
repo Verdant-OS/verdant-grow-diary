@@ -67,6 +67,24 @@ export interface DiaryCalendarEvent {
   plantName: string | null;
   /** Trimmed, length-capped note snippet — never raw details. */
   noteSnippet: string | null;
+  /** Pre-computed, allowlisted detail lines for the expanded view. */
+  details: DiaryCalendarEventDetails;
+}
+
+export interface DiaryCalendarEventDisplayField {
+  label: string;
+  value: string;
+}
+
+export interface DiaryCalendarEventDetails {
+  /** Human-readable section heading, e.g. "Watering details". */
+  sectionLabel: string;
+  /** Allowlisted, vetted display fields. Never the raw details object. */
+  fields: DiaryCalendarEventDisplayField[];
+  /** Read-only EC @25°C preview for feeding only; never marked as stored. */
+  ecPreview: EcCompensationPreviewModel | null;
+  /** Calm fallback when there are no fields, no preview, and no note. */
+  fallback: string | null;
 }
 
 export interface DiaryCalendarDayGroup {

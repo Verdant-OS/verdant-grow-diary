@@ -216,8 +216,7 @@ export function buildSensorNormalizationPreviewViewModel(
   input: SensorNormalizationPreviewInput,
 ): SensorNormalizationPreviewViewModel {
   const normalized = normalizeSensorReading(input.payload, input.options);
-  const longFormRows = normalizedReadingToLongFormRows(normalized);
-  const longFormPreview = buildLongFormRows(longFormRows);
+  const metricRowsAll = normalizedReadingToLongFormRows(normalized);
   const metricRows = buildMetricRows(normalized);
   const warnings = buildWarnings(normalized);
   const badges = buildBadges(normalized);

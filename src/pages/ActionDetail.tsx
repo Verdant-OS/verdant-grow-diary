@@ -65,8 +65,9 @@ import {
   buildStatusBadgeAriaLabel,
   sanitizeActionCopy,
   APPROVE_DIALOG_REASSURANCE,
-  ACTION_EVIDENCE_QUALITY_NOT_AVAILABLE,
 } from "@/lib/actionQueueRowView";
+import { buildActionEvidenceViewModel } from "@/lib/actionQueueEvidenceViewModel";
+
 
 import {
   ACTION_FOLLOWUP_EVENT_TYPE,

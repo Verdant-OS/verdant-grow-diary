@@ -135,15 +135,25 @@ export function buildLegacyQuickLogUnifiedPayload(
     };
   }
 
-  const note = appendLegacyDetailsToNote(input.noteWithHardware, input.details);
+  let note = appendLegacyDetailsToNote(input.noteWithHardware, input.details);
+  const suffix = trimStr(input.noteSuffix);
+  if (suffix) {
+    note = note ? `${note}\n\n${suffix}` : suffix;
+  }
 
-  // Only build the `p_details` envelope when the caller passed a non-null
-  // redacted sensor payload. We never invent details, never persist
-  // raw_payload, and never re-key the envelope as `sensor_snapshot`.
+  // Build the `p_details` envelope when the caller passed a redacted
+  // sensor payload and/or an early-stage milestone envelope. We never
+  // invent details, never persist raw_payload, and never re-key the
+  // sensor envelope as `sensor_snapshot`.
+  const envelopeFields: Record<string, unknown> = {};
+  if (input.sensorAttachPayload != null) {
+    envelopeFields.sensor = input.sensorAttachPayload;
+  }
+  if (input.earlyStage != null) {
+    envelopeFields.early_stage = input.earlyStage;
+  }
   const detailsEnvelope: Record<string, unknown> | null =
-    input.sensorAttachPayload != null
-      ? { sensor: input.sensorAttachPayload }
-      : null;
+    Object.keys(envelopeFields).length > 0 ? envelopeFields : null;
 
   if (input.eventType === "watering") {
     const raw = trimStr(input.details.watering);

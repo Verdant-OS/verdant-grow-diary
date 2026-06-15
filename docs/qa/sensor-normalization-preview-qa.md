@@ -254,6 +254,10 @@ Warning chips are data-quality signals, not automatic plant diagnosis. They do n
 | pH outside realistic range | Maybe for review | No | Confirm mapping/source |
 | Missing `captured_at` | Maybe for review | No | Fix timestamp mapping |
 | Missing/invalid tent | Yes for parsed summary only | No | Link valid tent or treat as note-only |
+| Plant context missing but tent verified | Yes for tent-level metrics | Preview-only for now | Confirm whether plant-specific attribution is needed |
+| Units mismatch suspected | Maybe for review | No | Confirm unit source before trusting |
+| Stale reading | Maybe for historical review | No | Confirm source freshness |
+| Unknown warning code | Review only | No | Inspect source data and update docs/rules if needed |
 | Raw payload / private-looking key appears | No | No | Stop QA and fix raw leak |
 
 Practical rule:
@@ -262,9 +266,48 @@ Practical rule:
 
 ---
 
+## Warning-chip troubleshooting flowchart
+
+Use this short text flowchart when a warning chip is visible but the parsed metric summary still looks plausible.
+
+```txt
+Warning chip appears
+  ↓
+Does the warning mention missing/invalid tent context?
+  → Yes: Treat as note-only. Long-form rows must stay hidden/empty.
+         Link a real tent before trusting write-ready rows.
+  → No:
+      ↓
+Does the warning mention timestamp / captured_at?
+  → Yes: Inspect parsed metrics only.
+         Fix timestamp mapping/source before treating as write-ready.
+  → No:
+      ↓
+Does the warning mention unit or magnitude mismatch?
+  → Yes: Confirm units before trusting the reading.
+         Common issue: µS/cm shown as mS/cm.
+  → No:
+      ↓
+Does the warning mention stuck boundary values
+(humidity 0/100, soil moisture 0/100)?
+  → Yes: Inspect source/sensor calibration.
+         Do not classify as healthy from this reading.
+  → No:
+      ↓
+Do metric summaries still look plausible?
+  → Yes: Use for review only. Keep preview-only unless source,
+         timestamp, tent context, and units are verified.
+  → No:  Treat as invalid/noisy data and do not use for decisions.
+```
+
+> When in doubt, treat the preview as note-only and do not write sensor data.
+
+---
+
 ## Related Docs
 
 - [`docs/qa/csv-sensor-import-preview-qa.md`](./csv-sensor-import-preview-qa.md)
+- [`docs/qa/quick-log-environment-check-preview-qa.md`](./quick-log-environment-check-preview-qa.md)
 - [`docs/sensor-truth-rules.md`](./sensor-truth-rules.md)
 - [`docs/qa/v0-manual-qa-checklist.md`](./v0-manual-qa-checklist.md)
 - [`docs/data-labeling-spec.md`](./data-labeling-spec.md)

@@ -752,9 +752,22 @@ export default function ActionQueue() {
       ) : (
       <>
       <section className="glass rounded-2xl p-4 mb-4" aria-label="Needs Review">
-        <h2 className="text-sm font-semibold mb-3 uppercase tracking-wider text-muted-foreground">
-          Needs Review ({pending.length})
-        </h2>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Needs Review ({pending.length})
+          </h2>
+          {!loading && isRefreshing && (
+            <span
+              role="status"
+              aria-live="polite"
+              data-testid="action-queue-refreshing-indicator"
+              className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground"
+            >
+              <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+              Refreshing actions…
+            </span>
+          )}
+        </div>
         {loading ? (
           <div
             role="status"

@@ -28,10 +28,13 @@ import { EVENT_TYPE_MAP } from "@/lib/diary";
 
 afterEach(() => cleanup());
 
-function renderQuickLog(ctx: Parameters<typeof GlobalFastAddButton>[0]["context"] = null) {
+function renderQuickLog(
+  ctx: Parameters<typeof GlobalFastAddButton>[0]["context"] = null,
+  extra?: Omit<Parameters<typeof GlobalFastAddButton>[0], "context">,
+) {
   return render(
     <MemoryRouter initialEntries={["/dashboard"]}>
-      <GlobalFastAddButton context={ctx} />
+      <GlobalFastAddButton context={ctx} {...extra} />
     </MemoryRouter>,
   );
 }

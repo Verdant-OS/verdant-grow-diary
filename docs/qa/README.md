@@ -6,7 +6,8 @@ These checklists help operators verify Verdant flows without changing data, enab
 
 ## Sensor normalization preview
 
-- [`sensor-normalization-preview-qa.md`](./sensor-normalization-preview-qa.md) — Full QA checklist for CSV and Quick Log Environment Check normalization preview behavior, including write-disabled verification, raw-payload non-leakage, missing-tent gating, and suspicious telemetry checks.
+- [`sensor-normalization-preview-qa.md`](./sensor-normalization-preview-qa.md) — Full QA checklist for CSV and Quick Log Environment Check normalization preview behavior, including write-disabled verification, raw-payload non-leakage, missing-tent gating, suspicious telemetry checks, no-write verification, and warning-chip troubleshooting.
+- [`csv-sensor-import-preview-qa.md`](./csv-sensor-import-preview-qa.md) — Focused CSV review-gate QA covering accepted vs rejected rows, write-disabled signals, raw payload non-leak, and missing tent behavior.
 
 ---
 
@@ -71,6 +72,7 @@ Important notes:
 - Missing/invalid tent context blocks long-form write-ready rows.
 - Preview warnings are **not** a diagnosis.
 - The grower/operator decides whether the source data is trustworthy.
+- Use the warning-chip troubleshooting section in [`sensor-normalization-preview-qa.md`](./sensor-normalization-preview-qa.md#when-warning-chips-appear-but-metrics-still-look-usable) when metric summaries appear but Verdant flags source, timestamp, unit, or context concerns.
 
 ---
 

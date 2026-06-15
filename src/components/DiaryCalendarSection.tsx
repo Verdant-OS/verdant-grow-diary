@@ -455,6 +455,13 @@ export default function DiaryCalendarSection({
           )}
         </>
       )}
+      <DiaryCalendarEventDrawer
+        model={drawerEvent}
+        open={drawerEvent !== null}
+        onOpenChange={(open) => {
+          if (!open) setDrawerEvent(null);
+        }}
+      />
     </section>
   );
 }

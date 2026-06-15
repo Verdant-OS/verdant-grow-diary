@@ -473,6 +473,20 @@ export default function QuickLog({
         notes: earlyNotes,
         stage,
       });
+      const environmentCheckEnvelope =
+        eventType === "environment"
+          ? buildEnvironmentCheckDetails({
+              roomTempF: envRoomTempF,
+              humidityPct: envHumidityPct,
+              vpdKpa: envVpdKpa,
+              waterTempValue: envWaterTempValue,
+              waterTempUnit: envWaterTempUnit,
+              ecMscm: envEcMscm,
+              note: null,
+            })
+          : null;
+      const environmentCheckRecord: Record<string, unknown> | null =
+        environmentCheckEnvelope ? { ...environmentCheckEnvelope } : null;
       const built = buildLegacyQuickLogUnifiedPayload({
         eventType,
         noteWithHardware,
@@ -481,6 +495,7 @@ export default function QuickLog({
         details,
         sensorAttachPayload,
         earlyStage: earlyStageRecord,
+        environmentCheck: environmentCheckRecord,
         noteSuffix: earlyStageSuffix || null,
       });
       if (built.ok !== true) {

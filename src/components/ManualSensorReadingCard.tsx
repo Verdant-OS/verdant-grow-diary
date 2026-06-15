@@ -440,6 +440,24 @@ export default function ManualSensorReadingCard({
           </div>
         )}
 
+        <section
+          className="rounded-md border border-border/50 bg-muted/30 p-3 space-y-2"
+          data-testid="manual-reading-snapshot-quality"
+          aria-label="Snapshot quality"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Snapshot quality
+            </h3>
+          </div>
+          <ManualSensorSnapshotQualityBadge evaluation={snapshotQuality} />
+          <p className="text-[11px] text-muted-foreground">
+            This check helps AI Doctor decide whether the reading can support
+            current-room guidance.
+          </p>
+        </section>
+
+
         <div className="flex items-center justify-between gap-2 pt-1">
           <p className="text-[11px] text-muted-foreground">
             {validation.metrics.length > 0

@@ -41,7 +41,7 @@ import {
   ACTION_QUEUE_EMPTY_PENDING_HELP,
   type ActionEvidenceViewModel,
 } from "@/lib/actionQueueEvidenceViewModel";
-
+import { formatLastUpdatedAgo } from "@/lib/lastUpdatedAgo";
 
 import { actionDetailPath, actionsPath, aiDoctorSessionDetailPath, alertDetailPath } from "@/lib/routes";
 import { toast } from "sonner";
@@ -239,6 +239,7 @@ export default function ActionQueue() {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const hasLoadedOnceRef = useRef(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [noteDialog, setNoteDialog] = useState<
     { row: ActionRow; kind: "approve" | "reject" | "simulate" | "complete" | "cancel" } | null
@@ -300,7 +301,11 @@ export default function ActionQueue() {
       .order("created_at", { ascending: false })
       .limit(100);
     const { data, error } = effectiveGrowId ? await q.eq("grow_id", effectiveGrowId) : await q;
-    if (error) toast.error(error.message);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      setLastUpdatedAt(Date.now());
+    }
     const list = (data ?? []) as ActionRow[];
     setRows(list);
 
@@ -328,6 +333,7 @@ export default function ActionQueue() {
   // the full skeleton (not just a subtle refresh) on a scope switch.
   useEffect(() => {
     hasLoadedOnceRef.current = false;
+    setLastUpdatedAt(null);
   }, [effectiveGrowId]);
 
   useEffect(() => {
@@ -546,6 +552,15 @@ export default function ActionQueue() {
           Suggestions are <span className="text-foreground">approval-gated</span>.
           Verdant never sends commands to equipment.
         </p>
+        {lastUpdatedAt !== null && (
+          <p
+            className="text-[11px] text-muted-foreground mt-1"
+            data-testid="action-queue-last-updated"
+            aria-label={formatLastUpdatedAgo(lastUpdatedAt, Date.now())}
+          >
+            {formatLastUpdatedAgo(lastUpdatedAt, Date.now())}
+          </p>
+        )}
         <div
           className="mt-2 rounded-lg border border-border/60 bg-secondary/30 px-3 py-2"
           data-testid="action-queue-grow-context-hint"

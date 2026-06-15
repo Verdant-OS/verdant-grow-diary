@@ -381,6 +381,12 @@ export default function QuickLog({
     setEarlyMilestone(null);
     setEarlyVigor(null);
     setEarlyNotes("");
+    setEnvRoomTempF("");
+    setEnvHumidityPct("");
+    setEnvVpdKpa("");
+    setEnvWaterTempValue("");
+    setEnvWaterTempUnit("F");
+    setEnvEcMscm("");
     if (keepPlantId) setPlantId(keepPlantId);
     setTimeout(() => noteRef.current?.focus(), 0);
   }

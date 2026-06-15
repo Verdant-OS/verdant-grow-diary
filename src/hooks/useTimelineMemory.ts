@@ -81,6 +81,7 @@ function diaryRowToDiaryItem(
     photoUrl: row.photo_url ?? null,
     photos: readPhotosArray(row.details),
     stage: readStage(row.details),
+    earlyStage: buildEarlyStageTimelineViewModel(row.details),
   };
 }
 

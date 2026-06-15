@@ -47,6 +47,12 @@ export const DIARY_CALENDAR_EMPTY_HINT =
 
 export type DiaryCalendarFilter = "all" | DiaryCalendarEventKind;
 
+export interface DiaryCalendarFilterCount {
+  filter: DiaryCalendarFilter;
+  label: string;
+  count: number;
+}
+
 export const DIARY_CALENDAR_FILTERS: ReadonlyArray<{
   value: DiaryCalendarFilter;
   label: string;

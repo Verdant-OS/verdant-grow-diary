@@ -426,6 +426,18 @@ export default function QuickLog({
         snapshot && sensorTentId && stripView.status === "usable"
           ? buildSensorSnapshotSavePayload(sensorState.snapshot)
           : null;
+      const earlyStageEnvelope = buildEarlyStageDetails({
+        milestone: earlyMilestone,
+        vigor: earlyVigor,
+        notes: earlyNotes,
+        stage,
+      });
+      const earlyStageSuffix = buildEarlyStageNoteSuffix({
+        milestone: earlyMilestone,
+        vigor: earlyVigor,
+        notes: earlyNotes,
+        stage,
+      });
       const built = buildLegacyQuickLogUnifiedPayload({
         eventType,
         noteWithHardware,
@@ -433,6 +445,8 @@ export default function QuickLog({
         plantTentId: selectedPlant.tent_id ?? null,
         details,
         sensorAttachPayload,
+        earlyStage: earlyStageEnvelope,
+        noteSuffix: earlyStageSuffix || null,
       });
       if (built.ok !== true) {
         setSaveError(built.message);

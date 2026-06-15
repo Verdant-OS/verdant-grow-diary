@@ -117,17 +117,18 @@ describe("DiaryCalendarSection — filter chips UI", () => {
         rawEntries={[
           {
             id: "f1",
-            entry_at: "2026-06-10T09:00:00Z",
+            entry_at: "2026-06-11T09:00:00Z",
             event_type: "feeding",
             details: {
               nutrients: "FEEDING_SECRET_RECIPE",
               raw_payload: { token: "tok_LEAK" },
             },
           },
-          { id: "w1", entry_at: "2026-06-11T09:00:00Z", event_type: "watering" },
+          { id: "w1", entry_at: "2026-06-10T09:00:00Z", event_type: "watering" },
         ]}
       />,
     );
+    // Newest day is feeding and is expanded by default.
     expect(container.innerHTML).toContain("FEEDING_SECRET_RECIPE");
     fireEvent.click(screen.getByTestId("diary-calendar-filter-watering"));
     expect(container.innerHTML).not.toContain("FEEDING_SECRET_RECIPE");

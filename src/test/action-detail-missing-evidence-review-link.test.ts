@@ -153,6 +153,10 @@ describe("ActionDetail missing-evidence guidance wiring", () => {
     expect(ACTION_DETAIL_SRC).not.toMatch(/autoFocus[\s\S]{0,200}action-detail-evidence-review-link/);
   });
 
+  it("keeps centralized missing-evidence help copy alongside the link", () => {
+    expect(ACTION_DETAIL_SRC).toContain("ACTION_EVIDENCE_MISSING_PANEL_HELP");
+  });
+
   it("helper module does not introduce unsafe patterns", () => {
     const unsafe: RegExp[] = [
       /supabase/i,

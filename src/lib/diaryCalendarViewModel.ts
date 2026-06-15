@@ -562,3 +562,26 @@ export function diaryCalendarMonthEmptyTitle(
   return `No ${filter} events logged for ${label}.`;
 }
 
+/** Current UTC month key (YYYY-MM) for the given date. Pure & deterministic. */
+export function currentMonthKey(now: Date): string {
+  const y = now.getUTCFullYear();
+  const m = String(now.getUTCMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}
+
+/**
+ * Newest matching dateKey in the given month under the active filter.
+ * Returns null when the month has no matching events. Pure & deterministic.
+ */
+export function newestMatchingDateKeyInMonth(
+  groups: readonly DiaryCalendarDayGroup[],
+  monthKey: string | null,
+  filter: DiaryCalendarFilter,
+): string | null {
+  if (!monthKey) return null;
+  const scoped = filterDiaryCalendarGroupsByMonth(groups, monthKey);
+  const filtered = filterDiaryCalendarGroups(scoped, filter);
+  return filtered[0]?.dateKey ?? null;
+}
+
+

@@ -10,6 +10,7 @@
  *    ("Manual"). Never "live", "synced", "connected", or "imported".
  *  - No reads, no writes, no Supabase, no automation.
  */
+import { useMemo } from "react";
 import { Gauge, AlertTriangle, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +23,26 @@ import {
 import { formatSensorFieldLabel } from "@/constants/sensorFields";
 import { DERIVED_LABEL, formatSensorValue } from "@/lib/sensorFormat";
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
+import {
+  evaluateManualSensorSnapshotQuality,
+  type ManualSensorSnapshotInput,
+} from "@/lib/manualSensorSnapshotQualityRules";
+import ManualSensorSnapshotQualityBadge from "@/components/ManualSensorSnapshotQualityBadge";
+
+/**
+ * Map view-model reading fields to the sanitized quality-helper field names.
+ * Only well-known numeric metrics are forwarded — no raw payloads, vendor
+ * metadata, tokens, filenames, or private IDs are ever passed through.
+ */
+const FIELD_MAP: Readonly<Record<string, keyof ManualSensorSnapshotInput>> = {
+  air_temp_c: "temperature_c",
+  humidity_pct: "humidity_pct",
+  vpd_kpa: "vpd_kpa",
+  soil_temp_c: "soil_temp_c",
+  soil_moisture_pct: "soil_moisture_pct",
+  soil_ec_mscm: "soil_ec_mscm",
+  reservoir_ph: "ph",
+};
 
 interface Props {
   card: ManualSnapshotTimelineCardModel;

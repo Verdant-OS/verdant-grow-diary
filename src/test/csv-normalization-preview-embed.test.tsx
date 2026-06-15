@@ -46,7 +46,8 @@ describe("CSV normalization preview embed", () => {
         now={FIXED_NOW}
       />,
     );
-    expect(screen.getByText("CSV normalization preview")).toBeInTheDocument();
+    expect(screen.getByTestId("csv-normalization-preview-section")).toBeInTheDocument();
+    expect(screen.getAllByText("CSV normalization preview").length).toBeGreaterThan(0);
     expect(
       screen.getByTestId("csv-normalization-preview-section-disclaimer"),
     ).toHaveTextContent(/Preview only — no sensor readings will be saved\./);

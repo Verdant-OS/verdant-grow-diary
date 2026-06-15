@@ -1,5 +1,7 @@
 # Sensor Normalization Preview QA
 
+> Back to [Verdant QA Checklists](./README.md).
+
 Run before any partner demo or release-candidate sign-off that includes the CSV review gate or Quick Log Environment Check preview.
 
 Scope: read-only preview only. This checklist verifies that Verdant shows how CSV/manual sensor data would be interpreted **before any save/write path exists**.

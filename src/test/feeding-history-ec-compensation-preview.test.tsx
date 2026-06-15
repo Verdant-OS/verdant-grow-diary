@@ -111,15 +111,18 @@ describe("FeedingHistoryPanel — EC @25°C preview rendering", () => {
     ).toBeNull();
   });
 
-  it("flags suspicious EC magnitude as Needs unit review", () => {
+  it("hides preview when EC is out of plausible range (rejected upstream by diary normalizer)", () => {
+    // The diary normalizer drops ec > 10 before it ever reaches the preview,
+    // so unit-mismatched historical rows simply produce no preview block
+    // rather than a "Needs unit review" badge in the timeline.
     render(
       <FeedingHistoryPanel
         rawEntries={[feeding("f-bad-ec", { ec: 1800, water_temp_c: 22 })]}
       />,
     );
-    const block = screen.getByTestId("feeding-history-ec-compensation-f-bad-ec");
-    expect(block).toHaveAttribute("data-tone", "review");
-    expect(within(block).getByText(/Needs unit review/)).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("feeding-history-ec-compensation-f-bad-ec"),
+    ).toBeNull();
   });
 
   it("flags suspicious water temperature as Needs unit review", () => {

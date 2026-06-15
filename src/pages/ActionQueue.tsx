@@ -34,8 +34,9 @@ import {
   sanitizeActionCopy,
   formatActionTargetLabel,
   APPROVE_DIALOG_REASSURANCE,
-  ACTION_EVIDENCE_QUALITY_NOT_AVAILABLE,
 } from "@/lib/actionQueueRowView";
+import { buildActionEvidenceViewModel } from "@/lib/actionQueueEvidenceViewModel";
+
 import { actionDetailPath, actionsPath, aiDoctorSessionDetailPath, alertDetailPath } from "@/lib/routes";
 import { toast } from "sonner";
 import {
@@ -821,8 +822,9 @@ export default function ActionQueue() {
                       className="mt-1 text-[11px] text-muted-foreground"
                       data-testid="action-queue-row-evidence-quality"
                     >
-                      {ACTION_EVIDENCE_QUALITY_NOT_AVAILABLE}
+                      {buildActionEvidenceViewModel({ source: row.source, action_type: row.action_type, captured_at: row.created_at }).evidenceQualityLabel}
                     </p>
+
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 mt-3">

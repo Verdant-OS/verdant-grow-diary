@@ -65,8 +65,9 @@ import {
   buildStatusBadgeAriaLabel,
   sanitizeActionCopy,
   APPROVE_DIALOG_REASSURANCE,
-  ACTION_EVIDENCE_QUALITY_NOT_AVAILABLE,
 } from "@/lib/actionQueueRowView";
+import { buildActionEvidenceViewModel } from "@/lib/actionQueueEvidenceViewModel";
+
 
 import {
   ACTION_FOLLOWUP_EVENT_TYPE,
@@ -660,8 +661,9 @@ export default function ActionDetail() {
                   className="mt-3 text-[11px] text-muted-foreground"
                   data-testid="action-detail-evidence-quality"
                 >
-                  {ACTION_EVIDENCE_QUALITY_NOT_AVAILABLE}
+                  {buildActionEvidenceViewModel({ source: row.source, action_type: row.action_type, captured_at: row.created_at }).evidenceQualityLabel}
                 </p>
+
               </div>
             );
           })()}
@@ -702,8 +704,9 @@ export default function ActionDetail() {
                   className="mt-3 text-[11px] text-muted-foreground"
                   data-testid="action-detail-evidence-quality"
                 >
-                  {ACTION_EVIDENCE_QUALITY_NOT_AVAILABLE}
+                  {buildActionEvidenceViewModel({ source: row.source, action_type: row.action_type, captured_at: row.created_at }).evidenceQualityLabel}
                 </p>
+
               </div>
             );
           })()}

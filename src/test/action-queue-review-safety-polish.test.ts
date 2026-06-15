@@ -114,10 +114,19 @@ describe("Action Queue / Action Detail — wired polish", () => {
     expect(ACTION_DETAIL_SRC).toContain("APPROVE_DIALOG_REASSURANCE");
   });
 
-  it("Action Queue + Action Detail surface the neutral evidence-quality copy", () => {
-    expect(ACTION_QUEUE_SRC).toContain("ACTION_EVIDENCE_QUALITY_NOT_AVAILABLE");
-    expect(ACTION_DETAIL_SRC).toContain("ACTION_EVIDENCE_QUALITY_NOT_AVAILABLE");
+  it("Action Queue + Action Detail surface the neutral evidence-quality copy via the centralized view-model", () => {
+    // Both surfaces now route through buildActionEvidenceViewModel which
+    // owns the neutral "Evidence quality: not available from this action
+    // record" copy. Assert the wiring uses the shared helper rather than
+    // inlining the constant.
+    expect(ACTION_QUEUE_SRC).toContain("buildActionEvidenceViewModel");
+    expect(ACTION_DETAIL_SRC).toContain("buildActionEvidenceViewModel");
+    // And the constant value itself is still exported as the source of truth.
+    expect(ACTION_EVIDENCE_QUALITY_NOT_AVAILABLE).toBe(
+      "Evidence quality: not available from this action record",
+    );
   });
+
 
   it("polished surfaces never reference raw_payload / service_role / secrets", () => {
     for (const src of [ACTION_QUEUE_SRC, ACTION_DETAIL_SRC]) {

@@ -239,6 +239,7 @@ export default function ActionQueue() {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const hasLoadedOnceRef = useRef(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [noteDialog, setNoteDialog] = useState<
     { row: ActionRow; kind: "approve" | "reject" | "simulate" | "complete" | "cancel" } | null

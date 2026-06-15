@@ -248,7 +248,53 @@ describe("Action Queue safety — current posture (suggest-only by construction)
       expect(ALL_PROD_CODE).not.toMatch(re);
     }
   });
+
+  it("2b. narrow allow for blocked_device_command_risk status enum only", () => {
+    // The allowance MUST be exact-token only — it must not let other
+    // device_command usages through, and it must not introduce grower-facing
+    // device-control copy or hide private/secret leakage.
+    const PREVIEW_RULES_PATH = resolve(
+      ROOT,
+      "src/lib/aiDoctorActionSuggestionPreviewRules.ts",
+    );
+    const previewRulesSrc = readFileSync(PREVIEW_RULES_PATH, "utf8");
+
+    // Only the safety-blocking status enum may mention device_command in this file.
+    const deviceCommandMatches = previewRulesSrc.match(/device_command/gi) ?? [];
+    const blockedMatches = previewRulesSrc.match(/blocked_device_command_risk/g) ?? [];
+    expect(deviceCommandMatches.length).toBe(blockedMatches.length);
+    expect(blockedMatches.length).toBeGreaterThan(0);
+
+    // Unsafe grower-facing device-control copy must still fail the scan.
+    const UNSAFE_COPY = [
+      "turn on equipment",
+      "send command",
+      "control device",
+      "auto-run equipment",
+      "actuator.send(",
+      "device_command_executed",
+    ];
+    const BANNED_RES: RegExp[] = [
+      /turn on equipment/i,
+      /send command/i,
+      /control device/i,
+      /auto[- ]?run equipment/i,
+      /\bactuator\.(send|trigger|run|fire)/i,
+      /device_command/i,
+    ];
+    for (const sample of UNSAFE_COPY) {
+      const stripped = sample.replace(/blocked_device_command_risk/g, "blocked_DCR_status");
+      expect(BANNED_RES.some((re) => re.test(stripped))).toBe(true);
+    }
+
+    // Allow-list must NOT mask service_role / token / raw_payload leakage.
+    const LEAK_RES = [/service_role/i, /raw_payload/i, /sk_live_/i, /bearer\s+ey/i];
+    for (const re of LEAK_RES) {
+      expect("blocked_device_command_risk".replace(/blocked_device_command_risk/g, "blocked_DCR_status")).not.toMatch(re);
+    }
+  });
 });
+
 
 describe("Action Queue safety — future-proof contract (active only when action_queue ships)", () => {
   it(`detects whether action_queue table exists (currently: ${HAS_ACTION_QUEUE_TABLE ? "YES" : "no — gated tests are pending"})`, () => {

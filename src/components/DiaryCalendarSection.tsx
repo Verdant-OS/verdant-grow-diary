@@ -142,7 +142,7 @@ export default function DiaryCalendarSection({
 
           <ul className="space-y-2" role="list">
             {visibleGroups.map((group) => {
-              const isOpen = openDay === group.dateKey;
+              const isOpen = effectiveOpenDay === group.dateKey;
               const headingId = `diary-calendar-day-${group.dateKey}`;
               return (
                 <li

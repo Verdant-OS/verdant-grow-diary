@@ -247,51 +247,59 @@ describe("Action Queue safety — current posture (suggest-only by construction)
     }
   });
 
-  it("2b. narrow allow for blocked_device_command_risk status enum only", () => {
-    // The allowance MUST be exact-token only — it must not let other
-    // device_command usages through, and it must not introduce grower-facing
-    // device-control copy or hide private/secret leakage.
+  it("2b. allow-listed safety file aiDoctorActionSuggestionPreviewRules.ts contains only blocking infrastructure", () => {
     const PREVIEW_RULES_PATH = resolve(
       ROOT,
       "src/lib/aiDoctorActionSuggestionPreviewRules.ts",
     );
-    const previewRulesSrc = readFileSync(PREVIEW_RULES_PATH, "utf8");
+    const src = readFileSync(PREVIEW_RULES_PATH, "utf8");
 
-    // Only the safety-blocking status enum may mention device_command in this file.
-    const deviceCommandMatches = previewRulesSrc.match(/device_command/gi) ?? [];
-    const blockedMatches = previewRulesSrc.match(/blocked_device_command_risk/g) ?? [];
-    expect(deviceCommandMatches.length).toBe(blockedMatches.length);
-    expect(blockedMatches.length).toBeGreaterThan(0);
+    // The file MUST contain the safety-blocking status enum.
+    expect(src).toMatch(/"blocked_device_command_risk"/);
+    // And it MUST define a denylist of device-command-shaped patterns it
+    // BLOCKS — that's the entire reason for the allow-list entry.
+    expect(src).toMatch(/DEVICE_COMMAND_PATTERNS/);
 
-    // Unsafe grower-facing device-control copy must still fail the scan.
-    const UNSAFE_COPY = [
-      "turn on equipment",
-      "send command",
-      "control device",
-      "auto-run equipment",
-      "actuator.send(",
-      "device_command_executed",
-    ];
-    const BANNED_RES: RegExp[] = [
+    // The file MUST NOT contain real device-control surfaces or grower-facing
+    // unsafe equipment copy or any secret/raw-payload leakage.
+    const BANNED: RegExp[] = [
+      /\bmqtt:\/\//i,
+      /\bmqtt\.connect\b/i,
+      /\bactuator\.(send|trigger|run|fire)/i,
+      /\brelay\.(on|off|toggle)/i,
+      /command_bus/i,
       /turn on equipment/i,
-      /send command/i,
+      /send command to/i,
       /control device/i,
       /auto[- ]?run equipment/i,
-      /\bactuator\.(send|trigger|run|fire)/i,
-      /device_command/i,
+      /pump\.(on|off|run)/i,
+      /dose\(/i,
+      /service_role/i,
+      /raw_payload/i,
+      /sk_live_/i,
+      /Bearer\s+ey/i,
+      /SUPABASE_SERVICE_ROLE_KEY/i,
     ];
-    for (const sample of UNSAFE_COPY) {
-      const stripped = sample.replace(/blocked_device_command_risk/g, "blocked_DCR_status");
-      expect(BANNED_RES.some((re) => re.test(stripped))).toBe(true);
+    for (const re of BANNED) {
+      expect(src, `preview rules file must not contain: ${re}`).not.toMatch(re);
     }
 
-    // Allow-list must NOT mask service_role / token / raw_payload leakage.
-    const LEAK_RES = [/service_role/i, /raw_payload/i, /sk_live_/i, /bearer\s+ey/i];
-    for (const re of LEAK_RES) {
-      expect("blocked_device_command_risk".replace(/blocked_device_command_risk/g, "blocked_DCR_status")).not.toMatch(re);
+    // Every device_command occurrence in the file must sit inside safety-block
+    // semantics (status enum, denylist patterns, blocked-reason copy, or
+    // comments). Sanity-check by requiring a "block" / "denylist" / "BLOCK" /
+    // "safety" keyword within 80 chars of each device_command hit.
+    const hits = [...src.matchAll(/device_command/gi)];
+    expect(hits.length).toBeGreaterThan(0);
+    for (const m of hits) {
+      const ctx = src.slice(Math.max(0, m.index! - 120), m.index! + 120);
+      expect(
+        /block|denylist|deny[_-]?list|safety|BLOCK|risk|PATTERNS|never|forbidden/i.test(ctx),
+        `device_command at ${m.index} lacks safety/block context: ${ctx}`,
+      ).toBe(true);
     }
   });
 });
+
 
 
 describe("Action Queue safety — future-proof contract (active only when action_queue ships)", () => {

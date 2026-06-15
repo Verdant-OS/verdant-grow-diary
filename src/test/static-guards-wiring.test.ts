@@ -49,3 +49,21 @@ describe("action-detail-leakage script + CI wiring", () => {
     expect(ci).toMatch(/bun run test:action-detail-leakage/);
   });
 });
+
+describe("action-queue-evidence-leakage script + CI wiring", () => {
+  const pkg = JSON.parse(readFileSync("package.json", "utf8")) as {
+    scripts: Record<string, string>;
+  };
+  const script = pkg.scripts["test:action-queue-evidence-leakage"];
+  const ci = readFileSync(".github/workflows/ci.yml", "utf8");
+
+  it("defines a test:action-queue-evidence-leakage npm script", () => {
+    expect(script).toBeTruthy();
+    expect(script).toMatch(/^vitest run /);
+    expect(script).toContain("src/test/action-queue-evidence-provenance-leakage.test.ts");
+  });
+
+  it("CI runs bun run test:action-queue-evidence-leakage as its own step", () => {
+    expect(ci).toMatch(/bun run test:action-queue-evidence-leakage/);
+  });
+});

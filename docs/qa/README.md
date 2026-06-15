@@ -9,6 +9,8 @@ These checklists help operators verify Verdant flows without changing data, enab
 - [`sensor-normalization-preview-qa.md`](./sensor-normalization-preview-qa.md) — Full QA checklist for CSV and Quick Log Environment Check normalization preview behavior, including write-disabled verification, raw-payload non-leakage, missing-tent gating, suspicious telemetry checks, no-write verification, warning-chip troubleshooting, and the warning-chip flowchart.
 - [`csv-sensor-import-preview-qa.md`](./csv-sensor-import-preview-qa.md) — Focused CSV review-gate QA covering accepted vs rejected rows, write-disabled signals, raw payload non-leak, and missing tent behavior.
 - [`quick-log-environment-check-preview-qa.md`](./quick-log-environment-check-preview-qa.md) — Focused Quick Log manual Environment Check QA covering required labels, preview-only verification, preview-vs-database row distinction, note-only behavior, and warning chips.
+- [`preview-no-write-verification.md`](./preview-no-write-verification.md) — Checklist to verify that sensor normalization previews are read-only and do not save sensor data, create database rows, trigger alerts, or enable automation. Use this before approving any preview-related release.
+- [`preview-comparison-matrix.md`](./preview-comparison-matrix.md) — Explains how CSV vs Quick Log preview behavior differs across source labels, triggers, write gating, and warning chips.
 
 ---
 

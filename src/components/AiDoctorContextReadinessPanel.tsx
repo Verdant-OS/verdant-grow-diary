@@ -80,17 +80,22 @@ export default function AiDoctorContextReadinessPanel({
   );
   const style = STATE_STYLES[view.state];
 
-  const actionPreview = useMemo(
-    () => previewActionSuggestion(deriveActionSuggestionPreviewInput(view)),
-    [view],
-  );
-
   const currentSnapshotQuality = useMemo(
     () =>
       evaluateManualSensorSnapshotQuality(
         deriveCurrentSnapshotFromAiDoctorContext(context),
       ),
     [context],
+  );
+
+  const actionPreview = useMemo(
+    () =>
+      previewActionSuggestion(
+        deriveActionSuggestionPreviewInput(view, {
+          snapshotQuality: currentSnapshotQuality,
+        }),
+      ),
+    [view, currentSnapshotQuality],
   );
 
   return (

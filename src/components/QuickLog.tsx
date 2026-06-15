@@ -80,6 +80,7 @@ import {
   buildEcCompensationPreview,
   EC_COMPENSATION_PREVIEW_DISCLAIMER,
 } from "@/lib/ecCompensationPreviewViewModel";
+import { buildEnvironmentCheckSensorContext } from "@/lib/environmentCheckSensorContextRules";
 
 export interface QuickLogPrefill {
   plantId?: string | null;
@@ -1052,6 +1053,20 @@ export default function QuickLog({
               waterTempC: previewTempC,
               sourceLabel: "manual",
             });
+            const sensorContext = buildEnvironmentCheckSensorContext({
+              tentId: sensorTentId,
+              plantId: selectedPlant?.id ?? null,
+              sourceLabel: "manual",
+              hasMeasurements: hasMeasurement,
+            });
+            const ctxTone =
+              sensorContext.status === "valid"
+                ? "border-emerald-500/40 bg-emerald-500/10"
+                : sensorContext.status === "blocked"
+                  ? "border-destructive/40 bg-destructive/10"
+                  : sensorContext.status === "warning"
+                    ? "border-amber-500/40 bg-amber-500/10"
+                    : "border-border/60 bg-secondary/30";
             return (
               <section
                 data-testid="quick-log-environment-check-section"
@@ -1157,6 +1172,27 @@ export default function QuickLog({
                   >
                     {ENVIRONMENT_CHECK_HELPER_COPY}
                   </p>
+                )}
+                {sensorContext.status !== "not_applicable" && (
+                  <div
+                    data-testid="quick-log-env-sensor-context"
+                    data-status={sensorContext.status}
+                    data-reason={sensorContext.reasonCode}
+                    className={`rounded-lg border p-2.5 space-y-0.5 ${ctxTone}`}
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground">
+                      {sensorContext.title}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {sensorContext.message}
+                    </p>
+                    <p
+                      data-testid="quick-log-env-sensor-context-source"
+                      className="text-[11px] text-muted-foreground"
+                    >
+                      Source: {sensorContext.sourceLabel}
+                    </p>
+                  </div>
                 )}
                 {ecPreview.visible && (
                   <div

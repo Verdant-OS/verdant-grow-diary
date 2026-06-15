@@ -366,10 +366,25 @@ export interface ActionSuggestionPreviewReadinessLike {
 }
 
 /**
+ * Optional derivation inputs. Pass `snapshotQuality` (from
+ * `evaluateManualSensorSnapshotQuality`) to align preview eligibility
+ * with the Manual Sensor Snapshot quality badge: only `usable` quality
+ * results from manual/live sources can support a current-room
+ * suggestion preview; `invalid` quality blocks the preview.
+ */
+export interface ActionSuggestionPreviewDerivationOptions {
+  snapshotQuality?: ManualSensorSnapshotQuality | null;
+}
+
+/**
  * Derive a preview input from a readiness view. Pure + null-safe.
+ * When `options.snapshotQuality` is provided it is the authoritative
+ * source for current-reading eligibility and invalid telemetry —
+ * keeping the badge and preview in agreement.
  */
 export function deriveActionSuggestionPreviewInput(
   view: ActionSuggestionPreviewReadinessLike,
+  options: ActionSuggestionPreviewDerivationOptions = {},
 ): ActionSuggestionPreviewInput {
   const badges = view?.sourceBadges ?? [];
   const limitations = view?.limitations ?? [];
@@ -380,16 +395,37 @@ export function deriveActionSuggestionPreviewInput(
       ? plantPresent
       : Boolean(view?.plantIdentity?.tentId);
   const hasPlantContext = plantPresent && stagePresent && tentPresent;
-  const hasCurrentManualOrLiveReading = badges.some(
-    (b) =>
-      (b.source === "live" || b.source === "manual") && b.sampleCount > 0,
-  );
   const hasImportedHistory = badges.some(
     (b) => (b.source === "csv" || b.source === "import") && b.sampleCount > 0,
   );
-  const hasInvalidOrUnknownCriticalTelemetry = limitations.some(
-    (l) => l.code === "stale_or_invalid",
-  );
+
+  const q = options.snapshotQuality ?? null;
+  let hasCurrentManualOrLiveReading: boolean;
+  let hasInvalidOrUnknownCriticalTelemetry: boolean;
+  let invalidTelemetryMetrics: readonly string[] | undefined;
+
+  if (q) {
+    // Snapshot quality is the source of truth for current-reading
+    // eligibility and invalid telemetry. CSV/demo/stale/invalid/unknown
+    // sources cannot support the preview.
+    hasCurrentManualOrLiveReading = q.canSupportActionSuggestionPreview;
+    if (q.quality === "invalid") {
+      hasInvalidOrUnknownCriticalTelemetry = true;
+      invalidTelemetryMetrics =
+        q.invalidFields.length > 0 ? [...q.invalidFields] : undefined;
+    } else {
+      hasInvalidOrUnknownCriticalTelemetry = false;
+    }
+  } else {
+    hasCurrentManualOrLiveReading = badges.some(
+      (b) =>
+        (b.source === "live" || b.source === "manual") && b.sampleCount > 0,
+    );
+    hasInvalidOrUnknownCriticalTelemetry = limitations.some(
+      (l) => l.code === "stale_or_invalid",
+    );
+  }
+
   return {
     hasPlantContext,
     hasCurrentManualOrLiveReading,
@@ -400,6 +436,7 @@ export function deriveActionSuggestionPreviewInput(
       tent: tentPresent,
       stage: stagePresent,
     },
+    ...(invalidTelemetryMetrics ? { invalidTelemetryMetrics } : {}),
   };
 }
 

@@ -284,7 +284,14 @@ export default function ActionQueue() {
 
   const load = useCallback(async () => {
     if (!user) return;
-    setLoading(true);
+    // Distinguish initial load from background refetch so existing rows
+    // are never cleared/replaced by a skeleton. Refresh is presenter-only
+    // — it never fakes data and never blocks approval controls.
+    if (hasLoadedOnceRef.current) {
+      setIsRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     const q = supabase
       .from("action_queue")
       .select(
@@ -313,7 +320,15 @@ export default function ActionQueue() {
       setEvents({});
     }
     setLoading(false);
+    setIsRefreshing(false);
+    hasLoadedOnceRef.current = true;
   }, [user, effectiveGrowId]);
+
+  // Reset the initial-load gate when grow scope changes so the user gets
+  // the full skeleton (not just a subtle refresh) on a scope switch.
+  useEffect(() => {
+    hasLoadedOnceRef.current = false;
+  }, [effectiveGrowId]);
 
   useEffect(() => {
     load();

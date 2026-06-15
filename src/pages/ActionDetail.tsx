@@ -661,12 +661,28 @@ export default function ActionDetail() {
                     The source alert is no longer open. Re-check current grow conditions before approving this action.
                   </div>
                 )}
-                <p
-                  className="mt-3 text-[11px] text-muted-foreground"
-                  data-testid="action-detail-evidence-quality"
-                >
-                  {buildActionEvidenceViewModel({ source: row.source, action_type: row.action_type, captured_at: row.created_at }).evidenceQualityLabel}
-                </p>
+                {(() => {
+                  const ev = buildActionEvidenceViewModel({ source: row.source, action_type: row.action_type, captured_at: row.created_at });
+                  return (
+                    <>
+                      <p
+                        className="mt-3 text-[11px] text-muted-foreground"
+                        data-testid="action-detail-evidence-quality"
+                      >
+                        {ev.evidenceQualityLabel}
+                      </p>
+                      {!ev.hasSnapshotQuality && (
+                        <p
+                          className="mt-1 text-[11px] text-muted-foreground"
+                          data-testid="action-detail-evidence-missing-help"
+                        >
+                          {ACTION_EVIDENCE_MISSING_PANEL_HELP}
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
+
 
               </div>
             );

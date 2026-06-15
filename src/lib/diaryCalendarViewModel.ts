@@ -61,7 +61,33 @@ export const DIARY_CALENDAR_FILTERS: ReadonlyArray<{
   { value: "watering", label: "Watering" },
   { value: "feeding", label: "Feeding" },
   { value: "diagnosis", label: "Diagnosis" },
-];
+/**
+ * Compute per-filter event counts from the full unfiltered dataset.
+ * Counts reflect the complete calendar dataset before any active filter
+ * is applied, and ignore unsupported event types.
+ * Pure & deterministic.
+ */
+export function computeDiaryCalendarFilterCounts(
+  groups: readonly DiaryCalendarDayGroup[],
+): Record<DiaryCalendarFilter, number> {
+  const counts: Record<DiaryCalendarEventKind, number> = {
+    watering: 0,
+    feeding: 0,
+    diagnosis: 0,
+  };
+  for (const g of groups) {
+    counts.watering += g.counts.watering;
+    counts.feeding += g.counts.feeding;
+    counts.diagnosis += g.counts.diagnosis;
+  }
+  return {
+    all: counts.watering + counts.feeding + counts.diagnosis,
+    watering: counts.watering,
+    feeding: counts.feeding,
+    diagnosis: counts.diagnosis,
+  };
+}
+
 
 /**
  * Filter pre-built calendar day groups by event kind. Returns a new array

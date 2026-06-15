@@ -333,6 +333,7 @@ export default function ActionQueue() {
   // the full skeleton (not just a subtle refresh) on a scope switch.
   useEffect(() => {
     hasLoadedOnceRef.current = false;
+    setLastUpdatedAt(null);
   }, [effectiveGrowId]);
 
   useEffect(() => {

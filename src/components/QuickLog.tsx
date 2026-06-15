@@ -68,6 +68,18 @@ import {
   type EarlyStageMilestone,
   type EarlyStageVigor,
 } from "@/lib/earlyStageQuickLogRules";
+import {
+  ENVIRONMENT_CHECK_HELPER_COPY,
+  ENVIRONMENT_CHECK_SECTION_TITLE,
+  buildEnvironmentCheckDetails,
+  hasAnyEnvironmentCheckMeasurement,
+  resolvePreviewWaterTempC,
+  type EnvironmentCheckWaterTempUnit,
+} from "@/lib/environmentCheckQuickLogRules";
+import {
+  buildEcCompensationPreview,
+  EC_COMPENSATION_PREVIEW_DISCLAIMER,
+} from "@/lib/ecCompensationPreviewViewModel";
 
 export interface QuickLogPrefill {
   plantId?: string | null;
@@ -136,6 +148,7 @@ function savedVerb(eventType: string): string {
   if (eventType === "feeding") return "feeding";
   if (eventType === "observation") return "observation";
   if (eventType === "photo") return "photo note";
+  if (eventType === "environment") return "environment check";
   return "log";
 }
 
@@ -194,6 +207,13 @@ export default function QuickLog({
   const [earlyVigor, setEarlyVigor] = useState<EarlyStageVigor | null>(null);
   const [earlyNotes, setEarlyNotes] = useState<string>("");
   const [earlyManuallyOpen, setEarlyManuallyOpen] = useState(false);
+  const [envRoomTempF, setEnvRoomTempF] = useState<string>("");
+  const [envHumidityPct, setEnvHumidityPct] = useState<string>("");
+  const [envVpdKpa, setEnvVpdKpa] = useState<string>("");
+  const [envWaterTempValue, setEnvWaterTempValue] = useState<string>("");
+  const [envWaterTempUnit, setEnvWaterTempUnit] =
+    useState<EnvironmentCheckWaterTempUnit>("F");
+  const [envEcMscm, setEnvEcMscm] = useState<string>("");
 
   const wateringInputRef = useRef<HTMLInputElement | null>(null);
   const plantSelectTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -335,6 +355,12 @@ export default function QuickLog({
     setEarlyVigor(null);
     setEarlyNotes("");
     setEarlyManuallyOpen(false);
+    setEnvRoomTempF("");
+    setEnvHumidityPct("");
+    setEnvVpdKpa("");
+    setEnvWaterTempValue("");
+    setEnvWaterTempUnit("F");
+    setEnvEcMscm("");
   }
 
   function resetForAnother() {
@@ -355,6 +381,12 @@ export default function QuickLog({
     setEarlyMilestone(null);
     setEarlyVigor(null);
     setEarlyNotes("");
+    setEnvRoomTempF("");
+    setEnvHumidityPct("");
+    setEnvVpdKpa("");
+    setEnvWaterTempValue("");
+    setEnvWaterTempUnit("F");
+    setEnvEcMscm("");
     if (keepPlantId) setPlantId(keepPlantId);
     setTimeout(() => noteRef.current?.focus(), 0);
   }
@@ -441,6 +473,20 @@ export default function QuickLog({
         notes: earlyNotes,
         stage,
       });
+      const environmentCheckEnvelope =
+        eventType === "environment"
+          ? buildEnvironmentCheckDetails({
+              roomTempF: envRoomTempF,
+              humidityPct: envHumidityPct,
+              vpdKpa: envVpdKpa,
+              waterTempValue: envWaterTempValue,
+              waterTempUnit: envWaterTempUnit,
+              ecMscm: envEcMscm,
+              note: null,
+            })
+          : null;
+      const environmentCheckRecord: Record<string, unknown> | null =
+        environmentCheckEnvelope ? { ...environmentCheckEnvelope } : null;
       const built = buildLegacyQuickLogUnifiedPayload({
         eventType,
         noteWithHardware,
@@ -449,6 +495,7 @@ export default function QuickLog({
         details,
         sensorAttachPayload,
         earlyStage: earlyStageRecord,
+        environmentCheck: environmentCheckRecord,
         noteSuffix: earlyStageSuffix || null,
       });
       if (built.ok !== true) {
@@ -985,6 +1032,154 @@ export default function QuickLog({
               </section>
             );
           })()}
+
+          {eventType === "environment" && (() => {
+            const hasMeasurement = hasAnyEnvironmentCheckMeasurement({
+              roomTempF: envRoomTempF,
+              humidityPct: envHumidityPct,
+              vpdKpa: envVpdKpa,
+              waterTempValue: envWaterTempValue,
+              waterTempUnit: envWaterTempUnit,
+              ecMscm: envEcMscm,
+            });
+            const previewTempC = resolvePreviewWaterTempC({
+              waterTempValue: envWaterTempValue,
+              waterTempUnit: envWaterTempUnit,
+            });
+            const ecPreview = buildEcCompensationPreview({
+              ec: envEcMscm,
+              ecUnit: "mS/cm",
+              waterTempC: previewTempC,
+              sourceLabel: "manual",
+            });
+            return (
+              <section
+                data-testid="quick-log-environment-check-section"
+                aria-label={ENVIRONMENT_CHECK_SECTION_TITLE}
+                className="rounded-xl border border-border/60 bg-secondary/20 p-3 space-y-2"
+              >
+                <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {ENVIRONMENT_CHECK_SECTION_TITLE}
+                </h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs" htmlFor="quick-log-env-room-temp-f">
+                      Room temperature (°F)
+                    </Label>
+                    <Input
+                      id="quick-log-env-room-temp-f"
+                      data-testid="quick-log-env-room-temp-f"
+                      inputMode="decimal"
+                      value={envRoomTempF}
+                      onChange={(e) => setEnvRoomTempF(e.target.value)}
+                      placeholder="76"
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs" htmlFor="quick-log-env-humidity">
+                      Humidity (%)
+                    </Label>
+                    <Input
+                      id="quick-log-env-humidity"
+                      data-testid="quick-log-env-humidity"
+                      inputMode="decimal"
+                      value={envHumidityPct}
+                      onChange={(e) => setEnvHumidityPct(e.target.value)}
+                      placeholder="55"
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs" htmlFor="quick-log-env-vpd">
+                      VPD (kPa)
+                    </Label>
+                    <Input
+                      id="quick-log-env-vpd"
+                      data-testid="quick-log-env-vpd"
+                      inputMode="decimal"
+                      value={envVpdKpa}
+                      onChange={(e) => setEnvVpdKpa(e.target.value)}
+                      placeholder="1.1"
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs" htmlFor="quick-log-env-ec">
+                      EC (mS/cm)
+                    </Label>
+                    <Input
+                      id="quick-log-env-ec"
+                      data-testid="quick-log-env-ec"
+                      inputMode="decimal"
+                      value={envEcMscm}
+                      onChange={(e) => setEnvEcMscm(e.target.value)}
+                      placeholder="1.4"
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs" htmlFor="quick-log-env-water-temp">
+                      Water/root-zone temperature
+                    </Label>
+                    <Input
+                      id="quick-log-env-water-temp"
+                      data-testid="quick-log-env-water-temp"
+                      inputMode="decimal"
+                      value={envWaterTempValue}
+                      onChange={(e) => setEnvWaterTempValue(e.target.value)}
+                      placeholder={envWaterTempUnit === "F" ? "68" : "20"}
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Water temp unit</Label>
+                    <Select
+                      value={envWaterTempUnit}
+                      onValueChange={(v) =>
+                        setEnvWaterTempUnit(v as EnvironmentCheckWaterTempUnit)
+                      }
+                    >
+                      <SelectTrigger data-testid="quick-log-env-water-temp-unit">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="F">°F</SelectItem>
+                        <SelectItem value="C">°C</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {!hasMeasurement && (
+                  <p
+                    data-testid="quick-log-env-helper"
+                    className="text-[11px] text-muted-foreground"
+                  >
+                    {ENVIRONMENT_CHECK_HELPER_COPY}
+                  </p>
+                )}
+                {ecPreview.visible && (
+                  <div
+                    data-testid="quick-log-env-ec-preview"
+                    data-tone={ecPreview.tone}
+                    className="rounded-lg border border-border/60 bg-secondary/30 p-2.5 space-y-0.5"
+                  >
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      {ecPreview.label}
+                    </p>
+                    <p className="text-sm font-medium text-foreground">
+                      {ecPreview.valueDisplay}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {EC_COMPENSATION_PREVIEW_DISCLAIMER}
+                    </p>
+                  </div>
+                )}
+              </section>
+            );
+          })()}
+
+
 
 
 

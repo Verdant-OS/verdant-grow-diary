@@ -109,9 +109,9 @@ const PLANT_NAME = "Verdant Test Plant";
 
 interface SupportedVariant {
   /** prefill.eventType value driving the Quick Log form. */
-  eventType: "observation" | "note" | "watering";
+  eventType: "observation" | "note" | "watering" | "environment";
   /** Word produced by QuickLog.savedVerb for this event type. */
-  verb: "observation" | "log" | "watering";
+  verb: "observation" | "log" | "watering" | "environment check";
   /** Whether the variant needs a note in the textarea to clear validation. */
   requiresNote: boolean;
   /** Whether the variant needs a watering volume to clear validation. */
@@ -125,6 +125,7 @@ const SUPPORTED_VARIANTS: SupportedVariant[] = [
   // here; the legacy unified save tests cover the "note" RPC mapping.
   { eventType: "observation", verb: "observation", requiresNote: true, requiresWateringVolume: false },
   { eventType: "watering",    verb: "watering",    requiresNote: false, requiresWateringVolume: true },
+  { eventType: "environment", verb: "environment check", requiresNote: true, requiresWateringVolume: false },
 ];
 
 interface UnsupportedVariant {
@@ -135,7 +136,6 @@ interface UnsupportedVariant {
 
 const UNSUPPORTED_VARIANTS: UnsupportedVariant[] = [
   { eventType: "feeding",     note: "Routed to dedicated feeding form / coming soon in unified path." },
-  { eventType: "environment", note: "Routed through manual sensor snapshot, not unified save." },
   { eventType: "training",    note: "Coming soon in unified save path." },
   { eventType: "diagnosis",   note: "AI Doctor flow, not Quick Log save path." },
   { eventType: "harvest",     note: "Coming soon in unified save path." },

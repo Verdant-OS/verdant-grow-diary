@@ -68,6 +68,17 @@ jobs:
       - name: AI Doctor preview safety
         run: bun run ai-doctor:preview-safety
 
+      # Stop-ship: Action Queue device-control surface scanner + allow-list
+      # guard tests. Locks the narrow safety-file allow-list (e.g.
+      # `blocked_device_command_risk`, `DEVICE_COMMAND_PATTERNS`) so it can
+      # never silently broaden into real actuator/control surfaces, unsafe
+      # grower-facing equipment copy, `raw_payload` leakage, `service_role`,
+      # or Bearer/API-key exposure. Runs on every PR.
+      - name: Action Queue safety scanner + allow-list guards
+        run: bunx vitest run src/test/action-queue-safety.test.ts src/test/action-queue-safety-allow-list-guards.test.ts --reporter=dot
+
+
+
       # Stop-ship: QuickLog v2 RPC ownership / reason-code / mixed-boundary
       # regression. See docs/quicklog-rpc-safety.md.
       - name: QuickLog v2 RPC ownership + security

@@ -107,7 +107,8 @@ export default function AppShell() {
         {/* Mobile floating + */}
         <button
           onClick={() => { setPrefill(null); setOpenLog(true); }}
-          aria-label="Quick log"
+          aria-label="Open Quick Log"
+          data-testid="mobile-quick-log-fab"
           className="md:hidden fixed z-40 bottom-20 right-4 h-14 w-14 rounded-full gradient-leaf shadow-elevated flex items-center justify-center text-primary-foreground hover:scale-105 transition active:scale-95 glow-accent"
         >
           <Plus className="h-6 w-6" />

@@ -137,7 +137,7 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
     fireEvent.change(dialog.querySelector("textarea") as HTMLTextAreaElement, {
       target: { value: "Topped plant" },
     });
-    fireEvent.click(within(dialog).getByRole("button", { name: /save entry/i }));
+    fireEvent.click(within(dialog).getByRole("button", { name: /save log/i }));
 
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
     const payload = saveMock.mock.calls[0][0];
@@ -173,7 +173,7 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
     );
 
     const dialog = screen.getByRole("dialog");
-    fireEvent.click(within(dialog).getByRole("button", { name: /save entry/i }));
+    fireEvent.click(within(dialog).getByRole("button", { name: /save log/i }));
 
     await waitFor(() => expect(toastError).toHaveBeenCalledWith("Add a quick note"));
     expect(saveMock).not.toHaveBeenCalled();
@@ -201,7 +201,7 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
     fireEvent.change(dialog.querySelector("textarea") as HTMLTextAreaElement, {
       target: { value: "Note" },
     });
-    fireEvent.click(within(dialog).getByRole("button", { name: /save entry/i }));
+    fireEvent.click(within(dialog).getByRole("button", { name: /save log/i }));
 
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
     await waitFor(() =>

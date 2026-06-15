@@ -20,3 +20,18 @@ or device control.
 - Runbook: [`../runbooks/ai-doctor-imported-history.md`](../runbooks/ai-doctor-imported-history.md)
 - QA checklist: [`../qa/ai-doctor-imported-history-safety-checklist.md`](../qa/ai-doctor-imported-history-safety-checklist.md)
 - Known flake note: [`../testing/known-vitest-flakes.md`](../testing/known-vitest-flakes.md)
+
+### 2026-06-15 — AI Doctor Action Queue Suggestion Preview Safety Hardening
+
+Related follow-up to the imported-history safety slice. Adds the
+read-only Action Queue suggestion preview inside AI Doctor context
+readiness, with deterministic eligibility rules, UI-level safety
+filters, and accessibility improvements.
+
+- Behavior: preview-only; no Action Queue rows created; no Supabase
+  writes; no AI/model calls; no device control.
+- Validation: 27/27 preview helper + presenter tests pass.
+- Regression: 38/38 imported-history + readiness tests pass.
+- Docs: see `ai-doctor-output-contract.md` "Action Queue suggestion
+  preview" section, `qa/ai-doctor-imported-history-safety-checklist.md`
+  preview checklist, and `runbooks/ai-doctor-imported-history.md`.

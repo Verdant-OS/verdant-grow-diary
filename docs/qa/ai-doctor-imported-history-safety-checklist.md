@@ -18,10 +18,26 @@ touches imported-history surfaces.
 - [ ] No raw payload fields (`raw_payload`, vendor secrets, internal IDs,
       private filenames, bridge tokens) render in any visible UI.
 - [ ] No device-command-shaped strings render (`execute_device`,
-      `setpoint_write`, `irrigation_control`, `light_control`,
-      `fan_control`).
+   `setpoint_write`, `irrigation_control`, `light_control`,
+   `fan_control`).
 - [ ] Approval-required suggestions are **not** shown as approved,
       executed, or queued — they remain context-only.
+
+## Action Queue suggestion preview
+
+- [ ] Preview status chip is visible in the readiness panel.
+- [ ] Screen-reader status (`role="status"`) is present and audible.
+- [ ] Missing context chips render when plant, tent, stage, or current
+      sensor snapshot is absent.
+- [ ] Invalid / "Needs review" chips render when telemetry is flagged
+      invalid, unknown, or stale.
+- [ ] No `approved`, `queued`, or `executed` wording appears in the
+      preview card.
+- [ ] No executable `<button>` elements exist inside the preview card.
+- [ ] No device-command-shaped text (`turn on`, `turn off`, `pump`,
+      `dose`, `setpoint`, `mqtt publish`) appears in preview copy.
+- [ ] No Supabase write, Action Queue insert, Edge Function invoke, or
+      alert creation is triggered by the preview path.
 
 ## Repository hygiene
 

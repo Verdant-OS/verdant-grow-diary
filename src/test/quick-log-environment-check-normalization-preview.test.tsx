@@ -69,9 +69,13 @@ function renderWithClient(ui: ReactElement) {
 }
 
 async function openEnvironmentPreset() {
-  renderWithClient(<QuickLog open onOpenChange={() => undefined} />);
-  const envBtn = await screen.findByRole("button", { name: /environment check/i });
-  fireEvent.click(envBtn);
+  renderWithClient(
+    <QuickLog
+      open
+      onOpenChange={() => undefined}
+      prefill={{ plantId: "plant-1", growId: "grow-1", eventType: "environment" }}
+    />,
+  );
   await screen.findByTestId("quick-log-environment-check-section");
 }
 

@@ -156,6 +156,52 @@ function downloadJsonBlob(filename: string, jsonText: string): void {
   URL.revokeObjectURL(url);
 }
 
+function buildCsvNormalizationPreview(
+  result: CsvPreviewParseResult,
+  tentId: string,
+  plantId: string,
+  now: Date,
+): SensorNormalizationPreviewViewModel | null {
+  const dataRows = result.rows ?? [];
+  if (dataRows.length === 0) return null;
+
+  const tsIdx = result.mappings.findIndex((m) => m.field === "captured_at");
+  // Pick first row that has a captured_at (or just first row if none).
+  let chosenRow: string[] | null = null;
+  for (const r of dataRows) {
+    if (tsIdx >= 0 && r[tsIdx]) {
+      chosenRow = r;
+      break;
+    }
+  }
+  if (!chosenRow) chosenRow = dataRows[0];
+
+  const payload: Record<string, unknown> = {};
+  result.mappings.forEach((m, colIdx) => {
+    if (!m.field || m.field === "captured_at") return;
+    const raw = chosenRow![colIdx];
+    if (raw == null || raw === "") return;
+    payload[m.field] = raw;
+  });
+
+  const capturedAt = tsIdx >= 0 ? (chosenRow[tsIdx] ?? null) : null;
+  const trimmedTent = tentId.trim();
+  const trimmedPlant = plantId.trim();
+
+  return buildSensorNormalizationPreviewViewModel({
+    payload,
+    options: {
+      source: "csv",
+      sourceIdentity: "csv_import",
+      transport: "csv",
+      tentId: trimmedTent ? trimmedTent : null,
+      plantId: trimmedPlant ? trimmedPlant : null,
+      capturedAt: capturedAt || null,
+      now,
+    },
+  });
+}
+
 export function CsvPreviewReviewGate({
   hasHardBlockedRows,
   hasAcceptedRows,

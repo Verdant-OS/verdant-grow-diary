@@ -127,7 +127,7 @@ const KEYS = {
   soilTempF: ["soil_temperature_f", "soil_temp_f"] as const,
   soilEcMs: ["soil_ec_ms_cm", "soil_ec"] as const,
   soilEcUs: ["soil_ec_us_cm"] as const,
-  resEcMs: ["reservoir_ec_ms_cm", "reservoir_ec"] as const,
+  resEcMs: ["reservoir_ec_ms_cm", "reservoir_ec", "ec_ms_cm"] as const,
   resEcAmbiguous: ["ec"] as const,
   resEcUs: ["ec_us_cm"] as const,
   ph: ["reservoir_ph", "ph"] as const,

@@ -212,3 +212,35 @@ export default function FeedingHistoryPanel({
     </section>
   );
 }
+
+function EcCompensationPreview({ row }: { row: FeedingHistoryRow }) {
+  if (row.ec === null || row.waterTempC === null) return null;
+  const preview = buildEcCompensationPreview({
+    ec: row.ec,
+    waterTempC: row.waterTempC,
+    sourceLabel: row.sourceLabel,
+  });
+  if (!preview.visible) return null;
+  const toneClass =
+    preview.tone === "review"
+      ? "text-amber-600 dark:text-amber-400"
+      : preview.tone === "unavailable"
+        ? "text-muted-foreground"
+        : "text-foreground/90 font-medium";
+  return (
+    <div
+      className="mb-2 rounded-md border border-border/40 bg-secondary/20 px-2 py-1.5"
+      data-testid={`feeding-history-ec-compensation-${row.id}`}
+      data-tone={preview.tone}
+    >
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-muted-foreground">{preview.label}:</span>
+        <span className={toneClass}>{preview.valueDisplay}</span>
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        {EC_COMPENSATION_PREVIEW_DISCLAIMER}
+        {preview.hint ? ` — ${preview.hint}` : ""}
+      </p>
+    </div>
+  );
+}

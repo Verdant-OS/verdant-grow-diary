@@ -33,7 +33,7 @@ describe("DiaryCalendarSection", () => {
     // First (newest) day expanded by default — shows its diagnosis event.
     const events = screen.getAllByTestId("diary-calendar-event");
     expect(events.length).toBeGreaterThanOrEqual(1);
-    expect(within(events[0]).getByText(/Diagnosis/i)).toBeInTheDocument();
+    expect(within(events[0]).getAllByText(/Diagnosis/i).length).toBeGreaterThan(0);
   });
 
   it("expands a collapsed day on tap and shows safe event details", () => {

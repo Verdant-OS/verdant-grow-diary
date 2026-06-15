@@ -414,6 +414,18 @@ export function compilePlantContextFromRows(
     (g) => g.source === "live" && g.sample_count > 0,
   );
 
+  // ----- early-stage (germination/seedling) memory, additive & safe -----
+  const earlyStage = buildEarlyStageAiDoctorContext({
+    diaryRows: input.growEvents ?? [],
+    // Compiler knows live sensor presence; pass it explicitly so the
+    // helper can surface a missing-sensor caveat only when known false.
+    hasRecentSensorSnapshot: hasLiveSensorReadings,
+    // No photo signal exists in the compiler context — leave undefined.
+  });
+  const early_stage_memory: EarlyStageAiDoctorContext | null =
+    earlyStage.hasEarlyStageMemory ? earlyStage : null;
+
+
   return {
     grow_id: plant?.grow_id ?? null,
     tent_id: plant?.tent_id ?? null,

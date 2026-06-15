@@ -230,6 +230,13 @@ export function CsvPreviewReviewGate({
 
   const plan = built?.plan ?? null;
 
+  const acceptedRowCount = plan?.acceptedWrites.length ?? (hasAcceptedRows ? 1 : 0);
+  const normalizationPreview = useMemo<SensorNormalizationPreviewViewModel | null>(() => {
+    if (!previewResult || !previewResult.ok) return null;
+    if (acceptedRowCount === 0) return null;
+    return buildCsvNormalizationPreview(previewResult, tentId, plantId, effectiveNow);
+  }, [previewResult, tentId, plantId, effectiveNow, acceptedRowCount]);
+
   const [diaryDate, setDiaryDate] = useState<string>(() =>
     effectiveNow.toISOString().slice(0, 16),
   );

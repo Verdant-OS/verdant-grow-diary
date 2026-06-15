@@ -807,8 +807,8 @@ export default function ActionQueue() {
                       )}
 
 
-                      <span className="text-xs text-muted-foreground">
-                        {row.target_metric ?? row.target_device}
+                      <span className="text-xs text-muted-foreground" data-testid="action-queue-row-target-label">
+                        {formatActionTargetLabel(row.target_metric, row.target_device)}
                       </span>
                     </div>
                     <p className="text-sm mt-1">{sanitizeActionCopy(row.suggested_change)}</p>

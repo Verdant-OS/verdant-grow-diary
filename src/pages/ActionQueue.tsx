@@ -301,7 +301,11 @@ export default function ActionQueue() {
       .order("created_at", { ascending: false })
       .limit(100);
     const { data, error } = effectiveGrowId ? await q.eq("grow_id", effectiveGrowId) : await q;
-    if (error) toast.error(error.message);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      setLastUpdatedAt(Date.now());
+    }
     const list = (data ?? []) as ActionRow[];
     setRows(list);
 

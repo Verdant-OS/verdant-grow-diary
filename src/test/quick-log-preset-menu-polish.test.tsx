@@ -14,7 +14,7 @@
  *
  * Pure render + static tests. No I/O. No Supabase. No model calls.
  */
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import GlobalFastAddButton from "@/components/GlobalFastAddButton";
@@ -120,7 +120,7 @@ describe("Quick Log preset menu — event wiring", () => {
   )(
     "clicking '%s' dispatches the existing Quick Log event with eventType=%s",
     (actionId, expectedEventType) => {
-      const onDispatchEvent = jest.fn();
+      const onDispatchEvent = vi.fn();
       renderQuickLog({
         plantId: "p1",
         tentId: null,
@@ -137,8 +137,8 @@ describe("Quick Log preset menu — event wiring", () => {
   );
 
   it("diagnosis preset navigates instead of dispatching an event", () => {
-    const onNavigate = jest.fn();
-    const onDispatchEvent = jest.fn();
+    const onNavigate = vi.fn();
+    const onDispatchEvent = vi.fn();
     renderQuickLog({
       plantId: "p1",
       tentId: null,

@@ -112,21 +112,34 @@ export default function DiaryCalendarSection({
         >
           {DIARY_CALENDAR_FILTERS.map((f) => {
             const active = filter === f.value;
+            const count = filterCounts[f.value];
             return (
               <button
                 key={f.value}
                 type="button"
                 aria-pressed={active}
+                aria-label={`${f.label}, ${count} ${count === 1 ? "event" : "events"}`}
                 onClick={() => setFilter(f.value)}
                 data-testid={`diary-calendar-filter-${f.value}`}
                 className={cn(
-                  "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition",
+                  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition",
                   active
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-secondary/50 text-foreground border-border/50 hover:bg-secondary",
                 )}
               >
                 {f.label}
+                <span
+                  className={cn(
+                    "inline-flex items-center justify-center min-w-[1rem] px-1 rounded-full text-[10px] font-semibold",
+                    active
+                      ? "bg-primary-foreground/20 text-primary-foreground"
+                      : "bg-muted text-muted-foreground",
+                  )}
+                  aria-hidden
+                >
+                  {count}
+                </span>
               </button>
             );
           })}

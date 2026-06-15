@@ -31,6 +31,11 @@ import {
   isUnsafePreviewText,
   previewActionSuggestion,
 } from "@/lib/aiDoctorActionSuggestionPreviewRules";
+import {
+  deriveCurrentSnapshotFromAiDoctorContext,
+  evaluateManualSensorSnapshotQuality,
+} from "@/lib/manualSensorSnapshotQualityRules";
+import ManualSensorSnapshotQualityBadge from "@/components/ManualSensorSnapshotQualityBadge";
 
 export interface AiDoctorContextReadinessPanelProps {
   context: AiDoctorContext;
@@ -78,6 +83,14 @@ export default function AiDoctorContextReadinessPanel({
   const actionPreview = useMemo(
     () => previewActionSuggestion(deriveActionSuggestionPreviewInput(view)),
     [view],
+  );
+
+  const currentSnapshotQuality = useMemo(
+    () =>
+      evaluateManualSensorSnapshotQuality(
+        deriveCurrentSnapshotFromAiDoctorContext(context),
+      ),
+    [context],
   );
 
   return (
@@ -184,6 +197,15 @@ export default function AiDoctorContextReadinessPanel({
           </ul>
         )}
       </div>
+
+      <div data-testid="ai-doctor-context-readiness-panel-current-snapshot-quality">
+        <h3 className="text-xs font-medium text-muted-foreground mb-1">
+          Current reading quality
+        </h3>
+        <ManualSensorSnapshotQualityBadge evaluation={currentSnapshotQuality} />
+      </div>
+
+
 
       {view.limitations.length > 0 ? (
         <div>

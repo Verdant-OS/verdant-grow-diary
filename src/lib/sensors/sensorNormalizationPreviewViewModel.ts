@@ -25,6 +25,7 @@ import {
   normalizedReadingToLongFormRows,
   type NormalizedSensorLongFormRow,
 } from "./sensorReadingLongForm";
+import { isUuid } from "@/lib/isUuid";
 
 export interface SensorNormalizationPreviewInput {
   payload: unknown;

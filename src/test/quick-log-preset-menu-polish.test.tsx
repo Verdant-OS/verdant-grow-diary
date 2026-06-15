@@ -124,12 +124,10 @@ describe("Quick Log preset menu — event wiring", () => {
     "clicking '%s' dispatches the existing Quick Log event with eventType=%s",
     (actionId, expectedEventType) => {
       const onDispatchEvent = vi.fn();
-      renderQuickLog({
-        plantId: "p1",
-        tentId: null,
-        growId: "g1",
-        onDispatchEvent,
-      } as any);
+      renderQuickLog(
+        { plantId: "p1", tentId: null, growId: "g1" },
+        { onDispatchEvent },
+      );
       fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
       fireEvent.click(screen.getByTestId(`global-fast-add-action-${actionId}`));
       expect(onDispatchEvent).toHaveBeenCalledTimes(1);

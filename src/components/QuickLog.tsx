@@ -432,6 +432,9 @@ export default function QuickLog({
         notes: earlyNotes,
         stage,
       });
+      const earlyStageRecord: Record<string, unknown> | null = earlyStageEnvelope
+        ? { ...earlyStageEnvelope }
+        : null;
       const earlyStageSuffix = buildEarlyStageNoteSuffix({
         milestone: earlyMilestone,
         vigor: earlyVigor,

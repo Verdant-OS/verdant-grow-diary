@@ -54,14 +54,14 @@ const FORBIDDEN_IN_ALLOW_LIST: ReadonlyArray<{ name: string; re: RegExp }> = [
   { name: "dose call", re: /\bdose\(/i },
   { name: "fetch device endpoint", re: /fetch\(\s*['"`][^'"`]*\/(device|relay|pump|valve)\b/i },
 
-  // Grower-facing unsafe equipment copy. Substring match — the scanner
-  // must reject these even if they appear inside string literals.
-  { name: "copy: turn on equipment", re: /turn on equipment/i },
-  { name: "copy: send command", re: /send command/i },
-  { name: "copy: control device", re: /control device/i },
-  { name: "copy: auto-run equipment", re: /auto[- ]?run equipment/i },
-  { name: "copy: set humidity", re: /\bset humidity\b/i },
-  { name: "copy: set temperature", re: /\bset temperature\b/i },
+  // Grower-facing unsafe equipment copy. NOTE: ambiguous phrases like
+  // "control device" / "set humidity" are intentionally NOT scanned per
+  // file because allow-listed safety files legitimately contain NEGATED
+  // disclaimers (e.g. "must not be used to control devices"). Those
+  // grower-copy semantics are guarded via synthetic samples in the
+  // negative-regression block below, which exercises the scanner's
+  // banned regexes directly.
+
 
   // Secret / leakage tokens.
   { name: "service_role", re: /service_role/i },

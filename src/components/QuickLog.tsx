@@ -849,7 +849,11 @@ export default function QuickLog({
 
           <section className="space-y-2">
             <div className="grid grid-cols-2 gap-2">
-              <EventTypeSelector value={eventType} onValueChange={setEventType} />
+              <EventTypeSelector
+                id="quick-log-event-type"
+                value={eventType}
+                onValueChange={setEventType}
+              />
               <div>
                 <Label className="text-xs">Stage</Label>
                 <Select value={stage} onValueChange={setStage}>

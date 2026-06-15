@@ -23,6 +23,21 @@ export type ActionSuggestionPreviewStatus =
   | "blocked_invalid_data"
   | "blocked_device_command_risk";
 
+export type ActionSuggestionMissingField =
+  | "plant"
+  | "tent"
+  | "stage"
+  | "current_sensor_snapshot";
+
+export type ActionSuggestionInvalidField =
+  | "temperature"
+  | "humidity"
+  | "vpd"
+  | "soil_ec"
+  | "soil_moisture"
+  | "co2"
+  | "unknown";
+
 export interface ActionSuggestionPreviewInput {
   /** Plant + tent + stage context all known. */
   hasPlantContext: boolean;
@@ -32,6 +47,17 @@ export interface ActionSuggestionPreviewInput {
   hasImportedHistory: boolean;
   /** Critical telemetry is flagged invalid, unknown, blocked, or stale. */
   hasInvalidOrUnknownCriticalTelemetry: boolean;
+  /**
+   * Optional per-field plant-context detail. Each value is `true` when the
+   * field is PRESENT. When omitted, missing fields are derived from
+   * `hasPlantContext`.
+   */
+  plantContextDetail?: { plant?: boolean; tent?: boolean; stage?: boolean };
+  /**
+   * Optional explicit list of telemetry metrics flagged invalid/unknown.
+   * Unknown labels are bucketed as "unknown".
+   */
+  invalidTelemetryMetrics?: readonly string[];
   /**
    * Candidate suggestion strings derived from context. Scanned for
    * device-command-shaped language. Anything matching blocks eligibility.
@@ -45,6 +71,10 @@ export interface ActionSuggestionPreview {
   summary: string;
   reasons: readonly string[];
   safetyNotes: readonly string[];
+  /** Deterministic, sorted list of missing context fields. */
+  missingFields: readonly ActionSuggestionMissingField[];
+  /** Deterministic, sorted list of invalid/unknown telemetry fields. */
+  invalidFields: readonly ActionSuggestionInvalidField[];
   suggestedActionPreview?: string;
   approvalRequired: true;
   deviceControl: false;
@@ -67,7 +97,7 @@ const DEVICE_COMMAND_PATTERNS: readonly RegExp[] = Object.freeze([
 
 const SAFETY_NOTES: readonly string[] = Object.freeze([
   "Approval required — grower must approve any action before it runs.",
-  "No device control — Verdant will not execute equipment commands.",
+  "No device control — Verdant will not run equipment commands.",
   "Preview only — no Action Queue item is created.",
 ]);
 
@@ -88,6 +118,66 @@ const CONSERVATIVE_PREVIEW_COPY =
   "Review environment and add a current sensor snapshot before changing anything. " +
   "Monitor for 24 hours if confidence is low.";
 
+const MISSING_FIELD_ORDER: readonly ActionSuggestionMissingField[] = [
+  "plant",
+  "tent",
+  "stage",
+  "current_sensor_snapshot",
+];
+
+const INVALID_FIELD_ORDER: readonly ActionSuggestionInvalidField[] = [
+  "temperature",
+  "humidity",
+  "vpd",
+  "soil_ec",
+  "soil_moisture",
+  "co2",
+  "unknown",
+];
+
+export const ACTION_SUGGESTION_MISSING_FIELD_LABELS: Record<
+  ActionSuggestionMissingField,
+  string
+> = Object.freeze({
+  plant: "Plant",
+  tent: "Tent",
+  stage: "Growth stage",
+  current_sensor_snapshot: "Current manual/live sensor snapshot",
+});
+
+export const ACTION_SUGGESTION_INVALID_FIELD_LABELS: Record<
+  ActionSuggestionInvalidField,
+  string
+> = Object.freeze({
+  temperature: "Temperature",
+  humidity: "Humidity",
+  vpd: "VPD",
+  soil_ec: "Soil EC",
+  soil_moisture: "Soil moisture",
+  co2: "CO2",
+  unknown: "Unknown / unverified telemetry",
+});
+
+const INVALID_METRIC_ALIASES: Record<string, ActionSuggestionInvalidField> = {
+  temperature: "temperature",
+  temperature_c: "temperature",
+  temperature_f: "temperature",
+  temp: "temperature",
+  humidity: "humidity",
+  humidity_pct: "humidity",
+  rh: "humidity",
+  rh_pct: "humidity",
+  vpd: "vpd",
+  vpd_kpa: "vpd",
+  soil_ec: "soil_ec",
+  ec: "soil_ec",
+  soil_moisture: "soil_moisture",
+  moisture: "soil_moisture",
+  swc: "soil_moisture",
+  co2: "co2",
+  co2_ppm: "co2",
+};
+
 function containsDeviceCommand(text: string): boolean {
   if (typeof text !== "string" || text.length === 0) return false;
   return DEVICE_COMMAND_PATTERNS.some((p) => p.test(text));
@@ -95,6 +185,53 @@ function containsDeviceCommand(text: string): boolean {
 
 function freeze<T>(value: T): T {
   return Object.freeze(value) as T;
+}
+
+function sortByOrder<T extends string>(
+  values: Iterable<T>,
+  order: readonly T[],
+): T[] {
+  const set = new Set(values);
+  return order.filter((v) => set.has(v));
+}
+
+function bucketInvalidMetric(raw: string): ActionSuggestionInvalidField {
+  const key = String(raw ?? "").trim().toLowerCase();
+  return INVALID_METRIC_ALIASES[key] ?? "unknown";
+}
+
+function deriveMissingFields(
+  input: ActionSuggestionPreviewInput,
+): ActionSuggestionMissingField[] {
+  const missing = new Set<ActionSuggestionMissingField>();
+  const detail = input.plantContextDetail;
+  if (detail) {
+    if (detail.plant === false) missing.add("plant");
+    if (detail.tent === false) missing.add("tent");
+    if (detail.stage === false) missing.add("stage");
+  } else if (!input.hasPlantContext) {
+    missing.add("plant");
+    missing.add("tent");
+    missing.add("stage");
+  }
+  if (!input.hasCurrentManualOrLiveReading) {
+    missing.add("current_sensor_snapshot");
+  }
+  return sortByOrder(missing, MISSING_FIELD_ORDER);
+}
+
+function deriveInvalidFields(
+  input: ActionSuggestionPreviewInput,
+): ActionSuggestionInvalidField[] {
+  const metrics = input.invalidTelemetryMetrics;
+  if (Array.isArray(metrics) && metrics.length > 0) {
+    const bucketed = metrics.map(bucketInvalidMetric);
+    return sortByOrder(bucketed, INVALID_FIELD_ORDER);
+  }
+  if (input.hasInvalidOrUnknownCriticalTelemetry) {
+    return ["unknown"];
+  }
+  return [];
 }
 
 /**
@@ -108,6 +245,8 @@ export function previewActionSuggestion(
     (s): s is string => typeof s === "string" && s.length > 0,
   );
   const deviceRisk = candidates.some(containsDeviceCommand);
+  const invalidFields = deriveInvalidFields(input);
+  const missingFields = deriveMissingFields(input);
 
   let status: ActionSuggestionPreviewStatus;
   const reasons: string[] = [];
@@ -117,12 +256,12 @@ export function previewActionSuggestion(
     reasons.push(
       "One or more candidate strings contain device-command-shaped language.",
     );
-  } else if (input.hasInvalidOrUnknownCriticalTelemetry) {
+  } else if (invalidFields.length > 0) {
     status = "blocked_invalid_data";
     reasons.push(
       "Critical telemetry is flagged invalid, unknown, or unverified.",
     );
-  } else if (!input.hasPlantContext) {
+  } else if (!input.hasPlantContext || missingFields.some((f) => f !== "current_sensor_snapshot")) {
     status = "missing_context";
     reasons.push("Plant, tent, or stage context is not available.");
   } else if (!input.hasCurrentManualOrLiveReading) {
@@ -153,6 +292,8 @@ export function previewActionSuggestion(
     summary: SUMMARY_BY_STATUS[status],
     reasons: freeze([...reasons]),
     safetyNotes: SAFETY_NOTES,
+    missingFields: freeze(missingFields),
+    invalidFields: freeze(invalidFields),
     approvalRequired: true,
     deviceControl: false,
     contextOnly: true,
@@ -177,11 +318,41 @@ export const ACTION_SUGGESTION_PREVIEW_STATUS_LABELS: Record<
 });
 
 /**
+ * UI-level safety filter. Returns true if a rendered string contains
+ * approved/queued/executable/device-command language that must never reach
+ * the preview card, regardless of helper output. The presenter uses this
+ * to drop unsafe strings as a defence-in-depth guard.
+ */
+const UI_FORBIDDEN_PATTERNS: readonly RegExp[] = Object.freeze([
+  /\bapproved\b/i,
+  /\b(queued|added to (the )?queue)\b/i,
+  /\b(was|is|has been|have been) executed\b/i,
+  /\bexecute\b/i,
+  /\bsend\b/i,
+  /\bturn[_\s-]?on\b/i,
+  /\bturn[_\s-]?off\b/i,
+  /\bpump\b/i,
+  /\bdose\b/i,
+  /\bset[_\s-]?temp\b/i,
+  /\bset[_\s-]?(humidity|rh)\b/i,
+  /\bmqtt[_\s-]?publish\b/i,
+]);
+
+export function isUnsafePreviewText(text: unknown): boolean {
+  if (typeof text !== "string" || text.length === 0) return false;
+  return UI_FORBIDDEN_PATTERNS.some((p) => p.test(text));
+}
+
+/**
  * Lightweight readiness-view shape used to derive a preview input. Kept
  * structural so this module stays decoupled from the readiness view-model.
  */
 export interface ActionSuggestionPreviewReadinessLike {
-  plantIdentity: { plantId: string | null; stage: string | null };
+  plantIdentity: {
+    plantId: string | null;
+    stage: string | null;
+    tentId?: string | null;
+  };
   sourceBadges: ReadonlyArray<{
     source: string;
     sampleCount: number;
@@ -198,9 +369,13 @@ export function deriveActionSuggestionPreviewInput(
 ): ActionSuggestionPreviewInput {
   const badges = view?.sourceBadges ?? [];
   const limitations = view?.limitations ?? [];
-  const hasPlantContext = Boolean(
-    view?.plantIdentity?.plantId && view?.plantIdentity?.stage,
-  );
+  const plantPresent = Boolean(view?.plantIdentity?.plantId);
+  const stagePresent = Boolean(view?.plantIdentity?.stage);
+  const tentPresent =
+    view?.plantIdentity?.tentId === undefined
+      ? plantPresent
+      : Boolean(view?.plantIdentity?.tentId);
+  const hasPlantContext = plantPresent && stagePresent && tentPresent;
   const hasCurrentManualOrLiveReading = badges.some(
     (b) =>
       (b.source === "live" || b.source === "manual") && b.sampleCount > 0,
@@ -216,11 +391,18 @@ export function deriveActionSuggestionPreviewInput(
     hasCurrentManualOrLiveReading,
     hasImportedHistory,
     hasInvalidOrUnknownCriticalTelemetry,
+    plantContextDetail: {
+      plant: plantPresent,
+      tent: tentPresent,
+      stage: stagePresent,
+    },
   };
 }
 
 export const __testing = {
   DEVICE_COMMAND_PATTERNS,
+  UI_FORBIDDEN_PATTERNS,
   containsDeviceCommand,
   SAFETY_NOTES,
+  bucketInvalidMetric,
 };

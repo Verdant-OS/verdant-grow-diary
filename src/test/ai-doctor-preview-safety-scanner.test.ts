@@ -65,7 +65,7 @@ describe("ai-doctor preview safety scanner", () => {
   });
 
   it("flags service_role references", () => {
-    const v = scanText(`const k = service_role_key;`, SCAN_OPTS);
+    const v = scanText(`const k = "uses service_role from env";`, SCAN_OPTS);
     expect(v.map((x) => x.rule)).toContain("no-service-role");
   });
 

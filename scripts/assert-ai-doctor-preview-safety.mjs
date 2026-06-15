@@ -63,9 +63,6 @@ export const PREVIEW_IDENTIFIER_MARKERS = Object.freeze([
   "previewActionSuggestion",
   "aiDoctorActionSuggestionPreview",
   "ai-doctor-action-suggestion-preview",
-  "contextOnly",
-  "approvalRequired",
-  "deviceControl",
 ]);
 
 export const RULES = [

@@ -142,6 +142,16 @@ export default function DiaryCalendarSection({
     );
     setOpenDay(nextGroups[0]?.dateKey ?? null);
   };
+  // Today: jump to the current UTC month, keep active filter, and expand
+  // the newest matching day in that month. If no matches exist, close the
+  // expanded day so we don't leak stale details.
+  const goToToday = () => {
+    const today = now ?? new Date();
+    const todayMonth = currentMonthKey(today);
+    setVisibleMonth(todayMonth);
+    setOpenDay(newestMatchingDateKeyInMonth(allGroups, todayMonth, filter));
+  };
+
 
   // Belt-and-braces: never render stale details if the open day was removed
   // (e.g. raw entries changed asynchronously, or month/filter shifted).

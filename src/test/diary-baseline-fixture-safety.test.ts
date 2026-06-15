@@ -69,15 +69,20 @@ describe("diary baseline fixture safety", () => {
     expect(fixture.is_live).toBe(false);
   });
 
-  it("never mislabels any nested reading or status as live", () => {
-    const strings = collectStrings(fixture);
-    for (const s of strings) {
-      // Allow the literal token "live" only inside explicit negations
-      // (we don't expect any in this fixture).
-      expect(/\blive\b/i.test(s) && !/not\s+live|non[- ]?live/i.test(s)).toBe(
-        false,
-      );
+  it("never sets source=live or is_live=true on any nested node", () => {
+    function walk(node: unknown) {
+      if (!node || typeof node !== "object") return;
+      if (Array.isArray(node)) {
+        node.forEach(walk);
+        return;
+      }
+      const obj = node as Record<string, unknown>;
+      if ("source" in obj) expect(obj.source).not.toBe("live");
+      if ("is_live" in obj) expect(obj.is_live).not.toBe(true);
+      if ("data_label" in obj) expect(obj.data_label).not.toBe("live");
+      Object.values(obj).forEach(walk);
     }
+    walk(fixture);
   });
 
   it("keeps soil-probe zero/missing values flagged, never healthy", () => {

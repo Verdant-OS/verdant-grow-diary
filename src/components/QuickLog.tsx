@@ -331,6 +331,10 @@ export default function QuickLog({
     setWateringError(null);
     setSaveError(null);
     setSavedTarget(null);
+    setEarlyMilestone(null);
+    setEarlyVigor(null);
+    setEarlyNotes("");
+    setEarlyManuallyOpen(false);
   }
 
   function resetForAnother() {

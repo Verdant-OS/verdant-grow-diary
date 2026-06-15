@@ -82,13 +82,18 @@ export default function ManualSensorReadingCard({
     // Build a sanitized snapshot from validated metrics only. No raw_payload,
     // no vendor metadata, no tokens, no private IDs. captured_at = now since
     // the grower is entering a current reading right now.
-    const snap: ManualSensorSnapshotInput = { source: "manual", captured_at: new Date().toISOString() };
+    const fields: Record<string, number> = {};
     for (const m of validation.metrics) {
-      if (m.metric === "temperature_c") snap.temperature_c = m.value;
-      else if (m.metric === "humidity_pct") snap.humidity_pct = m.value;
-      else if (m.metric === "vpd_kpa") snap.vpd_kpa = m.value;
-      else if (m.metric === "soil_moisture_pct") snap.soil_moisture_pct = m.value;
+      if (m.metric === "temperature_c") fields.temperature_c = m.value;
+      else if (m.metric === "humidity_pct") fields.humidity_pct = m.value;
+      else if (m.metric === "vpd_kpa") fields.vpd_kpa = m.value;
+      else if (m.metric === "soil_moisture_pct") fields.soil_moisture_pct = m.value;
     }
+    const snap: ManualSensorSnapshotInput = {
+      source: "manual",
+      captured_at: new Date().toISOString(),
+      ...fields,
+    };
     return evaluateManualSensorSnapshotQuality(snap);
   }, [validation.metrics]);
 

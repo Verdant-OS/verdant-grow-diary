@@ -63,6 +63,7 @@ export default function DiaryCalendarSection({
     [groups, dayLimit],
   );
   const summary = useMemo(() => summarizeDiaryCalendar(groups), [groups]);
+  const filterCounts = useMemo(() => computeDiaryCalendarFilterCounts(allGroups), [allGroups]);
   const [openDay, setOpenDay] = useState<string | null>(
     visibleGroups[0]?.dateKey ?? null,
   );

@@ -355,6 +355,12 @@ export default function QuickLog({
     setEarlyVigor(null);
     setEarlyNotes("");
     setEarlyManuallyOpen(false);
+    setEnvRoomTempF("");
+    setEnvHumidityPct("");
+    setEnvVpdKpa("");
+    setEnvWaterTempValue("");
+    setEnvWaterTempUnit("F");
+    setEnvEcMscm("");
   }
 
   function resetForAnother() {

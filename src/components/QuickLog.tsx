@@ -207,6 +207,13 @@ export default function QuickLog({
   const [earlyVigor, setEarlyVigor] = useState<EarlyStageVigor | null>(null);
   const [earlyNotes, setEarlyNotes] = useState<string>("");
   const [earlyManuallyOpen, setEarlyManuallyOpen] = useState(false);
+  const [envRoomTempF, setEnvRoomTempF] = useState<string>("");
+  const [envHumidityPct, setEnvHumidityPct] = useState<string>("");
+  const [envVpdKpa, setEnvVpdKpa] = useState<string>("");
+  const [envWaterTempValue, setEnvWaterTempValue] = useState<string>("");
+  const [envWaterTempUnit, setEnvWaterTempUnit] =
+    useState<EnvironmentCheckWaterTempUnit>("F");
+  const [envEcMscm, setEnvEcMscm] = useState<string>("");
 
   const wateringInputRef = useRef<HTMLInputElement | null>(null);
   const plantSelectTriggerRef = useRef<HTMLButtonElement | null>(null);

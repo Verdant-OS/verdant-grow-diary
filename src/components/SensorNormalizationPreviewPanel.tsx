@@ -16,6 +16,7 @@ import type {
 export interface SensorNormalizationPreviewPanelProps {
   viewModel: SensorNormalizationPreviewViewModel;
   title?: string;
+  variant?: "default" | "compact";
 }
 
 const TONE_CLASS: Record<SensorNormalizationPreviewBadgeTone, string> = {

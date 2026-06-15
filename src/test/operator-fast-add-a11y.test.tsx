@@ -41,10 +41,10 @@ function renderFastAdd(ctx: Parameters<typeof GlobalFastAddButton>[0]["context"]
   );
 }
 
-describe("Global Fast Add — accessible names", () => {
-  it("trigger button has an accessible name 'Fast Add'", () => {
+describe("Global Quick Log — accessible names", () => {
+  it("trigger button has an accessible name 'Quick Log'", () => {
     renderFastAdd();
-    const trigger = screen.getByRole("button", { name: /fast add/i });
+    const trigger = screen.getByRole("button", { name: /quick log/i });
     expect(trigger).toBeInTheDocument();
     expect(trigger.getAttribute("aria-haspopup")).toBe("menu");
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
@@ -55,7 +55,7 @@ describe("Global Fast Add — accessible names", () => {
     fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
     const menu = screen.getByRole("menu");
     expect(menu).toBeInTheDocument();
-    expect(menu.getAttribute("aria-label")).toMatch(/fast add/i);
+    expect(menu.getAttribute("aria-label")).toMatch(/quick log/i);
     expect(
       screen.getByTestId("global-fast-add-trigger").getAttribute("aria-expanded"),
     ).toBe("true");

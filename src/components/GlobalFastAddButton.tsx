@@ -1,7 +1,11 @@
 /**
- * GlobalFastAddButton — presenter-only Fast Add menu for authenticated
+ * GlobalFastAddButton — presenter-only Quick Log menu for authenticated
  * surfaces. Surfaces 8 grower-friendly logging entry points and routes
  * them to the existing Quick Log / AI Doctor flows.
+ *
+ * NOTE: Internal component/file name retained for code stability. The
+ * grower-facing label is "Quick Log" — the single consolidated logging
+ * entry point. There is no separate "Fast Add" surface.
  *
  * Hard constraints:
  *  - Never inserts diary, sensor, alert, Action Queue, or device rows.
@@ -90,20 +94,20 @@ export default function GlobalFastAddButton({
           setNotice(null);
           setOpen((v) => !v);
         }}
-        aria-label="Fast Add"
+        aria-label="Quick Log"
         aria-haspopup="menu"
         aria-expanded={open}
         data-testid="global-fast-add-trigger"
         className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-secondary/40 px-4 min-h-11 min-w-11 text-sm font-medium hover:bg-secondary/70 active:bg-secondary/80 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background touch-manipulation"
       >
         <Plus className="h-5 w-5" aria-hidden="true" />
-        Fast Add
+        Quick Log
       </button>
 
       {open ? (
         <div
           role="menu"
-          aria-label="Fast Add actions"
+          aria-label="Quick Log actions"
           data-testid="global-fast-add-menu"
           className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-1rem)] rounded-xl border border-border/60 bg-popover shadow-elevated p-1.5 z-50"
         >

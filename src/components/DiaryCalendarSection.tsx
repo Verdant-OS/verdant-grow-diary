@@ -163,6 +163,44 @@ export default function DiaryCalendarSection({
                                   {ev.noteSnippet}
                                 </p>
                               )}
+                              <div
+                                className="mt-2 rounded-lg border border-border/40 bg-background/40 px-2 py-1.5"
+                                data-testid="diary-calendar-event-details"
+                                aria-label={ev.details.sectionLabel}
+                              >
+                                <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+                                  {ev.details.sectionLabel}
+                                </p>
+                                {ev.details.fields.length > 0 && (
+                                  <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-[11px]">
+                                    {ev.details.fields.map((f) => (
+                                      <div key={f.label} className="contents">
+                                        <dt className="text-muted-foreground">{f.label}</dt>
+                                        <dd className="break-words">{f.value}</dd>
+                                      </div>
+                                    ))}
+                                  </dl>
+                                )}
+                                {ev.details.ecPreview && ev.details.ecPreview.visible && (
+                                  <p
+                                    className="mt-1 text-[11px] text-muted-foreground"
+                                    data-testid="diary-calendar-ec-preview"
+                                  >
+                                    <span className="font-medium text-foreground">
+                                      {ev.details.ecPreview.label}:
+                                    </span>{" "}
+                                    {ev.details.ecPreview.valueDisplay}
+                                    <span className="ml-1 italic">
+                                      ({ev.details.ecPreview.disclaimer})
+                                    </span>
+                                  </p>
+                                )}
+                                {ev.details.fallback && (
+                                  <p className="text-[11px] text-muted-foreground italic">
+                                    {ev.details.fallback}
+                                  </p>
+                                )}
+                              </div>
                             </div>
                           </li>
                         );

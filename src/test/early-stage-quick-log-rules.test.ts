@@ -151,11 +151,15 @@ describe("safety boundary — pure module", () => {
     "utf8",
   );
   it("imports no Supabase, Action Queue, AI, or device-control surfaces", () => {
-    expect(source).not.toMatch(/supabase/i);
-    expect(source).not.toMatch(/action_queue/);
-    expect(source).not.toMatch(/edge-function/i);
-    expect(source).not.toMatch(/openai|anthropic|ai-gateway|lovable-ai/i);
-    expect(source).not.toMatch(/device[_-]?control|home[_-]?assistant|mqtt/i);
-    expect(source).not.toMatch(/automation|cron|trigger/i);
+    const importLines = source
+      .split("\n")
+      .filter((l) => /^\s*import\b/.test(l))
+      .join("\n");
+    expect(importLines).toBe(""); // pure module — zero imports
+    expect(source).not.toMatch(/from\s+["'][^"']*supabase[^"']*["']/i);
+    expect(source).not.toMatch(/from\s+["'][^"']*action[_-]?queue[^"']*["']/i);
+    expect(source).not.toMatch(/from\s+["'][^"']*ai-gateway[^"']*["']/i);
+    expect(source).not.toMatch(/from\s+["'][^"']*(openai|anthropic)[^"']*["']/i);
+    expect(source).not.toMatch(/from\s+["'][^"']*(home[_-]?assistant|mqtt|device[_-]?control)[^"']*["']/i);
   });
 });

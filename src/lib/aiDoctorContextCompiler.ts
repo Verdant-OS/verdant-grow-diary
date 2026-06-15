@@ -214,7 +214,10 @@ export interface GrowEventRowLike {
   event_type?: string | null;
   source?: string | null;
   note?: string | null;
+  /** Free-form details JSON — may carry an `early_stage` envelope. */
+  details?: unknown;
 }
+
 
 export interface SensorReadingRowLike {
   metric?: string | null;

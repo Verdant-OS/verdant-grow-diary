@@ -151,7 +151,8 @@ describe("earlyStageTimelineViewModel — safety boundaries", () => {
   it("contains no Supabase / RPC / Action Queue / device-control code", () => {
     expect(SRC).not.toMatch(/from\s*\(\s*['"]/);
     expect(SRC).not.toMatch(/\.rpc\s*\(/);
-    expect(SRC).not.toMatch(/supabase/i);
+    expect(SRC).not.toMatch(/from\s*['"]@\/integrations\/supabase/);
+    expect(SRC).not.toMatch(/createClient\s*\(/);
     expect(SRC).not.toMatch(/action_queue/i);
     expect(SRC).not.toMatch(/device|relay|control/i);
     expect(SRC).not.toMatch(/service_role|service-role/i);

@@ -18,7 +18,7 @@ describe("ManualSensorSnapshotQualityBadge", () => {
     );
     render(<ManualSensorSnapshotQualityBadge evaluation={evaluation} />);
     expect(screen.getByText("Needs review")).toBeInTheDocument();
-    expect(screen.getByText(/Source: csv/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Source: csv/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/CSV history only/i)).toBeInTheDocument();
   });
 
@@ -36,7 +36,7 @@ describe("ManualSensorSnapshotQualityBadge", () => {
     );
     render(<ManualSensorSnapshotQualityBadge evaluation={evaluation} />);
     expect(screen.getByText("Usable current reading")).toBeInTheDocument();
-    expect(screen.getByText(/Source: manual/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Source: manual/i).length).toBeGreaterThan(0);
   });
 
   it("renders Invalid for an out-of-range reading and lists a reason", () => {

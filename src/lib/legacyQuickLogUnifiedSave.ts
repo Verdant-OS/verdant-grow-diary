@@ -74,6 +74,19 @@ export interface LegacyQuickLogFormInput {
    * preserving the existing no-details behavior.
    */
   sensorAttachPayload?: SensorAttachPayload;
+  /**
+   * Optional early-stage (germination/seedling) envelope. Folded into
+   * `p_details.early_stage` alongside (not replacing) the sensor envelope.
+   * No schema change required — the RPC already accepts JSONB `p_details`.
+   * Pure pass-through: this adapter does not invent or normalize values.
+   */
+  earlyStage?: Record<string, unknown> | null;
+  /**
+   * Optional human-readable suffix (e.g. milestone + vigor summary)
+   * appended to the diary note so timelines that read the note column
+   * stay informative without depending on JSON details.
+   */
+  noteSuffix?: string | null;
 }
 
 export type LegacyUnifiedBuildResult =

@@ -18,12 +18,15 @@ import {
   formatDiaryCalendarMonthLabel,
   diaryCalendarMonthEmptyTitle,
   computeDiaryCalendarFilterCounts,
+  currentMonthKey,
+  newestMatchingDateKeyInMonth,
   DIARY_CALENDAR_EMPTY_HINT,
   DIARY_CALENDAR_FILTERS,
   type DiaryCalendarRawEntry,
   type DiaryCalendarEventKind,
   type DiaryCalendarFilter,
 } from "@/lib/diaryCalendarViewModel";
+
 import { cn } from "@/lib/utils";
 
 const KIND_TONE: Record<DiaryCalendarEventKind, string> = {
@@ -54,12 +57,16 @@ export interface DiaryCalendarSectionProps {
   rawEntries: readonly DiaryCalendarRawEntry[] | null | undefined;
   /** Optional limit on number of days shown. Default 12. */
   dayLimit?: number;
+  /** Injectable "today" for deterministic tests. Defaults to new Date(). */
+  now?: Date;
 }
 
 export default function DiaryCalendarSection({
   rawEntries,
   dayLimit = 12,
+  now,
 }: DiaryCalendarSectionProps) {
+
   const allGroups = useMemo(
     () => buildDiaryCalendarViewModel(rawEntries ?? []),
     [rawEntries],
@@ -135,6 +142,16 @@ export default function DiaryCalendarSection({
     );
     setOpenDay(nextGroups[0]?.dateKey ?? null);
   };
+  // Today: jump to the current UTC month, keep active filter, and expand
+  // the newest matching day in that month. If no matches exist, close the
+  // expanded day so we don't leak stale details.
+  const goToToday = () => {
+    const today = now ?? new Date();
+    const todayMonth = currentMonthKey(today);
+    setVisibleMonth(todayMonth);
+    setOpenDay(newestMatchingDateKeyInMonth(allGroups, todayMonth, filter));
+  };
+
 
   // Belt-and-braces: never render stale details if the open day was removed
   // (e.g. raw entries changed asynchronously, or month/filter shifted).
@@ -186,15 +203,27 @@ export default function DiaryCalendarSection({
           >
             {monthLabel}
           </span>
-          <button
-            type="button"
-            aria-label="Next month"
-            onClick={() => shiftMonth(1)}
-            data-testid="diary-calendar-month-next"
-            className="inline-flex items-center justify-center h-8 w-8 rounded-full border border-border/50 bg-secondary/50 hover:bg-secondary transition"
-          >
-            <ChevronRight className="h-4 w-4" aria-hidden />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              aria-label="Today"
+              onClick={goToToday}
+              data-testid="diary-calendar-today"
+              className="inline-flex items-center justify-center h-8 px-2.5 rounded-full border border-border/50 bg-secondary/50 hover:bg-secondary transition text-[11px] font-medium"
+            >
+              Today
+            </button>
+            <button
+              type="button"
+              aria-label="Next month"
+              onClick={() => shiftMonth(1)}
+              data-testid="diary-calendar-month-next"
+              className="inline-flex items-center justify-center h-8 w-8 rounded-full border border-border/50 bg-secondary/50 hover:bg-secondary transition"
+            >
+              <ChevronRight className="h-4 w-4" aria-hidden />
+            </button>
+          </div>
+
         </div>
       )}
 

@@ -18,12 +18,15 @@ import {
   formatDiaryCalendarMonthLabel,
   diaryCalendarMonthEmptyTitle,
   computeDiaryCalendarFilterCounts,
+  currentMonthKey,
+  newestMatchingDateKeyInMonth,
   DIARY_CALENDAR_EMPTY_HINT,
   DIARY_CALENDAR_FILTERS,
   type DiaryCalendarRawEntry,
   type DiaryCalendarEventKind,
   type DiaryCalendarFilter,
 } from "@/lib/diaryCalendarViewModel";
+
 import { cn } from "@/lib/utils";
 
 const KIND_TONE: Record<DiaryCalendarEventKind, string> = {

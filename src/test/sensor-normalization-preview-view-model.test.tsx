@@ -97,7 +97,7 @@ describe("sensorNormalizationPreviewViewModel", () => {
     expect(vm.tentIdStatus).toBe("missing");
     expect(vm.warnings.some((w) => w.code === "missing_tent_id")).toBe(true);
     expect(vm.longFormRowCount).toBe(0);
-    expect(vm.emptyState).toBe(SENSOR_NORMALIZATION_PREVIEW_EMPTY_STATE);
+    expect(vm.emptyState).toBe(SENSOR_NORMALIZATION_PREVIEW_TENT_MISSING_EMPTY_STATE);
   });
 
   it("µS/cm EC alias converts to mS/cm; mS/cm field with huge value warns", () => {

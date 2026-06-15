@@ -20,6 +20,7 @@ import { resolve } from "node:path";
 import {
   buildMissingEvidenceReviewLink,
   ACTION_EVIDENCE_REVIEW_LINK_LABEL,
+  ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL,
   ACTION_EVIDENCE_REVIEW_LINK_HELPER,
 } from "@/lib/actionQueueMissingEvidenceLink";
 import { timelinePath } from "@/lib/routes";
@@ -45,6 +46,7 @@ describe("buildMissingEvidenceReviewLink", () => {
     expect(link!.to).toBe(timelinePath("grow-123"));
     expect(link!.label).toBe(ACTION_EVIDENCE_REVIEW_LINK_LABEL);
     expect(link!.helper).toBe(ACTION_EVIDENCE_REVIEW_LINK_HELPER);
+    expect(ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL).toMatch(/review.*before approving/i);
   });
 
   it("uses the existing /timeline route pattern", () => {
@@ -111,6 +113,52 @@ describe("ActionDetail missing-evidence guidance wiring", () => {
     expect(ACTION_DETAIL_SRC).toMatch(
       /variant="outline"[\s\S]{0,200}buildMissingEvidenceReviewLink|buildMissingEvidenceReviewLink[\s\S]{0,400}variant="outline"/,
     );
+  });
+
+  it("link has explicit aria-label with review/before-approving language", () => {
+    expect(ACTION_DETAIL_SRC).toContain('aria-label={ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL}');
+    expect(ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL).toMatch(/review.*diary.*timeline/i);
+    expect(ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL).toMatch(/before approving/i);
+  });
+
+  it("link aria-label does not use approval/action wording", () => {
+    const unsafe: RegExp[] = [
+      /approve now/i,
+      /approve action/i,
+      /auto[- ]?run/i,
+      /turn (on|off)/i,
+      /actuator/i,
+      /relay/i,
+      /submit/i,
+    ];
+    for (const re of unsafe) {
+      expect(ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL).not.toMatch(re);
+    }
+  });
+
+  it("link renders as a Link component, not a button or submit", () => {
+    // Should be a react-router Link inside Button asChild
+    const src = ACTION_DETAIL_SRC;
+    expect(src).toContain('aria-label={ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL}');
+    // Extract the Link block that carries our aria-label
+    const linkBlock = src.match(
+      /<Link[\s\S]*?aria-label=\{ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL\}[\s\S]*?<\/Link>/,
+    );
+    expect(linkBlock).toBeTruthy();
+    if (linkBlock) {
+      expect(linkBlock[0]).not.toContain('type="submit"');
+      expect(linkBlock[0]).not.toContain('onClick=');
+    }
+  });
+
+  it("link uses existing focus-visible utility from Button asChild", () => {
+    // Button base variant includes focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
+    expect(ACTION_DETAIL_SRC).toContain('Button asChild size="sm" variant="outline"');
+  });
+
+  it("link does not steal focus on mount (no autoFocus)", () => {
+    expect(ACTION_DETAIL_SRC).not.toMatch(/autoFocus[\s\S]*?buildMissingEvidenceReviewLink/);
+    expect(ACTION_DETAIL_SRC).not.toMatch(/autoFocus[\s\S]{0,200}action-detail-evidence-review-link/);
   });
 
   it("keeps centralized missing-evidence help copy alongside the link", () => {

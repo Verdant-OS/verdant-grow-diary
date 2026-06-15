@@ -11,6 +11,11 @@
  *  - Only emits a small, vetted display surface (label, plant_name, note
  *    snippet) — never the raw details object.
  */
+import {
+  buildEcCompensationPreview,
+  type EcCompensationPreviewModel,
+} from "@/lib/ecCompensationPreviewViewModel";
+import type { EcUnit } from "@/constants/units";
 
 export type DiaryCalendarEventKind = "watering" | "feeding" | "diagnosis";
 

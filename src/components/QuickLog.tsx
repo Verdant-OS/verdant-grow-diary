@@ -352,6 +352,9 @@ export default function QuickLog({
     setWateringError(null);
     setSaveError(null);
     setSavedTarget(null);
+    setEarlyMilestone(null);
+    setEarlyVigor(null);
+    setEarlyNotes("");
     if (keepPlantId) setPlantId(keepPlantId);
     setTimeout(() => noteRef.current?.focus(), 0);
   }

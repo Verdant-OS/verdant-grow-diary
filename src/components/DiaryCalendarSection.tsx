@@ -5,6 +5,7 @@ import {
   summarizeDiaryCalendar,
   filterDiaryCalendarGroups,
   diaryCalendarEmptyTitleFor,
+  computeDiaryCalendarFilterCounts,
   DIARY_CALENDAR_EMPTY_HINT,
   DIARY_CALENDAR_FILTERS,
   type DiaryCalendarRawEntry,

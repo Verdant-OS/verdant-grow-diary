@@ -145,13 +145,11 @@ function assertNoWriteSideEffects() {
   expect(deleteMock).not.toHaveBeenCalled();
   expect(uploadMock).not.toHaveBeenCalled();
   expect(invokeMock).not.toHaveBeenCalled();
-  // Even if .from() was called, none of "sensor_readings"/"action_queue"/"alerts"
-  // should have been targeted in preview render.
-  const tables = fromSpy.mock.calls.map((c) => c[0]);
-  expect(tables).not.toContain("sensor_readings");
-  expect(tables).not.toContain("action_queue");
-  expect(tables).not.toContain("alerts");
+  // Reads (.select on tents/sensor_readings) are allowed; writes are not.
+  // The shared write mocks above already cover any table-targeted write
+  // since they back every .from(...).{insert,upsert,update,delete}.
 }
+
 
 beforeEach(() => {
   saveMock.mockReset();

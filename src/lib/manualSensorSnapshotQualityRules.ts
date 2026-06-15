@@ -347,7 +347,7 @@ export function deriveCurrentSnapshotFromAiDoctorContext(
   }
   if (!chosen || !chosen.readings) return null;
 
-  const fields: { [K in keyof ManualSensorSnapshotInput]?: unknown } = {};
+  const fields: Record<string, unknown> = {};
   let latestCapturedMs: number | null = null;
   let latestCapturedIso: string | null = null;
 

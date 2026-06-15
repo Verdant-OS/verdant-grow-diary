@@ -597,6 +597,37 @@ export function CsvPreviewReviewGate({
         </div>
       )}
 
+      <section
+        data-testid="csv-normalization-preview-section"
+        data-writes-enabled="false"
+        aria-label="CSV normalization preview"
+        className="rounded-md border border-border bg-muted/10 p-3 space-y-2"
+      >
+        <header className="flex items-center justify-between gap-2 flex-wrap">
+          <h3 className="text-sm font-semibold">CSV normalization preview</h3>
+          <span
+            data-testid="csv-normalization-preview-section-disclaimer"
+            className="text-xs text-muted-foreground"
+          >
+            Preview only — no sensor readings will be saved.
+          </span>
+        </header>
+        {normalizationPreview ? (
+          <SensorNormalizationPreviewPanel
+            viewModel={normalizationPreview}
+            title="CSV normalization preview"
+            variant="compact"
+          />
+        ) : (
+          <p
+            data-testid="csv-normalization-preview-empty"
+            className="text-xs text-muted-foreground"
+          >
+            No accepted CSV rows are available for normalization preview.
+          </p>
+        )}
+      </section>
+
       <ul data-testid="csv-gate-checklist" className="text-xs text-muted-foreground space-y-0.5">
         <li data-testid="csv-gate-check-grow" data-ok={checks.growSelected}>Grow selected: {checks.growSelected ? "yes" : "no"}</li>
         <li data-testid="csv-gate-check-tent" data-ok={checks.tentSelected}>Tent selected: {checks.tentSelected ? "yes" : "no"}</li>

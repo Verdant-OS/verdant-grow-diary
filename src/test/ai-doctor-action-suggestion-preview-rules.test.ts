@@ -113,4 +113,114 @@ describe("aiDoctorActionSuggestionPreviewRules", () => {
       expect(label).not.toMatch(/approved|queued|executed/i);
     }
   });
+
+  // ---- Partial telemetry + field-level detail ----
+
+  it("returns blocked_invalid_data when temperature is valid but EC is invalid", () => {
+    const out = previewActionSuggestion({
+      ...baseInput,
+      invalidTelemetryMetrics: ["soil_ec"],
+    });
+    expect(out.status).toBe("blocked_invalid_data");
+    expect(out.invalidFields).toEqual(["soil_ec"]);
+  });
+
+  it("returns missing_context with stage in missingFields when stage is absent", () => {
+    const out = previewActionSuggestion({
+      ...baseInput,
+      hasPlantContext: false,
+      plantContextDetail: { plant: true, tent: true, stage: false },
+    });
+    expect(out.status).toBe("missing_context");
+    expect(out.missingFields).toEqual(["stage"]);
+  });
+
+  it("returns eligible when live/manual current reading + plant/tent/stage are all present", () => {
+    const out = previewActionSuggestion({
+      ...baseInput,
+      plantContextDetail: { plant: true, tent: true, stage: true },
+    });
+    expect(out.status).toBe("eligible");
+    expect(out.missingFields).toEqual([]);
+    expect(out.invalidFields).toEqual([]);
+  });
+
+  it("returns needs_current_reading for imported CSV-only context with rich history", () => {
+    const out = previewActionSuggestion({
+      ...baseInput,
+      hasCurrentManualOrLiveReading: false,
+      hasImportedHistory: true,
+    });
+    expect(out.status).toBe("needs_current_reading");
+    expect(out.missingFields).toContain("current_sensor_snapshot");
+  });
+
+  it("produces a deterministic, sorted invalidFields list", () => {
+    const out = previewActionSuggestion({
+      ...baseInput,
+      invalidTelemetryMetrics: ["soil_moisture", "co2", "vpd", "temperature_c"],
+    });
+    // Canonical order: temperature, humidity, vpd, soil_ec, soil_moisture, co2, unknown
+    expect(out.invalidFields).toEqual(["temperature", "vpd", "soil_moisture", "co2"]);
+    const again = previewActionSuggestion({
+      ...baseInput,
+      invalidTelemetryMetrics: ["co2", "temperature_c", "vpd", "soil_moisture"],
+    });
+    expect(again.invalidFields).toEqual(out.invalidFields);
+  });
+
+  it("produces a deterministic, sorted missingFields list", () => {
+    const out = previewActionSuggestion({
+      ...baseInput,
+      hasCurrentManualOrLiveReading: false,
+      hasPlantContext: false,
+      plantContextDetail: { plant: false, tent: false, stage: false },
+    });
+    expect(out.missingFields).toEqual([
+      "plant",
+      "tent",
+      "stage",
+      "current_sensor_snapshot",
+    ]);
+  });
+
+  it("conservative suggested copy avoids nutrient/irrigation/equipment language", () => {
+    const out = previewActionSuggestion(baseInput);
+    const copy = out.suggestedActionPreview ?? "";
+    expect(copy).not.toMatch(
+      /nutrient|irrigation|dose|pump|fan on|light on|setpoint|equipment/i,
+    );
+  });
+
+  // ---- UI safety filter ----
+
+  it("isUnsafePreviewText catches approved/queued/executable/device-command language", () => {
+    for (const bad of [
+      "approved",
+      "queued for execution",
+      "was executed",
+      "execute now",
+      "send to device",
+      "turn on the fan",
+      "turn off pump",
+      "pump start",
+      "dose nutrients",
+      "set temp to 24",
+      "set humidity 60",
+      "mqtt publish",
+    ]) {
+      expect(isUnsafePreviewText(bad), `should flag: ${bad}`).toBe(true);
+    }
+  });
+
+  it("isUnsafePreviewText allows passive safety labels", () => {
+    for (const ok of [
+      "Approval required — grower must approve any action before it runs.",
+      "No device control — Verdant will not run equipment commands.",
+      "Preview only — no Action Queue item is created.",
+      "Imported history is included as background only.",
+    ]) {
+      expect(isUnsafePreviewText(ok), `should allow: ${ok}`).toBe(false);
+    }
+  });
 });

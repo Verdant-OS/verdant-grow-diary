@@ -332,6 +332,7 @@ export function buildDiaryCalendarViewModel(
     const iso = toIso(raw.entry_at ?? raw.occurred_at ?? null);
     if (!iso) continue;
 
+    const noteSnippet = safeNote(raw.note);
     events.push({
       id: raw.id,
       kind,
@@ -339,7 +340,8 @@ export function buildDiaryCalendarViewModel(
       occurredAt: iso,
       dateKey: dateKeyUtc(iso),
       plantName: safePlantName(raw.details),
-      noteSnippet: safeNote(raw.note),
+      noteSnippet,
+      details: buildEventDetails(kind, raw.details, noteSnippet),
     });
   }
 

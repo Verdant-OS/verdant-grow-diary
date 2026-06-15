@@ -23,9 +23,16 @@ import {
   DIARY_CALENDAR_EMPTY_HINT,
   DIARY_CALENDAR_FILTERS,
   type DiaryCalendarRawEntry,
+  type DiaryCalendarEvent,
   type DiaryCalendarEventKind,
   type DiaryCalendarFilter,
 } from "@/lib/diaryCalendarViewModel";
+import {
+  buildDiaryCalendarEventDrawerViewModel,
+  DIARY_CALENDAR_DRAWER_VIEW_LABEL,
+  type DiaryCalendarEventDrawerViewModel,
+} from "@/lib/diaryCalendarEventDrawerViewModel";
+import DiaryCalendarEventDrawer from "@/components/DiaryCalendarEventDrawer";
 
 import { cn } from "@/lib/utils";
 

@@ -72,6 +72,11 @@ export default function AiDoctorContextReadinessPanel({
   );
   const style = STATE_STYLES[view.state];
 
+  const actionPreview = useMemo(
+    () => previewActionSuggestion(deriveActionSuggestionPreviewInput(view)),
+    [view],
+  );
+
   return (
     <section
       aria-labelledby="ai-doctor-context-readiness-panel-heading"

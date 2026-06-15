@@ -100,8 +100,10 @@ describe("DiaryCalendarSection — month navigation UI", () => {
     expect(screen.getByTestId("diary-calendar-month-label")).toHaveTextContent(
       /May 2026/,
     );
-    // May has 1 watering + 1 feeding.
-    expect(screen.getAllByTestId("diary-calendar-event").length).toBe(2);
+    // May has 1 watering + 1 feeding on different days; only the newest
+    // day auto-expands so 1 event is visible. Both days are listed.
+    expect(screen.getAllByTestId("diary-calendar-day").length).toBe(2);
+    expect(screen.getAllByTestId("diary-calendar-event").length).toBe(1);
     fireEvent.click(screen.getByTestId("diary-calendar-month-next"));
     expect(screen.getByTestId("diary-calendar-month-label")).toHaveTextContent(
       /June 2026/,

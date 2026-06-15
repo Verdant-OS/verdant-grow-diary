@@ -202,6 +202,38 @@ export function buildActionEvidenceViewModel(
     ? snapshotQuality!.summary
     : ACTION_EVIDENCE_QUALITY_UNAVAILABLE_SUMMARY;
 
+  // Compact row evidence status — deterministic triage for operators.
+  // Missing: input is bare / no origin relationship at all.
+  // Quality unavailable: origin exists but no sanitized snapshot metrics.
+  // Available: sanitized snapshot metrics are present and classified.
+  const hasOrigin =
+    (typeof safe.source === "string" && safe.source.trim().length > 0) ||
+    (typeof safe.action_type === "string" && safe.action_type.trim().length > 0) ||
+    (typeof safe.alert_type === "string" && safe.alert_type.trim().length > 0) ||
+    (safe.captured_at != null && safe.captured_at !== "");
+
+  let rowEvidenceStatus: ActionEvidenceViewModel["rowEvidenceStatus"];
+  let rowEvidenceStatusLabel: string;
+  let rowEvidenceStatusHelp: string;
+  let rowEvidenceStatusTone: ActionEvidenceViewModel["rowEvidenceStatusTone"];
+
+  if (hasSnapshotQuality) {
+    rowEvidenceStatus = "available";
+    rowEvidenceStatusLabel = ACTION_EVIDENCE_STATUS_AVAILABLE_LABEL;
+    rowEvidenceStatusHelp = ACTION_EVIDENCE_STATUS_AVAILABLE_HELP;
+    rowEvidenceStatusTone = "ok";
+  } else if (hasOrigin) {
+    rowEvidenceStatus = "quality_unavailable";
+    rowEvidenceStatusLabel = ACTION_EVIDENCE_STATUS_UNAVAILABLE_LABEL;
+    rowEvidenceStatusHelp = ACTION_EVIDENCE_STATUS_UNAVAILABLE_HELP;
+    rowEvidenceStatusTone = "neutral";
+  } else {
+    rowEvidenceStatus = "missing";
+    rowEvidenceStatusLabel = ACTION_EVIDENCE_STATUS_MISSING_LABEL;
+    rowEvidenceStatusHelp = ACTION_EVIDENCE_STATUS_MISSING_HELP;
+    rowEvidenceStatusTone = "caution";
+  }
+
   return Object.freeze({
     originLabel,
     originKind,
@@ -213,6 +245,10 @@ export function buildActionEvidenceViewModel(
     safetyNotes: Object.freeze([...safetyNotes]),
     hasSnapshotQuality,
     snapshotQuality,
+    rowEvidenceStatus,
+    rowEvidenceStatusLabel,
+    rowEvidenceStatusHelp,
+    rowEvidenceStatusTone,
   });
 }
 

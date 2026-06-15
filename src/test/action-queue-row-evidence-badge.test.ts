@@ -34,7 +34,8 @@ describe("Action Queue row evidence status badge", () => {
 
   it("reviewed rows also render the evidence status badge", () => {
     const reviewedStart = ACTION_QUEUE_SRC.indexOf("reviewed.slice(0, 50)");
-    const reviewedBlock = ACTION_QUEUE_SRC.slice(reviewedStart, reviewedStart + 1200);
+    const reviewedEnd = ACTION_QUEUE_SRC.indexOf("</section>", reviewedStart);
+    const reviewedBlock = ACTION_QUEUE_SRC.slice(reviewedStart, reviewedEnd);
     expect(reviewedBlock).toContain("buildActionEvidenceViewModel");
     expect(reviewedBlock).toContain("EvidenceStatusBadge");
   });

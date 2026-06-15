@@ -107,7 +107,7 @@ describe("DiaryCalendarSection — filter chips UI", () => {
     );
     fireEvent.click(screen.getByTestId("diary-calendar-filter-feeding"));
     expect(screen.getByTestId("diary-calendar-empty")).toHaveTextContent(
-      /No feeding events logged for this period\./i,
+      /No feeding events logged for June 2026\./i,
     );
   });
 

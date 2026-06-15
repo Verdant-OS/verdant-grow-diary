@@ -134,6 +134,7 @@ export function evaluateManualSensorSnapshotQuality(
   const capturedMs = toMs(input.captured_at);
   const nowMs = options.nowMs ?? Date.now();
   const staleHours = options.staleHours ?? MANUAL_SNAPSHOT_CURRENT_STALE_HOURS;
+  const mode = options.mode ?? "current";
 
   if (capturedMs == null) {
     missingFields.push("captured_at");

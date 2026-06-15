@@ -109,9 +109,9 @@ const PLANT_NAME = "Verdant Test Plant";
 
 interface SupportedVariant {
   /** prefill.eventType value driving the Quick Log form. */
-  eventType: "observation" | "note" | "watering";
+  eventType: "observation" | "note" | "watering" | "environment";
   /** Word produced by QuickLog.savedVerb for this event type. */
-  verb: "observation" | "log" | "watering";
+  verb: "observation" | "log" | "watering" | "environment check";
   /** Whether the variant needs a note in the textarea to clear validation. */
   requiresNote: boolean;
   /** Whether the variant needs a watering volume to clear validation. */

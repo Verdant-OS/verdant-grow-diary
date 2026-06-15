@@ -193,7 +193,15 @@ export interface PlantContextPayload {
    * missing-live-readings caveat.
    */
   missingLiveSensorReadings: boolean;
+  /**
+   * Optional, additive early-stage (germination/seedling) memory compiled
+   * from saved Quick Log / diary `details.early_stage` envelopes. Null
+   * when no early-stage memory exists. Safe-by-construction: never
+   * carries raw payloads, tokens, service_role, or unknown enum strings.
+   */
+  early_stage_memory: EarlyStageAiDoctorContext | null;
 }
+
 
 // ---------------------------------------------------------------------------
 // Row shapes (intentionally permissive — caller supplies whatever they have).

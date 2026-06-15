@@ -738,17 +738,19 @@ export default function ActionQueue() {
           </div>
         ) : pending.length === 0 ? (
           <div className="py-4" data-testid="action-queue-empty-pending">
-            <p className="text-sm text-foreground">
-              {filtersActive ? "No actions match these filters." : "No pending actions."}
+            <p className="text-sm text-foreground" data-testid="action-queue-empty-pending-title">
+              {filtersActive ? "No actions match these filters." : ACTION_QUEUE_EMPTY_PENDING_TITLE}
             </p>
             {!filtersActive && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Verdant will list grower-reviewed recommendations here when
-                they appear. Review before acting — grower approval is always
-                required.
+              <p
+                className="text-xs text-muted-foreground mt-1"
+                data-testid="action-queue-empty-pending-help"
+              >
+                {ACTION_QUEUE_EMPTY_PENDING_HELP}
               </p>
             )}
           </div>
+
         ) : (
           <ul className="space-y-3">
             {pending.map((row) => {

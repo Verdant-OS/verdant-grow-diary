@@ -57,6 +57,17 @@ import {
 import { buildSensorSnapshotSavePayload } from "@/lib/latestSensorSnapshotRules";
 import { buildStaleSnapshotHelperCopy } from "@/lib/quickLogStaleSnapshotHelperCopy";
 import { plantDetailPath } from "@/lib/routes";
+import {
+  EARLY_STAGE_MILESTONES,
+  EARLY_STAGE_VIGOR_OPTIONS,
+  EARLY_STAGE_PHOTO_HINT,
+  EARLY_STAGE_NOTE_PLACEHOLDER,
+  buildEarlyStageDetails,
+  buildEarlyStageNoteSuffix,
+  evaluateEarlyStageVisibility,
+  type EarlyStageMilestone,
+  type EarlyStageVigor,
+} from "@/lib/earlyStageQuickLogRules";
 
 export interface QuickLogPrefill {
   plantId?: string | null;
@@ -179,6 +190,10 @@ export default function QuickLog({
   const [wateringError, setWateringError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedTarget, setSavedTarget] = useState<SavedTarget | null>(null);
+  const [earlyMilestone, setEarlyMilestone] = useState<EarlyStageMilestone | null>(null);
+  const [earlyVigor, setEarlyVigor] = useState<EarlyStageVigor | null>(null);
+  const [earlyNotes, setEarlyNotes] = useState<string>("");
+  const [earlyManuallyOpen, setEarlyManuallyOpen] = useState(false);
 
   const wateringInputRef = useRef<HTMLInputElement | null>(null);
   const plantSelectTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -316,6 +331,10 @@ export default function QuickLog({
     setWateringError(null);
     setSaveError(null);
     setSavedTarget(null);
+    setEarlyMilestone(null);
+    setEarlyVigor(null);
+    setEarlyNotes("");
+    setEarlyManuallyOpen(false);
   }
 
   function resetForAnother() {
@@ -333,6 +352,9 @@ export default function QuickLog({
     setWateringError(null);
     setSaveError(null);
     setSavedTarget(null);
+    setEarlyMilestone(null);
+    setEarlyVigor(null);
+    setEarlyNotes("");
     if (keepPlantId) setPlantId(keepPlantId);
     setTimeout(() => noteRef.current?.focus(), 0);
   }
@@ -404,6 +426,21 @@ export default function QuickLog({
         snapshot && sensorTentId && stripView.status === "usable"
           ? buildSensorSnapshotSavePayload(sensorState.snapshot)
           : null;
+      const earlyStageEnvelope = buildEarlyStageDetails({
+        milestone: earlyMilestone,
+        vigor: earlyVigor,
+        notes: earlyNotes,
+        stage,
+      });
+      const earlyStageRecord: Record<string, unknown> | null = earlyStageEnvelope
+        ? { ...earlyStageEnvelope }
+        : null;
+      const earlyStageSuffix = buildEarlyStageNoteSuffix({
+        milestone: earlyMilestone,
+        vigor: earlyVigor,
+        notes: earlyNotes,
+        stage,
+      });
       const built = buildLegacyQuickLogUnifiedPayload({
         eventType,
         noteWithHardware,
@@ -411,6 +448,8 @@ export default function QuickLog({
         plantTentId: selectedPlant.tent_id ?? null,
         details,
         sensorAttachPayload,
+        earlyStage: earlyStageRecord,
+        noteSuffix: earlyStageSuffix || null,
       });
       if (built.ok !== true) {
         setSaveError(built.message);
@@ -833,6 +872,121 @@ export default function QuickLog({
               spellCheck={true}
             />
           </section>
+
+          {(() => {
+            const visibility = evaluateEarlyStageVisibility({
+              stage,
+              plantCreatedAt:
+                (selectedPlant as { created_at?: string | null } | null)?.created_at ?? null,
+            });
+            if (visibility === "hidden" && !earlyManuallyOpen) return null;
+            const isCollapsed = visibility === "suggested" && !earlyManuallyOpen;
+            return (
+              <section
+                data-testid="quick-log-early-stage-section"
+                data-visibility={visibility}
+                aria-label="Early-stage milestone (germination/seedling)"
+                className="rounded-xl border border-border/60 bg-secondary/20 p-3 space-y-2"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Early stage · germination / seedling
+                  </h3>
+                  {visibility !== "visible" && (
+                    <button
+                      type="button"
+                      data-testid="quick-log-early-stage-toggle"
+                      onClick={() => setEarlyManuallyOpen((v) => !v)}
+                      className="text-[11px] underline text-muted-foreground"
+                    >
+                      {isCollapsed ? "Open" : "Hide"}
+                    </button>
+                  )}
+                </div>
+                {!isCollapsed && (
+                  <>
+                    <div
+                      data-testid="quick-log-early-stage-milestone-chips"
+                      role="radiogroup"
+                      aria-label="Early-stage milestone"
+                      className="flex flex-wrap gap-1.5"
+                    >
+                      {EARLY_STAGE_MILESTONES.map((m) => {
+                        const selected = earlyMilestone === m.value;
+                        return (
+                          <button
+                            key={m.value}
+                            type="button"
+                            role="radio"
+                            aria-checked={selected}
+                            data-testid={`quick-log-early-stage-milestone-${m.value}`}
+                            onClick={() =>
+                              setEarlyMilestone(selected ? null : m.value)
+                            }
+                            className={`rounded-full border px-2.5 py-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                              selected
+                                ? "border-primary bg-primary/15 text-foreground"
+                                : "border-border/60 bg-secondary/30 text-foreground hover:bg-secondary/60"
+                            }`}
+                          >
+                            {m.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div
+                      data-testid="quick-log-early-stage-vigor-chips"
+                      role="radiogroup"
+                      aria-label="Plant vigor"
+                      className="flex flex-wrap gap-1.5"
+                    >
+                      {EARLY_STAGE_VIGOR_OPTIONS.map((v) => {
+                        const selected = earlyVigor === v.value;
+                        return (
+                          <button
+                            key={v.value}
+                            type="button"
+                            role="radio"
+                            aria-checked={selected}
+                            data-testid={`quick-log-early-stage-vigor-${v.value}`}
+                            onClick={() => setEarlyVigor(selected ? null : v.value)}
+                            className={`rounded-full border px-2.5 py-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                              selected
+                                ? "border-primary bg-primary/15 text-foreground"
+                                : "border-border/60 bg-secondary/30 text-foreground hover:bg-secondary/60"
+                            }`}
+                          >
+                            Vigor: {v.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div>
+                      <Label htmlFor="quick-log-early-stage-notes" className="text-xs">
+                        {EARLY_STAGE_NOTE_PLACEHOLDER}
+                      </Label>
+                      <Input
+                        id="quick-log-early-stage-notes"
+                        data-testid="quick-log-early-stage-notes"
+                        value={earlyNotes}
+                        onChange={(e) => setEarlyNotes(e.target.value)}
+                        placeholder="Optional — short observation"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <p
+                      data-testid="quick-log-early-stage-photo-hint"
+                      className="text-[11px] text-muted-foreground"
+                    >
+                      {EARLY_STAGE_PHOTO_HINT}
+                    </p>
+                  </>
+                )}
+              </section>
+            );
+          })()}
+
+
 
           {eventType === "reminder" && (
             <div>

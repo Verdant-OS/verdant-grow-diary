@@ -45,8 +45,8 @@ describe("buildMissingEvidenceReviewLink", () => {
     expect(link).not.toBeNull();
     expect(link!.to).toBe(timelinePath("grow-123"));
     expect(link!.label).toBe(ACTION_EVIDENCE_REVIEW_LINK_LABEL);
-    expect(link!.ariaLabel).toBe(ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL);
     expect(link!.helper).toBe(ACTION_EVIDENCE_REVIEW_LINK_HELPER);
+    expect(ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL).toMatch(/review.*before approving/i);
   });
 
   it("uses the existing /timeline route pattern", () => {

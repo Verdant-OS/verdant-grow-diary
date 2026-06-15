@@ -275,3 +275,112 @@ export const MANUAL_SNAPSHOT_QUALITY_SOURCE_LABELS: Readonly<
   invalid: "Source: invalid",
   unknown: "Source: unknown",
 });
+
+// ---------------------------------------------------------------------------
+// AI Doctor context → sanitized current-snapshot derivation
+// ---------------------------------------------------------------------------
+
+/** Minimal reading shape accepted from AI Doctor context sensor groups. */
+interface CurrentSnapshotReadingLike {
+  readonly captured_at?: string | null;
+  readonly metric?: string | null;
+  readonly value?: number | null;
+  readonly source_tag?: string | null;
+}
+
+interface CurrentSnapshotGroupLike {
+  readonly source?: string | null;
+  readonly readings?: ReadonlyArray<CurrentSnapshotReadingLike> | null;
+}
+
+interface CurrentSnapshotContextLike {
+  readonly sensor_groups?: ReadonlyArray<CurrentSnapshotGroupLike> | null;
+}
+
+const SOURCE_PRIORITY: ReadonlyArray<ManualSnapshotSourceLabel> = [
+  "live",
+  "manual",
+  "stale",
+  "demo",
+  "csv",
+  "invalid",
+];
+
+const METRIC_MAP: Readonly<
+  Record<string, keyof ManualSensorSnapshotInput>
+> = Object.freeze({
+  temperature_c: "temperature_c",
+  humidity_pct: "humidity_pct",
+  vpd_kpa: "vpd_kpa",
+  soil_temp_c: "soil_temp_c",
+  soil_moisture_pct: "soil_moisture_pct",
+  soil_ec_mscm: "soil_ec_mscm",
+  ph: "ph",
+});
+
+/**
+ * Build a sanitized ManualSensorSnapshotInput from an AI Doctor context.
+ * Only well-known numeric metric fields and the captured_at timestamp are
+ * propagated. Vendor metadata, raw payloads, tokens, filenames, private
+ * IDs, and unknown metrics are never forwarded.
+ *
+ * Returns null when no live/manual/stale/csv/demo/invalid group with at
+ * least one reading is available — caller should treat as "missing".
+ */
+export function deriveCurrentSnapshotFromAiDoctorContext(
+  context: CurrentSnapshotContextLike | null | undefined,
+): ManualSensorSnapshotInput | null {
+  const groups = context?.sensor_groups ?? [];
+  if (!Array.isArray(groups) || groups.length === 0) return null;
+
+  let chosen: CurrentSnapshotGroupLike | null = null;
+  let chosenPriority = SOURCE_PRIORITY.length;
+  for (const g of groups) {
+    if (!g || !Array.isArray(g.readings) || g.readings.length === 0) continue;
+    const src = normalizeSource(g.source);
+    const p = SOURCE_PRIORITY.indexOf(src);
+    if (p === -1) continue;
+    if (p < chosenPriority) {
+      chosen = g;
+      chosenPriority = p;
+    }
+  }
+  if (!chosen || !chosen.readings) return null;
+
+  const fields: { [K in keyof ManualSensorSnapshotInput]?: unknown } = {};
+  let latestCapturedMs: number | null = null;
+  let latestCapturedIso: string | null = null;
+
+  // Walk newest-first per metric.
+  const sorted = [...chosen.readings]
+    .filter((r) => r && typeof r.captured_at === "string")
+    .sort((a, b) => {
+      const ta = Date.parse(String(a.captured_at));
+      const tb = Date.parse(String(b.captured_at));
+      return (Number.isFinite(tb) ? tb : 0) - (Number.isFinite(ta) ? ta : 0);
+    });
+
+  for (const r of sorted) {
+    const metric = typeof r.metric === "string" ? r.metric : "";
+    const key = METRIC_MAP[metric];
+    if (!key) continue;
+    if (fields[key] !== undefined) continue;
+    if (typeof r.value !== "number" || !Number.isFinite(r.value)) continue;
+    fields[key] = r.value;
+    const ts = Date.parse(String(r.captured_at));
+    if (Number.isFinite(ts) && (latestCapturedMs == null || ts > latestCapturedMs)) {
+      latestCapturedMs = ts;
+      latestCapturedIso = String(r.captured_at);
+    }
+  }
+
+  if (latestCapturedIso == null && Object.keys(fields).length === 0) {
+    return null;
+  }
+
+  return {
+    source: normalizeSource(chosen.source),
+    captured_at: latestCapturedIso,
+    ...(fields as ManualSensorSnapshotInput),
+  };
+}

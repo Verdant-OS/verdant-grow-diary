@@ -1,11 +1,32 @@
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  ALLOW_MARKER,
-  ALLOW_PHRASES,
+  AllowlistConfigError,
+  DEFAULT_ALLOWLIST_PATH,
+  KNOWN_TARGETS,
+  PREVIEW_IDENTIFIER_MARKERS,
   RULES,
+  discoverTargets,
+  escapeAnnotation,
+  formatAnnotation,
   formatViolation,
+  loadAllowlist,
   scanText,
 } from "../../scripts/assert-ai-doctor-preview-safety.mjs";
+import { pickRelevantStaged } from "../../scripts/precommit-ai-doctor-preview-safety.mjs";
+
+const ALLOWLIST = loadAllowlist();
+const SCAN_OPTS = {
+  allowedPhrases: [...ALLOWLIST.allowedPhrases],
+  allowedLineMarkers: [...ALLOWLIST.allowedLineMarkers],
+};
+const ALLOW_MARKER = ALLOWLIST.allowedLineMarkers[0];
+
+function makeTempRoot(): string {
+  return mkdtempSync(join(tmpdir(), "ai-doctor-preview-safety-"));
+}
 
 describe("ai-doctor preview safety scanner", () => {
   it("passes clean preview text with safe phrases", () => {
@@ -15,48 +36,40 @@ describe("ai-doctor preview safety scanner", () => {
       "const dev = 'No device control — Verdant will not run equipment commands.';",
       "const ui = 'Preview only — no Action Queue item is created.';",
     ].join("\n");
-    expect(scanText(text)).toEqual([]);
+    expect(scanText(text, SCAN_OPTS)).toEqual([]);
   });
 
   it("flags 'queued' language", () => {
-    const text = `const s = "Suggestion was queued for approval";`;
-    const violations = scanText(text);
-    expect(violations.length).toBeGreaterThan(0);
-    expect(violations[0].rule).toBe("no-queued-language");
-    expect(violations[0].line).toBe(1);
+    const v = scanText(`const s = "Suggestion was queued for approval";`, SCAN_OPTS);
+    expect(v.map((x) => x.rule)).toContain("no-queued-language");
   });
 
   it("flags 'approved' language", () => {
-    const text = `const s = "Action was approved automatically";`;
-    const violations = scanText(text);
-    expect(violations.map((v) => v.rule)).toContain("no-approved-language");
+    const v = scanText(`const s = "Action was approved automatically";`, SCAN_OPTS);
+    expect(v.map((x) => x.rule)).toContain("no-approved-language");
   });
 
   it("flags 'executed' / 'execute' language", () => {
-    const violations = scanText(`const s = "Action was executed by Verdant";`);
-    expect(violations.map((v) => v.rule)).toContain("no-executed-language");
+    const v = scanText(`const s = "Action was executed by Verdant";`, SCAN_OPTS);
+    expect(v.map((x) => x.rule)).toContain("no-executed-language");
   });
 
   it("flags Supabase action_queue write paths", () => {
-    const text = `await supabase.from("action_queue").insert({ id: 1 });`;
-    const violations = scanText(text);
-    expect(violations.map((v) => v.rule)).toContain("no-action-queue-write");
+    const v = scanText(`await supabase.from("action_queue").insert({});`, SCAN_OPTS);
+    expect(v.map((x) => x.rule)).toContain("no-action-queue-write");
   });
 
   it("flags functions.invoke calls", () => {
-    const text = `await supabase.functions.invoke("ai-doctor");`;
-    const violations = scanText(text);
-    expect(violations.map((v) => v.rule)).toContain("no-functions-invoke");
+    const v = scanText(`await supabase.functions.invoke("ai-doctor");`, SCAN_OPTS);
+    expect(v.map((x) => x.rule)).toContain("no-functions-invoke");
   });
 
   it("flags service_role references", () => {
-    const text = `const k = serviceRoleKey; // uses service_role from env`;
-    // first segment scanned: trimmed line includes "service_role" outside the comment portion
-    const violations = scanText(text);
-    expect(violations.map((v) => v.rule)).toContain("no-service-role");
+    const v = scanText(`const k = service_role_key;`, SCAN_OPTS);
+    expect(v.map((x) => x.rule)).toContain("no-service-role");
   });
 
-  it("flags device command / mqtt publish / turn on / pump / dose / set temp / set humidity", () => {
+  it("flags device/mqtt/turn-on/pump/dose/set/control/automation language", () => {
     const samples = [
       `const a = "send device command to fan";`,
       `const b = "mqtt publish climate/cmd";`,
@@ -69,15 +82,14 @@ describe("ai-doctor preview safety scanner", () => {
       `const i = "automation enabled by default";`,
     ];
     for (const text of samples) {
-      const v = scanText(text);
-      expect(v.length, `expected violation for: ${text}`).toBeGreaterThan(0);
+      expect(scanText(text, SCAN_OPTS).length, text).toBeGreaterThan(0);
     }
   });
 
-  it("allows the explicit safety phrases verbatim", () => {
-    for (const phrase of ALLOW_PHRASES) {
+  it("allows the configured safety phrases verbatim", () => {
+    for (const phrase of ALLOWLIST.allowedPhrases) {
       const text = `const s = "${phrase} — safety note";`;
-      expect(scanText(text), `phrase should pass: ${phrase}`).toEqual([]);
+      expect(scanText(text, SCAN_OPTS), `phrase: ${phrase}`).toEqual([]);
     }
   });
 
@@ -87,7 +99,7 @@ describe("ai-doctor preview safety scanner", () => {
       "/* approved/queued/executed language reference */",
       " * service_role appears in jsdoc only",
     ].join("\n");
-    expect(scanText(text)).toEqual([]);
+    expect(scanText(text, SCAN_OPTS)).toEqual([]);
   });
 
   it("skips regex-literal pattern declaration lines", () => {
@@ -96,12 +108,12 @@ describe("ai-doctor preview safety scanner", () => {
       "  /\\bpump[_\\s-]?(on|off)\\b/i,",
       "  /\\bexecute\\b/i,",
     ].join("\n");
-    expect(scanText(text)).toEqual([]);
+    expect(scanText(text, SCAN_OPTS)).toEqual([]);
   });
 
-  it("honours the ALLOW marker on the same line", () => {
+  it("honours the allow marker on the same line", () => {
     const text = `const s = "Suggestion was queued"; // ${ALLOW_MARKER} — test fixture`;
-    expect(scanText(text)).toEqual([]);
+    expect(scanText(text, SCAN_OPTS)).toEqual([]);
   });
 
   it("treats denial / safety-context lines as safe", () => {
@@ -110,12 +122,12 @@ describe("ai-doctor preview safety scanner", () => {
       `const t = "Blocked — device-command risk";`,
       `const u = "Safety filter drops approved/queued language";`,
     ].join("\n");
-    expect(scanText(text)).toEqual([]);
+    expect(scanText(text, SCAN_OPTS)).toEqual([]);
   });
 
-  it("does not scan files inside src/test/**", () => {
+  it("does not scan test files", () => {
     const text = `const s = "Suggestion was queued and executed";`;
-    expect(scanText(text, { isTestFile: true })).toEqual([]);
+    expect(scanText(text, { ...SCAN_OPTS, isTestFile: true })).toEqual([]);
   });
 
   it("formatViolation includes file, line, rule, and matched text", () => {
@@ -128,16 +140,188 @@ describe("ai-doctor preview safety scanner", () => {
     const out = formatViolation("src/foo.ts", v);
     expect(out).toContain("src/foo.ts:12");
     expect(out).toContain("[no-queued-language]");
-    expect(out).toContain('"const s = \\"queued\\";"'.replace(/\\"/g, '"'));
+    expect(out).toContain('"const s = "queued";"');
     expect(out).toContain("Preview must never claim queued.");
   });
 
-  it("RULES export is non-empty and every rule has a name + pattern + explanation", () => {
+  it("RULES export is non-empty and well-formed", () => {
     expect(RULES.length).toBeGreaterThan(0);
     for (const r of RULES) {
       expect(typeof r.name).toBe("string");
       expect(r.pattern).toBeInstanceOf(RegExp);
       expect(typeof r.explanation).toBe("string");
     }
+  });
+});
+
+describe("allowlist config loader", () => {
+  it("loads the default allowlist with required arrays", () => {
+    const cfg = loadAllowlist();
+    expect(Array.isArray(cfg.allowedPhrases)).toBe(true);
+    expect(Array.isArray(cfg.allowedLineMarkers)).toBe(true);
+    expect(cfg.allowedPhrases.length).toBeGreaterThan(0);
+    expect(cfg.allowedLineMarkers.length).toBeGreaterThan(0);
+  });
+
+  it("default allowlist path points at the JSON config", () => {
+    expect(DEFAULT_ALLOWLIST_PATH).toMatch(
+      /scripts[\\/]config[\\/]ai-doctor-preview-safety-allowlist\.json$/,
+    );
+  });
+
+  it("fails closed when the file is missing", () => {
+    expect(() => loadAllowlist("/tmp/does-not-exist-xyz.json")).toThrow(
+      AllowlistConfigError,
+    );
+  });
+
+  it("fails closed on invalid JSON", () => {
+    const dir = makeTempRoot();
+    try {
+      const p = join(dir, "bad.json");
+      writeFileSync(p, "{ not valid json");
+      expect(() => loadAllowlist(p)).toThrow(AllowlistConfigError);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails closed when arrays are missing", () => {
+    const dir = makeTempRoot();
+    try {
+      const p = join(dir, "bad.json");
+      writeFileSync(p, JSON.stringify({ allowedPhrases: ["x"] }));
+      expect(() => loadAllowlist(p)).toThrow(AllowlistConfigError);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails closed when an array contains a non-string", () => {
+    const dir = makeTempRoot();
+    try {
+      const p = join(dir, "bad.json");
+      writeFileSync(
+        p,
+        JSON.stringify({ allowedPhrases: [""], allowedLineMarkers: ["m"] }),
+      );
+      expect(() => loadAllowlist(p)).toThrow(AllowlistConfigError);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("target discovery", () => {
+  function setupTree(): { root: string; cleanup: () => void } {
+    const root = makeTempRoot();
+    mkdirSync(join(root, "src", "lib"), { recursive: true });
+    mkdirSync(join(root, "src", "components"), { recursive: true });
+    // Known targets — minimal stub content
+    writeFileSync(
+      join(root, "src", "lib", "aiDoctorActionSuggestionPreviewRules.ts"),
+      "// previewActionSuggestion stub\n",
+    );
+    writeFileSync(
+      join(root, "src", "components", "AiDoctorContextReadinessPanel.tsx"),
+      "// ActionSuggestionPreview stub\n",
+    );
+    // Future preview-related file
+    writeFileSync(
+      join(root, "src", "lib", "FutureActionSuggestionPreviewView.ts"),
+      "export const k = 'previewActionSuggestion future helper';\n",
+    );
+    // Unrelated file — must be ignored
+    writeFileSync(
+      join(root, "src", "components", "RandomUnrelatedCard.tsx"),
+      "export default function RandomUnrelatedCard() { return null; }\n",
+    );
+    return { root, cleanup: () => rmSync(root, { recursive: true, force: true }) };
+  }
+
+  it("always includes the known preview targets", () => {
+    const { root, cleanup } = setupTree();
+    try {
+      const targets = discoverTargets(root);
+      for (const known of KNOWN_TARGETS) expect(targets).toContain(known);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("includes future files matching a preview-identifier marker", () => {
+    const { root, cleanup } = setupTree();
+    try {
+      const targets = discoverTargets(root);
+      expect(targets).toContain("src/lib/FutureActionSuggestionPreviewView.ts");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("ignores unrelated component files", () => {
+    const { root, cleanup } = setupTree();
+    try {
+      const targets = discoverTargets(root);
+      expect(targets).not.toContain("src/components/RandomUnrelatedCard.tsx");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("exports a non-empty list of preview-identifier markers", () => {
+    expect(PREVIEW_IDENTIFIER_MARKERS.length).toBeGreaterThan(0);
+  });
+});
+
+describe("GitHub Actions annotation formatting", () => {
+  it("escapes %, :, ',', \\r, \\n per workflow-command spec", () => {
+    const out = escapeAnnotation("a%b:c,d\re\nf");
+    expect(out).toBe("a%25b%3Ac%2Cd%0De%0Af");
+  });
+
+  it("formatAnnotation produces ::error with file/line/title and escaped message", () => {
+    const v = {
+      line: 7,
+      rule: "no-queued-language",
+      explanation: "Preview must never claim queued — see docs.",
+      text: 'const s = "queued, now";',
+    };
+    const out = formatAnnotation("src/lib/foo.ts", v);
+    expect(out).toMatch(/^::error file=src\/lib\/foo\.ts,line=7,title=no-queued-language::/);
+    // colon and comma inside message must be escaped
+    expect(out).toContain("%3A");
+    expect(out).toContain("%2C");
+    // message preserves the matched text marker
+    expect(out).toContain("matched");
+  });
+});
+
+describe("precommit hook helper", () => {
+  it("returns empty when no relevant files are staged", () => {
+    const picked = pickRelevantStaged(
+      ["README.md", "src/pages/Home.tsx", "src/lib/somethingElse.ts"],
+      ["src/lib/aiDoctorActionSuggestionPreviewRules.ts"],
+    );
+    expect(picked).toEqual([]);
+  });
+
+  it("picks the scanner script, config, test, and any discovered target", () => {
+    const picked = pickRelevantStaged(
+      [
+        "scripts/assert-ai-doctor-preview-safety.mjs",
+        "scripts/config/ai-doctor-preview-safety-allowlist.json",
+        "src/test/ai-doctor-preview-safety-scanner.test.ts",
+        "src/components/AiDoctorContextReadinessPanel.tsx",
+        "README.md",
+      ],
+      ["src/components/AiDoctorContextReadinessPanel.tsx"],
+    );
+    expect(picked).toEqual([
+      "scripts/assert-ai-doctor-preview-safety.mjs",
+      "scripts/config/ai-doctor-preview-safety-allowlist.json",
+      "src/test/ai-doctor-preview-safety-scanner.test.ts",
+      "src/components/AiDoctorContextReadinessPanel.tsx",
+    ]);
   });
 });

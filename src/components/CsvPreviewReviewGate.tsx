@@ -156,6 +156,20 @@ function downloadJsonBlob(filename: string, jsonText: string): void {
   URL.revokeObjectURL(url);
 }
 
+// Map csv preview ImportMetric (from FieldMapping.field) to canonical
+// normalizer payload keys understood by normalizeSensorReading.
+const CSV_FIELD_TO_NORMALIZER_KEY: Record<string, string> = {
+  temperature: "temperature_c",
+  humidity: "humidity_pct",
+  vpd: "vpd_kpa",
+  co2: "co2_ppm",
+  vwc: "soil_moisture_pct",
+  ec: "reservoir_ec_ms_cm",
+  substrate_temperature: "soil_temperature_c",
+  ph: "reservoir_ph",
+  ppfd: "ppfd_umol_m2_s",
+};
+
 function buildCsvNormalizationPreview(
   result: CsvPreviewParseResult,
   tentId: string,
@@ -166,7 +180,6 @@ function buildCsvNormalizationPreview(
   if (dataRows.length === 0) return null;
 
   const tsIdx = result.mappings.findIndex((m) => m.field === "captured_at");
-  // Pick first row that has a captured_at (or just first row if none).
   let chosenRow: string[] | null = null;
   for (const r of dataRows) {
     if (tsIdx >= 0 && r[tsIdx]) {
@@ -179,9 +192,11 @@ function buildCsvNormalizationPreview(
   const payload: Record<string, unknown> = {};
   result.mappings.forEach((m, colIdx) => {
     if (!m.field || m.field === "captured_at") return;
+    const key = CSV_FIELD_TO_NORMALIZER_KEY[m.field as string];
+    if (!key) return;
     const raw = chosenRow![colIdx];
     if (raw == null || raw === "") return;
-    payload[m.field] = raw;
+    payload[key] = raw;
   });
 
   const capturedAt = tsIdx >= 0 ? (chosenRow[tsIdx] ?? null) : null;

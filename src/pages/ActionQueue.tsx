@@ -41,7 +41,7 @@ import {
   ACTION_QUEUE_EMPTY_PENDING_HELP,
   type ActionEvidenceViewModel,
 } from "@/lib/actionQueueEvidenceViewModel";
-
+import { formatLastUpdatedAgo } from "@/lib/lastUpdatedAgo";
 
 import { actionDetailPath, actionsPath, aiDoctorSessionDetailPath, alertDetailPath } from "@/lib/routes";
 import { toast } from "sonner";

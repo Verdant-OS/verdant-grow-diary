@@ -26,6 +26,8 @@ export interface MissingEvidenceReviewLink {
 }
 
 export const ACTION_EVIDENCE_REVIEW_LINK_LABEL = "Review timeline";
+export const ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL =
+  "Review related diary timeline before approving";
 export const ACTION_EVIDENCE_REVIEW_LINK_HELPER =
   "Open the related diary or sensor history before approving.";
 

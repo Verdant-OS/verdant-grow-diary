@@ -1,10 +1,22 @@
-import { useMemo, useState } from "react";
-import { Droplets, Utensils, Stethoscope, CalendarDays, ChevronDown, ChevronRight } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Droplets,
+  Utensils,
+  Stethoscope,
+  CalendarDays,
+  ChevronDown,
+  ChevronRight,
+  ChevronLeft,
+} from "lucide-react";
 import {
   buildDiaryCalendarViewModel,
   summarizeDiaryCalendar,
   filterDiaryCalendarGroups,
-  diaryCalendarEmptyTitleFor,
+  filterDiaryCalendarGroupsByMonth,
+  defaultDiaryCalendarMonth,
+  shiftMonthKey,
+  formatDiaryCalendarMonthLabel,
+  diaryCalendarMonthEmptyTitle,
   computeDiaryCalendarFilterCounts,
   DIARY_CALENDAR_EMPTY_HINT,
   DIARY_CALENDAR_FILTERS,
@@ -27,7 +39,6 @@ const KIND_ICON: Record<DiaryCalendarEventKind, typeof Droplets> = {
 };
 
 function formatDateHeader(dateKey: string): string {
-  // YYYY-MM-DD; render in UTC to match grouping bucket.
   const [y, m, d] = dateKey.split("-").map((n) => Number(n));
   if (!y || !m || !d) return dateKey;
   const date = new Date(Date.UTC(y, m - 1, d));
@@ -54,38 +65,84 @@ export default function DiaryCalendarSection({
     [rawEntries],
   );
   const [filter, setFilterState] = useState<DiaryCalendarFilter>("all");
+  const [visibleMonth, setVisibleMonth] = useState<string | null>(() =>
+    defaultDiaryCalendarMonth(allGroups, "all"),
+  );
+
+  // If the parent dataset changes and the current month no longer exists,
+  // snap to the newest month with matching events under the active filter.
+  useEffect(() => {
+    if (allGroups.length === 0) {
+      if (visibleMonth !== null) setVisibleMonth(null);
+      return;
+    }
+    if (visibleMonth === null) {
+      setVisibleMonth(defaultDiaryCalendarMonth(allGroups, filter));
+    }
+    // Note: we intentionally do not auto-shift away from an empty month
+    // chosen by explicit prev/next navigation — empty state will explain.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allGroups]);
+
+  // Month-scoped view of the full dataset (before kind filter).
+  const monthGroupsAll = useMemo(
+    () => filterDiaryCalendarGroupsByMonth(allGroups, visibleMonth),
+    [allGroups, visibleMonth],
+  );
+  // Visible-month counts: badges reflect what's in the visible month so
+  // they stay informative as the user navigates history.
+  const filterCounts = useMemo(
+    () => computeDiaryCalendarFilterCounts(monthGroupsAll),
+    [monthGroupsAll],
+  );
   const groups = useMemo(
-    () => filterDiaryCalendarGroups(allGroups, filter),
-    [allGroups, filter],
+    () => filterDiaryCalendarGroups(monthGroupsAll, filter),
+    [monthGroupsAll, filter],
   );
   const visibleGroups = useMemo(
     () => groups.slice(0, Math.max(1, dayLimit)),
     [groups, dayLimit],
   );
   const summary = useMemo(() => summarizeDiaryCalendar(groups), [groups]);
-  const filterCounts = useMemo(() => computeDiaryCalendarFilterCounts(allGroups), [allGroups]);
   const [openDay, setOpenDay] = useState<string | null>(
     visibleGroups[0]?.dateKey ?? null,
   );
 
-  // Switching filter: jump to the newest day under the new filter so events
-  // remain visible immediately. Explicit user collapse (openDay=null) is
-  // preserved within a filter.
+  // Switching filter: jump to the newest month with matching events under
+  // the new filter so the user sees results immediately, and reset the
+  // expanded day to the newest match within that month.
   const setFilter = (next: DiaryCalendarFilter) => {
     if (next === filter) return;
     setFilterState(next);
-    const nextGroups = filterDiaryCalendarGroups(allGroups, next);
-    setOpenDay(nextGroups[0]?.dateKey ?? null);
+    const nextMonth = defaultDiaryCalendarMonth(allGroups, next) ?? visibleMonth;
+    setVisibleMonth(nextMonth);
+    const nextMonthGroups = filterDiaryCalendarGroups(
+      filterDiaryCalendarGroupsByMonth(allGroups, nextMonth),
+      next,
+    );
+    setOpenDay(nextMonthGroups[0]?.dateKey ?? null);
+  };
+
+  // Month nav: shift visible month and reset expanded day. Filter stays.
+  const shiftMonth = (delta: number) => {
+    if (!visibleMonth) return;
+    const next = shiftMonthKey(visibleMonth, delta);
+    setVisibleMonth(next);
+    setOpenDay(null);
   };
 
   // Belt-and-braces: never render stale details if the open day was removed
-  // (e.g. raw entries changed asynchronously).
+  // (e.g. raw entries changed asynchronously, or month/filter shifted).
   const openDayStillVisible =
     openDay !== null && visibleGroups.some((g) => g.dateKey === openDay);
   const effectiveOpenDay =
     openDay === null || openDayStillVisible ? openDay : null;
 
   const hasAnyEntries = allGroups.length > 0;
+  const monthLabel = visibleMonth
+    ? formatDiaryCalendarMonthLabel(visibleMonth)
+    : "";
+
 
   return (
     <section

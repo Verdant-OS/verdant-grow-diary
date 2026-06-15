@@ -254,8 +254,7 @@ export function previewActionSuggestion(
   if (deviceRisk) {
     status = "blocked_device_command_risk";
     reasons.push(
-      // AI-DOCTOR-PREVIEW-SAFETY: ALLOW — describes the block reason; no command is emitted.
-      "One or more candidate strings contain device-command-shaped language.",
+      "One or more candidate strings contain device-command-shaped language.", // AI-DOCTOR-PREVIEW-SAFETY: ALLOW
     );
   } else if (invalidFields.length > 0) {
     status = "blocked_invalid_data";

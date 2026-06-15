@@ -273,3 +273,30 @@ Additional positive confirmation (no change required):
 - No `service_role` / private API key references in any source file on the alert/action path.
 
 These addendum items can be bundled into the recommended snapshot-quality-chip slice as cheap micro-polish, or shipped as a separate one-PR copy-hygiene pass. They do not change the safety verdict.
+
+---
+
+## Update — G3 scanner false-positive resolved
+
+The `action-queue-safety.test.ts` "no device-control surface" scan previously
+flagged the safety-blocking status enum `blocked_device_command_risk` in
+`src/lib/aiDoctorActionSuggestionPreviewRules.ts` along with that file's
+`DEVICE_COMMAND_PATTERNS` denylist constant. Both are safety infrastructure:
+they exist to BLOCK device-command-shaped wording from ever reaching a preview
+or Action Queue suggestion. They are not control surfaces.
+
+Fix: extended the scoped allow-list in `src/test/action-queue-safety.test.ts`
+to include `src/lib/aiDoctorActionSuggestionPreviewRules.ts` and
+`src/lib/aiDoctorFixtureContextRules.ts` (sibling safety-only file with the
+same denylist pattern), mirroring the existing exclusion for
+`src/lib/aiDoctorSafetyRules.ts`. Added a new positive test
+("2b. allow-listed safety file aiDoctorActionSuggestionPreviewRules.ts contains
+only blocking infrastructure") that asserts the file contains the blocking
+enum + denylist constant AND does NOT contain any real device-control surface,
+grower-facing unsafe equipment copy, `service_role`, `raw_payload`, or token
+leakage. Every `device_command` hit inside the file must sit within a
+block/safety/denylist context window.
+
+Validation: `bunx vitest run src/test/action-queue-safety.test.ts` →
+29/29 passed. `bun run typecheck` → OK.
+`bun run ai-doctor:preview-safety` → OK (4 files scanned).

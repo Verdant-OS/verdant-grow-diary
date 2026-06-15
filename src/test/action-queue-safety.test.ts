@@ -185,17 +185,25 @@ describe("Action Queue safety — current posture (suggest-only by construction)
       { name: "relay control", re: /\brelay\.(on|off|toggle)/i },
       { name: "command bus", re: /command_bus/i },
     ];
-    // Scoped allow-list: src/lib/aiDoctorSafetyRules.ts contains DENYLIST
-    // tokens (e.g. `device_command`) used only to STRIP unsafe wording from
-    // AI Doctor drafts. These tokens never reach an execution surface — they
-    // exist to BLOCK device control, not enable it. Exclude that single file
-    // from the device-control-surface scan.
-    const SAFETY_RULES_PATH = resolve(ROOT, "src/lib/aiDoctorSafetyRules.ts");
-    const safetyBoundary = FILE_BOUNDARIES.find((b) => b.path === SAFETY_RULES_PATH);
-    const scanText = safetyBoundary
-      ? ALL_PROD_CODE.slice(0, safetyBoundary.start) +
-        ALL_PROD_CODE.slice(safetyBoundary.end)
-      : ALL_PROD_CODE;
+    // Scoped allow-list: a small set of safety modules contain DENYLIST
+    // tokens (e.g. `device_command`, `blocked_device_command_risk`) used only
+    // to STRIP / BLOCK unsafe wording from AI Doctor drafts and Action Queue
+    // suggestion previews. These tokens never reach an execution surface —
+    // they exist to BLOCK device control, not enable it. Exclude these
+    // specific files from the device-control-surface scan.
+    const SAFETY_ALLOW_PATHS = new Set<string>([
+      resolve(ROOT, "src/lib/aiDoctorSafetyRules.ts"),
+      resolve(ROOT, "src/lib/aiDoctorActionSuggestionPreviewRules.ts"),
+      resolve(ROOT, "src/lib/aiDoctorFixtureContextRules.ts"),
+    ]);
+
+    let scanText = "";
+    for (const b of FILE_BOUNDARIES) {
+      if (SAFETY_ALLOW_PATHS.has(b.path)) continue;
+      scanText += ALL_PROD_CODE.slice(b.start, b.end) + "\n\n//FILE\n\n";
+    }
+
+
     for (const { name, re } of banned) {
       expect(scanText, `must not contain device-control surface: ${name}`).not.toMatch(re);
     }
@@ -240,7 +248,61 @@ describe("Action Queue safety — current posture (suggest-only by construction)
       expect(ALL_PROD_CODE).not.toMatch(re);
     }
   });
+
+  it("2b. allow-listed safety file aiDoctorActionSuggestionPreviewRules.ts contains only blocking infrastructure", () => {
+    const PREVIEW_RULES_PATH = resolve(
+      ROOT,
+      "src/lib/aiDoctorActionSuggestionPreviewRules.ts",
+    );
+    const src = readFileSync(PREVIEW_RULES_PATH, "utf8");
+
+    // The file MUST contain the safety-blocking status enum.
+    expect(src).toMatch(/"blocked_device_command_risk"/);
+    // And it MUST define a denylist of device-command-shaped patterns it
+    // BLOCKS — that's the entire reason for the allow-list entry.
+    expect(src).toMatch(/DEVICE_COMMAND_PATTERNS/);
+
+    // The file MUST NOT contain real device-control surfaces or grower-facing
+    // unsafe equipment copy or any secret/raw-payload leakage.
+    const BANNED: RegExp[] = [
+      /\bmqtt:\/\//i,
+      /\bmqtt\.connect\b/i,
+      /\bactuator\.(send|trigger|run|fire)/i,
+      /\brelay\.(on|off|toggle)/i,
+      /command_bus/i,
+      /turn on equipment/i,
+      /send command to/i,
+      /control device/i,
+      /auto[- ]?run equipment/i,
+      /pump\.(on|off|run)/i,
+      /dose\(/i,
+      /service_role/i,
+      /raw_payload/i,
+      /sk_live_/i,
+      /Bearer\s+ey/i,
+      /SUPABASE_SERVICE_ROLE_KEY/i,
+    ];
+    for (const re of BANNED) {
+      expect(src, `preview rules file must not contain: ${re}`).not.toMatch(re);
+    }
+
+    // Every device_command occurrence in the file must sit inside safety-block
+    // semantics (status enum, denylist patterns, blocked-reason copy, or
+    // comments). Sanity-check by requiring a "block" / "denylist" / "BLOCK" /
+    // "safety" keyword within 80 chars of each device_command hit.
+    const hits = [...src.matchAll(/device_command/gi)];
+    expect(hits.length).toBeGreaterThan(0);
+    for (const m of hits) {
+      const ctx = src.slice(Math.max(0, m.index! - 120), m.index! + 120);
+      expect(
+        /block|denylist|deny[_-]?list|safety|BLOCK|risk|PATTERNS|never|forbidden/i.test(ctx),
+        `device_command at ${m.index} lacks safety/block context: ${ctx}`,
+      ).toBe(true);
+    }
+  });
 });
+
+
 
 describe("Action Queue safety — future-proof contract (active only when action_queue ships)", () => {
   it(`detects whether action_queue table exists (currently: ${HAS_ACTION_QUEUE_TABLE ? "YES" : "no — gated tests are pending"})`, () => {

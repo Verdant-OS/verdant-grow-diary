@@ -23,9 +23,12 @@ import {
 import type { AiDoctorContext } from "@/lib/aiDoctorEngine";
 import AiDoctorImportedHistoryDisclosurePanel from "@/components/AiDoctorImportedHistoryDisclosurePanel";
 import {
+  ACTION_SUGGESTION_INVALID_FIELD_LABELS,
+  ACTION_SUGGESTION_MISSING_FIELD_LABELS,
   ACTION_SUGGESTION_PREVIEW_LABEL,
   ACTION_SUGGESTION_PREVIEW_STATUS_LABELS,
   deriveActionSuggestionPreviewInput,
+  isUnsafePreviewText,
   previewActionSuggestion,
 } from "@/lib/aiDoctorActionSuggestionPreviewRules";
 

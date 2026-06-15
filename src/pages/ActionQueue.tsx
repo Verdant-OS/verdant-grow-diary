@@ -35,7 +35,12 @@ import {
   formatActionTargetLabel,
   APPROVE_DIALOG_REASSURANCE,
 } from "@/lib/actionQueueRowView";
-import { buildActionEvidenceViewModel } from "@/lib/actionQueueEvidenceViewModel";
+import {
+  buildActionEvidenceViewModel,
+  ACTION_QUEUE_EMPTY_PENDING_TITLE,
+  ACTION_QUEUE_EMPTY_PENDING_HELP,
+} from "@/lib/actionQueueEvidenceViewModel";
+
 
 import { actionDetailPath, actionsPath, aiDoctorSessionDetailPath, alertDetailPath } from "@/lib/routes";
 import { toast } from "sonner";

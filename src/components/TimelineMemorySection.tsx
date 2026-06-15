@@ -34,6 +34,10 @@ import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 import { buildTimelineSensorSnapshotViewModel } from "@/lib/timelineSensorSnapshotViewModel";
 import { buildTimelinePhotoPreviewViewModel } from "@/lib/timelinePhotoPreviewViewModel";
 import { buildTimelineDayGroups } from "@/lib/timelineDayGroupingViewModel";
+import {
+  EARLY_STAGE_MILESTONE_UNKNOWN_LABEL,
+  EARLY_STAGE_VIGOR_UNKNOWN_LABEL,
+} from "@/lib/earlyStageTimelineViewModel";
 
 type Props =
   | { scope: "plant"; plantId: string | null | undefined }

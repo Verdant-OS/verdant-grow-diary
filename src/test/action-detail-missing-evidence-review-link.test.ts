@@ -138,11 +138,13 @@ describe("ActionDetail missing-evidence guidance wiring", () => {
 
   it("link renders as a Link component, not a button or submit", () => {
     // Should be a react-router Link inside Button asChild
-    const linkBlock = ACTION_DETAIL_SRC.match(
-      /<Link\s+[\s\S]*?aria-label=\{ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL\}[\s\S]*?>{link\.label}<\/Link>/,
+    const src = ACTION_DETAIL_SRC;
+    expect(src).toContain('aria-label={ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL}');
+    // Extract the Link block that carries our aria-label
+    const linkBlock = src.match(
+      /<Link[\s\S]*?aria-label=\{ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL\}[\s\S]*?<\/Link>/,
     );
     expect(linkBlock).toBeTruthy();
-    // The Link block should not have type="submit" or onClick
     if (linkBlock) {
       expect(linkBlock[0]).not.toContain('type="submit"');
       expect(linkBlock[0]).not.toContain('onClick=');

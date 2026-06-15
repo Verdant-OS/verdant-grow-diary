@@ -113,6 +113,181 @@ function safePlantName(details: unknown): string | null {
   return trimmed;
 }
 
+// ---------------------------------------------------------------------------
+// Expanded-detail helpers (allowlisted, presenter-safe).
+// ---------------------------------------------------------------------------
+
+const STRING_VALUE_MAX = 80;
+
+function pickRecord(details: unknown): Record<string, unknown> | null {
+  if (!details || typeof details !== "object" || Array.isArray(details)) return null;
+  return details as Record<string, unknown>;
+}
+
+function pickFirstString(
+  d: Record<string, unknown>,
+  keys: readonly string[],
+): string | null {
+  for (const k of keys) {
+    const v = d[k];
+    if (typeof v === "string") {
+      const t = v.trim();
+      if (t) return t.length > STRING_VALUE_MAX ? `${t.slice(0, STRING_VALUE_MAX - 1)}…` : t;
+    }
+  }
+  return null;
+}
+
+function pickFirstFiniteNumber(
+  d: Record<string, unknown>,
+  keys: readonly string[],
+): number | null {
+  for (const k of keys) {
+    const v = d[k];
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+    if (typeof v === "string" && v.trim() !== "") {
+      const n = Number(v);
+      if (Number.isFinite(n)) return n;
+    }
+  }
+  return null;
+}
+
+function normalizeEcUnit(raw: unknown): EcUnit | null {
+  if (typeof raw !== "string") return null;
+  const k = raw.trim().toLowerCase().replace(/\s+/g, "");
+  if (k === "ms/cm" || k === "mscm") return "mS/cm";
+  if (k === "us/cm" || k === "uscm" || k === "µs/cm" || k === "μs/cm") return "µS/cm";
+  return null;
+}
+
+function buildWateringFields(d: Record<string, unknown>): DiaryCalendarEventDisplayField[] {
+  const fields: DiaryCalendarEventDisplayField[] = [];
+  const ml = pickFirstFiniteNumber(d, [
+    "watering_amount_ml",
+    "wateringAmountMl",
+    "volume_ml",
+    "amount_ml",
+  ]);
+  const l = pickFirstFiniteNumber(d, ["watering_amount_l", "wateringAmountL", "amount_l"]);
+  if (ml != null) fields.push({ label: "Amount", value: `${ml} ml` });
+  else if (l != null) fields.push({ label: "Amount", value: `${l} L` });
+
+  const method = pickFirstString(d, ["method", "watering_method", "wateringMethod"]);
+  if (method) fields.push({ label: "Method", value: method });
+
+  const ph = pickFirstFiniteNumber(d, ["ph", "ph_value", "runoff_ph"]);
+  if (ph != null) fields.push({ label: "pH", value: ph.toFixed(2) });
+
+  return fields;
+}
+
+function buildFeedingFields(d: Record<string, unknown>): DiaryCalendarEventDisplayField[] {
+  const fields: DiaryCalendarEventDisplayField[] = [];
+
+  const recipe = pickFirstString(d, ["nutrients", "recipe", "nutrient_line", "nutrientLine"]);
+  if (recipe) fields.push({ label: "Nutrients", value: recipe });
+
+  const brand = pickFirstString(d, ["nutrient_brand", "nutrientBrand", "brand"]);
+  if (brand) fields.push({ label: "Brand", value: brand });
+
+  const ph = pickFirstFiniteNumber(d, ["ph", "ph_value"]);
+  if (ph != null) fields.push({ label: "pH", value: ph.toFixed(2) });
+
+  const ec = pickFirstFiniteNumber(d, ["ec", "ec_value", "ecValue"]);
+  const ecUnit = normalizeEcUnit(d.ec_unit ?? d.ecUnit) ?? "mS/cm";
+  if (ec != null) fields.push({ label: "EC", value: `${ec} ${ecUnit}` });
+
+  const waterTempC = pickFirstFiniteNumber(d, ["water_temp_c", "waterTempC"]);
+  if (waterTempC != null) {
+    fields.push({ label: "Water temp", value: `${waterTempC.toFixed(1)}°C` });
+  }
+
+  return fields;
+}
+
+const DIAGNOSIS_SEVERITY_LABELS: Record<string, string> = {
+  low: "Low",
+  medium: "Medium",
+  moderate: "Medium",
+  high: "High",
+  critical: "Critical",
+  info: "Info",
+};
+
+function buildDiagnosisFields(d: Record<string, unknown>): DiaryCalendarEventDisplayField[] {
+  const fields: DiaryCalendarEventDisplayField[] = [];
+
+  const summary = pickFirstString(d, ["summary", "title", "headline"]);
+  if (summary) fields.push({ label: "Summary", value: summary });
+
+  const issue = pickFirstString(d, ["likely_issue", "likelyIssue", "issue"]);
+  if (issue) fields.push({ label: "Likely issue", value: issue });
+
+  const confidence = pickFirstFiniteNumber(d, ["confidence", "confidence_score"]);
+  if (confidence != null) {
+    const pct = confidence > 1 ? Math.round(confidence) : Math.round(confidence * 100);
+    if (Number.isFinite(pct) && pct >= 0 && pct <= 100) {
+      fields.push({ label: "Confidence", value: `${pct}%` });
+    }
+  }
+
+  const severityRaw = pickFirstString(d, ["severity", "risk_level", "riskLevel"]);
+  if (severityRaw) {
+    const lbl = DIAGNOSIS_SEVERITY_LABELS[severityRaw.toLowerCase()] ?? null;
+    if (lbl) fields.push({ label: "Severity", value: lbl });
+  }
+
+  return fields;
+}
+
+const DETAIL_SECTION_LABEL: Record<DiaryCalendarEventKind, string> = {
+  watering: "Watering details",
+  feeding: "Feeding details",
+  diagnosis: "Diagnosis details",
+};
+
+const DIARY_CALENDAR_EMPTY_DETAILS_FALLBACK =
+  "No extra details saved for this entry.";
+
+export const DIARY_CALENDAR_DETAILS_EMPTY = DIARY_CALENDAR_EMPTY_DETAILS_FALLBACK;
+
+function buildEventDetails(
+  kind: DiaryCalendarEventKind,
+  rawDetails: unknown,
+  noteSnippet: string | null,
+): DiaryCalendarEventDetails {
+  const d = pickRecord(rawDetails);
+  let fields: DiaryCalendarEventDisplayField[] = [];
+  let ecPreview: EcCompensationPreviewModel | null = null;
+
+  if (d) {
+    if (kind === "watering") fields = buildWateringFields(d);
+    else if (kind === "feeding") {
+      fields = buildFeedingFields(d);
+      const ec = pickFirstFiniteNumber(d, ["ec", "ec_value", "ecValue"]);
+      const ecUnit = normalizeEcUnit(d.ec_unit ?? d.ecUnit) ?? "mS/cm";
+      const waterTempC = pickFirstFiniteNumber(d, ["water_temp_c", "waterTempC"]);
+      if (ec != null && waterTempC != null) {
+        const preview = buildEcCompensationPreview({
+          ec,
+          ecUnit,
+          waterTempC,
+          sourceLabel: "manual",
+        });
+        if (preview.visible) ecPreview = preview;
+      }
+    } else if (kind === "diagnosis") fields = buildDiagnosisFields(d);
+  }
+
+  const hasContent = fields.length > 0 || ecPreview !== null || !!noteSnippet;
+  return {
+    sectionLabel: DETAIL_SECTION_LABEL[kind],
+    fields,
+    ecPreview,
+    fallback: hasContent ? null : DIARY_CALENDAR_EMPTY_DETAILS_FALLBACK,
+  };
+
 function extractKind(entry: DiaryCalendarRawEntry): DiaryCalendarEventKind | null {
   const direct = normalizeKind(entry.event_type);
   if (direct) return direct;

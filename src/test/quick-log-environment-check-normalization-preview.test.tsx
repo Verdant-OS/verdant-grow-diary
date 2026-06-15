@@ -176,23 +176,36 @@ describe("Quick Log Environment Check — selector accessibility", () => {
   });
 
   it("selecting Environment Check via the real combobox flow renders the section", async () => {
-    renderWithClient(
-      <QuickLog
-        open
-        onOpenChange={() => undefined}
-        prefill={{ plantId: "plant-1", growId: "grow-1" }}
-      />,
-    );
-    const dialog = screen.getByRole("dialog");
-    const combobox = within(dialog).getByRole("combobox", { name: /event/i });
-    // Open the Radix Select listbox.
-    fireEvent.keyDown(combobox, { key: "Enter", code: "Enter" });
-    // Radix portals the listbox; pick the Environment Check option by role + name.
-    const option = await screen.findByRole("option", { name: /environment check/i });
-    expect(option).toBeInTheDocument();
-    fireEvent.click(option);
-    expect(
-      await within(dialog).findByTestId("quick-log-environment-check-section"),
-    ).toBeInTheDocument();
+    // Radix Select calls Element.scrollIntoView when opened; jsdom lacks it.
+    const originalScrollIntoView = (Element.prototype as unknown as { scrollIntoView?: () => void }).scrollIntoView;
+    (Element.prototype as unknown as { scrollIntoView: () => void }).scrollIntoView = () => undefined;
+    // Also stub hasPointerCapture for Radix.
+    const originalHasPC = (Element.prototype as unknown as { hasPointerCapture?: () => boolean }).hasPointerCapture;
+    (Element.prototype as unknown as { hasPointerCapture: () => boolean }).hasPointerCapture = () => false;
+    try {
+      renderWithClient(
+        <QuickLog
+          open
+          onOpenChange={() => undefined}
+          prefill={{ plantId: "plant-1", growId: "grow-1" }}
+        />,
+      );
+      const dialog = screen.getByRole("dialog");
+      const combobox = within(dialog).getByRole("combobox", { name: /event/i });
+      fireEvent.pointerDown(combobox, { button: 0, ctrlKey: false, pointerType: "mouse" });
+      fireEvent.click(combobox);
+      const option = await screen.findByRole("option", { name: /environment check/i });
+      fireEvent.click(option);
+      expect(
+        await within(dialog).findByTestId("quick-log-environment-check-section"),
+      ).toBeInTheDocument();
+    } finally {
+      if (originalScrollIntoView) {
+        (Element.prototype as unknown as { scrollIntoView: typeof originalScrollIntoView }).scrollIntoView = originalScrollIntoView;
+      }
+      if (originalHasPC) {
+        (Element.prototype as unknown as { hasPointerCapture: typeof originalHasPC }).hasPointerCapture = originalHasPC;
+      }
+    }
   });
 });

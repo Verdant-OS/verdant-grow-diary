@@ -53,6 +53,26 @@ export const ACTION_EVIDENCE_HISTORICAL_NOTE =
   "Captured-moment evidence only — not current-room guidance.";
 export const ACTION_EVIDENCE_ORIGIN_FALLBACK = "Review evidence";
 
+/**
+ * Centralized empty-state copy for the Action Queue "Needs Review" list.
+ * Preserves the safety promise that nothing is auto-approved or auto-run.
+ */
+export const ACTION_QUEUE_EMPTY_PENDING_TITLE =
+  "No actions need review right now.";
+export const ACTION_QUEUE_EMPTY_PENDING_HELP =
+  "New AI Doctor or alert suggestions will appear here for grower approval.";
+
+/**
+ * Centralized missing-evidence copy for Action Detail origin panels when
+ * no sanitized snapshot is attached. Reinforces the review-only posture
+ * without implying the action is already approved or executed.
+ */
+export const ACTION_EVIDENCE_MISSING_PANEL_TITLE =
+  "Evidence details are not available from this action record.";
+export const ACTION_EVIDENCE_MISSING_PANEL_HELP =
+  "Review the diary timeline and sensor history before approving.";
+
+
 const SOURCE_LABEL: Readonly<Record<ActionQueueSource, string>> = {
   environment_alert: "Environment Alert",
   ai_coach: "AI Coach",

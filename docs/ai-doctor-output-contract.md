@@ -85,3 +85,62 @@ history is documented and QA-tracked separately:
 
 This is documentation, QA, and safety validation only — no new AI
 diagnosis behavior shipped.
+
+## Action Queue suggestion preview
+
+The Action Queue suggestion preview is a read-only, context-only
+presenter embedded inside the AI Doctor readiness panel. It tells the
+grower whether the current context is sufficient to later support a safe,
+approval-required Action Queue suggestion.
+
+What it does:
+- Evaluates eligibility based on current live/manual sensor readings and
+  plant/tent/stage context.
+- Shows deterministic status chips (`eligible`, `needs_current_reading`,
+  `missing_context`, `blocked_invalid_data`, `blocked_device_command_risk`).
+- Lists missing context fields and invalid/unknown telemetry fields
+  explicitly so growers know what to add or review.
+- Renders conservative suggested copy and safety notes
+  (`Approval required`, `No device control`, `Preview only`).
+
+What it does NOT do:
+- **Never creates an Action Queue row.**
+- **Never calls Supabase, Edge Functions, or any model.**
+- **Never emits executable device commands.**
+- **Never promotes imported CSV history to live telemetry.**
+- **Never classifies invalid or unknown telemetry as healthy.**
+
+Eligibility rules:
+- `eligible` requires plant context (plant, tent, stage) AND at least one
+  current live or manual sensor snapshot.
+- `needs_current_reading` is returned when only imported CSV history is
+  available. Imported history is treated as background only.
+- `missing_context` is returned when plant, tent, or stage is absent.
+- `blocked_invalid_data` is returned when critical telemetry is flagged
+  invalid or unknown.
+- `blocked_device_command_risk` is returned when candidate suggestion text
+  matches device-command patterns (e.g. "turn on", "pump", "dose",
+  "setpoint", "mqtt publish").
+
+UI safety boundaries:
+- Safety notes always include: `Approval required`, `No device control`,
+  `Preview only — no Action Queue item is created.`
+- Suggested copy is conservative and avoids nutrient, irrigation, and
+  equipment-control language.
+- A UI-level `isUnsafePreviewText` filter drops any string containing
+  `approved`, `queued`, `executed`, `turn on/off`, `pump`, `dose`,
+  `set temp`, `set humidity`, or `mqtt publish` before it reaches the DOM.
+- The preview card is a `<section>` with `aria-labelledby` and
+  `aria-describedby`, including a `role="status"` screen-reader summary.
+- No `<button>` elements are rendered inside the preview card.
+
+Validation:
+- Helper tests: `src/test/ai-doctor-action-suggestion-preview-rules.test.ts`
+- Presenter tests: `src/test/ai-doctor-action-suggestion-preview-panel.test.tsx`
+- Known good results: 27/27 helper + presenter tests pass; 38/38
+  imported-history + readiness regression tests pass.
+
+See also:
+- Runbook: `runbooks/ai-doctor-imported-history.md`
+- QA checklist: `qa/ai-doctor-imported-history-safety-checklist.md`
+- Release note: `releases/ai-doctor-imported-history-safety.md`

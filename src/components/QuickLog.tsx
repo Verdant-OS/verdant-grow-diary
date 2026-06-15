@@ -448,7 +448,7 @@ export default function QuickLog({
         plantTentId: selectedPlant.tent_id ?? null,
         details,
         sensorAttachPayload,
-        earlyStage: earlyStageEnvelope,
+        earlyStage: earlyStageRecord,
         noteSuffix: earlyStageSuffix || null,
       });
       if (built.ok !== true) {

@@ -222,7 +222,7 @@ describe("AiDoctorContextReadinessPanel", () => {
     ).toBeTruthy();
     expect(
       screen.getByTestId("ai-doctor-imported-history-missing-live-warning").textContent,
-    ).toContain("missing");
+    ).toMatch(/Missing current live\/manual readings/i);
   });
 
   it("does not show missing-live warning when live readings are present", () => {

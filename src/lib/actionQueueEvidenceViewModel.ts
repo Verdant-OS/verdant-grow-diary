@@ -72,6 +72,16 @@ export const ACTION_EVIDENCE_MISSING_PANEL_TITLE =
 export const ACTION_EVIDENCE_MISSING_PANEL_HELP =
   "Review the diary timeline and sensor history before approving.";
 
+export const ACTION_EVIDENCE_STATUS_AVAILABLE_LABEL = "Evidence available";
+export const ACTION_EVIDENCE_STATUS_AVAILABLE_HELP =
+  "Historical snapshot quality is available for review.";
+export const ACTION_EVIDENCE_STATUS_UNAVAILABLE_LABEL = "Evidence quality unavailable";
+export const ACTION_EVIDENCE_STATUS_UNAVAILABLE_HELP =
+  "This action record does not include sanitized snapshot metrics.";
+export const ACTION_EVIDENCE_STATUS_MISSING_LABEL = "Evidence missing";
+export const ACTION_EVIDENCE_STATUS_MISSING_HELP =
+  "Review the diary timeline and sensor history before approving.";
+
 
 const SOURCE_LABEL: Readonly<Record<ActionQueueSource, string>> = {
   environment_alert: "Environment Alert",

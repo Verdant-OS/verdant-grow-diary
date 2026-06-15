@@ -134,8 +134,9 @@ describe("buildMissingEvidenceReviewLink — null safety", () => {
     expect(buildMissingEvidenceReviewLink({ grow_id: 123 })).toBeNull();
     // @ts-expect-error invalid input shape
     expect(buildMissingEvidenceReviewLink({ plant_id: 42 })).toBeNull();
-    // @ts-expect-error invalid input shape
-    expect(buildMissingEvidenceReviewLink(null)).toBeNull();
+    expect(
+      buildMissingEvidenceReviewLink(null as unknown as Parameters<typeof buildMissingEvidenceReviewLink>[0]),
+    ).toBeNull();
   });
 });
 

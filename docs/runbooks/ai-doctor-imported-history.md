@@ -47,6 +47,7 @@ It is **useful background** — trend, prior conditions, lineage — but it is
 
 - Release note: `docs/releases/ai-doctor-imported-history-safety.md`
 - QA checklist: `docs/qa/ai-doctor-imported-history-safety-checklist.md`
+- Action Queue suggestion preview QA runbook: `docs/runbooks/ai-doctor-action-suggestion-preview-qa.md`
 - Fixture: `fixtures/diary/2026-06-13-multi-tent-baseline.json` (test-only)
 - Fixture summary: `docs/diary/2026-06-13-multi-tent-baseline.md`
 - Known flake note: `docs/testing/known-vitest-flakes.md`

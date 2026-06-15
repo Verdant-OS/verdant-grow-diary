@@ -222,17 +222,52 @@ export function buildSensorNormalizationPreviewViewModel(
   const warnings = buildWarnings(normalized);
   const badges = buildBadges(normalized);
 
+  // Tent ID classification (uses existing isUuid helper).
+  const rawTentId = input.options.tentId;
+  let tentStatus: SensorNormalizationPreviewTentStatus;
+  let tentStatusLabel: string;
+  if (rawTentId === undefined || rawTentId === null || (typeof rawTentId === "string" && rawTentId.trim() === "")) {
+    tentStatus = "missing";
+    tentStatusLabel = "Missing tent ID";
+  } else if (!isUuid(rawTentId)) {
+    tentStatus = "invalid";
+    tentStatusLabel = "Invalid tent ID";
+  } else {
+    tentStatus = "linked_verified";
+    tentStatusLabel = "Linked tent verified";
+  }
+
+  // Plant ID classification (informational; missing is not an error).
+  const rawPlantId = input.options.plantId;
+  let plantStatus: SensorNormalizationPreviewPlantStatus;
+  let plantStatusLabel: string;
+  if (rawPlantId === undefined) {
+    plantStatus = "not_applicable";
+    plantStatusLabel = "";
+  } else if (rawPlantId === null || (typeof rawPlantId === "string" && rawPlantId.trim() === "")) {
+    plantStatus = "missing";
+    plantStatusLabel = "No plant linked";
+  } else if (!isUuid(rawPlantId)) {
+    plantStatus = "invalid";
+    plantStatusLabel = "Invalid plant ID";
+  } else {
+    plantStatus = "linked";
+    plantStatusLabel = "Linked plant present";
+  }
+
   let emptyState: string | null = null;
   if (normalized.source === "invalid") {
     emptyState = SENSOR_NORMALIZATION_PREVIEW_INVALID_NOTICE;
+  } else if (tentStatus !== "linked_verified") {
+    emptyState = SENSOR_NORMALIZATION_PREVIEW_TENT_MISSING_EMPTY_STATE;
   } else if (longFormPreview.length === 0) {
     emptyState = SENSOR_NORMALIZATION_PREVIEW_EMPTY_STATE;
   }
 
   const plantIdStatus: "present" | "missing" | "not_applicable" =
-    input.options.plantId === undefined
+    plantStatus === "not_applicable"
       ? "not_applicable"
-      : normalized.plant_id
+      : plantStatus === "linked"
         ? "present"
         : "missing";
 
@@ -245,8 +280,12 @@ export function buildSensorNormalizationPreviewViewModel(
     transport: normalized.transport,
     confidence: normalized.confidence,
     isStale: normalized.is_stale,
-    tentIdStatus: normalized.tent_id ? "present" : "missing",
+    tentIdStatus: tentStatus === "linked_verified" ? "present" : "missing",
+    tentStatus,
+    tentStatusLabel,
     plantIdStatus,
+    plantStatus,
+    plantStatusLabel,
     capturedAtDisplay: normalized.captured_at ?? "—",
     capturedAtPresent: normalized.captured_at !== null,
     badges,

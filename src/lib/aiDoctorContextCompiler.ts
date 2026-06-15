@@ -34,6 +34,11 @@ import {
   buildAiDoctorCsvHistoryContext,
   type AiDoctorCsvHistoryContext,
 } from "./aiDoctorCsvHistoryContextRules";
+import {
+  buildEarlyStageAiDoctorContext,
+  type EarlyStageAiDoctorContext,
+} from "./earlyStageAiDoctorContextRules";
+
 
 /** Section label rendered for imported CSV/XLSX sensor history. */
 export const AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL =

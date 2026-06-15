@@ -153,43 +153,53 @@ export function SensorNormalizationPreviewPanel({
       )}
 
       {vm.longFormRows.length > 0 ? (
-        <div
-          data-testid="sensor-normalization-preview-long-form"
-          className="rounded-lg border border-border/60 bg-secondary/20 p-2 overflow-x-auto"
-        >
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Long-form row preview
-          </p>
-          <table className="w-full text-[11px]">
-            <thead>
-              <tr className="text-left text-muted-foreground">
-                <th className="font-medium">Metric</th>
-                <th className="font-medium">Value</th>
-                <th className="font-medium">Source</th>
-                <th className="font-medium">Identity</th>
-                <th className="font-medium">Transport</th>
-                <th className="font-medium">Confidence</th>
-                <th className="font-medium">Captured At</th>
-              </tr>
-            </thead>
-            <tbody>
-              {vm.longFormRows.map((r, i) => (
-                <tr
-                  key={`${r.metric}-${i}`}
-                  data-testid="sensor-normalization-preview-long-form-row"
-                >
-                  <td className="font-mono">{r.metric}</td>
-                  <td>{r.value}</td>
-                  <td>{r.source}</td>
-                  <td>{r.source_identity}</td>
-                  <td>{r.transport}</td>
-                  <td>{r.confidence}</td>
-                  <td className="font-mono">{r.captured_at}</td>
+        !compact ? (
+          <div
+            data-testid="sensor-normalization-preview-long-form"
+            className="rounded-lg border border-border/60 bg-secondary/20 p-2 overflow-x-auto"
+          >
+            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Long-form row preview
+            </p>
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr className="text-left text-muted-foreground">
+                  <th className="font-medium">Metric</th>
+                  <th className="font-medium">Value</th>
+                  <th className="font-medium">Source</th>
+                  <th className="font-medium">Identity</th>
+                  <th className="font-medium">Transport</th>
+                  <th className="font-medium">Confidence</th>
+                  <th className="font-medium">Captured At</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {vm.longFormRows.map((r, i) => (
+                  <tr
+                    key={`${r.metric}-${i}`}
+                    data-testid="sensor-normalization-preview-long-form-row"
+                  >
+                    <td className="font-mono">{r.metric}</td>
+                    <td>{r.value}</td>
+                    <td>{r.source}</td>
+                    <td>{r.source_identity}</td>
+                    <td>{r.transport}</td>
+                    <td>{r.confidence}</td>
+                    <td className="font-mono">{r.captured_at}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p
+            data-testid="sensor-normalization-preview-long-form-summary"
+            className="text-[11px] text-muted-foreground"
+          >
+            {vm.longFormRowCount} write-ready row
+            {vm.longFormRowCount === 1 ? "" : "s"} prepared (not saved).
+          </p>
+        )
       ) : (
         <p
           data-testid="sensor-normalization-preview-empty-state"

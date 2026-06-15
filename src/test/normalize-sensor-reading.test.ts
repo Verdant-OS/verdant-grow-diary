@@ -243,6 +243,79 @@ describe("normalizeSensorReading", () => {
     expect(r.warnings).toContain("unknown_input_shape");
   });
 
+  it("null input does not throw and yields invalid", () => {
+    const r = normalizeSensorReading(null, {
+      source: "live",
+      tentId: TENT,
+      capturedAt: FRESH,
+      now: NOW,
+    });
+    expect(r.source).toBe("invalid");
+    expect(r.warnings).toContain("unknown_input_shape");
+    expect(r.warnings).toContain("no_usable_metrics");
+  });
+
+  it("parses numeric string values safely", () => {
+    const r = normalizeSensorReading(
+      { temperature_c: "24.5", humidity: " 55 " },
+      { source: "manual", tentId: TENT, capturedAt: FRESH, now: NOW },
+    );
+    expect(r.metrics.temperature_c).toBe(24.5);
+    expect(r.metrics.humidity_pct).toBe(55);
+  });
+
+  it("rejects bad string values without producing metrics", () => {
+    const r = normalizeSensorReading(
+      { temperature_c: "hello", humidity: "n/a" },
+      { source: "manual", tentId: TENT, capturedAt: FRESH, now: NOW },
+    );
+    expect(r.metrics.temperature_c).toBeNull();
+    expect(r.metrics.humidity_pct).toBeNull();
+    expect(r.source).toBe("invalid");
+  });
+
+  it("ec_ms_cm alias is honored and large values warn as µS/cm", () => {
+    const ok = normalizeSensorReading(
+      { ec_ms_cm: 1.4 },
+      { source: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
+    );
+    expect(ok.metrics.reservoir_ec_ms_cm).toBe(1.4);
+    const warn = normalizeSensorReading(
+      { ec_ms_cm: 1450 },
+      { source: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
+    );
+    expect(warn.warnings).toContain("reservoir_ec_likely_us_cm");
+  });
+
+  it("demo identity uses demo_fixture cleanly", () => {
+    const r = normalizeSensorReading(
+      { temperature_c: 24, humidity: 50 },
+      {
+        source: "demo",
+        sourceIdentity: "demo_fixture",
+        transport: "unknown",
+        tentId: TENT,
+        capturedAt: FRESH,
+        now: NOW,
+      },
+    );
+    expect(r.source).toBe("demo");
+    expect(r.source_identity).toBe("demo_fixture");
+    expect(r.confidence).toBeLessThanOrEqual(50);
+  });
+
+  it("is deterministic with injected now", () => {
+    const a = normalizeSensorReading(
+      { temperature_c: 24, humidity: 50 },
+      { source: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
+    );
+    const b = normalizeSensorReading(
+      { temperature_c: 24, humidity: 50 },
+      { source: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
+    );
+    expect(a).toEqual(b);
+  });
+
   it("does not import Supabase, Action Queue, automation, or device-control code", () => {
     const source = readFileSync(
       resolve(__dirname, "../lib/sensors/normalizeSensorReading.ts"),

@@ -552,6 +552,15 @@ export default function ActionQueue() {
           Suggestions are <span className="text-foreground">approval-gated</span>.
           Verdant never sends commands to equipment.
         </p>
+        {lastUpdatedAt !== null && (
+          <p
+            className="text-[11px] text-muted-foreground mt-1"
+            data-testid="action-queue-last-updated"
+            aria-label={formatLastUpdatedAgo(lastUpdatedAt, Date.now())}
+          >
+            {formatLastUpdatedAgo(lastUpdatedAt, Date.now())}
+          </p>
+        )}
         <div
           className="mt-2 rounded-lg border border-border/60 bg-secondary/30 px-3 py-2"
           data-testid="action-queue-grow-context-hint"

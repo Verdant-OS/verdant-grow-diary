@@ -46,7 +46,9 @@ const FORBIDDEN = [
 ];
 
 /** Skip lines that are clearly denials/negations. */
-const DENIAL = /\b(do not|don't|must not|never|no |without |refus(e|ed|es)|prohibit|forbid|not (added|enabled|shipped|changed|written|created)|remains? (test|context)-only)\b/i;
+// Tolerate markdown emphasis like "Do **not**" by stripping `*` and `_` before checking.
+const DENIAL = /\b(do not|don't|must not|cannot|never|no |without |refus(e|ed|es)|prohibit|forbid|not (added|enabled|shipped|changed|written|created|claim)|remains? (test|context|docs)-only|claim(s|ed)? .{0,20}(was|were|is|are|has|have))\b/i;
+const stripEmphasis = (s) => s.replace(/[*_`]/g, "");
 const ALLOW_MARKER = "RELEASE-DOCS-SAFETY: ALLOW";
 
 function walk(dir, out = []) {

@@ -47,6 +47,38 @@ surfaces.
 - [ ] Screen-reader summary (`role="status"`) is present and describes
       quality + source.
 
+## Entry / review / confirmation surfaces
+
+The Manual Sensor Snapshot quality badge currently appears in two
+presenter-only surfaces:
+
+- **Manual entry** — `src/components/ManualSensorReadingCard.tsx` renders
+  the badge live as the grower types values, alongside the existing
+  review-before-save prompt for suspicious readings.
+- **AI Doctor readiness** — `src/components/AiDoctorContextReadinessPanel.tsx`
+  renders the badge for the resolved current snapshot used as AI Doctor
+  context.
+
+Audit result (no separate review/confirmation surface exists):
+
+- The Quick Log sensor snapshot strip (`QuickLogSensorSnapshotStrip.tsx`)
+  already shows source + trust state via `SnapshotTrustBadge` and the
+  strict resolver — it is **not** a manual-entry review surface, and
+  adding a second badge would duplicate noisy labels for the same
+  reading.
+- Timeline / history cards (`ManualSnapshotTimelineCard.tsx`,
+  `TentManualSnapshotHistoryList.tsx`, `ManualSnapshotTimelineSection.tsx`)
+  render historical entries, not a pre-save confirmation step.
+- `TentManualSnapshotChangeContext.tsx` displays change context for an
+  already-persisted snapshot, not a pre-attach review.
+
+If a dedicated manual-snapshot review/confirmation surface is added
+later (e.g. a Quick Log "Review before attach" modal for manually
+entered values), render `ManualSensorSnapshotQualityBadge` near the
+reviewed values using only sanitized metric fields — never pass raw
+payloads, vendor metadata, tokens, filenames, private IDs, or full
+context objects.
+
 ## Safety / data hygiene
 
 - [ ] No raw payload content renders in the badge or readiness panel.

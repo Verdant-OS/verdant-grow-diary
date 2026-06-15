@@ -118,6 +118,20 @@ export default function DiaryCalendarSection({
     [groups, dayLimit],
   );
   const summary = useMemo(() => summarizeDiaryCalendar(groups), [groups]);
+  const rawDetailsById = useMemo(() => {
+    const map = new Map<string, unknown>();
+    for (const r of rawEntries ?? []) {
+      if (r && typeof r.id === "string") map.set(r.id, r.details);
+    }
+    return map;
+  }, [rawEntries]);
+  const [drawerEvent, setDrawerEvent] =
+    useState<DiaryCalendarEventDrawerViewModel | null>(null);
+  const openEventDrawer = (ev: DiaryCalendarEvent) => {
+    setDrawerEvent(
+      buildDiaryCalendarEventDrawerViewModel(ev, rawDetailsById.get(ev.id) ?? null),
+    );
+  };
   const [openDay, setOpenDay] = useState<string | null>(
     visibleGroups[0]?.dateKey ?? null,
   );

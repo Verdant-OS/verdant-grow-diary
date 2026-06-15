@@ -15,6 +15,7 @@
  * and never recommends nutrient, irrigation, or equipment changes from weak
  * evidence.
  */
+import type { ManualSensorSnapshotQuality } from "@/lib/manualSensorSnapshotQualityRules";
 
 export type ActionSuggestionPreviewStatus =
   | "eligible"

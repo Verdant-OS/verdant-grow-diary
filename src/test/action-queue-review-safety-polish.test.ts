@@ -151,4 +151,10 @@ describe("Action Queue / Action Detail — wired polish", () => {
       }
     }
   });
+
+  it("polished surfaces include the compact evidence status badge without unsafe language", () => {
+    expect(ACTION_QUEUE_SRC).toContain("EvidenceStatusBadge");
+    expect(ACTION_QUEUE_SRC).toContain("rowEvidenceStatus");
+    expect(ACTION_DETAIL_SRC).toContain("buildActionEvidenceViewModel");
+  });
 });

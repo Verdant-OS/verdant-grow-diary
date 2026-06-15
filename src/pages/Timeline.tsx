@@ -27,6 +27,7 @@ import {
   TrainingHistoryPanel,
   MeasurementHistoryPanel,
 } from "@/components/QuickLogHistoryPanels";
+import DiaryCalendarSection from "@/components/DiaryCalendarSection";
 import { hasManualHandheldReadings } from "@/lib/quickLogHistoryRules";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { actionDetailPath, alertDetailPath, logsPath, timelinePath } from "@/lib/routes";
@@ -401,6 +402,10 @@ export default function Timeline() {
           bottom so Quick Log entries are not buried. */}
       <div className="mt-4">
         <RecentQuickLogActivityPanel rawEntries={recentLaneRawEntries} limit={10} />
+      </div>
+
+      <div className="mt-4">
+        <DiaryCalendarSection rawEntries={entries} />
       </div>
 
       <div className="mt-4">

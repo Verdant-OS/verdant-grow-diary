@@ -48,6 +48,7 @@ export interface ImportedHistoryDisclosureVisible {
   showSuspiciousFlags: boolean;
   showMissingLiveWarning: boolean;
   missingLiveWarning: string | null;
+  invalidNote: string;
 }
 
 export interface ImportedHistoryDisclosureHidden {

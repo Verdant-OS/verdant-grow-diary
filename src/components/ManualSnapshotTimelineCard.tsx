@@ -110,6 +110,17 @@ export default function ManualSnapshotTimelineCard({ card }: Props) {
         </p>
       </CardHeader>
       <CardContent className="space-y-2 pt-0">
+        <section
+          data-testid="manual-snapshot-timeline-card-quality"
+          aria-label="Historical snapshot quality"
+          className="rounded-md border border-border/40 bg-secondary/10 p-2"
+        >
+          <ManualSensorSnapshotQualityBadge evaluation={quality} />
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Historical reading — quality reflects captured values; not
+            current-room guidance.
+          </p>
+        </section>
         {card.readings.length > 0 ? (
           <ul
             className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs"

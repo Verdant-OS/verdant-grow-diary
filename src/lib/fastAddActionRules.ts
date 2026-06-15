@@ -109,12 +109,12 @@ function hasContext(ctx: FastAddSelectionContext | null | undefined): boolean {
 }
 
 /**
- * Resolve a Fast Add action against the current selection context.
+ * Resolve a Quick Log preset against the current selection context.
  *
- * - All actions require a plant or tent to be selected.
+ * - All presets require a plant or tent to be selected.
  * - Diagnosis routes to the AI Doctor surface (scoped to the plant when
  *   available) — never triggers a model call directly.
- * - All other actions request the existing Quick Log sheet via the
+ * - All other presets request the existing Quick Log sheet via the
  *   already-wired window event. The grower still confirms + saves.
  */
 export interface ResolveFastAddOptions {
@@ -169,14 +169,14 @@ export function resolveFastAddIntent(
 }
 
 /**
- * Compute sensible default timestamps for a Fast Add action.
+ * Compute sensible default timestamps for a Quick Log preset.
  *
  * Pure helper — does NOT persist or dispatch anything. The QuickLog form
  * still owns the actual write; this only seeds initial values.
  *
  * Rules:
- *  - All logging actions set `occurred_at = now`.
- *  - Environment Check additionally sets `captured_at = now`.
+ *  - All logging presets set `occurred_at = now`.
+ *  - Environment additionally sets `captured_at = now`.
  *  - Diagnosis is navigation-only and returns {}.
  */
 export function buildFastAddTimestampDefaults(

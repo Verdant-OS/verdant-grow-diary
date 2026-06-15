@@ -120,4 +120,77 @@ describe("AiDoctorContextReadinessPanel — Action Queue suggestion preview", ()
     expect(text).not.toMatch(/\b(was|is|has been|have been) executed\b/i);
     expect(text).not.toMatch(/turn on|turn off|setpoint|actuate|dose/i);
   });
+
+  it("exposes meaningful ARIA labelling and a screen-reader status", () => {
+    const context = ctx(
+      [{ occurred_at: ago(12 * HOUR), event_type: "watering", source: "manual" }],
+      [{ metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "live" }],
+    );
+    render(<AiDoctorContextReadinessPanel context={context} />);
+    const card = getPreview();
+    expect(card.getAttribute("aria-labelledby")).toContain(
+      "ai-doctor-action-suggestion-preview-heading",
+    );
+    expect(card.getAttribute("aria-describedby")).toContain(
+      "ai-doctor-action-suggestion-preview-sr-status",
+    );
+    const heading = card.querySelector("#ai-doctor-action-suggestion-preview-heading");
+    expect(heading?.textContent).toContain("Action Queue suggestion preview");
+    const sr = screen.getByTestId("ai-doctor-action-suggestion-preview-sr-status");
+    expect(sr.getAttribute("role")).toBe("status");
+    expect(sr.textContent).toMatch(/Action Queue suggestion preview/i);
+    expect(sr.textContent).toMatch(/Approval required/i);
+    expect(sr.textContent).toMatch(/No device control/i);
+    expect(sr.textContent).toMatch(/Preview only/i);
+    const notes = screen.getByTestId(
+      "ai-doctor-action-suggestion-preview-safety-notes",
+    );
+    expect(notes.getAttribute("aria-label")).toMatch(/safety posture/i);
+  });
+
+  it("renders missing context fields when plant context is incomplete", () => {
+    const context = compileAiDoctorContextFromRows({
+      plant: { id: "p1", name: "Plant A", strain: "X", stage: null, grow_id: null, tent_id: "t1" },
+      growEvents: [],
+      sensorReadings: [],
+      now: NOW,
+    });
+    render(<AiDoctorContextReadinessPanel context={context} />);
+    const card = getPreview();
+    expect(card.getAttribute("data-status")).toBe("missing_context");
+    expect(
+      screen.getByTestId("ai-doctor-action-suggestion-preview-missing"),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId("ai-doctor-action-suggestion-preview-missing-stage"),
+    ).toBeTruthy();
+  });
+
+  it("renders invalid (Needs review) fields when telemetry is flagged", () => {
+    const context = ctx(
+      [{ occurred_at: ago(12 * HOUR), event_type: "watering", source: "manual" }],
+      [
+        { metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "invalid" },
+      ],
+    );
+    render(<AiDoctorContextReadinessPanel context={context} />);
+    const card = getPreview();
+    expect(card.getAttribute("data-status")).toBe("blocked_invalid_data");
+    expect(
+      screen.getByTestId("ai-doctor-action-suggestion-preview-invalid"),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId("ai-doctor-action-suggestion-preview-invalid-unknown"),
+    ).toBeTruthy();
+  });
+
+  it("never renders executable action buttons inside the preview card", () => {
+    const context = ctx(
+      [{ occurred_at: ago(12 * HOUR), event_type: "watering", source: "manual" }],
+      [{ metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "live" }],
+    );
+    render(<AiDoctorContextReadinessPanel context={context} />);
+    const buttons = getPreview().querySelectorAll("button");
+    expect(buttons.length).toBe(0);
+  });
 });

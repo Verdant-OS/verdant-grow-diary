@@ -140,13 +140,10 @@ describe("Quick Log preset menu — event wiring", () => {
   it("diagnosis preset navigates instead of dispatching an event", () => {
     const onNavigate = vi.fn();
     const onDispatchEvent = vi.fn();
-    renderQuickLog({
-      plantId: "p1",
-      tentId: null,
-      growId: "g1",
-      onNavigate,
-      onDispatchEvent,
-    } as any);
+    renderQuickLog(
+      { plantId: "p1", tentId: null, growId: "g1" },
+      { onNavigate, onDispatchEvent },
+    );
     fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
     fireEvent.click(screen.getByTestId("global-fast-add-action-diagnosis"));
     expect(onNavigate).toHaveBeenCalledWith("/plants/p1#ai-doctor");

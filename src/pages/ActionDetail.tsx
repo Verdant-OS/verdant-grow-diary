@@ -676,37 +676,39 @@ export default function ActionDetail() {
                         {ev.evidenceQualityLabel}
                       </p>
                       {!ev.hasSnapshotQuality && (
-                        <p
-                          className="mt-1 text-[11px] text-muted-foreground"
-                          data-testid="action-detail-evidence-missing-help"
-                        >
-                          {ACTION_EVIDENCE_MISSING_PANEL_HELP}
-                        </p>
+                        <div className="flex flex-col gap-2" data-testid="action-detail-missing-evidence-group">
+                          <p
+                            className="text-[11px] text-muted-foreground"
+                            data-testid="action-detail-evidence-missing-help"
+                          >
+                            {ACTION_EVIDENCE_MISSING_PANEL_HELP}
+                          </p>
+                          {!ev.hasSnapshotQuality && (() => {
+                            const link = buildMissingEvidenceReviewLink({
+                              grow_id: row.grow_id,
+                              tent_id: row.tent_id,
+                              plant_id: row.plant_id,
+                            });
+                            if (!link) return null;
+                            return (
+                              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                                <Button asChild size="sm" variant="outline" className="w-full sm:w-auto min-h-[2.25rem] justify-center">
+                                  <Link
+                                    to={link.to}
+                                    data-testid={link.testId}
+                                    aria-label={ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL}
+                                  >
+                                    {link.label}
+                                  </Link>
+                                </Button>
+                                <p className="text-[11px] text-muted-foreground">
+                                  {link.helper}
+                                </p>
+                              </div>
+                            );
+                          })()}
+                        </div>
                       )}
-                      {!ev.hasSnapshotQuality && (() => {
-                        const link = buildMissingEvidenceReviewLink({
-                          grow_id: row.grow_id,
-                          tent_id: row.tent_id,
-                          plant_id: row.plant_id,
-                        });
-                        if (!link) return null;
-                        return (
-                          <div className="mt-2">
-                            <Button asChild size="sm" variant="outline">
-                              <Link
-                                to={link.to}
-                                data-testid={link.testId}
-                                aria-label={ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL}
-                              >
-                                {link.label}
-                              </Link>
-                            </Button>
-                            <p className="mt-1 text-[11px] text-muted-foreground">
-                              {link.helper}
-                            </p>
-                          </div>
-                        );
-                      })()}
                     </>
                   );
                 })()}
@@ -759,37 +761,39 @@ export default function ActionDetail() {
                         {ev.evidenceQualityLabel}
                       </p>
                       {!ev.hasSnapshotQuality && (
-                        <p
-                          className="mt-1 text-[11px] text-muted-foreground"
-                          data-testid="action-detail-evidence-missing-help"
-                        >
-                          {ACTION_EVIDENCE_MISSING_PANEL_HELP}
-                        </p>
+                        <div className="flex flex-col gap-2" data-testid="action-detail-missing-evidence-group">
+                          <p
+                            className="text-[11px] text-muted-foreground"
+                            data-testid="action-detail-evidence-missing-help"
+                          >
+                            {ACTION_EVIDENCE_MISSING_PANEL_HELP}
+                          </p>
+                          {!ev.hasSnapshotQuality && (() => {
+                            const link = buildMissingEvidenceReviewLink({
+                              grow_id: row.grow_id,
+                              tent_id: row.tent_id,
+                              plant_id: row.plant_id,
+                            });
+                            if (!link) return null;
+                            return (
+                              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                                <Button asChild size="sm" variant="outline" className="w-full sm:w-auto min-h-[2.25rem] justify-center">
+                                  <Link
+                                    to={link.to}
+                                    data-testid={link.testId}
+                                    aria-label={ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL}
+                                  >
+                                    {link.label}
+                                  </Link>
+                                </Button>
+                                <p className="text-[11px] text-muted-foreground">
+                                  {link.helper}
+                                </p>
+                              </div>
+                            );
+                          })()}
+                        </div>
                       )}
-                      {!ev.hasSnapshotQuality && (() => {
-                        const link = buildMissingEvidenceReviewLink({
-                          grow_id: row.grow_id,
-                          tent_id: row.tent_id,
-                          plant_id: row.plant_id,
-                        });
-                        if (!link) return null;
-                        return (
-                          <div className="mt-2">
-                            <Button asChild size="sm" variant="outline">
-                              <Link
-                                to={link.to}
-                                data-testid={link.testId}
-                                aria-label={ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL}
-                              >
-                                {link.label}
-                              </Link>
-                            </Button>
-                            <p className="mt-1 text-[11px] text-muted-foreground">
-                              {link.helper}
-                            </p>
-                          </div>
-                        );
-                      })()}
                     </>
                   );
                 })()}

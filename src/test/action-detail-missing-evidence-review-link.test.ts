@@ -204,7 +204,7 @@ describe("ActionDetail missing-evidence guidance wiring", () => {
 
   it("renders the helper as an outline Link, not an approval Button", () => {
     expect(ACTION_DETAIL_SRC).toMatch(
-      /variant="outline"[\s\S]{0,200}buildMissingEvidenceReviewLink|buildMissingEvidenceReviewLink[\s\S]{0,400}variant="outline"/,
+      /variant="outline"[\s\S]{0,200}buildMissingEvidenceReviewLink|buildMissingEvidenceReviewLink[\s\S]{0,800}variant="outline"/,
     );
   });
 
@@ -257,6 +257,34 @@ describe("ActionDetail missing-evidence guidance wiring", () => {
     expect(ACTION_DETAIL_SRC).toContain("ACTION_EVIDENCE_MISSING_PANEL_HELP");
   });
 
+  it("groups missing-evidence chip, help, and link in a responsive vertical stack", () => {
+    expect(ACTION_DETAIL_SRC).toContain('data-testid="action-detail-missing-evidence-group"');
+    expect(ACTION_DETAIL_SRC).toMatch(/flex flex-col gap-2[\s\S]{0,400}action-detail-missing-evidence-group/);
+  });
+
+  it("stacks review link and helper text on mobile and keeps them inline on desktop", () => {
+    expect(ACTION_DETAIL_SRC).toMatch(
+      /flex-col gap-1\.5 sm:flex-row sm:items-center sm:gap-2/,
+    );
+  });
+
+  it("review link uses a thumb-friendly minimum touch target on mobile", () => {
+    expect(ACTION_DETAIL_SRC).toContain("min-h-[2.25rem]");
+  });
+
+  it("review link spans full width on mobile and auto on desktop", () => {
+    expect(ACTION_DETAIL_SRC).toContain("w-full sm:w-auto");
+  });
+
+  it("review link stays inside missing-evidence context, separated from approval controls", () => {
+    expect(ACTION_DETAIL_SRC).toContain('data-testid="action-detail-missing-evidence-group"');
+    expect(ACTION_DETAIL_SRC).toContain("data-testid={link.testId}");
+    const approveIndex = ACTION_DETAIL_SRC.indexOf("gradient-leaf");
+    const missingGroupIndex = ACTION_DETAIL_SRC.indexOf("action-detail-missing-evidence-group");
+    expect(missingGroupIndex).toBeGreaterThan(-1);
+    expect(approveIndex).toBeGreaterThan(missingGroupIndex);
+  });
+
   it("helper module does not introduce unsafe patterns", () => {
     const unsafe: RegExp[] = [
       /supabase/i,
@@ -274,5 +302,25 @@ describe("ActionDetail missing-evidence guidance wiring", () => {
     for (const re of unsafe) {
       expect(HELPER_SRC).not.toMatch(re);
     }
+  });
+
+  it("ActionDetail source does not expose raw IDs, tokens, or automation language", () => {
+    const unsafe: RegExp[] = [
+      /raw_payload/i,
+      /service_role/i,
+      /Bearer\s+ey/i,
+      /actuator/i,
+      /auto[- ]?run/i,
+      /turn (on|off)/i,
+      /relay/i,
+    ];
+    for (const re of unsafe) {
+      expect(ACTION_DETAIL_SRC).not.toMatch(re);
+    }
+  });
+
+  it("approval and rejection controls are unchanged", () => {
+    expect(ACTION_DETAIL_SRC).toMatch(/<Button[\s\S]*?gradient-leaf[\s\S]*?Approve/);
+    expect(ACTION_DETAIL_SRC).toMatch(/<Button[\s\S]*?Reject/);
   });
 });

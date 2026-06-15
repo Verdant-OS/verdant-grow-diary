@@ -547,6 +547,18 @@ export default function ActionQueue() {
         <h1 className="text-2xl font-display font-bold flex items-center gap-2">
           <ListChecks className="h-5 w-5 text-primary" />
           Action Queue
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={load}
+            disabled={loading || isRefreshing}
+            aria-label="Refresh Action Queue"
+            data-testid="action-queue-refresh-button"
+            className="ml-auto"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} aria-hidden="true" />
+            <span>Refresh</span>
+          </Button>
         </h1>
         <p className="text-sm text-muted-foreground">
           Suggestions are <span className="text-foreground">approval-gated</span>.

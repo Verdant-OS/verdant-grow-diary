@@ -779,7 +779,7 @@ export default function ActionDetail() {
                               <Link
                                 to={link.to}
                                 data-testid={link.testId}
-                                aria-label={link.label}
+                                aria-label={ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL}
                               >
                                 {link.label}
                               </Link>

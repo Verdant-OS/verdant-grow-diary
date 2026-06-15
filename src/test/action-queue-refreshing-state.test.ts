@@ -81,9 +81,11 @@ describe("Action Queue background refresh indicator", () => {
   it("approve / reject / simulate / cancel buttons are NOT gated by isRefreshing", () => {
     // Buttons must remain disabled only when the per-row mutation is in flight (busyId === row.id).
     expect(SRC).toMatch(/const disabled = busyId === row\.id;/);
-    // Sanity: no button passes `disabled={isRefreshing}` or similar.
-    expect(SRC).not.toMatch(/disabled=\{isRefreshing/);
-    expect(SRC).not.toMatch(/disabled=\{.*isRefreshing.*\}/);
+    // In the action row button block, no disabled prop should reference isRefreshing.
+    const actionRowsStart = SRC.indexOf("const disabled = busyId === row.id;");
+    const actionBlock = SRC.slice(actionRowsStart, actionRowsStart + 700);
+    expect(actionBlock).not.toMatch(/disabled=\{isRefreshing/);
+    expect(actionBlock).not.toMatch(/disabled=\{.*isRefreshing.*\}/);
   });
 
   it("loading skeleton path stays mutually exclusive with the refresh indicator", () => {

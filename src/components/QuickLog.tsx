@@ -1173,6 +1173,27 @@ export default function QuickLog({
                     {ENVIRONMENT_CHECK_HELPER_COPY}
                   </p>
                 )}
+                {sensorContext.status !== "not_applicable" && (
+                  <div
+                    data-testid="quick-log-env-sensor-context"
+                    data-status={sensorContext.status}
+                    data-reason={sensorContext.reasonCode}
+                    className={`rounded-lg border p-2.5 space-y-0.5 ${ctxTone}`}
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground">
+                      {sensorContext.title}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {sensorContext.message}
+                    </p>
+                    <p
+                      data-testid="quick-log-env-sensor-context-source"
+                      className="text-[11px] text-muted-foreground"
+                    >
+                      Source: {sensorContext.sourceLabel}
+                    </p>
+                  </div>
+                )}
                 {ecPreview.visible && (
                   <div
                     data-testid="quick-log-env-ec-preview"

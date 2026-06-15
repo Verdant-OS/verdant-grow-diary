@@ -30,8 +30,10 @@ const TONE_CLASS: Record<SensorNormalizationPreviewBadgeTone, string> = {
 export function SensorNormalizationPreviewPanel({
   viewModel,
   title = "Normalization preview",
+  variant = "default",
 }: SensorNormalizationPreviewPanelProps): JSX.Element {
   const vm = viewModel;
+  const compact = variant === "compact";
   return (
     <section
       data-testid="sensor-normalization-preview-panel"

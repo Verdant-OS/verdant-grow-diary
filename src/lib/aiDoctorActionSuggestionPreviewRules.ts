@@ -97,7 +97,7 @@ const DEVICE_COMMAND_PATTERNS: readonly RegExp[] = Object.freeze([
 
 const SAFETY_NOTES: readonly string[] = Object.freeze([
   "Approval required — grower must approve any action before it runs.",
-  "No device control — Verdant will not execute equipment commands.",
+  "No device control — Verdant will not run equipment commands.",
   "Preview only — no Action Queue item is created.",
 ]);
 

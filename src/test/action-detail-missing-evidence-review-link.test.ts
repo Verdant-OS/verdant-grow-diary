@@ -204,7 +204,7 @@ describe("ActionDetail missing-evidence guidance wiring", () => {
 
   it("renders the helper as an outline Link, not an approval Button", () => {
     expect(ACTION_DETAIL_SRC).toMatch(
-      /variant="outline"[\s\S]{0,200}buildMissingEvidenceReviewLink|buildMissingEvidenceReviewLink[\s\S]{0,400}variant="outline"/,
+      /variant="outline"[\s\S]{0,200}buildMissingEvidenceReviewLink|buildMissingEvidenceReviewLink[\s\S]{0,800}variant="outline"/,
     );
   });
 

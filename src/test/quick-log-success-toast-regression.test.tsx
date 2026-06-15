@@ -119,8 +119,11 @@ interface SupportedVariant {
 }
 
 const SUPPORTED_VARIANTS: SupportedVariant[] = [
+  // "note" is an internal alias for the same RPC action as "observation",
+  // but the EventTypeSelector does not expose a "note" option — growers
+  // pick "observation" in the UI. We exercise "observation" + "watering"
+  // here; the legacy unified save tests cover the "note" RPC mapping.
   { eventType: "observation", verb: "observation", requiresNote: true, requiresWateringVolume: false },
-  { eventType: "note",        verb: "log",         requiresNote: true, requiresWateringVolume: false },
   { eventType: "watering",    verb: "watering",    requiresNote: false, requiresWateringVolume: true },
 ];
 

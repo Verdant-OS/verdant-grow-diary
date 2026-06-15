@@ -206,9 +206,11 @@ export function evaluateManualSensorSnapshotQuality(
     }
   }
 
-  // Stale check
+  // Stale check — only applies to "current" mode. Historical/timeline
+  // surfaces must not mislead growers by marking captured-moment readings
+  // as stale just because time has passed.
   let isStaleByTime = false;
-  if (capturedMs != null) {
+  if (mode === "current" && capturedMs != null) {
     const ageMs = nowMs - capturedMs;
     const staleMs = staleHours * 60 * 60 * 1000;
     if (ageMs > staleMs) {
@@ -228,37 +230,47 @@ export function evaluateManualSensorSnapshotQuality(
   let quality: ManualSnapshotQuality;
   let summary: string;
 
+  const isHistorical = mode === "historical";
+
   if (sourceLabel === "invalid" || invalidFields.length > 0) {
     quality = "invalid";
-    summary = "Invalid reading";
+    summary = isHistorical ? "Historical invalid reading" : "Invalid reading";
   } else if (capturedMs == null) {
     quality = "missing";
-    summary = "Missing current reading";
+    summary = isHistorical
+      ? "Missing captured timestamp"
+      : "Missing current reading";
   } else if (sourceLabel === "unknown") {
     quality = "needs_review";
-    summary = "Needs review";
+    summary = isHistorical ? "Historical reading needs review" : "Needs review";
     reasons.unshift("Sensor source unknown.");
   } else if (sourceLabel === "csv") {
     quality = "needs_review";
-    summary = "Needs review";
+    summary = isHistorical ? "Historical reading needs review" : "Needs review";
     reasons.unshift("CSV history only — not a current-room reading.");
   } else if (sourceLabel === "demo") {
     quality = "needs_review";
-    summary = "Needs review";
+    summary = isHistorical ? "Historical reading needs review" : "Needs review";
     reasons.unshift("Demo data — not a current-room reading.");
   } else if (sourceLabel === "stale" || isStaleByTime) {
     quality = "needs_review";
-    summary = "Needs review";
+    summary = isHistorical ? "Historical reading needs review" : "Needs review";
     if (sourceLabel === "stale") {
       reasons.unshift("Snapshot labeled stale.");
     }
   } else {
     quality = "usable";
-    summary = "Usable current reading";
+    summary = isHistorical ? "Historical usable reading" : "Usable current reading";
+  }
+
+  if (isHistorical) {
+    // Historical-mode surfaces must never claim current-room support, even
+    // when the captured values themselves look fine.
+    reasons.push("Not current-room guidance.");
   }
 
   const canSupportAiDoctorCurrentContext =
-    quality === "usable" && !sourceBlocksCurrent;
+    !isHistorical && quality === "usable" && !sourceBlocksCurrent;
   const canSupportActionSuggestionPreview = canSupportAiDoctorCurrentContext;
 
   return {

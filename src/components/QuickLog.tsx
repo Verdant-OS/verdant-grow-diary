@@ -1213,6 +1213,35 @@ export default function QuickLog({
                     </p>
                   </div>
                 )}
+                {hasMeasurement && (() => {
+                  const normPreviewVm = buildSensorNormalizationPreviewViewModel({
+                    payload: {
+                      temperature_f: envRoomTempF || undefined,
+                      humidity_pct: envHumidityPct || undefined,
+                      vpd_kpa: envVpdKpa || undefined,
+                      soil_ec_ms_cm: envEcMscm || undefined,
+                      [envWaterTempUnit === "C" ? "soil_temperature_c" : "soil_temperature_f"]:
+                        envWaterTempValue || undefined,
+                    },
+                    options: {
+                      source: "manual",
+                      sourceIdentity: "manual_entry",
+                      transport: "manual",
+                      tentId: sensorTentId,
+                      plantId: selectedPlant?.id ?? null,
+                      capturedAt: new Date().toISOString(),
+                    },
+                  });
+                  return (
+                    <div data-testid="quick-log-env-normalization-preview-slot">
+                      <SensorNormalizationPreviewPanel
+                        viewModel={normPreviewVm}
+                        variant="compact"
+                        title="Sensor normalization preview"
+                      />
+                    </div>
+                  );
+                })()}
               </section>
             );
           })()}

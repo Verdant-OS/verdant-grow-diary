@@ -61,6 +61,8 @@ export const DIARY_CALENDAR_FILTERS: ReadonlyArray<{
   { value: "watering", label: "Watering" },
   { value: "feeding", label: "Feeding" },
   { value: "diagnosis", label: "Diagnosis" },
+];
+
 /**
  * Compute per-filter event counts from the full unfiltered dataset.
  * Counts reflect the complete calendar dataset before any active filter

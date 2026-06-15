@@ -442,7 +442,9 @@ export function compilePlantContextFromRows(
     imported_sensor_history,
     hasLiveSensorReadings,
     missingLiveSensorReadings: !hasLiveSensorReadings,
+    early_stage_memory,
   };
+
 }
 
 function bucketAverages(rows: readonly RecentSensorReading[]): SensorRollingAverages {

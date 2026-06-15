@@ -64,6 +64,17 @@ export interface SensorNormalizationPreviewWarning {
   label: string;
 }
 
+export type SensorNormalizationPreviewTentStatus =
+  | "linked_verified"
+  | "missing"
+  | "invalid";
+
+export type SensorNormalizationPreviewPlantStatus =
+  | "linked"
+  | "missing"
+  | "invalid"
+  | "not_applicable";
+
 export interface SensorNormalizationPreviewViewModel {
   writesEnabled: false;
   disclaimer: string;
@@ -73,8 +84,14 @@ export interface SensorNormalizationPreviewViewModel {
   transport: SensorTransport;
   confidence: number;
   isStale: boolean;
+  /** Back-compat coarse status (present/missing). */
   tentIdStatus: "present" | "missing";
+  /** Detailed status incl. invalid UUID. */
+  tentStatus: SensorNormalizationPreviewTentStatus;
+  tentStatusLabel: string;
   plantIdStatus: "present" | "missing" | "not_applicable";
+  plantStatus: SensorNormalizationPreviewPlantStatus;
+  plantStatusLabel: string;
   capturedAtDisplay: string;
   capturedAtPresent: boolean;
   badges: SensorNormalizationPreviewBadge[];
@@ -98,8 +115,11 @@ export const SENSOR_NORMALIZATION_PREVIEW_EMPTY_STATE =
 export const SENSOR_NORMALIZATION_PREVIEW_INVALID_NOTICE =
   "Invalid preview — no long-form rows will be generated." as const;
 
+export const SENSOR_NORMALIZATION_PREVIEW_TENT_MISSING_EMPTY_STATE =
+  "No write-ready metric rows were generated because a valid tent context is missing." as const;
+
 export const SENSOR_NORMALIZATION_PREVIEW_RAW_NOTE =
-  "Raw payload preserved for future ingest/debug context." as const;
+  "Raw payload preserved for future ingest/debug context. Full raw payload is not shown in preview mode." as const;
 
 const WARNING_LABELS: Record<string, string> = {
   missing_tent_id: "Missing tent ID",

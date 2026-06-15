@@ -67,10 +67,11 @@ export default function DiaryCalendarSection({
   );
 
   // Reset open day when the filter removes it, so stale details never render.
-  const openDayStillVisible = visibleGroups.some((g) => g.dateKey === openDay);
-  const effectiveOpenDay = openDayStillVisible
-    ? openDay
-    : (visibleGroups[0]?.dateKey ?? null);
+  // Preserve explicit collapse (openDay === null); only redirect when the
+  // currently-open day was filtered out, so stale details never render.
+  const openDayStillVisible =
+    openDay !== null && visibleGroups.some((g) => g.dateKey === openDay);
+  const effectiveOpenDay = openDay === null || openDayStillVisible ? openDay : null;
 
   const hasAnyEntries = allGroups.length > 0;
 

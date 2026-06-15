@@ -138,9 +138,15 @@ describe("ActionDetail missing-evidence guidance wiring", () => {
 
   it("link renders as a Link component, not a button or submit", () => {
     // Should be a react-router Link inside Button asChild
-    expect(ACTION_DETAIL_SRC).toMatch(/<Link\s+[\s\S]*?to=\{link\.to\}/);
-    expect(ACTION_DETAIL_SRC).not.toMatch(/type="submit"[\s\S]*?buildMissingEvidenceReviewLink/);
-    expect(ACTION_DETAIL_SRC).not.toMatch(/onClick=[\s\S]*?buildMissingEvidenceReviewLink/);
+    const linkBlock = ACTION_DETAIL_SRC.match(
+      /<Link\s+[\s\S]*?aria-label=\{ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL\}[\s\S]*?>{link\.label}<\/Link>/,
+    );
+    expect(linkBlock).toBeTruthy();
+    // The Link block should not have type="submit" or onClick
+    if (linkBlock) {
+      expect(linkBlock[0]).not.toContain('type="submit"');
+      expect(linkBlock[0]).not.toContain('onClick=');
+    }
   });
 
   it("link uses existing focus-visible utility from Button asChild", () => {

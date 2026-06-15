@@ -228,7 +228,7 @@ describe("diary timeline filtered-empty state — all filter combos", () => {
     }
   });
 
-  it("true empty state still renders the friendly Fast Add hint", () => {
+  it("true empty state still renders the friendly Quick Log hint", () => {
     const s = selectDiaryTimelineEmptyState({
       hasAnyEntries: false,
       filtersActive: false,

@@ -247,3 +247,29 @@ files. The recommended next slice (snapshot-quality chip on the queue
 row + detail origin panel) is presenter-only and reuses existing safe
 helpers; it does not introduce any write, RPC, or device-control
 surface.
+
+---
+
+## 9. Addendum — corroborating subagent line cites
+
+Independent presenter sweep confirmed the findings above and surfaced
+five low-severity cosmetic gaps. None affect safety boundaries; all are
+presenter-only and out of scope for the recommended next slice unless
+bundled as micro-polish.
+
+| Area | File:Line | Gap | Presenter-only fix |
+|---|---|---|---|
+| Alert source label | `src/pages/AlertDetail.tsx:511` | Raw `{alert.source}` (e.g. `environment_alert`) rendered without humanizer | Wrap with `formatAlertSourceLabel(alert.source)` (already used in `Alerts.tsx`) |
+| Related-action fallback | `src/pages/AlertDetail.tsx:798` | `?? a.id` exposes raw UUID when both `suggested_change` and `action_type` are null | Replace with `?? "Unknown action"` |
+| Reviewed-section status badge | `src/pages/ActionQueue.tsx:901` | `{row.status}` raw (e.g. `pending_approval`) | Wrap with `formatStatusLabel(row.status)` (already imported via `buildActionRowAriaLabel`) |
+| Pending row title | `src/pages/ActionQueue.tsx:766` | `{row.action_type}` raw, no humanizer | Wrap with `formatActionTypeLabel(row.action_type)` |
+| `target_device` copy | `src/pages/ActionQueue.tsx:802, 362` | Field rendered as grower-visible fallback / toast text — could surface hardware identifier | Conditionally omit or relabel; render only when `target_metric` is null AND value is grower-meaningful |
+
+Additional positive confirmation (no change required):
+- `usePersistEnvironmentAlerts` writes only to `alerts` / `alert_events`; the only `action_queue` INSERT in the alert path is the grower-initiated button in `AlertDetail.tsx:351–414`, double-guarded by `shouldBlockInsert` + `queuing` lock.
+- `DIALOG_META` in `ActionQueue.tsx:386–416` carries five distinct "No equipment command is sent." disclaimers across approve/simulate/reject/complete/cancel.
+- `target_device` is read but no execution surface dispatches on it anywhere in the codebase.
+- `raw_payload` is never fetched for `alerts` or `action_queue`; `IngestInspector.tsx` is the only render site and it pipes through `redactRawPayload()`.
+- No `service_role` / private API key references in any source file on the alert/action path.
+
+These addendum items can be bundled into the recommended snapshot-quality-chip slice as cheap micro-polish, or shipped as a separate one-PR copy-hygiene pass. They do not change the safety verdict.

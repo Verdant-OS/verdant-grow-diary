@@ -45,6 +45,57 @@ export const DIARY_CALENDAR_EMPTY_TITLE =
 export const DIARY_CALENDAR_EMPTY_HINT =
   "Use Quick Log to add your next plant event.";
 
+export type DiaryCalendarFilter = "all" | DiaryCalendarEventKind;
+
+export const DIARY_CALENDAR_FILTERS: ReadonlyArray<{
+  value: DiaryCalendarFilter;
+  label: string;
+}> = [
+  { value: "all", label: "All" },
+  { value: "watering", label: "Watering" },
+  { value: "feeding", label: "Feeding" },
+  { value: "diagnosis", label: "Diagnosis" },
+];
+
+/**
+ * Filter pre-built calendar day groups by event kind. Returns a new array
+ * containing only days that still have at least one matching event, with
+ * per-day counts recomputed against the filter. Pure & deterministic.
+ */
+export function filterDiaryCalendarGroups(
+  groups: readonly DiaryCalendarDayGroup[],
+  filter: DiaryCalendarFilter,
+): DiaryCalendarDayGroup[] {
+  if (filter === "all") return groups.map((g) => ({ ...g, events: [...g.events] }));
+  const out: DiaryCalendarDayGroup[] = [];
+  for (const g of groups) {
+    const events = g.events.filter((e) => e.kind === filter);
+    if (events.length === 0) continue;
+    const counts: Record<DiaryCalendarEventKind, number> = {
+      watering: 0,
+      feeding: 0,
+      diagnosis: 0,
+    };
+    events.forEach((e) => {
+      counts[e.kind] += 1;
+    });
+    out.push({ dateKey: g.dateKey, events, counts });
+  }
+  return out;
+}
+
+const FILTER_EMPTY_COPY: Record<DiaryCalendarEventKind, string> = {
+  watering: "No watering events logged for this period.",
+  feeding: "No feeding events logged for this period.",
+  diagnosis: "No diagnosis events logged for this period.",
+};
+
+/** Filter-aware empty title. "all" preserves the original copy. */
+export function diaryCalendarEmptyTitleFor(filter: DiaryCalendarFilter): string {
+  if (filter === "all") return DIARY_CALENDAR_EMPTY_TITLE;
+  return FILTER_EMPTY_COPY[filter];
+}
+
 export interface DiaryCalendarRawEntry {
   id: string;
   entry_at?: string | null;

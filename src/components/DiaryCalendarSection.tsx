@@ -3,10 +3,13 @@ import { Droplets, Utensils, Stethoscope, CalendarDays, ChevronDown, ChevronRigh
 import {
   buildDiaryCalendarViewModel,
   summarizeDiaryCalendar,
-  DIARY_CALENDAR_EMPTY_TITLE,
+  filterDiaryCalendarGroups,
+  diaryCalendarEmptyTitleFor,
   DIARY_CALENDAR_EMPTY_HINT,
+  DIARY_CALENDAR_FILTERS,
   type DiaryCalendarRawEntry,
   type DiaryCalendarEventKind,
+  type DiaryCalendarFilter,
 } from "@/lib/diaryCalendarViewModel";
 import { cn } from "@/lib/utils";
 
@@ -45,12 +48,42 @@ export default function DiaryCalendarSection({
   rawEntries,
   dayLimit = 12,
 }: DiaryCalendarSectionProps) {
-  const groups = useMemo(() => buildDiaryCalendarViewModel(rawEntries ?? []), [rawEntries]);
-  const visibleGroups = useMemo(() => groups.slice(0, Math.max(1, dayLimit)), [groups, dayLimit]);
+  const allGroups = useMemo(
+    () => buildDiaryCalendarViewModel(rawEntries ?? []),
+    [rawEntries],
+  );
+  const [filter, setFilterState] = useState<DiaryCalendarFilter>("all");
+  const groups = useMemo(
+    () => filterDiaryCalendarGroups(allGroups, filter),
+    [allGroups, filter],
+  );
+  const visibleGroups = useMemo(
+    () => groups.slice(0, Math.max(1, dayLimit)),
+    [groups, dayLimit],
+  );
   const summary = useMemo(() => summarizeDiaryCalendar(groups), [groups]);
   const [openDay, setOpenDay] = useState<string | null>(
     visibleGroups[0]?.dateKey ?? null,
   );
+
+  // Switching filter: jump to the newest day under the new filter so events
+  // remain visible immediately. Explicit user collapse (openDay=null) is
+  // preserved within a filter.
+  const setFilter = (next: DiaryCalendarFilter) => {
+    if (next === filter) return;
+    setFilterState(next);
+    const nextGroups = filterDiaryCalendarGroups(allGroups, next);
+    setOpenDay(nextGroups[0]?.dateKey ?? null);
+  };
+
+  // Belt-and-braces: never render stale details if the open day was removed
+  // (e.g. raw entries changed asynchronously).
+  const openDayStillVisible =
+    openDay !== null && visibleGroups.some((g) => g.dateKey === openDay);
+  const effectiveOpenDay =
+    openDay === null || openDayStillVisible ? openDay : null;
+
+  const hasAnyEntries = allGroups.length > 0;
 
   return (
     <section
@@ -68,12 +101,42 @@ export default function DiaryCalendarSection({
         </span>
       </header>
 
+      {hasAnyEntries && (
+        <div
+          role="group"
+          aria-label="Filter calendar by event type"
+          className="mb-3 flex flex-wrap gap-1.5"
+          data-testid="diary-calendar-filters"
+        >
+          {DIARY_CALENDAR_FILTERS.map((f) => {
+            const active = filter === f.value;
+            return (
+              <button
+                key={f.value}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setFilter(f.value)}
+                data-testid={`diary-calendar-filter-${f.value}`}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition",
+                  active
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-secondary/50 text-foreground border-border/50 hover:bg-secondary",
+                )}
+              >
+                {f.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {groups.length === 0 ? (
         <div
           className="py-8 text-center text-sm text-muted-foreground"
           data-testid="diary-calendar-empty"
         >
-          <p>{DIARY_CALENDAR_EMPTY_TITLE}</p>
+          <p>{diaryCalendarEmptyTitleFor(filter)}</p>
           <p className="text-xs mt-1">{DIARY_CALENDAR_EMPTY_HINT}</p>
         </div>
       ) : (
@@ -87,9 +150,10 @@ export default function DiaryCalendarSection({
             </span>
           </div>
 
+
           <ul className="space-y-2" role="list">
             {visibleGroups.map((group) => {
-              const isOpen = openDay === group.dateKey;
+              const isOpen = effectiveOpenDay === group.dateKey;
               const headingId = `diary-calendar-day-${group.dateKey}`;
               return (
                 <li

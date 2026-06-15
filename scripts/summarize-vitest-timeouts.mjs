@@ -30,9 +30,14 @@ export function parseVitestLog(text) {
     if (!m) continue;
     const file = m[1];
     const name = (m[2] || "").trim();
-    // Look ahead a small window for a timeout error message
-    const window = lines.slice(i + 1, i + 25).join("\n");
-    const isTimeout = TIMEOUT_RE.test(window) || TIMEOUT_RE.test(lines[i]);
+    // Scan ahead until the next FAIL line (or end), so timeouts don't bleed across blocks.
+    const windowLines = [];
+    for (let j = i + 1; j < lines.length && j < i + 50; j++) {
+      if (FAIL_LINE_RE.test(lines[j])) break;
+      windowLines.push(lines[j]);
+    }
+    const windowText = windowLines.join("\n");
+    const isTimeout = TIMEOUT_RE.test(windowText) || TIMEOUT_RE.test(lines[i]);
     failures.push({
       file,
       name,

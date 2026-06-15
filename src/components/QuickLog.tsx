@@ -81,6 +81,8 @@ import {
   EC_COMPENSATION_PREVIEW_DISCLAIMER,
 } from "@/lib/ecCompensationPreviewViewModel";
 import { buildEnvironmentCheckSensorContext } from "@/lib/environmentCheckSensorContextRules";
+import { buildSensorNormalizationPreviewViewModel } from "@/lib/sensors/sensorNormalizationPreviewViewModel";
+import { SensorNormalizationPreviewPanel } from "@/components/SensorNormalizationPreviewPanel";
 
 export interface QuickLogPrefill {
   plantId?: string | null;

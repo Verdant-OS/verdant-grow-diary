@@ -68,6 +68,18 @@ import {
   type EarlyStageMilestone,
   type EarlyStageVigor,
 } from "@/lib/earlyStageQuickLogRules";
+import {
+  ENVIRONMENT_CHECK_HELPER_COPY,
+  ENVIRONMENT_CHECK_SECTION_TITLE,
+  buildEnvironmentCheckDetails,
+  hasAnyEnvironmentCheckMeasurement,
+  resolvePreviewWaterTempC,
+  type EnvironmentCheckWaterTempUnit,
+} from "@/lib/environmentCheckQuickLogRules";
+import {
+  buildEcCompensationPreview,
+  EC_COMPENSATION_PREVIEW_DISCLAIMER,
+} from "@/lib/ecCompensationPreviewViewModel";
 
 export interface QuickLogPrefill {
   plantId?: string | null;

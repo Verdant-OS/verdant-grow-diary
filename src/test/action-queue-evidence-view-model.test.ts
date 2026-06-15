@@ -176,4 +176,51 @@ describe("buildActionEvidenceViewModel", () => {
     const b = buildActionEvidenceViewModel(input, { nowMs: NOW });
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
   });
+
+  it("returns available status when sanitized historical snapshot quality exists", () => {
+    const snapshot = {
+      source: "manual",
+      captured_at: "2026-06-14T11:30:00.000Z",
+      temperature_c: 24,
+      humidity_pct: 55,
+      vpd_kpa: 1.1,
+    } as const;
+    const vm = buildActionEvidenceViewModel(
+      { source: "environment_alert", alert_type: "high_vpd", snapshot },
+      { nowMs: NOW },
+    );
+    expect(vm.rowEvidenceStatus).toBe("available");
+    expect(vm.rowEvidenceStatusLabel).toBe("Evidence available");
+    expect(vm.rowEvidenceStatusHelp).toMatch(/available for review/);
+    expect(vm.rowEvidenceStatusTone).toBe("ok");
+  });
+
+  it("returns quality_unavailable status when origin exists but no sanitized snapshot metrics", () => {
+    const vm = buildActionEvidenceViewModel({
+      source: "ai_doctor",
+      action_type: "review_canopy_stress",
+      captured_at: "2026-06-14T22:00:00.000Z",
+    });
+    expect(vm.rowEvidenceStatus).toBe("quality_unavailable");
+    expect(vm.rowEvidenceStatusLabel).toBe("Evidence quality unavailable");
+    expect(vm.rowEvidenceStatusHelp).toMatch(/does not include sanitized snapshot metrics/);
+    expect(vm.rowEvidenceStatusTone).toBe("neutral");
+  });
+
+  it("returns missing status when no origin/evidence relationship is present", () => {
+    const vm = buildActionEvidenceViewModel({});
+    expect(vm.rowEvidenceStatus).toBe("missing");
+    expect(vm.rowEvidenceStatusLabel).toBe("Evidence missing");
+    expect(vm.rowEvidenceStatusHelp).toMatch(/diary timeline|sensor history|before approving/i);
+    expect(vm.rowEvidenceStatusTone).toBe("caution");
+  });
+
+  it("returns missing status for null/undefined input", () => {
+    const a = buildActionEvidenceViewModel(null);
+    const b = buildActionEvidenceViewModel(undefined);
+    expect(a.rowEvidenceStatus).toBe("missing");
+    expect(b.rowEvidenceStatus).toBe("missing");
+    expect(a.rowEvidenceStatusTone).toBe("caution");
+    expect(b.rowEvidenceStatusTone).toBe("caution");
+  });
 });

@@ -680,6 +680,30 @@ export default function ActionDetail() {
                           {ACTION_EVIDENCE_MISSING_PANEL_HELP}
                         </p>
                       )}
+                      {!ev.hasSnapshotQuality && (() => {
+                        const link = buildMissingEvidenceReviewLink({
+                          grow_id: row.grow_id,
+                          tent_id: row.tent_id,
+                          plant_id: row.plant_id,
+                        });
+                        if (!link) return null;
+                        return (
+                          <div className="mt-2">
+                            <Button asChild size="sm" variant="outline">
+                              <Link
+                                to={link.to}
+                                data-testid={link.testId}
+                                aria-label={link.label}
+                              >
+                                {link.label}
+                              </Link>
+                            </Button>
+                            <p className="mt-1 text-[11px] text-muted-foreground">
+                              {link.helper}
+                            </p>
+                          </div>
+                        );
+                      })()}
                     </>
                   );
                 })()}

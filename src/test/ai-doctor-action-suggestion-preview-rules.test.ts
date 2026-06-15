@@ -224,3 +224,158 @@ describe("aiDoctorActionSuggestionPreviewRules", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Snapshot-quality-driven derivation
+// ---------------------------------------------------------------------------
+
+import type { ManualSensorSnapshotQuality } from "@/lib/manualSensorSnapshotQualityRules";
+
+function makeQuality(
+  q: Partial<ManualSensorSnapshotQuality> &
+    Pick<ManualSensorSnapshotQuality, "quality">,
+): ManualSensorSnapshotQuality {
+  const usable = q.quality === "usable";
+  return {
+    quality: q.quality,
+    sourceLabel: q.sourceLabel ?? "manual",
+    summary: q.summary ?? "test",
+    reasons: q.reasons ?? [],
+    invalidFields: q.invalidFields ?? [],
+    missingFields: q.missingFields ?? [],
+    canSupportAiDoctorCurrentContext:
+      q.canSupportAiDoctorCurrentContext ?? usable,
+    canSupportActionSuggestionPreview:
+      q.canSupportActionSuggestionPreview ?? usable,
+  };
+}
+
+const readinessWithPlant = {
+  plantIdentity: { plantId: "p1", stage: "veg", tentId: "t1" },
+  sourceBadges: [] as ReadonlyArray<{
+    source: string;
+    sampleCount: number;
+    isTrustworthy: boolean;
+  }>,
+  limitations: [] as ReadonlyArray<{ code: string }>,
+};
+
+describe("aiDoctorActionSuggestionPreviewRules — snapshot quality integration", () => {
+  it("eligible when manual quality usable + plant/tent/stage present", () => {
+    const input = deriveActionSuggestionPreviewInput(readinessWithPlant, {
+      snapshotQuality: makeQuality({ quality: "usable", sourceLabel: "manual" }),
+    });
+    const out = previewActionSuggestion(input);
+    expect(out.status).toBe("eligible");
+    expect(out.eligible).toBe(true);
+  });
+
+  it("eligible when live quality usable + plant/tent/stage present", () => {
+    const input = deriveActionSuggestionPreviewInput(readinessWithPlant, {
+      snapshotQuality: makeQuality({ quality: "usable", sourceLabel: "live" }),
+    });
+    expect(previewActionSuggestion(input).status).toBe("eligible");
+  });
+
+  it("needs_current_reading when CSV history-only quality is provided", () => {
+    const input = deriveActionSuggestionPreviewInput(
+      {
+        ...readinessWithPlant,
+        sourceBadges: [
+          { source: "csv", sampleCount: 10, isTrustworthy: false },
+        ],
+      },
+      {
+        snapshotQuality: makeQuality({
+          quality: "needs_review",
+          sourceLabel: "csv",
+        }),
+      },
+    );
+    const out = previewActionSuggestion(input);
+    expect(out.status).toBe("needs_current_reading");
+    expect(out.missingFields).toContain("current_sensor_snapshot");
+  });
+
+  it("needs_current_reading for demo/stale/unknown quality", () => {
+    for (const sourceLabel of ["demo", "stale", "unknown"] as const) {
+      const out = previewActionSuggestion(
+        deriveActionSuggestionPreviewInput(readinessWithPlant, {
+          snapshotQuality: makeQuality({
+            quality: "needs_review",
+            sourceLabel,
+          }),
+        }),
+      );
+      expect(out.status, sourceLabel).toBe("needs_current_reading");
+      expect(out.eligible).toBe(false);
+    }
+  });
+
+  it("blocked_invalid_data with soil_ec when quality flags soil_ec_mscm", () => {
+    const input = deriveActionSuggestionPreviewInput(readinessWithPlant, {
+      snapshotQuality: makeQuality({
+        quality: "invalid",
+        sourceLabel: "manual",
+        invalidFields: ["soil_ec_mscm"],
+      }),
+    });
+    const out = previewActionSuggestion(input);
+    expect(out.status).toBe("blocked_invalid_data");
+    expect(out.invalidFields).toEqual(["soil_ec"]);
+  });
+
+  it("needs_current_reading when snapshot quality is missing", () => {
+    const out = previewActionSuggestion(
+      deriveActionSuggestionPreviewInput(readinessWithPlant, {
+        snapshotQuality: makeQuality({
+          quality: "missing",
+          sourceLabel: "unknown",
+        }),
+      }),
+    );
+    expect(out.status).toBe("needs_current_reading");
+  });
+
+  it("missing_context when stage is absent even with usable manual snapshot", () => {
+    const out = previewActionSuggestion(
+      deriveActionSuggestionPreviewInput(
+        {
+          ...readinessWithPlant,
+          plantIdentity: { plantId: "p1", stage: null, tentId: "t1" },
+        },
+        {
+          snapshotQuality: makeQuality({
+            quality: "usable",
+            sourceLabel: "manual",
+          }),
+        },
+      ),
+    );
+    expect(out.status).toBe("missing_context");
+    expect(out.missingFields).toContain("stage");
+  });
+
+  it("badge eligibility flags and preview eligibility agree", () => {
+    const usable = makeQuality({ quality: "usable", sourceLabel: "manual" });
+    const previewEligible = previewActionSuggestion(
+      deriveActionSuggestionPreviewInput(readinessWithPlant, {
+        snapshotQuality: usable,
+      }),
+    ).eligible;
+    expect(previewEligible).toBe(usable.canSupportActionSuggestionPreview);
+
+    const invalid = makeQuality({
+      quality: "invalid",
+      sourceLabel: "manual",
+      invalidFields: ["humidity_pct"],
+    });
+    const previewEligible2 = previewActionSuggestion(
+      deriveActionSuggestionPreviewInput(readinessWithPlant, {
+        snapshotQuality: invalid,
+      }),
+    ).eligible;
+    expect(previewEligible2).toBe(invalid.canSupportActionSuggestionPreview);
+    expect(previewEligible2).toBe(false);
+  });
+});

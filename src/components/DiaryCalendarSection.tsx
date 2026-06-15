@@ -57,12 +57,16 @@ export interface DiaryCalendarSectionProps {
   rawEntries: readonly DiaryCalendarRawEntry[] | null | undefined;
   /** Optional limit on number of days shown. Default 12. */
   dayLimit?: number;
+  /** Injectable "today" for deterministic tests. Defaults to new Date(). */
+  now?: Date;
 }
 
 export default function DiaryCalendarSection({
   rawEntries,
   dayLimit = 12,
+  now,
 }: DiaryCalendarSectionProps) {
+
   const allGroups = useMemo(
     () => buildDiaryCalendarViewModel(rawEntries ?? []),
     [rawEntries],

@@ -31,6 +31,7 @@
     "sb:verify": "tsx scripts/verify-seed.ts",
     "test:sensor-safety": "vitest run src/test/csv-sensor-import.test.ts src/test/manual-sensor-freshness-and-delta.test.ts src/test/manual-sensor-chronology-delta.test.ts src/test/plant-manual-sensor-freshness-card.test.tsx",
     "test:static-safety": "vitest run src/test/utils/stripSourceComments.test.ts src/test/action-queue-provenance.test.ts src/test/action-queue-alert-context-chip.test.tsx src/test/action-queue-safety.test.ts src/test/v0-operating-loop-ci-guardrails.test.ts",
+    "test:static-guards": "vitest run src/test/feeding-history.test.ts src/test/manual-sensor-reading-entry.test.ts src/test/photo-history.test.ts src/test/typed-watering-write-feature-flag.test.ts src/test/watering-history.test.ts",
     "docs:release-safety": "node scripts/assert-release-docs-safety.mjs",
     "ai-doctor:preview-safety": "node scripts/assert-ai-doctor-preview-safety.mjs",
     "precommit:ai-doctor-preview-safety": "node scripts/precommit-ai-doctor-preview-safety.mjs",

@@ -39,6 +39,7 @@ import {
   buildActionEvidenceViewModel,
   ACTION_QUEUE_EMPTY_PENDING_TITLE,
   ACTION_QUEUE_EMPTY_PENDING_HELP,
+  type ActionEvidenceViewModel,
 } from "@/lib/actionQueueEvidenceViewModel";
 
 
@@ -188,6 +189,34 @@ function LinkedAlertLink({
       >
         View linked alert
       </Link>
+    </span>
+  );
+}
+
+const EVIDENCE_TONE_VARIANT: Record<ActionEvidenceViewModel["rowEvidenceStatusTone"], string> = {
+  ok: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  neutral: "text-muted-foreground border-border/60",
+  caution: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+};
+
+/**
+ * Compact evidence-status badge for Action Queue rows.
+ * Scan-friendly: growers see at a glance whether evidence is available,
+ * unavailable, or missing — without raw payloads, IDs, or automation copy.
+ */
+function EvidenceStatusBadge({ vm }: { vm: ActionEvidenceViewModel }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Badge
+        variant="outline"
+        className={`text-[10px] uppercase ${EVIDENCE_TONE_VARIANT[vm.rowEvidenceStatusTone]}`}
+        data-testid={`action-queue-row-evidence-status-${vm.rowEvidenceStatus}`}
+        aria-label={`Evidence: ${vm.rowEvidenceStatusLabel}. ${vm.rowEvidenceStatusHelp}`}
+        title={vm.rowEvidenceStatusHelp}
+      >
+        {vm.rowEvidenceStatusLabel}
+      </Badge>
+      <span className="sr-only">{vm.rowEvidenceStatusHelp}</span>
     </span>
   );
 }
@@ -757,6 +786,11 @@ export default function ActionQueue() {
               const titleId = `aq-pending-title-${row.id}`;
               const descId = `aq-pending-desc-${row.id}`;
               const isFocused = focusedActionId === row.id;
+              const ev = buildActionEvidenceViewModel({
+                source: row.source,
+                action_type: row.action_type,
+                captured_at: row.created_at,
+              });
               return (
               <li
                 key={row.id}
@@ -785,6 +819,7 @@ export default function ActionQueue() {
                       <Badge variant="outline" className={RISK_VARIANT[row.risk_level]} aria-label={`Risk: ${row.risk_level}`}>
                         {row.risk_level}
                       </Badge>
+                      <EvidenceStatusBadge vm={ev} />
                       {isAlertDerived(row) && (
                         <Badge
                           variant="outline"
@@ -829,7 +864,7 @@ export default function ActionQueue() {
                       className="mt-1 text-[11px] text-muted-foreground"
                       data-testid="action-queue-row-evidence-quality"
                     >
-                      {buildActionEvidenceViewModel({ source: row.source, action_type: row.action_type, captured_at: row.created_at }).evidenceQualityLabel}
+                      {ev.evidenceQualityLabel}
                     </p>
 
                   </div>
@@ -902,6 +937,11 @@ export default function ActionQueue() {
               const titleId = `aq-reviewed-title-${row.id}`;
               const descId = `aq-reviewed-desc-${row.id}`;
               const isFocused = focusedActionId === row.id;
+              const ev = buildActionEvidenceViewModel({
+                source: row.source,
+                action_type: row.action_type,
+                captured_at: row.created_at,
+              });
               return (
               <li
                 key={row.id}
@@ -926,6 +966,7 @@ export default function ActionQueue() {
                   <Badge variant="outline" className={`text-[10px] uppercase ${RISK_VARIANT[row.risk_level]}`} aria-label={`Risk: ${row.risk_level}`}>
                     {row.risk_level}
                   </Badge>
+                  <EvidenceStatusBadge vm={ev} />
                   {isAlertDerived(row) && (
                     <Badge
                       variant="outline"

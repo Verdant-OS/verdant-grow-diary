@@ -72,6 +72,16 @@ export const ACTION_EVIDENCE_MISSING_PANEL_TITLE =
 export const ACTION_EVIDENCE_MISSING_PANEL_HELP =
   "Review the diary timeline and sensor history before approving.";
 
+export const ACTION_EVIDENCE_STATUS_AVAILABLE_LABEL = "Evidence available";
+export const ACTION_EVIDENCE_STATUS_AVAILABLE_HELP =
+  "Historical snapshot quality is available for review.";
+export const ACTION_EVIDENCE_STATUS_UNAVAILABLE_LABEL = "Evidence quality unavailable";
+export const ACTION_EVIDENCE_STATUS_UNAVAILABLE_HELP =
+  "This action record does not include sanitized snapshot metrics.";
+export const ACTION_EVIDENCE_STATUS_MISSING_LABEL = "Evidence missing";
+export const ACTION_EVIDENCE_STATUS_MISSING_HELP =
+  "Review the diary timeline and sensor history before approving.";
+
 
 const SOURCE_LABEL: Readonly<Record<ActionQueueSource, string>> = {
   environment_alert: "Environment Alert",
@@ -112,6 +122,10 @@ export interface ActionEvidenceViewModel {
   readonly safetyNotes: ReadonlyArray<string>;
   readonly hasSnapshotQuality: boolean;
   readonly snapshotQuality: ManualSensorSnapshotQuality | null;
+  readonly rowEvidenceStatus: "available" | "missing" | "quality_unavailable";
+  readonly rowEvidenceStatusLabel: string;
+  readonly rowEvidenceStatusHelp: string;
+  readonly rowEvidenceStatusTone: "neutral" | "caution" | "ok";
 }
 
 function formatCapturedAtLabel(
@@ -188,6 +202,38 @@ export function buildActionEvidenceViewModel(
     ? snapshotQuality!.summary
     : ACTION_EVIDENCE_QUALITY_UNAVAILABLE_SUMMARY;
 
+  // Compact row evidence status — deterministic triage for operators.
+  // Missing: input is bare / no origin relationship at all.
+  // Quality unavailable: origin exists but no sanitized snapshot metrics.
+  // Available: sanitized snapshot metrics are present and classified.
+  const hasOrigin =
+    (typeof safe.source === "string" && safe.source.trim().length > 0) ||
+    (typeof safe.action_type === "string" && safe.action_type.trim().length > 0) ||
+    (typeof safe.alert_type === "string" && safe.alert_type.trim().length > 0) ||
+    (safe.captured_at != null && safe.captured_at !== "");
+
+  let rowEvidenceStatus: ActionEvidenceViewModel["rowEvidenceStatus"];
+  let rowEvidenceStatusLabel: string;
+  let rowEvidenceStatusHelp: string;
+  let rowEvidenceStatusTone: ActionEvidenceViewModel["rowEvidenceStatusTone"];
+
+  if (hasSnapshotQuality) {
+    rowEvidenceStatus = "available";
+    rowEvidenceStatusLabel = ACTION_EVIDENCE_STATUS_AVAILABLE_LABEL;
+    rowEvidenceStatusHelp = ACTION_EVIDENCE_STATUS_AVAILABLE_HELP;
+    rowEvidenceStatusTone = "ok";
+  } else if (hasOrigin) {
+    rowEvidenceStatus = "quality_unavailable";
+    rowEvidenceStatusLabel = ACTION_EVIDENCE_STATUS_UNAVAILABLE_LABEL;
+    rowEvidenceStatusHelp = ACTION_EVIDENCE_STATUS_UNAVAILABLE_HELP;
+    rowEvidenceStatusTone = "neutral";
+  } else {
+    rowEvidenceStatus = "missing";
+    rowEvidenceStatusLabel = ACTION_EVIDENCE_STATUS_MISSING_LABEL;
+    rowEvidenceStatusHelp = ACTION_EVIDENCE_STATUS_MISSING_HELP;
+    rowEvidenceStatusTone = "caution";
+  }
+
   return Object.freeze({
     originLabel,
     originKind,
@@ -199,6 +245,10 @@ export function buildActionEvidenceViewModel(
     safetyNotes: Object.freeze([...safetyNotes]),
     hasSnapshotQuality,
     snapshotQuality,
+    rowEvidenceStatus,
+    rowEvidenceStatusLabel,
+    rowEvidenceStatusHelp,
+    rowEvidenceStatusTone,
   });
 }
 

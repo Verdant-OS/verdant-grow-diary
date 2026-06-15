@@ -213,8 +213,58 @@ If this checklist mentions forbidden terms like `service_role` or `bridge_token`
 
 ---
 
+## No write / preview only verification
+
+Operators must confirm every signal below before signing off. The preview is read-only and must never trigger a write path.
+
+UI signals:
+
+- [ ] `data-writes-enabled="false"` appears on the preview section or panel.
+- [ ] Copy appears: `Preview only — no sensor readings will be saved.`
+- [ ] No new Save, Import, Convert, or Submit button is enabled by the preview.
+- [ ] Existing disabled / “coming later” CTA remains unchanged.
+
+Data-path signals:
+
+- [ ] Preview rows are not database rows.
+- [ ] Long-form rows are preview-only.
+- [ ] No `sensor_readings` row is created.
+- [ ] No Supabase insert/update request occurs.
+- [ ] No Edge Function request occurs.
+- [ ] No Action Queue item is created.
+- [ ] No alert is created.
+- [ ] Quick Log save still uses the diary / Quick Log save path only.
+
+Operator instruction:
+
+> Use DevTools Network while interacting with the preview. Opening, filling, or inspecting the preview should not create insert/update requests or Edge Function calls.
+
+---
+
+## When warning chips appear but metrics still look usable
+
+Warning chips are data-quality signals, not automatic plant diagnosis. They do not always block metric summaries — the parsed summary stays visible so the operator can inspect what Verdant interpreted. Missing or invalid tent context still blocks long-form write-ready rows. Suspicious telemetry must never be treated as healthy without review. When uncertain, treat the preview as note-only and do not import or write sensor readings.
+
+| Situation | Treat metric summary as usable? | Treat as write-ready? | Operator action |
+| --- | --- | --- | --- |
+| Valid tent + normal ranges + no major warnings | Yes | Preview-only for now | Continue QA |
+| Warning chip but obvious typo/mapping issue | No | No | Fix CSV mapping/source |
+| Humidity or soil moisture stuck at 0/100 | Maybe for review | No | Check sensor/source before trusting |
+| EC suspicious magnitude | Maybe for review | No | Confirm mS/cm vs µS/cm |
+| pH outside realistic range | Maybe for review | No | Confirm mapping/source |
+| Missing `captured_at` | Maybe for review | No | Fix timestamp mapping |
+| Missing/invalid tent | Yes for parsed summary only | No | Link valid tent or treat as note-only |
+| Raw payload / private-looking key appears | No | No | Stop QA and fix raw leak |
+
+Practical rule:
+
+> When warnings appear, the safest default is: inspect the parsed metric summary, do not treat it as healthy, and do not treat it as write-ready unless the source, timestamp, tent context, and units are verified.
+
+---
+
 ## Related Docs
 
+- [`docs/qa/csv-sensor-import-preview-qa.md`](./csv-sensor-import-preview-qa.md)
 - [`docs/sensor-truth-rules.md`](./sensor-truth-rules.md)
 - [`docs/qa/v0-manual-qa-checklist.md`](./v0-manual-qa-checklist.md)
 - [`docs/data-labeling-spec.md`](./data-labeling-spec.md)

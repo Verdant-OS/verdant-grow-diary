@@ -367,7 +367,7 @@ export default function ActionQueue() {
     if (kind === "simulate") {
       // Simulation NEVER sends device commands. Status + audit only.
       toast.message("Simulated (no device command sent)", {
-        description: `${row.action_type} → ${row.target_metric ?? row.target_device}`,
+        description: `${row.action_type} → ${formatActionTargetLabel(row.target_metric, row.target_device)}`,
       });
     }
     const patch = buildTransitionPatch(kind);

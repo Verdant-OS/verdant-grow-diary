@@ -71,25 +71,33 @@ export function SensorNormalizationPreviewPanel({
 
       <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
         <div>
-          <dt className="font-semibold text-foreground">Tent ID</dt>
-          <dd data-testid="sensor-normalization-preview-tent-status">
-            {vm.tentIdStatus === "present" ? "Provided" : "Missing"}
+          <dt className="font-semibold text-foreground">Tent</dt>
+          <dd
+            data-testid="sensor-normalization-preview-tent-status"
+            data-tent-status={vm.tentStatus}
+          >
+            {vm.tentStatusLabel}
           </dd>
         </div>
-        {vm.plantIdStatus !== "not_applicable" && (
+        {vm.plantStatus !== "not_applicable" && (
           <div>
-            <dt className="font-semibold text-foreground">Plant ID</dt>
-            <dd data-testid="sensor-normalization-preview-plant-status">
-              {vm.plantIdStatus === "present" ? "Provided" : "Missing"}
+            <dt className="font-semibold text-foreground">Plant</dt>
+            <dd
+              data-testid="sensor-normalization-preview-plant-status"
+              data-plant-status={vm.plantStatus}
+            >
+              {vm.plantStatusLabel}
             </dd>
           </div>
         )}
-        <div>
-          <dt className="font-semibold text-foreground">Captured at</dt>
-          <dd data-testid="sensor-normalization-preview-captured-at">
-            {vm.capturedAtDisplay}
-          </dd>
-        </div>
+        {!compact && (
+          <div>
+            <dt className="font-semibold text-foreground">Captured at</dt>
+            <dd data-testid="sensor-normalization-preview-captured-at">
+              {vm.capturedAtDisplay}
+            </dd>
+          </div>
+        )}
         <div>
           <dt className="font-semibold text-foreground">Long-form rows</dt>
           <dd data-testid="sensor-normalization-preview-row-count">
@@ -97,6 +105,7 @@ export function SensorNormalizationPreviewPanel({
           </dd>
         </div>
       </dl>
+
 
       {vm.warnings.length > 0 && (
         <ul

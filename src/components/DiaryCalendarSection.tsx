@@ -160,6 +160,39 @@ export default function DiaryCalendarSection({
         </span>
       </header>
 
+      {hasAnyEntries && visibleMonth && (
+        <div
+          className="mb-3 flex items-center justify-between gap-2"
+          data-testid="diary-calendar-month-nav"
+        >
+          <button
+            type="button"
+            aria-label="Previous month"
+            onClick={() => shiftMonth(-1)}
+            data-testid="diary-calendar-month-prev"
+            className="inline-flex items-center justify-center h-8 w-8 rounded-full border border-border/50 bg-secondary/50 hover:bg-secondary transition"
+          >
+            <ChevronLeft className="h-4 w-4" aria-hidden />
+          </button>
+          <span
+            className="text-sm font-medium text-foreground"
+            data-testid="diary-calendar-month-label"
+            aria-live="polite"
+          >
+            {monthLabel}
+          </span>
+          <button
+            type="button"
+            aria-label="Next month"
+            onClick={() => shiftMonth(1)}
+            data-testid="diary-calendar-month-next"
+            className="inline-flex items-center justify-center h-8 w-8 rounded-full border border-border/50 bg-secondary/50 hover:bg-secondary transition"
+          >
+            <ChevronRight className="h-4 w-4" aria-hidden />
+          </button>
+        </div>
+      )}
+
       {hasAnyEntries && (
         <div
           role="group"
@@ -208,7 +241,8 @@ export default function DiaryCalendarSection({
           className="py-8 text-center text-sm text-muted-foreground"
           data-testid="diary-calendar-empty"
         >
-          <p>{diaryCalendarEmptyTitleFor(filter)}</p>
+          <p>{diaryCalendarMonthEmptyTitle(visibleMonth, filter)}</p>
+
           <p className="text-xs mt-1">{DIARY_CALENDAR_EMPTY_HINT}</p>
         </div>
       ) : (

@@ -1,0 +1,104 @@
+{
+  "$comment": "Historical sensor context fixture. NOT live telemetry. Source = csv (imported XLSX from Verdant Genetics export). Companion doc: docs/diary/2026-06-13-multi-tent-baseline.md. Do not wire into runtime, alerts, Action Queue, or AI calls without an explicit task.",
+  "id": "diary-2026-06-13-multi-tent-baseline",
+  "logged_at": "2026-06-13",
+  "source": "csv",
+  "source_app": "verdant-genetics-xlsx-export",
+  "is_live": false,
+  "window": {
+    "start": "2026-06-04T03:00:00Z",
+    "end": "2026-06-13T11:00:00Z",
+    "reading_count": 57
+  },
+  "tents": {
+    "flower": {
+      "status": "stable_but_high_vpd",
+      "averages": {
+        "temperature_f": 77.3,
+        "rh_pct": 50.1,
+        "vpd_kpa": 1.61
+      },
+      "recent_peak": {
+        "temperature_f": 82.5,
+        "rh_pct": 45,
+        "vpd_kpa": 2.09
+      },
+      "notes": "Trending warmer/drier. May be acceptable for current flower stage. Visually verify against canopy stress markers before any change."
+    },
+    "seedling": {
+      "status": "watch_high_humidity_spikes",
+      "peak_rh_pct": 97,
+      "min_vpd_kpa_approx": 0,
+      "notes": "Highest watch item. Episodic high-humidity / low-VPD events. Risk: damping-off, mold, stretch, weak root-zone transition."
+    },
+    "vegetation": {
+      "status": "balanced_benchmark",
+      "averages": {
+        "vpd_kpa": 1.01
+      },
+      "notes": "Most stable tent. Use as current benchmark for environmental control."
+    }
+  },
+  "soil_probes": {
+    "status": "partial_invalid_or_unknown",
+    "notes": "Early values include zeros / missing entries. Likely probe commissioning, placement, or inactive channels. Per sensor truth rules these must NOT be treated as healthy; keep flagged as invalid/stale/unknown until active placement is confirmed."
+  },
+  "ai_doctor_context": {
+    "treat_as": "historical_sensor_context_only",
+    "do_not": [
+      "present as live telemetry",
+      "produce standalone diagnosis",
+      "recommend aggressive nutrient/irrigation/defoliation/equipment changes"
+    ],
+    "missing_information": [
+      "current live or manual readings per tent",
+      "recent canopy/stem photos",
+      "recent watering and feeding logs",
+      "recent plant observations"
+    ]
+  },
+  "suggested_action_queue_items": [
+    {
+      "id": "seedling-rh-vpd-investigation",
+      "title": "Investigate seedling tent RH/VPD spikes",
+      "approval_required": true,
+      "device_control": false,
+      "back_pointer": "diary-2026-06-13-multi-tent-baseline",
+      "checklist": [
+        "Verify whether spikes were real events or sensor/placement artifacts",
+        "Physically check seedlings",
+        "Capture canopy/stem photos",
+        "Review watering and ventilation/dehumidifier behavior around 2026-06-06 and 2026-06-11"
+      ]
+    },
+    {
+      "id": "flower-high-vpd-monitor",
+      "title": "Monitor flower tent for high-VPD stress markers",
+      "approval_required": true,
+      "device_control": false,
+      "back_pointer": "diary-2026-06-13-multi-tent-baseline",
+      "checklist": [
+        "Upload current Sour Diesel canopy photos",
+        "Compare against recent high-VPD windows",
+        "If healthy: log as high-VPD flower baseline",
+        "If stress visible: review RH/temperature balance BEFORE changing irrigation or feed"
+      ]
+    }
+  ],
+  "follow_ups": {
+    "24_hour": "Capture current manual/live readings for each tent and upload seedling + flower canopy photos.",
+    "3_day": "Review whether seedling RH spikes recur and whether flower high-VPD conditions correlate with any visible stress."
+  },
+  "safety": {
+    "verdict": "documentation_only",
+    "no_db_writes": true,
+    "no_schema_changes": true,
+    "no_rls_changes": true,
+    "no_edge_function_changes": true,
+    "no_alerts_written": true,
+    "no_action_queue_writes": true,
+    "no_ai_calls": true,
+    "no_device_control": true,
+    "data_label": "csv"
+  }
+}

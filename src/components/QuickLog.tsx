@@ -57,6 +57,17 @@ import {
 import { buildSensorSnapshotSavePayload } from "@/lib/latestSensorSnapshotRules";
 import { buildStaleSnapshotHelperCopy } from "@/lib/quickLogStaleSnapshotHelperCopy";
 import { plantDetailPath } from "@/lib/routes";
+import {
+  EARLY_STAGE_MILESTONES,
+  EARLY_STAGE_VIGOR_OPTIONS,
+  EARLY_STAGE_PHOTO_HINT,
+  EARLY_STAGE_NOTE_PLACEHOLDER,
+  buildEarlyStageDetails,
+  buildEarlyStageNoteSuffix,
+  evaluateEarlyStageVisibility,
+  type EarlyStageMilestone,
+  type EarlyStageVigor,
+} from "@/lib/earlyStageQuickLogRules";
 
 export interface QuickLogPrefill {
   plantId?: string | null;

@@ -3,59 +3,70 @@
  * Verdant AI Doctor Action Queue Suggestion Preview — Safety Scanner
  * ------------------------------------------------------------------
  * Dependency-free static check that scans the preview helper + presenter
- * for unsafe executable / write-path language. Keeps the read-only
- * preview from drifting into an Action Queue write, automation, or
- * device-control feature.
+ * (and any future preview-related files) for unsafe executable /
+ * write-path language. Keeps the read-only preview from drifting into
+ * an Action Queue write, automation, or device-control feature.
  *
- * Scans:
+ * Always scans:
  *   - src/lib/aiDoctorActionSuggestionPreviewRules.ts
  *   - src/components/AiDoctorContextReadinessPanel.tsx
  *
- * Each violation prints:
+ * Additionally scans any `.ts` / `.tsx` file under `src/lib/**` or
+ * `src/components/**` whose content contains a preview-identifying
+ * marker (see PREVIEW_IDENTIFIER_MARKERS). Unrelated files are ignored.
+ *
+ * Allowlist:
+ *   scripts/config/ai-doctor-preview-safety-allowlist.json
+ *   Required JSON shape:
+ *     { "allowedPhrases": string[], "allowedLineMarkers": string[] }
+ *   The scanner fails closed if the file is missing or malformed.
+ *
+ * Each violation prints structured output:
  *   <file>:<line> [<rule>] "<text>" — <explanation>
  *
- * A line is skipped (not scanned) when ANY of these hold:
- *   - file path is inside src/test/**
- *   - line is a JS/TS comment (starts with `*`, `//`, or `/*`)
- *   - line is a regex-pattern declaration (e.g. `/\bturn_on\b/i`)
- *   - line contains the marker `AI-DOCTOR-PREVIEW-SAFETY: ALLOW`
- *   - line contains a denial/safety context word
- *     (never, not, n't, cannot, blocked, drop, prohibit, prevent,
- *      guard, refuse, forbid, safety filter, defence/defense)
- *   - line contains one of the allow phrases:
- *       "Approval required"
- *       "No device control"
- *       "Preview only"
- *       "no queue item created"
- *       "no Action Queue item is created"
- *       "will not run equipment commands"
+ * When running in GitHub Actions (GITHUB_ACTIONS === "true") the scanner
+ * also emits workflow annotations:
+ *   ::error file=<file>,line=<line>,title=<rule>::<escaped message>
  *
  * Usage:
  *   node scripts/assert-ai-doctor-preview-safety.mjs
  *
  * Exit codes:
  *   0 — no violations
- *   1 — one or more violations
+ *   1 — one or more violations OR allowlist load failure
  */
-import { readFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, relative, sep } from "node:path";
 
 const ROOT = process.cwd();
-export const ALLOW_MARKER = "AI-DOCTOR-PREVIEW-SAFETY: ALLOW";
+export const DEFAULT_ALLOWLIST_PATH = join(
+  "scripts",
+  "config",
+  "ai-doctor-preview-safety-allowlist.json",
+);
 
-export const SCAN_TARGETS = [
+export const KNOWN_TARGETS = Object.freeze([
   "src/lib/aiDoctorActionSuggestionPreviewRules.ts",
   "src/components/AiDoctorContextReadinessPanel.tsx",
-];
+]);
 
-export const ALLOW_PHRASES = [
-  "approval required",
-  "no device control",
-  "preview only",
-  "no queue item created",
-  "no action queue item is created",
-  "will not run equipment commands",
-];
+export const DISCOVERY_ROOTS = Object.freeze(["src/lib", "src/components"]);
+
+/**
+ * Content markers that identify a file as part of the AI Doctor Action
+ * Queue suggestion preview surface. A future file must contain at least
+ * one of these to be auto-included.
+ */
+export const PREVIEW_IDENTIFIER_MARKERS = Object.freeze([
+  "Action Queue suggestion preview",
+  "ActionSuggestionPreview",
+  "previewActionSuggestion",
+  "aiDoctorActionSuggestionPreview",
+  "ai-doctor-action-suggestion-preview",
+  "contextOnly",
+  "approvalRequired",
+  "deviceControl",
+]);
 
 export const RULES = [
   {
@@ -98,32 +109,27 @@ export const RULES = [
   {
     name: "no-mqtt-publish",
     pattern: /\bmqtt[\s_-]?publish\b/i,
-    explanation:
-      "Preview must never publish MQTT / device messages.",
+    explanation: "Preview must never publish MQTT / device messages.",
   },
   {
     name: "no-device-command",
     pattern: /\bdevice[\s_-]?commands?\b/i,
-    explanation:
-      "Preview must never emit device commands.",
+    explanation: "Preview must never emit device commands.",
   },
   {
     name: "no-turn-on-off",
     pattern: /\bturn[\s_-]?(on|off)\b/i,
-    explanation:
-      "Preview must never tell equipment to turn on/off.",
+    explanation: "Preview must never tell equipment to turn on/off.",
   },
   {
     name: "no-pump-on-off",
     pattern: /\bpump[\s_-]?(on|off|start|stop)\b/i,
-    explanation:
-      "Preview must never command pumps.",
+    explanation: "Preview must never command pumps.",
   },
   {
     name: "no-dose",
     pattern: /\bdose\b/i,
-    explanation:
-      "Preview must never recommend dosing.",
+    explanation: "Preview must never recommend dosing.",
   },
   {
     name: "no-set-temp-humidity",
@@ -134,19 +140,82 @@ export const RULES = [
   {
     name: "no-automation-enabled",
     pattern: /\bautomation\s+(enabled|on|active|engaged)\b/i,
-    explanation:
-      "Preview must never enable automation.",
+    explanation: "Preview must never enable automation.",
   },
   {
     name: "no-control-equipment",
     pattern: /\bcontrol(s|ling)?\s+equipment\b/i,
-    explanation:
-      "Preview must never control equipment.",
+    explanation: "Preview must never control equipment.",
   },
 ];
 
 const DENIAL =
   /\b(never|not|n't|cannot|blocked?|drops?|dropped|prohibit(s|ed)?|prevent(s|ed)?|guard(s|ed)?|refus(e|es|ed)|forbid(s|den)?|defence|defense|safety[-\s]?(filter|posture|note|net|guard))\b/i;
+
+// ─── Allowlist config ─────────────────────────────────────────────────
+
+export class AllowlistConfigError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "AllowlistConfigError";
+  }
+}
+
+/**
+ * Load and validate the allowlist config. Fails closed: missing file,
+ * unreadable file, invalid JSON, wrong shape, or non-string entries all
+ * throw AllowlistConfigError.
+ */
+export function loadAllowlist(configPath = DEFAULT_ALLOWLIST_PATH) {
+  const abs = configPath.startsWith("/") ? configPath : join(ROOT, configPath);
+  let raw;
+  try {
+    raw = readFileSync(abs, "utf8");
+  } catch (err) {
+    throw new AllowlistConfigError(
+      `Allowlist config not found or unreadable at ${configPath}: ${err.message}`,
+    );
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    throw new AllowlistConfigError(
+      `Allowlist config is not valid JSON (${configPath}): ${err.message}`,
+    );
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new AllowlistConfigError(
+      `Allowlist config must be a JSON object (${configPath}).`,
+    );
+  }
+  const { allowedPhrases, allowedLineMarkers } = parsed;
+  if (!Array.isArray(allowedPhrases) || !Array.isArray(allowedLineMarkers)) {
+    throw new AllowlistConfigError(
+      `Allowlist config must contain string arrays "allowedPhrases" and "allowedLineMarkers" (${configPath}).`,
+    );
+  }
+  for (const v of allowedPhrases) {
+    if (typeof v !== "string" || v.length === 0) {
+      throw new AllowlistConfigError(
+        `allowedPhrases must contain non-empty strings (${configPath}).`,
+      );
+    }
+  }
+  for (const v of allowedLineMarkers) {
+    if (typeof v !== "string" || v.length === 0) {
+      throw new AllowlistConfigError(
+        `allowedLineMarkers must contain non-empty strings (${configPath}).`,
+      );
+    }
+  }
+  return Object.freeze({
+    allowedPhrases: Object.freeze([...allowedPhrases]),
+    allowedLineMarkers: Object.freeze([...allowedLineMarkers]),
+  });
+}
+
+// ─── Scan helpers ─────────────────────────────────────────────────────
 
 function isCommentLine(trimmed) {
   return (
@@ -158,29 +227,31 @@ function isCommentLine(trimmed) {
 }
 
 function isRegexLiteralLine(trimmed) {
-  // e.g. `/\bturn_on\b/i,`  or  `/\bexec(ute)?[_\s-]?(command|device)\b/i,`
   if (/^\/\\b/.test(trimmed)) return true;
-  // any line whose only "code" is a regex literal in an array of patterns
   return /\/\\b[^/]+\\b\/[a-z]*\s*,?\s*$/.test(trimmed);
 }
 
-function hasAllowPhrase(lower) {
-  return ALLOW_PHRASES.some((p) => lower.includes(p));
-}
-
-export function scanText(text, { isTestFile = false } = {}) {
+export function scanText(
+  text,
+  {
+    isTestFile = false,
+    allowedPhrases = [],
+    allowedLineMarkers = [],
+  } = {},
+) {
   if (isTestFile) return [];
+  const lowerPhrases = allowedPhrases.map((p) => p.toLowerCase());
   const lines = text.split(/\r?\n/);
   const violations = [];
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i];
     const trimmed = raw.trim();
     if (!trimmed) continue;
-    if (trimmed.includes(ALLOW_MARKER)) continue;
+    if (allowedLineMarkers.some((m) => trimmed.includes(m))) continue;
     if (isCommentLine(trimmed)) continue;
     if (isRegexLiteralLine(trimmed)) continue;
     const lower = trimmed.toLowerCase();
-    if (hasAllowPhrase(lower)) continue;
+    if (lowerPhrases.some((p) => lower.includes(p))) continue;
     if (DENIAL.test(trimmed)) continue;
     for (const rule of RULES) {
       if (rule.pattern.test(trimmed)) {
@@ -200,10 +271,103 @@ export function formatViolation(file, v) {
   return `${file}:${v.line} [${v.rule}] "${v.text}" — ${v.explanation}`;
 }
 
+/**
+ * Escape a string for safe use inside a GitHub Actions workflow command.
+ * See: https://docs.github.com/actions/using-workflows/workflow-commands-for-github-actions
+ */
+export function escapeAnnotation(value) {
+  return String(value)
+    .replace(/%/g, "%25")
+    .replace(/\r/g, "%0D")
+    .replace(/\n/g, "%0A")
+    .replace(/:/g, "%3A")
+    .replace(/,/g, "%2C");
+}
+
+export function formatAnnotation(file, v) {
+  const message = escapeAnnotation(`${v.explanation} — matched: ${v.text}`);
+  const title = escapeAnnotation(v.rule);
+  const safeFile = escapeAnnotation(file);
+  return `::error file=${safeFile},line=${v.line},title=${title}::${message}`;
+}
+
+// ─── Target discovery ─────────────────────────────────────────────────
+
+function fileMatchesPreviewMarker(absPath) {
+  let text;
+  try {
+    text = readFileSync(absPath, "utf8");
+  } catch {
+    return false;
+  }
+  return PREVIEW_IDENTIFIER_MARKERS.some((m) => text.includes(m));
+}
+
+function walkSourceTree(dir, out = []) {
+  let entries;
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return out;
+  }
+  for (const name of entries) {
+    const p = join(dir, name);
+    let st;
+    try {
+      st = statSync(p);
+    } catch {
+      continue;
+    }
+    if (st.isDirectory()) {
+      walkSourceTree(p, out);
+    } else if (st.isFile() && (name.endsWith(".ts") || name.endsWith(".tsx"))) {
+      out.push(p);
+    }
+  }
+  return out;
+}
+
+/**
+ * Discover all preview-related files relative to the given root.
+ * Always includes KNOWN_TARGETS (even if missing — they are scanned and
+ * reported as missing). Additionally includes any .ts/.tsx file under
+ * DISCOVERY_ROOTS whose content matches a PREVIEW_IDENTIFIER_MARKER.
+ * Test files under any `/test/` segment are excluded from discovery.
+ */
+export function discoverTargets(rootDir = ROOT) {
+  const out = new Set();
+  for (const rel of KNOWN_TARGETS) out.add(rel.split("/").join(sep));
+  for (const rel of DISCOVERY_ROOTS) {
+    const absRoot = join(rootDir, rel);
+    const files = walkSourceTree(absRoot);
+    for (const abs of files) {
+      const relPath = relative(rootDir, abs);
+      if (relPath.split(sep).includes("test")) continue;
+      if (relPath.split(sep).includes("__tests__")) continue;
+      if (fileMatchesPreviewMarker(abs)) out.add(relPath);
+    }
+  }
+  // Normalise to forward-slash for stable output across platforms.
+  return [...out].map((p) => p.split(sep).join("/")).sort();
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────
+
 function main() {
+  let allowlist;
+  try {
+    allowlist = loadAllowlist();
+  } catch (err) {
+    console.error(`ai-doctor preview safety: ${err.message}`);
+    process.exit(1);
+  }
+
+  const ghActions = process.env.GITHUB_ACTIONS === "true";
+  const targets = discoverTargets(ROOT);
   let failed = 0;
   let scanned = 0;
-  for (const rel of SCAN_TARGETS) {
+
+  for (const rel of targets) {
     const abs = join(ROOT, rel);
     let text;
     try {
@@ -217,14 +381,20 @@ function main() {
     }
     scanned += 1;
     const isTestFile = rel.includes("/test/");
-    const violations = scanText(text, { isTestFile });
+    const violations = scanText(text, {
+      isTestFile,
+      allowedPhrases: allowlist.allowedPhrases,
+      allowedLineMarkers: allowlist.allowedLineMarkers,
+    });
     if (violations.length) {
       failed += violations.length;
       for (const v of violations) {
-        console.error(formatViolation(relative(ROOT, abs), v));
+        console.error(formatViolation(rel, v));
+        if (ghActions) console.error(formatAnnotation(rel, v));
       }
     }
   }
+
   if (failed) {
     console.error(
       `\nAI Doctor preview safety: ${failed} violation(s) across ${scanned} file(s) scanned.`,

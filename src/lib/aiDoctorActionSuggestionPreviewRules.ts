@@ -176,6 +176,49 @@ export const ACTION_SUGGESTION_PREVIEW_STATUS_LABELS: Record<
   blocked_device_command_risk: "Blocked — device-command risk",
 });
 
+/**
+ * Lightweight readiness-view shape used to derive a preview input. Kept
+ * structural so this module stays decoupled from the readiness view-model.
+ */
+export interface ActionSuggestionPreviewReadinessLike {
+  plantIdentity: { plantId: string | null; stage: string | null };
+  sourceBadges: ReadonlyArray<{
+    source: string;
+    sampleCount: number;
+    isTrustworthy: boolean;
+  }>;
+  limitations: ReadonlyArray<{ code: string }>;
+}
+
+/**
+ * Derive a preview input from a readiness view. Pure + null-safe.
+ */
+export function deriveActionSuggestionPreviewInput(
+  view: ActionSuggestionPreviewReadinessLike,
+): ActionSuggestionPreviewInput {
+  const badges = view?.sourceBadges ?? [];
+  const limitations = view?.limitations ?? [];
+  const hasPlantContext = Boolean(
+    view?.plantIdentity?.plantId && view?.plantIdentity?.stage,
+  );
+  const hasCurrentManualOrLiveReading = badges.some(
+    (b) =>
+      (b.source === "live" || b.source === "manual") && b.sampleCount > 0,
+  );
+  const hasImportedHistory = badges.some(
+    (b) => (b.source === "csv" || b.source === "import") && b.sampleCount > 0,
+  );
+  const hasInvalidOrUnknownCriticalTelemetry = limitations.some(
+    (l) => l.code === "stale_or_invalid",
+  );
+  return {
+    hasPlantContext,
+    hasCurrentManualOrLiveReading,
+    hasImportedHistory,
+    hasInvalidOrUnknownCriticalTelemetry,
+  };
+}
+
 export const __testing = {
   DEVICE_COMMAND_PATTERNS,
   containsDeviceCommand,

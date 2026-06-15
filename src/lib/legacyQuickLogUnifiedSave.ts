@@ -36,6 +36,7 @@ export const SUPPORTED_LEGACY_EVENT_TYPES = [
   "watering",
   "observation",
   "note",
+  "environment",
 ] as const;
 export type SupportedLegacyEventType =
   (typeof SUPPORTED_LEGACY_EVENT_TYPES)[number];

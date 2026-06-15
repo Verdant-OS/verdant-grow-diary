@@ -75,7 +75,7 @@ function tentRowsFromFixture(f: DiaryFixture & { source_app?: string }) {
   let i = 0;
   for (const [tent, t] of Object.entries(f.tents ?? {})) {
     const captured = new Date(NOW.getTime() - (++i) * HOUR).toISOString();
-    const avg = (t as { averages?: Record<string, number> }).averages ?? {};
+    const avg = ((t as { averages?: { temperature_f?: number; rh_pct?: number } }).averages) ?? {};
     if (typeof avg.temperature_f === "number") {
       rows.push({
         metric: "temperature_c",

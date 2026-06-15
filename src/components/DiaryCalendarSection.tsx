@@ -123,12 +123,17 @@ export default function DiaryCalendarSection({
     setOpenDay(nextMonthGroups[0]?.dateKey ?? null);
   };
 
-  // Month nav: shift visible month and reset expanded day. Filter stays.
+  // Month nav: shift visible month, reset expanded day to the newest day
+  // in the new month (under the active filter) so events render immediately.
   const shiftMonth = (delta: number) => {
     if (!visibleMonth) return;
     const next = shiftMonthKey(visibleMonth, delta);
     setVisibleMonth(next);
-    setOpenDay(null);
+    const nextGroups = filterDiaryCalendarGroups(
+      filterDiaryCalendarGroupsByMonth(allGroups, next),
+      filter,
+    );
+    setOpenDay(nextGroups[0]?.dateKey ?? null);
   };
 
   // Belt-and-braces: never render stale details if the open day was removed

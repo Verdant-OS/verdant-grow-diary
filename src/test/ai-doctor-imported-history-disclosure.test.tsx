@@ -75,13 +75,13 @@ describe("AiDoctorImportedHistoryDisclosurePanel", () => {
     expect(screen.getByText("Imported history")).toBeTruthy();
   });
 
-  it("states the data is not live telemetry", () => {
+  it("states the data is not live telemetry and suggests adding current readings", () => {
     render(
       <AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />,
     );
     expect(
       screen.getByText(
-        "AI Doctor used imported CSV/XLSX history as historical context. This is not live telemetry.",
+        "CSV/imported readings can give AI Doctor useful background, but they are not live telemetry. Add a current manual or live sensor snapshot before relying on this for current-room decisions.",
       ),
     ).toBeTruthy();
   });

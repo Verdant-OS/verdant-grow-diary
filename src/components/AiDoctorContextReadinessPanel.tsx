@@ -80,13 +80,19 @@ export default function AiDoctorContextReadinessPanel({
   );
   const style = STATE_STYLES[view.state];
 
-  const currentSnapshotQuality = useMemo(
-    () =>
-      evaluateManualSensorSnapshotQuality(
-        deriveCurrentSnapshotFromAiDoctorContext(context),
-      ),
-    [context],
-  );
+  const currentSnapshotQuality = useMemo(() => {
+    const snapshotInput = deriveCurrentSnapshotFromAiDoctorContext(context);
+    // Use the snapshot's own captured_at as "now" so time-staleness is
+    // measured relative to context timestamps (which lack an as_of marker),
+    // not wall-clock. Source-driven gates (csv/demo/stale/invalid/unknown)
+    // and value checks still apply.
+    const capturedMs =
+      snapshotInput?.captured_at != null
+        ? Date.parse(String(snapshotInput.captured_at))
+        : NaN;
+    const nowMs = Number.isFinite(capturedMs) ? capturedMs : Date.now();
+    return evaluateManualSensorSnapshotQuality(snapshotInput, { nowMs });
+  }, [context]);
 
   const actionPreview = useMemo(
     () =>

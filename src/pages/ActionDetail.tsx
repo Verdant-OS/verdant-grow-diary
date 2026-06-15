@@ -656,6 +656,12 @@ export default function ActionDetail() {
                     The source alert is no longer open. Re-check current grow conditions before approving this action.
                   </div>
                 )}
+                <p
+                  className="mt-3 text-[11px] text-muted-foreground"
+                  data-testid="action-detail-evidence-quality"
+                >
+                  {ACTION_EVIDENCE_QUALITY_NOT_AVAILABLE}
+                </p>
               </div>
             );
           })()}

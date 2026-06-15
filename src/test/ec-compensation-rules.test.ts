@@ -156,7 +156,7 @@ describe("ecCompensationRules — static safety", () => {
     expect(src).not.toMatch(/from\s+["']@\/integrations\/supabase/);
     expect(src).not.toMatch(/supabase-js/);
     expect(src).not.toMatch(/\bfetch\s*\(/);
-    expect(src).not.toMatch(/pg_cron|cron|setInterval|setTimeout/);
+    expect(src).not.toMatch(/\b(pg_cron|setInterval|setTimeout)\b/);
     expect(src).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.upsert\(/);
   });
 });

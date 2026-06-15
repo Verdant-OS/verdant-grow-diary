@@ -405,6 +405,10 @@ export default function Timeline() {
       </div>
 
       <div className="mt-4">
+        <DiaryCalendarSection rawEntries={entries} />
+      </div>
+
+      <div className="mt-4">
         <WateringHistoryPanel rawEntries={entries} limit={20} />
       </div>
 

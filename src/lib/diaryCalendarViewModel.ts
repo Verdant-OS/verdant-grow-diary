@@ -287,6 +287,8 @@ function buildEventDetails(
     ecPreview,
     fallback: hasContent ? null : DIARY_CALENDAR_EMPTY_DETAILS_FALLBACK,
   };
+}
+
 
 function extractKind(entry: DiaryCalendarRawEntry): DiaryCalendarEventKind | null {
   const direct = normalizeKind(entry.event_type);

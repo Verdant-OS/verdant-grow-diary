@@ -22,6 +22,12 @@ import {
 } from "@/lib/aiDoctorReadinessViewModel";
 import type { AiDoctorContext } from "@/lib/aiDoctorEngine";
 import AiDoctorImportedHistoryDisclosurePanel from "@/components/AiDoctorImportedHistoryDisclosurePanel";
+import {
+  ACTION_SUGGESTION_PREVIEW_LABEL,
+  ACTION_SUGGESTION_PREVIEW_STATUS_LABELS,
+  deriveActionSuggestionPreviewInput,
+  previewActionSuggestion,
+} from "@/lib/aiDoctorActionSuggestionPreviewRules";
 
 export interface AiDoctorContextReadinessPanelProps {
   context: AiDoctorContext;
@@ -65,6 +71,11 @@ export default function AiDoctorContextReadinessPanel({
     [context, openAlertsCount],
   );
   const style = STATE_STYLES[view.state];
+
+  const actionPreview = useMemo(
+    () => previewActionSuggestion(deriveActionSuggestionPreviewInput(view)),
+    [view],
+  );
 
   return (
     <section
@@ -235,6 +246,63 @@ export default function AiDoctorContextReadinessPanel({
           <span className="text-muted-foreground">Confidence: </span>
           {view.preview.confidenceBand} ({view.preview.confidence.toFixed(2)})
         </p>
+      </div>
+
+      <div
+        className="rounded-lg border border-border/50 bg-background/30 p-3 space-y-2"
+        data-testid="ai-doctor-action-suggestion-preview"
+        data-status={actionPreview.status}
+        data-eligible={actionPreview.eligible ? "true" : "false"}
+      >
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h3 className="text-sm font-semibold">
+            {ACTION_SUGGESTION_PREVIEW_LABEL}
+          </h3>
+          <span
+            className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground"
+            data-testid="ai-doctor-action-suggestion-preview-status"
+          >
+            {ACTION_SUGGESTION_PREVIEW_STATUS_LABELS[actionPreview.status]}
+          </span>
+        </div>
+        <p
+          className="text-xs"
+          data-testid="ai-doctor-action-suggestion-preview-summary"
+        >
+          {actionPreview.summary}
+        </p>
+        {actionPreview.reasons.length > 0 ? (
+          <ul
+            className="list-disc pl-4 space-y-0.5 text-xs"
+            data-testid="ai-doctor-action-suggestion-preview-reasons"
+          >
+            {actionPreview.reasons.map((r) => (
+              <li key={r}>{r}</li>
+            ))}
+          </ul>
+        ) : null}
+        {actionPreview.suggestedActionPreview ? (
+          <p
+            className="text-xs"
+            data-testid="ai-doctor-action-suggestion-preview-action"
+          >
+            <span className="text-muted-foreground">Cautious next step: </span>
+            {actionPreview.suggestedActionPreview}
+          </p>
+        ) : null}
+        <ul
+          className="flex flex-wrap gap-1.5 text-[10px] uppercase tracking-wide"
+          data-testid="ai-doctor-action-suggestion-preview-safety-notes"
+        >
+          {actionPreview.safetyNotes.map((note) => (
+            <li
+              key={note}
+              className="inline-flex items-center rounded-md border border-border/60 px-2 py-0.5 text-muted-foreground"
+            >
+              {note}
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   );

@@ -131,7 +131,7 @@ describe("Quick Log · early-stage milestone presets", () => {
     fireEvent.change(dialog.querySelector("textarea") as HTMLTextAreaElement, {
       target: { value: "day 4" },
     });
-    fireEvent.click(within(dialog).getByRole("button", { name: /save entry/i }));
+    fireEvent.click(within(dialog).getByTestId("quick-log-save"));
 
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
     const payload = saveMock.mock.calls[0][0];
@@ -167,7 +167,7 @@ describe("Quick Log · early-stage milestone presets", () => {
     fireEvent.change(dialog.querySelector("textarea") as HTMLTextAreaElement, {
       target: { value: "leggy stretch" },
     });
-    fireEvent.click(within(dialog).getByRole("button", { name: /save entry/i }));
+    fireEvent.click(within(dialog).getByTestId("quick-log-save"));
 
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
     const payload = saveMock.mock.calls[0][0];

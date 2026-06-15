@@ -42,12 +42,12 @@ export interface FastAddActionDef {
 }
 
 export const FAST_ADD_ACTIONS: readonly FastAddActionDef[] = [
-  { id: "diary_note", label: "Diary Note", quickLogEventType: "observation" },
+  { id: "diary_note", label: "Note", quickLogEventType: "observation" },
+  { id: "photo", label: "Photo", quickLogEventType: "photo" },
   { id: "watering", label: "Watering", quickLogEventType: "watering" },
   { id: "feeding", label: "Feeding", quickLogEventType: "feeding" },
+  { id: "environment", label: "Environment", quickLogEventType: "environment" },
   { id: "training", label: "Training", quickLogEventType: "training" },
-  { id: "photo", label: "Photo", quickLogEventType: "photo" },
-  { id: "environment", label: "Environment Check", quickLogEventType: "environment" },
   { id: "diagnosis", label: "Diagnosis", quickLogEventType: null },
   { id: "harvest", label: "Harvest", quickLogEventType: "harvest" },
 ] as const;

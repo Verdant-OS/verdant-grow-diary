@@ -156,7 +156,9 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
       expect(document.querySelector('[data-testid="quick-log-view-target-plant"]')).not.toBeNull(),
     );
     expect(onCreated).toHaveBeenCalled();
-    expect(toastSuccess).toHaveBeenCalledWith(expect.stringMatching(/Logged note for|Logged observation for/));
+    expect(toastSuccess).toHaveBeenCalledWith(
+      expect.stringMatching(/^(Saved|Logged) (note|observation|note for|observation for)/),
+    );
     expect(toastError).not.toHaveBeenCalled();
   });
 

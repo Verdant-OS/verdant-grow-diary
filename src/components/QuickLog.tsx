@@ -1053,6 +1053,20 @@ export default function QuickLog({
               waterTempC: previewTempC,
               sourceLabel: "manual",
             });
+            const sensorContext = buildEnvironmentCheckSensorContext({
+              tentId: sensorTentId,
+              plantId: selectedPlant?.id ?? null,
+              sourceLabel: "manual",
+              hasMeasurements: hasMeasurement,
+            });
+            const ctxTone =
+              sensorContext.status === "valid"
+                ? "border-emerald-500/40 bg-emerald-500/10"
+                : sensorContext.status === "blocked"
+                  ? "border-destructive/40 bg-destructive/10"
+                  : sensorContext.status === "warning"
+                    ? "border-amber-500/40 bg-amber-500/10"
+                    : "border-border/60 bg-secondary/30";
             return (
               <section
                 data-testid="quick-log-environment-check-section"

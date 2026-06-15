@@ -27,7 +27,15 @@ import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
-import { buildActionRowAriaLabel, buildActionButtonAriaLabel, buildStatusBadgeAriaLabel, sanitizeActionCopy } from "@/lib/actionQueueRowView";
+import {
+  buildActionRowAriaLabel,
+  buildActionButtonAriaLabel,
+  buildStatusBadgeAriaLabel,
+  sanitizeActionCopy,
+  formatActionTargetLabel,
+  APPROVE_DIALOG_REASSURANCE,
+  ACTION_EVIDENCE_QUALITY_NOT_AVAILABLE,
+} from "@/lib/actionQueueRowView";
 import { actionDetailPath, actionsPath, aiDoctorSessionDetailPath, alertDetailPath } from "@/lib/routes";
 import { toast } from "sonner";
 import {

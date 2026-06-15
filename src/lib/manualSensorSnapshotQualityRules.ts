@@ -99,6 +99,14 @@ function inRange(n: number, r: { min: number; max: number }): boolean {
 export interface EvaluateOptions {
   readonly nowMs?: number;
   readonly staleHours?: number;
+  /**
+   * Display mode. "current" (default) applies the staleness clock and may
+   * support AI Doctor / Action Queue current-room eligibility. "historical"
+   * evaluates a captured-moment reading for timeline/history surfaces: it
+   * skips the time-based stale rule, never claims current-room support,
+   * and uses historical-phrased summary copy.
+   */
+  readonly mode?: "current" | "historical";
 }
 
 export function evaluateManualSensorSnapshotQuality(

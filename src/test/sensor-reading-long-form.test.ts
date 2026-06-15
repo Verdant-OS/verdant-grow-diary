@@ -12,7 +12,7 @@ function fresh() {
   return normalizeSensorReading(
     { temperature_c: 24, humidity: 50, co2: 800 },
     {
-      truthSource: "live",
+      source: "live",
       sourceIdentity: "ecowitt",
       transport: "webhook",
       tentId: TENT,
@@ -38,7 +38,7 @@ describe("normalizedReadingToLongFormRows", () => {
   it("rejects readings without tent_id", () => {
     const r = normalizeSensorReading(
       { temperature_c: 24, humidity: 50 },
-      { truthSource: "live", capturedAt: FRESH, now: NOW },
+      { source: "live", capturedAt: FRESH, now: NOW },
     );
     expect(normalizedReadingToLongFormRows(r)).toEqual([]);
   });
@@ -46,7 +46,7 @@ describe("normalizedReadingToLongFormRows", () => {
   it("rejects readings without captured_at", () => {
     const r = normalizeSensorReading(
       { temperature_c: 24, humidity: 50 },
-      { truthSource: "live", tentId: TENT, now: NOW },
+      { source: "live", tentId: TENT, now: NOW },
     );
     expect(normalizedReadingToLongFormRows(r)).toEqual([]);
   });
@@ -54,7 +54,7 @@ describe("normalizedReadingToLongFormRows", () => {
   it("rejects invalid readings", () => {
     const r = normalizeSensorReading(
       {},
-      { truthSource: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
+      { source: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
     );
     expect(r.source).toBe("invalid");
     expect(normalizedReadingToLongFormRows(r)).toEqual([]);

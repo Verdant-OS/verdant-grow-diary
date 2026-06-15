@@ -52,7 +52,7 @@ export default function DiaryCalendarSection({
     () => buildDiaryCalendarViewModel(rawEntries ?? []),
     [rawEntries],
   );
-  const [filter, setFilter] = useState<DiaryCalendarFilter>("all");
+  const [filter, setFilterState] = useState<DiaryCalendarFilter>("all");
   const groups = useMemo(
     () => filterDiaryCalendarGroups(allGroups, filter),
     [allGroups, filter],
@@ -66,12 +66,22 @@ export default function DiaryCalendarSection({
     visibleGroups[0]?.dateKey ?? null,
   );
 
-  // Reset open day when the filter removes it, so stale details never render.
-  // Preserve explicit collapse (openDay === null); only redirect when the
-  // currently-open day was filtered out, so stale details never render.
+  // Switching filter: jump to the newest day under the new filter so events
+  // remain visible immediately. Explicit user collapse (openDay=null) is
+  // preserved within a filter.
+  const setFilter = (next: DiaryCalendarFilter) => {
+    if (next === filter) return;
+    setFilterState(next);
+    const nextGroups = filterDiaryCalendarGroups(allGroups, next);
+    setOpenDay(nextGroups[0]?.dateKey ?? null);
+  };
+
+  // Belt-and-braces: never render stale details if the open day was removed
+  // (e.g. raw entries changed asynchronously).
   const openDayStillVisible =
     openDay !== null && visibleGroups.some((g) => g.dateKey === openDay);
-  const effectiveOpenDay = openDay === null || openDayStillVisible ? openDay : null;
+  const effectiveOpenDay =
+    openDay === null || openDayStillVisible ? openDay : null;
 
   const hasAnyEntries = allGroups.length > 0;
 

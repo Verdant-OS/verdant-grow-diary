@@ -131,8 +131,9 @@ describe("buildActionEvidenceViewModel", () => {
   });
 
   it("never returns raw_payload / service_role / token / Bearer / private-id strings", () => {
-    const vm = buildActionEvidenceViewModel({
+    const dirty = {
       source: "environment_alert",
+      action_type: "review_high_vpd",
       alert_type: "high_vpd",
       captured_at: "2026-06-14T11:30:00.000Z",
       snapshot: {
@@ -142,19 +143,20 @@ describe("buildActionEvidenceViewModel", () => {
         humidity_pct: 60,
         vpd_kpa: 1.2,
       },
-      // @ts-expect-error — extra fields must be ignored by the helper.
       raw_payload: { secret: "sk_live_zzzz" },
-      // @ts-expect-error
       service_role_key: "ey.xx.yy",
-      // @ts-expect-error
       authorization: "Bearer eyExample",
-    });
+      action_id: "00000000-0000-0000-0000-000000000000",
+    } as unknown as Parameters<typeof buildActionEvidenceViewModel>[0];
+    const vm = buildActionEvidenceViewModel(dirty);
     const blob = JSON.stringify(vm);
     expect(blob).not.toMatch(/raw_payload/i);
     expect(blob).not.toMatch(/service_role/i);
     expect(blob).not.toMatch(/sk_live_/i);
     expect(blob).not.toMatch(/Bearer\s+ey/i);
+    expect(blob).not.toMatch(/00000000-0000-0000-0000-000000000000/);
   });
+
 
   it("handles null/undefined input without throwing", () => {
     const a = buildActionEvidenceViewModel(null);

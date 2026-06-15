@@ -817,6 +817,12 @@ export default function ActionQueue() {
                       <AiDoctorSessionLink row={row} />
                       <LinkedAlertLink row={row} />
                     </div>
+                    <p
+                      className="mt-1 text-[11px] text-muted-foreground"
+                      data-testid="action-queue-row-evidence-quality"
+                    >
+                      {ACTION_EVIDENCE_QUALITY_NOT_AVAILABLE}
+                    </p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 mt-3">

@@ -98,5 +98,6 @@ export function buildAiDoctorImportedHistoryDisclosureViewModel(
     showSuspiciousFlags: history.suspiciousFlagCount > 0,
     showMissingLiveWarning: missingLive,
     missingLiveWarning: missingLive ? s.missingLiveWarning : null,
+    invalidNote: s.invalidNote,
   };
 }

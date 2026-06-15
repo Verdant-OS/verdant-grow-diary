@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-// @ts-expect-error — mjs script without types; tests verify exported behavior.
+// @ts-ignore — mjs script without types; tests verify exported behavior.
 import { scanText, formatViolation, RULES } from "../../scripts/assert-release-docs-safety.mjs";
 
 describe("release-docs safety scanner", () => {

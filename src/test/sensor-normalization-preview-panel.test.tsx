@@ -118,6 +118,64 @@ describe("SensorNormalizationPreviewPanel", () => {
     expect(text).not.toMatch(/"secret"/);
   });
 
+  it("renders prominent tent and plant status labels", () => {
+    const vm = buildSensorNormalizationPreviewViewModel({
+      payload: { temperature_c: 24, humidity: 50 },
+      options: {
+        source: "manual",
+        sourceIdentity: "manual_entry",
+        transport: "manual",
+        tentId: TENT,
+        plantId: null,
+        capturedAt: FRESH,
+        now: NOW,
+      },
+    });
+    render(<SensorNormalizationPreviewPanel viewModel={vm} />);
+    const tent = screen.getByTestId("sensor-normalization-preview-tent-status");
+    expect(tent.getAttribute("data-tent-status")).toBe("linked_verified");
+    expect(tent.textContent).toBe("Linked tent verified");
+    const plant = screen.getByTestId("sensor-normalization-preview-plant-status");
+    expect(plant.getAttribute("data-plant-status")).toBe("missing");
+    expect(plant.textContent).toBe("No plant linked");
+  });
+
+  it("renders raw field count only — no raw payload keys leak", () => {
+    const payload = {
+      temperature_c: 24,
+      humidity: 50,
+      vendor_serial_abc: "leak-key-value",
+    };
+    const { container } = render(
+      <SensorNormalizationPreviewPanel viewModel={buildVm({ payload })} />,
+    );
+    const note = screen.getByTestId("sensor-normalization-preview-raw-note");
+    expect(note.textContent).toMatch(/Raw fields: 3/);
+    const text = container.textContent ?? "";
+    expect(text).not.toContain("vendor_serial_abc");
+    expect(text).not.toContain("leak-key-value");
+    expect(text).not.toMatch(/raw_payload/i);
+  });
+
+  it("compact variant hides long-form table but shows row-count summary", () => {
+    render(
+      <SensorNormalizationPreviewPanel viewModel={buildVm()} variant="compact" />,
+    );
+    expect(
+      screen.queryByTestId("sensor-normalization-preview-long-form"),
+    ).toBeNull();
+    expect(
+      screen.getByTestId("sensor-normalization-preview-long-form-summary").textContent,
+    ).toMatch(/write-ready row/);
+    // Still renders source/identity/transport/confidence/warnings/row count.
+    const badges = screen.getAllByTestId("sensor-normalization-preview-badge");
+    expect(badges.some((b) => (b.textContent ?? "").includes("Source: csv"))).toBe(true);
+    expect(
+      screen.getByTestId("sensor-normalization-preview-row-count").textContent,
+    ).toMatch(/\d+/);
+  });
+
+
   it("static safety: panel does not import write paths or call edges", () => {
     const src = readFileSync(
       resolve(__dirname, "../components/SensorNormalizationPreviewPanel.tsx"),

@@ -25,6 +25,7 @@ import {
   normalizedReadingToLongFormRows,
   type NormalizedSensorLongFormRow,
 } from "./sensorReadingLongForm";
+import { isUuid } from "@/lib/isUuid";
 
 export interface SensorNormalizationPreviewInput {
   payload: unknown;
@@ -63,6 +64,17 @@ export interface SensorNormalizationPreviewWarning {
   label: string;
 }
 
+export type SensorNormalizationPreviewTentStatus =
+  | "linked_verified"
+  | "missing"
+  | "invalid";
+
+export type SensorNormalizationPreviewPlantStatus =
+  | "linked"
+  | "missing"
+  | "invalid"
+  | "not_applicable";
+
 export interface SensorNormalizationPreviewViewModel {
   writesEnabled: false;
   disclaimer: string;
@@ -72,8 +84,14 @@ export interface SensorNormalizationPreviewViewModel {
   transport: SensorTransport;
   confidence: number;
   isStale: boolean;
+  /** Back-compat coarse status (present/missing). */
   tentIdStatus: "present" | "missing";
+  /** Detailed status incl. invalid UUID. */
+  tentStatus: SensorNormalizationPreviewTentStatus;
+  tentStatusLabel: string;
   plantIdStatus: "present" | "missing" | "not_applicable";
+  plantStatus: SensorNormalizationPreviewPlantStatus;
+  plantStatusLabel: string;
   capturedAtDisplay: string;
   capturedAtPresent: boolean;
   badges: SensorNormalizationPreviewBadge[];
@@ -97,8 +115,11 @@ export const SENSOR_NORMALIZATION_PREVIEW_EMPTY_STATE =
 export const SENSOR_NORMALIZATION_PREVIEW_INVALID_NOTICE =
   "Invalid preview — no long-form rows will be generated." as const;
 
+export const SENSOR_NORMALIZATION_PREVIEW_TENT_MISSING_EMPTY_STATE =
+  "No write-ready metric rows were generated because a valid tent context is missing." as const;
+
 export const SENSOR_NORMALIZATION_PREVIEW_RAW_NOTE =
-  "Raw payload preserved for future ingest/debug context." as const;
+  "Raw payload preserved for future ingest/debug context. Full raw payload is not shown in preview mode." as const;
 
 const WARNING_LABELS: Record<string, string> = {
   missing_tent_id: "Missing tent ID",
@@ -195,23 +216,57 @@ export function buildSensorNormalizationPreviewViewModel(
   input: SensorNormalizationPreviewInput,
 ): SensorNormalizationPreviewViewModel {
   const normalized = normalizeSensorReading(input.payload, input.options);
-  const longFormRows = normalizedReadingToLongFormRows(normalized);
-  const longFormPreview = buildLongFormRows(longFormRows);
+  const metricRowsAll = normalizedReadingToLongFormRows(normalized);
   const metricRows = buildMetricRows(normalized);
   const warnings = buildWarnings(normalized);
   const badges = buildBadges(normalized);
 
+  // Tent ID classification (uses existing isUuid helper).
+  const rawTentId = input.options.tentId;
+  let tentStatus: SensorNormalizationPreviewTentStatus;
+  let tentStatusLabel: string;
+  if (rawTentId === undefined || rawTentId === null || (typeof rawTentId === "string" && rawTentId.trim() === "")) {
+    tentStatus = "missing";
+    tentStatusLabel = "Missing tent ID";
+  } else if (!isUuid(rawTentId)) {
+    tentStatus = "invalid";
+    tentStatusLabel = "Invalid tent ID";
+  } else {
+    tentStatus = "linked_verified";
+    tentStatusLabel = "Linked tent verified";
+  }
+
+  // Plant ID classification (informational; missing is not an error).
+  const rawPlantId = input.options.plantId;
+  let plantStatus: SensorNormalizationPreviewPlantStatus;
+  let plantStatusLabel: string;
+  if (rawPlantId === undefined) {
+    plantStatus = "not_applicable";
+    plantStatusLabel = "";
+  } else if (rawPlantId === null || (typeof rawPlantId === "string" && rawPlantId.trim() === "")) {
+    plantStatus = "missing";
+    plantStatusLabel = "No plant linked";
+  } else if (!isUuid(rawPlantId)) {
+    plantStatus = "invalid";
+    plantStatusLabel = "Invalid plant ID";
+  } else {
+    plantStatus = "linked";
+    plantStatusLabel = "Linked plant present";
+  }
+
   let emptyState: string | null = null;
   if (normalized.source === "invalid") {
     emptyState = SENSOR_NORMALIZATION_PREVIEW_INVALID_NOTICE;
+  } else if (tentStatus !== "linked_verified") {
+    emptyState = SENSOR_NORMALIZATION_PREVIEW_TENT_MISSING_EMPTY_STATE;
   } else if (longFormPreview.length === 0) {
     emptyState = SENSOR_NORMALIZATION_PREVIEW_EMPTY_STATE;
   }
 
   const plantIdStatus: "present" | "missing" | "not_applicable" =
-    input.options.plantId === undefined
+    plantStatus === "not_applicable"
       ? "not_applicable"
-      : normalized.plant_id
+      : plantStatus === "linked"
         ? "present"
         : "missing";
 
@@ -224,8 +279,12 @@ export function buildSensorNormalizationPreviewViewModel(
     transport: normalized.transport,
     confidence: normalized.confidence,
     isStale: normalized.is_stale,
-    tentIdStatus: normalized.tent_id ? "present" : "missing",
+    tentIdStatus: tentStatus === "linked_verified" ? "present" : "missing",
+    tentStatus,
+    tentStatusLabel,
     plantIdStatus,
+    plantStatus,
+    plantStatusLabel,
     capturedAtDisplay: normalized.captured_at ?? "—",
     capturedAtPresent: normalized.captured_at !== null,
     badges,

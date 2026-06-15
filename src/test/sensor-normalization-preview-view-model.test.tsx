@@ -4,8 +4,8 @@ import { resolve } from "node:path";
 import {
   buildSensorNormalizationPreviewViewModel,
   SENSOR_NORMALIZATION_PREVIEW_DISCLAIMER,
-  SENSOR_NORMALIZATION_PREVIEW_EMPTY_STATE,
   SENSOR_NORMALIZATION_PREVIEW_INVALID_NOTICE,
+  SENSOR_NORMALIZATION_PREVIEW_TENT_MISSING_EMPTY_STATE,
 } from "@/lib/sensors/sensorNormalizationPreviewViewModel";
 
 const TENT = "11111111-1111-4111-8111-111111111111";
@@ -96,7 +96,7 @@ describe("sensorNormalizationPreviewViewModel", () => {
     expect(vm.tentIdStatus).toBe("missing");
     expect(vm.warnings.some((w) => w.code === "missing_tent_id")).toBe(true);
     expect(vm.longFormRowCount).toBe(0);
-    expect(vm.emptyState).toBe(SENSOR_NORMALIZATION_PREVIEW_EMPTY_STATE);
+    expect(vm.emptyState).toBe(SENSOR_NORMALIZATION_PREVIEW_TENT_MISSING_EMPTY_STATE);
   });
 
   it("µS/cm EC alias converts to mS/cm; mS/cm field with huge value warns", () => {
@@ -144,6 +144,57 @@ describe("sensorNormalizationPreviewViewModel", () => {
       options: { source: "csv", tentId: TENT, capturedAt: FRESH, now: NOW },
     });
     expect({ ...a, normalized: null }).toEqual({ ...b, normalized: null });
+  });
+
+  it("classifies non-UUID tent as invalid and yields tent-missing empty state", () => {
+    const vm = buildSensorNormalizationPreviewViewModel({
+      payload: { temperature_c: 24, humidity: 50 },
+      options: { source: "manual", tentId: "tent-1", capturedAt: FRESH, now: NOW },
+    });
+    expect(vm.tentStatus).toBe("invalid");
+    expect(vm.tentStatusLabel).toBe("Invalid tent ID");
+    expect(vm.longFormRowCount).toBe(0);
+    expect(vm.emptyState).toBe(SENSOR_NORMALIZATION_PREVIEW_TENT_MISSING_EMPTY_STATE);
+  });
+
+  it("classifies UUID tent as linked_verified", () => {
+    const vm = buildSensorNormalizationPreviewViewModel({
+      payload: { temperature_c: 24, humidity: 50 },
+      options: { source: "manual", tentId: TENT, capturedAt: FRESH, now: NOW },
+    });
+    expect(vm.tentStatus).toBe("linked_verified");
+    expect(vm.tentStatusLabel).toBe("Linked tent verified");
+  });
+
+  it("classifies missing plant as informational (not invalid)", () => {
+    const vm = buildSensorNormalizationPreviewViewModel({
+      payload: { temperature_c: 24, humidity: 50 },
+      options: {
+        source: "manual",
+        tentId: TENT,
+        plantId: null,
+        capturedAt: FRESH,
+        now: NOW,
+      },
+    });
+    expect(vm.plantStatus).toBe("missing");
+    expect(vm.plantStatusLabel).toBe("No plant linked");
+    expect(vm.longFormRowCount).toBeGreaterThan(0);
+  });
+
+  it("classifies non-UUID plant as invalid", () => {
+    const vm = buildSensorNormalizationPreviewViewModel({
+      payload: { temperature_c: 24, humidity: 50 },
+      options: {
+        source: "manual",
+        tentId: TENT,
+        plantId: "plant-1",
+        capturedAt: FRESH,
+        now: NOW,
+      },
+    });
+    expect(vm.plantStatus).toBe("invalid");
+    expect(vm.plantStatusLabel).toBe("Invalid plant ID");
   });
 
   it("static safety: helper does not import write paths or call edges", () => {

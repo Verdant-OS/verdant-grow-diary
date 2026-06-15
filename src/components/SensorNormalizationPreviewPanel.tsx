@@ -16,6 +16,7 @@ import type {
 export interface SensorNormalizationPreviewPanelProps {
   viewModel: SensorNormalizationPreviewViewModel;
   title?: string;
+  variant?: "default" | "compact";
 }
 
 const TONE_CLASS: Record<SensorNormalizationPreviewBadgeTone, string> = {
@@ -29,8 +30,10 @@ const TONE_CLASS: Record<SensorNormalizationPreviewBadgeTone, string> = {
 export function SensorNormalizationPreviewPanel({
   viewModel,
   title = "Normalization preview",
+  variant = "default",
 }: SensorNormalizationPreviewPanelProps): JSX.Element {
   const vm = viewModel;
+  const compact = variant === "compact";
   return (
     <section
       data-testid="sensor-normalization-preview-panel"
@@ -68,25 +71,33 @@ export function SensorNormalizationPreviewPanel({
 
       <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
         <div>
-          <dt className="font-semibold text-foreground">Tent ID</dt>
-          <dd data-testid="sensor-normalization-preview-tent-status">
-            {vm.tentIdStatus === "present" ? "Provided" : "Missing"}
+          <dt className="font-semibold text-foreground">Tent</dt>
+          <dd
+            data-testid="sensor-normalization-preview-tent-status"
+            data-tent-status={vm.tentStatus}
+          >
+            {vm.tentStatusLabel}
           </dd>
         </div>
-        {vm.plantIdStatus !== "not_applicable" && (
+        {vm.plantStatus !== "not_applicable" && (
           <div>
-            <dt className="font-semibold text-foreground">Plant ID</dt>
-            <dd data-testid="sensor-normalization-preview-plant-status">
-              {vm.plantIdStatus === "present" ? "Provided" : "Missing"}
+            <dt className="font-semibold text-foreground">Plant</dt>
+            <dd
+              data-testid="sensor-normalization-preview-plant-status"
+              data-plant-status={vm.plantStatus}
+            >
+              {vm.plantStatusLabel}
             </dd>
           </div>
         )}
-        <div>
-          <dt className="font-semibold text-foreground">Captured at</dt>
-          <dd data-testid="sensor-normalization-preview-captured-at">
-            {vm.capturedAtDisplay}
-          </dd>
-        </div>
+        {!compact && (
+          <div>
+            <dt className="font-semibold text-foreground">Captured at</dt>
+            <dd data-testid="sensor-normalization-preview-captured-at">
+              {vm.capturedAtDisplay}
+            </dd>
+          </div>
+        )}
         <div>
           <dt className="font-semibold text-foreground">Long-form rows</dt>
           <dd data-testid="sensor-normalization-preview-row-count">
@@ -94,6 +105,7 @@ export function SensorNormalizationPreviewPanel({
           </dd>
         </div>
       </dl>
+
 
       {vm.warnings.length > 0 && (
         <ul
@@ -141,43 +153,53 @@ export function SensorNormalizationPreviewPanel({
       )}
 
       {vm.longFormRows.length > 0 ? (
-        <div
-          data-testid="sensor-normalization-preview-long-form"
-          className="rounded-lg border border-border/60 bg-secondary/20 p-2 overflow-x-auto"
-        >
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Long-form row preview
-          </p>
-          <table className="w-full text-[11px]">
-            <thead>
-              <tr className="text-left text-muted-foreground">
-                <th className="font-medium">Metric</th>
-                <th className="font-medium">Value</th>
-                <th className="font-medium">Source</th>
-                <th className="font-medium">Identity</th>
-                <th className="font-medium">Transport</th>
-                <th className="font-medium">Confidence</th>
-                <th className="font-medium">Captured At</th>
-              </tr>
-            </thead>
-            <tbody>
-              {vm.longFormRows.map((r, i) => (
-                <tr
-                  key={`${r.metric}-${i}`}
-                  data-testid="sensor-normalization-preview-long-form-row"
-                >
-                  <td className="font-mono">{r.metric}</td>
-                  <td>{r.value}</td>
-                  <td>{r.source}</td>
-                  <td>{r.source_identity}</td>
-                  <td>{r.transport}</td>
-                  <td>{r.confidence}</td>
-                  <td className="font-mono">{r.captured_at}</td>
+        !compact ? (
+          <div
+            data-testid="sensor-normalization-preview-long-form"
+            className="rounded-lg border border-border/60 bg-secondary/20 p-2 overflow-x-auto"
+          >
+            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Long-form row preview
+            </p>
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr className="text-left text-muted-foreground">
+                  <th className="font-medium">Metric</th>
+                  <th className="font-medium">Value</th>
+                  <th className="font-medium">Source</th>
+                  <th className="font-medium">Identity</th>
+                  <th className="font-medium">Transport</th>
+                  <th className="font-medium">Confidence</th>
+                  <th className="font-medium">Captured At</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {vm.longFormRows.map((r, i) => (
+                  <tr
+                    key={`${r.metric}-${i}`}
+                    data-testid="sensor-normalization-preview-long-form-row"
+                  >
+                    <td className="font-mono">{r.metric}</td>
+                    <td>{r.value}</td>
+                    <td>{r.source}</td>
+                    <td>{r.source_identity}</td>
+                    <td>{r.transport}</td>
+                    <td>{r.confidence}</td>
+                    <td className="font-mono">{r.captured_at}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p
+            data-testid="sensor-normalization-preview-long-form-summary"
+            className="text-[11px] text-muted-foreground"
+          >
+            {vm.longFormRowCount} write-ready row
+            {vm.longFormRowCount === 1 ? "" : "s"} prepared (not saved).
+          </p>
+        )
       ) : (
         <p
           data-testid="sensor-normalization-preview-empty-state"

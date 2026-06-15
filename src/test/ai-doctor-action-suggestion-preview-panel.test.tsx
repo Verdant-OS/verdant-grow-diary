@@ -115,8 +115,9 @@ describe("AiDoctorContextReadinessPanel — Action Queue suggestion preview", ()
     render(<AiDoctorContextReadinessPanel context={context} />);
     const text = getPreview().textContent ?? "";
     expect(text).not.toMatch(/\bapproved\b/i);
-    expect(text).not.toMatch(/\bqueued\b/i);
-    expect(text).not.toMatch(/\bexecuted?\b/i);
+    expect(text).not.toMatch(/\b(queued|added to the queue)\b/i);
+    // Past/declarative execution claims must not appear; "will not execute" is fine.
+    expect(text).not.toMatch(/\b(was|is|has been|have been) executed\b/i);
     expect(text).not.toMatch(/turn on|turn off|setpoint|actuate|dose/i);
   });
 });

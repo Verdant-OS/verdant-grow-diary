@@ -68,11 +68,11 @@ describe("AiDoctorImportedHistoryDisclosurePanel", () => {
     expect(panel).toBeTruthy();
   });
 
-  it("shows the panel title 'Imported sensor history used'", () => {
+  it("shows the panel title 'Imported history'", () => {
     render(
       <AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />,
     );
-    expect(screen.getByText("Imported sensor history used")).toBeTruthy();
+    expect(screen.getByText("Imported history")).toBeTruthy();
   });
 
   it("states the data is not live telemetry", () => {

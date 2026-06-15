@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -237,6 +237,8 @@ export default function ActionQueue() {
   const [rows, setRows] = useState<ActionRow[]>([]);
   const [events, setEvents] = useState<Record<string, EventRow[]>>({});
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const hasLoadedOnceRef = useRef(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [noteDialog, setNoteDialog] = useState<
     { row: ActionRow; kind: "approve" | "reject" | "simulate" | "complete" | "cancel" } | null
@@ -282,7 +284,14 @@ export default function ActionQueue() {
 
   const load = useCallback(async () => {
     if (!user) return;
-    setLoading(true);
+    // Distinguish initial load from background refetch so existing rows
+    // are never cleared/replaced by a skeleton. Refresh is presenter-only
+    // — it never fakes data and never blocks approval controls.
+    if (hasLoadedOnceRef.current) {
+      setIsRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     const q = supabase
       .from("action_queue")
       .select(
@@ -311,7 +320,15 @@ export default function ActionQueue() {
       setEvents({});
     }
     setLoading(false);
+    setIsRefreshing(false);
+    hasLoadedOnceRef.current = true;
   }, [user, effectiveGrowId]);
+
+  // Reset the initial-load gate when grow scope changes so the user gets
+  // the full skeleton (not just a subtle refresh) on a scope switch.
+  useEffect(() => {
+    hasLoadedOnceRef.current = false;
+  }, [effectiveGrowId]);
 
   useEffect(() => {
     load();
@@ -735,9 +752,22 @@ export default function ActionQueue() {
       ) : (
       <>
       <section className="glass rounded-2xl p-4 mb-4" aria-label="Needs Review">
-        <h2 className="text-sm font-semibold mb-3 uppercase tracking-wider text-muted-foreground">
-          Needs Review ({pending.length})
-        </h2>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Needs Review ({pending.length})
+          </h2>
+          {!loading && isRefreshing && (
+            <span
+              role="status"
+              aria-live="polite"
+              data-testid="action-queue-refreshing-indicator"
+              className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground"
+            >
+              <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+              Refreshing actions…
+            </span>
+          )}
+        </div>
         {loading ? (
           <div
             role="status"

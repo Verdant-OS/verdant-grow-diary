@@ -34,6 +34,10 @@ import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 import { buildTimelineSensorSnapshotViewModel } from "@/lib/timelineSensorSnapshotViewModel";
 import { buildTimelinePhotoPreviewViewModel } from "@/lib/timelinePhotoPreviewViewModel";
 import { buildTimelineDayGroups } from "@/lib/timelineDayGroupingViewModel";
+import {
+  EARLY_STAGE_MILESTONE_UNKNOWN_LABEL,
+  EARLY_STAGE_VIGOR_UNKNOWN_LABEL,
+} from "@/lib/earlyStageTimelineViewModel";
 
 type Props =
   | { scope: "plant"; plantId: string | null | undefined }
@@ -98,6 +102,50 @@ function DiaryItemRow({ item }: { item: Extract<TimelineMemoryItem, { kind: "dia
       </div>
       {item.note && (
         <p className="mt-1.5 text-sm text-foreground/90 break-words">{item.note}</p>
+      )}
+
+      {item.earlyStage && (
+        <div
+          className="mt-2 flex flex-wrap items-center gap-1.5"
+          data-testid="timeline-diary-early-stage"
+        >
+          {item.earlyStage.stageContextLabel && (
+            <Badge
+              variant="outline"
+              className="text-[10px]"
+              data-testid="timeline-diary-early-stage-stage"
+            >
+              Stage: {item.earlyStage.stageContextLabel}
+            </Badge>
+          )}
+          {(item.earlyStage.milestoneLabel || item.earlyStage.milestoneUnknown) && (
+            <Badge
+              variant="secondary"
+              className="text-[10px]"
+              data-testid="timeline-diary-early-stage-milestone"
+            >
+              Milestone:{" "}
+              {item.earlyStage.milestoneLabel ?? EARLY_STAGE_MILESTONE_UNKNOWN_LABEL}
+            </Badge>
+          )}
+          {(item.earlyStage.vigorLabel || item.earlyStage.vigorUnknown) && (
+            <Badge
+              variant="secondary"
+              className="text-[10px]"
+              data-testid="timeline-diary-early-stage-vigor"
+            >
+              Vigor: {item.earlyStage.vigorLabel ?? EARLY_STAGE_VIGOR_UNKNOWN_LABEL}
+            </Badge>
+          )}
+          {item.earlyStage.note && (
+            <p
+              className="basis-full text-xs text-muted-foreground"
+              data-testid="timeline-diary-early-stage-note"
+            >
+              What changed: {item.earlyStage.note}
+            </p>
+          )}
+        </div>
       )}
 
       {sensorVm.kind === "chips" && (

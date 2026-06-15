@@ -81,6 +81,12 @@ export interface TimelineDiaryItem {
   plantName?: string | null;
   /** Optional stage from `details.stage` — surfaced but never invented. */
   stage?: string | null;
+  /**
+   * Optional read-only early-stage view model (germination/seedling
+   * milestone + vigor + short note) extracted from `details.early_stage`.
+   * Presenter-only — never echoed as raw payload.
+   */
+  earlyStage?: import("./earlyStageTimelineViewModel").EarlyStageTimelineViewModel | null;
 }
 
 export interface TimelineManualSnapshotItem {

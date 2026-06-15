@@ -78,6 +78,19 @@ export default function ManualSensorReadingCard({
 
   const validation = useMemo(() => validateManualEntry(form), [form]);
   const advisor = useMemo(() => evaluateManualSnapshotAdvisor(form), [form]);
+  const snapshotQuality = useMemo(() => {
+    // Build a sanitized snapshot from validated metrics only. No raw_payload,
+    // no vendor metadata, no tokens, no private IDs. captured_at = now since
+    // the grower is entering a current reading right now.
+    const snap: ManualSensorSnapshotInput = { source: "manual", captured_at: new Date().toISOString() };
+    for (const m of validation.metrics) {
+      if (m.metric === "temperature_c") snap.temperature_c = m.value;
+      else if (m.metric === "humidity_pct") snap.humidity_pct = m.value;
+      else if (m.metric === "vpd_kpa") snap.vpd_kpa = m.value;
+      else if (m.metric === "soil_moisture_pct") snap.soil_moisture_pct = m.value;
+    }
+    return evaluateManualSensorSnapshotQuality(snap);
+  }, [validation.metrics]);
 
   function update<K extends keyof ManualEntryInput>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));

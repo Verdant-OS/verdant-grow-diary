@@ -31,6 +31,11 @@ import {
   isUnsafePreviewText,
   previewActionSuggestion,
 } from "@/lib/aiDoctorActionSuggestionPreviewRules";
+import {
+  deriveCurrentSnapshotFromAiDoctorContext,
+  evaluateManualSensorSnapshotQuality,
+} from "@/lib/manualSensorSnapshotQualityRules";
+import ManualSensorSnapshotQualityBadge from "@/components/ManualSensorSnapshotQualityBadge";
 
 export interface AiDoctorContextReadinessPanelProps {
   context: AiDoctorContext;
@@ -78,6 +83,14 @@ export default function AiDoctorContextReadinessPanel({
   const actionPreview = useMemo(
     () => previewActionSuggestion(deriveActionSuggestionPreviewInput(view)),
     [view],
+  );
+
+  const currentSnapshotQuality = useMemo(
+    () =>
+      evaluateManualSensorSnapshotQuality(
+        deriveCurrentSnapshotFromAiDoctorContext(context),
+      ),
+    [context],
   );
 
   return (

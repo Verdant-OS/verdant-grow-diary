@@ -391,7 +391,8 @@ export default function ActionQueue() {
     approve: {
       title: "Approve Action",
       description:
-        "Approved actions are recorded for future manual or controlled execution. No equipment command is sent.",
+        "Approved actions are recorded for future manual or controlled execution. No equipment command is sent. " +
+        APPROVE_DIALOG_REASSURANCE,
       label: "Approval note",
       placeholder: "Optional — why are you approving?",
       confirmLabel: "Approve",

@@ -21,6 +21,11 @@ import {
   type BlockedRowContext,
 } from "@/lib/csvImportPlanReport";
 import type { CsvPreviewParseResult } from "@/lib/csvSensorPreviewRules";
+import { SensorNormalizationPreviewPanel } from "@/components/SensorNormalizationPreviewPanel";
+import {
+  buildSensorNormalizationPreviewViewModel,
+  type SensorNormalizationPreviewViewModel,
+} from "@/lib/sensors/sensorNormalizationPreviewViewModel";
 
 /**
  * CsvPreviewReviewGate — presentational-only review gate + import plan summary

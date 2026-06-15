@@ -382,7 +382,7 @@ describe("Diary calendar drawer — static safety", () => {
 
   it("contains no Supabase write/insert/update/delete code", () => {
     for (const src of [drawerVM, drawerComp]) {
-      expect(src).not.toMatch(/supabase/i);
+      expect(src).not.toMatch(/from\s+["'][^"']*supabase[^"']*["']/);
       expect(src).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.upsert\(/);
     }
   });

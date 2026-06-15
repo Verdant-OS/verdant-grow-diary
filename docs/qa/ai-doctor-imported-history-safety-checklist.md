@@ -13,6 +13,21 @@ touches imported-history surfaces.
       current live or manual snapshot is present.
 - [ ] Invalid/unknown soil note is visible when invalid values are present.
 
+## Manual sensor snapshot quality (current reading)
+
+- [ ] Valid manual snapshot with good values → **Usable** current reading.
+- [ ] Valid live snapshot with good values → **Usable** current reading.
+- [ ] CSV-only history → **history-only / not current**.
+- [ ] Demo / stale / invalid / unknown source → **not current**.
+- [ ] Missing snapshot entirely → **missing** current reading.
+- [ ] Humidity stuck at 0 or 100 % → flagged **invalid** or **needs review**.
+- [ ] Suspicious EC > 50 mS/cm → flagged **invalid** or **needs review**.
+- [ ] pH outside realistic range → flagged **invalid** or **needs review**.
+- [ ] No raw payload, vendor secrets, bridge tokens, or private IDs render
+      in the quality badge or readiness panel.
+- [ ] Action Queue suggestion preview stays `needs_current_reading` when
+      only CSV history is present.
+
 ## Render safety
 
 - [ ] No raw payload fields (`raw_payload`, vendor secrets, internal IDs,
@@ -69,3 +84,10 @@ Known good results:
 | `scripts/assert-release-docs-safety.mjs` | OK |
 
 See `docs/testing/known-vitest-flakes.md` for the known parallelism flake.
+
+## Related docs
+
+- Manual snapshot quality checklist: `qa/manual-sensor-snapshot-quality-checklist.md`
+- AI Doctor output contract: `ai-doctor-output-contract.md`
+- Action Queue suggestion preview QA runbook: `runbooks/ai-doctor-action-suggestion-preview-qa.md`
+- Preview safety scanner: `testing/ai-doctor-preview-safety-scanner.md`

@@ -86,6 +86,58 @@ history is documented and QA-tracked separately:
 This is documentation, QA, and safety validation only — no new AI
 diagnosis behavior shipped.
 
+## Current sensor snapshot quality
+
+The **Manual Sensor Snapshot quality badge** is a presenter/readiness
+context component that tells growers whether a current sensor snapshot
+can support AI Doctor current-room context and Action Queue suggestion
+preview eligibility.
+
+What it is:
+- A **read-only quality indicator** (`usable`, `needs_review`, `invalid`, `missing`).
+- Derived from a **sanitized** snapshot containing only whitelisted numeric
+  metrics (`temperature_c`, `humidity_pct`, `ph`, `ec_ms_cm`, `vpd_kpa`, `soil_moisture_pct`).
+- Rendered next to current readings in the AI Doctor context readiness panel.
+
+What it is NOT:
+- It does **not** create Action Queue rows.
+- It does **not** call Supabase, Edge Functions, or models.
+- It does **not** render raw payloads, vendor secrets, bridge tokens, or private IDs.
+
+Eligibility by source:
+- `live` and `manual` current readings can support AI Doctor current context
+  and Action Queue suggestion preview **when values pass validation**.
+- `csv` is **history-only** — never treated as current live telemetry.
+- `demo`, `stale`, `invalid`, and `unknown` sources **cannot** support
+  current-room decisions.
+
+Validation rules:
+- **Stale threshold**: `MANUAL_SNAPSHOT_CURRENT_STALE_HOURS = 6`.
+  Readings older than 6 hours are treated as stale and cannot support
+  current context.
+- **Humidity stuck at 0 or 100 %** → flagged invalid or needs review.
+- **Soil moisture stuck at 0 or 100 %** → flagged invalid or needs review.
+- **EC > 50 mS/cm** → treated as likely unit mismatch, flagged invalid or
+  needs review.
+- **pH outside realistic range** → flagged invalid or needs review.
+- **Temperature / VPD out of range** → flagged invalid or needs review.
+- **Missing or unparseable timestamp** → flagged missing or invalid.
+
+Sanitization boundary:
+- Only known, safe, numeric metrics are mapped to the badge input.
+- `raw_payload`, `service_role`, tokens, vendor metadata, and internal IDs
+  are explicitly stripped during derivation.
+- The presenter (`ManualSensorSnapshotQualityBadge`) never renders raw
+  payload fields or private strings.
+
+Validation:
+- Helper tests: `src/test/manual-sensor-snapshot-quality-rules.test.ts`
+- Presenter tests: `src/test/manual-sensor-snapshot-quality-badge.test.tsx`
+- Integration tests: `src/test/ai-doctor-context-readiness-panel-current-snapshot-quality.test.tsx`
+- Known good results: 18/18 helper + badge tests pass; 65/65 related
+  readiness/imported-history/action-preview tests pass; 5/5 integration
+  tests pass.
+
 ## Action Queue suggestion preview
 
 The Action Queue suggestion preview is a read-only, context-only
@@ -141,6 +193,7 @@ Validation:
   imported-history + readiness regression tests pass.
 
 See also:
-- Runbook: `runbooks/ai-doctor-imported-history.md`
+- Manual snapshot quality: `src/lib/manualSensorSnapshotQualityRules.ts`
+- Runbook: `runbooks/ai-doctor-action-suggestion-preview-qa.md`
 - QA checklist: `qa/ai-doctor-imported-history-safety-checklist.md`
 - Release note: `releases/ai-doctor-imported-history-safety.md`

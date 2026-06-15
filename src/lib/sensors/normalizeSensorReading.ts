@@ -25,12 +25,16 @@ export type SensorTruthSource =
 
 export type SensorSourceIdentity =
   | "manual_entry"
+  | "demo_fixture"
+  | "csv_import"
   | "ecowitt"
   | "switchbot"
   | "home_assistant"
   | "mqtt_bridge"
   | "raspberry_pi"
-  | "csv_import"
+  | "spider_farmer"
+  | "sensorpush"
+  | "aroya"
   | "unknown";
 
 export type SensorTransport =
@@ -40,10 +44,11 @@ export type SensorTransport =
   | "webhook"
   | "home_assistant"
   | "local_bridge"
+  | "api"
   | "unknown";
 
 export interface NormalizeSensorReadingOptions {
-  truthSource: SensorTruthSource;
+  source: SensorTruthSource;
   sourceIdentity?: SensorSourceIdentity;
   transport?: SensorTransport;
   tentId?: string | null;

@@ -146,6 +146,57 @@ describe("sensorNormalizationPreviewViewModel", () => {
     expect({ ...a, normalized: null }).toEqual({ ...b, normalized: null });
   });
 
+  it("classifies non-UUID tent as invalid and yields tent-missing empty state", () => {
+    const vm = buildSensorNormalizationPreviewViewModel({
+      payload: { temperature_c: 24, humidity: 50 },
+      options: { source: "manual", tentId: "tent-1", capturedAt: FRESH, now: NOW },
+    });
+    expect(vm.tentStatus).toBe("invalid");
+    expect(vm.tentStatusLabel).toBe("Invalid tent ID");
+    expect(vm.longFormRowCount).toBe(0);
+    expect(vm.emptyState).toBe(SENSOR_NORMALIZATION_PREVIEW_TENT_MISSING_EMPTY_STATE);
+  });
+
+  it("classifies UUID tent as linked_verified", () => {
+    const vm = buildSensorNormalizationPreviewViewModel({
+      payload: { temperature_c: 24, humidity: 50 },
+      options: { source: "manual", tentId: TENT, capturedAt: FRESH, now: NOW },
+    });
+    expect(vm.tentStatus).toBe("linked_verified");
+    expect(vm.tentStatusLabel).toBe("Linked tent verified");
+  });
+
+  it("classifies missing plant as informational (not invalid)", () => {
+    const vm = buildSensorNormalizationPreviewViewModel({
+      payload: { temperature_c: 24, humidity: 50 },
+      options: {
+        source: "manual",
+        tentId: TENT,
+        plantId: null,
+        capturedAt: FRESH,
+        now: NOW,
+      },
+    });
+    expect(vm.plantStatus).toBe("missing");
+    expect(vm.plantStatusLabel).toBe("No plant linked");
+    expect(vm.longFormRowCount).toBeGreaterThan(0);
+  });
+
+  it("classifies non-UUID plant as invalid", () => {
+    const vm = buildSensorNormalizationPreviewViewModel({
+      payload: { temperature_c: 24, humidity: 50 },
+      options: {
+        source: "manual",
+        tentId: TENT,
+        plantId: "plant-1",
+        capturedAt: FRESH,
+        now: NOW,
+      },
+    });
+    expect(vm.plantStatus).toBe("invalid");
+    expect(vm.plantStatusLabel).toBe("Invalid plant ID");
+  });
+
   it("static safety: helper does not import write paths or call edges", () => {
     const src = readFileSync(
       resolve(__dirname, "../lib/sensors/sensorNormalizationPreviewViewModel.ts"),

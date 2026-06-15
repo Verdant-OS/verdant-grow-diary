@@ -498,7 +498,8 @@ export function listDiaryCalendarMonthKeys(
 ): string[] {
   const set = new Set<string>();
   for (const g of groups) set.add(monthKeyFromDateKey(g.dateKey));
-  return Array.from(set).sort((a, b) => (a < b ? 1 : a < b ? 0 : a > b ? -1 : 0));
+  return [...set].sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
+
 }
 
 /**

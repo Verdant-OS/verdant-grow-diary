@@ -16,6 +16,10 @@ import {
   FEEDING_REVIEW_DEFAULTS_FLAG,
   FEEDING_REVIEW_NEEDS_INPUT,
 } from "@/lib/quickLogFeedingReviewViewModel";
+import {
+  buildEcCompensationPreview,
+  EC_COMPENSATION_PREVIEW_DISCLAIMER,
+} from "@/lib/ecCompensationPreviewViewModel";
 
 interface Props {
   value: QuickLogFeedingFormState;

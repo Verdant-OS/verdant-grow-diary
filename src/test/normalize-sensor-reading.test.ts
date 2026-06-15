@@ -13,7 +13,7 @@ describe("normalizeSensorReading", () => {
     const r = normalizeSensorReading(
       { temperature_c: 24, humidity: 50 },
       {
-        truthSource: "manual",
+        source: "manual",
         sourceIdentity: "manual_entry",
         transport: "manual",
         tentId: TENT,
@@ -33,7 +33,7 @@ describe("normalizeSensorReading", () => {
     const r = normalizeSensorReading(
       { temp_f: 75, rh: 55 },
       {
-        truthSource: "csv",
+        source: "csv",
         sourceIdentity: "csv_import",
         transport: "csv",
         tentId: TENT,
@@ -51,7 +51,7 @@ describe("normalizeSensorReading", () => {
     const r = normalizeSensorReading(
       { tempf: 76, humidity: 52 },
       {
-        truthSource: "live",
+        source: "live",
         sourceIdentity: "ecowitt",
         transport: "webhook",
         tentId: TENT,
@@ -68,7 +68,7 @@ describe("normalizeSensorReading", () => {
     const r = normalizeSensorReading(
       { temperature_c: 23, humidity: 60 },
       {
-        truthSource: "live",
+        source: "live",
         sourceIdentity: "raspberry_pi",
         transport: "local_bridge",
         tentId: TENT,
@@ -85,7 +85,7 @@ describe("normalizeSensorReading", () => {
     const r = normalizeSensorReading(
       { temperature_c: 24, humidity: 50 },
       {
-        truthSource: "demo",
+        source: "demo",
         sourceIdentity: "unknown",
         transport: "unknown",
         tentId: TENT,
@@ -101,7 +101,7 @@ describe("normalizeSensorReading", () => {
     const r = normalizeSensorReading(
       { temperature_c: 24, humidity: 50 },
       {
-        truthSource: "live",
+        source: "live",
         sourceIdentity: "ecowitt",
         transport: "webhook",
         tentId: TENT,
@@ -118,7 +118,7 @@ describe("normalizeSensorReading", () => {
     const r = normalizeSensorReading(
       { temperature_c: 24 },
       {
-        truthSource: "invalid",
+        source: "invalid",
         tentId: TENT,
         capturedAt: OLD,
         now: NOW,
@@ -131,7 +131,7 @@ describe("normalizeSensorReading", () => {
     const r = normalizeSensorReading(
       { temperature_c: 24, humidity: 50 },
       {
-        truthSource: "demo",
+        source: "demo",
         tentId: TENT,
         capturedAt: OLD,
         now: NOW,
@@ -144,7 +144,7 @@ describe("normalizeSensorReading", () => {
   it("missing tent_id adds warning", () => {
     const r = normalizeSensorReading(
       { temperature_c: 24, humidity: 50 },
-      { truthSource: "manual", capturedAt: FRESH, now: NOW },
+      { source: "manual", capturedAt: FRESH, now: NOW },
     );
     expect(r.warnings).toContain("missing_tent_id");
     expect(r.tent_id).toBeNull();
@@ -153,7 +153,7 @@ describe("normalizeSensorReading", () => {
   it("missing captured_at adds warning", () => {
     const r = normalizeSensorReading(
       { temperature_c: 24, humidity: 50 },
-      { truthSource: "manual", tentId: TENT, now: NOW },
+      { source: "manual", tentId: TENT, now: NOW },
     );
     expect(r.warnings).toContain("missing_captured_at");
     expect(r.captured_at).toBeNull();
@@ -162,7 +162,7 @@ describe("normalizeSensorReading", () => {
   it("no usable metrics → source becomes invalid", () => {
     const r = normalizeSensorReading(
       {},
-      { truthSource: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
+      { source: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
     );
     expect(r.source).toBe("invalid");
     expect(r.warnings).toContain("no_usable_metrics");
@@ -172,7 +172,7 @@ describe("normalizeSensorReading", () => {
     for (const h of [0, 100]) {
       const r = normalizeSensorReading(
         { temperature_c: 24, humidity: h },
-        { truthSource: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
+        { source: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
       );
       expect(r.warnings).toContain("humidity_stuck_value");
     }
@@ -182,7 +182,7 @@ describe("normalizeSensorReading", () => {
     for (const v of [0, 100]) {
       const r = normalizeSensorReading(
         { soil_moisture: v },
-        { truthSource: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
+        { source: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
       );
       expect(r.warnings).toContain("soil_moisture_stuck_value");
     }
@@ -191,7 +191,7 @@ describe("normalizeSensorReading", () => {
   it("µS/cm EC converts to mS/cm when field name says so", () => {
     const r = normalizeSensorReading(
       { soil_ec_us_cm: 1450 },
-      { truthSource: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
+      { source: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
     );
     expect(r.metrics.soil_ec_ms_cm).toBeCloseTo(1.45, 2);
     expect(r.warnings).not.toContain("soil_ec_likely_us_cm");
@@ -200,7 +200,7 @@ describe("normalizeSensorReading", () => {
   it("EC like 1450 in an mS/cm field creates warning", () => {
     const r = normalizeSensorReading(
       { soil_ec_ms_cm: 1450 },
-      { truthSource: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
+      { source: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
     );
     expect(r.warnings).toContain("soil_ec_likely_us_cm");
   });
@@ -208,12 +208,12 @@ describe("normalizeSensorReading", () => {
   it("pH outside realistic range creates warning", () => {
     const r1 = normalizeSensorReading(
       { ph: 1.5 },
-      { truthSource: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
+      { source: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
     );
     expect(r1.warnings).toContain("ph_out_of_realistic_range");
     const r2 = normalizeSensorReading(
       { ph: 99 },
-      { truthSource: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
+      { source: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
     );
     expect(r2.warnings).toContain("ph_out_of_range");
   });
@@ -221,7 +221,7 @@ describe("normalizeSensorReading", () => {
   it("preserves raw payload, source identity, and transport", () => {
     const raw = { temperature_c: 24, humidity: 50, extra: "anything" };
     const r = normalizeSensorReading(raw, {
-      truthSource: "live",
+      source: "live",
       sourceIdentity: "switchbot",
       transport: "mqtt",
       tentId: TENT,
@@ -235,12 +235,85 @@ describe("normalizeSensorReading", () => {
 
   it("unknown input shape adds warning", () => {
     const r = normalizeSensorReading(42, {
-      truthSource: "live",
+      source: "live",
       tentId: TENT,
       capturedAt: FRESH,
       now: NOW,
     });
     expect(r.warnings).toContain("unknown_input_shape");
+  });
+
+  it("null input does not throw and yields invalid", () => {
+    const r = normalizeSensorReading(null, {
+      source: "live",
+      tentId: TENT,
+      capturedAt: FRESH,
+      now: NOW,
+    });
+    expect(r.source).toBe("invalid");
+    expect(r.warnings).toContain("unknown_input_shape");
+    expect(r.warnings).toContain("no_usable_metrics");
+  });
+
+  it("parses numeric string values safely", () => {
+    const r = normalizeSensorReading(
+      { temperature_c: "24.5", humidity: " 55 " },
+      { source: "manual", tentId: TENT, capturedAt: FRESH, now: NOW },
+    );
+    expect(r.metrics.temperature_c).toBe(24.5);
+    expect(r.metrics.humidity_pct).toBe(55);
+  });
+
+  it("rejects bad string values without producing metrics", () => {
+    const r = normalizeSensorReading(
+      { temperature_c: "hello", humidity: "n/a" },
+      { source: "manual", tentId: TENT, capturedAt: FRESH, now: NOW },
+    );
+    expect(r.metrics.temperature_c).toBeNull();
+    expect(r.metrics.humidity_pct).toBeNull();
+    expect(r.source).toBe("invalid");
+  });
+
+  it("ec_ms_cm alias is honored and large values warn as µS/cm", () => {
+    const ok = normalizeSensorReading(
+      { ec_ms_cm: 1.4 },
+      { source: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
+    );
+    expect(ok.metrics.reservoir_ec_ms_cm).toBe(1.4);
+    const warn = normalizeSensorReading(
+      { ec_ms_cm: 1450 },
+      { source: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
+    );
+    expect(warn.warnings).toContain("reservoir_ec_likely_us_cm");
+  });
+
+  it("demo identity uses demo_fixture cleanly", () => {
+    const r = normalizeSensorReading(
+      { temperature_c: 24, humidity: 50 },
+      {
+        source: "demo",
+        sourceIdentity: "demo_fixture",
+        transport: "unknown",
+        tentId: TENT,
+        capturedAt: FRESH,
+        now: NOW,
+      },
+    );
+    expect(r.source).toBe("demo");
+    expect(r.source_identity).toBe("demo_fixture");
+    expect(r.confidence).toBeLessThanOrEqual(50);
+  });
+
+  it("is deterministic with injected now", () => {
+    const a = normalizeSensorReading(
+      { temperature_c: 24, humidity: 50 },
+      { source: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
+    );
+    const b = normalizeSensorReading(
+      { temperature_c: 24, humidity: 50 },
+      { source: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
+    );
+    expect(a).toEqual(b);
   });
 
   it("does not import Supabase, Action Queue, automation, or device-control code", () => {
@@ -251,12 +324,17 @@ describe("normalizeSensorReading", () => {
     expect(source).not.toMatch(/from\s+["']@\/integrations\/supabase/);
     expect(source).not.toMatch(/insertSensorReading/);
     expect(source).not.toMatch(/\.insert\(/);
+    expect(source).not.toMatch(/\.upsert\(/);
+    expect(source).not.toMatch(/\.update\(/);
+    expect(source).not.toMatch(/\.delete\(/);
     expect(source).not.toMatch(/\.upload\(/);
+    expect(source).not.toMatch(/supabase\.from\(["']sensor_readings["']\)/);
     expect(source).not.toMatch(/functions\.invoke/);
     expect(source).not.toMatch(/action_queue/);
     expect(source).not.toMatch(/alerts/);
     expect(source).not.toMatch(/device[_-]?control/i);
     expect(source).not.toMatch(/automation/i);
     expect(source).not.toMatch(/service_role/);
+    expect(source).not.toMatch(/bridge[_\s-]?token/i);
   });
 });

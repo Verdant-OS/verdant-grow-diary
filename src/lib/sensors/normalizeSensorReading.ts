@@ -25,12 +25,16 @@ export type SensorTruthSource =
 
 export type SensorSourceIdentity =
   | "manual_entry"
+  | "demo_fixture"
+  | "csv_import"
   | "ecowitt"
   | "switchbot"
   | "home_assistant"
   | "mqtt_bridge"
   | "raspberry_pi"
-  | "csv_import"
+  | "spider_farmer"
+  | "sensorpush"
+  | "aroya"
   | "unknown";
 
 export type SensorTransport =
@@ -40,10 +44,11 @@ export type SensorTransport =
   | "webhook"
   | "home_assistant"
   | "local_bridge"
+  | "api"
   | "unknown";
 
 export interface NormalizeSensorReadingOptions {
-  truthSource: SensorTruthSource;
+  source: SensorTruthSource;
   sourceIdentity?: SensorSourceIdentity;
   transport?: SensorTransport;
   tentId?: string | null;
@@ -122,7 +127,7 @@ const KEYS = {
   soilTempF: ["soil_temperature_f", "soil_temp_f"] as const,
   soilEcMs: ["soil_ec_ms_cm", "soil_ec"] as const,
   soilEcUs: ["soil_ec_us_cm"] as const,
-  resEcMs: ["reservoir_ec_ms_cm", "reservoir_ec"] as const,
+  resEcMs: ["reservoir_ec_ms_cm", "reservoir_ec", "ec_ms_cm"] as const,
   resEcAmbiguous: ["ec"] as const,
   resEcUs: ["ec_us_cm"] as const,
   ph: ["reservoir_ph", "ph"] as const,
@@ -140,7 +145,7 @@ export function normalizeSensorReading(
   options: NormalizeSensorReadingOptions,
 ): NormalizedSensorReading {
   const warnings: string[] = [];
-  const truthSource: SensorTruthSource = options.truthSource;
+  const truthSource: SensorTruthSource = options.source;
   const sourceIdentity: SensorSourceIdentity = options.sourceIdentity ?? "unknown";
   const transport: SensorTransport = options.transport ?? "unknown";
   const tent_id =

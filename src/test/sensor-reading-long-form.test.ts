@@ -12,7 +12,7 @@ function fresh() {
   return normalizeSensorReading(
     { temperature_c: 24, humidity: 50, co2: 800 },
     {
-      truthSource: "live",
+      source: "live",
       sourceIdentity: "ecowitt",
       transport: "webhook",
       tentId: TENT,
@@ -38,7 +38,7 @@ describe("normalizedReadingToLongFormRows", () => {
   it("rejects readings without tent_id", () => {
     const r = normalizeSensorReading(
       { temperature_c: 24, humidity: 50 },
-      { truthSource: "live", capturedAt: FRESH, now: NOW },
+      { source: "live", capturedAt: FRESH, now: NOW },
     );
     expect(normalizedReadingToLongFormRows(r)).toEqual([]);
   });
@@ -46,7 +46,7 @@ describe("normalizedReadingToLongFormRows", () => {
   it("rejects readings without captured_at", () => {
     const r = normalizeSensorReading(
       { temperature_c: 24, humidity: 50 },
-      { truthSource: "live", tentId: TENT, now: NOW },
+      { source: "live", tentId: TENT, now: NOW },
     );
     expect(normalizedReadingToLongFormRows(r)).toEqual([]);
   });
@@ -54,7 +54,7 @@ describe("normalizedReadingToLongFormRows", () => {
   it("rejects invalid readings", () => {
     const r = normalizeSensorReading(
       {},
-      { truthSource: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
+      { source: "live", tentId: TENT, capturedAt: FRESH, now: NOW },
     );
     expect(r.source).toBe("invalid");
     expect(normalizedReadingToLongFormRows(r)).toEqual([]);
@@ -86,11 +86,17 @@ describe("normalizedReadingToLongFormRows", () => {
     expect(source).not.toMatch(/from\s+["']@\/integrations\/supabase/);
     expect(source).not.toMatch(/insertSensorReading/);
     expect(source).not.toMatch(/\.insert\(/);
+    expect(source).not.toMatch(/\.upsert\(/);
+    expect(source).not.toMatch(/\.update\(/);
+    expect(source).not.toMatch(/\.delete\(/);
     expect(source).not.toMatch(/\.upload\(/);
+    expect(source).not.toMatch(/supabase\.from\(["']sensor_readings["']\)/);
     expect(source).not.toMatch(/functions\.invoke/);
     expect(source).not.toMatch(/action_queue/);
     expect(source).not.toMatch(/alerts/);
     expect(source).not.toMatch(/device[_-]?control/i);
     expect(source).not.toMatch(/automation/i);
+    expect(source).not.toMatch(/service_role/);
+    expect(source).not.toMatch(/bridge[_\s-]?token/i);
   });
 });

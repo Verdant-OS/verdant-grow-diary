@@ -80,6 +80,7 @@ import {
   buildEcCompensationPreview,
   EC_COMPENSATION_PREVIEW_DISCLAIMER,
 } from "@/lib/ecCompensationPreviewViewModel";
+import { buildEnvironmentCheckSensorContext } from "@/lib/environmentCheckSensorContextRules";
 
 export interface QuickLogPrefill {
   plantId?: string | null;

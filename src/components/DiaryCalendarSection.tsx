@@ -426,6 +426,17 @@ export default function DiaryCalendarSection({
                                   </p>
                                 )}
                               </div>
+                              <div className="mt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => openEventDrawer(ev)}
+                                  aria-label={DIARY_CALENDAR_DRAWER_VIEW_LABEL}
+                                  data-testid="diary-calendar-event-view"
+                                  className="inline-flex items-center text-[11px] font-medium text-primary hover:underline"
+                                >
+                                  {DIARY_CALENDAR_DRAWER_VIEW_LABEL}
+                                </button>
+                              </div>
                             </div>
                           </li>
                         );

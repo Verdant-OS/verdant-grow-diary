@@ -30,7 +30,9 @@ describe("mobile Quick Log — single FAB", () => {
   });
 
   it("AppShell mobile FAB is guarded by md:hidden", () => {
-    expect(APP_SHELL).toMatch(/md:hidden[\s\S]{0,400}data-testid="mobile-quick-log-fab"/);
+    expect(APP_SHELL).toMatch(
+      /data-testid="mobile-quick-log-fab"[\s\S]{0,400}md:hidden/,
+    );
   });
 
   it("QuickLogV2Fab Button is hidden on mobile (hidden md:inline-flex)", () => {

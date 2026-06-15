@@ -1,16 +1,16 @@
 /**
- * fastAddActionRules — pure rules for Verdant's Global Fast Add menu.
+ * fastAddActionRules — pure rules for Verdant's Quick Log menu.
  *
  * Deterministic. Presenter helpers only:
- *  - Defines the 8 Fast Add actions in stable order.
- *  - Resolves each action against the current selection context into a
+ *  - Defines the 8 Quick Log presets in stable order.
+ *  - Resolves each preset against the current selection context into a
  *    safe intent: navigate, open-quicklog (event dispatch), or
  *    needs-context (calm copy).
  *
  * Hard constraints:
  *  - No I/O. No Supabase writes. No alerts. No Action Queue writes.
  *  - No model/API calls. No device control. No automation strings.
- *  - The Diagnosis action navigates to the AI Doctor surface only;
+ *  - The Diagnosis preset navigates to the AI Doctor surface only;
  *    it must never trigger a model call by itself.
  */
 

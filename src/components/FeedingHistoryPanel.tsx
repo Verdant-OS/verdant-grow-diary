@@ -9,6 +9,11 @@ import {
   buildFeedingHistory,
   type FeedingHistoryRow,
 } from "@/lib/feedingHistoryRules";
+import {
+  buildEcCompensationPreview,
+  EC_COMPENSATION_PREVIEW_DISCLAIMER,
+} from "@/lib/ecCompensationPreviewViewModel";
+import { formatTempDualF } from "@/lib/temperatureDisplay";
 
 interface FeedingHistoryPanelProps {
   /**
@@ -96,7 +101,15 @@ function Row({ row }: { row: FeedingHistoryRow }) {
           />
         )}
         {row.recipe && <MetricChip label="Recipe" value={row.recipe} />}
+        {formatTempDualF(row.waterTempC).display && (
+          <MetricChip
+            label="Water"
+            value={formatTempDualF(row.waterTempC).display as string}
+          />
+        )}
       </div>
+
+      <EcCompensationPreview row={row} />
 
       {row.nutrients.length > 0 && (
         <ul className="flex flex-wrap gap-1.5 mb-2">

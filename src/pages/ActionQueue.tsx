@@ -786,6 +786,11 @@ export default function ActionQueue() {
               const titleId = `aq-pending-title-${row.id}`;
               const descId = `aq-pending-desc-${row.id}`;
               const isFocused = focusedActionId === row.id;
+              const ev = buildActionEvidenceViewModel({
+                source: row.source,
+                action_type: row.action_type,
+                captured_at: row.created_at,
+              });
               return (
               <li
                 key={row.id}
@@ -814,6 +819,7 @@ export default function ActionQueue() {
                       <Badge variant="outline" className={RISK_VARIANT[row.risk_level]} aria-label={`Risk: ${row.risk_level}`}>
                         {row.risk_level}
                       </Badge>
+                      <EvidenceStatusBadge vm={ev} />
                       {isAlertDerived(row) && (
                         <Badge
                           variant="outline"
@@ -858,7 +864,7 @@ export default function ActionQueue() {
                       className="mt-1 text-[11px] text-muted-foreground"
                       data-testid="action-queue-row-evidence-quality"
                     >
-                      {buildActionEvidenceViewModel({ source: row.source, action_type: row.action_type, captured_at: row.created_at }).evidenceQualityLabel}
+                      {ev.evidenceQualityLabel}
                     </p>
 
                   </div>

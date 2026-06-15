@@ -68,7 +68,8 @@ function scanFile(file) {
   const lines = text.split(/\r?\n/);
   const violations = [];
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+    const raw = lines[i];
+    const line = stripEmphasis(raw);
     if (line.includes(ALLOW_MARKER)) continue;
     if (DENIAL.test(line)) continue;
     // Skip negation-style headings like "## What did NOT change"

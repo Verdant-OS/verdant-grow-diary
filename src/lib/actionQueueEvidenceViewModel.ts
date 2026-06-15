@@ -122,6 +122,10 @@ export interface ActionEvidenceViewModel {
   readonly safetyNotes: ReadonlyArray<string>;
   readonly hasSnapshotQuality: boolean;
   readonly snapshotQuality: ManualSensorSnapshotQuality | null;
+  readonly rowEvidenceStatus: "available" | "missing" | "quality_unavailable";
+  readonly rowEvidenceStatusLabel: string;
+  readonly rowEvidenceStatusHelp: string;
+  readonly rowEvidenceStatusTone: "neutral" | "caution" | "ok";
 }
 
 function formatCapturedAtLabel(

@@ -69,7 +69,7 @@ const SECRET_BAITS = {
  * imported history. The adapter never relabels CSV as live and always
  * embeds a `source_app` matching the fixture.
  */
-function tentRowsFromFixture(f: DiaryFixture) {
+function tentRowsFromFixture(f: DiaryFixture & { source_app?: string }) {
   const HOUR = 3600 * 1000;
   const rows: Array<Record<string, unknown>> = [];
   let i = 0;

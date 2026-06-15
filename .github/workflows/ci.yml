@@ -52,6 +52,14 @@ jobs:
       - name: Static safety scans (Action Queue provenance + chip)
         run: bun run test:static-safety
 
+      # Release docs safety: docs/releases/*.md must not claim unsafe
+      # behavior (live telemetry, import writes, AI behavior changes,
+      # Action Queue auto-writes, device control, schema/RLS/Edge changes,
+      # or expose secrets/tokens/raw payloads). See
+      # scripts/assert-release-docs-safety.mjs.
+      - name: Release docs safety
+        run: bun run docs:release-safety
+
       # Stop-ship: QuickLog v2 RPC ownership / reason-code / mixed-boundary
       # regression. See docs/quicklog-rpc-safety.md.
       - name: QuickLog v2 RPC ownership + security

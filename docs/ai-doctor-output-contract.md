@@ -72,3 +72,16 @@ Any actionable output flows through the Approval-Required Action Queue.
 
 A single photo or single reading is never sufficient for `high` confidence.
 Diagnoses from one input must be `low` or `medium` with populated `missing_info`.
+
+## Imported history safety
+
+Imported CSV/XLSX sensor history is **background only** — never live
+telemetry. The safety contract for AI Doctor's handling of imported
+history is documented and QA-tracked separately:
+
+- Runbook: [`runbooks/ai-doctor-imported-history.md`](./runbooks/ai-doctor-imported-history.md)
+- QA checklist: [`qa/ai-doctor-imported-history-safety-checklist.md`](./qa/ai-doctor-imported-history-safety-checklist.md)
+- Release note: [`releases/ai-doctor-imported-history-safety.md`](./releases/ai-doctor-imported-history-safety.md)
+
+This is documentation, QA, and safety validation only — no new AI
+diagnosis behavior shipped.

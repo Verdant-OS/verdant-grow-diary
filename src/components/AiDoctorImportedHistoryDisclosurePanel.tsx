@@ -133,6 +133,13 @@ export function AiDoctorImportedHistoryDisclosurePanel({
           {vm.missingLiveWarning}
         </p>
       ) : null}
+
+      <p
+        data-testid="ai-doctor-imported-history-invalid-note"
+        className="text-xs text-muted-foreground"
+      >
+        {vm.invalidNote}
+      </p>
     </section>
   );
 }

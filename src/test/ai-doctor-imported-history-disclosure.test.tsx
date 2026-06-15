@@ -68,20 +68,20 @@ describe("AiDoctorImportedHistoryDisclosurePanel", () => {
     expect(panel).toBeTruthy();
   });
 
-  it("shows the panel title 'Imported sensor history used'", () => {
+  it("shows the panel title 'Imported history'", () => {
     render(
       <AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />,
     );
-    expect(screen.getByText("Imported sensor history used")).toBeTruthy();
+    expect(screen.getByText("Imported history")).toBeTruthy();
   });
 
-  it("states the data is not live telemetry", () => {
+  it("states the data is not live telemetry and suggests adding current readings", () => {
     render(
       <AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />,
     );
     expect(
       screen.getByText(
-        "AI Doctor used imported CSV/XLSX history as historical context. This is not live telemetry.",
+        "CSV/imported readings can give AI Doctor useful background, but they are not live telemetry. Add a current manual or live sensor snapshot before relying on this for current-room decisions.",
       ),
     ).toBeTruthy();
   });
@@ -174,7 +174,7 @@ describe("AiDoctorImportedHistoryDisclosurePanel", () => {
     expect(
       screen.getByTestId("ai-doctor-imported-history-missing-live-warning")
         .textContent,
-    ).toBe("Current/live sensor readings were missing or unavailable.");
+    ).toBe("Missing current live/manual readings — diagnosis confidence should stay conservative.");
   });
 
   it("does not render missing-live warning when live readings exist", () => {
@@ -184,6 +184,15 @@ describe("AiDoctorImportedHistoryDisclosurePanel", () => {
     expect(
       screen.queryByTestId("ai-doctor-imported-history-missing-live-warning"),
     ).toBeNull();
+  });
+
+  it("renders invalid-note when panel is visible", () => {
+    render(
+      <AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />,
+    );
+    expect(
+      screen.getByTestId("ai-doctor-imported-history-invalid-note").textContent,
+    ).toBe("Invalid or unknown readings are shown for review only and are not treated as healthy.");
   });
 
   it("renders nothing when no imported_sensor_history exists", () => {

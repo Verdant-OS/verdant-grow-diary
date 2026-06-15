@@ -16,12 +16,14 @@
 import type { PlantContextPayload } from "./aiDoctorContextCompiler";
 
 export const IMPORTED_HISTORY_DISCLOSURE_STRINGS = Object.freeze({
-  panelTitle: "Imported sensor history used",
+  panelTitle: "Imported history",
   panelBody:
-    "AI Doctor used imported CSV/XLSX history as historical context. This is not live telemetry.",
+    "CSV/imported readings can give AI Doctor useful background, but they are not live telemetry. Add a current manual or live sensor snapshot before relying on this for current-room decisions.",
   sourceLabel: "CSV history",
   missingLiveWarning:
-    "Current/live sensor readings were missing or unavailable.",
+    "Missing current live/manual readings — diagnosis confidence should stay conservative.",
+  invalidNote:
+    "Invalid or unknown readings are shown for review only and are not treated as healthy.",
 });
 
 export interface ImportedHistoryDisclosureMetric {
@@ -46,6 +48,7 @@ export interface ImportedHistoryDisclosureVisible {
   showSuspiciousFlags: boolean;
   showMissingLiveWarning: boolean;
   missingLiveWarning: string | null;
+  invalidNote: string;
 }
 
 export interface ImportedHistoryDisclosureHidden {
@@ -95,5 +98,6 @@ export function buildAiDoctorImportedHistoryDisclosureViewModel(
     showSuspiciousFlags: history.suspiciousFlagCount > 0,
     showMissingLiveWarning: missingLive,
     missingLiveWarning: missingLive ? s.missingLiveWarning : null,
+    invalidNote: s.invalidNote,
   };
 }

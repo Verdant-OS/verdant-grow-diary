@@ -254,6 +254,9 @@ export function buildSensorNormalizationPreviewViewModel(
     plantStatusLabel = "Linked plant present";
   }
 
+  const longFormPreview =
+    tentStatus === "linked_verified" ? buildLongFormRows(metricRowsAll) : [];
+
   let emptyState: string | null = null;
   if (normalized.source === "invalid") {
     emptyState = SENSOR_NORMALIZATION_PREVIEW_INVALID_NOTICE;

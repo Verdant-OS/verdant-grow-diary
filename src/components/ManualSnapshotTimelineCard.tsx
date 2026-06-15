@@ -55,6 +55,23 @@ function severityIcon(severity: ManualSnapshotTimelineCardModel["severity"]) {
 }
 
 export default function ManualSnapshotTimelineCard({ card }: Props) {
+  const quality = useMemo(() => {
+    const fields: Record<string, number> = {};
+    for (const r of card.readings) {
+      const key = FIELD_MAP[r.field];
+      if (!key) continue;
+      if (typeof r.value === "number" && Number.isFinite(r.value)) {
+        fields[key] = r.value;
+      }
+    }
+    const snap: ManualSensorSnapshotInput = {
+      source: card.source,
+      captured_at: card.capturedAt,
+      ...fields,
+    };
+    return evaluateManualSensorSnapshotQuality(snap, { mode: "historical" });
+  }, [card.readings, card.source, card.capturedAt]);
+
   return (
     <Card
       data-testid="manual-snapshot-timeline-card"

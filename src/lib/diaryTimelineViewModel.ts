@@ -18,7 +18,7 @@ import {
 
 export const DIARY_TIMELINE_EMPTY_TITLE = "No plant history yet.";
 export const DIARY_TIMELINE_EMPTY_HINT =
-  "Use Fast Add to log your first note, watering, photo, or environment check.";
+  "Use Quick Log to log your first note, watering, photo, or environment check.";
 export const DIARY_TIMELINE_FILTERED_EMPTY_COPY =
   "No entries match these filters.";
 

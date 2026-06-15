@@ -285,7 +285,7 @@ export default function TimelineMemorySection(props: Props) {
           >
             <p className="text-foreground">No plant history yet.</p>
             <p className="text-muted-foreground">
-              Use Fast Add or Quick Log to record an observation, watering,
+              Use Quick Log to record an observation, watering,
               feeding, photo, or environment check.
             </p>
           </div>

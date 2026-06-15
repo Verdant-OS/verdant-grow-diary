@@ -72,7 +72,7 @@ describe("Global Quick Log — accessible names", () => {
   );
 });
 
-describe("Global Fast Add — gated helper text + CTAs (screen-reader reachable)", () => {
+describe("Global Quick Log — gated helper text + CTAs (screen-reader reachable)", () => {
   it("the needs-context notice exposes role='status' with aria-live='polite'", () => {
     renderFastAdd();
     fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
@@ -111,7 +111,7 @@ describe("Global Fast Add — gated helper text + CTAs (screen-reader reachable)
   });
 });
 
-describe("Global Fast Add — interactive controls are reachable on mobile-sized render", () => {
+describe("Global Quick Log — interactive controls are reachable on mobile-sized render", () => {
   it("every menu item exposes a focusable button element", () => {
     renderFastAdd();
     fireEvent.click(screen.getByTestId("global-fast-add-trigger"));

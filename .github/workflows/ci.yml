@@ -95,6 +95,14 @@ jobs:
       - name: Action Detail evidence leakage guard
         run: bun run test:action-detail-leakage
 
+      # Stop-ship: Action Queue row evidence/provenance leakage guard.
+      # View-model + static scan: no raw_payload, service_role, Bearer/JWT,
+      # SUPABASE_SERVICE_ROLE_KEY, PRIVATE_API_KEY, sk_live_, mqtt/device-
+      # control strings reach row-level evidence surfaces. Approval/reject
+      # controls remain wired (review-only posture).
+      - name: Action Queue evidence leakage guard
+        run: bun run test:action-queue-evidence-leakage
+
 
 
       # Stop-ship: QuickLog v2 RPC ownership / reason-code / mixed-boundary

@@ -4,7 +4,6 @@ import { resolve } from "node:path";
 import {
   buildSensorNormalizationPreviewViewModel,
   SENSOR_NORMALIZATION_PREVIEW_DISCLAIMER,
-  SENSOR_NORMALIZATION_PREVIEW_EMPTY_STATE,
   SENSOR_NORMALIZATION_PREVIEW_INVALID_NOTICE,
   SENSOR_NORMALIZATION_PREVIEW_TENT_MISSING_EMPTY_STATE,
 } from "@/lib/sensors/sensorNormalizationPreviewViewModel";

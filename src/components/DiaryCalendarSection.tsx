@@ -203,15 +203,27 @@ export default function DiaryCalendarSection({
           >
             {monthLabel}
           </span>
-          <button
-            type="button"
-            aria-label="Next month"
-            onClick={() => shiftMonth(1)}
-            data-testid="diary-calendar-month-next"
-            className="inline-flex items-center justify-center h-8 w-8 rounded-full border border-border/50 bg-secondary/50 hover:bg-secondary transition"
-          >
-            <ChevronRight className="h-4 w-4" aria-hidden />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              aria-label="Today"
+              onClick={goToToday}
+              data-testid="diary-calendar-today"
+              className="inline-flex items-center justify-center h-8 px-2.5 rounded-full border border-border/50 bg-secondary/50 hover:bg-secondary transition text-[11px] font-medium"
+            >
+              Today
+            </button>
+            <button
+              type="button"
+              aria-label="Next month"
+              onClick={() => shiftMonth(1)}
+              data-testid="diary-calendar-month-next"
+              className="inline-flex items-center justify-center h-8 w-8 rounded-full border border-border/50 bg-secondary/50 hover:bg-secondary transition"
+            >
+              <ChevronRight className="h-4 w-4" aria-hidden />
+            </button>
+          </div>
+
         </div>
       )}
 

@@ -68,11 +68,14 @@ export default function AppShell() {
                   <Search className="h-4 w-4" /><span className="hidden lg:inline">Search…</span>
                   <kbd className="hidden lg:inline ml-2 text-[10px] px-1.5 py-0.5 rounded bg-background/60 border border-border/40">⌘K</kbd>
                 </button>
-                
+                {/* Quick Log is the single grower-facing logging entry
+                    point on desktop. The dropdown surfaces event-type
+                    presets (diary note, watering, feeding, training,
+                    photo, environment, diagnosis, harvest) and opens the
+                    existing Quick Log sheet via the wired window event.
+                    The previous standalone "Quick log" button has been
+                    removed to eliminate duplicate add/log CTAs. */}
                 <GlobalFastAddButton className="hidden md:inline-flex" />
-                <Button variant="outline" size="sm" onClick={() => { setPrefill(null); setOpenLog(true); }} className="hidden md:inline-flex">
-                  <Plus className="h-4 w-4" /> Quick log
-                </Button>
                 <Button variant="ghost" size="icon" onClick={() => nav("/alerts")} aria-label="Alerts" className="relative">
                   <Bell className="h-4 w-4" />
                   {unread > 0 && (

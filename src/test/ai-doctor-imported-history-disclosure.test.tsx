@@ -174,7 +174,7 @@ describe("AiDoctorImportedHistoryDisclosurePanel", () => {
     expect(
       screen.getByTestId("ai-doctor-imported-history-missing-live-warning")
         .textContent,
-    ).toBe("Current/live sensor readings were missing or unavailable.");
+    ).toBe("Missing current live/manual readings — diagnosis confidence should stay conservative.");
   });
 
   it("does not render missing-live warning when live readings exist", () => {

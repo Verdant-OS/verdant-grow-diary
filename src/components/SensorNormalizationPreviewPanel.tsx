@@ -4,8 +4,8 @@
  *
  * Hard rules:
  *  - Presenter-only. No Supabase. No fetch. No mutations.
- *  - Never renders raw_payload. Never renders service_role, bridge
- *    tokens, or internal IDs.
+ *  - Never renders the underlying payload directly. Never renders
+ *    privileged credentials, vendor secrets, or internal IDs.
  *  - Always advertises data-writes-enabled="false".
  */
 import type {

@@ -13,6 +13,7 @@
     "format:check": "prettier --check .",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:summarize-timeouts": "node scripts/summarize-vitest-timeouts.mjs",
     "test:watch": "vitest",
     "prepare": "husky",
     "sb:login": "supabase login",

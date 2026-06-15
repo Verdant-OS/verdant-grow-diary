@@ -145,7 +145,7 @@ export function normalizeSensorReading(
   options: NormalizeSensorReadingOptions,
 ): NormalizedSensorReading {
   const warnings: string[] = [];
-  const truthSource: SensorTruthSource = options.truthSource;
+  const truthSource: SensorTruthSource = options.source;
   const sourceIdentity: SensorSourceIdentity = options.sourceIdentity ?? "unknown";
   const transport: SensorTransport = options.transport ?? "unknown";
   const tent_id =

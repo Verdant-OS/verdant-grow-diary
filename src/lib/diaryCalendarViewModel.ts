@@ -482,3 +482,82 @@ export function summarizeDiaryCalendar(
   }
   return { totalEvents: total, totalDays: groups.length, counts };
 }
+
+// ---------------------------------------------------------------------------
+// Month navigation helpers (pure & deterministic).
+// ---------------------------------------------------------------------------
+
+/** Month key (YYYY-MM) for a YYYY-MM-DD date key. */
+export function monthKeyFromDateKey(dateKey: string): string {
+  return dateKey.slice(0, 7);
+}
+
+/** Unique month keys present in groups, sorted newest-first. */
+export function listDiaryCalendarMonthKeys(
+  groups: readonly DiaryCalendarDayGroup[],
+): string[] {
+  const set = new Set<string>();
+  for (const g of groups) set.add(monthKeyFromDateKey(g.dateKey));
+  return Array.from(set).sort((a, b) => (a < b ? 1 : a < b ? 0 : a > b ? -1 : 0));
+}
+
+/**
+ * Default visible month: newest month containing at least one event under
+ * the active filter. Falls back to newest month in the full dataset, then
+ * null if there are no groups.
+ */
+export function defaultDiaryCalendarMonth(
+  groups: readonly DiaryCalendarDayGroup[],
+  filter: DiaryCalendarFilter,
+): string | null {
+  const filtered = filterDiaryCalendarGroups(groups, filter);
+  if (filtered.length > 0) return monthKeyFromDateKey(filtered[0].dateKey);
+  if (groups.length > 0) return monthKeyFromDateKey(groups[0].dateKey);
+  return null;
+}
+
+/** Filter groups to a single visible month. Pure. */
+export function filterDiaryCalendarGroupsByMonth(
+  groups: readonly DiaryCalendarDayGroup[],
+  monthKey: string | null,
+): DiaryCalendarDayGroup[] {
+  if (!monthKey) return groups.map((g) => ({ ...g, events: [...g.events] }));
+  return groups
+    .filter((g) => monthKeyFromDateKey(g.dateKey) === monthKey)
+    .map((g) => ({ ...g, events: [...g.events] }));
+}
+
+/** Shift a month key by delta months (UTC-safe). */
+export function shiftMonthKey(monthKey: string, delta: number): string {
+  const [y, m] = monthKey.split("-").map((n) => Number(n));
+  if (!Number.isFinite(y) || !Number.isFinite(m)) return monthKey;
+  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+  const yy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  return `${yy}-${mm}`;
+}
+
+/** Human-readable month label, e.g. "June 2026". */
+export function formatDiaryCalendarMonthLabel(monthKey: string): string {
+  const [y, m] = monthKey.split("-").map((n) => Number(n));
+  if (!Number.isFinite(y) || !Number.isFinite(m)) return monthKey;
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString(undefined, {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+/** Empty-state title that names the visible month and active filter. */
+export function diaryCalendarMonthEmptyTitle(
+  monthKey: string | null,
+  filter: DiaryCalendarFilter,
+): string {
+  if (!monthKey) return diaryCalendarEmptyTitleFor(filter);
+  const label = formatDiaryCalendarMonthLabel(monthKey);
+  if (filter === "all") {
+    return `No watering, feeding, or diagnosis events logged for ${label}.`;
+  }
+  return `No ${filter} events logged for ${label}.`;
+}
+

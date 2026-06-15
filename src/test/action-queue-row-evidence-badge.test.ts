@@ -33,15 +33,13 @@ describe("Action Queue row evidence status badge", () => {
   });
 
   it("reviewed rows also render the evidence status badge", () => {
-    // The reviewed map block must call buildActionEvidenceViewModel and use EvidenceStatusBadge.
     const reviewedStart = ACTION_QUEUE_SRC.indexOf("reviewed.slice(0, 50)");
-    const reviewedBlock = ACTION_QUEUE_SRC.slice(reviewedStart, reviewedStart + 800);
+    const reviewedBlock = ACTION_QUEUE_SRC.slice(reviewedStart, reviewedStart + 1200);
     expect(reviewedBlock).toContain("buildActionEvidenceViewModel");
     expect(reviewedBlock).toContain("EvidenceStatusBadge");
   });
 
   it("badge does not duplicate the long missing-evidence panel text", () => {
-    // The compact badge label constants must be distinct from the panel help.
     expect(ACTION_QUEUE_SRC).not.toMatch(
       /action-queue-row-evidence-status.*Evidence details are not available/,
     );

@@ -86,6 +86,15 @@ jobs:
       - name: Repo-wide static guard tests (fs-walking)
         run: bun run test:static-guards
 
+      # Stop-ship: Action Detail evidence provenance leakage guard.
+      # Renders alert- and AI-derived Action Detail panels with malicious
+      # mock extras and confirms no raw_payload, service_role, Bearer/JWT,
+      # SUPABASE_SERVICE_ROLE_KEY, PRIVATE_API_KEY, sk_live_, or mqtt/
+      # device-control strings leak into UI textContent/innerHTML.
+      # Review timeline link must remain accessible and review-only.
+      - name: Action Detail evidence leakage guard
+        run: bun run test:action-detail-leakage
+
 
 
       # Stop-ship: QuickLog v2 RPC ownership / reason-code / mixed-boundary

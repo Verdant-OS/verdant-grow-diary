@@ -77,6 +77,15 @@ jobs:
       - name: Action Queue safety scanner + allow-list guards
         run: bunx vitest run src/test/action-queue-safety.test.ts src/test/action-queue-safety-allow-list-guards.test.ts --reporter=dot
 
+      # Stop-ship: repo-wide filesystem/static scanner guards (source
+      # ownership, no raw payloads, no device control, no RPC misuse,
+      # route/helper leakage). Split into its own step so timeout-only
+      # failures in slow sandboxes are easy to attribute and triage with
+      # `bun run test:summarize-timeouts`. See
+      # docs/testing/static-guards.md.
+      - name: Repo-wide static guard tests (fs-walking)
+        run: bun run test:static-guards
+
 
 
       # Stop-ship: QuickLog v2 RPC ownership / reason-code / mixed-boundary

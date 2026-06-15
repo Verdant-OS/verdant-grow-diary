@@ -34,40 +34,64 @@ import { renderQuickLogEnvironmentCheck } from "./helpers/quickLogEnvironmentChe
 // Supabase / Quick Log mocks (hoisted)
 // ---------------------------------------------------------------------------
 
-const saveMock = vi.fn();
+const mocks = vi.hoisted(() => {
+  const saveMock = vi.fn();
+  const insertMock = vi.fn();
+  const upsertMock = vi.fn();
+  const updateMock = vi.fn();
+  const deleteMock = vi.fn();
+  const uploadMock = vi.fn();
+  const invokeMock = vi.fn();
+  const fromSpy = vi.fn((_table: string) => ({
+    insert: insertMock,
+    upsert: upsertMock,
+    update: () => ({ eq: updateMock }),
+    delete: () => ({ eq: deleteMock }),
+    select: () => ({
+      eq: () => ({
+        order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+      }),
+    }),
+  }));
+  return {
+    saveMock,
+    insertMock,
+    upsertMock,
+    updateMock,
+    deleteMock,
+    uploadMock,
+    invokeMock,
+    fromSpy,
+  };
+});
+
+const {
+  saveMock,
+  insertMock,
+  upsertMock,
+  updateMock,
+  deleteMock,
+  uploadMock,
+  invokeMock,
+  fromSpy,
+} = mocks;
+
 vi.mock("@/hooks/useQuickLogV2Save", () => ({
   useQuickLogV2Save: () => ({
-    save: (...a: unknown[]) => saveMock(...a),
+    save: (...a: unknown[]) => mocks.saveMock(...a),
     saving: false,
     error: null,
   }),
 }));
 
-const insertMock = vi.fn();
-const upsertMock = vi.fn();
-const updateMock = vi.fn();
-const deleteMock = vi.fn();
-const uploadMock = vi.fn();
-const invokeMock = vi.fn();
-const fromSpy = vi.fn((_table: string) => ({
-  insert: insertMock,
-  upsert: upsertMock,
-  update: () => ({ eq: updateMock }),
-  delete: () => ({ eq: deleteMock }),
-  select: () => ({
-    eq: () => ({
-      order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
-    }),
-  }),
-}));
-
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    from: (table: string) => fromSpy(table),
-    storage: { from: () => ({ upload: uploadMock, remove: vi.fn() }) },
-    functions: { invoke: invokeMock },
+    from: (table: string) => mocks.fromSpy(table),
+    storage: { from: () => ({ upload: mocks.uploadMock, remove: vi.fn() }) },
+    functions: { invoke: mocks.invokeMock },
   },
 }));
+
 
 vi.mock("@/store/auth", () => ({ useAuth: () => ({ user: { id: "user-1" } }) }));
 vi.mock("@/store/grows", () => ({

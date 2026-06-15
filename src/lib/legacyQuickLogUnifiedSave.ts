@@ -161,6 +161,9 @@ export function buildLegacyQuickLogUnifiedPayload(
   if (input.earlyStage != null) {
     envelopeFields.early_stage = input.earlyStage;
   }
+  if (input.environmentCheck != null) {
+    envelopeFields.environment_check = input.environmentCheck;
+  }
   const detailsEnvelope: Record<string, unknown> | null =
     Object.keys(envelopeFields).length > 0 ? envelopeFields : null;
 

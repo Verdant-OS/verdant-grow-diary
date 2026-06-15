@@ -72,6 +72,7 @@ Important notes:
 - Missing/invalid tent context blocks long-form write-ready rows.
 - Preview warnings are **not** a diagnosis.
 - The grower/operator decides whether the source data is trustworthy.
+- Use the warning-chip troubleshooting section in [`sensor-normalization-preview-qa.md`](./sensor-normalization-preview-qa.md#when-warning-chips-appear-but-metrics-still-look-usable) when metric summaries appear but Verdant flags source, timestamp, unit, or context concerns.
 
 ---
 

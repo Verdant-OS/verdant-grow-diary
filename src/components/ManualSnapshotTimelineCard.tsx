@@ -10,6 +10,7 @@
  *    ("Manual"). Never "live", "synced", "connected", or "imported".
  *  - No reads, no writes, no Supabase, no automation.
  */
+import { useMemo } from "react";
 import { Gauge, AlertTriangle, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +23,26 @@ import {
 import { formatSensorFieldLabel } from "@/constants/sensorFields";
 import { DERIVED_LABEL, formatSensorValue } from "@/lib/sensorFormat";
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
+import {
+  evaluateManualSensorSnapshotQuality,
+  type ManualSensorSnapshotInput,
+} from "@/lib/manualSensorSnapshotQualityRules";
+import ManualSensorSnapshotQualityBadge from "@/components/ManualSensorSnapshotQualityBadge";
+
+/**
+ * Map view-model reading fields to the sanitized quality-helper field names.
+ * Only well-known numeric metrics are forwarded — no raw payloads, vendor
+ * metadata, tokens, filenames, or private IDs are ever passed through.
+ */
+const FIELD_MAP: Readonly<Record<string, keyof ManualSensorSnapshotInput>> = {
+  air_temp_c: "temperature_c",
+  humidity_pct: "humidity_pct",
+  vpd_kpa: "vpd_kpa",
+  soil_temp_c: "soil_temp_c",
+  soil_moisture_pct: "soil_moisture_pct",
+  soil_ec_mscm: "soil_ec_mscm",
+  reservoir_ph: "ph",
+};
 
 interface Props {
   card: ManualSnapshotTimelineCardModel;
@@ -34,6 +55,23 @@ function severityIcon(severity: ManualSnapshotTimelineCardModel["severity"]) {
 }
 
 export default function ManualSnapshotTimelineCard({ card }: Props) {
+  const quality = useMemo(() => {
+    const fields: Record<string, number> = {};
+    for (const r of card.readings) {
+      const key = FIELD_MAP[r.field];
+      if (!key) continue;
+      if (typeof r.value === "number" && Number.isFinite(r.value)) {
+        fields[key] = r.value;
+      }
+    }
+    const snap: ManualSensorSnapshotInput = {
+      source: card.source,
+      captured_at: card.capturedAt,
+      ...fields,
+    };
+    return evaluateManualSensorSnapshotQuality(snap, { mode: "historical" });
+  }, [card.readings, card.source, card.capturedAt]);
+
   return (
     <Card
       data-testid="manual-snapshot-timeline-card"
@@ -72,6 +110,17 @@ export default function ManualSnapshotTimelineCard({ card }: Props) {
         </p>
       </CardHeader>
       <CardContent className="space-y-2 pt-0">
+        <section
+          data-testid="manual-snapshot-timeline-card-quality"
+          aria-label="Historical snapshot quality"
+          className="rounded-md border border-border/40 bg-secondary/10 p-2"
+        >
+          <ManualSensorSnapshotQualityBadge evaluation={quality} />
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Historical reading — quality reflects captured values; not
+            current-room guidance.
+          </p>
+        </section>
         {card.readings.length > 0 ? (
           <ul
             className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs"

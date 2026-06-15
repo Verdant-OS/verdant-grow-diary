@@ -186,6 +186,15 @@ describe("AiDoctorImportedHistoryDisclosurePanel", () => {
     ).toBeNull();
   });
 
+  it("renders invalid-note when panel is visible", () => {
+    render(
+      <AiDoctorImportedHistoryDisclosurePanel context={buildImportedContext()} />,
+    );
+    expect(
+      screen.getByTestId("ai-doctor-imported-history-invalid-note").textContent,
+    ).toBe("Invalid or unknown readings are shown for review only and are not treated as healthy.");
+  });
+
   it("renders nothing when no imported_sensor_history exists", () => {
     const ctx = compilePlantContextFromRows({
       plant: { id: "p1" },

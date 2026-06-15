@@ -155,3 +155,44 @@ export function buildActionButtonAriaLabel(
 export function buildStatusBadgeAriaLabel(status: string | null | undefined): string {
   return `Current status: ${formatStatusLabel(status)}`;
 }
+
+/**
+ * Safe grower-facing fallback for the optional `target_device` field on
+ * an action queue row. The raw value can be a hardware identifier or an
+ * internal enum (e.g. `fan_a`, `relay_2`) — never render it verbatim.
+ *
+ * Returns one of:
+ *   - the metric label when `target_metric` is set (already grower-safe)
+ *   - "Grow-room equipment" when a target_device is present
+ *   - "Manual review target" when neither is set
+ *
+ * Pure, deterministic, null-safe.
+ */
+export function formatActionTargetLabel(
+  target_metric: string | null | undefined,
+  target_device: string | null | undefined,
+): string {
+  const metric = (target_metric ?? "").trim();
+  if (metric) return metric;
+  const device = (target_device ?? "").trim();
+  if (device) return "Grow-room equipment";
+  return "Manual review target";
+}
+
+/**
+ * Single source of truth for the explicit "no automation" reassurance
+ * line surfaced inside the approve confirmation dialog body. The header
+ * already states "Verdant never sends commands to equipment"; this line
+ * reinforces the same boundary at the decision moment.
+ */
+export const APPROVE_DIALOG_REASSURANCE =
+  "Approving this records your decision. Verdant will not send equipment commands automatically.";
+
+/**
+ * Neutral copy rendered in place of the Manual Sensor Snapshot quality
+ * chip on Action Queue surfaces when no sanitized snapshot evidence is
+ * available in the row/detail view-model. Action Queue rows never claim
+ * current-room support — this string is intentionally cautious.
+ */
+export const ACTION_EVIDENCE_QUALITY_NOT_AVAILABLE =
+  "Evidence quality: not available from this action record";

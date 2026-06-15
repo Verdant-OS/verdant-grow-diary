@@ -60,7 +60,13 @@ import {
   shouldWarnPendingActionHasClosedSourceAlert,
   stripBackPointerTokens,
 } from "@/lib/actionQueueProvenanceRules";
-import { buildActionButtonAriaLabel, buildStatusBadgeAriaLabel, sanitizeActionCopy } from "@/lib/actionQueueRowView";
+import {
+  buildActionButtonAriaLabel,
+  buildStatusBadgeAriaLabel,
+  sanitizeActionCopy,
+  APPROVE_DIALOG_REASSURANCE,
+  ACTION_EVIDENCE_QUALITY_NOT_AVAILABLE,
+} from "@/lib/actionQueueRowView";
 
 import {
   ACTION_FOLLOWUP_EVENT_TYPE,
@@ -128,7 +134,8 @@ const DIALOG_META: Record<
   approve: {
     title: "Approve Action",
     description:
-      "Approved actions are recorded for future manual or controlled execution. No equipment command is sent.",
+      "Approved actions are recorded for future manual or controlled execution. No equipment command is sent. " +
+      APPROVE_DIALOG_REASSURANCE,
     label: "Approval note",
     placeholder: "Optional — why are you approving?",
     confirmLabel: "Approve",
@@ -649,6 +656,12 @@ export default function ActionDetail() {
                     The source alert is no longer open. Re-check current grow conditions before approving this action.
                   </div>
                 )}
+                <p
+                  className="mt-3 text-[11px] text-muted-foreground"
+                  data-testid="action-detail-evidence-quality"
+                >
+                  {ACTION_EVIDENCE_QUALITY_NOT_AVAILABLE}
+                </p>
               </div>
             );
           })()}
@@ -685,6 +698,12 @@ export default function ActionDetail() {
                     </Link>
                   </Button>
                 )}
+                <p
+                  className="mt-3 text-[11px] text-muted-foreground"
+                  data-testid="action-detail-evidence-quality"
+                >
+                  {ACTION_EVIDENCE_QUALITY_NOT_AVAILABLE}
+                </p>
               </div>
             );
           })()}

@@ -27,7 +27,15 @@ import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
-import { buildActionRowAriaLabel, buildActionButtonAriaLabel, buildStatusBadgeAriaLabel, sanitizeActionCopy } from "@/lib/actionQueueRowView";
+import {
+  buildActionRowAriaLabel,
+  buildActionButtonAriaLabel,
+  buildStatusBadgeAriaLabel,
+  sanitizeActionCopy,
+  formatActionTargetLabel,
+  APPROVE_DIALOG_REASSURANCE,
+  ACTION_EVIDENCE_QUALITY_NOT_AVAILABLE,
+} from "@/lib/actionQueueRowView";
 import { actionDetailPath, actionsPath, aiDoctorSessionDetailPath, alertDetailPath } from "@/lib/routes";
 import { toast } from "sonner";
 import {
@@ -359,7 +367,7 @@ export default function ActionQueue() {
     if (kind === "simulate") {
       // Simulation NEVER sends device commands. Status + audit only.
       toast.message("Simulated (no device command sent)", {
-        description: `${row.action_type} → ${row.target_metric ?? row.target_device}`,
+        description: `${row.action_type} → ${formatActionTargetLabel(row.target_metric, row.target_device)}`,
       });
     }
     const patch = buildTransitionPatch(kind);
@@ -383,7 +391,8 @@ export default function ActionQueue() {
     approve: {
       title: "Approve Action",
       description:
-        "Approved actions are recorded for future manual or controlled execution. No equipment command is sent.",
+        "Approved actions are recorded for future manual or controlled execution. No equipment command is sent. " +
+        APPROVE_DIALOG_REASSURANCE,
       label: "Approval note",
       placeholder: "Optional — why are you approving?",
       confirmLabel: "Approve",
@@ -798,8 +807,8 @@ export default function ActionQueue() {
                       )}
 
 
-                      <span className="text-xs text-muted-foreground">
-                        {row.target_metric ?? row.target_device}
+                      <span className="text-xs text-muted-foreground" data-testid="action-queue-row-target-label">
+                        {formatActionTargetLabel(row.target_metric, row.target_device)}
                       </span>
                     </div>
                     <p className="text-sm mt-1">{sanitizeActionCopy(row.suggested_change)}</p>
@@ -808,6 +817,12 @@ export default function ActionQueue() {
                       <AiDoctorSessionLink row={row} />
                       <LinkedAlertLink row={row} />
                     </div>
+                    <p
+                      className="mt-1 text-[11px] text-muted-foreground"
+                      data-testid="action-queue-row-evidence-quality"
+                    >
+                      {ACTION_EVIDENCE_QUALITY_NOT_AVAILABLE}
+                    </p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 mt-3">

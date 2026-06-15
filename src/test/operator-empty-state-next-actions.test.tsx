@@ -62,7 +62,7 @@ describe("Reports onboarding — next-action buttons", () => {
   });
 });
 
-describe("Global Fast Add — gated empty-state CTA navigation", () => {
+describe("Global Quick Log — gated empty-state CTA navigation", () => {
   it("each picker CTA invokes navigate with the expected destination", () => {
     const navigate = vi.fn<(to: string) => void>();
     render(
@@ -84,7 +84,7 @@ describe("Global Fast Add — gated empty-state CTA navigation", () => {
     expect(navigate).toHaveBeenCalledWith("/tents");
   });
 
-  it("with a plant in context, Fast Add dispatches a Quick Log event carrying the operator scope", () => {
+  it("with a plant in context, Quick Log dispatches a Quick Log event carrying the operator scope", () => {
     const onDispatch = vi.fn<(eventName: string, detail: unknown) => void>();
     const plant = OPERATOR_DIARY_DATASET.plants[0];
     render(

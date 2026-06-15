@@ -2,7 +2,7 @@
  * Gated-feature empty-state regression tests.
  *
  * Verifies the calm "needs-context" copy + CTA buttons for the Global
- * Fast Add menu (the gated state every Fast Add action falls into when
+ * Quick Log menu (the gated state every preset falls into when
  * no plant/tent is selected). Also pins the Reports / Grow Learning Hub
  * empty-state copy.
  *
@@ -29,7 +29,7 @@ function renderFastAddNoContext() {
   );
 }
 
-describe("Gated feature — Global Fast Add (no plant/tent selected)", () => {
+describe("Gated feature — Global Quick Log (no plant/tent selected)", () => {
   it.each(FAST_ADD_ACTIONS.map((a) => [a.id, a.label] as const))(
     "shows the calm helper text + CTA buttons when '%s' is invoked without context",
     (actionId) => {

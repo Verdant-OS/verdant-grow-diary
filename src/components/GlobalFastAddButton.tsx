@@ -1,7 +1,7 @@
 /**
  * GlobalFastAddButton — presenter-only Quick Log menu for authenticated
- * surfaces. Surfaces 8 grower-friendly logging entry points and routes
- * them to the existing Quick Log / AI Doctor flows.
+ * surfaces. Surfaces 8 grower-friendly logging presets and routes them
+ * to the existing Quick Log / AI Doctor flows.
  *
  * NOTE: Internal component/file name retained for code stability. The
  * grower-facing label is "Quick Log" — the single consolidated logging
@@ -9,9 +9,9 @@
  *
  * Hard constraints:
  *  - Never inserts diary, sensor, alert, Action Queue, or device rows.
- *  - Diagnosis action navigates to the AI Doctor surface only; it does
+ *  - Diagnosis preset navigates to the AI Doctor surface only; it does
  *    NOT call any model or edge function.
- *  - Without a selected plant/tent, all actions show a calm context copy.
+ *  - Without a selected plant/tent, all presets show a calm context copy.
  *  - All business rules live in `@/lib/fastAddActionRules`.
  */
 import { useCallback, useMemo, useState } from "react";
@@ -111,6 +111,9 @@ export default function GlobalFastAddButton({
           data-testid="global-fast-add-menu"
           className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-1rem)] rounded-xl border border-border/60 bg-popover shadow-elevated p-1.5 z-50"
         >
+          <p className="px-3 py-1.5 text-xs text-muted-foreground">
+            Choose what you want to log.
+          </p>
           <ul className="space-y-1">
             {FAST_ADD_ACTIONS.map((a) => (
               <li key={a.id}>

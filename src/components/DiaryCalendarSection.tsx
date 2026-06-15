@@ -23,9 +23,16 @@ import {
   DIARY_CALENDAR_EMPTY_HINT,
   DIARY_CALENDAR_FILTERS,
   type DiaryCalendarRawEntry,
+  type DiaryCalendarEvent,
   type DiaryCalendarEventKind,
   type DiaryCalendarFilter,
 } from "@/lib/diaryCalendarViewModel";
+import {
+  buildDiaryCalendarEventDrawerViewModel,
+  DIARY_CALENDAR_DRAWER_VIEW_LABEL,
+  type DiaryCalendarEventDrawerViewModel,
+} from "@/lib/diaryCalendarEventDrawerViewModel";
+import DiaryCalendarEventDrawer from "@/components/DiaryCalendarEventDrawer";
 
 import { cn } from "@/lib/utils";
 
@@ -111,6 +118,20 @@ export default function DiaryCalendarSection({
     [groups, dayLimit],
   );
   const summary = useMemo(() => summarizeDiaryCalendar(groups), [groups]);
+  const rawDetailsById = useMemo(() => {
+    const map = new Map<string, unknown>();
+    for (const r of rawEntries ?? []) {
+      if (r && typeof r.id === "string") map.set(r.id, r.details);
+    }
+    return map;
+  }, [rawEntries]);
+  const [drawerEvent, setDrawerEvent] =
+    useState<DiaryCalendarEventDrawerViewModel | null>(null);
+  const openEventDrawer = (ev: DiaryCalendarEvent) => {
+    setDrawerEvent(
+      buildDiaryCalendarEventDrawerViewModel(ev, rawDetailsById.get(ev.id) ?? null),
+    );
+  };
   const [openDay, setOpenDay] = useState<string | null>(
     visibleGroups[0]?.dateKey ?? null,
   );
@@ -405,6 +426,17 @@ export default function DiaryCalendarSection({
                                   </p>
                                 )}
                               </div>
+                              <div className="mt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => openEventDrawer(ev)}
+                                  aria-label={DIARY_CALENDAR_DRAWER_VIEW_LABEL}
+                                  data-testid="diary-calendar-event-view"
+                                  className="inline-flex items-center text-[11px] font-medium text-primary hover:underline"
+                                >
+                                  {DIARY_CALENDAR_DRAWER_VIEW_LABEL}
+                                </button>
+                              </div>
                             </div>
                           </li>
                         );
@@ -423,6 +455,13 @@ export default function DiaryCalendarSection({
           )}
         </>
       )}
+      <DiaryCalendarEventDrawer
+        model={drawerEvent}
+        open={drawerEvent !== null}
+        onOpenChange={(open) => {
+          if (!open) setDrawerEvent(null);
+        }}
+      />
     </section>
   );
 }

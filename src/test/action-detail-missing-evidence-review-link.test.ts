@@ -278,9 +278,7 @@ describe("ActionDetail missing-evidence guidance wiring", () => {
 
   it("review link stays inside missing-evidence context, separated from approval controls", () => {
     expect(ACTION_DETAIL_SRC).toContain('data-testid="action-detail-missing-evidence-group"');
-    // The review link testId value must still appear in the source (via link.testId expression).
-    expect(ACTION_DETAIL_SRC).toContain("action-detail-evidence-review-link");
-    // Approval buttons should appear outside the missing-evidence group.
+    expect(ACTION_DETAIL_SRC).toContain("data-testid={link.testId}");
     const approveIndex = ACTION_DETAIL_SRC.indexOf("gradient-leaf");
     const missingGroupIndex = ACTION_DETAIL_SRC.indexOf("action-detail-missing-evidence-group");
     expect(missingGroupIndex).toBeGreaterThan(-1);

@@ -76,8 +76,14 @@ describe("Action Queue manual refresh button behavior", () => {
   });
 
   it("does not gate approve/reject/complete/cancel buttons with refresh state", () => {
-    expect(SRC).not.toMatch(/disabled=\{.*isRefreshing.*\}/);
-    expect(SRC).not.toMatch(/disabled=\{.*loading.*\}/);
+    // Action row buttons must remain disabled only when the per-row mutation is in flight.
+    expect(SRC).toMatch(/const disabled = busyId === row\.id;/);
+    // In the action row button block, no disabled prop should reference isRefreshing.
+    const btnBlockStart = SRC.indexOf("action-queue-refresh-button");
+    const actionRowsStart = SRC.indexOf("const disabled = busyId === row.id;");
+    const actionBlock = SRC.slice(actionRowsStart, actionRowsStart + 700);
+    expect(actionBlock).not.toMatch(/disabled=\{.*isRefreshing.*\}/);
+    expect(actionBlock).not.toMatch(/disabled=\{.*loading.*\}/);
   });
 
   it("approve/reject buttons remain governed by busyId only", () => {

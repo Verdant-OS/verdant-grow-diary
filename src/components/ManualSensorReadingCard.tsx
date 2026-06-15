@@ -24,6 +24,11 @@ import {
   MAX_MANUAL_DEVICE_NOTE_LEN,
 } from "@/lib/manualSensorSourceLabel";
 import { evaluateManualSnapshotAdvisor } from "@/lib/manualSensorSnapshotAdvisorRules";
+import {
+  evaluateManualSensorSnapshotQuality,
+  type ManualSensorSnapshotInput,
+} from "@/lib/manualSensorSnapshotQualityRules";
+import ManualSensorSnapshotQualityBadge from "@/components/ManualSensorSnapshotQualityBadge";
 import DerivedVpdStatus from "@/components/DerivedVpdStatus";
 import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
 import { shouldRequireFirstTentSetup } from "@/lib/firstTentSetupRules";

@@ -27,6 +27,7 @@ import {
   TrainingHistoryPanel,
   MeasurementHistoryPanel,
 } from "@/components/QuickLogHistoryPanels";
+import DiaryCalendarSection from "@/components/DiaryCalendarSection";
 import { hasManualHandheldReadings } from "@/lib/quickLogHistoryRules";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { actionDetailPath, alertDetailPath, logsPath, timelinePath } from "@/lib/routes";

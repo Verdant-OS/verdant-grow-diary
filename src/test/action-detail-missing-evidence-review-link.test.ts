@@ -115,8 +115,42 @@ describe("ActionDetail missing-evidence guidance wiring", () => {
     );
   });
 
-  it("keeps centralized missing-evidence help copy alongside the link", () => {
-    expect(ACTION_DETAIL_SRC).toContain("ACTION_EVIDENCE_MISSING_PANEL_HELP");
+  it("link has explicit aria-label with review/before-approving language", () => {
+    expect(ACTION_DETAIL_SRC).toContain('aria-label={ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL}');
+    expect(ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL).toMatch(/review.*diary.*timeline/i);
+    expect(ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL).toMatch(/before approving/i);
+  });
+
+  it("link aria-label does not use approval/action wording", () => {
+    const unsafe: RegExp[] = [
+      /approve now/i,
+      /approve action/i,
+      /auto[- ]?run/i,
+      /turn (on|off)/i,
+      /actuator/i,
+      /relay/i,
+      /submit/i,
+    ];
+    for (const re of unsafe) {
+      expect(ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL).not.toMatch(re);
+    }
+  });
+
+  it("link renders as a Link component, not a button or submit", () => {
+    // Should be a react-router Link inside Button asChild
+    expect(ACTION_DETAIL_SRC).toMatch(/<Link\s+[\s\S]*?to=\{link\.to\}/);
+    expect(ACTION_DETAIL_SRC).not.toMatch(/type="submit"[\s\S]*?buildMissingEvidenceReviewLink/);
+    expect(ACTION_DETAIL_SRC).not.toMatch(/onClick=[\s\S]*?buildMissingEvidenceReviewLink/);
+  });
+
+  it("link uses existing focus-visible utility from Button asChild", () => {
+    // Button base variant includes focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
+    expect(ACTION_DETAIL_SRC).toContain('Button asChild size="sm" variant="outline"');
+  });
+
+  it("link does not steal focus on mount (no autoFocus)", () => {
+    expect(ACTION_DETAIL_SRC).not.toMatch(/autoFocus[\s\S]*?buildMissingEvidenceReviewLink/);
+    expect(ACTION_DETAIL_SRC).not.toMatch(/autoFocus[\s\S]{0,200}action-detail-evidence-review-link/);
   });
 
   it("helper module does not introduce unsafe patterns", () => {

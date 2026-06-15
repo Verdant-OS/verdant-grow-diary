@@ -16,6 +16,10 @@ import {
   FEEDING_REVIEW_DEFAULTS_FLAG,
   FEEDING_REVIEW_NEEDS_INPUT,
 } from "@/lib/quickLogFeedingReviewViewModel";
+import {
+  buildEcCompensationPreview,
+  EC_COMPENSATION_PREVIEW_DISCLAIMER,
+} from "@/lib/ecCompensationPreviewViewModel";
 
 interface Props {
   value: QuickLogFeedingFormState;
@@ -231,9 +235,50 @@ export default function QuickLogFeedingForm({
                 <dd className="font-medium">{review.note}</dd>
               </div>
             )}
+            <EcCompensationPreviewLine
+              ec={value.ecIn}
+              waterTempC={value.waterTempC}
+            />
           </dl>
         )}
       </div>
+    </div>
+  );
+}
+
+function EcCompensationPreviewLine({
+  ec,
+  waterTempC,
+}: {
+  ec: string;
+  waterTempC: string;
+}) {
+  const preview = buildEcCompensationPreview({
+    ec,
+    waterTempC,
+    sourceLabel: "manual",
+  });
+  if (!preview.visible) return null;
+  const toneClass =
+    preview.tone === "review"
+      ? "text-amber-600 dark:text-amber-400"
+      : preview.tone === "unavailable"
+        ? "text-muted-foreground"
+        : "font-medium";
+  return (
+    <div
+      className="flex flex-col gap-0.5 pt-1"
+      data-testid="qlv2-feeding-ec-compensation-preview"
+      data-tone={preview.tone}
+    >
+      <div className="flex gap-2">
+        <dt className="text-muted-foreground">{preview.label}:</dt>
+        <dd className={toneClass}>{preview.valueDisplay}</dd>
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        {EC_COMPENSATION_PREVIEW_DISCLAIMER}
+        {preview.hint ? ` — ${preview.hint}` : ""}
+      </p>
     </div>
   );
 }

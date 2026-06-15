@@ -231,6 +231,10 @@ export default function QuickLogFeedingForm({
                 <dd className="font-medium">{review.note}</dd>
               </div>
             )}
+            <EcCompensationPreviewLine
+              ec={value.ecIn}
+              waterTempC={value.waterTempC}
+            />
           </dl>
         )}
       </div>

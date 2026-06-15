@@ -194,7 +194,9 @@ describe("Action Queue safety — current posture (suggest-only by construction)
     const SAFETY_ALLOW_PATHS = new Set<string>([
       resolve(ROOT, "src/lib/aiDoctorSafetyRules.ts"),
       resolve(ROOT, "src/lib/aiDoctorActionSuggestionPreviewRules.ts"),
+      resolve(ROOT, "src/lib/aiDoctorFixtureContextRules.ts"),
     ]);
+
     let scanText = "";
     for (const b of FILE_BOUNDARIES) {
       if (SAFETY_ALLOW_PATHS.has(b.path)) continue;

@@ -5,7 +5,7 @@
  * calendar date for a compact mobile-first month/week list.
  *
  * Safety:
- *  - No I/O, no Supabase, no model calls, no Action Queue writes.
+ *  - Pure: no I/O, no network, no model calls, no Action Queue writes.
  *  - Unknown event kinds are ignored.
  *  - Never echoes private payloads, role keys, tokens, or private IDs.
  *  - Only emits a small, vetted display surface (label, plant_name, note

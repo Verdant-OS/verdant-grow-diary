@@ -7,9 +7,9 @@
  * Safety:
  *  - No I/O, no Supabase, no model calls, no Action Queue writes.
  *  - Unknown event kinds are ignored.
- *  - Never echoes raw_payload, service_role, tokens, or private IDs.
+ *  - Never echoes private payloads, role keys, tokens, or private IDs.
  *  - Only emits a small, vetted display surface (label, plant_name, note
- *    snippet) — never the raw `details` object.
+ *    snippet) — never the raw details object.
  */
 
 export type DiaryCalendarEventKind = "watering" | "feeding" | "diagnosis";

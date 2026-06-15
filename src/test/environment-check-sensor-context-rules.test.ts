@@ -34,7 +34,7 @@ describe("environmentCheckSensorContextRules", () => {
       expect(v.canAttachManualSnapshot).toBe(false);
       expect(v.canSaveEnvironmentCheck).toBe(true);
       expect(v.contextStatus).toBe("unverified");
-      expect(v.message).not.toMatch(/verified sensor data/i);
+      expect(v.message).toMatch(/not be treated as verified sensor data/i);
     }
   });
 

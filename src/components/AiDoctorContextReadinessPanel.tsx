@@ -251,14 +251,19 @@ export default function AiDoctorContextReadinessPanel({
         </p>
       </div>
 
-      <div
+      <section
+        aria-labelledby="ai-doctor-action-suggestion-preview-heading"
+        aria-describedby="ai-doctor-action-suggestion-preview-summary ai-doctor-action-suggestion-preview-sr-status"
         className="rounded-lg border border-border/50 bg-background/30 p-3 space-y-2"
         data-testid="ai-doctor-action-suggestion-preview"
         data-status={actionPreview.status}
         data-eligible={actionPreview.eligible ? "true" : "false"}
       >
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <h3 className="text-sm font-semibold">
+          <h3
+            id="ai-doctor-action-suggestion-preview-heading"
+            className="text-sm font-semibold"
+          >
             {ACTION_SUGGESTION_PREVIEW_LABEL}
           </h3>
           <span
@@ -268,23 +273,85 @@ export default function AiDoctorContextReadinessPanel({
             {ACTION_SUGGESTION_PREVIEW_STATUS_LABELS[actionPreview.status]}
           </span>
         </div>
+
+        {/* Screen-reader status: combines eligibility + safety posture so SR users hear it in one pass. */}
         <p
-          className="text-xs"
-          data-testid="ai-doctor-action-suggestion-preview-summary"
+          id="ai-doctor-action-suggestion-preview-sr-status"
+          className="sr-only"
+          role="status"
+          data-testid="ai-doctor-action-suggestion-preview-sr-status"
         >
-          {actionPreview.summary}
+          {ACTION_SUGGESTION_PREVIEW_LABEL}:{" "}
+          {ACTION_SUGGESTION_PREVIEW_STATUS_LABELS[actionPreview.status]}.
+          Approval required. No device control. Preview only — no Action
+          Queue item is created.
         </p>
+
+        {!isUnsafePreviewText(actionPreview.summary) ? (
+          <p
+            id="ai-doctor-action-suggestion-preview-summary"
+            className="text-xs"
+            data-testid="ai-doctor-action-suggestion-preview-summary"
+          >
+            {actionPreview.summary}
+          </p>
+        ) : null}
+
         {actionPreview.reasons.length > 0 ? (
           <ul
             className="list-disc pl-4 space-y-0.5 text-xs"
             data-testid="ai-doctor-action-suggestion-preview-reasons"
           >
-            {actionPreview.reasons.map((r) => (
-              <li key={r}>{r}</li>
-            ))}
+            {actionPreview.reasons
+              .filter((r) => !isUnsafePreviewText(r))
+              .map((r) => (
+                <li key={r}>{r}</li>
+              ))}
           </ul>
         ) : null}
-        {actionPreview.suggestedActionPreview ? (
+
+        {actionPreview.missingFields.length > 0 ? (
+          <div data-testid="ai-doctor-action-suggestion-preview-missing">
+            <h4 className="text-xs font-medium text-muted-foreground mb-1">
+              Missing context
+            </h4>
+            <ul className="flex flex-wrap gap-1.5 text-xs">
+              {actionPreview.missingFields.map((field) => (
+                <li
+                  key={field}
+                  data-field={field}
+                  data-testid={`ai-doctor-action-suggestion-preview-missing-${field}`}
+                  className="inline-flex items-center rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-amber-200"
+                >
+                  {ACTION_SUGGESTION_MISSING_FIELD_LABELS[field]}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {actionPreview.invalidFields.length > 0 ? (
+          <div data-testid="ai-doctor-action-suggestion-preview-invalid">
+            <h4 className="text-xs font-medium text-muted-foreground mb-1">
+              Needs review
+            </h4>
+            <ul className="flex flex-wrap gap-1.5 text-xs">
+              {actionPreview.invalidFields.map((field) => (
+                <li
+                  key={field}
+                  data-field={field}
+                  data-testid={`ai-doctor-action-suggestion-preview-invalid-${field}`}
+                  className="inline-flex items-center rounded-md border border-rose-500/40 bg-rose-500/10 px-2 py-0.5 text-rose-200"
+                >
+                  {ACTION_SUGGESTION_INVALID_FIELD_LABELS[field]}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {actionPreview.suggestedActionPreview &&
+        !isUnsafePreviewText(actionPreview.suggestedActionPreview) ? (
           <p
             className="text-xs"
             data-testid="ai-doctor-action-suggestion-preview-action"
@@ -293,20 +360,24 @@ export default function AiDoctorContextReadinessPanel({
             {actionPreview.suggestedActionPreview}
           </p>
         ) : null}
+
         <ul
           className="flex flex-wrap gap-1.5 text-[10px] uppercase tracking-wide"
           data-testid="ai-doctor-action-suggestion-preview-safety-notes"
+          aria-label="Action Queue suggestion preview safety posture"
         >
-          {actionPreview.safetyNotes.map((note) => (
-            <li
-              key={note}
-              className="inline-flex items-center rounded-md border border-border/60 px-2 py-0.5 text-muted-foreground"
-            >
-              {note}
-            </li>
-          ))}
+          {actionPreview.safetyNotes
+            .filter((note) => !isUnsafePreviewText(note))
+            .map((note) => (
+              <li
+                key={note}
+                className="inline-flex items-center rounded-md border border-border/60 px-2 py-0.5 text-muted-foreground"
+              >
+                {note}
+              </li>
+            ))}
         </ul>
-      </div>
+      </section>
     </section>
   );
 }

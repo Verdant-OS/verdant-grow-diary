@@ -60,6 +60,14 @@ jobs:
       - name: Release docs safety
         run: bun run docs:release-safety
 
+      # AI Doctor Action Queue suggestion preview must remain read-only:
+      # the preview helper + presenter must not drift into approved/queued/
+      # executed wording, Action Queue writes, functions.invoke, service_role,
+      # device-command or automation language. See
+      # scripts/assert-ai-doctor-preview-safety.mjs.
+      - name: AI Doctor preview safety
+        run: bun run ai-doctor:preview-safety
+
       # Stop-ship: QuickLog v2 RPC ownership / reason-code / mixed-boundary
       # regression. See docs/quicklog-rpc-safety.md.
       - name: QuickLog v2 RPC ownership + security

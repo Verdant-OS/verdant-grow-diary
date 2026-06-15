@@ -294,12 +294,7 @@ export default function Dashboard() {
         }
       />
 
-      <DailyGrowCheckOnboardingCard
-        compact
-        hideWhenReady
-        tentIds={tents.map((t) => t.id)}
-        className="mb-3"
-      />
+
 
       <DailyGrowCheckStatusCard
         className="mb-6"

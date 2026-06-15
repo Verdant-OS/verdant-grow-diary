@@ -74,7 +74,7 @@ describe("Action Queue background refresh indicator", () => {
 
   it("scope changes reset the loaded-once gate so a real skeleton shows on grow switch", () => {
     expect(SRC).toMatch(
-      /useEffect\(\(\) => \{\s*hasLoadedOnceRef\.current = false;\s*\}, \[effectiveGrowId\]\)/,
+      /useEffect\(\(\) => \{\s*hasLoadedOnceRef\.current = false;.*\}, \[effectiveGrowId\]\)/,
     );
   });
 

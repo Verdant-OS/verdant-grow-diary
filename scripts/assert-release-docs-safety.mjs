@@ -51,7 +51,7 @@ export const RULES = [
   },
   {
     name: "no-action-queue-auto-write",
-    pattern: /\b(auto[- ]?created|automatically (created|written|inserted)) action[- ]queue\b|\bauto[- ]?(create|insert|write)s? .{0,40}action[- ]queue\b/i,
+    pattern: /\b(auto[- ]?(created?|inserted?|written|writes?)|automatically (created?|inserted?|written|writes?)) .{0,80}action[- ]queue\b|\baction[- ]queue (rows?|items?|entries?) (are|is|were|have been) (auto[- ]?|automatically )(created?|inserted?|written)\b/i,
     explanation: "Action Queue rows must remain approval-required; auto-creation is not allowed.",
   },
   {

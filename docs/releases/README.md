@@ -10,6 +10,17 @@ changes, or exposed secrets/raw payloads in docs-only or test-only slices.
 
 ## Entries
 
+### 2026-06-15 — Manual Sensor Snapshot Quality Badges
+
+Adds presenter-safe quality badges for manual and current sensor snapshots
+so growers can see whether readings are usable for AI Doctor context and
+Action Queue suggestion preview eligibility.
+
+- Behavior: read-only badge; no schema changes; no Supabase writes; no AI/model calls; no device control.
+- Validation: 18/18 helper + badge tests pass; 65/65 related readiness / imported-history / action-preview tests pass; 5/5 integration tests pass.
+- Docs: see `docs/ai-doctor-output-contract.md` "Current sensor snapshot quality" section and `qa/manual-sensor-snapshot-quality-checklist.md`.
+- Related: `runbooks/ai-doctor-action-suggestion-preview-qa.md`, `testing/ai-doctor-preview-safety-scanner.md`.
+
 ### 2026-06-15 — AI Doctor Imported History Safety Slice
 
 Documents the test-backed safety path for imported CSV history in AI Doctor

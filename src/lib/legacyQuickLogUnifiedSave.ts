@@ -83,6 +83,14 @@ export interface LegacyQuickLogFormInput {
    */
   earlyStage?: Record<string, unknown> | null;
   /**
+   * Optional Environment Check envelope. Folded into
+   * `p_details.environment_check` alongside (not replacing) the sensor
+   * and early-stage envelopes. No schema change required — the RPC
+   * already accepts JSONB `p_details`. Pure pass-through: this adapter
+   * does not invent, normalize, or convert units.
+   */
+  environmentCheck?: Record<string, unknown> | null;
+  /**
    * Optional human-readable suffix (e.g. milestone + vigor summary)
    * appended to the diary note so timelines that read the note column
    * stay informative without depending on JSON details.

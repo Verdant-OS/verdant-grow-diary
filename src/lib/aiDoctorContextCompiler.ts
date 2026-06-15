@@ -34,6 +34,11 @@ import {
   buildAiDoctorCsvHistoryContext,
   type AiDoctorCsvHistoryContext,
 } from "./aiDoctorCsvHistoryContextRules";
+import {
+  buildEarlyStageAiDoctorContext,
+  type EarlyStageAiDoctorContext,
+} from "./earlyStageAiDoctorContextRules";
+
 
 /** Section label rendered for imported CSV/XLSX sensor history. */
 export const AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL =
@@ -188,7 +193,15 @@ export interface PlantContextPayload {
    * missing-live-readings caveat.
    */
   missingLiveSensorReadings: boolean;
+  /**
+   * Optional, additive early-stage (germination/seedling) memory compiled
+   * from saved Quick Log / diary `details.early_stage` envelopes. Null
+   * when no early-stage memory exists. Safe-by-construction: never
+   * carries raw payloads, tokens, service_role, or unknown enum strings.
+   */
+  early_stage_memory: EarlyStageAiDoctorContext | null;
 }
+
 
 // ---------------------------------------------------------------------------
 // Row shapes (intentionally permissive — caller supplies whatever they have).
@@ -209,7 +222,10 @@ export interface GrowEventRowLike {
   event_type?: string | null;
   source?: string | null;
   note?: string | null;
+  /** Free-form details JSON — may carry an `early_stage` envelope. */
+  details?: unknown;
 }
+
 
 export interface SensorReadingRowLike {
   metric?: string | null;
@@ -398,6 +414,18 @@ export function compilePlantContextFromRows(
     (g) => g.source === "live" && g.sample_count > 0,
   );
 
+  // ----- early-stage (germination/seedling) memory, additive & safe -----
+  const earlyStage = buildEarlyStageAiDoctorContext({
+    diaryRows: input.growEvents ?? [],
+    // Compiler knows live sensor presence; pass it explicitly so the
+    // helper can surface a missing-sensor caveat only when known false.
+    hasRecentSensorSnapshot: hasLiveSensorReadings,
+    // No photo signal exists in the compiler context — leave undefined.
+  });
+  const early_stage_memory: EarlyStageAiDoctorContext | null =
+    earlyStage.hasEarlyStageMemory ? earlyStage : null;
+
+
   return {
     grow_id: plant?.grow_id ?? null,
     tent_id: plant?.tent_id ?? null,
@@ -414,7 +442,9 @@ export function compilePlantContextFromRows(
     imported_sensor_history,
     hasLiveSensorReadings,
     missingLiveSensorReadings: !hasLiveSensorReadings,
+    early_stage_memory,
   };
+
 }
 
 function bucketAverages(rows: readonly RecentSensorReading[]): SensorRollingAverages {

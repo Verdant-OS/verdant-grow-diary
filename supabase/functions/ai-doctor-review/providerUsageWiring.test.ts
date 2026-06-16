@@ -203,3 +203,158 @@ Deno.test("structural safety: edge function wiring contains no forbidden writes"
     "must use the named local variable",
   );
 });
+
+// --- Uncommon provider-response shape coverage --------------------------
+// All of these MUST clear providerReportedTokens to null without throwing
+// and without retaining any raw reference.
+
+function expectsNull(name: string, providerResponse: unknown) {
+  Deno.test(`uncommon shape clears to null: ${name}`, () => {
+    const m = freshMeasurement();
+    const out = attachProviderResponseUsageToAiDoctorPromptMeasurement(
+      m,
+      providerResponse,
+    );
+    assertEquals(out.providerReportedTokens, null);
+    // Original measurement fields preserved.
+    assertEquals(out.promptName, m.promptName);
+    assertEquals(out.summaryByteSize, m.summaryByteSize);
+    assertEquals(out.status, m.status);
+  });
+}
+
+expectsNull("usage missing required keys", { usage: {} });
+expectsNull("usage with only total_tokens", { usage: { total_tokens: 10 } });
+expectsNull("usage with only prompt_tokens", { usage: { prompt_tokens: 5 } });
+expectsNull("usage with only completion_tokens", { usage: { completion_tokens: 5 } });
+expectsNull("usage with prompt_tokens null", {
+  usage: { prompt_tokens: null, completion_tokens: 5, total_tokens: 5 },
+});
+expectsNull("usage with completion_tokens null", {
+  usage: { prompt_tokens: 5, completion_tokens: null, total_tokens: 5 },
+});
+expectsNull("usage with numeric-looking strings", {
+  usage: { prompt_tokens: "5", completion_tokens: "5", total_tokens: "10" },
+});
+expectsNull("usage with fractional values", {
+  usage: { prompt_tokens: 1.5, completion_tokens: 2.5, total_tokens: 4 },
+});
+expectsNull("usage with negative values", {
+  usage: { prompt_tokens: -1, completion_tokens: 5, total_tokens: 4 },
+});
+expectsNull("usage with NaN", {
+  usage: { prompt_tokens: NaN, completion_tokens: 5, total_tokens: 5 },
+});
+expectsNull("usage with Infinity", {
+  usage: { prompt_tokens: Infinity, completion_tokens: 5, total_tokens: 5 },
+});
+expectsNull("usage nested under result.usage", {
+  result: { usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } },
+});
+expectsNull("usage nested under choices[0].usage", {
+  choices: [{ usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } }],
+});
+expectsNull("usage nested under metadata.usage", {
+  metadata: { usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } },
+});
+expectsNull("usage nested under payload.debug.usage", {
+  payload: {
+    debug: { usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } },
+  },
+});
+expectsNull("deeply nested usage object", {
+  a: { b: { c: { d: { usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } } } } },
+});
+
+// --- Recursive reference-retention safety -------------------------------
+// Walk the returned measurement and assert NONE of the provided raw
+// provider-response sub-objects are referenced anywhere in it.
+
+function collectObjectRefs(root: unknown): Set<unknown> {
+  const seen = new Set<unknown>();
+  const stack: unknown[] = [root];
+  while (stack.length) {
+    const v = stack.pop();
+    if (v === null || typeof v !== "object") continue;
+    if (seen.has(v)) continue;
+    seen.add(v);
+    if (Array.isArray(v)) {
+      for (const item of v) stack.push(item);
+    } else {
+      for (const key of Object.keys(v as Record<string, unknown>)) {
+        stack.push((v as Record<string, unknown>)[key]);
+      }
+    }
+  }
+  return seen;
+}
+
+Deno.test("returned measurement retains no raw provider-response refs (recursive walk)", () => {
+  const usage = { prompt_tokens: 3, completion_tokens: 4, total_tokens: 7 };
+  const nestedMsg = { role: "assistant", content: "do-not-leak" };
+  const choices = [{ message: nestedMsg }];
+  const headers = { authorization: "Bearer secret" };
+  const metadata = { trace: "abc" };
+  const response = { usage };
+  const data = { usage };
+  const root = {
+    id: "resp_x",
+    model: "y",
+    usage,
+    response,
+    data,
+    choices,
+    headers,
+    metadata,
+  };
+  const out = attachProviderResponseUsageToAiDoctorPromptMeasurement(
+    freshMeasurement(),
+    root,
+  );
+  const refs = collectObjectRefs(out);
+  const forbidden: Array<[string, unknown]> = [
+    ["root", root],
+    ["usage", usage],
+    ["response", response],
+    ["response.usage", response.usage],
+    ["data", data],
+    ["data.usage", data.usage],
+    ["choices", choices],
+    ["choices[0]", choices[0]],
+    ["headers", headers],
+    ["metadata", metadata],
+    ["nestedMsg", nestedMsg],
+  ];
+  for (const [label, ref] of forbidden) {
+    assert(!refs.has(ref), `returned measurement must not retain ${label}`);
+  }
+  // The normalized token triple is still attached.
+  assertEquals(out.providerReportedTokens, {
+    promptTokens: 3,
+    completionTokens: 4,
+    totalTokens: 7,
+  });
+});
+
+Deno.test("frozen measurement immutability regression", () => {
+  const m = Object.freeze(freshMeasurement());
+  let out!: ReturnType<typeof attachProviderResponseUsageToAiDoctorPromptMeasurement>;
+  // Must not throw despite the original being frozen.
+  out = attachProviderResponseUsageToAiDoctorPromptMeasurement(m, {
+    usage: { prompt_tokens: 11, completion_tokens: 12, total_tokens: 23 },
+  });
+  assertNotStrictEquals(out, m);
+  // Original is unchanged.
+  assertEquals(m.providerReportedTokens, null);
+  // Existing fields preserved.
+  assertEquals(out.promptName, m.promptName);
+  assertEquals(out.recordedAt, m.recordedAt);
+  assertEquals(out.summaryByteSize, m.summaryByteSize);
+  assertEquals(out.rawHistoryFallback, m.rawHistoryFallback);
+  // Provider tokens attached correctly.
+  assertEquals(out.providerReportedTokens, {
+    promptTokens: 11,
+    completionTokens: 12,
+    totalTokens: 23,
+  });
+});

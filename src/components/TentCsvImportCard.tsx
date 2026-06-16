@@ -15,6 +15,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { tentDetailPath } from "@/lib/routes";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, FileUp, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";

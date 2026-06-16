@@ -185,6 +185,9 @@ export function SensorNormalizationPreviewPanel({
             <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Long-form row preview
             </p>
+            <p className="mb-2 text-[11px] text-muted-foreground">
+              These rows show what Verdant parsed. They are preview-only and are not database rows.
+            </p>
             <table className="w-full text-[11px]">
               <thead>
                 <tr className="text-left text-muted-foreground">
@@ -225,12 +228,24 @@ export function SensorNormalizationPreviewPanel({
           </p>
         )
       ) : (
-        <p
+        <div
           data-testid="sensor-normalization-preview-empty-state"
-          className="rounded-lg border border-dashed border-border/60 bg-muted/30 p-2 text-[11px] text-muted-foreground"
+          className="rounded-lg border border-dashed border-border/60 bg-muted/30 p-2 text-[11px] text-muted-foreground space-y-1"
         >
-          {vm.emptyState ?? ""}
-        </p>
+          <p>{vm.emptyState ?? ""}</p>
+          {vm.tentStatus !== "linked_verified" && (
+            <p>
+              Metric summaries may still appear for review, but they are not
+              saved as sensor readings.
+            </p>
+          )}
+          {vm.emptyState === SENSOR_NORMALIZATION_PREVIEW_NO_METRICS_EMPTY_STATE && (
+            <p>
+              Check the input fields, CSV mapping, units, and timestamp before
+              treating this data as useful.
+            </p>
+          )}
+        </div>
       )}
 
       <p

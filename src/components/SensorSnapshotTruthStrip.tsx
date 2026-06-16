@@ -6,8 +6,8 @@
  * Rules (stop-ship if violated):
  *  - No data fetching, no writes, no Supabase imports.
  *  - Never marks stale / manual / csv / demo / invalid as healthy.
- *  - Never renders raw payload, bridge tokens, service role keys, or
- *    private internal IDs beyond what the read model already exposes.
+ *  - Never renders raw payloads, secrets, or private internal IDs beyond
+ *    what the read model already exposes.
  */
 import { Badge } from "@/components/ui/badge";
 import type {

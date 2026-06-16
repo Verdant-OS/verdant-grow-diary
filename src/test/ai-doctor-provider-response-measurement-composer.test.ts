@@ -304,4 +304,117 @@ describe("attachProviderResponseUsageToAiDoctorPromptMeasurement", () => {
       expect(source).not.toContain(forbidden);
     }
   });
+
+  describe("uncommon provider response shapes regression", () => {
+    const uncommonShapes: ReadonlyArray<{ label: string; input: unknown }> = [
+      { label: "{ usage: null }", input: { usage: null } },
+      { label: "{ usage: [] }", input: { usage: [] } },
+      { label: "{ usage: { total_tokens: 100 } }", input: { usage: { total_tokens: 100 } } },
+      { label: "{ usage: { prompt_tokens: 10 } }", input: { usage: { prompt_tokens: 10 } } },
+      { label: "{ usage: { completion_tokens: 5 } }", input: { usage: { completion_tokens: 5 } } },
+      {
+        label: "{ usage: { prompt_tokens: 10, completion_tokens: null } }",
+        input: { usage: { prompt_tokens: 10, completion_tokens: null } },
+      },
+      { label: "{ response: { usage: null } }", input: { response: { usage: null } } },
+      { label: "{ data: { usage: [] } }", input: { data: { usage: [] } } },
+      {
+        label: "{ result: { usage: ... } } unsupported envelope",
+        input: { result: { usage: { prompt_tokens: 10, completion_tokens: 5 } } },
+      },
+      {
+        label: "{ choices: [{ usage: ... }] } not searched recursively",
+        input: { choices: [{ usage: { prompt_tokens: 10, completion_tokens: 5 } }] },
+      },
+      {
+        label: "{ usage: { input_tokens, output_tokens } } Anthropic-style",
+        input: { usage: { input_tokens: 10, output_tokens: 5 } },
+      },
+      {
+        label: "deeply nested usage",
+        input: { a: { b: { c: { usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } } } } },
+      },
+    ];
+
+    for (const { label, input } of uncommonShapes) {
+      it(`clears providerReportedTokens for ${label}`, () => {
+        const base = makeBaseMeasurement({
+          providerReportedTokens: { promptTokens: 9, completionTokens: 9, totalTokens: 18 },
+        });
+        const baseSnapshot = JSON.stringify(base);
+
+        const result = attachProviderResponseUsageToAiDoctorPromptMeasurement(
+          base,
+          input,
+        );
+
+        expect(result.providerReportedTokens).toBeNull();
+        expect(JSON.stringify(base)).toBe(baseSnapshot);
+        const keys = Object.keys(result);
+        for (const forbidden of [
+          "id",
+          "model",
+          "choices",
+          "headers",
+          "metadata",
+          "authorization",
+          "usage",
+          "response",
+          "data",
+          "result",
+          "input_tokens",
+          "output_tokens",
+        ]) {
+          expect(keys).not.toContain(forbidden);
+        }
+      });
+    }
+  });
 });
+
+describe("cost library entrypoint (src/lib/cost)", () => {
+  it("re-exports the composer and attaches valid usage end-to-end", async () => {
+    const mod = await import("@/lib/cost");
+    expect(typeof mod.attachProviderResponseUsageToAiDoctorPromptMeasurement).toBe(
+      "function",
+    );
+
+    const base = makeBaseMeasurement();
+    const result = mod.attachProviderResponseUsageToAiDoctorPromptMeasurement(
+      base,
+      {
+        id: "chatcmpl_entrypoint",
+        usage: { prompt_tokens: 12, completion_tokens: 8, total_tokens: 20 },
+      },
+    );
+
+    expect(result.providerReportedTokens).toEqual({
+      promptTokens: 12,
+      completionTokens: 8,
+      totalTokens: 20,
+    });
+    expect(JSON.stringify(result)).not.toContain("chatcmpl_entrypoint");
+  });
+
+  it("structural safety: entrypoint has no forbidden imports or side effects", () => {
+    const filePath = path.resolve(process.cwd(), "src/lib/cost/index.ts");
+    const source = fs.readFileSync(filePath, "utf8");
+    for (const forbidden of [
+      "fetch(",
+      "supabase",
+      "localStorage",
+      "sessionStorage",
+      "window.",
+      "document.",
+      "setTimeout",
+      "setInterval",
+      "import React",
+      "from \"react",
+      "supabase/functions",
+      "@/integrations/supabase",
+    ]) {
+      expect(source).not.toContain(forbidden);
+    }
+  });
+});
+

@@ -5,8 +5,11 @@
  *  - exported constants are stable
  *  - getCachedTsFiles returns the same list when called twice
  *    (cache hit; no second filesystem walk)
+ *  - getCachedScannerFiles returns the same list when called twice
+ *    for arbitrary scanner extension sets
  *  - getCachedTsFiles output only contains .ts / .tsx files
  *  - the slow-test JSONL report path is well-formed
+ *  - slow-test report rows expose a stable machine-readable field contract
  *
  * No production code is exercised by this test.
  */
@@ -17,7 +20,11 @@ import { resolve } from "node:path";
 import {
   SCANNER_GUARDRAIL_TIMEOUT_MS,
   SLOW_SCANNER_THRESHOLD_MS,
+  SCANNER_GUARDRAIL_SLOW_TEST_REPORT_PATH,
+  buildScannerSlowTestReportRow,
+  getCachedScannerFiles,
   getCachedTsFiles,
+  scannerIt,
   __resetScannerHarnessCachesForTests,
 } from "./support/scannerGuardrailHarness";
 
@@ -30,6 +37,10 @@ describe("scannerGuardrailHarness", () => {
     );
   });
 
+  it("exposes scannerIt as the scanner-suite test helper", () => {
+    expect(scannerIt).toBe(it);
+  });
+
   it("getCachedTsFiles returns identical reference on second call (cache hit)", () => {
     __resetScannerHarnessCachesForTests();
     const root = resolve(__dirname, "support");
@@ -38,6 +49,62 @@ describe("scannerGuardrailHarness", () => {
     expect(second).toBe(first);
     expect(first.length).toBeGreaterThan(0);
     expect(first.every((p) => /\.(ts|tsx)$/.test(p))).toBe(true);
+  });
+
+  it("getCachedScannerFiles returns identical reference for matching scanner walks", () => {
+    __resetScannerHarnessCachesForTests();
+    const first = getCachedScannerFiles({
+      root: resolve(__dirname, ".."),
+      dirs: ["test/support"],
+      exts: [".ts", ".tsx"],
+    });
+    const second = getCachedScannerFiles({
+      root: resolve(__dirname, ".."),
+      dirs: ["test/support"],
+      exts: [".tsx", ".ts"],
+    });
+    expect(second).toBe(first);
+    expect(first.length).toBeGreaterThan(0);
+    expect(first.every((p) => /\.(ts|tsx)$/.test(p))).toBe(true);
+  });
+
+  it("builds stable slow-test JSONL report rows", () => {
+    const row = buildScannerSlowTestReportRow({
+      test: "contains zero unsafe references",
+      suite: "ecowitt-only-sensor-direction",
+      file: "src/test/ecowitt-only-sensor-direction.test.ts",
+      durationMs: 5_000.6,
+      thresholdMs: 5_000,
+      recordedAt: "2026-06-16T00:00:00.000Z",
+    });
+
+    expect(Object.keys(row)).toEqual([
+      "test",
+      "suite",
+      "file",
+      "durationMs",
+      "thresholdMs",
+      "recordedAt",
+    ]);
+    expect(row).toEqual({
+      test: "contains zero unsafe references",
+      suite: "ecowitt-only-sensor-direction",
+      file: "src/test/ecowitt-only-sensor-direction.test.ts",
+      durationMs: 5_001,
+      thresholdMs: 5_000,
+      recordedAt: "2026-06-16T00:00:00.000Z",
+    });
+    expect(JSON.parse(JSON.stringify(row))).toEqual(row);
+  });
+
+  it("derives a stable suite label from the test file when none is supplied", () => {
+    const row = buildScannerSlowTestReportRow({
+      test: "current repository is clean",
+      file: "/repo/src/test/sensor-intelligence-safety.test.ts",
+      durationMs: 5_123,
+      recordedAt: "2026-06-16T00:00:00.000Z",
+    });
+    expect(row.suite).toBe("sensor-intelligence-safety");
   });
 
   it("harness source file documents safety constraints", () => {
@@ -53,14 +120,8 @@ describe("scannerGuardrailHarness", () => {
   });
 
   it("slow-test report path is under test-results/", () => {
-    // Path is computed lazily inside afterEach; verify shape by inspecting
-    // the source. We cannot import the private constant directly.
-    const src = readFileSync(
-      resolve(__dirname, "support/scannerGuardrailHarness.ts"),
-      "utf8",
-    );
-    expect(src).toMatch(
-      /test-results[\s\S]*scanner-guardrail-slow-tests\.jsonl/,
+    expect(SCANNER_GUARDRAIL_SLOW_TEST_REPORT_PATH).toMatch(
+      /test-results.*scanner-guardrail-slow-tests\.jsonl/,
     );
     // Sanity: the directory is allowed to not exist yet (only created on
     // first slow test). Just confirm we don't accidentally write into src/.

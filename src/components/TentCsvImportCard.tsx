@@ -373,7 +373,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         toast.error("Couldn't import CSV.", { description: batchResult.diagnostic });
         return;
       }
-      toast.success(batchResult.diagnostic);
+      toast.success(batchResult.diagnostic, { description: CSV_HISTORY_IMPORT_SCOPE_LINE });
       const auditInput = buildRegistryCsvAuditInput({
         sourceAppId: detected,
         adapterResult: result,

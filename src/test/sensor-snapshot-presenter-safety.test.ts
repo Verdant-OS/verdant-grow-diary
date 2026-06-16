@@ -17,7 +17,10 @@ const PRESENTERS = [
   "src/components/PlantManualSensorFreshnessCard.tsx",
   "src/components/ManualSnapshotTimelineSection.tsx",
   "src/components/ManualSnapshotTimelineCard.tsx",
-  "src/components/ManualSensorReadingCard.tsx",
+  // ManualSensorReadingCard is intentionally excluded: it is the Quick Log
+  // *input* form (writes a manual reading via the audited save hook), not a
+  // read-only snapshot presenter.
+
   "src/components/ManualSensorSnapshotQualityBadge.tsx",
   "src/components/QuickLogSensorSnapshotStrip.tsx",
   "src/components/SensorSnapshotPreview.tsx",

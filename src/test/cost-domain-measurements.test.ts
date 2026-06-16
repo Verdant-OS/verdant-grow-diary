@@ -132,8 +132,12 @@ describe("cost-domain separation", () => {
 
   it("threshold config contains only TBD markers, no fabricated numeric limits", () => {
     expect(thresholdsAreAllTbd(COST_THRESHOLDS)).toBe(true);
-    const json = JSON.stringify(COST_THRESHOLDS);
-    expect(json).not.toMatch(/\d/);
+    for (const group of Object.values(COST_THRESHOLDS)) {
+      for (const value of Object.values(group)) {
+        expect(typeof value).toBe("string");
+        expect(value).toMatch(/^TBD_(MEASURED|LOAD_TEST)$/);
+      }
+    }
   });
 
   it("measurement wrappers are deterministic and repeatable", () => {

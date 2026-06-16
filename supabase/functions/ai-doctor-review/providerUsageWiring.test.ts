@@ -11,10 +11,16 @@
 //   - never recursively searches into nested fields (no throwing-getter trip)
 //   - the runtime wiring does NOT introduce persistence, capture, budget,
 //     back-pressure, alerts, action_queue writes, or service-role usage.
+//
+// Runtime safety: this is a LOCAL/UNIT test file only.
+//   * No provider API call is made.
+//   * No Supabase call is made.
+//   * No network access is required.
+//   * No secrets/environment variables are required.
+// Safe to run in CI on every PR (including untrusted forks).
 import {
   assert,
   assertEquals,
-  assertStrictEquals,
   assertNotStrictEquals,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {

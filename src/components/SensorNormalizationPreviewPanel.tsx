@@ -108,21 +108,44 @@ export function SensorNormalizationPreviewPanel({
 
 
       {vm.warnings.length > 0 && (
-        <ul
-          data-testid="sensor-normalization-preview-warnings"
-          className="flex flex-wrap gap-1.5"
-        >
-          {vm.warnings.map((w) => (
-            <li
-              key={w.code}
-              data-testid="sensor-normalization-preview-warning"
-              data-code={w.code}
-              className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[11px] text-foreground"
-            >
-              {w.label}
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul
+            data-testid="sensor-normalization-preview-warnings"
+            className="flex flex-wrap gap-1.5"
+          >
+            {vm.warnings.map((w) => (
+              <li
+                key={w.code}
+                data-testid="sensor-normalization-preview-warning"
+                data-code={w.code}
+                className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[11px] text-foreground"
+              >
+                {w.label}
+              </li>
+            ))}
+          </ul>
+
+          <details
+            data-testid="sensor-normalization-preview-warning-disclosure"
+            className="rounded-lg border border-border/60 bg-secondary/20 p-2 text-[11px]"
+          >
+            <summary className="cursor-pointer select-none font-medium text-foreground">
+              Why am I seeing this warning?
+            </summary>
+            <div className="mt-2 space-y-2 text-muted-foreground">
+              <p>
+                Warnings are data-quality signals. They mean Verdant noticed
+                missing context, stale data, suspicious units, or values that may
+                need review. They are not plant diagnosis and they do not save
+                sensor readings.
+              </p>
+              <p>
+                When unsure, treat this preview as note-only until the source,
+                timestamp, tent context, and units are verified.
+              </p>
+            </div>
+          </details>
+        </>
       )}
 
       {vm.metricRows.length > 0 && (

@@ -73,6 +73,77 @@ describe("SensorNormalizationPreviewPanel", () => {
     expect(items.some((el) => el.getAttribute("data-code") === "missing_tent_id")).toBe(true);
   });
 
+  it("renders warning disclosure trigger when warnings exist", () => {
+    render(
+      <SensorNormalizationPreviewPanel viewModel={buildVm({ tentId: null })} />,
+    );
+    expect(
+      screen.getByTestId("sensor-normalization-preview-warning-disclosure"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Why am I seeing this warning?"),
+    ).toBeInTheDocument();
+  });
+
+  it("does not render warning disclosure when there are no warnings", () => {
+    render(<SensorNormalizationPreviewPanel viewModel={buildVm()} />);
+    expect(
+      screen.queryByTestId("sensor-normalization-preview-warning-disclosure"),
+    ).toBeNull();
+  });
+
+  it("disclosure expanded copy says warnings are data-quality signals, not plant diagnosis", () => {
+    render(
+      <SensorNormalizationPreviewPanel viewModel={buildVm({ tentId: null })} />,
+    );
+    const disclosure = screen.getByTestId(
+      "sensor-normalization-preview-warning-disclosure",
+    );
+    expect(disclosure.textContent).toMatch(/data-quality signals/i);
+    expect(disclosure.textContent).toMatch(/not plant diagnosis/i);
+  });
+
+  it("disclosure expanded copy says warnings do not save sensor readings", () => {
+    render(
+      <SensorNormalizationPreviewPanel viewModel={buildVm({ tentId: null })} />,
+    );
+    const disclosure = screen.getByTestId(
+      "sensor-normalization-preview-warning-disclosure",
+    );
+    expect(disclosure.textContent).toMatch(/do not save sensor readings/i);
+  });
+
+  it("disclosure expanded copy includes note-only guidance", () => {
+    render(
+      <SensorNormalizationPreviewPanel viewModel={buildVm({ tentId: null })} />,
+    );
+    const disclosure = screen.getByTestId(
+      "sensor-normalization-preview-warning-disclosure",
+    );
+    expect(disclosure.textContent).toMatch(/note-only/i);
+    expect(disclosure.textContent).toMatch(/source, timestamp, tent context, and units/i);
+  });
+
+  it("disclosure does not render raw payload or private-looking values", () => {
+    const payload = {
+      temperature_c: 24,
+      humidity: 50,
+      service_role: "leak-service-role",
+      bridge_token: "leak-bridge-token",
+      raw_payload: { secret: "leak-raw" },
+    };
+    const { container } = render(
+      <SensorNormalizationPreviewPanel viewModel={buildVm({ payload, tentId: null })} />,
+    );
+    const text = container.textContent ?? "";
+    expect(text).not.toContain("leak-service-role");
+    expect(text).not.toContain("leak-bridge-token");
+    expect(text).not.toContain("leak-raw");
+    expect(text).not.toContain("service_role");
+    expect(text).not.toContain("bridge_token");
+    expect(text).not.toMatch(/"secret"/);
+  });
+
   it("renders normalized metric summary rows only for non-null metrics", () => {
     render(<SensorNormalizationPreviewPanel viewModel={buildVm()} />);
     const rows = screen.getAllByTestId("sensor-normalization-preview-metric-row");

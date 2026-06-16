@@ -42,18 +42,32 @@ function baseCard(
 }
 
 describe("ManualSnapshotTimelineCard — historical quality badge", () => {
-  it("renders the historical quality badge with helper copy", () => {
+  it("renders the historical quality badge with safer review copy and truth chips", () => {
     render(<ManualSnapshotTimelineCard card={baseCard()} />);
     const section = screen.getByTestId("manual-snapshot-timeline-card-quality");
+    // Risky "usable" copy must NOT appear in the historical card.
+    expect(within(section).queryByText(/Historical usable reading/i)).toBeNull();
     expect(
-      within(section).getByText("Historical usable reading"),
+      within(section).getByText("Historical review reading"),
     ).toBeInTheDocument();
     expect(
       within(section).getByText(/Historical reading — quality reflects captured values/i),
     ).toBeInTheDocument();
+    const chips = within(section).getByTestId(
+      "manual-snapshot-timeline-card-truth-chips",
+    );
+    expect(within(chips).getByText("Source: manual")).toBeInTheDocument();
+    expect(within(chips).getByText("Identity: manual_entry")).toBeInTheDocument();
+    expect(within(chips).getByText("Transport: manual")).toBeInTheDocument();
+    expect(within(chips).getByText("Confidence: unknown")).toBeInTheDocument();
   });
 
-  it("flags humidity stuck at 0% as historical invalid with reason", () => {
+  it("never labels a manual snapshot as live", () => {
+    const { container } = render(<ManualSnapshotTimelineCard card={baseCard()} />);
+    expect(container.textContent ?? "").not.toMatch(/\blive\b/i);
+  });
+
+  it("flags humidity stuck at 0% as historical invalid with reason and not-healthy copy", () => {
     render(
       <ManualSnapshotTimelineCard
         card={baseCard({
@@ -65,7 +79,14 @@ describe("ManualSnapshotTimelineCard — historical quality badge", () => {
     );
     const quality = screen.getByTestId("manual-snapshot-quality");
     expect(quality.getAttribute("data-quality")).toBe("invalid");
-    expect(within(quality).getByText("Historical invalid reading")).toBeInTheDocument();
+    expect(
+      within(quality).getByText("Historical invalid reading — review before use"),
+    ).toBeInTheDocument();
+    expect(
+      within(quality.parentElement!).getByText(
+        /Bad or unknown telemetry is not treated as healthy\./i,
+      ),
+    ).toBeInTheDocument();
     expect(
       within(quality).getByText(/Humidity appears stuck at 0 or 100%/i),
     ).toBeInTheDocument();

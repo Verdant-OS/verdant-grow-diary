@@ -116,10 +116,39 @@ export default function ManualSnapshotTimelineCard({ card }: Props) {
           className="rounded-md border border-border/40 bg-secondary/10 p-2"
         >
           <ManualSensorSnapshotQualityBadge evaluation={quality} />
+          <ul
+            className="mt-2 flex flex-wrap gap-1"
+            data-testid="manual-snapshot-timeline-card-truth-chips"
+            aria-label="Sensor truth chips"
+          >
+            {[
+              `Source: ${card.source === "manual" ? "manual" : "unknown"}`,
+              `Identity: ${card.source === "manual" ? "manual_entry" : "unknown"}`,
+              `Transport: ${card.source === "manual" ? "manual" : "unknown"}`,
+              "Confidence: unknown",
+            ].map((label) => (
+              <li key={label}>
+                <Badge
+                  variant="outline"
+                  className="h-5 px-1.5 text-[10px] font-normal"
+                >
+                  {label}
+                </Badge>
+              </li>
+            ))}
+          </ul>
           <p className="mt-1 text-[11px] text-muted-foreground">
             Historical reading — quality reflects captured values; not
             current-room guidance.
           </p>
+          {(quality.quality === "invalid" || quality.quality === "needs_review") && (
+            <p
+              className="mt-1 text-[11px] text-muted-foreground"
+              data-testid="manual-snapshot-timeline-card-not-healthy"
+            >
+              Bad or unknown telemetry is not treated as healthy.
+            </p>
+          )}
         </section>
         {card.readings.length > 0 ? (
           <ul

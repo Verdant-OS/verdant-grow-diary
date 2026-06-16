@@ -168,14 +168,14 @@ jobs:
         run: bunx vitest run
 
       # Scanner guardrail timeout sentinel — re-runs only the filesystem-
-      # scanning guardrail suites in isolation. These suites time out under
-      # heavy full-suite parallel load if their per-file timeout regresses
-      # or new redundant fs walks are introduced. This step is a safety
-      # net that catches future scanner timeout regressions early; it does
+      # scanning guardrail suites in isolation. The CI wrapper deletes stale
+      # local telemetry, runs the full scanner suite + harness self-test,
+      # validates the JSONL row contract, and fails the build if any scanner
+      # guardrail emits a slow-test row at or above 5000ms. This step does
       # NOT replace the full suite above. See
-      # src/test/support/scannerGuardrailHarness.ts.
+      # docs/testing/scanner-guardrails.md.
       - name: Scanner guardrail timeout sentinel
-        run: bun run test:scanner-guardrails
+        run: bun run test:scanner-guardrails:ci
 
       - name: Upload scanner guardrail slow-test report
         if: always()
@@ -187,4 +187,3 @@ jobs:
 
       - name: Build
         run: bun run build
-

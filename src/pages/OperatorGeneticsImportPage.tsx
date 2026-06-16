@@ -17,6 +17,10 @@ export default function OperatorGeneticsImportPage() {
           is saved until confirmed. This screen never writes sensor readings
           and never enables device control.
         </p>
+        <p className="text-xs text-muted-foreground" data-testid="operator-genetics-import-safety">
+          This tool validates genetics spreadsheets in-browser. Batch linking is
+          not enabled yet.
+        </p>
       </header>
       <VerdantGeneticsXlsxImportPanel />
     </div>

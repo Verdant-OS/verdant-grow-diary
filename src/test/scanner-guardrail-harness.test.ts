@@ -97,6 +97,21 @@ describe("scannerGuardrailHarness", () => {
     expect(JSON.parse(JSON.stringify(row))).toEqual(row);
   });
 
+  it("normalizes absolute test file paths to stable repo-relative POSIX paths", () => {
+    const row = buildScannerSlowTestReportRow({
+      test: "contains zero unsafe references",
+      file: resolve(
+        process.cwd(),
+        "src/test/ecowitt-only-sensor-direction.test.ts",
+      ),
+      durationMs: 5_123,
+      recordedAt: "2026-06-16T00:00:00.000Z",
+    });
+
+    expect(row.file).toBe("src/test/ecowitt-only-sensor-direction.test.ts");
+    expect(row.file).not.toContain("\\");
+  });
+
   it("derives a stable suite label from the test file when none is supplied", () => {
     const row = buildScannerSlowTestReportRow({
       test: "current repository is clean",

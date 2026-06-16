@@ -96,29 +96,13 @@ describe("pi-ingest server secret resolver — contract doc", () => {
   });
 });
 
-function walk(dir: string, acc: string[] = []): string[] {
-  if (!existsSync(dir)) return acc;
-  for (const name of readdirSync(dir)) {
-    if (name === "node_modules" || name === ".git" || name === "dist") continue;
-    const p = join(dir, name);
-    const st = statSync(p);
-    if (st.isDirectory()) walk(p, acc);
-    else acc.push(p);
-  }
-  return acc;
-}
-
 const SELF = resolve(__dirname, "piIngestServerSecretResolverContract.test.ts");
 
 describe("pi-ingest server secret resolver — repo guardrails", () => {
   it("no server secret resolver module exists yet (types-only modules allowed)", () => {
-    const files = walk(resolve(ROOT, "src/lib")).filter((p) =>
-      /\.(ts|tsx)$/.test(p),
-    );
+    const files = listTsFilesCached(resolve(ROOT, "src/lib"));
     for (const f of files) {
       const base = f.split("/").pop() ?? "";
-      // Types/contracts-only modules (e.g. *ResolverTypes.ts) are permitted
-      // per docs/pi-ingest-server-secret-resolver-implementation-plan.md.
       const isTypesOnly = /Types\.ts$/.test(base);
       const looksLikeResolver =
         /ServerSecretResolver|BridgeSecretResolver|BridgeCredentialResolver/.test(
@@ -143,11 +127,9 @@ describe("pi-ingest server secret resolver — repo guardrails", () => {
   });
 
   it("no PI_INGEST_SECRET_KEY env reads anywhere in src/", () => {
-    const files = walk(resolve(ROOT, "src")).filter(
-      (p) => /\.(ts|tsx)$/.test(p) && p !== SELF,
-    );
+    const files = listTsFilesCached(resolve(ROOT, "src")).filter((p) => p !== SELF);
     for (const f of files) {
-      const text = readFileSync(f, "utf8");
+      const text = readFileCached(f);
       expect(text, `env read in ${f}`).not.toMatch(
         /(process\.env|Deno\.env\.get\(\s*["'`])PI_INGEST_SECRET_KEY/,
       );
@@ -155,11 +137,9 @@ describe("pi-ingest server secret resolver — repo guardrails", () => {
   });
 
   it("no decryption APIs anywhere in src/", () => {
-    const files = walk(resolve(ROOT, "src")).filter(
-      (p) => /\.(ts|tsx)$/.test(p) && p !== SELF,
-    );
+    const files = listTsFilesCached(resolve(ROOT, "src")).filter((p) => p !== SELF);
     for (const f of files) {
-      const text = readFileSync(f, "utf8");
+      const text = readFileCached(f);
       expect(text, `crypto.subtle.decrypt in ${f}`).not.toMatch(
         /crypto\.subtle\.decrypt\s*\(/,
       );
@@ -176,9 +156,9 @@ describe("pi-ingest server secret resolver — repo guardrails", () => {
       resolve(ROOT, "src/hooks"),
     ];
     for (const root of clientRoots) {
-      const files = walk(root).filter((p) => /\.(ts|tsx)$/.test(p));
+      const files = listTsFilesCached(root);
       for (const f of files) {
-        const text = readFileSync(f, "utf8");
+        const text = readFileCached(f);
         for (const re of [
           /secret_ciphertext/,
           /secret_nonce/,
@@ -191,3 +171,4 @@ describe("pi-ingest server secret resolver — repo guardrails", () => {
     }
   });
 });
+

@@ -169,3 +169,143 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
     expect(onLink).not.toHaveBeenCalled();
   });
 });
+
+describe("page safety copy", () => {
+  it("renders preview-only/no-data-saved copy and does not show 'live' or 'import complete'", () => {
+    render(<OperatorGeneticsImportPage />);
+    expect(
+      screen.getByTestId("operator-genetics-import-safety").textContent,
+    ).toMatch(/Batch linking is not enabled yet/i);
+    expect(screen.getByText(/No data saved until confirmed/i)).toBeInTheDocument();
+    // No misleading copy before any upload/confirmation.
+    expect(screen.queryByText(/live/i)).toBeNull();
+    expect(screen.queryByText(/saved/i)).toBeNull();
+    expect(screen.queryByText(/import complete/i)).toBeNull();
+  });
+});
+
+describe("validation export + template download", () => {
+  function stubDownload() {
+    const calls: Array<{ filename: string; content: string }> = [];
+    const realCreate = URL.createObjectURL;
+    const realRevoke = URL.revokeObjectURL;
+    const realAppend = document.body.appendChild.bind(document.body);
+    URL.createObjectURL = vi.fn(async (blob: Blob) => {
+      calls.push({
+        filename: "pending",
+        content: await (blob as Blob).text(),
+      });
+      return "blob://stub";
+    }) as unknown as typeof URL.createObjectURL;
+    URL.revokeObjectURL = vi.fn() as unknown as typeof URL.revokeObjectURL;
+    const origClick = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function () {
+      const a = this as HTMLAnchorElement;
+      if (calls.length > 0) calls[calls.length - 1].filename = a.download;
+    };
+    return {
+      calls,
+      restore() {
+        URL.createObjectURL = realCreate;
+        URL.revokeObjectURL = realRevoke;
+        HTMLAnchorElement.prototype.click = origClick;
+        document.body.appendChild = realAppend;
+      },
+    };
+  }
+
+  it("export button is disabled before parse, enabled after", async () => {
+    render(
+      <VerdantGeneticsXlsxImportPanel
+        loader={async () => [
+          HEADER,
+          ["Blueberry", "Dutch Passion", "feminized", null, "8", null],
+        ]}
+      />,
+    );
+    expect(screen.getByTestId("genetics-export-report-button")).toBeDisabled();
+    uploadFile(screen.getByTestId("genetics-xlsx-file-input"), makeFile());
+    await waitFor(() =>
+      expect(screen.getByTestId("genetics-export-report-button")).not.toBeDisabled(),
+    );
+  });
+
+  it("renders the Download CSV template button and the CSV-fallback copy", () => {
+    render(<VerdantGeneticsXlsxImportPanel loader={async () => []} />);
+    const btn = screen.getByTestId("genetics-template-button");
+    expect(btn.textContent).toMatch(/CSV template/i);
+    expect(
+      screen.getByTestId("genetics-template-fallback-copy").textContent,
+    ).toMatch(/XLSX template export is blocked/i);
+  });
+
+  it("exports a validation report containing row number, status, and messages", async () => {
+    const stub = stubDownload();
+    try {
+      render(
+        <VerdantGeneticsXlsxImportPanel
+          loader={async () => [
+            HEADER,
+            ["Blueberry", "Dutch Passion", "feminized", null, "8", null],
+            ["", "Sensi", "feminized", null, "9", null],
+            ["Critical", "Royal Queen", "auto", null, "soon", null],
+          ]}
+        />,
+      );
+      uploadFile(screen.getByTestId("genetics-xlsx-file-input"), makeFile());
+      await waitFor(() =>
+        expect(screen.getByTestId("genetics-export-report-button")).not.toBeDisabled(),
+      );
+      fireEvent.click(screen.getByTestId("genetics-export-report-button"));
+      await waitFor(() => expect(stub.calls.length).toBeGreaterThan(0));
+      const csv = stub.calls[stub.calls.length - 1].content;
+      const fname = stub.calls[stub.calls.length - 1].filename;
+      expect(fname).toBe("verdant-genetics-validation-report.csv");
+      expect(csv).toContain("row_number,status,strain");
+      expect(csv).toContain("valid");
+      expect(csv).toContain("blocked");
+      expect(csv).toContain("warning");
+      expect(csv).toContain("Row 3 is missing strain name.");
+    } finally {
+      stub.restore();
+    }
+  });
+
+  it("downloads a CSV template with required columns and example rows", async () => {
+    const stub = stubDownload();
+    try {
+      render(<VerdantGeneticsXlsxImportPanel loader={async () => []} />);
+      fireEvent.click(screen.getByTestId("genetics-template-button"));
+      await waitFor(() => expect(stub.calls.length).toBeGreaterThan(0));
+      const csv = stub.calls[stub.calls.length - 1].content;
+      const fname = stub.calls[stub.calls.length - 1].filename;
+      expect(fname).toBe("verdant-genetics-template.csv");
+      expect(csv).toContain("strain,breeder,seed_type");
+      expect(csv).toContain("Example Auto");
+      expect(csv).toContain("Example Fem");
+      expect(csv).toContain("Example Regular");
+    } finally {
+      stub.restore();
+    }
+  });
+});
+
+describe("duplicate header warnings", () => {
+  it("surfaces a duplicate-mapped-headers alert in the panel", async () => {
+    render(
+      <VerdantGeneticsXlsxImportPanel
+        loader={async () => [
+          ["Strain", "Variety", "Breeder", "Seed Type"],
+          ["First", "Second", "B", "auto"],
+        ]}
+      />,
+    );
+    uploadFile(screen.getByTestId("genetics-xlsx-file-input"), makeFile());
+    await waitFor(() =>
+      expect(screen.getByTestId("genetics-file-warnings")).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("genetics-file-warnings").textContent).toMatch(
+      /Multiple columns map to "strain"/,
+    );
+  });
+});

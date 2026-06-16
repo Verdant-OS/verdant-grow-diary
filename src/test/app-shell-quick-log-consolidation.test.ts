@@ -49,7 +49,7 @@ describe("AppShell — Quick Log is the single grower-facing logging CTA", () =>
     expect(APP_SHELL_SRC).toContain("PLANT_QUICKLOG_PREFILL_EVENT");
     expect(APP_SHELL_SRC).toContain("<QuickLog");
     // The mobile FAB remains as the mobile Quick Log entry point.
-    expect(APP_SHELL_SRC).toMatch(/aria-label="Quick log"/);
+    expect(APP_SHELL_SRC).toMatch(/aria-label="Open Quick Log"/);
   });
 
   it("introduces no Supabase writes, alerts, or Action Queue behavior", () => {

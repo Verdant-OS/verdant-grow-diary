@@ -42,24 +42,33 @@ describe("TentCsvImportCard toast wiring — uses hardened helper output", () =>
     expect(CARD).toMatch(/CSV_HISTORY_IMPORT_SCOPE_LINE/);
   });
 
-  it("every toast.success call passes batchResult.diagnostic as the headline", () => {
-    const successCalls = [
-      ...CARD.matchAll(/toast\.success\(([^)]*)\)/g),
-    ].map((m) => m[1]);
-    expect(successCalls.length).toBeGreaterThanOrEqual(2);
-    for (const args of successCalls) {
-      expect(args).toMatch(/batchResult\.diagnostic/);
-    }
+  it("the two duplicate-aware handlers pass batchResult.diagnostic to toast.success", () => {
+    const diagnosticCalls = [
+      ...CARD.matchAll(/toast\.success\([^)]*batchResult\.diagnostic[^)]*\)/g),
+    ];
+    expect(diagnosticCalls.length).toBeGreaterThanOrEqual(2);
   });
 
   it("every toast.success call attaches CSV_HISTORY_IMPORT_SCOPE_LINE as the description", () => {
     const successCalls = [
       ...CARD.matchAll(/toast\.success\([^)]*\)/g),
     ].map((m) => m[0]);
+    expect(successCalls.length).toBeGreaterThanOrEqual(2);
     for (const call of successCalls) {
       expect(call).toMatch(
         /description:\s*CSV_HISTORY_IMPORT_SCOPE_LINE/,
       );
+    }
+  });
+
+  it("every toast.success message carries the no-live reassurance (via diagnostic or literal)", () => {
+    const successCalls = [
+      ...CARD.matchAll(/toast\.success\([^)]*\)/g),
+    ].map((m) => m[0]);
+    for (const call of successCalls) {
+      const carriesViaDiagnostic = /batchResult\.diagnostic/.test(call);
+      const carriesLiteral = call.includes("No live sensor data was created.");
+      expect(carriesViaDiagnostic || carriesLiteral).toBe(true);
     }
   });
 

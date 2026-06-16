@@ -53,15 +53,15 @@ describe("SensorNormalizationPreviewPanel", () => {
     expect(badges.some((b) => b.textContent === "Stale")).toBe(true);
   });
 
-  it("renders invalid badge and empty state when no metrics", () => {
+  it("renders invalid badge and no-metrics empty state when payload has no metrics", () => {
     render(
       <SensorNormalizationPreviewPanel viewModel={buildVm({ payload: {} })} />,
     );
     const badges = screen.getAllByTestId("sensor-normalization-preview-badge");
     expect(badges.some((b) => b.textContent === "Invalid")).toBe(true);
-    expect(
-      screen.getByTestId("sensor-normalization-preview-empty-state").textContent,
-    ).toMatch(/Invalid preview/i);
+    const empty = screen.getByTestId("sensor-normalization-preview-empty-state");
+    expect(empty.textContent).toMatch(/No usable sensor metrics were found/i);
+    expect(empty.textContent).toMatch(/Check the input fields/i);
   });
 
   it("renders warning chips with friendly labels", () => {

@@ -1,5 +1,7 @@
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, statSync } from "node:fs";
+import { relative, resolve } from "node:path";
+
+import { getCachedTsFiles } from "./support/scannerGuardrailHarness";
 
 function matchesNeedle(text: string, needle: RegExp | string): boolean {
   if (typeof needle === "string") return text.includes(needle);
@@ -7,24 +9,25 @@ function matchesNeedle(text: string, needle: RegExp | string): boolean {
   return needle.test(text);
 }
 
+function collectSearchFiles(path: string): string[] {
+  const abs = resolve(process.cwd(), path);
+  const stat = statSync(abs);
+  if (stat.isDirectory()) return getCachedTsFiles(abs);
+  if (/\.(ts|tsx)$/.test(abs)) return [abs];
+  return [];
+}
+
 export function findMatches(paths: string[], needle: RegExp | string): string[] {
   const out: string[] = [];
 
-  function walk(path: string) {
-    const stat = statSync(path);
-    if (stat.isDirectory()) {
-      for (const entry of readdirSync(path).sort()) {
-        walk(join(path, entry));
+  for (const path of paths) {
+    for (const file of collectSearchFiles(path)) {
+      const src = readFileSync(file, "utf8");
+      if (matchesNeedle(src, needle)) {
+        out.push(relative(process.cwd(), file).replace(/\\/g, "/"));
       }
-      return;
     }
-
-    if (!path.endsWith(".ts") && !path.endsWith(".tsx")) return;
-
-    const src = readFileSync(path, "utf8");
-    if (matchesNeedle(src, needle)) out.push(path.replace(/\\/g, "/"));
   }
 
-  for (const path of paths) walk(path);
   return out.sort();
 }

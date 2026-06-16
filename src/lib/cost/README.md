@@ -289,7 +289,77 @@ const next = attachProviderResponseUsageToAiDoctorPromptMeasurement(
 );
 ```
 
+## Future AI Doctor provider response boundary contract
 
+This contract describes the exact attachment boundary a future AI Doctor
+wiring PR must use. Live wiring is still blocked — the Edge Function
+(`supabase/functions/ai-doctor-review/index.ts`) is not modified in this
+slice.
+
+**When the boundary runs**
+
+- Only **after** the AI Doctor provider response is received from the model
+  gateway. Never before the call. Never inside prompt assembly.
+
+**Inputs**
+
+- Input A: an existing `AiDoctorPromptMeasurement` built by
+  `buildAiDoctorPromptMeasurement(...)`.
+- Input B: the raw provider response, typed as `unknown`.
+
+**Function**
+
+```ts
+import { attachProviderResponseUsageToAiDoctorPromptMeasurement } from "@/lib/cost";
+
+const measured = attachProviderResponseUsageToAiDoctorPromptMeasurement(
+  promptMeasurement,
+  providerResponse,
+);
+
+// Only `measured.providerReportedTokens` is safe to pass onward.
+// Do NOT store providerResponse. Do NOT pass providerResponse to any
+// capture store, CSV export, persistence layer, or log line.
+```
+
+**Output**
+
+- A **new** `AiDoctorPromptMeasurement`. The original is never mutated.
+- Only `providerReportedTokens` may change vs. the input measurement; every
+  other field (`promptName`, `summaryByteSize`, `estimatedPromptTokens`,
+  `rawHistoryFallback`, `status`, `errorCode`, `recordedAt`, `domain`) is
+  preserved exactly.
+
+**Behavior guarantees**
+
+- Provider usage is **optional**: missing or malformed usage clears
+  `providerReportedTokens` to `null`. The function never throws.
+- The raw provider response is **never** stored or returned.
+- The raw provider response is **never** forwarded to persistence/capture
+  stores, CSV exporters, logs, or alerts.
+- No budget, threshold, alert, back-pressure, model-selection, or AI
+  degradation behavior is triggered by this function.
+
+**Adapter input/output cases**
+
+| Input shape                                                          | Result                                                                 |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Valid top-level `usage` (snake or camel)                             | `providerReportedTokens` populated                                     |
+| Valid `response.usage`                                               | `providerReportedTokens` populated                                     |
+| Valid `data.usage`                                                   | `providerReportedTokens` populated                                     |
+| `{ usage: null }`, `{ usage: [] }`, `{ usage: "x" }`                 | `providerReportedTokens: null`                                         |
+| `{ usage: { prompt_tokens: 10 } }` (missing completion)              | `providerReportedTokens: null`                                         |
+| `{ usage: { prompt_tokens: -1, completion_tokens: 5 } }`             | `providerReportedTokens: null`                                         |
+| `{ usage: { input_tokens, output_tokens } }` (Anthropic-style keys)  | `providerReportedTokens: null` (not in supported key set)              |
+| `{ result: { usage: ... } }`, `{ choices: [{ usage: ... }] }`        | `providerReportedTokens: null` (boundary does **not** search recursively) |
+| Top-level `usage` AND nested `response.usage`                        | Top-level wins                                                         |
+| Deeply nested usage objects                                          | `providerReportedTokens: null` (not searched)                          |
+
+The extractor only inspects the documented shapes
+(`usage`, `response.usage`, `data.usage`). It does **not** walk arbitrary
+trees, does **not** look inside `choices[*]`, and does **not** accept
+Anthropic-style or unrelated key names. This is intentional: the boundary
+prefers a clean `null` over a guessed match.
 
 
 ## What remains blocked until real measurements exist

@@ -67,6 +67,7 @@ import {
 import {
   CSV_HISTORY_INSERT_BATCH_SIZE,
   insertSensorReadingsInBatches,
+  validateSensorReadingInsertRows,
   type BatchInsertError,
 } from "@/lib/csv-import/sensorReadingsBatchInsert";
 import SensorHistoryImportAuditLedger from "@/components/SensorHistoryImportAuditLedger";
@@ -215,6 +216,14 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         importBatchId,
         rows: preview.rows,
       });
+      const preflight = validateSensorReadingInsertRows(
+        rows as unknown as Array<Record<string, unknown>>,
+      );
+      if (!preflight.ok) {
+        setParseError(preflight.message ?? "Import blocked.");
+        toast.error("Couldn't import CSV.", { description: preflight.message ?? undefined });
+        return;
+      }
       // NOTE: no `user_id` in payload — DB default auth.uid() owns the row.
       const batchResult = await insertSensorReadingsInBatches({
         rows,
@@ -295,6 +304,14 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         toast.error("Duplicate import blocked.", {
           description: SENSOR_HISTORY_IMPORT_DUPLICATE_COPY,
         });
+        return;
+      }
+      const preflight = validateSensorReadingInsertRows(
+        result.rows as unknown as Array<Record<string, unknown>>,
+      );
+      if (!preflight.ok) {
+        setParseError(preflight.message ?? "Import blocked.");
+        toast.error("Couldn't import CSV.", { description: preflight.message ?? undefined });
         return;
       }
       const batchResult = await insertSensorReadingsInBatches({

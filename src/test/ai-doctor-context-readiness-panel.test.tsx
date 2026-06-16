@@ -288,11 +288,11 @@ describe("AiDoctorContextReadinessPanel", () => {
     expect(src).not.toMatch(/functions\s*\.\s*invoke/);
     expect(src).not.toMatch(/\bfetch\s*\(/);
     // Disallow Action Queue write helper identifiers (camelCase code refs),
-    // not human-readable "Action Queue" copy or test-id strings.
+    // not human-readable "Action Queue" UI copy or test-id strings.
     expect(src).not.toMatch(/useAddAiDoctorSessionSuggestionToActionQueue/);
     expect(src).not.toMatch(/buildActionQueueDraftFromAiDoctorSession/);
     expect(src).not.toMatch(/AiDoctorSessionActionQueueButton/);
-    expect(src).not.toMatch(/from\(["'`]action_queue["'`]\)/);
+    expect(src).not.toMatch(/from\(\s*["'`]action_queue["'`]\s*\)/);
     expect(src).not.toMatch(/\.rpc\s*\(/);
     expect(src).not.toMatch(/\.insert\s*\(/);
     expect(src).not.toMatch(/\.update\s*\(/);

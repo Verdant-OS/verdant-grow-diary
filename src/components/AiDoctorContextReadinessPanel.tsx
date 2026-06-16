@@ -414,10 +414,10 @@ export default function AiDoctorContextReadinessPanel({
         {/*
           Disabled handoff control. Intentionally not wired to any write
           path: the AI Doctor preview surface is read-only. A safe Action
-          Queue insert path exists (useAddAiDoctorSessionSuggestionToActionQueue)
-          but requires a saved AI Doctor session + suggested action — the
-          readiness preview has neither. Re-wiring is deferred to a future
-          slice with an explicit grower-confirm modal.
+          Queue insert path exists for saved AI Doctor sessions, but the
+          readiness preview has neither a saved session nor a structured
+          suggested action. Re-wiring is deferred to a future slice with
+          an explicit grower-confirm modal.
         */}
         <div
           className="flex flex-col gap-1 pt-1"

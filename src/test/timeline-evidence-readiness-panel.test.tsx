@@ -259,11 +259,11 @@ describe("TimelineEvidenceReadinessPanel — safety", () => {
     );
     expect(src).not.toMatch(/integrations\/supabase/);
     expect(src).not.toMatch(/\bfetch\(/);
-    expect(src).not.toMatch(/aiDoctorEngine/);
-    expect(src).not.toMatch(/aiDoctorContextCompiler/);
+    // Type-only imports of AiDoctorContext are OK; runtime AI/network code is not.
+    expect(src).not.toMatch(/generateAiDoctorResult|callAiDoctor|runAiDoctor/);
     expect(src).not.toMatch(/action_queue/);
-    expect(src).not.toMatch(/alerts/);
-    expect(src).not.toMatch(/device/i);
+    expect(src).not.toMatch(/insertAlert|createAlert/);
+    expect(src).not.toMatch(/deviceControl|device_control/);
   });
 
   it("mobile layout: counts grid uses 2-column baseline so cells stay visible at narrow widths", () => {

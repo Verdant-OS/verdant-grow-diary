@@ -2,12 +2,14 @@ import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  CSV_HISTORY_EMPTY_ROWS_COPY,
   CSV_HISTORY_INSERT_BATCH_SIZE,
   SENSOR_READINGS_INSERT_ALLOWED_KEYS,
   chunkRows,
   insertSensorReadingsInBatches,
   buildBatchFailureMessage,
   buildBatchSuccessMessage,
+  preflightCsvHistoryImport,
   validateSensorReadingInsertRows,
 } from "@/lib/csv-import/sensorReadingsBatchInsert";
 

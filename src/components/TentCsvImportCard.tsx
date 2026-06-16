@@ -25,6 +25,11 @@ import { Button } from "@/components/ui/button";
 // buildCsvInsertRows + normalizeAcInfinityRows below.
 
 import { Badge } from "@/components/ui/badge";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import {

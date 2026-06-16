@@ -105,4 +105,86 @@ describe("ImportedSensorHistoryPanel", () => {
     const section = container.querySelector("#imported-history");
     expect(section).not.toBeNull();
   });
+
+  it("renders metric filter controls only when CSV metrics exist", () => {
+    const { rerender } = render(
+      wrap(
+        <ImportedSensorHistoryPanel
+          tentId="tent-A"
+          readings={[csvRow({ source: "live" })]}
+        />,
+      ),
+    );
+    expect(
+      screen.queryByTestId("imported-history-metric-filters"),
+    ).not.toBeInTheDocument();
+
+    rerender(
+      wrap(
+        <ImportedSensorHistoryPanel
+          tentId="tent-A"
+          readings={[
+            csvRow({ metric: "temperature_c" }),
+            csvRow({ metric: "humidity_pct", captured_at: "2026-06-02T00:00:00Z" }),
+          ]}
+        />,
+      ),
+    );
+    const group = screen.getByTestId("imported-history-metric-filters");
+    expect(group).toBeInTheDocument();
+    expect(
+      within(group).getByTestId("imported-history-metric-filter-all"),
+    ).toHaveTextContent("All metrics");
+    expect(
+      within(group).getByTestId("imported-history-metric-filter-temperature_c"),
+    ).toHaveTextContent("temperature_c");
+  });
+
+  it("updates visible rows and visible count when a metric filter is selected", () => {
+    render(
+      wrap(
+        <ImportedSensorHistoryPanel
+          tentId="tent-A"
+          readings={[
+            csvRow({ metric: "temperature_c", captured_at: "2026-06-01T00:00:00Z" }),
+            csvRow({ metric: "temperature_c", captured_at: "2026-06-02T00:00:00Z" }),
+            csvRow({ metric: "humidity_pct", captured_at: "2026-06-03T00:00:00Z" }),
+          ]}
+        />,
+      ),
+    );
+    expect(screen.getByTestId("imported-history-total")).toHaveTextContent("3");
+    expect(screen.getByTestId("imported-history-visible")).toHaveTextContent("3");
+
+    fireEvent.click(
+      screen.getByTestId("imported-history-metric-filter-humidity_pct"),
+    );
+    expect(screen.getByTestId("imported-history-visible")).toHaveTextContent("1");
+    // Total readings count is unaffected by local filtering.
+    expect(screen.getByTestId("imported-history-total")).toHaveTextContent("3");
+
+    const rows = screen
+      .getByTestId("imported-history-recent-rows")
+      .querySelectorAll("tbody tr");
+    expect(rows.length).toBe(1);
+    expect(rows[0].textContent ?? "").toContain("humidity_pct");
+  });
+
+  it("never renders device_id, user_id, or internal id fields", () => {
+    const { container } = render(
+      wrap(
+        <ImportedSensorHistoryPanel
+          tentId="tent-A"
+          readings={[
+            csvRow({ metric: "temperature_c" }),
+            csvRow({ metric: "humidity_pct", captured_at: "2026-06-02T00:00:00Z" }),
+          ]}
+        />,
+      ),
+    );
+    const html = container.innerHTML.toLowerCase();
+    for (const banned of ["device_id", "user_id", "raw_payload"]) {
+      expect(html).not.toContain(banned);
+    }
+  });
 });

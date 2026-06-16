@@ -93,9 +93,12 @@ export interface SensorReadingLike {
   value: number | string | null;
   source?: string | null;
   device_id?: string | null;
-  // Note: the snapshot pipeline intentionally does not read the upstream
-  // provenance envelope. Callers may pass rows with extra fields; they
-  // are ignored by `snapshotFromReadings` to keep this surface presenter-safe.
+  /**
+   * Upstream provenance envelope. This file NEVER reads, returns, or
+   * renders its contents — it is forwarded as-is to
+   * `summarizeCsvVendor`, which is the only sanctioned reader.
+   */
+  raw_payload?: unknown;
 }
 
 /**

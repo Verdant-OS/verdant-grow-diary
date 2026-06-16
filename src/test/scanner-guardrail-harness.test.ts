@@ -17,7 +17,9 @@ import { resolve } from "node:path";
 import {
   SCANNER_GUARDRAIL_TIMEOUT_MS,
   SLOW_SCANNER_THRESHOLD_MS,
+  buildScannerSlowTestReportRow,
   getCachedTsFiles,
+  scannerIt,
   __resetScannerHarnessCachesForTests,
 } from "./support/scannerGuardrailHarness";
 

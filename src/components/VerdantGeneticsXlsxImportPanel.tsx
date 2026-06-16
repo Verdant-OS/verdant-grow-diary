@@ -211,11 +211,13 @@ export function VerdantGeneticsXlsxImportPanel({
 
         {result && !result.fileLevelError && result.fileWarnings.length > 0 && (
           <Alert data-testid="genetics-file-warnings">
-            <AlertTitle>Header warnings</AlertTitle>
+            <AlertTitle>Duplicate mapped headers detected.</AlertTitle>
             <AlertDescription>
               <ul className="list-disc pl-4 text-sm">
                 {result.fileWarnings.map((w, i) => (
-                  <li key={i}>{w.message}</li>
+                  <li key={i} data-testid={`genetics-file-warning-${w.field}`}>
+                    {w.message}
+                  </li>
                 ))}
               </ul>
             </AlertDescription>

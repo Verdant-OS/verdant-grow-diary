@@ -18,6 +18,10 @@ const appSource = readFileSync(
   resolve(process.cwd(), "src/App.tsx"),
   "utf8",
 );
+const sidebarSource = readFileSync(
+  resolve(process.cwd(), "src/components/AppSidebar.tsx"),
+  "utf8",
+);
 
 describe("operator nav: Genetics XLSX Import", () => {
   it("Diagnostics renders a card linking to /operator/genetics-import", () => {
@@ -38,5 +42,15 @@ describe("operator nav: Genetics XLSX Import", () => {
     expect(appSource).toMatch(
       /path=["']\/operator\/genetics-import["']\s+element=\{<OperatorGeneticsImportPage/,
     );
+  });
+
+  it("AppSidebar exposes Genetics XLSX Import (Preview-only)", () => {
+    expect(sidebarSource).toContain("/operator/genetics-import");
+    expect(sidebarSource).toContain("Genetics XLSX Import");
+    expect(sidebarSource).toContain("Preview-only");
+  });
+
+  it("AppSidebar still includes Diagnostics-style Operator group label", () => {
+    expect(sidebarSource).toMatch(/label:\s*["']Operator["']/);
   });
 });

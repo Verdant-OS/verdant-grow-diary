@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Box, Sprout, Activity, NotebookText,
-  ListChecks, Bell, Stethoscope, Settings, ShieldCheck, Wrench, LineChart,
+  ListChecks, Bell, Stethoscope, Settings, ShieldCheck, Wrench, LineChart, FileSpreadsheet,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -37,6 +37,9 @@ const groups: { label: string; items: NavItem[] }[] = [
   { label: "Archive", items: [
     { to: "/grows", label: "Harvest Archive", icon: Sprout },
     { to: "/grow-lineage", label: "Lineage Repair", icon: Wrench },
+  ]},
+  { label: "Operator", items: [
+    { to: "/operator/genetics-import", label: "Genetics XLSX Import (Preview-only)", icon: FileSpreadsheet },
   ]},
   { label: "Account", items: [{ to: "/settings", label: "Settings", icon: Settings }] },
 ];

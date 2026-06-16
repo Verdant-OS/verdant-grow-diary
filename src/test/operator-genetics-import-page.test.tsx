@@ -313,7 +313,10 @@ describe("duplicate header warnings", () => {
       expect(screen.getByTestId("genetics-file-warnings")).toBeInTheDocument(),
     );
     expect(screen.getByTestId("genetics-file-warnings").textContent).toMatch(
-      /Multiple columns map to "strain"/,
+      /Duplicate mapped headers detected/,
+    );
+    expect(screen.getByTestId("genetics-file-warnings").textContent).toMatch(
+      /Field "strain" used column "Strain" and ignored "Variety"/,
     );
   });
 });

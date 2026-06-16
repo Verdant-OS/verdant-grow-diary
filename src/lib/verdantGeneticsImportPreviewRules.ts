@@ -52,9 +52,20 @@ export interface GeneticsImportPreviewRow {
   issues: GeneticsImportRowIssue[];
 }
 
+export interface GeneticsImportDuplicateColumn {
+  /** Original header text as it appeared in the spreadsheet. */
+  header: string;
+  /** 0-based column index. */
+  columnIndex: number;
+}
+
 export interface GeneticsImportFileWarning {
   field: string;
   message: string;
+  /** Column actually used for this canonical field (optional metadata). */
+  usedColumn?: GeneticsImportDuplicateColumn;
+  /** Columns ignored because they mapped to the same canonical field. */
+  ignoredColumns?: GeneticsImportDuplicateColumn[];
 }
 
 export interface GeneticsImportPreviewResult {
@@ -142,38 +153,56 @@ function normalizeHeader(value: unknown): string {
 
 interface HeaderMapping {
   index: Record<CanonicalField, number | undefined>;
-  duplicates: CanonicalField[];
+  /** Per-field metadata about which column was used and which were ignored. */
+  duplicates: Record<
+    CanonicalField,
+    { used: GeneticsImportDuplicateColumn; ignored: GeneticsImportDuplicateColumn[] } | undefined
+  >;
+}
+
+function originalHeader(headerRow: ReadonlyArray<unknown>, idx: number): string {
+  const v = headerRow[idx];
+  if (v === null || v === undefined) return "";
+  return String(v).trim();
 }
 
 function mapHeaders(headerRow: ReadonlyArray<unknown>): HeaderMapping {
   const index: Record<string, number | undefined> = {};
-  const duplicates = new Set<CanonicalField>();
-  // Pass 1: exact canonical match (e.g. header "strain" → strain) takes
-  // priority over a less specific alias on a different column.
-  headerRow.forEach((cell, idx) => {
-    const n = normalizeHeader(cell);
-    if (!n) return;
-    if ((HEADER_ALIASES as Record<string, string[]>)[n] && index[n] === undefined) {
-      index[n] = idx;
+  const ignored: Record<string, GeneticsImportDuplicateColumn[]> = {};
+  const recordIgnored = (field: string, idx: number) => {
+    const list = ignored[field] ?? (ignored[field] = []);
+    if (!list.some((c) => c.columnIndex === idx)) {
+      list.push({ header: originalHeader(headerRow, idx), columnIndex: idx });
     }
-  });
-  // Pass 2: alias match, first detected column wins; later matches mark duplicate.
+  };
+  // First detected column wins for each canonical field. Later columns
+  // that map to the same canonical field are recorded as ignored.
   headerRow.forEach((cell, idx) => {
     const n = normalizeHeader(cell);
     if (!n) return;
     for (const [key, aliases] of Object.entries(HEADER_ALIASES)) {
-      if (!aliases.includes(n)) continue;
+      if (key !== n && !aliases.includes(n)) continue;
       if (index[key] === undefined) {
         index[key] = idx;
       } else if (index[key] !== idx) {
-        duplicates.add(key as CanonicalField);
+        recordIgnored(key, idx);
       }
     }
   });
-  return {
-    index: index as HeaderMapping["index"],
-    duplicates: Array.from(duplicates),
-  };
+  const duplicates: HeaderMapping["duplicates"] = {} as HeaderMapping["duplicates"];
+  for (const key of Object.keys(HEADER_ALIASES) as CanonicalField[]) {
+    const ig = ignored[key];
+    const usedIdx = index[key];
+    if (ig && ig.length > 0 && usedIdx !== undefined) {
+      duplicates[key] = {
+        used: { header: originalHeader(headerRow, usedIdx), columnIndex: usedIdx },
+        ignored: ig,
+      };
+    } else {
+      duplicates[key] = undefined;
+    }
+  }
+  return { index: index as HeaderMapping["index"], duplicates };
 }
 
 function toTrimmedString(value: unknown): string | null {
@@ -247,10 +276,21 @@ export function buildGeneticsImportPreview(
     };
   }
 
-  const fileWarnings: GeneticsImportFileWarning[] = duplicates.map((field) => ({
-    field,
-    message: `Multiple columns map to "${field}". Using the first detected column.`,
-  }));
+  const fileWarnings: GeneticsImportFileWarning[] = [];
+  for (const key of Object.keys(HEADER_ALIASES) as CanonicalField[]) {
+    const dup = duplicates[key];
+    if (!dup) continue;
+    const usedLabel = dup.used.header || `column ${dup.used.columnIndex + 1}`;
+    const ignoredLabels = dup.ignored
+      .map((c) => `"${c.header || `column ${c.columnIndex + 1}`}"`)
+      .join(", ");
+    fileWarnings.push({
+      field: key,
+      message: `Field "${key}" used column "${usedLabel}" and ignored ${ignoredLabels}.`,
+      usedColumn: dup.used,
+      ignoredColumns: dup.ignored,
+    });
+  }
 
   const rows: GeneticsImportPreviewRow[] = [];
   for (let i = 1; i < grid.length; i++) {

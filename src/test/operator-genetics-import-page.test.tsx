@@ -178,8 +178,10 @@ describe("page safety copy", () => {
     ).toMatch(/Batch linking is not enabled yet/i);
     expect(screen.getByText(/No data saved until confirmed/i)).toBeInTheDocument();
     // No misleading copy before any upload/confirmation.
-    expect(screen.queryByText(/live/i)).toBeNull();
-    expect(screen.queryByText(/saved/i)).toBeNull();
+    // Allow the cautionary "No data saved until confirmed" copy, but
+    // assert no misleading affirmative copy is shown before any upload.
+    expect(screen.queryByText(/\blive\b/i)).toBeNull();
+    expect(screen.queryByText(/\bdata saved\b(?! until)/i)).toBeNull();
     expect(screen.queryByText(/import complete/i)).toBeNull();
   });
 });

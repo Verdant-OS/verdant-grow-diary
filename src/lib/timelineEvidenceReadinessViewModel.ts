@@ -21,10 +21,8 @@
  *    only.
  */
 
-import type {
-  AiDoctorContext,
-  SensorSourceTag,
-} from "@/lib/aiDoctorContextCompiler";
+import type { SensorSourceTag } from "@/lib/aiDoctorContextCompiler";
+import type { AiDoctorContext } from "@/lib/aiDoctorEngine";
 import { resolveSensorSourceLabel } from "@/lib/sensorSourceLabelRules";
 
 /** Optional grower-supplied evidence counts the compiler doesn't track. */

@@ -31,8 +31,9 @@ export interface SensorSnapshot {
    */
   device_id?: string | null;
   /**
-   * CSV vendor lineage hint extracted from `raw_payload.source_app` on
-   * the contributing CSV rows. Presentation-only — NEVER promotes a
+   * CSV vendor lineage hint extracted upstream from the contributing
+   * CSV rows' provenance envelope (vendor app name only — never the
+   * underlying payload contents). Presentation-only — NEVER promotes a
    * reading to "live". `"multiple"` is used when multiple CSV vendors
    * are present at the latest timestamp.
    */

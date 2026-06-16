@@ -153,18 +153,23 @@ export function buildAiDoctorPromptMeasurement(
     missingLiveReadingsBlockPresent: input.missingLiveReadingsBlockPresent,
   });
 
+  const estimatedPromptTokens =
+    input.tokenEstimator === null
+      ? null
+      : estimatePromptTokensIfAvailable(text, input.tokenEstimator ?? undefined);
+
   const measurement = asAiDoctorPromptMeasurement({
     domain: "llm_prompt",
     promptName: input.promptName,
     summaryByteSize,
-    // No estimator exists in this repo today; keep null instead of guessing.
-    estimatedPromptTokens: null,
+    estimatedPromptTokens,
     providerReportedTokens: input.providerReportedTokens ?? null,
     rawHistoryFallback,
     status: input.status ?? "success",
     ...(input.errorCode ? { errorCode: input.errorCode } : {}),
     recordedAt: input.recordedAt,
   });
+
 
   const metadata: AiDoctorPromptMeasurementMetadata = {
     charCount,

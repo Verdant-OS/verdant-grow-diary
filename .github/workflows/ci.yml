@@ -138,6 +138,20 @@ jobs:
       - name: QuickLog RPC static trust-boundary
         run: bun run test:db:quicklog-rpc-static
 
+      # AI Doctor provider usage wiring (Deno) — local/unit only.
+      # Exercises the public cost composer used by the ai-doctor-review
+      # Edge Function at the provider response boundary. NO provider API
+      # call, NO Supabase call, NO network access, NO secrets required.
+      # Safe to run on every PR (including forks).
+      - name: AI Doctor provider usage wiring (Deno)
+        uses: denoland/setup-deno@e95548e56dfa95d4e1a28d6f422fafe75c4c26fb # v2.0.2
+        with:
+          deno-version: v1.x
+      - name: Run AI Doctor provider usage wiring tests
+        run: deno test --allow-env --allow-read supabase/functions/ai-doctor-review/providerUsageWiring.test.ts
+
+
+
       # Optional: QuickLog RPC runtime harnesses. Only runs when staging
       # Supabase credentials are configured as repo/org secrets. The
       # orchestrator script also skips cleanly when env is missing, so this

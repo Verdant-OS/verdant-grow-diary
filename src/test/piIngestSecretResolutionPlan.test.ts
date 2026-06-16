@@ -11,8 +11,7 @@ import {
   readFileCached,
 } from "./helpers/cachedSrcTextScan";
 
-const ROOT = resolve(ROOTDIR(), "..");
-function ROOTDIR() { return resolve(__dirname, ".."); }
+const ROOT = resolve(__dirname, "../..");
 const PLAN_PATH = resolve(ROOT, "docs/pi-ingest-secret-resolution-plan.md");
 const PLAN = existsSync(PLAN_PATH) ? readFileSync(PLAN_PATH, "utf8") : "";
 const FN_DIR = resolve(ROOT, "supabase/functions/pi-ingest-readings");

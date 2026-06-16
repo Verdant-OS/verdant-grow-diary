@@ -242,7 +242,7 @@ The operator must stop and not present a payload as future-ingest-ready when any
 
 ## 8. Future real ingest gates
 
-Real ingest is a **separate, explicitly approved phase**. Before any write path is enabled, the following must be in place:
+Real ingest is a **separate, explicitly approved phase**. Before any write path is enabled, all gates in [`ecowitt-future-real-ingest-gates.md`](./ecowitt-future-real-ingest-gates.md) must be satisfied. In summary:
 
 1. Real UUID-backed tent context.
 2. Approved bridge token authentication.
@@ -262,6 +262,7 @@ Until all of the above are in place, the dry-run preview remains the only sancti
 
 ## Related
 
+- [EcoWitt Future Real Ingest Gates](./ecowitt-future-real-ingest-gates.md)
 - [EcoWitt dry-run safety checklist](./ecowitt-dry-run-safety-checklist.md)
 - [EcoWitt live canary runbook](./ecowitt-live-canary-runbook.md)
 - [Sensor EcoWitt / Home Assistant field mapping](./sensor-ecowitt-home-assistant-field-mapping.md)

@@ -11,6 +11,7 @@ These checklists help operators verify Verdant flows without changing data, enab
 - [`quick-log-environment-check-preview-qa.md`](./quick-log-environment-check-preview-qa.md) — Focused Quick Log manual Environment Check QA covering required labels, preview-only verification, preview-vs-database row distinction, note-only behavior, and warning chips.
 - [`preview-no-write-verification.md`](./preview-no-write-verification.md) — Checklist to verify that sensor normalization previews are read-only and do not save sensor data, create database rows, trigger alerts, or enable automation. Use this before approving any preview-related release.
 - [`preview-comparison-matrix.md`](./preview-comparison-matrix.md) — Explains how CSV vs Quick Log preview behavior differs across source labels, triggers, write gating, and warning chips.
+- [`sensor-normalization-warning-reference.md`](./sensor-normalization-warning-reference.md) — Reference for every warning code the sensor normalizer currently emits, with field affected, typical trigger, whether metric summaries still render, whether long-form rows are write-ready, and operator action. Sourced from `normalizeSensorReading.ts`, `sensorNormalizationPreviewViewModel.ts`, and the warning gating tests.
 
 ---
 

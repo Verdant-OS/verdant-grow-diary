@@ -53,8 +53,8 @@ describe("EcoWitt ingest dry-run", () => {
   it("is_stale=true blocks send and warns", () => {
     const r = buildEcowittIngestDryRun(snap("flower", "valid"), { is_stale: true });
     expect(r.can_send_later).toBe(false);
-    expect(r.blocked_reasons).toContain("stale_evidence");
-    expect(r.warnings.some((w) => /stale/.test(w))).toBe(true);
+    expect(r.blocked_reasons.some((b) => /^stale_snapshot:/.test(b))).toBe(true);
+    expect(r.warnings.some((w) => /^stale_snapshot:/.test(w))).toBe(true);
   });
 
   it("payload excludes raw payload and private fields", () => {

@@ -92,7 +92,7 @@ Field meanings:
 |---|---|
 | `test` | The Vitest `it(...)` label that crossed the slow threshold |
 | `suite` | Stable scanner label, either passed explicitly or derived from the test filename |
-| `file` | Scanner test file that installed the harness |
+| `file` | Stable repo-relative POSIX scanner test file path |
 | `durationMs` | Rounded runtime in milliseconds |
 | `thresholdMs` | Threshold that caused the row to be emitted |
 | `recordedAt` | ISO timestamp for triage only |
@@ -101,7 +101,20 @@ An empty or missing report means no scanner test crossed the slow threshold in t
 
 ## Local validation
 
-Run the sentinel:
+Run the CI-equivalent scanner command:
+
+```bash
+bun run test:scanner-guardrails:ci
+```
+
+This single command:
+
+1. deletes any stale local slow-test report,
+2. runs the full scanner guardrail suite, including `scanner-guardrail-harness.test.ts`,
+3. validates the JSONL field contract if a report exists, and
+4. fails if any slow scanner row is emitted at or above the 5000ms threshold.
+
+For ad hoc scanner debugging, you can still run only the sentinel:
 
 ```bash
 bun run test:scanner-guardrails
@@ -113,7 +126,13 @@ Then inspect the report if it exists:
 cat test-results/scanner-guardrail-slow-tests.jsonl
 ```
 
-Validate that every row contains `test`, `suite`, `file`, `durationMs`, and `thresholdMs`. `recordedAt` is expected to change between runs; do not use it for deterministic assertions.
+`recordedAt` is expected to change between runs; do not use it for deterministic assertions.
+
+## CI behavior
+
+CI runs `bun run test:scanner-guardrails:ci`. If the report is missing, CI treats that as healthy. If the report contains any row, CI validates the contract and fails the build because at least one scanner crossed the slow threshold.
+
+The workflow uploads `test-results/scanner-guardrail-slow-tests.jsonl` as the `scanner-guardrail-slow-tests` artifact whenever the file exists, including failed runs.
 
 ## Guardrails
 
@@ -122,4 +141,4 @@ Validate that every row contains `test`, `suite`, `file`, `durationMs`, and `thr
 - Do not skip scanner tests.
 - Do not change global Vitest timeout.
 - Do not classify a timeout-only problem as a safety pass.
-- Keep scanner output informational unless an existing assertion fails.
+- Keep scanner output informational unless an existing assertion or CI telemetry check fails.

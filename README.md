@@ -70,6 +70,14 @@ npm run build
 
 All existing tests must pass. New behavior must ship with new tests.
 
+Scanner guardrail changes must also run the CI-equivalent sentinel:
+
+```bash
+bun run test:scanner-guardrails:ci
+```
+
+See [`docs/testing/scanner-guardrails.md`](docs/testing/scanner-guardrails.md) for `scannerIt`, `installScannerGuardrail`, cached scanner walks, and slow-test telemetry rules.
+
 Watch-mode tests:
 
 ```bash
@@ -162,4 +170,5 @@ regression checklist.
 - [QA regression checklist](docs/qa-regression-checklist.md)
 - [Launch checklist](docs/launch-checklist.md)
 - [Security checklist](docs/security-checklist.md)
+- [Scanner guardrail harness](docs/testing/scanner-guardrails.md) — scannerIt/installScannerGuardrail usage and slow-test telemetry contract
 - [Pi-ingest smoke runbook](docs/pi-ingest-smoke-runbook.md)

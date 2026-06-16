@@ -16,6 +16,8 @@ const TARGET_PATHS = [
   "src/lib/ecowittRealIngestValidator.ts",
   "src/lib/ecowittRealIngestRedaction.ts",
   "src/lib/ecowittRealIngestDedupe.ts",
+  "src/lib/ecowittRealIngestAuth.ts",
+  "src/lib/ecowittRealIngestEndpoint.ts",
 ] as const;
 
 function stripComments(src: string): string {

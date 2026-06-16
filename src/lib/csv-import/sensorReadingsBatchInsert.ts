@@ -204,7 +204,7 @@ export interface FailureDiagnosticInput {
  * another tenant's data.
  */
 export const CSV_HISTORY_DEDUPE_CONFLICT_COPY =
-  "These readings already exist for this tent (matched by tent, source, metric, and captured_at). No new rows were written. No live sensor data was created." as const;
+  "Import stopped because matching CSV history readings already exist for this tent under Verdant\u2019s dedupe key: user + tent + source + metric + captured timestamp. No live sensor data was created." as const;
 
 export function buildBatchFailureMessage(input: FailureDiagnosticInput): string {
   const {

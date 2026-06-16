@@ -179,7 +179,9 @@ describe("buildCsvInsertRows", () => {
     expect(inserts.length).toBe(2);
     for (const r of inserts) {
       expect(r.tent_id).toBe("t1");
-      expect(r.grow_id).toBe("g1");
+      expect(r).not.toHaveProperty("grow_id");
+      expect(r.raw_payload.grow_id).toBe("g1");
+
       expect(r.source).toBe(CSV_SOURCE_AC_INFINITY);
       expect(r.raw_payload.source_label).toBe(CSV_SOURCE_LABEL.ac_infinity);
       expect(r.raw_payload.import_batch_id).toBe("batch-1");

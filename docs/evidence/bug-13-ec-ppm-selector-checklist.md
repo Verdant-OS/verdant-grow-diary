@@ -25,37 +25,37 @@ Tents → select tent → plant / plant detail context → Quick Log → Feeding
 
 ## Captured screenshot status
 
-- **Status:** Pending.
-- **Expected screenshot path:** `docs/evidence/bug-13-ec-ppm-selector.png`
-- This file must be captured from the real authenticated preview UI.
-- The screenshot must show:
+- **Status:** Captured — PASS.
+- **Screenshot path:** `docs/evidence/bug-13-ec-ppm-selector.png`
+- Captured from the real authenticated preview UI on 2026-06-16.
+- The screenshot visibly shows:
   - Quick Log open
-  - Feeding selected
-  - Add more details expanded / open
+  - Feeding selected (`Fed` chip)
+  - Add more details expanded / open (toggle ON)
   - EC unit selector open
-  - `EC mS/cm` visible
+  - `EC mS/cm` visible (currently selected)
   - `EC µS/cm` visible
   - `PPM 500 scale` visible
   - `PPM 700 scale` visible
-- The automated smoke test is useful support evidence but does not replace the authenticated screenshot.
-- **Do not use an unauthenticated route, auth bypass, seeded account, committed credential, AI-generated screenshot, or fabricated evidence to close Bug #13.**
+- The automated smoke test supports this visual evidence.
+- No auth bypass, seeded account, committed credential, AI-generated screenshot, or fabricated evidence was used.
 
 ## Required screenshot contents
 
 A single screenshot must show all of the following simultaneously:
 
-- [ ] Quick Log is open
-- [ ] Feeding is selected
-- [ ] **Add more details** is expanded / open
-- [ ] EC unit selector is open
-- [ ] `EC mS/cm` is visible
-- [ ] `EC µS/cm` is visible
-- [ ] `PPM 500 scale` is visible
-- [ ] `PPM 700 scale` is visible
-- [ ] `µS/cm` is visually distinct from `mS/cm`
-- [ ] `PPM 500 scale` is visually distinct from `PPM 700 scale`
-- [ ] No demo/manual/live/stale/invalid source-label confusion is introduced
-- [ ] No fake-live sensor value is introduced
+- [x] Quick Log is open
+- [x] Feeding is selected
+- [x] **Add more details** is expanded / open
+- [x] EC unit selector is open
+- [x] `EC mS/cm` is visible
+- [x] `EC µS/cm` is visible
+- [x] `PPM 500 scale` is visible
+- [x] `PPM 700 scale` is visible
+- [x] `µS/cm` is visually distinct from `mS/cm`
+- [x] `PPM 500 scale` is visually distinct from `PPM 700 scale`
+- [x] No demo/manual/live/stale/invalid source-label confusion is introduced
+- [x] No fake-live sensor value is introduced
 
 ## Screenshot save path
 
@@ -86,6 +86,12 @@ All four labels visible        → Bug #13 CLOSE
 Selector missing or won't open → Bug #13 KEEP OPEN — fix required
 No screenshot                  → Bug #13 BLOCKED — authenticated visual evidence still required
 ```
+
+## Final verdict
+
+- **Bug #13 verdict:** CLOSE — visual evidence confirms selector works.
+- **Gate verdict:** GATE CLEARED.
+- **Slice 2 status:** May be considered separately.
 
 ## Manual capture reminder
 

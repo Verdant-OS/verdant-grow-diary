@@ -19,9 +19,12 @@ import {
   groupManualReadingsToSnapshots,
 } from "@/lib/manualSensorSnapshotChangeContextRules";
 
-// Per-file timeout bump for filesystem-scanning / heavy-render guardrail; no logic changed.
-import { vi as __vi_timeout } from "vitest";
-__vi_timeout.setConfig({ testTimeout: 30000, hookTimeout: 30000 });
+// Standardised scanner guardrail timeout + slow-test telemetry.
+// Replaces the previous per-file vi.setConfig bump. No scanner pattern,
+// allowlist, or assertion is changed.
+import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
+installScannerGuardrail({ file: __filename });
+
 
 const T1 = "2026-05-24T09:00:00Z";
 const T2 = "2026-05-24T15:00:00Z";

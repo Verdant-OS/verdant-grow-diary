@@ -11,10 +11,12 @@ import {
   readFileCached,
 } from "./helpers/cachedSrcTextScan";
 
-// Filesystem-scanning guardrail; bump per-file timeout to survive full-suite parallel load.
-// Narrow timeout bump only — no scanner pattern, allowlist, or safety assertion changed.
-import { vi as __vi_timeout } from "vitest";
-__vi_timeout.setConfig({ testTimeout: 30000, hookTimeout: 30000 });
+// Standardised scanner guardrail timeout + slow-test telemetry.
+// Replaces the previous per-file vi.setConfig bump. No scanner pattern,
+// allowlist, or assertion is changed.
+import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
+installScannerGuardrail({ file: __filename });
+
 
 const ROOT = resolve(__dirname, "../..");
 const PLAN_PATH = resolve(

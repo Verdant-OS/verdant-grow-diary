@@ -9,26 +9,24 @@
  * this test should be deleted in the same PR that restores it.
  */
 import { describe, it, expect } from "vitest";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
-// Filesystem-scanning guardrail; bump per-file timeout to survive full-suite parallel load.
-// Narrow timeout bump only — no scanner pattern, allowlist, or safety assertion changed.
-import { vi as __vi_timeout } from "vitest";
-__vi_timeout.setConfig({ testTimeout: 30000, hookTimeout: 30000 });
+// Standardised scanner guardrail timeout + slow-test telemetry.
+// Replaces the previous per-file vi.setConfig bump. No scanner pattern,
+// allowlist, or assertion is changed.
+import {
+  installScannerGuardrail,
+  getCachedTsFiles,
+} from "./support/scannerGuardrailHarness";
+installScannerGuardrail({ file: __filename });
 
 const ROOT = resolve(__dirname, "../..");
 
-function walkSource(dir: string, out: string[] = []): string[] {
-  for (const entry of readdirSync(dir)) {
-    if (entry === "node_modules" || entry.startsWith(".")) continue;
-    const full = join(dir, entry);
-    const st = statSync(full);
-    if (st.isDirectory()) walkSource(full, out);
-    else if (/\.(ts|tsx)$/.test(entry)) out.push(full);
-  }
-  return out;
-}
+// Optimisation: reuse one cached recursive walk of `src/` across the two
+// scanner `it` blocks below instead of walking the filesystem twice.
+// Pure read; identical to the previous walkSource() result.
+const walkSource = (dir: string): string[] => getCachedTsFiles(dir);
 
 describe("Shelly H&T integration is fully retired", () => {
   const config = readFileSync(resolve(ROOT, "supabase/config.toml"), "utf8");

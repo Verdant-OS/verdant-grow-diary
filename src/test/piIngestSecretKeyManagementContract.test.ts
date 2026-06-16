@@ -8,9 +8,12 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { listTsFilesCached, readFileCached } from "./helpers/cachedSrcTextScan";
 
-// Per-file timeout bump for filesystem-scanning / heavy-render guardrail; no logic changed.
-import { vi as __vi_timeout } from "vitest";
-__vi_timeout.setConfig({ testTimeout: 30000, hookTimeout: 30000 });
+// Standardised scanner guardrail timeout + slow-test telemetry.
+// Replaces the previous per-file vi.setConfig bump. No scanner pattern,
+// allowlist, or assertion is changed.
+import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
+installScannerGuardrail({ file: __filename });
+
 
 const ROOT = resolve(__dirname, "../..");
 const DOC_PATH = resolve(ROOT, "docs/pi-ingest-secret-key-management.md");

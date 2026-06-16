@@ -128,13 +128,17 @@ export function installScannerGuardrail(opts: {
  * accidentally be dropped. Behaviour is identical to `it` aside from
  * carrying the harness timeout default.
  */
-export const scannerIt: typeof vitestIt = ((
-  name: Parameters<typeof vitestIt>[0],
-  fn?: Parameters<typeof vitestIt>[1],
-  timeout?: Parameters<typeof vitestIt>[2],
+export const scannerIt = ((
+  name: string,
+  fn?: (...args: unknown[]) => unknown,
+  timeout?: number,
 ) => {
-  return vitestIt(name, fn, timeout ?? SCANNER_GUARDRAIL_TIMEOUT_MS);
-}) as typeof vitestIt;
+  return (vitestIt as unknown as (
+    n: string,
+    f?: (...args: unknown[]) => unknown,
+    t?: number,
+  ) => unknown)(name, fn, timeout ?? SCANNER_GUARDRAIL_TIMEOUT_MS);
+}) as unknown as typeof vitestIt;
 
 /**
  * Cached recursive walk for `.ts`/`.tsx` files (configurable).

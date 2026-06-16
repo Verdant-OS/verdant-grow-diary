@@ -306,7 +306,6 @@ export function buildRegistryCsvInsertRows(args: BuildArgs): AdapterResult {
     for (const r of emit) {
       rows.push({
         tent_id: args.tentId,
-        grow_id: args.growId ?? null,
         metric: r.metric,
         value: r.value,
         captured_at: captured,
@@ -316,6 +315,7 @@ export function buildRegistryCsvInsertRows(args: BuildArgs): AdapterResult {
       });
     }
   });
+
 
   return {
     rows,

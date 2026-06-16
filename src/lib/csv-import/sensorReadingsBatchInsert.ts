@@ -14,6 +14,83 @@
 
 export const CSV_HISTORY_INSERT_BATCH_SIZE = 500;
 
+/**
+ * Allow-list mirrors public.sensor_readings.Insert in
+ * src/integrations/supabase/types.ts. Update both together if the schema
+ * ever adds a column. Provenance like grow_id / plant_id / source_app must
+ * live inside raw_payload — never as a top-level key.
+ */
+export const SENSOR_READINGS_INSERT_ALLOWED_KEYS = Object.freeze([
+  "captured_at",
+  "created_at",
+  "device_id",
+  "id",
+  "metric",
+  "quality",
+  "raw_payload",
+  "source",
+  "tent_id",
+  "ts",
+  "user_id",
+  "value",
+] as const);
+
+const ALLOWED_KEYS_SET: ReadonlySet<string> = new Set(
+  SENSOR_READINGS_INSERT_ALLOWED_KEYS,
+);
+
+export interface ValidateInsertRowsResult {
+  ok: boolean;
+  unknownKeys: string[];
+  rowIndexes: number[];
+  message: string | null;
+}
+
+/**
+ * Pure preflight validator for CSV history insert payloads. Catches
+ * unknown top-level keys (e.g. grow_id, plant_id, source_app) BEFORE any
+ * Supabase write fires, so PGRST204 surfaces as a clear operator message
+ * with zero rows written. Nested provenance inside raw_payload is allowed.
+ */
+export function validateSensorReadingInsertRows(
+  rows: ReadonlyArray<Record<string, unknown>>,
+): ValidateInsertRowsResult {
+  if (rows.length === 0) {
+    return { ok: true, unknownKeys: [], rowIndexes: [], message: null };
+  }
+  const unknown = new Set<string>();
+  const affected: number[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || typeof row !== "object") continue;
+    let rowHasUnknown = false;
+    for (const key of Object.keys(row)) {
+      if (!ALLOWED_KEYS_SET.has(key)) {
+        unknown.add(key);
+        rowHasUnknown = true;
+      }
+    }
+    if (rowHasUnknown) affected.push(i);
+  }
+  if (unknown.size === 0) {
+    return { ok: true, unknownKeys: [], rowIndexes: [], message: null };
+  }
+  const sortedKeys = Array.from(unknown).sort();
+  const sampleIndexes = affected.slice(0, 3);
+  const indexHint =
+    affected.length > 0
+      ? ` First affected row index${affected.length === 1 ? "" : "es"}: ${sampleIndexes.join(", ")}${affected.length > sampleIndexes.length ? ` (+${affected.length - sampleIndexes.length} more)` : ""}.`
+      : "";
+  const message =
+    `Import blocked before writing rows. CSV history insert payload contains unsupported sensor_readings field(s): ${sortedKeys.join(", ")}.${indexHint} No rows were written. No live sensor data was created.`;
+  return {
+    ok: false,
+    unknownKeys: sortedKeys,
+    rowIndexes: affected,
+    message,
+  };
+}
+
 export interface BatchInsertError {
   message: string;
   code?: string | null;

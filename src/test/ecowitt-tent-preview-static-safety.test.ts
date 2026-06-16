@@ -21,6 +21,8 @@ const FILES = [
   "src/lib/ecowittSnapshotExport.ts",
   "src/lib/ecowittIngestDryRun.ts",
   "src/lib/ecowittIngestDryRunFieldMap.ts",
+  "src/lib/ecowittIngestDryRunCsv.ts",
+  "src/lib/ecowittIngestDryRunStatus.ts",
   "src/fixtures/ecowitt-preview-samples.ts",
   "src/pages/OperatorEcowittTentPreview.tsx",
 ];

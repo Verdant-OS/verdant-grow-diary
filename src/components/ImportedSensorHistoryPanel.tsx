@@ -5,20 +5,26 @@
  * section. Renders the CSV-imported subset of the tent's sensor
  * readings with clear CSV/imported/Not-live labels.
  *
+ * Local-only metric filtering. No new queries, no query params, no
+ * route changes. Logic lives in importedSensorHistoryViewModel.
+ *
  * Safety:
  *   - Never reads or renders `raw_payload`.
  *   - Never classifies imported readings as live.
  *   - No writes. No automation. No alerts. No Action Queue.
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
+  IMPORTED_SENSOR_HISTORY_ALL_METRICS,
   IMPORTED_SENSOR_HISTORY_ANCHOR_ID,
   IMPORTED_SENSOR_HISTORY_EMPTY_COPY,
   IMPORTED_SENSOR_HISTORY_NOT_LIVE_COPY,
   buildImportedSensorHistoryViewModel,
   type ImportedSensorHistoryInputRow,
+  type ImportedSensorHistoryMetricFilter,
 } from "@/lib/importedSensorHistoryViewModel";
 
 interface Props {
@@ -44,6 +50,10 @@ export default function ImportedSensorHistoryPanel({
 }: Props) {
   const sectionRef = useRef<HTMLElement | null>(null);
   const location = useLocation();
+  const [selectedMetric, setSelectedMetric] =
+    useState<ImportedSensorHistoryMetricFilter>(
+      IMPORTED_SENSOR_HISTORY_ALL_METRICS,
+    );
 
   useEffect(() => {
     if (location.hash !== `#${IMPORTED_SENSOR_HISTORY_ANCHOR_ID}`) return;
@@ -53,6 +63,16 @@ export default function ImportedSensorHistoryPanel({
       el.focus?.();
     }
   }, [location.hash]);
+
+  const vm = useMemo(
+    () =>
+      buildImportedSensorHistoryViewModel({
+        readings,
+        limit,
+        selectedMetric,
+      }),
+    [readings, limit, selectedMetric],
+  );
 
   // Safe empty render when no tent context. Still keeps the anchor target
   // present so the CTA navigation does not 404 the scroll.
@@ -73,8 +93,6 @@ export default function ImportedSensorHistoryPanel({
       </section>
     );
   }
-
-  const vm = buildImportedSensorHistoryViewModel({ readings, limit });
 
   return (
     <section
@@ -118,6 +136,15 @@ export default function ImportedSensorHistoryPanel({
               </dd>
             </div>
             <div>
+              <dt className="text-xs text-muted-foreground">Visible</dt>
+              <dd
+                className="font-medium"
+                data-testid="imported-history-visible"
+              >
+                {vm.visibleCount}
+              </dd>
+            </div>
+            <div>
               <dt className="text-xs text-muted-foreground">Earliest</dt>
               <dd data-testid="imported-history-earliest">
                 {formatTimestamp(vm.earliestCapturedAt)}
@@ -129,16 +156,34 @@ export default function ImportedSensorHistoryPanel({
                 {formatTimestamp(vm.latestCapturedAt)}
               </dd>
             </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">Metrics</dt>
-              <dd
-                className="text-xs"
-                data-testid="imported-history-metrics"
-              >
-                {vm.metrics.length > 0 ? vm.metrics.join(", ") : "—"}
-              </dd>
-            </div>
           </dl>
+
+          {vm.metrics.length > 0 ? (
+            <div
+              className="flex flex-wrap gap-1"
+              role="group"
+              aria-label="Filter imported readings by metric"
+              data-testid="imported-history-metric-filters"
+            >
+              {vm.metricOptions.map((opt) => {
+                const isActive = vm.selectedMetric === opt.id;
+                return (
+                  <Button
+                    key={opt.id}
+                    type="button"
+                    size="sm"
+                    variant={isActive ? "default" : "outline"}
+                    aria-pressed={isActive}
+                    data-testid={`imported-history-metric-filter-${opt.id}`}
+                    onClick={() => setSelectedMetric(opt.id)}
+                  >
+                    {opt.label}
+                    <span className="ml-1 text-xs opacity-70">({opt.count})</span>
+                  </Button>
+                );
+              })}
+            </div>
+          ) : null}
 
           <div
             className="overflow-x-auto"

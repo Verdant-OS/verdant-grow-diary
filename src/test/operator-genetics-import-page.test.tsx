@@ -256,9 +256,8 @@ describe("validation export + template download", () => {
         expect(screen.getByTestId("genetics-export-report-button")).not.toBeDisabled(),
       );
       fireEvent.click(screen.getByTestId("genetics-export-report-button"));
-      await waitFor(() => expect(stub.calls.length).toBeGreaterThan(0));
-      const csv = stub.calls[stub.calls.length - 1].content;
-      const fname = stub.calls[stub.calls.length - 1].filename;
+      await waitFor(() => expect(stub.blobs.length).toBeGreaterThan(0));
+      const { content: csv, filename: fname } = await stub.lastContent();
       expect(fname).toBe("verdant-genetics-validation-report.csv");
       expect(csv).toContain("row_number,status,strain");
       expect(csv).toContain("valid");

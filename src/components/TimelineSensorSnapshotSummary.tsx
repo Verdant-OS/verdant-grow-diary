@@ -80,7 +80,7 @@ export default function TimelineSensorSnapshotSummary({ input, className }: Prop
     summary.source === "invalid" ||
     summary.source === "demo";
 
-  const status = mapManualSnapshotQualityToSnapshotStatus(summary.quality);
+  const status = qualityToStatus(summary.quality);
 
   return (
     <section

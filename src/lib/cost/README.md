@@ -431,3 +431,76 @@ const providerReportedTokens =
 - This wiring does **not** create cost enforcement.
 - This wiring does **not** change AI Doctor prompt text, model selection,
   or returned diagnosis content.
+
+## `providerReportedTokens` null behavior (clarification)
+
+`measurement.providerReportedTokens` becomes `null` whenever provider
+usage is any of:
+
+- missing
+- malformed (e.g. non-numeric, partial, mismatched types)
+- partial (only one of `prompt_tokens` / `completion_tokens`)
+- non-object (string, number, boolean)
+- an array
+- unsafe numeric (`NaN`, `Infinity`, negative, fractional, string-shaped number)
+- nested under unsupported paths (`result.usage`, `choices[*].usage`,
+  `metadata.usage`, `payload.debug.usage`, deeply nested)
+- using unsupported key shapes (e.g. Anthropic-style `input_tokens` /
+  `output_tokens`)
+
+Missing or malformed usage is **not** an error condition:
+
+- it does **not** block AI Doctor
+- it does **not** trigger fallback or model degradation
+- it does **not** trigger a budget, threshold, or back-pressure path
+- it does **not** raise an alert or user-facing warning
+
+`null` means: *"no trustworthy provider-reported token usage was
+extracted."* That's the whole signal.
+
+## Boundary safety: what is and isn't safe to pass onward
+
+The only field derived from the raw provider response that is safe to
+pass onward is:
+
+```ts
+measurement.providerReportedTokens
+```
+
+Everything else from the raw provider response **must die at the
+boundary**. Specifically, the raw provider response is **not** safe to:
+
+- store (in memory, in Supabase, in localStorage, anywhere)
+- log (console, telemetry, error tracking)
+- export (CSV, JSON, downloads, copy-to-clipboard)
+- send to capture stores (the diagnostics capture store rejects
+  forbidden raw fields like `providerResponse` / `rawResponse`)
+- expose in UI (operator diagnostics or grower-facing surfaces)
+
+### Safe operator-only capture/export example
+
+```ts
+import {
+  attachProviderResponseUsageToAiDoctorPromptMeasurement,
+} from "@/lib/cost";
+
+const measurementWithProviderUsage =
+  attachProviderResponseUsageToAiDoctorPromptMeasurement(
+    promptMeasurement,
+    providerResponse,
+  );
+
+const providerReportedTokens =
+  measurementWithProviderUsage.providerReportedTokens;
+
+// Safe: pass sanitized measurement / providerReportedTokens
+// to operator-only diagnostics (capture store + CSV export).
+// Unsafe: storing, logging, exporting, or returning providerResponse.
+```
+
+The bounded in-memory capture store
+(`createAiDoctorPromptMeasurementCaptureStore`) and deterministic CSV
+serializer (`serializeAiDoctorPromptMeasurementsToCsv`) are
+operator/dev diagnostics only. They are NOT durable persistence, NOT a
+budget, NOT a back-pressure controller, NOT an alert source, and have
+no Action Queue or device-control behavior.

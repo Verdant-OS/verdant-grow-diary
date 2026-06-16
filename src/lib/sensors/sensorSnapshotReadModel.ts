@@ -86,9 +86,9 @@ function identityLabel(snapshot: SensorSnapshot): string {
   if (typeof deviceId === "string" && deviceId.trim() !== "") {
     return `Identity: ${deviceId.trim()}`;
   }
-  const csv = snapshot.csvVendor;
-  if (csv !== null && csv !== undefined && typeof csv === "object" && "label" in csv && typeof (csv as { label?: unknown }).label === "string") {
-    return `Identity: ${(csv as { label: string }).label}`;
+  const csv = snapshot.csvVendor as { label?: unknown } | null | undefined;
+  if (csv && typeof csv === "object" && typeof csv.label === "string" && csv.label.trim() !== "") {
+    return `Identity: ${csv.label}`;
   }
   return "Identity: unknown";
 }

@@ -20,7 +20,15 @@
  */
 import { vi, beforeEach, afterEach, it } from "vitest";
 import { appendFileSync, mkdirSync, readdirSync, statSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from "node:path";
 
 export const SCANNER_GUARDRAIL_TIMEOUT_MS = 30_000;
 export const SLOW_SCANNER_THRESHOLD_MS = 5_000;
@@ -43,7 +51,7 @@ export type ScannerGuardrailSlowTestReportRow = Readonly<{
   test: string;
   /** Stable suite label, usually derived from the scanner test filename. */
   suite: string;
-  /** Test file path supplied by the scanner suite. */
+  /** Stable repo-relative POSIX test file path when the file is inside cwd. */
   file: string;
   /** Rounded measured duration for the test body + hooks. */
   durationMs: number;
@@ -54,10 +62,29 @@ export type ScannerGuardrailSlowTestReportRow = Readonly<{
 }>;
 
 function deriveSuiteLabel(file: string): string {
-  return basename(file)
-    .replace(/\.test\.(t|j)sx?$/i, "")
-    .replace(/\.(t|j)sx?$/i, "")
-    .trim() || "scanner-guardrail";
+  return (
+    basename(file)
+      .replace(/\.test\.(t|j)sx?$/i, "")
+      .replace(/\.(t|j)sx?$/i, "")
+      .trim() || "scanner-guardrail"
+  );
+}
+
+function toPosixPath(path: string): string {
+  return path.split(sep).join("/");
+}
+
+function normalizeReportFilePath(file: string): string {
+  const cwd = resolve(process.cwd());
+  const absoluteFile = resolve(file);
+  const relativeFile = relative(cwd, absoluteFile);
+
+  if (relativeFile === "") return ".";
+  if (!relativeFile.startsWith("..") && !isAbsolute(relativeFile)) {
+    return toPosixPath(relativeFile);
+  }
+
+  return toPosixPath(file);
 }
 
 export function buildScannerSlowTestReportRow(input: {
@@ -69,11 +96,15 @@ export function buildScannerSlowTestReportRow(input: {
   suiteLabel?: string;
   recordedAt?: string;
 }): ScannerGuardrailSlowTestReportRow {
-  const suite = (input.suiteLabel ?? input.suite ?? deriveSuiteLabel(input.file)).trim();
+  const suite = (
+    input.suiteLabel ??
+    input.suite ??
+    deriveSuiteLabel(input.file)
+  ).trim();
   return {
     test: input.test || "(unknown test)",
     suite: suite || "scanner-guardrail",
-    file: input.file,
+    file: normalizeReportFilePath(input.file),
     durationMs: Math.round(input.durationMs),
     thresholdMs: input.thresholdMs ?? SLOW_SCANNER_THRESHOLD_MS,
     recordedAt: input.recordedAt ?? new Date().toISOString(),
@@ -114,7 +145,9 @@ export function installScannerGuardrail(opts: {
     const durationMs = performance.now() - startedAt;
     if (durationMs < SLOW_SCANNER_THRESHOLD_MS) return;
     try {
-      mkdirSync(dirname(SCANNER_GUARDRAIL_SLOW_TEST_REPORT_PATH), { recursive: true });
+      mkdirSync(dirname(SCANNER_GUARDRAIL_SLOW_TEST_REPORT_PATH), {
+        recursive: true,
+      });
       appendFileSync(
         SCANNER_GUARDRAIL_SLOW_TEST_REPORT_PATH,
         JSON.stringify(

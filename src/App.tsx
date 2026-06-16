@@ -35,6 +35,7 @@ import Diagnostics from "./pages/Diagnostics";
 import ActionQueue from "./pages/ActionQueue";
 import OperatorEcowittCanary from "./pages/OperatorEcowittCanary";
 import OperatorEcowittTentPreview from "./pages/OperatorEcowittTentPreview";
+import OperatorGeneticsImportPage from "./pages/OperatorGeneticsImportPage";
 import EcowittBridgeStatus from "./pages/EcowittBridgeStatus";
 import OneTentProofRecord from "./pages/OneTentProofRecord";
 import ActionDetail from "./pages/ActionDetail";
@@ -142,6 +143,7 @@ const App = () => (
                 <Route path="/operator/ecowitt-bridge-status" element={<EcowittBridgeStatus />} />
                 <Route path="/operator/ecowitt-live-bringup" element={<EcowittLiveBringup />} />
                 <Route path="/operator/ecowitt-tent-preview" element={<OperatorEcowittTentPreview />} />
+                <Route path="/operator/genetics-import" element={<OperatorGeneticsImportPage />} />
                 <Route path="/pi-ingest-status" element={<PiIngestStatus />} />
                 <Route path="/ingest-inspector" element={<IngestInspector />} />
                 <Route path="/imports/representative-csv" element={<RepresentativeCsvPreview />} />

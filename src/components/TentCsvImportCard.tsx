@@ -113,7 +113,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
   // timeline filters and never says "live".
   const viewImportedHistoryAction = {
     label: "View imported history",
-    onClick: () => navigate(`/tents/${tentId}#imported-history`),
+    onClick: () => navigate(`${tentDetailPath(tentId)}#imported-history`),
   } as const;
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [sourceApp, setSourceApp] = useState<CsvImportSourceApp>("ac_infinity");

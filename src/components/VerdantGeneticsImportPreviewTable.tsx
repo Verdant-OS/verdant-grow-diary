@@ -28,20 +28,14 @@ function statusLabel(status: GeneticsImportPreviewRow["status"]): string {
   return "Blocked";
 }
 
-function isMissing(
-  row: GeneticsImportPreviewRow,
-  field: GeneticsRequiredField,
-): boolean {
+function isMissing(row: GeneticsImportPreviewRow, field: GeneticsRequiredField): boolean {
   return row.missingRequired.includes(field);
 }
 
 export function VerdantGeneticsImportPreviewTable({ rows }: Props) {
   if (rows.length === 0) {
     return (
-      <p
-        data-testid="genetics-preview-empty"
-        className="text-sm text-muted-foreground"
-      >
+      <p data-testid="genetics-preview-empty" className="text-sm text-muted-foreground">
         No rows parsed yet. Upload an XLSX file to preview.
       </p>
     );
@@ -100,9 +94,7 @@ export function VerdantGeneticsImportPreviewTable({ rows }: Props) {
                 {r.breeder ?? "—"}
               </TableCell>
               <TableCell
-                className={cn(
-                  isMissing(r, "seed_type") && "text-destructive font-medium",
-                )}
+                className={cn(isMissing(r, "seed_type") && "text-destructive font-medium")}
                 data-missing={isMissing(r, "seed_type") ? "true" : undefined}
               >
                 {r.seedType ?? r.rawSeedType ?? "—"}

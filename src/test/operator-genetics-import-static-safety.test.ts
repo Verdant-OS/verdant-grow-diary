@@ -31,9 +31,7 @@ function read(path: string): string {
 
 /** Strip JS/TS comments so safety doc strings don't trip pattern checks. */
 function stripComments(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 }
 
 const SOURCES: Record<string, string> = Object.fromEntries(
@@ -49,8 +47,14 @@ interface ForbiddenPattern {
 }
 
 const forbidden: ForbiddenPattern[] = [
-  { name: 'from "@/integrations/supabase"', test: (s) => /from\s+["']@\/integrations\/supabase/.test(s) },
-  { name: 'from "../integrations/supabase"', test: (s) => /from\s+["']\.\.\/integrations\/supabase/.test(s) },
+  {
+    name: 'from "@/integrations/supabase"',
+    test: (s) => /from\s+["']@\/integrations\/supabase/.test(s),
+  },
+  {
+    name: 'from "../integrations/supabase"',
+    test: (s) => /from\s+["']\.\.\/integrations\/supabase/.test(s),
+  },
   { name: "supabase.", test: (s) => /\bsupabase\./.test(s) },
   { name: ".functions.invoke", test: (s) => /\.functions\.invoke\b/.test(s) },
   { name: "fetch(", test: (s) => /(^|[^.\w])fetch\s*\(/.test(s) },

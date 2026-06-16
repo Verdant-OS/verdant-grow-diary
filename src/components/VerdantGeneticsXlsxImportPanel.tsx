@@ -58,9 +58,7 @@ export interface VerdantGeneticsXlsxImportPanelProps {
    * Optional injected link helper. When omitted, the link action is
    * disabled and the blocker copy is shown.
    */
-  onLink?: (
-    rows: ReturnType<typeof selectImportableRows>,
-  ) => Promise<void> | void;
+  onLink?: (rows: ReturnType<typeof selectImportableRows>) => Promise<void> | void;
 }
 
 export function VerdantGeneticsXlsxImportPanel({
@@ -74,10 +72,7 @@ export function VerdantGeneticsXlsxImportPanel({
   const [linkMessage, setLinkMessage] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
 
-  const importableRows = useMemo(
-    () => (result ? selectImportableRows(result) : []),
-    [result],
-  );
+  const importableRows = useMemo(() => (result ? selectImportableRows(result) : []), [result]);
 
   const handleFile = useCallback(
     async (file: File) => {
@@ -91,9 +86,7 @@ export function VerdantGeneticsXlsxImportPanel({
         const preview = buildGeneticsImportPreview(grid);
         setResult(preview);
       } catch {
-        setError(
-          "Could not read this file. Please upload a valid .xlsx genetics sheet.",
-        );
+        setError("Could not read this file. Please upload a valid .xlsx genetics sheet.");
       } finally {
         setParsing(false);
       }
@@ -115,8 +108,7 @@ export function VerdantGeneticsXlsxImportPanel({
     }
   }, [onLink, importableRows]);
 
-  const linkDisabled =
-    !onLink || importableRows.length === 0 || linking || parsing;
+  const linkDisabled = !onLink || importableRows.length === 0 || linking || parsing;
 
   return (
     <Card data-testid="genetics-import-panel">
@@ -128,8 +120,7 @@ export function VerdantGeneticsXlsxImportPanel({
           XLSX genetics import preview. No data saved until confirmed.
         </p>
         <p className="text-xs text-muted-foreground">
-          This tool validates genetics spreadsheets in-browser. Batch linking is
-          not enabled yet.
+          This tool validates genetics spreadsheets in-browser. Batch linking is not enabled yet.
         </p>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -148,9 +139,7 @@ export function VerdantGeneticsXlsxImportPanel({
             }}
             className="text-sm"
           />
-          {fileName && (
-            <span className="text-xs text-muted-foreground">{fileName}</span>
-          )}
+          {fileName && <span className="text-xs text-muted-foreground">{fileName}</span>}
           <Button
             type="button"
             variant="outline"
@@ -184,16 +173,11 @@ export function VerdantGeneticsXlsxImportPanel({
             Export validation report
           </Button>
         </div>
-        <p
-          data-testid="genetics-template-fallback-copy"
-          className="text-xs text-muted-foreground"
-        >
+        <p data-testid="genetics-template-fallback-copy" className="text-xs text-muted-foreground">
           {GENETICS_TEMPLATE_CSV_FALLBACK_COPY}
         </p>
 
-        {parsing && (
-          <p className="text-sm text-muted-foreground">Parsing file…</p>
-        )}
+        {parsing && <p className="text-sm text-muted-foreground">Parsing file…</p>}
 
         {error && (
           <Alert variant="destructive" data-testid="genetics-file-error">
@@ -226,20 +210,11 @@ export function VerdantGeneticsXlsxImportPanel({
 
         {result && !result.fileLevelError && (
           <>
-            <div
-              data-testid="genetics-preview-summary"
-              className="flex flex-wrap gap-3 text-sm"
-            >
+            <div data-testid="genetics-preview-summary" className="flex flex-wrap gap-3 text-sm">
               <span>Total: {result.totals.total}</span>
-              <span className="text-emerald-700">
-                Ready: {result.totals.valid}
-              </span>
-              <span className="text-yellow-700">
-                Warnings: {result.totals.warning}
-              </span>
-              <span className="text-destructive">
-                Blocked: {result.totals.blocked}
-              </span>
+              <span className="text-emerald-700">Ready: {result.totals.valid}</span>
+              <span className="text-yellow-700">Warnings: {result.totals.warning}</span>
+              <span className="text-destructive">Blocked: {result.totals.blocked}</span>
             </div>
 
             <VerdantGeneticsImportPreviewTable rows={result.rows} />

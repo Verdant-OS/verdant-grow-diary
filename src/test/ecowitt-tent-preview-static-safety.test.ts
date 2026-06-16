@@ -15,6 +15,10 @@ const FILES = [
   "src/lib/ecowittTentPreviewViewModel.ts",
   "src/lib/ecowittLocalEvidence.ts",
   "src/lib/ecowittLocalEvidenceViewModel.ts",
+  "src/lib/ecowittEvidenceHistory.ts",
+  "src/lib/ecowittEvidenceHistoryViewModel.ts",
+  "src/lib/ecowittDiaryAttachPreview.ts",
+  "src/lib/ecowittSnapshotExport.ts",
   "src/fixtures/ecowitt-preview-samples.ts",
   "src/pages/OperatorEcowittTentPreview.tsx",
 ];

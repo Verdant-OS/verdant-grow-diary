@@ -15,6 +15,11 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { validateAiDoctorReviewResult } from "./contract.ts";
 import { buildAiDoctorPromptMessages } from "../../../src/lib/aiDoctorPromptAssembly.ts";
+// Measurement-only cost wiring. Pure helpers; no persistence, no I/O.
+import {
+  attachProviderResponseUsageToAiDoctorPromptMeasurement,
+  buildAiDoctorPromptMeasurement,
+} from "../../../src/lib/cost/index.ts";
 
 const TIMEOUT_MS = 25_000;
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";

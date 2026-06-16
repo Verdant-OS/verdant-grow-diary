@@ -169,3 +169,151 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
     expect(onLink).not.toHaveBeenCalled();
   });
 });
+
+describe("page safety copy", () => {
+  it("renders preview-only/no-data-saved copy and does not show 'live' or 'import complete'", () => {
+    render(<OperatorGeneticsImportPage />);
+    expect(
+      screen.getByTestId("operator-genetics-import-safety").textContent,
+    ).toMatch(/Batch linking is not enabled yet/i);
+    expect(screen.getByText(/No data saved until confirmed/i)).toBeInTheDocument();
+    // No misleading copy before any upload/confirmation.
+    // Allow the cautionary "No data saved until confirmed" copy, but
+    // assert no misleading affirmative copy is shown before any upload.
+    expect(screen.queryByText(/\blive\b/i)).toBeNull();
+    expect(screen.queryByText(/\bdata saved\b(?! until)/i)).toBeNull();
+    expect(screen.queryByText(/import complete/i)).toBeNull();
+  });
+});
+
+describe("validation export + template download", () => {
+  function stubDownload() {
+    const captures: Array<{ content: string; filename: string }> = [];
+    const realBlob = globalThis.Blob;
+    const realCreate = URL.createObjectURL;
+    const realRevoke = URL.revokeObjectURL;
+    class PatchedBlob extends realBlob {
+      constructor(parts?: BlobPart[], opts?: BlobPropertyBag) {
+        super(parts, opts);
+        const text = (parts ?? [])
+          .map((p) => (typeof p === "string" ? p : ""))
+          .join("");
+        captures.push({ content: text, filename: "" });
+      }
+    }
+    globalThis.Blob = PatchedBlob as unknown as typeof Blob;
+    URL.createObjectURL = (() => "blob://stub") as unknown as typeof URL.createObjectURL;
+    URL.revokeObjectURL = (() => {}) as unknown as typeof URL.revokeObjectURL;
+    const origClick = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function () {
+      const a = this as HTMLAnchorElement;
+      if (captures.length > 0) captures[captures.length - 1].filename = a.download;
+    };
+    return {
+      blobs: captures,
+      lastContent() {
+        const last = captures[captures.length - 1];
+        return Promise.resolve({ filename: last.filename, content: last.content });
+      },
+      restore() {
+        globalThis.Blob = realBlob;
+        URL.createObjectURL = realCreate;
+        URL.revokeObjectURL = realRevoke;
+        HTMLAnchorElement.prototype.click = origClick;
+      },
+    };
+  }
+
+  it("export button is disabled before parse, enabled after", async () => {
+    render(
+      <VerdantGeneticsXlsxImportPanel
+        loader={async () => [
+          HEADER,
+          ["Blueberry", "Dutch Passion", "feminized", null, "8", null],
+        ]}
+      />,
+    );
+    expect(screen.getByTestId("genetics-export-report-button")).toBeDisabled();
+    uploadFile(screen.getByTestId("genetics-xlsx-file-input"), makeFile());
+    await waitFor(() =>
+      expect(screen.getByTestId("genetics-export-report-button")).not.toBeDisabled(),
+    );
+  });
+
+  it("renders the Download CSV template button and the CSV-fallback copy", () => {
+    render(<VerdantGeneticsXlsxImportPanel loader={async () => []} />);
+    const btn = screen.getByTestId("genetics-template-button");
+    expect(btn.textContent).toMatch(/CSV template/i);
+    expect(
+      screen.getByTestId("genetics-template-fallback-copy").textContent,
+    ).toMatch(/XLSX template export is blocked/i);
+  });
+
+  it("exports a validation report containing row number, status, and messages", async () => {
+    const stub = stubDownload();
+    try {
+      render(
+        <VerdantGeneticsXlsxImportPanel
+          loader={async () => [
+            HEADER,
+            ["Blueberry", "Dutch Passion", "feminized", null, "8", null],
+            ["", "Sensi", "feminized", null, "9", null],
+            ["Critical", "Royal Queen", "auto", null, "soon", null],
+          ]}
+        />,
+      );
+      uploadFile(screen.getByTestId("genetics-xlsx-file-input"), makeFile());
+      await waitFor(() =>
+        expect(screen.getByTestId("genetics-export-report-button")).not.toBeDisabled(),
+      );
+      fireEvent.click(screen.getByTestId("genetics-export-report-button"));
+      await waitFor(() => expect(stub.blobs.length).toBeGreaterThan(0));
+      const { content: csv, filename: fname } = await stub.lastContent();
+      expect(fname).toBe("verdant-genetics-validation-report.csv");
+      expect(csv).toContain("row_number,status,strain");
+      expect(csv).toContain("valid");
+      expect(csv).toContain("blocked");
+      expect(csv).toContain("warning");
+      expect(csv).toContain("Row 3 is missing strain name.");
+    } finally {
+      stub.restore();
+    }
+  });
+
+  it("downloads a CSV template with required columns and example rows", async () => {
+    const stub = stubDownload();
+    try {
+      render(<VerdantGeneticsXlsxImportPanel loader={async () => []} />);
+      fireEvent.click(screen.getByTestId("genetics-template-button"));
+      await waitFor(() => expect(stub.blobs.length).toBeGreaterThan(0));
+      const { content: csv, filename: fname } = await stub.lastContent();
+      expect(fname).toBe("verdant-genetics-template.csv");
+      expect(csv).toContain("strain,breeder,seed_type");
+      expect(csv).toContain("Example Auto");
+      expect(csv).toContain("Example Fem");
+      expect(csv).toContain("Example Regular");
+    } finally {
+      stub.restore();
+    }
+  });
+});
+
+describe("duplicate header warnings", () => {
+  it("surfaces a duplicate-mapped-headers alert in the panel", async () => {
+    render(
+      <VerdantGeneticsXlsxImportPanel
+        loader={async () => [
+          ["Strain", "Variety", "Breeder", "Seed Type"],
+          ["First", "Second", "B", "auto"],
+        ]}
+      />,
+    );
+    uploadFile(screen.getByTestId("genetics-xlsx-file-input"), makeFile());
+    await waitFor(() =>
+      expect(screen.getByTestId("genetics-file-warnings")).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("genetics-file-warnings").textContent).toMatch(
+      /Multiple columns map to "strain"/,
+    );
+  });
+});

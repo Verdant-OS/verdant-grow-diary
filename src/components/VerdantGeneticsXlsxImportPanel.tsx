@@ -16,6 +16,10 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { readXlsxFileToCellGrid } from "@/lib/verdantGeneticsXlsxFileLoader";
 import {
   buildGeneticsImportPreview,
+  buildGeneticsTemplateCsv,
+  buildGeneticsValidationReportCsv,
+  GENETICS_TEMPLATE_CSV_FILENAME,
+  GENETICS_VALIDATION_REPORT_FILENAME,
   selectImportableRows,
   type GeneticsImportPreviewResult,
 } from "@/lib/verdantGeneticsImportPreviewRules";
@@ -23,6 +27,26 @@ import { VerdantGeneticsImportPreviewTable } from "@/components/VerdantGeneticsI
 
 export const GENETICS_LINK_DISABLED_COPY =
   "Batch linking is not enabled yet. Preview is safe and no data has been saved." as const;
+
+export const GENETICS_TEMPLATE_CSV_FALLBACK_COPY =
+  "XLSX template export is blocked pending a safe writer utility. Providing CSV template instead." as const;
+
+/**
+ * Trigger a local download from an in-memory text payload. Browser-only.
+ * No fetch, no Supabase, no network.
+ */
+function triggerLocalDownload(filename: string, content: string, mime: string) {
+  if (typeof window === "undefined" || typeof document === "undefined") return;
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 export interface VerdantGeneticsXlsxImportPanelProps {
   /**
@@ -103,8 +127,12 @@ export function VerdantGeneticsXlsxImportPanel({
         <p className="text-sm text-muted-foreground">
           XLSX genetics import preview. No data saved until confirmed.
         </p>
+        <p className="text-xs text-muted-foreground">
+          This tool validates genetics spreadsheets in-browser. Batch linking is
+          not enabled yet.
+        </p>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <label className="text-sm font-medium" htmlFor="genetics-xlsx-file">
             Upload genetics XLSX
           </label>
@@ -123,7 +151,45 @@ export function VerdantGeneticsXlsxImportPanel({
           {fileName && (
             <span className="text-xs text-muted-foreground">{fileName}</span>
           )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            data-testid="genetics-template-button"
+            onClick={() =>
+              triggerLocalDownload(
+                GENETICS_TEMPLATE_CSV_FILENAME,
+                buildGeneticsTemplateCsv(),
+                "text/csv;charset=utf-8",
+              )
+            }
+          >
+            Download CSV template
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            data-testid="genetics-export-report-button"
+            disabled={!result || !!result.fileLevelError}
+            onClick={() => {
+              if (!result) return;
+              triggerLocalDownload(
+                GENETICS_VALIDATION_REPORT_FILENAME,
+                buildGeneticsValidationReportCsv(result),
+                "text/csv;charset=utf-8",
+              );
+            }}
+          >
+            Export validation report
+          </Button>
         </div>
+        <p
+          data-testid="genetics-template-fallback-copy"
+          className="text-xs text-muted-foreground"
+        >
+          {GENETICS_TEMPLATE_CSV_FALLBACK_COPY}
+        </p>
 
         {parsing && (
           <p className="text-sm text-muted-foreground">Parsing file…</p>
@@ -140,6 +206,19 @@ export function VerdantGeneticsXlsxImportPanel({
           <Alert variant="destructive" data-testid="genetics-file-error">
             <AlertTitle>Unrecognized sheet</AlertTitle>
             <AlertDescription>{result.fileLevelError}</AlertDescription>
+          </Alert>
+        )}
+
+        {result && !result.fileLevelError && result.fileWarnings.length > 0 && (
+          <Alert data-testid="genetics-file-warnings">
+            <AlertTitle>Header warnings</AlertTitle>
+            <AlertDescription>
+              <ul className="list-disc pl-4 text-sm">
+                {result.fileWarnings.map((w, i) => (
+                  <li key={i}>{w.message}</li>
+                ))}
+              </ul>
+            </AlertDescription>
           </Alert>
         )}
 

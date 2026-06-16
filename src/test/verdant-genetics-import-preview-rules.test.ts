@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   buildGeneticsImportPreview,
+  buildGeneticsTemplateCsv,
+  buildGeneticsValidationReportCsv,
+  GENETICS_TEMPLATE_REQUIRED_COLUMNS,
+  GENETICS_VALIDATION_REPORT_COLUMNS,
   selectImportableRows,
 } from "@/lib/verdantGeneticsImportPreviewRules";
 
@@ -130,5 +134,149 @@ describe("buildGeneticsImportPreview", () => {
       ["", "B", "auto", null, null, null],
     ];
     expect(buildGeneticsImportPreview(grid)).toEqual(buildGeneticsImportPreview(grid));
+  });
+});
+
+describe("header alias detection", () => {
+  const baseRow = ["My Strain", "Dutch Passion", "feminized"];
+  it.each([
+    ["strain", "strain"],
+    ["Strain Name", "strain name"],
+    ["Variety", "variety"],
+    ["Cultivar Name", "cultivar name"],
+    ["GENETICS", "genetics"],
+    ["name", "name"],
+  ])("recognizes %s as strain", (header) => {
+    const r = buildGeneticsImportPreview([
+      [header, "Breeder", "Seed Type"],
+      baseRow,
+    ]);
+    expect(r.fileLevelError).toBeNull();
+    expect(r.rows[0].strain).toBe("My Strain");
+  });
+
+  it.each([
+    "breeder",
+    "Breeder Name",
+    "Seed Bank",
+    "seedbank",
+    "company",
+    "source",
+  ])("recognizes %s as breeder", (header) => {
+    const r = buildGeneticsImportPreview([
+      ["Strain", header, "Seed Type"],
+      baseRow,
+    ]);
+    expect(r.rows[0].breeder).toBe("Dutch Passion");
+  });
+
+  it.each(["seed type", "type", "Category", "Genetics Type", "Seed Class"])(
+    "recognizes %s as seed_type",
+    (header) => {
+      const r = buildGeneticsImportPreview([
+        ["Strain", "Breeder", header],
+        baseRow,
+      ]);
+      expect(r.rows[0].seedType).toBe("feminized");
+    },
+  );
+
+  it("recognizes flowering time as flowering_weeks", () => {
+    const r = buildGeneticsImportPreview([
+      ["Strain", "Breeder", "Seed Type", "Flowering Time"],
+      ["A", "B", "auto", "9"],
+    ]);
+    expect(r.rows[0].floweringWeeks).toBe(9);
+  });
+
+  it("normalizes punctuation, hyphens, and underscores in headers", () => {
+    const r = buildGeneticsImportPreview([
+      ["strain-name", "seed_bank", "seed type"],
+      ["A", "B", "auto"],
+    ]);
+    expect(r.fileLevelError).toBeNull();
+    expect(r.rows[0].strain).toBe("A");
+    expect(r.rows[0].breeder).toBe("B");
+  });
+
+  it("warns when two columns map to the same canonical field, using first detected", () => {
+    const r = buildGeneticsImportPreview([
+      ["Strain", "Variety", "Breeder", "Seed Type"],
+      ["First", "Second", "B", "auto"],
+    ]);
+    expect(r.fileWarnings.some((w) => w.field === "strain")).toBe(true);
+    expect(r.rows[0].strain).toBe("First");
+  });
+
+  it("still produces row-numbered errors when required fields are missing", () => {
+    const r = buildGeneticsImportPreview([
+      ["Variety", "Seed Bank", "Type"],
+      ["", "B", "auto"],
+    ]);
+    expect(
+      r.rows[0].issues.some((i) => i.message === "Row 2 is missing strain name."),
+    ).toBe(true);
+  });
+});
+
+describe("buildGeneticsValidationReportCsv", () => {
+  it("emits header row and includes all statuses with row numbers and messages", () => {
+    const r = buildGeneticsImportPreview([
+      ["Strain", "Breeder", "Seed Type", "Lineage", "Flowering Time", "Notes"],
+      ["A", "B", "auto", null, null, null],
+      ["", "B", "auto", null, null, null], // blocked
+      ["C", "D", "auto", null, "soon", null], // warning
+    ]);
+    const csv = buildGeneticsValidationReportCsv(r);
+    const lines = csv.trim().split("\r\n");
+    expect(lines[0]).toBe(GENETICS_VALIDATION_REPORT_COLUMNS.join(","));
+    expect(lines.length).toBe(4);
+    expect(lines[1]).toContain("valid");
+    expect(lines[2]).toContain("blocked");
+    expect(lines[2]).toContain("Row 3 is missing strain name.");
+    expect(lines[3]).toContain("warning");
+    expect(lines[3]).toContain("flowering time");
+  });
+
+  it("CSV-escapes fields containing commas, quotes, and newlines", () => {
+    const r = buildGeneticsImportPreview([
+      ["Strain", "Breeder", "Seed Type", "Notes"],
+      ['Has, comma', 'Quote "Co"', "auto", "line1\nline2"],
+    ]);
+    const csv = buildGeneticsValidationReportCsv(r);
+    expect(csv).toContain('"Has, comma"');
+    expect(csv).toContain('"Quote ""Co"""');
+  });
+});
+
+describe("buildGeneticsTemplateCsv", () => {
+  it("includes required columns and example rows", () => {
+    const csv = buildGeneticsTemplateCsv();
+    const lines = csv.trim().split("\r\n");
+    for (const col of GENETICS_TEMPLATE_REQUIRED_COLUMNS) {
+      expect(lines[0]).toContain(col);
+    }
+    expect(lines[0]).toContain("lineage");
+    expect(lines[0]).toContain("flowering_weeks");
+    expect(lines[0]).toContain("notes");
+    expect(csv).toContain("Example Auto");
+    expect(csv).toContain("autoflower");
+    expect(csv).toContain("Example Fem");
+    expect(csv).toContain("feminized");
+    expect(csv).toContain("Example Regular");
+    expect(csv).toContain("regular");
+  });
+});
+
+describe("selectImportableRows", () => {
+  it("excludes blocked rows but includes warnings", () => {
+    const r = buildGeneticsImportPreview([
+      ["Strain", "Breeder", "Seed Type", "Flowering Time"],
+      ["A", "B", "auto", "8"],
+      ["", "B", "auto", "8"],
+      ["C", "D", "auto", "soon"],
+    ]);
+    const importable = selectImportableRows(r);
+    expect(importable.map((x) => x.rowNumber)).toEqual([2, 4]);
   });
 });

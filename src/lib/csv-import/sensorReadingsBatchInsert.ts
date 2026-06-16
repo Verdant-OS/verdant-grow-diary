@@ -77,12 +77,13 @@ export function validateSensorReadingInsertRows(
   }
   const sortedKeys = Array.from(unknown).sort();
   const sampleIndexes = affected.slice(0, 3);
+  const overflow = affected.length - sampleIndexes.length;
   const indexHint =
     affected.length > 0
-      ? ` First affected row index${affected.length === 1 ? "" : "es"}: ${sampleIndexes.join(", ")}${affected.length > sampleIndexes.length ? ` (+${affected.length - sampleIndexes.length} more)` : ""}.`
+      ? ` Affected rows: ${sampleIndexes.join(", ")}${overflow > 0 ? ` (+${overflow} more)` : ""}.`
       : "";
   const message =
-    `Import blocked before writing rows. CSV history insert payload contains unsupported sensor_readings field(s): ${sortedKeys.join(", ")}.${indexHint} No rows were written. No live sensor data was created.`;
+    `Import blocked before writing rows. Unsupported sensor_readings field(s): ${sortedKeys.join(", ")}.${indexHint} No rows were written. No live sensor data was created.`;
   return {
     ok: false,
     unknownKeys: sortedKeys,

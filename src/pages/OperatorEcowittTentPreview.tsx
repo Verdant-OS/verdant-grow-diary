@@ -33,11 +33,8 @@ import {
   ECOWITT_DRY_RUN_TENT_PLACEHOLDER,
 } from "@/lib/ecowittIngestDryRun";
 import { buildEcowittIngestDryRunFieldMap } from "@/lib/ecowittIngestDryRunFieldMap";
-import {
-  normalizeEcowittTentPayload,
-  SUPPORTED_TENT_KEYS as ALL_TENT_KEYS,
-} from "@/lib/ecowittTentNormalizerRouter";
-import { loadEcowittEvidenceSample, isEcowittEvidenceStale } from "@/lib/ecowittLocalEvidence";
+import { normalizeEcowittTentPayload } from "@/lib/ecowittTentNormalizerRouter";
+import { loadEcowittEvidenceSample } from "@/lib/ecowittLocalEvidence";
 
 const TENT_KEY_LABEL: Record<EcowittTentKey, string> = {
   flower: "Flower Tent",

@@ -346,13 +346,20 @@ function EntryItem({ entry, demoVariant }: EntryItemProps) {
         {...commonDataAttrs}
         data-entry-kind="action"
         data-action-id={entry.action.id}
+        data-has-snapshot="false"
       >
-        <CardContent className="p-3">
+        <CardContent className="p-3 space-y-2">
           <ActionDetails
             action={entry.action}
             sourceLabel={sourceLabel}
             sourceTestId={sourceTestId}
           />
+          <p
+            className="text-xs text-muted-foreground italic"
+            data-testid="quick-log-grouped-action-missing-snapshot"
+          >
+            {MISSING_SNAPSHOT_NOTE_LABEL}
+          </p>
         </CardContent>
       </Card>
     );

@@ -143,6 +143,7 @@ const App = () => (
                 <Route path="/operator/ecowitt-bridge-status" element={<EcowittBridgeStatus />} />
                 <Route path="/operator/ecowitt-live-bringup" element={<EcowittLiveBringup />} />
                 <Route path="/operator/ecowitt-tent-preview" element={<OperatorEcowittTentPreview />} />
+                <Route path="/operator/genetics-import" element={<OperatorGeneticsImportPage />} />
                 <Route path="/pi-ingest-status" element={<PiIngestStatus />} />
                 <Route path="/ingest-inspector" element={<IngestInspector />} />
                 <Route path="/imports/representative-csv" element={<RepresentativeCsvPreview />} />

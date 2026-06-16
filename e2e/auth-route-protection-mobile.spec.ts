@@ -30,6 +30,7 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/operator/ecowitt",
   "/operator/ecowitt-bridge-status",
   "/operator/ecowitt-live-bringup",
+  "/operator/ecowitt-tent-preview",
   "/operator/one-tent-proof-record",
   "/pi-ingest-status",
   "/sensors/csv-preview",

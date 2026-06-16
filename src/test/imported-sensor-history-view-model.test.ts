@@ -14,6 +14,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import {
+  IMPORTED_SENSOR_HISTORY_ALL_METRICS,
   IMPORTED_SENSOR_HISTORY_ANCHOR_ID,
   IMPORTED_SENSOR_HISTORY_DEFAULT_LIMIT,
   IMPORTED_SENSOR_HISTORY_EMPTY_COPY,

@@ -4,8 +4,9 @@
  * encryption/decryption, no Edge Function, no resolver may appear yet.
  */
 import { describe, it, expect } from "vitest";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { listTsFilesCached, readFileCached } from "./helpers/cachedSrcTextScan";
 
 const ROOT = resolve(__dirname, "../..");
 const DOC_PATH = resolve(ROOT, "docs/pi-ingest-secret-key-management.md");
@@ -76,28 +77,21 @@ describe("pi-ingest secret key management — contract doc", () => {
   });
 });
 
-function walk(dir: string, acc: string[] = []): string[] {
-  if (!existsSync(dir)) return acc;
-  for (const name of readdirSync(dir)) {
-    if (name === "node_modules" || name === ".git" || name === "dist") continue;
-    const p = join(dir, name);
-    const st = statSync(p);
-    if (st.isDirectory()) walk(p, acc);
-    else acc.push(p);
-  }
-  return acc;
-}
-
 const SELF = resolve(__dirname, "piIngestSecretKeyManagementContract.test.ts");
 
 describe("pi-ingest secret key management — repo guardrails", () => {
-  const srcFiles = walk(resolve(ROOT, "src")).filter(
-    (p) => /\.(ts|tsx)$/.test(p) && p !== SELF,
+  const srcFiles = listTsFilesCached(resolve(ROOT, "src")).filter(
+    (p) => p !== SELF,
+  );
+  const edgeRoot = resolve(ROOT, "supabase/functions/pi-ingest-readings");
+  const edgeFiles = listTsFilesCached(resolve(ROOT, "supabase/functions"));
+  const allFiles = [...srcFiles, ...edgeFiles].filter(
+    (f) => !f.startsWith(edgeRoot) && f !== SELF,
   );
 
   it("no process.env.PI_INGEST_SECRET_KEY references in src/", () => {
     for (const f of srcFiles) {
-      const text = readFileSync(f, "utf8");
+      const text = readFileCached(f);
       expect(text, `forbidden env read in ${f}`).not.toMatch(
         /process\.env\.PI_INGEST_SECRET_KEY/,
       );
@@ -105,17 +99,8 @@ describe("pi-ingest secret key management — repo guardrails", () => {
   });
 
   it("no Deno.env.get(\"PI_INGEST_SECRET_KEY...\") outside future Edge Function paths", () => {
-    const edgeRoot = resolve(ROOT, "supabase/functions/pi-ingest-readings");
-    const all = [
-      ...srcFiles,
-      ...walk(resolve(ROOT, "supabase/functions")).filter((p) =>
-        /\.(ts|tsx)$/.test(p),
-      ),
-    ];
-    for (const f of all) {
-      if (f.startsWith(edgeRoot)) continue;
-      if (f === SELF) continue;
-      const text = readFileSync(f, "utf8");
+    for (const f of allFiles) {
+      const text = readFileCached(f);
       expect(
         text,
         `forbidden Deno.env.get PI_INGEST_SECRET_KEY in ${f}`,
@@ -124,17 +109,8 @@ describe("pi-ingest secret key management — repo guardrails", () => {
   });
 
   it("no crypto.subtle.decrypt calls outside future Edge Function paths", () => {
-    const edgeRoot = resolve(ROOT, "supabase/functions/pi-ingest-readings");
-    const all = [
-      ...srcFiles,
-      ...walk(resolve(ROOT, "supabase/functions")).filter((p) =>
-        /\.(ts|tsx)$/.test(p),
-      ),
-    ];
-    for (const f of all) {
-      if (f.startsWith(edgeRoot)) continue;
-      if (f === SELF) continue;
-      const text = readFileSync(f, "utf8");
+    for (const f of allFiles) {
+      const text = readFileCached(f);
       expect(text, `forbidden crypto.subtle.decrypt in ${f}`).not.toMatch(
         /crypto\.subtle\.decrypt\s*\(/,
       );
@@ -142,17 +118,8 @@ describe("pi-ingest secret key management — repo guardrails", () => {
   });
 
   it("no createDecipheriv calls outside future Edge Function paths", () => {
-    const edgeRoot = resolve(ROOT, "supabase/functions/pi-ingest-readings");
-    const all = [
-      ...srcFiles,
-      ...walk(resolve(ROOT, "supabase/functions")).filter((p) =>
-        /\.(ts|tsx)$/.test(p),
-      ),
-    ];
-    for (const f of all) {
-      if (f.startsWith(edgeRoot)) continue;
-      if (f === SELF) continue;
-      const text = readFileSync(f, "utf8");
+    for (const f of allFiles) {
+      const text = readFileCached(f);
       expect(text, `forbidden createDecipheriv in ${f}`).not.toMatch(
         /\bcreateDecipheriv\s*\(/,
       );
@@ -175,7 +142,7 @@ describe("pi-ingest secret key management — repo guardrails", () => {
 
   it("no code maps secret_hash to a secret field", () => {
     for (const f of srcFiles) {
-      const text = readFileSync(f, "utf8");
+      const text = readFileCached(f);
       for (const re of [
         /secret\s*:\s*[A-Za-z_.]*\.?secret_hash\b/,
         /\bsecret_hash\s+as\s+secret\b/,
@@ -187,7 +154,7 @@ describe("pi-ingest secret key management — repo guardrails", () => {
 
   it("no code maps secret_ciphertext to a secret field", () => {
     for (const f of srcFiles) {
-      const text = readFileSync(f, "utf8");
+      const text = readFileCached(f);
       for (const re of [
         /secret\s*:\s*[A-Za-z_.]*\.?secret_ciphertext\b/,
         /\bsecret_ciphertext\s+as\s+secret\b/,

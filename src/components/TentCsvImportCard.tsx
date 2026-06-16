@@ -463,7 +463,10 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         : "";
     toast.success(
       `Imported XLSX sensor history as CSV history. ${adapterResult.acceptedRowCount} rows imported.${rejectedSummary} No live sensor data was created.`,
-      { description: CSV_HISTORY_IMPORT_SCOPE_LINE },
+      {
+        description: CSV_HISTORY_IMPORT_SCOPE_LINE,
+        action: viewImportedHistoryAction,
+      },
     );
     recordSensorHistoryImportFingerprint(fingerprint);
     if (xlsxGrid) {

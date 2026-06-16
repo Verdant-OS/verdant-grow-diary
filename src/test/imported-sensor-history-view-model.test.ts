@@ -14,6 +14,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import {
+  IMPORTED_SENSOR_HISTORY_ALL_METRICS,
   IMPORTED_SENSOR_HISTORY_ANCHOR_ID,
   IMPORTED_SENSOR_HISTORY_DEFAULT_LIMIT,
   IMPORTED_SENSOR_HISTORY_EMPTY_COPY,
@@ -130,6 +131,75 @@ describe("buildImportedSensorHistoryViewModel — empty + summary", () => {
     expect(IMPORTED_SENSOR_HISTORY_ANCHOR_ID).toBe("imported-history");
     expect(IMPORTED_SENSOR_HISTORY_NOT_LIVE_COPY).toBe("Not live data");
     expect(IMPORTED_SENSOR_HISTORY_EMPTY_COPY).toContain("No imported CSV sensor history");
+  });
+});
+
+describe("buildImportedSensorHistoryViewModel — metric filtering", () => {
+  const mixed = [
+    row({ metric: "temperature_c", captured_at: "2026-06-01T00:00:00Z" }),
+    row({ metric: "temperature_c", captured_at: "2026-06-02T00:00:00Z" }),
+    row({ metric: "humidity_pct", captured_at: "2026-06-03T00:00:00Z" }),
+    row({ metric: "co2_ppm", captured_at: "2026-06-04T00:00:00Z" }),
+    row({ source: "live", metric: "temperature_c" }),
+  ];
+
+  it("returns deterministic metric options including an 'all' entry with counts", () => {
+    const vm = buildImportedSensorHistoryViewModel({ readings: mixed });
+    expect(vm.metricOptions.map((o) => o.id)).toEqual([
+      IMPORTED_SENSOR_HISTORY_ALL_METRICS,
+      "co2_ppm",
+      "humidity_pct",
+      "temperature_c",
+    ]);
+    const all = vm.metricOptions.find((o) => o.id === IMPORTED_SENSOR_HISTORY_ALL_METRICS);
+    expect(all?.count).toBe(4);
+    expect(vm.metricOptions.find((o) => o.id === "temperature_c")?.count).toBe(2);
+    expect(vm.metricOptions.find((o) => o.id === "humidity_pct")?.count).toBe(1);
+  });
+
+  it("defaults to 'all metrics' when no selection is provided", () => {
+    const vm = buildImportedSensorHistoryViewModel({ readings: mixed });
+    expect(vm.selectedMetric).toBe(IMPORTED_SENSOR_HISTORY_ALL_METRICS);
+    expect(vm.visibleCount).toBe(vm.totalCount);
+    expect(vm.recentRows.length).toBe(4);
+  });
+
+  it("filters recent rows by selected metric and reports visibleCount", () => {
+    const vm = buildImportedSensorHistoryViewModel({
+      readings: mixed,
+      selectedMetric: "temperature_c",
+    });
+    expect(vm.selectedMetric).toBe("temperature_c");
+    expect(vm.totalCount).toBe(4);
+    expect(vm.visibleCount).toBe(2);
+    expect(vm.recentRows.length).toBe(2);
+    expect(vm.recentRows.every((r) => r.metric === "temperature_c")).toBe(true);
+  });
+
+  it("falls back to 'all metrics' when the selected metric is unknown", () => {
+    const vm = buildImportedSensorHistoryViewModel({
+      readings: mixed,
+      selectedMetric: "ph",
+    });
+    expect(vm.selectedMetric).toBe(IMPORTED_SENSOR_HISTORY_ALL_METRICS);
+    expect(vm.visibleCount).toBe(vm.totalCount);
+  });
+
+  it("earliest/latest are computed across the full CSV set, not the filtered subset", () => {
+    const vm = buildImportedSensorHistoryViewModel({
+      readings: mixed,
+      selectedMetric: "co2_ppm",
+    });
+    expect(vm.earliestCapturedAt).toBe("2026-06-01T00:00:00.000Z");
+    expect(vm.latestCapturedAt).toBe("2026-06-04T00:00:00.000Z");
+    expect(vm.visibleCount).toBe(1);
+  });
+
+  it("metricOptions is empty and visibleCount is 0 when there are no CSV rows", () => {
+    const vm = buildImportedSensorHistoryViewModel({ readings: [] });
+    expect(vm.metricOptions).toEqual([]);
+    expect(vm.visibleCount).toBe(0);
+    expect(vm.selectedMetric).toBe(IMPORTED_SENSOR_HISTORY_ALL_METRICS);
   });
 });
 

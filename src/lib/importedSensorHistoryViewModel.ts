@@ -4,19 +4,25 @@
  * Pure read-only view model for the Tent Detail "Imported sensor history"
  * panel. Given the tent's loaded sensor readings, it filters to the
  * CSV-imported subset and summarizes count / earliest / latest / metrics
- * plus a capped list of safe display rows.
+ * plus a capped list of safe display rows. Supports a local, read-only
+ * metric filter (no query params, no new fetches).
  *
  * Safety contract:
  *   - Only rows with `source === "csv"` are surfaced.
  *   - `raw_payload` is NEVER read, returned, or referenced.
  *   - No automation, no alerts, no Action Queue, no AI calls.
- *   - Deterministic ordering (ts desc, then created_at desc).
+ *   - Deterministic ordering (captured_at desc, ties broken by metric asc).
  *   - Stable, null-safe output shape — usable from JSX without
  *     additional transforms.
  */
 
 export const IMPORTED_SENSOR_HISTORY_SOURCE = "csv" as const;
 export const IMPORTED_SENSOR_HISTORY_DEFAULT_LIMIT = 25;
+export const IMPORTED_SENSOR_HISTORY_ALL_METRICS = "all" as const;
+
+export type ImportedSensorHistoryMetricFilter =
+  | typeof IMPORTED_SENSOR_HISTORY_ALL_METRICS
+  | string;
 
 export interface ImportedSensorHistoryInputRow {
   tent_id: string | null;
@@ -37,12 +43,25 @@ export interface ImportedSensorHistoryDisplayRow {
   value: number | null;
 }
 
+export interface ImportedSensorHistoryMetricOption {
+  /** Stable id used as selection value. "all" for the all-metrics option. */
+  id: ImportedSensorHistoryMetricFilter;
+  /** Display label. */
+  label: string;
+  /** Count of CSV rows matching this option (across the full imported set). */
+  count: number;
+}
+
 export interface ImportedSensorHistoryViewModel {
   isEmpty: boolean;
   totalCount: number;
+  /** Count of rows matching the active metric filter (across full set). */
+  visibleCount: number;
   earliestCapturedAt: string | null;
   latestCapturedAt: string | null;
   metrics: string[];
+  metricOptions: ImportedSensorHistoryMetricOption[];
+  selectedMetric: ImportedSensorHistoryMetricFilter;
   recentRows: ImportedSensorHistoryDisplayRow[];
 }
 
@@ -56,11 +75,29 @@ function pickCapturedAt(row: ImportedSensorHistoryInputRow): string | null {
   return new Date(ms).toISOString();
 }
 
+function normalizeSelected(
+  selected: ImportedSensorHistoryMetricFilter | null | undefined,
+  metrics: string[],
+): ImportedSensorHistoryMetricFilter {
+  if (
+    !selected ||
+    selected === IMPORTED_SENSOR_HISTORY_ALL_METRICS ||
+    !metrics.includes(selected)
+  ) {
+    return IMPORTED_SENSOR_HISTORY_ALL_METRICS;
+  }
+  return selected;
+}
+
 export function buildImportedSensorHistoryViewModel(args: {
   readings: ReadonlyArray<ImportedSensorHistoryInputRow>;
   limit?: number;
+  selectedMetric?: ImportedSensorHistoryMetricFilter | null;
 }): ImportedSensorHistoryViewModel {
-  const limit = Math.max(1, Math.floor(args.limit ?? IMPORTED_SENSOR_HISTORY_DEFAULT_LIMIT));
+  const limit = Math.max(
+    1,
+    Math.floor(args.limit ?? IMPORTED_SENSOR_HISTORY_DEFAULT_LIMIT),
+  );
   const csvRows = (args.readings ?? []).filter(
     (r) => r && r.source === IMPORTED_SENSOR_HISTORY_SOURCE,
   );
@@ -69,18 +106,25 @@ export function buildImportedSensorHistoryViewModel(args: {
     return {
       isEmpty: true,
       totalCount: 0,
+      visibleCount: 0,
       earliestCapturedAt: null,
       latestCapturedAt: null,
       metrics: [],
+      metricOptions: [],
+      selectedMetric: IMPORTED_SENSOR_HISTORY_ALL_METRICS,
       recentRows: [],
     };
   }
 
   const metricsSet = new Set<string>();
+  const metricCounts = new Map<string, number>();
   let minMs: number | null = null;
   let maxMs: number | null = null;
   for (const r of csvRows) {
-    if (r.metric && typeof r.metric === "string") metricsSet.add(r.metric);
+    if (r.metric && typeof r.metric === "string") {
+      metricsSet.add(r.metric);
+      metricCounts.set(r.metric, (metricCounts.get(r.metric) ?? 0) + 1);
+    }
     const iso = pickCapturedAt(r);
     if (iso == null) continue;
     const ms = Date.parse(iso);
@@ -89,8 +133,29 @@ export function buildImportedSensorHistoryViewModel(args: {
     if (maxMs === null || ms > maxMs) maxMs = ms;
   }
 
+  const metrics = Array.from(metricsSet).sort();
+  const selectedMetric = normalizeSelected(args.selectedMetric, metrics);
+
+  const metricOptions: ImportedSensorHistoryMetricOption[] = [
+    {
+      id: IMPORTED_SENSOR_HISTORY_ALL_METRICS,
+      label: "All metrics",
+      count: csvRows.length,
+    },
+    ...metrics.map((m) => ({
+      id: m,
+      label: m,
+      count: metricCounts.get(m) ?? 0,
+    })),
+  ];
+
+  const matchingRows =
+    selectedMetric === IMPORTED_SENSOR_HISTORY_ALL_METRICS
+      ? csvRows
+      : csvRows.filter((r) => r.metric === selectedMetric);
+
   // Deterministic sort: latest captured_at first, ties broken by metric asc.
-  const sorted = [...csvRows].sort((a, b) => {
+  const sorted = [...matchingRows].sort((a, b) => {
     const aMs = Date.parse(pickCapturedAt(a) ?? "") || 0;
     const bMs = Date.parse(pickCapturedAt(b) ?? "") || 0;
     if (aMs !== bMs) return bMs - aMs;
@@ -113,9 +178,12 @@ export function buildImportedSensorHistoryViewModel(args: {
   return {
     isEmpty: false,
     totalCount: csvRows.length,
+    visibleCount: matchingRows.length,
     earliestCapturedAt: minMs !== null ? new Date(minMs).toISOString() : null,
     latestCapturedAt: maxMs !== null ? new Date(maxMs).toISOString() : null,
-    metrics: Array.from(metricsSet).sort(),
+    metrics,
+    metricOptions,
+    selectedMetric,
     recentRows,
   };
 }

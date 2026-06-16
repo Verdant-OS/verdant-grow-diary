@@ -8,15 +8,17 @@
  * Pure / read-only. No I/O against Supabase. No automation.
  */
 import { describe, it, expect } from "vitest";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
 // Standardised scanner guardrail timeout + slow-test telemetry.
 // Replaces the previous per-file vi.setConfig bump. No scanner pattern,
 // allowlist, or assertion is changed.
-import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
+import {
+  getCachedScannerFiles,
+  installScannerGuardrail,
+} from "./support/scannerGuardrailHarness";
 installScannerGuardrail({ file: __filename });
-
 
 const ROOT = resolve(__dirname, "../..");
 
@@ -60,36 +62,13 @@ const ALLOWED = new Set([
 
 const PATTERN = /switch[\s_-]?bot/i;
 
-function walk(dir: string, out: string[] = []): string[] {
-  let entries: string[];
-  try {
-    entries = readdirSync(dir);
-  } catch {
-    return out;
-  }
-  for (const name of entries) {
-    const p = join(dir, name);
-    let s;
-    try {
-      s = statSync(p);
-    } catch {
-      continue;
-    }
-    if (s.isDirectory()) {
-      if (name === "node_modules" || name === ".git" || name === "dist") continue;
-      walk(p, out);
-    } else {
-      const dot = name.lastIndexOf(".");
-      const ext = dot >= 0 ? name.slice(dot) : "";
-      if (SCAN_EXTS.has(ext)) out.push(p);
-    }
-  }
-  return out;
-}
-
 describe("EcoWitt-only sensor direction", () => {
   it("contains zero SwitchBot references outside the explicit allow-list", () => {
-    const files = SCAN_DIRS.flatMap((d) => walk(join(ROOT, d)));
+    const files = getCachedScannerFiles({
+      root: ROOT,
+      dirs: SCAN_DIRS,
+      exts: SCAN_EXTS,
+    });
     const offenders: string[] = [];
     for (const f of files) {
       const rel = relative(ROOT, f).split(sep).join("/");

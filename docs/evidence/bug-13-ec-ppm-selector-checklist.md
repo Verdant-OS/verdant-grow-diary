@@ -23,6 +23,23 @@ Tents → select tent → plant / plant detail context → Quick Log → Feeding
   - `Runoff EC mS/cm`
 - Those fixed display labels do **not** by themselves prove the selector options. The screenshot must show the **selector open** with all four unit options visible.
 
+## Captured screenshot status
+
+- **Status:** Pending.
+- **Expected screenshot path:** `docs/evidence/bug-13-ec-ppm-selector.png`
+- This file must be captured from the real authenticated preview UI.
+- The screenshot must show:
+  - Quick Log open
+  - Feeding selected
+  - Add more details expanded / open
+  - EC unit selector open
+  - `EC mS/cm` visible
+  - `EC µS/cm` visible
+  - `PPM 500 scale` visible
+  - `PPM 700 scale` visible
+- The automated smoke test is useful support evidence but does not replace the authenticated screenshot.
+- **Do not use an unauthenticated route, auth bypass, seeded account, committed credential, AI-generated screenshot, or fabricated evidence to close Bug #13.**
+
 ## Required screenshot contents
 
 A single screenshot must show all of the following simultaneously:

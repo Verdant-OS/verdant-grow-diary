@@ -48,12 +48,8 @@ describe("scripts/assert-vpd-stage-normalization-ownership.mjs", () => {
   });
 
   it("passes against the real repo", () => {
-    const res = spawnSync("node", [resolve(ROOT, SCRIPT)], {
-      cwd: ROOT,
-      encoding: "utf8",
-    });
+    const res = runScannerInRoot();
     if (res.status !== 0) {
-      // Make failures self-describing.
       throw new Error(
         "Scanner unexpectedly failed:\n" + res.stdout + "\n" + res.stderr,
       );

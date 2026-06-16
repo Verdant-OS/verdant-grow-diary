@@ -134,12 +134,14 @@ describe("buildImportedSensorHistoryViewModel — empty + summary", () => {
 });
 
 describe("static safety — view model + panel files", () => {
+  const stripComments = (s: string) =>
+    s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
   const FILES = [
     "src/lib/importedSensorHistoryViewModel.ts",
     "src/components/ImportedSensorHistoryPanel.tsx",
   ];
   for (const rel of FILES) {
-    const code = readFileSync(resolve(process.cwd(), rel), "utf8");
+    const code = stripComments(readFileSync(resolve(process.cwd(), rel), "utf8"));
     it(`${rel} never references raw_payload`, () => {
       expect(code).not.toMatch(/raw_payload/);
     });

@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import ManualSnapshotTimelineCard from "@/components/ManualSnapshotTimelineCard";
+import { MISSING_SNAPSHOT_NOTE_LABEL } from "@/lib/manualSensorSnapshotViewModel";
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 import { useQuickLogGroupedTimeline } from "@/hooks/useQuickLogGroupedTimeline";
 import type {
@@ -346,13 +347,20 @@ function EntryItem({ entry, demoVariant }: EntryItemProps) {
         {...commonDataAttrs}
         data-entry-kind="action"
         data-action-id={entry.action.id}
+        data-has-snapshot="false"
       >
-        <CardContent className="p-3">
+        <CardContent className="p-3 space-y-2">
           <ActionDetails
             action={entry.action}
             sourceLabel={sourceLabel}
             sourceTestId={sourceTestId}
           />
+          <p
+            className="text-xs text-muted-foreground italic"
+            data-testid="quick-log-grouped-action-missing-snapshot"
+          >
+            {MISSING_SNAPSHOT_NOTE_LABEL}
+          </p>
         </CardContent>
       </Card>
     );

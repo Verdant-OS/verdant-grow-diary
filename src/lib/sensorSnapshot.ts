@@ -91,7 +91,9 @@ export interface SensorReadingLike {
   value: number | string | null;
   source?: string | null;
   device_id?: string | null;
-  raw_payload?: unknown;
+  // Note: the snapshot pipeline intentionally does not read the upstream
+  // provenance envelope. Callers may pass rows with extra fields; they
+  // are ignored by `snapshotFromReadings` to keep this surface presenter-safe.
 }
 
 /**

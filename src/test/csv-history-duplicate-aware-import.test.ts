@@ -214,7 +214,7 @@ describe("runDuplicateAwareCsvHistoryImport — orchestration", () => {
     expect(out.duplicateRows).toBe(1);
     expect(inserted).toEqual([fresh]);
     expect(out.diagnostic).toBe(
-      "Imported 1 new Spider Farmer / THP Data CSV history readings. Skipped 1 duplicate reading already present for this tent. No live sensor data was created.",
+      "Imported 1 new Spider Farmer / THP Data CSV history readings for this tent. Skipped 1 duplicate reading already present for this tent. No live sensor data was created.",
     );
     // Source stays csv — never promoted to live.
     for (const r of inserted) expect(r.source).toBe("csv");

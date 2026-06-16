@@ -67,7 +67,10 @@ export interface BuildAiDoctorPromptMeasurementInput {
   /** Status; defaults to "success" for measurement attachment. */
   readonly status?: "success" | "error";
   readonly errorCode?: string;
+  /** Optional injected estimator. When omitted, the active singleton is used; if neither exists, tokens stay null. */
+  readonly tokenEstimator?: PromptTokenEstimator | null;
 }
+
 
 /** Metadata kept beside the strict measurement (not part of llm_prompt schema). */
 export interface AiDoctorPromptMeasurementMetadata {

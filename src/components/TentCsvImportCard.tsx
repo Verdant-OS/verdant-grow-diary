@@ -664,6 +664,16 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
             {sourcePreview.canonicalSourceCopy}
           </p>
 
+          <CsvImportMappingHelp
+            {...buildMappingDrawerMetrics(
+              sourcePreview.sourceAppId,
+              sourcePreview.mappedMetrics,
+              sourcePreview.unmappedColumns,
+              [],
+              [],
+            )}
+          />
+
           {!sourcePreview.importEnabled && sourcePreview.importDisabledReason && (
             <p
               className="text-[11px] text-amber-200/80"

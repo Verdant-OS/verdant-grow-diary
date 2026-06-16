@@ -29,7 +29,16 @@ import {
   type TimelineSnapshotSummary,
 } from "@/lib/timelineSnapshotSummaryViewModel";
 import { MISSING_SNAPSHOT_NOTE_LABEL } from "@/lib/manualSensorSnapshotViewModel";
-import { mapManualSnapshotQualityToSnapshotStatus } from "@/lib/manualSensorSnapshotQualityBridge";
+import type { SnapshotStatus } from "@/lib/sensorSnapshotStatusContract";
+import type { ManualSnapshotQuality } from "@/lib/manualSensorSnapshotQualityRules";
+
+/** Local, presentation-only mapping. Keeps demo/csv/etc. non-healthy. */
+function qualityToStatus(q: ManualSnapshotQuality): SnapshotStatus {
+  if (q === "usable") return "usable";
+  if (q === "invalid") return "invalid";
+  if (q === "missing") return "no_data";
+  return "needs_review";
+}
 
 export const TIMELINE_SNAPSHOT_NOT_TRUSTWORTHY_LABEL =
   "Not trustworthy" as const;

@@ -216,11 +216,23 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         rows: preview.rows,
       });
       // NOTE: no `user_id` in payload — DB default auth.uid() owns the row.
-      const { error } = await supabase
-        .from("sensor_readings")
-        .insert(rows as never);
-      if (error) throw error;
-      toast.success("CSV sensor history imported.");
+      const batchResult = await insertSensorReadingsInBatches({
+        rows,
+        vendorLabel: CSV_SOURCE_LABEL[sourceApp] ?? "CSV history",
+        batchSize: CSV_HISTORY_INSERT_BATCH_SIZE,
+        insertBatch: async (batch) => {
+          const { error } = await supabase
+            .from("sensor_readings")
+            .insert(batch as never);
+          return { error: error as BatchInsertError | null };
+        },
+      });
+      if (!batchResult.ok) {
+        setParseError(batchResult.diagnostic);
+        toast.error("Couldn't import CSV.", { description: batchResult.diagnostic });
+        return;
+      }
+      toast.success(batchResult.diagnostic);
       qc.invalidateQueries({ queryKey: ["sensor_readings"] });
       qc.invalidateQueries({ queryKey: ["grow", "sensors"] });
       qc.invalidateQueries({ queryKey: ["latest-sensor-snapshot"] });

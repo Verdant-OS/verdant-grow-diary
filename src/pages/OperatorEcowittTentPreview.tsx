@@ -53,6 +53,12 @@ export default function OperatorEcowittTentPreview() {
   const [showRaw, setShowRaw] = useState(false);
   const isMobile = useIsMobile();
 
+  // Preview-only identity overrides. Never persisted. Never sent.
+  const [tentIdOverride, setTentIdOverride] = useState<string>("");
+  const [plantIdOverride, setPlantIdOverride] = useState<string>("");
+  const [deviceIdentityOverride, setDeviceIdentityOverride] = useState<string>("");
+  const [sourceIdentityOverride, setSourceIdentityOverride] = useState<string>("");
+
   // Pin "now" per render of this view to keep the local VM/history consistent.
   const now = useMemo(() => new Date(), [tentKey, sampleKey]);
 
@@ -95,14 +101,60 @@ export default function OperatorEcowittTentPreview() {
     downloadEcowittSnapshotExport(tentKey, payload);
   };
 
+  const dryRunOptions = useMemo(
+    () => ({
+      tent_id: tentIdOverride,
+      plant_id: plantIdOverride,
+      device_identity: deviceIdentityOverride,
+      source_identity: sourceIdentityOverride,
+      is_stale: vm.is_stale,
+    }),
+    [tentIdOverride, plantIdOverride, deviceIdentityOverride, sourceIdentityOverride, vm.is_stale],
+  );
+
   const dryRun = useMemo(
-    () => buildEcowittIngestDryRun(snapshot, { is_stale: vm.is_stale }),
-    [snapshot, vm.is_stale],
+    () => buildEcowittIngestDryRun(snapshot, dryRunOptions),
+    [snapshot, dryRunOptions],
+  );
+
+  const fieldMap = useMemo(
+    () => buildEcowittIngestDryRunFieldMap(snapshot),
+    [snapshot],
   );
 
   const handleExportDryRun = () => {
     downloadEcowittIngestDryRun(tentKey, dryRun);
   };
+
+  const handleExportAllTents = () => {
+    const files = buildEcowittIngestDryRunExportFilesForTents(
+      SUPPORTED_TENT_KEYS.map((k) => {
+        const loaded = loadEcowittEvidenceSample(sampleKey, { now });
+        const snap = normalizeEcowittTentPayload(loaded.sample.payload, k, {
+          now,
+          captured_at_ms: loaded.captured_at_ms,
+        });
+        // Per-tent overrides: only apply tent_id override to the SELECTED tent.
+        // Other tents get placeholder; identity overrides do not leak across tents.
+        return {
+          tentKey: k,
+          snapshot: snap,
+          is_stale: vm.is_stale,
+          options:
+            k === tentKey
+              ? dryRunOptions
+              : {
+                  plant_id: null,
+                  device_identity: null,
+                  source_identity: null,
+                  is_stale: vm.is_stale,
+                },
+        };
+      }),
+    );
+    downloadEcowittIngestDryRunAllTents(files);
+  };
+
 
   return (
     <main

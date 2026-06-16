@@ -334,7 +334,7 @@ describe("post-import CTA — 'View imported history' navigation", () => {
       /label:\s*["']View imported history["']/,
     );
     expect(CARD).toMatch(
-      /navigate\(`\/tents\/\$\{tentId\}#imported-history`\)/,
+      /navigate\(`(?:\/tents\/\$\{tentId\}|\$\{tentDetailPath\(tentId\)\})#imported-history`\)/,
     );
   });
 

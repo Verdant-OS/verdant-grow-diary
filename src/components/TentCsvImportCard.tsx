@@ -64,6 +64,11 @@ import {
   hasSensorHistoryImportFingerprint,
   recordSensorHistoryImportFingerprint,
 } from "@/lib/sensorHistoryImportReplayGuard";
+import {
+  CSV_HISTORY_INSERT_BATCH_SIZE,
+  insertSensorReadingsInBatches,
+  type BatchInsertError,
+} from "@/lib/csv-import/sensorReadingsBatchInsert";
 import SensorHistoryImportAuditLedger from "@/components/SensorHistoryImportAuditLedger";
 
 interface Props {

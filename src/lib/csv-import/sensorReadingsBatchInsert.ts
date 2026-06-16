@@ -511,11 +511,19 @@ export interface DuplicateAwareSuccessCopyInput {
   totalBatches: number;
 }
 
+export const CSV_HISTORY_NO_ROWS_SAFE_FALLBACK_COPY =
+  "No CSV history readings were imported. No live sensor data was created." as const;
+
 export function buildDuplicateAwareSuccessMessage(
   input: DuplicateAwareSuccessCopyInput,
 ): string {
   const { vendorLabel, inserted, duplicates, totalBatches } = input;
-  if (inserted === 0 && duplicates > 0) {
+  // Safe fallback: orchestration should prevent this state via empty-row
+  // preflight, but the helper must never emit "Imported 0 new ...".
+  if (inserted <= 0 && duplicates <= 0) {
+    return CSV_HISTORY_NO_ROWS_SAFE_FALLBACK_COPY;
+  }
+  if (inserted <= 0 && duplicates > 0) {
     return `No new CSV history readings were imported. ${duplicates} reading${duplicates === 1 ? "" : "s"} already exist for this tent. No live sensor data was created.`;
   }
   if (duplicates > 0) {

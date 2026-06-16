@@ -13,8 +13,19 @@ import {
   SUPPORTED_TENT_KEYS,
 } from "@/lib/ecowittTentNormalizerRouter";
 import { buildEcowittLocalEvidencePreviewViewModel } from "@/lib/ecowittLocalEvidenceViewModel";
-import { ECOWITT_PREVIEW_SAMPLES, EcowittPreviewSampleKey } from "@/fixtures/ecowitt-preview-samples";
+import {
+  ECOWITT_PREVIEW_SAMPLES,
+  EcowittPreviewSampleKey,
+} from "@/fixtures/ecowitt-preview-samples";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { buildEcowittEvidenceHistoryViewModel } from "@/lib/ecowittEvidenceHistoryViewModel";
+import { buildEcowittDiaryAttachPreview } from "@/lib/ecowittDiaryAttachPreview";
+import {
+  buildEcowittSnapshotExport,
+  downloadEcowittSnapshotExport,
+} from "@/lib/ecowittSnapshotExport";
+import { normalizeEcowittTentPayload } from "@/lib/ecowittTentNormalizerRouter";
+import { loadEcowittEvidenceSample } from "@/lib/ecowittLocalEvidence";
 
 const TENT_KEY_LABEL: Record<EcowittTentKey, string> = {
   flower: "Flower Tent",
@@ -33,17 +44,47 @@ export default function OperatorEcowittTentPreview() {
   const [showRaw, setShowRaw] = useState(false);
   const isMobile = useIsMobile();
 
+  // Pin "now" per render of this view to keep the local VM/history consistent.
+  const now = useMemo(() => new Date(), [tentKey, sampleKey]);
+
   const vm = useMemo(
     () =>
       buildEcowittLocalEvidencePreviewViewModel({
         tentKey,
         sampleKey,
-        now: new Date(),
+        now,
       }),
-    [tentKey, sampleKey],
+    [tentKey, sampleKey, now],
+  );
+
+  const historyVm = useMemo(
+    () => buildEcowittEvidenceHistoryViewModel({ tentKey, now }),
+    [tentKey, now],
   );
 
   const preview = vm.preview;
+
+  // Reconstruct the canonical snapshot for diary/export from the same inputs.
+  const snapshot = useMemo(() => {
+    const loaded = loadEcowittEvidenceSample(sampleKey, { now });
+    return normalizeEcowittTentPayload(loaded.sample.payload, tentKey, {
+      now,
+      captured_at_ms: loaded.captured_at_ms,
+    });
+  }, [tentKey, sampleKey, now]);
+
+  const diaryPreview = useMemo(
+    () => buildEcowittDiaryAttachPreview(snapshot, { is_stale: vm.is_stale }),
+    [snapshot, vm.is_stale],
+  );
+
+  const handleExport = () => {
+    const payload = buildEcowittSnapshotExport(snapshot, {
+      evidence_source_label: vm.source_label,
+      now: new Date(),
+    });
+    downloadEcowittSnapshotExport(tentKey, payload);
+  };
 
   return (
     <main
@@ -188,6 +229,158 @@ export default function OperatorEcowittTentPreview() {
             </ul>
           </div>
         )}
+
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={handleExport}
+            data-testid="export-snapshot-button"
+            className="rounded-md border bg-background px-3 py-2 text-sm font-medium hover:bg-muted"
+          >
+            Export normalized snapshot
+          </button>
+        </div>
+      </section>
+
+      {/* Local evidence history timeline */}
+      <section
+        className="rounded-lg border p-4 space-y-2"
+        data-testid="evidence-history"
+        aria-label="Local evidence history"
+      >
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Local evidence history
+        </h2>
+        <ul className="space-y-2">
+          {historyVm.rows.map((row) => {
+            const selected = row.sample_key === sampleKey;
+            return (
+              <li key={row.id}>
+                <button
+                  type="button"
+                  onClick={() => setSampleKey(row.sample_key)}
+                  data-testid={`history-row-${row.sample_key}`}
+                  data-selected={selected ? "true" : "false"}
+                  aria-pressed={selected}
+                  className={`w-full min-h-12 rounded-md border p-3 text-left text-sm transition ${
+                    selected
+                      ? "border-primary bg-primary/10"
+                      : "bg-background hover:bg-muted"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="font-medium">{row.sample_label}</div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span
+                        data-testid={`history-status-${row.sample_key}`}
+                        className={`rounded border px-1.5 py-0.5 font-medium ${
+                          row.source === "live"
+                            ? "border-primary/40 bg-primary/15 text-primary"
+                            : row.source === "degraded"
+                              ? "border-border bg-muted text-muted-foreground"
+                              : "border-destructive/40 bg-destructive/15 text-destructive"
+                        }`}
+                      >
+                        {row.source_label}
+                      </span>
+                      {row.is_stale && (
+                        <span
+                          data-testid={`history-stale-${row.sample_key}`}
+                          className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-amber-700 dark:text-amber-300"
+                        >
+                          STALE
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {row.tent_label} · {row.captured_at}
+                  </div>
+                  <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs sm:grid-cols-3">
+                    <div>Air: {fmt(row.air_temp_f, "°F")}</div>
+                    <div>RH: {fmt(row.humidity_pct, "%")}</div>
+                    <div>Soil T: {fmt(row.soil_temp_f, "°F")}</div>
+                    <div>Soil M1: {fmt(row.soil_moisture_pct_primary, "%")}</div>
+                    <div>Soil M2: {fmt(row.soil_moisture_pct_secondary, "%")}</div>
+                    <div>Root: {row.root_zone_confidence}</div>
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Degraded: {row.degraded_reason_count} · Invalid: {row.invalid_reason_count}
+                  </div>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
+      {/* Diary attach preview (read-only) */}
+      <section
+        className="rounded-lg border p-4 space-y-2"
+        data-testid="diary-attach-preview"
+        aria-label="Diary attach preview"
+      >
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Attach to diary entry (preview)
+        </h2>
+        <p
+          data-testid="diary-preview-notice"
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-700 dark:text-amber-300"
+        >
+          {diaryPreview.notice}
+        </p>
+        <div className="text-sm font-medium" data-testid="diary-preview-title">
+          {diaryPreview.title}
+        </div>
+        <div className="text-xs text-muted-foreground">
+          Tent: <span data-testid="diary-preview-tent">{diaryPreview.tent_label}</span> ·
+          Provider: <span data-testid="diary-preview-provider">{diaryPreview.provider}</span> ·
+          Captured: <span data-testid="diary-preview-captured-at">{diaryPreview.captured_at ?? "—"}</span> ·
+          Source: <span data-testid="diary-preview-source">{diaryPreview.source_label}</span>
+        </div>
+        {diaryPreview.metrics_summary.length > 0 && (
+          <ul className="list-disc pl-5 text-xs" data-testid="diary-preview-metrics">
+            {diaryPreview.metrics_summary.map((m) => (
+              <li key={m}>{m}</li>
+            ))}
+          </ul>
+        )}
+        <div className="text-xs">
+          Root-zone confidence: {diaryPreview.root_zone_confidence}
+        </div>
+        {diaryPreview.warnings.length > 0 && (
+          <ul
+            className="list-disc pl-5 text-xs text-destructive"
+            data-testid="diary-preview-warnings"
+          >
+            {diaryPreview.warnings.map((w) => (
+              <li key={w}>{w}</li>
+            ))}
+          </ul>
+        )}
+        <pre
+          className="overflow-auto rounded-md bg-muted p-2 text-xs"
+          data-testid="diary-preview-body"
+        >
+          {diaryPreview.body}
+        </pre>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled
+            aria-disabled="true"
+            data-testid="diary-preview-attach-button"
+            className="cursor-not-allowed rounded-md border bg-muted px-3 py-2 text-sm font-medium text-muted-foreground"
+          >
+            {diaryPreview.attach_button_label}
+          </button>
+          <span
+            className="text-xs text-muted-foreground"
+            data-testid="diary-preview-disabled-label"
+          >
+            {diaryPreview.disabled_label}
+          </span>
+        </div>
       </section>
 
       {/* Redacted raw payload toggle */}

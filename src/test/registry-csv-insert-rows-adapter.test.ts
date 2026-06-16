@@ -72,17 +72,28 @@ describe("Spider Farmer — primary full fixture", () => {
     expect(r.rows.length).toBeGreaterThan(0);
   });
 
-  it("emits all five canonical metrics when numeric", () => {
+  it("emits four canonical metrics when numeric (PPFD detected but NOT imported)", () => {
     const metrics = new Set(r.rows.map((x) => x.metric));
     for (const m of [
       "temperature_c",
       "humidity_pct",
       "vpd_kpa",
       "co2_ppm",
-      "ppfd",
     ] as const) {
       expect(metrics.has(m)).toBe(true);
     }
+    // PPFD is detected by the Spider Farmer mapping but must NOT be
+    // emitted as a sensor_readings row in this release.
+    expect(metrics.has("ppfd" as never)).toBe(false);
+    for (const row of r.rows) {
+      expect(row.metric).not.toBe("ppfd");
+    }
+  });
+
+  it("imported row count excludes PPFD (4 metrics × accepted rows ceiling)", () => {
+    const accepted = r.acceptedRowCount;
+    // Every accepted row contributes at most 4 metric rows in this release.
+    expect(r.rows.length).toBeLessThanOrEqual(accepted * 4);
   });
 
   it("prefers raw °C over °F conversion when both are present", () => {
@@ -142,13 +153,14 @@ describe("Spider Farmer — sparse fixture (mostly blank co2/ppfd)", () => {
     expect(metrics.has("vpd_kpa")).toBe(true);
   });
 
-  it("co2_ppm and ppfd row counts are much smaller than core metrics (sparse)", () => {
+  it("co2_ppm row count is much smaller than core metrics (sparse); ppfd never emitted", () => {
     const counts: Record<string, number> = {};
     for (const row of r.rows) counts[row.metric] = (counts[row.metric] ?? 0) + 1;
     expect(counts.temperature_c).toBeGreaterThan(1000);
-    // Real fixture has ~189 numeric co2/ppfd cells across 5673 rows.
+    // Real fixture has ~189 numeric co2 cells across 5673 rows.
     expect(counts.co2_ppm ?? 0).toBeLessThan(counts.temperature_c / 5);
-    expect(counts.ppfd ?? 0).toBeLessThan(counts.temperature_c / 5);
+    // PPFD is detected but never imported in this release.
+    expect(counts.ppfd ?? 0).toBe(0);
   });
 });
 

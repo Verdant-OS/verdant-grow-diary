@@ -620,11 +620,12 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
             />
             <Stat
               label="Mapped metrics"
-              value={
-                sourcePreview.mappedMetrics.length > 0
-                  ? sourcePreview.mappedMetrics.join(", ")
-                  : "—"
-              }
+              value={(() => {
+                const imported = sourcePreview.mappedMetrics.filter(
+                  (m) => m !== "ppfd_umol_m2_s",
+                );
+                return imported.length > 0 ? imported.join(", ") : "—";
+              })()}
               testId="csv-source-preview-metrics"
             />
             <Stat
@@ -866,25 +867,22 @@ function buildMappingDrawerMetrics(
   }
 
   // Registry path — derive from mapped + unmapped columns.
+  // PPFD and EC are detected but NOT imported into sensor_readings in this
+  // release, regardless of whether the source-app mapping flagged them.
   const imported = toMetricLabels(
-    sourceAppId === "spider_farmer"
-      ? mappedMetrics.filter((m) => m !== "ppfd_umol_m2_s")
-      : mappedMetrics,
+    mappedMetrics.filter((m) => m !== "ppfd_umol_m2_s"),
   );
 
   const notImported: string[] = [];
-  const ecUnmapped = unmappedColumns.find((c) => /^ec$/i.test(c));
-  if (ecUnmapped) notImported.push("EC");
+  const hasEc =
+    unmappedColumns.some((c) => /^ec(_|$)/i.test(c)) ||
+    mappedMetrics.some((m) => /^ec(_|$)/i.test(m));
+  if (hasEc) notImported.push("EC");
 
-  if (sourceAppId === "spider_farmer") {
-    const ppfdUnmapped = unmappedColumns.find((c) => /^ppfd$/i.test(c));
-    if (ppfdUnmapped || mappedMetrics.includes("ppfd_umol_m2_s")) {
-      if (!notImported.includes("PPFD")) notImported.push("PPFD");
-    }
-  } else {
-    const ppfdUnmapped = unmappedColumns.find((c) => /^ppfd$/i.test(c));
-    if (ppfdUnmapped && !notImported.includes("PPFD")) notImported.push("PPFD");
-  }
+  const hasPpfd =
+    unmappedColumns.some((c) => /^ppfd$/i.test(c)) ||
+    mappedMetrics.includes("ppfd_umol_m2_s");
+  if (hasPpfd) notImported.push("PPFD");
 
   return { imported, notImported };
 }

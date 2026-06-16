@@ -14,15 +14,28 @@ import { tmpdir } from "node:os";
 import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
 installScannerGuardrail({ file: __filename });
 
-
 const ROOT = resolve(__dirname, "../..");
 const SCRIPT = "scripts/assert-vpd-stage-normalization-ownership.mjs";
 
-function runScannerIn(cwd: string) {
-  return spawnSync("node", [resolve(ROOT, SCRIPT)], {
+type ScannerRun = Readonly<{
+  status: number | null;
+  stdout: string;
+  stderr: string;
+}>;
+
+let cachedRealRepoScannerRun: ScannerRun | null = null;
+
+function runScannerIn(cwd: string): ScannerRun {
+  const res = spawnSync("node", [resolve(ROOT, SCRIPT)], {
     cwd,
     encoding: "utf8",
   });
+  return { status: res.status, stdout: res.stdout, stderr: res.stderr };
+}
+
+function runRealRepoScanner(): ScannerRun {
+  cachedRealRepoScannerRun ??= runScannerIn(ROOT);
+  return cachedRealRepoScannerRun;
 }
 
 describe("scripts/assert-vpd-stage-normalization-ownership.mjs", () => {
@@ -38,10 +51,7 @@ describe("scripts/assert-vpd-stage-normalization-ownership.mjs", () => {
   });
 
   it("passes against the real repo", () => {
-    const res = spawnSync("node", [resolve(ROOT, SCRIPT)], {
-      cwd: ROOT,
-      encoding: "utf8",
-    });
+    const res = runRealRepoScanner();
     if (res.status !== 0) {
       // Make failures self-describing.
       throw new Error(
@@ -89,10 +99,7 @@ describe("scripts/assert-vpd-stage-normalization-ownership.mjs", () => {
   it("ignores the allow-listed scanner and helper files", () => {
     // The scanner contains the pair literals in its own source for the
     // regex definitions; allow-listing prevents self-flagging.
-    const res = spawnSync("node", [resolve(ROOT, SCRIPT)], {
-      cwd: ROOT,
-      encoding: "utf8",
-    });
+    const res = runRealRepoScanner();
     expect(res.status).toBe(0);
   });
 });

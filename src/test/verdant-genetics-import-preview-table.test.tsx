@@ -8,9 +8,7 @@ import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 import { VerdantGeneticsImportPreviewTable } from "@/components/VerdantGeneticsImportPreviewTable";
-import {
-  buildGeneticsImportPreview,
-} from "@/lib/verdantGeneticsImportPreviewRules";
+import { buildGeneticsImportPreview } from "@/lib/verdantGeneticsImportPreviewRules";
 
 const HEADER = ["Strain", "Breeder", "Seed Type", "Lineage", "Flowering Time", "Notes"];
 

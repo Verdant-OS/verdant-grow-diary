@@ -53,9 +53,7 @@ describe("buildGeneticsImportPreview", () => {
     const blocked = r.rows.find((x) => x.rowNumber === 4)!;
     expect(blocked.status).toBe("blocked");
     expect(blocked.missingRequired).toContain("strain");
-    expect(blocked.issues.some((i) => i.message === "Row 4 is missing strain name.")).toBe(
-      true,
-    );
+    expect(blocked.issues.some((i) => i.message === "Row 4 is missing strain name.")).toBe(true);
   });
 
   it("flags invalid seed type per row", () => {
@@ -67,9 +65,7 @@ describe("buildGeneticsImportPreview", () => {
     ]);
     const bad = r.rows.find((x) => x.rowNumber === 3)!;
     expect(bad.status).toBe("blocked");
-    expect(
-      bad.issues.some((i) => i.message === "Row 3 has an invalid seed type."),
-    ).toBe(true);
+    expect(bad.issues.some((i) => i.message === "Row 3 has an invalid seed type.")).toBe(true);
   });
 
   it("flags missing breeder", () => {
@@ -78,17 +74,12 @@ describe("buildGeneticsImportPreview", () => {
       ["A", "B", "auto", null, null, null],
       ["A2", "", "auto", null, null, null], // row 3
     ]);
-    expect(
-      r.rows[1].issues.some((i) => i.message === "Row 3 is missing breeder."),
-    ).toBe(true);
+    expect(r.rows[1].issues.some((i) => i.message === "Row 3 is missing breeder.")).toBe(true);
     expect(r.rows[1].status).toBe("blocked");
   });
 
   it("flags warning on unrecognized flowering time", () => {
-    const r = buildGeneticsImportPreview([
-      HEADER,
-      ["A", "B", "auto", null, "soon", null],
-    ]);
+    const r = buildGeneticsImportPreview([HEADER, ["A", "B", "auto", null, "soon", null]]);
     expect(r.rows[0].status).toBe("warning");
     expect(
       r.rows[0].issues.some((i) => i.severity === "warning" && /flowering time/.test(i.message)),
@@ -147,36 +138,23 @@ describe("header alias detection", () => {
     ["GENETICS", "genetics"],
     ["name", "name"],
   ])("recognizes %s as strain", (header) => {
-    const r = buildGeneticsImportPreview([
-      [header, "Breeder", "Seed Type"],
-      baseRow,
-    ]);
+    const r = buildGeneticsImportPreview([[header, "Breeder", "Seed Type"], baseRow]);
     expect(r.fileLevelError).toBeNull();
     expect(r.rows[0].strain).toBe("My Strain");
   });
 
-  it.each([
-    "breeder",
-    "Breeder Name",
-    "Seed Bank",
-    "seedbank",
-    "company",
-    "source",
-  ])("recognizes %s as breeder", (header) => {
-    const r = buildGeneticsImportPreview([
-      ["Strain", header, "Seed Type"],
-      baseRow,
-    ]);
-    expect(r.rows[0].breeder).toBe("Dutch Passion");
-  });
+  it.each(["breeder", "Breeder Name", "Seed Bank", "seedbank", "company", "source"])(
+    "recognizes %s as breeder",
+    (header) => {
+      const r = buildGeneticsImportPreview([["Strain", header, "Seed Type"], baseRow]);
+      expect(r.rows[0].breeder).toBe("Dutch Passion");
+    },
+  );
 
   it.each(["seed type", "type", "Category", "Genetics Type", "Seed Class"])(
     "recognizes %s as seed_type",
     (header) => {
-      const r = buildGeneticsImportPreview([
-        ["Strain", "Breeder", header],
-        baseRow,
-      ]);
+      const r = buildGeneticsImportPreview([["Strain", "Breeder", header], baseRow]);
       expect(r.rows[0].seedType).toBe("feminized");
     },
   );
@@ -219,9 +197,7 @@ describe("header alias detection", () => {
       ["Variety", "Seed Bank", "Type"],
       ["", "B", "auto"],
     ]);
-    expect(
-      r.rows[0].issues.some((i) => i.message === "Row 2 is missing strain name."),
-    ).toBe(true);
+    expect(r.rows[0].issues.some((i) => i.message === "Row 2 is missing strain name.")).toBe(true);
   });
 
   it("first column wins for multiple duplicate aliases across strain/breeder/seed_type", () => {
@@ -300,7 +276,7 @@ describe("buildGeneticsValidationReportCsv", () => {
   it("CSV-escapes fields containing commas, quotes, and newlines", () => {
     const r = buildGeneticsImportPreview([
       ["Strain", "Breeder", "Seed Type", "Notes"],
-      ['Has, comma', 'Quote "Co"', "auto", "line1\nline2"],
+      ["Has, comma", 'Quote "Co"', "auto", "line1\nline2"],
     ]);
     const csv = buildGeneticsValidationReportCsv(r);
     expect(csv).toContain('"Has, comma"');

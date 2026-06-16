@@ -13,13 +13,11 @@ export default function OperatorGeneticsImportPage() {
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold">Operator · Genetics XLSX Import</h1>
         <p className="text-sm text-muted-foreground">
-          Preview parsed varieties from a Verdant genetics XLSX sheet. No data
-          is saved until confirmed. This screen never writes sensor readings
-          and never enables device control.
+          Preview parsed varieties from a Verdant genetics XLSX sheet. No data is saved until
+          confirmed. This screen never writes sensor readings and never enables device control.
         </p>
         <p className="text-xs text-muted-foreground" data-testid="operator-genetics-import-safety">
-          This tool validates genetics spreadsheets in-browser. Batch linking is
-          not enabled yet.
+          This tool validates genetics spreadsheets in-browser. Batch linking is not enabled yet.
         </p>
       </header>
       <VerdantGeneticsXlsxImportPanel />

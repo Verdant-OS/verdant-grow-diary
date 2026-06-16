@@ -31,9 +31,7 @@ function uploadFile(input: HTMLElement, file: File) {
 describe("OperatorGeneticsImportPage", () => {
   it("renders heading and panel with safe copy", () => {
     render(<OperatorGeneticsImportPage />);
-    expect(
-      screen.getByRole("heading", { name: /Genetics XLSX Import/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Genetics XLSX Import/i })).toBeInTheDocument();
     expect(screen.getByTestId("genetics-import-panel")).toBeInTheDocument();
     expect(screen.getByText(/No data saved until confirmed/i)).toBeInTheDocument();
   });
@@ -55,9 +53,7 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
       />,
     );
     uploadFile(screen.getByTestId("genetics-xlsx-file-input"), makeFile());
-    await waitFor(() =>
-      expect(screen.getByTestId("genetics-file-error")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("genetics-file-error")).toBeInTheDocument());
     expect(screen.getByTestId("genetics-file-error").textContent).not.toContain(
       "low-level parse boom",
     );
@@ -76,9 +72,7 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
       />,
     );
     uploadFile(screen.getByTestId("genetics-xlsx-file-input"), makeFile());
-    await waitFor(() =>
-      expect(screen.getByTestId("genetics-file-error")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("genetics-file-error")).toBeInTheDocument());
     expect(screen.getByTestId("genetics-file-error").textContent).toMatch(
       /does not contain a recognizable genetics sheet/i,
     );
@@ -95,35 +89,20 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
       />,
     );
     uploadFile(screen.getByTestId("genetics-xlsx-file-input"), makeFile());
-    await waitFor(() =>
-      expect(screen.getByTestId("genetics-preview-table")).toBeInTheDocument(),
-    );
-    expect(screen.getByTestId("genetics-preview-row-2")).toHaveAttribute(
-      "data-status",
-      "valid",
-    );
-    expect(screen.getByTestId("genetics-preview-row-3")).toHaveAttribute(
-      "data-status",
-      "blocked",
-    );
-    expect(screen.getByTestId("genetics-preview-summary").textContent).toMatch(
-      /Total: 2/,
-    );
+    await waitFor(() => expect(screen.getByTestId("genetics-preview-table")).toBeInTheDocument());
+    expect(screen.getByTestId("genetics-preview-row-2")).toHaveAttribute("data-status", "valid");
+    expect(screen.getByTestId("genetics-preview-row-3")).toHaveAttribute("data-status", "blocked");
+    expect(screen.getByTestId("genetics-preview-summary").textContent).toMatch(/Total: 2/);
   });
 
   it("disables link action with blocker copy when no onLink helper is provided", async () => {
     render(
       <VerdantGeneticsXlsxImportPanel
-        loader={async () => [
-          HEADER,
-          ["Blueberry", "Dutch Passion", "feminized", null, "8", null],
-        ]}
+        loader={async () => [HEADER, ["Blueberry", "Dutch Passion", "feminized", null, "8", null]]}
       />,
     );
     uploadFile(screen.getByTestId("genetics-xlsx-file-input"), makeFile());
-    await waitFor(() =>
-      expect(screen.getByTestId("genetics-link-button")).toBeDisabled(),
-    );
+    await waitFor(() => expect(screen.getByTestId("genetics-link-button")).toBeDisabled());
     expect(screen.getByTestId("genetics-link-disabled-copy").textContent).toBe(
       GENETICS_LINK_DISABLED_COPY,
     );
@@ -144,9 +123,7 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
       />,
     );
     uploadFile(screen.getByTestId("genetics-xlsx-file-input"), makeFile());
-    await waitFor(() =>
-      expect(screen.getByTestId("genetics-link-button")).not.toBeDisabled(),
-    );
+    await waitFor(() => expect(screen.getByTestId("genetics-link-button")).not.toBeDisabled());
     fireEvent.click(screen.getByTestId("genetics-link-button"));
     await waitFor(() => expect(onLink).toHaveBeenCalledTimes(1));
     const passed = onLink.mock.calls[0][0] as Array<{ rowNumber: number }>;
@@ -162,9 +139,7 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
       />,
     );
     uploadFile(screen.getByTestId("genetics-xlsx-file-input"), makeFile());
-    await waitFor(() =>
-      expect(screen.getByTestId("genetics-preview-table")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("genetics-preview-table")).toBeInTheDocument());
     expect(screen.getByTestId("genetics-link-button")).toBeDisabled();
     expect(onLink).not.toHaveBeenCalled();
   });
@@ -173,9 +148,9 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
 describe("page safety copy", () => {
   it("renders preview-only/no-data-saved copy and does not show 'live' or 'import complete'", () => {
     render(<OperatorGeneticsImportPage />);
-    expect(
-      screen.getByTestId("operator-genetics-import-safety").textContent,
-    ).toMatch(/Batch linking is not enabled yet/i);
+    expect(screen.getByTestId("operator-genetics-import-safety").textContent).toMatch(
+      /Batch linking is not enabled yet/i,
+    );
     expect(screen.getByText(/No data saved until confirmed/i)).toBeInTheDocument();
     // No misleading copy before any upload/confirmation.
     // Allow the cautionary "No data saved until confirmed" copy, but
@@ -195,9 +170,7 @@ describe("validation export + template download", () => {
     class PatchedBlob extends realBlob {
       constructor(parts?: BlobPart[], opts?: BlobPropertyBag) {
         super(parts, opts);
-        const text = (parts ?? [])
-          .map((p) => (typeof p === "string" ? p : ""))
-          .join("");
+        const text = (parts ?? []).map((p) => (typeof p === "string" ? p : "")).join("");
         captures.push({ content: text, filename: "" });
       }
     }
@@ -227,10 +200,7 @@ describe("validation export + template download", () => {
   it("export button is disabled before parse, enabled after", async () => {
     render(
       <VerdantGeneticsXlsxImportPanel
-        loader={async () => [
-          HEADER,
-          ["Blueberry", "Dutch Passion", "feminized", null, "8", null],
-        ]}
+        loader={async () => [HEADER, ["Blueberry", "Dutch Passion", "feminized", null, "8", null]]}
       />,
     );
     expect(screen.getByTestId("genetics-export-report-button")).toBeDisabled();
@@ -244,9 +214,9 @@ describe("validation export + template download", () => {
     render(<VerdantGeneticsXlsxImportPanel loader={async () => []} />);
     const btn = screen.getByTestId("genetics-template-button");
     expect(btn.textContent).toMatch(/CSV template/i);
-    expect(
-      screen.getByTestId("genetics-template-fallback-copy").textContent,
-    ).toMatch(/XLSX template export is blocked/i);
+    expect(screen.getByTestId("genetics-template-fallback-copy").textContent).toMatch(
+      /XLSX template export is blocked/i,
+    );
   });
 
   it("exports a validation report containing row number, status, and messages", async () => {
@@ -309,9 +279,7 @@ describe("duplicate header warnings", () => {
       />,
     );
     uploadFile(screen.getByTestId("genetics-xlsx-file-input"), makeFile());
-    await waitFor(() =>
-      expect(screen.getByTestId("genetics-file-warnings")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("genetics-file-warnings")).toBeInTheDocument());
     expect(screen.getByTestId("genetics-file-warnings").textContent).toMatch(
       /Duplicate mapped headers detected/,
     );

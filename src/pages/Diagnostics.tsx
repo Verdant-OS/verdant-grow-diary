@@ -35,10 +35,7 @@ export default function Diagnostics() {
   const update = (i: number, patch: Partial<CheckResult>) =>
     setChecks((prev) => prev.map((c, idx) => (idx === i ? { ...c, ...patch } : c)));
 
-  async function runCheck(
-    index: number,
-    fn: () => Promise<{ ok: boolean; detail?: string }>,
-  ) {
+  async function runCheck(index: number, fn: () => Promise<{ ok: boolean; detail?: string }>) {
     update(index, { status: "running" });
     const t0 = performance.now();
     try {
@@ -144,10 +141,7 @@ export default function Diagnostics() {
         .single();
       if (insErr) return { ok: false, detail: `insert: ${insErr.message}` };
 
-      const { error: delErr } = await supabase
-        .from("diary_entries")
-        .delete()
-        .eq("id", inserted.id);
+      const { error: delErr } = await supabase.from("diary_entries").delete().eq("id", inserted.id);
       if (delErr)
         return {
           ok: false,
@@ -168,9 +162,7 @@ export default function Diagnostics() {
     return (
       <div className="p-6 max-w-2xl mx-auto space-y-4">
         <h1 className="text-2xl font-bold">Connection diagnostics</h1>
-        <p className="text-muted-foreground">
-          You must be signed in to run diagnostics.
-        </p>
+        <p className="text-muted-foreground">You must be signed in to run diagnostics.</p>
         <Button asChild>
           <Link to="/auth">Go to sign in</Link>
         </Button>
@@ -183,8 +175,8 @@ export default function Diagnostics() {
       <header className="space-y-1">
         <h1 className="text-2xl font-bold">Connection diagnostics</h1>
         <p className="text-sm text-muted-foreground">
-          Verifies env vars, auth session, RLS-scoped reads, and a safe
-          insert/delete round-trip against your own data.
+          Verifies env vars, auth session, RLS-scoped reads, and a safe insert/delete round-trip
+          against your own data.
         </p>
       </header>
 
@@ -232,9 +224,7 @@ export default function Diagnostics() {
         <Card>
           <CardHeader className="space-y-2 pb-2">
             <div className="flex flex-wrap items-center gap-2">
-              <CardTitle className="text-base">
-                EcoWitt Live Bring-Up
-              </CardTitle>
+              <CardTitle className="text-base">EcoWitt Live Bring-Up</CardTitle>
               <Badge variant="outline">Operator</Badge>
               <Badge variant="secondary">Checklist</Badge>
               <Badge variant="outline">Read-only</Badge>
@@ -242,23 +232,18 @@ export default function Diagnostics() {
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-2">
             <p>
-              Static operator checklist for tonight's manual validation of
-              EcoWitt / MQTT → Verdant ingest. No live data queries, no
-              writes, no model calls, no device control.
+              Static operator checklist for tonight's manual validation of EcoWitt / MQTT → Verdant
+              ingest. No live data queries, no writes, no model calls, no device control.
             </p>
             <Button asChild variant="outline" size="sm">
-              <Link to="/operator/ecowitt-live-bringup">
-                Open checklist
-              </Link>
+              <Link to="/operator/ecowitt-live-bringup">Open checklist</Link>
             </Button>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="space-y-2 pb-2">
             <div className="flex flex-wrap items-center gap-2">
-              <CardTitle className="text-base">
-                Genetics XLSX Import
-              </CardTitle>
+              <CardTitle className="text-base">Genetics XLSX Import</CardTitle>
               <Badge variant="outline">Operator</Badge>
               <Badge variant="secondary">Preview-only</Badge>
               <Badge variant="outline">No data saved until confirmed</Badge>
@@ -266,10 +251,9 @@ export default function Diagnostics() {
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-2">
             <p>
-              Validate a genetics XLSX spreadsheet in-browser before any import.
-              Row-numbered errors, missing-field highlights, and a downloadable
-              validation report. No writes, no AI, no Action Queue, no device
-              control. Batch linking is not enabled yet.
+              Validate a genetics XLSX spreadsheet in-browser before any import. Row-numbered
+              errors, missing-field highlights, and a downloadable validation report. No writes, no
+              AI, no Action Queue, no device control. Batch linking is not enabled yet.
             </p>
             <Button asChild variant="outline" size="sm">
               <Link to="/operator/genetics-import" data-testid="operator-nav-genetics-import">
@@ -287,9 +271,7 @@ export default function Diagnostics() {
         <Card>
           <CardHeader className="space-y-2 pb-2">
             <div className="flex flex-wrap items-center gap-2">
-              <CardTitle className="text-base">
-                AI Doctor Phase 1 Preview
-              </CardTitle>
+              <CardTitle className="text-base">AI Doctor Phase 1 Preview</CardTitle>
               <Badge variant="outline">Internal</Badge>
               <Badge variant="secondary">Static demo data</Badge>
               <Badge variant="outline">Read-only</Badge>
@@ -297,28 +279,37 @@ export default function Diagnostics() {
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-2">
             <p>
-              Static read-only preview of the Phase 1 AI Doctor contract. No
-              model calls, no writes, no device control.
+              Static read-only preview of the Phase 1 AI Doctor contract. No model calls, no writes,
+              no device control.
             </p>
             <p className="text-xs">
-              Contract docs:{" "}
-              <code className="text-xs">
-                docs/ai-doctor-phase1-contract.md
-              </code>
+              Contract docs: <code className="text-xs">docs/ai-doctor-phase1-contract.md</code>
             </p>
             <Button asChild variant="outline" size="sm">
-              <Link to="/internal/ai-doctor-phase1-preview">
-                Open preview
-              </Link>
+              <Link to="/internal/ai-doctor-phase1-preview">Open preview</Link>
             </Button>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="space-y-2 pb-2">
             <div className="flex flex-wrap items-center gap-2">
-              <CardTitle className="text-base">
-                Sensor Truth Audit
-              </CardTitle>
+              <CardTitle className="text-base">Sensor Truth Audit</CardTitle>
+              <Badge variant="outline">Internal</Badge>
+              <Badge variant="secondary">Static</Badge>
+              <Badge variant="outline">Read-only</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground space-y-2">
+            <p>Static internal reference for live/manual/csv/demo/stale/invalid source rules.</p>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/internal/sensor-truth-audit">Open audit</Link>
+            </Button>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="space-y-2 pb-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-base">AI Doctor Confidence Audit</CardTitle>
               <Badge variant="outline">Internal</Badge>
               <Badge variant="secondary">Static</Badge>
               <Badge variant="outline">Read-only</Badge>
@@ -326,36 +317,11 @@ export default function Diagnostics() {
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-2">
             <p>
-              Static internal reference for live/manual/csv/demo/stale/invalid
-              source rules.
+              Static internal reference for confidence caps, source quality rules, and overdiagnosis
+              guards.
             </p>
             <Button asChild variant="outline" size="sm">
-              <Link to="/internal/sensor-truth-audit">
-                Open audit
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="space-y-2 pb-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <CardTitle className="text-base">
-                AI Doctor Confidence Audit
-              </CardTitle>
-              <Badge variant="outline">Internal</Badge>
-              <Badge variant="secondary">Static</Badge>
-              <Badge variant="outline">Read-only</Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground space-y-2">
-            <p>
-              Static internal reference for confidence caps, source quality
-              rules, and overdiagnosis guards.
-            </p>
-            <Button asChild variant="outline" size="sm">
-              <Link to="/internal/ai-doctor-confidence-audit">
-                Open audit
-              </Link>
+              <Link to="/internal/ai-doctor-confidence-audit">Open audit</Link>
             </Button>
           </CardContent>
         </Card>
@@ -365,7 +331,10 @@ export default function Diagnostics() {
 }
 
 function StatusBadge({ status }: { status: CheckStatus }) {
-  const map: Record<CheckStatus, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  const map: Record<
+    CheckStatus,
+    { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
+  > = {
     pending: { label: "Pending", variant: "outline" },
     running: { label: "Running…", variant: "secondary" },
     pass: { label: "Pass", variant: "default" },

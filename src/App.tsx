@@ -61,8 +61,6 @@ import AiDoctorConfidenceAudit from "./pages/AiDoctorConfidenceAudit";
 import EcowittLiveBringup from "./pages/EcowittLiveBringup";
 import EnvironmentSummaryReportPage from "./pages/EnvironmentSummaryReportPage";
 
-
-
 const queryClient = new QueryClient();
 
 function AnalyticsShell() {
@@ -133,8 +131,10 @@ const App = () => (
                 <Route path="/grows" element={<Grows />} />
                 <Route path="/grows/:growId" element={<GrowDetail />} />
                 <Route path="/reports" element={<Reports />} />
-                <Route path="/diary/environment-summary" element={<EnvironmentSummaryReportPage />} />
-
+                <Route
+                  path="/diary/environment-summary"
+                  element={<EnvironmentSummaryReportPage />}
+                />
 
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/diagnostics" element={<Diagnostics />} />
@@ -142,16 +142,25 @@ const App = () => (
                 <Route path="/operator/one-tent-proof-record" element={<OneTentProofRecord />} />
                 <Route path="/operator/ecowitt-bridge-status" element={<EcowittBridgeStatus />} />
                 <Route path="/operator/ecowitt-live-bringup" element={<EcowittLiveBringup />} />
-                <Route path="/operator/ecowitt-tent-preview" element={<OperatorEcowittTentPreview />} />
+                <Route
+                  path="/operator/ecowitt-tent-preview"
+                  element={<OperatorEcowittTentPreview />}
+                />
                 <Route path="/operator/genetics-import" element={<OperatorGeneticsImportPage />} />
                 <Route path="/pi-ingest-status" element={<PiIngestStatus />} />
                 <Route path="/ingest-inspector" element={<IngestInspector />} />
                 <Route path="/imports/representative-csv" element={<RepresentativeCsvPreview />} />
                 <Route path="/sensors/csv-preview" element={<SensorCsvPreview />} />
-                <Route path="/internal/ai-doctor-phase1-preview" element={<AiDoctorPhase1Preview />} />
+                <Route
+                  path="/internal/ai-doctor-phase1-preview"
+                  element={<AiDoctorPhase1Preview />}
+                />
                 <Route path="/internal/one-tent-loop-proof" element={<OneTentLoopProof />} />
                 <Route path="/internal/sensor-truth-audit" element={<SensorTruthAudit />} />
-                <Route path="/internal/ai-doctor-confidence-audit" element={<AiDoctorConfidenceAudit />} />
+                <Route
+                  path="/internal/ai-doctor-confidence-audit"
+                  element={<AiDoctorConfidenceAudit />}
+                />
                 {/* Leads is an internal admin/operator module, intentionally not
 
                     surfaced in grower-facing navigation. Primary route is

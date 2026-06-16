@@ -10,25 +10,14 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const diagnosticsSource = readFileSync(
-  resolve(process.cwd(), "src/pages/Diagnostics.tsx"),
-  "utf8",
-);
-const appSource = readFileSync(
-  resolve(process.cwd(), "src/App.tsx"),
-  "utf8",
-);
-const sidebarSource = readFileSync(
-  resolve(process.cwd(), "src/components/AppSidebar.tsx"),
-  "utf8",
-);
+const diagnosticsSource = readFileSync(resolve(process.cwd(), "src/pages/Diagnostics.tsx"), "utf8");
+const appSource = readFileSync(resolve(process.cwd(), "src/App.tsx"), "utf8");
+const sidebarSource = readFileSync(resolve(process.cwd(), "src/components/AppSidebar.tsx"), "utf8");
 
 describe("operator nav: Genetics XLSX Import", () => {
   it("Diagnostics renders a card linking to /operator/genetics-import", () => {
     expect(diagnosticsSource).toContain("Genetics XLSX Import");
-    expect(diagnosticsSource).toMatch(
-      /to=["']\/operator\/genetics-import["']/,
-    );
+    expect(diagnosticsSource).toMatch(/to=["']\/operator\/genetics-import["']/);
     expect(diagnosticsSource).toContain("operator-nav-genetics-import");
   });
 

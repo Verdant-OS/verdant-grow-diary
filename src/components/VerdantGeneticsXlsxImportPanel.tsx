@@ -16,6 +16,10 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { readXlsxFileToCellGrid } from "@/lib/verdantGeneticsXlsxFileLoader";
 import {
   buildGeneticsImportPreview,
+  buildGeneticsTemplateCsv,
+  buildGeneticsValidationReportCsv,
+  GENETICS_TEMPLATE_CSV_FILENAME,
+  GENETICS_VALIDATION_REPORT_FILENAME,
   selectImportableRows,
   type GeneticsImportPreviewResult,
 } from "@/lib/verdantGeneticsImportPreviewRules";
@@ -23,6 +27,26 @@ import { VerdantGeneticsImportPreviewTable } from "@/components/VerdantGeneticsI
 
 export const GENETICS_LINK_DISABLED_COPY =
   "Batch linking is not enabled yet. Preview is safe and no data has been saved." as const;
+
+export const GENETICS_TEMPLATE_CSV_FALLBACK_COPY =
+  "XLSX template export is blocked pending a safe writer utility. Providing CSV template instead." as const;
+
+/**
+ * Trigger a local download from an in-memory text payload. Browser-only.
+ * No fetch, no Supabase, no network.
+ */
+function triggerLocalDownload(filename: string, content: string, mime: string) {
+  if (typeof window === "undefined" || typeof document === "undefined") return;
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 export interface VerdantGeneticsXlsxImportPanelProps {
   /**

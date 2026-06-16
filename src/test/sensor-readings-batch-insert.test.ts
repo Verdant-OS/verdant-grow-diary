@@ -3,10 +3,12 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   CSV_HISTORY_INSERT_BATCH_SIZE,
+  SENSOR_READINGS_INSERT_ALLOWED_KEYS,
   chunkRows,
   insertSensorReadingsInBatches,
   buildBatchFailureMessage,
   buildBatchSuccessMessage,
+  validateSensorReadingInsertRows,
 } from "@/lib/csv-import/sensorReadingsBatchInsert";
 
 describe("sensorReadingsBatchInsert", () => {

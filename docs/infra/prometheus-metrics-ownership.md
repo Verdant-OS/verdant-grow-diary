@@ -107,6 +107,7 @@ The following are explicitly out of scope until the success criteria and revisit
 ## Related Docs
 
 - [Prometheus Operator CRD Backlog](./prometheus-operator-crd-backlog.md)
+- [Prometheus Alert Runbook Template](./prometheus-alert-runbook-template.md)
 
 ---
 

@@ -8,7 +8,7 @@
  * No Supabase, no writes, no AI, no Action Queue, no device control.
  */
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import {
   VerdantGeneticsXlsxImportPanel,
@@ -22,6 +22,10 @@ function makeFile(name = "genetics.xlsx"): File {
   return new File([new Uint8Array([1, 2, 3])], name, {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
+}
+
+function uploadFile(input: HTMLElement, file: File) {
+  fireEvent.change(input, { target: { files: [file] } });
 }
 
 describe("OperatorGeneticsImportPage", () => {
@@ -43,7 +47,6 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
   });
 
   it("shows user-friendly error when loader throws", async () => {
-    
     render(
       <VerdantGeneticsXlsxImportPanel
         loader={async () => {
@@ -51,7 +54,7 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
         }}
       />,
     );
-    fireEvent.change(screen.getByTestId("genetics-xlsx-file-input"), { target: { files: [makeFile(] } }));
+    uploadFile(screen.getByTestId("genetics-xlsx-file-input"), makeFile());
     await waitFor(() =>
       expect(screen.getByTestId("genetics-file-error")).toBeInTheDocument(),
     );
@@ -64,7 +67,6 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
   });
 
   it("shows file-level error for unrecognized sheet", async () => {
-    
     render(
       <VerdantGeneticsXlsxImportPanel
         loader={async () => [
@@ -73,7 +75,7 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
         ]}
       />,
     );
-    fireEvent.change(screen.getByTestId("genetics-xlsx-file-input"), { target: { files: [makeFile(] } }));
+    uploadFile(screen.getByTestId("genetics-xlsx-file-input"), makeFile());
     await waitFor(() =>
       expect(screen.getByTestId("genetics-file-error")).toBeInTheDocument(),
     );
@@ -83,7 +85,6 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
   });
 
   it("renders preview table after a successful parse", async () => {
-    
     render(
       <VerdantGeneticsXlsxImportPanel
         loader={async () => [
@@ -93,7 +94,7 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
         ]}
       />,
     );
-    fireEvent.change(screen.getByTestId("genetics-xlsx-file-input"), { target: { files: [makeFile(] } }));
+    uploadFile(screen.getByTestId("genetics-xlsx-file-input"), makeFile());
     await waitFor(() =>
       expect(screen.getByTestId("genetics-preview-table")).toBeInTheDocument(),
     );
@@ -111,7 +112,6 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
   });
 
   it("disables link action with blocker copy when no onLink helper is provided", async () => {
-    
     render(
       <VerdantGeneticsXlsxImportPanel
         loader={async () => [
@@ -120,7 +120,7 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
         ]}
       />,
     );
-    fireEvent.change(screen.getByTestId("genetics-xlsx-file-input"), { target: { files: [makeFile(] } }));
+    uploadFile(screen.getByTestId("genetics-xlsx-file-input"), makeFile());
     await waitFor(() =>
       expect(screen.getByTestId("genetics-link-button")).toBeDisabled(),
     );
@@ -130,23 +130,22 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
   });
 
   it("calls onLink exactly once with valid rows only when confirmed", async () => {
-    
     const onLink = vi.fn().mockResolvedValue(undefined);
     render(
       <VerdantGeneticsXlsxImportPanel
         loader={async () => [
           HEADER,
           ["Blueberry", "Dutch Passion", "feminized", null, "8", null],
-          ["", "Sensi", "feminized", null, "9", null], // blocked
-          ["Northern", "Sensi", "wat", null, "9", null], // blocked invalid seed type
-          ["Critical", "Royal Queen", "auto", null, "soon", null], // warning - included
+          ["", "Sensi", "feminized", null, "9", null],
+          ["Northern", "Sensi", "wat", null, "9", null],
+          ["Critical", "Royal Queen", "auto", null, "soon", null],
         ]}
         onLink={onLink}
       />,
     );
-    fireEvent.change(screen.getByTestId("genetics-xlsx-file-input"), { target: { files: [makeFile(] } }));
+    uploadFile(screen.getByTestId("genetics-xlsx-file-input"), makeFile());
     await waitFor(() =>
-      expect(screen.getByTestId("genetics-link-button")).toBeEnabled(),
+      expect(screen.getByTestId("genetics-link-button")).not.toBeDisabled(),
     );
     fireEvent.click(screen.getByTestId("genetics-link-button"));
     await waitFor(() => expect(onLink).toHaveBeenCalledTimes(1));
@@ -155,7 +154,6 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
   });
 
   it("disables link action when no importable rows", async () => {
-    
     const onLink = vi.fn();
     render(
       <VerdantGeneticsXlsxImportPanel
@@ -163,7 +161,7 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
         onLink={onLink}
       />,
     );
-    fireEvent.change(screen.getByTestId("genetics-xlsx-file-input"), { target: { files: [makeFile(] } }));
+    uploadFile(screen.getByTestId("genetics-xlsx-file-input"), makeFile());
     await waitFor(() =>
       expect(screen.getByTestId("genetics-preview-table")).toBeInTheDocument(),
     );

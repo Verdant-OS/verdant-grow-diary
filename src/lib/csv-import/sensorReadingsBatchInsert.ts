@@ -519,13 +519,20 @@ export function buildDuplicateAwareSuccessMessage(
     return `No new CSV history readings were imported. ${duplicates} reading${duplicates === 1 ? "" : "s"} already exist for this tent. No live sensor data was created.`;
   }
   if (duplicates > 0) {
-    return `Imported ${inserted} new ${vendorLabel} CSV history readings. Skipped ${duplicates} duplicate reading${duplicates === 1 ? "" : "s"} already present for this tent. No live sensor data was created.`;
+    return `Imported ${inserted} new ${vendorLabel} CSV history readings for this tent. Skipped ${duplicates} duplicate reading${duplicates === 1 ? "" : "s"} already present for this tent. No live sensor data was created.`;
   }
-  if (totalBatches <= 1) {
-    return `Imported ${inserted} ${vendorLabel} CSV history readings. No live sensor data was created.`;
-  }
-  return `Imported ${inserted} ${vendorLabel} CSV history readings across ${totalBatches} batches. No live sensor data was created.`;
+  const batchPhrase =
+    totalBatches <= 1 ? "in 1 batch" : `across ${totalBatches} batches`;
+  return `Imported ${inserted} new ${vendorLabel} CSV history readings for this tent ${batchPhrase}. No live sensor data was created.`;
 }
+
+/**
+ * Compact secondary metadata line for operator transparency. Names the
+ * dedupe-key shape so operators understand why a retry skipped rows,
+ * without exposing raw Postgres internals as the headline.
+ */
+export const CSV_HISTORY_IMPORT_SCOPE_LINE =
+  "Scope: selected tent \u00B7 source: csv \u00B7 duplicates checked by tent + source + metric + captured timestamp" as const;
 
 export interface DuplicateAwareImportArgs<TRow extends DedupeKeyParts> {
   rows: readonly TRow[];

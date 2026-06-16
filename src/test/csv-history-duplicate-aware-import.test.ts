@@ -214,7 +214,7 @@ describe("runDuplicateAwareCsvHistoryImport — orchestration", () => {
     expect(out.duplicateRows).toBe(1);
     expect(inserted).toEqual([fresh]);
     expect(out.diagnostic).toBe(
-      "Imported 1 new Spider Farmer / THP Data CSV history readings. Skipped 1 duplicate reading already present for this tent. No live sensor data was created.",
+      "Imported 1 new Spider Farmer / THP Data CSV history readings for this tent. Skipped 1 duplicate reading already present for this tent. No live sensor data was created.",
     );
     // Source stays csv — never promoted to live.
     for (const r of inserted) expect(r.source).toBe("csv");
@@ -237,11 +237,11 @@ describe("runDuplicateAwareCsvHistoryImport — orchestration", () => {
     expect(out.duplicateRows).toBe(0);
     expect(insertBatch).toHaveBeenCalledTimes(2);
     expect(out.diagnostic).toBe(
-      "Imported 3 Spider Farmer / THP Data CSV history readings across 2 batches. No live sensor data was created.",
+      "Imported 3 new Spider Farmer / THP Data CSV history readings for this tent across 2 batches. No live sensor data was created.",
     );
   });
 
-  it("single-batch no-duplicate uses the simpler copy without batch count", () => {
+  it("single-batch no-duplicate uses 'in 1 batch' phrasing", () => {
     expect(
       buildDuplicateAwareSuccessMessage({
         vendorLabel: "Spider Farmer",
@@ -250,7 +250,7 @@ describe("runDuplicateAwareCsvHistoryImport — orchestration", () => {
         totalBatches: 1,
       }),
     ).toBe(
-      "Imported 5 Spider Farmer CSV history readings. No live sensor data was created.",
+      "Imported 5 new Spider Farmer CSV history readings for this tent in 1 batch. No live sensor data was created.",
     );
   });
 });
@@ -502,5 +502,99 @@ describe("filterDuplicateRows — invalid keys are not classified as duplicates"
     });
     expect(r.duplicateCount).toBe(0);
     expect(r.newRows.length).toBe(1);
+  });
+});
+
+import { CSV_HISTORY_IMPORT_SCOPE_LINE } from "@/lib/csv-import/sensorReadingsBatchInsert";
+import { CSV_HISTORY_EMPTY_ROWS_COPY, preflightCsvHistoryImport } from "@/lib/csv-import/sensorReadingsBatchInsert";
+
+describe("operator copy polish — explicit inserted vs skipped", () => {
+  it("no-duplicate multi-batch copy: 'new', 'for this tent', 'across <N> batches', no-live reassurance", () => {
+    const msg = buildDuplicateAwareSuccessMessage({
+      vendorLabel: "Spider Farmer",
+      inserted: 100,
+      duplicates: 0,
+      totalBatches: 4,
+    });
+    expect(msg).toContain("100 new Spider Farmer CSV history readings");
+    expect(msg).toContain("for this tent");
+    expect(msg).toContain("across 4 batches");
+    expect(msg).toContain("No live sensor data was created.");
+  });
+
+  it("no-duplicate one-batch copy uses 'in 1 batch'", () => {
+    const msg = buildDuplicateAwareSuccessMessage({
+      vendorLabel: "AC Infinity",
+      inserted: 12,
+      duplicates: 0,
+      totalBatches: 1,
+    });
+    expect(msg).toContain("in 1 batch");
+    expect(msg).not.toContain("across 1 batches");
+  });
+
+  it("mixed copy reports both inserted and skipped counts and tent scope", () => {
+    const msg = buildDuplicateAwareSuccessMessage({
+      vendorLabel: "Spider Farmer",
+      inserted: 7,
+      duplicates: 3,
+      totalBatches: 2,
+    });
+    expect(msg).toContain("Imported 7 new Spider Farmer CSV history readings for this tent.");
+    expect(msg).toContain("Skipped 3 duplicate readings already present for this tent.");
+    expect(msg).toContain("No live sensor data was created.");
+  });
+
+  it("all-duplicate copy says no new readings imported and never promotes to live", () => {
+    const msg = buildDuplicateAwareSuccessMessage({
+      vendorLabel: "Spider Farmer",
+      inserted: 0,
+      duplicates: 42,
+      totalBatches: 0,
+    });
+    expect(msg).toMatch(/^No new CSV history readings were imported\./);
+    expect(msg).toContain("42 readings already exist for this tent.");
+    expect(msg).toContain("No live sensor data was created.");
+    expect(msg).not.toMatch(/source:\s*['"]?live/i);
+  });
+
+  it("empty-row preflight copy stays distinct from all-duplicate copy", () => {
+    const preflight = preflightCsvHistoryImport([]);
+    expect(preflight.ok).toBe(false);
+    expect(preflight.message).toBe(CSV_HISTORY_EMPTY_ROWS_COPY);
+    expect(preflight.message).toContain("Import blocked before writing rows");
+    expect(preflight.message).toContain("No importable sensor readings were found");
+    expect(preflight.message).not.toContain("already exist for this tent");
+  });
+
+  it("failure copy stays distinct from success copy (does not say 'Imported N new')", () => {
+    const fail = buildBatchFailureMessage({
+      batchIndex: 1,
+      totalBatches: 1,
+      failedBatchSize: 10,
+      insertedRows: 0,
+      vendorLabel: "Spider Farmer",
+      error: { code: "23505", message: "duplicate key", details: null, hint: null },
+    });
+    expect(fail).not.toMatch(/Imported \d+ new/);
+    expect(fail).toContain("No live sensor data was created.");
+  });
+
+  it("CSV_HISTORY_IMPORT_SCOPE_LINE names tent scope, csv source, and dedupe-key shape", () => {
+    expect(CSV_HISTORY_IMPORT_SCOPE_LINE).toContain("selected tent");
+    expect(CSV_HISTORY_IMPORT_SCOPE_LINE).toContain("source: csv");
+    expect(CSV_HISTORY_IMPORT_SCOPE_LINE).toContain(
+      "tent + source + metric + captured timestamp",
+    );
+    // Never leaks secrets / raw payload / service role to operator UI.
+    for (const banned of [
+      "service_role",
+      "bridge_token",
+      "raw_payload",
+      "auth.uid",
+      "Bearer ",
+    ]) {
+      expect(CSV_HISTORY_IMPORT_SCOPE_LINE).not.toContain(banned);
+    }
   });
 });

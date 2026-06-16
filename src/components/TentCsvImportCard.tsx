@@ -297,13 +297,23 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         });
         return;
       }
-      const { error } = await supabase
-        .from("sensor_readings")
-        .insert(result.rows as never);
-      if (error) throw error;
-      toast.success(
-        `Imported ${result.rows.length} ${sourcePreview.sourceAppLabel} CSV history rows.`,
-      );
+      const batchResult = await insertSensorReadingsInBatches({
+        rows: result.rows,
+        vendorLabel: sourcePreview.sourceAppLabel,
+        batchSize: CSV_HISTORY_INSERT_BATCH_SIZE,
+        insertBatch: async (batch) => {
+          const { error } = await supabase
+            .from("sensor_readings")
+            .insert(batch as never);
+          return { error: error as BatchInsertError | null };
+        },
+      });
+      if (!batchResult.ok) {
+        setParseError(batchResult.diagnostic);
+        toast.error("Couldn't import CSV.", { description: batchResult.diagnostic });
+        return;
+      }
+      toast.success(batchResult.diagnostic);
       const auditInput = buildRegistryCsvAuditInput({
         sourceAppId: detected,
         adapterResult: result,

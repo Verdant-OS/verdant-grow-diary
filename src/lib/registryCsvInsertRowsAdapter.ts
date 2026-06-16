@@ -254,6 +254,14 @@ export function buildRegistryCsvInsertRows(args: BuildArgs): AdapterResult {
       raw_row: rawRow,
     };
 
+    // Preserve grow lineage as provenance only — never as a top-level
+    // sensor_readings column (the table has no grow_id; surfacing it there
+    // triggers PostgREST PGRST204).
+    if (args.growId && args.growId.trim() !== "") {
+      payloadExtras.grow_id = args.growId;
+    }
+
+
     if (deviceSerialIdx >= 0) {
       const v = String(cells[deviceSerialIdx] ?? "").trim();
       if (v) payloadExtras.device_serial = v;

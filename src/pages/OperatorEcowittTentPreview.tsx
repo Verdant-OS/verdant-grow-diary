@@ -2,39 +2,19 @@
  * Operator EcoWitt Tent Preview.
  *
  * Read-only preview of canonical EcoWitt tent snapshots for Flower, Seedling,
- * and Vegetation tents. NO Supabase writes, NO Edge calls, NO RPC,
- * NO alerts/Action Queue, NO AI, NO device control.
+ * and Vegetation tents, loaded from local sample/evidence fixtures.
+ *
+ * NO Supabase writes, NO Edge calls, NO RPC, NO alerts/Action Queue,
+ * NO AI calls, NO device control.
  */
 import { useMemo, useState } from "react";
 import {
   EcowittTentKey,
   SUPPORTED_TENT_KEYS,
-  normalizeEcowittTentPayload,
 } from "@/lib/ecowittTentNormalizerRouter";
-import {
-  buildEcowittTentPreviewViewModel,
-  ECOWITT_TENT_PREVIEW_EVIDENCE_COPY,
-  ECOWITT_TENT_PREVIEW_READ_ONLY_COPY,
-} from "@/lib/ecowittTentPreviewViewModel";
-
-const SAMPLE_PAYLOAD: Record<string, unknown> = {
-  // Flower
-  temp1f: 82.04,
-  humidity1: 46,
-  tf_ch1: 69.98,
-  soilmoisture3: 80,
-  soilmoisture2: 69,
-  // Seedling
-  temp2f: 74.5,
-  humidity2: 58,
-  // Vegetation
-  temp3f: 78.1,
-  humidity3: 52,
-  soilmoisture1: 41,
-  // Lung Room (NOT a tent in this slice)
-  tempinf: 72,
-  humidityin: 50,
-};
+import { buildEcowittLocalEvidencePreviewViewModel } from "@/lib/ecowittLocalEvidenceViewModel";
+import { ECOWITT_PREVIEW_SAMPLES, EcowittPreviewSampleKey } from "@/fixtures/ecowitt-preview-samples";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const TENT_KEY_LABEL: Record<EcowittTentKey, string> = {
   flower: "Flower Tent",
@@ -49,27 +29,65 @@ function fmt(n: number | null, unit: string): string {
 
 export default function OperatorEcowittTentPreview() {
   const [tentKey, setTentKey] = useState<EcowittTentKey>("flower");
-  const vm = useMemo(() => {
-    const snap = normalizeEcowittTentPayload(SAMPLE_PAYLOAD, tentKey, {
-      now: new Date(),
-      captured_at_ms: Date.now() - 30_000,
-    });
-    return buildEcowittTentPreviewViewModel(snap);
-  }, [tentKey]);
+  const [sampleKey, setSampleKey] = useState<EcowittPreviewSampleKey>("valid");
+  const [showRaw, setShowRaw] = useState(false);
+  const isMobile = useIsMobile();
+
+  const vm = useMemo(
+    () =>
+      buildEcowittLocalEvidencePreviewViewModel({
+        tentKey,
+        sampleKey,
+        now: new Date(),
+      }),
+    [tentKey, sampleKey],
+  );
+
+  const preview = vm.preview;
 
   return (
-    <main className="mx-auto max-w-3xl p-6 space-y-6" data-testid="ecowitt-tent-preview">
+    <main
+      className="mx-auto max-w-3xl p-4 sm:p-6 space-y-6 pb-32"
+      data-testid="ecowitt-tent-preview"
+    >
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold">EcoWitt Tent Preview (Read-only)</h1>
         <p className="text-sm text-muted-foreground" data-testid="read-only-copy">
-          {ECOWITT_TENT_PREVIEW_READ_ONLY_COPY}
+          {vm.read_only_copy}
         </p>
         <p className="text-sm text-muted-foreground" data-testid="evidence-copy">
-          {ECOWITT_TENT_PREVIEW_EVIDENCE_COPY}
+          {vm.evidence_copy}
+        </p>
+        <p className="text-xs text-muted-foreground" data-testid="source-label">
+          Evidence source: {vm.source_label}
         </p>
       </header>
 
-      <div className="flex gap-2" role="tablist" aria-label="Select tent">
+      {/* Sample dropdown */}
+      <div className="flex flex-wrap items-center gap-2">
+        <label htmlFor="ecowitt-sample-select" className="text-sm font-medium">
+          Sample payload:
+        </label>
+        <select
+          id="ecowitt-sample-select"
+          data-testid="sample-select"
+          value={sampleKey}
+          onChange={(e) => setSampleKey(e.target.value as EcowittPreviewSampleKey)}
+          className="rounded-md border bg-background px-2 py-1 text-sm"
+        >
+          {ECOWITT_PREVIEW_SAMPLES.map((s) => (
+            <option key={s.key} value={s.key}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs text-muted-foreground" data-testid="sample-description">
+          {vm.sample_description}
+        </span>
+      </div>
+
+      {/* Desktop tent tabs */}
+      <div className="hidden gap-2 sm:flex" role="tablist" aria-label="Select tent">
         {SUPPORTED_TENT_KEYS.map((k) => (
           <button
             key={k}
@@ -87,6 +105,7 @@ export default function OperatorEcowittTentPreview() {
         ))}
       </div>
 
+      {/* Snapshot panel */}
       <section className="rounded-lg border p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div>
@@ -94,34 +113,41 @@ export default function OperatorEcowittTentPreview() {
               Selected tent
             </div>
             <div className="text-lg font-medium" data-testid="tent-label">
-              {vm.tent_label}
+              {preview.tent_label}
             </div>
           </div>
           <div className="text-right">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              Source
-            </div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Source</div>
             <span
               data-testid="source-status"
               className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${
-                vm.source === "live"
+                preview.source === "live"
                   ? "border-primary/40 bg-primary/15 text-primary"
-                  : vm.source === "degraded"
+                  : preview.source === "degraded"
                     ? "border-border bg-muted text-muted-foreground"
                     : "border-destructive/40 bg-destructive/15 text-destructive"
               }`}
             >
-              {vm.source_label}
+              {preview.source_label}
             </span>
           </div>
         </div>
         <div className="text-xs text-muted-foreground">
-          Provider: <span data-testid="provider">{vm.provider}</span> · Captured at:{" "}
-          <span data-testid="captured-at">{vm.captured_at ?? "—"}</span>
+          Provider: <span data-testid="provider">{preview.provider}</span> · Captured at:{" "}
+          <span data-testid="captured-at">{preview.captured_at ?? "—"}</span>
         </div>
 
+        {vm.is_stale && (
+          <div
+            data-testid="stale-warning"
+            className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-700 dark:text-amber-300"
+          >
+            {vm.stale_copy}
+          </div>
+        )}
+
         <ul className="divide-y border-t">
-          {vm.metrics.map((m) => (
+          {preview.metrics.map((m) => (
             <li
               key={m.key}
               data-testid={`metric-${m.key}`}
@@ -130,9 +156,7 @@ export default function OperatorEcowittTentPreview() {
             >
               <div>
                 <div className="font-medium">{m.label}</div>
-                <div className="text-xs text-muted-foreground">
-                  Channel: {m.channel ?? "—"}
-                </div>
+                <div className="text-xs text-muted-foreground">Channel: {m.channel ?? "—"}</div>
               </div>
               <div className="font-mono">{fmt(m.value, m.unit)}</div>
             </li>
@@ -141,30 +165,77 @@ export default function OperatorEcowittTentPreview() {
 
         <div className="text-xs">
           Root-zone confidence:{" "}
-          <span data-testid="root-zone-confidence">{vm.root_zone_confidence}</span>
+          <span data-testid="root-zone-confidence">{preview.root_zone_confidence}</span>
         </div>
 
-        {vm.degraded_reasons.length > 0 && (
+        {preview.degraded_reasons.length > 0 && (
           <div data-testid="degraded-reasons" className="text-xs text-muted-foreground">
             <div className="font-semibold uppercase tracking-wide">Degraded reasons</div>
             <ul className="list-disc pl-5">
-              {vm.degraded_reasons.map((r) => (
+              {preview.degraded_reasons.map((r) => (
                 <li key={r}>{r}</li>
               ))}
             </ul>
           </div>
         )}
-        {vm.invalid_reasons.length > 0 && (
+        {preview.invalid_reasons.length > 0 && (
           <div data-testid="invalid-reasons" className="text-xs text-destructive">
             <div className="font-semibold uppercase tracking-wide">Invalid reasons</div>
             <ul className="list-disc pl-5">
-              {vm.invalid_reasons.map((r) => (
+              {preview.invalid_reasons.map((r) => (
                 <li key={r}>{r}</li>
               ))}
             </ul>
           </div>
         )}
       </section>
+
+      {/* Redacted raw payload toggle */}
+      <section className="rounded-lg border p-4 space-y-2">
+        <button
+          type="button"
+          data-testid="raw-toggle"
+          aria-expanded={showRaw}
+          aria-controls="redacted-raw-panel"
+          onClick={() => setShowRaw((v) => !v)}
+          className="text-sm font-medium underline-offset-4 hover:underline"
+        >
+          {showRaw ? "Hide redacted raw payload" : "Show redacted raw payload"}
+        </button>
+        {showRaw && (
+          <pre
+            id="redacted-raw-panel"
+            data-testid="redacted-raw-panel"
+            className="overflow-auto rounded-md bg-muted p-2 text-xs"
+          >
+            {JSON.stringify(preview.redacted_raw_preview, null, 2)}
+          </pre>
+        )}
+      </section>
+
+      {/* Mobile thumb-friendly tent selector */}
+      {isMobile && (
+        <nav
+          data-testid="mobile-tent-selector"
+          aria-label="Select tent (mobile)"
+          className="fixed inset-x-0 bottom-0 z-40 flex justify-around border-t bg-background p-2 sm:hidden"
+        >
+          {SUPPORTED_TENT_KEYS.map((k) => (
+            <button
+              key={k}
+              type="button"
+              aria-pressed={tentKey === k}
+              onClick={() => setTentKey(k)}
+              data-testid={`mobile-tent-${k}`}
+              className={`min-h-12 flex-1 rounded-md px-2 py-3 text-sm font-medium ${
+                tentKey === k ? "bg-primary text-primary-foreground" : "bg-muted"
+              }`}
+            >
+              {TENT_KEY_LABEL[k]}
+            </button>
+          ))}
+        </nav>
+      )}
     </main>
   );
 }

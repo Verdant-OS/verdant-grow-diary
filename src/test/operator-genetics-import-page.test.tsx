@@ -274,9 +274,8 @@ describe("validation export + template download", () => {
     try {
       render(<VerdantGeneticsXlsxImportPanel loader={async () => []} />);
       fireEvent.click(screen.getByTestId("genetics-template-button"));
-      await waitFor(() => expect(stub.calls.length).toBeGreaterThan(0));
-      const csv = stub.calls[stub.calls.length - 1].content;
-      const fname = stub.calls[stub.calls.length - 1].filename;
+      await waitFor(() => expect(stub.blobs.length).toBeGreaterThan(0));
+      const { content: csv, filename: fname } = await stub.lastContent();
       expect(fname).toBe("verdant-genetics-template.csv");
       expect(csv).toContain("strain,breeder,seed_type");
       expect(csv).toContain("Example Auto");

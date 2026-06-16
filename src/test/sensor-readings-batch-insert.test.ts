@@ -236,6 +236,3 @@ describe("validateSensorReadingInsertRows — preflight payload shape", () => {
       ].sort(),
     );
   });
-});
-  }
-});

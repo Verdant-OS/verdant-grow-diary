@@ -95,10 +95,8 @@ describe("scripts/assert-vpd-stage-normalization-ownership.mjs", () => {
   it("ignores the allow-listed scanner and helper files", () => {
     // The scanner contains the pair literals in its own source for the
     // regex definitions; allow-listing prevents self-flagging.
-    const res = spawnSync("node", [resolve(ROOT, SCRIPT)], {
-      cwd: ROOT,
-      encoding: "utf8",
-    });
+    // Reuses the memoised real-repo run (same command, same cwd).
+    const res = runScannerInRoot();
     expect(res.status).toBe(0);
   });
 });

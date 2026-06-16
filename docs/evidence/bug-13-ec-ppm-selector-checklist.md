@@ -12,8 +12,16 @@
 Use the corrected navigation. Do **not** use the old "Grows → pick grow" wording.
 
 ```
-Tents → select tent → plant / plant detail context → Quick Log → Feeding → Hardware readings
+Tents → select tent → plant / plant detail context → Quick Log → Feeding → Add more details → EC unit selector
 ```
+
+## Where the selector lives
+
+- The **EC unit selector** is inside **Quick Log → Feeding → Add more details**.
+- The **Hardware readings** section may show fixed display labels such as:
+  - `Feed/Input EC mS/cm`
+  - `Runoff EC mS/cm`
+- Those fixed display labels do **not** by themselves prove the selector options. The screenshot must show the **selector open** with all four unit options visible.
 
 ## Required screenshot contents
 
@@ -21,8 +29,7 @@ A single screenshot must show all of the following simultaneously:
 
 - [ ] Quick Log is open
 - [ ] Feeding is selected
-- [ ] Hardware readings section is visible
-- [ ] `Feed/Input EC` or `Runoff EC` field is visible
+- [ ] **Add more details** is expanded / open
 - [ ] EC unit selector is open
 - [ ] `EC mS/cm` is visible
 - [ ] `EC µS/cm` is visible

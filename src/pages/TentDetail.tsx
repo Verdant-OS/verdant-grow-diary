@@ -297,6 +297,14 @@ export default function TentDetail() {
             </div>
           )}
         </div>
+        <SensorSnapshotTruthStrip
+          model={buildSensorSnapshotReadModel({
+            snapshot: header.snapshot,
+            truth: header.truth,
+          })}
+          className="mb-3"
+          testId="tent-detail-sensor-snapshot-truth"
+        />
         <TentManualSnapshotChangeContext tentId={id ?? null} readings={readings} />
         {series.length === 0 ? (
           <p

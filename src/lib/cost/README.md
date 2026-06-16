@@ -75,7 +75,60 @@ Do **not** invent numeric limits. Replace a marker only with evidence:
     usage; otherwise leave undefined.
 - The helper does NOT mutate prompt content, does NOT call any model, and
   does NOT persist. Callers decide what (if anything) to do with the bundle.
-- `estimatedPromptTokens` is always `null` until a real estimator is added.
+- `estimatedPromptTokens` is `null` unless a `PromptTokenEstimator` is
+  injected via `setPromptTokenEstimator(...)` or passed through
+  `buildAiDoctorPromptMeasurement({ tokenEstimator })`.
+
+### Optional prompt-token estimator
+
+- Adapter: `src/lib/cost/promptTokenEstimator.ts`
+  - `setPromptTokenEstimator(estimator | null)` registers or clears a
+    global estimator.
+  - `estimatePromptTokensIfAvailable(text, estimator?)` returns `number`
+    or `null`. Never falls back to a character-count heuristic.
+  - No `MAX_`, `THRESHOLD_`, `TOKEN_LIMIT`, or budget constants.
+- Verdant ships no estimator today; the adapter exists so a real tokenizer
+  (e.g. `tiktoken`) can be wired in without scattered conditionals.
+
+### Provider-reported token capture (call-site attachment point)
+
+- The AI Doctor provider call lives in
+  `supabase/functions/ai-doctor-review/index.ts`. The OpenAI-compatible
+  gateway response includes a `usage` object with `prompt_tokens`,
+  `completion_tokens`, `total_tokens` when the provider reports it.
+- To capture provider tokens, the edge function (or a client-side wrapper)
+  should normalize that usage into
+  `ProviderReportedTokenUsage = { promptTokens, completionTokens, totalTokens }`
+  and pass it to `buildAiDoctorPromptMeasurement({ providerReportedTokens })`.
+  If usage is missing, leave `providerReportedTokens` undefined — the
+  measurement keeps `providerReportedTokens: null`. Never log prompt text,
+  raw provider response, API keys, or headers.
+
+### Local-only measurement capture store
+
+- Sink: `src/lib/cost/aiDoctorPromptMeasurementCaptureStore.ts`
+  - In-memory ring buffer, default safety bound
+    `CAPTURE_STORE_SAFETY_BOUND = 200` records. This is a **storage safety
+    bound**, not a token budget or threshold.
+  - Rejects bundles carrying `userPromptText`, `promptText`, `rawResponse`,
+    `providerResponse`, `apiKey`, or `authorization`.
+  - No localStorage, no Supabase, no fetch.
+
+### CSV export
+
+- Helper: `src/lib/cost/aiDoctorPromptMeasurementCsvExport.ts`
+- Columns (deterministic order): `recordedAt, promptName, domain, status,
+  errorCode, summaryByteSize, estimatedPromptTokens, providerPromptTokens,
+  providerCompletionTokens, providerTotalTokens, rawHistoryFallback,
+  rawHistoryEventCount, staleSummaryUsed, missingSummaryUsed, summaryErrored,
+  includedWindows, sourceTags`.
+- Arrays are pipe-delimited. CSV cells are quote-escaped. Empty values are
+  rendered as blank.
+- UI: `src/components/AiDoctorPromptMeasurementExportButton.tsx` — a
+  presenter-only diagnostics button that downloads
+  `verdant-ai-doctor-prompt-measurements.csv`. **Mounting is currently
+  blocked**: there is no operator/diagnostics panel approved for grower
+  builds. Mount only inside an explicit operator/diagnostics surface.
 
 ## What remains blocked until real measurements exist
 
@@ -83,7 +136,12 @@ Do **not** invent numeric limits. Replace a marker only with evidence:
 2. Any back-pressure controller / throttle.
 3. Any cost-driven AI Doctor degradation behavior.
 4. Any cadence-driven ingest rejection.
-5. Any persistence target for these measurements (no metrics table exists; one
-   would require an explicit, separately-requested schema change).
-6. A real prompt-token estimator (today `estimatedPromptTokens` stays `null`).
+5. Any token-budget enforcement.
+6. Any durable persistence target for these measurements (no metrics table
+   exists; one would require an explicit, separately-requested schema
+   change).
+7. A real prompt-token estimator (today `estimatedPromptTokens` stays
+   `null` unless an estimator is injected by the caller).
+8. A grower-visible mount point for the CSV export button.
+
 

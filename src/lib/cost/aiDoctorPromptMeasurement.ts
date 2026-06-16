@@ -19,6 +19,11 @@ import {
   type AiDoctorPromptMeasurement,
   type RawHistoryFallbackState,
 } from "./costDomains";
+import {
+  estimatePromptTokensIfAvailable,
+  type PromptTokenEstimator,
+} from "./promptTokenEstimator";
+
 
 /** Optional provider-reported token usage shape (already-available only). */
 export interface ProviderReportedTokenUsage {
@@ -62,7 +67,10 @@ export interface BuildAiDoctorPromptMeasurementInput {
   /** Status; defaults to "success" for measurement attachment. */
   readonly status?: "success" | "error";
   readonly errorCode?: string;
+  /** Optional injected estimator. When omitted, the active singleton is used; if neither exists, tokens stay null. */
+  readonly tokenEstimator?: PromptTokenEstimator | null;
 }
+
 
 /** Metadata kept beside the strict measurement (not part of llm_prompt schema). */
 export interface AiDoctorPromptMeasurementMetadata {
@@ -145,18 +153,23 @@ export function buildAiDoctorPromptMeasurement(
     missingLiveReadingsBlockPresent: input.missingLiveReadingsBlockPresent,
   });
 
+  const estimatedPromptTokens =
+    input.tokenEstimator === null
+      ? null
+      : estimatePromptTokensIfAvailable(text, input.tokenEstimator ?? undefined);
+
   const measurement = asAiDoctorPromptMeasurement({
     domain: "llm_prompt",
     promptName: input.promptName,
     summaryByteSize,
-    // No estimator exists in this repo today; keep null instead of guessing.
-    estimatedPromptTokens: null,
+    estimatedPromptTokens,
     providerReportedTokens: input.providerReportedTokens ?? null,
     rawHistoryFallback,
     status: input.status ?? "success",
     ...(input.errorCode ? { errorCode: input.errorCode } : {}),
     recordedAt: input.recordedAt,
   });
+
 
   const metadata: AiDoctorPromptMeasurementMetadata = {
     charCount,

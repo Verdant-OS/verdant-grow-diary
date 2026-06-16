@@ -124,31 +124,20 @@ describe("pi-ingest secret resolution plan — required content", () => {
   });
 });
 
-function walkSrc(dir: string, acc: string[] = []): string[] {
-  if (!existsSync(dir)) return acc;
-  for (const name of readdirSync(dir)) {
-    if (name === "node_modules" || name === ".git" || name === "dist") continue;
-    const p = resolve(dir, name);
-    const st = statSync(p);
-    if (st.isDirectory()) walkSrc(p, acc);
-    else acc.push(p);
-  }
-  return acc;
+function srcTsFiles(): string[] {
+  return listTsFilesCached(resolve(ROOT, "src"));
 }
 
 describe("pi-ingest secret resolution plan — repo guardrails", () => {
   it("no src/ file maps secret_hash to a secret field", () => {
-    const files = walkSrc(resolve(ROOT, "src")).filter((p) =>
-      /\.(ts|tsx)$/.test(p),
-    );
     const forbidden = [
       /secret\s*:\s*[A-Za-z_.]*\.?secret_hash\b/,
       /\bsecret_hash\s+as\s+secret\b/,
     ];
-    for (const f of files) {
+    for (const f of srcTsFiles()) {
       if (f.endsWith("piIngestSecretResolutionPlan.test.ts")) continue;
       if (f.endsWith("piIngestBridgeSecretStrategy.test.ts")) continue;
-      const text = readFileSync(f, "utf8");
+      const text = readFileCached(f);
       for (const re of forbidden) {
         expect(text, `forbidden mapping in ${f}`).not.toMatch(re);
       }
@@ -156,16 +145,13 @@ describe("pi-ingest secret resolution plan — repo guardrails", () => {
   });
 
   it("no src/ file maps secret_ciphertext directly to a secret field", () => {
-    const files = walkSrc(resolve(ROOT, "src")).filter((p) =>
-      /\.(ts|tsx)$/.test(p),
-    );
     const forbidden = [
       /secret\s*:\s*[A-Za-z_.]*\.?secret_ciphertext\b/,
       /\bsecret_ciphertext\s+as\s+secret\b/,
     ];
-    for (const f of files) {
+    for (const f of srcTsFiles()) {
       if (f.endsWith("piIngestSecretResolutionPlan.test.ts")) continue;
-      const text = readFileSync(f, "utf8");
+      const text = readFileCached(f);
       for (const re of forbidden) {
         expect(text, `forbidden mapping in ${f}`).not.toMatch(re);
       }
@@ -173,12 +159,9 @@ describe("pi-ingest secret resolution plan — repo guardrails", () => {
   });
 
   it("no src/ file contains decryption APIs", () => {
-    const files = walkSrc(resolve(ROOT, "src")).filter((p) =>
-      /\.(ts|tsx)$/.test(p),
-    );
     const offenders: string[] = [];
-    for (const f of files) {
-      const text = readFileSync(f, "utf8");
+    for (const f of srcTsFiles()) {
+      const text = readFileCached(f);
       if (
         /crypto\.subtle\.decrypt\s*\(/.test(text) ||
         /\bcreateDecipheriv\s*\(/.test(text)
@@ -190,12 +173,9 @@ describe("pi-ingest secret resolution plan — repo guardrails", () => {
   });
 
   it("no src/ file imports resolver/crypto from the Edge Function dir", () => {
-    const files = walkSrc(resolve(ROOT, "src")).filter((p) =>
-      /\.(ts|tsx)$/.test(p),
-    );
     const offenders: string[] = [];
-    for (const f of files) {
-      const text = readFileSync(f, "utf8");
+    for (const f of srcTsFiles()) {
+      const text = readFileCached(f);
       if (
         /from\s+["'][^"']*supabase\/functions\/pi-ingest-readings\/(secretResolver|crypto)["']/
           .test(text)

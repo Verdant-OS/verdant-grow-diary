@@ -233,7 +233,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
       .lte("captured_at", scope.maxCapturedAt);
     if (error || !data) return new Set<string>();
     const keys = new Set<string>();
-    for (const row of data as Array<{
+    for (const row of data as unknown as Array<{
       tent_id: string | null;
       source: string | null;
       metric: string | null;

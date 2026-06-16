@@ -458,7 +458,7 @@ export default function OperatorEcowittTentPreview() {
           {JSON.stringify(dryRun.dry_run_payload, null, 2)}
         </pre>
         <p className="text-xs text-muted-foreground">
-          No private fields (PASSKEY/MAC/token/IP/station) are included in this payload.
+          No private identifiers, credentials, or network details are included in this payload.
         </p>
         <button
           type="button"

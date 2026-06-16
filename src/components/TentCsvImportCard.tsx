@@ -212,6 +212,45 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
       : `csv-${Date.now()}`;
   }
 
+  /**
+   * Reads existing sensor_readings rows scoped to (tent_id, source set,
+   * metric set, captured_at range) and returns the set of dedupe keys
+   * already present for this tent. RLS guarantees we only ever see rows
+   * owned by the current authenticated user, so this query is structurally
+   * tenant-isolated. Selects only the safe presence columns — never
+   * raw_payload, value, device_id, user_id, or id.
+   */
+  async function fetchExistingDedupeKeys(
+    scope: ExistingKeysQueryScope,
+  ): Promise<Set<string>> {
+    const { data, error } = await supabase
+      .from("sensor_readings")
+      .select(SENSOR_READINGS_DEDUPE_SELECT_CLAUSE)
+      .in("tent_id", scope.tentIds)
+      .in("source", scope.sources)
+      .in("metric", scope.metrics)
+      .gte("captured_at", scope.minCapturedAt)
+      .lte("captured_at", scope.maxCapturedAt);
+    if (error || !data) return new Set<string>();
+    const keys = new Set<string>();
+    for (const row of data as Array<{
+      tent_id: string | null;
+      source: string | null;
+      metric: string | null;
+      captured_at: string | null;
+    }>) {
+      const captured = row.captured_at ?? "";
+      const t = Date.parse(captured);
+      const normalized = Number.isFinite(t)
+        ? new Date(t).toISOString()
+        : captured;
+      keys.add(
+        `${row.tent_id ?? ""}|${row.source ?? ""}|${row.metric ?? ""}|${normalized}`,
+      );
+    }
+    return keys;
+  }
+
   async function handleImport() {
     if (!preview) return;
     setImporting(true);

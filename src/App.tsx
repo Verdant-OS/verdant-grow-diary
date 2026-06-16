@@ -35,6 +35,7 @@ import Diagnostics from "./pages/Diagnostics";
 import ActionQueue from "./pages/ActionQueue";
 import OperatorEcowittCanary from "./pages/OperatorEcowittCanary";
 import OperatorEcowittTentPreview from "./pages/OperatorEcowittTentPreview";
+import OperatorGeneticsImportPage from "./pages/OperatorGeneticsImportPage";
 import EcowittBridgeStatus from "./pages/EcowittBridgeStatus";
 import OneTentProofRecord from "./pages/OneTentProofRecord";
 import ActionDetail from "./pages/ActionDetail";

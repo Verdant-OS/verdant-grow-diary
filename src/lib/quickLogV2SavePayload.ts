@@ -50,6 +50,12 @@ export function buildQuickLogV2SavePayload(
   if (!resolved?.ok || !resolved.targetType || !resolved.targetId) {
     return { ok: false, reason: "target_unresolved" };
   }
+  if (action === "photo") {
+    // Photo saving is intentionally not wired through the RPC payload yet.
+    // Surface the specific gate reason so the sheet can show the canonical
+    // "photo saving not enabled" copy instead of a generic invalid-action.
+    return { ok: false, reason: "photo_saving_not_enabled" };
+  }
   if (action !== "water" && action !== "note") {
     return { ok: false, reason: "invalid_action" };
   }

@@ -172,6 +172,34 @@ Do **not** invent numeric limits. Replace a marker only with evidence:
     );
   ```
 
+### Provider response usage extractor (extraction boundary)
+
+- Helper: `src/lib/cost/aiDoctorProviderResponseUsageExtractor.ts`
+  - `extractProviderReportedUsageCandidate(providerResponse: unknown)` → `unknown | null`
+  - Supports common OpenAI-compatible shapes:
+    - `{ usage: { prompt_tokens, completion_tokens, total_tokens } }`
+    - `{ usage: { promptTokens, completionTokens, totalTokens } }`
+    - `{ response: { usage: ... } }`
+    - `{ data: { usage: ... } }`
+  - Returns only the candidate usage object (shallow copy); never returns the
+    raw response, ids, model names, choices, headers, or metadata.
+  - Does **not** normalize — that is `normalizeProviderReportedTokenUsage`'s job.
+  - Does **not** attach to a measurement — that is the adapter's job.
+  - Returns `null` for missing, malformed, array, primitive, or ambiguous shapes.
+  - Pure, deterministic, non-mutating.
+- **Live provider call wiring remains blocked.** The Edge Function
+  (`supabase/functions/ai-doctor-review/index.ts`) is intentionally
+  unchanged in this slice. Future wiring would compose:
+  ```ts
+  const candidate = extractProviderReportedUsageCandidate(response);
+  const normalized = normalizeProviderReportedTokenUsage(candidate);
+  const next = attachProviderReportedUsageToAiDoctorPromptMeasurement(
+    promptMeasurement,
+    normalized,
+  );
+  ```
+
+
 ## What remains blocked until real measurements exist
 
 1. Any numeric threshold in `costThresholds.ts`.

@@ -598,3 +598,160 @@ describe("operator copy polish — explicit inserted vs skipped", () => {
     }
   });
 });
+
+import {
+  CSV_HISTORY_NO_ROWS_SAFE_FALLBACK_COPY,
+} from "@/lib/csv-import/sensorReadingsBatchInsert";
+
+describe("buildDuplicateAwareSuccessMessage — edge case hardening", () => {
+  it("0 inserted + duplicates>0 never says 'Imported 0 new'", () => {
+    const msg = buildDuplicateAwareSuccessMessage({
+      vendorLabel: "Spider Farmer",
+      inserted: 0,
+      duplicates: 5,
+      totalBatches: 0,
+    });
+    expect(msg).not.toMatch(/Imported 0 new/i);
+    expect(msg).toMatch(/^No new CSV history readings were imported\./);
+    expect(msg).toContain("5 readings already exist for this tent.");
+    expect(msg).toContain("No live sensor data was created.");
+  });
+
+  it("0 inserted + duplicates=1 uses singular 'reading already exist'", () => {
+    const msg = buildDuplicateAwareSuccessMessage({
+      vendorLabel: "Spider Farmer",
+      inserted: 0,
+      duplicates: 1,
+      totalBatches: 0,
+    });
+    expect(msg).toContain("1 reading already exist for this tent.");
+  });
+
+  it("0 inserted + 0 duplicates returns the safe fallback (never 'Imported 0 new')", () => {
+    const msg = buildDuplicateAwareSuccessMessage({
+      vendorLabel: "Spider Farmer",
+      inserted: 0,
+      duplicates: 0,
+      totalBatches: 0,
+    });
+    expect(msg).toBe(CSV_HISTORY_NO_ROWS_SAFE_FALLBACK_COPY);
+    expect(msg).not.toMatch(/Imported 0 new/i);
+    expect(msg).toContain("No live sensor data was created.");
+  });
+
+  it("orchestration: empty input never reaches buildDuplicateAwareSuccessMessage via runDuplicateAwareCsvHistoryImport with 0 rows", async () => {
+    // Empty-row preflight is the caller's responsibility, but if a caller
+    // ever invokes the orchestrator with [] rows, the resulting diagnostic
+    // must still be safe (no 'Imported 0 new' wording).
+    const out = await runDuplicateAwareCsvHistoryImport({
+      rows: [],
+      vendorLabel: "Spider Farmer",
+      fetchExistingKeys: async () => new Set<string>(),
+      insertBatch: async () => ({ error: null }),
+    });
+    expect(out.ok).toBe(true);
+    expect(out.insertedRows).toBe(0);
+    expect(out.duplicateRows).toBe(0);
+    expect(out.diagnostic).not.toMatch(/Imported 0 new/i);
+    expect(out.diagnostic).toContain("No live sensor data was created.");
+  });
+
+  it("invalid-key rows (null dedupe key) pass through as new and do not corrupt copy", async () => {
+    // dedupeKeyOf returns null for rows missing tent_id/source/metric or
+    // with unparseable captured_at. filterDuplicateRows lets them through
+    // so upstream validation handles them — they must not be counted as
+    // duplicates and must not break the success copy.
+    const valid = row("tent-A", "temperature_c", "2026-06-01T00:00:00.000Z");
+    const invalid = {
+      tent_id: "tent-A",
+      source: "csv",
+      metric: "temperature_c",
+      captured_at: "not-a-date",
+      value: 2,
+    } as Row;
+    const inserted: Row[] = [];
+    const out = await runDuplicateAwareCsvHistoryImport({
+      rows: [valid, invalid],
+      vendorLabel: "Spider Farmer",
+      fetchExistingKeys: async () => new Set<string>(),
+      insertBatch: async (b) => {
+        inserted.push(...b);
+        return { error: null };
+      },
+    });
+    expect(out.ok).toBe(true);
+    expect(out.duplicateRows).toBe(0);
+    expect(out.insertedRows).toBeGreaterThanOrEqual(1);
+    expect(out.diagnostic).toMatch(/Imported \d+ new Spider Farmer CSV history readings for this tent/);
+    expect(out.diagnostic).toContain("No live sensor data was created.");
+  });
+
+  it("every result-copy branch includes 'No live sensor data was created.'", () => {
+    const branches = [
+      { inserted: 0, duplicates: 0, totalBatches: 0 },
+      { inserted: 0, duplicates: 3, totalBatches: 0 },
+      { inserted: 5, duplicates: 0, totalBatches: 1 },
+      { inserted: 5, duplicates: 0, totalBatches: 3 },
+      { inserted: 5, duplicates: 2, totalBatches: 2 },
+    ];
+    for (const b of branches) {
+      const msg = buildDuplicateAwareSuccessMessage({
+        vendorLabel: "Spider Farmer",
+        ...b,
+      });
+      expect(msg).toContain("No live sensor data was created.");
+    }
+  });
+});
+
+describe("static scan — forbidden 'live-created' phrases", () => {
+  const FORBIDDEN_LIVE_PHRASES = [
+    "live readings imported",
+    "live sensor readings imported",
+    "synced live data",
+    "created live sensor data",
+  ];
+  const FILES = [
+    "src/lib/csv-import/sensorReadingsBatchInsert.ts",
+    "src/components/TentCsvImportCard.tsx",
+  ];
+  for (const rel of FILES) {
+    it(`${rel} never contains live-creation wording`, () => {
+      const code = readFileSync(resolve(process.cwd(), rel), "utf8");
+      for (const banned of FORBIDDEN_LIVE_PHRASES) {
+        expect(code.toLowerCase()).not.toContain(banned.toLowerCase());
+      }
+    });
+  }
+
+  it("every constant success/result copy string in the helper module includes no-live reassurance", () => {
+    // Exercise every branch via the public helper and the exported
+    // constants used as operator-facing copy.
+    const samples = [
+      CSV_HISTORY_NO_ROWS_SAFE_FALLBACK_COPY,
+      CSV_HISTORY_EMPTY_ROWS_COPY,
+      CSV_HISTORY_DEDUPE_CONFLICT_COPY,
+      buildDuplicateAwareSuccessMessage({
+        vendorLabel: "v",
+        inserted: 1,
+        duplicates: 0,
+        totalBatches: 1,
+      }),
+      buildDuplicateAwareSuccessMessage({
+        vendorLabel: "v",
+        inserted: 1,
+        duplicates: 1,
+        totalBatches: 1,
+      }),
+      buildDuplicateAwareSuccessMessage({
+        vendorLabel: "v",
+        inserted: 0,
+        duplicates: 1,
+        totalBatches: 0,
+      }),
+    ];
+    for (const s of samples) {
+      expect(s).toContain("No live sensor data was created.");
+    }
+  });
+});

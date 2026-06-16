@@ -204,8 +204,14 @@ describe("header alias detection", () => {
       ["Strain", "Variety", "Breeder", "Seed Type"],
       ["First", "Second", "B", "auto"],
     ]);
-    expect(r.fileWarnings.some((w) => w.field === "strain")).toBe(true);
+    const w = r.fileWarnings.find((x) => x.field === "strain");
+    expect(w).toBeDefined();
     expect(r.rows[0].strain).toBe("First");
+    expect(w!.usedColumn?.header).toBe("Strain");
+    expect(w!.ignoredColumns?.map((c) => c.header)).toEqual(["Variety"]);
+    expect(w!.message).toContain('Field "strain"');
+    expect(w!.message).toContain('used column "Strain"');
+    expect(w!.message).toContain('"Variety"');
   });
 
   it("still produces row-numbered errors when required fields are missing", () => {
@@ -216,6 +222,59 @@ describe("header alias detection", () => {
     expect(
       r.rows[0].issues.some((i) => i.message === "Row 2 is missing strain name."),
     ).toBe(true);
+  });
+
+  it("first column wins for multiple duplicate aliases across strain/breeder/seed_type", () => {
+    const r = buildGeneticsImportPreview([
+      ["variety", "strain", "seed bank", "breeder", "type", "seed type"],
+      ["VarietyVal", "StrainVal", "SeedBankVal", "BreederVal", "auto", "feminized"],
+      ["", "X", "", "Y", "", "auto"], // row 3: missing strain/breeder via WINNING columns
+    ]);
+    expect(r.fileLevelError).toBeNull();
+    // First column wins
+    expect(r.rows[0].strain).toBe("VarietyVal");
+    expect(r.rows[0].breeder).toBe("SeedBankVal");
+    expect(r.rows[0].seedType).toBe("autoflower");
+    // Duplicate warnings per affected canonical field
+    const fields = r.fileWarnings.map((w) => w.field).sort();
+    expect(fields).toEqual(["breeder", "seed_type", "strain"]);
+    const strainW = r.fileWarnings.find((w) => w.field === "strain")!;
+    expect(strainW.usedColumn?.header).toBe("variety");
+    expect(strainW.ignoredColumns?.map((c) => c.header)).toEqual(["strain"]);
+    const breederW = r.fileWarnings.find((w) => w.field === "breeder")!;
+    expect(breederW.usedColumn?.header).toBe("seed bank");
+    expect(breederW.ignoredColumns?.map((c) => c.header)).toEqual(["breeder"]);
+    const seedW = r.fileWarnings.find((w) => w.field === "seed_type")!;
+    expect(seedW.usedColumn?.header).toBe("type");
+    expect(seedW.ignoredColumns?.map((c) => c.header)).toEqual(["seed type"]);
+    // Row-numbered errors still align to spreadsheet row 3
+    const r3 = r.rows.find((x) => x.rowNumber === 3)!;
+    expect(r3.issues.some((i) => i.message === "Row 3 is missing strain name.")).toBe(true);
+    expect(r3.issues.some((i) => i.message === "Row 3 is missing breeder.")).toBe(true);
+  });
+
+  it("duplicate strain aliases do not overwrite valid first-column values", () => {
+    const r = buildGeneticsImportPreview([
+      ["variety", "strain", "breeder", "seed type"],
+      ["Keep Me", "Should Be Ignored", "B", "auto"],
+    ]);
+    expect(r.rows[0].strain).toBe("Keep Me");
+  });
+
+  it("duplicate breeder aliases do not overwrite valid first-column values", () => {
+    const r = buildGeneticsImportPreview([
+      ["strain", "seed bank", "breeder", "seed type"],
+      ["A", "Keep Bank", "Ignored", "auto"],
+    ]);
+    expect(r.rows[0].breeder).toBe("Keep Bank");
+  });
+
+  it("duplicate seed_type aliases do not overwrite valid first-column values", () => {
+    const r = buildGeneticsImportPreview([
+      ["strain", "breeder", "type", "seed type"],
+      ["A", "B", "auto", "feminized"],
+    ]);
+    expect(r.rows[0].seedType).toBe("autoflower");
   });
 });
 

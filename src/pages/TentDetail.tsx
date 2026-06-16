@@ -352,6 +352,8 @@ export default function TentDetail() {
         <TentCsvImportCard tentId={id} growId={tent.growId ?? null} />
       )}
 
+      <ImportedSensorHistoryPanel tentId={id ?? null} readings={readings} />
+
       {id && <TentSensorWebhookSettingsCard tentId={id} />}
       {id && <TentBridgeTokensCard tentId={id} />}
       {id && <TentSensorSourceHealthCard tentId={id} />}

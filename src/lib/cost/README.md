@@ -187,17 +187,109 @@ Do **not** invent numeric limits. Replace a marker only with evidence:
   - Does **not** attach to a measurement — that is the adapter's job.
   - Returns `null` for missing, malformed, array, primitive, or ambiguous shapes.
   - Pure, deterministic, non-mutating.
-- **Live provider call wiring remains blocked.** The Edge Function
-  (`supabase/functions/ai-doctor-review/index.ts`) is intentionally
-  unchanged in this slice. Future wiring would compose:
-  ```ts
-  const candidate = extractProviderReportedUsageCandidate(response);
-  const normalized = normalizeProviderReportedTokenUsage(candidate);
-  const next = attachProviderReportedUsageToAiDoctorPromptMeasurement(
-    promptMeasurement,
-    normalized,
-  );
-  ```
+
+### Provider response measurement composer (composition boundary)
+
+- Helper: `src/lib/cost/aiDoctorProviderResponseMeasurementComposer.ts`
+  - `attachProviderResponseUsageToAiDoctorPromptMeasurement(measurement, providerResponse)` → `AiDoctorPromptMeasurement`
+  - Internally calls `extractProviderReportedUsageCandidate(providerResponse)`,
+    then `attachProviderReportedUsageToAiDoctorPromptMeasurement(measurement, candidate)`.
+  - Returns a new measurement with `providerReportedTokens` set (when valid)
+    or `null` (when extraction or normalization rejects the input).
+  - Preserves every other measurement field (`summaryByteSize`,
+    `estimatedPromptTokens`, `rawHistoryFallback`, `promptName`, `status`,
+    `recordedAt`, etc.) exactly.
+  - Never mutates the input measurement.
+  - Never preserves raw provider fields (`id`, `model`, `choices`, `headers`,
+    `metadata`, `authorization`, `message`, `content`, request ids).
+  - Pure logic only. No persistence, no capture wiring, no budgets, no
+    thresholds, no back-pressure.
+
+#### Accepted provider response examples
+
+Top-level snake_case usage:
+
+```js
+// raw provider response
+{ id: "chatcmpl_1", model: "gpt-4o-mini",
+  usage: { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 } }
+
+// extractProviderReportedUsageCandidate(...) →
+{ prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 }
+
+// composer/adapter providerReportedTokens →
+{ promptTokens: 100, completionTokens: 50, totalTokens: 150 }
+```
+
+Top-level camelCase usage:
+
+```js
+// raw
+{ usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 } }
+
+// candidate → { promptTokens: 10, completionTokens: 5, totalTokens: 15 }
+// providerReportedTokens → { promptTokens: 10, completionTokens: 5, totalTokens: 15 }
+```
+
+Nested `response.usage`:
+
+```js
+// raw
+{ response: { usage: { prompt_tokens: 1, completion_tokens: 2, total_tokens: 3 } } }
+
+// candidate → { prompt_tokens: 1, completion_tokens: 2, total_tokens: 3 }
+// providerReportedTokens → { promptTokens: 1, completionTokens: 2, totalTokens: 3 }
+```
+
+Nested `data.usage`:
+
+```js
+// raw
+{ data: { usage: { prompt_tokens: 7, completion_tokens: 11, total_tokens: 18 } } }
+
+// candidate → { prompt_tokens: 7, completion_tokens: 11, total_tokens: 18 }
+// providerReportedTokens → { promptTokens: 7, completionTokens: 11, totalTokens: 18 }
+```
+
+Invalid / missing usage:
+
+```js
+// raw
+{ id: "chatcmpl_x", choices: [] }   // or null, [], "string", { usage: { prompt_tokens: -1 } }
+
+// candidate → null
+// providerReportedTokens → null
+```
+
+In every case the raw response's `id`, `model`, `choices`, `headers`,
+`metadata`, `authorization`, and message content are **never** preserved on
+the returned measurement.
+
+### Future live provider call-site wiring — blocked
+
+- The future attachment point is the AI Doctor provider response boundary,
+  immediately after the model response is received in
+  `supabase/functions/ai-doctor-review/index.ts`.
+- Wiring the composer into the live provider call must be a separate,
+  explicit PR. This slice intentionally does **not** modify the Edge Function
+  runtime, the model call, the prompt content, or the AI Doctor output.
+- The composer enables **no** persistence, capture-store wiring,
+  budget enforcement, back-pressure, or cost-driven AI degradation.
+- Raw provider responses must never be stored. Only the normalized
+  `ProviderReportedTokenUsage` shape (`promptTokens`, `completionTokens`,
+  `totalTokens`) may be attached to a measurement; nothing else from the
+  response is allowed downstream.
+
+Future wiring would compose:
+
+```ts
+const next = attachProviderResponseUsageToAiDoctorPromptMeasurement(
+  promptMeasurement,
+  providerResponse,
+);
+```
+
+
 
 
 ## What remains blocked until real measurements exist

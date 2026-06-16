@@ -727,7 +727,7 @@ export default function OperatorEcowittTentPreview() {
         <button
           type="button"
           onClick={handleExportAllTents}
-          data-testid="export-dry-run-all-tents-confirm-button"
+          data-testid="export-dry-run-all-tents-button"
           className="rounded-md border bg-background px-3 py-2 text-sm font-medium hover:bg-muted"
         >
           Download all-tent dry-run files (read-only)

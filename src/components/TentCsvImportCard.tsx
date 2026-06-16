@@ -72,9 +72,11 @@ import {
 } from "@/lib/sensorHistoryImportReplayGuard";
 import {
   CSV_HISTORY_INSERT_BATCH_SIZE,
-  insertSensorReadingsInBatches,
+  SENSOR_READINGS_DEDUPE_SELECT_CLAUSE,
   preflightCsvHistoryImport,
+  runDuplicateAwareCsvHistoryImport,
   type BatchInsertError,
+  type ExistingKeysQueryScope,
 } from "@/lib/csv-import/sensorReadingsBatchInsert";
 import SensorHistoryImportAuditLedger from "@/components/SensorHistoryImportAuditLedger";
 

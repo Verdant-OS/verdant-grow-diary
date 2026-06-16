@@ -8,7 +8,7 @@
  *    callback so callers retain full Supabase ownership.
  *  - Never promotes imported rows to live: callers must already build
  *    rows with `source = "csv"` and vendor lineage in raw_payload.
- *  - Never writes to action_queue, alerts, AI tables, or device tables.
+ *  - Never writes to approval-queue, alert, AI, or device tables.
  *  - Deterministic: same inputs → same chunking + same diagnostic text.
  */
 

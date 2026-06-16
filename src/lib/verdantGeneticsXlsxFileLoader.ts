@@ -14,6 +14,7 @@
  *     browser.
  */
 import type { CellGrid } from "@/lib/verdantGeneticsXlsxParser";
+import * as XLSX from "xlsx";
 
 export interface XlsxFileToGridOptions {
   /** Sheet index (defaults to first sheet). */
@@ -25,15 +26,14 @@ export async function readXlsxFileToCellGrid(
   opts: XlsxFileToGridOptions = {},
 ): Promise<CellGrid> {
   const buffer = await file.arrayBuffer();
-  const XLSX = await import("xlsx");
   const wb = XLSX.read(buffer, { type: "array", cellDates: true });
   const sheetName = wb.SheetNames[opts.sheetIndex ?? 0];
   if (!sheetName) return [];
   const sheet = wb.Sheets[sheetName];
-  const aoa = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+  const aoa = XLSX.utils.sheet_to_json(sheet, {
     header: 1,
     raw: true,
     defval: null,
-  });
+  }) as unknown[][];
   return aoa as CellGrid;
 }

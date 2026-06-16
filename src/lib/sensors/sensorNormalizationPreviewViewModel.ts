@@ -118,6 +118,9 @@ export const SENSOR_NORMALIZATION_PREVIEW_INVALID_NOTICE =
 export const SENSOR_NORMALIZATION_PREVIEW_TENT_MISSING_EMPTY_STATE =
   "No write-ready metric rows were generated because a valid tent context is missing." as const;
 
+export const SENSOR_NORMALIZATION_PREVIEW_NO_METRICS_EMPTY_STATE =
+  "No usable sensor metrics were found in this preview." as const;
+
 export const SENSOR_NORMALIZATION_PREVIEW_RAW_NOTE =
   "Raw payload preserved for future ingest/debug context. Full raw payload is not shown in preview mode." as const;
 

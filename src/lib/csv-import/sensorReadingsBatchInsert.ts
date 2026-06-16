@@ -77,18 +77,64 @@ export function validateSensorReadingInsertRows(
   }
   const sortedKeys = Array.from(unknown).sort();
   const sampleIndexes = affected.slice(0, 3);
+  const overflow = affected.length - sampleIndexes.length;
   const indexHint =
     affected.length > 0
-      ? ` First affected row index${affected.length === 1 ? "" : "es"}: ${sampleIndexes.join(", ")}${affected.length > sampleIndexes.length ? ` (+${affected.length - sampleIndexes.length} more)` : ""}.`
+      ? ` Affected rows: ${sampleIndexes.join(", ")}${overflow > 0 ? ` (+${overflow} more)` : ""}.`
       : "";
   const message =
-    `Import blocked before writing rows. CSV history insert payload contains unsupported sensor_readings field(s): ${sortedKeys.join(", ")}.${indexHint} No rows were written. No live sensor data was created.`;
+    `Import blocked before writing rows. Unsupported sensor_readings field(s): ${sortedKeys.join(", ")}.${indexHint} No rows were written. No live sensor data was created.`;
   return {
     ok: false,
     unknownKeys: sortedKeys,
     rowIndexes: affected,
     message,
   };
+}
+
+export const CSV_HISTORY_EMPTY_ROWS_COPY =
+  "Import blocked before writing rows. No importable sensor readings were found. Check the CSV mapping, units, and timestamp columns. No rows were written. No live sensor data was created.";
+
+export interface PreflightCsvHistoryImportResult {
+  ok: boolean;
+  reason: "empty" | "unsupported_fields" | null;
+  message: string | null;
+  unknownKeys: string[];
+  rowIndexes: number[];
+}
+
+/**
+ * Composite preflight that callers use to abort BEFORE invoking
+ * `insertSensorReadingsInBatches`. Guarantees that:
+ *   - empty / parsed-to-zero CSVs never touch Supabase
+ *   - any row with an unsupported top-level sensor_readings key
+ *     aborts the entire import (no partial writes)
+ *   - operator copy ends with "No rows were written. No live sensor
+ *     data was created." for every block reason
+ */
+export function preflightCsvHistoryImport(
+  rows: ReadonlyArray<Record<string, unknown>>,
+): PreflightCsvHistoryImportResult {
+  if (rows.length === 0) {
+    return {
+      ok: false,
+      reason: "empty",
+      message: CSV_HISTORY_EMPTY_ROWS_COPY,
+      unknownKeys: [],
+      rowIndexes: [],
+    };
+  }
+  const v = validateSensorReadingInsertRows(rows);
+  if (!v.ok) {
+    return {
+      ok: false,
+      reason: "unsupported_fields",
+      message: v.message,
+      unknownKeys: v.unknownKeys,
+      rowIndexes: v.rowIndexes,
+    };
+  }
+  return { ok: true, reason: null, message: null, unknownKeys: [], rowIndexes: [] };
 }
 
 export interface BatchInsertError {

@@ -2,12 +2,14 @@ import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  CSV_HISTORY_EMPTY_ROWS_COPY,
   CSV_HISTORY_INSERT_BATCH_SIZE,
   SENSOR_READINGS_INSERT_ALLOWED_KEYS,
   chunkRows,
   insertSensorReadingsInBatches,
   buildBatchFailureMessage,
   buildBatchSuccessMessage,
+  preflightCsvHistoryImport,
   validateSensorReadingInsertRows,
 } from "@/lib/csv-import/sensorReadingsBatchInsert";
 
@@ -137,6 +139,8 @@ describe("sensorReadingsBatchInsert static safety", () => {
   ]) {
     it(`source does not contain forbidden token: ${needle}`, () => {
       expect(src).not.toContain(needle);
+    });
+  }
 });
 
 describe("validateSensorReadingInsertRows — preflight payload shape", () => {
@@ -234,6 +238,125 @@ describe("validateSensorReadingInsertRows — preflight payload shape", () => {
       ].sort(),
     );
   });
+
+  it("indexHint uses 'Affected rows:' phrasing", () => {
+    const r = validateSensorReadingInsertRows([
+      { metric: "t", value: 1, captured_at: "x", source: "csv", tent_id: "t", grow_id: "g" },
+    ]);
+    expect(r.message).toContain("Affected rows: 0");
+  });
 });
+
+describe("preflightCsvHistoryImport — composite import gate", () => {
+  const validRow = {
+    captured_at: "2026-06-01T00:00:00Z",
+    metric: "temperature",
+    value: 24.5,
+    source: "csv",
+    tent_id: "t-1",
+    raw_payload: { source_app: "spider_farmer", grow_id: "g-1" },
+  };
+
+  it("empty rows → blocked with exact operator copy", () => {
+    const r = preflightCsvHistoryImport([]);
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe("empty");
+    expect(r.message).toBe(CSV_HISTORY_EMPTY_ROWS_COPY);
+    expect(r.message).toContain("No importable sensor readings were found.");
+    expect(r.message).toContain("No rows were written.");
+    expect(r.message).toContain("No live sensor data was created.");
+  });
+
+  it("valid rows pass through", () => {
+    const r = preflightCsvHistoryImport([validRow]);
+    expect(r.ok).toBe(true);
+    expect(r.reason).toBeNull();
+    expect(r.message).toBeNull();
+  });
+
+  it("unsupported grow_id → blocked with key + no-write reassurance", () => {
+    const r = preflightCsvHistoryImport([{ ...validRow, grow_id: "g" }]);
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe("unsupported_fields");
+    expect(r.message).toContain("Import blocked before writing rows.");
+    expect(r.message).toContain("Unsupported sensor_readings field(s): grow_id");
+    expect(r.message).toContain("No rows were written. No live sensor data was created.");
+  });
+
+  it("unsupported plant_id → blocked", () => {
+    const r = preflightCsvHistoryImport([{ ...validRow, plant_id: "p" }]);
+    expect(r.ok).toBe(false);
+    expect(r.unknownKeys).toEqual(["plant_id"]);
+  });
+
+  it("mixed valid + invalid rows aborts the whole import (no partial pass)", () => {
+    const r = preflightCsvHistoryImport([
+      validRow,
+      { ...validRow, grow_id: "g" },
+      validRow,
+    ]);
+    expect(r.ok).toBe(false);
+    expect(r.rowIndexes).toEqual([1]);
+    expect(r.unknownKeys).toEqual(["grow_id"]);
+  });
+});
+
+describe("CSV history import orchestration — no-write proof", () => {
+  /**
+   * Mirrors TentCsvImportCard's submit composition:
+   *   preflightCsvHistoryImport(rows) -> insertSensorReadingsInBatches(rows)
+   * If the preflight blocks, insertSensorReadingsInBatches MUST NOT run.
+   */
+  async function runImport(rows: Array<Record<string, unknown>>) {
+    const insertBatch = vi.fn(async () => ({ error: null }));
+    const preflight = preflightCsvHistoryImport(rows);
+    if (!preflight.ok) {
+      return { blocked: true, message: preflight.message, insertBatch };
+    }
+    await insertSensorReadingsInBatches({
+      rows,
+      vendorLabel: "Spider Farmer",
+      insertBatch,
+    });
+    return { blocked: false, message: null, insertBatch };
   }
+
+  it("empty rows abort before any Supabase insert", async () => {
+    const r = await runImport([]);
+    expect(r.blocked).toBe(true);
+    expect(r.message).toBe(CSV_HISTORY_EMPTY_ROWS_COPY);
+    expect(r.insertBatch).not.toHaveBeenCalled();
+  });
+
+  it("unsupported grow_id aborts before any Supabase insert", async () => {
+    const r = await runImport([
+      { captured_at: "t", metric: "temperature", value: 1, source: "csv", tent_id: "t", grow_id: "g" },
+    ]);
+    expect(r.blocked).toBe(true);
+    expect(r.message).toContain("grow_id");
+    expect(r.message).toContain("No rows were written. No live sensor data was created.");
+    expect(r.insertBatch).not.toHaveBeenCalled();
+  });
+
+  it("unsupported plant_id aborts before any Supabase insert", async () => {
+    const r = await runImport([
+      { captured_at: "t", metric: "temperature", value: 1, source: "csv", tent_id: "t", plant_id: "p" },
+    ]);
+    expect(r.blocked).toBe(true);
+    expect(r.insertBatch).not.toHaveBeenCalled();
+  });
+
+  it("mixed rows abort entirely — even valid rows do not reach insert", async () => {
+    const valid = { captured_at: "t", metric: "temperature", value: 1, source: "csv", tent_id: "t" };
+    const r = await runImport([valid, { ...valid, grow_id: "g" }, valid]);
+    expect(r.blocked).toBe(true);
+    expect(r.insertBatch).not.toHaveBeenCalled();
+  });
+
+  it("valid rows still reach batch insert", async () => {
+    const valid = { captured_at: "t", metric: "temperature", value: 1, source: "csv", tent_id: "t" };
+    const r = await runImport([valid, valid]);
+    expect(r.blocked).toBe(false);
+    expect(r.insertBatch).toHaveBeenCalledTimes(1);
+  });
 });

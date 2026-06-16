@@ -67,7 +67,7 @@ import {
 import {
   CSV_HISTORY_INSERT_BATCH_SIZE,
   insertSensorReadingsInBatches,
-  validateSensorReadingInsertRows,
+  preflightCsvHistoryImport,
   type BatchInsertError,
 } from "@/lib/csv-import/sensorReadingsBatchInsert";
 import SensorHistoryImportAuditLedger from "@/components/SensorHistoryImportAuditLedger";
@@ -205,7 +205,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
   }
 
   async function handleImport() {
-    if (!preview || preview.rows.length === 0) return;
+    if (!preview) return;
     setImporting(true);
     try {
       const importBatchId = newBatchId();
@@ -216,7 +216,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         importBatchId,
         rows: preview.rows,
       });
-      const preflight = validateSensorReadingInsertRows(
+      const preflight = preflightCsvHistoryImport(
         rows as unknown as Array<Record<string, unknown>>,
       );
       if (!preflight.ok) {
@@ -289,12 +289,8 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         );
         return;
       }
-      if (result.rows.length === 0) {
-        setParseError(
-          "No sensor readings found. This file appears to contain timestamps or device metadata only.",
-        );
-        return;
-      }
+      // Empty/no-row guard is handled by preflightCsvHistoryImport below so
+      // the operator copy stays consistent across vendors.
       const fingerprint = buildSensorHistoryImportFingerprint({
         sourceAppId: detected,
         rows: toFingerprintRows(result.rows),
@@ -306,7 +302,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         });
         return;
       }
-      const preflight = validateSensorReadingInsertRows(
+      const preflight = preflightCsvHistoryImport(
         result.rows as unknown as Array<Record<string, unknown>>,
       );
       if (!preflight.ok) {

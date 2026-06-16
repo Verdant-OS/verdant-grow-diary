@@ -72,5 +72,6 @@ If this document is referenced during implementation, all sensor data, API token
 
 ## Related Docs
 
-- [Prometheus Metrics Ownership and Naming Plan](./prometheus-metrics-ownership.md)
+- [Prometheus Alert Lifecycle Checklist](./prometheus-alert-lifecycle-checklist.md)
 - [Prometheus Alert Runbook Template](./prometheus-alert-runbook-template.md)
+- [Prometheus Metrics Ownership and Naming Plan](./prometheus-metrics-ownership.md)

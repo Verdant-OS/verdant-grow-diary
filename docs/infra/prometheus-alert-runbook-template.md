@@ -293,6 +293,7 @@ The following are explicitly out of scope:
 
 ## Related Docs
 
+- [Prometheus Alert Lifecycle Checklist](./prometheus-alert-lifecycle-checklist.md)
 - [Prometheus Metrics Ownership and Naming Plan](./prometheus-metrics-ownership.md)
 - [Prometheus Operator CRD Backlog](./prometheus-operator-crd-backlog.md)
 

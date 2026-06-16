@@ -334,7 +334,7 @@ describe("post-import CTA — 'View imported history' navigation", () => {
       /label:\s*["']View imported history["']/,
     );
     expect(CARD).toMatch(
-      /navigate\(`\/tents\/\$\{tentId\}#imported-history`\)/,
+      /navigate\(`(?:\/tents\/\$\{tentId\}|\$\{tentDetailPath\(tentId\)\})#imported-history`\)/,
     );
   });
 
@@ -379,10 +379,16 @@ describe("post-import CTA — 'View imported history' navigation", () => {
 
   it("CTA navigation target is the selected tent + supported anchor only — no invented query params", () => {
     const navCalls = [...CARD.matchAll(/navigate\(`([^`]+)`\)/g)].map((m) => m[1]);
-    const ctaNav = navCalls.filter((p) => p.includes("/tents/"));
+    const ctaNav = navCalls.filter(
+      (p) => p.includes("/tents/") || p.includes("tentDetailPath("),
+    );
     expect(ctaNav.length).toBeGreaterThan(0);
     for (const path of ctaNav) {
-      expect(path).toBe("/tents/${tentId}#imported-history");
+      // Either inline template literal or shared route helper, both must
+      // resolve to the supported `#imported-history` anchor on the tent.
+      expect(path).toMatch(
+        /^(\/tents\/\$\{tentId\}|\$\{tentDetailPath\(tentId\)\})#imported-history$/,
+      );
       expect(path).not.toMatch(/\?/);
       expect(path).not.toContain("start=");
       expect(path).not.toContain("end=");

@@ -306,6 +306,7 @@ Do metric summaries still look plausible?
 
 ## Related Docs
 
+- [`docs/qa/sensor-normalization-warning-reference.md`](./sensor-normalization-warning-reference.md)
 - [`docs/qa/csv-sensor-import-preview-qa.md`](./csv-sensor-import-preview-qa.md)
 - [`docs/qa/quick-log-environment-check-preview-qa.md`](./quick-log-environment-check-preview-qa.md)
 - [`docs/sensor-truth-rules.md`](./sensor-truth-rules.md)

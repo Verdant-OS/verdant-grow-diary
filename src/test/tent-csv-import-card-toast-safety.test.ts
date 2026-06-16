@@ -212,3 +212,117 @@ describe("Toast result copy — helper output rendered into the toast", () => {
     );
   });
 });
+
+import {
+  preflightCsvHistoryImport,
+  validateSensorReadingInsertRows,
+} from "@/lib/csv-import/sensorReadingsBatchInsert";
+
+describe("preflight + failure copy stays distinct from success copy", () => {
+  const SUCCESS_PHRASES = [
+    /Imported \d+ new/,
+    /Skipped \d+ duplicate/,
+    /already present for this tent/,
+    /\bin 1 batch\b/,
+    /\bacross \d+ batches\b/,
+  ];
+
+  it("empty-row preflight copy is exact and contains no success wording", () => {
+    const r = preflightCsvHistoryImport([]);
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe("empty");
+    expect(r.message).toBe(
+      "Import blocked before writing rows. No importable sensor readings were found. Check the CSV mapping, units, and timestamp columns. No rows were written. No live sensor data was created.",
+    );
+    for (const banned of ["Imported", "new", "Skipped", "already present for this tent"]) {
+      expect(r.message).not.toContain(banned);
+    }
+  });
+
+  it("unsupported-field preflight copy carries blocked + field list + no-live; no success wording", () => {
+    const v = validateSensorReadingInsertRows([
+      { tent_id: "t", source: "csv", metric: "temperature_c", captured_at: "2026-06-01T00:00:00Z", value: 1, foo_bar: 1 } as Record<string, unknown>,
+    ]);
+    expect(v.ok).toBe(false);
+    const msg = v.message!;
+    expect(msg).toContain("Import blocked before writing rows.");
+    expect(msg).toContain("Unsupported sensor_readings field(s):");
+    expect(msg).toContain("foo_bar");
+    expect(msg).toContain("No rows were written.");
+    expect(msg).toContain("No live sensor data was created.");
+    for (const re of SUCCESS_PHRASES) {
+      expect(msg).not.toMatch(re);
+    }
+  });
+
+  it("23505 dedupe fallback copy stays tent-scoped, names dedupe key, has no success wording", () => {
+    const msg = buildBatchFailureMessage({
+      batchIndex: 1,
+      totalBatches: 1,
+      failedBatchSize: 100,
+      insertedRows: 0,
+      vendorLabel: "Spider Farmer / THP Data",
+      error: {
+        code: "23505",
+        message:
+          'duplicate key value violates unique constraint "sensor_readings_dedupe_uidx"',
+        details: null,
+        hint: null,
+      },
+    });
+    expect(msg).toContain(
+      "Import stopped because matching CSV history readings already exist for this tent",
+    );
+    expect(msg.toLowerCase()).toContain("dedupe key");
+    expect(msg).toContain("No live sensor data was created.");
+    for (const re of SUCCESS_PHRASES) {
+      expect(msg).not.toMatch(re);
+    }
+  });
+
+  it("non-dedupe batch failure stays operator-friendly with batch info + db code + no-live, no raw payload", () => {
+    const msg = buildBatchFailureMessage({
+      batchIndex: 3,
+      totalBatches: 10,
+      failedBatchSize: 250,
+      insertedRows: 500,
+      vendorLabel: "Spider Farmer",
+      error: {
+        code: "08006",
+        message: "connection terminated unexpectedly",
+        details: null,
+        hint: "retry the import",
+      },
+    });
+    expect(msg).toContain("batch 3 of 10");
+    expect(msg).toContain("250 Spider Farmer rows");
+    expect(msg).toContain("[code: 08006]");
+    expect(msg).toContain("Hint: retry the import.");
+    expect(msg).toContain("No live sensor data was created.");
+    expect(msg).toContain("500 readings from earlier batches");
+    // Never expose raw payload or sensitive surfaces
+    for (const banned of ["raw_payload", "service_role", "Bearer ", "auth.uid"]) {
+      expect(msg).not.toContain(banned);
+    }
+    // Never reuse success wording
+    for (const re of SUCCESS_PHRASES) {
+      expect(msg).not.toMatch(re);
+    }
+  });
+
+  it("XLSX error toast copy in TentCsvImportCard contains no forbidden live-creation phrases", () => {
+    const xlsxErrorBlock = CARD.match(/toast\.error\([^)]*XLSX[^)]*\)/);
+    // It's OK if not found (string may not include "XLSX"); but if present, scan it.
+    if (xlsxErrorBlock) {
+      const lower = xlsxErrorBlock[0].toLowerCase();
+      for (const phrase of FORBIDDEN_LIVE_PHRASES) {
+        expect(lower).not.toContain(phrase);
+      }
+    }
+    // Always scan the broader card source for forbidden XLSX error wording.
+    const lowerCard = CARD.toLowerCase();
+    for (const phrase of FORBIDDEN_LIVE_PHRASES) {
+      expect(lowerCard).not.toContain(phrase);
+    }
+  });
+});

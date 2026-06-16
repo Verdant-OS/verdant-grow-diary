@@ -64,6 +64,11 @@ import {
   hasSensorHistoryImportFingerprint,
   recordSensorHistoryImportFingerprint,
 } from "@/lib/sensorHistoryImportReplayGuard";
+import {
+  CSV_HISTORY_INSERT_BATCH_SIZE,
+  insertSensorReadingsInBatches,
+  type BatchInsertError,
+} from "@/lib/csv-import/sensorReadingsBatchInsert";
 import SensorHistoryImportAuditLedger from "@/components/SensorHistoryImportAuditLedger";
 
 interface Props {
@@ -211,11 +216,23 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         rows: preview.rows,
       });
       // NOTE: no `user_id` in payload — DB default auth.uid() owns the row.
-      const { error } = await supabase
-        .from("sensor_readings")
-        .insert(rows as never);
-      if (error) throw error;
-      toast.success("CSV sensor history imported.");
+      const batchResult = await insertSensorReadingsInBatches({
+        rows,
+        vendorLabel: CSV_SOURCE_LABEL[sourceApp] ?? "CSV history",
+        batchSize: CSV_HISTORY_INSERT_BATCH_SIZE,
+        insertBatch: async (batch) => {
+          const { error } = await supabase
+            .from("sensor_readings")
+            .insert(batch as never);
+          return { error: error as BatchInsertError | null };
+        },
+      });
+      if (!batchResult.ok) {
+        setParseError(batchResult.diagnostic);
+        toast.error("Couldn't import CSV.", { description: batchResult.diagnostic });
+        return;
+      }
+      toast.success(batchResult.diagnostic);
       qc.invalidateQueries({ queryKey: ["sensor_readings"] });
       qc.invalidateQueries({ queryKey: ["grow", "sensors"] });
       qc.invalidateQueries({ queryKey: ["latest-sensor-snapshot"] });
@@ -280,13 +297,23 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         });
         return;
       }
-      const { error } = await supabase
-        .from("sensor_readings")
-        .insert(result.rows as never);
-      if (error) throw error;
-      toast.success(
-        `Imported ${result.rows.length} ${sourcePreview.sourceAppLabel} CSV history rows.`,
-      );
+      const batchResult = await insertSensorReadingsInBatches({
+        rows: result.rows,
+        vendorLabel: sourcePreview.sourceAppLabel,
+        batchSize: CSV_HISTORY_INSERT_BATCH_SIZE,
+        insertBatch: async (batch) => {
+          const { error } = await supabase
+            .from("sensor_readings")
+            .insert(batch as never);
+          return { error: error as BatchInsertError | null };
+        },
+      });
+      if (!batchResult.ok) {
+        setParseError(batchResult.diagnostic);
+        toast.error("Couldn't import CSV.", { description: batchResult.diagnostic });
+        return;
+      }
+      toast.success(batchResult.diagnostic);
       const auditInput = buildRegistryCsvAuditInput({
         sourceAppId: detected,
         adapterResult: result,
@@ -480,8 +507,13 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
             type="button"
             size="sm"
             onClick={handleParse}
-            disabled={!text || !sourceEnabled}
+            disabled={!text || !sourceEnabled || registrySaveVisible}
             data-testid="csv-parse"
+            title={
+              registrySaveVisible
+                ? "Use the detected-source import button below — the legacy AC Infinity parser is not used for this file."
+                : undefined
+            }
           >
             Parse &amp; Preview
           </Button>
@@ -643,7 +675,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
       )}
 
 
-      {preview && (
+      {preview && !registrySaveVisible && (
         <div className="mt-4 grid gap-3" data-testid="csv-preview">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
             <Stat label="Readings parsed" value={String(validCount)} testId="csv-stat-parsed" />

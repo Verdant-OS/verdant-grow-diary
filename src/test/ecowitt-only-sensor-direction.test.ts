@@ -87,9 +87,18 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
+// Memoise the repo walk across `it`s in this file. The scanner only
+// reads files — it never mutates them — so a per-worker cache is safe.
+let cachedScanFiles: string[] | null = null;
+function getScanFiles(): string[] {
+  if (cachedScanFiles) return cachedScanFiles;
+  cachedScanFiles = SCAN_DIRS.flatMap((d) => walk(join(ROOT, d)));
+  return cachedScanFiles;
+}
+
 describe("EcoWitt-only sensor direction", () => {
   it("contains zero SwitchBot references outside the explicit allow-list", () => {
-    const files = SCAN_DIRS.flatMap((d) => walk(join(ROOT, d)));
+    const files = getScanFiles();
     const offenders: string[] = [];
     for (const f of files) {
       const rel = relative(ROOT, f).split(sep).join("/");

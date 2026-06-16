@@ -28,14 +28,19 @@ function renderPage() {
 }
 
 describe("Onboarding page", () => {
-  it("renders an accessible heading and radiogroup with three options", () => {
+  it("renders an accessible heading and radiogroup with all start-screen options", () => {
     renderPage();
     expect(
       screen.getByRole("heading", { name: /where do you want verdant to open first/i }),
     ).toBeInTheDocument();
     expect(screen.getByRole("radiogroup")).toBeInTheDocument();
     const radios = screen.getAllByRole("radio");
-    expect(radios).toHaveLength(3);
+    // Mirrors START_SCREEN_OPTIONS: quickLog, timeline, dashboard, onboarding, welcome.
+    expect(radios).toHaveLength(5);
+    const values = radios.map((r) => (r as HTMLInputElement).value).sort();
+    expect(values).toEqual(
+      ["dashboard", "onboarding", "quickLog", "timeline", "welcome"].sort(),
+    );
     // Quick Log is default and marked recommended
     const quickLog = radios.find((r) => (r as HTMLInputElement).value === "quickLog") as HTMLInputElement;
     expect(quickLog.checked).toBe(true);

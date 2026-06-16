@@ -25,6 +25,16 @@ function runScannerIn(cwd: string) {
   });
 }
 
+// Memoise the (slow) real-repo scanner run so the two `it`s that both
+// just expect "exit 0 against ROOT" don't pay for the spawn twice.
+// Same command, same cwd, deterministic output — safe to cache.
+let cachedRootRun: ReturnType<typeof spawnSync> | null = null;
+function runScannerInRoot() {
+  if (cachedRootRun) return cachedRootRun;
+  cachedRootRun = runScannerIn(ROOT);
+  return cachedRootRun;
+}
+
 describe("scripts/assert-vpd-stage-normalization-ownership.mjs", () => {
   it("the scanner file and package script exist", () => {
     expect(() => require("node:fs").readFileSync(resolve(ROOT, SCRIPT), "utf8"))
@@ -38,12 +48,8 @@ describe("scripts/assert-vpd-stage-normalization-ownership.mjs", () => {
   });
 
   it("passes against the real repo", () => {
-    const res = spawnSync("node", [resolve(ROOT, SCRIPT)], {
-      cwd: ROOT,
-      encoding: "utf8",
-    });
+    const res = runScannerInRoot();
     if (res.status !== 0) {
-      // Make failures self-describing.
       throw new Error(
         "Scanner unexpectedly failed:\n" + res.stdout + "\n" + res.stderr,
       );
@@ -89,10 +95,8 @@ describe("scripts/assert-vpd-stage-normalization-ownership.mjs", () => {
   it("ignores the allow-listed scanner and helper files", () => {
     // The scanner contains the pair literals in its own source for the
     // regex definitions; allow-listing prevents self-flagging.
-    const res = spawnSync("node", [resolve(ROOT, SCRIPT)], {
-      cwd: ROOT,
-      encoding: "utf8",
-    });
+    // Reuses the memoised real-repo run (same command, same cwd).
+    const res = runScannerInRoot();
     expect(res.status).toBe(0);
   });
 });

@@ -18,7 +18,7 @@
  *  - Does NOT alter scanner regexes, allowlists, or assertions.
  *  - Does NOT touch production code.
  */
-import { vi, beforeEach, afterEach } from "vitest";
+import { vi, beforeEach, afterEach, it as vitestIt } from "vitest";
 import { appendFileSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
@@ -30,6 +30,47 @@ const REPORT_PATH = resolve(
   "test-results",
   "scanner-guardrail-slow-tests.jsonl",
 );
+
+/** Stable JSONL row contract for the scanner slow-test telemetry report. */
+export interface ScannerSlowTestReportRow {
+  test: string;
+  suite: string;
+  file: string;
+  durationMs: number;
+  thresholdMs: number;
+  recordedAt: string;
+}
+
+/**
+ * Pure builder for a JSONL row. Exported so harness self-tests can
+ * validate the row shape deterministically without depending on real
+ * test timing.
+ */
+export function buildScannerSlowTestReportRow(input: {
+  test: string;
+  suite: string;
+  file: string;
+  durationMs: number;
+  recordedAt?: string;
+}): ScannerSlowTestReportRow {
+  const test = input.test.trim();
+  const suite = input.suite.trim();
+  const file = input.file.trim();
+  if (!test) throw new Error("scanner slow-test row: empty test name");
+  if (!suite) throw new Error("scanner slow-test row: empty suite label");
+  if (!file) throw new Error("scanner slow-test row: empty file path");
+  if (!Number.isFinite(input.durationMs)) {
+    throw new Error("scanner slow-test row: non-finite durationMs");
+  }
+  return {
+    test,
+    suite,
+    file,
+    durationMs: Math.round(input.durationMs),
+    thresholdMs: SLOW_SCANNER_THRESHOLD_MS,
+    recordedAt: input.recordedAt ?? new Date().toISOString(),
+  };
+}
 
 /**
  * Install the standard scanner guardrail timeout + slow-test timing
@@ -50,33 +91,54 @@ export function installScannerGuardrail(opts: {
 
   let startedAt = 0;
   let currentName = "";
+  let currentSuite = "";
 
   beforeEach((ctx) => {
     startedAt = performance.now();
-    // ctx.task is a Vitest Task; .name is the `it` label.
-    currentName = (ctx as { task?: { name?: string } }).task?.name ?? "";
+    const task = (ctx as { task?: { name?: string; suite?: { name?: string } } })
+      .task;
+    currentName = task?.name ?? "";
+    currentSuite = task?.suite?.name ?? "";
   });
 
   afterEach(() => {
     const durationMs = performance.now() - startedAt;
     if (durationMs < SLOW_SCANNER_THRESHOLD_MS) return;
     try {
+      const row = buildScannerSlowTestReportRow({
+        test: currentName || "(unknown test)",
+        suite: currentSuite || "(unknown suite)",
+        file: opts.file,
+        durationMs,
+      });
       mkdirSync(dirname(REPORT_PATH), { recursive: true });
-      appendFileSync(
-        REPORT_PATH,
-        JSON.stringify({
-          test: currentName,
-          file: opts.file,
-          durationMs: Math.round(durationMs),
-          thresholdMs: SLOW_SCANNER_THRESHOLD_MS,
-          recordedAt: new Date().toISOString(),
-        }) + "\n",
-      );
+      appendFileSync(REPORT_PATH, JSON.stringify(row) + "\n");
     } catch {
       // Informational only — never fail a guardrail because of report I/O.
     }
   });
 }
+
+/**
+ * Convenience wrapper. New scanner tests should prefer:
+ *
+ *   scannerIt("does not leak X", () => { ... });
+ *
+ * over a bare `it(...)` so the standardised per-test timeout cannot
+ * accidentally be dropped. Behaviour is identical to `it` aside from
+ * carrying the harness timeout default.
+ */
+export const scannerIt = ((
+  name: string,
+  fn?: (...args: unknown[]) => unknown,
+  timeout?: number,
+) => {
+  return (vitestIt as unknown as (
+    n: string,
+    f?: (...args: unknown[]) => unknown,
+    t?: number,
+  ) => unknown)(name, fn, timeout ?? SCANNER_GUARDRAIL_TIMEOUT_MS);
+}) as unknown as typeof vitestIt;
 
 /**
  * Cached recursive walk for `.ts`/`.tsx` files (configurable).

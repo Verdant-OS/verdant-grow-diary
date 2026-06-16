@@ -17,7 +17,9 @@ import { resolve } from "node:path";
 import {
   SCANNER_GUARDRAIL_TIMEOUT_MS,
   SLOW_SCANNER_THRESHOLD_MS,
+  buildScannerSlowTestReportRow,
   getCachedTsFiles,
+  scannerIt,
   __resetScannerHarnessCachesForTests,
 } from "./support/scannerGuardrailHarness";
 
@@ -67,5 +69,71 @@ describe("scannerGuardrailHarness", () => {
     expect(existsSync(resolve(__dirname, "../../src/test-results"))).toBe(
       false,
     );
+  });
+
+  it("buildScannerSlowTestReportRow produces the stable JSONL row shape", () => {
+    const row = buildScannerSlowTestReportRow({
+      test: "example slow scanner",
+      suite: "example suite",
+      file: "/repo/src/test/example.test.ts",
+      durationMs: 5234.7,
+      recordedAt: "2026-06-16T00:00:00.000Z",
+    });
+    expect(row).toEqual({
+      test: "example slow scanner",
+      suite: "example suite",
+      file: "/repo/src/test/example.test.ts",
+      durationMs: 5235,
+      thresholdMs: SLOW_SCANNER_THRESHOLD_MS,
+      recordedAt: "2026-06-16T00:00:00.000Z",
+    });
+    expect(typeof row.test).toBe("string");
+    expect(row.test.length).toBeGreaterThan(0);
+    expect(typeof row.suite).toBe("string");
+    expect(row.suite.length).toBeGreaterThan(0);
+    expect(typeof row.file).toBe("string");
+    expect(row.file.length).toBeGreaterThan(0);
+    expect(Number.isFinite(row.durationMs)).toBe(true);
+    expect(row.thresholdMs).toBe(5_000);
+    expect(new Date(row.recordedAt).toISOString()).toBe(row.recordedAt);
+  });
+
+  it("buildScannerSlowTestReportRow rejects empty/invalid input", () => {
+    expect(() =>
+      buildScannerSlowTestReportRow({
+        test: "",
+        suite: "s",
+        file: "f",
+        durationMs: 5001,
+      }),
+    ).toThrow(/empty test name/);
+    expect(() =>
+      buildScannerSlowTestReportRow({
+        test: "t",
+        suite: " ",
+        file: "f",
+        durationMs: 5001,
+      }),
+    ).toThrow(/empty suite label/);
+    expect(() =>
+      buildScannerSlowTestReportRow({
+        test: "t",
+        suite: "s",
+        file: "",
+        durationMs: 5001,
+      }),
+    ).toThrow(/empty file path/);
+    expect(() =>
+      buildScannerSlowTestReportRow({
+        test: "t",
+        suite: "s",
+        file: "f",
+        durationMs: Number.NaN,
+      }),
+    ).toThrow(/non-finite durationMs/);
+  });
+
+  scannerIt("scannerIt runs like vitest it and respects the harness", () => {
+    expect(typeof scannerIt).toBe("function");
   });
 });

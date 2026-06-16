@@ -296,7 +296,10 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         toast.error("Couldn't import CSV.", { description: batchResult.diagnostic });
         return;
       }
-      toast.success(batchResult.diagnostic, { description: CSV_HISTORY_IMPORT_SCOPE_LINE });
+      toast.success(batchResult.diagnostic, {
+        description: CSV_HISTORY_IMPORT_SCOPE_LINE,
+        action: viewImportedHistoryAction,
+      });
       qc.invalidateQueries({ queryKey: ["sensor_readings"] });
       qc.invalidateQueries({ queryKey: ["grow", "sensors"] });
       qc.invalidateQueries({ queryKey: ["latest-sensor-snapshot"] });

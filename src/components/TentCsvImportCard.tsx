@@ -319,10 +319,11 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         toast.error("Couldn't import CSV.", { description: preflight.message ?? undefined });
         return;
       }
-      const batchResult = await insertSensorReadingsInBatches({
+      const batchResult = await runDuplicateAwareCsvHistoryImport({
         rows: result.rows,
         vendorLabel: sourcePreview.sourceAppLabel,
         batchSize: CSV_HISTORY_INSERT_BATCH_SIZE,
+        fetchExistingKeys: (scope) => fetchExistingDedupeKeys(scope),
         insertBatch: async (batch) => {
           const { error } = await supabase
             .from("sensor_readings")

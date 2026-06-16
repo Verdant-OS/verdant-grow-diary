@@ -194,6 +194,18 @@ export interface FailureDiagnosticInput {
   vendorLabel: string;
 }
 
+/**
+ * Operator-facing copy for the partial unique index
+ * `sensor_readings_dedupe_uidx`, which is scoped to
+ * `(user_id, tent_id, source, metric, captured_at)`. Because the index is
+ * tenant-AND-tent scoped (audited 2026-06; see migration
+ * 20260604021425), a 23505 hit can only originate from rows the current
+ * authenticated user already saved for the selected tent — never from
+ * another tenant's data.
+ */
+export const CSV_HISTORY_DEDUPE_CONFLICT_COPY =
+  "These readings already exist for this tent (matched by tent, source, metric, and captured_at). No new rows were written. No live sensor data was created." as const;
+
 export function buildBatchFailureMessage(input: FailureDiagnosticInput): string {
   const {
     batchIndex,
@@ -203,6 +215,28 @@ export function buildBatchFailureMessage(input: FailureDiagnosticInput): string 
     error,
     vendorLabel,
   } = input;
+
+  // Friendly dedupe-conflict copy when Postgres reports a unique-violation
+  // on the audited tenant/tent-scoped index. Never claims another tenant's
+  // rows caused the collision.
+  const isDedupeConflict =
+    error.code === "23505" &&
+    /sensor_readings_dedupe_uidx/i.test(
+      `${error.message ?? ""} ${error.details ?? ""}`,
+    );
+  if (isDedupeConflict) {
+    const parts: string[] = [
+      `Import stopped on batch ${batchIndex} of ${totalBatches} (${failedBatchSize} ${vendorLabel} rows).`,
+      CSV_HISTORY_DEDUPE_CONFLICT_COPY,
+    ];
+    if (insertedRows > 0) {
+      parts.push(
+        `${insertedRows} reading${insertedRows === 1 ? "" : "s"} from earlier batches may already have been written. Review imported history before retrying.`,
+      );
+    }
+    return parts.join(" ");
+  }
+
   const parts: string[] = [];
   parts.push(
     `Import failed on batch ${batchIndex} of ${totalBatches} (${failedBatchSize} ${vendorLabel} rows in this batch).`,

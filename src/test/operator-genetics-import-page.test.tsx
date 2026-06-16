@@ -186,26 +186,35 @@ describe("page safety copy", () => {
 
 describe("validation export + template download", () => {
   function stubDownload() {
-    const blobs: Array<{ blob: Blob; filename: string }> = [];
+    const captures: Array<{ content: string; filename: string }> = [];
+    const realBlob = globalThis.Blob;
     const realCreate = URL.createObjectURL;
     const realRevoke = URL.revokeObjectURL;
-    URL.createObjectURL = ((blob: Blob) => {
-      blobs.push({ blob, filename: "" });
-      return "blob://stub";
-    }) as unknown as typeof URL.createObjectURL;
+    class PatchedBlob extends realBlob {
+      constructor(parts?: BlobPart[], opts?: BlobPropertyBag) {
+        super(parts, opts);
+        const text = (parts ?? [])
+          .map((p) => (typeof p === "string" ? p : ""))
+          .join("");
+        captures.push({ content: text, filename: "" });
+      }
+    }
+    globalThis.Blob = PatchedBlob as unknown as typeof Blob;
+    URL.createObjectURL = (() => "blob://stub") as unknown as typeof URL.createObjectURL;
     URL.revokeObjectURL = (() => {}) as unknown as typeof URL.revokeObjectURL;
     const origClick = HTMLAnchorElement.prototype.click;
     HTMLAnchorElement.prototype.click = function () {
       const a = this as HTMLAnchorElement;
-      if (blobs.length > 0) blobs[blobs.length - 1].filename = a.download;
+      if (captures.length > 0) captures[captures.length - 1].filename = a.download;
     };
     return {
-      blobs,
-      async lastContent() {
-        const last = blobs[blobs.length - 1];
-        return { filename: last.filename, content: await last.blob.text() };
+      blobs: captures,
+      lastContent() {
+        const last = captures[captures.length - 1];
+        return Promise.resolve({ filename: last.filename, content: last.content });
       },
       restore() {
+        globalThis.Blob = realBlob;
         URL.createObjectURL = realCreate;
         URL.revokeObjectURL = realRevoke;
         HTMLAnchorElement.prototype.click = origClick;

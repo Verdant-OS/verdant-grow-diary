@@ -4,8 +4,9 @@
  * no Edge Function, no decryption, no service_role.
  */
 import { describe, it, expect } from "vitest";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { listTsFilesCached, readFileCached } from "./helpers/cachedSrcTextScan";
 
 const ROOT = resolve(__dirname, "../..");
 const DOC_PATH = resolve(

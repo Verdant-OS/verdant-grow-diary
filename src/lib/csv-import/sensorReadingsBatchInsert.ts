@@ -340,7 +340,7 @@ export async function insertSensorReadingsInBatches<TRow>(
 //   - Scope is always (tent_id, source-in, metric-in, captured_at between
 //     [min, max]). RLS already restricts visible rows to the current
 //     authenticated user; this client filter never crosses tents.
-//   - No upsert. No ON CONFLICT. No service_role. No bridge tokens.
+//   - No upsert. No ON CONFLICT. No elevated-role keys. No bridge-issued tokens.
 
 /**
  * Allow-list of columns the duplicate-aware preflight query is permitted to

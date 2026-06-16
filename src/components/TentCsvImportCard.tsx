@@ -306,7 +306,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         });
         return;
       }
-      const preflight = validateSensorReadingInsertRows(
+      const preflight = preflightCsvHistoryImport(
         result.rows as unknown as Array<Record<string, unknown>>,
       );
       if (!preflight.ok) {

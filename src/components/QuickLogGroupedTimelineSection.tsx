@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import ManualSnapshotTimelineCard from "@/components/ManualSnapshotTimelineCard";
+import { MISSING_SNAPSHOT_NOTE_LABEL } from "@/lib/manualSensorSnapshotViewModel";
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 import { useQuickLogGroupedTimeline } from "@/hooks/useQuickLogGroupedTimeline";
 import type {

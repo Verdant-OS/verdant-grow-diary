@@ -15,8 +15,9 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { FileUp, Loader2, Upload } from "lucide-react";
+import { ChevronDown, FileUp, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
+
 
 import { Button } from "@/components/ui/button";
 // Source-app picker dropdown removed in favour of auto-detection.

@@ -289,12 +289,8 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         );
         return;
       }
-      if (result.rows.length === 0) {
-        setParseError(
-          "No sensor readings found. This file appears to contain timestamps or device metadata only.",
-        );
-        return;
-      }
+      // Empty/no-row guard is handled by preflightCsvHistoryImport below so
+      // the operator copy stays consistent across vendors.
       const fingerprint = buildSensorHistoryImportFingerprint({
         sourceAppId: detected,
         rows: toFingerprintRows(result.rows),

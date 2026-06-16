@@ -4,10 +4,15 @@
  * encryption, decryption, or service_role usage may appear here.
  */
 import { describe, it, expect } from "vitest";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  listTsFilesCached,
+  readFileCached,
+} from "./helpers/cachedSrcTextScan";
 
-const ROOT = resolve(__dirname, "../..");
+const ROOT = resolve(ROOTDIR(), "..");
+function ROOTDIR() { return resolve(__dirname, ".."); }
 const PLAN_PATH = resolve(ROOT, "docs/pi-ingest-secret-resolution-plan.md");
 const PLAN = existsSync(PLAN_PATH) ? readFileSync(PLAN_PATH, "utf8") : "";
 const FN_DIR = resolve(ROOT, "supabase/functions/pi-ingest-readings");

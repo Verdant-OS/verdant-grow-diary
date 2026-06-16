@@ -742,6 +742,16 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
             </p>
           )}
 
+          <CsvImportMappingHelp
+            {...buildMappingDrawerMetrics(
+              sourceApp,
+              [],
+              [],
+              preview.metricsDetected,
+              preview.unsupportedMetrics,
+            )}
+          />
+
           <div className="overflow-x-auto rounded-md border border-border/60">
             <table className="w-full text-xs" data-testid="csv-preview-table">
               <thead className="bg-muted/30">

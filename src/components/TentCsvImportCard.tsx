@@ -805,3 +805,113 @@ function Stat({
     </div>
   );
 }
+
+// ---------- mapping-help drawer ----------
+
+const METRIC_LABELS: Record<string, string> = {
+  temp_f: "Temperature",
+  humidity_pct: "Humidity",
+  vpd_kpa: "VPD",
+  co2_ppm: "CO₂",
+  ppfd_umol_m2_s: "PPFD",
+  temperature_c: "Temperature",
+  soil_moisture_pct: "Soil moisture",
+  ph: "pH",
+  ec: "EC",
+  ppfd: "PPFD",
+};
+
+function toMetricLabels(metrics: string[]): string[] {
+  return metrics.map((m) => METRIC_LABELS[m] ?? m);
+}
+
+interface MappingDrawerMetrics {
+  imported: string[];
+  notImported: string[];
+}
+
+function buildMappingDrawerMetrics(
+  sourceAppId: string,
+  mappedMetrics: string[],
+  unmappedColumns: string[],
+  metricsDetected: string[],
+  unsupportedMetrics: string[],
+): MappingDrawerMetrics {
+  if (sourceAppId === "spider_farmer" || sourceAppId === "vivosun") {
+    const imported = toMetricLabels(
+      mappedMetrics.filter((m) => m !== "ppfd_umol_m2_s"),
+    );
+    const notImported: string[] = [];
+    const ecUnmapped = unmappedColumns.find((c) => /^ec$/i.test(c));
+    if (ecUnmapped) notImported.push("EC");
+    const ppfdUnmapped = unmappedColumns.find((c) => /^ppfd$/i.test(c));
+    if (ppfdUnmapped || mappedMetrics.includes("ppfd_umol_m2_s")) {
+      if (!notImported.includes("PPFD")) notImported.push("PPFD");
+    }
+    return { imported, notImported };
+  }
+  return {
+    imported: toMetricLabels(metricsDetected),
+    notImported: toMetricLabels(unsupportedMetrics),
+  };
+}
+
+function CsvImportMappingHelp({
+  imported,
+  notImported,
+}: MappingDrawerMetrics) {
+  return (
+    <Collapsible data-testid="csv-mapping-help">
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mt-2"
+          data-testid="csv-mapping-help-trigger"
+        >
+          Which columns will import?
+          <ChevronDown className="h-3 w-3 transition-transform group-data-[state=open]:rotate-180" />
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div
+          className="mt-2 rounded-md border border-border/50 bg-muted/20 p-3 text-xs space-y-2"
+          data-testid="csv-mapping-help-content"
+        >
+          <p data-testid="csv-mapping-help-csv-not-live">
+            Imported rows are CSV history, not live sensor readings.
+          </p>
+
+          {imported.length > 0 && (
+            <div data-testid="csv-mapping-help-imported">
+              <p className="font-medium">Imported in this release:</p>
+              <ul className="list-disc list-inside text-muted-foreground">
+                {imported.map((m) => (
+                  <li key={m}>{m}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {notImported.length > 0 && (
+            <div data-testid="csv-mapping-help-not-imported">
+              <p className="font-medium">Detected but not imported in this release:</p>
+              <ul className="list-disc list-inside text-muted-foreground">
+                {notImported.map((m) => (
+                  <li key={m}>{m}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <p className="text-muted-foreground" data-testid="csv-mapping-help-preflight">
+            Before writing, Verdant checks that each insert row only uses fields supported by the sensor_readings table. If unsupported fields are found, the import is blocked before any rows are written.
+          </p>
+
+          <p className="text-muted-foreground" data-testid="csv-mapping-help-provenance">
+            Vendor and grow provenance may be preserved for audit context, but raw payload contents are not shown here.
+          </p>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}

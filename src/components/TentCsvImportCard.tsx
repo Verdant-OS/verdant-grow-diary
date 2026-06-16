@@ -216,7 +216,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         importBatchId,
         rows: preview.rows,
       });
-      const preflight = validateSensorReadingInsertRows(
+      const preflight = preflightCsvHistoryImport(
         rows as unknown as Array<Record<string, unknown>>,
       );
       if (!preflight.ok) {

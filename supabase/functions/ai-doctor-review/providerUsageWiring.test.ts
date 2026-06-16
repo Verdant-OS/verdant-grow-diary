@@ -163,9 +163,13 @@ Deno.test("does not recursively walk into unexpected nested fields (throwing get
 });
 
 Deno.test("structural safety: edge function wiring contains no forbidden writes", async () => {
-  const src = await Deno.readTextFile(
+  const raw = await Deno.readTextFile(
     new URL("./index.ts", import.meta.url),
   );
+  // Strip line + block comments so safety assertions only see executable code.
+  const src = raw
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
   // No new persistence / writes introduced by the wiring slice.
   assert(!/action_queue/i.test(src), "must not write action_queue");
   assert(!/\.from\(\s*['"]alerts['"]/i.test(src), "must not write alerts");

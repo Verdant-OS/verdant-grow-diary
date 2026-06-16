@@ -525,6 +525,59 @@ export default function OperatorEcowittTentPreview() {
             {dryRun.can_send_later ? "YES" : "BLOCKED"}
           </span>
         </div>
+
+        {/* Inline taxonomy explanation */}
+        <div
+          data-testid="dry-run-status-explanation"
+          data-state={statusExplanation.state}
+          className="rounded-md border p-2 text-xs space-y-2"
+        >
+          {statusExplanation.blockers.length > 0 && (
+            <div data-testid="status-blockers">
+              <div className="font-semibold uppercase tracking-wide text-destructive">
+                Blocking triggers
+              </div>
+              <ul className="list-disc pl-5">
+                {statusExplanation.blockers.map((b) => (
+                  <li key={b.trigger} data-testid={`status-blocker-${b.trigger}`}>
+                    <span className="font-mono">{b.trigger}</span> — {b.explanation}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {statusExplanation.warnings.length > 0 && (
+            <div data-testid="status-warnings">
+              <div className="font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                Warning triggers
+              </div>
+              <ul className="list-disc pl-5 text-muted-foreground">
+                {statusExplanation.warnings.map((w) => (
+                  <li key={w.trigger} data-testid={`status-warning-${w.trigger}`}>
+                    <span className="font-mono">{w.trigger}</span> — {w.explanation}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {statusExplanation.state === "pass" &&
+            statusExplanation.pass_reasons.length > 0 && (
+              <div data-testid="status-pass-reasons">
+                <div className="font-semibold uppercase tracking-wide text-primary">
+                  Why this passed
+                </div>
+                <ul className="list-disc pl-5 text-muted-foreground">
+                  {statusExplanation.pass_reasons.map((p) => (
+                    <li key={p.trigger} data-testid={`status-pass-${p.trigger}`}>
+                      <span className="font-mono">{p.trigger}</span> — {p.explanation}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+        </div>
+
+        {/* Legacy compact blocked/warning lists kept for downstream consumers */}
         {dryRun.blocked_reasons.length > 0 && (
           <ul
             className="list-disc pl-5 text-xs text-destructive"
@@ -545,14 +598,16 @@ export default function OperatorEcowittTentPreview() {
             ))}
           </ul>
         )}
+
         <pre
           className="overflow-auto rounded-md bg-muted p-2 text-xs"
           data-testid="dry-run-payload-json"
         >
-          {JSON.stringify(dryRun.dry_run_payload, null, 2)}
+          {dryRunPayloadJson}
         </pre>
         <p className="text-xs text-muted-foreground">
           No private identifiers, credentials, or network details are included in this payload.
+          CSV export is for audit review only. Copy payload copies the local preview JSON only.
         </p>
         <div className="flex flex-wrap gap-2">
           <button
@@ -565,13 +620,118 @@ export default function OperatorEcowittTentPreview() {
           </button>
           <button
             type="button"
-            onClick={handleExportAllTents}
-            data-testid="export-dry-run-all-tents-button"
+            onClick={handleExportDryRunCsv}
+            data-testid="export-dry-run-csv-button"
             className="rounded-md border bg-background px-3 py-2 text-sm font-medium hover:bg-muted"
           >
-            Export dry-run for all tents
+            Export dry-run metrics CSV
           </button>
+          <button
+            type="button"
+            onClick={handleCopyDryRunPayload}
+            data-testid="copy-dry-run-payload-button"
+            className="rounded-md border bg-background px-3 py-2 text-sm font-medium hover:bg-muted"
+          >
+            Copy dry-run payload
+          </button>
+          {copyState === "copied" && (
+            <span data-testid="copy-dry-run-status-copied" className="self-center text-xs text-primary">
+              Copied to clipboard.
+            </span>
+          )}
+          {copyState === "unavailable" && (
+            <span
+              data-testid="copy-dry-run-status-unavailable"
+              className="self-center text-xs text-amber-700 dark:text-amber-300"
+            >
+              Clipboard unavailable. Select the JSON above to copy manually.
+            </span>
+          )}
         </div>
+      </section>
+
+      {/* All-tent export preview table */}
+      <section
+        className="rounded-lg border p-4 space-y-2"
+        data-testid="dry-run-all-tents-preview"
+        aria-label="All-tent dry-run export preview"
+      >
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          All-tent dry-run export preview
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          All-tent export uses currently available preview snapshots only. A future real ingest
+          path requires a separate approved phase.
+        </p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs" data-testid="all-tents-preview-table">
+            <thead>
+              <tr className="border-b text-left text-muted-foreground">
+                <th className="py-1 pr-2">Tent</th>
+                <th className="py-1 pr-2">Filename</th>
+                <th className="py-1 pr-2">Send</th>
+                <th className="py-1 pr-2">Required</th>
+                <th className="py-1 pr-2">Source</th>
+                <th className="py-1 pr-2">Captured</th>
+                <th className="py-1 pr-2">Blocked</th>
+                <th className="py-1 pr-2">Warnings</th>
+              </tr>
+            </thead>
+            <tbody>
+              {allTentExportFiles.map((f) => {
+                const m = f.payload.metrics;
+                const required_ok = m.air_temp_f !== null && m.humidity_pct !== null;
+                return (
+                  <tr
+                    key={f.tentKey}
+                    data-testid={`all-tents-row-${f.tentKey}`}
+                    data-can-send={f.can_send_later ? "true" : "false"}
+                    className="border-b last:border-b-0 align-top"
+                  >
+                    <td className="py-1 pr-2 font-medium">
+                      {f.payload.metadata.tent_label}{" "}
+                      <span className="text-muted-foreground">({f.payload.tent_id})</span>
+                    </td>
+                    <td className="py-1 pr-2 font-mono">{f.filename}</td>
+                    <td
+                      className={`py-1 pr-2 font-medium ${
+                        f.can_send_later ? "text-primary" : "text-destructive"
+                      }`}
+                      data-testid={`all-tents-row-${f.tentKey}-can-send`}
+                    >
+                      {f.can_send_later ? "YES" : "BLOCKED"}
+                    </td>
+                    <td className="py-1 pr-2">
+                      {required_ok ? "present" : "missing"}
+                    </td>
+                    <td className="py-1 pr-2">{f.payload.source}</td>
+                    <td className="py-1 pr-2">{f.payload.captured_at ?? "—"}</td>
+                    <td
+                      className="py-1 pr-2 text-destructive"
+                      data-testid={`all-tents-row-${f.tentKey}-blocked`}
+                    >
+                      {f.blocked_reasons.length === 0 ? "—" : f.blocked_reasons.join(", ")}
+                    </td>
+                    <td
+                      className="py-1 pr-2 text-muted-foreground"
+                      data-testid={`all-tents-row-${f.tentKey}-warnings`}
+                    >
+                      {f.warnings.length === 0 ? "—" : f.warnings.join(", ")}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <button
+          type="button"
+          onClick={handleExportAllTents}
+          data-testid="export-dry-run-all-tents-confirm-button"
+          className="rounded-md border bg-background px-3 py-2 text-sm font-medium hover:bg-muted"
+        >
+          Download all-tent dry-run files (read-only)
+        </button>
       </section>
 
       {/* Preview-only identity overrides */}

@@ -107,6 +107,24 @@ describe("safety: no schema/RLS/Edge/auth/alerts/AI/device-control surfaces", ()
     expect(CARD).not.toMatch(/bridge_token/i);
   });
 
+  it("renders a mapping-help drawer trigger and copy", () => {
+    expect(CARD).toMatch(/csv-mapping-help-trigger/);
+    expect(CARD).toMatch(/Which columns will import\?/);
+    expect(CARD).toMatch(/CSV history, not live sensor readings/);
+    expect(CARD).toMatch(/Before writing, Verdant checks/);
+    expect(CARD).toMatch(/blocked before any rows are written/);
+    expect(CARD).toMatch(/raw payload contents are not shown here/);
+  });
+
+  it("drawer imported-metrics list uses user-friendly labels", () => {
+    expect(CARD).toMatch(/Imported in this release:/);
+  });
+
+  it("drawer does not render raw payload values or enable hidden buttons", () => {
+    expect(CARD).not.toMatch(/raw_payload\s*[:=]/);
+    expect(CARD).not.toMatch(/convert/i);
+  });
+
   it("never labels imported rows as live in the persistence payload", () => {
     expect(CARD).not.toMatch(/source:\s*["']live["']/);
   });

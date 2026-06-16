@@ -306,6 +306,14 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         });
         return;
       }
+      const preflight = validateSensorReadingInsertRows(
+        result.rows as unknown as Array<Record<string, unknown>>,
+      );
+      if (!preflight.ok) {
+        setParseError(preflight.message ?? "Import blocked.");
+        toast.error("Couldn't import CSV.", { description: preflight.message ?? undefined });
+        return;
+      }
       const batchResult = await insertSensorReadingsInBatches({
         rows: result.rows,
         vendorLabel: sourcePreview.sourceAppLabel,

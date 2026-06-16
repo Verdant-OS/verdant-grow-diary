@@ -53,7 +53,7 @@ describe("ActionQueue — grouping & empty states", () => {
   });
 
   it("has all three required empty-state messages", () => {
-    expect(PAGE).toContain("No pending actions.");
+    expect(PAGE).toMatch(/ACTION_QUEUE_EMPTY_PENDING_TITLE/);
     expect(PAGE).toContain("No reviewed actions.");
     expect(PAGE).toContain("No actions match these filters.");
   });

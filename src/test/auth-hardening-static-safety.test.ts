@@ -1,8 +1,9 @@
 // Static-safety scans for the Vite Supabase auth hardening slice.
 // See docs/auth-security.md.
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { listFilesCached, readFileCached } from "./helpers/cachedSrcTextScan";
 
 const ROOT = resolve(__dirname, "../..");
 const SRC = resolve(ROOT, "src");
@@ -10,16 +11,9 @@ const CLIENT = readFileSync(resolve(SRC, "integrations/supabase/client.ts"), "ut
 const AUTH_DOC = readFileSync(resolve(ROOT, "docs/auth-security.md"), "utf8");
 const RLS_DOC = readFileSync(resolve(ROOT, "docs/qa-rls-checklist.md"), "utf8");
 
-function walk(dir: string, out: string[] = []): string[] {
-  for (const name of readdirSync(dir)) {
-    const p = join(dir, name);
-    const s = statSync(p);
-    if (s.isDirectory()) walk(p, out);
-    else if (/\.(ts|tsx|js|jsx)$/.test(name)) out.push(p);
-  }
-  return out;
-}
-const SRC_FILES = walk(SRC);
+const SRC_FILES = listFilesCached(SRC).filter((p) =>
+  /\.(ts|tsx|js|jsx)$/.test(p),
+);
 
 describe("Supabase client storage", () => {
   it("uses sessionStorage (not localStorage) for auth persistence", () => {

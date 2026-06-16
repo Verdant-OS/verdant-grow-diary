@@ -87,7 +87,7 @@ function identityLabel(snapshot: SensorSnapshot): string {
     return `Identity: ${deviceId.trim()}`;
   }
   const csv = snapshot.csvVendor;
-  if (csv && typeof csv === "object" && "label" in csv && typeof (csv as { label?: unknown }).label === "string") {
+  if (csv !== null && csv !== undefined && typeof csv === "object" && "label" in csv && typeof (csv as { label?: unknown }).label === "string") {
     return `Identity: ${(csv as { label: string }).label}`;
   }
   return "Identity: unknown";

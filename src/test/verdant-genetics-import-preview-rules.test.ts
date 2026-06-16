@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   buildGeneticsImportPreview,
+  buildGeneticsTemplateCsv,
+  buildGeneticsValidationReportCsv,
+  GENETICS_TEMPLATE_REQUIRED_COLUMNS,
+  GENETICS_VALIDATION_REPORT_COLUMNS,
   selectImportableRows,
 } from "@/lib/verdantGeneticsImportPreviewRules";
 

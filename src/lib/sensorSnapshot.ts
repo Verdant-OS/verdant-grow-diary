@@ -31,10 +31,13 @@ export interface SensorSnapshot {
    */
   device_id?: string | null;
   /**
-   * CSV vendor lineage hint extracted from `raw_payload.source_app` on
-   * the contributing CSV rows. Presentation-only — NEVER promotes a
-   * reading to "live". `"multiple"` is used when multiple CSV vendors
-   * are present at the latest timestamp.
+   * CSV vendor lineage hint summarized from the contributing CSV rows'
+   * upstream provenance envelope (vendor app name only — payload
+   * contents are never read or returned by this file; see
+   * `summarizeCsvVendor` for the only access path).
+   * Presentation-only — NEVER promotes a reading to "live".
+   * `"multiple"` is used when multiple CSV vendors are present at the
+   * latest timestamp.
    */
   csvVendor?: import("@/lib/sensorSourceDisplayLabel").CsvVendorSummary;
 }
@@ -90,6 +93,11 @@ export interface SensorReadingLike {
   value: number | string | null;
   source?: string | null;
   device_id?: string | null;
+  /**
+   * Upstream provenance envelope. This file NEVER reads, returns, or
+   * renders its contents — it is forwarded as-is to
+   * `summarizeCsvVendor`, which is the only sanctioned reader.
+   */
   raw_payload?: unknown;
 }
 

@@ -28,7 +28,6 @@ export type SensorSourceIdentity =
   | "demo_fixture"
   | "csv_import"
   | "ecowitt"
-  | "switchbot"
   | "home_assistant"
   | "mqtt_bridge"
   | "raspberry_pi"

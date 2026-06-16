@@ -222,14 +222,14 @@ describe("normalizeSensorReading", () => {
     const raw = { temperature_c: 24, humidity: 50, extra: "anything" };
     const r = normalizeSensorReading(raw, {
       source: "live",
-      sourceIdentity: "switchbot",
+      sourceIdentity: "sensorpush",
       transport: "mqtt",
       tentId: TENT,
       capturedAt: FRESH,
       now: NOW,
     });
     expect(r.raw_payload).toBe(raw);
-    expect(r.source_identity).toBe("switchbot");
+    expect(r.source_identity).toBe("sensorpush");
     expect(r.transport).toBe("mqtt");
   });
 

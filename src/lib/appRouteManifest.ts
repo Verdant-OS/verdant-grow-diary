@@ -107,6 +107,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/operator/ecowitt-bridge-status", access: "operator", description: "EcoWitt bridge status." },
   { path: "/operator/ecowitt-live-bringup", access: "operator", description: "EcoWitt live bring-up operator checklist." },
   { path: "/operator/ecowitt-tent-preview", access: "operator", description: "EcoWitt multi-tent read-only normalizer preview." },
+  { path: "/operator/genetics-import", access: "operator", description: "Verdant genetics XLSX import preview (preview-only)." },
   { path: "/operator/one-tent-proof-record", access: "operator", description: "One-tent proof record export." },
   { path: "/partners/csv-preview", access: "public" },
   { path: "/pi-ingest-status", access: "operator" },

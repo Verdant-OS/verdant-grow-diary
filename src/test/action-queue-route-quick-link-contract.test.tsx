@@ -62,8 +62,8 @@ describe("Action Queue route — quick link contract", () => {
   it("renders loading and empty states with the required copy", () => {
     // Loading branch exists.
     expect(ACTIONS).toMatch(/loading\s*\?\s*/);
-    // Empty state copy is present.
-    expect(ACTIONS).toMatch(/No pending actions\./);
+    // Empty state copy is present (canonical: "No actions need review right now.").
+    expect(ACTIONS).toMatch(/No actions need review/);
   });
 
   it("keeps copy approval-focused and avoids autopilot/device execution language", () => {

@@ -12,6 +12,7 @@ import type {
   SensorNormalizationPreviewBadgeTone,
   SensorNormalizationPreviewViewModel,
 } from "@/lib/sensors/sensorNormalizationPreviewViewModel";
+import { SENSOR_NORMALIZATION_PREVIEW_NO_METRICS_EMPTY_STATE } from "@/lib/sensors/sensorNormalizationPreviewViewModel";
 
 export interface SensorNormalizationPreviewPanelProps {
   viewModel: SensorNormalizationPreviewViewModel;

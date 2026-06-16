@@ -234,7 +234,9 @@ export function evaluateManualSensorSnapshotQuality(
 
   if (sourceLabel === "invalid" || invalidFields.length > 0) {
     quality = "invalid";
-    summary = isHistorical ? "Historical invalid reading" : "Invalid reading";
+    summary = isHistorical
+      ? "Historical invalid reading — review before use"
+      : "Invalid reading";
   } else if (capturedMs == null) {
     quality = "missing";
     summary = isHistorical
@@ -260,7 +262,7 @@ export function evaluateManualSensorSnapshotQuality(
     }
   } else {
     quality = "usable";
-    summary = isHistorical ? "Historical usable reading" : "Usable current reading";
+    summary = isHistorical ? "Historical review reading" : "Usable current reading";
   }
 
   if (isHistorical) {

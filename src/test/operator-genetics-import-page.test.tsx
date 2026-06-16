@@ -43,7 +43,7 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
   });
 
   it("shows user-friendly error when loader throws", async () => {
-    const user = userEvent.setup();
+    
     render(
       <VerdantGeneticsXlsxImportPanel
         loader={async () => {
@@ -51,7 +51,7 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
         }}
       />,
     );
-    await user.upload(screen.getByTestId("genetics-xlsx-file-input"), makeFile());
+    fireEvent.change(screen.getByTestId("genetics-xlsx-file-input"), { target: { files: [makeFile(] } }));
     await waitFor(() =>
       expect(screen.getByTestId("genetics-file-error")).toBeInTheDocument(),
     );
@@ -64,7 +64,7 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
   });
 
   it("shows file-level error for unrecognized sheet", async () => {
-    const user = userEvent.setup();
+    
     render(
       <VerdantGeneticsXlsxImportPanel
         loader={async () => [
@@ -73,7 +73,7 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
         ]}
       />,
     );
-    await user.upload(screen.getByTestId("genetics-xlsx-file-input"), makeFile());
+    fireEvent.change(screen.getByTestId("genetics-xlsx-file-input"), { target: { files: [makeFile(] } }));
     await waitFor(() =>
       expect(screen.getByTestId("genetics-file-error")).toBeInTheDocument(),
     );
@@ -83,7 +83,7 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
   });
 
   it("renders preview table after a successful parse", async () => {
-    const user = userEvent.setup();
+    
     render(
       <VerdantGeneticsXlsxImportPanel
         loader={async () => [
@@ -93,7 +93,7 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
         ]}
       />,
     );
-    await user.upload(screen.getByTestId("genetics-xlsx-file-input"), makeFile());
+    fireEvent.change(screen.getByTestId("genetics-xlsx-file-input"), { target: { files: [makeFile(] } }));
     await waitFor(() =>
       expect(screen.getByTestId("genetics-preview-table")).toBeInTheDocument(),
     );
@@ -111,7 +111,7 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
   });
 
   it("disables link action with blocker copy when no onLink helper is provided", async () => {
-    const user = userEvent.setup();
+    
     render(
       <VerdantGeneticsXlsxImportPanel
         loader={async () => [
@@ -120,7 +120,7 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
         ]}
       />,
     );
-    await user.upload(screen.getByTestId("genetics-xlsx-file-input"), makeFile());
+    fireEvent.change(screen.getByTestId("genetics-xlsx-file-input"), { target: { files: [makeFile(] } }));
     await waitFor(() =>
       expect(screen.getByTestId("genetics-link-button")).toBeDisabled(),
     );
@@ -130,7 +130,7 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
   });
 
   it("calls onLink exactly once with valid rows only when confirmed", async () => {
-    const user = userEvent.setup();
+    
     const onLink = vi.fn().mockResolvedValue(undefined);
     render(
       <VerdantGeneticsXlsxImportPanel
@@ -144,18 +144,18 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
         onLink={onLink}
       />,
     );
-    await user.upload(screen.getByTestId("genetics-xlsx-file-input"), makeFile());
+    fireEvent.change(screen.getByTestId("genetics-xlsx-file-input"), { target: { files: [makeFile(] } }));
     await waitFor(() =>
       expect(screen.getByTestId("genetics-link-button")).toBeEnabled(),
     );
-    await user.click(screen.getByTestId("genetics-link-button"));
+    fireEvent.click(screen.getByTestId("genetics-link-button"));
     await waitFor(() => expect(onLink).toHaveBeenCalledTimes(1));
     const passed = onLink.mock.calls[0][0] as Array<{ rowNumber: number }>;
     expect(passed.map((r) => r.rowNumber).sort()).toEqual([2, 5]);
   });
 
   it("disables link action when no importable rows", async () => {
-    const user = userEvent.setup();
+    
     const onLink = vi.fn();
     render(
       <VerdantGeneticsXlsxImportPanel
@@ -163,7 +163,7 @@ describe("VerdantGeneticsXlsxImportPanel", () => {
         onLink={onLink}
       />,
     );
-    await user.upload(screen.getByTestId("genetics-xlsx-file-input"), makeFile());
+    fireEvent.change(screen.getByTestId("genetics-xlsx-file-input"), { target: { files: [makeFile(] } }));
     await waitFor(() =>
       expect(screen.getByTestId("genetics-preview-table")).toBeInTheDocument(),
     );

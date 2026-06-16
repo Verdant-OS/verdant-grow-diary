@@ -91,6 +91,15 @@ export default function OperatorEcowittTentPreview() {
     downloadEcowittSnapshotExport(tentKey, payload);
   };
 
+  const dryRun = useMemo(
+    () => buildEcowittIngestDryRun(snapshot, { is_stale: vm.is_stale }),
+    [snapshot, vm.is_stale],
+  );
+
+  const handleExportDryRun = () => {
+    downloadEcowittIngestDryRun(tentKey, dryRun);
+  };
+
   return (
     <main
       className="mx-auto max-w-3xl p-4 sm:p-6 space-y-6 pb-32"

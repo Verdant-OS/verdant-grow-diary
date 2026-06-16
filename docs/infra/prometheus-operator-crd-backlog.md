@@ -68,6 +68,8 @@ Until then, this document should remain a **backlog reference only**.
 
 If this document is referenced during implementation, all sensor data, API tokens, bridge tokens, and Alertmanager secrets must remain outside of Git. Use sealed secrets, external secret operators, or vault injection. Do not paste real values into examples, runbooks, or CRD templates.
 
----
-
 *Backlog item — not scheduled. Last updated: 2026-06-15.*
+
+## Related Docs
+
+- [Prometheus Metrics Ownership and Naming Plan](./prometheus-metrics-ownership.md)

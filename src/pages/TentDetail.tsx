@@ -31,6 +31,8 @@ import TentCsvImportCard from "@/components/TentCsvImportCard";
 import TentSensorWebhookSettingsCard from "@/components/TentSensorWebhookSettingsCard";
 import TentBridgeTokensCard from "@/components/TentBridgeTokensCard";
 import TentSensorSourceHealthCard from "@/components/TentSensorSourceHealthCard";
+import SensorSnapshotTruthStrip from "@/components/SensorSnapshotTruthStrip";
+import { buildSensorSnapshotReadModel } from "@/lib/sensors/sensorSnapshotReadModel";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useGrowTent, useGrowPlants, getGrowDataMeta } from "@/hooks/useGrowData";
 import {
@@ -295,6 +297,14 @@ export default function TentDetail() {
             </div>
           )}
         </div>
+        <SensorSnapshotTruthStrip
+          model={buildSensorSnapshotReadModel({
+            snapshot: header.snapshot,
+            truth: header.truth,
+          })}
+          className="mb-3"
+          testId="tent-detail-sensor-snapshot-truth"
+        />
         <TentManualSnapshotChangeContext tentId={id ?? null} readings={readings} />
         {series.length === 0 ? (
           <p

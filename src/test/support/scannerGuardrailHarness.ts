@@ -8,9 +8,9 @@
  *    machine-readable JSONL report for any test exceeding
  *    SLOW_SCANNER_THRESHOLD_MS. The report is INFORMATIONAL ONLY — it
  *    never fails a test.
- *  - Provide a small read-only cache for recursive `.ts/.tsx` walks so
- *    that scanner suites can share the same walk result across tests
- *    without re-walking the filesystem per-`it`.
+ *  - Provide small read-only caches for recursive scanner walks so suites can
+ *    share the same walk result across tests without re-walking the filesystem
+ *    per-`it`.
  *
  * Safety:
  *  - Does NOT change global Vitest timeout (uses vi.setConfig per file).
@@ -18,18 +18,67 @@
  *  - Does NOT alter scanner regexes, allowlists, or assertions.
  *  - Does NOT touch production code.
  */
-import { vi, beforeEach, afterEach } from "vitest";
+import { vi, beforeEach, afterEach, it } from "vitest";
 import { appendFileSync, mkdirSync, readdirSync, statSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 
 export const SCANNER_GUARDRAIL_TIMEOUT_MS = 30_000;
 export const SLOW_SCANNER_THRESHOLD_MS = 5_000;
 
-const REPORT_PATH = resolve(
+export const SCANNER_GUARDRAIL_SLOW_TEST_REPORT_PATH = resolve(
   process.cwd(),
   "test-results",
   "scanner-guardrail-slow-tests.jsonl",
 );
+
+/**
+ * Optional alias for new scanner suites. Existing suites may keep importing
+ * Vitest's `it`; the per-file timeout/telemetry comes from
+ * installScannerGuardrail either way.
+ */
+export const scannerIt = it;
+
+export type ScannerGuardrailSlowTestReportRow = Readonly<{
+  /** Vitest `it(...)` label. */
+  test: string;
+  /** Stable suite label, usually derived from the scanner test filename. */
+  suite: string;
+  /** Test file path supplied by the scanner suite. */
+  file: string;
+  /** Rounded measured duration for the test body + hooks. */
+  durationMs: number;
+  /** Slow-test threshold that caused this row to be emitted. */
+  thresholdMs: number;
+  /** ISO timestamp for informational triage only. */
+  recordedAt: string;
+}>;
+
+function deriveSuiteLabel(file: string): string {
+  return basename(file)
+    .replace(/\.test\.(t|j)sx?$/i, "")
+    .replace(/\.(t|j)sx?$/i, "")
+    .trim() || "scanner-guardrail";
+}
+
+export function buildScannerSlowTestReportRow(input: {
+  test: string;
+  file: string;
+  durationMs: number;
+  thresholdMs?: number;
+  suite?: string;
+  suiteLabel?: string;
+  recordedAt?: string;
+}): ScannerGuardrailSlowTestReportRow {
+  const suite = (input.suiteLabel ?? input.suite ?? deriveSuiteLabel(input.file)).trim();
+  return {
+    test: input.test || "(unknown test)",
+    suite: suite || "scanner-guardrail",
+    file: input.file,
+    durationMs: Math.round(input.durationMs),
+    thresholdMs: input.thresholdMs ?? SLOW_SCANNER_THRESHOLD_MS,
+    recordedAt: input.recordedAt ?? new Date().toISOString(),
+  };
+}
 
 /**
  * Install the standard scanner guardrail timeout + slow-test timing
@@ -40,12 +89,16 @@ const REPORT_PATH = resolve(
  *   installScannerGuardrail({ file: __filename });
  *
  * Optional opts.timeoutMs overrides the per-file timeout (default 30s).
+ * Optional opts.suite/suiteLabel overrides the telemetry suite label.
  */
 export function installScannerGuardrail(opts: {
   file: string;
   timeoutMs?: number;
+  suite?: string;
+  suiteLabel?: string;
 }): void {
   const timeoutMs = opts.timeoutMs ?? SCANNER_GUARDRAIL_TIMEOUT_MS;
+  const suiteLabel = opts.suiteLabel ?? opts.suite ?? deriveSuiteLabel(opts.file);
   vi.setConfig({ testTimeout: timeoutMs, hookTimeout: timeoutMs });
 
   let startedAt = 0;
@@ -61,21 +114,93 @@ export function installScannerGuardrail(opts: {
     const durationMs = performance.now() - startedAt;
     if (durationMs < SLOW_SCANNER_THRESHOLD_MS) return;
     try {
-      mkdirSync(dirname(REPORT_PATH), { recursive: true });
+      mkdirSync(dirname(SCANNER_GUARDRAIL_SLOW_TEST_REPORT_PATH), { recursive: true });
       appendFileSync(
-        REPORT_PATH,
-        JSON.stringify({
-          test: currentName,
-          file: opts.file,
-          durationMs: Math.round(durationMs),
-          thresholdMs: SLOW_SCANNER_THRESHOLD_MS,
-          recordedAt: new Date().toISOString(),
-        }) + "\n",
+        SCANNER_GUARDRAIL_SLOW_TEST_REPORT_PATH,
+        JSON.stringify(
+          buildScannerSlowTestReportRow({
+            test: currentName,
+            suite: suiteLabel,
+            file: opts.file,
+            durationMs,
+            thresholdMs: SLOW_SCANNER_THRESHOLD_MS,
+          }),
+        ) + "\n",
       );
     } catch {
       // Informational only — never fail a guardrail because of report I/O.
     }
   });
+}
+
+const DEFAULT_SCANNER_SKIP_DIRS = new Set([
+  "node_modules",
+  ".git",
+  "dist",
+  "build",
+  ".next",
+  ".turbo",
+  ".cache",
+  "coverage",
+]);
+
+/** Cached recursive scanner walk for arbitrary source extensions. */
+const scannerFileCache = new Map<string, string[]>();
+
+export function getCachedScannerFiles(opts: {
+  root: string;
+  dirs?: string[];
+  exts?: Iterable<string>;
+  skipDirs?: Iterable<string>;
+}): string[] {
+  const root = resolve(opts.root);
+  const dirs = [...(opts.dirs ?? ["."])].sort();
+  const exts = new Set(opts.exts ?? [".ts", ".tsx"]);
+  const skipDirs = new Set([
+    ...DEFAULT_SCANNER_SKIP_DIRS,
+    ...(opts.skipDirs ?? []),
+  ]);
+  const key = JSON.stringify({
+    root,
+    dirs,
+    exts: [...exts].sort(),
+    skipDirs: [...skipDirs].sort(),
+  });
+  const hit = scannerFileCache.get(key);
+  if (hit) return hit;
+
+  const out: string[] = [];
+  const walk = (dir: string) => {
+    let entries: string[];
+    try {
+      entries = readdirSync(dir).sort();
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      const full = join(dir, entry);
+      let st;
+      try {
+        st = statSync(full);
+      } catch {
+        continue;
+      }
+      if (st.isDirectory()) {
+        if (skipDirs.has(entry)) continue;
+        walk(full);
+      } else if (st.isFile()) {
+        const dot = entry.lastIndexOf(".");
+        const ext = dot >= 0 ? entry.slice(dot) : "";
+        if (exts.has(ext)) out.push(full);
+      }
+    }
+  };
+
+  for (const dir of dirs) walk(resolve(root, dir));
+  out.sort();
+  scannerFileCache.set(key, out);
+  return out;
 }
 
 /**
@@ -97,7 +222,7 @@ export function getCachedTsFiles(
 
   const out: string[] = [];
   const walk = (dir: string) => {
-    for (const entry of readdirSync(dir)) {
+    for (const entry of readdirSync(dir).sort()) {
       if (entry === "node_modules" || entry.startsWith(".")) continue;
       const full = join(dir, entry);
       const st = statSync(full);
@@ -106,6 +231,7 @@ export function getCachedTsFiles(
     }
   };
   walk(root);
+  out.sort();
   walkCache.set(key, out);
   return out;
 }
@@ -113,4 +239,5 @@ export function getCachedTsFiles(
 /** Test-only helper to reset the walk cache (used by harness self-tests). */
 export function __resetScannerHarnessCachesForTests(): void {
   walkCache.clear();
+  scannerFileCache.clear();
 }

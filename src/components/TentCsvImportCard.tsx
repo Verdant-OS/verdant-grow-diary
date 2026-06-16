@@ -205,7 +205,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
   }
 
   async function handleImport() {
-    if (!preview || preview.rows.length === 0) return;
+    if (!preview) return;
     setImporting(true);
     try {
       const importBatchId = newBatchId();

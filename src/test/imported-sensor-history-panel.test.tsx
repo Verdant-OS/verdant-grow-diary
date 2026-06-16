@@ -73,13 +73,11 @@ describe("ImportedSensorHistoryPanel", () => {
       ),
     );
     expect(screen.getByTestId("imported-history-total")).toHaveTextContent("2");
-    expect(screen.getByTestId("imported-history-metrics")).toHaveTextContent(
-      "humidity_pct, temperature_c",
-    );
-    // Live row never leaks into the metrics summary.
-    expect(
-      screen.getByTestId("imported-history-metrics").textContent ?? "",
-    ).not.toContain("co2_ppm");
+    const filters = screen.getByTestId("imported-history-metric-filters");
+    expect(filters).toHaveTextContent("humidity_pct");
+    expect(filters).toHaveTextContent("temperature_c");
+    // Live row never leaks into the metric filter list.
+    expect(filters.textContent ?? "").not.toContain("co2_ppm");
   });
 
   it("never renders raw_payload or forbidden live-creation wording", () => {

@@ -127,20 +127,19 @@ export default function OperatorEcowittTentPreview() {
     [snapshot],
   );
 
-  const handleExportDryRun = () => {
-    downloadEcowittIngestDryRun(tentKey, dryRun);
-  };
+  const statusExplanation = useMemo(
+    () => buildEcowittDryRunStatusExplanation(snapshot, dryRun),
+    [snapshot, dryRun],
+  );
 
-  const handleExportAllTents = () => {
-    const files = buildEcowittIngestDryRunExportFilesForTents(
+  const allTentExportFiles = useMemo(() => {
+    return buildEcowittIngestDryRunExportFilesForTents(
       SUPPORTED_TENT_KEYS.map((k) => {
         const loaded = loadEcowittEvidenceSample(sampleKey, { now });
         const snap = normalizeEcowittTentPayload(loaded.sample.payload, k, {
           now,
           captured_at_ms: loaded.captured_at_ms,
         });
-        // Per-tent overrides: only apply tent_id override to the SELECTED tent.
-        // Other tents get placeholder; identity overrides do not leak across tents.
         return {
           tentKey: k,
           snapshot: snap,
@@ -157,8 +156,42 @@ export default function OperatorEcowittTentPreview() {
         };
       }),
     );
-    downloadEcowittIngestDryRunAllTents(files);
+  }, [sampleKey, now, tentKey, dryRunOptions, vm.is_stale]);
+
+  const handleExportDryRun = () => {
+    downloadEcowittIngestDryRun(tentKey, dryRun);
   };
+
+  const handleExportDryRunCsv = () => {
+    downloadEcowittIngestDryRunMetricsCsv(snapshot, dryRunOptions);
+  };
+
+  const handleExportAllTents = () => {
+    downloadEcowittIngestDryRunAllTents(allTentExportFiles);
+  };
+
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "unavailable">("idle");
+  const dryRunPayloadJson = useMemo(
+    () => JSON.stringify(dryRun.dry_run_payload, null, 2),
+    [dryRun],
+  );
+  const handleCopyDryRunPayload = async () => {
+    try {
+      if (
+        typeof navigator !== "undefined" &&
+        navigator.clipboard &&
+        typeof navigator.clipboard.writeText === "function"
+      ) {
+        await navigator.clipboard.writeText(dryRunPayloadJson);
+        setCopyState("copied");
+        return;
+      }
+    } catch {
+      // fall through to unavailable
+    }
+    setCopyState("unavailable");
+  };
+
 
 
   return (

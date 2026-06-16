@@ -184,7 +184,9 @@ describe("runDuplicateAwareCsvHistoryImport — orchestration", () => {
       insertBatch: async () => ({ error: null }),
     });
     expect(fetchExistingKeys).toHaveBeenCalledTimes(1);
-    const scope = fetchExistingKeys.mock.calls[0][0];
+    const scope = (fetchExistingKeys.mock.calls[0] as unknown as [
+      { tentIds: string[]; sources: string[]; metrics: string[]; minCapturedAt: string; maxCapturedAt: string },
+    ])[0];
     expect(scope.tentIds).toEqual(["tent-A"]);
     expect(scope.sources).toEqual(["csv"]);
     expect(scope.metrics).toEqual(["humidity_pct", "temperature_c"]);

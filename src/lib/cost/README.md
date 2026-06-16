@@ -55,6 +55,28 @@ Do **not** invent numeric limits. Replace a marker only with evidence:
 | Refresh queue                    | No      | —                                                                     | db_refresh                  | queue wait                                               | When added, must record `queueWaitMs`.                                       |
 | Existing metrics tables          | No safe metrics sink found | `sensor_ingest_audit_log` exists but is ingest-only | n/a                       | n/a                                                      | No table reused; no schema change made.                                      |
 
+## Measurement attachment points
+
+### AI Doctor prompt (llm_prompt)
+
+- Helper: `src/lib/cost/aiDoctorPromptMeasurement.ts`
+  - `buildAiDoctorPromptMeasurement(input)` → `{ measurement, metadata }`
+  - `classifyRawHistoryFallback(...)` and `computeUtf8ByteSize(...)` are exported pure helpers.
+- Attach at the AI Doctor review call site, after
+  `buildAiDoctorPromptMessages` (see `src/lib/aiDoctorPromptAssembly.ts`)
+  produces `{ system, user, importedHistoryBlock, missingLiveReadingsBlock }`.
+  Pass the assembled `user` text plus the two block flags:
+  - `userPromptText`
+  - `importedHistoryBlockPresent` ← `messages.importedHistoryBlock !== null`
+  - `missingLiveReadingsBlockPresent` ← `messages.missingLiveReadingsBlock !== null`
+  - Optional caller-known flags: `staleSummaryUsed`, `missingSummaryUsed`,
+    `summaryErrored`, `rawHistoryEventCount`, `includedWindows`, `sourceTags`.
+  - `providerReportedTokens` only if the model response already includes
+    usage; otherwise leave undefined.
+- The helper does NOT mutate prompt content, does NOT call any model, and
+  does NOT persist. Callers decide what (if anything) to do with the bundle.
+- `estimatedPromptTokens` is always `null` until a real estimator is added.
+
 ## What remains blocked until real measurements exist
 
 1. Any numeric threshold in `costThresholds.ts`.
@@ -63,3 +85,5 @@ Do **not** invent numeric limits. Replace a marker only with evidence:
 4. Any cadence-driven ingest rejection.
 5. Any persistence target for these measurements (no metrics table exists; one
    would require an explicit, separately-requested schema change).
+6. A real prompt-token estimator (today `estimatedPromptTokens` stays `null`).
+

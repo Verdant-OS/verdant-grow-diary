@@ -72,9 +72,11 @@ import {
 } from "@/lib/sensorHistoryImportReplayGuard";
 import {
   CSV_HISTORY_INSERT_BATCH_SIZE,
-  insertSensorReadingsInBatches,
+  SENSOR_READINGS_DEDUPE_SELECT_CLAUSE,
   preflightCsvHistoryImport,
+  runDuplicateAwareCsvHistoryImport,
   type BatchInsertError,
+  type ExistingKeysQueryScope,
 } from "@/lib/csv-import/sensorReadingsBatchInsert";
 import SensorHistoryImportAuditLedger from "@/components/SensorHistoryImportAuditLedger";
 
@@ -210,6 +212,45 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
       : `csv-${Date.now()}`;
   }
 
+  /**
+   * Reads existing sensor_readings rows scoped to (tent_id, source set,
+   * metric set, captured_at range) and returns the set of dedupe keys
+   * already present for this tent. RLS guarantees we only ever see rows
+   * owned by the current authenticated user, so this query is structurally
+   * tenant-isolated. Selects only the safe presence columns — never
+   * raw_payload, value, device_id, user_id, or id.
+   */
+  async function fetchExistingDedupeKeys(
+    scope: ExistingKeysQueryScope,
+  ): Promise<Set<string>> {
+    const { data, error } = await supabase
+      .from("sensor_readings")
+      .select(SENSOR_READINGS_DEDUPE_SELECT_CLAUSE)
+      .in("tent_id", scope.tentIds)
+      .in("source", scope.sources)
+      .in("metric", scope.metrics)
+      .gte("captured_at", scope.minCapturedAt)
+      .lte("captured_at", scope.maxCapturedAt);
+    if (error || !data) return new Set<string>();
+    const keys = new Set<string>();
+    for (const row of data as unknown as Array<{
+      tent_id: string | null;
+      source: string | null;
+      metric: string | null;
+      captured_at: string | null;
+    }>) {
+      const captured = row.captured_at ?? "";
+      const t = Date.parse(captured);
+      const normalized = Number.isFinite(t)
+        ? new Date(t).toISOString()
+        : captured;
+      keys.add(
+        `${row.tent_id ?? ""}|${row.source ?? ""}|${row.metric ?? ""}|${normalized}`,
+      );
+    }
+    return keys;
+  }
+
   async function handleImport() {
     if (!preview) return;
     setImporting(true);
@@ -231,10 +272,11 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         return;
       }
       // NOTE: no `user_id` in payload — DB default auth.uid() owns the row.
-      const batchResult = await insertSensorReadingsInBatches({
+      const batchResult = await runDuplicateAwareCsvHistoryImport({
         rows,
         vendorLabel: CSV_SOURCE_LABEL[sourceApp] ?? "CSV history",
         batchSize: CSV_HISTORY_INSERT_BATCH_SIZE,
+        fetchExistingKeys: (scope) => fetchExistingDedupeKeys(scope),
         insertBatch: async (batch) => {
           const { error } = await supabase
             .from("sensor_readings")
@@ -316,10 +358,11 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         toast.error("Couldn't import CSV.", { description: preflight.message ?? undefined });
         return;
       }
-      const batchResult = await insertSensorReadingsInBatches({
+      const batchResult = await runDuplicateAwareCsvHistoryImport({
         rows: result.rows,
         vendorLabel: sourcePreview.sourceAppLabel,
         batchSize: CSV_HISTORY_INSERT_BATCH_SIZE,
+        fetchExistingKeys: (scope) => fetchExistingDedupeKeys(scope),
         insertBatch: async (batch) => {
           const { error } = await supabase
             .from("sensor_readings")

@@ -67,6 +67,7 @@ import {
 import {
   CSV_HISTORY_INSERT_BATCH_SIZE,
   insertSensorReadingsInBatches,
+  validateSensorReadingInsertRows,
   type BatchInsertError,
 } from "@/lib/csv-import/sensorReadingsBatchInsert";
 import SensorHistoryImportAuditLedger from "@/components/SensorHistoryImportAuditLedger";

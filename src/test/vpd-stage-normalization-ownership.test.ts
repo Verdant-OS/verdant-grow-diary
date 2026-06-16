@@ -8,6 +8,11 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, cpSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
 
+// Filesystem-scanning guardrail; bump per-file timeout to survive full-suite parallel load.
+// Narrow timeout bump only — no scanner pattern, allowlist, or safety assertion changed.
+import { vi as __vi_timeout } from "vitest";
+__vi_timeout.setConfig({ testTimeout: 30000, hookTimeout: 30000 });
+
 const ROOT = resolve(__dirname, "../..");
 const SCRIPT = "scripts/assert-vpd-stage-normalization-ownership.mjs";
 

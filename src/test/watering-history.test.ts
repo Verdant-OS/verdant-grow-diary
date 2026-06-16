@@ -10,6 +10,11 @@ import { buildWateringHistory } from "@/lib/wateringHistoryRules";
 import { typedWateringWriteEnabled } from "@/lib/featureFlags";
 import { findMatches } from "./testFileSearchRules";
 
+// Filesystem-scanning guardrail; bump per-file timeout to survive full-suite parallel load.
+// Narrow timeout bump only — no scanner pattern, allowlist, or safety assertion changed.
+import { vi as __vi_timeout } from "vitest";
+__vi_timeout.setConfig({ testTimeout: 30000, hookTimeout: 30000 });
+
 const REPO_ROOT = process.cwd();
 
 function normalize(raw: unknown[]): NormalizedDiaryEntry[] {

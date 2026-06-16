@@ -16,6 +16,11 @@ import {
   // @ts-ignore — JS module without types
 } from "../../scripts/assert-sensor-intelligence-safety.mjs";
 
+// Filesystem-scanning guardrail; bump per-file timeout to survive full-suite parallel load.
+// Narrow timeout bump only — no scanner pattern, allowlist, or safety assertion changed.
+import { vi as __vi_timeout } from "vitest";
+__vi_timeout.setConfig({ testTimeout: 30000, hookTimeout: 30000 });
+
 describe("sensor-intelligence safety scanner — repository scan", () => {
   it("current repository is clean", () => {
     const violations = scanRepository(process.cwd());

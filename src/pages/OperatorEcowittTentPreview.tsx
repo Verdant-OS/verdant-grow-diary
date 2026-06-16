@@ -26,9 +26,13 @@ import {
 } from "@/lib/ecowittSnapshotExport";
 import {
   buildEcowittIngestDryRun,
+  buildEcowittIngestDryRunExportFilesForTents,
   downloadEcowittIngestDryRun,
+  downloadEcowittIngestDryRunAllTents,
   ECOWITT_DRY_RUN_NOTICE,
+  ECOWITT_DRY_RUN_TENT_PLACEHOLDER,
 } from "@/lib/ecowittIngestDryRun";
+import { buildEcowittIngestDryRunFieldMap } from "@/lib/ecowittIngestDryRunFieldMap";
 import { normalizeEcowittTentPayload } from "@/lib/ecowittTentNormalizerRouter";
 import { loadEcowittEvidenceSample } from "@/lib/ecowittLocalEvidence";
 
@@ -48,6 +52,12 @@ export default function OperatorEcowittTentPreview() {
   const [sampleKey, setSampleKey] = useState<EcowittPreviewSampleKey>("valid");
   const [showRaw, setShowRaw] = useState(false);
   const isMobile = useIsMobile();
+
+  // Preview-only identity overrides. Never persisted. Never sent.
+  const [tentIdOverride, setTentIdOverride] = useState<string>("");
+  const [plantIdOverride, setPlantIdOverride] = useState<string>("");
+  const [deviceIdentityOverride, setDeviceIdentityOverride] = useState<string>("");
+  const [sourceIdentityOverride, setSourceIdentityOverride] = useState<string>("");
 
   // Pin "now" per render of this view to keep the local VM/history consistent.
   const now = useMemo(() => new Date(), [tentKey, sampleKey]);
@@ -91,14 +101,60 @@ export default function OperatorEcowittTentPreview() {
     downloadEcowittSnapshotExport(tentKey, payload);
   };
 
+  const dryRunOptions = useMemo(
+    () => ({
+      tent_id: tentIdOverride,
+      plant_id: plantIdOverride,
+      device_identity: deviceIdentityOverride,
+      source_identity: sourceIdentityOverride,
+      is_stale: vm.is_stale,
+    }),
+    [tentIdOverride, plantIdOverride, deviceIdentityOverride, sourceIdentityOverride, vm.is_stale],
+  );
+
   const dryRun = useMemo(
-    () => buildEcowittIngestDryRun(snapshot, { is_stale: vm.is_stale }),
-    [snapshot, vm.is_stale],
+    () => buildEcowittIngestDryRun(snapshot, dryRunOptions),
+    [snapshot, dryRunOptions],
+  );
+
+  const fieldMap = useMemo(
+    () => buildEcowittIngestDryRunFieldMap(snapshot),
+    [snapshot],
   );
 
   const handleExportDryRun = () => {
     downloadEcowittIngestDryRun(tentKey, dryRun);
   };
+
+  const handleExportAllTents = () => {
+    const files = buildEcowittIngestDryRunExportFilesForTents(
+      SUPPORTED_TENT_KEYS.map((k) => {
+        const loaded = loadEcowittEvidenceSample(sampleKey, { now });
+        const snap = normalizeEcowittTentPayload(loaded.sample.payload, k, {
+          now,
+          captured_at_ms: loaded.captured_at_ms,
+        });
+        // Per-tent overrides: only apply tent_id override to the SELECTED tent.
+        // Other tents get placeholder; identity overrides do not leak across tents.
+        return {
+          tentKey: k,
+          snapshot: snap,
+          is_stale: vm.is_stale,
+          options:
+            k === tentKey
+              ? dryRunOptions
+              : {
+                  plant_id: null,
+                  device_identity: null,
+                  source_identity: null,
+                  is_stale: vm.is_stale,
+                },
+        };
+      }),
+    );
+    downloadEcowittIngestDryRunAllTents(files);
+  };
+
 
   return (
     <main
@@ -460,14 +516,141 @@ export default function OperatorEcowittTentPreview() {
         <p className="text-xs text-muted-foreground">
           No private identifiers, credentials, or network details are included in this payload.
         </p>
-        <button
-          type="button"
-          onClick={handleExportDryRun}
-          data-testid="export-dry-run-button"
-          className="rounded-md border bg-background px-3 py-2 text-sm font-medium hover:bg-muted"
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={handleExportDryRun}
+            data-testid="export-dry-run-button"
+            className="rounded-md border bg-background px-3 py-2 text-sm font-medium hover:bg-muted"
+          >
+            Export dry-run ingest payload
+          </button>
+          <button
+            type="button"
+            onClick={handleExportAllTents}
+            data-testid="export-dry-run-all-tents-button"
+            className="rounded-md border bg-background px-3 py-2 text-sm font-medium hover:bg-muted"
+          >
+            Export dry-run for all tents
+          </button>
+        </div>
+      </section>
+
+      {/* Preview-only identity overrides */}
+      <section
+        className="rounded-lg border p-4 space-y-3"
+        data-testid="dry-run-identity-overrides"
+        aria-label="Dry-run identity overrides"
+      >
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Dry-run identity overrides
+        </h2>
+        <p
+          data-testid="dry-run-overrides-notice"
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-700 dark:text-amber-300"
         >
-          Export dry-run ingest payload
-        </button>
+          Preview identity overrides only affect this generated payload. Nothing is sent. A real
+          ingest later requires a real UUID-backed tent context.
+        </p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label className="text-xs space-y-1">
+            <span className="block font-medium">tent_id (preview-only)</span>
+            <input
+              type="text"
+              data-testid="override-tent-id"
+              value={tentIdOverride}
+              onChange={(e) => setTentIdOverride(e.target.value)}
+              placeholder={ECOWITT_DRY_RUN_TENT_PLACEHOLDER}
+              className="w-full rounded-md border bg-background px-2 py-1 text-xs"
+            />
+          </label>
+          <label className="text-xs space-y-1">
+            <span className="block font-medium">plant_id (preview-only)</span>
+            <input
+              type="text"
+              data-testid="override-plant-id"
+              value={plantIdOverride}
+              onChange={(e) => setPlantIdOverride(e.target.value)}
+              placeholder="(empty → null)"
+              className="w-full rounded-md border bg-background px-2 py-1 text-xs"
+            />
+          </label>
+          <label className="text-xs space-y-1">
+            <span className="block font-medium">device_identity (preview-only)</span>
+            <input
+              type="text"
+              data-testid="override-device-identity"
+              value={deviceIdentityOverride}
+              onChange={(e) => setDeviceIdentityOverride(e.target.value)}
+              placeholder="(empty → null)"
+              className="w-full rounded-md border bg-background px-2 py-1 text-xs"
+            />
+          </label>
+          <label className="text-xs space-y-1">
+            <span className="block font-medium">source_identity (preview-only)</span>
+            <input
+              type="text"
+              data-testid="override-source-identity"
+              value={sourceIdentityOverride}
+              onChange={(e) => setSourceIdentityOverride(e.target.value)}
+              placeholder="(empty → null)"
+              className="w-full rounded-md border bg-background px-2 py-1 text-xs"
+            />
+          </label>
+        </div>
+      </section>
+
+      {/* Canonical field mapping panel */}
+      <section
+        className="rounded-lg border p-4 space-y-2"
+        data-testid="dry-run-field-map"
+        aria-label="Dry-run canonical field mapping"
+      >
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Canonical → ingest field mapping
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          Invalid, stale, or missing required telemetry cannot be marked sendable. Degraded
+          telemetry is shown as warning-only unless a blocking sensor truth rule applies.
+        </p>
+        <ul className="divide-y border-t">
+          {fieldMap.map((row) => (
+            <li
+              key={row.ingest_key}
+              data-testid={`field-map-row-${row.ingest_key}`}
+              data-status={row.status}
+              data-required={row.required ? "true" : "false"}
+              className="flex flex-wrap items-center justify-between gap-2 py-2 text-xs"
+            >
+              <div>
+                <div className="font-medium">
+                  {row.ingest_key}{" "}
+                  <span className="text-muted-foreground">
+                    ({row.required ? "required" : "optional"})
+                  </span>
+                </div>
+                <div className="text-muted-foreground">from {row.source_field}</div>
+                {row.note && (
+                  <div className="text-muted-foreground italic">{row.note}</div>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-mono">{row.value === null ? "—" : String(row.value)}</span>
+                <span
+                  className={`rounded border px-1.5 py-0.5 font-medium uppercase ${
+                    row.status === "mapped"
+                      ? "border-primary/40 bg-primary/15 text-primary"
+                      : row.status === "blocked" || row.status === "missing_required"
+                        ? "border-destructive/40 bg-destructive/15 text-destructive"
+                        : "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                  }`}
+                >
+                  {row.status}
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
       </section>
 
       {/* Redacted raw payload toggle */}

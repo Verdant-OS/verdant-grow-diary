@@ -20,6 +20,7 @@ const FILES = [
   "src/lib/ecowittDiaryAttachPreview.ts",
   "src/lib/ecowittSnapshotExport.ts",
   "src/lib/ecowittIngestDryRun.ts",
+  "src/lib/ecowittIngestDryRunFieldMap.ts",
   "src/fixtures/ecowitt-preview-samples.ts",
   "src/pages/OperatorEcowittTentPreview.tsx",
 ];

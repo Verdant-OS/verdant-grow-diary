@@ -23,9 +23,10 @@ import { insertSensorReadingsInBatches } from "@/lib/csv-import/sensorReadingsBa
 
 const ROOT = resolve(__dirname, "..", "..");
 const SPIDER_FIXTURE = readFileSync(
-  resolve(ROOT, "src/test/fixtures/spider_farmer_thp_full.csv"),
+  resolve(ROOT, "fixtures/sensor-csv/spider_farmer_primary_full_20260612214443.csv"),
   "utf8",
 );
+
 
 // Allow-list mirrors public.sensor_readings.Insert in
 // src/integrations/supabase/types.ts.

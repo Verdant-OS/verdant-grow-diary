@@ -196,6 +196,15 @@ Deno.serve(async (req) => {
 
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+    // Build the prompt once so the assembled text can feed both the upstream
+    // call AND an in-memory cost measurement. Measurement is local-only;
+    // never persisted, logged, or returned to the client.
+    const promptMessages = buildAiDoctorPromptMessages(packet);
+    const promptMeasurement = buildAiDoctorPromptMeasurement({
+      promptName: FEATURE,
+      recordedAt: new Date().toISOString(),
+      userPromptText: promptMessages.user,
+    }).measurement;
     let upstream: Response;
     try {
       upstream = await fetch(GATEWAY_URL, {
@@ -207,13 +216,10 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           model: MODEL,
-          messages: (() => {
-            const m = buildAiDoctorPromptMessages(packet);
-            return [
-              { role: "system", content: m.system },
-              { role: "user", content: m.user },
-            ];
-          })(),
+          messages: [
+            { role: "system", content: promptMessages.system },
+            { role: "user", content: promptMessages.user },
+          ],
           tools: [TOOL_SCHEMA],
           tool_choice: {
             type: "function",

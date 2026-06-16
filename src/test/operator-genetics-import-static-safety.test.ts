@@ -108,7 +108,7 @@ describe("operator genetics import: static safety (preview-only boundary)", () =
     expect(page).toMatch(
       /This tool validates genetics spreadsheets in-browser\.\s+Batch linking is\s+not enabled yet\./,
     );
-    expect(page).toMatch(/No data\s+is saved until confirmed/);
+    expect(page).toMatch(/No data\s+is saved until\s+confirmed/);
   });
 
   it("local-only export and template helpers remain in pure rules module", () => {

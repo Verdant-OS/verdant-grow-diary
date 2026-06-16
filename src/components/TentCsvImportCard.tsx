@@ -71,6 +71,7 @@ import {
   recordSensorHistoryImportFingerprint,
 } from "@/lib/sensorHistoryImportReplayGuard";
 import {
+  CSV_HISTORY_IMPORT_SCOPE_LINE,
   CSV_HISTORY_INSERT_BATCH_SIZE,
   SENSOR_READINGS_DEDUPE_SELECT_CLAUSE,
   normalizeCapturedAtForDedupe,

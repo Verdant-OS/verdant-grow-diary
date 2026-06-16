@@ -232,7 +232,10 @@ export function buildRegistryCsvInsertRows(args: BuildArgs): AdapterResult {
     if (humidity != null) emit.push({ metric: "humidity_pct", value: humidity });
     if (vpd != null) emit.push({ metric: "vpd_kpa", value: vpd });
     if (co2 != null) emit.push({ metric: "co2_ppm", value: co2 });
-    if (ppfd != null) emit.push({ metric: "ppfd", value: ppfd });
+    // PPFD is detected for source-app preview/diagnostics but is intentionally
+    // NOT imported into sensor_readings in this release. The original numeric
+    // value is preserved verbatim inside raw_payload.raw_row when present.
+    void ppfd;
 
     if (emit.length === 0) {
       bump(rejectionReasons, "empty_metrics");

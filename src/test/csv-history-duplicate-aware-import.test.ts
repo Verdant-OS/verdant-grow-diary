@@ -506,7 +506,7 @@ describe("filterDuplicateRows — invalid keys are not classified as duplicates"
 });
 
 import { CSV_HISTORY_IMPORT_SCOPE_LINE } from "@/lib/csv-import/sensorReadingsBatchInsert";
-import { PREFLIGHT_EMPTY_ROWS_BLOCKED_COPY, preflightCsvHistoryImport } from "@/lib/csv-import/sensorReadingsBatchInsert";
+import { CSV_HISTORY_EMPTY_ROWS_COPY, preflightCsvHistoryImport } from "@/lib/csv-import/sensorReadingsBatchInsert";
 
 describe("operator copy polish — explicit inserted vs skipped", () => {
   it("no-duplicate multi-batch copy: 'new', 'for this tent', 'across <N> batches', no-live reassurance", () => {
@@ -561,7 +561,7 @@ describe("operator copy polish — explicit inserted vs skipped", () => {
   it("empty-row preflight copy stays distinct from all-duplicate copy", () => {
     const preflight = preflightCsvHistoryImport([]);
     expect(preflight.ok).toBe(false);
-    expect(preflight.message).toBe(PREFLIGHT_EMPTY_ROWS_BLOCKED_COPY);
+    expect(preflight.message).toBe(CSV_HISTORY_EMPTY_ROWS_COPY);
     expect(preflight.message).toContain("Import blocked before writing rows");
     expect(preflight.message).toContain("No importable sensor readings were found");
     expect(preflight.message).not.toContain("already exist for this tent");

@@ -27,7 +27,7 @@ describe("evaluateManualSensorSnapshotQuality — historical mode", () => {
       { nowMs: NOW, mode: "historical" },
     );
     expect(r.quality).toBe("usable");
-    expect(r.summary).toBe("Historical usable reading");
+    expect(r.summary).toBe("Historical review reading");
     expect(r.reasons.some((x) => /older than/i.test(x))).toBe(false);
     expect(r.canSupportAiDoctorCurrentContext).toBe(false);
     expect(r.canSupportActionSuggestionPreview).toBe(false);

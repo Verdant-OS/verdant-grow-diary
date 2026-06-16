@@ -14,6 +14,7 @@
  */
 
 import { useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, FileUp, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
@@ -104,6 +105,14 @@ const DETECTED_SOURCE_DISPLAY: Record<string, string> = {
 
 export default function TentCsvImportCard({ tentId, growId }: Props) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
+  // Success-only CTA: jump to the selected tent's detail/timeline view.
+  // Scoped to the current tent id only — never invents query params for
+  // unsupported timeline filters and never says "live".
+  const viewImportedHistoryAction = {
+    label: "View imported history",
+    onClick: () => navigate(`/tents/${tentId}`),
+  } as const;
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [sourceApp, setSourceApp] = useState<CsvImportSourceApp>("ac_infinity");
   const [fileName, setFileName] = useState<string | null>(null);
@@ -287,7 +296,10 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         toast.error("Couldn't import CSV.", { description: batchResult.diagnostic });
         return;
       }
-      toast.success(batchResult.diagnostic, { description: CSV_HISTORY_IMPORT_SCOPE_LINE });
+      toast.success(batchResult.diagnostic, {
+        description: CSV_HISTORY_IMPORT_SCOPE_LINE,
+        action: viewImportedHistoryAction,
+      });
       qc.invalidateQueries({ queryKey: ["sensor_readings"] });
       qc.invalidateQueries({ queryKey: ["grow", "sensors"] });
       qc.invalidateQueries({ queryKey: ["latest-sensor-snapshot"] });
@@ -373,7 +385,10 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         toast.error("Couldn't import CSV.", { description: batchResult.diagnostic });
         return;
       }
-      toast.success(batchResult.diagnostic, { description: CSV_HISTORY_IMPORT_SCOPE_LINE });
+      toast.success(batchResult.diagnostic, {
+        description: CSV_HISTORY_IMPORT_SCOPE_LINE,
+        action: viewImportedHistoryAction,
+      });
       const auditInput = buildRegistryCsvAuditInput({
         sourceAppId: detected,
         adapterResult: result,
@@ -448,7 +463,10 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         : "";
     toast.success(
       `Imported XLSX sensor history as CSV history. ${adapterResult.acceptedRowCount} rows imported.${rejectedSummary} No live sensor data was created.`,
-      { description: CSV_HISTORY_IMPORT_SCOPE_LINE },
+      {
+        description: CSV_HISTORY_IMPORT_SCOPE_LINE,
+        action: viewImportedHistoryAction,
+      },
     );
     recordSensorHistoryImportFingerprint(fingerprint);
     if (xlsxGrid) {

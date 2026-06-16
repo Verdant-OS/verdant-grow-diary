@@ -326,3 +326,78 @@ describe("preflight + failure copy stays distinct from success copy", () => {
     }
   });
 });
+
+describe("post-import CTA — 'View imported history' navigation", () => {
+  it("declares a single view-imported-history action wired to navigate(`/tents/${tentId}`)", () => {
+    expect(CARD).toMatch(/viewImportedHistoryAction/);
+    expect(CARD).toMatch(
+      /label:\s*["']View imported history["']/,
+    );
+    expect(CARD).toMatch(/navigate\(`\/tents\/\$\{tentId\}`\)/);
+  });
+
+  it("the CTA label says 'imported history' (never 'live')", () => {
+    const ctaBlock = CARD.match(
+      /viewImportedHistoryAction\s*=\s*\{[\s\S]*?\}\s*as\s*const;/,
+    );
+    expect(ctaBlock).not.toBeNull();
+    const block = ctaBlock![0];
+    expect(block).toContain("imported history");
+    for (const banned of [
+      "live data",
+      "live readings",
+      "synced live data",
+      "created live sensor data",
+      "live sensor",
+    ]) {
+      expect(block.toLowerCase()).not.toContain(banned.toLowerCase());
+    }
+  });
+
+  it("every toast.success call attaches the view-imported-history action", () => {
+    const successCalls = [
+      ...CARD.matchAll(/toast\.success\([^)]*\)/g),
+    ].map((m) => m[0]);
+    expect(successCalls.length).toBeGreaterThanOrEqual(2);
+    for (const call of successCalls) {
+      expect(call).toMatch(/action:\s*viewImportedHistoryAction/);
+    }
+  });
+
+  it("no toast.error call attaches the view-imported-history action (failure / preflight stays distinct)", () => {
+    const errorCalls = [
+      ...CARD.matchAll(/toast\.error\([^)]*\)/g),
+    ].map((m) => m[0]);
+    expect(errorCalls.length).toBeGreaterThan(0);
+    for (const call of errorCalls) {
+      expect(call).not.toMatch(/viewImportedHistoryAction/);
+      expect(call).not.toMatch(/View imported history/);
+    }
+  });
+
+  it("CTA navigation target is the selected tent route only — no invented query params", () => {
+    // Only `/tents/${tentId}` is allowed; no &source=, no ?start=, no ?end=.
+    const navCalls = [...CARD.matchAll(/navigate\(`([^`]+)`\)/g)].map((m) => m[1]);
+    const ctaNav = navCalls.filter((p) => p.includes("/tents/"));
+    expect(ctaNav.length).toBeGreaterThan(0);
+    for (const path of ctaNav) {
+      expect(path).toBe("/tents/${tentId}");
+      expect(path).not.toMatch(/\?/);
+      expect(path).not.toContain("start=");
+      expect(path).not.toContain("end=");
+      expect(path).not.toContain("captured_at");
+    }
+  });
+
+  it("CTA is reachable for all success branches (no-duplicate, mixed, all-duplicate) because both handlers reuse the same success-toast wiring", () => {
+    // Both duplicate-aware handlers call toast.success(batchResult.diagnostic, ...)
+    // exactly when batchResult.ok === true (which covers all-duplicate too,
+    // since runDuplicateAwareCsvHistoryImport returns ok: true for that case).
+    const diagnosticSuccesses = [
+      ...CARD.matchAll(
+        /toast\.success\([^)]*batchResult\.diagnostic[^)]*action:\s*viewImportedHistoryAction[^)]*\)/g,
+      ),
+    ];
+    expect(diagnosticSuccesses.length).toBeGreaterThanOrEqual(2);
+  });
+});

@@ -25,6 +25,16 @@ function runScannerIn(cwd: string) {
   });
 }
 
+// Memoise the (slow) real-repo scanner run so the two `it`s that both
+// just expect "exit 0 against ROOT" don't pay for the spawn twice.
+// Same command, same cwd, deterministic output — safe to cache.
+let cachedRootRun: ReturnType<typeof spawnSync> | null = null;
+function runScannerInRoot() {
+  if (cachedRootRun) return cachedRootRun;
+  cachedRootRun = runScannerIn(ROOT);
+  return cachedRootRun;
+}
+
 describe("scripts/assert-vpd-stage-normalization-ownership.mjs", () => {
   it("the scanner file and package script exist", () => {
     expect(() => require("node:fs").readFileSync(resolve(ROOT, SCRIPT), "utf8"))

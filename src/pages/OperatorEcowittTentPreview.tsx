@@ -397,6 +397,79 @@ export default function OperatorEcowittTentPreview() {
         </div>
       </section>
 
+      {/* Ingest dry-run preview */}
+      <section
+        className="rounded-lg border p-4 space-y-2"
+        data-testid="ingest-dry-run-preview"
+        aria-label="Ingest dry-run preview"
+      >
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Ingest dry-run preview
+        </h2>
+        <p
+          data-testid="dry-run-notice"
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-700 dark:text-amber-300"
+        >
+          {ECOWITT_DRY_RUN_NOTICE}
+        </p>
+        <div className="text-xs text-muted-foreground">
+          Selected tent: <span data-testid="dry-run-tent">{preview.tent_label}</span> · Source:{" "}
+          <span data-testid="dry-run-source">{preview.source_label}</span> · Captured:{" "}
+          <span data-testid="dry-run-captured-at">{preview.captured_at ?? "—"}</span> ·{" "}
+          Provider: <span data-testid="dry-run-provider">{preview.provider}</span>
+        </div>
+        <div className="text-xs">
+          Can send later:{" "}
+          <span
+            data-testid="dry-run-can-send"
+            className={`rounded border px-1.5 py-0.5 font-medium ${
+              dryRun.can_send_later
+                ? "border-primary/40 bg-primary/15 text-primary"
+                : "border-destructive/40 bg-destructive/15 text-destructive"
+            }`}
+          >
+            {dryRun.can_send_later ? "YES" : "BLOCKED"}
+          </span>
+        </div>
+        {dryRun.blocked_reasons.length > 0 && (
+          <ul
+            className="list-disc pl-5 text-xs text-destructive"
+            data-testid="dry-run-blocked-reasons"
+          >
+            {dryRun.blocked_reasons.map((r) => (
+              <li key={r}>{r}</li>
+            ))}
+          </ul>
+        )}
+        {dryRun.warnings.length > 0 && (
+          <ul
+            className="list-disc pl-5 text-xs text-muted-foreground"
+            data-testid="dry-run-warnings"
+          >
+            {dryRun.warnings.map((w) => (
+              <li key={w}>{w}</li>
+            ))}
+          </ul>
+        )}
+        <pre
+          className="overflow-auto rounded-md bg-muted p-2 text-xs"
+          data-testid="dry-run-payload-json"
+        >
+          {JSON.stringify(dryRun.dry_run_payload, null, 2)}
+        </pre>
+        <p className="text-xs text-muted-foreground">
+          No private fields (PASSKEY/MAC/token/IP/station) are included in this payload.
+        </p>
+        <button
+          type="button"
+          onClick={handleExportDryRun}
+          data-testid="export-dry-run-button"
+          className="rounded-md border bg-background px-3 py-2 text-sm font-medium hover:bg-muted"
+        >
+          Export dry-run ingest payload
+        </button>
+      </section>
+
       {/* Redacted raw payload toggle */}
       <section className="rounded-lg border p-4 space-y-2">
         <button

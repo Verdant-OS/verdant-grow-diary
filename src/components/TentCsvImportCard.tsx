@@ -240,14 +240,10 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
       metric: string | null;
       captured_at: string | null;
     }>) {
-      const captured = row.captured_at ?? "";
-      const t = Date.parse(captured);
-      const normalized = Number.isFinite(t)
-        ? new Date(t).toISOString()
-        : captured;
-      keys.add(
-        `${row.tent_id ?? ""}|${row.source ?? ""}|${row.metric ?? ""}|${normalized}`,
-      );
+      if (!row.tent_id || !row.source || !row.metric) continue;
+      const normalized = normalizeCapturedAtForDedupe(row.captured_at);
+      if (normalized === null) continue;
+      keys.add(`${row.tent_id}|${row.source}|${row.metric}|${normalized}`);
     }
     return keys;
   }

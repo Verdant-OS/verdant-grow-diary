@@ -28,6 +28,8 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/imports/representative-csv",
   "/ingest-inspector",
   "/operator/ecowitt",
+  "/operator/ecowitt-bridge-status",
+  "/operator/ecowitt-live-bringup",
   "/operator/one-tent-proof-record",
   "/pi-ingest-status",
   "/sensors/csv-preview",
@@ -36,6 +38,10 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   // internal
   "/admin/leads",
   "/grow-lineage",
+  "/internal/ai-doctor-confidence-audit",
+  "/internal/ai-doctor-phase1-preview",
+  "/internal/one-tent-loop-proof",
+  "/internal/sensor-truth-audit",
   "/leads",
   // representative auth-gated surfaces
   "/",

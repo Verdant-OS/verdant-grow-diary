@@ -127,8 +127,12 @@ export function VerdantGeneticsXlsxImportPanel({
         <p className="text-sm text-muted-foreground">
           XLSX genetics import preview. No data saved until confirmed.
         </p>
+        <p className="text-xs text-muted-foreground">
+          This tool validates genetics spreadsheets in-browser. Batch linking is
+          not enabled yet.
+        </p>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <label className="text-sm font-medium" htmlFor="genetics-xlsx-file">
             Upload genetics XLSX
           </label>
@@ -147,7 +151,45 @@ export function VerdantGeneticsXlsxImportPanel({
           {fileName && (
             <span className="text-xs text-muted-foreground">{fileName}</span>
           )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            data-testid="genetics-template-button"
+            onClick={() =>
+              triggerLocalDownload(
+                GENETICS_TEMPLATE_CSV_FILENAME,
+                buildGeneticsTemplateCsv(),
+                "text/csv;charset=utf-8",
+              )
+            }
+          >
+            Download CSV template
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            data-testid="genetics-export-report-button"
+            disabled={!result || !!result.fileLevelError}
+            onClick={() => {
+              if (!result) return;
+              triggerLocalDownload(
+                GENETICS_VALIDATION_REPORT_FILENAME,
+                buildGeneticsValidationReportCsv(result),
+                "text/csv;charset=utf-8",
+              );
+            }}
+          >
+            Export validation report
+          </Button>
         </div>
+        <p
+          data-testid="genetics-template-fallback-copy"
+          className="text-xs text-muted-foreground"
+        >
+          {GENETICS_TEMPLATE_CSV_FALLBACK_COPY}
+        </p>
 
         {parsing && (
           <p className="text-sm text-muted-foreground">Parsing file…</p>
@@ -164,6 +206,19 @@ export function VerdantGeneticsXlsxImportPanel({
           <Alert variant="destructive" data-testid="genetics-file-error">
             <AlertTitle>Unrecognized sheet</AlertTitle>
             <AlertDescription>{result.fileLevelError}</AlertDescription>
+          </Alert>
+        )}
+
+        {result && !result.fileLevelError && result.fileWarnings.length > 0 && (
+          <Alert data-testid="genetics-file-warnings">
+            <AlertTitle>Header warnings</AlertTitle>
+            <AlertDescription>
+              <ul className="list-disc pl-4 text-sm">
+                {result.fileWarnings.map((w, i) => (
+                  <li key={i}>{w.message}</li>
+                ))}
+              </ul>
+            </AlertDescription>
           </Alert>
         )}
 

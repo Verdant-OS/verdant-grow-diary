@@ -262,7 +262,11 @@ export function buildSensorNormalizationPreviewViewModel(
 
   let emptyState: string | null = null;
   if (normalized.source === "invalid") {
-    emptyState = SENSOR_NORMALIZATION_PREVIEW_INVALID_NOTICE;
+    if (normalized.warnings.includes("no_usable_metrics")) {
+      emptyState = SENSOR_NORMALIZATION_PREVIEW_NO_METRICS_EMPTY_STATE;
+    } else {
+      emptyState = SENSOR_NORMALIZATION_PREVIEW_INVALID_NOTICE;
+    }
   } else if (tentStatus !== "linked_verified") {
     emptyState = SENSOR_NORMALIZATION_PREVIEW_TENT_MISSING_EMPTY_STATE;
   } else if (longFormPreview.length === 0) {

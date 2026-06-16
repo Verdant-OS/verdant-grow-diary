@@ -96,13 +96,32 @@ Do **not** invent numeric limits. Replace a marker only with evidence:
   `supabase/functions/ai-doctor-review/index.ts`. The OpenAI-compatible
   gateway response includes a `usage` object with `prompt_tokens`,
   `completion_tokens`, `total_tokens` when the provider reports it.
-- To capture provider tokens, the edge function (or a client-side wrapper)
-  should normalize that usage into
-  `ProviderReportedTokenUsage = { promptTokens, completionTokens, totalTokens }`
-  and pass it to `buildAiDoctorPromptMeasurement({ providerReportedTokens })`.
-  If usage is missing, leave `providerReportedTokens` undefined — the
+- To capture provider tokens, normalize that usage with
+  `normalizeProviderReportedTokenUsage(input)` from
+  `src/lib/cost/aiDoctorProviderUsageRules.ts`. This helper accepts both
+  snake_case and camelCase keys, validates every field, derives `totalTokens`
+  only when `total` is missing, and returns `null` for unsafe or malformed
+  usage — never clamps silently.
+- Pass the normalized result to `buildAiDoctorPromptMeasurement({ providerReportedTokens })`.
+  If normalization returns `null`, leave `providerReportedTokens` undefined — the
   measurement keeps `providerReportedTokens: null`. Never log prompt text,
   raw provider response, API keys, or headers.
+- **Edge Function runtime is intentionally not changed in this slice.**
+  The normalizer is pure logic ready for future wiring at the call site.
+
+### Provider usage normalizer
+
+- Helper: `src/lib/cost/aiDoctorProviderUsageRules.ts`
+  - `normalizeProviderReportedTokenUsage(input: unknown)` → `ProviderReportedTokenUsage | null`
+  - Supports `prompt_tokens` / `completion_tokens` / `total_tokens` (OpenAI)
+    and `promptTokens` / `completionTokens` / `totalTokens` (common camelCase).
+  - Rejects: `null`, `undefined`, non-objects, negative values, `NaN`,
+    `Infinity`, string numbers, fractional counts, and partial objects missing
+    prompt or completion.
+  - Derives `totalTokens = promptTokens + completionTokens` only when total
+    is absent; preserves provider-reported total when present.
+  - Does not export, log, or embed raw prompts, responses, headers, or secrets.
+  - Does not mutate input.
 
 ### Local-only measurement capture store
 

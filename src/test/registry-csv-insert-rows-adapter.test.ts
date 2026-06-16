@@ -153,13 +153,14 @@ describe("Spider Farmer — sparse fixture (mostly blank co2/ppfd)", () => {
     expect(metrics.has("vpd_kpa")).toBe(true);
   });
 
-  it("co2_ppm and ppfd row counts are much smaller than core metrics (sparse)", () => {
+  it("co2_ppm row count is much smaller than core metrics (sparse); ppfd never emitted", () => {
     const counts: Record<string, number> = {};
     for (const row of r.rows) counts[row.metric] = (counts[row.metric] ?? 0) + 1;
     expect(counts.temperature_c).toBeGreaterThan(1000);
-    // Real fixture has ~189 numeric co2/ppfd cells across 5673 rows.
+    // Real fixture has ~189 numeric co2 cells across 5673 rows.
     expect(counts.co2_ppm ?? 0).toBeLessThan(counts.temperature_c / 5);
-    expect(counts.ppfd ?? 0).toBeLessThan(counts.temperature_c / 5);
+    // PPFD is detected but never imported in this release.
+    expect(counts.ppfd ?? 0).toBe(0);
   });
 });
 

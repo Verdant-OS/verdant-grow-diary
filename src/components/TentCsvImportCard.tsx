@@ -675,7 +675,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
       )}
 
 
-      {preview && (
+      {preview && !registrySaveVisible && (
         <div className="mt-4 grid gap-3" data-testid="csv-preview">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
             <Stat label="Readings parsed" value={String(validCount)} testId="csv-stat-parsed" />

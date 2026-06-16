@@ -186,30 +186,29 @@ describe("page safety copy", () => {
 
 describe("validation export + template download", () => {
   function stubDownload() {
-    const calls: Array<{ filename: string; content: string }> = [];
+    const blobs: Array<{ blob: Blob; filename: string }> = [];
     const realCreate = URL.createObjectURL;
     const realRevoke = URL.revokeObjectURL;
-    const realAppend = document.body.appendChild.bind(document.body);
-    URL.createObjectURL = vi.fn(async (blob: Blob) => {
-      calls.push({
-        filename: "pending",
-        content: await (blob as Blob).text(),
-      });
+    URL.createObjectURL = ((blob: Blob) => {
+      blobs.push({ blob, filename: "" });
       return "blob://stub";
     }) as unknown as typeof URL.createObjectURL;
-    URL.revokeObjectURL = vi.fn() as unknown as typeof URL.revokeObjectURL;
+    URL.revokeObjectURL = (() => {}) as unknown as typeof URL.revokeObjectURL;
     const origClick = HTMLAnchorElement.prototype.click;
     HTMLAnchorElement.prototype.click = function () {
       const a = this as HTMLAnchorElement;
-      if (calls.length > 0) calls[calls.length - 1].filename = a.download;
+      if (blobs.length > 0) blobs[blobs.length - 1].filename = a.download;
     };
     return {
-      calls,
+      blobs,
+      async lastContent() {
+        const last = blobs[blobs.length - 1];
+        return { filename: last.filename, content: await last.blob.text() };
+      },
       restore() {
         URL.createObjectURL = realCreate;
         URL.revokeObjectURL = realRevoke;
         HTMLAnchorElement.prototype.click = origClick;
-        document.body.appendChild = realAppend;
       },
     };
   }

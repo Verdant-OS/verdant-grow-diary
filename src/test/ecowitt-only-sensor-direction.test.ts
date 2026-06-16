@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { join, relative, resolve, sep } from "node:path";
+import { relative, resolve, sep } from "node:path";
 
 // Standardised scanner guardrail timeout + slow-test telemetry.
 // Replaces the previous per-file vi.setConfig bump. No scanner pattern,

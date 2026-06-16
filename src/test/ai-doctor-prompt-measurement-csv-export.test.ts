@@ -37,12 +37,12 @@ describe("aiDoctorPromptMeasurementCsvExport", () => {
       }),
     );
     const csv = serializeAiDoctorPromptMeasurementsToCsv(store.list());
-    const lines = csv.split("\n");
-    expect(lines[1]).toContain('"name, with ""quote""\nand newline"');
-    expect(lines[1]).toContain("10,5,15");
-    expect(lines[1]).toContain("5m|1h");
-    expect(lines[1]).toContain("live|csv");
+    expect(csv).toContain('"name, with ""quote""\nand newline"');
+    expect(csv).toContain("10,5,15");
+    expect(csv).toContain("5m|1h");
+    expect(csv).toContain("live|csv");
   });
+
 
   it("renders missing provider tokens as blank cells", () => {
     const store = createAiDoctorPromptMeasurementCaptureStore();

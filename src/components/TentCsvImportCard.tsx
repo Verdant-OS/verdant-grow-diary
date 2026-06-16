@@ -857,23 +857,36 @@ function buildMappingDrawerMetrics(
   metricsDetected: string[],
   unsupportedMetrics: string[],
 ): MappingDrawerMetrics {
-  if (sourceAppId === "spider_farmer" || sourceAppId === "vivosun") {
-    const imported = toMetricLabels(
-      mappedMetrics.filter((m) => m !== "ppfd_umol_m2_s"),
-    );
-    const notImported: string[] = [];
-    const ecUnmapped = unmappedColumns.find((c) => /^ec$/i.test(c));
-    if (ecUnmapped) notImported.push("EC");
+  // Legacy path: metricsDetected / unsupportedMetrics are authoritative.
+  if (metricsDetected.length > 0 || unsupportedMetrics.length > 0) {
+    return {
+      imported: toMetricLabels(metricsDetected),
+      notImported: toMetricLabels(unsupportedMetrics),
+    };
+  }
+
+  // Registry path — derive from mapped + unmapped columns.
+  const imported = toMetricLabels(
+    sourceAppId === "spider_farmer"
+      ? mappedMetrics.filter((m) => m !== "ppfd_umol_m2_s")
+      : mappedMetrics,
+  );
+
+  const notImported: string[] = [];
+  const ecUnmapped = unmappedColumns.find((c) => /^ec$/i.test(c));
+  if (ecUnmapped) notImported.push("EC");
+
+  if (sourceAppId === "spider_farmer") {
     const ppfdUnmapped = unmappedColumns.find((c) => /^ppfd$/i.test(c));
     if (ppfdUnmapped || mappedMetrics.includes("ppfd_umol_m2_s")) {
       if (!notImported.includes("PPFD")) notImported.push("PPFD");
     }
-    return { imported, notImported };
+  } else {
+    const ppfdUnmapped = unmappedColumns.find((c) => /^ppfd$/i.test(c));
+    if (ppfdUnmapped && !notImported.includes("PPFD")) notImported.push("PPFD");
   }
-  return {
-    imported: toMetricLabels(metricsDetected),
-    notImported: toMetricLabels(unsupportedMetrics),
-  };
+
+  return { imported, notImported };
 }
 
 function CsvImportMappingHelp({

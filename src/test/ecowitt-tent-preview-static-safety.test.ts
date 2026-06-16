@@ -35,6 +35,11 @@ const FORBIDDEN_PATTERNS: Array<{ name: string; re: RegExp }> = [
   { name: "action queue write", re: /\b(createActionQueueItem|enqueueAction|insertActionQueue)\b/ },
   { name: "ai/model helper", re: /\b(callAiDoctor|invokeAi|openai|anthropic|lovable-ai)\b/i },
   { name: "device control", re: /\b(deviceControl|controlDevice|setRelay|fanOn|fanOff|lightOn|lightOff|pumpOn|pumpOff)\b/ },
+  { name: "diary write helper", re: /\b(insertDiaryEntry|createDiaryEntry|saveDiaryEntry|upsertDiaryEntry)\b/ },
+  { name: "quick log save helper", re: /\b(saveQuickLog|insertQuickLog|createQuickLog)\b/ },
+  { name: "grow event write helper", re: /\b(createGrowEvent|insertGrowEvent|saveGrowEvent)\b/ },
+  { name: "bridge token", re: /\b(BRIDGE_TOKEN|bridgeToken|getBridgeToken)\b/ },
+  { name: "service role key", re: /\b(SERVICE_ROLE|service_role_key|serviceRoleKey|SUPABASE_SERVICE_ROLE_KEY)\b/ },
 ];
 
 describe("EcoWitt multi-tent preview/router static safety guard", () => {

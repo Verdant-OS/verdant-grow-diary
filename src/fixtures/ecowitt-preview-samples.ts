@@ -3,13 +3,41 @@
 // Used only by the read-only preview page. Never sent to any backend.
 
 export interface EcowittPreviewSample {
-  key: "valid" | "degraded" | "invalid";
+  key:
+    | "valid"
+    | "degraded"
+    | "invalid"
+    | "just-fresh"
+    | "just-stale";
   label: string;
   description: string;
   /** Payload age in ms relative to "now" when normalizing. */
   captured_age_ms: number;
   payload: Readonly<Record<string, unknown>>;
 }
+
+/**
+ * Evidence freshness window used by the preview + boundary fixtures.
+ * The normalizer/evidence helpers treat `age_ms > FRESHNESS_WINDOW_MS` as stale.
+ *
+ * Boundary contract:
+ * - age == FRESHNESS_WINDOW_MS  → NOT stale (just-fresh)
+ * - age >  FRESHNESS_WINDOW_MS  → stale    (just-stale)
+ */
+export const ECOWITT_EVIDENCE_FRESHNESS_WINDOW_MS = 10 * 60 * 1000;
+
+const BOUNDARY_PAYLOAD: Readonly<Record<string, unknown>> = Object.freeze({
+  temp1f: 80.0,
+  humidity1: 50,
+  tf_ch1: 70.0,
+  soilmoisture3: 60,
+  soilmoisture2: 55,
+  temp2f: 75.0,
+  humidity2: 55,
+  temp3f: 78.0,
+  humidity3: 52,
+  soilmoisture1: 45,
+});
 
 export const ECOWITT_PREVIEW_SAMPLES: readonly EcowittPreviewSample[] = [
   {
@@ -74,6 +102,22 @@ export const ECOWITT_PREVIEW_SAMPLES: readonly EcowittPreviewSample[] = [
       humidity3: 52,
       soilmoisture1: 250, // out of range
     }),
+  },
+  {
+    key: "just-fresh",
+    label: "Just-fresh boundary sample",
+    description:
+      "Captured exactly at the freshness boundary (age == window). Must NOT show stale.",
+    captured_age_ms: ECOWITT_EVIDENCE_FRESHNESS_WINDOW_MS,
+    payload: BOUNDARY_PAYLOAD,
+  },
+  {
+    key: "just-stale",
+    label: "Just-stale boundary sample",
+    description:
+      "Captured one millisecond past the freshness boundary. Must show stale.",
+    captured_age_ms: ECOWITT_EVIDENCE_FRESHNESS_WINDOW_MS + 1,
+    payload: BOUNDARY_PAYLOAD,
   },
 ];
 

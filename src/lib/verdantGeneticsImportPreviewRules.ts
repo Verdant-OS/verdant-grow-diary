@@ -223,6 +223,7 @@ export function buildGeneticsImportPreview(
   const empty: GeneticsImportPreviewResult = {
     rows: [],
     fileLevelError: null,
+    fileWarnings: [],
     totals: { total: 0, valid: 0, warning: 0, blocked: 0 },
   };
   if (!grid || grid.length === 0) {
@@ -233,7 +234,7 @@ export function buildGeneticsImportPreview(
     };
   }
   const headerRow = grid[0] ?? [];
-  const map = mapHeaders(headerRow);
+  const { index: map, duplicates } = mapHeaders(headerRow);
   const hasAnyKnown =
     map.strain !== undefined ||
     map.breeder !== undefined ||
@@ -245,6 +246,11 @@ export function buildGeneticsImportPreview(
         "The uploaded file does not contain a recognizable genetics sheet.",
     };
   }
+
+  const fileWarnings: GeneticsImportFileWarning[] = duplicates.map((field) => ({
+    field,
+    message: `Multiple columns map to "${field}". Using the first detected column.`,
+  }));
 
   const rows: GeneticsImportPreviewRow[] = [];
   for (let i = 1; i < grid.length; i++) {
@@ -340,11 +346,85 @@ export function buildGeneticsImportPreview(
     blocked: rows.filter((r) => r.status === "blocked").length,
   };
 
-  return { rows, fileLevelError: null, totals };
+  return { rows, fileLevelError: null, fileWarnings, totals };
 }
 
 export function selectImportableRows(
   result: GeneticsImportPreviewResult,
 ): GeneticsImportPreviewRow[] {
   return result.rows.filter((r) => r.status !== "blocked");
+}
+
+// -- CSV export helpers (preview-only, no I/O) ------------------------------
+
+/** Escape a single CSV field per RFC 4180 (quote if it contains , " \r \n). */
+function csvField(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  const s = String(value);
+  if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function toCsv(rows: ReadonlyArray<ReadonlyArray<unknown>>): string {
+  return rows.map((r) => r.map(csvField).join(",")).join("\r\n") + "\r\n";
+}
+
+export const GENETICS_VALIDATION_REPORT_FILENAME =
+  "verdant-genetics-validation-report.csv" as const;
+
+export const GENETICS_TEMPLATE_CSV_FILENAME =
+  "verdant-genetics-template.csv" as const;
+
+export const GENETICS_VALIDATION_REPORT_COLUMNS = [
+  "row_number",
+  "status",
+  "strain",
+  "breeder",
+  "seed_type",
+  "lineage",
+  "flowering_weeks",
+  "messages",
+] as const;
+
+export function buildGeneticsValidationReportCsv(
+  result: GeneticsImportPreviewResult,
+): string {
+  const header = [...GENETICS_VALIDATION_REPORT_COLUMNS] as unknown as string[];
+  const body = result.rows.map((r) => [
+    r.rowNumber,
+    r.status,
+    r.strain ?? "",
+    r.breeder ?? "",
+    r.seedType ?? r.rawSeedType ?? "",
+    r.lineage ?? "",
+    r.floweringWeeks ?? "",
+    r.issues.map((i) => i.message).join(" | "),
+  ]);
+  return toCsv([header, ...body]);
+}
+
+export const GENETICS_TEMPLATE_REQUIRED_COLUMNS = [
+  "strain",
+  "breeder",
+  "seed_type",
+] as const;
+
+export const GENETICS_TEMPLATE_OPTIONAL_COLUMNS = [
+  "lineage",
+  "flowering_weeks",
+  "notes",
+] as const;
+
+export const GENETICS_TEMPLATE_EXAMPLE_ROWS: ReadonlyArray<ReadonlyArray<string>> = [
+  ["Example Auto", "Example Breeder", "autoflower", "", "9", ""],
+  ["Example Fem", "Example Breeder", "feminized", "", "8", ""],
+  ["Example Regular", "Example Breeder", "regular", "", "9", ""],
+];
+
+export function buildGeneticsTemplateCsv(): string {
+  const header = [
+    ...GENETICS_TEMPLATE_REQUIRED_COLUMNS,
+    ...GENETICS_TEMPLATE_OPTIONAL_COLUMNS,
+  ] as unknown as string[];
+  return toCsv([header, ...GENETICS_TEMPLATE_EXAMPLE_ROWS]);
 }

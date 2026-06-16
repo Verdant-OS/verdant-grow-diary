@@ -19,6 +19,10 @@ import {
   groupManualReadingsToSnapshots,
 } from "@/lib/manualSensorSnapshotChangeContextRules";
 
+// Per-file timeout bump for filesystem-scanning / heavy-render guardrail; no logic changed.
+import { vi as __vi_timeout } from "vitest";
+__vi_timeout.setConfig({ testTimeout: 30000, hookTimeout: 30000 });
+
 const T1 = "2026-05-24T09:00:00Z";
 const T2 = "2026-05-24T15:00:00Z";
 

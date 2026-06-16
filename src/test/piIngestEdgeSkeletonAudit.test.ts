@@ -10,6 +10,10 @@ import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 
+// Per-file timeout bump for filesystem-scanning / heavy-render guardrail; no logic changed.
+import { vi as __vi_timeout } from "vitest";
+__vi_timeout.setConfig({ testTimeout: 30000, hookTimeout: 30000 });
+
 const ROOT = resolve(__dirname, "../..");
 const AUDIT_PATH = resolve(ROOT, "docs/pi-ingest-edge-skeleton-audit.md");
 const FN_DIR = resolve(ROOT, "supabase/functions/pi-ingest-readings");

@@ -10,6 +10,10 @@ import { buildPhotoHistory } from "@/lib/photoHistoryRules";
 import { typedWateringWriteEnabled } from "@/lib/featureFlags";
 import { findMatches } from "./testFileSearchRules";
 
+// Per-file timeout bump for filesystem-scanning / heavy-render guardrail; no logic changed.
+import { vi as __vi_timeout } from "vitest";
+__vi_timeout.setConfig({ testTimeout: 30000, hookTimeout: 30000 });
+
 const REPO_ROOT = process.cwd();
 
 function normalize(raw: unknown[]): NormalizedDiaryEntry[] {

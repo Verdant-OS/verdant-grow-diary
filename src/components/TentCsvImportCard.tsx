@@ -233,10 +233,11 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         return;
       }
       // NOTE: no `user_id` in payload — DB default auth.uid() owns the row.
-      const batchResult = await insertSensorReadingsInBatches({
+      const batchResult = await runDuplicateAwareCsvHistoryImport({
         rows,
         vendorLabel: CSV_SOURCE_LABEL[sourceApp] ?? "CSV history",
         batchSize: CSV_HISTORY_INSERT_BATCH_SIZE,
+        fetchExistingKeys: (scope) => fetchExistingDedupeKeys(scope),
         insertBatch: async (batch) => {
           const { error } = await supabase
             .from("sensor_readings")

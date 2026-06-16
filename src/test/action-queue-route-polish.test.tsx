@@ -181,16 +181,16 @@ describe("Action Queue route — loading skeleton", () => {
 });
 
 describe("Action Queue route — empty state", () => {
-  it("renders 'No pending actions.' with approval-focused helper copy", async () => {
+  it("renders 'No actions need review right now.' with approval-focused helper copy", async () => {
     actionRowsMock = [];
     renderPage();
     await waitFor(() =>
       expect(screen.queryByTestId("action-queue-loading-skeleton")).toBeNull(),
     );
     const empty = screen.getByTestId("action-queue-empty-pending");
-    expect(empty.textContent).toMatch(/No pending actions\./);
-    expect(empty.textContent).toMatch(/grower-reviewed recommendations/i);
-    expect(empty.textContent).toMatch(/grower approval is always required/i);
+    expect(empty.textContent).toMatch(/No actions need review right now\./);
+    expect(empty.textContent).toMatch(/AI Doctor or alert suggestions/i);
+    expect(empty.textContent).toMatch(/grower approval/i);
   });
 });
 

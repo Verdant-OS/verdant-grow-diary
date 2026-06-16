@@ -65,7 +65,7 @@ describe("src/ static safety", () => {
   it("never imports the service role key into src/", () => {
     const offenders = SRC_FILES.filter((f) => {
       if (/src\/test\//.test(f)) return false; // guard tests assert absence
-      const body = readFileSync(f, "utf8");
+      const body = readFileCached(f);
       // Real escalation surface: env access or createClient using service role.
       return (
         /\bSUPABASE_SERVICE_ROLE_KEY\b/.test(body) ||
@@ -80,7 +80,7 @@ describe("src/ static safety", () => {
   it("introduces no NEXT_PUBLIC_* env vars in src/", () => {
     const offenders = SRC_FILES.filter((f) => {
       if (/src\/test\//.test(f)) return false;
-      return /NEXT_PUBLIC_/.test(readFileSync(f, "utf8"));
+      return /NEXT_PUBLIC_/.test(readFileCached(f));
     });
     expect(offenders).toEqual([]);
   });
@@ -88,7 +88,7 @@ describe("src/ static safety", () => {
   it("does not import @supabase/ssr or next/headers anywhere in src/", () => {
     const offenders = SRC_FILES.filter((f) => {
       if (f.endsWith("auth-hardening-static-safety.test.ts")) return false;
-      const body = readFileSync(f, "utf8");
+      const body = readFileCached(f);
       return /from\s+['"]@supabase\/ssr['"]|from\s+['"]next\/headers['"]/.test(
         body,
       );

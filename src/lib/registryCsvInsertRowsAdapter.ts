@@ -19,7 +19,7 @@
  *   humidity_pct       → humidity_pct
  *   vpd_kpa            → vpd_kpa
  *   co2_ppm            → co2_ppm
- *   ppfd_umol_m2_s     → ppfd
+ *   ppfd_umol_m2_s     → (detected only; NOT imported in this release)
  */
 import {
   cleanHeaders,

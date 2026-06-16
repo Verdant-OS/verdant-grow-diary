@@ -38,7 +38,7 @@ function makeCtx(opts: {
   stage?: string | null;
 }) {
   return compileAiDoctorContextFromRows({
-    plant: { ...plant, stage: opts.stage ?? plant.stage },
+    plant: { ...plant, stage: ("stage" in opts ? opts.stage : plant.stage) as never },
     growEvents: opts.growEvents ?? [],
     sensorReadings: opts.sensorReadings ?? [],
     now: NOW,

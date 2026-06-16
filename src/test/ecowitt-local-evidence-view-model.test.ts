@@ -48,7 +48,7 @@ describe("buildEcowittLocalEvidencePreviewViewModel", () => {
         expect(["complete", "partial", "missing"]).toContain(p.root_zone_confidence);
         expect(Array.isArray(p.degraded_reasons)).toBe(true);
         expect(Array.isArray(p.invalid_reasons)).toBe(true);
-        expect(p.channel_map).toBeTypeOf("object");
+        expect(p.metrics.length).toBeGreaterThan(0);
         expect(typeof p.redacted_raw_preview).toBe("object");
       }
     }

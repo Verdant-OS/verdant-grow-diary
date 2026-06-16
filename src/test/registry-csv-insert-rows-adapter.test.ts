@@ -262,13 +262,28 @@ describe("guards", () => {
     ).toThrow();
   });
 
-  it("growId defaults to null when not provided", () => {
-    const r = buildRegistryCsvInsertRows({
+  it("never adds top-level grow_id (sensor_readings has no such column)", () => {
+    const r = buildRegistryCsvInsertRows(baseArgs("spider_farmer", SPIDER_FULL));
+    expect(r.rows.length).toBeGreaterThan(0);
+    for (const row of r.rows.slice(0, 5)) {
+      expect(row).not.toHaveProperty("grow_id");
+      expect(row).not.toHaveProperty("plant_id");
+    }
+  });
+
+  it("preserves growId as provenance inside raw_payload only", () => {
+    const withGrow = buildRegistryCsvInsertRows(
+      baseArgs("spider_farmer", SPIDER_FULL),
+    );
+    expect(withGrow.rows[0].raw_payload.grow_id).toBe("grow-1");
+
+    const withoutGrow = buildRegistryCsvInsertRows({
       tentId: "tent-1",
       sourceApp: "spider_farmer",
       importBatchId: "b",
       csvText: SPIDER_FULL,
     });
-    expect(r.rows[0].grow_id).toBeNull();
+    expect(withoutGrow.rows[0].raw_payload.grow_id).toBeUndefined();
   });
 });
+

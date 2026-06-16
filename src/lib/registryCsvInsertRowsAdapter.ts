@@ -40,10 +40,17 @@ export type AdapterMetric =
 
 export const ADAPTER_CANONICAL_SOURCE = SENSOR_IMPORT_CANONICAL_SOURCE; // "csv"
 
-/** Insert-row shape compatible with public.sensor_readings. */
+/**
+ * Insert-row shape compatible with public.sensor_readings.
+ *
+ * IMPORTANT: keys here MUST be a subset of the columns that actually exist
+ * on the `sensor_readings` table — otherwise PostgREST rejects the batch
+ * with PGRST204 ("Could not find the 'X' column of 'sensor_readings'").
+ * Notably there is NO top-level `grow_id` or `plant_id` on sensor_readings;
+ * grow lineage travels inside `raw_payload.grow_id`.
+ */
 export interface RegistryCsvInsertRow {
   tent_id: string;
-  grow_id: string | null;
   metric: AdapterMetric;
   value: number;
   captured_at: string; // ISO-8601 UTC
@@ -55,6 +62,8 @@ export interface RegistryCsvInsertRow {
     import_batch_id: string;
     row_index: number; // 0-based, header excluded
     raw_row: Record<string, string>;
+    /** Provenance only — never used for auth / routing. */
+    grow_id?: string;
     // Optional vendor lineage extras (only present when known).
     device_serial?: string;
     room_id?: string;
@@ -67,6 +76,7 @@ export interface RegistryCsvInsertRow {
     built_in?: Partial<Record<"temperature_f" | "humidity_pct" | "vpd_kpa" | "co2_ppm", number>>;
   };
 }
+
 
 export interface BuildArgs {
   tentId: string;
@@ -244,6 +254,14 @@ export function buildRegistryCsvInsertRows(args: BuildArgs): AdapterResult {
       raw_row: rawRow,
     };
 
+    // Preserve grow lineage as provenance only — never as a top-level
+    // sensor_readings column (the table has no grow_id; surfacing it there
+    // triggers PostgREST PGRST204).
+    if (args.growId && args.growId.trim() !== "") {
+      payloadExtras.grow_id = args.growId;
+    }
+
+
     if (deviceSerialIdx >= 0) {
       const v = String(cells[deviceSerialIdx] ?? "").trim();
       if (v) payloadExtras.device_serial = v;
@@ -288,7 +306,6 @@ export function buildRegistryCsvInsertRows(args: BuildArgs): AdapterResult {
     for (const r of emit) {
       rows.push({
         tent_id: args.tentId,
-        grow_id: args.growId ?? null,
         metric: r.metric,
         value: r.value,
         captured_at: captured,
@@ -298,6 +315,7 @@ export function buildRegistryCsvInsertRows(args: BuildArgs): AdapterResult {
       });
     }
   });
+
 
   return {
     rows,

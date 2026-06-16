@@ -74,6 +74,23 @@ describe("registry adapter wiring in TentCsvImportCard", () => {
   it("uses CSV-history language in the registry save button", () => {
     expect(CARD).toMatch(/CSV history/);
   });
+
+  it("renders the mapping-help drawer with imported / not-imported metric lists", () => {
+    expect(CARD).toMatch(/csv-mapping-help-trigger/);
+    expect(CARD).toMatch(/Imported in this release:/);
+    expect(CARD).toMatch(/Detected but not imported in this release:/);
+    expect(CARD).toMatch(/Which columns will import\?/);
+  });
+
+  it("drawer preflight copy references sensor_readings table and blocking", () => {
+    expect(CARD).toMatch(/sensor_readings table/);
+    expect(CARD).toMatch(/blocked before any rows are written/);
+  });
+
+  it("drawer does not expose raw payload or enable convert buttons", () => {
+    expect(CARD).not.toMatch(/raw_payload/);
+    expect(CARD).not.toMatch(/convert/i);
+  });
 });
 
 describe("persistence gate after enablement", () => {

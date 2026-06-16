@@ -251,6 +251,20 @@ Deno.serve(async (req) => {
       return calmFailure("parse");
     }
 
+    // Provider response boundary: attach provider-reported token usage to the
+    // in-memory prompt measurement. Pure, immutable; never persisted, never
+    // logged, never returned. Raw `payload` is NOT stored anywhere downstream.
+    const measurementWithProviderUsage =
+      attachProviderResponseUsageToAiDoctorPromptMeasurement(
+        promptMeasurement,
+        payload,
+      );
+    // Reference the result so future safe consumers (none yet) can extend
+    // this boundary without changing the call site. No persistence here.
+    void measurementWithProviderUsage;
+
+
+
     const toolArgsStr = readToolArguments(payload);
     if (!toolArgsStr) {
       console.log("ai-doctor-review status=empty");

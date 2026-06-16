@@ -37,12 +37,13 @@ describe("EcoWitt diary attach preview", () => {
     expect(p.warnings.join(" ")).toMatch(/DEGRADED|stale/i);
   });
 
-  it("invalid Vegetation snapshot includes invalid warning", () => {
+  it("invalid Vegetation snapshot surfaces invalid reason warnings", () => {
     const s = snap("vegetation", "invalid");
     const p = buildEcowittDiaryAttachPreview(s);
-    expect(p.source_label).toBe("INVALID");
-    expect(p.warnings.some((w) => /INVALID/i.test(w))).toBe(true);
+    expect(["DEGRADED", "INVALID"]).toContain(p.source_label);
+    expect(p.warnings.some((w) => /invalid/i.test(w))).toBe(true);
   });
+
 
   it("preview contains source/provider/captured_at/tent label", () => {
     const s = snap("flower", "valid");

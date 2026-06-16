@@ -10,9 +10,12 @@ import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 
-// Per-file timeout bump for filesystem-scanning / heavy-render guardrail; no logic changed.
-import { vi as __vi_timeout } from "vitest";
-__vi_timeout.setConfig({ testTimeout: 30000, hookTimeout: 30000 });
+// Standardised scanner guardrail timeout + slow-test telemetry.
+// Replaces the previous per-file vi.setConfig bump. No scanner pattern,
+// allowlist, or assertion is changed.
+import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
+installScannerGuardrail({ file: __filename });
+
 
 const ROOT = resolve(__dirname, "../..");
 const AUDIT_PATH = resolve(ROOT, "docs/pi-ingest-edge-skeleton-audit.md");

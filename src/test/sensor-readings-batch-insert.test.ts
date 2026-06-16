@@ -137,6 +137,8 @@ describe("sensorReadingsBatchInsert static safety", () => {
   ]) {
     it(`source does not contain forbidden token: ${needle}`, () => {
       expect(src).not.toContain(needle);
+    });
+  }
 });
 
 describe("validateSensorReadingInsertRows — preflight payload shape", () => {

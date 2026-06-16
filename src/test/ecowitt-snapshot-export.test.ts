@@ -86,10 +86,9 @@ describe("EcoWitt snapshot export", () => {
     // jsdom doesn't implement URL.createObjectURL by default — stub it.
     const createObjectURL = vi.fn().mockReturnValue("blob:fake");
     const revokeObjectURL = vi.fn();
-    // @ts-expect-error — augmenting in jsdom
-    URL.createObjectURL = createObjectURL;
-    // @ts-expect-error — augmenting in jsdom
-    URL.revokeObjectURL = revokeObjectURL;
+    (URL as unknown as { createObjectURL: typeof createObjectURL }).createObjectURL = createObjectURL;
+    (URL as unknown as { revokeObjectURL: typeof revokeObjectURL }).revokeObjectURL = revokeObjectURL;
+
 
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     const fetchSpy = vi.spyOn(globalThis, "fetch" as any).mockImplementation(() => {

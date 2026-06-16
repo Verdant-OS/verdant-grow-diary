@@ -4,8 +4,12 @@
  * decryption, or Edge Function behavior change may appear in this task.
  */
 import { describe, it, expect } from "vitest";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  listTsFilesCached,
+  readFileCached,
+} from "./helpers/cachedSrcTextScan";
 
 const ROOT = resolve(__dirname, "../..");
 const PLAN_PATH = resolve(
@@ -156,47 +160,29 @@ describe("server-secret resolver implementation plan — repo state", () => {
 
   it("no src/ file imports a resolver from the Edge Function dir", () => {
     const offenders: string[] = [];
-    function walk(dir: string) {
-      for (const name of readdirSync(dir)) {
-        const p = resolve(dir, name);
-        const s = statSync(p);
-        if (s.isDirectory()) {
-          walk(p);
-        } else if (/\.(ts|tsx)$/.test(name)) {
-          const text = readFileSync(p, "utf8");
-          if (
-            /from\s+["'][^"']*supabase\/functions\/pi-ingest-readings\/(secretResolver|crypto)["']/
-              .test(text)
-          ) {
-            offenders.push(p);
-          }
-        }
+    for (const p of listTsFilesCached(resolve(ROOT, "src"))) {
+      const text = readFileCached(p);
+      if (
+        /from\s+["'][^"']*supabase\/functions\/pi-ingest-readings\/(secretResolver|crypto)["']/
+          .test(text)
+      ) {
+        offenders.push(p);
       }
     }
-    walk(resolve(ROOT, "src"));
     expect(offenders).toEqual([]);
   });
 
   it("no src/ file contains decrypt APIs (resolver must live in Edge Function)", () => {
     const offenders: string[] = [];
-    function walk(dir: string) {
-      for (const name of readdirSync(dir)) {
-        const p = resolve(dir, name);
-        const s = statSync(p);
-        if (s.isDirectory()) {
-          walk(p);
-        } else if (/\.(ts|tsx)$/.test(name)) {
-          const text = readFileSync(p, "utf8");
-          if (
-            /crypto\.subtle\.decrypt\s*\(/.test(text) ||
-            /\bcreateDecipheriv\s*\(/.test(text)
-          ) {
-            offenders.push(p);
-          }
-        }
+    for (const p of listTsFilesCached(resolve(ROOT, "src"))) {
+      const text = readFileCached(p);
+      if (
+        /crypto\.subtle\.decrypt\s*\(/.test(text) ||
+        /\bcreateDecipheriv\s*\(/.test(text)
+      ) {
+        offenders.push(p);
       }
     }
-    walk(resolve(ROOT, "src"));
     expect(offenders).toEqual([]);
   });
 });

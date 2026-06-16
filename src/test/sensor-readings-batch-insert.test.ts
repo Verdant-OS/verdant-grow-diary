@@ -137,6 +137,103 @@ describe("sensorReadingsBatchInsert static safety", () => {
   ]) {
     it(`source does not contain forbidden token: ${needle}`, () => {
       expect(src).not.toContain(needle);
-    });
+});
+
+describe("validateSensorReadingInsertRows — preflight payload shape", () => {
+  const validRow = {
+    captured_at: "2026-06-01T00:00:00Z",
+    metric: "temperature",
+    value: 24.5,
+    source: "csv",
+    tent_id: "t-1",
+    quality: "ok",
+    raw_payload: { source_app: "spider_farmer", grow_id: "g-1" },
+  };
+
+  it("empty rows return ok no-op", () => {
+    const r = validateSensorReadingInsertRows([]);
+    expect(r.ok).toBe(true);
+    expect(r.unknownKeys).toEqual([]);
+    expect(r.rowIndexes).toEqual([]);
+    expect(r.message).toBeNull();
+  });
+
+  it("Spider-Farmer-shaped row with nested raw_payload.grow_id passes", () => {
+    const r = validateSensorReadingInsertRows([validRow]);
+    expect(r.ok).toBe(true);
+    expect(r.message).toBeNull();
+  });
+
+  it("AC-Infinity-shaped row passes", () => {
+    const r = validateSensorReadingInsertRows([
+      {
+        captured_at: "2026-06-01T00:00:00Z",
+        metric: "humidity",
+        value: 50,
+        source: "csv",
+        tent_id: "t-1",
+        raw_payload: { source_app: "ac_infinity" },
+      },
+    ]);
+    expect(r.ok).toBe(true);
+  });
+
+  it("top-level grow_id fails with operator-facing message", () => {
+    const r = validateSensorReadingInsertRows([
+      { ...validRow, grow_id: "g-1" },
+    ]);
+    expect(r.ok).toBe(false);
+    expect(r.unknownKeys).toEqual(["grow_id"]);
+    expect(r.rowIndexes).toEqual([0]);
+    expect(r.message).toContain("grow_id");
+    expect(r.message).toContain("No rows were written.");
+    expect(r.message).toContain("No live sensor data was created.");
+  });
+
+  it("top-level plant_id fails", () => {
+    const r = validateSensorReadingInsertRows([
+      { ...validRow, plant_id: "p-1" },
+    ]);
+    expect(r.ok).toBe(false);
+    expect(r.unknownKeys).toEqual(["plant_id"]);
+  });
+
+  it("multiple unknown keys are sorted and deduped", () => {
+    const r = validateSensorReadingInsertRows([
+      { ...validRow, plant_id: "p", grow_id: "g" },
+      { ...validRow, grow_id: "g", source_app: "x" },
+    ]);
+    expect(r.ok).toBe(false);
+    expect(r.unknownKeys).toEqual(["grow_id", "plant_id", "source_app"]);
+    expect(r.rowIndexes).toEqual([0, 1]);
+  });
+
+  it("limits row indexes to first 3 + overflow hint", () => {
+    const rows = Array.from({ length: 6 }, () => ({ ...validRow, grow_id: "g" }));
+    const r = validateSensorReadingInsertRows(rows);
+    expect(r.ok).toBe(false);
+    expect(r.rowIndexes).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(r.message).toMatch(/0, 1, 2 \(\+3 more\)/);
+  });
+
+  it("allowed key list matches the documented sensor_readings.Insert shape", () => {
+    expect([...SENSOR_READINGS_INSERT_ALLOWED_KEYS].sort()).toEqual(
+      [
+        "captured_at",
+        "created_at",
+        "device_id",
+        "id",
+        "metric",
+        "quality",
+        "raw_payload",
+        "source",
+        "tent_id",
+        "ts",
+        "user_id",
+        "value",
+      ].sort(),
+    );
+  });
+});
   }
 });

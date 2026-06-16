@@ -378,3 +378,56 @@ prefers a clean `null` over a guessed match.
 
 
 
+
+## Runtime provider usage wiring
+
+The `ai-doctor-review` Edge Function now calls
+`attachProviderResponseUsageToAiDoctorPromptMeasurement` at the provider
+response boundary (immediately after `await upstream.json()`), producing a
+local `measurementWithProviderUsage` that lives only in the request scope.
+
+Guarantees of this wiring (measurement-only):
+
+- The raw provider response is **not stored** anywhere. Only the normalized
+  `providerReportedTokens` derived from it is safe to pass onward.
+- Provider usage is optional: missing, malformed, or unexpectedly-nested
+  usage clears `providerReportedTokens` to `null`. AI Doctor output content
+  is unaffected.
+- No persistence, capture store, CSV export, alert, Action Queue write,
+  budget enforcement, back-pressure, threshold, or model degradation
+  behavior is introduced by this wiring.
+- The original prompt measurement is never mutated; a new measurement
+  object is returned.
+- Future persistence of `providerReportedTokens` must be a separate,
+  explicitly-requested PR (it would require a new metrics table).
+
+### Import example
+
+```ts
+import {
+  attachProviderResponseUsageToAiDoctorPromptMeasurement,
+} from "@/lib/cost";
+
+const measurementWithProviderUsage =
+  attachProviderResponseUsageToAiDoctorPromptMeasurement(
+    promptMeasurement,
+    providerResponse,
+  );
+
+// Safe to pass onward:
+const providerReportedTokens =
+  measurementWithProviderUsage.providerReportedTokens;
+
+// Do not store providerResponse.
+// Do not log providerResponse.
+// Do not pass providerResponse to capture/persistence.
+```
+
+### Safety note
+
+- Only `providerReportedTokens` (a `{ promptTokens, completionTokens,
+  totalTokens }` numeric triple) is safe to pass onward.
+- The raw provider response is **not** safe to persist or log.
+- This wiring does **not** create cost enforcement.
+- This wiring does **not** change AI Doctor prompt text, model selection,
+  or returned diagnosis content.

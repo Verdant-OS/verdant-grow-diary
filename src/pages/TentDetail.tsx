@@ -28,6 +28,7 @@ import ManualSnapshotTimelineSection from "@/components/ManualSnapshotTimelineSe
 import TimelineMemorySection from "@/components/TimelineMemorySection";
 import QuickLogGroupedTimelineSection from "@/components/QuickLogGroupedTimelineSection";
 import TentCsvImportCard from "@/components/TentCsvImportCard";
+import ImportedSensorHistoryPanel from "@/components/ImportedSensorHistoryPanel";
 import TentSensorWebhookSettingsCard from "@/components/TentSensorWebhookSettingsCard";
 import TentBridgeTokensCard from "@/components/TentBridgeTokensCard";
 import TentSensorSourceHealthCard from "@/components/TentSensorSourceHealthCard";
@@ -351,6 +352,8 @@ export default function TentDetail() {
       {id && (
         <TentCsvImportCard tentId={id} growId={tent.growId ?? null} />
       )}
+
+      <ImportedSensorHistoryPanel tentId={id ?? null} readings={readings} />
 
       {id && <TentSensorWebhookSettingsCard tentId={id} />}
       {id && <TentBridgeTokensCard tentId={id} />}

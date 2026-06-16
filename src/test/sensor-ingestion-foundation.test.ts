@@ -114,8 +114,14 @@ describe("safety: no forbidden surfaces in batch ingestion code", () => {
 });
 
 describe("snapshot pipeline ignores raw_payload", () => {
-  it("sensorSnapshot.ts never reads raw_payload", () => {
-    expect(snapshotSrc).not.toMatch(/raw_payload/);
+  it("sensorSnapshot.ts never directly reads raw_payload (.raw_payload access or destructure)", () => {
+    // The snapshot file may declare `raw_payload?: unknown` on its
+    // input shape so callers can forward upstream rows to the sanctioned
+    // reader (`summarizeCsvVendor`), but it must never read the field
+    // itself — that would expose private payload contents to a
+    // presenter-only surface.
+    expect(snapshotSrc).not.toMatch(/\.raw_payload\b/);
+    expect(snapshotSrc).not.toMatch(/\{[^}]*\braw_payload\b[^}]*\}\s*=/);
   });
 });
 

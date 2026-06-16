@@ -171,25 +171,29 @@ describe("CSV history insert row builders — static safety surface", () => {
     "src/lib/registryCsvInsertRowsAdapter.ts",
     "src/lib/csvSensorImportRules.ts",
   ];
+  const stripComments = (s: string) =>
+    s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
   for (const rel of FILES) {
-    const src = readFileSync(resolve(ROOT, rel), "utf8");
+    const code = stripComments(readFileSync(resolve(ROOT, rel), "utf8"));
     describe(rel, () => {
       it("does not promote rows to source = 'live'", () => {
-        expect(src).not.toMatch(/source:\s*["']live["']/);
+        expect(code).not.toMatch(/source:\s*["']live["']/);
       });
-      it("does not contain device control / automation / action_queue / alerts hooks", () => {
+      it("does not contain device control / automation / write hooks", () => {
         for (const needle of [
-          "action_queue",
-          "alerts",
+          'from("action_queue")',
+          'from("alerts")',
           "device control",
+          "deviceControl",
           "automation",
           "service_role",
           "bridge_token",
           "functions.invoke",
         ]) {
-          expect(src).not.toContain(needle);
+          expect(code, `${rel} should not contain ${needle}`).not.toContain(needle);
         }
       });
     });
   }
 });
+

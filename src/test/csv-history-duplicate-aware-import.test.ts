@@ -237,11 +237,11 @@ describe("runDuplicateAwareCsvHistoryImport — orchestration", () => {
     expect(out.duplicateRows).toBe(0);
     expect(insertBatch).toHaveBeenCalledTimes(2);
     expect(out.diagnostic).toBe(
-      "Imported 3 Spider Farmer / THP Data CSV history readings across 2 batches. No live sensor data was created.",
+      "Imported 3 new Spider Farmer / THP Data CSV history readings for this tent across 2 batches. No live sensor data was created.",
     );
   });
 
-  it("single-batch no-duplicate uses the simpler copy without batch count", () => {
+  it("single-batch no-duplicate uses 'in 1 batch' phrasing", () => {
     expect(
       buildDuplicateAwareSuccessMessage({
         vendorLabel: "Spider Farmer",
@@ -250,7 +250,7 @@ describe("runDuplicateAwareCsvHistoryImport — orchestration", () => {
         totalBatches: 1,
       }),
     ).toBe(
-      "Imported 5 Spider Farmer CSV history readings. No live sensor data was created.",
+      "Imported 5 new Spider Farmer CSV history readings for this tent in 1 batch. No live sensor data was created.",
     );
   });
 });

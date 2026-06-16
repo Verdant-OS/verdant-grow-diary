@@ -4,8 +4,12 @@
  * decryption, or Edge Function behavior change may appear in this task.
  */
 import { describe, it, expect } from "vitest";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  listTsFilesCached,
+  readFileCached,
+} from "./helpers/cachedSrcTextScan";
 
 const ROOT = resolve(__dirname, "../..");
 const PLAN_PATH = resolve(

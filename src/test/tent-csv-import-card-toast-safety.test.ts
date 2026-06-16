@@ -328,12 +328,14 @@ describe("preflight + failure copy stays distinct from success copy", () => {
 });
 
 describe("post-import CTA — 'View imported history' navigation", () => {
-  it("declares a single view-imported-history action wired to navigate(`/tents/${tentId}`)", () => {
+  it("declares a single view-imported-history action wired to the #imported-history anchor on the selected tent", () => {
     expect(CARD).toMatch(/viewImportedHistoryAction/);
     expect(CARD).toMatch(
       /label:\s*["']View imported history["']/,
     );
-    expect(CARD).toMatch(/navigate\(`\/tents\/\$\{tentId\}`\)/);
+    expect(CARD).toMatch(
+      /navigate\(`\/tents\/\$\{tentId\}#imported-history`\)/,
+    );
   });
 
   it("the CTA label says 'imported history' (never 'live')", () => {
@@ -375,17 +377,17 @@ describe("post-import CTA — 'View imported history' navigation", () => {
     }
   });
 
-  it("CTA navigation target is the selected tent route only — no invented query params", () => {
-    // Only `/tents/${tentId}` is allowed; no &source=, no ?start=, no ?end=.
+  it("CTA navigation target is the selected tent + supported anchor only — no invented query params", () => {
     const navCalls = [...CARD.matchAll(/navigate\(`([^`]+)`\)/g)].map((m) => m[1]);
     const ctaNav = navCalls.filter((p) => p.includes("/tents/"));
     expect(ctaNav.length).toBeGreaterThan(0);
     for (const path of ctaNav) {
-      expect(path).toBe("/tents/${tentId}");
+      expect(path).toBe("/tents/${tentId}#imported-history");
       expect(path).not.toMatch(/\?/);
       expect(path).not.toContain("start=");
       expect(path).not.toContain("end=");
       expect(path).not.toContain("captured_at");
+      expect(path).not.toContain("source=");
     }
   });
 

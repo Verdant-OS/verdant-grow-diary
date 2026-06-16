@@ -331,3 +331,176 @@ describe("static safety — duplicate-aware module + import card", () => {
     });
   });
 });
+
+import { normalizeCapturedAtForDedupe } from "@/lib/csv-import/sensorReadingsBatchInsert";
+
+describe("normalizeCapturedAtForDedupe — canonical timestamp helper", () => {
+  it("ISO UTC string round-trips to the same canonical form", () => {
+    expect(normalizeCapturedAtForDedupe("2026-06-01T00:00:00.000Z")).toBe(
+      "2026-06-01T00:00:00.000Z",
+    );
+  });
+  it("ISO with explicit +00:00 offset normalizes to UTC Z", () => {
+    expect(normalizeCapturedAtForDedupe("2026-06-01T00:00:00+00:00")).toBe(
+      "2026-06-01T00:00:00.000Z",
+    );
+  });
+  it("ISO with non-UTC offset converts to UTC", () => {
+    expect(normalizeCapturedAtForDedupe("2026-06-01T02:30:00+02:30")).toBe(
+      "2026-06-01T00:00:00.000Z",
+    );
+  });
+  it("ISO without milliseconds gains canonical .000Z", () => {
+    expect(normalizeCapturedAtForDedupe("2026-06-01T00:00:00Z")).toBe(
+      "2026-06-01T00:00:00.000Z",
+    );
+  });
+  it("ISO with milliseconds preserves them", () => {
+    expect(normalizeCapturedAtForDedupe("2026-06-01T00:00:00.123Z")).toBe(
+      "2026-06-01T00:00:00.123Z",
+    );
+  });
+  it("Postgres-style timestamptz with space separator normalizes", () => {
+    // Postgres often returns "2026-06-01 00:00:00+00" via raw psql, but
+    // PostgREST returns ISO. We still accept the space form defensively.
+    const out = normalizeCapturedAtForDedupe("2026-06-01T00:00:00+00:00");
+    expect(out).toBe("2026-06-01T00:00:00.000Z");
+  });
+  it("trims surrounding whitespace before parsing", () => {
+    expect(normalizeCapturedAtForDedupe("  2026-06-01T00:00:00Z  ")).toBe(
+      "2026-06-01T00:00:00.000Z",
+    );
+  });
+  it("null / undefined / empty / whitespace return null", () => {
+    expect(normalizeCapturedAtForDedupe(null)).toBeNull();
+    expect(normalizeCapturedAtForDedupe(undefined)).toBeNull();
+    expect(normalizeCapturedAtForDedupe("")).toBeNull();
+    expect(normalizeCapturedAtForDedupe("   ")).toBeNull();
+  });
+  it("unparseable input returns null (never 'Invalid Date' or NaN)", () => {
+    for (const bad of ["not-a-date", "2026-13-40T99:99:99Z", "abc", "NaN"]) {
+      const out = normalizeCapturedAtForDedupe(bad);
+      expect(out).toBeNull();
+      expect(out).not.toBe("Invalid Date");
+    }
+  });
+  it("never throws on hostile input", () => {
+    for (const bad of ["{}", "[]", "<script>", "null"]) {
+      expect(() => normalizeCapturedAtForDedupe(bad)).not.toThrow();
+    }
+  });
+});
+
+describe("dedupeKeyOf — null-safety + cross-format equivalence", () => {
+  it("returns null when captured_at is invalid", () => {
+    expect(
+      dedupeKeyOf({
+        tent_id: "tent-A",
+        source: "csv",
+        metric: "temperature_c",
+        captured_at: "not-a-date",
+      }),
+    ).toBeNull();
+  });
+  it("returns null when captured_at is missing", () => {
+    expect(
+      dedupeKeyOf({
+        tent_id: "tent-A",
+        source: "csv",
+        metric: "temperature_c",
+        captured_at: null,
+      }),
+    ).toBeNull();
+  });
+  it("returns null when tent_id / source / metric is missing", () => {
+    const base = {
+      tent_id: "tent-A",
+      source: "csv",
+      metric: "temperature_c",
+      captured_at: "2026-06-01T00:00:00Z",
+    };
+    expect(dedupeKeyOf({ ...base, tent_id: null })).toBeNull();
+    expect(dedupeKeyOf({ ...base, source: "" })).toBeNull();
+    expect(dedupeKeyOf({ ...base, metric: "" })).toBeNull();
+  });
+  it("imported row (offset) and DB row (Z, ms) with same instant dedupe", () => {
+    const imported = dedupeKeyOf({
+      tent_id: "tent-A",
+      source: "csv",
+      metric: "temperature_c",
+      captured_at: "2026-06-01T02:30:00+02:30",
+    });
+    const fromDb = dedupeKeyOf({
+      tent_id: "tent-A",
+      source: "csv",
+      metric: "temperature_c",
+      captured_at: "2026-06-01T00:00:00.000Z",
+    });
+    expect(imported).not.toBeNull();
+    expect(imported).toBe(fromDb);
+  });
+  it("different real instants do not dedupe", () => {
+    const a = dedupeKeyOf({
+      tent_id: "tent-A",
+      source: "csv",
+      metric: "temperature_c",
+      captured_at: "2026-06-01T00:00:00Z",
+    });
+    const b = dedupeKeyOf({
+      tent_id: "tent-A",
+      source: "csv",
+      metric: "temperature_c",
+      captured_at: "2026-06-01T00:00:01Z",
+    });
+    expect(a).not.toBe(b);
+  });
+});
+
+describe("summarizeDedupeScope — invalid-timestamp hardening", () => {
+  it("ignores rows with invalid captured_at when computing min/max", () => {
+    const scope = summarizeDedupeScope([
+      { tent_id: "t", source: "csv", metric: "temperature_c", captured_at: "bad" },
+      { tent_id: "t", source: "csv", metric: "temperature_c", captured_at: "2026-06-01T00:00:00Z" },
+      { tent_id: "t", source: "csv", metric: "temperature_c", captured_at: "2026-06-01T01:00:00Z" },
+    ]);
+    expect(scope).not.toBeNull();
+    expect(scope!.minCapturedAt).toBe("2026-06-01T00:00:00.000Z");
+    expect(scope!.maxCapturedAt).toBe("2026-06-01T01:00:00.000Z");
+  });
+  it("all-invalid timestamps → returns null (no unbounded query)", () => {
+    const scope = summarizeDedupeScope([
+      { tent_id: "t", source: "csv", metric: "temperature_c", captured_at: "bad" },
+      { tent_id: "t", source: "csv", metric: "temperature_c", captured_at: null },
+    ]);
+    expect(scope).toBeNull();
+  });
+  it("boundary timestamps are included exactly (gte/lte safe)", () => {
+    const minIso = "2026-06-01T00:00:00.000Z";
+    const maxIso = "2026-06-01T23:59:59.999Z";
+    const scope = summarizeDedupeScope([
+      { tent_id: "t", source: "csv", metric: "temperature_c", captured_at: minIso },
+      { tent_id: "t", source: "csv", metric: "temperature_c", captured_at: maxIso },
+    ]);
+    expect(scope!.minCapturedAt).toBe(minIso);
+    expect(scope!.maxCapturedAt).toBe(maxIso);
+  });
+});
+
+describe("filterDuplicateRows — invalid keys are not classified as duplicates", () => {
+  it("row with invalid captured_at passes through (preflight is responsible)", () => {
+    const r = filterDuplicateRows({
+      rows: [
+        {
+          tent_id: "t",
+          source: "csv",
+          metric: "temperature_c",
+          captured_at: "not-a-date",
+          value: 1,
+        },
+      ],
+      existingKeys: new Set<string>(),
+    });
+    expect(r.duplicateCount).toBe(0);
+    expect(r.newRows.length).toBe(1);
+  });
+});

@@ -507,8 +507,13 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
             type="button"
             size="sm"
             onClick={handleParse}
-            disabled={!text || !sourceEnabled}
+            disabled={!text || !sourceEnabled || registrySaveVisible}
             data-testid="csv-parse"
+            title={
+              registrySaveVisible
+                ? "Use the detected-source import button below — the legacy AC Infinity parser is not used for this file."
+                : undefined
+            }
           >
             Parse &amp; Preview
           </Button>

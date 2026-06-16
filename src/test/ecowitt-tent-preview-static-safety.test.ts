@@ -19,6 +19,7 @@ const FILES = [
   "src/lib/ecowittEvidenceHistoryViewModel.ts",
   "src/lib/ecowittDiaryAttachPreview.ts",
   "src/lib/ecowittSnapshotExport.ts",
+  "src/lib/ecowittIngestDryRun.ts",
   "src/fixtures/ecowitt-preview-samples.ts",
   "src/pages/OperatorEcowittTentPreview.tsx",
 ];
@@ -26,6 +27,7 @@ const FILES = [
 const FORBIDDEN_PATTERNS: Array<{ name: string; re: RegExp }> = [
   { name: "supabase client import", re: /@\/integrations\/supabase\/client/ },
   { name: "functions.invoke", re: /functions\s*\.\s*invoke\s*\(/ },
+  { name: "fetch(", re: /\bfetch\s*\(/ },
   { name: ".insert(", re: /\.\s*insert\s*\(/ },
   { name: ".update(", re: /\.\s*update\s*\(/ },
   { name: ".upsert(", re: /\.\s*upsert\s*\(/ },

@@ -63,7 +63,7 @@ describe("evaluateManualSensorSnapshotQuality — historical mode", () => {
       { nowMs: NOW, mode: "historical" },
     );
     expect(r.quality).toBe("invalid");
-    expect(r.summary).toBe("Historical invalid reading");
+    expect(r.summary).toBe("Historical invalid reading — review before use");
   });
 
   it("CSV-source historical reading is needs_review and not current-room", () => {

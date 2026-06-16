@@ -620,11 +620,12 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
             />
             <Stat
               label="Mapped metrics"
-              value={
-                sourcePreview.mappedMetrics.length > 0
-                  ? sourcePreview.mappedMetrics.join(", ")
-                  : "—"
-              }
+              value={(() => {
+                const imported = sourcePreview.mappedMetrics.filter(
+                  (m) => m !== "ppfd_umol_m2_s",
+                );
+                return imported.length > 0 ? imported.join(", ") : "—";
+              })()}
               testId="csv-source-preview-metrics"
             />
             <Stat

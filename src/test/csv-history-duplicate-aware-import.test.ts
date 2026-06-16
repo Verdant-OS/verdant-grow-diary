@@ -58,10 +58,12 @@ describe("SENSOR_READINGS_DEDUPE_SELECT_COLUMNS — safe presence columns only",
       "tent_id",
     ]);
   });
-  it("never selects raw_payload, value, device_id, user_id, id", () => {
-    for (const banned of ["raw_payload", "value", "device_id", "user_id", "id"]) {
+  it("never selects raw_payload, value, device_id, user_id, or row id", () => {
+    for (const banned of ["raw_payload", "value", "device_id", "user_id"]) {
       expect(SENSOR_READINGS_DEDUPE_SELECT_CLAUSE).not.toContain(banned);
     }
+    // "id" alone would match "tent_id"; only the standalone id column is forbidden.
+    expect(SENSOR_READINGS_DEDUPE_SELECT_CLAUSE.split(",")).not.toContain("id");
   });
 });
 

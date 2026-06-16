@@ -13,6 +13,9 @@ const FILES = [
   "src/lib/ecowittVegetationTentNormalizer.ts",
   "src/lib/ecowittTentNormalizerRouter.ts",
   "src/lib/ecowittTentPreviewViewModel.ts",
+  "src/lib/ecowittLocalEvidence.ts",
+  "src/lib/ecowittLocalEvidenceViewModel.ts",
+  "src/fixtures/ecowitt-preview-samples.ts",
   "src/pages/OperatorEcowittTentPreview.tsx",
 ];
 

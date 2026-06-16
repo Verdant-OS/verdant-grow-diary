@@ -52,9 +52,15 @@ export interface GeneticsImportPreviewRow {
   issues: GeneticsImportRowIssue[];
 }
 
+export interface GeneticsImportFileWarning {
+  field: string;
+  message: string;
+}
+
 export interface GeneticsImportPreviewResult {
   rows: GeneticsImportPreviewRow[];
   fileLevelError: string | null;
+  fileWarnings: GeneticsImportFileWarning[];
   totals: {
     total: number;
     valid: number;

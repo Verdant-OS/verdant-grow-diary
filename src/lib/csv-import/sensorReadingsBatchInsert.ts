@@ -362,29 +362,55 @@ export interface DedupeKeyParts {
   tent_id: string | null;
   source: string;
   metric: string;
-  captured_at: string;
+  captured_at: string | null | undefined;
 }
 
 /**
- * Normalize captured_at to a canonical ISO instant so client-built rows
- * and Postgres-returned timestamps produce the same key. Falls back to
- * the raw string if parsing fails (the row will then only match an exact
- * string equal — safer than silently merging rows).
+ * Canonical captured_at normalizer used on BOTH sides of CSV history
+ * dedupe (locally-built rows and DB-returned rows). Rules:
+ *   - Returns a UTC ISO-8601 string (YYYY-MM-DDTHH:mm:ss.sssZ) when
+ *     parseable. Whitespace is trimmed first.
+ *   - Returns null for null, undefined, empty, or unparseable input —
+ *     never the literal string "Invalid Date" and never NaN.
+ *   - Pure: ignores caller timezone/locale. `Date.parse` on an explicit
+ *     ISO-with-offset or trailing `Z` is timezone-stable; we re-emit via
+ *     `toISOString()` so two valid inputs that name the same instant
+ *     always produce the same key (e.g. "...+00:00" vs "...Z").
+ *   - Milliseconds are preserved when present (toISOString always emits
+ *     `.sss`). Postgres `timestamptz` round-trips milliseconds, so DB
+ *     rows and client rows normalize to the same precision.
+ *   - Never throws.
  */
-function normalizeCapturedAt(raw: string): string {
-  if (!raw) return raw;
-  const t = Date.parse(raw);
-  if (Number.isFinite(t)) return new Date(t).toISOString();
-  return raw;
+export function normalizeCapturedAtForDedupe(
+  value: string | null | undefined,
+): string | null {
+  if (value == null) return null;
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  if (trimmed.length === 0) return null;
+  const ms = Date.parse(trimmed);
+  if (!Number.isFinite(ms)) return null;
+  const d = new Date(ms);
+  const iso = d.toISOString();
+  // Defense in depth: toISOString throws on invalid Date, but guard the
+  // sentinel string anyway so a broken polyfill can never poison a key.
+  if (iso === "Invalid Date") return null;
+  return iso;
 }
 
-export function dedupeKeyOf(row: DedupeKeyParts): string {
-  return [
-    row.tent_id ?? "",
-    row.source ?? "",
-    row.metric ?? "",
-    normalizeCapturedAt(row.captured_at ?? ""),
-  ].join("|");
+/**
+ * Build the canonical dedupe key matching the deployed partial unique
+ * index `sensor_readings_dedupe_uidx (user_id, tent_id, source, metric,
+ * captured_at)`. user_id is supplied by RLS, not the client.
+ *
+ * Returns null when any required part is missing or when captured_at
+ * cannot be normalized. Callers must treat a null key as "not a known
+ * duplicate" so invalid rows are never silently merged.
+ */
+export function dedupeKeyOf(row: DedupeKeyParts): string | null {
+  if (!row.tent_id || !row.source || !row.metric) return null;
+  const captured = normalizeCapturedAtForDedupe(row.captured_at);
+  if (captured === null) return null;
+  return `${row.tent_id}|${row.source}|${row.metric}|${captured}`;
 }
 
 export interface ExistingKeysQueryScope {
@@ -397,8 +423,12 @@ export interface ExistingKeysQueryScope {
 
 /**
  * Pure summarization of the scope needed to fetch potentially-conflicting
- * rows. Returns null when the import has no usable scope (no tent_id, no
- * captured_at, etc.) so callers can skip the preflight read safely.
+ * rows. Rows with missing/invalid captured_at are ignored when computing
+ * the [min, max] range so a single bad row can never trigger an unbounded
+ * preflight query. Returns null when the import has no usable scope
+ * (empty input, no tent_id, no source, no metric, or zero valid
+ * timestamps) so callers skip the read safely. Boundary timestamps (min
+ * and max) are included exactly via gte/lte on the consumer side.
  */
 export function summarizeDedupeScope(
   rows: ReadonlyArray<DedupeKeyParts>,
@@ -413,11 +443,12 @@ export function summarizeDedupeScope(
     if (r.tent_id) tentIds.add(r.tent_id);
     if (r.source) sources.add(r.source);
     if (r.metric) metrics.add(r.metric);
-    const t = Date.parse(r.captured_at ?? "");
-    if (Number.isFinite(t)) {
-      if (min === null || t < min) min = t;
-      if (max === null || t > max) max = t;
-    }
+    const iso = normalizeCapturedAtForDedupe(r.captured_at);
+    if (iso === null) continue;
+    const t = Date.parse(iso);
+    if (!Number.isFinite(t)) continue;
+    if (min === null || t < min) min = t;
+    if (max === null || t > max) max = t;
   }
   if (
     tentIds.size === 0 ||
@@ -442,6 +473,14 @@ export interface FilterDuplicateRowsResult<TRow> {
   duplicateCount: number;
 }
 
+/**
+ * Skip rows whose dedupe key matches an existing DB row OR an earlier
+ * row in the same batch. Rows whose key cannot be computed (invalid
+ * captured_at, missing tent/source/metric) are NEVER classified as
+ * duplicates — they pass through so the upstream preflight or DB
+ * validation surfaces the real problem. This is deliberate: silently
+ * merging invalid rows would violate the "no fake live data" rule.
+ */
 export function filterDuplicateRows<TRow extends DedupeKeyParts>(args: {
   rows: readonly TRow[];
   existingKeys: ReadonlySet<string>;
@@ -451,6 +490,10 @@ export function filterDuplicateRows<TRow extends DedupeKeyParts>(args: {
   let duplicateCount = 0;
   for (const r of args.rows) {
     const key = dedupeKeyOf(r);
+    if (key === null) {
+      newRows.push(r);
+      continue;
+    }
     if (args.existingKeys.has(key) || seenInBatch.has(key)) {
       duplicateCount += 1;
       continue;

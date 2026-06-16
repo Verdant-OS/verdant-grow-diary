@@ -149,6 +149,29 @@ Do **not** invent numeric limits. Replace a marker only with evidence:
   blocked**: there is no operator/diagnostics panel approved for grower
   builds. Mount only inside an explicit operator/diagnostics surface.
 
+### Provider usage measurement adapter (attachment boundary)
+
+- Adapter: `src/lib/cost/aiDoctorProviderUsageMeasurementAdapter.ts`
+  - `attachProviderReportedUsageToAiDoctorPromptMeasurement(measurement, providerUsage)` → `AiDoctorPromptMeasurement`
+  - Calls `normalizeProviderReportedTokenUsage` internally.
+  - If the provider usage normalizes successfully, returns a new measurement
+    with `providerReportedTokens` attached.
+  - If the usage is malformed, partial, unsafe, or rejected, returns a new
+    measurement with `providerReportedTokens: null`.
+  - Never mutates the input measurement.
+  - Never alters existing byte counts, estimated tokens, or other fields.
+  - Never preserves raw provider fields (raw responses, headers, secrets).
+  - Pure logic only; not wired into live AI Doctor calls yet.
+- Future wiring should inject provider response usage explicitly after a model
+  call and before optional measurement capture/export:
+  ```ts
+  const normalizedMeasurement =
+    attachProviderReportedUsageToAiDoctorPromptMeasurement(
+      promptMeasurement,
+      response.usage,
+    );
+  ```
+
 ## What remains blocked until real measurements exist
 
 1. Any numeric threshold in `costThresholds.ts`.
@@ -162,5 +185,6 @@ Do **not** invent numeric limits. Replace a marker only with evidence:
 7. A real prompt-token estimator (today `estimatedPromptTokens` stays
    `null` unless an estimator is injected by the caller).
 8. A grower-visible mount point for the CSV export button.
+
 
 

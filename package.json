@@ -68,7 +68,15 @@
     "e2e:auth-loading": "playwright test e2e/auth-loading.spec.ts --project=chromium-authed",
     "test:db:quicklog-rpc-static": "vitest run src/test/quicklog-save-event-rpc-trust-boundary.test.ts src/test/quicklog-save-manual-rpc-trust-boundary.test.ts src/test/quicklog-save-manual-rpc-ownership.test.ts src/test/quicklog-save-manual-rpc-reason-codes.test.ts src/test/quicklog-save-manual-rpc-mixed-boundary.test.ts src/test/quicklog-rpc-harness-static-safety.test.ts",
     "test:db:quicklog-rpc-runtime": "bun run scripts/run-quicklog-rpc-rls-harnesses.ts",
-    "test:db:quicklog-rpc": "bun run test:db:quicklog-rpc-static && bun run test:db:quicklog-rpc-runtime"
+    "test:db:quicklog-rpc": "bun run test:db:quicklog-rpc-static && bun run test:db:quicklog-rpc-runtime",
+    "test:genetics-import": "vitest run src/test/verdant-genetics* src/test/operator-genetics-import* --reporter=verbose",
+    "verify:genetics-import": "bun run typecheck && vitest run src/test/verdant-genetics* src/test/operator-genetics-import* --reporter=verbose",
+    "test:full:shard1": "vitest run --reporter=dot --shard=1/4",
+    "test:full:shard2": "vitest run --reporter=dot --shard=2/4",
+    "test:full:shard3": "vitest run --reporter=dot --shard=3/4",
+    "test:full:shard4": "vitest run --reporter=dot --shard=4/4",
+    "test:full:sharded": "bun run test:full:shard1 && bun run test:full:shard2 && bun run test:full:shard3 && bun run test:full:shard4",
+    "verify:full:sharded": "bun run typecheck && bun run test:full:sharded"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

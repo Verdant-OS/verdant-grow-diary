@@ -69,41 +69,111 @@ export interface GeneticsImportPreviewResult {
   };
 }
 
+type CanonicalField =
+  | "strain"
+  | "breeder"
+  | "seed_type"
+  | "lineage"
+  | "flowering_weeks"
+  | "notes";
+
 /** Canonical header aliases we accept for each logical column. */
-const HEADER_ALIASES: Record<
-  "strain" | "breeder" | "seed_type" | "lineage" | "flowering_weeks" | "notes",
-  string[]
-> = {
-  strain: ["strain", "variety", "variety name", "strain name", "name"],
-  breeder: ["breeder", "bank", "seed bank"],
-  seed_type: ["seed type", "type", "seedtype"],
-  lineage: ["lineage", "parents", "genetics"],
-  flowering_weeks: [
-    "flowering time",
-    "flowering weeks",
-    "flower time",
-    "flower weeks",
-    "flowering",
+const HEADER_ALIASES: Record<CanonicalField, string[]> = {
+  strain: [
+    "strain",
+    "strain name",
+    "variety",
+    "variety name",
+    "cultivar",
+    "cultivar name",
+    "genetics",
+    "name",
   ],
-  notes: ["notes", "note", "comments"],
+  breeder: [
+    "breeder",
+    "breeder name",
+    "company",
+    "seed bank",
+    "seedbank",
+    "source",
+    "bank",
+  ],
+  seed_type: [
+    "seed type",
+    "seedtype",
+    "type",
+    "category",
+    "genetics type",
+    "seed class",
+  ],
+  lineage: [
+    "lineage",
+    "parents",
+    "parentage",
+    "cross",
+    "genetics lineage",
+  ],
+  flowering_weeks: [
+    "flowering weeks",
+    "flower weeks",
+    "flowering time",
+    "flower time",
+    "flowering",
+    "weeks",
+    "days to harvest",
+  ],
+  notes: ["notes", "note", "description", "comments", "remarks"],
 };
 
+/**
+ * Normalize a header cell: lowercase, collapse separators (space, underscore,
+ * hyphen) to single spaces, strip non-alphanumeric punctuation, trim.
+ * Deterministic.
+ */
 function normalizeHeader(value: unknown): string {
   if (value === null || value === undefined) return "";
-  return String(value).trim().toLowerCase().replace(/_/g, " ");
+  return String(value)
+    .toLowerCase()
+    .replace(/[_\-]+/g, " ")
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-function mapHeaders(headerRow: ReadonlyArray<unknown>): Record<string, number> {
-  const mapping: Record<string, number> = {};
+interface HeaderMapping {
+  index: Record<CanonicalField, number | undefined>;
+  duplicates: CanonicalField[];
+}
+
+function mapHeaders(headerRow: ReadonlyArray<unknown>): HeaderMapping {
+  const index: Record<string, number | undefined> = {};
+  const duplicates = new Set<CanonicalField>();
+  // Pass 1: exact canonical match (e.g. header "strain" → strain) takes
+  // priority over a less specific alias on a different column.
+  headerRow.forEach((cell, idx) => {
+    const n = normalizeHeader(cell);
+    if (!n) return;
+    if ((HEADER_ALIASES as Record<string, string[]>)[n] && index[n] === undefined) {
+      index[n] = idx;
+    }
+  });
+  // Pass 2: alias match, first detected column wins; later matches mark duplicate.
   headerRow.forEach((cell, idx) => {
     const n = normalizeHeader(cell);
     if (!n) return;
     for (const [key, aliases] of Object.entries(HEADER_ALIASES)) {
-      if (mapping[key] !== undefined) continue;
-      if (aliases.includes(n)) mapping[key] = idx;
+      if (!aliases.includes(n)) continue;
+      if (index[key] === undefined) {
+        index[key] = idx;
+      } else if (index[key] !== idx) {
+        duplicates.add(key as CanonicalField);
+      }
     }
   });
-  return mapping;
+  return {
+    index: index as HeaderMapping["index"],
+    duplicates: Array.from(duplicates),
+  };
 }
 
 function toTrimmedString(value: unknown): string | null {

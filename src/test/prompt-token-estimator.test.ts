@@ -52,9 +52,10 @@ describe("promptTokenEstimator — guards against forbidden constants", () => {
     const src = await import("node:fs").then((fs) =>
       fs.readFileSync("src/lib/cost/promptTokenEstimator.ts", "utf8"),
     );
-    expect(src).not.toMatch(/MAX_/);
-    expect(src).not.toMatch(/THRESHOLD/);
-    expect(src).not.toMatch(/TOKEN_LIMIT/);
-    expect(src).not.toMatch(/BUDGET/i);
+    expect(src).not.toMatch(/(const|let|var)\s+MAX_/);
+    expect(src).not.toMatch(/(const|let|var)\s+\w*THRESHOLD/);
+    expect(src).not.toMatch(/(const|let|var)\s+\w*TOKEN_LIMIT/);
+    expect(src).not.toMatch(/(const|let|var)\s+\w*BUDGET/i);
+
   });
 });

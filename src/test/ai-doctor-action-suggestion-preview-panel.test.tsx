@@ -184,13 +184,19 @@ describe("AiDoctorContextReadinessPanel — Action Queue suggestion preview", ()
     ).toBeTruthy();
   });
 
-  it("never renders executable action buttons inside the preview card", () => {
+  it("renders only the disabled handoff button (no executable action buttons)", () => {
     const context = ctx(
       [{ occurred_at: ago(12 * HOUR), event_type: "watering", source: "manual" }],
       [{ metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "live" }],
     );
     render(<AiDoctorContextReadinessPanel context={context} />);
     const buttons = getPreview().querySelectorAll("button");
-    expect(buttons.length).toBe(0);
+    expect(buttons.length).toBe(1);
+    const btn = buttons[0] as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+    expect(btn.getAttribute("aria-disabled")).toBe("true");
+    expect(btn.getAttribute("data-testid")).toBe(
+      "ai-doctor-action-suggestion-preview-handoff-button",
+    );
   });
 });

@@ -82,6 +82,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/daily-check", access: "auth" },
   { path: "/demo", access: "redirect", description: "→ /welcome" },
   { path: "/diagnostics", access: "operator" },
+  { path: "/diary/environment-summary", access: "auth", description: "Environment summary report (diary)." },
   { path: "/doctor", access: "auth" },
   { path: "/doctor/sessions", access: "auth" },
   { path: "/doctor/sessions/:sessionId", access: "auth" },

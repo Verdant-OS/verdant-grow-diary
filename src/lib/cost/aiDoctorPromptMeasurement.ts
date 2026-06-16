@@ -19,6 +19,11 @@ import {
   type AiDoctorPromptMeasurement,
   type RawHistoryFallbackState,
 } from "./costDomains";
+import {
+  estimatePromptTokensIfAvailable,
+  type PromptTokenEstimator,
+} from "./promptTokenEstimator";
+
 
 /** Optional provider-reported token usage shape (already-available only). */
 export interface ProviderReportedTokenUsage {

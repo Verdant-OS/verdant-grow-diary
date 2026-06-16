@@ -5,6 +5,7 @@ import {
   buildSensorNormalizationPreviewViewModel,
   SENSOR_NORMALIZATION_PREVIEW_DISCLAIMER,
   SENSOR_NORMALIZATION_PREVIEW_INVALID_NOTICE,
+  SENSOR_NORMALIZATION_PREVIEW_NO_METRICS_EMPTY_STATE,
   SENSOR_NORMALIZATION_PREVIEW_TENT_MISSING_EMPTY_STATE,
 } from "@/lib/sensors/sensorNormalizationPreviewViewModel";
 
@@ -70,7 +71,7 @@ describe("sensorNormalizationPreviewViewModel", () => {
     expect(vm.warnings.some((w) => w.code === "stale_reading")).toBe(true);
   });
 
-  it("invalid row shows invalid badge, invalid notice, and zero write-ready rows", () => {
+  it("empty payload shows invalid badge, no-metrics notice, and zero write-ready rows", () => {
     const vm = buildSensorNormalizationPreviewViewModel({
       payload: {},
       options: {
@@ -85,6 +86,23 @@ describe("sensorNormalizationPreviewViewModel", () => {
     expect(vm.source).toBe("invalid");
     expect(vm.badges.some((b) => b.label === "Invalid")).toBe(true);
     expect(vm.longFormRowCount).toBe(0);
+    expect(vm.emptyState).toBe(SENSOR_NORMALIZATION_PREVIEW_NO_METRICS_EMPTY_STATE);
+  });
+
+  it("forced invalid source with metrics shows invalid badge and invalid notice", () => {
+    const vm = buildSensorNormalizationPreviewViewModel({
+      payload: { temperature_c: 24 },
+      options: {
+        source: "invalid",
+        sourceIdentity: "ecowitt",
+        transport: "webhook",
+        tentId: TENT,
+        capturedAt: FRESH,
+        now: NOW,
+      },
+    });
+    expect(vm.source).toBe("invalid");
+    expect(vm.badges.some((b) => b.label === "Invalid")).toBe(true);
     expect(vm.emptyState).toBe(SENSOR_NORMALIZATION_PREVIEW_INVALID_NOTICE);
   });
 

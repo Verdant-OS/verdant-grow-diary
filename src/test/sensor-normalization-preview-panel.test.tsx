@@ -53,15 +53,15 @@ describe("SensorNormalizationPreviewPanel", () => {
     expect(badges.some((b) => b.textContent === "Stale")).toBe(true);
   });
 
-  it("renders invalid badge and empty state when no metrics", () => {
+  it("renders invalid badge and no-metrics empty state when payload has no metrics", () => {
     render(
       <SensorNormalizationPreviewPanel viewModel={buildVm({ payload: {} })} />,
     );
     const badges = screen.getAllByTestId("sensor-normalization-preview-badge");
     expect(badges.some((b) => b.textContent === "Invalid")).toBe(true);
-    expect(
-      screen.getByTestId("sensor-normalization-preview-empty-state").textContent,
-    ).toMatch(/Invalid preview/i);
+    const empty = screen.getByTestId("sensor-normalization-preview-empty-state");
+    expect(empty.textContent).toMatch(/No usable sensor metrics were found/i);
+    expect(empty.textContent).toMatch(/Check the input fields/i);
   });
 
   it("renders warning chips with friendly labels", () => {
@@ -160,13 +160,46 @@ describe("SensorNormalizationPreviewPanel", () => {
     expect(rows.length).toBeGreaterThan(0);
   });
 
-  it("renders empty state when no long-form rows are generated", () => {
+  it("renders missing-tent empty state with primary and secondary copy", () => {
+    render(
+      <SensorNormalizationPreviewPanel viewModel={buildVm({ tentId: null })} />,
+    );
+    const empty = screen.getByTestId("sensor-normalization-preview-empty-state");
+    expect(empty.textContent).toMatch(
+      /No write-ready metric rows were generated because a valid tent context is missing/i,
+    );
+    expect(empty.textContent).toMatch(
+      /Metric summaries may still appear for review, but they are not saved as sensor readings/i,
+    );
+  });
+
+  it("missing tent state still renders metric summaries when available", () => {
     render(
       <SensorNormalizationPreviewPanel viewModel={buildVm({ tentId: null })} />,
     );
     expect(
-      screen.getByTestId("sensor-normalization-preview-empty-state").textContent,
-    ).toMatch(/No write-ready metric rows/i);
+      screen.getByTestId("sensor-normalization-preview-metrics"),
+    ).toBeInTheDocument();
+    const rows = screen.getAllByTestId("sensor-normalization-preview-metric-row");
+    expect(rows.length).toBeGreaterThan(0);
+  });
+
+  it("missing tent state does not render long-form rows", () => {
+    render(
+      <SensorNormalizationPreviewPanel viewModel={buildVm({ tentId: null })} />,
+    );
+    expect(
+      screen.queryByTestId("sensor-normalization-preview-long-form"),
+    ).toBeNull();
+  });
+
+  it("long-form section is labeled and includes helper copy", () => {
+    render(<SensorNormalizationPreviewPanel viewModel={buildVm()} />);
+    const longForm = screen.getByTestId("sensor-normalization-preview-long-form");
+    expect(longForm.textContent).toMatch(/Long-form row preview/i);
+    expect(longForm.textContent).toMatch(
+      /These rows show what Verdant parsed. They are preview-only and are not database rows./i,
+    );
   });
 
   it("does not render raw payload values or private fields", () => {

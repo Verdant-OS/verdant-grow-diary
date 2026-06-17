@@ -409,8 +409,9 @@ def health() -> Any:
 def ecowitt() -> Any:
     raw = extract_payload()
     metrics = normalize_metrics(raw)
-    source = resolve_source()
+    source = resolve_source(payload=raw, remote_addr=request.remote_addr)
     captured_at = datetime.now(timezone.utc).isoformat()
+
 
     reading = {
         "captured_at": captured_at,

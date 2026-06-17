@@ -144,11 +144,37 @@ export interface BatchInsertError {
   hint?: string | null;
 }
 
+/**
+ * Detects a Postgres unique-violation (23505) on the deployed
+ * tenant/tent-scoped sensor_readings dedupe index. Used both for the
+ * operator failure copy and for the short race-window retry path.
+ *
+ * Conservative: requires both the explicit `23505` code AND a reference
+ * to the index name somewhere in the error payload, so unrelated
+ * unique-violations never get reclassified as safe duplicates.
+ */
+export function isSensorReadingsDedupeUniqueViolation(
+  error: BatchInsertError | null | undefined,
+): boolean {
+  if (!error) return false;
+  if (error.code !== "23505") return false;
+  const haystack = `${error.message ?? ""} ${error.details ?? ""}`;
+  return /sensor_readings_dedupe_uidx/i.test(haystack);
+}
+
 export interface BatchInsertResult<TRow> {
   ok: boolean;
   totalRows: number;
   totalBatches: number;
   insertedRows: number;
+  /**
+   * Rows that the short race-window recovery proved were already present
+   * in the DB (re-queried after a 23505) and reclassified as skipped
+   * duplicates instead of a hard batch failure. Zero when no recovery
+   * fired. Never includes rows whose duplicate status could not be
+   * confirmed — those preserve the original failure path.
+   */
+  recoveredDuplicateRows: number;
   /** 1-based index of the first batch that failed, when ok = false. */
   failedBatchIndex: number | null;
   failedBatchSize: number;

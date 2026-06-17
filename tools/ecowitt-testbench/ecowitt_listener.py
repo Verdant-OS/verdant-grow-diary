@@ -295,10 +295,76 @@ FORWARD_STATS: Dict[str, Any] = {
     "attempt_count": 0,
     "success_count": 0,
     "failure_count": 0,
+    "blocked_count": 0,
     "last_status": None,
     "last_at": None,
     "last_error": None,
 }
+
+
+import re as _re
+
+_UUID_RE = _re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+    _re.IGNORECASE,
+)
+
+# Demo/placeholder tent IDs that must never be accepted as a real tent.
+_FORBIDDEN_TENT_IDS = {
+    "00000000-0000-0000-0000-000000000000",
+    "tent-1",
+    "demo-tent",
+    "t1",
+}
+
+
+def is_valid_tent_id(value: Optional[str]) -> bool:
+    """True iff value is a real UUID string (not the all-zero placeholder)."""
+    if not isinstance(value, str):
+        return False
+    v = value.strip()
+    if not v:
+        return False
+    if v.lower() in _FORBIDDEN_TENT_IDS:
+        return False
+    try:
+        uuid.UUID(v)
+    except (ValueError, AttributeError, TypeError):
+        return False
+    return bool(_UUID_RE.match(v))
+
+
+def evaluate_forwarding_readiness(
+    url: Optional[str],
+    token: Optional[str],
+    tent_id: Optional[str],
+) -> Dict[str, Any]:
+    """Pure check: are all required Verdant fields present and valid?
+
+    Returns dict with: ready, reason, tent_id_configured, tent_id_valid,
+    ingest_url_configured, bridge_token_configured. Never returns the
+    tent_id itself.
+    """
+    url_ok = bool(url)
+    token_ok = bool(token)
+    tent_configured = bool(tent_id and str(tent_id).strip())
+    tent_valid = is_valid_tent_id(tent_id)
+    if not url_ok or not token_ok:
+        reason: Optional[str] = "no_forwarding_configured"
+    elif not tent_configured:
+        reason = "blocked_missing_tent_id"
+    elif not tent_valid:
+        reason = "blocked_invalid_tent_id"
+    else:
+        reason = None
+    return {
+        "ready": reason is None,
+        "reason": reason,
+        "ingest_url_configured": url_ok,
+        "bridge_token_configured": token_ok,
+        "tent_id_configured": tent_configured,
+        "tent_id_valid": tent_valid,
+    }
 
 
 def _short_sanitized_error(exc: Any) -> str:
@@ -322,8 +388,26 @@ def sanitize_debug_payload_str_safe(text: str) -> str:
 def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
     url = os.environ.get("VERDANT_INGEST_URL")
     token = os.environ.get("VERDANT_BRIDGE_TOKEN")
-    if not url or not token:
-        return {"forwarded": False, "reason": "no_forwarding_configured"}
+    tent_id = os.environ.get("VERDANT_TENT_ID")
+
+    readiness = evaluate_forwarding_readiness(url, token, tent_id)
+    if not readiness["ready"]:
+        reason = readiness["reason"] or "not_ready"
+        # "no_forwarding_configured" is a quiet no-op (forwarding never
+        # opted in). The other blocks are explicit local refusals — track
+        # them so the operator can see them in /debug/forwarding-status,
+        # never as a remote webhook failure.
+        if reason != "no_forwarding_configured":
+            FORWARD_STATS["blocked_count"] += 1
+            FORWARD_STATS["last_status"] = None
+            FORWARD_STATS["last_at"] = datetime.now(timezone.utc).isoformat()
+            FORWARD_STATS["last_error"] = reason
+            print(
+                f"[verdant-testbench] forwarding blocked locally: {reason} "
+                "(no request sent to ingest webhook)"
+            )
+        return {"forwarded": False, "reason": reason}
+
     if requests is None:
         return {"forwarded": False, "reason": "requests_not_installed"}
 
@@ -332,21 +416,31 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
         print(
             "[verdant-testbench] refusing to forward: Authorization header "
             "contains non-ASCII or placeholder characters. Token preview: "
-            f"{mask_token(token)}",
+            f"{mask_token(token or '')}",
             file=sys.stderr,
         )
         return {"forwarded": False, "reason": "non_ascii_auth_header"}
+
+    # Attach tent context. Edge Function requires top-level tent_id;
+    # x-verdant-tent-id is a secondary signal already in the CORS allowlist.
+    outbound = dict(reading)
+    outbound["tent_id"] = tent_id
+    if isinstance(outbound.get("metadata"), dict):
+        md = dict(outbound["metadata"])
+        md["tent_id"] = tent_id
+        outbound["metadata"] = md
 
     headers = {
         "Authorization": auth,
         "Content-Type": "application/json",
         "Idempotency-Key": str(uuid.uuid4()),
         "User-Agent": f"{VENDOR}/1.0",
+        "x-verdant-tent-id": tent_id or "",
     }
     FORWARD_STATS["attempt_count"] += 1
     FORWARD_STATS["last_at"] = datetime.now(timezone.utc).isoformat()
     try:
-        resp = requests.post(url, json=reading, headers=headers, timeout=10)
+        resp = requests.post(url, json=outbound, headers=headers, timeout=10)
         FORWARD_STATS["last_status"] = resp.status_code
         if 200 <= resp.status_code < 300:
             FORWARD_STATS["success_count"] += 1
@@ -356,7 +450,7 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
             FORWARD_STATS["last_error"] = f"http_{resp.status_code}"
         print(
             f"[verdant-testbench] forwarded reading -> {resp.status_code} "
-            f"(token {mask_token(token)})"
+            f"(token {mask_token(token or '')})"
         )
         return {
             "forwarded": True,

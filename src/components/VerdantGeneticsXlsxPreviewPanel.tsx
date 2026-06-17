@@ -113,6 +113,7 @@ export function VerdantGeneticsXlsxPreviewPanel({
   tentOptions = [],
   growId,
   onSave,
+  onViewImportedHistory,
 }: VerdantGeneticsXlsxPreviewPanelProps) {
   const vm = buildVerdantGeneticsXlsxPreviewViewModel(grid);
   const [mappingState, setMappingState] = useState(() =>

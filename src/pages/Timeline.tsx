@@ -64,6 +64,8 @@ import {
 import TimelinePhotoLightbox from "@/components/TimelinePhotoLightbox";
 import TimelineEvidenceDetailDrawer from "@/components/TimelineEvidenceDetailDrawer";
 import { buildTimelineEvidenceDetailViewModel } from "@/lib/timelineEvidenceDetailViewModel";
+import TimelineSensorSourceBadge from "@/components/TimelineSensorSourceBadge";
+import { classifyTimelineSensorSource } from "@/lib/timelineSensorSourceBadgeRules";
 
 
 

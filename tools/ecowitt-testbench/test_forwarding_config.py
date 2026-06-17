@@ -21,7 +21,7 @@ from ecowitt_listener import (
 
 VALID_TENT_UUID = "11111111-2222-3333-4444-555555555555"
 INGEST_URL = "https://example.supabase.co/functions/v1/sensor-ingest-webhook"
-BRIDGE_TOKEN = "vbt_test_token_value_for_unit_tests_only"
+BRIDGE_TOKEN = "test-bridge-token-not-a-real-vbt"
 
 
 def _reset_stats() -> None:

@@ -3,7 +3,7 @@
  * "Plant profile context" card on Plant Detail.
  *
  * Hard rules:
- *  - No I/O. No Supabase. No fetch. No storage. No AI calls.
+ *  - No I/O. No backend writes. No fetch. No storage. No AI calls.
  *  - Never infer `medium` or `pot_size` from strain, notes, tent name,
  *    grow title, diary entries, or any freeform text.
  *  - Blank / whitespace strings collapse to unknown.

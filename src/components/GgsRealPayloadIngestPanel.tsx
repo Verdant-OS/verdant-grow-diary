@@ -41,9 +41,10 @@ import { bridgeTokenStatus } from "@/lib/bridgeTokenRules";
 const EXAMPLE_PAYLOAD = `{
   "timestamp": "2026-06-17T18:30:00Z",
   "sensor_id": "REAL_GGS_PROBE_ID",
-  "moisture_vwc": 42.5,
+  "soil_moisture_pct": 42.5,
   "soil_temp_c": 22.3,
-  "ec_ms_cm": 0.85
+  "soil_ec": 0.85,
+  "tent_id": "<tent uuid>"
 }`;
 
 export default function GgsRealPayloadIngestPanel() {

@@ -481,6 +481,17 @@ export function VerdantGeneticsXlsxPreviewPanel({
                   : `${XLSX_SAVE_SUCCESS_PREFIX} ${savedCount} rows imported.`}
               </span>
             )}
+            {saveStatus === "success" && onViewImportedHistory && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={onViewImportedHistory}
+                data-testid="vg-xlsx-view-imported-history"
+              >
+                View imported history
+              </Button>
+            )}
             {saveStatus === "error" && saveError && (
               <span
                 role="alert"

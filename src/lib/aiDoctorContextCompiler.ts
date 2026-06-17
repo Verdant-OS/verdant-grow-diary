@@ -418,14 +418,15 @@ export function compilePlantContextFromRows(
   // ----- early-stage (germination/seedling) memory, additive & safe -----
   const earlyStage = buildEarlyStageAiDoctorContext({
     diaryRows: input.growEvents ?? [],
-    // Compiler knows live sensor presence; pass it explicitly so the
-    // helper can surface a missing-sensor caveat only when known false.
     hasRecentSensorSnapshot: hasLiveSensorReadings,
-    // No photo signal exists in the compiler context — leave undefined.
   });
   const early_stage_memory: EarlyStageAiDoctorContext | null =
     earlyStage.hasEarlyStageMemory ? earlyStage : null;
 
+  // Medium / pot size carried directly from the plant row. Whitespace-
+  // normalized; blank / non-string inputs collapse to null. Never inferred.
+  const medium = cleanPlantString(plant?.medium);
+  const pot_size = cleanPlantString(plant?.pot_size);
 
   return {
     grow_id: plant?.grow_id ?? null,
@@ -434,6 +435,8 @@ export function compilePlantContextFromRows(
     plant_name: plant?.name ?? null,
     strain: plant?.strain ?? null,
     stage: plant?.stage ?? plant?.growth_stage ?? null,
+    medium,
+    pot_size,
     recent_grow_events: Object.freeze(recent_grow_events),
     recentSensorReadings: Object.freeze(recentSensorReadings),
     sensor_groups: Object.freeze(sensor_groups),

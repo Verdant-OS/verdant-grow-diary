@@ -57,7 +57,9 @@ const OFFLINE_SUB =
 
 export function buildForwardingStatusViewModel(
   fetchState: LocalForwardingFetchState,
+  nowMs: number = Date.now(),
 ): ForwardingStatusViewModel {
+  const verifiedMarker = classifyLiveIngestVerifiedMarker(fetchState, nowMs);
   if (fetchState.state === "loading") {
     return {
       state: "loading",
@@ -65,6 +67,7 @@ export function buildForwardingStatusViewModel(
       subheadline: "",
       rows: [],
       banner: HIDDEN_BANNER,
+      verifiedMarker,
     };
   }
   if (fetchState.state === "offline") {
@@ -74,6 +77,7 @@ export function buildForwardingStatusViewModel(
       subheadline: OFFLINE_SUB,
       rows: [],
       banner: HIDDEN_BANNER,
+      verifiedMarker,
     };
   }
   const s: LocalForwardingStatus = fetchState.status;

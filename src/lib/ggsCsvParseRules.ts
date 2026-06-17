@@ -26,20 +26,35 @@
 import { SPIDER_FARMER_GGS_PROVIDER } from "@/lib/spiderFarmerGgsMappingRules";
 
 /** Vendor identity label written into raw_payload.source_app. */
+/**
+ * ggsCsvParseRules — pure, read-only parser/normalizer for a single
+ * GGS 3-in-1 Soil Sensor Pro CSV-row shaped input.
+ *
+ * Canonical metrics emitted as long-format insert drafts:
+ *   - soil_moisture_pct
+ *   - ec  (mS/cm)
+ *   - soil_temp_c  (°C, root-zone soil temperature; bounds -20..80)
+ *
+ * Soil temperature drafts are gated on the same validation bounds the
+ * DB trigger enforces: values outside [-20, 80] °C are flagged and
+ * NEVER emitted (no silent clamping). The parsed °C value is always
+ * preserved in raw_payload.parsed_soil_temp_c for audit.
+ */
+
+import { SPIDER_FARMER_GGS_PROVIDER } from "@/lib/spiderFarmerGgsMappingRules";
+
+/** Vendor identity label written into raw_payload.source_app. */
 export const GGS_CSV_SOURCE_APP = SPIDER_FARMER_GGS_PROVIDER;
 
 /** Canonical Verdant V0 source labels this parser may emit. */
 export type GgsCsvSource = "csv" | "invalid";
 
 /** Canonical metrics this parser may emit as long-format insert drafts. */
-export type GgsCsvAllowedMetric = "soil_moisture_pct" | "ec";
+export type GgsCsvAllowedMetric = "soil_moisture_pct" | "ec" | "soil_temp_c";
 
-/** Metric names that are parsed/preserved but explicitly NOT emitted. */
+/** Metric names that are parsed but explicitly NOT emitted (e.g. out of bounds). */
 export type GgsCsvSkippedMetric = "soil_temp_c";
 
-export interface GgsCsvReadingDraft {
-  /** Canonical metric name accepted by validate_sensor_reading. */
-  metric: GgsCsvAllowedMetric;
   /** Normalized numeric value in canonical units. */
   value: number;
   /** Verdant V0 canonical source label. Always "csv" for this parser. */

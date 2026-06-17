@@ -410,3 +410,214 @@ describe("ecowitt windows testbench — CI workflow + tooling folder safety", ()
     expect(script).toMatch(/if\s*\(\s*\$ForwardToVerdant\s*\)/);
   });
 });
+
+describe("ecowitt windows testbench — /debug/status extended fields", () => {
+  const py = readFileSync(join(TESTBENCH_DIR, "ecowitt_listener.py"), "utf-8");
+  const block =
+    py.split('@app.get("/debug/status")')[1]?.split("@app.get(")[0] ?? "";
+
+  it("includes parsed_line_count, skipped_line_count, last_parse_error", () => {
+    expect(block).toMatch(/parsed_line_count/);
+    expect(block).toMatch(/skipped_line_count/);
+    expect(block).toMatch(/last_parse_error/);
+  });
+
+  it("missing log file returns zero counts and null last_parse_error", () => {
+    const missing = block.split("LOG_PATH.exists()")[1]?.split("try:")[0] ?? "";
+    expect(missing).toMatch(/"parsed_line_count":\s*0/);
+    expect(missing).toMatch(/"skipped_line_count":\s*0/);
+    expect(missing).toMatch(/"last_parse_error":\s*None/);
+  });
+
+  it("parse_jsonl_entries returns sanitized last error and never raw line text", () => {
+    const helper = py.split("def parse_jsonl_entries")[1]?.split("\ndef ")[0] ?? "";
+    expect(helper).toMatch(/sanitize_debug_payload/);
+    // Must use exception class+message, NOT the raw line `text` variable.
+    expect(helper).toMatch(/type\(exc\)\.__name__/);
+    expect(helper).not.toMatch(/last_err\s*=\s*text/);
+  });
+
+  it("latest_metrics is taken from sanitized entry", () => {
+    expect(block).toMatch(/latest_metrics/);
+    expect(block).toMatch(/sanitize_debug_payload/);
+  });
+
+  it("status endpoint does not forward or import supabase", () => {
+    expect(block).not.toMatch(/requests\.post/);
+    expect(block).not.toMatch(/maybe_forward/);
+    expect(py).not.toMatch(/from\s+supabase/i);
+  });
+
+  it("status endpoint is loopback-only", () => {
+    expect(block).toMatch(/_is_local_request/);
+    expect(block).toMatch(/forbidden_non_local/);
+  });
+});
+
+describe("ecowitt windows testbench — /debug/forwarding-status safety", () => {
+  const py = readFileSync(join(TESTBENCH_DIR, "ecowitt_listener.py"), "utf-8");
+  const block =
+    py.split('@app.get("/debug/forwarding-status")')[1]?.split("@app.get(")[0]
+    ?? py.split('@app.get("/debug/forwarding-status")')[1]?.split("\ndef main(")[0]
+    ?? "";
+
+  it("declares the /debug/forwarding-status endpoint", () => {
+    expect(py).toMatch(/@app\.get\(["']\/debug\/forwarding-status["']\)/);
+  });
+
+  it("enforces loopback-only with 403", () => {
+    expect(block).toMatch(/_is_local_request/);
+    expect(block).toMatch(/forbidden_non_local/);
+    expect(block).toMatch(/\b403\b/);
+  });
+
+  it("returns forwarding configuration fields", () => {
+    expect(block).toMatch(/forwarding_enabled/);
+    expect(block).toMatch(/ingest_url_configured/);
+    expect(block).toMatch(/bridge_token_configured/);
+    expect(block).toMatch(/masked_ingest_url/);
+    expect(block).toMatch(/masked_token_preview/);
+  });
+
+  it("returns attempt/success/failure counters and last-forward fields", () => {
+    expect(block).toMatch(/forward_attempt_count/);
+    expect(block).toMatch(/forward_success_count/);
+    expect(block).toMatch(/forward_failure_count/);
+    expect(block).toMatch(/last_forward_status/);
+    expect(block).toMatch(/last_forward_at/);
+    expect(block).toMatch(/last_forward_error/);
+  });
+
+  it("masks the token preview via mask_token and never returns the raw token", () => {
+    expect(block).toMatch(/mask_token/);
+    // The block must not return os.environ.get("VERDANT_BRIDGE_TOKEN") as-is.
+    expect(block).not.toMatch(/"token"\s*:\s*token\b/);
+    expect(block).not.toMatch(/"bridge_token"\s*:\s*token\b/);
+  });
+
+  it("masks the ingest URL via mask_ingest_url", () => {
+    expect(block).toMatch(/mask_ingest_url/);
+    const helper = py.split("def mask_ingest_url")[1]?.split("\ndef ")[0] ?? "";
+    expect(helper).toMatch(/\*\*\*/);
+  });
+
+  it("does not return Authorization header or raw payload", () => {
+    expect(block).not.toMatch(/Authorization/);
+    expect(block).not.toMatch(/raw_payload/);
+  });
+
+  it("sanitizes last_forward_error through sanitize_debug_payload", () => {
+    expect(block).toMatch(/sanitize_debug_payload/);
+  });
+
+  it("does not forward or import supabase", () => {
+    expect(block).not.toMatch(/requests\.post/);
+    expect(block).not.toMatch(/maybe_forward/);
+    expect(py).not.toMatch(/from\s+supabase/i);
+    expect(py).not.toMatch(/import\s+supabase/i);
+  });
+});
+
+describe("ecowitt windows testbench — forwarding counters", () => {
+  const py = readFileSync(join(TESTBENCH_DIR, "ecowitt_listener.py"), "utf-8");
+  const fn = py.split("def maybe_forward")[1]?.split("\ndef ")[0] ?? "";
+
+  it("declares module-level FORWARD_STATS counters", () => {
+    expect(py).toMatch(/FORWARD_STATS\s*:\s*Dict\[str,\s*Any\]\s*=\s*\{/);
+    expect(py).toMatch(/"attempt_count"/);
+    expect(py).toMatch(/"success_count"/);
+    expect(py).toMatch(/"failure_count"/);
+    expect(py).toMatch(/"last_status"/);
+    expect(py).toMatch(/"last_at"/);
+    expect(py).toMatch(/"last_error"/);
+  });
+
+  it("increments attempt counter only in the forwarding branch (after env checks)", () => {
+    expect(fn).toMatch(/FORWARD_STATS\["attempt_count"\]\s*\+=\s*1/);
+    // The attempt increment must come AFTER the early-return guards.
+    const noFwdIdx = fn.indexOf('no_forwarding_configured');
+    const attemptIdx = fn.indexOf('FORWARD_STATS["attempt_count"]');
+    expect(noFwdIdx).toBeGreaterThanOrEqual(0);
+    expect(attemptIdx).toBeGreaterThan(noFwdIdx);
+  });
+
+  it("increments success counter on 2xx response", () => {
+    expect(fn).toMatch(/200\s*<=\s*resp\.status_code\s*<\s*300/);
+    expect(fn).toMatch(/FORWARD_STATS\["success_count"\]\s*\+=\s*1/);
+  });
+
+  it("increments failure counter on non-2xx and on exception", () => {
+    const failures = (fn.match(/FORWARD_STATS\["failure_count"\]\s*\+=\s*1/g) || []).length;
+    expect(failures).toBeGreaterThanOrEqual(2);
+    expect(fn).toMatch(/except\s+Exception/);
+  });
+
+  it("sanitizes the last error via _short_sanitized_error", () => {
+    expect(fn).toMatch(/_short_sanitized_error/);
+    const helper = py.split("def _short_sanitized_error")[1]?.split("\ndef ")[0] ?? "";
+    expect(helper).toMatch(/sanitize_debug_payload/);
+  });
+});
+
+describe("ecowitt windows testbench — troubleshooting docs", () => {
+  const doc = readFileSync(DOC_PATH, "utf-8");
+
+  it("contains a troubleshooting section for malformed JSONL", () => {
+    expect(doc).toMatch(/##\s+Troubleshooting malformed JSONL/);
+  });
+
+  it("documents common malformed JSONL cases", () => {
+    expect(doc).toMatch(/partial write/i);
+    expect(doc).toMatch(/manually edited/i);
+    expect(doc).toMatch(/old test line/i);
+    expect(doc).toMatch(/non-JSON raw body/i);
+  });
+
+  it("explains parsed/skipped/malformed counts and last_parse_error", () => {
+    expect(doc).toMatch(/parsed_line_count/);
+    expect(doc).toMatch(/skipped_line_count/);
+    expect(doc).toMatch(/malformed_line_count/);
+    expect(doc).toMatch(/last_parse_error/);
+    expect(doc).toMatch(/latest_metrics/);
+  });
+
+  it("includes curl example for /debug/forwarding-status", () => {
+    expect(doc).toMatch(/curl[^\n]*\/debug\/forwarding-status/);
+  });
+});
+
+describe("ecowitt windows testbench — CI secret scan step", () => {
+  const WORKFLOW_PATH = join(
+    process.cwd(),
+    ".github",
+    "workflows",
+    "ecowitt-testbench-safety.yml",
+  );
+  const workflow = readFileSync(WORKFLOW_PATH, "utf-8");
+
+  it("contains a testbench-only secret scan step", () => {
+    expect(workflow).toMatch(/secret scan/i);
+    expect(workflow).toMatch(/tools\/ecowitt-testbench/);
+  });
+
+  it("scan targets tools/ecowitt-testbench and uses grep", () => {
+    expect(workflow).toMatch(/DIR=tools\/ecowitt-testbench/);
+    expect(workflow).toMatch(/grep\s+-R/);
+  });
+
+  it("scan checks for vbt_, JWT, service_role, and hardcoded bearer patterns", () => {
+    expect(workflow).toMatch(/vbt_/);
+    expect(workflow).toMatch(/eyJ/);
+    expect(workflow).toMatch(/service_role/);
+    expect(workflow).toMatch(/Authorization/);
+  });
+
+  it("scan requires no repository secrets", () => {
+    expect(workflow).not.toMatch(/\$\{\{\s*secrets\./);
+  });
+
+  it("scan allows the documented placeholder vbt_REPLACE_WITH_REAL_TOKEN", () => {
+    expect(workflow).toMatch(/vbt_REPLACE_WITH_REAL_TOKEN/);
+  });
+});
+

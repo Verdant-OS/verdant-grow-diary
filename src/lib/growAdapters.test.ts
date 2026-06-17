@@ -40,6 +40,8 @@ const plantRow = {
   last_note: "Trichomes cloudy",
   is_archived: false,
   schema_version: 1,
+  medium: null,
+  pot_size: null,
   created_at: "2026-02-10T00:00:00Z",
   updated_at: "2026-05-01T00:00:00Z",
 } as const;

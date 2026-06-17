@@ -65,7 +65,7 @@ export default function GgsSentinelSmokeRunnerPanel() {
 
       const ev = evaluateGgsSentinelReadiness({
         rows: (rows ?? []) as GgsSentinelInputRow[],
-        snapshot: (snap ?? null) as GgsSentinelSnapshot | null,
+        snapshot: (snap ?? null) as unknown as GgsSentinelSnapshot | null,
       });
       setEvaluation(ev);
     } catch (e) {

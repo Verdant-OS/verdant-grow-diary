@@ -56,6 +56,14 @@ import {
   TIMELINE_EVIDENCE_EMPTY_TITLE,
   TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER,
 } from "@/lib/timelineEvidenceFilterRules";
+import {
+  buildTimelinePhotoLightboxList,
+  findTimelinePhotoIndexById,
+  buildTimelinePhotoAltText,
+} from "@/lib/timelinePhotoLightboxRules";
+import TimelinePhotoLightbox from "@/components/TimelinePhotoLightbox";
+
+
 
 
 const TIMELINE_SNAPSHOT_STALE_MS = 30 * 60 * 1000;
@@ -152,6 +160,7 @@ export default function Timeline() {
   const [plantFilter, setPlantFilter] = useState("");
   const [tentFilter, setTentFilter] = useState("");
   const [eventTypeFilter, setEventTypeFilter] = useState("");
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   async function load() {
     if (!user || !activeGrowId) {

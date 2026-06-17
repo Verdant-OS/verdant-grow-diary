@@ -1451,6 +1451,7 @@ def debug_forwarding_error_report() -> Any:
         "last_forward_response_error": last_resp_error,
         "last_forward_response_classification": last_resp_cls,
         "last_forward_response_message": last_resp_msg,
+        "last_forward_response_reason": last_resp_reason,
         "retry_count": int(FORWARD_STATS.get("retry_count", 0)),
         "last_retry_error": last_retry_err,
         "max_retry_attempts": MAX_RETRY_ATTEMPTS,

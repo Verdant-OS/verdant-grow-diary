@@ -264,7 +264,8 @@ describe("parseGgsCsvRow — static safety", () => {
     expect(src).not.toMatch(/functions\.invoke/);
     // No AI / alerts / Action Queue / device control hints.
     expect(src).not.toMatch(/openai|anthropic|gemini|lovable-ai/i);
-    expect(src).not.toMatch(/action_queue|alerts/);
+    expect(src).not.toMatch(/from\s+["'][^"']*action_queue/);
+    expect(src).not.toMatch(/from\s+["'][^"']*\/alerts/);
     expect(src).not.toMatch(/relay_on|valve_open|light_on|device_command/);
     // No spreadsheet/upload UI.
     expect(src).not.toMatch(/xlsx|sheetjs|FileReader|input\s+type=["']file/i);

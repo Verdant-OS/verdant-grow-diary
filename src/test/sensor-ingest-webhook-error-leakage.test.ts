@@ -29,9 +29,10 @@ describe("sensor-ingest-webhook error leakage", () => {
     }
   });
 
-  it("emits only the terse `insert_failed` error code on insert failure", () => {
-    // The exact response shape after the scrub.
-    expect(SRC).toMatch(/json\(\s*req\s*,\s*\{\s*error:\s*["']insert_failed["']\s*\}\s*,\s*400\s*\)/);
+  it("emits only the terse `insert_failed` error code (with sanitized reason) on insert failure", () => {
+    // Response shape: { error: "insert_failed", reason: <enum> }. The reason
+    // is a stable enum from classifyInsertError — never raw PG text.
+    expect(SRC).toMatch(/json\(\s*req\s*,\s*\{\s*error:\s*["']insert_failed["']\s*,\s*reason\s*\}\s*,\s*400\s*\)/);
   });
 
   it("does not echo bridge token id, hash, or raw token in any response", () => {

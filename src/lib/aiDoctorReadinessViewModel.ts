@@ -259,9 +259,15 @@ export function buildAiDoctorReadinessView(
     });
   }
 
+  const confidenceClass = classifyConfidenceClass(state);
+  const evidenceFlags = deriveAiDoctorContextEvidenceFlags(context, openAlerts);
+
   return Object.freeze({
     state,
     stateLabel: AI_DOCTOR_READINESS_STATE_LABELS[state],
+    confidenceClass,
+    confidenceClassCopy: AI_DOCTOR_CONFIDENCE_CLASS_COPY[confidenceClass],
+    evidenceFlags,
     plantIdentity: {
       plantId: context.plant_id,
       plantName: context.plant_name,

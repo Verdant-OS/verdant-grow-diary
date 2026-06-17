@@ -16,12 +16,18 @@ import {
   fetchLocalForwardingErrorReportText,
   fetchLocalForwardingStatus,
   sanitizeReportText,
+  sanitizeReportValue,
   type LocalForwardingFetchState,
 } from "@/lib/ecowittLocalForwardingStatus";
 import {
   buildForwardingStatusViewModel,
   type ForwardingStatusRow,
 } from "@/lib/ecowittLocalForwardingStatusViewModel";
+import {
+  buildSanitizedForwardingReport,
+  serializeSanitizedForwardingReport,
+  type ForwardingErrorReportLike,
+} from "@/lib/ecowittForwardingReportExport";
 
 export interface EcowittLocalForwardingStatusWidgetProps {
   /** Test seam: skip the initial auto-fetch (use a manual refresh). */

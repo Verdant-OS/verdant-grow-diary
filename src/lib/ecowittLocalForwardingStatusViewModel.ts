@@ -9,6 +9,10 @@ import type {
   LocalForwardingStatus,
 } from "@/lib/ecowittLocalForwardingStatus";
 import { recommendForStatus } from "@/lib/ecowittForwardingRecommendedNextStepRules";
+import {
+  classifyLiveIngestVerifiedMarker,
+  type LiveIngestVerifiedMarker,
+} from "@/lib/ecowittLiveIngestVerifiedRules";
 
 export interface ForwardingStatusRow {
   key: string;

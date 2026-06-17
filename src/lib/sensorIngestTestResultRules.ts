@@ -114,7 +114,10 @@ export function classifySensorIngestTestResult(
 
 
   const { status, body } = input;
-  const reason = pickString(body, "error") ?? pickString(body, "reason");
+  const rawReason = pickString(body, "error") ?? pickString(body, "reason");
+  const reason = rawReason ? sanitizeReasonForDisplay(rawReason) : null;
+  const codeCopy = rawReason ? SANITIZED_WEBHOOK_ERROR_COPY[rawReason] : undefined;
+
 
   if (status >= 200 && status < 300) {
     const inserted = pickNumber(body, "inserted") ?? 0;

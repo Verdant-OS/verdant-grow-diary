@@ -92,6 +92,7 @@ export default function AiDoctorContextReadinessPanel({
   context,
   openAlertsCount,
   className,
+  quickActions,
 }: AiDoctorContextReadinessPanelProps) {
   const view = useMemo(
     () => buildAiDoctorReadinessView({ context, openAlertsCount }),

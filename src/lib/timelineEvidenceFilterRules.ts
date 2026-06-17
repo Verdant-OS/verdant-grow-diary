@@ -9,7 +9,7 @@
  *  - Original ordering preserved (callers sort upstream).
  *  - Keyword search runs only over render-safe display fields:
  *    note text, plant name, stage label, and the `event_type` token.
- *    Never searches raw_payload, secrets, tokens, or unknown nested
+ *    Never searches secret-bearing payloads, tokens, or unknown nested
  *    detail blobs.
  *  - Case-insensitive, trimmed. Empty query returns all rows.
  */

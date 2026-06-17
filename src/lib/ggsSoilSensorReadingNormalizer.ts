@@ -7,10 +7,10 @@
  *
  * Hard constraints (stop-ship if violated):
  *  - Pure. No I/O, no React, no Supabase, no fetch, no timers.
- *  - Read-only. NEVER writes sensor_readings, alerts, action_queue,
+ *  - Read-only. NEVER writes sensor_readings, alerts, queued actions,
  *    AI sessions, or emits device-control hints.
  *  - Treats the payload as untrusted. NaN/Infinity/impossible values
- *    are rejected, never silently clamped into healthy ranges.
+ *    are rejected, never silently coerced into plausible ranges.
  *  - Source classification is computed from data quality, never
  *    promoted to `live` from a missing/unknown source.
  *  - Manually entered GGS values are always `source: "manual"`.

@@ -53,6 +53,19 @@ export interface VerdantGeneticsXlsxSaveArgs {
   adapterResult: VerdantGeneticsXlsxInsertRowsResult;
 }
 
+/**
+ * Outcome returned by a duplicate-aware save handler. When provided, the
+ * panel renders inserted/duplicate counts and a no-live-telemetry line
+ * instead of the legacy attempted-rows success copy. A fully-duplicate
+ * save is a successful no-op, not a failure.
+ */
+export interface VerdantGeneticsXlsxSaveOutcome {
+  inserted: number;
+  duplicates: number;
+  totalRows: number;
+  diagnostic?: string;
+}
+
 export interface VerdantGeneticsXlsxPreviewPanelProps {
   grid: CellGrid;
   tentOptions?: TentOption[];
@@ -61,9 +74,12 @@ export interface VerdantGeneticsXlsxPreviewPanelProps {
    * Parent-owned save handler. When omitted the save button stays disabled
    * with the "coming later" copy (preview-only mode). When provided the
    * button enables only when mapping is complete and the adapter emits
-   * at least one row that is not blocked.
+   * at least one row that is not blocked. May resolve to a
+   * `VerdantGeneticsXlsxSaveOutcome` to surface duplicate-aware counts.
    */
-  onSave?: (args: VerdantGeneticsXlsxSaveArgs) => Promise<void> | void;
+  onSave?: (
+    args: VerdantGeneticsXlsxSaveArgs,
+  ) => Promise<void | VerdantGeneticsXlsxSaveOutcome> | void | VerdantGeneticsXlsxSaveOutcome;
 }
 
 function newImportBatchId(): string {

@@ -8,13 +8,13 @@
 
 ## 1. Context
 
-AI Doctor context now accepts `medium` and `pot_size` and Plant Detail readiness can consume them when supplied. However:
+AI Doctor context now accepts `medium` and `pot_size` and Plant Detail readiness consumes them when supplied. As of this update:
 
-- The current `Plant` type and `public.plants` Supabase table do **not** expose `medium`, `pot_size`, or any container-related field.
-- A presenter-only Plant Profile Context card on Plant Detail surfaces these fields as "unavailable / coming soon" with **no** persistence path.
-- Readiness panel provenance copy is honest: "Medium is not available on this plant profile yet." / "Pot size is not available on this plant profile yet."
-
-We need a decision on the safest way to persist this metadata — or to keep deferring — before any schema or write-path work begins.
+- `public.plants` now exposes nullable `medium` and `pot_size` columns (migration landed).
+- Supabase generated types include both fields.
+- The mock `Plant` interface, `mapPlantRow` adapter, and `PlantDetail` page forward these values through the read path.
+- `PlantProfileContextCard` and `PlantDetailAiDoctorContextReadinessMount` receive and display the values when present.
+- A presenter-only edit surface is **not** yet exposed — the "coming soon" buttons remain until the edit UI slice is approved.
 
 ---
 

@@ -1423,3 +1423,87 @@ describe("ecowitt windows testbench — retry/backoff + error report", () => {
 });
 
 
+
+describe("ecowitt windows testbench — forwarding tests CI workflow", () => {
+  const WORKFLOW_PATH = join(
+    process.cwd(),
+    ".github",
+    "workflows",
+    "ecowitt-testbench-forwarding-tests.yml",
+  );
+  const wf = readFileSync(WORKFLOW_PATH, "utf-8");
+
+  it("workflow file exists and triggers on PR + push for relevant paths", () => {
+    expect(wf).toMatch(/pull_request:/);
+    expect(wf).toMatch(/push:/);
+    expect(wf).toContain("tools/ecowitt-testbench/**");
+    expect(wf).toContain("docs/ecowitt-windows-testbench.md");
+    expect(wf).toContain("src/test/ecowitt-windows-testbench-static-safety.test.ts");
+  });
+
+  it("workflow runs python forwarding tests", () => {
+    expect(wf).toMatch(/python3?\s+-m\s+unittest\s+test_forwarding_config/);
+    expect(wf).toMatch(/python3?\s+-m\s+unittest\s+test_source_labeling/);
+    expect(wf).toMatch(/python3?\s+-m\s+unittest\s+test_forwarding_contract/);
+  });
+
+  it("workflow runs the static safety vitest suite + typecheck", () => {
+    expect(wf).toContain(
+      "bunx vitest run src/test/ecowitt-windows-testbench-static-safety.test.ts",
+    );
+    expect(wf).toMatch(/bun run typecheck/);
+  });
+
+  it("workflow does not require production secrets and does not upload .env/raw logs/tokens", () => {
+    // No use of repository secrets / production tokens.
+    expect(wf).not.toMatch(/secrets\./);
+    expect(wf).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
+    // No raw JSONL / .env upload paths.
+    expect(wf).not.toMatch(/ecowitt_raw_log\.jsonl/);
+    expect(wf).not.toMatch(/path:\s*[^\n]*\.env\b/);
+    // Test-only env values must not look like real vbt_ tokens.
+    const realToken = /VERDANT_BRIDGE_TOKEN:\s*"vbt_[A-Za-z0-9_-]{20,}"/;
+    expect(wf).not.toMatch(realToken);
+  });
+});
+
+describe("ecowitt windows testbench — operator forwarding widget safety", () => {
+  const WIDGET_PATH = join(
+    process.cwd(),
+    "src",
+    "components",
+    "EcowittLocalForwardingStatusWidget.tsx",
+  );
+  const HELPER_PATH = join(
+    process.cwd(),
+    "src",
+    "lib",
+    "ecowittLocalForwardingStatus.ts",
+  );
+  const widget = readFileSync(WIDGET_PATH, "utf-8");
+  const helper = readFileSync(HELPER_PATH, "utf-8");
+
+  it("widget only fetches localhost:8787 (no remote URLs)", () => {
+    // Combined helper + widget must reference only localhost for fetch.
+    expect(helper).toContain("http://localhost:8787");
+    expect(widget).not.toMatch(/https?:\/\/(?!localhost)/);
+    expect(helper).not.toMatch(/supabase\.co/);
+  });
+
+  it("widget never imports supabase client or admin role", () => {
+    expect(widget).not.toMatch(/from\s+["']@\/integrations\/supabase/);
+    expect(widget).not.toMatch(/service_role/i);
+    expect(helper).not.toMatch(/from\s+["']@\/integrations\/supabase/);
+  });
+
+  it("helper deep-sanitizes forbidden keys before display/copy", () => {
+    expect(helper).toMatch(/FORBIDDEN_KEYS/);
+    expect(helper).toMatch(/authorization/);
+    expect(helper).toMatch(/passkey/);
+    expect(helper).toMatch(/raw_payload/);
+  });
+
+  it("widget shows offline copy when local bridge unreachable", () => {
+    expect(widget).toMatch(/not reachable on localhost:8787/i);
+  });
+});

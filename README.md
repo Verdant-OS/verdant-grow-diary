@@ -76,6 +76,27 @@ Watch-mode tests:
 npx vitest
 ```
 
+### Scanner guardrail sentinel
+
+The scanner guardrail suite walks the filesystem and is the most likely
+source of environmental timeout flakes. A 5000ms slow-test sentinel
+appends offenders to `test-results/scanner-guardrail-slow-tests.jsonl`.
+
+```bash
+bun run test:scanner-guardrails        # raw scanner sentinel (vitest)
+bun run test:scanner-guardrails:ci     # CI-equivalent wrapper:
+                                       #   - deletes the stale report
+                                       #   - runs the scanner suite
+                                       #   - validates JSONL row contract
+                                       #   - fails the build if any slow
+                                       #     row was emitted
+bun run test:scanner-guardrails:clean  # local cleanup of the slow-test JSONL
+```
+
+Report path: `test-results/scanner-guardrail-slow-tests.jsonl`. See
+[`docs/testing/scanner-guardrails.md`](docs/testing/scanner-guardrails.md)
+for the full contract.
+
 ## Development workflow & safety standards
 
 Every PR that touches data access, auth, AI, the Action Queue, sensors, device

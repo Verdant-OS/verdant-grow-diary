@@ -37,6 +37,7 @@ import OperatorEcowittCanary from "./pages/OperatorEcowittCanary";
 import OperatorEcowittTentPreview from "./pages/OperatorEcowittTentPreview";
 import OperatorGeneticsImportPage from "./pages/OperatorGeneticsImportPage";
 import EcowittBridgeStatus from "./pages/EcowittBridgeStatus";
+import EcowittBridgeDebug from "./pages/EcowittBridgeDebug";
 import OneTentProofRecord from "./pages/OneTentProofRecord";
 import ActionDetail from "./pages/ActionDetail";
 import GrowLineageRepair from "./pages/GrowLineageRepair";

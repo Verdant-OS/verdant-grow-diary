@@ -46,6 +46,10 @@ export default function Sensors() {
   // be written to via RLS. The display list above may include mock tents.
   const { data: realTents = [] } = useTentRows();
   const [tentId, setTentId] = useState<string>(tents[0]?.id ?? "t1");
+  const [searchParams] = useSearchParams();
+  const urlSensorSources = parseSensorSourcesParam(
+    searchParams.get(SENSOR_SOURCES_PARAM),
+  );
   const filtered = readings.filter((r) => r.tentId === tentId);
   const latest = filtered.length > 0 ? filtered[filtered.length - 1] : null;
   const selectedTent = tents.find((t) => t.id === tentId) ?? null;

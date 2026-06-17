@@ -35,6 +35,8 @@
     "test:static-guards": "vitest run src/test/feeding-history.test.ts src/test/manual-sensor-reading-entry.test.ts src/test/photo-history.test.ts src/test/typed-watering-write-feature-flag.test.ts src/test/watering-history.test.ts",
     "test:action-detail-leakage": "vitest run src/test/action-detail-evidence-provenance-leakage.test.tsx --reporter=dot",
     "test:action-queue-evidence-leakage": "vitest run src/test/action-queue-evidence-provenance-leakage.test.ts --reporter=dot",
+    "test:sensor-source-phase3-regression": "vitest run src/test/sensor-source-summary-widget.test.tsx src/test/timeline-filter-lightbox-integration.test.tsx",
+    "check:sensor-source-phase3": "bun run typecheck && bun run test:sensor-source-phase3-regression",
     "docs:release-safety": "node scripts/assert-release-docs-safety.mjs",
     "ai-doctor:preview-safety": "node scripts/assert-ai-doctor-preview-safety.mjs",
     "precommit:ai-doctor-preview-safety": "node scripts/precommit-ai-doctor-preview-safety.mjs",

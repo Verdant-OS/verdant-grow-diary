@@ -85,4 +85,80 @@ describe("scanner-guardrails-ci JSONL contract", () => {
     expect(errors[1]).toMatch(/repo-relative/);
     expect(errors[2]).toMatch(/invalid JSON/);
   });
+
+  it("returns field-level failure details on invalid rows", () => {
+    const res = validateScannerSlowRow({ ...validRow(), file: "/abs/x.ts", thresholdMs: 3000 });
+    expect(res.ok).toBe(false);
+    const fields = (res as { failedFields: Array<{ field: string; expected: string; got: string }> })
+      .failedFields;
+    const names = fields.map((f) => f.field);
+    expect(names).toContain("file");
+    expect(names).toContain("thresholdMs");
+    const fileFail = fields.find((f) => f.field === "file")!;
+    expect(fileFail.expected).toMatch(/repo-relative/);
+    expect(fileFail.got).toContain("/abs/x.ts");
+    const thresholdFail = fields.find((f) => f.field === "thresholdMs")!;
+    expect(thresholdFail.expected).toBe(String(SCANNER_SLOW_THRESHOLD_MS));
+    expect(thresholdFail.got).toBe("3000");
+  });
+
+  it("formats a compact per-row field diff", () => {
+    const res = validateScannerSlowRow({ ...validRow(), file: "/abs/x.ts", thresholdMs: 3000 });
+    const diff = formatRowFieldDiff(
+      2,
+      (res as { failedFields: Array<{ field: string; expected: string; got: string; message: string }> })
+        .failedFields,
+    );
+    expect(diff).toContain("[scanner-guardrails] line 2 failed fields:");
+    expect(diff).toMatch(/- file: expected repo-relative/);
+    expect(diff).toMatch(/- thresholdMs: expected 5000, got 3000/);
+    // Compact — no giant payload dump.
+    for (const line of diff.split("\n")) expect(line.length).toBeLessThan(200);
+  });
+
+  it("truncates oversized values in previews", () => {
+    const huge = "x".repeat(500);
+    const preview = previewValue(huge);
+    expect(preview.length).toBeLessThanOrEqual(82);
+    expect(preview.endsWith("…")).toBe(true);
+  });
+
+  it("builds a GitHub Actions ::error annotation for the first offender", () => {
+    const row = {
+      ...validRow(),
+      suite: "my-suite",
+      test: "current repository is clean",
+      file: "src/test/foo.test.ts",
+      durationMs: 6123,
+      thresholdMs: 3000,
+    };
+    const res = validateScannerSlowRow(row);
+    const annotation = buildGithubAnnotation({
+      reportPath: "test-results/scanner-guardrail-slow-tests.jsonl",
+      lineNumber: 2,
+      row,
+      failedFields: (res as { failedFields: Array<{ field: string }> }).failedFields,
+    });
+    expect(annotation.startsWith("::error ")).toBe(true);
+    expect(annotation).toContain("file=test-results/scanner-guardrail-slow-tests.jsonl");
+    expect(annotation).toContain("line=2");
+    expect(annotation).toContain("title=Scanner guardrail slow telemetry");
+    expect(annotation).toContain("suite=my-suite");
+    expect(annotation).toContain('test="current repository is clean"');
+    expect(annotation).toContain("file=src/test/foo.test.ts");
+    expect(annotation).toContain("durationMs=6123");
+    expect(annotation).toContain("thresholdMs=3000");
+    expect(annotation).toMatch(/failedFields=[a-zA-Z,]*thresholdMs/);
+  });
+
+  it("returns empty annotation when no failed fields are given", () => {
+    expect(
+      buildGithubAnnotation({
+        reportPath: "x.jsonl",
+        lineNumber: 1,
+        row: validRow(),
+        failedFields: [],
+      }),
+    ).toBe("");
+  });
 });

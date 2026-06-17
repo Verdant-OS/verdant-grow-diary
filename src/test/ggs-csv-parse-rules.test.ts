@@ -34,7 +34,7 @@ describe("parseGgsCsvRow — happy path", () => {
     expect(r.tent_id).toBe("tent-1");
     expect(r.device_id).toBe("GGS_SOIL_001");
     expect(r.captured_at).toBe(TS);
-    expect(r.drafts).toHaveLength(2);
+    expect(r.drafts).toHaveLength(3);
     for (const d of r.drafts) {
       expect(d.source).toBe("csv");
       expect(d.raw_payload.source_app).toBe(GGS_CSV_SOURCE_APP);
@@ -45,8 +45,11 @@ describe("parseGgsCsvRow — happy path", () => {
     expect(moisture.value).toBeCloseTo(42.5);
     const ec = r.drafts.find((d) => d.metric === "ec")!;
     expect(ec.value).toBeCloseTo(0.85);
-    expect(r.skippedMetrics).toContain("soil_temp_c");
+    const soilTemp = r.drafts.find((d) => d.metric === "soil_temp_c")!;
+    expect(soilTemp.value).toBeCloseTo(22.3);
+    expect(r.skippedMetrics).toEqual([]);
   });
+
 
   it("accepts camelCase aliases", () => {
     const r = parseGgsCsvRow(

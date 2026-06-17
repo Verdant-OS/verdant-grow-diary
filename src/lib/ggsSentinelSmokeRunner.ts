@@ -122,9 +122,15 @@ export const GGS_METRIC_FRIENDLY_NAME: Record<GgsSentinelMetric, string> = {
 export function formatGgsAgeLabel(ageMs: number): string {
   if (!Number.isFinite(ageMs) || ageMs < 0) return "just now";
   const totalSec = Math.round(ageMs / 1000);
+  if (totalSec === 0) return "0m ago";
   if (totalSec < 60) return `${totalSec}s ago`;
-  const totalMin = Math.round(totalSec / 60);
-  if (totalMin < 60) return `${totalMin}m ago`;
+  const totalMin = Math.floor(totalSec / 60);
+  const remainingSec = totalSec % 60;
+  if (totalMin < 60) {
+    return remainingSec === 0
+      ? `${totalMin}m ago`
+      : `${totalMin}m ${remainingSec}s ago`;
+  }
   const hours = Math.floor(totalMin / 60);
   const mins = totalMin % 60;
   return mins === 0 ? `${hours}h ago` : `${hours}h ${mins}m ago`;

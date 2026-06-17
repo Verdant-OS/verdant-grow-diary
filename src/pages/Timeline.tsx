@@ -619,7 +619,12 @@ export default function Timeline() {
                 </div>
                 <ul className="space-y-3">
                   {group.items.map((e) => (
-                    <li key={e.id} className="glass rounded-2xl overflow-hidden animate-fade-in">
+                    <li
+                      key={e.id}
+                      id={`timeline-entry-${e.id}`}
+                      data-testid="timeline-entry"
+                      className="glass rounded-2xl overflow-hidden animate-fade-in"
+                    >
                       {e.photo_url ? (
                         (() => {
                           const idx = findTimelinePhotoIndexById(lightboxItems, e.id);

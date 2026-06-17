@@ -2,8 +2,8 @@
  * Operator: One-Tent Loop Smoke Test checklist.
  *
  * Read-only, static checklist. No Supabase reads/writes, no rpc, no
- * functions.invoke, no AI calls, no alert writes, no Action Queue writes,
- * no device control, no POST to the local bridge, no fake live data.
+ * edge function invocations, no AI calls, no alert writes, no Action Queue
+ * writes, no device control, no POST to the local bridge, no fake live data.
  *
  * Mirrors docs/one-tent-loop-smoke-test.md.
  */

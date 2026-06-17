@@ -88,6 +88,95 @@ const STATE_STYLES: Record<
   },
 };
 
+interface QuickActionButtonSpec {
+  id: "fast-add-photo" | "add-watering" | "add-feeding" | "add-sensor-snapshot";
+  label: string;
+  emptyCopy: string;
+  handler: (() => void) | undefined;
+}
+
+function QuickActionsRow({
+  flags,
+  actions,
+}: {
+  flags: import("@/lib/aiDoctorReadinessViewModel").AiDoctorContextEvidenceFlags;
+  actions: AiDoctorReadinessQuickActions | undefined;
+}) {
+  const items: QuickActionButtonSpec[] = [];
+  if (!flags.hasRecentPhoto) {
+    items.push({
+      id: "fast-add-photo",
+      label: "Fast Add Photo",
+      emptyCopy: QUICK_ACTION_COPY.photo,
+      handler: actions?.onFastAddPhoto,
+    });
+  }
+  if (!flags.hasRecentWatering) {
+    items.push({
+      id: "add-watering",
+      label: "Add Watering",
+      emptyCopy: QUICK_ACTION_COPY.watering,
+      handler: actions?.onAddWatering,
+    });
+  }
+  if (!flags.hasRecentFeeding) {
+    items.push({
+      id: "add-feeding",
+      label: "Add Feeding",
+      emptyCopy: QUICK_ACTION_COPY.feeding,
+      handler: actions?.onAddFeeding,
+    });
+  }
+  // Sensor snapshot button is always offered when there is no current
+  // sensor evidence handler wired; renders disabled when no route exists.
+  items.push({
+    id: "add-sensor-snapshot",
+    label: "Add Sensor Snapshot",
+    emptyCopy: QUICK_ACTION_COPY.sensor,
+    handler: actions?.onAddSensorSnapshot,
+  });
+
+  if (items.length === 0) return null;
+
+  return (
+    <div
+      data-testid="ai-doctor-context-readiness-panel-quick-actions"
+      className="space-y-1"
+    >
+      <h3 className="text-xs font-medium text-muted-foreground">
+        Next evidence to add
+      </h3>
+      <ul className="flex flex-wrap gap-1.5">
+        {items.map((item) => {
+          const disabled = typeof item.handler !== "function";
+          return (
+            <li key={item.id}>
+              <button
+                type="button"
+                disabled={disabled}
+                aria-disabled={disabled ? "true" : "false"}
+                onClick={disabled ? undefined : item.handler}
+                title={disabled ? QUICK_ACTION_COPY.disabled : item.emptyCopy}
+                data-testid={`ai-doctor-context-readiness-panel-quick-action-${item.id}`}
+                data-quick-action={item.id}
+                data-disabled={disabled ? "true" : "false"}
+                className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs ${
+                  disabled
+                    ? "border-border/40 bg-muted/20 text-muted-foreground opacity-60 cursor-not-allowed"
+                    : "border-emerald-500/30 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/20"
+                }`}
+              >
+                {item.label}
+                {disabled ? " · soon" : ""}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 export default function AiDoctorContextReadinessPanel({
   context,
   openAlertsCount,

@@ -13,8 +13,9 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import EcowittBridgeDebug from "@/pages/EcowittBridgeDebug";
 
+const toastSpy = vi.fn();
 vi.mock("@/hooks/use-toast", () => ({
-  useToast: () => ({ toast: vi.fn() }),
+  useToast: () => ({ toast: toastSpy }),
 }));
 
 const LEAKY_STATUS = {

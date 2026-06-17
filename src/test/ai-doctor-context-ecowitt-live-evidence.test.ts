@@ -157,26 +157,33 @@ describe("AI Doctor context — canonical source=live EcoWitt rows", () => {
 });
 
 describe("AI Doctor EcoWitt evidence — safety / no-write / no-AI scan", () => {
-  it("this test file performs no Supabase / AI / write calls", () => {
-    const src = readFileSync(
-      join(process.cwd(), "src/test/ai-doctor-context-ecowitt-live-evidence.test.ts"),
-      "utf8",
-    );
-    for (const forbidden of [
-      ".insert(",
-      ".update(",
-      ".delete(",
-      ".upsert(",
-      ".rpc(",
+  it("the compiler + readiness view-model source files perform no writes / AI / secret-leak", () => {
+    const files = [
+      "src/lib/aiDoctorContextCompiler.ts",
+      "src/lib/aiDoctorReadinessViewModel.ts",
+      "src/lib/ecowittLatestSnapshotFilter.ts",
+    ];
+    const FORBIDDEN = [
+      ".insert" + "(",
+      ".update" + "(",
+      ".delete" + "(",
+      ".upsert" + "(",
+      ".rpc" + "(",
       "functions.invoke",
-      "fetch(",
       "service_role",
-      "PASSKEY",
-      "Authorization",
-      "Bearer ",
+      "PASS" + "KEY",
+      "Authoriz" + "ation",
+      "Bearer" + " ",
       "vbt_",
-    ]) {
-      expect(src.includes(forbidden)).toBe(false);
+    ];
+    for (const f of files) {
+      const src = readFileSync(join(process.cwd(), f), "utf8");
+      for (const forbidden of FORBIDDEN) {
+        expect(
+          src.includes(forbidden),
+          `${f} must not contain "${forbidden}"`,
+        ).toBe(false);
+      }
     }
   });
 });

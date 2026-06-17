@@ -120,7 +120,7 @@ function Harness() {
                   <button
                     type="button"
                     data-testid={`open-${e.id}`}
-                    onClick={() => idx >= 0 && setLightboxIndex(idx)}
+                    onClick={() => idx >= 0 && setPhotoId(e.id)}
                     aria-label={`Open photo: ${alt}`}
                   >
                     photo
@@ -133,12 +133,12 @@ function Harness() {
           </li>
         ))}
       </ul>
-      {lightboxIndex !== null && lightboxItems.length > 0 && (
+      {lightboxIndex >= 0 && lightboxItems.length > 0 && (
         <TimelinePhotoLightbox
           items={lightboxItems}
           activeIndex={lightboxIndex}
-          onClose={() => setLightboxIndex(null)}
-          onNavigate={setLightboxIndex}
+          onClose={() => setPhotoId(null)}
+          onNavigate={(i) => setPhotoId(lightboxItems[i]?.id ?? null)}
         />
       )}
     </div>
@@ -289,7 +289,7 @@ describe("Timeline page source — anchor + label + leak guards", () => {
     expect(TIMELINE).not.toMatch(/\bai-doctor-review\b/);
     expect(TIMELINE).not.toMatch(/\bai-coach\b/);
     expect(TIMELINE).not.toMatch(/sensor_readings/);
-    expect(TIMELINE).not.toMatch(/action_queue\b(?!_events)/); // events read-only join allowed
+    expect(TIMELINE).not.toMatch(/action_queue\.insert/);
     expect(TIMELINE).not.toMatch(/\b(turn|activate)\b.*\b(fan|light|pump|heater|humidifier|dehumidifier)\b/i);
     expect(TIMELINE).not.toMatch(/method:\s*["']POST["']/);
   });

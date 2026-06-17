@@ -65,11 +65,12 @@ describe("sensor-ingest-webhook CORS contract", () => {
   it("every json() error response receives CORS headers via the helper", () => {
     // The helper spreads buildCorsHeaders into the response headers.
     expect(SRC).toMatch(/headers:\s*\{\s*\.\.\.buildCorsHeaders\(req\)/);
-    // Every json(...) call passes `req` so headers are attached.
-    const jsonCalls = SRC.match(/\bjson\(([^,)]+),/g) ?? [];
+    // Every json(...) call site (excluding the function declaration) passes
+    // `req` as the first argument so CORS headers are attached.
+    const jsonCalls = SRC.match(/\breturn\s+json\(([^,)]+),/g) ?? [];
     expect(jsonCalls.length).toBeGreaterThan(5);
     for (const call of jsonCalls) {
-      expect(call.trim()).toMatch(/^json\(\s*req\s*,/);
+      expect(call).toMatch(/return\s+json\(\s*req\s*,/);
     }
   });
 

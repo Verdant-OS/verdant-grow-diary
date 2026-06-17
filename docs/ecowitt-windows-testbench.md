@@ -360,6 +360,17 @@ cd tools\ecowitt-testbench
 .\start-listener-windows.ps1
 ```
 
+For deeper path debugging, run preflight in diagnostics mode:
+
+```powershell
+.\tools\ecowitt-testbench\preflight-windows.ps1 -Diagnostics
+```
+
+`-Diagnostics` prints safe path detection only (PSScriptRoot, candidate
+start paths, detected repo root, detected testbench path, missing
+files). It does **not** read `.env`, does **not** start the listener,
+and does **not** forward any data.
+
 ## Files
 
 ```

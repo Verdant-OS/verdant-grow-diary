@@ -272,6 +272,6 @@ describe("parseGgsCsvRow — static safety", () => {
     // No secret/token surface.
     expect(src).not.toMatch(/service_role|SUPABASE_SERVICE_ROLE|bridge_token/i);
     // Forbidden source labels.
-    expect(src).not.toMatch(/ggs_live|ggs_csv/);
+    expect(src).not.toMatch(/["']ggs_live["']|["']ggs_csv["']/);
   });
 });

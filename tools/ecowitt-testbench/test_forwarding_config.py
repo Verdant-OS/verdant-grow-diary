@@ -39,11 +39,18 @@ def _reset_stats() -> None:
         "success_count",
         "failure_count",
         "blocked_count",
+        "retry_count",
     ):
         FORWARD_STATS[k] = 0
     FORWARD_STATS["last_status"] = None
     FORWARD_STATS["last_at"] = None
     FORWARD_STATS["last_error"] = None
+    FORWARD_STATS["last_retry_error"] = None
+    FORWARD_STATS["last_retry_at"] = None
+    FORWARD_STATS["last_retryable_status"] = None
+    FORWARD_STATS["last_forward_response_error"] = None
+    FORWARD_STATS["last_forward_response_classification"] = None
+    FORWARD_STATS["last_forward_response_message"] = None
 
 
 class TentIdValidationTests(unittest.TestCase):

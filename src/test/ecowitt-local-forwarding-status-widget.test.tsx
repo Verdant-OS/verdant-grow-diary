@@ -262,9 +262,10 @@ describe("EcowittLocalForwardingStatusWidget", () => {
   it("shows banner on failed forwarding status with status/classification/reason and next step", async () => {
     const failedWithReason = {
       ...FAILED_STATUS,
+      // Classification must match the storage-insert branch so the
+      // insert-reason mapping rule fires.
+      last_forward_response_classification: "storage_insert_failed",
       last_forward_response_reason: "insert_source_constraint_failed",
-      recommended_next_step:
-        "Confirm the stored canonical source remap to \"live\" is deployed.",
       generated_at: "2026-06-17T05:40:30Z",
       malformed_line_count: 0,
       latest_metrics: {
@@ -281,7 +282,7 @@ describe("EcowittLocalForwardingStatusWidget", () => {
     expect(screen.getByTestId("ecowitt-local-forwarding-banner-status")).toHaveTextContent("400");
     expect(
       screen.getByTestId("ecowitt-local-forwarding-banner-classification"),
-    ).toHaveTextContent("payload_shape_mismatch");
+    ).toHaveTextContent("storage_insert_failed");
     expect(
       screen.getByTestId("ecowitt-local-forwarding-banner-reason"),
     ).toHaveTextContent("insert_source_constraint_failed");

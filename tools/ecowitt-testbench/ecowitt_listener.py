@@ -691,6 +691,7 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
     FORWARD_STATS["last_forward_response_error"] = None
     FORWARD_STATS["last_forward_response_classification"] = None
     FORWARD_STATS["last_forward_response_message"] = None
+    FORWARD_STATS["last_forward_response_reason"] = None
 
     import time as _time
 

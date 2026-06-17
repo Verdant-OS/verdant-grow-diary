@@ -557,10 +557,12 @@ class InsertFailedReasonCaptureTests(unittest.TestCase):
         if reason is not None:
             body["reason"] = reason
         body.update(extra_body)
-        with mock.patch.dict(os.environ, _full_env(), clear=False):
-            with mock.patch("ecowitt_listener.requests") as fake_requests:
-                fake_requests.post.return_value = _FakeResp(400, body)
-                maybe_forward({"captured_at": "x", "metrics": {"temp_f": 70.0}})
+        env_ctx = mock.patch.dict(os.environ, _full_env(), clear=False)
+        env_ctx.start()
+        self.addCleanup(env_ctx.stop)
+        with mock.patch("ecowitt_listener.requests") as fake_requests:
+            fake_requests.post.return_value = _FakeResp(400, body)
+            maybe_forward({"captured_at": "x", "metrics": {"temp_f": 70.0}})
 
     def test_summarize_captures_known_reason(self):
         r = summarize_forward_response(

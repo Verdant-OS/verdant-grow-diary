@@ -113,6 +113,7 @@ Deno.test({
   assert(res.status === 400 || res.status === 401 || res.status === 503);
   corsHeaderAssertions(res);
   await assertBodyHasNoSecrets(res);
+  },
 });
 
 Deno.test("disallowed origin still receives CORS headers (falls back to canonical origin)", async () => {

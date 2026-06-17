@@ -779,12 +779,12 @@ export default function Timeline() {
         onSaved={(patch) => setEntries((rows) => rows.map((r) => r.id === patch.id ? { ...r, ...patch } as Entry : r))}
         onDeleted={(id) => setEntries((rows) => rows.filter((r) => r.id !== id))}
       />
-      {lightboxIndex !== null && lightboxItems.length > 0 && (
+      {lightboxIndex >= 0 && lightboxItems.length > 0 && (
         <TimelinePhotoLightbox
           items={lightboxItems}
           activeIndex={lightboxIndex}
-          onClose={() => setLightboxIndex(null)}
-          onNavigate={(i) => setLightboxIndex(i)}
+          onClose={() => setLightboxPhotoId(null)}
+          onNavigate={(i) => setLightboxPhotoId(lightboxItems[i]?.id ?? null)}
         />
       )}
     </div>

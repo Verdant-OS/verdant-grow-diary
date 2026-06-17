@@ -210,7 +210,7 @@ export default function EcowittLocalForwardingStatusWidget({
             disabled={busy}
             data-testid="ecowitt-local-forwarding-refresh"
           >
-            Refresh
+            {busy ? "Refreshing…" : "Refresh bridge status"}
           </Button>
           <Button
             size="sm"

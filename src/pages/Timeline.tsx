@@ -803,6 +803,25 @@ export default function Timeline() {
           onNavigate={(i) => setLightboxPhotoId(lightboxItems[i]?.id ?? null)}
         />
       )}
+      <TimelineEvidenceDetailDrawer
+        open={!!detailEntryId}
+        viewModel={(() => {
+          const row = entries.find((r) => r.id === detailEntryId);
+          return row
+            ? buildTimelineEvidenceDetailViewModel({
+                id: row.id,
+                note: row.note,
+                photo_url: row.photo_url,
+                stage: row.stage,
+                entry_at: row.entry_at,
+                plant_id: row.plant_id,
+                tent_id: row.tent_id,
+                details: row.details,
+              })
+            : null;
+        })()}
+        onClose={() => setDetailEntryId(null)}
+      />
     </div>
   );
 }

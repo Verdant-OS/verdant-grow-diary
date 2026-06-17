@@ -324,7 +324,7 @@ report** safe to share with a developer. It includes:
 - `ingest_url_configured`, `bridge_token_configured`
 - `tent_id_configured`, `tent_id_valid` (booleans only — never the raw UUID)
 - `last_forward_status`, `last_forward_error`
-- `last_forward_response_error`, `last_forward_response_classification`, `last_forward_response_message`
+- `last_forward_response_error`, `last_forward_response_classification`, `last_forward_response_message`, `last_forward_response_reason`
 - `retry_count`, `last_retry_error`, `max_retry_attempts`
 - `latest_metrics` (source, vendor, metrics, captured_at — no raw payload)
 - `malformed_line_count`

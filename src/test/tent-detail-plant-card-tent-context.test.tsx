@@ -20,7 +20,14 @@ vi.mock("@/hooks/useGrowData", async (importOriginal) => {
   return {
     ...actual,
     useGrowTent: () => ({
-      data: { id: "tent-77", name: "Tent 77", growId: "grow-1" },
+      data: {
+        id: "tent-77",
+        name: "Tent 77",
+        growId: "grow-1",
+        light: { on: true, schedule: "18/6", wattage: 400 },
+        ventilation: { fanOn: true, exhaustOn: true, intakeOn: true },
+        currentStage: "veg",
+      },
       isLoading: false,
       isError: false,
     }),

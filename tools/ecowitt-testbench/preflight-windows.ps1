@@ -12,6 +12,12 @@
 #
 # Usage (from repo root OR from tools/ecowitt-testbench):
 #   .\preflight-windows.ps1
+#   .\preflight-windows.ps1 -Diagnostics
+
+[CmdletBinding()]
+param(
+    [switch]$Diagnostics
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -36,6 +42,7 @@ function Find-RepoRoot {
             $hasPkg   = Test-Path -LiteralPath (Join-Path $dir "package.json")
             $hasTools = Test-Path -LiteralPath (Join-Path $dir "tools\ecowitt-testbench")
             if (($hasGit -or $hasPkg) -and $hasTools) {
+                Write-Verbose "[preflight] repo root match at: $dir"
                 return $dir
             }
             $parent = Split-Path -Parent $dir
@@ -56,6 +63,11 @@ if ([string]::IsNullOrWhiteSpace($scriptDir)) {
     }
 }
 $scriptDir = Get-SafePath $scriptDir
+$scriptPath = $null
+if ($scriptDir) {
+    $candidate = Join-Path $scriptDir "preflight-windows.ps1"
+    if (Test-Path -LiteralPath $candidate) { $scriptPath = $candidate }
+}
 
 $cwd = Get-SafePath ((Get-Location).Path)
 
@@ -63,7 +75,14 @@ $candidates = @()
 if ($scriptDir) { $candidates += $scriptDir }
 if ($cwd)       { $candidates += $cwd }
 
+Write-Verbose "[preflight] candidate start paths: $($candidates -join '; ')"
+
 $repoRoot = Find-RepoRoot -StartPaths $candidates
+$testbenchPath = $null
+if ($repoRoot) {
+    $tb = Join-Path $repoRoot "tools\ecowitt-testbench"
+    if (Test-Path -LiteralPath $tb) { $testbenchPath = $tb }
+}
 
 Write-Host "[preflight] current directory: $cwd"
 Write-Host "[preflight] script directory:  $scriptDir"
@@ -71,6 +90,19 @@ if ($repoRoot) {
     Write-Host "[preflight] detected repo root: $repoRoot" -ForegroundColor Green
 } else {
     Write-Host "[preflight] detected repo root: (none)" -ForegroundColor Yellow
+}
+
+if ($Diagnostics) {
+    Write-Host ""
+    Write-Host "=== Diagnostics (safe paths only) ===" -ForegroundColor Cyan
+    Write-Host "PSScriptRoot:         $PSScriptRoot"
+    Write-Host "Script path:          $scriptPath"
+    Write-Host "Current directory:    $cwd"
+    Write-Host "Script directory:     $scriptDir"
+    Write-Host "Candidate starts:     $($candidates -join '; ')"
+    Write-Host "Detected repo root:   $repoRoot"
+    Write-Host "Detected testbench:   $testbenchPath"
+    Write-Host "(no .env, tokens, Authorization headers, or payloads are read or printed)"
 }
 
 # Detect old standalone folder pattern (safe regex on plain strings).
@@ -83,11 +115,6 @@ foreach ($p in @($cwd, $scriptDir)) {
     if ($p -match '(?i)C:\\Users\\[^\\]+\\verdant-testbench($|\\)') {
         $looksLikeOldStandalone = $true
     }
-}
-if ($looksLikeOldStandalone) {
-    Write-Host ""
-    Write-Host "This looks like the old standalone testbench folder, not the repo-integrated kit." -ForegroundColor Yellow
-    Write-Host "Expected path ends with: verdant-grow-diary\tools\ecowitt-testbench" -ForegroundColor Yellow
 }
 
 $missing = @()
@@ -108,6 +135,7 @@ if (-not $repoRoot) {
         "setup-windows.ps1",
         "start-listener-windows.ps1",
         "verify-testbench-windows.ps1",
+        "run-testbench-windows.ps1",
         "preflight-windows.ps1"
     )
     foreach ($f in $expectedKit) {
@@ -128,14 +156,51 @@ if (-not $repoRoot) {
 
 if ($missing.Count -gt 0) {
     Write-Host ""
-    Write-Host "[preflight] MISSING files:" -ForegroundColor Red
+    Write-Host "EcoWitt testbench preflight failed." -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Current directory:"
+    Write-Host "  $cwd"
+    Write-Host ""
+    Write-Host "Detected repo root:"
+    if ($repoRoot) { Write-Host "  $repoRoot" } else { Write-Host "  (not found)" }
+    Write-Host ""
+    Write-Host "Expected repo-relative paths:"
+    Write-Host "  tools/ecowitt-testbench/.env.example"
+    Write-Host "  tools/ecowitt-testbench/ecowitt_listener.py"
+    Write-Host "  tools/ecowitt-testbench/requirements.txt"
+    Write-Host "  tools/ecowitt-testbench/send-demo-payload-windows.ps1"
+    Write-Host "  tools/ecowitt-testbench/setup-windows.ps1"
+    Write-Host "  tools/ecowitt-testbench/start-listener-windows.ps1"
+    Write-Host "  tools/ecowitt-testbench/verify-testbench-windows.ps1"
+    Write-Host "  tools/ecowitt-testbench/run-testbench-windows.ps1"
+    Write-Host "  tools/ecowitt-testbench/preflight-windows.ps1"
+    Write-Host "  docs/ecowitt-windows-testbench.md"
+    Write-Host "  src/test/ecowitt-windows-testbench-static-safety.test.ts"
+    Write-Host "  .github/workflows/ecowitt-testbench-safety.yml"
+    Write-Host ""
+    Write-Host "Missing:" -ForegroundColor Red
     foreach ($m in $missing) { Write-Host "  - $m" -ForegroundColor Red }
     Write-Host ""
     Write-Host "Recommended commands:" -ForegroundColor Yellow
+    Write-Host '  cd "C:\Users\G7\OneDrive\Documents\GitHub\verdant-grow-diary"'
     Write-Host "  git status"
     Write-Host "  git pull origin verdant-grow-diary"
     Write-Host "  dir tools\ecowitt-testbench"
+    Write-Host "  .\tools\ecowitt-testbench\preflight-windows.ps1 -Diagnostics"
+
+    if ($looksLikeOldStandalone) {
+        Write-Host ""
+        Write-Host "This looks like the old standalone testbench folder, not the repo-integrated kit." -ForegroundColor Yellow
+        Write-Host "Use the Verdant repo path that ends with:" -ForegroundColor Yellow
+        Write-Host "  verdant-grow-diary\tools\ecowitt-testbench" -ForegroundColor Yellow
+    }
     exit 1
+}
+
+if ($looksLikeOldStandalone) {
+    Write-Host ""
+    Write-Host "This looks like the old standalone testbench folder, not the repo-integrated kit." -ForegroundColor Yellow
+    Write-Host "Expected path ends with: verdant-grow-diary\tools\ecowitt-testbench" -ForegroundColor Yellow
 }
 
 Write-Host ""

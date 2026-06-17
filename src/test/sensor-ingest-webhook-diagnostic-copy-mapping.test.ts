@@ -44,10 +44,10 @@ describe("SANITIZED_WEBHOOK_ERROR_COPY — every webhook code has copy", () => {
 });
 
 describe("classifySensorIngestTestResult — copy/category coverage", () => {
-  it("401 unauthorized is auth_problem with reason echoed (sanitized)", () => {
+  it("401 unauthorized is auth_problem with sanitized copy", () => {
     const r = classifySensorIngestTestResult({ status: 401, body: { error: "unauthorized" } });
     expect(r.category).toBe("auth_problem");
-    expect(r.detail).toContain("unauthorized");
+    expect(r.detail.toLowerCase()).toContain("bridge token");
     expect(r.corsWorking).toBe(true);
   });
 

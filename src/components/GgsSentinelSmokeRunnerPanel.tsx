@@ -160,6 +160,36 @@ export default function GgsSentinelSmokeRunnerPanel() {
               ))}
             </ul>
 
+            {evaluation.metricFreshness.length > 0 && (
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="text-sm font-medium">Freshness guidance</h3>
+                  <span className="text-xs text-muted-foreground">
+                    Freshness window: {formatGgsWindowLabel(SPIDER_FARMER_GGS_STALE_MS)}
+                  </span>
+                </div>
+                <ul className="divide-y rounded-md border text-sm">
+                  {evaluation.metricFreshness.map((f) => (
+                    <li key={f.metric} className="grid grid-cols-1 gap-1 px-3 py-2 md:grid-cols-[1fr_auto] md:items-center">
+                      <div>
+                        <div className="font-medium">
+                          {GGS_METRIC_FRIENDLY_NAME[f.metric]}{" "}
+                          <span className="text-xs text-muted-foreground">({f.metric})</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {f.capturedAt ? `Captured ${f.ageLabel} · ${f.capturedAt}` : "No recent row"}
+                        </div>
+                        <div className="text-xs">{f.nextActionLabel}</div>
+                      </div>
+                      <FreshnessBadge freshness={f} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+
+
             {evaluation.safeMetrics.length > 0 && (
               <div>
                 <h3 className="mb-2 text-sm font-medium">Latest safe metric summary</h3>

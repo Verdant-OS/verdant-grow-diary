@@ -65,7 +65,7 @@ describe("filterTimelineEvidenceRows + sensorSources", () => {
     row("manual", { sensor_snapshot: { temp: 22 } }),
     row("csv", { sensor_snapshot: { source: "csv" } }),
     row("demo", { sensor_snapshot: { source: "demo" } }),
-    row("invalid", { sensor_snapshot: { source: "bogus" } }),
+    row("invalid", { sensor_snapshot: { source: "invalid" } }),
     row("note", { event_type: "note" }),
   ];
 
@@ -84,7 +84,7 @@ describe("filterTimelineEvidenceRows + sensorSources", () => {
     expect(out.map((r) => r.id).sort()).toEqual(["csv", "manual"]);
   });
 
-  it("invalid filter matches missing/unknown sources", () => {
+  it("invalid filter matches explicit invalid source", () => {
     const out = filterTimelineEvidenceRows(rows, { sensorSources: ["invalid"] });
     expect(out.map((r) => r.id)).toEqual(["invalid"]);
   });

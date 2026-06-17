@@ -123,6 +123,61 @@ network call.
 - It will not trigger alerts, Action Queue writes, AI calls, or device
   control.
 
+## Curl checks without PowerShell scripts
+
+These are local-only checks. They never need a bridge token, and they
+never forward to Verdant. Do **not** paste real `vbt_…` tokens into curl
+commands. Keep test payloads on `source="demo"`. Use forwarding only
+after local payloads look correct.
+
+Health check:
+
+```
+curl http://localhost:8787/health
+```
+
+Demo GET payload:
+
+```
+curl "http://localhost:8787/ecowitt?temp1f=77.4&humidity1=58&soilmoisture1=33&co2=721"
+```
+
+Debug raw log tail (newest entries last; sanitized; local-only):
+
+```
+curl "http://localhost:8787/debug/raw-log-tail"
+```
+
+Debug raw log tail with custom line count (clamped to 1..50):
+
+```
+curl "http://localhost:8787/debug/raw-log-tail?lines=5"
+```
+
+Optional POST JSON payload:
+
+```
+curl -X POST "http://localhost:8787/ecowitt" \
+  -H "Content-Type: application/json" \
+  -d "{\"temp1f\":\"77.4\",\"humidity1\":\"58\",\"soilmoisture1\":\"33\",\"co2\":\"721\"}"
+```
+
+Windows-friendly note: use `curl.exe` explicitly in PowerShell so the
+built-in `curl` alias for `Invoke-WebRequest` doesn't reinterpret args:
+
+```
+curl.exe "http://localhost:8787/health"
+curl.exe "http://localhost:8787/debug/raw-log-tail?lines=5"
+```
+
+The `/debug/raw-log-tail` endpoint:
+
+- only responds to local loopback callers (`127.0.0.1`, `::1`); LAN
+  callers get HTTP 403,
+- redacts Authorization headers, bearer tokens, `vbt_…` tokens,
+  JWT-shaped values, and common secret field names before returning,
+- is read-only and never forwards to Verdant or writes to Supabase.
+
 ## Files
 
 ```

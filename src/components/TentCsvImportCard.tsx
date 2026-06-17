@@ -656,6 +656,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
             tentOptions={tentOptions}
             growId={growId ?? undefined}
             onSave={handleXlsxSave}
+            onViewImportedHistory={viewImportedHistoryAction.onClick}
           />
 
         </div>

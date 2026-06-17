@@ -160,7 +160,7 @@ export default function Timeline() {
   const [plantFilter, setPlantFilter] = useState("");
   const [tentFilter, setTentFilter] = useState("");
   const [eventTypeFilter, setEventTypeFilter] = useState("");
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
 
   async function load() {
     if (!user || !activeGrowId) {
@@ -280,18 +280,20 @@ export default function Timeline() {
   }
 
   // Lightbox navigation list derived from currently visible (filtered)
-  // entries. Pure helper, no writes. Closing the lightbox when the
-  // backing list shrinks below the active index keeps navigation safe.
+  // entries. Pure helper, no writes. The active photo is tracked by id so
+  // filter changes that hide or reorder the active photo auto-close or
+  // re-align navigation without pointing at the wrong item.
   const lightboxItems = useMemo(
     () => buildTimelinePhotoLightboxList(filtered),
     [filtered],
   );
+  const lightboxIndex = useMemo(
+    () => findTimelinePhotoIndexById(lightboxItems, lightboxPhotoId),
+    [lightboxItems, lightboxPhotoId],
+  );
   useEffect(() => {
-    if (lightboxIndex === null) return;
-    if (lightboxIndex < 0 || lightboxIndex >= lightboxItems.length) {
-      setLightboxIndex(null);
-    }
-  }, [lightboxItems, lightboxIndex]);
+    if (lightboxPhotoId !== null && lightboxIndex < 0) setLightboxPhotoId(null);
+  }, [lightboxPhotoId, lightboxIndex]);
 
   // Merge `grow_events` (Quick Log v2 manual saves) into the raw entries
   // passed to the Recent Quick Logs panel so just-saved entries surface at
@@ -619,7 +621,12 @@ export default function Timeline() {
                 </div>
                 <ul className="space-y-3">
                   {group.items.map((e) => (
-                    <li key={e.id} className="glass rounded-2xl overflow-hidden animate-fade-in">
+                    <li
+                      key={e.id}
+                      id={`timeline-entry-${e.id}`}
+                      data-testid="timeline-entry"
+                      className="glass rounded-2xl overflow-hidden animate-fade-in"
+                    >
                       {e.photo_url ? (
                         (() => {
                           const idx = findTimelinePhotoIndexById(lightboxItems, e.id);
@@ -628,7 +635,7 @@ export default function Timeline() {
                           return (
                             <button
                               type="button"
-                              onClick={() => { if (idx >= 0) setLightboxIndex(idx); }}
+                              onClick={() => { if (idx >= 0) setLightboxPhotoId(e.id); }}
                               aria-label={`Open photo: ${alt}`}
                               data-testid="timeline-photo-open"
                               className="block w-full focus:outline-none focus:ring-2 focus:ring-primary/60"
@@ -772,12 +779,12 @@ export default function Timeline() {
         onSaved={(patch) => setEntries((rows) => rows.map((r) => r.id === patch.id ? { ...r, ...patch } as Entry : r))}
         onDeleted={(id) => setEntries((rows) => rows.filter((r) => r.id !== id))}
       />
-      {lightboxIndex !== null && lightboxItems.length > 0 && (
+      {lightboxIndex >= 0 && lightboxItems.length > 0 && (
         <TimelinePhotoLightbox
           items={lightboxItems}
           activeIndex={lightboxIndex}
-          onClose={() => setLightboxIndex(null)}
-          onNavigate={(i) => setLightboxIndex(i)}
+          onClose={() => setLightboxPhotoId(null)}
+          onNavigate={(i) => setLightboxPhotoId(lightboxItems[i]?.id ?? null)}
         />
       )}
     </div>

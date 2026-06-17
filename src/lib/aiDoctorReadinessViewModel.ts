@@ -90,6 +90,17 @@ export const AI_DOCTOR_CONFIDENCE_CLASS_COPY: Record<
 });
 
 /**
+ * Honest provenance copy for fields that are not (yet) available on the
+ * Plant Detail data source. The panel renders these alongside the
+ * unknown flag so the grower understands "not available from profile
+ * source" vs. "you forgot to fill it in". No schema is implied.
+ */
+export const AI_DOCTOR_UNKNOWN_PROVENANCE_COPY = Object.freeze({
+  medium: "Medium is not available on this plant profile yet.",
+  pot_size: "Pot size is not available on this plant profile yet.",
+});
+
+/**
  * Evidence flags derived purely from existing AI Doctor context fields.
  * No caller-supplied extras: watering / feeding / photo / unknown
  * stage / unknown medium / unknown pot size all come from the context

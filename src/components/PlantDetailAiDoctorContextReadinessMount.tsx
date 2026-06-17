@@ -32,6 +32,19 @@ export interface PlantDetailAiDoctorContextReadinessMountProps {
   plantName?: string | null;
   strain?: string | null;
   stage?: string | null;
+  /**
+   * Optional pass-through for growing medium. The Plant Detail data
+   * source (`useGrowPlant` / `plants` table) does NOT yet expose this
+   * field — callers may thread it in when a future profile/metadata
+   * source provides it. Never inferred from notes / strain / freeform.
+   */
+  medium?: string | null;
+  /**
+   * Optional pass-through for container / pot size. Same provenance
+   * rules as `medium` — null when the underlying data source has no
+   * value to surface.
+   */
+  potSize?: string | null;
 }
 
 function FallbackShell({
@@ -59,6 +72,8 @@ export default function PlantDetailAiDoctorContextReadinessMount({
   plantName,
   strain,
   stage,
+  medium,
+  potSize,
 }: PlantDetailAiDoctorContextReadinessMountProps) {
   const recentActivity = usePlantRecentActivity(plantId);
   const manualLogs = usePlantManualSensorLogs(plantId);
@@ -74,8 +89,12 @@ export default function PlantDetailAiDoctorContextReadinessMount({
       stage: stage ?? null,
       grow_id: growId,
       tent_id: tentId,
+      // Optional pass-through; the compiler normalizes blanks → null.
+      // No inference: undefined stays unknown on the context payload.
+      medium: medium ?? null,
+      pot_size: potSize ?? null,
     }),
-    [plantId, plantName, strain, stage, growId, tentId],
+    [plantId, plantName, strain, stage, growId, tentId, medium, potSize],
   );
 
   const built = useMemo(() => {

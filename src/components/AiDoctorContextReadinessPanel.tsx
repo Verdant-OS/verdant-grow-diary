@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import {
   buildAiDoctorReadinessView,
+  AI_DOCTOR_UNKNOWN_PROVENANCE_COPY,
   type AiDoctorReadinessState,
 } from "@/lib/aiDoctorReadinessViewModel";
 import type { AiDoctorContext } from "@/lib/aiDoctorEngine";
@@ -256,6 +257,27 @@ export default function AiDoctorContextReadinessPanel({
       </p>
 
       <QuickActionsRow flags={view.evidenceFlags} actions={quickActions} />
+
+      {view.evidenceFlags.hasUnknownMedium ||
+      view.evidenceFlags.hasUnknownPotSize ? (
+        <ul
+          data-testid="ai-doctor-context-readiness-panel-profile-provenance"
+          className="list-disc pl-4 space-y-0.5 text-[11px] text-muted-foreground"
+        >
+          {view.evidenceFlags.hasUnknownMedium ? (
+            <li data-testid="ai-doctor-context-readiness-panel-medium-unavailable">
+              {AI_DOCTOR_UNKNOWN_PROVENANCE_COPY.medium}
+            </li>
+          ) : null}
+          {view.evidenceFlags.hasUnknownPotSize ? (
+            <li data-testid="ai-doctor-context-readiness-panel-pot-size-unavailable">
+              {AI_DOCTOR_UNKNOWN_PROVENANCE_COPY.pot_size}
+            </li>
+          ) : null}
+        </ul>
+      ) : null}
+
+
 
 
 

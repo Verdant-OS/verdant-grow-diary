@@ -578,7 +578,11 @@ export default function Timeline() {
         : entries.length === 0 ? (
           <Empty title="No entries yet" desc="Tap the + button to log your first photo and note." />
         ) : filtered.length === 0 ? (
-          <Empty title="No matching entries" desc="Try a different stage or event filter." />
+          <Empty
+            title={evidenceActive ? TIMELINE_EVIDENCE_EMPTY_TITLE : "No matching entries"}
+            desc={evidenceActive ? TIMELINE_EVIDENCE_EMPTY_DESC : "Try a different stage or event filter."}
+          />
+
         ) : (
           <div className="space-y-5">
             {groupedByStage.map((group, gi) => (

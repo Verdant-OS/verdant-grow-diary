@@ -271,10 +271,14 @@ export function evaluateGgsSentinelReadiness(
       state: "BLOCKED_NO_GGS_ROWS",
       checks,
       safeMetrics: [],
+      metricFreshness: GGS_SENTINEL_METRICS.map((m) =>
+        buildFreshness(m, null, now, staleMs),
+      ),
       snapshot: summarizeSnapshot(input.snapshot, now),
       passed: false,
     };
   }
+
 
   const hasSoilTemp = latestByMetric.has("soil_temp_c");
   checks.push(

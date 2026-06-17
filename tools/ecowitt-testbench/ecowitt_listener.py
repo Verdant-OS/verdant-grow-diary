@@ -657,35 +657,70 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
     FORWARD_STATS["last_forward_response_error"] = None
     FORWARD_STATS["last_forward_response_classification"] = None
     FORWARD_STATS["last_forward_response_message"] = None
-    try:
-        resp = requests.post(url, json=outbound, headers=headers, timeout=10)
-        FORWARD_STATS["last_status"] = resp.status_code
-        if 200 <= resp.status_code < 300:
-            FORWARD_STATS["success_count"] += 1
-            FORWARD_STATS["last_error"] = None
-        else:
-            FORWARD_STATS["failure_count"] += 1
-            FORWARD_STATS["last_error"] = f"http_{resp.status_code}"
-            summary = summarize_forward_response(resp)
-            FORWARD_STATS["last_forward_response_error"] = summary["error"]
-            FORWARD_STATS["last_forward_response_classification"] = summary[
-                "classification"
-            ]
-            FORWARD_STATS["last_forward_response_message"] = summary["message"]
-        print(
-            f"[verdant-testbench] forwarded reading -> {resp.status_code} "
-            f"(token {mask_token(token or '')})"
-        )
-        return {
-            "forwarded": True,
-            "status_code": resp.status_code,
-            "idempotency_key": headers["Idempotency-Key"],
-        }
-    except Exception as exc:
+
+    import time as _time
+
+    last_resp: Any = None
+    last_exc: Optional[BaseException] = None
+    final_status: Optional[int] = None
+
+    # Bounded retry loop: 1 + MAX_RETRY_ATTEMPTS total attempts. We
+    # never block indefinitely and never queue unbounded readings.
+    for attempt_index in range(MAX_RETRY_ATTEMPTS + 1):
+        try:
+            last_resp = requests.post(url, json=outbound, headers=headers, timeout=10)
+            last_exc = None
+            final_status = last_resp.status_code
+            if 200 <= final_status < 300:
+                break
+            if attempt_index < MAX_RETRY_ATTEMPTS and is_retryable_status(final_status):
+                FORWARD_STATS["retry_count"] = int(FORWARD_STATS.get("retry_count", 0)) + 1
+                FORWARD_STATS["last_retry_at"] = datetime.now(timezone.utc).isoformat()
+                FORWARD_STATS["last_retryable_status"] = final_status
+                FORWARD_STATS["last_retry_error"] = f"http_{final_status}"
+                _time.sleep(compute_backoff_delay(attempt_index))
+                continue
+            break
+        except Exception as exc:
+            last_exc = exc
+            last_resp = None
+            final_status = None
+            if attempt_index < MAX_RETRY_ATTEMPTS:
+                FORWARD_STATS["retry_count"] = int(FORWARD_STATS.get("retry_count", 0)) + 1
+                FORWARD_STATS["last_retry_at"] = datetime.now(timezone.utc).isoformat()
+                FORWARD_STATS["last_retryable_status"] = None
+                FORWARD_STATS["last_retry_error"] = _short_sanitized_error(exc)
+                _time.sleep(compute_backoff_delay(attempt_index))
+                continue
+            break
+
+    if last_exc is not None:
         FORWARD_STATS["failure_count"] += 1
         FORWARD_STATS["last_status"] = None
-        FORWARD_STATS["last_error"] = _short_sanitized_error(exc)
-        return {"forwarded": False, "reason": f"request_error: {type(exc).__name__}"}
+        FORWARD_STATS["last_error"] = _short_sanitized_error(last_exc)
+        return {"forwarded": False, "reason": f"request_error: {type(last_exc).__name__}"}
+
+    resp = last_resp
+    FORWARD_STATS["last_status"] = resp.status_code
+    if 200 <= resp.status_code < 300:
+        FORWARD_STATS["success_count"] += 1
+        FORWARD_STATS["last_error"] = None
+    else:
+        FORWARD_STATS["failure_count"] += 1
+        FORWARD_STATS["last_error"] = f"http_{resp.status_code}"
+        summary = summarize_forward_response(resp)
+        FORWARD_STATS["last_forward_response_error"] = summary["error"]
+        FORWARD_STATS["last_forward_response_classification"] = summary["classification"]
+        FORWARD_STATS["last_forward_response_message"] = summary["message"]
+    print(
+        f"[verdant-testbench] forwarded reading -> {resp.status_code} "
+        f"(token {mask_token(token or '')})"
+    )
+    return {
+        "forwarded": True,
+        "status_code": resp.status_code,
+        "idempotency_key": headers["Idempotency-Key"],
+    }
 
 
 

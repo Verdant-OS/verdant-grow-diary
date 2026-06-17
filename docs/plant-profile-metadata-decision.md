@@ -164,15 +164,16 @@ Rationale:
 
 ## 9. Rollout plan (Option A)
 
-1. **Migration**: add nullable `medium` and `pot_size` columns to `public.plants`. No backfill.
-2. **Generated types**: regenerate Supabase types; confirm `Plant` type now exposes both fields.
-3. **Read-path wiring**: extend `useGrowPlant` / plant fetch selectors to include the new columns; forward through `PlantDetailAiDoctorContextReadinessMount` (already accepts optional `medium` / `potSize`).
-4. **Edit UI**: replace "coming soon" buttons on the existing Plant Profile Context card with a small inline edit form (text inputs, save → `plants` update scoped by owner).
-5. **AI Doctor readiness update**: no code change needed — flags flip automatically once the read path delivers non-null values. Provenance copy continues to appear when values are `null`.
-6. **Regression tests**: per Section 8.
-7. **Docs**: update workspace knowledge "Current Context" with the new persisted fields and update this decision doc's status to "Implemented".
+1. ✅ **Migration**: add nullable `medium` and `pot_size` columns to `public.plants`. No backfill.
+2. ✅ **Generated types**: regenerated Supabase types; `PlantRow` now exposes both fields.
+3. ✅ **Read-path wiring**: extended `mapPlantRow` and `PlantDetail` to forward values through `PlantProfileContextCard` and `PlantDetailAiDoctorContextReadinessMount`.
+4. ⏸ **Edit UI**: replace "coming soon" buttons on the existing Plant Profile Context card with a small inline edit form (text inputs, save → `plants` update scoped by owner). **Not yet exposed.**
+5. ✅ **AI Doctor readiness update**: no code change needed — flags flip automatically once the read path delivers non-null values. Provenance copy continues to appear when values are `null`.
+6. ✅ **Regression tests**: compiler, adapter, card, and mount tests extended.
+7. ⏸ **RLS write harness**: pending edit UI slice.
+8. ✅ **Docs**: this doc updated to "Implemented (read path)".
 
-Each step is independently shippable; recommend landing migration + read path before exposing the edit UI to avoid grower-visible half-states.
+Read path landed before edit UI to avoid grower-visible half-states.
 
 ---
 

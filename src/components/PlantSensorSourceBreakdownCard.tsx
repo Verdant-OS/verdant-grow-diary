@@ -114,9 +114,9 @@ export default function PlantSensorSourceBreakdownCard({
   // healthy "live" classification.
   const summary = summarizeSensorSources(readings, {
     range: range ?? null,
-    // Plant diary `sensor_snapshot` rows without a source string are
-    // intrinsically grower-entered (Quick Log).
-    fallback: "manual",
+    // Unknown explicit source strings stay flagged as "invalid" rather
+    // than being silently relabeled as healthy live/manual data.
+    fallback: "invalid",
   });
 
   if (!plantId) return null;

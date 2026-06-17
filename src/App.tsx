@@ -37,6 +37,7 @@ import OperatorEcowittCanary from "./pages/OperatorEcowittCanary";
 import OperatorEcowittTentPreview from "./pages/OperatorEcowittTentPreview";
 import OperatorGeneticsImportPage from "./pages/OperatorGeneticsImportPage";
 import EcowittBridgeStatus from "./pages/EcowittBridgeStatus";
+import EcowittBridgeDebug from "./pages/EcowittBridgeDebug";
 import OneTentProofRecord from "./pages/OneTentProofRecord";
 import ActionDetail from "./pages/ActionDetail";
 import GrowLineageRepair from "./pages/GrowLineageRepair";
@@ -141,6 +142,7 @@ const App = () => (
                 <Route path="/operator/ecowitt" element={<OperatorEcowittCanary />} />
                 <Route path="/operator/one-tent-proof-record" element={<OneTentProofRecord />} />
                 <Route path="/operator/ecowitt-bridge-status" element={<EcowittBridgeStatus />} />
+                <Route path="/operator/ecowitt-bridge-debug" element={<EcowittBridgeDebug />} />
                 <Route path="/operator/ecowitt-live-bringup" element={<EcowittLiveBringup />} />
                 <Route
                   path="/operator/ecowitt-tent-preview"

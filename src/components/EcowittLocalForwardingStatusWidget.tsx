@@ -16,12 +16,18 @@ import {
   fetchLocalForwardingErrorReportText,
   fetchLocalForwardingStatus,
   sanitizeReportText,
+  sanitizeReportValue,
   type LocalForwardingFetchState,
 } from "@/lib/ecowittLocalForwardingStatus";
 import {
   buildForwardingStatusViewModel,
   type ForwardingStatusRow,
 } from "@/lib/ecowittLocalForwardingStatusViewModel";
+import {
+  buildSanitizedForwardingReport,
+  serializeSanitizedForwardingReport,
+  type ForwardingErrorReportLike,
+} from "@/lib/ecowittForwardingReportExport";
 
 export interface EcowittLocalForwardingStatusWidgetProps {
   /** Test seam: skip the initial auto-fetch (use a manual refresh). */
@@ -43,7 +49,14 @@ export default function EcowittLocalForwardingStatusWidget({
     const next = await fetchLocalForwardingStatus();
     setFetchState(next);
     setBusy(false);
-  }, []);
+    if (next.state === "offline") {
+      toast({
+        title: "EcoWitt local bridge not reachable",
+        description:
+          "Start the listener on localhost:8787, then refresh. No data was sent.",
+      });
+    }
+  }, [toast]);
 
   useEffect(() => {
     if (autoFetch) {
@@ -52,24 +65,41 @@ export default function EcowittLocalForwardingStatusWidget({
   }, [autoFetch, refresh]);
 
   const handleCopyReport = useCallback(async () => {
-    const result = await fetchLocalForwardingErrorReportText();
-    if (result.ok !== true) {
-      const reason = result.reason;
-      const msg =
-        reason === "offline"
-          ? "EcoWitt local bridge is not reachable. Start the listener first."
-          : reason === "http_error"
-            ? "Local bridge returned an error. Restart it and try again."
-            : "Local bridge returned an unreadable report.";
+    // Re-fetch BOTH the live status and the error report so the copied
+    // payload reflects "right now" even if rows are stale.
+    const [statusNext, reportText] = await Promise.all([
+      fetchLocalForwardingStatus(),
+      fetchLocalForwardingErrorReportText(),
+    ]);
+
+    if (statusNext.state !== "ready") {
       toast({
         title: "Could not copy report",
-        description: msg,
+        description:
+          "EcoWitt local bridge is not reachable. Start the listener first.",
         variant: "destructive",
       });
       return;
     }
-    // Belt-and-braces: re-scrub before clipboard write.
-    const safeJson = sanitizeReportText(result.json);
+
+    let errorReport: ForwardingErrorReportLike | null = null;
+    if (reportText.ok === true) {
+      try {
+        const parsed = JSON.parse(reportText.json) as unknown;
+        errorReport = sanitizeReportValue(parsed) as ForwardingErrorReportLike;
+      } catch {
+        errorReport = null;
+      }
+    }
+
+    const report = buildSanitizedForwardingReport({
+      status: statusNext.status,
+      errorReport,
+    });
+    // Belt-and-braces: re-scrub the serialized string before clipboard write.
+    const safeJson = sanitizeReportText(serializeSanitizedForwardingReport(report));
+    setFetchState(statusNext);
+
     try {
       if (typeof navigator !== "undefined" && navigator.clipboard) {
         await navigator.clipboard.writeText(safeJson);
@@ -180,7 +210,7 @@ export default function EcowittLocalForwardingStatusWidget({
             disabled={busy}
             data-testid="ecowitt-local-forwarding-refresh"
           >
-            Refresh
+            {busy ? "Refreshing…" : "Refresh bridge status"}
           </Button>
           <Button
             size="sm"

@@ -8,6 +8,7 @@ import type {
   LocalForwardingFetchState,
   LocalForwardingStatus,
 } from "@/lib/ecowittLocalForwardingStatus";
+import { recommendForStatus } from "@/lib/ecowittForwardingRecommendedNextStepRules";
 
 export interface ForwardingStatusRow {
   key: string;
@@ -196,6 +197,8 @@ export function buildForwardingStatusViewModel(
       s.last_forward_error != null ||
       s.last_forward_response_error != null);
 
+  const recommended = recommendForStatus(s);
+
   const banner: ForwardingStatusBanner = failureDetected
     ? {
         show: true,
@@ -204,9 +207,7 @@ export function buildForwardingStatusViewModel(
           s.last_forward_status == null ? "—" : String(s.last_forward_status),
         classification: s.last_forward_response_classification ?? "—",
         reason: s.last_forward_response_reason ?? "—",
-        recommendedNextStep:
-          s.recommended_next_step ??
-          "Open the sanitized forwarding report below for next steps.",
+        recommendedNextStep: recommended.text,
       }
     : HIDDEN_BANNER;
 

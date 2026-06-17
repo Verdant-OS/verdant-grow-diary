@@ -1412,6 +1412,13 @@ def debug_forwarding_error_report() -> Any:
     last_resp_msg = sanitize_forward_error_value(
         FORWARD_STATS.get("last_forward_response_message")
     )
+    raw_reason = FORWARD_STATS.get("last_forward_response_reason")
+    if isinstance(raw_reason, str) and raw_reason in _KNOWN_INSERT_REASONS:
+        last_resp_reason: Optional[str] = raw_reason
+    elif isinstance(raw_reason, str) and raw_reason:
+        last_resp_reason = "insert_unknown"
+    else:
+        last_resp_reason = None
     last_retry_err_raw = FORWARD_STATS.get("last_retry_error")
     last_retry_err = (
         sanitize_debug_payload(last_retry_err_raw)
@@ -1425,6 +1432,7 @@ def debug_forwarding_error_report() -> Any:
         classification_str,
         last_error if isinstance(last_error, str) else None,
         FORWARD_STATS.get("last_status"),
+        last_resp_reason,
     )
 
     latest = _latest_metrics_summary()

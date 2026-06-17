@@ -1,9 +1,14 @@
 /**
  * sensor-source-summary-widget — render tests.
  */
+import type { ReactElement } from "react";
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render as rtlRender, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import SensorSourceSummaryWidget from "@/components/SensorSourceSummaryWidget";
+
+const render = (ui: ReactElement) =>
+  rtlRender(<MemoryRouter>{ui}</MemoryRouter>);
 
 describe("SensorSourceSummaryWidget", () => {
   it("renders empty state when no readings", () => {

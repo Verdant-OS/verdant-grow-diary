@@ -328,7 +328,12 @@ export default function QuickLogV2Sheet({
         return;
       }
       setSaveStatus(FEEDING_SAVE_SUCCESS_MESSAGE);
-      toast.success(FEEDING_SAVE_SUCCESS_MESSAGE);
+      showTimelineConfirmation(FEEDING_SAVE_SUCCESS_MESSAGE, {
+        targetType: resolved.targetType as "plant" | "tent",
+        targetId: resolved.targetId as string,
+        tentId: resolved.tentId ?? null,
+        growEventId: null,
+      });
       applyQuickLogV2Refresh(queryClient, {
         targetType: resolved.targetType as "plant" | "tent",
         targetId: resolved.targetId as string,

@@ -282,7 +282,15 @@ describe("Timeline page source — anchor + label + leak guards", () => {
     // scope this guard to patterns the filter/lightbox slice must not add.
     expect(TIMELINE).not.toMatch(/\.insert\(/);
     expect(TIMELINE).not.toMatch(/\.update\(/);
-    expect(TIMELINE).not.toMatch(/\.delete\(/);
+    // Narrowed: only flag Supabase/client write-style `.delete(` calls.
+    // Browser URL helpers (URLSearchParams.delete) are not write paths.
+    const URL_PARAM_DELETE_NAMES =
+      /^(next|prev|sp|params|searchParams|urlParams|query|qs)$/i;
+    const deleteCalls = [
+      ...TIMELINE.matchAll(/([A-Za-z_$][\w$]*)\.delete\(/g),
+    ].filter(([, name]) => !URL_PARAM_DELETE_NAMES.test(name));
+    expect(deleteCalls.map((m) => m[0])).toEqual([]);
+    expect(TIMELINE).not.toMatch(/\.from\([^)]*\)[\s\S]{0,200}?\.delete\(/);
     expect(TIMELINE).not.toMatch(/\.upsert\(/);
     expect(TIMELINE).not.toMatch(/\.rpc\(/);
     expect(TIMELINE).not.toMatch(/functions\s*\.\s*invoke\s*\(/);

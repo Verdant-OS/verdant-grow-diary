@@ -859,6 +859,7 @@ def debug_parse_diagnostics() -> Any:
 
 
 
+def main() -> None:  # pragma: no cover
     print(f"[verdant-testbench] listening on http://localhost:{PORT}")
     print(f"[verdant-testbench] health:  http://localhost:{PORT}/health")
     print(

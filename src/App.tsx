@@ -59,6 +59,7 @@ import AiDoctorConfidenceAudit from "./pages/AiDoctorConfidenceAudit";
 import EcowittLiveBringup from "./pages/EcowittLiveBringup";
 import EnvironmentSummaryReportPage from "./pages/EnvironmentSummaryReportPage";
 import OperatorOneTentLoopSmokeTest from "./pages/OperatorOneTentLoopSmokeTest";
+import OperatorGgsRealPayloadIngest from "./pages/OperatorGgsRealPayloadIngest";
 
 const queryClient = new QueryClient();
 
@@ -150,6 +151,10 @@ const App = () => (
                 <Route
                   path="/operator/one-tent-loop-smoke-test"
                   element={<OperatorOneTentLoopSmokeTest />}
+                />
+                <Route
+                  path="/operator/ggs-real-payload-ingest"
+                  element={<OperatorGgsRealPayloadIngest />}
                 />
                 <Route path="/pi-ingest-status" element={<PiIngestStatus />} />
                 <Route path="/ingest-inspector" element={<IngestInspector />} />

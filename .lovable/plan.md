@@ -1,67 +1,84 @@
-## Goal
+# GGS 3-in-1 Soil Sensor Pro — Audit Findings + Minimal Slice Plan
 
-Remove operator-facing XLSX and spreadsheet/CSV import surfaces (routes, nav, pages, components, copy, docs, tests) now that Verdant has real sensor ingest. Preserve pure helpers still used by AI Doctor imported-history context. No schema/RLS/Edge/auth/ingest changes.
+## Audit findings (existing patterns reused, no duplication)
 
-## Audit findings
+**Sensor normalization & GGS mapping**
+- `src/lib/spiderFarmerGgsMappingRules.ts` already normalizes Spider Farmer GGS payloads (the parent product line for the 3-in-1 Soil Sensor Pro). It supports `soil_water_content`, `soil_ec`, `soil_temp_c`, `soil_temp_f`, plus alias tolerance, bounds checks, stale window (`SPIDER_FARMER_GGS_STALE_MS = 15min`), `source ∈ live | stale | invalid`, `raw_payload` preservation, and warnings instead of throws.
+- `src/lib/sensors/normalizeSensorReading.ts`, `src/lib/sensorIngestNormalizationRules.ts`, `src/lib/sensorValidation.ts` define the canonical reading shape and metric list.
+- DB trigger `public.validate_sensor_reading` already accepts metrics `soil_moisture_pct`, `ec`, plus the canonical source labels (`live | manual | csv | demo | stale | invalid`).
 
-Operator-facing surfaces to remove:
+**Ingest paths (no new edge function needed)**
+- `supabase/functions/sensor-ingest-webhook/` — generic per-tent bridge webhook.
+- `supabase/functions/pi-ingest-readings/` — Pi/local bridge using `pi_ingest_commit_batch` RPC.
+- `supabase/functions/ecowitt-ingest/`, `ecowitt-real-ingest/` — vendor adapters.
+- The GGS 3-in-1 Soil Sensor Pro is delivered through the same Spider Farmer GGS local bridge (MQTT / Home Assistant / Pi bridge), so it rides the **existing `sensor-ingest-webhook` + Pi bridge** path — no new edge function.
 
-- Routes in `src/App.tsx`:
-  - `/operator/genetics-import` → `OperatorGeneticsImportPage`
-  - `/imports/representative-csv` → `RepresentativeCsvPreview`
-  - `/sensors/csv-preview` → `SensorCsvPreview`
-  - `/partners/csv-preview` → `PartnerCsvPreviewLanding`
-- Sidebar entry "Genetics XLSX Import (Preview-only)" in `src/components/AppSidebar.tsx`.
-- Operator XLSX pages/components:
-  - `src/pages/OperatorGeneticsImportPage.tsx`
-  - `src/pages/SensorCsvPreview.tsx`
-  - `src/pages/RepresentativeCsvPreview.tsx`
-  - `src/pages/PartnerCsvPreviewLanding.tsx`
-  - `src/components/VerdantGeneticsXlsx*.tsx`, `VerdantGeneticsImportPreviewTable.tsx`
-  - `src/components/TentCsvImportCard.tsx`, `EnvironmentCsvImportModal.tsx`, `EnvironmentCsvImportLauncher.tsx`, `CsvPreviewReviewGate.tsx`, `CsvPreviewRecordingGuide.tsx`, `CsvPreviewHelpPanel.tsx`, `CsvSensorPreviewPanel.tsx`
-- XLSX-only lib files:
-  - `src/lib/verdantGeneticsXlsx*.ts`, `verdantGeneticsImportPreviewRules.ts`
-- Mount points in `src/pages/TentDetail.tsx` and `src/pages/Sensors.tsx` (remove TentCsvImportCard/EnvironmentCsvImportLauncher usage and any related copy/anchors).
-- Route manifest entries in `src/lib/appRouteManifest.ts`.
-- Docs: `docs/csv-preview-partner-demo.md` and any "Genetics XLSX Import" / "Upload spreadsheet" copy in docs.
-- `xlsx` package in `package.json` (only used by `verdantGeneticsXlsxFileLoader.ts`).
+**Provider labels & source badges**
+- `src/constants/sensorProviderLabels.ts` already includes `spider_farmer_ggs → "Spider Farmer GGS"`.
+- `src/components/TimelineSensorSourceBadge.tsx` + `src/lib/timelineSensorSourceBadgeRules.ts` already render canonical source badges, and Evidence Drawer reuses the same component.
 
-Preserve (still referenced by AI Doctor imported-history pure logic):
+**Quick Log snapshot attach**
+- `src/lib/latestSensorSnapshotRules.ts` builds the latest tent snapshot from long-format `sensor_readings`. Quick Log reads it through `src/components/QuickLogSensorSnapshotStrip.tsx` and attaches via existing `quicklog_save_event` / `quicklog_save_manual` RPCs. Quick Log never inserts sensor readings.
+- `manualSensorSnapshotQualityRules.ts` already classifies fresh/stale/invalid and blocks bad attachments.
 
-- `src/lib/aiDoctorCsvHistoryContextRules.ts`, `aiDoctorContextCompiler.ts`, `aiDoctorImportedHistoryPromptRules.ts`, `aiDoctorImportedHistoryDisclosureViewModel.ts`, `aiDoctorPromptAssembly.ts`
-- `src/components/AiDoctorImportedHistoryDisclosurePanel.tsx` (read-only AI surface)
-- `src/lib/csvSensorPreviewRules.ts`, `csvSensorPreviewPdf.ts`, `csvMappingPresetStorage.ts`, `environmentCsvPreviewCopyRules.ts`, `sensorHistoryImportFingerprintRules.ts`, `sensorHistoryImportAuditLog.ts`, `sensorHistoryImportAuditEventBuilders.ts` only if still referenced after page/component removal; otherwise delete.
-- Backend (`supabase/functions/ai-doctor-review/index.ts`) — unchanged.
+**What is missing (the minimal slice)**
+1. A thin GGS-soil-only adapter that converts a normalized `SpiderFarmerGgsDraft` (or raw payload) into canonical long-format `sensor_readings` drafts limited to the soil probe metrics, and asserts tent context.
+2. Whitelist `spider_farmer_ggs` in the snapshot/provider trust path so Quick Log shows the correct source chip + Live/stale state.
+3. Tests + static-safety guards.
 
-## File-level plan
+## File-level plan (additive, minimal)
 
-1. `src/App.tsx`: remove 4 routes + 4 imports listed above.
-2. `src/components/AppSidebar.tsx`: remove the "Operator" group's Genetics XLSX item; drop unused `FileSpreadsheet` import. (If group becomes empty, remove the group.)
-3. Delete pages: `OperatorGeneticsImportPage.tsx`, `SensorCsvPreview.tsx`, `RepresentativeCsvPreview.tsx`, `PartnerCsvPreviewLanding.tsx`.
-4. Delete components: all `VerdantGeneticsXlsx*`, `VerdantGeneticsImportPreviewTable`, `TentCsvImportCard`, `EnvironmentCsvImportModal`, `EnvironmentCsvImportLauncher`, `CsvPreviewReviewGate`, `CsvPreviewRecordingGuide`, `CsvPreviewHelpPanel`, `CsvSensorPreviewPanel`.
-5. Delete libs: all `verdantGeneticsXlsx*`, `verdantGeneticsImportPreviewRules`. Re-scan remaining `csv*`/`sensorHistoryImport*` libs and delete any that become orphaned (kept only if AI Doctor or sensor-truth code still imports them).
-6. `src/pages/TentDetail.tsx`, `src/pages/Sensors.tsx`: remove import-card mounts, related section headings, anchors, and replacement copy → small honest note: "Sensor readings come from live ingest, manual entry, CSV history where explicitly labeled, or demo data in demo mode." Keep all live/manual sensor UI intact.
-7. `src/lib/appRouteManifest.ts`: remove the four route entries.
-8. Delete now-obsolete tests under `src/test/` matching: `verdant-genetics-*`, `operator-genetics-*`, `csv-import-review-*`, `csv-mapping-*`, `csv-preview-*`, `csv-sensor-preview-*`, `csv-row-validation-*`, `csv-timeline-preview-*`, `csv-normalization-preview-embed*`, `csv-history-duplicate-aware-import*`, `csv-sensor-import*`, `representative-csv-*`, `tent-csv-import-card-*`, `environment-csv-import-ui*`, `sensor-import-preview-copy*`, `sensors-import-anchor*`, `registry-csv-insert-rows-adapter*`, `sensor-readings-batch-insert*` if it covers removed import path, `sensor-history-import-replay-guard*` / `sensor-history-import-audit-wiring*` if dependent on removed UI. Keep AI Doctor imported-history tests.
-9. Docs cleanup: delete or archive `docs/csv-preview-partner-demo.md`; sweep `docs/` for "XLSX import"/"Upload spreadsheet"/"Excel import" operator copy.
-10. `package.json`: remove `xlsx` dependency after step 3 leaves no `xlsx` import.
-11. Add tests:
-    - `src/test/operator-import-routes-removed.test.ts`: assert `/operator/genetics-import`, `/imports/representative-csv`, `/sensors/csv-preview`, `/partners/csv-preview` are absent from `appRouteManifest` and `App.tsx`.
-    - `src/test/sidebar-no-xlsx-import.test.tsx`: render `AppSidebar`; assert no link contains "XLSX", "Spreadsheet", or "Genetics Import".
-    - `src/test/no-operator-spreadsheet-copy-static-safety.test.ts`: scan `src/pages/**` and `src/components/**` for forbidden strings ("XLSX import", "Excel import", "Upload spreadsheet", "Import readings from XLSX") and fail if found; ignore `src/test/**` and `docs/`.
-12. Validation: `bun run typecheck`, then targeted `bunx vitest run` on new tests plus AI Doctor imported-history suites and Quick Log/Timeline suites to confirm no regression.
+**New**
+- `src/lib/ggsSoilSensorReadingNormalizer.ts` — pure helper. Input: unknown payload. Output: `{ status: "accepted" | "degraded" | "invalid", source: "live"|"stale"|"invalid", provider: "spider_farmer_ggs", tent_id, plant_id?, captured_at, confidence: "high"|"medium"|"low", readings: { soil_moisture_pct?, soil_temp_c?, ec? }, raw_payload, warnings[] }`. Internally delegates to `normalizeSpiderFarmerGgsPayload` for parsing/bounds and adds soil-only canonical mapping (incl. EC unit-mismatch heuristic, missing-tent rejection, manual-vs-live source rules, NaN/Infinity rejection).
+- `src/lib/ggsSoilSensorSnapshotAttach.ts` — pure adapter that takes the latest validated GGS soil readings for a tent/plant and produces a Quick Log snapshot draft compatible with the existing snapshot attach contract. Never writes.
+- `src/test/ggs-soil-sensor-reading-normalizer.test.ts` — alias coverage (snake + camelCase), missing tent rejection, missing source ≠ live, NaN/Infinity, EC unit-mismatch flag, stale classification, raw_payload preserved but never rendered.
+- `src/test/ggs-soil-sensor-snapshot-attach.test.ts` — latest valid GGS attaches with `source: live`; stale → blocked or visibly marked stale; invalid → blocked; no sensor_readings insert.
+- `src/test/ggs-soil-sensor-ingest-wiring-safety.test.ts` — static safety: no new edge function, no UI `.insert/.update/.delete/.upsert/.rpc/functions.invoke`, no service role / bridge token literal, no XLSX import surface reintroduced, no `raw_payload` rendered, no AI/alert/action-queue writes, no device-control verbs.
+- `src/test/ggs-soil-sensor-timeline-badge.test.tsx` — Timeline + Evidence Drawer render the `spider_farmer_ggs` provider chip with the correct canonical source badge.
 
-## Preserved active sensor paths
+**Edited (presenters only, no logic duplication)**
+- `src/components/QuickLogSensorSnapshotStrip.tsx` — recognize `provider === "spider_farmer_ggs"` for the soil probe so the provider chip + freshness reuse the existing rules. (Likely already works through `deriveProviderLabel`; will only edit if a test exposes a gap.)
 
-- Live ingest (Ecowitt, Pi), manual sensor entry, sensor-truth source labeling (`live|manual|csv|demo|stale|invalid`), AI Doctor imported-history context (pure helpers + disclosure panel), Quick Log + Timeline.
+**Not touched**
+- No schema/RLS/Edge changes.
+- No new edge function.
+- No UI rewrites.
+- No XLSX/import surfaces.
+- No AI/alerts/action-queue/device-control code.
 
-## Safety
+## Source & provenance behavior
 
-- No schema/RLS/Edge/auth/ingest changes.
-- No new write paths.
-- No Action Queue / alert / device-control changes.
-- Pure deletions + small copy update + new guard tests.
+| Condition | source | confidence |
+|---|---|---|
+| Fresh (<15 min) payload via bridge, tent valid, values in bounds | `live` | `high` |
+| Some metrics valid, others out of bounds/missing | `live` | `medium` (warnings recorded) |
+| Captured_at older than stale window | `stale` | `low` |
+| Malformed / NaN / impossible values / missing tent / unknown source / EC unit mismatch | `invalid` | `low` |
+| Manually entered GGS values | `manual` | per existing manual rules |
+
+`raw_payload` is preserved on the reading draft; UI guard tests assert it is never rendered.
+
+## Current grow E2E smoke
+
+- Confirm via `supabase--read_query` whether the signed-in test grow has any `sensor_readings` rows with `source = 'spider_farmer_ggs'`.
+- If yes: run the read-only Quick Log attach path against the latest soil reading and verify Timeline + Evidence Drawer badges.
+- If no: use an explicitly labeled fixture (`source: 'demo'` or test fixture passed directly to the normalizer), and report Sentinel sign-off blocked on a real bridge reading.
+
+## Validation commands
+
+- `bunx vitest run src/test/ggs-soil-sensor-reading-normalizer.test.ts src/test/ggs-soil-sensor-snapshot-attach.test.ts src/test/ggs-soil-sensor-ingest-wiring-safety.test.ts src/test/ggs-soil-sensor-timeline-badge.test.tsx`
+- `bunx vitest run src/test/spider-farmer-ggs-mapping-rules.test.ts src/test/timeline-sensor-source-badge-component.test.tsx src/test/sensor-source-summary-rules.test.ts`
+- `bun run typecheck` (3 pre-existing ecowitt errors expected, unrelated)
+
+## Safety verdict (pre-commit, will re-state post-implementation)
+
+- New write path: **no** — normalizer + snapshot adapter are pure.
+- Bypasses ingest validation: **no** — payloads still flow through `validate_sensor_reading` + existing webhook auth.
+- Quick Log inserts sensor readings: **no** — attach only.
+- Alerts / Action Queue / AI / device control: **no**.
+- GGS data clearly labeled `live | manual | stale | invalid`: **yes**.
 
 ## Risk / rollback
 
-Risk: a non-import surface may transitively import a deleted CSV component. Mitigation: typecheck after each deletion batch; restore the file if a non-import caller surfaces. Rollback: revert the change set; no data migration involved.
+- Risk: low — additive pure helpers + tests, no schema or edge changes.
+- Rollback: delete the new files and revert any minor `QuickLogSensorSnapshotStrip.tsx` edit.

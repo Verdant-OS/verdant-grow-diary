@@ -4,7 +4,7 @@
  * Builds a navigation list of photo-bearing entries from the currently
  * visible/filtered Timeline rows. Deterministic, null-safe, side-effect
  * free. No DB / fetch / AI / device / alert / Action Queue work. Only
- * a tiny allow-list of display fields is exposed — never `raw_payload`
+ * a tiny allow-list of display fields is exposed — never `private payload fields`
  * or token-bearing fields.
  */
 
@@ -49,7 +49,7 @@ function isSafePhotoUrl(value: unknown): value is string {
 /**
  * Build the lightbox-ready list from currently visible Timeline rows.
  * Preserves the caller-provided ordering. Skips rows missing a usable
- * `photo_url`. Never emits `raw_payload` or other private fields.
+ * `photo_url`. Never emits `private payload fields` or other private fields.
  */
 export function buildTimelinePhotoLightboxList(
   rows: ReadonlyArray<TimelinePhotoSourceRow> | null | undefined,

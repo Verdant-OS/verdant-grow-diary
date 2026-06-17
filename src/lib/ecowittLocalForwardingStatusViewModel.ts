@@ -57,6 +57,7 @@ export function buildForwardingStatusViewModel(
       headline: "Checking local EcoWitt bridge…",
       subheadline: "",
       rows: [],
+      banner: HIDDEN_BANNER,
     };
   }
   if (fetchState.state === "offline") {
@@ -65,6 +66,7 @@ export function buildForwardingStatusViewModel(
       headline: OFFLINE_HEADLINE,
       subheadline: OFFLINE_SUB,
       rows: [],
+      banner: HIDDEN_BANNER,
     };
   }
   const s: LocalForwardingStatus = fetchState.status;
@@ -96,6 +98,15 @@ export function buildForwardingStatusViewModel(
     tone: s.last_forward_response_classification ? "warn" : "neutral",
   });
 
+  if (s.last_forward_response_reason) {
+    rows.push({
+      key: "last_forward_response_reason",
+      label: "Last reason",
+      value: s.last_forward_response_reason,
+      tone: "warn",
+    });
+  }
+
   rows.push({
     key: "retry_count",
     label: "Retries (since restart)",
@@ -126,6 +137,51 @@ export function buildForwardingStatusViewModel(
     tone: s.forward_failure_count > 0 ? "error" : "neutral",
   });
 
+  rows.push({
+    key: "malformed_line_count",
+    label: "Malformed log lines",
+    value: String(s.malformed_line_count),
+    tone: s.malformed_line_count > 0 ? "warn" : "neutral",
+  });
+
+  if (s.latest_metrics) {
+    const m = s.latest_metrics;
+    const summary = [
+      m.source ? `source=${m.source}` : null,
+      m.vendor ? `vendor=${m.vendor}` : null,
+      m.captured_at ? `captured_at=${m.captured_at}` : null,
+      m.metric_keys.length > 0 ? `metrics=${m.metric_keys.join(",")}` : null,
+    ]
+      .filter((v): v is string => v != null)
+      .join(" • ");
+    if (summary) {
+      rows.push({
+        key: "latest_metrics",
+        label: "Latest metrics",
+        value: summary,
+        tone: "neutral",
+      });
+    }
+  }
+
+  if (s.recommended_next_step) {
+    rows.push({
+      key: "recommended_next_step",
+      label: "Recommended next step",
+      value: s.recommended_next_step,
+      tone: "warn",
+    });
+  }
+
+  if (s.generated_at) {
+    rows.push({
+      key: "generated_at",
+      label: "Report generated",
+      value: s.generated_at,
+      tone: "neutral",
+    });
+  }
+
   const headline = s.forwarding_ready
     ? "Local bridge ready to forward."
     : "Local bridge not ready to forward.";
@@ -133,5 +189,26 @@ export function buildForwardingStatusViewModel(
     ? "Verdant ingest webhook will be called for new EcoWitt readings."
     : "Set VERDANT_TENT_ID / VERDANT_INGEST_URL / VERDANT_BRIDGE_TOKEN in .env and restart the listener.";
 
-  return { state: "ready", headline, subheadline: sub, rows };
+  const failureDetected =
+    s.forwarding_enabled === true &&
+    ((typeof s.last_forward_status === "number" && s.last_forward_status >= 400) ||
+      s.forward_failure_count > 0 ||
+      s.last_forward_error != null ||
+      s.last_forward_response_error != null);
+
+  const banner: ForwardingStatusBanner = failureDetected
+    ? {
+        show: true,
+        title: "EcoWitt ingest needs attention",
+        status:
+          s.last_forward_status == null ? "—" : String(s.last_forward_status),
+        classification: s.last_forward_response_classification ?? "—",
+        reason: s.last_forward_response_reason ?? "—",
+        recommendedNextStep:
+          s.recommended_next_step ??
+          "Open the sanitized forwarding report below for next steps.",
+      }
+    : HIDDEN_BANNER;
+
+  return { state: "ready", headline, subheadline: sub, rows, banner };
 }

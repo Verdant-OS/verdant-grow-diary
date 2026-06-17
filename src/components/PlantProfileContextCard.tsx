@@ -3,7 +3,7 @@
  * plant profile fields are known vs missing for AI Doctor context.
  *
  * Strictly UI:
- *  - No Supabase writes. No fetch. No storage. No AI calls.
+ *  - No backend writes. No fetch. No storage. No AI calls.
  *  - Disabled "coming soon" actions; no persistence path.
  *  - Does not feed draft values back into AI Doctor context.
  */

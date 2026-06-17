@@ -28,6 +28,15 @@ function Resolve-RepoRoot {
 $RepoRoot = Resolve-RepoRoot
 $Failures = @()
 
+$preflight = Join-Path $RepoRoot "tools\ecowitt-testbench\preflight-windows.ps1"
+if (Test-Path $preflight) {
+    & $preflight
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Preflight failed. Aborting verify." -ForegroundColor Red
+        exit 1
+    }
+}
+
 function Write-Section($title) {
     Write-Host ""
     Write-Host "=== $title ===" -ForegroundColor Cyan

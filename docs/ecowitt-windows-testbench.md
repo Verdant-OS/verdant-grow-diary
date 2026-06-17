@@ -319,17 +319,61 @@ start the listener, read `.env`, print bridge tokens, post payloads, or
 forward to Verdant. If the listener is not running it tells you to run
 `.\start-listener-windows.ps1` first.
 
+## One-command wrapper (Windows)
+
+```powershell
+cd "C:\Users\G7\OneDrive\Documents\GitHub\verdant-grow-diary"
+.\tools\ecowitt-testbench\run-testbench-windows.ps1
+```
+
+`run-testbench-windows.ps1` runs preflight, then setup, starts the
+listener in a new PowerShell window, waits briefly for
+`http://localhost:8787/health`, then runs verify. It does **not** read
+`.env`, print bridge tokens, post payloads, or forward to Verdant.
+
+## Troubleshooting: wrong folder or out-of-date checkout
+
+If PowerShell says `setup-windows.ps1` or `start-listener-windows.ps1`
+is "not recognized", you are likely not inside `tools\ecowitt-testbench`.
+
+If `dir tools\ecowitt-testbench` fails from the repo root, your local
+checkout is stale or the files have not been pulled.
+
+`C:\Users\G7\verdant-testbench` is likely the **old standalone
+testbench**, not the repo-integrated kit. The correct repo-integrated
+path should end with:
+
+```
+verdant-grow-diary\tools\ecowitt-testbench
+```
+
+Recovery commands:
+
+```powershell
+cd "C:\Users\G7\OneDrive\Documents\GitHub\verdant-grow-diary"
+git status
+git pull origin verdant-grow-diary
+dir tools\ecowitt-testbench
+cd tools\ecowitt-testbench
+.\preflight-windows.ps1
+.\setup-windows.ps1
+.\start-listener-windows.ps1
+```
+
 ## Files
 
 ```
 tools/ecowitt-testbench/
   ecowitt_listener.py
   requirements.txt
+  preflight-windows.ps1
   setup-windows.ps1
   start-listener-windows.ps1
   send-demo-payload-windows.ps1
   verify-testbench-windows.ps1
+  run-testbench-windows.ps1
   .env.example
 docs/ecowitt-windows-testbench.md  (this file)
 ```
+
 

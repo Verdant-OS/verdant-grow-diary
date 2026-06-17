@@ -11,6 +11,18 @@ $ErrorActionPreference = "Stop"
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $here
 
+$preflight = Join-Path $here "preflight-windows.ps1"
+if (Test-Path $preflight) {
+    & $preflight
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Preflight failed. Fix the issues above before running setup."
+        exit 1
+    }
+} else {
+    Write-Host "[verdant-testbench] preflight-windows.ps1 not found alongside this script." -ForegroundColor Yellow
+    Write-Host "You may be in the wrong folder. Expected: tools\ecowitt-testbench" -ForegroundColor Yellow
+}
+
 Write-Host "[verdant-testbench] working dir: $here"
 
 # Locate a usable Python interpreter.

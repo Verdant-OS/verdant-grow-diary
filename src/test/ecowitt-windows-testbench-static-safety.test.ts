@@ -853,3 +853,115 @@ describe("ecowitt windows testbench — preserved behavior", () => {
 });
 
 
+
+describe("ecowitt windows testbench — preflight + wrapper + CI artifacts", () => {
+  const preflightPath = join(TESTBENCH_DIR, "preflight-windows.ps1");
+  const wrapperPath = join(TESTBENCH_DIR, "run-testbench-windows.ps1");
+  const WORKFLOW_PATH = join(
+    process.cwd(),
+    ".github",
+    "workflows",
+    "ecowitt-testbench-safety.yml",
+  );
+  const doc = readFileSync(DOC_PATH, "utf-8");
+  const workflow = readFileSync(WORKFLOW_PATH, "utf-8");
+
+  it("preflight-windows.ps1 exists", () => {
+    expect(statSync(preflightPath).isFile()).toBe(true);
+  });
+
+  it("preflight verifies tools/ecowitt-testbench and expected files", () => {
+    const body = readFileSync(preflightPath, "utf-8");
+    expect(body).toMatch(/tools\\ecowitt-testbench/);
+    for (const f of [
+      ".env.example",
+      "ecowitt_listener.py",
+      "requirements.txt",
+      "send-demo-payload-windows.ps1",
+      "setup-windows.ps1",
+      "start-listener-windows.ps1",
+      "verify-testbench-windows.ps1",
+      "preflight-windows.ps1",
+    ]) {
+      expect(body, `preflight missing check for ${f}`).toContain(f);
+    }
+    expect(body).toMatch(/docs\\ecowitt-windows-testbench\.md/);
+    expect(body).toMatch(/src\\test\\ecowitt-windows-testbench-static-safety\.test\.ts/);
+    expect(body).toMatch(/\.github\\workflows\\ecowitt-testbench-safety\.yml/);
+  });
+
+  it("preflight warns about old standalone verdant-testbench folder", () => {
+    const body = readFileSync(preflightPath, "utf-8");
+    expect(body).toMatch(/old standalone testbench folder/i);
+    expect(body).toMatch(/verdant-testbench/);
+  });
+
+  it("preflight prints git pull origin verdant-grow-diary", () => {
+    const body = readFileSync(preflightPath, "utf-8");
+    expect(body).toMatch(/git pull origin verdant-grow-diary/);
+  });
+
+  it("preflight does not read .env or forward", () => {
+    const body = readFileSync(preflightPath, "utf-8");
+    expect(body).not.toMatch(/Get-Content\s+.*\.env/i);
+    expect(body).not.toMatch(/-ForwardToVerdant/);
+    expect(body).not.toMatch(/vbt_[A-Za-z0-9_-]{8,}/);
+  });
+
+  it("run-testbench-windows.ps1 exists and orchestrates preflight/setup/verify", () => {
+    const body = readFileSync(wrapperPath, "utf-8");
+    expect(body).toMatch(/preflight-windows\.ps1/);
+    expect(body).toMatch(/setup-windows\.ps1/);
+    expect(body).toMatch(/start-listener-windows\.ps1/);
+    expect(body).toMatch(/verify-testbench-windows\.ps1/);
+    expect(body).toMatch(/localhost:8787\/health/);
+  });
+
+  it("run-testbench wrapper is safe (no .env read, no forward, no default POST)", () => {
+    const body = readFileSync(wrapperPath, "utf-8");
+    expect(body).not.toMatch(/Get-Content\s+.*\.env/i);
+    expect(body).not.toMatch(/-ForwardToVerdant/);
+    expect(body).not.toMatch(/Invoke-RestMethod\s+-Method\s+Post/i);
+    expect(body).not.toMatch(/vbt_[A-Za-z0-9_-]{8,}/);
+  });
+
+  it("docs add wrong-folder/out-of-date checkout troubleshooting section", () => {
+    expect(doc).toMatch(/Troubleshooting:\s*wrong folder or out-of-date checkout/i);
+    expect(doc).toMatch(/dir tools\\ecowitt-testbench/);
+    expect(doc).toMatch(/verdant-testbench/);
+    expect(doc).toMatch(/git pull origin verdant-grow-diary/);
+  });
+
+  it("docs document the one-command wrapper", () => {
+    expect(doc).toMatch(/run-testbench-windows\.ps1/);
+  });
+
+  it("CI workflow uses actions/upload-artifact", () => {
+    expect(workflow).toMatch(/actions\/upload-artifact@/);
+    expect(workflow).toMatch(/ecowitt-testbench-safety-logs/);
+  });
+
+  it("CI workflow captures typecheck, static safety, and secret scan logs", () => {
+    expect(workflow).toMatch(/artifacts\/ecowitt-testbench\/typecheck\.log/);
+    expect(workflow).toMatch(/artifacts\/ecowitt-testbench\/static-safety\.log/);
+    expect(workflow).toMatch(/artifacts\/ecowitt-testbench\/secret-scan\.log/);
+  });
+
+  it("CI workflow preserves command failures via pipefail", () => {
+    expect(workflow).toMatch(/set -o pipefail/);
+  });
+
+  it("CI workflow does not upload .env or raw JSONL", () => {
+    expect(workflow).not.toMatch(/\.env(\s|$|"|')/);
+    expect(workflow).not.toMatch(/ecowitt_raw_log\.jsonl/);
+  });
+
+  it("CI workflow still runs typecheck and static safety tests", () => {
+    expect(workflow).toMatch(/bun run typecheck/);
+    expect(workflow).toMatch(/ecowitt-windows-testbench-static-safety\.test\.ts/);
+  });
+
+  it("CI secret scan still scoped to tools/ecowitt-testbench", () => {
+    expect(workflow).toMatch(/DIR=tools\/ecowitt-testbench/);
+  });
+});

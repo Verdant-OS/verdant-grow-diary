@@ -42,7 +42,7 @@ export const SENSOR_PROVENANCE_APPS = [
   "home_assistant",
   "raspberry_pi_bridge",
   "esp32_bridge",
-  "ecowitt",
+  "eco_witt",
   "manual_quick_log",
   "unknown_app",
 ] as const;
@@ -66,7 +66,7 @@ export const NON_CANONICAL_SOURCE_ALIASES = [
   "spider_farmer_ggs",
   "ggs_api",
   "ggs_export",
-  "ecowitt",
+  "eco_witt",
   "unknown",
 ] as const;
 

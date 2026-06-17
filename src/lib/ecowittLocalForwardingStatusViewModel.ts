@@ -8,6 +8,7 @@ import type {
   LocalForwardingFetchState,
   LocalForwardingStatus,
 } from "@/lib/ecowittLocalForwardingStatus";
+import { recommendForStatus } from "@/lib/ecowittForwardingRecommendedNextStepRules";
 
 export interface ForwardingStatusRow {
   key: string;

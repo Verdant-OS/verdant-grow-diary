@@ -1503,7 +1503,9 @@ describe("ecowitt windows testbench — operator forwarding widget safety", () =
     expect(helper).toMatch(/raw_payload/);
   });
 
+  const VM_PATH = join(process.cwd(), "src", "lib", "ecowittLocalForwardingStatusViewModel.ts");
+  const vm = readFileSync(VM_PATH, "utf-8");
   it("widget shows offline copy when local bridge unreachable", () => {
-    expect(widget).toMatch(/not reachable on localhost:8787/i);
+    expect(vm).toMatch(/not reachable on localhost:8787/i);
   });
 });

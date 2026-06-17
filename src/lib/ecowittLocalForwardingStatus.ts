@@ -23,6 +23,13 @@ export const LOCAL_FORWARDING_STATUS_URL =
 export const LOCAL_FORWARDING_ERROR_REPORT_URL =
   `${LOCAL_FORWARDING_BASE_URL}${LOCAL_FORWARDING_ERROR_REPORT_PATH}` as const;
 
+export interface LocalForwardingLatestMetrics {
+  source: string | null;
+  vendor: string | null;
+  captured_at: string | null;
+  metric_keys: string[];
+}
+
 export interface LocalForwardingStatus {
   ok: boolean;
   forwarding_enabled: boolean;
@@ -35,6 +42,7 @@ export interface LocalForwardingStatus {
   last_forward_error: string | null;
   last_forward_response_error: string | null;
   last_forward_response_classification: string | null;
+  last_forward_response_reason: string | null;
   last_forward_response_message: string | null;
   forward_success_count: number;
   forward_failure_count: number;
@@ -45,6 +53,10 @@ export interface LocalForwardingStatus {
   last_retry_at: string | null;
   last_retryable_status: number | null;
   max_retry_attempts: number;
+  recommended_next_step: string | null;
+  malformed_line_count: number;
+  generated_at: string | null;
+  latest_metrics: LocalForwardingLatestMetrics | null;
 }
 
 export type LocalForwardingFetchState =
@@ -166,6 +178,24 @@ export function normalizeLocalForwardingStatus(
         ? safe.last_retryable_status
         : null,
     max_retry_attempts: coerceNumber(safe.max_retry_attempts, 0),
+    last_forward_response_reason: coerceString(safe.last_forward_response_reason),
+    recommended_next_step: coerceString(safe.recommended_next_step),
+    malformed_line_count: coerceNumber(safe.malformed_line_count, 0),
+    generated_at: coerceString(safe.generated_at),
+    latest_metrics: normalizeLatestMetrics(safe.latest_metrics),
+  };
+}
+
+function normalizeLatestMetrics(raw: unknown): LocalForwardingLatestMetrics | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const metricsObj = r.metrics && typeof r.metrics === "object" ? (r.metrics as Record<string, unknown>) : {};
+  const keys = Object.keys(metricsObj).filter((k) => typeof k === "string");
+  return {
+    source: coerceString(r.source),
+    vendor: coerceString(r.vendor),
+    captured_at: coerceString(r.captured_at),
+    metric_keys: keys,
   };
 }
 

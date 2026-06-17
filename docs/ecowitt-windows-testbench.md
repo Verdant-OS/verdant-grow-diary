@@ -260,6 +260,64 @@ Operator guidance:
 
 
 
+### Interpreting /debug/forwarding-status
+
+Safe curl examples (no Authorization header, no token):
+
+```
+curl "http://localhost:8787/debug/forwarding-status"
+curl.exe "http://localhost:8787/debug/forwarding-status"
+```
+
+Fields:
+
+- `forwarding_enabled` — true only when both `VERDANT_INGEST_URL` and `VERDANT_BRIDGE_TOKEN` are configured. It only proves config is present; it does **not** prove ingest succeeded.
+- `ingest_url_configured` — true when `VERDANT_INGEST_URL` is set.
+- `bridge_token_configured` — true when `VERDANT_BRIDGE_TOKEN` is set.
+- `masked_ingest_url` — host/path summary with project identifiers masked.
+- `masked_token_preview` — short `vbt_abc...xyz` preview. The full bridge token is **never** returned. Do not paste it into curl commands or docs.
+- `forward_attempt_count` — forward attempts since listener start. `0` means none yet.
+- `forward_success_count` — webhook calls that returned 2xx. `>0` confirms at least one successful ingest.
+- `forward_failure_count` — non-2xx responses or request exceptions. `>0` means inspect `last_forward_error` and `last_forward_status`.
+- `last_forward_status` — last HTTP status (or `null` on exception).
+- `last_forward_at` — ISO timestamp of the most recent attempt.
+- `last_forward_error` — short sanitized error summary.
+
+Notes:
+
+- Counters are **in-memory** and reset when the listener restarts.
+- `forwarding_enabled=false` is expected for local-only testing.
+- Do **not** paste bridge tokens into curl commands.
+
+### Parse diagnostics — categorize malformed JSONL safely
+
+When `malformed_line_count` is greater than zero, use `/debug/parse-diagnostics`
+to see categorized counts without reading raw lines:
+
+```
+curl "http://localhost:8787/debug/parse-diagnostics"
+curl.exe "http://localhost:8787/debug/parse-diagnostics"
+```
+
+It returns categories like `empty_line`, `json_decode_error`,
+`non_object_json`, `missing_metrics`, `missing_captured_at`,
+`unknown_normalized_shape`, and `secret_redacted`. It is safe for local
+debugging: loopback-only, read-only, sanitized, and never returns raw
+JSONL lines or raw payloads.
+
+## One-command verification (Windows)
+
+```powershell
+cd tools/ecowitt-testbench
+.\verify-testbench-windows.ps1
+```
+
+The script runs `bun run typecheck`, the EcoWitt static safety vitest,
+and probes the safe local debug endpoints (`/health`, `/debug/status`,
+`/debug/forwarding-status`, `/debug/parse-diagnostics`). It does **not**
+start the listener, read `.env`, print bridge tokens, post payloads, or
+forward to Verdant. If the listener is not running it tells you to run
+`.\start-listener-windows.ps1` first.
 
 ## Files
 
@@ -270,6 +328,8 @@ tools/ecowitt-testbench/
   setup-windows.ps1
   start-listener-windows.ps1
   send-demo-payload-windows.ps1
+  verify-testbench-windows.ps1
   .env.example
 docs/ecowitt-windows-testbench.md  (this file)
 ```
+

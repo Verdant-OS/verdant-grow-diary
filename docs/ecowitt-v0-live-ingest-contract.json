@@ -1,0 +1,50 @@
+{
+  "$schema": "https://verdant.local/schemas/ecowitt-v0-live-ingest-contract.json",
+  "version": "v0",
+  "canonical_stored_sources": ["live", "manual", "csv", "demo", "stale", "invalid"],
+  "transport_sources": {
+    "ecowitt": {
+      "stored_source_for_live_ecowitt": "live",
+      "lineage_fields": [
+        "raw_payload.vendor",
+        "raw_payload.metadata.transport_source",
+        "raw_payload.metadata.verdant_source"
+      ],
+      "rule": "EcoWitt is transport/vendor lineage only; the canonical stored source must be one of canonical_stored_sources."
+    }
+  },
+  "forbidden_render_strings": [
+    "PASSKEY",
+    "Authorization",
+    "Bearer",
+    "vbt_",
+    "service_role",
+    "raw_payload"
+  ],
+  "forbidden_string_patterns": [
+    "eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}",
+    "https?://[A-Za-z0-9.-]+/functions/v1/sensor-ingest-webhook"
+  ],
+  "no_goals": [
+    "no fake live data",
+    "no device control",
+    "no trigger-forward UI",
+    "no Action Queue writes",
+    "no alert creation",
+    "no AI invocation from readiness"
+  ],
+  "stored_row_top_level_columns_must_not_include": [
+    "vendor",
+    "metadata",
+    "idempotency_key"
+  ],
+  "regression_commands": [
+    "python3 -m unittest test_forwarding_config test_source_labeling test_forwarding_contract",
+    "bunx vitest run src/test/ecowitt-live-source-snapshot-visibility.test.ts src/test/ai-doctor-context-ecowitt-live-evidence.test.ts",
+    "bunx vitest run src/test/ecowitt-local-forwarding-status-widget.test.tsx src/test/ecowitt-bridge-debug-page.test.tsx src/test/ecowitt-live-ingest-verified-rules.test.ts src/test/ecowitt-windows-testbench-static-safety.test.ts",
+    "bunx vitest run src/test/sensor-readings-dedupe-index-migration.test.ts",
+    "bunx vitest run src/test/ecowitt-v0-live-ingest-contract-doc.test.ts",
+    "bun run test:edge:sensor-ingest-webhook",
+    "bun run typecheck"
+  ]
+}

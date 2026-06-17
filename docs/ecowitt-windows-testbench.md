@@ -292,6 +292,13 @@ Fields:
   - `non_json_response` — webhook returned a non-JSON body (often an edge or gateway error page).
   - `unknown_webhook_error` — an unrecognized error string.
 - `last_forward_response_message` — sanitized short summary from the response body. Token-like substrings (`vbt_…`, JWT-shaped strings, `Bearer …`) are redacted inline. Never the full raw body.
+- `last_forward_response_reason` — sanitized `reason` sub-code parsed from `insert_failed` responses. Whitelisted to one of:
+  - `insert_required_field_missing` — a required DB field was missing from the insert payload.
+  - `insert_source_constraint_failed` — stored `source` failed the canonical source check (EcoWitt transport `source` must be remapped to stored `source = "live"`).
+  - `insert_check_failed` — a database check constraint rejected the row.
+  - `insert_column_mismatch` — the insert payload references a column that does not exist or no longer matches schema.
+  - `insert_duplicate` — duplicate/idempotent reading; usually safe.
+  - `insert_unknown` — fallback when the webhook returned a `reason` we do not recognize, or any value containing token-like text. Raw PG messages, SQL, and constraint names are **never** echoed.
 
 Notes:
 

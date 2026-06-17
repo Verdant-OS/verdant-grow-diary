@@ -10,6 +10,17 @@ $ErrorActionPreference = "Stop"
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $here
 
+$preflight = Join-Path $here "preflight-windows.ps1"
+if (Test-Path $preflight) {
+    & $preflight
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Preflight failed. Fix the issues above before starting the listener."
+        exit 1
+    }
+} else {
+    Write-Host "[verdant-testbench] preflight-windows.ps1 not found. You may be in the wrong folder." -ForegroundColor Yellow
+}
+
 $venvPython = Join-Path $here ".venv\Scripts\python.exe"
 if (-not (Test-Path $venvPython)) {
     Write-Error "Python venv not found at $venvPython. Run .\setup-windows.ps1 first."

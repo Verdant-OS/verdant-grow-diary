@@ -502,6 +502,36 @@ export default function Timeline() {
             Clear filters
           </Button>
         </div>
+        <div
+          className="flex flex-wrap items-center gap-1.5"
+          data-testid="timeline-sensor-source-filter"
+          aria-label="Filter timeline by sensor source"
+        >
+          <span className="text-[11px] uppercase tracking-wide text-muted-foreground mr-1">
+            Sensor source
+          </span>
+          {SENSOR_SOURCE_KINDS.map((kind) => {
+            const active = sensorSourceFilter.includes(kind);
+            return (
+              <button
+                key={kind}
+                type="button"
+                onClick={() => toggleSensorSource(kind)}
+                aria-pressed={active}
+                data-testid={`timeline-sensor-source-toggle-${kind}`}
+                className={cn(
+                  "inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] transition",
+                  active
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-secondary/50 text-foreground border-border/50 hover:bg-secondary",
+                )}
+              >
+                {SENSOR_SOURCE_SHORT_LABEL[kind]}
+              </button>
+            );
+          })}
+          <SensorSourceLegendTooltip testIdSuffix="timeline-filter" className="ml-1" />
+        </div>
         <p
           className="text-xs text-muted-foreground"
           data-testid="timeline-results-count"
@@ -511,6 +541,7 @@ export default function Timeline() {
           {entries.length === 1 ? "entry" : "entries"}
         </p>
       </div>
+
 
       {/* Filters */}
       <div className="space-y-2 mb-4">

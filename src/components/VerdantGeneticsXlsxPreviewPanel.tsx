@@ -463,7 +463,14 @@ export function VerdantGeneticsXlsxPreviewPanel({
                 className="text-[11px] text-emerald-300/90"
                 data-testid="vg-xlsx-save-success"
               >
-                {XLSX_SAVE_SUCCESS_PREFIX} {savedCount} rows imported.
+                {saveOutcome
+                  ? (saveOutcome.diagnostic
+                    ?? (saveOutcome.inserted === 0 && saveOutcome.duplicates > 0
+                      ? `Imported 0 new readings. Skipped ${saveOutcome.duplicates} duplicate${saveOutcome.duplicates === 1 ? "" : "s"} already present for this tent. No live sensor data was created.`
+                      : saveOutcome.duplicates > 0
+                        ? `Imported ${saveOutcome.inserted} new reading${saveOutcome.inserted === 1 ? "" : "s"}. Skipped ${saveOutcome.duplicates} duplicate${saveOutcome.duplicates === 1 ? "" : "s"} already present for this tent. No live sensor data was created.`
+                        : `${XLSX_SAVE_SUCCESS_PREFIX} ${saveOutcome.inserted} rows imported. No live sensor data was created.`))
+                  : `${XLSX_SAVE_SUCCESS_PREFIX} ${savedCount} rows imported.`}
               </span>
             )}
             {saveStatus === "error" && saveError && (

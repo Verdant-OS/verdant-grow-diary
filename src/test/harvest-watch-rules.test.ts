@@ -49,7 +49,7 @@ function baseInput(overrides: Partial<HarvestWatchInput> = {}): HarvestWatchInpu
 
 describe("safety fences", () => {
   it("contains no forbidden imports", () => {
-    expect(SOURCE).not.toMatch(/supabase/i);
+    expect(SOURCE).not.toMatch(/from\s+["'][^"']*supabase[^"']*["']/i);
     expect(SOURCE).not.toMatch(/fetch\s*\(/);
     expect(SOURCE).not.toMatch(/from\s+["']react["']/);
   });

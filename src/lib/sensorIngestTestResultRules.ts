@@ -23,6 +23,13 @@ export interface SensorIngestTestClassification {
   headline: string;
   detail: string;
   isSuccess: boolean;
+  /**
+   * True when the browser received a real HTTP status (preflight + CORS
+   * worked); false when fetch threw / status was 0 (request blocked before a
+   * readable response). Lets diagnostic UIs distinguish "CORS broken" from
+   * "CORS fine, server rejected the POST".
+   */
+  corsWorking: boolean;
 }
 
 export interface ClassifyInput {

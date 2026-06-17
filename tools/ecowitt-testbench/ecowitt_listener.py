@@ -11,11 +11,15 @@ Safety properties (must remain true):
 * No direct Supabase table writes. Forwarding, when explicitly enabled,
   goes only to the existing validated ingest webhook
   (`VERDANT_INGEST_URL`) using the bridge token (`VERDANT_BRIDGE_TOKEN`).
-* No fake live data. Built-in browser/test payloads are labeled
-  ``source = "demo"``. ``source = "live"`` is only used when the request
-  is explicitly marked as coming from a real EcoWitt gateway via the
-  ``X-Verdant-Forward-Mode: live`` header or the ``VERDANT_FORWARD_MODE``
-  env var.
+* No fake live data. Synthetic loopback browser/curl/demo payloads are
+  labeled ``source = "demo"``. Real LAN EcoWitt gateway uploads
+  (non-loopback caller carrying EcoWitt gateway marker fields such as
+  ``PASSKEY`` / ``stationtype`` / ``model`` / ``dateutc``) are labeled
+  ``source = "live"``. Explicit ``X-Verdant-Forward-Mode: live`` header
+  or ``VERDANT_FORWARD_MODE=live`` env var also opts in to ``live``.
+  Unknown / spoofed ``source`` values from the payload normalize to
+  ``invalid`` and are never silently treated as live or healthy.
+
 * Missing / malformed / stale values are never silently classified as
   healthy — they are normalized to ``None`` and the raw payload is kept
   in ``metadata.raw_payload`` for audit.

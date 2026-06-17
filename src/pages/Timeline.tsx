@@ -6,7 +6,13 @@ import { STAGES, stageLabel } from "@/lib/grow";
 import { format, formatDistanceToNow } from "date-fns";
 import { Sprout, Image as ImageIcon, Loader2, Camera, FileText, FlaskConical, Check, Pencil, Leaf, Gauge, Bell, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
+import {
+  SENSOR_SOURCES_PARAM,
+  encodeSensorSourcesParam,
+  parseSensorSourcesParam,
+  sensorSourcesEqual,
+} from "@/lib/sensorSourceUrlRules";
 
 import EntryEditDialog from "@/components/EntryEditDialog";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";

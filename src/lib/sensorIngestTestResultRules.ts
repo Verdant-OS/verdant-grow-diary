@@ -214,7 +214,7 @@ export function classifySensorIngestTestResult(
   return {
     category: "unknown",
     headline: status > 0 ? `HTTP ${status}` : "Unknown response",
-    detail: reason ?? "Unrecognized response from the ingest endpoint.",
+    detail: codeCopy ?? reason ?? "Unrecognized response from the ingest endpoint.",
     isSuccess: false,
     corsWorking: true,
   };

@@ -6,7 +6,13 @@ import { STAGES, stageLabel } from "@/lib/grow";
 import { format, formatDistanceToNow } from "date-fns";
 import { Sprout, Image as ImageIcon, Loader2, Camera, FileText, FlaskConical, Check, Pencil, Leaf, Gauge, Bell, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
+import {
+  SENSOR_SOURCES_PARAM,
+  encodeSensorSourcesParam,
+  parseSensorSourcesParam,
+  sensorSourcesEqual,
+} from "@/lib/sensorSourceUrlRules";
 
 import EntryEditDialog from "@/components/EntryEditDialog";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
@@ -168,7 +174,32 @@ export default function Timeline() {
   const [eventTypeFilter, setEventTypeFilter] = useState("");
   const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
   const [detailEntryId, setDetailEntryId] = useState<string | null>(null);
-  const [sensorSourceFilter, setSensorSourceFilter] = useState<TimelineSensorSourceKind[]>([]);
+  // Source filter state is mirrored to/from the `?sensorSources=` URL
+  // query param so the Sensors page summary widget can link directly into
+  // a pre-filtered Timeline without introducing app-wide global state.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [sensorSourceFilter, setSensorSourceFilter] = useState<TimelineSensorSourceKind[]>(
+    () => parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM)),
+  );
+
+  // Pull URL → state when the param changes externally (e.g. via Link).
+  useEffect(() => {
+    const next = parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM));
+    setSensorSourceFilter((cur) => (sensorSourcesEqual(cur, next) ? cur : next));
+  }, [searchParams]);
+
+  // Push state → URL whenever the local filter diverges from the URL.
+  useEffect(() => {
+    const fromUrl = parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM));
+    if (sensorSourcesEqual(fromUrl, sensorSourceFilter)) return;
+    const next = new URLSearchParams(searchParams);
+    const encoded = encodeSensorSourcesParam(sensorSourceFilter);
+    if (encoded) next.set(SENSOR_SOURCES_PARAM, encoded);
+    else next.delete(SENSOR_SOURCES_PARAM);
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sensorSourceFilter]);
+
 
   async function load() {
     if (!user || !activeGrowId) {

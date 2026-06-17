@@ -3,11 +3,18 @@
  * many sensor readings came from each canonical source for the supplied
  * readings/date range.
  *
+ * Rows with count > 0 link to the Timeline filtered by that source
+ * (and optional date range / plant). Rows with count = 0 stay visible
+ * but render as accessible-disabled non-links so growers can still see
+ * the full legend at a glance.
+ *
  * Pure presenter. No I/O. No writes. No AI calls.
  */
+import { Link } from "react-router-dom";
 import {
   SENSOR_SOURCE_KINDS,
   SENSOR_SOURCE_SHORT_LABEL,
+  SENSOR_SOURCE_LEGEND,
 } from "@/constants/sensorSourceLabels";
 import {
   SENSOR_SOURCE_SUMMARY_EMPTY_TEXT,
@@ -16,6 +23,8 @@ import {
   type SensorSourceSummaryReading,
 } from "@/lib/sensorSourceSummaryRules";
 import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
+import { buildTimelineFilterUrl } from "@/lib/sensorSourceUrlRules";
+import type { TimelineSensorSourceKind } from "@/lib/timelineSensorSourceBadgeRules";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -23,6 +32,17 @@ interface Props {
   options?: SensorSourceSummaryOptions;
   className?: string;
   title?: string;
+  /**
+   * Optional date range applied to the click-through Timeline URL.
+   * Should be YYYY-MM-DD strings.
+   */
+  dateRange?: { from?: string | null; to?: string | null } | null;
+  /** Optional plant scope applied to the click-through URL. */
+  plantId?: string | null;
+  /** Override the link base (default `/timeline`). */
+  linkBase?: string;
+  /** When false, rows are non-clicking even when count > 0. */
+  enableLinks?: boolean;
 }
 
 const TONE: Record<string, string> = {
@@ -39,8 +59,77 @@ export default function SensorSourceSummaryWidget({
   options,
   className,
   title = "Sensor source summary",
+  dateRange,
+  plantId,
+  linkBase,
+  enableLinks = true,
 }: Props) {
   const summary = summarizeSensorSources(readings, options);
+
+  function renderRow(kind: TimelineSensorSourceKind) {
+    const count = summary.counts[kind];
+    const label = SENSOR_SOURCE_SHORT_LABEL[kind];
+    const legend = SENSOR_SOURCE_LEGEND[kind];
+    const baseCls = cn(
+      "flex items-center justify-between rounded-lg border bg-background/40 px-2.5 py-1.5 text-xs",
+      TONE[kind],
+    );
+    const a11yLabel = `${label}: ${count} ${count === 1 ? "reading" : "readings"} — ${legend}`;
+    const inner = (
+      <>
+        <span className="font-medium">{label}</span>
+        <span
+          className="tabular-nums font-semibold"
+          data-testid={`sensor-source-summary-count-${kind}`}
+        >
+          {count}
+        </span>
+      </>
+    );
+    const sharedAttrs = {
+      "data-testid": `sensor-source-summary-row-${kind}`,
+      "data-source-kind": kind,
+      "data-source-count": String(count),
+      "aria-label": a11yLabel,
+      title: legend,
+    } as const;
+
+    if (!enableLinks || count <= 0) {
+      return (
+        <li
+          key={kind}
+          {...sharedAttrs}
+          data-clickable="false"
+          aria-disabled={count <= 0 ? "true" : undefined}
+          className={cn(baseCls, count <= 0 && "opacity-60")}
+        >
+          {inner}
+        </li>
+      );
+    }
+    const to = buildTimelineFilterUrl({
+      sources: [kind],
+      from: dateRange?.from ?? null,
+      to: dateRange?.to ?? null,
+      plantId: plantId ?? null,
+      base: linkBase,
+    });
+    return (
+      <li key={kind} {...sharedAttrs} data-clickable="true">
+        <Link
+          to={to}
+          aria-label={`Open Timeline filtered to ${label} source (${count} ${count === 1 ? "reading" : "readings"})`}
+          data-testid={`sensor-source-summary-link-${kind}`}
+          className={cn(
+            baseCls,
+            "w-full hover:bg-background/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
+          )}
+        >
+          {inner}
+        </Link>
+      </li>
+    );
+  }
 
   return (
     <section
@@ -73,25 +162,7 @@ export default function SensorSourceSummaryWidget({
           className="grid grid-cols-2 gap-1.5 sm:grid-cols-3"
           data-testid="sensor-source-summary-rows"
         >
-          {SENSOR_SOURCE_KINDS.map((kind) => (
-            <li
-              key={kind}
-              data-testid={`sensor-source-summary-row-${kind}`}
-              data-source-kind={kind}
-              className={cn(
-                "flex items-center justify-between rounded-lg border bg-background/40 px-2.5 py-1.5 text-xs",
-                TONE[kind],
-              )}
-            >
-              <span className="font-medium">{SENSOR_SOURCE_SHORT_LABEL[kind]}</span>
-              <span
-                className="tabular-nums font-semibold"
-                data-testid={`sensor-source-summary-count-${kind}`}
-              >
-                {summary.counts[kind]}
-              </span>
-            </li>
-          ))}
+          {SENSOR_SOURCE_KINDS.map(renderRow)}
         </ul>
       )}
     </section>

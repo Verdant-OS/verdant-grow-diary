@@ -23,6 +23,12 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import SensorSourceSummaryWidget from "@/components/SensorSourceSummaryWidget";
 import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
+import SensorSourceInlineLegend from "@/components/SensorSourceInlineLegend";
+import { useSearchParams } from "react-router-dom";
+import {
+  SENSOR_SOURCES_PARAM,
+  parseSensorSourcesParam,
+} from "@/lib/sensorSourceUrlRules";
 
 const METRICS = [
   { key: "temp", label: "Temperature" },
@@ -40,6 +46,10 @@ export default function Sensors() {
   // be written to via RLS. The display list above may include mock tents.
   const { data: realTents = [] } = useTentRows();
   const [tentId, setTentId] = useState<string>(tents[0]?.id ?? "t1");
+  const [searchParams] = useSearchParams();
+  const urlSensorSources = parseSensorSourcesParam(
+    searchParams.get(SENSOR_SOURCES_PARAM),
+  );
   const filtered = readings.filter((r) => r.tentId === tentId);
   const latest = filtered.length > 0 ? filtered[filtered.length - 1] : null;
   const selectedTent = tents.find((t) => t.id === tentId) ?? null;
@@ -189,6 +199,12 @@ export default function Sensors() {
           mode. Stale or invalid telemetry is flagged and should not be
           treated as healthy current data.
         </p>
+        <div className="mt-2">
+          <SensorSourceInlineLegend
+            testId="sensors-source-inline-legend"
+            highlight={urlSensorSources}
+          />
+        </div>
       </div>
       <SensorSourceSummaryWidget
         className="mt-4 max-w-xl"

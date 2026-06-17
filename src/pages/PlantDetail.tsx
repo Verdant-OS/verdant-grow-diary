@@ -56,6 +56,7 @@ import { format, formatDistanceToNow } from "date-fns";
 
 import PlantQuickLog from "@/components/PlantQuickLog";
 import PlantManualSensorFreshnessCard from "@/components/PlantManualSensorFreshnessCard";
+import PlantSensorSourceBreakdownCard from "@/components/PlantSensorSourceBreakdownCard";
 import { useEffect, useState } from "react";
 import { Zap } from "lucide-react";
 
@@ -637,6 +638,10 @@ export default function PlantDetail() {
           <PlantManualSensorFreshnessCard
             plantId={plant.id}
             onUpdate={() => setQuickLogOpen(true)}
+          />
+          <PlantSensorSourceBreakdownCard
+            plantId={plant.id}
+            className="mt-1"
           />
           <PlantTentEnvironmentPanel
             tentId={plant.tentId ?? null}

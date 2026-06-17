@@ -142,6 +142,7 @@ const App = () => (
                 <Route path="/operator/ecowitt" element={<OperatorEcowittCanary />} />
                 <Route path="/operator/one-tent-proof-record" element={<OneTentProofRecord />} />
                 <Route path="/operator/ecowitt-bridge-status" element={<EcowittBridgeStatus />} />
+                <Route path="/operator/ecowitt-bridge-debug" element={<EcowittBridgeDebug />} />
                 <Route path="/operator/ecowitt-live-bringup" element={<EcowittLiveBringup />} />
                 <Route
                   path="/operator/ecowitt-tent-preview"

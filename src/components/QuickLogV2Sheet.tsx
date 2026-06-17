@@ -772,9 +772,20 @@ export default function QuickLogV2Sheet({
               role="alert"
               aria-live="assertive"
               data-testid="qlv2-error"
-              className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive"
+              className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive flex items-center justify-between gap-2"
             >
-              {localError}
+              <span>{localError}</span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                data-testid="qlv2-save-retry"
+                aria-label="Retry saving Quick Log"
+                disabled={saving || feedingSaving || contextBlocked}
+                onClick={handleSave}
+              >
+                Retry
+              </Button>
             </div>
           )}
 

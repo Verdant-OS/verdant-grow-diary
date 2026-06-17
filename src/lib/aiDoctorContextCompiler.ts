@@ -170,38 +170,28 @@ export interface PlantContextPayload {
   plant_name: string | null;
   strain: string | null;
   stage: string | null;
+  /**
+   * Growing medium carried directly from the plant/profile row. Null
+   * when missing, empty, or blank. Never inferred from notes/strain.
+   */
+  medium: string | null;
+  /**
+   * Container / pot size label carried directly from the plant/profile
+   * row. Null when missing, empty, or blank. Never inferred.
+   */
+  pot_size: string | null;
   recent_grow_events: readonly RecentGrowEvent[];
   recentSensorReadings: readonly RecentSensorReading[];
   sensor_groups: readonly SensorSourceGroup[];
   averages_7d: SensorRollingAverages;
   notable_deviations: readonly string[];
   source_tags: readonly SensorSourceTag[];
-  /**
-   * Safe, read-only summary of imported CSV/XLSX sensor history.
-   * Present only when at least one CSV row contributed. Never used as
-   * a substitute for current/live telemetry.
-   */
   imported_sensor_history: ImportedSensorHistorySection | null;
-  /**
-   * True only when at least one trustworthy live reading exists in the
-   * compiled context. CSV history NEVER flips this flag to true.
-   */
   hasLiveSensorReadings: boolean;
-  /**
-   * True when no current/live sensor evidence exists. Stays true even
-   * when CSV history is present, so AI Doctor still surfaces the
-   * missing-live-readings caveat.
-   */
   missingLiveSensorReadings: boolean;
-  /**
-   * Optional, additive early-stage (germination/seedling) memory compiled
-   * from saved Quick Log / diary `details.early_stage` envelopes. Null
-   * when no early-stage memory exists. Safe-by-construction: never
-   * carries raw payloads, tokens, privileged backend keys, or unknown
-   * enum strings.
-   */
   early_stage_memory: EarlyStageAiDoctorContext | null;
 }
+
 
 
 // ---------------------------------------------------------------------------

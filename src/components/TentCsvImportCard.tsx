@@ -428,7 +428,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
   async function handleXlsxSave(args: {
     adapterResult: import("@/lib/verdantGeneticsXlsxInsertRowsAdapter").VerdantGeneticsXlsxInsertRowsResult;
     tentIdBySensorGroup?: Record<string, string>;
-  }) {
+  }): Promise<import("@/components/VerdantGeneticsXlsxPreviewPanel").VerdantGeneticsXlsxSaveOutcome> {
     const { adapterResult, tentIdBySensorGroup = {} } = args;
     if (adapterResult.blocked || adapterResult.rows.length === 0) {
       toast.error("No XLSX sensor readings were imported.");
@@ -448,28 +448,39 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
       });
       throw new Error(SENSOR_HISTORY_IMPORT_DUPLICATE_COPY);
     }
-    const { error } = await supabase
-      .from("sensor_readings")
-      .insert(adapterResult.rows as never);
-    if (error) {
-      toast.error("Couldn't import XLSX.", { description: error.message });
-      throw error;
+    // Duplicate-aware import: preflight existing dedupe keys, then insert
+    // only genuinely-new rows in batches. A fully-duplicate import is a
+    // successful no-op — never surfaced as "Save failed".
+    const batchResult = await runDuplicateAwareCsvHistoryImport({
+      rows: adapterResult.rows,
+      vendorLabel: "Verdant Genetics XLSX",
+      batchSize: CSV_HISTORY_INSERT_BATCH_SIZE,
+      fetchExistingKeys: (scope) => fetchExistingDedupeKeys(scope),
+      insertBatch: async (batch) => {
+        const { error } = await supabase
+          .from("sensor_readings")
+          .insert(batch as never);
+        return { error: error as BatchInsertError | null };
+      },
+    });
+    if (!batchResult.ok) {
+      toast.error("Couldn't import XLSX.", {
+        description: batchResult.diagnostic,
+      });
+      throw new Error(batchResult.diagnostic);
     }
     const rejectedSummary =
       adapterResult.rejectedRowCount > 0
-        ? ` ${adapterResult.rejectedRowCount} rows rejected (${Object.entries(
+        ? ` ${adapterResult.rejectedRowCount} row${adapterResult.rejectedRowCount === 1 ? "" : "s"} rejected before save (${Object.entries(
             adapterResult.rejectionReasons,
           )
             .map(([k, v]) => `${k}: ${v}`)
             .join(", ")}).`
         : "";
-    toast.success(
-      `Imported XLSX sensor history as CSV history. ${adapterResult.acceptedRowCount} rows imported.${rejectedSummary} No live sensor data was created.`,
-      {
-        description: CSV_HISTORY_IMPORT_SCOPE_LINE,
-        action: viewImportedHistoryAction,
-      },
-    );
+    toast.success(`${batchResult.diagnostic}${rejectedSummary}`, {
+      description: CSV_HISTORY_IMPORT_SCOPE_LINE,
+      action: viewImportedHistoryAction,
+    });
     recordSensorHistoryImportFingerprint(fingerprint);
     if (xlsxGrid) {
       try {
@@ -493,7 +504,14 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
     qc.invalidateQueries({ queryKey: ["latest-sensor-snapshot"] });
     qc.invalidateQueries({ queryKey: ["plant-tent-environment"] });
     qc.invalidateQueries({ queryKey: ["environment-trends"] });
+    return {
+      inserted: batchResult.insertedRows,
+      duplicates: batchResult.duplicateRows,
+      totalRows: batchResult.totalRows,
+      diagnostic: batchResult.diagnostic,
+    };
   }
+
 
 
   const registrySaveVisible =

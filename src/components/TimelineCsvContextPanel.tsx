@@ -103,6 +103,15 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
       <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         CSV environment context
       </h3>
+      <div
+        role="note"
+        data-testid="timeline-csv-context-readonly-banner"
+        className="rounded-md border border-amber-500/40 bg-amber-500/5 p-2 text-[11px] text-amber-200"
+      >
+        CSV context is read-only. Verdant shows this history only when the
+        source is explicitly labeled csv. Live and manual sensor readings
+        remain separate.
+      </div>
       {[...matchedByEntry.values()].map((c) => (
         <CsvTimelineEnvironmentChip
           key={c.diaryEntryId}

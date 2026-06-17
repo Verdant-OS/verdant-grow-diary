@@ -35,7 +35,7 @@ import Diagnostics from "./pages/Diagnostics";
 import ActionQueue from "./pages/ActionQueue";
 import OperatorEcowittCanary from "./pages/OperatorEcowittCanary";
 import OperatorEcowittTentPreview from "./pages/OperatorEcowittTentPreview";
-import OperatorGeneticsImportPage from "./pages/OperatorGeneticsImportPage";
+
 import EcowittBridgeStatus from "./pages/EcowittBridgeStatus";
 import EcowittBridgeDebug from "./pages/EcowittBridgeDebug";
 import OneTentProofRecord from "./pages/OneTentProofRecord";
@@ -52,9 +52,6 @@ import Leads from "./pages/Leads";
 import PiIngestStatus from "./pages/PiIngestStatus";
 import IngestInspector from "./pages/IngestInspector";
 import NotFound from "./pages/NotFound";
-import RepresentativeCsvPreview from "./pages/RepresentativeCsvPreview";
-import SensorCsvPreview from "./pages/SensorCsvPreview";
-import PartnerCsvPreviewLanding from "./pages/PartnerCsvPreviewLanding";
 import AiDoctorPhase1Preview from "./pages/AiDoctorPhase1Preview";
 import OneTentLoopProof from "./pages/OneTentLoopProof";
 import SensorTruthAudit from "./pages/SensorTruthAudit";
@@ -98,7 +95,7 @@ const App = () => (
               <Route path="/hardware-integrations" element={<HardwareIntegrations />} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/billing/:plan" element={<BillingPlaceholder />} />
-              <Route path="/partners/csv-preview" element={<PartnerCsvPreviewLanding />} />
+              
 
               <Route element={<AppShell />}>
                 <Route path="/" element={<Dashboard />} />
@@ -149,15 +146,13 @@ const App = () => (
                   path="/operator/ecowitt-tent-preview"
                   element={<OperatorEcowittTentPreview />}
                 />
-                <Route path="/operator/genetics-import" element={<OperatorGeneticsImportPage />} />
+                
                 <Route
                   path="/operator/one-tent-loop-smoke-test"
                   element={<OperatorOneTentLoopSmokeTest />}
                 />
                 <Route path="/pi-ingest-status" element={<PiIngestStatus />} />
                 <Route path="/ingest-inspector" element={<IngestInspector />} />
-                <Route path="/imports/representative-csv" element={<RepresentativeCsvPreview />} />
-                <Route path="/sensors/csv-preview" element={<SensorCsvPreview />} />
                 <Route
                   path="/internal/ai-doctor-phase1-preview"
                   element={<AiDoctorPhase1Preview />}

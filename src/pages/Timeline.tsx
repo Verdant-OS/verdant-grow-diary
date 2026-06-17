@@ -31,7 +31,7 @@ import DiaryCalendarSection from "@/components/DiaryCalendarSection";
 import { hasManualHandheldReadings } from "@/lib/quickLogHistoryRules";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { actionDetailPath, alertDetailPath, logsPath, timelinePath } from "@/lib/routes";
-import EnvironmentCsvImportLauncher from "@/components/EnvironmentCsvImportLauncher";
+
 import {
   buildEnvironmentSummaryReportUrl,
   defaultEnvironmentSummaryRange,
@@ -540,13 +540,6 @@ export default function Timeline() {
         >
           Summary
         </Link>
-        <EnvironmentCsvImportLauncher
-          growId={activeGrowId}
-          tentId={entries.find((e) => !!e.tent_id)?.tent_id ?? null}
-          variant="compact"
-          label="Import CSV"
-          testIdPrefix="timeline-csv-launcher"
-        />
       </div>
 
 

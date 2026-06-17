@@ -127,6 +127,12 @@ export function timelineEvidenceRowMatches(
     if (got !== want) return false;
   }
 
+  if (Array.isArray(input.sensorSources) && input.sensorSources.length > 0) {
+    const kind = deriveTimelineRowSensorSource(row);
+    if (kind === null) return false;
+    if (!input.sensorSources.includes(kind)) return false;
+  }
+
   return true;
 }
 
@@ -142,7 +148,8 @@ export function filterTimelineEvidenceRows<T extends TimelineEvidenceRow>(
   const noPlant = !input.plantId || input.plantId.trim() === "";
   const noTent = !input.tentId || input.tentId.trim() === "";
   const noType = !input.eventType || input.eventType.trim() === "";
-  if (noQuery && noPlant && noTent && noType) return [...rows];
+  const noSrc = !Array.isArray(input.sensorSources) || input.sensorSources.length === 0;
+  if (noQuery && noPlant && noTent && noType && noSrc) return [...rows];
   return rows.filter((r) => timelineEvidenceRowMatches(r, input));
 }
 

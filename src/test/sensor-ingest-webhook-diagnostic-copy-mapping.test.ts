@@ -14,6 +14,8 @@ import {
 
 const EXPECTED_CODES = [
   "unauthorized",
+  "token_revoked",
+  "token_expired",
   "server_misconfigured",
   "invalid_json",
   "invalid_payload",
@@ -22,6 +24,7 @@ const EXPECTED_CODES = [
   "insert_failed",
   "method_not_allowed",
   "internal_error",
+  "auth_lookup_failed",
 ];
 
 describe("SANITIZED_WEBHOOK_ERROR_COPY — every webhook code has copy", () => {

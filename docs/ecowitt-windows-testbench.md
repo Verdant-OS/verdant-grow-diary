@@ -281,13 +281,24 @@ Fields:
 - `forward_failure_count` — non-2xx responses or request exceptions. `>0` means inspect `last_forward_error` and `last_forward_status`.
 - `last_forward_status` — last HTTP status (or `null` on exception).
 - `last_forward_at` — ISO timestamp of the most recent attempt.
-- `last_forward_error` — short sanitized error summary.
+- `last_forward_error` — short sanitized error summary (e.g. `http_400`).
+- `last_forward_response_error` — sanitized `error` field parsed from the webhook response body (e.g. `invalid_payload`, `forbidden_tent`, `tent_lookup_failed`, `insert_failed`, `unauthorized`, `non_json_response`). `null` on success or when no response was received.
+- `last_forward_response_classification` — operator-friendly classification of the response error:
+  - `payload_shape_mismatch` — the forwarded payload did not match the `sensor-ingest-webhook` contract (likely the `source`, `tent_id`, `captured_at`, or `metrics` shape).
+  - `tent_authorization_mismatch` — bridge token / tent pairing rejected (`forbidden_tent`).
+  - `tent_lookup_failed` — webhook could not verify tent context server-side.
+  - `storage_insert_failed` — webhook accepted the payload but the database insert failed (`insert_failed`).
+  - `auth_failed` — bridge token rejected (`unauthorized`).
+  - `non_json_response` — webhook returned a non-JSON body (often an edge or gateway error page).
+  - `unknown_webhook_error` — an unrecognized error string.
+- `last_forward_response_message` — sanitized short summary from the response body. Token-like substrings (`vbt_…`, JWT-shaped strings, `Bearer …`) are redacted inline. Never the full raw body.
 
 Notes:
 
 - Counters are **in-memory** and reset when the listener restarts.
 - `forwarding_enabled=false` is expected for local-only testing.
-- Do **not** paste bridge tokens into curl commands.
+- Do **not** paste bridge tokens, Authorization headers, or raw EcoWitt payloads into curl commands, support chats, or issue reports. The sanitized `last_forward_response_*` fields are the safe way to share failure context.
+
 
 ### Parse diagnostics — categorize malformed JSONL safely
 

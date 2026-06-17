@@ -853,6 +853,8 @@ def debug_forwarding_status() -> Any:
 
     url = os.environ.get("VERDANT_INGEST_URL")
     token = os.environ.get("VERDANT_BRIDGE_TOKEN")
+    tent_id = os.environ.get("VERDANT_TENT_ID")
+    readiness = evaluate_forwarding_readiness(url, token, tent_id)
     forwarding_enabled = bool(url and token)
 
     last_error = FORWARD_STATS.get("last_error")
@@ -864,13 +866,17 @@ def debug_forwarding_status() -> Any:
         {
             "ok": True,
             "forwarding_enabled": forwarding_enabled,
-            "ingest_url_configured": bool(url),
-            "bridge_token_configured": bool(token),
+            "forwarding_ready": readiness["ready"],
+            "ingest_url_configured": readiness["ingest_url_configured"],
+            "bridge_token_configured": readiness["bridge_token_configured"],
+            "tent_id_configured": readiness["tent_id_configured"],
+            "tent_id_valid": readiness["tent_id_valid"],
             "masked_ingest_url": mask_ingest_url(url),
             "masked_token_preview": _mask_token_preview(token),
             "forward_attempt_count": int(FORWARD_STATS.get("attempt_count", 0)),
             "forward_success_count": int(FORWARD_STATS.get("success_count", 0)),
             "forward_failure_count": int(FORWARD_STATS.get("failure_count", 0)),
+            "forward_blocked_count": int(FORWARD_STATS.get("blocked_count", 0)),
             "last_forward_status": FORWARD_STATS.get("last_status"),
             "last_forward_at": FORWARD_STATS.get("last_at"),
             "last_forward_error": last_error,

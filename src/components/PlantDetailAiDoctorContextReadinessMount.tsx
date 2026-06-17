@@ -152,6 +152,16 @@ export default function PlantDetailAiDoctorContextReadinessMount({
 
   const auditLogs = (manualLogs.data ?? []) as ReadonlyArray<ManualSensorLog>;
 
+  const safeOpenQuickLog =
+    growId && tentId
+      ? () =>
+          openManualSensorEntry({
+            plantId,
+            growId,
+            tentId,
+          })
+      : undefined;
+
   return (
     <div
       data-testid="plant-detail-ai-doctor-context-readiness-mount"
@@ -160,6 +170,16 @@ export default function PlantDetailAiDoctorContextReadinessMount({
       <AiDoctorContextReadinessPanel
         context={built.context}
         openAlertsCount={alerts.rows.length}
+        quickActions={{
+          // Watering / Feeding route into the existing QuickLog prefill
+          // surface; the grower still confirms and saves. No writes here.
+          onAddWatering: safeOpenQuickLog,
+          onAddFeeding: safeOpenQuickLog,
+          // Fast Add Photo and Add Sensor Snapshot have no safe single-
+          // tap entry yet — leave undefined so the panel renders them
+          // disabled with clear "coming soon" copy rather than inventing
+          // a route.
+        }}
       />
       <PlantSensorContextAuditPanel
         logs={auditLogs}

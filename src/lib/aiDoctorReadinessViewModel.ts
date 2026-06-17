@@ -64,9 +64,56 @@ export interface AiDoctorReadinessLimitation {
   message: string;
 }
 
+/**
+ * Coarse confidence/trust class derived from the existing AI Doctor
+ * context. Distinguishes:
+ *  - "ready"          — trustworthy live/manual evidence + recent events.
+ *  - "limited"        — context can run, but the answer may be weak.
+ *  - "not_trustworthy" — sensor data is stale/invalid/demo-only and
+ *                       must not be presented as healthy live data.
+ */
+export type AiDoctorReadinessConfidenceClass =
+  | "ready"
+  | "limited"
+  | "not_trustworthy";
+
+export const AI_DOCTOR_CONFIDENCE_CLASS_COPY: Record<
+  AiDoctorReadinessConfidenceClass,
+  string
+> = Object.freeze({
+  ready:
+    "Context looks strong enough for a more useful AI Doctor check.",
+  limited:
+    "AI Doctor can run, but the answer may be limited until more evidence is added.",
+  not_trustworthy:
+    "Sensor context is not trustworthy enough to rely on. Add or verify readings before using them for diagnosis.",
+});
+
+/**
+ * Evidence flags derived purely from existing AI Doctor context fields.
+ * No caller-supplied extras: watering / feeding / photo / unknown
+ * stage / unknown medium / unknown pot size all come from the context
+ * payload itself. Open-alerts uses the count already threaded into the
+ * view-model. Medium and pot size are not yet tracked on the Phase 1
+ * payload — they are reported as `unknown` so the panel can prompt the
+ * grower, never inferred or guessed.
+ */
+export interface AiDoctorContextEvidenceFlags {
+  hasRecentWatering: boolean;
+  hasRecentFeeding: boolean;
+  hasRecentPhoto: boolean;
+  hasOpenAlerts: boolean;
+  hasUnknownStage: boolean;
+  hasUnknownMedium: boolean;
+  hasUnknownPotSize: boolean;
+}
+
 export interface AiDoctorReadinessView {
   state: AiDoctorReadinessState;
   stateLabel: string;
+  confidenceClass: AiDoctorReadinessConfidenceClass;
+  confidenceClassCopy: string;
+  evidenceFlags: AiDoctorContextEvidenceFlags;
   plantIdentity: {
     plantId: string | null;
     plantName: string | null;
@@ -95,6 +142,50 @@ export interface AiDoctorReadinessView {
     whatNotToDo: readonly string[];
   };
 }
+
+const WATERING_EVENT_RE = /water/i;
+const FEEDING_EVENT_RE = /feed|nutrient/i;
+const PHOTO_EVENT_RE = /photo|image|picture/i;
+
+export function deriveAiDoctorContextEvidenceFlags(
+  context: AiDoctorContext,
+  openAlertsCount: number,
+): AiDoctorContextEvidenceFlags {
+  const events = context.recent_grow_events ?? [];
+  let hasRecentWatering = false;
+  let hasRecentFeeding = false;
+  let hasRecentPhoto = false;
+  for (const ev of events) {
+    const type = ev.event_type ?? "";
+    if (!hasRecentWatering && WATERING_EVENT_RE.test(type)) hasRecentWatering = true;
+    if (!hasRecentFeeding && FEEDING_EVENT_RE.test(type)) hasRecentFeeding = true;
+    if (!hasRecentPhoto && PHOTO_EVENT_RE.test(type)) hasRecentPhoto = true;
+  }
+  const stage =
+    typeof context.stage === "string" ? context.stage.trim() : context.stage;
+  return {
+    hasRecentWatering,
+    hasRecentFeeding,
+    hasRecentPhoto,
+    hasOpenAlerts: openAlertsCount > 0,
+    hasUnknownStage: !stage,
+    // Medium and pot size are not present on the Phase 1 context payload
+    // yet — surface them as unknown so the panel can prompt the grower.
+    hasUnknownMedium: true,
+    hasUnknownPotSize: true,
+  };
+}
+
+function classifyConfidenceClass(
+  state: AiDoctorReadinessState,
+): AiDoctorReadinessConfidenceClass {
+  if (state === "ready") return "ready";
+  if (state === "demo_only" || state === "telemetry_limited") {
+    return "not_trustworthy";
+  }
+  return "limited";
+}
+
 
 export const AI_DOCTOR_PREVIEW_NOTICE = "Preview only — not saved.";
 
@@ -168,9 +259,15 @@ export function buildAiDoctorReadinessView(
     });
   }
 
+  const confidenceClass = classifyConfidenceClass(state);
+  const evidenceFlags = deriveAiDoctorContextEvidenceFlags(context, openAlerts);
+
   return Object.freeze({
     state,
     stateLabel: AI_DOCTOR_READINESS_STATE_LABELS[state],
+    confidenceClass,
+    confidenceClassCopy: AI_DOCTOR_CONFIDENCE_CLASS_COPY[confidenceClass],
+    evidenceFlags,
     plantIdentity: {
       plantId: context.plant_id,
       plantName: context.plant_name,

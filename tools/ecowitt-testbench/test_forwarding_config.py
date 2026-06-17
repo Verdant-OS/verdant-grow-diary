@@ -162,8 +162,184 @@ class MaybeForwardTests(unittest.TestCase):
             self.assertFalse(result["forwarded"])
             self.assertEqual(result["reason"], "no_forwarding_configured")
         # Silent no-op: not counted as a "blocked" forward.
-        self.assertEqual(FORWARD_STATS["blocked_count"], 0)
+class _FakeResp:
+    def __init__(self, status_code, json_body=None, text=""):
+        self.status_code = status_code
+        self._json = json_body
+        self.text = text
+
+    def json(self):
+        if self._json is None:
+            raise ValueError("no json")
+        return self._json
+
+
+def _full_env(**extra):
+    env = {
+        "VERDANT_INGEST_URL": INGEST_URL,
+        "VERDANT_BRIDGE_TOKEN": BRIDGE_TOKEN,
+        "VERDANT_TENT_ID": VALID_TENT_UUID,
+    }
+    env.update(extra)
+    return env
+
+
+class ForwardedPayloadContractTests(unittest.TestCase):
+    def setUp(self):
+        _reset_stats()
+
+    def _send(self, reading):
+        with mock.patch.dict(os.environ, _full_env(), clear=False):
+            with mock.patch("ecowitt_listener.requests") as fake_requests:
+                fake_requests.post.return_value = _FakeResp(200, {"ok": True})
+                result = maybe_forward(reading)
+                kwargs = fake_requests.post.call_args.kwargs
+                return result, kwargs
+
+    def test_forwarded_payload_uses_webhook_transport_source_not_verdant_live(self):
+        reading = {
+            "captured_at": "2026-06-17T05:40:30Z",
+            "source": "live",
+            "vendor": "ecowitt_windows_testbench",
+            "metrics": {"temp_f": 80.0},
+            "metadata": {"raw_payload": {"tempf": 80.0}},
+        }
+        _, kwargs = self._send(reading)
+        payload = kwargs["json"]
+        # webhook contract requires WEBHOOK_ALLOWED_SOURCES; "live" is rejected
+        self.assertEqual(payload["source"], WEBHOOK_TRANSPORT_SOURCE)
+        self.assertEqual(payload["vendor"], "ecowitt_windows_testbench")
+        self.assertEqual(payload["captured_at"], "2026-06-17T05:40:30Z")
+        self.assertEqual(payload["metrics"], {"temp_f": 80.0})
+        self.assertEqual(payload["tent_id"], VALID_TENT_UUID)
+        # Verdant local source label preserved as lineage, never sent as `source`
+        self.assertEqual(payload["metadata"]["verdant_source"], "live")
+
+    def test_passkey_is_stripped_from_forwarded_raw_payload(self):
+        reading = {
+            "captured_at": "2026-06-17T05:40:30Z",
+            "source": "live",
+            "metrics": {"temp_f": 70.0},
+            "metadata": {
+                "raw_payload": {
+                    "PASSKEY": "SECRETDEVICEAUTH123",
+                    "passkey": "alt-secret",
+                    "tempf": 70.0,
+                    "stationtype": "GW1200B_V1.4.7",
+                }
+            },
+        }
+        _, kwargs = self._send(reading)
+        payload = kwargs["json"]
+        raw = payload["metadata"]["raw_payload"]
+        self.assertNotIn("PASSKEY", raw)
+        self.assertNotIn("passkey", raw)
+        self.assertNotIn("Passkey", raw)
+        self.assertIn("tempf", raw)
+        self.assertIn("stationtype", raw)
+        # And the literal secret string must not appear anywhere in the body
+        import json as _json
+        body_text = _json.dumps(payload)
+        self.assertNotIn("SECRETDEVICEAUTH123", body_text)
+        self.assertNotIn("alt-secret", body_text)
+
+
+class ForwardErrorSanitizationTests(unittest.TestCase):
+    def setUp(self):
+        _reset_stats()
+
+    def test_400_invalid_payload_json_body_is_captured(self):
+        with mock.patch.dict(os.environ, _full_env(), clear=False):
+            with mock.patch("ecowitt_listener.requests") as fake_requests:
+                fake_requests.post.return_value = _FakeResp(
+                    400, {"error": "invalid_payload", "errors": ["tent_id required (uuid)"]}
+                )
+                maybe_forward({"captured_at": "x", "metrics": {"temp_f": 70.0}})
+        self.assertEqual(FORWARD_STATS["last_status"], 400)
+        self.assertEqual(FORWARD_STATS["last_error"], "http_400")
+        self.assertEqual(
+            FORWARD_STATS["last_forward_response_error"], "invalid_payload"
+        )
+        self.assertEqual(
+            FORWARD_STATS["last_forward_response_classification"],
+            "payload_shape_mismatch",
+        )
+        # message is sanitized
+        msg = FORWARD_STATS["last_forward_response_message"]
+        self.assertIsNotNone(msg)
+
+    def test_400_with_token_like_string_is_redacted(self):
+        leaky = "vbt_AAAAAAAAAAAAAAAAAAAAAAAAAA"
+        with mock.patch.dict(os.environ, _full_env(), clear=False):
+            with mock.patch("ecowitt_listener.requests") as fake_requests:
+                fake_requests.post.return_value = _FakeResp(
+                    400,
+                    {
+                        "error": "invalid_payload",
+                        "message": f"bad token {leaky} in payload",
+                    },
+                )
+                maybe_forward({"captured_at": "x", "metrics": {"temp_f": 70.0}})
+        import json as _json
+        dumped = _json.dumps(FORWARD_STATS, default=str)
+        self.assertNotIn(leaky, dumped)
+
+    def test_non_json_400_body_is_summarized(self):
+        with mock.patch.dict(os.environ, _full_env(), clear=False):
+            with mock.patch("ecowitt_listener.requests") as fake_requests:
+                fake_requests.post.return_value = _FakeResp(
+                    400, json_body=None, text="<html>nginx 400</html>"
+                )
+                maybe_forward({"captured_at": "x", "metrics": {"temp_f": 70.0}})
+        self.assertEqual(
+            FORWARD_STATS["last_forward_response_error"], "non_json_response"
+        )
+        self.assertEqual(
+            FORWARD_STATS["last_forward_response_classification"],
+            "non_json_response",
+        )
+        msg = FORWARD_STATS["last_forward_response_message"]
+        self.assertIsInstance(msg, str)
+        self.assertLessEqual(len(msg), 240)
+
+    def test_response_fields_reset_each_attempt(self):
+        with mock.patch.dict(os.environ, _full_env(), clear=False):
+            with mock.patch("ecowitt_listener.requests") as fake_requests:
+                fake_requests.post.return_value = _FakeResp(
+                    400, {"error": "invalid_payload"}
+                )
+                maybe_forward({"captured_at": "x", "metrics": {"temp_f": 70.0}})
+                self.assertEqual(
+                    FORWARD_STATS["last_forward_response_error"], "invalid_payload"
+                )
+                # second call succeeds — fields should clear
+                fake_requests.post.return_value = _FakeResp(200, {"ok": True})
+                maybe_forward({"captured_at": "x", "metrics": {"temp_f": 70.0}})
+                self.assertIsNone(FORWARD_STATS["last_forward_response_error"])
+                self.assertIsNone(
+                    FORWARD_STATS["last_forward_response_classification"]
+                )
+
+    def test_sanitize_forward_error_value_redacts_token_like_strings(self):
+        leaky = "vbt_BBBBBBBBBBBBBBBBBBBBBBBBBB"
+        out = sanitize_forward_error_value(leaky)
+        self.assertNotEqual(out, leaky)
+        out2 = sanitize_forward_error_value("Bearer eyJabcdefghij.eyJabcdefghij.signaturesignature")
+        self.assertNotIn("eyJ", str(out2))
+
+    def test_summarize_forward_response_known_classifications(self):
+        for err, cls in [
+            ("invalid_payload", "payload_shape_mismatch"),
+            ("forbidden_tent", "tent_authorization_mismatch"),
+            ("tent_lookup_failed", "tent_lookup_failed"),
+            ("insert_failed", "storage_insert_failed"),
+            ("unauthorized", "auth_failed"),
+        ]:
+            r = summarize_forward_response(_FakeResp(400, {"error": err}))
+            self.assertEqual(r["error"], err)
+            self.assertEqual(r["classification"], cls)
 
 
 if __name__ == "__main__":
     unittest.main()
+

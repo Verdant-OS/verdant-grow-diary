@@ -19,7 +19,19 @@ import {
 const TENT = "11111111-1111-4111-8111-111111111111";
 const USER = "22222222-2222-4222-8222-222222222222";
 
-const baseRow = {
+interface BaseRow {
+  tent_id: string;
+  metric: string;
+  value: number;
+  captured_at: string;
+  ts: string;
+  quality: string;
+  device_id: string | null;
+  raw_payload: Record<string, unknown>;
+  source?: string;
+}
+
+const baseRow: BaseRow = {
   tent_id: TENT,
   metric: "temperature_c",
   value: 26.9,
@@ -34,8 +46,8 @@ const baseRow = {
     metrics: { temp_f: 80.42, humidity_percent: 41, soil_moisture_pct: 83 },
     metadata: { device_id: "GW2000A_V1.2.3" },
     vendor: "ecowitt",
-  } as Record<string, unknown>,
-} as Record<string, unknown>;
+  },
+};
 
 describe("mapStoredSourceForTransport", () => {
   it("collapses ecowitt transport to canonical live", () => {

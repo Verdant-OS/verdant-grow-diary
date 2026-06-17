@@ -49,5 +49,7 @@ jobs:
         with:
           name: sensor-ingest-webhook-deno-log
           path: deno-edge-tests.log
-          # Never upload .env, raw JSONL, or local listener logs.
+          # Only the test log is uploaded — never dotfiles, raw JSONL listener
+          # output, or local logs.
           if-no-files-found: ignore
+

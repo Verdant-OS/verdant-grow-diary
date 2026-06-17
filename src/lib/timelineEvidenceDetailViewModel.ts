@@ -53,7 +53,7 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
 };
 
 // Hard list of details keys the drawer may read. Anything outside this
-// list — especially `raw_payload`, tokens, headers, URLs — is ignored.
+// list — especially payload blobs, tokens, headers, URLs — is ignored.
 const SAFE_DETAIL_KEYS: ReadonlySet<string> = new Set([
   "event_type",
   "plant_name",

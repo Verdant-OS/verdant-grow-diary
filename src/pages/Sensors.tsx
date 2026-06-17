@@ -173,9 +173,17 @@ export default function Sensors() {
           <ManualSensorReadingCard tents={manualTents} defaultTentId={defaultManualTentId} />
         )}
       </div>
-      <div className="mt-4 max-w-xl rounded-lg border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground">
-        Sensor readings come from live ingest, manual entry, CSV history where
-        explicitly labeled, or demo data in demo mode.
+      <div
+        className="mt-4 max-w-xl rounded-lg border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground"
+        data-testid="sensors-source-explainer"
+      >
+        <p className="font-semibold text-foreground mb-1">Sensor sources</p>
+        <p>
+          Verdant can show live ingest readings, grower-entered manual
+          readings, explicitly labeled csv history, or demo data in demo
+          mode. Stale or invalid telemetry is flagged and should not be
+          treated as healthy current data.
+        </p>
       </div>
       <div className="mt-4 max-w-xl">
         <SensorBridgeHealthCard />

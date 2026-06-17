@@ -10,15 +10,19 @@
  *   4. If no report exists after a successful run, print a healthy
  *      message and exit 0.
  *
- * Diagnostics:
- *   - Emits a single GitHub Actions `::error` annotation for the first
- *     offending row when running under GITHUB_ACTIONS, so PR reviewers
- *     get an inline failure surface.
- *   - Always prints a compact, truncated per-row field-level diff for
- *     human readers (no raw payload dumps, no secrets).
+ * Flags:
+ *   --verbose   Print report path, threshold, stale-report removal state,
+ *               post-run report presence, row count, validation stats
+ *               (valid/invalid/slow), and the value-preview truncation limit.
  *
- * The pure validation helpers are exported so a runtime contract test
- * can exercise them without needing a real >5s sleep.
+ * Diagnostics:
+ *   - Under GITHUB_ACTIONS=true, emits one `::error` annotation per
+ *     invalid or slow telemetry row (not just the first offender).
+ *   - Always prints compact, truncated per-row field-level diffs for
+ *     human readers. No raw payload dumps, no secrets.
+ *
+ * Pure helpers are exported so the runtime contract test can exercise
+ * them without needing a real >5s sleep.
  *
  * Safety:
  *   - No production code changes.
@@ -33,9 +37,9 @@ import { fileURLToPath } from "node:url";
 
 export const SCANNER_SLOW_REPORT_PATH = "test-results/scanner-guardrail-slow-tests.jsonl";
 export const SCANNER_SLOW_THRESHOLD_MS = 5_000;
+export const MAX_VALUE_PREVIEW = 80;
 
 const REQUIRED_FIELDS = ["test", "suite", "file", "durationMs", "thresholdMs", "recordedAt"];
-const MAX_VALUE_PREVIEW = 80;
 
 /** Truncate any value for safe, compact log output (no giant payload dumps). */
 export function previewValue(v) {
@@ -56,10 +60,6 @@ export function previewValue(v) {
 
 /**
  * Validate a single parsed JSONL row against the stable telemetry contract.
- * Returns { ok: true } when valid, otherwise
- * { ok: false, error: string, failedFields: Array<{ field, expected, got, message }> }.
- *
- * `failedFields[].got` is a compact, truncated preview — never a full payload.
  */
 export function validateScannerSlowRow(row) {
   const failedFields = [];
@@ -123,11 +123,6 @@ export function validateScannerSlowRow(row) {
   return { ok: false, error: failedFields[0].message, failedFields };
 }
 
-/**
- * Parse JSONL content and validate every row. Returns
- * { rows, errors, failedFields } — errors[i] is null for ok rows,
- * failedFields[i] is [] for ok rows.
- */
 export function parseAndValidateScannerSlowReport(content) {
   const lines = content.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
   const rows = [];
@@ -158,10 +153,6 @@ export function parseAndValidateScannerSlowReport(content) {
   return { rows, errors, failedFields };
 }
 
-/**
- * Build a compact, multi-line per-row field-level diff. Caller decides
- * whether to print it. Truncates values via previewValue.
- */
 export function formatRowFieldDiff(lineNumber, fields) {
   if (!fields || fields.length === 0) return "";
   const lines = [`[scanner-guardrails] line ${lineNumber} failed fields:`];
@@ -172,8 +163,8 @@ export function formatRowFieldDiff(lineNumber, fields) {
 }
 
 /**
- * Build a GitHub Actions `::error` annotation string for the first
- * offending row. Returns "" if no offending row exists.
+ * Build a GitHub Actions `::error` annotation string for a single
+ * offending row. Returns "" when there are no failed fields.
  */
 export function buildGithubAnnotation({ reportPath, lineNumber, row, failedFields }) {
   if (!failedFields || failedFields.length === 0) return "";
@@ -191,6 +182,21 @@ export function buildGithubAnnotation({ reportPath, lineNumber, row, failedField
   return `::error file=${reportPath},line=${lineNumber},title=${title}::${body}`;
 }
 
+/**
+ * Compute summary stats for a parsed report. A row is "slow" when it is
+ * structurally valid (passes the contract). A row is "invalid" when at
+ * least one failed field was reported. Both categories are offenders.
+ */
+export function summarizeReport({ rows, failedFields }) {
+  let valid = 0;
+  let invalid = 0;
+  for (let i = 0; i < rows.length; i++) {
+    if (failedFields[i] && failedFields[i].length > 0) invalid += 1;
+    else valid += 1;
+  }
+  return { total: rows.length, valid, invalid, slow: valid };
+}
+
 function repoRelativeReportPath() {
   return resolve(process.cwd(), SCANNER_SLOW_REPORT_PATH);
 }
@@ -199,8 +205,9 @@ function deleteStaleReport() {
   const p = repoRelativeReportPath();
   if (existsSync(p)) {
     rmSync(p, { force: true });
-    console.log(`[scanner-guardrails-ci] removed stale report: ${SCANNER_SLOW_REPORT_PATH}`);
+    return true;
   }
+  return false;
 }
 
 function runScannerSuite() {
@@ -211,23 +218,39 @@ function runScannerSuite() {
   return res.status ?? 1;
 }
 
-function inspectReport() {
+function inspectReport({ verbose } = { verbose: false }) {
   const p = repoRelativeReportPath();
-  if (!existsSync(p)) {
+  const exists = existsSync(p);
+  if (verbose) {
+    console.log(`[scanner-guardrails-ci] report-exists-after-run=${exists}`);
+  }
+  if (!exists) {
     console.log(
       "[scanner-guardrails-ci] healthy: no scanner guardrail tests exceeded " +
         `${SCANNER_SLOW_THRESHOLD_MS}ms (no report emitted).`,
     );
+    if (verbose) {
+      console.log(
+        `[scanner-guardrails-ci] verbose stats: rows=0 valid=0 invalid=0 slow=0 truncation-limit=${MAX_VALUE_PREVIEW}`,
+      );
+    }
     return 0;
   }
   const content = readFileSync(p, "utf8");
   const { rows, errors, failedFields } = parseAndValidateScannerSlowReport(content);
+  const stats = summarizeReport({ rows, failedFields });
   console.error(
     `[scanner-guardrails-ci] FAIL: ${rows.length} slow scanner row(s) emitted ` +
       `(threshold=${SCANNER_SLOW_THRESHOLD_MS}ms). Report: ${SCANNER_SLOW_REPORT_PATH}`,
   );
+  if (verbose) {
+    console.error(
+      `[scanner-guardrails-ci] verbose stats: rows=${stats.total} valid=${stats.valid} ` +
+        `invalid=${stats.invalid} slow=${stats.slow} truncation-limit=${MAX_VALUE_PREVIEW}`,
+    );
+  }
 
-  let firstOffenderEmitted = false;
+  const inActions = process.env.GITHUB_ACTIONS === "true";
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
     const lineNumber = i + 1;
@@ -241,35 +264,53 @@ function inspectReport() {
       if (diff) console.error(diff);
     }
 
-    if (!firstOffenderEmitted && process.env.GITHUB_ACTIONS === "true") {
+    if (inActions) {
+      const fieldsForAnnotation =
+        failedFields[i] && failedFields[i].length > 0
+          ? failedFields[i]
+          : [
+              {
+                field: "durationMs",
+                expected: `<=${SCANNER_SLOW_THRESHOLD_MS}`,
+                got: previewValue(r && r.durationMs),
+                message: "slow scanner row",
+              },
+            ];
       const annotation = buildGithubAnnotation({
         reportPath: SCANNER_SLOW_REPORT_PATH,
         lineNumber,
         row: r,
-        // Treat a clean-but-slow row as an offender too (it tripped the sentinel).
-        failedFields:
-          failedFields[i] && failedFields[i].length > 0
-            ? failedFields[i]
-            : [{ field: "durationMs", expected: `<=${SCANNER_SLOW_THRESHOLD_MS}`, got: previewValue(r && r.durationMs), message: "slow scanner row" }],
+        failedFields: fieldsForAnnotation,
       });
-      if (annotation) {
-        console.error(annotation);
-        firstOffenderEmitted = true;
-      }
+      if (annotation) console.error(annotation);
     }
   }
   return 1;
 }
 
-export async function main() {
-  deleteStaleReport();
+export function parseCliArgs(argv) {
+  return { verbose: argv.includes("--verbose") };
+}
+
+export async function main({ argv = process.argv.slice(2) } = {}) {
+  const { verbose } = parseCliArgs(argv);
+  const removed = deleteStaleReport();
+  if (verbose) {
+    console.log(
+      `[scanner-guardrails-ci] verbose: report-path=${SCANNER_SLOW_REPORT_PATH} ` +
+        `threshold-ms=${SCANNER_SLOW_THRESHOLD_MS} stale-report-deleted=${removed} ` +
+        `truncation-limit=${MAX_VALUE_PREVIEW}`,
+    );
+  } else if (removed) {
+    console.log(`[scanner-guardrails-ci] removed stale report: ${SCANNER_SLOW_REPORT_PATH}`);
+  }
   const code = runScannerSuite();
   if (code !== 0) {
     console.error(`[scanner-guardrails-ci] scanner suite failed with exit code ${code}`);
-    inspectReport();
+    inspectReport({ verbose });
     return code;
   }
-  return inspectReport();
+  return inspectReport({ verbose });
 }
 
 const invokedDirectly =

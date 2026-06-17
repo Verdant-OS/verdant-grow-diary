@@ -13,7 +13,10 @@ import {
   formatRowFieldDiff,
   buildGithubAnnotation,
   previewValue,
+  summarizeReport,
+  parseCliArgs,
   SCANNER_SLOW_THRESHOLD_MS,
+  MAX_VALUE_PREVIEW,
   // @ts-ignore - .mjs without types; helpers are pure JS.
 } from "../../scripts/run-scanner-guardrails-ci.mjs";
 
@@ -160,5 +163,66 @@ describe("scanner-guardrails-ci JSONL contract", () => {
         failedFields: [],
       }),
     ).toBe("");
+  });
+
+  it("builds one annotation per offending row (not just first)", () => {
+    const slow = { ...validRow(), durationMs: 5500 };
+    const invalid = { ...validRow(), file: "/abs/x.ts" };
+    const content = [JSON.stringify(slow), JSON.stringify(invalid)].join("\n") + "\n";
+    const { rows, failedFields } = parseAndValidateScannerSlowReport(content);
+    expect(rows.length).toBe(2);
+
+    const annotations: string[] = [];
+    for (let i = 0; i < rows.length; i++) {
+      const fields =
+        failedFields[i] && failedFields[i].length > 0
+          ? failedFields[i]
+          : [
+              {
+                field: "durationMs",
+                expected: `<=${SCANNER_SLOW_THRESHOLD_MS}`,
+                got: previewValue(rows[i].durationMs),
+                message: "slow scanner row",
+              },
+            ];
+      const a = buildGithubAnnotation({
+        reportPath: "test-results/scanner-guardrail-slow-tests.jsonl",
+        lineNumber: i + 1,
+        row: rows[i],
+        failedFields: fields,
+      });
+      annotations.push(a);
+    }
+    expect(annotations).toHaveLength(2);
+    expect(annotations[0]).toContain("line=1");
+    expect(annotations[0]).toContain("failedFields=durationMs");
+    expect(annotations[1]).toContain("line=2");
+    expect(annotations[1]).toContain("failedFields=file");
+    for (const a of annotations) {
+      expect(a.startsWith("::error ")).toBe(true);
+      expect(a.length).toBeLessThan(600);
+    }
+  });
+
+  it("summarizes report into total / valid / invalid / slow counts", () => {
+    const slow = { ...validRow(), durationMs: 5500 };
+    const slow2 = { ...validRow(), durationMs: 9000 };
+    const invalid = { ...validRow(), file: "/abs/x.ts" };
+    const content = [JSON.stringify(slow), JSON.stringify(slow2), JSON.stringify(invalid)].join("\n");
+    const parsed = parseAndValidateScannerSlowReport(content);
+    const stats = summarizeReport(parsed);
+    expect(stats).toEqual({ total: 3, valid: 2, invalid: 1, slow: 2 });
+  });
+
+  it("parseCliArgs detects --verbose flag", () => {
+    expect(parseCliArgs([])).toEqual({ verbose: false });
+    expect(parseCliArgs(["--verbose"])).toEqual({ verbose: true });
+    expect(parseCliArgs(["something", "--verbose", "else"])).toEqual({ verbose: true });
+  });
+
+  it("exposes a stable truncation limit for value previews", () => {
+    expect(MAX_VALUE_PREVIEW).toBe(80);
+    const huge = "y".repeat(500);
+    expect(previewValue(huge).length).toBeLessThanOrEqual(MAX_VALUE_PREVIEW + 2);
   });
 });

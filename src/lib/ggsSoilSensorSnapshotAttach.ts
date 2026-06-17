@@ -9,7 +9,7 @@
  *    only selects + presents an existing reading draft.
  *  - Never invents data. Stale or invalid GGS readings are returned
  *    with `attachable: false` and a clear reason; UI must surface
- *    the stale/invalid badge instead of labeling missing data as healthy.
+ *    the stale/invalid badge instead of presenting absent data as ok.
  *  - Never assumes a plant-specific reading unless `plantId` matches
  *    the draft's `plant_id` (or the draft has no plant scope and
  *    `plantId` is null, i.e. tent-level attach).

@@ -380,6 +380,68 @@ def _is_local_request() -> bool:
     return False
 
 
+DEFAULT_DEBUG_LINES = 10
+MIN_DEBUG_LINES = 1
+MAX_DEBUG_LINES = 50
+
+
+def parse_debug_line_count(
+    raw_value: Any,
+    default: int = DEFAULT_DEBUG_LINES,
+    minimum: int = MIN_DEBUG_LINES,
+    maximum: int = MAX_DEBUG_LINES,
+) -> int:
+    """Parse and clamp a ?lines= query value.
+
+    Pure / deterministic. Never raises. Defaults safely on missing,
+    non-numeric, list-shaped, or otherwise malformed inputs.
+    """
+    # Flask may surface repeated query params; pick the first non-empty.
+    if isinstance(raw_value, (list, tuple)):
+        raw_value = next((v for v in raw_value if v not in (None, "")), None)
+    if raw_value is None:
+        return default
+    try:
+        n = int(str(raw_value).strip())
+    except (TypeError, ValueError):
+        return default
+    if n < minimum:
+        return minimum
+    if n > maximum:
+        return maximum
+    return n
+
+
+def read_recent_log_lines(n: int) -> list[str]:
+    """Read the last N raw lines from LOG_PATH. Returns [] if missing."""
+    if not LOG_PATH.exists():
+        return []
+    try:
+        with LOG_PATH.open("r", encoding="utf-8", errors="replace") as fh:
+            return fh.readlines()[-n:]
+    except Exception:
+        return []
+
+
+def parse_jsonl_entries(lines: list[str]) -> tuple[list[Dict[str, Any]], int]:
+    """Parse JSONL lines. Returns (parsed_entries, malformed_line_count)."""
+    parsed: list[Dict[str, Any]] = []
+    malformed = 0
+    for raw in lines:
+        text = raw.rstrip("\n")
+        if not text.strip():
+            continue
+        try:
+            obj = json.loads(text)
+            if isinstance(obj, dict):
+                parsed.append(obj)
+            else:
+                malformed += 1
+        except Exception:
+            malformed += 1
+    return parsed, malformed
+
+
 @app.get("/debug/raw-log-tail")
 def debug_raw_log_tail() -> Any:
     # Local-only: never expose log contents over LAN.
@@ -389,23 +451,14 @@ def debug_raw_log_tail() -> Any:
             403,
         )
 
-    max_lines = 50
-    default_lines = 10
-    try:
-        n = int(request.args.get("lines", default_lines))
-    except (TypeError, ValueError):
-        n = default_lines
-    if n < 1:
-        n = 1
-    if n > max_lines:
-        n = max_lines
+    n = parse_debug_line_count(request.args.get("lines"))
 
     if not LOG_PATH.exists():
         return jsonify(
             {
                 "ok": True,
                 "count": 0,
-                "max_lines": max_lines,
+                "max_lines": MAX_DEBUG_LINES,
                 "message": "No raw log file found yet.",
                 "entries": [],
             }
@@ -442,8 +495,119 @@ def debug_raw_log_tail() -> Any:
         {
             "ok": True,
             "count": len(entries),
-            "max_lines": max_lines,
+            "max_lines": MAX_DEBUG_LINES,
             "entries": entries,
+        }
+    )
+
+
+@app.get("/debug/status")
+def debug_status() -> Any:
+    # Local-only: never expose log status over LAN.
+    if not _is_local_request():
+        return (
+            jsonify({"ok": False, "error": "forbidden_non_local"}),
+            403,
+        )
+
+    log_path_str = str(LOG_PATH)
+    if not LOG_PATH.exists():
+        return jsonify(
+            {
+                "ok": True,
+                "log_exists": False,
+                "log_path": log_path_str,
+                "entry_count": 0,
+                "malformed_line_count": 0,
+                "latest_entry": None,
+                "latest_captured_at": None,
+                "latest_received_at": None,
+                "latest_metrics": None,
+                "message": "No raw log file found yet.",
+            }
+        )
+
+    try:
+        with LOG_PATH.open("r", encoding="utf-8", errors="replace") as fh:
+            all_lines = fh.readlines()
+    except Exception as exc:
+        return (
+            jsonify({"ok": False, "error": f"read_failed: {exc!s}"}),
+            500,
+        )
+
+    parsed, malformed = parse_jsonl_entries(all_lines)
+    latest = parsed[-1] if parsed else None
+    latest_safe = sanitize_debug_payload(latest) if latest else None
+
+    latest_captured_at = None
+    latest_received_at = None
+    latest_metrics = None
+    if isinstance(latest_safe, dict):
+        latest_captured_at = latest_safe.get("captured_at")
+        latest_received_at = latest_safe.get("received_at") or (
+            latest_safe.get("metadata", {}).get("received_at")
+            if isinstance(latest_safe.get("metadata"), dict)
+            else None
+        )
+        latest_metrics = latest_safe.get("metrics")
+
+    return jsonify(
+        {
+            "ok": True,
+            "log_exists": True,
+            "log_path": log_path_str,
+            "entry_count": len(parsed),
+            "malformed_line_count": malformed,
+            "latest_entry": latest_safe,
+            "latest_captured_at": latest_captured_at,
+            "latest_received_at": latest_received_at,
+            "latest_metrics": latest_metrics,
+            "message": "ok",
+        }
+    )
+
+
+@app.get("/debug/last-events")
+def debug_last_events() -> Any:
+    # Local-only: never expose normalized events over LAN.
+    if not _is_local_request():
+        return (
+            jsonify({"ok": False, "error": "forbidden_non_local"}),
+            403,
+        )
+
+    n = parse_debug_line_count(request.args.get("lines"))
+    lines = read_recent_log_lines(max(n * 4, n))  # over-read to tolerate malformed
+    parsed, malformed = parse_jsonl_entries(lines)
+    parsed_tail = parsed[-n:]
+
+    events: list[Dict[str, Any]] = []
+    for entry in parsed_tail:
+        safe = sanitize_debug_payload(entry)
+        if not isinstance(safe, dict):
+            continue
+        metadata = safe.get("metadata") if isinstance(safe.get("metadata"), dict) else {}
+        slim: Dict[str, Any] = {
+            "captured_at": safe.get("captured_at"),
+            "source": safe.get("source"),
+            "vendor": safe.get("vendor"),
+            "metrics": safe.get("metrics"),
+        }
+        if metadata.get("device_id") is not None:
+            slim["device_id"] = metadata.get("device_id")
+        if metadata.get("confidence") is not None:
+            slim["confidence"] = metadata.get("confidence")
+        # Explicitly do NOT include raw_payload by default.
+        events.append(slim)
+
+    return jsonify(
+        {
+            "ok": True,
+            "count": len(events),
+            "max_lines": MAX_DEBUG_LINES,
+            "malformed_line_count": malformed,
+            "entries": events,
         }
     )
 

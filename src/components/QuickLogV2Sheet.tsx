@@ -47,12 +47,19 @@ import {
 } from "@/lib/quickLogFeedingFormViewModel";
 import { writeFeedingTypedEvent } from "@/lib/writeFeedingTypedEvent";
 import QuickLogFeedingForm from "@/components/QuickLogFeedingForm";
+import QuickLogMaturityEvidenceFields from "@/components/QuickLogMaturityEvidenceFields";
 import {
   buildFeedingDefaults,
   applyFeedingDefaultsToForm,
   FEEDING_DEFAULTS_LABEL,
 } from "@/lib/feedingDefaultsViewModel";
 import { useRecentFeedingsForDefaults } from "@/hooks/useRecentFeedingsForDefaults";
+import {
+  EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM,
+  buildQuickLogMaturityEvidenceDetails,
+  quickLogMaturityEvidenceReasonToMessage,
+  type QuickLogMaturityEvidenceFormState,
+} from "@/lib/quickLogMaturityEvidenceRules";
 
 interface Props {
   open: boolean;
@@ -131,6 +138,9 @@ export default function QuickLogV2Sheet({
   const [feedingForm, setFeedingForm] = useState<QuickLogFeedingFormState>(
     EMPTY_QUICKLOG_FEEDING_FORM,
   );
+  const [maturityEvidenceForm, setMaturityEvidenceForm] = useState<QuickLogMaturityEvidenceFormState>(
+    EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM,
+  );
   const [feedingSaving, setFeedingSaving] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<string>("");
@@ -185,6 +195,8 @@ export default function QuickLogV2Sheet({
   const selectedTargetMissing = !contextBlocked && !form.selectedKey;
   const noteLength = form.note.length;
   const volumeMissing = form.action === "water" && form.volumeMl.trim() === "";
+  const showMaturityEvidence =
+    form.action !== "feed" && resolvedTarget.ok && resolvedTarget.targetType === "plant";
   const saveHelper = getSaveHelperMessage({
     contextBlocked,
     isLoadingContext,
@@ -209,6 +221,7 @@ export default function QuickLogV2Sheet({
         selectedKey: defaultTargetKey ?? null,
       });
       setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
+      setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
       setFeedingDefaultsApplied(false);
       setLocalError(null);
       setSaveStatus("");
@@ -361,6 +374,16 @@ export default function QuickLogV2Sheet({
       return;
     }
 
+    const maturityEvidence = buildQuickLogMaturityEvidenceDetails({
+      form: maturityEvidenceForm,
+      targetType: resolved.targetType ?? null,
+      observedAt: new Date().toISOString(),
+    });
+    if (maturityEvidence.ok !== true) {
+      setLocalError(quickLogMaturityEvidenceReasonToMessage(maturityEvidence.reason));
+      setSaveStatus("");
+      return;
+    }
 
     let uploadedPath: string | null = null;
     if (photoFile) {
@@ -386,6 +409,7 @@ export default function QuickLogV2Sheet({
       temperatureC: form.temperatureC,
       humidityPct: form.humidityPct,
       vpdKpa: form.vpdKpa,
+      details: maturityEvidence.details,
     });
     if (built.ok !== true) {
       if (uploadedPath) {
@@ -726,6 +750,16 @@ export default function QuickLogV2Sheet({
             </div>
           </div>
           )}
+
+          <QuickLogMaturityEvidenceFields
+            value={maturityEvidenceForm}
+            onChange={(next) => {
+              setMaturityEvidenceForm(next);
+              setLocalError(null);
+            }}
+            visible={showMaturityEvidence}
+            disabled={saving || feedingSaving}
+          />
 
           {form.action !== "feed" && (
           <details className="rounded-md border border-border p-3">

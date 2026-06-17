@@ -163,6 +163,7 @@ export default function Timeline() {
   const [tentFilter, setTentFilter] = useState("");
   const [eventTypeFilter, setEventTypeFilter] = useState("");
   const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
+  const [detailEntryId, setDetailEntryId] = useState<string | null>(null);
 
   async function load() {
     if (!user || !activeGrowId) {

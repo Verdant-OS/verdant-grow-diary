@@ -365,7 +365,7 @@ class RetryBehaviorTests(unittest.TestCase):
     def test_retries_on_500(self):
         with mock.patch.dict(os.environ, _full_env(), clear=False):
             with mock.patch("ecowitt_listener.requests") as fake_requests, \
-                 mock.patch("ecowitt_listener.time.sleep" if False else "time.sleep"):
+                 mock.patch("time.sleep"):
                 fake_requests.post.side_effect = self._fake_responses([500, 500, 200])
                 maybe_forward({"captured_at": "x", "metrics": {"temp_f": 70.0}})
         self.assertEqual(FORWARD_STATS["retry_count"], 2)

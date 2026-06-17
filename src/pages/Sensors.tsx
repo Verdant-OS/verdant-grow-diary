@@ -199,6 +199,12 @@ export default function Sensors() {
           mode. Stale or invalid telemetry is flagged and should not be
           treated as healthy current data.
         </p>
+        <div className="mt-2">
+          <SensorSourceInlineLegend
+            testId="sensors-source-inline-legend"
+            highlight={urlSensorSources}
+          />
+        </div>
       </div>
       <SensorSourceSummaryWidget
         className="mt-4 max-w-xl"

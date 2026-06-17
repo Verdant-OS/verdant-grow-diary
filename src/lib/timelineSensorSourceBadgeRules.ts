@@ -17,14 +17,12 @@
  *    is present. If no fallback is provided, the result is "invalid".
  *  - No I/O. No randomness. Deterministic.
  */
+import {
+  CANONICAL_SENSOR_SOURCES,
+  type CanonicalSensorSource,
+} from "@/constants/sensorIngestProvenance";
 
-export type TimelineSensorSourceKind =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid";
+export type TimelineSensorSourceKind = CanonicalSensorSource;
 
 export interface TimelineSensorSourceBadge {
   kind: TimelineSensorSourceKind;
@@ -46,14 +44,9 @@ export interface ClassifyTimelineSensorSourceInput {
   fallback?: TimelineSensorSourceKind;
 }
 
-const ALLOWED: ReadonlySet<TimelineSensorSourceKind> = new Set([
-  "live",
-  "manual",
-  "csv",
-  "demo",
-  "stale",
-  "invalid",
-]);
+const ALLOWED: ReadonlySet<TimelineSensorSourceKind> = new Set(
+  CANONICAL_SENSOR_SOURCES,
+);
 
 const LABELS: Record<TimelineSensorSourceKind, string> = {
   live: "Source: live",

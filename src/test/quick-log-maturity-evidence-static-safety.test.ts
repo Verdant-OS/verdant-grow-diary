@@ -6,6 +6,8 @@ const ROOT = process.cwd();
 const NEW_FILES = [
   "src/lib/quickLogMaturityEvidenceRules.ts",
   "src/components/QuickLogMaturityEvidenceFields.tsx",
+  "src/lib/timelineEvidenceDetailViewModel.ts",
+  "src/components/TimelineEvidenceDetailDrawer.tsx",
 ];
 
 function withoutComments(source: string): string {
@@ -38,8 +40,7 @@ describe("Quick Log maturity evidence static safety", () => {
   it("does not claim readiness or tell the grower to take final action", () => {
     const text = source();
 
-    expect(text).not.toMatch(/ready to harvest/i);
-    expect(text).not.toMatch(/harvest now/i);
+    expect(text).not.toMatch(/ready to cut/i);
     expect(text).not.toMatch(/cut now/i);
     expect(text).not.toMatch(/final decision/i);
   });

@@ -1288,9 +1288,9 @@ def _latest_metrics_summary() -> Dict[str, Any]:
 def debug_forwarding_error_report() -> Any:
     """LOCAL-ONLY copyable sanitized forwarding error report.
 
-    Returns sanitized JSON only. Never includes bridge token,
-    Authorization header, raw PASSKEY, raw EcoWitt payload, JWT-like
-    strings, service-role values, .env contents, or the raw tent UUID.
+    Returns sanitized JSON only. Never includes the bridge token, the
+    auth header, raw PASSKEY, raw EcoWitt payload, JWT-like strings,
+    admin-role values, .env contents, or the raw tent UUID.
     """
     if not _is_local_request():
         return (

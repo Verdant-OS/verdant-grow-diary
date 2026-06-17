@@ -20,7 +20,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock3,
+  Database,
+  HelpCircle,
+  Loader2,
+  TimerOff,
+  XCircle,
+} from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { useTents } from "@/hooks/use-tents";
 import {
@@ -32,9 +47,9 @@ import {
   type GgsSentinelInputRow,
   type GgsSentinelSnapshot,
   type GgsSentinelMetricFreshness,
+  type GgsFreshnessStatus,
 } from "@/lib/ggsSentinelSmokeRunner";
 import { SPIDER_FARMER_GGS_STALE_MS } from "@/lib/spiderFarmerGgsMappingRules";
-
 
 const WINDOW_HOURS = 4;
 
@@ -162,33 +177,43 @@ export default function GgsSentinelSmokeRunnerPanel() {
 
             {evaluation.metricFreshness.length > 0 && (
               <div>
-                <div className="mb-2 flex items-center justify-between">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-sm font-medium">Freshness guidance</h3>
                   <span className="text-xs text-muted-foreground">
                     Freshness window: {formatGgsWindowLabel(SPIDER_FARMER_GGS_STALE_MS)}
                   </span>
                 </div>
-                <ul className="divide-y rounded-md border text-sm">
-                  {evaluation.metricFreshness.map((f) => (
-                    <li key={f.metric} className="grid grid-cols-1 gap-1 px-3 py-2 md:grid-cols-[1fr_auto] md:items-center">
-                      <div>
-                        <div className="font-medium">
-                          {GGS_METRIC_FRIENDLY_NAME[f.metric]}{" "}
-                          <span className="text-xs text-muted-foreground">({f.metric})</span>
+                <p className="mb-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground" data-testid="ggs-freshness-priority-note">
+                  Freshness guidance explains metric timing only; result-state priority still comes from the smoke-check result above.
+                </p>
+                <TooltipProvider delayDuration={150}>
+                  <ul className="divide-y rounded-md border text-xs sm:text-sm" data-testid="ggs-freshness-compact-list">
+                    {evaluation.metricFreshness.map((f) => (
+                      <li
+                        key={f.metric}
+                        className={`grid grid-cols-[minmax(6.5rem,1.15fr)_auto_auto_minmax(7.5rem,1fr)] items-center gap-2 px-2 py-2 sm:px-3 ${freshnessRowClass(f.freshnessStatus)}`}
+                        data-testid={`ggs-freshness-row-${f.freshnessStatus}`}
+                      >
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <FreshnessStatusIcon status={f.freshnessStatus} />
+                          <span className="truncate font-medium">{GGS_METRIC_FRIENDLY_NAME[f.metric]}</span>
+                          <span className="hidden truncate font-mono text-[11px] text-muted-foreground sm:inline">
+                            {f.metric}
+                          </span>
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          {f.capturedAt ? `Captured ${f.ageLabel} · ${f.capturedAt}` : "No recent row"}
-                        </div>
-                        <div className="text-xs">{f.nextActionLabel}</div>
-                      </div>
-                      <FreshnessBadge freshness={f} />
-                    </li>
-                  ))}
-                </ul>
+                        <span className="whitespace-nowrap font-mono text-[11px] text-muted-foreground" title={f.capturedAt ?? "No row found"}>
+                          {f.ageLabel}
+                        </span>
+                        <FreshnessBadge freshness={f} />
+                        <span className="truncate text-[11px] text-muted-foreground" title={f.nextActionLabel}>
+                          {f.nextActionLabel}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </TooltipProvider>
               </div>
             )}
-
-
 
             {evaluation.safeMetrics.length > 0 && (
               <div>
@@ -240,11 +265,69 @@ function CheckBadge({ status }: { status: "pass" | "fail" | "warn" | "skipped" }
   return <Badge variant="outline">skipped</Badge>;
 }
 
-function FreshnessBadge({ freshness }: { freshness: GgsSentinelMetricFreshness }) {
-  const s = freshness.freshnessStatus;
-  if (s === "fresh") return <Badge variant="default">fresh</Badge>;
-  if (s === "aging") return <Badge variant="secondary">fresh but aging</Badge>;
-  if (s === "stale") return <Badge variant="destructive">stale</Badge>;
-  return <Badge variant="outline">missing</Badge>;
+function freshnessRowClass(status: GgsFreshnessStatus): string {
+  if (status === "stale") return "border-l-4 border-l-destructive bg-destructive/10";
+  if (status === "missing") return "border-l-4 border-l-muted-foreground/60 border-dashed bg-muted/40";
+  if (status === "aging") return "border-l-4 border-l-amber-500/70 bg-amber-500/10";
+  return "border-l-4 border-l-emerald-500/70 bg-emerald-500/10";
 }
 
+function FreshnessStatusIcon({ status }: { status: GgsFreshnessStatus }) {
+  if (status === "stale") {
+    return <TimerOff className="h-3.5 w-3.5 shrink-0 text-destructive" aria-label="row expired" />;
+  }
+  if (status === "missing") {
+    return <Database className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-label="no row found" />;
+  }
+  if (status === "aging") {
+    return <Clock3 className="h-3.5 w-3.5 shrink-0 text-amber-500" aria-label="row aging" />;
+  }
+  return <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" aria-label="row fresh" />;
+}
+
+function FreshnessBadge({ freshness }: { freshness: GgsSentinelMetricFreshness }) {
+  const s = freshness.freshnessStatus;
+  const label = s === "aging" ? "aging" : s;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          aria-label={`${label} freshness details`}
+          data-testid={`ggs-freshness-badge-${s}`}
+        >
+          <Badge variant={freshnessBadgeVariant(s)} className={freshnessBadgeClass(s)}>
+            <HelpCircle className="mr-1 h-3 w-3" aria-hidden="true" />
+            {label}
+          </Badge>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-xs text-xs">
+        {freshnessTooltip(freshness)}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function freshnessBadgeVariant(status: GgsFreshnessStatus): "default" | "secondary" | "destructive" | "outline" {
+  if (status === "fresh") return "default";
+  if (status === "aging") return "secondary";
+  if (status === "stale") return "destructive";
+  return "outline";
+}
+
+function freshnessBadgeClass(status: GgsFreshnessStatus): string {
+  if (status === "missing") return "border-dashed text-muted-foreground";
+  if (status === "aging") return "border-amber-500/50 text-amber-700 dark:text-amber-300";
+  return "";
+}
+
+function freshnessTooltip(freshness: GgsSentinelMetricFreshness): string {
+  const window = freshness.freshnessWindowLabel;
+  const base = `${window} window: fresh through 75% of the window, aging after 75% until ${window}, stale after ${window}.`;
+  if (freshness.freshnessStatus === "missing") {
+    return `${base} Missing means no row was found for this metric in the checked rows.`;
+  }
+  return `${base} This ${GGS_METRIC_FRIENDLY_NAME[freshness.metric]} row is ${freshness.freshnessStatus} (${freshness.ageLabel}).`;
+}

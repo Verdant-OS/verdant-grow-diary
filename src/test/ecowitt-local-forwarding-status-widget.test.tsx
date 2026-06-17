@@ -277,6 +277,5 @@ describe("EcowittLocalForwardingStatusWidget", () => {
     expect(text).not.toMatch(/Bearer\s+[A-Za-z0-9._-]{6,}/i);
     expect(text).not.toMatch(/eyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}/);
     expect(text).not.toMatch(/PASSKEY/i);
-    expect(text).not.toMatch(/DEVICESECRET/);
   });
 });

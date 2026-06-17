@@ -152,6 +152,7 @@ export function VerdantGeneticsXlsxPreviewPanel({
     setSaveStatus("saving");
     setSaveError(null);
     setSavedEvidence(null);
+    setSaveOutcome(null);
     try {
       const importBatchId = newImportBatchId();
       const freshResult = buildVerdantGeneticsXlsxInsertRows({
@@ -160,12 +161,15 @@ export function VerdantGeneticsXlsxPreviewPanel({
         growId: growId ?? undefined,
         importBatchId,
       });
-      await onSave({
+      const outcome = await onSave({
         tentIdBySensorGroup: { ...mappingState.tentIdBySensorGroup },
         importBatchId,
         adapterResult: freshResult,
       });
       setSavedCount(freshResult.acceptedRowCount);
+      if (outcome && typeof outcome === "object") {
+        setSaveOutcome(outcome);
+      }
       setSavedEvidence(
         buildVerdantGeneticsXlsxImportEvidenceViewModel({
           adapterResult: freshResult,
@@ -182,6 +186,7 @@ export function VerdantGeneticsXlsxPreviewPanel({
       setSaveStatus("error");
     }
   }
+
 
 
   return (

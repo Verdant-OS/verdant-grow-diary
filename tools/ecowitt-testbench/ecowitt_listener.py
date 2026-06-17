@@ -1187,6 +1187,18 @@ _RECOMMENDED_NEXT_STEP: Dict[str, str] = {
         "Bridge token rejected. Re-check VERDANT_BRIDGE_TOKEN in .env "
         "(do not paste it anywhere) and restart the listener."
     ),
+    "token_revoked": (
+        "Bridge token was revoked. Generate or paste a new active bridge token, "
+        "update .env, restart the listener, and retry one forward."
+    ),
+    "token_expired": (
+        "Bridge token has expired. Generate a new active bridge token, "
+        "update .env, restart the listener, and retry one forward."
+    ),
+    "auth_lookup_failed": (
+        "Webhook could not look up the bridge token. Retry shortly; "
+        "if it persists, share the sanitized report only."
+    ),
     "tent_authorization_mismatch": (
         "The bridge token is not authorized for this tent. Verify "
         "VERDANT_TENT_ID matches a tent the token can write to."

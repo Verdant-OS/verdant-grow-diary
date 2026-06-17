@@ -90,13 +90,8 @@ describe("TentDetail plant card link", () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    const cards = screen.queryAllByTestId("tent-detail-plant-card");
-    if (cards.length === 0) {
-      // Render path may stub Plants — skip silently rather than fail
-      // if upstream fixtures change. Pure route helper above is the
-      // authoritative contract.
-      return;
-    }
+    const cards = screen.getAllByTestId("tent-detail-plant-card");
+    expect(cards.length).toBeGreaterThan(0);
     const link = cards[0].querySelector("a");
     expect(link).not.toBeNull();
     expect(link!.getAttribute("href")).toBe(

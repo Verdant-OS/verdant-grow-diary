@@ -1,0 +1,53 @@
+name: sensor-ingest-webhook Edge Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/functions/sensor-ingest-webhook/**"
+      - "src/lib/sensorIngestTestResultRules.ts"
+      - "src/test/sensor-ingest-webhook*.test.ts"
+      - "package.json"
+      - ".github/workflows/sensor-ingest-webhook-edge-tests.yml"
+  pull_request:
+    paths:
+      - "supabase/functions/sensor-ingest-webhook/**"
+      - "src/lib/sensorIngestTestResultRules.ts"
+      - "src/test/sensor-ingest-webhook*.test.ts"
+      - "package.json"
+      - ".github/workflows/sensor-ingest-webhook-edge-tests.yml"
+
+jobs:
+  edge-tests:
+    name: Deno CORS + sanitizer E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      - name: Run sensor-ingest-webhook Deno tests
+        # Fake env only — no production secrets are used or required.
+        env:
+          SUPABASE_URL: https://example.test
+          SUPABASE_ANON_KEY: test-anon-key
+        run: |
+          deno test \
+            --allow-env \
+            --allow-net=esm.sh,deno.land,jsr.io,npm.jsr.io \
+            supabase/functions/sensor-ingest-webhook/cors_e2e_test.ts \
+            2>&1 | tee deno-edge-tests.log
+
+      - name: Upload Deno test log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sensor-ingest-webhook-deno-log
+          path: deno-edge-tests.log
+          # Never upload .env, raw JSONL, or local listener logs.
+          if-no-files-found: ignore

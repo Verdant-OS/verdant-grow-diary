@@ -178,6 +178,24 @@ export function normalizeLocalForwardingStatus(
         ? safe.last_retryable_status
         : null,
     max_retry_attempts: coerceNumber(safe.max_retry_attempts, 0),
+    last_forward_response_reason: coerceString(safe.last_forward_response_reason),
+    recommended_next_step: coerceString(safe.recommended_next_step),
+    malformed_line_count: coerceNumber(safe.malformed_line_count, 0),
+    generated_at: coerceString(safe.generated_at),
+    latest_metrics: normalizeLatestMetrics(safe.latest_metrics),
+  };
+}
+
+function normalizeLatestMetrics(raw: unknown): LocalForwardingLatestMetrics | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const metricsObj = r.metrics && typeof r.metrics === "object" ? (r.metrics as Record<string, unknown>) : {};
+  const keys = Object.keys(metricsObj).filter((k) => typeof k === "string");
+  return {
+    source: coerceString(r.source),
+    vendor: coerceString(r.vendor),
+    captured_at: coerceString(r.captured_at),
+    metric_keys: keys,
   };
 }
 

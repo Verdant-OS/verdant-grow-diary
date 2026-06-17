@@ -58,7 +58,7 @@ const LABELS: Record<TimelineSensorSourceKind, string> = {
 };
 
 const DESCRIPTIONS: Record<TimelineSensorSourceKind, string> = {
-  live: "Reading from a connected live ingest source.",
+  live: "Reading from a connected live source.",
   manual: "Reading entered manually by the grower.",
   csv: "Historical CSV context — not live sensor data.",
   demo: "Demo data — not a real sensor reading.",
@@ -70,9 +70,9 @@ function normalize(raw: string | null | undefined): TimelineSensorSourceKind | n
   if (typeof raw !== "string") return null;
   const v = raw.trim().toLowerCase();
   if (v.length === 0) return null;
-  if (v === "live" || v === "ingest" || v === "sensor" || v === "supabase") return "live";
+  if (v === "live" || v === "sensor" || v === "supabase") return "live";
   if (v === "manual" || v === "user" || v === "entry" || v === "log") return "manual";
-  if (v === "csv" || v === "import" || v === "imported") return "csv";
+  if (v === "csv") return "csv";
   if (v === "demo" || v === "mock" || v === "fake" || v === "sample" || v === "fixture") return "demo";
   if (v === "stale") return "stale";
   if (v === "invalid") return "invalid";

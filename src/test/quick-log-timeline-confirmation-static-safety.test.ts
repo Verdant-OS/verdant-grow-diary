@@ -68,4 +68,34 @@ describe("QuickLog timeline confirmation — static safety", () => {
     expect(body).toMatch(/QUICK_LOG_TIMELINE_CTA_LABEL/);
     expect(body).toMatch(/showTimelineConfirmation\(/);
   });
+
+  it("photo success path also surfaces the CTA via showTimelineConfirmation", () => {
+    const body = src("src/components/QuickLogV2Sheet.tsx");
+    // Both the standard/photo success path and the feeding path must
+    // route success messaging through showTimelineConfirmation.
+    const matches = body.match(/showTimelineConfirmation\(/g) ?? [];
+    expect(matches.length).toBeGreaterThanOrEqual(2);
+    expect(body).toMatch(/"Log and photo saved"|'Log and photo saved'/);
+  });
+
+  it("inline failed-save Retry reuses handleSave (no alternate save fn)", () => {
+    const body = src("src/components/QuickLogV2Sheet.tsx");
+    expect(body).toMatch(/data-testid="qlv2-save-retry"/);
+    expect(body).toMatch(/onClick=\{handleSave\}/);
+    // No new save handlers introduced for retry.
+    expect(body).not.toMatch(/retryHandleSave|handleRetrySave|backgroundRetry/);
+  });
+
+  it("touched files do not introduce raw mutations or bridge POSTs", () => {
+    for (const rel of FILES) {
+      const body = src(rel);
+      // Only quicklog_save_manual rpc is allowed and it lives in the hook,
+      // not in these files — assert no .rpc / fetch-to-bridge appears here.
+      expect(body).not.toMatch(/\.rpc\(/);
+      expect(body).not.toMatch(/fetch\(["'`]https?:\/\/[^"'`]*bridge/i);
+      expect(body).not.toMatch(/raw_payload/);
+      expect(body).not.toMatch(/Bearer\s+[A-Za-z0-9]/);
+    }
+  });
 });
+

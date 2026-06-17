@@ -62,6 +62,8 @@ import {
   buildTimelinePhotoAltText,
 } from "@/lib/timelinePhotoLightboxRules";
 import TimelinePhotoLightbox from "@/components/TimelinePhotoLightbox";
+import TimelineEvidenceDetailDrawer from "@/components/TimelineEvidenceDetailDrawer";
+import { buildTimelineEvidenceDetailViewModel } from "@/lib/timelineEvidenceDetailViewModel";
 
 
 

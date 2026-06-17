@@ -715,13 +715,47 @@ export async function runDuplicateAwareCsvHistoryImport<
     vendorLabel: args.vendorLabel,
     batchSize: args.batchSize,
     insertBatch: args.insertBatch,
+    // Short race-window recovery: when a batch hits the dedupe
+    // unique-violation, re-query the same scope and reclassify rows that
+    // are now provably present as skipped duplicates. Rows still missing
+    // from the re-query are returned for a single retry insert. Anything
+    // we cannot prove falls back to the original failure semantics.
+    onDedupeConflict: async (failedBatch) => {
+      const failedScope = summarizeDedupeScope(failedBatch);
+      if (!failedScope) return null;
+      let refreshedKeys: Set<string>;
+      try {
+        refreshedKeys = await args.fetchExistingKeys(failedScope);
+      } catch {
+        return null;
+      }
+      let confirmedDuplicateRows = 0;
+      const retryRows: TRow[] = [];
+      for (const row of failedBatch) {
+        const key = dedupeKeyOf(row);
+        if (key === null) {
+          // Cannot prove this row is a benign duplicate — refuse to
+          // recover the batch. Caller preserves failure path.
+          return null;
+        }
+        if (refreshedKeys.has(key)) {
+          confirmedDuplicateRows += 1;
+        } else {
+          retryRows.push(row);
+        }
+      }
+      return { confirmedDuplicateRows, retryRows };
+    },
   });
+
+  const recoveredDuplicates = batchResult.recoveredDuplicateRows ?? 0;
+  const totalDuplicates = duplicateCount + recoveredDuplicates;
 
   if (!batchResult.ok) {
     return {
       ok: false,
       insertedRows: batchResult.insertedRows,
-      duplicateRows: duplicateCount,
+      duplicateRows: totalDuplicates,
       totalRows,
       totalBatches: batchResult.totalBatches,
       allDuplicates: false,
@@ -731,19 +765,24 @@ export async function runDuplicateAwareCsvHistoryImport<
     };
   }
 
+  // If the only inserts were race-window recoveries that fully resolved
+  // to duplicates, treat the run as a duplicate-only no-op.
+  const allResolvedToDuplicates =
+    batchResult.insertedRows === 0 && totalDuplicates > 0;
+
   return {
     ok: true,
     insertedRows: batchResult.insertedRows,
-    duplicateRows: duplicateCount,
+    duplicateRows: totalDuplicates,
     totalRows,
     totalBatches: batchResult.totalBatches,
-    allDuplicates: false,
+    allDuplicates: allResolvedToDuplicates,
     batchResult,
     error: null,
     diagnostic: buildDuplicateAwareSuccessMessage({
       vendorLabel: args.vendorLabel,
       inserted: batchResult.insertedRows,
-      duplicates: duplicateCount,
+      duplicates: totalDuplicates,
       totalBatches: batchResult.totalBatches,
     }),
   };

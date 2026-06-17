@@ -173,6 +173,22 @@ export function derivePlantDetailBlockedStateView(
       if (!plant || isActivePlant(plant)) return null;
       const label = getArchivedPlantLabel(plant);
       const merged = label.kind === "merged";
+      const plantId =
+        typeof (plant as { id?: unknown }).id === "string"
+          ? ((plant as { id: string }).id)
+          : null;
+      const tentForLink = readPlantTentId(plant) ?? (typeof input.contextTentId === "string" ? input.contextTentId : null);
+      const archivedTimelineAction: PlantDetailBlockedStateAction | null = plantId
+        ? {
+            testId: "plant-detail-view-archived-timeline",
+            label: "View archived timeline",
+            path: plantDetailPath(plantId, {
+              tentId: tentForLink,
+              mode: "archived-timeline",
+            }),
+            kind: "plants",
+          }
+        : null;
       return {
         kind: "archived",
         testId: "plant-detail-archived",
@@ -183,6 +199,7 @@ export function derivePlantDetailBlockedStateView(
         showRetry: false,
         primaryBack: primary,
         secondaryBack: secondary,
+        archivedTimelineAction,
       };
     }
     case "loading":

@@ -279,6 +279,20 @@ export default function Timeline() {
     setEventTypeFilter("");
   }
 
+  // Lightbox navigation list derived from currently visible (filtered)
+  // entries. Pure helper, no writes. Closing the lightbox when the
+  // backing list shrinks below the active index keeps navigation safe.
+  const lightboxItems = useMemo(
+    () => buildTimelinePhotoLightboxList(filtered),
+    [filtered],
+  );
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    if (lightboxIndex < 0 || lightboxIndex >= lightboxItems.length) {
+      setLightboxIndex(null);
+    }
+  }, [lightboxItems, lightboxIndex]);
+
   // Merge `grow_events` (Quick Log v2 manual saves) into the raw entries
   // passed to the Recent Quick Logs panel so just-saved entries surface at
   // the top. `buildRecentQuickLogActivity` sorts newest-first by entry_at,

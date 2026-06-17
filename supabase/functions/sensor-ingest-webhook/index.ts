@@ -53,11 +53,13 @@ function buildCorsHeaders(req: Request): Record<string, string> {
 }
 
 function json(req: Request, body: unknown, status: number) {
-  return new Response(JSON.stringify(body), {
+  const safe = sanitizeForResponse(body);
+  return new Response(JSON.stringify(safe), {
     status,
     headers: { ...buildCorsHeaders(req), "Content-Type": "application/json" },
   });
 }
+
 
 // Exported for Deno-based CORS + secret-leakage tests. Behavior is identical
 // to the live serve handler: OPTIONS short-circuits before auth/body/DB, and

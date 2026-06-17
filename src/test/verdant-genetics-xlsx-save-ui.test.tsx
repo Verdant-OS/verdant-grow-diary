@@ -168,6 +168,91 @@ describe("VerdantGeneticsXlsxPreviewPanel — save flow", () => {
     expect(err.textContent).toMatch(/network down/);
   });
 
+  it("duplicate-only XLSX save shows safe no-op copy, never failure wording", async () => {
+    const onSave = vi.fn(async () => ({
+      inserted: 0,
+      duplicates: 2266,
+      totalRows: 2266,
+    }));
+    render(
+      <VerdantGeneticsXlsxPreviewPanel
+        grid={grid}
+        tentOptions={TENT_OPTIONS}
+        onSave={onSave}
+      />,
+    );
+    await mapAllGroups();
+    fireEvent.click(screen.getByTestId("vg-xlsx-save"));
+    const success = await screen.findByTestId("vg-xlsx-save-success");
+    const text = success.textContent ?? "";
+    // Required wording.
+    expect(text).toMatch(/Imported 0 new/);
+    expect(text).toMatch(/2266 duplicate/);
+    expect(text).toMatch(/for this tent/);
+    expect(text).toMatch(/No live sensor data was created/);
+    // Selected tent option label is visible somewhere in the panel.
+    expect(screen.getAllByText(/Main Flower/).length).toBeGreaterThan(0);
+    // Historical/imported scope copy stays visible.
+    expect(
+      screen.getByTestId("vg-xlsx-csv-history-copy").textContent,
+    ).toMatch(/CSV history/);
+    // No scary failure wording.
+    expect(screen.queryByTestId("vg-xlsx-save-error")).toBeNull();
+    expect(text).not.toMatch(/Save failed/i);
+    expect(text).not.toMatch(/Import failed/i);
+    expect(text).not.toMatch(/live telemetry/i);
+    expect(text).not.toMatch(/\bcurrent\b/i);
+    expect(text).not.toMatch(/\blive\b(?! sensor data was created)/i);
+  });
+
+  it("mixed XLSX save shows inserted + skipped counts with no-live wording", async () => {
+    const onSave = vi.fn(async () => ({
+      inserted: 120,
+      duplicates: 2146,
+      totalRows: 2266,
+    }));
+    render(
+      <VerdantGeneticsXlsxPreviewPanel
+        grid={grid}
+        tentOptions={TENT_OPTIONS}
+        onSave={onSave}
+      />,
+    );
+    await mapAllGroups();
+    fireEvent.click(screen.getByTestId("vg-xlsx-save"));
+    const success = await screen.findByTestId("vg-xlsx-save-success");
+    const text = success.textContent ?? "";
+    expect(text).toMatch(/Imported 120 new/);
+    expect(text).toMatch(/2146 duplicate/);
+    expect(text).toMatch(/for this tent/);
+    expect(text).toMatch(/No live sensor data was created/);
+    expect(
+      screen.getByTestId("vg-xlsx-csv-history-copy").textContent,
+    ).toMatch(/CSV history/);
+    expect(screen.queryByTestId("vg-xlsx-save-error")).toBeNull();
+    expect(text).not.toMatch(/Save failed/i);
+    expect(text).not.toMatch(/Import failed/i);
+    expect(text).not.toMatch(/live telemetry/i);
+  });
+
+  it("real DB failure still surfaces failure copy and no false success", async () => {
+    const onSave = vi.fn().mockRejectedValue(
+      new Error("duplicate key value violates unique constraint"),
+    );
+    render(
+      <VerdantGeneticsXlsxPreviewPanel
+        grid={grid}
+        tentOptions={TENT_OPTIONS}
+        onSave={onSave}
+      />,
+    );
+    await mapAllGroups();
+    fireEvent.click(screen.getByTestId("vg-xlsx-save"));
+    const err = await screen.findByTestId("vg-xlsx-save-error");
+    expect(err.textContent).toMatch(/duplicate key value/);
+    expect(screen.queryByTestId("vg-xlsx-save-success")).toBeNull();
+  });
+
   it("save button stays disabled with blocked copy when no readable rows exist", () => {
     const emptyGrid: CellGrid = [
       ["", "Flower Tent"],

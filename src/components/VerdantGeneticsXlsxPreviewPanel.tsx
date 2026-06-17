@@ -80,6 +80,13 @@ export interface VerdantGeneticsXlsxPreviewPanelProps {
   onSave?: (
     args: VerdantGeneticsXlsxSaveArgs,
   ) => Promise<void | VerdantGeneticsXlsxSaveOutcome> | void | VerdantGeneticsXlsxSaveOutcome;
+  /**
+   * Optional post-success CTA. When provided, a "View imported history"
+   * button is rendered after a successful save outcome. Navigation/filter
+   * scope is owned entirely by the parent — the panel never invents URLs
+   * or filter params and never claims live telemetry.
+   */
+  onViewImportedHistory?: () => void;
 }
 
 function newImportBatchId(): string {
@@ -106,6 +113,7 @@ export function VerdantGeneticsXlsxPreviewPanel({
   tentOptions = [],
   growId,
   onSave,
+  onViewImportedHistory,
 }: VerdantGeneticsXlsxPreviewPanelProps) {
   const vm = buildVerdantGeneticsXlsxPreviewViewModel(grid);
   const [mappingState, setMappingState] = useState(() =>
@@ -472,6 +480,17 @@ export function VerdantGeneticsXlsxPreviewPanel({
                         : `${XLSX_SAVE_SUCCESS_PREFIX} ${saveOutcome.inserted} rows imported. No live sensor data was created.`))
                   : `${XLSX_SAVE_SUCCESS_PREFIX} ${savedCount} rows imported.`}
               </span>
+            )}
+            {saveStatus === "success" && onViewImportedHistory && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={onViewImportedHistory}
+                data-testid="vg-xlsx-view-imported-history"
+              >
+                View imported history
+              </Button>
             )}
             {saveStatus === "error" && saveError && (
               <span

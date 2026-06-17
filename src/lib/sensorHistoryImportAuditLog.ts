@@ -46,6 +46,13 @@ export interface SensorHistoryImportAuditEvent {
   fileType: SensorHistoryImportFileType;
   acceptedRowCount: number;
   rejectedRowCount: number;
+  /**
+   * Counts from the duplicate-aware insert orchestrator, when available.
+   * Older events recorded before this slice will omit them; the ledger
+   * presenter must render "—" for missing values and never fabricate.
+   */
+  insertedRowCount?: number;
+  duplicateRowCount?: number;
   dateRange: { start: string; end: string } | null;
   mappedTentLabels: string[];
   mappedSensorGroups: string[];
@@ -62,10 +69,13 @@ export interface RecordSensorHistoryImportAuditInput {
   fileType: SensorHistoryImportFileType;
   acceptedRowCount: number;
   rejectedRowCount: number;
+  insertedRowCount?: number;
+  duplicateRowCount?: number;
   dateRange?: { start: string; end: string } | null;
   mappedTentLabels?: ReadonlyArray<string> | null;
   mappedSensorGroups?: ReadonlyArray<string> | null;
 }
+
 
 function getStorage(opts?: SensorHistoryImportAuditOptions): Storage | null {
   if (opts && Object.prototype.hasOwnProperty.call(opts, "storage")) {
@@ -194,6 +204,12 @@ export function recordSensorHistoryImportAuditEvent(
     fileType: input.fileType,
     acceptedRowCount: safeNonNegInt(input.acceptedRowCount),
     rejectedRowCount: safeNonNegInt(input.rejectedRowCount),
+    ...(typeof input.insertedRowCount === "number"
+      ? { insertedRowCount: safeNonNegInt(input.insertedRowCount) }
+      : {}),
+    ...(typeof input.duplicateRowCount === "number"
+      ? { duplicateRowCount: safeNonNegInt(input.duplicateRowCount) }
+      : {}),
     dateRange: sanitizeDateRange(input.dateRange ?? null),
     mappedTentLabels: sanitizeLabels(input.mappedTentLabels ?? null),
     mappedSensorGroups: sanitizeLabels(input.mappedSensorGroups ?? null),

@@ -705,7 +705,7 @@ def debug_last_events() -> Any:
 
     n = parse_debug_line_count(request.args.get("lines"))
     lines = read_recent_log_lines(max(n * 4, n))  # over-read to tolerate malformed
-    parsed, malformed = parse_jsonl_entries(lines)
+    parsed, malformed, _last_err = parse_jsonl_entries(lines)
     parsed_tail = parsed[-n:]
 
     events: list[Dict[str, Any]] = []

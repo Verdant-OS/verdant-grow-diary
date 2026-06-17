@@ -332,4 +332,20 @@ describe("EcowittLocalForwardingStatusWidget", () => {
     expect(text).not.toMatch(/eyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}/);
     expect(text).not.toMatch(/PASSKEY/i);
   });
+
+  it("refresh button shows 'Refresh bridge status' label and re-fetches localhost via GET only", async () => {
+    const fn = mockFetchOnce({ "*": READY_STATUS });
+    render(<EcowittLocalForwardingStatusWidget />);
+    const btn = await screen.findByTestId("ecowitt-local-forwarding-refresh");
+    expect(btn).toHaveTextContent(/Refresh bridge status|Refreshing/i);
+    const before = fn.mock.calls.length;
+    fireEvent.click(btn);
+    await waitFor(() => expect(fn.mock.calls.length).toBeGreaterThan(before));
+    for (const call of fn.mock.calls) {
+      const [url, init] = call as unknown as [string, RequestInit | undefined];
+      expect(url).toMatch(/^http:\/\/localhost:8787\//);
+      expect(init?.method ?? "GET").toBe("GET");
+      expect(init?.body).toBeUndefined();
+    }
+  });
 });

@@ -124,6 +124,25 @@ describe("GgsSentinelFreshnessGuidanceList", () => {
           freshness({ metric: "soil_moisture_pct", freshnessStatus: "fresh" }),
           freshness({ metric: "ec", freshnessStatus: "aging" }),
           freshness({ metric: "soil_temp_c", freshnessStatus: "stale", stale: true, fresh: false }),
+        ]}
+      />,
+    );
+
+    for (const label of [
+      "fresh freshness details",
+      "aging freshness details",
+      "stale freshness details",
+    ]) {
+      const trigger = screen.getByLabelText(label);
+      expect(trigger).toBeInTheDocument();
+      expect(trigger.tagName.toLowerCase()).toBe("button");
+    }
+  });
+
+  it("renders a focusable missing tooltip trigger", () => {
+    render(
+      <GgsSentinelFreshnessGuidanceList
+        metricFreshness={[
           freshness({
             metric: "soil_temp_c",
             capturedAt: null,
@@ -137,16 +156,9 @@ describe("GgsSentinelFreshnessGuidanceList", () => {
       />,
     );
 
-    for (const label of [
-      "fresh freshness details",
-      "aging freshness details",
-      "stale freshness details",
-      "missing freshness details",
-    ]) {
-      const trigger = screen.getByLabelText(label);
-      expect(trigger).toBeInTheDocument();
-      expect(trigger.tagName.toLowerCase()).toBe("button");
-    }
+    const trigger = screen.getByLabelText("missing freshness details");
+    expect(trigger).toBeInTheDocument();
+    expect(trigger.tagName.toLowerCase()).toBe("button");
 
     const missingBadge = screen.getByTestId("ggs-freshness-badge-missing");
     expect(within(missingBadge).getByText("missing")).toBeInTheDocument();

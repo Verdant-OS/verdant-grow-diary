@@ -12,6 +12,7 @@ import {
   buildGgsRealPayloadCommitInput,
   GGS_REAL_PAYLOAD_SOURCE,
   GGS_REAL_PAYLOAD_SOURCE_APP,
+  type GgsRealPayloadCommitInput,
 } from "@/lib/ggsRealPayloadIngestRules";
 
 const NOW = new Date("2026-06-17T12:00:00Z");
@@ -36,6 +37,12 @@ function realLookingPayload(): Record<string, unknown> {
     soil_ec: 1.6,
     original_units: { soil_ec: "mS/cm", soil_temp: "C" },
   };
+}
+
+/** Narrowing helper: asserts plan is a refusal and returns its reason. */
+function refusalReason(plan: GgsRealPayloadCommitInput): string {
+  if (plan.ok) throw new Error(`expected refusal, got success with ${plan.rows.length} rows`);
+  return plan.reason;
 }
 
 describe("buildGgsRealPayloadCommitInput", () => {
@@ -64,8 +71,8 @@ describe("buildGgsRealPayloadCommitInput", () => {
     const plan = buildGgsRealPayloadCommitInput(realLookingPayload(), CTX);
     if (!plan.ok) throw new Error("expected ok");
     for (const row of plan.rows) {
-      expect(row.source).not.toBe("ggs_live");
-      expect(row.source).not.toBe("ggs_csv");
+      expect(row.source).not.toBe("ggs_live" as never);
+      expect(row.source).not.toBe("ggs_csv" as never);
     }
   });
 
@@ -74,9 +81,7 @@ describe("buildGgsRealPayloadCommitInput", () => {
       { ...realLookingPayload(), source: "demo" },
       CTX,
     );
-    expect(plan.ok).toBe(false);
-    if (plan.ok) return;
-    expect(plan.reason).toBe("forbidden_declared_source");
+    expect(refusalReason(plan)).toBe("forbidden_declared_source");
   });
 
   it.each(["ggs_live", "ggs_csv", "fixture", "test", "sample"])(
@@ -86,9 +91,7 @@ describe("buildGgsRealPayloadCommitInput", () => {
         { ...realLookingPayload(), source: src },
         CTX,
       );
-      expect(plan.ok).toBe(false);
-      if (plan.ok) return;
-      expect(plan.reason).toBe("forbidden_declared_source");
+      expect(refusalReason(plan)).toBe("forbidden_declared_source");
     },
   );
 
@@ -96,9 +99,7 @@ describe("buildGgsRealPayloadCommitInput", () => {
     const p = realLookingPayload();
     delete p.timestamp;
     const plan = buildGgsRealPayloadCommitInput(p, CTX);
-    expect(plan.ok).toBe(false);
-    if (plan.ok) return;
-    expect(plan.reason).toBe("captured_at_missing_or_malformed");
+    expect(refusalReason(plan)).toBe("captured_at_missing_or_malformed");
   });
 
   it("refuses when tent_id is missing from context", () => {
@@ -106,9 +107,7 @@ describe("buildGgsRealPayloadCommitInput", () => {
       ...CTX,
       tentId: "",
     });
-    expect(plan.ok).toBe(false);
-    if (plan.ok) return;
-    expect(plan.reason).toBe("tent_id_missing");
+    expect(refusalReason(plan)).toBe("tent_id_missing");
   });
 
   it("refuses when device_id is missing from context", () => {
@@ -116,20 +115,15 @@ describe("buildGgsRealPayloadCommitInput", () => {
       ...CTX,
       deviceId: "",
     });
-    expect(plan.ok).toBe(false);
-    if (plan.ok) return;
-    expect(plan.reason).toBe("device_id_missing");
+    expect(refusalReason(plan)).toBe("device_id_missing");
   });
 
-  it("refuses non-numeric values", () => {
-    const plan = buildGgsRealPayloadCommitInput(
+  it("refuses fully non-numeric payloads and never emits NaN rows for partials", () => {
+    const partial = buildGgsRealPayloadCommitInput(
       { ...realLookingPayload(), soil_temp_c: "warm" },
       CTX,
     );
-    // The normalizer drops the bad field; with the other two readings we
-    // still get a plan, but if ALL three are bad we refuse. Verify that
-    // a fully non-numeric payload is refused.
-    const plan2 = buildGgsRealPayloadCommitInput(
+    const allBad = buildGgsRealPayloadCommitInput(
       {
         sensor_id: "x",
         tent_id: TENT,
@@ -140,13 +134,12 @@ describe("buildGgsRealPayloadCommitInput", () => {
       },
       CTX,
     );
-    expect(plan2.ok).toBe(false);
-    if (plan2.ok) return;
-    expect(["no_canonical_readings", "normalizer_refused"]).toContain(plan2.reason);
-    // and ensure the partial-bad case still doesn't emit a NaN row
-    if (plan.ok) {
-      expect(plan.rows.find((r) => r.metric === "soil_temp_c")).toBeUndefined();
-      for (const row of plan.rows) expect(Number.isFinite(row.value)).toBe(true);
+    expect(["no_canonical_readings", "normalizer_refused"]).toContain(
+      refusalReason(allBad),
+    );
+    if (partial.ok) {
+      expect(partial.rows.find((r) => r.metric === "soil_temp_c")).toBeUndefined();
+      for (const row of partial.rows) expect(Number.isFinite(row.value)).toBe(true);
     }
   });
 
@@ -155,17 +148,10 @@ describe("buildGgsRealPayloadCommitInput", () => {
       { ...realLookingPayload(), soil_temp_c: Number.POSITIVE_INFINITY },
       CTX,
     );
-    expect(plan.ok).toBe(false);
-    if (plan.ok) return;
-    expect(plan.reason).toBe("non_finite_value");
+    expect(refusalReason(plan)).toBe("non_finite_value");
   });
 
   it("refuses out-of-bounds soil_temp_c", () => {
-    // The underlying GGS normalizer rejects unrealistic temps via the
-    // spider_farmer mapping, so this surfaces as no_canonical_readings
-    // for soil_temp_c with the field dropped. We verify the bounds
-    // refusal triggers when the value DOES make it through normalization
-    // by stubbing a value just past the trigger.
     const plan = buildGgsRealPayloadCommitInput(
       { ...realLookingPayload(), soil_temp_c: 999 },
       CTX,
@@ -187,23 +173,17 @@ describe("buildGgsRealPayloadCommitInput", () => {
       { ...realLookingPayload(), soil_ec: 1500 },
       CTX,
     );
-    expect(plan.ok).toBe(false);
-    if (plan.ok) return;
-    expect(plan.reason).toBe("soil_ec_unit_mismatch_suspected");
+    expect(refusalReason(plan)).toBe("soil_ec_unit_mismatch_suspected");
   });
 
   it("refuses missing payload", () => {
     const plan = buildGgsRealPayloadCommitInput(null, CTX);
-    expect(plan.ok).toBe(false);
-    if (plan.ok) return;
-    expect(plan.reason).toBe("payload_missing");
+    expect(refusalReason(plan)).toBe("payload_missing");
   });
 
   it("refuses payload that is not an object", () => {
     const plan = buildGgsRealPayloadCommitInput([1, 2, 3], CTX);
-    expect(plan.ok).toBe(false);
-    if (plan.ok) return;
-    expect(plan.reason).toBe("payload_not_object");
+    expect(refusalReason(plan)).toBe("payload_not_object");
   });
 
   it("refuses when user/bridge context is missing", () => {
@@ -211,15 +191,13 @@ describe("buildGgsRealPayloadCommitInput", () => {
       ...CTX,
       userId: "",
     });
-    expect(a.ok).toBe(false);
-    if (!a.ok) expect(a.reason).toBe("user_id_missing");
+    expect(refusalReason(a)).toBe("user_id_missing");
 
     const b = buildGgsRealPayloadCommitInput(realLookingPayload(), {
       ...CTX,
       bridgeId: "",
     });
-    expect(b.ok).toBe(false);
-    if (!b.ok) expect(b.reason).toBe("bridge_id_missing");
+    expect(refusalReason(b)).toBe("bridge_id_missing");
   });
 
   it("does not import Supabase, fetch, AI, alerts, action_queue, or device control", () => {

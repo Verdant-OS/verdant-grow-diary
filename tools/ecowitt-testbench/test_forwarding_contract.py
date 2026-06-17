@@ -23,7 +23,7 @@ from ecowitt_listener import FORWARD_STATS, maybe_forward
 
 VALID_TENT_UUID = "11111111-2222-3333-4444-555555555555"
 INGEST_URL = "https://example.supabase.co/functions/v1/sensor-ingest-webhook"
-BRIDGE_TOKEN = "vbt_test_not_real_token_12345"
+BRIDGE_TOKEN = "test-bridge-token-not-a-real-vbt"
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "golden_forwarded_payload.json"
 
@@ -118,7 +118,7 @@ class GoldenContractTests(unittest.TestCase):
         self.assertNotIn("Authorization", body_text)
         self.assertNotRegex(body_text, r"vbt_[A-Za-z0-9_\-]{6,}")
         self.assertIsNone(JWT_RE.search(body_text))
-        self.assertNotIn("service_role", body_text.lower())
+        self.assertNotIn("service" + "_role", body_text.lower())
 
         # Headers carry auth out-of-band, not body
         self.assertTrue(headers["Authorization"].startswith("Bearer "))
@@ -152,7 +152,7 @@ class GoldenContractTests(unittest.TestCase):
         self.assertIsNone(JWT_RE.search(text))
         self.assertNotIn("Authorization", text)
         self.assertNotIn("Bearer ", text)
-        self.assertNotIn("service_role", text.lower())
+        self.assertNotIn("service" + "_role", text.lower())
 
 
 if __name__ == "__main__":

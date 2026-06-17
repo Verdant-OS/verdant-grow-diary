@@ -1008,6 +1008,18 @@ def debug_forwarding_status() -> Any:
         safe_err = sanitize_debug_payload(last_error)
         last_error = safe_err if isinstance(safe_err, str) else _REDACTED
 
+    # Sanitized webhook response fields (always re-sanitized at read
+    # time as a belt-and-braces guard).
+    last_resp_error = sanitize_forward_error_value(
+        FORWARD_STATS.get("last_forward_response_error")
+    )
+    last_resp_cls = sanitize_forward_error_value(
+        FORWARD_STATS.get("last_forward_response_classification")
+    )
+    last_resp_msg = sanitize_forward_error_value(
+        FORWARD_STATS.get("last_forward_response_message")
+    )
+
     return jsonify(
         {
             "ok": True,
@@ -1026,8 +1038,12 @@ def debug_forwarding_status() -> Any:
             "last_forward_status": FORWARD_STATS.get("last_status"),
             "last_forward_at": FORWARD_STATS.get("last_at"),
             "last_forward_error": last_error,
+            "last_forward_response_error": last_resp_error,
+            "last_forward_response_classification": last_resp_cls,
+            "last_forward_response_message": last_resp_msg,
         }
     )
+
 
 
 

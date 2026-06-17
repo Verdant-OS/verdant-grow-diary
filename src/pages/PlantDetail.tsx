@@ -128,6 +128,16 @@ function BlockedStateView({
                 Retry
               </Button>
             )}
+            {view.kind === "archived" && view.archivedTimelineAction && (
+              <Button asChild variant="outline" className="min-h-11">
+                <Link
+                  to={view.archivedTimelineAction.path}
+                  data-testid={view.archivedTimelineAction.testId}
+                >
+                  {view.archivedTimelineAction.label}
+                </Link>
+              </Button>
+            )}
             <BlockedStateBackLink action={view.primaryBack} />
             {view.secondaryBack && (
               <BlockedStateBackLink action={view.secondaryBack} />
@@ -138,6 +148,78 @@ function BlockedStateView({
     </div>
   );
 }
+
+function ArchivedTimelineReadOnlyView({
+  plant,
+  tentName,
+  backAction,
+}: {
+  plant: {
+    id: string;
+    name: string;
+    strain: string;
+    stage: string;
+    startedAt: string;
+    tentId: string | null;
+    growId: string | null;
+  };
+  tentName: string | null;
+  backAction: PlantDetailBlockedStateAction;
+}) {
+  return (
+    <div data-testid="plant-detail-archived-timeline-readonly">
+      <Button asChild variant="ghost" size="sm" className="mb-3">
+        <Link to={backAction.path} data-testid={backAction.testId}>
+          <ArrowLeft className="h-4 w-4" /> {backAction.label}
+        </Link>
+      </Button>
+      <div
+        role="status"
+        data-testid="plant-detail-archived-timeline-banner"
+        className="my-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100"
+      >
+        <div className="flex items-start gap-2">
+          <Archive className="h-4 w-4 mt-0.5 shrink-0" />
+          <div>
+            <div className="font-medium">Archived timeline — read-only</div>
+            <p className="text-xs text-amber-200/80 mt-0.5">
+              Showing preserved history for {plant.name}. No write actions are
+              available in this view.
+            </p>
+          </div>
+        </div>
+      </div>
+      <PageHeader
+        title={plant.name}
+        description={plant.strain}
+        icon={<Sprout className="h-5 w-5" />}
+        actions={<StageBadge stage={plant.stage} />}
+      />
+      <div className="grid lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 glass rounded-2xl p-5 space-y-3">
+          <PlantRecentActivityPanel plantId={plant.id} plantName={plant.name} />
+          <PlantRelativeTimelineSection
+            plantId={plant.id}
+            plantStartedAt={plant.startedAt}
+            currentStage={plant.stage}
+            plantName={plant.name}
+            tentName={tentName}
+            growId={plant.growId}
+            tentId={plant.tentId}
+          />
+          <ManualSnapshotTimelineSection scope="plant" plantId={plant.id} />
+          <QuickLogGroupedTimelineSection
+            scope="plant"
+            plantId={plant.id}
+            tentId={plant.tentId}
+          />
+          <TimelineMemorySection scope="plant" plantId={plant.id} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 export default function PlantDetail() {
   const [quickLogOpen, setQuickLogOpen] = useState(false);
@@ -223,7 +305,27 @@ export default function PlantDetail() {
     );
   }
 
+  const archivedTimelineMode =
+    searchParams.get("mode") === "archived-timeline";
+
   if (blockedView && blockedView.kind === "archived") {
+    if (archivedTimelineMode && plant) {
+      return (
+        <ArchivedTimelineReadOnlyView
+          plant={{
+            id: plant.id,
+            name: plant.name,
+            strain: plant.strain,
+            stage: plant.stage,
+            startedAt: plant.startedAt,
+            tentId: plant.tentId ?? null,
+            growId: plant.growId ?? null,
+          }}
+          tentName={tent?.name ?? null}
+          backAction={blockedView.primaryBack}
+        />
+      );
+    }
     return (
       <div>
         <PlantDetailDataSourceDisclosure
@@ -234,6 +336,7 @@ export default function PlantDetail() {
       </div>
     );
   }
+
 
 
 

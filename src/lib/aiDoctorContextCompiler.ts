@@ -216,6 +216,16 @@ export interface PlantRowLike {
   strain?: string | null;
   stage?: string | null;
   growth_stage?: string | null;
+  /**
+   * Growing medium (e.g. "soil", "coco", "hydro"). Carried forward as
+   * evidence only — never inferred from notes / strain / freeform text.
+   */
+  medium?: string | null;
+  /**
+   * Container / pot size label (e.g. "3 gal", "11 L"). Free string; the
+   * compiler only normalizes whitespace and rejects blanks.
+   */
+  pot_size?: string | null;
 }
 
 export interface GrowEventRowLike {

@@ -169,9 +169,11 @@ export function classifySensorIngestTestResult(
     return {
       category: "payload_problem",
       headline: "HTTP 400 — payload problem",
-      detail: reason
-        ? `Server rejected payload: ${reason}.`
-        : "Server rejected payload. Check source, captured_at, and metric names.",
+      detail: codeCopy
+        ?? (reason
+          ? `Server rejected payload: ${reason}.`
+          : "Server rejected payload. Check source, captured_at, and metric names."),
+
       isSuccess: false,
       corsWorking: true,
     };

@@ -475,6 +475,7 @@ def summarize_forward_response(resp: Any) -> Dict[str, Any]:
         "error": None,
         "classification": None,
         "message": None,
+        "reason": None,
     }
     body_obj: Any = None
     try:
@@ -495,6 +496,17 @@ def summarize_forward_response(resp: Any) -> Dict[str, Any]:
         msg_candidates = body_obj.get("errors") or body_obj.get("message")
         if msg_candidates is not None:
             out["message"] = sanitize_forward_error_value(msg_candidates)
+        raw_reason = body_obj.get("reason")
+        if isinstance(raw_reason, str) and raw_reason:
+            safe_reason_val = sanitize_forward_error_value(raw_reason)
+            safe_reason = safe_reason_val if isinstance(safe_reason_val, str) else None
+            # Whitelist: only echo known sanitized insert reason codes.
+            # Anything else (including any text that survived sanitizer)
+            # collapses to "insert_unknown" — never raw DB strings.
+            if safe_reason and safe_reason in _KNOWN_INSERT_REASONS:
+                out["reason"] = safe_reason
+            else:
+                out["reason"] = "insert_unknown"
         return out
 
     # Non-JSON body — store a short sanitized summary only.

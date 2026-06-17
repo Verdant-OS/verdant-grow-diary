@@ -281,6 +281,170 @@ def ecowitt() -> Any:
     return jsonify({"ok": True, "reading": reading, "forward": forward_result})
 
 
+
+
+# ---------------------------------------------------------------------------
+# Debug raw log tail — LOCAL-ONLY, sanitized, read-only
+# ---------------------------------------------------------------------------
+
+# Field names that should always be redacted regardless of value.
+_SECRET_FIELD_NAMES = {
+    "authorization",
+    "token",
+    "bridge_token",
+    "verdant_bridge_token",
+    "api_key",
+    "apikey",
+    "password",
+    "secret",
+    "service_role",
+    "service_role_key",
+    "supabase_service_role_key",
+    "private_api_key",
+}
+
+_REDACTED = "[REDACTED]"
+
+
+def _looks_like_secret_value(value: str) -> bool:
+    """Heuristics for secret-shaped strings (token-like, JWT-like, bearer)."""
+    if not isinstance(value, str) or not value:
+        return False
+    v = value.strip()
+    lv = v.lower()
+    if lv.startswith("bearer "):
+        return True
+    if v.startswith("vbt_") and len(v) >= 12:
+        # Allow the literal placeholder so docs/examples don't redact themselves.
+        if v == "vbt_REPLACE_WITH_REAL_TOKEN":
+            return False
+        return True
+    # JWT-shaped: three dot-separated base64url segments, first starts with eyJ.
+    parts = v.split(".")
+    if (
+        len(parts) == 3
+        and parts[0].startswith("eyJ")
+        and all(len(p) >= 8 for p in parts)
+    ):
+        return True
+    # service_role marker anywhere.
+    if "service_role" in lv:
+        return True
+    return False
+
+
+def sanitize_debug_payload(value: Any) -> Any:
+    """Recursively redact secrets from a value before returning to caller.
+
+    Never returns full tokens. Handles dicts, lists, tuples, and strings.
+    Pure function — no I/O.
+    """
+    if isinstance(value, dict):
+        out: Dict[str, Any] = {}
+        for k, v in value.items():
+            key_str = str(k)
+            if key_str.lower() in _SECRET_FIELD_NAMES:
+                out[key_str] = _REDACTED
+            else:
+                out[key_str] = sanitize_debug_payload(v)
+        return out
+    if isinstance(value, list):
+        return [sanitize_debug_payload(v) for v in value]
+    if isinstance(value, tuple):
+        return [sanitize_debug_payload(v) for v in value]
+    if isinstance(value, str):
+        if _looks_like_secret_value(value):
+            return _REDACTED
+        return value
+    return value
+
+
+_LOOPBACK_ADDRS = {"127.0.0.1", "::1", "localhost"}
+
+
+def _is_local_request() -> bool:
+    """Only allow local loopback callers to read the raw log tail."""
+    remote = (request.remote_addr or "").strip().lower()
+    if not remote:
+        return False
+    if remote in _LOOPBACK_ADDRS:
+        return True
+    # IPv4-mapped IPv6 loopback (e.g. "::ffff:127.0.0.1")
+    if remote.startswith("::ffff:127."):
+        return True
+    if remote.startswith("127."):
+        return True
+    return False
+
+
+@app.get("/debug/raw-log-tail")
+def debug_raw_log_tail() -> Any:
+    # Local-only: never expose log contents over LAN.
+    if not _is_local_request():
+        return (
+            jsonify({"ok": False, "error": "forbidden_non_local"}),
+            403,
+        )
+
+    max_lines = 50
+    default_lines = 10
+    try:
+        n = int(request.args.get("lines", default_lines))
+    except (TypeError, ValueError):
+        n = default_lines
+    if n < 1:
+        n = 1
+    if n > max_lines:
+        n = max_lines
+
+    if not LOG_PATH.exists():
+        return jsonify(
+            {
+                "ok": True,
+                "count": 0,
+                "max_lines": max_lines,
+                "message": "No raw log file found yet.",
+                "entries": [],
+            }
+        )
+
+    try:
+        with LOG_PATH.open("r", encoding="utf-8", errors="replace") as fh:
+            lines = fh.readlines()
+    except Exception as exc:
+        return (
+            jsonify({"ok": False, "error": f"read_failed: {exc!s}"}),
+            500,
+        )
+
+    tail = lines[-n:]
+    entries = []
+    for raw in tail:
+        text = raw.rstrip("\n")
+        try:
+            parsed = json.loads(text)
+            entries.append({"parsed": True, "entry": sanitize_debug_payload(parsed)})
+        except Exception:
+            # Sanitize text fallback too — could still contain a token.
+            safe_text = (
+                _REDACTED
+                if _looks_like_secret_value(text)
+                else text[:500]
+            )
+            entries.append(
+                {"parsed": False, "warning": "json_parse_failed", "text": safe_text}
+            )
+
+    return jsonify(
+        {
+            "ok": True,
+            "count": len(entries),
+            "max_lines": max_lines,
+            "entries": entries,
+        }
+    )
+
+
 def main() -> None:  # pragma: no cover
     print(f"[verdant-testbench] listening on http://localhost:{PORT}")
     print(f"[verdant-testbench] health:  http://localhost:{PORT}/health")

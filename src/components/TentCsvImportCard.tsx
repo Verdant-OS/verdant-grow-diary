@@ -464,7 +464,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
       },
     });
     if (!batchResult.ok) {
-      toast.error("Couldn't import XLSX.", {
+      toast.error("Import failed. No live sensor data was created.", {
         description: batchResult.diagnostic,
       });
       throw new Error(batchResult.diagnostic);
@@ -490,6 +490,8 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
           adapterResult,
           tentIdBySensorGroup,
           tentOptions,
+          insertedRowCount: batchResult.insertedRows,
+          duplicateRowCount: batchResult.duplicateRows,
         });
         if (auditInput) {
           recordSensorHistoryImportAuditEvent(auditInput);

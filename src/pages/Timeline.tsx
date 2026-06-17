@@ -657,7 +657,20 @@ export default function Timeline() {
                           <ImageIcon className="h-8 w-8" />
                         </div>
                       )}
-                      <div className="p-4">
+                      <div
+                        className="p-4 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        role="button"
+                        tabIndex={0}
+                        data-testid="timeline-entry-body"
+                        aria-label="Open entry details"
+                        onClick={() => setDetailEntryId(e.id)}
+                        onKeyDown={(ev) => {
+                          if (ev.key === "Enter" || ev.key === " ") {
+                            ev.preventDefault();
+                            setDetailEntryId(e.id);
+                          }
+                        }}
+                      >
                         {(() => {
                           const et = getEventType((e.details?.event_type as string | undefined) ?? null);
                           const Icon = et.icon;

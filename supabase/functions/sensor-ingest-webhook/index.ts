@@ -21,26 +21,61 @@ import {
 } from "./auth.ts";
 
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+// Centralized CORS handling. Allowed origins are explicit — no wildcard is
+// returned when an Authorization or bridge token may be present. Every
+// response path (success, auth failure, validation failure, method not
+// allowed, malformed JSON, unexpected error) MUST include these headers so
+// the browser surfaces real HTTP statuses instead of collapsing to status 0.
+const ALLOWED_ORIGINS = new Set<string>([
+  "https://verdantgrowdiary.com",
+  "https://www.verdantgrowdiary.com",
+  "https://verdantgrowdiary-com.lovable.app",
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://localhost:8080",
+]);
 
-function json(body: unknown, status: number) {
+function buildCorsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("origin") ?? "";
+  const allowOrigin = ALLOWED_ORIGINS.has(origin)
+    ? origin
+    : "https://verdantgrowdiary.com";
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers":
+      "authorization, content-type, apikey, x-client-info, x-verdant-bridge-token, x-verdant-tent-id, idempotency-key",
+    "Access-Control-Max-Age": "86400",
+    "Vary": "Origin",
+  };
+}
+
+function json(req: Request, body: unknown, status: number) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...buildCorsHeaders(req), "Content-Type": "application/json" },
   });
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+  // OPTIONS preflight: respond before auth, body parsing, or DB lookups.
+  // No bridge token required. No telemetry classification. No writes.
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: buildCorsHeaders(req) });
+  }
+  try {
+    return await handle(req);
+  } catch (_err) {
+    // Never leak error text, stack traces, tokens, or PG details.
+    return json(req, { error: "internal_error" }, 500);
+  }
+});
+
+async function handle(req: Request): Promise<Response> {
+  if (req.method !== "POST") return json(req, { error: "method_not_allowed" }, 405);
 
   const authHeader = req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) return json({ error: "unauthorized" }, 401);
+  if (!authHeader?.startsWith("Bearer ")) return json(req, { error: "unauthorized" }, 401);
   const rawToken = authHeader.replace("Bearer ", "");
 
   // Optional client-supplied idempotency key (recommended for bridge clients:
@@ -57,7 +92,7 @@ Deno.serve(async (req) => {
   const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    return json({ error: "server_misconfigured" }, 503);
+    return json(req, { error: "server_misconfigured" }, 503);
   }
 
   const admin = SUPABASE_SERVICE_ROLE_KEY
@@ -85,23 +120,23 @@ Deno.serve(async (req) => {
   });
   if (!authRes.ok) {
     const status = authRes.error === "server_misconfigured" || authRes.error === "auth_lookup_failed" ? 503 : 401;
-    return json({ error: authRes.error }, status);
+    return json(req, { error: authRes.error }, status);
   }
   const auth: AuthResult = authRes.auth;
 
   let body: WebhookIngestPayload;
   try { body = (await req.json()) as WebhookIngestPayload; }
-  catch { return json({ error: "invalid_json" }, 400); }
+  catch { return json(req, { error: "invalid_json" }, 400); }
 
   const normalized = normalizeWebhookIngestPayload(body);
   if (!normalized.ok) {
-    return json({ error: "invalid_payload", errors: normalized.errors }, 400);
+    return json(req, { error: "invalid_payload", errors: normalized.errors }, 400);
   }
 
   const payloadTentId = normalized.rows[0].tent_id as string;
 
   if (!tentScopeMatches(auth, payloadTentId)) {
-    return json({ error: "forbidden_tent" }, 403);
+    return json(req, { error: "forbidden_tent" }, 403);
   }
 
   // For JWT path, verify tent ownership (RLS would also block).
@@ -109,9 +144,9 @@ Deno.serve(async (req) => {
   if (auth.kind === "jwt") {
     const { data: tentRow, error: tentErr } = await anonForJwt
       .from("tents").select("id, user_id").eq("id", payloadTentId).maybeSingle();
-    if (tentErr) return json({ error: "tent_lookup_failed" }, 503);
+    if (tentErr) return json(req, { error: "tent_lookup_failed" }, 503);
     if (!tentRow || tentRow.user_id !== auth.userId) {
-      return json({ error: "forbidden_tent" }, 403);
+      return json(req, { error: "forbidden_tent" }, 403);
     }
   }
 
@@ -155,7 +190,7 @@ Deno.serve(async (req) => {
       tent_id_present: !!payloadTentId,
       // Intentionally NOT logging the raw insErr.message.
     });
-    return json({ error: "insert_failed" }, 400);
+    return json(req, { error: "insert_failed" }, 400);
   }
 
   const insertedCount = upserted?.length ?? 0;
@@ -189,7 +224,7 @@ Deno.serve(async (req) => {
   }
 
 
-  return json({
+  return json(req, {
     ok: true,
     inserted: insertedCount,
     skipped_duplicate: skippedDuplicate,
@@ -198,5 +233,5 @@ Deno.serve(async (req) => {
     auth: auth.kind,
     idempotency_key: idempotencyKey,
   }, 200);
-});
+}
 

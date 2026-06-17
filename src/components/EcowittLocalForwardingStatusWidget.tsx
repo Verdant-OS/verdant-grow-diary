@@ -53,11 +53,12 @@ export default function EcowittLocalForwardingStatusWidget({
 
   const handleCopyReport = useCallback(async () => {
     const result = await fetchLocalForwardingErrorReportText();
-    if (!result.ok) {
+    if (result.ok !== true) {
+      const reason = result.reason;
       const msg =
-        result.reason === "offline"
+        reason === "offline"
           ? "EcoWitt local bridge is not reachable. Start the listener first."
-          : result.reason === "http_error"
+          : reason === "http_error"
             ? "Local bridge returned an error. Restart it and try again."
             : "Local bridge returned an unreadable report.";
       toast({

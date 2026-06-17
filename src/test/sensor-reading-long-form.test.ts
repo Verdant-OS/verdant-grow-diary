@@ -35,6 +35,41 @@ describe("normalizedReadingToLongFormRows", () => {
     expect(rows.every((r) => Number.isFinite(r.value))).toBe(true);
   });
 
+  it("emits canonical soil_temp_c metric (DB allowlist), not soil_temperature_c", () => {
+    const r = normalizeSensorReading(
+      { temperature_c: 24, humidity: 50, soil_temperature_c: 22.5 },
+      {
+        source: "live",
+        sourceIdentity: "ecowitt",
+        transport: "webhook",
+        tentId: TENT,
+        capturedAt: FRESH,
+        now: NOW,
+      },
+    );
+    const metrics = normalizedReadingToLongFormRows(r).map((row) => row.metric);
+    expect(metrics).toContain("soil_temp_c");
+    expect(metrics).not.toContain("soil_temperature_c");
+  });
+
+  it("accepts soil_temp_c input alias and emits canonical soil_temp_c", () => {
+    const r = normalizeSensorReading(
+      { temperature_c: 24, humidity: 50, soil_temp_c: 21 },
+      {
+        source: "live",
+        sourceIdentity: "ecowitt",
+        transport: "webhook",
+        tentId: TENT,
+        capturedAt: FRESH,
+        now: NOW,
+      },
+    );
+    const row = normalizedReadingToLongFormRows(r).find((x) => x.metric === "soil_temp_c");
+    expect(row?.value).toBe(21);
+    expect(r.source).toBe("live");
+  });
+
+
   it("rejects readings without tent_id", () => {
     const r = normalizeSensorReading(
       { temperature_c: 24, humidity: 50 },

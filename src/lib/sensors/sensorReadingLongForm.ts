@@ -47,8 +47,12 @@ export function normalizedReadingToLongFormRows(
     ["vpd_kpa", m.vpd_kpa],
     ["co2_ppm", m.co2_ppm],
     ["soil_moisture_pct", m.soil_moisture_pct],
-    ["soil_temperature_c", m.soil_temperature_c],
-    ["soil_temperature_f", m.soil_temperature_f],
+    // Canonical DB metric is soil_temp_c (see sensor_readings validate trigger).
+    // The internal NormalizedSensorMetrics field retains its descriptive name
+    // for backward compatibility; only the emitted long-form metric string is
+    // aligned to the DB allowlist here.
+    ["soil_temp_c", m.soil_temperature_c],
+    ["soil_temp_f", m.soil_temperature_f],
     ["soil_ec_ms_cm", m.soil_ec_ms_cm],
     ["reservoir_ec_ms_cm", m.reservoir_ec_ms_cm],
     ["reservoir_ph", m.reservoir_ph],

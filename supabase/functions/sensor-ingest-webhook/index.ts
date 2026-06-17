@@ -81,7 +81,12 @@ export async function handleRequest(req: Request): Promise<Response> {
 
 
 
-Deno.serve(handleRequest);
+// Only start the HTTP listener when run as the main module (Supabase Edge
+// Runtime). Importing this file from a Deno test must NOT bind a port.
+if (import.meta.main) {
+  Deno.serve(handleRequest);
+}
+
 
 
 async function handle(req: Request): Promise<Response> {

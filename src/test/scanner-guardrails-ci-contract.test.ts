@@ -10,6 +10,9 @@ import { describe, it, expect } from "vitest";
 import {
   validateScannerSlowRow,
   parseAndValidateScannerSlowReport,
+  formatRowFieldDiff,
+  buildGithubAnnotation,
+  previewValue,
   SCANNER_SLOW_THRESHOLD_MS,
   // @ts-ignore - .mjs without types; helpers are pure JS.
 } from "../../scripts/run-scanner-guardrails-ci.mjs";

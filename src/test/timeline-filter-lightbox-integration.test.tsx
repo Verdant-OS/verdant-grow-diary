@@ -243,6 +243,45 @@ describe("Timeline filter + lightbox integration", () => {
   });
 });
 
+/**
+ * Shared static-safety helpers used by the Timeline guard tests.
+ *
+ * Browser URL/query-param mutation (URLSearchParams.delete()) is allowed —
+ * it is not a Verdant write path. Supabase/client destructive deletes such
+ * as `supabase.from("x").delete()` MUST remain blocked. Do not broaden
+ * `filterAppDeleteCalls` back into a raw `\.delete\(` scan.
+ */
+const URL_PARAM_DELETE_NAMES =
+  /^(next|prev|sp|params|searchParams|urlParams|query|qs)$/i;
+const SUPABASE_CHAIN_DELETE = /\.from\([^)]*\)[\s\S]{0,200}?\.delete\(/;
+function filterAppDeleteCalls(source: string): string[] {
+  return [...source.matchAll(/([A-Za-z_$][\w$]*)\.delete\(/g)]
+    .filter(([, name]) => !URL_PARAM_DELETE_NAMES.test(name))
+    .map((m) => m[0]);
+}
+
+describe("Timeline static-safety guard — URL param allowlist", () => {
+  it("allows URLSearchParams.delete() in browser URL sync code", () => {
+    const sample = `
+      const next = new URLSearchParams(searchParams);
+      next.delete("sensorSources");
+      searchParams.delete("from");
+    `;
+    expect(filterAppDeleteCalls(sample)).toEqual([]);
+    expect(sample).not.toMatch(SUPABASE_CHAIN_DELETE);
+  });
+
+  it("still flags Supabase .from(...).delete() destructive writes", () => {
+    const bad = `await supabase.from("sensor_readings").delete().eq("id", id);`;
+    expect(bad).toMatch(SUPABASE_CHAIN_DELETE);
+  });
+
+  it("still flags arbitrary client/table .delete() calls", () => {
+    const bad = `client.delete({ id: 1 });`;
+    expect(filterAppDeleteCalls(bad)).toEqual(["client.delete("]);
+  });
+});
+
 describe("Timeline page source — anchor + label + leak guards", () => {
   const TIMELINE = readFileSync(join(process.cwd(), "src/pages/Timeline.tsx"), "utf8");
 
@@ -282,15 +321,14 @@ describe("Timeline page source — anchor + label + leak guards", () => {
     // scope this guard to patterns the filter/lightbox slice must not add.
     expect(TIMELINE).not.toMatch(/\.insert\(/);
     expect(TIMELINE).not.toMatch(/\.update\(/);
-    // Narrowed: only flag Supabase/client write-style `.delete(` calls.
-    // Browser URL helpers (URLSearchParams.delete) are not write paths.
-    const URL_PARAM_DELETE_NAMES =
-      /^(next|prev|sp|params|searchParams|urlParams|query|qs)$/i;
-    const deleteCalls = [
-      ...TIMELINE.matchAll(/([A-Za-z_$][\w$]*)\.delete\(/g),
-    ].filter(([, name]) => !URL_PARAM_DELETE_NAMES.test(name));
-    expect(deleteCalls.map((m) => m[0])).toEqual([]);
-    expect(TIMELINE).not.toMatch(/\.from\([^)]*\)[\s\S]{0,200}?\.delete\(/);
+    // Static safety note: this test blocks app write/destructive paths, not
+    // browser URL query-param cleanup. URLSearchParams.delete() is allowed
+    // for filter URL sync. Supabase/client deletes and other write paths
+    // must remain forbidden. Do NOT broaden this back to a raw `\.delete\(`
+    // scan — use the allowlist + Supabase chain guard below.
+    const filtered = filterAppDeleteCalls(TIMELINE);
+    expect(filtered).toEqual([]);
+    expect(TIMELINE).not.toMatch(SUPABASE_CHAIN_DELETE);
     expect(TIMELINE).not.toMatch(/\.upsert\(/);
     expect(TIMELINE).not.toMatch(/\.rpc\(/);
     expect(TIMELINE).not.toMatch(/functions\s*\.\s*invoke\s*\(/);

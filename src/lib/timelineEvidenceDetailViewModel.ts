@@ -5,7 +5,7 @@
  * Strictly read-only. Deterministic. Null-safe. No DOM, no React, no
  * fetch, no DB, no AI, no Action Queue / alert / device / sensor work.
  *
- * Only a tiny allow-list of safe display fields is exposed. `raw_payload`,
+ * Only a tiny allow-list of safe display fields is exposed. Raw payload
  * Authorization headers, bridge tokens, JWTs, service-role keys, ingest
  * URLs and similar secrets MUST NEVER appear in the returned model.
  */

@@ -154,6 +154,102 @@ class GoldenContractTests(unittest.TestCase):
         self.assertNotIn("Bearer ", text)
         self.assertNotIn("service" + "_role", text.lower())
 
+CANONICAL_STORED_SOURCES = {"live", "manual", "csv", "demo", "stale", "invalid"}
+
+
+def _map_stored_source_for_transport(incoming):
+    """Python mirror of supabase/functions/sensor-ingest-webhook/storageMapping.ts
+    mapStoredSourceForTransport().
+
+    Transport / vendor labels collapse to canonical "live". Already-canonical
+    labels pass through. Empty / null / unknown defaults to "live".
+    """
+    if not isinstance(incoming, str):
+        return "live"
+    lower = incoming.strip().lower()
+    if not lower:
+        return "live"
+    if lower in CANONICAL_STORED_SOURCES:
+        return lower
+    return "live"
+
+
+def _build_stored_row_from_forwarded(forwarded):
+    """Python mirror of buildStoredRow() for the EcoWitt golden contract.
+
+    Models the canonical sensor_readings row the Edge Function will insert
+    given the forwarded transport payload. Mirrors only the fields the
+    cross-language contract pins:
+      - source -> canonical stored source
+      - raw_payload.metadata.transport_source -> original transport label
+      - raw_payload.metadata.verdant_source   -> stored source
+      - raw_payload.vendor                    -> preserved
+    PASSKEY MUST stay stripped at this layer.
+    """
+    incoming = forwarded.get("source")
+    stored_source = _map_stored_source_for_transport(incoming)
+    raw_payload = {
+        "vendor": forwarded.get("vendor"),
+        "metadata": {
+            **(forwarded.get("metadata") or {}),
+            "transport_source": incoming,
+            "verdant_source": stored_source,
+        },
+    }
+    # Drop any caller-supplied user_id; stripped server-side.
+    return {
+        "tent_id": forwarded.get("tent_id"),
+        "source": stored_source,
+        "raw_payload": raw_payload,
+    }
+
+
+class StoredRowMappingTests(unittest.TestCase):
+    """Forwarded transport payload ↔ stored sensor_readings row contract."""
+
+    def setUp(self):
+        self.golden = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+
+    def test_golden_forwarded_payload_keeps_transport_source_ecowitt(self):
+        # The webhook expects 'source: ecowitt' as transport input.
+        self.assertEqual(self.golden["source"], "ecowitt")
+        # And the verdant truth source lives in metadata only.
+        self.assertEqual(self.golden["metadata"]["verdant_source"], "live")
+
+    def test_stored_row_maps_ecowitt_transport_to_live_source(self):
+        stored = _build_stored_row_from_forwarded(self.golden)
+        self.assertEqual(stored["source"], "live")
+        self.assertNotEqual(stored["source"], "ecowitt")
+        self.assertIn(stored["source"], CANONICAL_STORED_SOURCES)
+
+    def test_stored_row_preserves_transport_and_verdant_lineage(self):
+        stored = _build_stored_row_from_forwarded(self.golden)
+        meta = stored["raw_payload"]["metadata"]
+        self.assertEqual(meta["transport_source"], "ecowitt")
+        self.assertEqual(meta["verdant_source"], "live")
+        self.assertEqual(stored["raw_payload"]["vendor"], self.golden["vendor"])
+
+    def test_canonical_sources_pass_through_unchanged(self):
+        for s in CANONICAL_STORED_SOURCES:
+            self.assertEqual(_map_stored_source_for_transport(s), s)
+
+    def test_unknown_transport_labels_collapse_to_live(self):
+        for s in ("mqtt", "webhook", "home_assistant_bridge", "ecowitt", "?weird?"):
+            mapped = _map_stored_source_for_transport(s)
+            self.assertIn(mapped, CANONICAL_STORED_SOURCES)
+            self.assertEqual(mapped, "live")
+
+    def test_stored_row_never_contains_passkey_or_secrets(self):
+        stored = _build_stored_row_from_forwarded(self.golden)
+        text = json.dumps(stored)
+        self.assertNotIn("PASSKEY", text)
+        self.assertNotIn("passkey", text.lower())
+        self.assertNotIn("Authorization", text)
+        self.assertNotIn("Bearer ", text)
+        self.assertNotRegex(text, r"vbt_[A-Za-z0-9_\-]{6,}")
+        self.assertIsNone(JWT_RE.search(text))
+        self.assertNotIn("service" + "_role", text.lower())
+
 
 if __name__ == "__main__":
     unittest.main()

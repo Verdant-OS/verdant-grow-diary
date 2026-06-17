@@ -13,7 +13,10 @@ import {
   formatRowFieldDiff,
   buildGithubAnnotation,
   previewValue,
+  summarizeReport,
+  parseCliArgs,
   SCANNER_SLOW_THRESHOLD_MS,
+  MAX_VALUE_PREVIEW,
   // @ts-ignore - .mjs without types; helpers are pure JS.
 } from "../../scripts/run-scanner-guardrails-ci.mjs";
 

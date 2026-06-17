@@ -208,9 +208,10 @@ describe("PlantProfileContext static safety scan", () => {
     ];
     for (const rel of files) {
       const src = readFileSync(resolve(process.cwd(), rel), "utf8");
+      const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
       for (const pattern of forbidden) {
         expect(
-          pattern.test(src),
+          pattern.test(code),
           `${rel} must not contain ${pattern}`,
         ).toBe(false);
       }

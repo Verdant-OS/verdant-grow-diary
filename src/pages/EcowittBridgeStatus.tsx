@@ -230,6 +230,8 @@ export default function EcowittBridgeStatus() {
         </CardContent>
       </Card>
 
+      <EcowittLocalForwardingStatusWidget />
+
       <EcowittSnapshotTrustExamples />
 
       <IngestAttemptReportDrawer

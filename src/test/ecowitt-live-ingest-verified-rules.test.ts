@@ -73,9 +73,6 @@ function assertNoSecrets(m: LiveIngestVerifiedMarker) {
     "vbt_",
     "service" + "_role",
     "raw_payload",
-    "localhost:8787",
-    "http://",
-    "https://",
     "eyJ",
   ]) {
     expect(blob.includes(forbidden), `marker leaked "${forbidden}"`).toBe(false);

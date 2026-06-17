@@ -26,10 +26,15 @@ import { useTents } from "@/hooks/use-tents";
 import {
   evaluateGgsSentinelReadiness,
   GGS_SENTINEL_METRICS,
+  GGS_METRIC_FRIENDLY_NAME,
+  formatGgsWindowLabel,
   type GgsSentinelEvaluation,
   type GgsSentinelInputRow,
   type GgsSentinelSnapshot,
+  type GgsSentinelMetricFreshness,
 } from "@/lib/ggsSentinelSmokeRunner";
+import { SPIDER_FARMER_GGS_STALE_MS } from "@/lib/spiderFarmerGgsMappingRules";
+
 
 const WINDOW_HOURS = 4;
 

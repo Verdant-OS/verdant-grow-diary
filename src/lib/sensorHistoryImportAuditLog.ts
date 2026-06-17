@@ -204,6 +204,12 @@ export function recordSensorHistoryImportAuditEvent(
     fileType: input.fileType,
     acceptedRowCount: safeNonNegInt(input.acceptedRowCount),
     rejectedRowCount: safeNonNegInt(input.rejectedRowCount),
+    ...(typeof input.insertedRowCount === "number"
+      ? { insertedRowCount: safeNonNegInt(input.insertedRowCount) }
+      : {}),
+    ...(typeof input.duplicateRowCount === "number"
+      ? { duplicateRowCount: safeNonNegInt(input.duplicateRowCount) }
+      : {}),
     dateRange: sanitizeDateRange(input.dateRange ?? null),
     mappedTentLabels: sanitizeLabels(input.mappedTentLabels ?? null),
     mappedSensorGroups: sanitizeLabels(input.mappedSensorGroups ?? null),

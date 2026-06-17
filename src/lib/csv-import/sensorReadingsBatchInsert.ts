@@ -279,6 +279,27 @@ export function buildBatchFailureMessage(input: FailureDiagnosticInput): string 
   return parts.join(" ");
 }
 
+/**
+ * Result of the short race-window recovery callback. When the orchestrator
+ * sees a 23505 unique-violation on the deployed dedupe index it calls
+ * `onDedupeConflict` to re-confirm which rows of the failed batch are
+ * provably already present in the DB.
+ *
+ * - `retryRows` is the subset of the failed batch the recoverer believes
+ *   are still genuinely new and should be re-inserted ONCE.
+ * - `confirmedDuplicateRows` is how many rows the recoverer proved are
+ *   already present and can be safely reclassified as skipped duplicates.
+ *
+ * Returning `null` means the recoverer could not prove the conflict was a
+ * benign duplicate (e.g. some rows have un-computable keys or the
+ * re-query failed). In that case the orchestrator MUST preserve the
+ * original failure path — we never silently swallow unknown DB errors.
+ */
+export interface DedupeConflictResolution<TRow> {
+  confirmedDuplicateRows: number;
+  retryRows: TRow[];
+}
+
 export interface InsertSensorReadingsInBatchesArgs<TRow> {
   rows: readonly TRow[];
   vendorLabel: string;
@@ -292,6 +313,18 @@ export interface InsertSensorReadingsInBatchesArgs<TRow> {
     batch: TRow[],
     batchIndex: number,
   ) => Promise<{ error: BatchInsertError | null }>;
+  /**
+   * Optional short race-window recovery. Only consulted when a batch
+   * fails with the deployed sensor_readings dedupe unique-violation
+   * (code 23505 + `sensor_readings_dedupe_uidx`). Recovery is best-effort
+   * and at most one retry per failed batch. Returning `null` keeps the
+   * original failure semantics intact.
+   */
+  onDedupeConflict?: (
+    failedBatch: TRow[],
+    error: BatchInsertError,
+    batchIndex: number,
+  ) => Promise<DedupeConflictResolution<TRow> | null>;
 }
 
 export async function insertSensorReadingsInBatches<TRow>(
@@ -302,16 +335,52 @@ export async function insertSensorReadingsInBatches<TRow>(
   const totalBatches = batches.length;
   const totalRows = args.rows.length;
   let inserted = 0;
+  let recoveredDuplicateRows = 0;
 
   for (let i = 0; i < batches.length; i++) {
     const batch = batches[i];
-    const result = await args.insertBatch(batch, i + 1);
+    let result = await args.insertBatch(batch, i + 1);
+
+    // Short race-window recovery for the deployed dedupe unique-violation.
+    // Only fires when the caller supplied a recoverer AND the error
+    // matches the audited (user_id, tent_id, source, metric, captured_at)
+    // index. Unknown DB errors fall straight through to the failure path.
+    if (
+      result.error &&
+      args.onDedupeConflict &&
+      isSensorReadingsDedupeUniqueViolation(result.error)
+    ) {
+      let resolution: DedupeConflictResolution<TRow> | null = null;
+      try {
+        resolution = await args.onDedupeConflict(batch, result.error, i + 1);
+      } catch {
+        resolution = null;
+      }
+      if (resolution) {
+        if (resolution.retryRows.length === 0) {
+          // Whole batch reclassified as already-present duplicates.
+          recoveredDuplicateRows += resolution.confirmedDuplicateRows;
+          continue;
+        }
+        // Some rows confirmed duplicates, some still need writing.
+        // One retry only — if it fails we surface the original semantics.
+        const retryResult = await args.insertBatch(resolution.retryRows, i + 1);
+        if (!retryResult.error) {
+          inserted += resolution.retryRows.length;
+          recoveredDuplicateRows += resolution.confirmedDuplicateRows;
+          continue;
+        }
+        result = retryResult;
+      }
+    }
+
     if (result.error) {
       return {
         ok: false,
         totalRows,
         totalBatches,
         insertedRows: inserted,
+        recoveredDuplicateRows,
         failedBatchIndex: i + 1,
         failedBatchSize: batch.length,
         partialWrite: inserted > 0,
@@ -335,6 +404,7 @@ export async function insertSensorReadingsInBatches<TRow>(
     totalRows,
     totalBatches,
     insertedRows: inserted,
+    recoveredDuplicateRows,
     failedBatchIndex: null,
     failedBatchSize: 0,
     partialWrite: false,

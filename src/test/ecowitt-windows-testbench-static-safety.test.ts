@@ -1298,10 +1298,14 @@ describe("ecowitt windows testbench — forwarding response sanitization", () =>
     expect(doc).toMatch(/last_forward_response_error/);
     expect(doc).toMatch(/last_forward_response_classification/);
     expect(doc).toMatch(/last_forward_response_message/);
+    expect(doc).toMatch(/last_forward_response_reason/);
     expect(doc).toMatch(/invalid_payload/);
     expect(doc).toMatch(/forbidden_tent/);
     expect(doc).toMatch(/tent_lookup_failed/);
     expect(doc).toMatch(/insert_failed/);
+    expect(doc).toMatch(/insert_source_constraint_failed/);
+    expect(doc).toMatch(/insert_check_failed/);
+    expect(doc).toMatch(/insert_duplicate/);
     expect(doc).toMatch(/Never paste bridge token/i);
   });
 });

@@ -747,6 +747,7 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
         FORWARD_STATS["last_forward_response_error"] = summary["error"]
         FORWARD_STATS["last_forward_response_classification"] = summary["classification"]
         FORWARD_STATS["last_forward_response_message"] = summary["message"]
+        FORWARD_STATS["last_forward_response_reason"] = summary.get("reason")
     print(
         f"[verdant-testbench] forwarded reading -> {resp.status_code} "
         f"(token {mask_token(token or '')})"

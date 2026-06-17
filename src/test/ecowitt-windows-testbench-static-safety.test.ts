@@ -1014,3 +1014,112 @@ describe("ecowitt windows testbench — preflight path-safety regression", () =>
     expect(body).not.toMatch(/Start-Process.*listener/i);
   });
 });
+
+describe("ecowitt windows testbench — preflight diagnostics + invocation smoke", () => {
+  const body = readFileSync(join(TESTBENCH_DIR, "preflight-windows.ps1"), "utf-8");
+
+  it("preflight accepts -Diagnostics switch", () => {
+    expect(body).toMatch(/\[switch\]\$Diagnostics/);
+    expect(body).toMatch(/=== Diagnostics \(safe paths only\) ===/);
+  });
+
+  it("preflight diagnostics block prints only safe path info", () => {
+    // Diagnostics must not leak sensitive markers.
+    const diagBlock = body.split("=== Diagnostics (safe paths only) ===")[1] ?? "";
+    expect(diagBlock).not.toMatch(/Authorization/);
+    expect(diagBlock).not.toMatch(/Bearer/);
+    expect(diagBlock).not.toMatch(/vbt_[A-Za-z0-9_-]/);
+    expect(diagBlock).not.toMatch(/Get-Content\s+.*\.env/i);
+    expect(diagBlock).not.toMatch(/raw_payload/);
+  });
+
+  it("preflight failure block prints improved wrong-folder guidance", () => {
+    expect(body).toMatch(/EcoWitt testbench preflight failed\./);
+    expect(body).toMatch(/Expected repo-relative paths:/);
+    expect(body).toMatch(/git pull origin verdant-grow-diary/);
+    expect(body).toMatch(/preflight-windows\.ps1 -Diagnostics/);
+    expect(body).toMatch(/old standalone testbench folder/i);
+  });
+
+  it("preflight uses Write-Verbose for internals", () => {
+    expect(body).toMatch(/Write-Verbose/);
+    expect(body).toMatch(/\[CmdletBinding\(\)\]/);
+  });
+});
+
+describe("ecowitt windows testbench — preflight PowerShell invocation smoke", () => {
+  // These tests actually invoke PowerShell. Skip when no PS executable
+  // is available so non-Windows CI does not fail.
+  const { spawnSync } = require("node:child_process") as typeof import("node:child_process");
+  const { existsSync } = require("node:fs") as typeof import("node:fs");
+
+  function findPwsh(): string | null {
+    for (const c of ["pwsh", "powershell.exe", "powershell"]) {
+      const r = spawnSync(c, ["-NoLogo", "-NoProfile", "-Command", "$PSVersionTable.PSVersion.Major"], {
+        encoding: "utf-8",
+      });
+      if (r.status === 0) return c;
+    }
+    return null;
+  }
+
+  const pwsh = findPwsh();
+  const repoRoot = process.cwd();
+  const tbDir = TESTBENCH_DIR;
+  const scriptRel = "tools\\ecowitt-testbench\\preflight-windows.ps1";
+  const scriptAbs = join(tbDir, "preflight-windows.ps1");
+
+  const skipMsg = "PowerShell not available; skipping invocation smoke tests";
+  const maybeIt = pwsh ? it : it.skip;
+
+  if (!pwsh) {
+    it("invocation smoke tests skipped (no powershell/pwsh in PATH)", () => {
+      console.warn(skipMsg);
+      expect(existsSync(scriptAbs)).toBe(true);
+    });
+  }
+
+  function runPreflight(cwd: string, args: string[]) {
+    return spawnSync(
+      pwsh!,
+      ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptAbs, ...args],
+      { cwd, encoding: "utf-8", timeout: 30_000 },
+    );
+  }
+
+  function assertSafeOutput(out: string) {
+    expect(out).not.toMatch(/Illegal characters in path/);
+    expect(out).not.toMatch(/Resolve-Path\s*:/);
+    expect(out).not.toMatch(/ArgumentException/);
+    expect(out).not.toMatch(/Authorization/);
+    expect(out).not.toMatch(/Bearer\s+[A-Za-z0-9._-]{8,}/);
+    expect(out).not.toMatch(/vbt_[A-Za-z0-9_-]{8,}/);
+    expect(out).not.toMatch(/SUPABASE_SERVICE_ROLE/);
+  }
+
+  maybeIt("invokes successfully from repo root", () => {
+    const r = runPreflight(repoRoot, []);
+    const out = (r.stdout || "") + (r.stderr || "");
+    assertSafeOutput(out);
+    expect(r.status, out).toBe(0);
+    expect(out).toMatch(/\[preflight\]/);
+    expect(out.toLowerCase()).toMatch(/repo root/);
+  });
+
+  maybeIt("invokes successfully from tools/ecowitt-testbench", () => {
+    const r = runPreflight(tbDir, []);
+    const out = (r.stdout || "") + (r.stderr || "");
+    assertSafeOutput(out);
+    expect(r.status, out).toBe(0);
+    expect(out).toMatch(/\[preflight\]/);
+  });
+
+  maybeIt("invokes successfully by direct script path from repo root with -Diagnostics", () => {
+    const r = runPreflight(repoRoot, ["-Diagnostics"]);
+    const out = (r.stdout || "") + (r.stderr || "");
+    assertSafeOutput(out);
+    expect(r.status, out).toBe(0);
+    expect(out).toMatch(/Diagnostics \(safe paths only\)/);
+    expect(out.toLowerCase()).toMatch(/detected repo root/);
+  });
+});

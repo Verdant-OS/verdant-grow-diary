@@ -135,10 +135,12 @@ describe("ecowitt windows testbench — /debug/raw-log-tail safety", () => {
     expect(py).toMatch(/forbidden_non_local/);
   });
 
-  it("clamps the lines query param to a maximum of 50", () => {
-    // Look for the clamp logic explicitly.
-    expect(py).toMatch(/max_lines\s*=\s*50/);
-    expect(py).toMatch(/if\s+n\s*>\s*max_lines/);
+  it("clamps the lines query param to a maximum of 50 via parse_debug_line_count", () => {
+    expect(py).toMatch(/MAX_DEBUG_LINES\s*=\s*50/);
+    expect(py).toMatch(/MIN_DEBUG_LINES\s*=\s*1/);
+    expect(py).toMatch(/DEFAULT_DEBUG_LINES\s*=\s*10/);
+    expect(py).toMatch(/def\s+parse_debug_line_count\s*\(/);
+    expect(py).toMatch(/parse_debug_line_count\(request\.args\.get\("lines"\)\)/);
   });
 
   it("handles missing log file without crashing", () => {

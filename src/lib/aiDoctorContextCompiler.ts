@@ -273,6 +273,17 @@ function toFiniteNumber(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * Normalize a plant/profile string field (e.g. medium, pot_size). Returns
+ * a trimmed string or null when the input is missing, non-string, blank,
+ * or otherwise unusable. Never infers values.
+ */
+function cleanPlantString(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const trimmed = v.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 function avg(nums: readonly number[]): number | null {
   if (nums.length === 0) return null;
   const sum = nums.reduce((a, b) => a + b, 0);

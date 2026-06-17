@@ -532,14 +532,37 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
         )
         return {"forwarded": False, "reason": "non_ascii_auth_header"}
 
-    # Attach tent context. Edge Function requires top-level tent_id;
-    # x-verdant-tent-id is a secondary signal already in the CORS allowlist.
-    outbound = dict(reading)
-    outbound["tent_id"] = tent_id
-    if isinstance(outbound.get("metadata"), dict):
-        md = dict(outbound["metadata"])
-        md["tent_id"] = tent_id
-        outbound["metadata"] = md
+    # Attach tent context AND align with the sensor-ingest-webhook
+    # contract (WEBHOOK_ALLOWED_SOURCES requires a canonical transport
+    # label such as "ecowitt"; the local Verdant source — "live" /
+    # "demo" / ... — is preserved under metadata.verdant_source for
+    # audit but never sent as `source`).
+    verdant_source = reading.get("source")
+    raw_payload_in = None
+    metadata_in = reading.get("metadata") if isinstance(reading.get("metadata"), dict) else {}
+    if isinstance(metadata_in, dict):
+        raw_payload_in = metadata_in.get("raw_payload")
+    safe_raw_payload = _redact_raw_payload_for_forward(raw_payload_in)
+
+    safe_metadata: Dict[str, Any] = {}
+    if isinstance(metadata_in, dict):
+        for k, v in metadata_in.items():
+            if k == "raw_payload":
+                continue
+            safe_metadata[str(k)] = v
+    safe_metadata["tent_id"] = tent_id
+    safe_metadata["verdant_source"] = verdant_source
+    if safe_raw_payload is not None:
+        safe_metadata["raw_payload"] = safe_raw_payload
+
+    outbound: Dict[str, Any] = {
+        "tent_id": tent_id,
+        "source": WEBHOOK_TRANSPORT_SOURCE,
+        "vendor": VENDOR,
+        "captured_at": reading.get("captured_at"),
+        "metrics": reading.get("metrics") or {},
+        "metadata": safe_metadata,
+    }
 
     headers = {
         "Authorization": auth,
@@ -550,6 +573,11 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
     }
     FORWARD_STATS["attempt_count"] += 1
     FORWARD_STATS["last_at"] = datetime.now(timezone.utc).isoformat()
+    # Reset prior sanitized response fields each attempt — they only
+    # describe the *last* response, never carried over silently.
+    FORWARD_STATS["last_forward_response_error"] = None
+    FORWARD_STATS["last_forward_response_classification"] = None
+    FORWARD_STATS["last_forward_response_message"] = None
     try:
         resp = requests.post(url, json=outbound, headers=headers, timeout=10)
         FORWARD_STATS["last_status"] = resp.status_code
@@ -559,6 +587,12 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
         else:
             FORWARD_STATS["failure_count"] += 1
             FORWARD_STATS["last_error"] = f"http_{resp.status_code}"
+            summary = summarize_forward_response(resp)
+            FORWARD_STATS["last_forward_response_error"] = summary["error"]
+            FORWARD_STATS["last_forward_response_classification"] = summary[
+                "classification"
+            ]
+            FORWARD_STATS["last_forward_response_message"] = summary["message"]
         print(
             f"[verdant-testbench] forwarded reading -> {resp.status_code} "
             f"(token {mask_token(token or '')})"
@@ -572,7 +606,8 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
         FORWARD_STATS["failure_count"] += 1
         FORWARD_STATS["last_status"] = None
         FORWARD_STATS["last_error"] = _short_sanitized_error(exc)
-        return {"forwarded": False, "reason": f"request_error: {exc!s}"}
+        return {"forwarded": False, "reason": f"request_error: {type(exc).__name__}"}
+
 
 
 def mask_ingest_url(url: Optional[str]) -> Optional[str]:

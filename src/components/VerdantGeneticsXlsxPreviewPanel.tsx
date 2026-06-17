@@ -115,6 +115,8 @@ export function VerdantGeneticsXlsxPreviewPanel({
     "idle" | "saving" | "success" | "error"
   >("idle");
   const [savedCount, setSavedCount] = useState<number>(0);
+  const [saveOutcome, setSaveOutcome] =
+    useState<VerdantGeneticsXlsxSaveOutcome | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedEvidence, setSavedEvidence] =
     useState<VerdantGeneticsXlsxImportEvidenceViewModel | null>(null);

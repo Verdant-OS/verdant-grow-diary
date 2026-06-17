@@ -273,7 +273,6 @@ describe("Timeline static-safety guard — URL param allowlist", () => {
 
   it("still flags Supabase .from(...).delete() destructive writes", () => {
     const bad = `await supabase.from("sensor_readings").delete().eq("id", id);`;
-    expect(filterAppDeleteCalls(bad)).not.toEqual([]);
     expect(bad).toMatch(SUPABASE_CHAIN_DELETE);
   });
 

@@ -1,7 +1,7 @@
 # Plant Profile Metadata Persistence Decision
 
-**Status:** Needs owner approval (recommendation: Option A, conditional)
-**Scope:** Decision/architecture only. No code, schema, RLS, Edge Function, or UI changes accompany this document.
+**Status:** Implemented (Option A — read path + schema landed; edit UI pending)
+**Scope:** Schema, read-path wiring, and UI pass-through completed. Edit surface not yet exposed.
 **Last updated:** 2026-06-17
 
 ---

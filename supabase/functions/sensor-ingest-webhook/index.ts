@@ -19,6 +19,8 @@ import {
   tentScopeMatches,
   type AuthResult,
 } from "./auth.ts";
+import { sanitizeForResponse, safeLog } from "./sanitize.ts";
+
 
 
 // Centralized CORS handling. Allowed origins are explicit — no wildcard is
@@ -51,11 +53,13 @@ function buildCorsHeaders(req: Request): Record<string, string> {
 }
 
 function json(req: Request, body: unknown, status: number) {
-  return new Response(JSON.stringify(body), {
+  const safe = sanitizeForResponse(body);
+  return new Response(JSON.stringify(safe), {
     status,
     headers: { ...buildCorsHeaders(req), "Content-Type": "application/json" },
   });
 }
+
 
 // Exported for Deno-based CORS + secret-leakage tests. Behavior is identical
 // to the live serve handler: OPTIONS short-circuits before auth/body/DB, and
@@ -70,11 +74,19 @@ export async function handleRequest(req: Request): Promise<Response> {
     return await handle(req);
   } catch (_err) {
     // Never leak error text, stack traces, tokens, or PG details.
+    safeLog("internal_error");
     return json(req, { error: "internal_error" }, 500);
   }
 }
 
-Deno.serve(handleRequest);
+
+
+// Only start the HTTP listener when run as the main module (Supabase Edge
+// Runtime). Importing this file from a Deno test must NOT bind a port.
+if (import.meta.main) {
+  Deno.serve(handleRequest);
+}
+
 
 
 async function handle(req: Request): Promise<Response> {
@@ -191,13 +203,13 @@ async function handle(req: Request): Promise<Response> {
   if (insErr) {
     // Never leak PG error text, constraint names, payload values, tokens,
     // bridge ids, secrets, or internal table names. Log internally only.
-    console.error("[sensor-ingest-webhook] insert failed", {
+    safeLog("insert_failed", {
       auth_kind: auth.kind,
       tent_id_present: !!payloadTentId,
-      // Intentionally NOT logging the raw insErr.message.
     });
     return json(req, { error: "insert_failed" }, 400);
   }
+
 
   const insertedCount = upserted?.length ?? 0;
   const skippedDuplicate = toInsert.length - insertedCount;

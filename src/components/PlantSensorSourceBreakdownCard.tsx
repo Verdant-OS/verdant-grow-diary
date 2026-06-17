@@ -14,7 +14,7 @@
  * here (tracked as a follow-up).
  *
  * Safety contract:
- *   - No writes. No alerts. No action_queue. No AI calls. Read-only.
+ *   - No writes. No alerts. No queued actions. No AI calls. Read-only.
  */
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
@@ -147,7 +147,7 @@ export default function PlantSensorSourceBreakdownCard({
       ) : (
         <SensorSourceSummaryWidget
           readings={readings}
-          options={{ range: range ?? null, fallback: "manual" }}
+          options={{ range: range ?? null, fallback: "invalid" }}
           title="Sensor sources for this plant"
           dateRange={
             range

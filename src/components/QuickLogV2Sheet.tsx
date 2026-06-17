@@ -84,8 +84,24 @@ export default function QuickLogV2Sheet({
   const plants = (plantsQ.data as Parameters<typeof buildQuickLogV2TargetOptions>[1]) ?? [];
   const tents = (tentsQ.data as Parameters<typeof buildQuickLogV2TargetOptions>[0]) ?? [];
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
+  const inRouter = useInRouterContext();
+  // `useNavigate` throws when called outside a Router. The sheet is
+  // always mounted inside the app's Router in production, but some
+  // tests mount it bare — fall back to a no-op navigator in that case.
+  // Hook order is preserved because `inRouter` is stable across renders.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const navigate = inRouter ? useNavigate() : null;
   const { save, saving } = useQuickLogV2Save();
+
+  function navigateToTimeline(href: string) {
+    if (navigate) {
+      navigate(href);
+      return;
+    }
+    if (typeof window !== "undefined" && window.location) {
+      window.location.assign(href);
+    }
+  }
 
   function showTimelineConfirmation(
     message: string,
@@ -104,7 +120,7 @@ export default function QuickLogV2Sheet({
     toast.success(message, {
       action: {
         label: QUICK_LOG_TIMELINE_CTA_LABEL,
-        onClick: () => navigate(nav.href),
+        onClick: () => navigateToTimeline(nav.href),
       },
     });
   }

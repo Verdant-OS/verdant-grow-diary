@@ -349,14 +349,17 @@ _WEBHOOK_ERROR_CLASSIFICATIONS = {
 }
 
 
+import re as _re_inline
+
 # Substring patterns redacted inline even when embedded in a larger
 # string (so error messages like "bad token vbt_XYZ in payload" do not
 # leak the embedded credential).
 _INLINE_REDACT_PATTERNS = [
-    _re.compile(r"vbt_[A-Za-z0-9_\-]{6,}"),
-    _re.compile(r"eyJ[A-Za-z0-9_\-]{6,}\.[A-Za-z0-9_\-]{6,}\.[A-Za-z0-9_\-]{6,}"),
-    _re.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]{6,}"),
+    _re_inline.compile(r"vbt_[A-Za-z0-9_\-]{6,}"),
+    _re_inline.compile(r"eyJ[A-Za-z0-9_\-]{6,}\.[A-Za-z0-9_\-]{6,}\.[A-Za-z0-9_\-]{6,}"),
+    _re_inline.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]{6,}"),
 ]
+
 
 
 def _scrub_inline_secrets(text: str) -> str:

@@ -173,4 +173,3 @@ describe("QuickLogV2Sheet — failed save Retry button", () => {
   });
 });
 
-});

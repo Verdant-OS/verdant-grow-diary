@@ -221,5 +221,5 @@ export function buildForwardingStatusViewModel(
       }
     : HIDDEN_BANNER;
 
-  return { state: "ready", headline, subheadline: sub, rows, banner };
+  return { state: "ready", headline, subheadline: sub, rows, banner, verifiedMarker };
 }

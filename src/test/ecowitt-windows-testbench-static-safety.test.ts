@@ -1245,12 +1245,14 @@ describe("ecowitt windows testbench — forwarding response sanitization", () =>
     expect(listener).toMatch(/"last_forward_response_error"/);
     expect(listener).toMatch(/"last_forward_response_classification"/);
     expect(listener).toMatch(/"last_forward_response_message"/);
+    expect(listener).toMatch(/"last_forward_response_reason"/);
   });
 
   it("/debug/forwarding-status exposes sanitized response fields", () => {
     expect(fwdBlock).toMatch(/last_forward_response_error/);
     expect(fwdBlock).toMatch(/last_forward_response_classification/);
     expect(fwdBlock).toMatch(/last_forward_response_message/);
+    expect(fwdBlock).toMatch(/last_forward_response_reason/);
     expect(fwdBlock).toMatch(/sanitize_forward_error_value/);
   });
 

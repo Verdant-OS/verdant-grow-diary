@@ -188,24 +188,23 @@ Read path landed before edit UI to avoid grower-visible half-states.
 
 ## 11. Decision status
 
-**Needs owner approval.**
+**Implemented — read path landed; edit UI pending.**
 
-- ✅ Recommended now: **Option A**, *if* a plant profile edit slice is in this iteration's scope.
-- ⏸ Defer (**Option C**) if no edit surface is imminent — persisting empty columns adds risk without product value.
+- ✅ **Option A read path** completed: schema, generated types, adapter mapping, Plant Detail wiring, AI Doctor context compiler pass-through, and Plant Profile Context card display.
+- ⏸ **Option A edit UI** deferred to a follow-up slice to avoid grower-visible half-states.
 - 🚫 **Option B** not recommended at this time; revisit only when ≥ ~5 optional context fields are queued.
+- 🚫 **Option C** no longer needed — persistence is in place, just waiting for the edit surface.
 
 ---
 
-## 12. Follow-up implementation slice (only if Option A is approved)
+## 12. Follow-up implementation slice (edit UI)
 
-Smallest safe first slice:
-
-1. Migration: `ALTER TABLE public.plants ADD COLUMN medium text NULL, ADD COLUMN pot_size text NULL;` (no GRANT/RLS changes — existing `plants` policies cover both columns).
-2. Regenerate Supabase types.
-3. Extend plant read selector to include both columns.
-4. Wire values through `PlantDetailAiDoctorContextReadinessMount` (props already exist).
-5. Add minimal inline edit form on `PlantProfileContextCard` (owner-scoped update via authenticated session).
-6. Tests per Section 8 (compiler, view-model, mount, edit form, RLS harness, regression).
-7. Update this doc's status to "Implemented" and update workspace knowledge.
+1. Replace disabled "coming soon" buttons on `PlantProfileContextCard` with inline text inputs + save/cancel.
+2. Save triggers `supabase.from("plants").update({ medium, pot_size })` scoped by plant owner.
+3. Empty / whitespace-only submit normalizes to `null` (matching `cleanPlantString` contract).
+4. Round-trip test: save → refetch → readiness panel flips from unknown to known.
+5. RLS runtime harness: owner can update own plant; non-owner cannot.
+6. Safety fence: no AI/model call triggered by saving metadata; no Action Queue / alerts side effects.
+7. Update this doc's status to "Fully implemented".
 
 Each item is a separate PR-sized change; do not bundle.

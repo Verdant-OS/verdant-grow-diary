@@ -1178,3 +1178,52 @@ describe("ecowitt windows testbench — preflight PowerShell invocation smoke", 
     expect(out.toLowerCase()).toMatch(/detected repo root/);
   });
 });
+
+describe("ecowitt windows testbench — forwarding tent-context safety", () => {
+  const LISTENER_PATH = join(TESTBENCH_DIR, "ecowitt_listener.py");
+  const ENV_EXAMPLE_PATH = join(TESTBENCH_DIR, ".env.example");
+  const listener = readFileSync(LISTENER_PATH, "utf-8");
+  const envExample = readFileSync(ENV_EXAMPLE_PATH, "utf-8");
+  const doc = readFileSync(DOC_PATH, "utf-8");
+
+  it("listener defines tent-id readiness helpers", () => {
+    expect(listener).toMatch(/def is_valid_tent_id\(/);
+    expect(listener).toMatch(/def evaluate_forwarding_readiness\(/);
+  });
+
+  it("listener blocks forwarding when tent_id is missing or invalid", () => {
+    expect(listener).toMatch(/blocked_missing_tent_id/);
+    expect(listener).toMatch(/blocked_invalid_tent_id/);
+    expect(listener).toMatch(/forwarding blocked locally/);
+  });
+
+  it("listener attaches tent_id to forwarded payload and x-verdant-tent-id header", () => {
+    expect(listener).toMatch(/outbound\["tent_id"\]\s*=\s*tent_id/);
+    expect(listener).toMatch(/"x-verdant-tent-id"/);
+  });
+
+  it("forwarding-status exposes tent_id_configured / tent_id_valid / forwarding_ready", () => {
+    expect(listener).toMatch(/"tent_id_configured"/);
+    expect(listener).toMatch(/"tent_id_valid"/);
+    expect(listener).toMatch(/"forwarding_ready"/);
+    expect(listener).toMatch(/"forward_blocked_count"/);
+  });
+
+  it("forwarding-status does not echo the raw tent UUID value", () => {
+    expect(listener).not.toMatch(/"tent_id":\s*tent_id\b/);
+  });
+
+  it(".env.example documents VERDANT_TENT_ID as a real UUID requirement", () => {
+    expect(envExample).toMatch(/VERDANT_TENT_ID=/);
+    expect(envExample).toMatch(/UUID/i);
+    expect(envExample).toMatch(/Flower Tent|display name/i);
+    expect(envExample).toMatch(/tent-1|demo-tent/);
+  });
+
+  it("docs explain http_400 + tent_id: null troubleshooting", () => {
+    expect(doc).toMatch(/VERDANT_TENT_ID/);
+    expect(doc).toMatch(/http[_ ]?400|HTTP 400/i);
+    expect(doc).toMatch(/tent_id/);
+    expect(doc).toMatch(/forwarding_ready/);
+  });
+});

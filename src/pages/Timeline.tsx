@@ -56,6 +56,14 @@ import {
   TIMELINE_EVIDENCE_EMPTY_TITLE,
   TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER,
 } from "@/lib/timelineEvidenceFilterRules";
+import {
+  buildTimelinePhotoLightboxList,
+  findTimelinePhotoIndexById,
+  buildTimelinePhotoAltText,
+} from "@/lib/timelinePhotoLightboxRules";
+import TimelinePhotoLightbox from "@/components/TimelinePhotoLightbox";
+
+
 
 
 const TIMELINE_SNAPSHOT_STALE_MS = 30 * 60 * 1000;
@@ -152,6 +160,7 @@ export default function Timeline() {
   const [plantFilter, setPlantFilter] = useState("");
   const [tentFilter, setTentFilter] = useState("");
   const [eventTypeFilter, setEventTypeFilter] = useState("");
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   async function load() {
     if (!user || !activeGrowId) {
@@ -269,6 +278,20 @@ export default function Timeline() {
     setTentFilter("");
     setEventTypeFilter("");
   }
+
+  // Lightbox navigation list derived from currently visible (filtered)
+  // entries. Pure helper, no writes. Closing the lightbox when the
+  // backing list shrinks below the active index keeps navigation safe.
+  const lightboxItems = useMemo(
+    () => buildTimelinePhotoLightboxList(filtered),
+    [filtered],
+  );
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    if (lightboxIndex < 0 || lightboxIndex >= lightboxItems.length) {
+      setLightboxIndex(null);
+    }
+  }, [lightboxItems, lightboxIndex]);
 
   // Merge `grow_events` (Quick Log v2 manual saves) into the raw entries
   // passed to the Recent Quick Logs panel so just-saved entries surface at
@@ -598,7 +621,27 @@ export default function Timeline() {
                   {group.items.map((e) => (
                     <li key={e.id} className="glass rounded-2xl overflow-hidden animate-fade-in">
                       {e.photo_url ? (
-                        <img src={e.photo_url} className="w-full aspect-[4/3] object-cover" alt="" loading="lazy" />
+                        (() => {
+                          const idx = findTimelinePhotoIndexById(lightboxItems, e.id);
+                          const item = idx >= 0 ? lightboxItems[idx] : null;
+                          const alt = buildTimelinePhotoAltText(item);
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => { if (idx >= 0) setLightboxIndex(idx); }}
+                              aria-label={`Open photo: ${alt}`}
+                              data-testid="timeline-photo-open"
+                              className="block w-full focus:outline-none focus:ring-2 focus:ring-primary/60"
+                            >
+                              <img
+                                src={e.photo_url}
+                                className="w-full aspect-[4/3] object-cover"
+                                alt={alt}
+                                loading="lazy"
+                              />
+                            </button>
+                          );
+                        })()
                       ) : (
                         <div className="w-full aspect-[4/3] bg-secondary/40 flex items-center justify-center text-muted-foreground">
                           <ImageIcon className="h-8 w-8" />
@@ -729,6 +772,14 @@ export default function Timeline() {
         onSaved={(patch) => setEntries((rows) => rows.map((r) => r.id === patch.id ? { ...r, ...patch } as Entry : r))}
         onDeleted={(id) => setEntries((rows) => rows.filter((r) => r.id !== id))}
       />
+      {lightboxIndex !== null && lightboxItems.length > 0 && (
+        <TimelinePhotoLightbox
+          items={lightboxItems}
+          activeIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onNavigate={(i) => setLightboxIndex(i)}
+        />
+      )}
     </div>
   );
 }

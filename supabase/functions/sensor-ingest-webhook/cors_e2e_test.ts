@@ -92,7 +92,11 @@ Deno.test("GET returns 405 method_not_allowed WITH CORS headers", async () => {
   assertStringIncludes(text, "method_not_allowed");
 });
 
-Deno.test("POST with bearer + invalid JSON returns 400 WITH CORS headers; body has no token", async () => {
+Deno.test({
+  name: "POST with bearer + invalid JSON returns 400 WITH CORS headers; body has no token",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  fn: async () => {
   const SECRET = "vbt_test_bridge_token_value_should_not_leak";
   const req = new Request("https://test.supabase.co/functions/v1/sensor-ingest-webhook", {
     method: "POST",

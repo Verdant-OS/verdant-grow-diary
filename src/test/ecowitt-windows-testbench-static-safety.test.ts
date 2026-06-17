@@ -1355,8 +1355,9 @@ describe("ecowitt windows testbench — retry/backoff + error report", () => {
     // never echoes Authorization or raw payload
     expect(fn).not.toMatch(/Authorization/);
     expect(fn).not.toMatch(/raw_payload/);
-    // never reads .env contents
-    expect(fn).not.toMatch(/\.env/);
+    // never reads .env file contents (allow os.environ access)
+    expect(fn).not.toMatch(/open\([^)]*\.env\b/);
+    expect(fn).not.toMatch(/\.env"|'\.env'/);
   });
 
   it("no endpoint reads or returns .env file contents", () => {

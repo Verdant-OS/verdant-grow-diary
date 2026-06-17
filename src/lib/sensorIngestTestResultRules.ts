@@ -57,6 +57,45 @@ function pickArrayLen(obj: unknown, key: string): number {
   return Array.isArray(v) ? v.length : 0;
 }
 
+/**
+ * Map sanitized webhook error codes (returned by sensor-ingest-webhook) to
+ * grower-safe troubleshooting copy. Used by the diagnostic UI so we never
+ * echo raw token values, Authorization headers, or PG error text.
+ */
+export const SANITIZED_WEBHOOK_ERROR_COPY: Record<string, string> = {
+  unauthorized:
+    "Bridge token or Authorization header was rejected. Recheck the token value in the local bridge .env; do not paste it into the browser.",
+  server_misconfigured:
+    "The ingest function is missing required server-side configuration.",
+  invalid_json: "The request body was not valid JSON.",
+  invalid_payload: "The payload shape failed validation.",
+  forbidden_tent: "The token is not authorized for that tent.",
+  tent_lookup_failed: "The function could not verify the tent context.",
+  insert_failed:
+    "The function reached storage but could not save the reading.",
+  method_not_allowed:
+    "Use POST for ingest and OPTIONS for browser preflight.",
+  internal_error:
+    "The function failed unexpectedly; check sanitized server logs.",
+  auth_lookup_failed:
+    "The function could not verify the bridge token. Retry shortly.",
+};
+
+// Strip strings that look like Bearer headers, JWTs, vbt_* tokens, or
+// service-role keys before rendering. Defense-in-depth: the server already
+// sanitizes its responses, but the diagnostic UI must not become a leak
+// surface if a malicious response slips through.
+function sanitizeReasonForDisplay(raw: string): string {
+  if (!raw) return raw;
+  let s = raw.replace(/Bearer\s+\S+/gi, "Bearer [redacted]");
+  if (/^vbt_/i.test(s) && s.length >= 12) return "[redacted]";
+  if (/^[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}$/.test(s)) return "[redacted]";
+  if (/^sb_[A-Za-z0-9_-]{16,}$/.test(s)) return "[redacted]";
+  if (/SUPABASE_SERVICE_ROLE_KEY/.test(s)) s = s.replace(/SUPABASE_SERVICE_ROLE_KEY/g, "[redacted]");
+  return s.slice(0, 200);
+}
+
+
 export function classifySensorIngestTestResult(
   input: ClassifyInput,
 ): SensorIngestTestClassification {

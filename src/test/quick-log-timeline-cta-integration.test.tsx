@@ -116,6 +116,9 @@ beforeEach(() => {
   storageRemove.mockClear();
   insertMock.mockClear();
   document.body.innerHTML = "";
+  // jsdom doesn't implement URL.createObjectURL; stub for photo preview.
+  (URL as unknown as { createObjectURL: (f: unknown) => string }).createObjectURL =
+    () => "blob:mock";
   // Default to a non-matching pathname so default behavior is cross-page.
   Object.defineProperty(window, "location", {
     writable: true,

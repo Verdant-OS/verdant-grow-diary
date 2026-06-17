@@ -9,6 +9,10 @@ import type {
   LocalForwardingStatus,
 } from "@/lib/ecowittLocalForwardingStatus";
 import { recommendForStatus } from "@/lib/ecowittForwardingRecommendedNextStepRules";
+import {
+  classifyLiveIngestVerifiedMarker,
+  type LiveIngestVerifiedMarker,
+} from "@/lib/ecowittLiveIngestVerifiedRules";
 
 export interface ForwardingStatusRow {
   key: string;
@@ -34,6 +38,8 @@ export interface ForwardingStatusViewModel {
   subheadline: string;
   rows: ForwardingStatusRow[];
   banner: ForwardingStatusBanner;
+  /** Operator-mode "Live Ingest Verified" marker. */
+  verifiedMarker: LiveIngestVerifiedMarker;
 }
 
 const HIDDEN_BANNER: ForwardingStatusBanner = {
@@ -51,7 +57,9 @@ const OFFLINE_SUB =
 
 export function buildForwardingStatusViewModel(
   fetchState: LocalForwardingFetchState,
+  nowMs: number = Date.now(),
 ): ForwardingStatusViewModel {
+  const verifiedMarker = classifyLiveIngestVerifiedMarker(fetchState, nowMs);
   if (fetchState.state === "loading") {
     return {
       state: "loading",
@@ -59,6 +67,7 @@ export function buildForwardingStatusViewModel(
       subheadline: "",
       rows: [],
       banner: HIDDEN_BANNER,
+      verifiedMarker,
     };
   }
   if (fetchState.state === "offline") {
@@ -68,6 +77,7 @@ export function buildForwardingStatusViewModel(
       subheadline: OFFLINE_SUB,
       rows: [],
       banner: HIDDEN_BANNER,
+      verifiedMarker,
     };
   }
   const s: LocalForwardingStatus = fetchState.status;
@@ -211,5 +221,5 @@ export function buildForwardingStatusViewModel(
       }
     : HIDDEN_BANNER;
 
-  return { state: "ready", headline, subheadline: sub, rows, banner };
+  return { state: "ready", headline, subheadline: sub, rows, banner, verifiedMarker };
 }

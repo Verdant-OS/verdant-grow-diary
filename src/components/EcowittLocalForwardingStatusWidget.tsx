@@ -146,6 +146,49 @@ export default function EcowittLocalForwardingStatusWidget({
           ) : null}
         </div>
 
+        {vm.verifiedMarker.show ? (
+          <div
+            data-testid="ecowitt-live-ingest-verified-marker"
+            data-state={vm.verifiedMarker.state}
+            className={
+              "rounded-md border p-3 space-y-1 text-xs " +
+              (vm.verifiedMarker.tone === "ok"
+                ? "border-emerald-500/40 bg-emerald-500/5"
+                : vm.verifiedMarker.tone === "warn"
+                  ? "border-amber-500/40 bg-amber-500/5"
+                  : vm.verifiedMarker.tone === "error"
+                    ? "border-destructive/40 bg-destructive/5"
+                    : "border-muted bg-muted/30")
+            }
+          >
+            <p
+              className="text-sm font-semibold"
+              data-testid="ecowitt-live-ingest-verified-title"
+            >
+              {vm.verifiedMarker.title}
+            </p>
+            {vm.verifiedMarker.detail ? (
+              <p data-testid="ecowitt-live-ingest-verified-detail">
+                {vm.verifiedMarker.detail}
+              </p>
+            ) : null}
+            {vm.verifiedMarker.source ? (
+              <p data-testid="ecowitt-live-ingest-verified-source">
+                <span className="text-muted-foreground">Source: </span>
+                <span className="font-medium">{vm.verifiedMarker.source}</span>
+              </p>
+            ) : null}
+            {vm.verifiedMarker.capturedAt ? (
+              <p data-testid="ecowitt-live-ingest-verified-captured-at">
+                <span className="text-muted-foreground">Captured at: </span>
+                <span className="font-medium">
+                  {vm.verifiedMarker.capturedAt}
+                </span>
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
         {vm.banner.show ? (
           <div
             role="alert"

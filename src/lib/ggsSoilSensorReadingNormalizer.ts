@@ -7,7 +7,7 @@
  *
  * Hard constraints (stop-ship if violated):
  *  - Pure. No I/O, no React, no Supabase, no fetch, no timers.
- *  - Read-only. NEVER writes sensor_readings, alerts, queued actions,
+ *  - Read-only. NEVER writes sensor_readings, alert rows, queued actions,
  *    AI sessions, or emits device-control hints.
  *  - Treats the payload as untrusted. NaN/Infinity/impossible values
  *    are rejected, never silently coerced into plausible ranges.

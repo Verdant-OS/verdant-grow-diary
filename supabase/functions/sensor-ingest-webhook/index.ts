@@ -197,13 +197,13 @@ async function handle(req: Request): Promise<Response> {
   if (insErr) {
     // Never leak PG error text, constraint names, payload values, tokens,
     // bridge ids, secrets, or internal table names. Log internally only.
-    console.error("[sensor-ingest-webhook] insert failed", {
+    safeLog("insert_failed", {
       auth_kind: auth.kind,
       tent_id_present: !!payloadTentId,
-      // Intentionally NOT logging the raw insErr.message.
     });
     return json(req, { error: "insert_failed" }, 400);
   }
+
 
   const insertedCount = upserted?.length ?? 0;
   const skippedDuplicate = toInsert.length - insertedCount;

@@ -402,6 +402,19 @@ _WEBHOOK_ERROR_CLASSIFICATIONS = {
     "internal_error": "internal_error",
 }
 
+# Known sanitized `reason` sub-codes for storage_insert_failed responses.
+# Used both to whitelist values and to drive operator guidance copy.
+# Anything not in this set is collapsed to "insert_unknown" — we never
+# echo raw PG messages, SQLSTATEs, constraint names, or column lists.
+_KNOWN_INSERT_REASONS = {
+    "insert_required_field_missing",
+    "insert_source_constraint_failed",
+    "insert_check_failed",
+    "insert_column_mismatch",
+    "insert_duplicate",
+    "insert_unknown",
+}
+
 
 import re as _re_inline
 

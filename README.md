@@ -175,6 +175,9 @@ covers signed-bridge happy-path, replay/idempotency, tampered signature, and
 unknown-bridge cases. The contract that runbook verifies lives in
 [`docs/pi-ingest-write-transaction-contract.md`](docs/pi-ingest-write-transaction-contract.md).
 
+Windows EcoWitt local testbench: see
+[`docs/ecowitt-windows-testbench.md`](docs/ecowitt-windows-testbench.md).
+
 ## Safety philosophy
 
 Verdant follows a read-only, no-write, no-control architecture for advisory

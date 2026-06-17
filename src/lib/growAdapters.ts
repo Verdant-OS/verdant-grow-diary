@@ -91,6 +91,12 @@ export function mapTentRow(row: TentRow): Tent {
   };
 }
 
+function cleanPlantString(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const trimmed = v.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 export function mapPlantRow(row: PlantRow): Plant {
   return {
     id: row.id,
@@ -102,8 +108,10 @@ export function mapPlantRow(row: PlantRow): Plant {
     health: coerceHealth(row.health),
     photo: row.photo_url ?? "",
     lastNote: row.last_note ?? "",
-    growId: (row as { grow_id?: string | null }).grow_id ?? null,
-    isArchived: Boolean((row as { is_archived?: boolean | null }).is_archived ?? false),
+    growId: row.grow_id ?? null,
+    isArchived: Boolean(row.is_archived ?? false),
+    medium: cleanPlantString(row.medium),
+    potSize: cleanPlantString(row.pot_size),
   };
 }
 

@@ -430,6 +430,8 @@ export default function PlantDetail() {
       <PlantProfileContextCard
         stage={plant.stage ?? null}
         strain={plant.strain ?? null}
+        medium={plant.medium ?? null}
+        potSize={plant.potSize ?? null}
       />
       <PlantDetailAiDoctorContextReadinessMount
         plantId={plant.id}
@@ -438,6 +440,8 @@ export default function PlantDetail() {
         plantName={plant.name}
         strain={plant.strain}
         stage={plant.stage ?? null}
+        medium={plant.medium ?? null}
+        potSize={plant.potSize ?? null}
       />
       <PlantDetailTimelineEvidenceReadinessLaunch
         plantId={plant.id}

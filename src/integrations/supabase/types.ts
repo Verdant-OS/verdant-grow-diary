@@ -1235,8 +1235,10 @@ export type Database = {
           id: string
           is_archived: boolean
           last_note: string | null
+          medium: string | null
           name: string
           photo_url: string | null
+          pot_size: string | null
           schema_version: number
           stage: string
           started_at: string
@@ -1252,8 +1254,10 @@ export type Database = {
           id?: string
           is_archived?: boolean
           last_note?: string | null
+          medium?: string | null
           name: string
           photo_url?: string | null
+          pot_size?: string | null
           schema_version?: number
           stage?: string
           started_at?: string
@@ -1269,8 +1273,10 @@ export type Database = {
           id?: string
           is_archived?: boolean
           last_note?: string | null
+          medium?: string | null
           name?: string
           photo_url?: string | null
+          pot_size?: string | null
           schema_version?: number
           stage?: string
           started_at?: string

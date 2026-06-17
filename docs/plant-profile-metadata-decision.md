@@ -1,20 +1,20 @@
 # Plant Profile Metadata Persistence Decision
 
-**Status:** Needs owner approval (recommendation: Option A, conditional)
-**Scope:** Decision/architecture only. No code, schema, RLS, Edge Function, or UI changes accompany this document.
+**Status:** Implemented (Option A — read path + schema landed; edit UI pending)
+**Scope:** Schema, read-path wiring, and UI pass-through completed. Edit surface not yet exposed.
 **Last updated:** 2026-06-17
 
 ---
 
 ## 1. Context
 
-AI Doctor context now accepts `medium` and `pot_size` and Plant Detail readiness can consume them when supplied. However:
+AI Doctor context now accepts `medium` and `pot_size` and Plant Detail readiness consumes them when supplied. As of this update:
 
-- The current `Plant` type and `public.plants` Supabase table do **not** expose `medium`, `pot_size`, or any container-related field.
-- A presenter-only Plant Profile Context card on Plant Detail surfaces these fields as "unavailable / coming soon" with **no** persistence path.
-- Readiness panel provenance copy is honest: "Medium is not available on this plant profile yet." / "Pot size is not available on this plant profile yet."
-
-We need a decision on the safest way to persist this metadata — or to keep deferring — before any schema or write-path work begins.
+- `public.plants` now exposes nullable `medium` and `pot_size` columns (migration landed).
+- Supabase generated types include both fields.
+- The mock `Plant` interface, `mapPlantRow` adapter, and `PlantDetail` page forward these values through the read path.
+- `PlantProfileContextCard` and `PlantDetailAiDoctorContextReadinessMount` receive and display the values when present.
+- A presenter-only edit surface is **not** yet exposed — the "coming soon" buttons remain until the edit UI slice is approved.
 
 ---
 
@@ -164,15 +164,16 @@ Rationale:
 
 ## 9. Rollout plan (Option A)
 
-1. **Migration**: add nullable `medium` and `pot_size` columns to `public.plants`. No backfill.
-2. **Generated types**: regenerate Supabase types; confirm `Plant` type now exposes both fields.
-3. **Read-path wiring**: extend `useGrowPlant` / plant fetch selectors to include the new columns; forward through `PlantDetailAiDoctorContextReadinessMount` (already accepts optional `medium` / `potSize`).
-4. **Edit UI**: replace "coming soon" buttons on the existing Plant Profile Context card with a small inline edit form (text inputs, save → `plants` update scoped by owner).
-5. **AI Doctor readiness update**: no code change needed — flags flip automatically once the read path delivers non-null values. Provenance copy continues to appear when values are `null`.
-6. **Regression tests**: per Section 8.
-7. **Docs**: update workspace knowledge "Current Context" with the new persisted fields and update this decision doc's status to "Implemented".
+1. ✅ **Migration**: add nullable `medium` and `pot_size` columns to `public.plants`. No backfill.
+2. ✅ **Generated types**: regenerated Supabase types; `PlantRow` now exposes both fields.
+3. ✅ **Read-path wiring**: extended `mapPlantRow` and `PlantDetail` to forward values through `PlantProfileContextCard` and `PlantDetailAiDoctorContextReadinessMount`.
+4. ⏸ **Edit UI**: replace "coming soon" buttons on the existing Plant Profile Context card with a small inline edit form (text inputs, save → `plants` update scoped by owner). **Not yet exposed.**
+5. ✅ **AI Doctor readiness update**: no code change needed — flags flip automatically once the read path delivers non-null values. Provenance copy continues to appear when values are `null`.
+6. ✅ **Regression tests**: compiler, adapter, card, and mount tests extended.
+7. ⏸ **RLS write harness**: pending edit UI slice.
+8. ✅ **Docs**: this doc updated to "Implemented (read path)".
 
-Each step is independently shippable; recommend landing migration + read path before exposing the edit UI to avoid grower-visible half-states.
+Read path landed before edit UI to avoid grower-visible half-states.
 
 ---
 
@@ -187,24 +188,23 @@ Each step is independently shippable; recommend landing migration + read path be
 
 ## 11. Decision status
 
-**Needs owner approval.**
+**Implemented — read path landed; edit UI pending.**
 
-- ✅ Recommended now: **Option A**, *if* a plant profile edit slice is in this iteration's scope.
-- ⏸ Defer (**Option C**) if no edit surface is imminent — persisting empty columns adds risk without product value.
+- ✅ **Option A read path** completed: schema, generated types, adapter mapping, Plant Detail wiring, AI Doctor context compiler pass-through, and Plant Profile Context card display.
+- ⏸ **Option A edit UI** deferred to a follow-up slice to avoid grower-visible half-states.
 - 🚫 **Option B** not recommended at this time; revisit only when ≥ ~5 optional context fields are queued.
+- 🚫 **Option C** no longer needed — persistence is in place, just waiting for the edit surface.
 
 ---
 
-## 12. Follow-up implementation slice (only if Option A is approved)
+## 12. Follow-up implementation slice (edit UI)
 
-Smallest safe first slice:
-
-1. Migration: `ALTER TABLE public.plants ADD COLUMN medium text NULL, ADD COLUMN pot_size text NULL;` (no GRANT/RLS changes — existing `plants` policies cover both columns).
-2. Regenerate Supabase types.
-3. Extend plant read selector to include both columns.
-4. Wire values through `PlantDetailAiDoctorContextReadinessMount` (props already exist).
-5. Add minimal inline edit form on `PlantProfileContextCard` (owner-scoped update via authenticated session).
-6. Tests per Section 8 (compiler, view-model, mount, edit form, RLS harness, regression).
-7. Update this doc's status to "Implemented" and update workspace knowledge.
+1. Replace disabled "coming soon" buttons on `PlantProfileContextCard` with inline text inputs + save/cancel.
+2. Save triggers `supabase.from("plants").update({ medium, pot_size })` scoped by plant owner.
+3. Empty / whitespace-only submit normalizes to `null` (matching `cleanPlantString` contract).
+4. Round-trip test: save → refetch → readiness panel flips from unknown to known.
+5. RLS runtime harness: owner can update own plant; non-owner cannot.
+6. Safety fence: no AI/model call triggered by saving metadata; no Action Queue / alerts side effects.
+7. Update this doc's status to "Fully implemented".
 
 Each item is a separate PR-sized change; do not bundle.

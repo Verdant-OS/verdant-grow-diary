@@ -45,6 +45,25 @@ describe("PlantProfileContextCard", () => {
     expect(localSet).not.toHaveBeenCalled();
   });
 
+  it("renders known medium and pot size when provided", () => {
+    render(
+      <PlantProfileContextCard
+        stage="Flower"
+        strain="BD"
+        medium="coco"
+        potSize="11 L"
+      />,
+    );
+    expect(screen.getByText("Medium: coco")).toBeInTheDocument();
+    expect(screen.getByText("Pot size: 11 L")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("plant-profile-context-field-medium").getAttribute("data-known"),
+    ).toBe("true");
+    expect(
+      screen.getByTestId("plant-profile-context-field-pot-size").getAttribute("data-known"),
+    ).toBe("true");
+  });
+
   it("does not infer medium/pot size from strain or freeform values", () => {
     render(
       <PlantProfileContextCard

@@ -40,6 +40,8 @@ const plantRow = {
   last_note: "Trichomes cloudy",
   is_archived: false,
   schema_version: 1,
+  medium: null,
+  pot_size: null,
   created_at: "2026-02-10T00:00:00Z",
   updated_at: "2026-05-01T00:00:00Z",
 } as const;
@@ -107,6 +109,8 @@ describe("mapPlantRow", () => {
       lastNote: "Trichomes cloudy",
       growId: null,
       isArchived: false,
+      medium: null,
+      potSize: null,
     });
   });
   it("defaults null tent_id, strain, photo, note, and invalid health", () => {
@@ -136,6 +140,24 @@ describe("mapPlantRow", () => {
     expect(mapPlantRow({ ...plantRow, stage: "seedling" }).stage).toBe("seedling");
     expect(mapPlantRow({ ...plantRow, stage: "veg" }).stage).toBe("veg");
     expect(mapPlantRow({ ...plantRow, stage: "flower" }).stage).toBe("flower");
+  });
+  it("maps medium and pot_size when present", () => {
+    const p = mapPlantRow({
+      ...plantRow,
+      medium: "coco",
+      pot_size: "3 gal",
+    });
+    expect(p.medium).toBe("coco");
+    expect(p.potSize).toBe("3 gal");
+  });
+  it("normalizes blank medium / pot_size to null", () => {
+    const p = mapPlantRow({
+      ...plantRow,
+      medium: "   ",
+      pot_size: "",
+    });
+    expect(p.medium).toBeNull();
+    expect(p.potSize).toBeNull();
   });
 });
 

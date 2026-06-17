@@ -125,6 +125,8 @@ describe("normalizeVpdStage classifies adapter output correctly", () => {
       last_note: null,
       is_archived: false,
       schema_version: 1,
+      medium: null,
+      pot_size: null,
       created_at: "x",
       updated_at: "x",
     };

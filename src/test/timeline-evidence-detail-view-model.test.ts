@@ -155,6 +155,7 @@ describe("timelineEvidenceDetailViewModel", () => {
     expect(TIMELINE_EVIDENCE_SAFE_DETAIL_KEYS.has("event_type")).toBe(true);
     expect(TIMELINE_EVIDENCE_SAFE_DETAIL_KEYS.has("plant_name")).toBe(true);
     expect(TIMELINE_EVIDENCE_SAFE_DETAIL_KEYS.has("sensor_snapshot")).toBe(true);
+    expect(TIMELINE_EVIDENCE_SAFE_DETAIL_KEYS.has("maturity_evidence")).toBe(true);
   });
 
   it("watering and feeding details produce dedicated sections + badges", () => {
@@ -176,6 +177,60 @@ describe("timelineEvidenceDetailViewModel", () => {
     expect(f!.feeding?.ec).toBe(1.6);
     expect(f!.feeding?.ph).toBe(6.1);
     expect(f!.badges).toContain("feeding");
+  });
+
+  it("surfaces maturity evidence without turning it into a decision", () => {
+    const m = vm({
+      id: "m1",
+      photo_url: null,
+      entry_at: "2025-06-01T11:00:00Z",
+      details: {
+        event_type: "note",
+        maturity_evidence: {
+          source: "manual",
+          evidence_type: "quick_log_maturity_evidence",
+          advisory_only: true,
+          observed_at: "2025-06-01T10:55:00Z",
+          clear_pct: 10,
+          cloudy_pct: 70,
+          amber_pct: 20,
+          color_note: "mostly turned",
+          grower_note: "watch again tomorrow",
+          raw_payload: { secret: "do-not-leak" },
+        },
+      },
+    });
+
+    expect(m!.maturityEvidence).toEqual({
+      observedAt: "2025-06-01T10:55:00Z",
+      advisoryOnly: true,
+      clearPct: 10,
+      cloudyPct: 70,
+      amberPct: 20,
+      notes: [
+        { label: "Color", value: "mostly turned" },
+        { label: "Grower note", value: "watch again tomorrow" },
+      ],
+    });
+    expect(m!.badges).toContain("maturity_evidence");
+    const json = JSON.stringify(m);
+    expect(json).not.toContain("raw_payload");
+    expect(json).not.toContain("do-not-leak");
+    expect(json).not.toMatch(/ready to harvest/i);
+    expect(json).not.toMatch(/harvest now/i);
+  });
+
+  it("ignores malformed maturity evidence", () => {
+    const m = vm({
+      id: "m2",
+      entry_at: "2025-06-01T11:00:00Z",
+      details: {
+        event_type: "note",
+        maturity_evidence: { evidence_type: "other", clear_pct: 10 },
+      },
+    });
+    expect(m!.maturityEvidence).toBeNull();
+    expect(m!.badges).not.toContain("maturity_evidence");
   });
 
   it("is deterministic for identical inputs", () => {

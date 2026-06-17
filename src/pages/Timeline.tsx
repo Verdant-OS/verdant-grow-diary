@@ -635,7 +635,7 @@ export default function Timeline() {
                           return (
                             <button
                               type="button"
-                              onClick={() => { if (idx >= 0) setLightboxIndex(idx); }}
+                              onClick={() => { if (idx >= 0) setLightboxPhotoId(e.id); }}
                               aria-label={`Open photo: ${alt}`}
                               data-testid="timeline-photo-open"
                               className="block w-full focus:outline-none focus:ring-2 focus:ring-primary/60"

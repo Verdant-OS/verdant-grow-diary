@@ -53,6 +53,19 @@ export interface VerdantGeneticsXlsxSaveArgs {
   adapterResult: VerdantGeneticsXlsxInsertRowsResult;
 }
 
+/**
+ * Outcome returned by a duplicate-aware save handler. When provided, the
+ * panel renders inserted/duplicate counts and a no-live-telemetry line
+ * instead of the legacy attempted-rows success copy. A fully-duplicate
+ * save is a successful no-op, not a failure.
+ */
+export interface VerdantGeneticsXlsxSaveOutcome {
+  inserted: number;
+  duplicates: number;
+  totalRows: number;
+  diagnostic?: string;
+}
+
 export interface VerdantGeneticsXlsxPreviewPanelProps {
   grid: CellGrid;
   tentOptions?: TentOption[];
@@ -61,9 +74,12 @@ export interface VerdantGeneticsXlsxPreviewPanelProps {
    * Parent-owned save handler. When omitted the save button stays disabled
    * with the "coming later" copy (preview-only mode). When provided the
    * button enables only when mapping is complete and the adapter emits
-   * at least one row that is not blocked.
+   * at least one row that is not blocked. May resolve to a
+   * `VerdantGeneticsXlsxSaveOutcome` to surface duplicate-aware counts.
    */
-  onSave?: (args: VerdantGeneticsXlsxSaveArgs) => Promise<void> | void;
+  onSave?: (
+    args: VerdantGeneticsXlsxSaveArgs,
+  ) => Promise<void | VerdantGeneticsXlsxSaveOutcome> | void | VerdantGeneticsXlsxSaveOutcome;
 }
 
 function newImportBatchId(): string {
@@ -99,6 +115,8 @@ export function VerdantGeneticsXlsxPreviewPanel({
     "idle" | "saving" | "success" | "error"
   >("idle");
   const [savedCount, setSavedCount] = useState<number>(0);
+  const [saveOutcome, setSaveOutcome] =
+    useState<VerdantGeneticsXlsxSaveOutcome | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedEvidence, setSavedEvidence] =
     useState<VerdantGeneticsXlsxImportEvidenceViewModel | null>(null);
@@ -134,6 +152,7 @@ export function VerdantGeneticsXlsxPreviewPanel({
     setSaveStatus("saving");
     setSaveError(null);
     setSavedEvidence(null);
+    setSaveOutcome(null);
     try {
       const importBatchId = newImportBatchId();
       const freshResult = buildVerdantGeneticsXlsxInsertRows({
@@ -142,12 +161,15 @@ export function VerdantGeneticsXlsxPreviewPanel({
         growId: growId ?? undefined,
         importBatchId,
       });
-      await onSave({
+      const outcome = await onSave({
         tentIdBySensorGroup: { ...mappingState.tentIdBySensorGroup },
         importBatchId,
         adapterResult: freshResult,
       });
       setSavedCount(freshResult.acceptedRowCount);
+      if (outcome && typeof outcome === "object") {
+        setSaveOutcome(outcome);
+      }
       setSavedEvidence(
         buildVerdantGeneticsXlsxImportEvidenceViewModel({
           adapterResult: freshResult,
@@ -164,6 +186,7 @@ export function VerdantGeneticsXlsxPreviewPanel({
       setSaveStatus("error");
     }
   }
+
 
 
   return (
@@ -440,7 +463,14 @@ export function VerdantGeneticsXlsxPreviewPanel({
                 className="text-[11px] text-emerald-300/90"
                 data-testid="vg-xlsx-save-success"
               >
-                {XLSX_SAVE_SUCCESS_PREFIX} {savedCount} rows imported.
+                {saveOutcome
+                  ? (saveOutcome.diagnostic
+                    ?? (saveOutcome.inserted === 0 && saveOutcome.duplicates > 0
+                      ? `Imported 0 new readings. Skipped ${saveOutcome.duplicates} duplicate${saveOutcome.duplicates === 1 ? "" : "s"} already present for this tent. No live sensor data was created.`
+                      : saveOutcome.duplicates > 0
+                        ? `Imported ${saveOutcome.inserted} new reading${saveOutcome.inserted === 1 ? "" : "s"}. Skipped ${saveOutcome.duplicates} duplicate${saveOutcome.duplicates === 1 ? "" : "s"} already present for this tent. No live sensor data was created.`
+                        : `${XLSX_SAVE_SUCCESS_PREFIX} ${saveOutcome.inserted} rows imported. No live sensor data was created.`))
+                  : `${XLSX_SAVE_SUCCESS_PREFIX} ${savedCount} rows imported.`}
               </span>
             )}
             {saveStatus === "error" && saveError && (

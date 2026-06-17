@@ -207,3 +207,206 @@ describe("ecowitt windows testbench — /debug/raw-log-tail safety", () => {
     expect(doc).toMatch(/curl\.exe/);
   });
 });
+
+describe("ecowitt windows testbench — parse_debug_line_count safety", () => {
+  const py = readFileSync(join(TESTBENCH_DIR, "ecowitt_listener.py"), "utf-8");
+
+  it("declares parse_debug_line_count with safe defaults", () => {
+    expect(py).toMatch(
+      /def\s+parse_debug_line_count\s*\(\s*raw_value[^)]*default[^)]*minimum[^)]*maximum/,
+    );
+  });
+
+  it("uses try/except around int() so non-numeric input does not crash", () => {
+    // The parser must catch TypeError/ValueError and return the default.
+    const fn = py.split("def parse_debug_line_count")[1]?.split("\ndef ")[0] ?? "";
+    expect(fn).toMatch(/int\(/);
+    expect(fn).toMatch(/except\s*\(\s*TypeError\s*,\s*ValueError\s*\)/);
+    expect(fn).toMatch(/return\s+default/);
+  });
+
+  it("clamps below minimum and above maximum", () => {
+    const fn = py.split("def parse_debug_line_count")[1]?.split("\ndef ")[0] ?? "";
+    expect(fn).toMatch(/if\s+n\s*<\s*minimum/);
+    expect(fn).toMatch(/return\s+minimum/);
+    expect(fn).toMatch(/if\s+n\s*>\s*maximum/);
+    expect(fn).toMatch(/return\s+maximum/);
+  });
+
+  it("handles list/tuple-shaped Flask repeat query values", () => {
+    const fn = py.split("def parse_debug_line_count")[1]?.split("\ndef ")[0] ?? "";
+    expect(fn).toMatch(/isinstance\(raw_value,\s*\(list,\s*tuple\)\)/);
+  });
+
+  it("debug endpoints route ?lines= through parse_debug_line_count", () => {
+    const occurrences = (py.match(/parse_debug_line_count\(request\.args\.get\("lines"\)\)/g) || []).length;
+    expect(occurrences).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("ecowitt windows testbench — /debug/status safety", () => {
+  const py = readFileSync(join(TESTBENCH_DIR, "ecowitt_listener.py"), "utf-8");
+  const block = py.split('@app.get("/debug/status")')[1]?.split("@app.get(") [0] ?? "";
+
+  it("declares the /debug/status endpoint", () => {
+    expect(py).toMatch(/@app\.get\(["']\/debug\/status["']\)/);
+  });
+
+  it("enforces local-only gate with 403 fallback", () => {
+    expect(block).toMatch(/_is_local_request/);
+    expect(block).toMatch(/forbidden_non_local/);
+    expect(block).toMatch(/\b403\b/);
+  });
+
+  it("handles missing log file without crashing", () => {
+    expect(block).toMatch(/LOG_PATH\.exists\(\)/);
+    expect(block).toMatch(/"log_exists":\s*False/);
+    expect(block).toMatch(/"entry_count":\s*0/);
+    expect(block).toMatch(/"latest_entry":\s*None/);
+  });
+
+  it("reports entry_count, malformed_line_count, and latest parsed entry", () => {
+    expect(block).toMatch(/entry_count/);
+    expect(block).toMatch(/malformed_line_count/);
+    expect(block).toMatch(/latest_entry/);
+    expect(block).toMatch(/latest_captured_at/);
+    expect(block).toMatch(/latest_received_at/);
+    expect(block).toMatch(/latest_metrics/);
+  });
+
+  it("sanitizes the latest entry before returning", () => {
+    expect(block).toMatch(/sanitize_debug_payload/);
+  });
+
+  it("does not return raw VERDANT_BRIDGE_TOKEN", () => {
+    expect(block).not.toMatch(/VERDANT_BRIDGE_TOKEN/);
+  });
+
+  it("does not forward to Verdant", () => {
+    expect(block).not.toMatch(/requests\.post/);
+    expect(block).not.toMatch(/maybe_forward/);
+  });
+
+  it("does not import/use Supabase client", () => {
+    // Whole-file invariant (these endpoints share the module).
+    expect(py).not.toMatch(/from\s+supabase/i);
+    expect(py).not.toMatch(/import\s+supabase/i);
+  });
+});
+
+describe("ecowitt windows testbench — /debug/last-events safety", () => {
+  const py = readFileSync(join(TESTBENCH_DIR, "ecowitt_listener.py"), "utf-8");
+  const block =
+    py.split('@app.get("/debug/last-events")')[1]?.split("\ndef main(")[0] ?? "";
+
+  it("declares the /debug/last-events endpoint", () => {
+    expect(py).toMatch(/@app\.get\(["']\/debug\/last-events["']\)/);
+  });
+
+  it("enforces local-only gate with 403 fallback", () => {
+    expect(block).toMatch(/_is_local_request/);
+    expect(block).toMatch(/forbidden_non_local/);
+    expect(block).toMatch(/\b403\b/);
+  });
+
+  it("reuses parse_debug_line_count for ?lines=", () => {
+    expect(block).toMatch(/parse_debug_line_count\(request\.args\.get\("lines"\)\)/);
+  });
+
+  it("uses parse_jsonl_entries which skips malformed JSON lines", () => {
+    expect(block).toMatch(/parse_jsonl_entries/);
+    const helper = py.split("def parse_jsonl_entries")[1]?.split("\ndef ")[0] ?? "";
+    expect(helper).toMatch(/except\s+Exception/);
+    expect(helper).toMatch(/malformed\s*\+=\s*1/);
+  });
+
+  it("returns parsed normalized fields only (no raw_payload by default)", () => {
+    expect(block).toMatch(/"captured_at"/);
+    expect(block).toMatch(/"source"/);
+    expect(block).toMatch(/"vendor"/);
+    expect(block).toMatch(/"metrics"/);
+    // Must explicitly avoid raw_payload in the response shape.
+    expect(block).not.toMatch(/raw_payload/);
+  });
+
+  it("sanitizes every entry before returning", () => {
+    expect(block).toMatch(/sanitize_debug_payload/);
+  });
+
+  it("does not return raw VERDANT_BRIDGE_TOKEN", () => {
+    expect(block).not.toMatch(/VERDANT_BRIDGE_TOKEN/);
+  });
+
+  it("does not forward to Verdant", () => {
+    expect(block).not.toMatch(/requests\.post/);
+    expect(block).not.toMatch(/maybe_forward/);
+  });
+
+  it("reports count, max_lines, malformed_line_count", () => {
+    expect(block).toMatch(/"count"/);
+    expect(block).toMatch(/"max_lines"/);
+    expect(block).toMatch(/"malformed_line_count"/);
+  });
+
+  it("docs include curl examples for /debug/status and /debug/last-events", () => {
+    const doc = readFileSync(DOC_PATH, "utf-8");
+    expect(doc).toMatch(/curl[^\n]*\/debug\/status/);
+    expect(doc).toMatch(/curl[^\n]*\/debug\/last-events/);
+    expect(doc).toMatch(/lines=abc/);
+    expect(doc).toMatch(/lines=-10/);
+    expect(doc).toMatch(/lines=999999/);
+  });
+});
+
+describe("ecowitt windows testbench — CI workflow + tooling folder safety", () => {
+  const WORKFLOW_PATH = join(
+    process.cwd(),
+    ".github",
+    "workflows",
+    "ecowitt-testbench-safety.yml",
+  );
+  const workflow = readFileSync(WORKFLOW_PATH, "utf-8");
+
+  it("runs typecheck", () => {
+    expect(workflow).toMatch(/bun run typecheck/);
+  });
+
+  it("runs the EcoWitt static safety vitest file", () => {
+    expect(workflow).toMatch(
+      /bunx vitest run src\/test\/ecowitt-windows-testbench-static-safety\.test\.ts/,
+    );
+  });
+
+  it("is triggered on pull_request", () => {
+    expect(workflow).toMatch(/pull_request:/);
+  });
+
+  it("does not require any repo secrets to run", () => {
+    expect(workflow).not.toMatch(/\$\{\{\s*secrets\./);
+  });
+
+  it("tooling folder has no Supabase client imports anywhere", () => {
+    for (const { path, body } of testbenchFiles.map((p) => ({
+      path: p,
+      body: readFileSync(p, "utf-8"),
+    }))) {
+      expect(body, `supabase import in ${path}`).not.toMatch(/from\s+supabase/i);
+      expect(body, `supabase import in ${path}`).not.toMatch(/import\s+supabase/i);
+    }
+  });
+
+  it("tooling folder contains no committed .env file", () => {
+    for (const path of testbenchFiles) {
+      expect(path.endsWith("/.env"), `committed .env at ${path}`).toBe(false);
+    }
+  });
+
+  it("forwarding still requires explicit -ForwardToVerdant opt-in", () => {
+    const script = readFileSync(
+      join(TESTBENCH_DIR, "send-demo-payload-windows.ps1"),
+      "utf-8",
+    );
+    expect(script).toMatch(/\[switch\]\$ForwardToVerdant/);
+    expect(script).toMatch(/if\s*\(\s*\$ForwardToVerdant\s*\)/);
+  });
+});

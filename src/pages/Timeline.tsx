@@ -231,13 +231,44 @@ export default function Timeline() {
     return m;
   }, [entries]);
 
+  const plantOptions = useMemo(() => deriveTimelinePlantOptions(entries), [entries]);
+  const tentOptions = useMemo(() => deriveTimelineTentOptions(entries), [entries]);
+  const eventTypeOptions = useMemo(
+    () => deriveTimelineEventTypeOptions(entries),
+    [entries],
+  );
+
+  const evidenceFilterInput = {
+    query: searchQuery,
+    plantId: plantFilter,
+    tentId: tentFilter,
+    eventType: eventTypeFilter,
+  };
+  const evidenceActive = isTimelineEvidenceFilterActive(evidenceFilterInput);
+
   const filtered = useMemo(() => {
-    return entries.filter((e) => {
+    const afterStageEvent = entries.filter((e) => {
       if (stageFilter !== "all" && e.stage !== stageFilter) return false;
       if (eventFilter !== "all" && !entryKinds(e).includes(eventFilter)) return false;
       return true;
     });
-  }, [entries, stageFilter, eventFilter]);
+    return filterTimelineEvidenceRows(afterStageEvent, evidenceFilterInput);
+  }, [
+    entries,
+    stageFilter,
+    eventFilter,
+    searchQuery,
+    plantFilter,
+    tentFilter,
+    eventTypeFilter,
+  ]);
+
+  function clearEvidenceFilters() {
+    setSearchQuery("");
+    setPlantFilter("");
+    setTentFilter("");
+    setEventTypeFilter("");
+  }
 
   // Merge `grow_events` (Quick Log v2 manual saves) into the raw entries
   // passed to the Recent Quick Logs panel so just-saved entries surface at

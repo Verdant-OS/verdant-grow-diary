@@ -205,6 +205,89 @@ describe("VerdantGeneticsXlsxPreviewPanel — save flow", () => {
     expect(text).not.toMatch(/\blive\b(?! sensor data was created)/i);
   });
 
+  it("renders 'View imported history' CTA after duplicate-only success when handler provided", async () => {
+    const onSave = vi.fn(async () => ({
+      inserted: 0,
+      duplicates: 2266,
+      totalRows: 2266,
+    }));
+    const onViewImportedHistory = vi.fn();
+    render(
+      <VerdantGeneticsXlsxPreviewPanel
+        grid={grid}
+        tentOptions={TENT_OPTIONS}
+        onSave={onSave}
+        onViewImportedHistory={onViewImportedHistory}
+      />,
+    );
+    await mapAllGroups();
+    fireEvent.click(screen.getByTestId("vg-xlsx-save"));
+    const cta = await screen.findByTestId("vg-xlsx-view-imported-history");
+    expect(cta.textContent).toMatch(/View imported history/);
+    expect(cta.textContent).not.toMatch(/live/i);
+    fireEvent.click(cta);
+    expect(onViewImportedHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders 'View imported history' CTA after mixed-insert success", async () => {
+    const onSave = vi.fn(async () => ({
+      inserted: 120,
+      duplicates: 2146,
+      totalRows: 2266,
+    }));
+    const onViewImportedHistory = vi.fn();
+    render(
+      <VerdantGeneticsXlsxPreviewPanel
+        grid={grid}
+        tentOptions={TENT_OPTIONS}
+        onSave={onSave}
+        onViewImportedHistory={onViewImportedHistory}
+      />,
+    );
+    await mapAllGroups();
+    fireEvent.click(screen.getByTestId("vg-xlsx-save"));
+    const cta = await screen.findByTestId("vg-xlsx-view-imported-history");
+    expect(cta).toBeInTheDocument();
+  });
+
+  it("does NOT render 'View imported history' CTA when onViewImportedHistory not provided", async () => {
+    const onSave = vi.fn(async () => ({
+      inserted: 0,
+      duplicates: 5,
+      totalRows: 5,
+    }));
+    render(
+      <VerdantGeneticsXlsxPreviewPanel
+        grid={grid}
+        tentOptions={TENT_OPTIONS}
+        onSave={onSave}
+      />,
+    );
+    await mapAllGroups();
+    fireEvent.click(screen.getByTestId("vg-xlsx-save"));
+    await screen.findByTestId("vg-xlsx-save-success");
+    expect(screen.queryByTestId("vg-xlsx-view-imported-history")).toBeNull();
+  });
+
+  it("does NOT render 'View imported history' CTA on failure", async () => {
+    const onSave = vi.fn().mockRejectedValue(new Error("network down"));
+    const onViewImportedHistory = vi.fn();
+    render(
+      <VerdantGeneticsXlsxPreviewPanel
+        grid={grid}
+        tentOptions={TENT_OPTIONS}
+        onSave={onSave}
+        onViewImportedHistory={onViewImportedHistory}
+      />,
+    );
+    await mapAllGroups();
+    fireEvent.click(screen.getByTestId("vg-xlsx-save"));
+    await screen.findByTestId("vg-xlsx-save-error");
+    expect(screen.queryByTestId("vg-xlsx-view-imported-history")).toBeNull();
+    expect(onViewImportedHistory).not.toHaveBeenCalled();
+  });
+
+
   it("mixed XLSX save shows inserted + skipped counts with no-live wording", async () => {
     const onSave = vi.fn(async () => ({
       inserted: 120,

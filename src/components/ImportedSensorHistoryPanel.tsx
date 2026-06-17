@@ -112,6 +112,15 @@ export default function ImportedSensorHistoryPanel({
           {IMPORTED_SENSOR_HISTORY_NOT_LIVE_COPY}
         </Badge>
       </header>
+      <div
+        role="note"
+        data-testid="imported-history-readonly-banner"
+        className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-xs text-amber-200"
+      >
+        Read-only CSV history. These readings are shown only when explicitly
+        labeled as csv. They are historical context, not live sensor data, and
+        they do not write new readings or control equipment.
+      </div>
 
       {vm.isEmpty ? (
         <p

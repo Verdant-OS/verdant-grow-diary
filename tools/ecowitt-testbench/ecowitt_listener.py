@@ -349,21 +349,48 @@ _WEBHOOK_ERROR_CLASSIFICATIONS = {
 }
 
 
+# Substring patterns redacted inline even when embedded in a larger
+# string (so error messages like "bad token vbt_XYZ in payload" do not
+# leak the embedded credential).
+_INLINE_REDACT_PATTERNS = [
+    _re.compile(r"vbt_[A-Za-z0-9_\-]{6,}"),
+    _re.compile(r"eyJ[A-Za-z0-9_\-]{6,}\.[A-Za-z0-9_\-]{6,}\.[A-Za-z0-9_\-]{6,}"),
+    _re.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]{6,}"),
+]
+
+
+def _scrub_inline_secrets(text: str) -> str:
+    out = text
+    for pat in _INLINE_REDACT_PATTERNS:
+        out = pat.sub(_REDACTED, out)
+    return out
+
+
 def sanitize_forward_error_value(value: Any) -> Any:
     """Sanitize a value pulled from a webhook error response.
 
     Always passes through the recursive sanitizer (which redacts vbt_,
     JWT, Bearer, Authorization, x-verdant-bridge-token, PASSKEY, and
-    service-role markers). Long strings are truncated to a short summary.
-    Never returns raw response bodies of unbounded length.
+    service-role markers) AND scrubs embedded token-like substrings.
+    Long strings are truncated to a short summary. Never returns raw
+    response bodies of unbounded length.
     """
     safe = sanitize_debug_payload(value)
     if isinstance(safe, str):
-        s = safe.strip()
+        s = _scrub_inline_secrets(safe).strip()
         if len(s) > 240:
             s = s[:240] + "..."
         return s
+    if isinstance(safe, (dict, list)):
+        # Re-serialize/parse through inline scrub to catch embedded tokens.
+        try:
+            dumped = json.dumps(safe, default=str)
+            scrubbed = _scrub_inline_secrets(dumped)
+            return json.loads(scrubbed)
+        except Exception:
+            return safe
     return safe
+
 
 
 def summarize_forward_response(resp: Any) -> Dict[str, Any]:

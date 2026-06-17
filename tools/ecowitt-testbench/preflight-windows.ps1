@@ -102,7 +102,7 @@ if ($Diagnostics) {
     Write-Host "Candidate starts:     $($candidates -join '; ')"
     Write-Host "Detected repo root:   $repoRoot"
     Write-Host "Detected testbench:   $testbenchPath"
-    Write-Host "(no .env, tokens, Authorization headers, or payloads are read or printed)"
+    Write-Host "(no .env, tokens, auth headers, or payloads are read or printed)"
 }
 
 # Detect old standalone folder pattern (safe regex on plain strings).

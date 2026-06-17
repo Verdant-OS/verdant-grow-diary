@@ -190,7 +190,13 @@ describe("EcowittLocalForwardingStatusWidget", () => {
     expect(written).not.toContain("bridge_token");
     expect(written).not.toContain("authorization");
     expect(written).not.toMatch(/PASSKEY/i);
-    expect(written).not.toContain("raw_payload");
+    // raw_payload (as a key) must never appear. The safety block intentionally
+    // contains the boolean `raw_payload_included: false`, so we assert the
+    // strict key shape rather than a brittle substring match.
+    expect(written).not.toMatch(/"raw_payload"\s*:/);
+    expect(parsed).not.toHaveProperty("raw_payload");
+    expect(parsed.bridge_status).not.toHaveProperty("raw_payload");
+    expect(parsed.latest_metrics).not.toHaveProperty("raw_payload");
     expect(written).not.toMatch(/\.env/);
     expect(written).not.toMatch(/service_role/i);
     expect(written).not.toMatch(/eyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}/);

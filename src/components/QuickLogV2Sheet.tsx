@@ -13,6 +13,11 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import {
+  buildQuickLogTimelineNavTarget,
+  QUICK_LOG_TIMELINE_CTA_LABEL,
+} from "@/lib/quickLogTimelineNavigationTarget";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";

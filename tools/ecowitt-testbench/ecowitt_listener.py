@@ -738,6 +738,127 @@ def debug_last_events() -> Any:
     )
 
 
+# ---------------------------------------------------------------------------
+# /debug/parse-diagnostics — LOCAL-ONLY, sanitized, read-only
+# ---------------------------------------------------------------------------
+
+def categorize_parse_issue(
+    raw_text: str,
+) -> tuple[Optional[Dict[str, Any]], Optional[str], Optional[str]]:
+    """Categorize a single raw JSONL line.
+
+    Returns (parsed_object_or_none, category_or_none, short_error_or_none).
+    Never returns the raw line text. The short error is sanitized.
+    """
+    text = raw_text.rstrip("\n")
+    if not text.strip():
+        return None, "empty_line", None
+    try:
+        obj = json.loads(text)
+    except Exception as exc:
+        msg = f"{type(exc).__name__}: {str(exc)[:120]}"
+        safe = sanitize_debug_payload(msg)
+        safe_str = safe if isinstance(safe, str) else _REDACTED
+        return None, "json_decode_error", safe_str
+    if not isinstance(obj, dict):
+        return None, "non_object_json", None
+    # Detect secret marker presence so we can flag (not expose) it.
+    sanitized = sanitize_debug_payload(obj)
+    try:
+        had_redaction = _REDACTED in json.dumps(sanitized, default=str)
+    except Exception:
+        had_redaction = False
+    extra: Optional[str] = None
+    if not isinstance(obj.get("metrics"), dict):
+        extra = "missing_metrics"
+    elif obj.get("captured_at") in (None, ""):
+        extra = "missing_captured_at"
+    elif "source" not in obj or "vendor" not in obj:
+        extra = "unknown_normalized_shape"
+    elif had_redaction:
+        extra = "secret_redacted"
+    return obj, extra, None
+
+
+@app.get("/debug/parse-diagnostics")
+def debug_parse_diagnostics() -> Any:
+    # Local-only: never expose parse diagnostics over LAN.
+    if not _is_local_request():
+        return (
+            jsonify({"ok": False, "error": "forbidden_non_local"}),
+            403,
+        )
+
+    if not LOG_PATH.exists():
+        return jsonify(
+            {
+                "ok": True,
+                "log_exists": False,
+                "entry_count": 0,
+                "parsed_line_count": 0,
+                "malformed_line_count": 0,
+                "skipped_line_count": 0,
+                "categories": [],
+                "last_parse_error": None,
+                "message": "No raw log file found yet.",
+            }
+        )
+
+    try:
+        with LOG_PATH.open("r", encoding="utf-8", errors="replace") as fh:
+            all_lines = fh.readlines()
+    except Exception as exc:
+        return (
+            jsonify({"ok": False, "error": f"read_failed: {exc!s}"}),
+            500,
+        )
+
+    category_counts: Dict[str, int] = {}
+    category_last_err: Dict[str, Optional[str]] = {}
+    parsed_count = 0
+    malformed_count = 0
+    last_parse_error: Optional[str] = None
+
+    for raw in all_lines:
+        obj, category, short_err = categorize_parse_issue(raw)
+        if obj is not None:
+            parsed_count += 1
+        if category is None:
+            continue
+        # empty_line, json_decode_error, non_object_json count as skipped/malformed
+        if category in ("json_decode_error", "non_object_json"):
+            malformed_count += 1
+            if short_err:
+                last_parse_error = short_err
+        category_counts[category] = category_counts.get(category, 0) + 1
+        if short_err:
+            category_last_err[category] = short_err
+
+    categories = [
+        {
+            "category": name,
+            "count": count,
+            "last_error": category_last_err.get(name),
+        }
+        for name, count in sorted(category_counts.items())
+    ]
+
+    return jsonify(
+        {
+            "ok": True,
+            "log_exists": True,
+            "entry_count": parsed_count,
+            "parsed_line_count": parsed_count,
+            "malformed_line_count": malformed_count,
+            "skipped_line_count": malformed_count,
+            "categories": categories,
+            "last_parse_error": last_parse_error,
+            "message": "ok",
+        }
+    )
+
+
+
 def main() -> None:  # pragma: no cover
     print(f"[verdant-testbench] listening on http://localhost:{PORT}")
     print(f"[verdant-testbench] health:  http://localhost:{PORT}/health")

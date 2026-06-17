@@ -621,3 +621,235 @@ describe("ecowitt windows testbench — CI secret scan step", () => {
   });
 });
 
+describe("ecowitt windows testbench — forwarding-status troubleshooting docs", () => {
+  const doc = readFileSync(DOC_PATH, "utf-8");
+
+  it("has an Interpreting /debug/forwarding-status section", () => {
+    expect(doc).toMatch(/###\s+Interpreting \/debug\/forwarding-status/);
+  });
+
+  it("documents that counters reset on restart", () => {
+    expect(doc).toMatch(/in-memory.*reset.*restart/is);
+  });
+
+  it("includes safe curl and curl.exe examples for forwarding-status", () => {
+    expect(doc).toMatch(/curl\s+"http:\/\/localhost:8787\/debug\/forwarding-status"/);
+    expect(doc).toMatch(/curl\.exe\s+"http:\/\/localhost:8787\/debug\/forwarding-status"/);
+  });
+
+  it("forwarding-status curl examples do not include Authorization or token", () => {
+    const section =
+      doc.split("### Interpreting /debug/forwarding-status")[1]?.split("\n## ")[0]
+      ?.split("\n### ")[0] ?? "";
+    expect(section).not.toMatch(/Authorization:/i);
+    expect(section).not.toMatch(/Bearer\s+[A-Za-z0-9._-]{8,}/);
+    expect(section).not.toMatch(/vbt_[A-Za-z0-9_-]{20,}/);
+  });
+});
+
+describe("ecowitt windows testbench — verify-testbench-windows.ps1", () => {
+  const SCRIPT_PATH = join(TESTBENCH_DIR, "verify-testbench-windows.ps1");
+
+  it("file exists", () => {
+    expect(() => readFileSync(SCRIPT_PATH, "utf-8")).not.toThrow();
+  });
+
+  const script = readFileSync(SCRIPT_PATH, "utf-8");
+
+  it("runs bun run typecheck", () => {
+    expect(script).toMatch(/bun run typecheck/);
+  });
+
+  it("runs the EcoWitt static safety vitest", () => {
+    expect(script).toMatch(
+      /bunx vitest run src\/test\/ecowitt-windows-testbench-static-safety\.test\.ts/,
+    );
+  });
+
+  it("calls /health, /debug/status, and /debug/forwarding-status", () => {
+    expect(script).toMatch(/\/health/);
+    expect(script).toMatch(/\/debug\/status/);
+    expect(script).toMatch(/\/debug\/forwarding-status/);
+  });
+
+  it("does not call -ForwardToVerdant", () => {
+    expect(script).not.toMatch(/-ForwardToVerdant/);
+  });
+
+  it("does not read or print .env", () => {
+    expect(script).not.toMatch(/Get-Content[^\n]*\.env/i);
+    expect(script).not.toMatch(/cat\s+\.env/i);
+    expect(script).not.toMatch(/Write-Host[^\n]*\.env/);
+  });
+
+  it("does not include real-looking bridge tokens", () => {
+    const matches = script.match(/vbt_[A-Za-z0-9_-]{20,}/g) || [];
+    for (const m of matches) {
+      expect(m).toMatch(/^vbt_REPLACE_WITH_REAL_TOKEN$/);
+    }
+  });
+
+  it("exits non-zero on failure", () => {
+    expect(script).toMatch(/exit\s+1/);
+  });
+
+  it("tells the operator to start the listener if not running", () => {
+    expect(script).toMatch(/start-listener-windows\.ps1/);
+  });
+});
+
+describe("ecowitt windows testbench — /debug/parse-diagnostics safety", () => {
+  const py = readFileSync(join(TESTBENCH_DIR, "ecowitt_listener.py"), "utf-8");
+  const block =
+    py.split('@app.get("/debug/parse-diagnostics")')[1]?.split("@app.get(")[0]
+    ?? py.split('@app.get("/debug/parse-diagnostics")')[1]?.split("\ndef main(")[0]
+    ?? "";
+
+  it("declares the /debug/parse-diagnostics endpoint", () => {
+    expect(py).toMatch(/@app\.get\(["']\/debug\/parse-diagnostics["']\)/);
+  });
+
+  it("enforces loopback-only with 403 fallback", () => {
+    expect(block).toMatch(/_is_local_request/);
+    expect(block).toMatch(/forbidden_non_local/);
+    expect(block).toMatch(/\b403\b/);
+  });
+
+  it("is read-only and does not forward", () => {
+    expect(block).not.toMatch(/requests\.post/);
+    expect(block).not.toMatch(/maybe_forward/);
+  });
+
+  it("does not import/use Supabase client", () => {
+    expect(py).not.toMatch(/from\s+supabase/i);
+    expect(py).not.toMatch(/import\s+supabase/i);
+  });
+
+  it("does not return raw JSONL lines or raw payloads", () => {
+    expect(block).not.toMatch(/raw_payload/);
+    expect(block).not.toMatch(/"raw_line"/);
+    expect(block).not.toMatch(/"text"/);
+  });
+
+  it("returns category counts and last_parse_error", () => {
+    expect(block).toMatch(/"categories"/);
+    expect(block).toMatch(/"last_parse_error"/);
+    expect(block).toMatch(/"count"/);
+  });
+
+  it("uses categorize_parse_issue helper that enumerates category names", () => {
+    const helper = py.split("def categorize_parse_issue")[1]?.split("\n@app")[0]
+      ?.split("\ndef ")[0] ?? "";
+    expect(helper).toMatch(/json_decode_error/);
+    expect(helper).toMatch(/non_object_json/);
+    expect(helper).toMatch(/missing_metrics/);
+    expect(helper).toMatch(/missing_captured_at/);
+    expect(helper).toMatch(/secret_redacted/);
+    expect(helper).toMatch(/empty_line/);
+  });
+
+  it("sanitizes parse errors via sanitize_debug_payload", () => {
+    const helper = py.split("def categorize_parse_issue")[1]?.split("\n@app")[0]
+      ?.split("\ndef ")[0] ?? "";
+    expect(helper).toMatch(/sanitize_debug_payload/);
+    // Must never put the raw line text into the error string.
+    expect(helper).not.toMatch(/last_error\s*=\s*text/);
+    expect(helper).not.toMatch(/last_error\s*=\s*raw_text/);
+  });
+
+  it("missing log file returns safe zero counts", () => {
+    expect(block).toMatch(/LOG_PATH\.exists\(\)/);
+    expect(block).toMatch(/"log_exists":\s*False/);
+    expect(block).toMatch(/"parsed_line_count":\s*0/);
+    expect(block).toMatch(/"malformed_line_count":\s*0/);
+    expect(block).toMatch(/"skipped_line_count":\s*0/);
+    expect(block).toMatch(/"categories":\s*\[\]/);
+    expect(block).toMatch(/"last_parse_error":\s*None/);
+  });
+
+  it("malformed lines never crash — categorizer is wrapped in try/except", () => {
+    const helper = py.split("def categorize_parse_issue")[1]?.split("\n@app")[0]
+      ?.split("\ndef ")[0] ?? "";
+    expect(helper).toMatch(/except\s+Exception/);
+  });
+});
+
+describe("ecowitt windows testbench — parse-diagnostics docs", () => {
+  const doc = readFileSync(DOC_PATH, "utf-8");
+
+  it("documents the parse-diagnostics curl examples", () => {
+    expect(doc).toMatch(/curl\s+"http:\/\/localhost:8787\/debug\/parse-diagnostics"/);
+    expect(doc).toMatch(/curl\.exe\s+"http:\/\/localhost:8787\/debug\/parse-diagnostics"/);
+  });
+
+  it("mentions it is loopback-only and sanitized", () => {
+    const section = doc.split("### Parse diagnostics")[1]?.split("\n## ")[0]
+      ?.split("\n### ")[0] ?? "";
+    expect(section).toMatch(/loopback-only/i);
+    expect(section).toMatch(/sanitiz/i);
+    expect(section).toMatch(/never returns raw/i);
+  });
+
+  it("lists multiple categories operators can expect", () => {
+    const section = doc.split("### Parse diagnostics")[1]?.split("\n## ")[0]
+      ?.split("\n### ")[0] ?? "";
+    expect(section).toMatch(/json_decode_error/);
+    expect(section).toMatch(/missing_metrics/);
+    expect(section).toMatch(/missing_captured_at/);
+    expect(section).toMatch(/secret_redacted/);
+  });
+
+  it("documents the one-command verification script", () => {
+    expect(doc).toMatch(/verify-testbench-windows\.ps1/);
+  });
+});
+
+describe("ecowitt windows testbench — preserved behavior", () => {
+  const py = readFileSync(join(TESTBENCH_DIR, "ecowitt_listener.py"), "utf-8");
+  const WORKFLOW_PATH = join(
+    process.cwd(),
+    ".github",
+    "workflows",
+    "ecowitt-testbench-safety.yml",
+  );
+  const workflow = readFileSync(WORKFLOW_PATH, "utf-8");
+
+  it("/debug/status still exists", () => {
+    expect(py).toMatch(/@app\.get\(["']\/debug\/status["']\)/);
+  });
+
+  it("/debug/forwarding-status still exists", () => {
+    expect(py).toMatch(/@app\.get\(["']\/debug\/forwarding-status["']\)/);
+  });
+
+  it("CI secret scan step still exists", () => {
+    expect(workflow).toMatch(/secret scan/i);
+    expect(workflow).toMatch(/tools\/ecowitt-testbench/);
+  });
+
+  it("typecheck still in workflow", () => {
+    expect(workflow).toMatch(/bun run typecheck/);
+  });
+
+  it("no Supabase client imports anywhere in testbench files", () => {
+    for (const path of testbenchFiles) {
+      const body = readFileSync(path, "utf-8");
+      expect(body, `supabase import in ${path}`).not.toMatch(/from\s+supabase/i);
+      expect(body, `supabase import in ${path}`).not.toMatch(/import\s+supabase/i);
+    }
+  });
+
+  it("no real-looking tokens/JWT/service-role in any testbench file", () => {
+    for (const path of testbenchFiles) {
+      const body = readFileSync(path, "utf-8");
+      const tokens = body.match(/vbt_[A-Za-z0-9_-]{20,}/g) || [];
+      for (const t of tokens) expect(t).toMatch(/^vbt_REPLACE_WITH_REAL_TOKEN$/);
+      expect(body, `JWT in ${path}`).not.toMatch(
+        /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/,
+      );
+      expect(body, `service_role literal in ${path}`).not.toMatch(/service_role/i);
+    }
+  });
+});
+
+

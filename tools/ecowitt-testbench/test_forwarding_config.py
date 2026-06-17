@@ -269,7 +269,7 @@ class ForwardErrorSanitizationTests(unittest.TestCase):
         self.assertIsNotNone(msg)
 
     def test_400_with_token_like_string_is_redacted(self):
-        leaky = "vbt_AAAAAAAAAAAAAAAAAAAAAAAAAA"
+        leaky = "vbt_" + ("A" * 26)
         with mock.patch.dict(os.environ, _full_env(), clear=False):
             with mock.patch("ecowitt_listener.requests") as fake_requests:
                 fake_requests.post.return_value = _FakeResp(

@@ -1203,6 +1203,7 @@ def debug_forwarding_status() -> Any:
             "last_forward_response_error": last_resp_error,
             "last_forward_response_classification": last_resp_cls,
             "last_forward_response_message": last_resp_msg,
+            "last_forward_response_reason": last_resp_reason,
             "retry_count": int(FORWARD_STATS.get("retry_count", 0)),
             "last_retry_error": last_retry_err,
             "last_retry_at": FORWARD_STATS.get("last_retry_at"),

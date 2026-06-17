@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import {
   buildAiDoctorReadinessView,
+  AI_DOCTOR_UNKNOWN_PROVENANCE_COPY,
   type AiDoctorReadinessState,
 } from "@/lib/aiDoctorReadinessViewModel";
 import type { AiDoctorContext } from "@/lib/aiDoctorEngine";

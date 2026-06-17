@@ -200,20 +200,65 @@ curl.exe "http://localhost:8787/debug/last-events?lines=5"
 curl.exe "http://localhost:8787/debug/raw-log-tail?lines=abc"
 ```
 
+Debug forwarding status (configuration + in-memory counters; sanitized):
+
+```
+curl "http://localhost:8787/debug/forwarding-status"
+curl.exe "http://localhost:8787/debug/forwarding-status"
+```
+
 Debug endpoint summary:
 
-- `/debug/status` — log existence, entry count, latest normalized status.
+- `/debug/status` — log existence, entry count, latest normalized status,
+  `parsed_line_count`, `skipped_line_count`, `malformed_line_count`,
+  `last_parse_error`.
 - `/debug/last-events` — last N normalized readings only; no raw payload by default.
 - `/debug/raw-log-tail` — sanitized raw-log debugging (parsed JSONL entries).
-- All three endpoints are loopback-only (`127.0.0.1`, `::1`). LAN callers get HTTP 403.
+- `/debug/forwarding-status` — read-only forwarding configuration and
+  in-memory attempt/success/failure counters. Token preview is masked,
+  ingest URL is masked, the bridge token and Authorization header are
+  never returned.
+- All endpoints are loopback-only (`127.0.0.1`, `::1`). LAN callers get HTTP 403.
 - All output is passed through the sanitizer: Authorization headers,
   bearer tokens, `vbt_…` tokens, JWT-shaped values, Supabase admin-role
   markers, and common secret field names are redacted.
-- All three endpoints are read-only. They never forward to Verdant and
+- All endpoints are read-only. They never forward to Verdant and
   never write to Supabase.
 - Do not expose these endpoints over LAN. Do not paste bridge tokens
   into curl commands. Demo payloads remain `source="demo"`. Forwarding
   remains explicit opt-in (`-ForwardToVerdant`).
+
+## Troubleshooting malformed JSONL and debug status
+
+`ecowitt_raw_log.jsonl` is append-only JSONL. Each line should be a
+single normalized JSON object written by the listener. A handful of
+common situations can leave malformed lines behind:
+
+- A **partial write** if the listener was stopped mid-write (Ctrl+C during a request).
+- A **manually edited** `ecowitt_raw_log.jsonl` line (typos, missing quotes, trailing commas).
+- A **copied/pasted** line with trailing whitespace, smart quotes, or log decorations.
+- An **old test line** from a previous script version with a different shape.
+- A **non-JSON raw body** captured during early testing.
+- Encoding or quote issues from manual edits in a Windows editor.
+
+How to interpret `/debug/status` fields:
+
+- `entry_count` / `parsed_line_count` — JSONL lines that parsed cleanly into JSON objects.
+- `skipped_line_count` / `malformed_line_count` — lines that did not parse or were not JSON objects.
+- `last_parse_error` — short sanitized summary of the most recent parse failure. Never includes the raw offending line, tokens, or payloads.
+- `latest_metrics` — normalized canonical metric names from the last parsed entry. `null` values mean the EcoWitt field was missing or unusable and was intentionally not classified as healthy.
+- `latest_captured_at` / `latest_received_at` — timestamps from the last parsed entry's envelope.
+
+Operator guidance:
+
+- One malformed line does **not** mean the listener is broken. The endpoint skips bad lines and keeps reporting on the good ones.
+- If `malformed_line_count` keeps increasing alongside real EcoWitt uploads, inspect `/debug/raw-log-tail`.
+- If `latest_metrics` is `null` or missing fields, the EcoWitt field names may not match the current normalizer (`FIELD_MAP`).
+- If `/debug/last-events` is empty but `/debug/raw-log-tail` has entries, the raw lines are likely malformed or not in normalized JSONL shape.
+- Do **not** paste bridge tokens into curl commands.
+- Do **not** forward to Verdant until local `/debug/status` and `/debug/last-events` look correct.
+
+
 
 
 ## Files

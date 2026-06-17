@@ -61,6 +61,12 @@ export interface PlantDetailBlockedStateView {
    * already targets the plants list — UI may dedupe with `secondaryBack`.
    */
   secondaryBack: PlantDetailBlockedStateAction | null;
+  /**
+   * Optional read-only escape to the archived timeline. Populated only
+   * for the `archived` kind when a plant id is available. Never present
+   * on writable/loading/error surfaces.
+   */
+  archivedTimelineAction?: PlantDetailBlockedStateAction | null;
 }
 
 export interface DerivePlantDetailBlockedStateInput {

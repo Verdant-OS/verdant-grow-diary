@@ -471,7 +471,8 @@ describe("ingest matrix — static safety guards on edge function source", () =>
   });
 
   it("stamps server-resolved user_id on every insert row", () => {
-    expect(SRC).toMatch(/user_id:\s*auth\.userId/);
+    // Either inline (user_id: auth.userId) or via buildStoredRow({ userId: auth.userId, ... }).
+    expect(SRC).toMatch(/user_id:\s*auth\.userId|userId:\s*auth\.userId/);
   });
 
   it("does not use service_role before authentication completes", () => {

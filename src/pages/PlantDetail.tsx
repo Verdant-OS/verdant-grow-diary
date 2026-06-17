@@ -639,6 +639,10 @@ export default function PlantDetail() {
             plantId={plant.id}
             onUpdate={() => setQuickLogOpen(true)}
           />
+          <PlantSensorSourceBreakdownCard
+            plantId={plant.id}
+            className="mt-1"
+          />
           <PlantTentEnvironmentPanel
             tentId={plant.tentId ?? null}
             tentName={tent?.name ?? null}

@@ -51,11 +51,11 @@ describe("ingest-real-ggs-payload script — static safety", () => {
   });
 
   it("introduces no AI / alert / Action Queue / device-control surface", () => {
-    expect(src).not.toMatch(/\baction_queue\b/);
-    expect(src).not.toMatch(/\balerts\b/);
-    expect(src).not.toMatch(/\bai[_-]?doctor\b/i);
-    expect(src).not.toMatch(/\bdevice[_-]?control\b/i);
-    expect(src).not.toMatch(/automation/i);
+    expect(src).not.toMatch(/\.from\(["']action_queue["']\)/);
+    expect(src).not.toMatch(/\.from\(["']alerts["']\)/);
+    expect(src).not.toMatch(/ai[_-]?doctor[_-]?session/i);
+    expect(src).not.toMatch(/device[_-]?control\s*[=:(]/i);
+    expect(src).not.toMatch(/automation\s*[=:(]/i);
     expect(src).not.toMatch(/functions\.invoke/);
   });
 

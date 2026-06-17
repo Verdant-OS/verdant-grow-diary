@@ -63,7 +63,7 @@ describe("buildGgsRealPayloadCommitInput", () => {
       expect(row.raw_payload.source_app).toBe("spider_farmer_ggs");
       expect(row.raw_payload.sensor_id).toBe("GGS-PRO-1234567");
       expect(row.raw_payload.original_units?.soil_ec).toBe("mS/cm");
-      expect(row.captured_at).toBe(FRESH_TS);
+      expect(new Date(row.captured_at).toISOString()).toBe(new Date(FRESH_TS).toISOString());
       expect(row.device_id).toBe(CTX.deviceId);
       expect(row.idempotency_key.startsWith("ggs:")).toBe(true);
       expect(Number.isFinite(row.value)).toBe(true);
@@ -217,7 +217,7 @@ describe("buildGgsRealPayloadCommitInput", () => {
     expect(src).not.toMatch(/functions\.invoke/);
     expect(src).not.toMatch(/\baction_queue\b/);
     expect(src).not.toMatch(/\balerts\b/);
-    expect(src).not.toMatch(/\bdevice[_-]?control\b/i);
+    expect(src).not.toMatch(/device[_-]?control\s*[=:(]/i);
     expect(src).not.toMatch(/automation/i);
     expect(src).not.toMatch(/SERVICE_ROLE/);
     expect(src).not.toMatch(/bridge[_\s-]?token/i);

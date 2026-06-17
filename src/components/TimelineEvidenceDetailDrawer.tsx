@@ -102,6 +102,7 @@ export default function TimelineEvidenceDetailDrawer({ viewModel, open, onClose 
           {vm.badges.includes("note") && <Chip icon={<FileText className="h-3 w-3" />}>Note</Chip>}
           {vm.badges.includes("watering") && <Chip icon={<Droplets className="h-3 w-3" />}>Watering</Chip>}
           {vm.badges.includes("feeding") && <Chip icon={<FlaskConical className="h-3 w-3" />}>Feeding</Chip>}
+          {vm.badges.includes("maturity_evidence") && <Chip icon={<Leaf className="h-3 w-3" />}>Maturity evidence</Chip>}
           {vm.badges.includes("stale_sensor") && (
             <Chip icon={<Clock className="h-3 w-3" />} tone="warn">Stale snapshot</Chip>
           )}
@@ -137,6 +138,40 @@ export default function TimelineEvidenceDetailDrawer({ viewModel, open, onClose 
             >
               {vm.note}
             </p>
+          </section>
+        )}
+
+        {vm.maturityEvidence && (
+          <section className="mb-4" data-testid="timeline-maturity-evidence">
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+              Maturity evidence
+            </p>
+            <div className="rounded-lg border border-violet-500/30 bg-violet-500/10 p-3 text-xs text-violet-200">
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {vm.maturityEvidence.clearPct != null && <Chip tone="maturity">Clear {vm.maturityEvidence.clearPct}%</Chip>}
+                {vm.maturityEvidence.cloudyPct != null && <Chip tone="maturity">Cloudy {vm.maturityEvidence.cloudyPct}%</Chip>}
+                {vm.maturityEvidence.amberPct != null && <Chip tone="maturity">Amber {vm.maturityEvidence.amberPct}%</Chip>}
+              </div>
+              {vm.maturityEvidence.observedAt && (
+                <p className="mb-2 text-[11px] text-violet-100/80">
+                  Observed {vm.maturityEvidence.observedAt}
+                </p>
+              )}
+              {vm.maturityEvidence.advisoryOnly && (
+                <p className="mb-2 text-[11px] text-violet-100/90" data-testid="timeline-maturity-advisory">
+                  Evidence only — grower decides.
+                </p>
+              )}
+              {vm.maturityEvidence.notes.length > 0 && (
+                <ul className="space-y-1 text-[11px]">
+                  {vm.maturityEvidence.notes.map((n) => (
+                    <li key={n.label}>
+                      <span className="font-medium text-violet-100">{n.label}:</span> {n.value}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </section>
         )}
 
@@ -199,12 +234,14 @@ function Chip({
 }: {
   children: React.ReactNode;
   icon?: React.ReactNode;
-  tone?: "warn";
+  tone?: "warn" | "maturity";
 }) {
   const cls =
     tone === "warn"
       ? "bg-amber-500/10 border-amber-500/30 text-amber-300"
-      : "bg-secondary/60 border-border/40";
+      : tone === "maturity"
+        ? "bg-violet-500/10 border-violet-500/30 text-violet-100"
+        : "bg-secondary/60 border-border/40";
   return (
     <span className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border ${cls}`}>
       {icon}

@@ -384,7 +384,7 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
       });
       if (!batchResult.ok) {
         setParseError(batchResult.diagnostic);
-        toast.error("Couldn't import CSV.", { description: batchResult.diagnostic });
+        toast.error("Import failed. No live sensor data was created.", { description: batchResult.diagnostic });
         return;
       }
       toast.success(batchResult.diagnostic, {
@@ -396,6 +396,8 @@ export default function TentCsvImportCard({ tentId, growId }: Props) {
         adapterResult: result,
         tentId,
         tentOptions,
+        insertedRowCount: batchResult.insertedRows,
+        duplicateRowCount: batchResult.duplicateRows,
       });
       if (auditInput) {
         recordSensorHistoryImportAuditEvent(auditInput);

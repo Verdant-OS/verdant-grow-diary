@@ -12,6 +12,7 @@ import { join } from "node:path";
 
 const FILES = [
   "src/lib/quickLogTimelineNavigationTarget.ts",
+  "src/lib/timelineAnchorNavigation.ts",
   "src/components/QuickLogV2Sheet.tsx",
 ];
 

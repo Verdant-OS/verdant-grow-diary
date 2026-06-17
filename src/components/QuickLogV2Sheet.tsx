@@ -18,6 +18,7 @@ import {
   buildQuickLogTimelineNavTarget,
   QUICK_LOG_TIMELINE_CTA_LABEL,
 } from "@/lib/quickLogTimelineNavigationTarget";
+import { navigateToTimelineAnchor } from "@/lib/timelineAnchorNavigation";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -93,14 +94,15 @@ export default function QuickLogV2Sheet({
   const navigate = inRouter ? useNavigate() : null;
   const { save, saving } = useQuickLogV2Save();
 
-  function navigateToTimeline(href: string) {
-    if (navigate) {
-      navigate(href);
-      return;
-    }
-    if (typeof window !== "undefined" && window.location) {
-      window.location.assign(href);
-    }
+  function navigateToTimeline(href: string, hash: string, path: string) {
+    navigateToTimelineAnchor(
+      { path, hash, href },
+      {
+        navigate: navigate ?? null,
+        currentPath:
+          typeof window !== "undefined" ? window.location?.pathname ?? null : null,
+      },
+    );
   }
 
   function showTimelineConfirmation(
@@ -120,7 +122,7 @@ export default function QuickLogV2Sheet({
     toast.success(message, {
       action: {
         label: QUICK_LOG_TIMELINE_CTA_LABEL,
-        onClick: () => navigateToTimeline(nav.href),
+        onClick: () => navigateToTimeline(nav.href, nav.hash, nav.path),
       },
     });
   }

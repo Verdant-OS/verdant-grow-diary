@@ -1,0 +1,24 @@
+{
+  "tent_id": "11111111-2222-3333-4444-555555555555",
+  "source": "ecowitt",
+  "vendor": "ecowitt_windows_testbench",
+  "captured_at": "2026-06-17T05:40:30Z",
+  "metrics": {
+    "temp_f": 80.42,
+    "humidity_percent": 41,
+    "soil_moisture_pct": 83
+  },
+  "metadata": {
+    "tent_id": "11111111-2222-3333-4444-555555555555",
+    "verdant_source": "live",
+    "remote_addr": "192.168.68.75",
+    "raw_payload": {
+      "stationtype": "GW1200B_V1.4.7",
+      "model": "GW1200B",
+      "dateutc": "2026-06-17 05:40:30",
+      "tempf": 80.42,
+      "humidity": 41,
+      "soilmoisture1": 83
+    }
+  }
+}

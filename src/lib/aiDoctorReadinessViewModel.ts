@@ -163,16 +163,21 @@ export function deriveAiDoctorContextEvidenceFlags(
   }
   const stage =
     typeof context.stage === "string" ? context.stage.trim() : context.stage;
+  // Medium / pot size come from the context payload (carried directly
+  // from the plant/profile row). Anything blank / non-string / null is
+  // treated as unknown — never inferred from notes or strain.
+  const medium =
+    typeof context.medium === "string" ? context.medium.trim() : null;
+  const potSize =
+    typeof context.pot_size === "string" ? context.pot_size.trim() : null;
   return {
     hasRecentWatering,
     hasRecentFeeding,
     hasRecentPhoto,
     hasOpenAlerts: openAlertsCount > 0,
     hasUnknownStage: !stage,
-    // Medium and pot size are not present on the Phase 1 context payload
-    // yet — surface them as unknown so the panel can prompt the grower.
-    hasUnknownMedium: true,
-    hasUnknownPotSize: true,
+    hasUnknownMedium: !medium,
+    hasUnknownPotSize: !potSize,
   };
 }
 

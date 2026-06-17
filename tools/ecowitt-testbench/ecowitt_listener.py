@@ -1289,15 +1289,55 @@ _RECOMMENDED_BLOCKED: Dict[str, str] = {
 }
 
 
+# Reason-specific next steps for storage_insert_failed sub-codes. These
+# override the generic storage_insert_failed copy when the webhook
+# returns a known sanitized `reason` value.
+_RECOMMENDED_NEXT_STEP_BY_REASON: Dict[str, str] = {
+    "insert_required_field_missing": (
+        "The webhook reached storage but a required DB field is missing. "
+        "Share the sanitized report with a developer."
+    ),
+    "insert_source_constraint_failed": (
+        "Stored source failed the canonical source constraint. Confirm "
+        "EcoWitt transport source is remapped to stored source 'live'."
+    ),
+    "insert_check_failed": (
+        "A database check constraint rejected the row. Share the "
+        "sanitized report with a developer."
+    ),
+    "insert_column_mismatch": (
+        "The insert payload references a column that does not exist or "
+        "no longer matches schema."
+    ),
+    "insert_duplicate": (
+        "This looks like a duplicate/idempotent reading. Usually safe; "
+        "verify dedupe behavior."
+    ),
+    "insert_unknown": (
+        "Storage insert failed for an unknown sanitized reason. Share "
+        "the sanitized report only."
+    ),
+}
+
+
 def _recommended_next_step_for(
     readiness: Dict[str, Any],
     classification: Optional[str],
     last_error: Optional[str],
     last_status: Optional[int],
+    reason: Optional[str] = None,
 ) -> str:
     if not readiness.get("ready"):
-        reason = readiness.get("reason") or "no_forwarding_configured"
-        return _RECOMMENDED_BLOCKED.get(reason, "Resolve forwarding readiness before retrying.")
+        block_reason = readiness.get("reason") or "no_forwarding_configured"
+        return _RECOMMENDED_BLOCKED.get(block_reason, "Resolve forwarding readiness before retrying.")
+    # When the webhook reports storage_insert_failed, prefer the
+    # reason-specific copy if we have a known sanitized reason.
+    if (
+        classification == "storage_insert_failed"
+        and isinstance(reason, str)
+        and reason in _RECOMMENDED_NEXT_STEP_BY_REASON
+    ):
+        return _RECOMMENDED_NEXT_STEP_BY_REASON[reason]
     if isinstance(classification, str) and classification in _RECOMMENDED_NEXT_STEP:
         return _RECOMMENDED_NEXT_STEP[classification]
     if isinstance(last_status, int) and is_retryable_status(last_status):

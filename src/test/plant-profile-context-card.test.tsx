@@ -232,7 +232,7 @@ describe("PlantProfileContext static safety scan", () => {
     expect(code).not.toMatch(/\bdevice\b/i);
     expect(code).not.toMatch(/openai|functions\.invoke/i);
     // Only updates the plants table.
-    const updateMatches = src.match(/\.from\(['"]([^'"]+)['"]\)/g) ?? [];
+    const updateMatches = code.match(/\.from\(['"]([^'"]+)['"]\)/g) ?? [];
     for (const m of updateMatches) {
       expect(m).toContain("plants");
     }

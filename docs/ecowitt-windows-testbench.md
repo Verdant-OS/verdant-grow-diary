@@ -170,13 +170,51 @@ curl.exe "http://localhost:8787/health"
 curl.exe "http://localhost:8787/debug/raw-log-tail?lines=5"
 ```
 
-The `/debug/raw-log-tail` endpoint:
+Debug listener/log status (existence, entry count, latest normalized reading):
 
-- only responds to local loopback callers (`127.0.0.1`, `::1`); LAN
-  callers get HTTP 403,
-- redacts Authorization headers, bearer tokens, `vbt_…` tokens,
-  JWT-shaped values, and common secret field names before returning,
-- is read-only and never forwards to Verdant or writes to Supabase.
+```
+curl "http://localhost:8787/debug/status"
+```
+
+Debug last normalized events (parsed entries only, no raw payload):
+
+```
+curl "http://localhost:8787/debug/last-events"
+curl "http://localhost:8787/debug/last-events?lines=5"
+```
+
+Line-count clamp behavior (non-numeric defaults to 10; values are
+clamped to the `[1, 50]` range — bad input never crashes the server):
+
+```
+curl "http://localhost:8787/debug/raw-log-tail?lines=abc"
+curl "http://localhost:8787/debug/raw-log-tail?lines=-10"
+curl "http://localhost:8787/debug/raw-log-tail?lines=999999"
+```
+
+Windows (`curl.exe`) variants:
+
+```
+curl.exe "http://localhost:8787/debug/status"
+curl.exe "http://localhost:8787/debug/last-events?lines=5"
+curl.exe "http://localhost:8787/debug/raw-log-tail?lines=abc"
+```
+
+Debug endpoint summary:
+
+- `/debug/status` — log existence, entry count, latest normalized status.
+- `/debug/last-events` — last N normalized readings only; no raw payload by default.
+- `/debug/raw-log-tail` — sanitized raw-log debugging (parsed JSONL entries).
+- All three endpoints are loopback-only (`127.0.0.1`, `::1`). LAN callers get HTTP 403.
+- All output is passed through the sanitizer: Authorization headers,
+  bearer tokens, `vbt_…` tokens, JWT-shaped values, Supabase admin-role
+  markers, and common secret field names are redacted.
+- All three endpoints are read-only. They never forward to Verdant and
+  never write to Supabase.
+- Do not expose these endpoints over LAN. Do not paste bridge tokens
+  into curl commands. Demo payloads remain `source="demo"`. Forwarding
+  remains explicit opt-in (`-ForwardToVerdant`).
+
 
 ## Files
 

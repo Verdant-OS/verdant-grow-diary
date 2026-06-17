@@ -1,0 +1,40 @@
+name: EcoWitt Windows Testbench safety
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  testbench-static-safety:
+    name: Static safety scan for tools/ecowitt-testbench
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+
+      - name: Cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Stop-ship: fails if a committed token/secret pattern, weakened
+      # forwarding opt-in, weakened demo source requirement, weakened
+      # Authorization ASCII validation, weakened debug-endpoint local-only
+      # access, or Supabase client / service_role imports appear in
+      # tools/ecowitt-testbench/.
+      - name: EcoWitt Windows testbench static safety tests
+        run: bunx vitest run src/test/ecowitt-windows-testbench-static-safety.test.ts --reporter=dot

@@ -34,6 +34,7 @@ import AiDoctorReviewResultPreview from "@/components/AiDoctorReviewResultPrevie
 import PlantDetailAiDoctorLiveReview from "@/components/PlantDetailAiDoctorLiveReview";
 import PlantDetailAiDoctorContextReadinessMount from "@/components/PlantDetailAiDoctorContextReadinessMount";
 import PlantProfileContextCard from "@/components/PlantProfileContextCard";
+import { updatePlantProfileMetadata } from "@/lib/plantProfileMetadataUpdate";
 import PlantDetailTimelineEvidenceReadinessLaunch from "@/components/PlantDetailTimelineEvidenceReadinessLaunch";
 import PlantDetailAskDoctorHelper from "@/components/PlantDetailAskDoctorHelper";
 import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
@@ -432,7 +433,12 @@ export default function PlantDetail() {
         strain={plant.strain ?? null}
         medium={plant.medium ?? null}
         potSize={plant.potSize ?? null}
+        onSave={async ({ medium, potSize }) => {
+          await updatePlantProfileMetadata(plant.id, { medium, potSize });
+          await refetch();
+        }}
       />
+
       <PlantDetailAiDoctorContextReadinessMount
         plantId={plant.id}
         growId={plant.growId ?? null}

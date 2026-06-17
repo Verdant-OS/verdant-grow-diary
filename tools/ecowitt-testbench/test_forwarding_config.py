@@ -51,6 +51,7 @@ def _reset_stats() -> None:
     FORWARD_STATS["last_forward_response_error"] = None
     FORWARD_STATS["last_forward_response_classification"] = None
     FORWARD_STATS["last_forward_response_message"] = None
+    FORWARD_STATS["last_forward_response_reason"] = None
 
 
 class TentIdValidationTests(unittest.TestCase):

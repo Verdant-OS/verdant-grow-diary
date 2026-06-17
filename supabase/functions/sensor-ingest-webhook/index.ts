@@ -19,6 +19,8 @@ import {
   tentScopeMatches,
   type AuthResult,
 } from "./auth.ts";
+import { sanitizeForResponse, safeLog } from "./sanitize.ts";
+
 
 
 // Centralized CORS handling. Allowed origins are explicit — no wildcard is

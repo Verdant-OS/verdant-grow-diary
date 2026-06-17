@@ -11,13 +11,13 @@
  *  - Vendor identity is preserved in `raw_payload.source_app =
  *    "spider_farmer_ggs"`. The canonical `source` is always one of
  *    the Verdant V0 labels: `csv | invalid`. Never `ggs_csv`/`ggs_live`.
- *  - Soil temperature is parsed + preserved in raw_payload but
- *    NEVER emitted as an insert draft, because `soil_temp_c` is not
- *    in the current validate_sensor_reading trigger allowlist. A
- *    `skippedMetrics` note is returned instead so callers cannot
- *    pretend it was ingested.
- *  - Only canonical metrics `soil_moisture_pct` and `ec` are emitted
- *    as long-format insert drafts.
+ *  - Canonical metrics emitted as long-format insert drafts:
+ *      soil_moisture_pct, ec (mS/cm), soil_temp_c (°C, bounds -20..80).
+ *  - Soil temperature drafts are gated on the same bounds the DB
+ *    trigger enforces: values outside [-20, 80] °C are flagged and
+ *    NEVER emitted (no silent clamping). The parsed °C value is always
+ *    preserved in raw_payload.parsed_soil_temp_c for audit, and
+ *    rejected metrics are reported via `skippedMetrics`.
  *  - Tent context is required. Missing tent → invalid, no drafts.
  *  - `raw_payload` is preserved verbatim for audit; presenter code
  *    MUST NOT render it (guarded by static-safety tests elsewhere).
@@ -32,10 +32,14 @@ export const GGS_CSV_SOURCE_APP = SPIDER_FARMER_GGS_PROVIDER;
 export type GgsCsvSource = "csv" | "invalid";
 
 /** Canonical metrics this parser may emit as long-format insert drafts. */
-export type GgsCsvAllowedMetric = "soil_moisture_pct" | "ec";
+export type GgsCsvAllowedMetric = "soil_moisture_pct" | "ec" | "soil_temp_c";
 
-/** Metric names that are parsed/preserved but explicitly NOT emitted. */
+/** Metric names that are parsed but explicitly NOT emitted (e.g. out of bounds). */
 export type GgsCsvSkippedMetric = "soil_temp_c";
+
+/** Soil-temperature bounds (°C). Mirrors the DB validate_sensor_reading trigger. */
+export const GGS_SOIL_TEMP_C_MIN = -20;
+export const GGS_SOIL_TEMP_C_MAX = 80;
 
 export interface GgsCsvReadingDraft {
   /** Canonical metric name accepted by validate_sensor_reading. */
@@ -53,6 +57,7 @@ export interface GgsCsvReadingDraft {
   /** Audit-only preservation of the original row + provenance. */
   raw_payload: GgsCsvRawPayload;
 }
+
 
 export interface GgsCsvOriginalUnits {
   soil_moisture_pct?: "fraction_0_1" | "percent_0_100";
@@ -255,8 +260,13 @@ export function parseGgsCsvRow(
     }
   }
 
-  // Soil temperature: parse + preserve only. NEVER emit a draft.
+  // Soil temperature: parse + bounds-check. Emit a draft only if the
+  // value is finite and within the same [-20, 80] °C bounds the DB
+  // trigger enforces. Out-of-bounds values are flagged + skipped, never
+  // clamped. The parsed °C value is preserved in raw_payload for audit
+  // regardless of whether a draft was emitted.
   let parsedSoilTempC: number | undefined;
+  let soilTempCEmit: number | null = null;
   const rawTempF = pick(raw, TEMP_F_ALIASES);
   const rawTempC = pick(raw, TEMP_C_ALIASES);
   if (rawTempF !== undefined) {
@@ -265,7 +275,6 @@ export function parseGgsCsvRow(
     else {
       parsedSoilTempC = ((n - 32) * 5) / 9;
       originalUnits.soil_temp_c = "fahrenheit";
-      skipped.add("soil_temp_c");
     }
   } else if (rawTempC !== undefined) {
     const n = toFiniteNumber(rawTempC);
@@ -273,7 +282,17 @@ export function parseGgsCsvRow(
     else {
       parsedSoilTempC = n;
       originalUnits.soil_temp_c = "celsius";
+    }
+  }
+  if (parsedSoilTempC !== undefined) {
+    if (
+      parsedSoilTempC < GGS_SOIL_TEMP_C_MIN ||
+      parsedSoilTempC > GGS_SOIL_TEMP_C_MAX
+    ) {
+      warnings.add("soil_temp_out_of_range");
       skipped.add("soil_temp_c");
+    } else {
+      soilTempCEmit = parsedSoilTempC;
     }
   }
 
@@ -311,6 +330,18 @@ export function parseGgsCsvRow(
       raw_payload,
     });
   }
+  if (canEmit && soilTempCEmit !== null) {
+    drafts.push({
+      metric: "soil_temp_c",
+      value: soilTempCEmit,
+      source: "csv",
+      captured_at: capturedAt,
+      tent_id,
+      device_id: sensorId,
+      raw_payload,
+    });
+  }
+
 
   const source: GgsCsvSource = drafts.length > 0 ? "csv" : "invalid";
 

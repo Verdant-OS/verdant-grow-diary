@@ -34,7 +34,7 @@ describe("parseGgsCsvRow — happy path", () => {
     expect(r.tent_id).toBe("tent-1");
     expect(r.device_id).toBe("GGS_SOIL_001");
     expect(r.captured_at).toBe(TS);
-    expect(r.drafts).toHaveLength(2);
+    expect(r.drafts).toHaveLength(3);
     for (const d of r.drafts) {
       expect(d.source).toBe("csv");
       expect(d.raw_payload.source_app).toBe(GGS_CSV_SOURCE_APP);
@@ -45,8 +45,11 @@ describe("parseGgsCsvRow — happy path", () => {
     expect(moisture.value).toBeCloseTo(42.5);
     const ec = r.drafts.find((d) => d.metric === "ec")!;
     expect(ec.value).toBeCloseTo(0.85);
-    expect(r.skippedMetrics).toContain("soil_temp_c");
+    const soilTemp = r.drafts.find((d) => d.metric === "soil_temp_c")!;
+    expect(soilTemp.value).toBeCloseTo(22.3);
+    expect(r.skippedMetrics).toEqual([]);
   });
+
 
   it("accepts camelCase aliases", () => {
     const r = parseGgsCsvRow(
@@ -117,20 +120,43 @@ describe("parseGgsCsvRow — unit normalization", () => {
     expect(r.raw_payload.original_units.ec).toBe("unknown_large");
   });
 
-  it("°F converts to °C and is preserved in raw_payload only", () => {
+  it("°F converts to °C and is emitted as a soil_temp_c draft", () => {
     const r = parseGgsCsvRow(
       { timestamp: TS, tent_id: "t", soil_temp_f: 72.14, vwc: 40 },
       { now: NOW },
     );
-    expect(r.drafts.find((d) => (d.metric as string) === "soil_temp_c")).toBeUndefined();
+    const soilTemp = r.drafts.find((d) => d.metric === "soil_temp_c")!;
+    expect(soilTemp).toBeDefined();
+    expect(soilTemp.value).toBeCloseTo(22.3, 1);
     expect(r.raw_payload.parsed_soil_temp_c).toBeCloseTo(22.3, 1);
     expect(r.raw_payload.original_units.soil_temp_c).toBe("fahrenheit");
+    expect(r.skippedMetrics).toEqual([]);
+  });
+
+  it("soil_temp_c below -20 is rejected as out-of-range, not emitted", () => {
+    const r = parseGgsCsvRow(
+      { timestamp: TS, tent_id: "t", soil_temp_c: -40, vwc: 40 },
+      { now: NOW },
+    );
+    expect(r.drafts.find((d) => d.metric === "soil_temp_c")).toBeUndefined();
+    expect(r.warnings).toContain("soil_temp_out_of_range");
+    expect(r.skippedMetrics).toContain("soil_temp_c");
+    expect(r.raw_payload.parsed_soil_temp_c).toBe(-40);
+  });
+
+  it("soil_temp_c above 80 is rejected as out-of-range, not emitted", () => {
+    const r = parseGgsCsvRow(
+      { timestamp: TS, tent_id: "t", soil_temp_c: 120, vwc: 40 },
+      { now: NOW },
+    );
+    expect(r.drafts.find((d) => d.metric === "soil_temp_c")).toBeUndefined();
+    expect(r.warnings).toContain("soil_temp_out_of_range");
     expect(r.skippedMetrics).toContain("soil_temp_c");
   });
 });
 
-describe("parseGgsCsvRow — soil temperature never emits a draft", () => {
-  it("only allowed metrics appear in drafts even when soil temp is present", () => {
+describe("parseGgsCsvRow — soil temperature draft emission", () => {
+  it("emits soil_temp_c draft alongside other metrics", () => {
     const r = parseGgsCsvRow(
       {
         timestamp: TS,
@@ -141,13 +167,13 @@ describe("parseGgsCsvRow — soil temperature never emits a draft", () => {
       },
       { now: NOW },
     );
-    const metrics = r.drafts.map((d) => d.metric);
-    expect(metrics).toEqual(expect.arrayContaining(["soil_moisture_pct", "ec"]));
-    expect(metrics).not.toContain("soil_temp_c" as never);
-    expect(r.skippedMetrics).toEqual(["soil_temp_c"]);
+    const metrics = r.drafts.map((d) => d.metric).sort();
+    expect(metrics).toEqual(["ec", "soil_moisture_pct", "soil_temp_c"]);
+    expect(r.skippedMetrics).toEqual([]);
     expect(r.raw_payload.parsed_soil_temp_c).toBe(21);
   });
 });
+
 
 describe("parseGgsCsvRow — bad data is never healthy", () => {
   it("rejects malformed timestamp", () => {

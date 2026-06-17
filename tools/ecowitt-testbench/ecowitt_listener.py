@@ -330,8 +330,8 @@ def _looks_like_secret_value(value: str) -> bool:
         and all(len(p) >= 8 for p in parts)
     ):
         return True
-    # service_role marker anywhere.
-    if "service_role" in lv:
+    # Supabase admin role marker anywhere.
+    if _SR_MARKER in lv:
         return True
     return False
 

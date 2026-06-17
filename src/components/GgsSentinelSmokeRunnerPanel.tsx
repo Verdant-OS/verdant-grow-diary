@@ -175,45 +175,7 @@ export default function GgsSentinelSmokeRunnerPanel() {
               ))}
             </ul>
 
-            {evaluation.metricFreshness.length > 0 && (
-              <div>
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="text-sm font-medium">Freshness guidance</h3>
-                  <span className="text-xs text-muted-foreground">
-                    Freshness window: {formatGgsWindowLabel(SPIDER_FARMER_GGS_STALE_MS)}
-                  </span>
-                </div>
-                <p className="mb-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground" data-testid="ggs-freshness-priority-note">
-                  Freshness guidance explains metric timing only; result-state priority still comes from the smoke-check result above.
-                </p>
-                <TooltipProvider delayDuration={150}>
-                  <ul className="divide-y rounded-md border text-xs sm:text-sm" data-testid="ggs-freshness-compact-list">
-                    {evaluation.metricFreshness.map((f) => (
-                      <li
-                        key={f.metric}
-                        className={`grid grid-cols-[minmax(6.5rem,1.15fr)_auto_auto_minmax(7.5rem,1fr)] items-center gap-2 px-2 py-2 sm:px-3 ${freshnessRowClass(f.freshnessStatus)}`}
-                        data-testid={`ggs-freshness-row-${f.freshnessStatus}`}
-                      >
-                        <div className="flex min-w-0 items-center gap-1.5">
-                          <FreshnessStatusIcon status={f.freshnessStatus} />
-                          <span className="truncate font-medium">{GGS_METRIC_FRIENDLY_NAME[f.metric]}</span>
-                          <span className="hidden truncate font-mono text-[11px] text-muted-foreground sm:inline">
-                            {f.metric}
-                          </span>
-                        </div>
-                        <span className="whitespace-nowrap font-mono text-[11px] text-muted-foreground" title={f.capturedAt ?? "No row found"}>
-                          {f.ageLabel}
-                        </span>
-                        <FreshnessBadge freshness={f} />
-                        <span className="truncate text-[11px] text-muted-foreground" title={f.nextActionLabel}>
-                          {f.nextActionLabel}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </TooltipProvider>
-              </div>
-            )}
+            <GgsSentinelFreshnessGuidanceList metricFreshness={evaluation.metricFreshness} />
 
             {evaluation.safeMetrics.length > 0 && (
               <div>
@@ -251,6 +213,54 @@ export default function GgsSentinelSmokeRunnerPanel() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+export function GgsSentinelFreshnessGuidanceList({
+  metricFreshness,
+}: {
+  metricFreshness: GgsSentinelMetricFreshness[];
+}) {
+  if (metricFreshness.length === 0) return null;
+
+  return (
+    <div>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-medium">Freshness guidance</h3>
+        <span className="text-xs text-muted-foreground">
+          Freshness window: {formatGgsWindowLabel(SPIDER_FARMER_GGS_STALE_MS)}
+        </span>
+      </div>
+      <p className="mb-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground" data-testid="ggs-freshness-priority-note">
+        Freshness guidance explains metric timing only; result-state priority still comes from the smoke-check result above.
+      </p>
+      <TooltipProvider delayDuration={150}>
+        <ul className="divide-y rounded-md border text-xs sm:text-sm" data-testid="ggs-freshness-compact-list">
+          {metricFreshness.map((f) => (
+            <li
+              key={f.metric}
+              className={`grid grid-cols-[minmax(6.5rem,1.15fr)_auto_auto_minmax(7.5rem,1fr)] items-center gap-2 px-2 py-2 sm:px-3 ${freshnessRowClass(f.freshnessStatus)}`}
+              data-testid={`ggs-freshness-row-${f.freshnessStatus}`}
+            >
+              <div className="flex min-w-0 items-center gap-1.5">
+                <FreshnessStatusIcon status={f.freshnessStatus} />
+                <span className="truncate font-medium">{GGS_METRIC_FRIENDLY_NAME[f.metric]}</span>
+                <span className="hidden truncate font-mono text-[11px] text-muted-foreground sm:inline">
+                  {f.metric}
+                </span>
+              </div>
+              <span className="whitespace-nowrap font-mono text-[11px] text-muted-foreground" title={f.capturedAt ?? "No row found"}>
+                {f.ageLabel}
+              </span>
+              <FreshnessBadge freshness={f} />
+              <span className="truncate text-[11px] text-muted-foreground" title={f.nextActionLabel}>
+                {f.nextActionLabel}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </TooltipProvider>
+    </div>
   );
 }
 

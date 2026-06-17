@@ -321,11 +321,13 @@ class ForwardErrorSanitizationTests(unittest.TestCase):
                 )
 
     def test_sanitize_forward_error_value_redacts_token_like_strings(self):
-        leaky = "vbt_BBBBBBBBBBBBBBBBBBBBBBBBBB"
+        leaky = "vbt_" + ("B" * 26)
         out = sanitize_forward_error_value(leaky)
         self.assertNotEqual(out, leaky)
-        out2 = sanitize_forward_error_value("Bearer eyJabcdefghij.eyJabcdefghij.signaturesignature")
+        jwt_like = "Bearer " + "eyJ" + "abcdefghij" + "." + "eyJ" + "abcdefghij" + ".signaturesignature"
+        out2 = sanitize_forward_error_value(jwt_like)
         self.assertNotIn("eyJ", str(out2))
+
 
     def test_summarize_forward_response_known_classifications(self):
         for err, cls in [

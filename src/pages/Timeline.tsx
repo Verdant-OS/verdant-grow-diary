@@ -160,7 +160,7 @@ export default function Timeline() {
   const [plantFilter, setPlantFilter] = useState("");
   const [tentFilter, setTentFilter] = useState("");
   const [eventTypeFilter, setEventTypeFilter] = useState("");
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
 
   async function load() {
     if (!user || !activeGrowId) {
@@ -280,18 +280,20 @@ export default function Timeline() {
   }
 
   // Lightbox navigation list derived from currently visible (filtered)
-  // entries. Pure helper, no writes. Closing the lightbox when the
-  // backing list shrinks below the active index keeps navigation safe.
+  // entries. Pure helper, no writes. The active photo is tracked by id so
+  // filter changes that hide or reorder the active photo auto-close or
+  // re-align navigation without pointing at the wrong item.
   const lightboxItems = useMemo(
     () => buildTimelinePhotoLightboxList(filtered),
     [filtered],
   );
+  const lightboxIndex = useMemo(
+    () => findTimelinePhotoIndexById(lightboxItems, lightboxPhotoId),
+    [lightboxItems, lightboxPhotoId],
+  );
   useEffect(() => {
-    if (lightboxIndex === null) return;
-    if (lightboxIndex < 0 || lightboxIndex >= lightboxItems.length) {
-      setLightboxIndex(null);
-    }
-  }, [lightboxItems, lightboxIndex]);
+    if (lightboxPhotoId !== null && lightboxIndex < 0) setLightboxPhotoId(null);
+  }, [lightboxPhotoId, lightboxIndex]);
 
   // Merge `grow_events` (Quick Log v2 manual saves) into the raw entries
   // passed to the Recent Quick Logs panel so just-saved entries surface at

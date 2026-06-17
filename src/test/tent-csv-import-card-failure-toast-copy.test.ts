@@ -32,7 +32,7 @@ describe("TentCsvImportCard — import-failed toast wording", () => {
     // Collect every toast.error("…", { description: batchResult.diagnostic })
     const calls = [
       ...CODE.matchAll(
-        /toast\.error\(\s*(["'`])([^"'`]+)\1\s*,\s*\{\s*description:\s*batchResult\.diagnostic\s*\}\s*\)/g,
+        /toast\.error\(\s*(["'`])([^"'`]+)\1\s*,\s*\{\s*description:\s*batchResult\.diagnostic\s*,?\s*\}\s*\)/g,
       ),
     ];
     expect(calls.length).toBeGreaterThanOrEqual(3); // legacy CSV, registry CSV, XLSX

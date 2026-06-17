@@ -152,6 +152,24 @@ export default function AiDoctorContextReadinessPanel({
         </span>
       </header>
 
+      <p
+        data-testid="ai-doctor-context-readiness-panel-confidence-class-copy"
+        data-confidence-class={view.confidenceClass}
+        className={`text-xs rounded-md border px-2 py-1.5 ${
+          view.confidenceClass === "ready"
+            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+            : view.confidenceClass === "not_trustworthy"
+              ? "border-rose-500/40 bg-rose-500/10 text-rose-200"
+              : "border-amber-500/30 bg-amber-500/10 text-amber-200"
+        }`}
+      >
+        {view.confidenceClassCopy}
+      </p>
+
+      <QuickActionsRow flags={view.evidenceFlags} actions={quickActions} />
+
+
+
       <dl
         className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs"
         data-testid="ai-doctor-context-readiness-panel-counts"

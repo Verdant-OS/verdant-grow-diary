@@ -18,10 +18,16 @@ function read(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
 }
 
-const PANEL = read("src/components/GgsRealPayloadIngestPanel.tsx");
-const PAGE = read("src/pages/OperatorGgsRealPayloadIngest.tsx");
-const COMMIT = read("src/lib/ggsRealPayloadCommit.ts");
-const VM = read("src/lib/ggsRealPayloadIngestViewModel.ts");
+// Strip /** ... */ block comments so safety regexes don't match documentation
+// that intentionally references the forbidden patterns.
+function stripBlockComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, "");
+}
+
+const PANEL = stripBlockComments(read("src/components/GgsRealPayloadIngestPanel.tsx"));
+const PAGE = stripBlockComments(read("src/pages/OperatorGgsRealPayloadIngest.tsx"));
+const COMMIT = stripBlockComments(read("src/lib/ggsRealPayloadCommit.ts"));
+const VM = stripBlockComments(read("src/lib/ggsRealPayloadIngestViewModel.ts"));
 
 describe("operator GGS real-payload ingest — static safety", () => {
   it("panel never renders raw_payload body fields", () => {

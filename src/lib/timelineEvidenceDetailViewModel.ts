@@ -6,7 +6,7 @@
  * fetch, no DB, no AI, no Action Queue / alert / device / sensor work.
  *
  * Only a tiny allow-list of safe display fields is exposed. Raw payload
- * Authorization headers, bridge tokens, JWTs, service-role keys, ingest
+ * Authorization headers, bridge tokens, JWTs, privileged keys, ingest
  * URLs and similar secrets MUST NEVER appear in the returned model.
  */
 

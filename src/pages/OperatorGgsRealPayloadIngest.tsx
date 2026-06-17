@@ -26,10 +26,8 @@ export default function OperatorGgsRealPayloadIngest() {
 
   return (
     <div className="container mx-auto max-w-3xl space-y-4 p-4">
-      <Helmet>
-        <title>Operator · GGS real-payload ingest</title>
-        <meta name="robots" content="noindex,nofollow" />
-      </Helmet>
+
+
 
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold">Spider Farmer GGS real-payload ingest</h1>

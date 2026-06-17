@@ -182,14 +182,14 @@ describe("ecowitt windows testbench — /debug/raw-log-tail safety", () => {
     // The endpoint must not read or return the token value.
     const endpointBlock = py
       .split("@app.get(\"/debug/raw-log-tail\")")[1]
-      ?.split("def main(") [0] ?? "";
+      ?.split("@app.get(") [0] ?? "";
     expect(endpointBlock).not.toMatch(/VERDANT_BRIDGE_TOKEN/);
   });
 
   it("debug endpoint is read-only and does not forward to Verdant", () => {
     const endpointBlock = py
       .split("@app.get(\"/debug/raw-log-tail\")")[1]
-      ?.split("def main(") [0] ?? "";
+      ?.split("@app.get(") [0] ?? "";
     expect(endpointBlock).not.toMatch(/requests\.post/);
     expect(endpointBlock).not.toMatch(/maybe_forward/);
   });

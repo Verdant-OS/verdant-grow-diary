@@ -79,12 +79,14 @@ export default function GgsSentinelSmokeRunnerPanel() {
         state: "BLOCKED_VALIDATION_ERROR",
         checks: [],
         safeMetrics: [],
+        metricFreshness: [],
         snapshot: null,
         passed: false,
       });
     } finally {
       setRunning(false);
     }
+
   }
 
   const passed = evaluation?.passed === true;

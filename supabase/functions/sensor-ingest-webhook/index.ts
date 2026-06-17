@@ -74,10 +74,11 @@ export async function handleRequest(req: Request): Promise<Response> {
     return await handle(req);
   } catch (_err) {
     // Never leak error text, stack traces, tokens, or PG details.
-    safeLog("internal_error", { method: req.method });
+    safeLog("internal_error");
     return json(req, { error: "internal_error" }, 500);
   }
 }
+
 
 
 Deno.serve(handleRequest);

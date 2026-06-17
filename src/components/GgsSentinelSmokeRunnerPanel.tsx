@@ -239,3 +239,12 @@ function CheckBadge({ status }: { status: "pass" | "fail" | "warn" | "skipped" }
   if (status === "warn") return <Badge variant="secondary">warn</Badge>;
   return <Badge variant="outline">skipped</Badge>;
 }
+
+function FreshnessBadge({ freshness }: { freshness: GgsSentinelMetricFreshness }) {
+  const s = freshness.freshnessStatus;
+  if (s === "fresh") return <Badge variant="default">fresh</Badge>;
+  if (s === "aging") return <Badge variant="secondary">fresh but aging</Badge>;
+  if (s === "stale") return <Badge variant="destructive">stale</Badge>;
+  return <Badge variant="outline">missing</Badge>;
+}
+

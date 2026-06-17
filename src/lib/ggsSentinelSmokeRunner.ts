@@ -320,6 +320,7 @@ export function evaluateGgsSentinelReadiness(
     if (age * 1000 > staleMs) {
       if (!staleMetric || age > staleMetric.age) staleMetric = { metric, age };
     }
+    const freshness = buildFreshness(metric, row.captured_at, now, staleMs);
     safeMetrics.push({
       metric,
       value: row.value as number,
@@ -327,8 +328,15 @@ export function evaluateGgsSentinelReadiness(
       vendor,
       captured_at: row.captured_at,
       age_seconds: age,
+      freshness,
     });
   }
+
+  const metricFreshness: GgsSentinelMetricFreshness[] = GGS_SENTINEL_METRICS.map((m) => {
+    const found = safeMetrics.find((s) => s.metric === m);
+    return found ? found.freshness : buildFreshness(m, null, now, staleMs);
+  });
+
 
   checks.push(
     check(

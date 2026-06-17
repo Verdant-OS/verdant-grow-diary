@@ -405,7 +405,12 @@ export default function QuickLogV2Sheet({
 
     const successMessage = photoFile ? "Log and photo saved" : "Log saved";
     setSaveStatus(successMessage);
-    toast.success(successMessage);
+    showTimelineConfirmation(successMessage, {
+      targetType: resolved.targetType as "plant" | "tent",
+      targetId: resolved.targetId as string,
+      tentId: resolved.tentId ?? null,
+      growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
+    });
     applyQuickLogV2Refresh(queryClient, {
       targetType: resolved.targetType as "plant" | "tent",
       targetId: resolved.targetId as string,

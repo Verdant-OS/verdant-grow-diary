@@ -183,8 +183,8 @@ describe("buildPlantProfileMetadataPayload (allow-list)", () => {
     } as unknown as { medium: string; potSize: string };
     const payload = buildPlantProfileMetadataPayload(loose);
     expect(payload).toEqual({ medium: "soil", pot_size: "5 gal" });
-    expect((payload as Record<string, unknown>).stage).toBeUndefined();
-    expect((payload as Record<string, unknown>).is_archived).toBeUndefined();
+    expect((payload as unknown as Record<string, unknown>).stage).toBeUndefined();
+    expect((payload as unknown as Record<string, unknown>).is_archived).toBeUndefined();
   });
 });
 

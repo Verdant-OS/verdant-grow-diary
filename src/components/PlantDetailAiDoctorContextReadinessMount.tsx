@@ -96,6 +96,33 @@ export default function PlantDetailAiDoctorContextReadinessMount({
     }
   }, [plantRow, recentActivity.data, manualLogs.data]);
 
+  // NOTE: All hooks below MUST be called unconditionally on every render.
+  // Previously `useMemo(auditIdentity)` and `useCallback(openManualSensorEntry)`
+  // lived AFTER the early returns for !plantId / isLoading / built.error,
+  // which caused "Rendered more hooks than during the previous render."
+  // when context flipped from missing/loading to available. Keep these
+  // declarations above any conditional return.
+  const auditIdentity = useMemo(
+    () => ({
+      plantId,
+      plantName: plantName ?? null,
+      growId,
+      tentId,
+      tentName: null as string | null,
+    }),
+    [plantId, plantName, growId, tentId],
+  );
+
+  const openManualSensorEntry = useCallback(
+    (prefill: { plantId: string; growId: string; tentId: string }) => {
+      if (typeof window === "undefined") return;
+      window.dispatchEvent(
+        new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: prefill }),
+      );
+    },
+    [],
+  );
+
   if (!plantId) {
     return (
       <FallbackShell
@@ -125,27 +152,6 @@ export default function PlantDetailAiDoctorContextReadinessMount({
 
   const auditLogs = (manualLogs.data ?? []) as ReadonlyArray<ManualSensorLog>;
 
-  const auditIdentity = useMemo(
-    () => ({
-      plantId,
-      plantName: plantName ?? null,
-      growId,
-      tentId,
-      tentName: null,
-    }),
-    [plantId, plantName, growId, tentId],
-  );
-
-  const openManualSensorEntry = useCallback(
-    (prefill: { plantId: string; growId: string; tentId: string }) => {
-      if (typeof window === "undefined") return;
-      window.dispatchEvent(
-        new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: prefill }),
-      );
-    },
-    [],
-  );
-
   return (
     <div
       data-testid="plant-detail-ai-doctor-context-readiness-mount"
@@ -164,3 +170,4 @@ export default function PlantDetailAiDoctorContextReadinessMount({
     </div>
   );
 }
+

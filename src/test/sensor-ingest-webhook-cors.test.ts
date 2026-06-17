@@ -20,10 +20,10 @@ const codeOnly = SRC.replace(/\/\/[^\n]*/g, "");
 
 describe("sensor-ingest-webhook CORS contract", () => {
   it("declares an explicit allowed-origin set (no bare wildcard with auth)", () => {
-    expect(codeOnly).toMatch(/ALLOWED_ORIGINS\s*=\s*new Set/);
-    expect(codeOnly).toContain("https://verdantgrowdiary.com");
+    expect(SRC).toMatch(/ALLOWED_ORIGINS\s*=\s*new Set/);
+    expect(SRC).toContain("https://verdantgrowdiary.com");
     // Wildcard must not be used as the static Allow-Origin value.
-    expect(codeOnly).not.toMatch(/Access-Control-Allow-Origin["']\s*:\s*["']\*["']/);
+    expect(SRC).not.toMatch(/Access-Control-Allow-Origin["']\s*:\s*["']\*["']/);
   });
 
   it("returns CORS headers for OPTIONS before any auth / body / DB work", () => {

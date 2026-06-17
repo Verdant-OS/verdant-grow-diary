@@ -120,6 +120,61 @@ describe("ecowitt windows testbench — static safety", () => {
   });
 });
 
+describe("ecowitt windows testbench — source labeling rules", () => {
+  const py = readFileSync(join(TESTBENCH_DIR, "ecowitt_listener.py"), "utf-8");
+
+  it("defines the canonical ALLOWED_SOURCES set", () => {
+    expect(py).toMatch(
+      /ALLOWED_SOURCES\s*=\s*\{[^}]*"live"[^}]*"manual"[^}]*"csv"[^}]*"demo"[^}]*"stale"[^}]*"invalid"[^}]*\}/,
+    );
+  });
+
+  it("declares EcoWitt gateway marker fields used to detect real uploads", () => {
+    expect(py).toMatch(/ECOWITT_GATEWAY_MARKERS/);
+    for (const marker of ["passkey", "stationtype", "model", "dateutc"]) {
+      expect(py).toMatch(new RegExp(`"${marker}"`));
+    }
+  });
+
+  it("resolve_source accepts payload + remote_addr (not just headers)", () => {
+    expect(py).toMatch(
+      /def\s+resolve_source\s*\([\s\S]*?payload[\s\S]*?remote_addr[\s\S]*?\)\s*->\s*str/,
+    );
+    expect(py).toMatch(
+      /resolve_source\(payload=raw,\s*remote_addr=request\.remote_addr\)/,
+    );
+  });
+
+  it("non-loopback gateway uploads are normalized to live", () => {
+    expect(py).toMatch(/is_lan[\s\S]{0,120}looks_gateway/);
+    expect(py).toMatch(/return\s+"live"/);
+  });
+
+  it("unknown payload source labels normalize to invalid, never live", () => {
+    expect(py).toMatch(/return\s+"invalid"/);
+    expect(py).toMatch(/explicit\s*==\s*"live"/);
+  });
+
+  it("loopback callers without explicit live opt-in stay demo", () => {
+    expect(py).toMatch(/_is_loopback_source_addr/);
+    expect(py).toMatch(/return\s+"demo"/);
+  });
+
+  it("debug status / events endpoints sanitize payloads (no token leaks)", () => {
+    expect(py).toMatch(/sanitize_debug_payload/);
+  });
+
+  it("ships a Python unit test file for resolve_source", () => {
+    const t = readFileSync(
+      join(TESTBENCH_DIR, "test_source_labeling.py"),
+      "utf-8",
+    );
+    expect(t).toMatch(/test_lan_ecowitt_gateway_is_live/);
+    expect(t).toMatch(/test_loopback_browser_demo_is_demo/);
+    expect(t).toMatch(/test_unknown_source_label_is_invalid_not_live/);
+  });
+});
+
 describe("ecowitt windows testbench — /debug/raw-log-tail safety", () => {
   const py = readFileSync(join(TESTBENCH_DIR, "ecowitt_listener.py"), "utf-8");
 

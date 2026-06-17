@@ -11,11 +11,15 @@ Safety properties (must remain true):
 * No direct Supabase table writes. Forwarding, when explicitly enabled,
   goes only to the existing validated ingest webhook
   (`VERDANT_INGEST_URL`) using the bridge token (`VERDANT_BRIDGE_TOKEN`).
-* No fake live data. Built-in browser/test payloads are labeled
-  ``source = "demo"``. ``source = "live"`` is only used when the request
-  is explicitly marked as coming from a real EcoWitt gateway via the
-  ``X-Verdant-Forward-Mode: live`` header or the ``VERDANT_FORWARD_MODE``
-  env var.
+* No fake live data. Synthetic loopback browser/curl/demo payloads are
+  labeled ``source = "demo"``. Real LAN EcoWitt gateway uploads
+  (non-loopback caller carrying EcoWitt gateway marker fields such as
+  ``PASSKEY`` / ``stationtype`` / ``model`` / ``dateutc``) are labeled
+  ``source = "live"``. Explicit ``X-Verdant-Forward-Mode: live`` header
+  or ``VERDANT_FORWARD_MODE=live`` env var also opts in to ``live``.
+  Unknown / spoofed ``source`` values from the payload normalize to
+  ``invalid`` and are never silently treated as live or healthy.
+
 * Missing / malformed / stale values are never silently classified as
   healthy — they are normalized to ``None`` and the raw payload is kept
   in ``metadata.raw_payload`` for audit.
@@ -143,15 +147,101 @@ def extract_payload() -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Source labeling — demo by default, live only on explicit opt-in
+# Source labeling — demo for loopback synthetic, live for real LAN gateway
 # ---------------------------------------------------------------------------
 
-def resolve_source() -> str:
-    header_mode = (request.headers.get("X-Verdant-Forward-Mode") or "").strip().lower()
-    env_mode = (os.environ.get("VERDANT_FORWARD_MODE") or "").strip().lower()
+# Canonical Verdant source labels. Anything outside this set is "invalid".
+ALLOWED_SOURCES = {"live", "manual", "csv", "demo", "stale", "invalid"}
+
+# Marker fields commonly present in real EcoWitt gateway uploads. We
+# require >=2 to avoid false positives from minimal demo URLs.
+ECOWITT_GATEWAY_MARKERS = {
+    "passkey",
+    "stationtype",
+    "model",
+    "dateutc",
+    "freq",
+    "runtime",
+    "wh65batt",
+    "wh25batt",
+}
+
+_LOOPBACK_SOURCE_ADDRS = {"127.0.0.1", "::1", "localhost"}
+
+
+def _is_loopback_source_addr(addr: Optional[str]) -> bool:
+    a = (addr or "").strip().lower()
+    if not a:
+        return False
+    if a in _LOOPBACK_SOURCE_ADDRS:
+        return True
+    if a.startswith("::ffff:127.") or a.startswith("127."):
+        return True
+    return False
+
+
+def looks_like_ecowitt_gateway(payload: Optional[Dict[str, Any]]) -> bool:
+    """True when the payload carries >=2 EcoWitt gateway marker fields."""
+    if not isinstance(payload, dict):
+        return False
+    keys_lower = {str(k).lower() for k in payload.keys()}
+    return len(keys_lower & ECOWITT_GATEWAY_MARKERS) >= 2
+
+
+def resolve_source(
+    payload: Optional[Dict[str, Any]] = None,
+    remote_addr: Optional[str] = None,
+    header_mode: Optional[str] = None,
+    env_mode: Optional[str] = None,
+) -> str:
+    """Return a canonical Verdant source label.
+
+    Rules:
+      1. Explicit payload ``source`` is honored only when in ALLOWED_SOURCES.
+         Unknown labels normalize to ``invalid`` (never silently "live").
+      2. Real LAN EcoWitt gateway uploads (non-loopback remote + gateway
+         marker fields) normalize to ``live``.
+      3. Explicit ``X-Verdant-Forward-Mode: live`` header or
+         ``VERDANT_FORWARD_MODE=live`` env var keeps the existing opt-in
+         path to ``live``.
+      4. Everything else (loopback browser/curl, demo scripts) is ``demo``.
+    """
+    if header_mode is None:
+        header_mode = (request.headers.get("X-Verdant-Forward-Mode") or "").strip().lower()
+    if env_mode is None:
+        env_mode = (os.environ.get("VERDANT_FORWARD_MODE") or "").strip().lower()
+
+    explicit: Optional[str] = None
+    if isinstance(payload, dict):
+        raw_src = payload.get("source")
+        if isinstance(raw_src, str) and raw_src.strip():
+            cand = raw_src.strip().lower()
+            if cand in ALLOWED_SOURCES:
+                explicit = cand
+            else:
+                # Unknown / spoofed label — never accept as live or healthy.
+                return "invalid"
+
+    is_lan = not _is_loopback_source_addr(remote_addr)
+    looks_gateway = looks_like_ecowitt_gateway(payload)
+
+    if explicit == "live":
+        # Only honor explicit live when it actually looks like a real
+        # gateway from a non-loopback caller. Otherwise downgrade.
+        if is_lan and looks_gateway:
+            return "live"
+        return "demo"
+    if explicit in {"manual", "csv", "demo", "stale", "invalid"}:
+        return explicit
+
+    if is_lan and looks_gateway:
+        return "live"
+
     if header_mode == "live" or env_mode == "live":
         return "live"
+
     return "demo"
+
 
 
 # ---------------------------------------------------------------------------
@@ -323,8 +413,9 @@ def health() -> Any:
 def ecowitt() -> Any:
     raw = extract_payload()
     metrics = normalize_metrics(raw)
-    source = resolve_source()
+    source = resolve_source(payload=raw, remote_addr=request.remote_addr)
     captured_at = datetime.now(timezone.utc).isoformat()
+
 
     reading = {
         "captured_at": captured_at,

@@ -46,6 +46,16 @@ import {
   mapGrowEventsToRecentRawEntries,
   type GrowEventRowForRecent,
 } from "@/lib/growEventToDiaryRawEntry";
+import {
+  deriveTimelineEventTypeOptions,
+  deriveTimelinePlantOptions,
+  deriveTimelineTentOptions,
+  filterTimelineEvidenceRows,
+  isTimelineEvidenceFilterActive,
+  TIMELINE_EVIDENCE_EMPTY_DESC,
+  TIMELINE_EVIDENCE_EMPTY_TITLE,
+  TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER,
+} from "@/lib/timelineEvidenceFilterRules";
 
 
 const TIMELINE_SNAPSHOT_STALE_MS = 30 * 60 * 1000;
@@ -138,6 +148,10 @@ export default function Timeline() {
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [plantFilter, setPlantFilter] = useState("");
+  const [tentFilter, setTentFilter] = useState("");
+  const [eventTypeFilter, setEventTypeFilter] = useState("");
 
   async function load() {
     if (!user || !activeGrowId) {
@@ -217,13 +231,44 @@ export default function Timeline() {
     return m;
   }, [entries]);
 
+  const plantOptions = useMemo(() => deriveTimelinePlantOptions(entries), [entries]);
+  const tentOptions = useMemo(() => deriveTimelineTentOptions(entries), [entries]);
+  const eventTypeOptions = useMemo(
+    () => deriveTimelineEventTypeOptions(entries),
+    [entries],
+  );
+
+  const evidenceFilterInput = {
+    query: searchQuery,
+    plantId: plantFilter,
+    tentId: tentFilter,
+    eventType: eventTypeFilter,
+  };
+  const evidenceActive = isTimelineEvidenceFilterActive(evidenceFilterInput);
+
   const filtered = useMemo(() => {
-    return entries.filter((e) => {
+    const afterStageEvent = entries.filter((e) => {
       if (stageFilter !== "all" && e.stage !== stageFilter) return false;
       if (eventFilter !== "all" && !entryKinds(e).includes(eventFilter)) return false;
       return true;
     });
-  }, [entries, stageFilter, eventFilter]);
+    return filterTimelineEvidenceRows(afterStageEvent, evidenceFilterInput);
+  }, [
+    entries,
+    stageFilter,
+    eventFilter,
+    searchQuery,
+    plantFilter,
+    tentFilter,
+    eventTypeFilter,
+  ]);
+
+  function clearEvidenceFilters() {
+    setSearchQuery("");
+    setPlantFilter("");
+    setTentFilter("");
+    setEventTypeFilter("");
+  }
 
   // Merge `grow_events` (Quick Log v2 manual saves) into the raw entries
   // passed to the Recent Quick Logs panel so just-saved entries surface at
@@ -339,6 +384,92 @@ export default function Timeline() {
         />
       )}
 
+      {/* Search + evidence filters (read-only, client-side) */}
+      <div
+        className="mb-3 space-y-2 rounded-2xl border border-border/40 bg-secondary/20 p-3"
+        data-testid="timeline-evidence-filters"
+        aria-label="Search and filter timeline entries"
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER}
+            aria-label={TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER}
+            data-testid="timeline-search-input"
+            className="flex-1 min-w-[12rem] rounded-md border border-border/50 bg-background/60 px-3 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+          />
+          {plantOptions.length > 0 && (
+            <select
+              value={plantFilter}
+              onChange={(e) => setPlantFilter(e.target.value)}
+              aria-label="Filter by plant"
+              data-testid="timeline-plant-filter"
+              className="rounded-md border border-border/50 bg-background/60 px-2 py-1.5 text-sm"
+            >
+              <option value="">All plants</option>
+              {plantOptions.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label} ({o.count})
+                </option>
+              ))}
+            </select>
+          )}
+          {tentOptions.length > 0 && (
+            <select
+              value={tentFilter}
+              onChange={(e) => setTentFilter(e.target.value)}
+              aria-label="Filter by tent"
+              data-testid="timeline-tent-filter"
+              className="rounded-md border border-border/50 bg-background/60 px-2 py-1.5 text-sm"
+            >
+              <option value="">All tents</option>
+              {tentOptions.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label} ({o.count})
+                </option>
+              ))}
+            </select>
+          )}
+          {eventTypeOptions.length > 0 && (
+            <select
+              value={eventTypeFilter}
+              onChange={(e) => setEventTypeFilter(e.target.value)}
+              aria-label="Filter by log type"
+              data-testid="timeline-event-type-filter"
+              className="rounded-md border border-border/50 bg-background/60 px-2 py-1.5 text-sm"
+            >
+              <option value="">All log types</option>
+              {eventTypeOptions.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label} ({o.count})
+                </option>
+              ))}
+            </select>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={clearEvidenceFilters}
+            disabled={!evidenceActive}
+            data-testid="timeline-clear-filters"
+            aria-label="Clear timeline filters"
+          >
+            Clear filters
+          </Button>
+        </div>
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="timeline-results-count"
+          aria-live="polite"
+        >
+          Showing {filtered.length} of {entries.length}{" "}
+          {entries.length === 1 ? "entry" : "entries"}
+        </p>
+      </div>
+
       {/* Filters */}
       <div className="space-y-2 mb-4">
         <div className="flex flex-wrap gap-1.5">
@@ -362,6 +493,7 @@ export default function Timeline() {
           <FilterChip active={eventFilter === "followup"} onClick={() => setEventFilter("followup")} label="Follow-ups" icon={<Check className="h-3 w-3" />} count={eventCounts.followup} />
         </div>
       </div>
+
 
       <div className="mb-4 flex items-center justify-end gap-2 flex-wrap">
         <Link
@@ -446,7 +578,11 @@ export default function Timeline() {
         : entries.length === 0 ? (
           <Empty title="No entries yet" desc="Tap the + button to log your first photo and note." />
         ) : filtered.length === 0 ? (
-          <Empty title="No matching entries" desc="Try a different stage or event filter." />
+          <Empty
+            title={evidenceActive ? TIMELINE_EVIDENCE_EMPTY_TITLE : "No matching entries"}
+            desc={evidenceActive ? TIMELINE_EVIDENCE_EMPTY_DESC : "Try a different stage or event filter."}
+          />
+
         ) : (
           <div className="space-y-5">
             {groupedByStage.map((group, gi) => (

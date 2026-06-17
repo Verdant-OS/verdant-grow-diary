@@ -600,7 +600,7 @@ def debug_last_events() -> Any:
             slim["device_id"] = metadata.get("device_id")
         if metadata.get("confidence") is not None:
             slim["confidence"] = metadata.get("confidence")
-        # Explicitly do NOT include raw_payload by default.
+        # Explicitly slim: do NOT include the raw EcoWitt payload by default.
         events.append(slim)
 
     return jsonify(

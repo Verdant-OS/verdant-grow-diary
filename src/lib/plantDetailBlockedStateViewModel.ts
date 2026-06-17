@@ -25,7 +25,7 @@ import {
   isActivePlant,
   type ArchivedPlantLike,
 } from "@/lib/archivedPlantVisibilityRules";
-import { plantsPath, tentDetailPath } from "@/lib/routes";
+import { plantsPath, tentDetailPath, plantDetailPath } from "@/lib/routes";
 import type { PlantDetailLoadState } from "@/lib/plantDetailLoadTimeoutRules";
 
 export type PlantDetailBlockedStateKind =

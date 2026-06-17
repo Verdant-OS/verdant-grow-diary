@@ -1,0 +1,188 @@
+/**
+ * EcoWitt Local Forwarding Status Widget — operator-only, read-only.
+ *
+ * Polls the LOCAL listener (http://localhost:8787) for sanitized
+ * forwarding health and exposes a copy-button for the sanitized error
+ * report. Never contacts Verdant, Supabase, Edge Functions, or any
+ * remote service. No tokens, no Authorization headers, no raw payloads.
+ */
+
+import { useCallback, useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
+import {
+  LOCAL_FORWARDING_ERROR_REPORT_URL,
+  fetchLocalForwardingErrorReportText,
+  fetchLocalForwardingStatus,
+  sanitizeReportText,
+  type LocalForwardingFetchState,
+} from "@/lib/ecowittLocalForwardingStatus";
+import {
+  buildForwardingStatusViewModel,
+  type ForwardingStatusRow,
+} from "@/lib/ecowittLocalForwardingStatusViewModel";
+
+export interface EcowittLocalForwardingStatusWidgetProps {
+  /** Test seam: skip the initial auto-fetch (use a manual refresh). */
+  autoFetch?: boolean;
+}
+
+export default function EcowittLocalForwardingStatusWidget({
+  autoFetch = true,
+}: EcowittLocalForwardingStatusWidgetProps) {
+  const { toast } = useToast();
+  const [fetchState, setFetchState] = useState<LocalForwardingFetchState>({
+    state: "loading",
+  });
+  const [busy, setBusy] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setBusy(true);
+    setFetchState({ state: "loading" });
+    const next = await fetchLocalForwardingStatus();
+    setFetchState(next);
+    setBusy(false);
+  }, []);
+
+  useEffect(() => {
+    if (autoFetch) {
+      void refresh();
+    }
+  }, [autoFetch, refresh]);
+
+  const handleCopyReport = useCallback(async () => {
+    const result = await fetchLocalForwardingErrorReportText();
+    if (!result.ok) {
+      const msg =
+        result.reason === "offline"
+          ? "EcoWitt local bridge is not reachable. Start the listener first."
+          : result.reason === "http_error"
+            ? "Local bridge returned an error. Restart it and try again."
+            : "Local bridge returned an unreadable report.";
+      toast({
+        title: "Could not copy report",
+        description: msg,
+        variant: "destructive",
+      });
+      return;
+    }
+    // Belt-and-braces: re-scrub before clipboard write.
+    const safeJson = sanitizeReportText(result.json);
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard) {
+        await navigator.clipboard.writeText(safeJson);
+        toast({
+          title: "Sanitized forwarding report copied",
+          description:
+            "Safe to share with a developer. Never paste your bridge token.",
+        });
+      } else {
+        toast({
+          title: "Clipboard not available",
+          description: `Open ${LOCAL_FORWARDING_ERROR_REPORT_URL} in your browser to view the report.`,
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "Clipboard write failed",
+        description: `Open ${LOCAL_FORWARDING_ERROR_REPORT_URL} manually.`,
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
+
+  const vm = buildForwardingStatusViewModel(fetchState);
+
+  return (
+    <Card data-testid="ecowitt-local-forwarding-widget">
+      <CardHeader>
+        <CardTitle className="text-base">
+          EcoWitt Local Bridge — Forwarding Health
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="space-y-1">
+          <p
+            className="text-sm font-medium"
+            data-testid="ecowitt-local-forwarding-headline"
+          >
+            {vm.headline}
+          </p>
+          {vm.subheadline ? (
+            <p className="text-xs text-muted-foreground">{vm.subheadline}</p>
+          ) : null}
+        </div>
+
+        {vm.state === "ready" && vm.rows.length > 0 ? (
+          <dl
+            className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs"
+            data-testid="ecowitt-local-forwarding-rows"
+          >
+            {vm.rows.map((row) => (
+              <Row key={row.key} row={row} />
+            ))}
+          </dl>
+        ) : null}
+
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void refresh()}
+            disabled={busy}
+            data-testid="ecowitt-local-forwarding-refresh"
+          >
+            Refresh
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void handleCopyReport()}
+            data-testid="ecowitt-local-forwarding-copy-report"
+          >
+            Copy sanitized forwarding error report
+          </Button>
+          <a
+            className="text-[11px] text-muted-foreground underline"
+            href={LOCAL_FORWARDING_ERROR_REPORT_URL}
+            target="_blank"
+            rel="noreferrer"
+            data-testid="ecowitt-local-forwarding-report-link"
+          >
+            {LOCAL_FORWARDING_ERROR_REPORT_URL}
+          </a>
+        </div>
+
+        <p className="text-[11px] text-muted-foreground">
+          Widget reads only the local listener on localhost:8787. No tokens,
+          Authorization headers, raw payloads, or .env values are fetched,
+          shown, or copied.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function Row({ row }: { row: ForwardingStatusRow }) {
+  const tone =
+    row.tone === "ok"
+      ? "text-emerald-600 dark:text-emerald-400"
+      : row.tone === "warn"
+        ? "text-amber-600 dark:text-amber-400"
+        : row.tone === "error"
+          ? "text-destructive"
+          : "";
+  return (
+    <div>
+      <dt className="text-muted-foreground">{row.label}</dt>
+      <dd
+        className={`font-medium ${tone}`}
+        data-testid={`ecowitt-local-forwarding-row-${row.key}`}
+      >
+        {row.value}
+      </dd>
+    </div>
+  );
+}

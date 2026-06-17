@@ -26,10 +26,15 @@ import { useTents } from "@/hooks/use-tents";
 import {
   evaluateGgsSentinelReadiness,
   GGS_SENTINEL_METRICS,
+  GGS_METRIC_FRIENDLY_NAME,
+  formatGgsWindowLabel,
   type GgsSentinelEvaluation,
   type GgsSentinelInputRow,
   type GgsSentinelSnapshot,
+  type GgsSentinelMetricFreshness,
 } from "@/lib/ggsSentinelSmokeRunner";
+import { SPIDER_FARMER_GGS_STALE_MS } from "@/lib/spiderFarmerGgsMappingRules";
+
 
 const WINDOW_HOURS = 4;
 
@@ -74,12 +79,14 @@ export default function GgsSentinelSmokeRunnerPanel() {
         state: "BLOCKED_VALIDATION_ERROR",
         checks: [],
         safeMetrics: [],
+        metricFreshness: [],
         snapshot: null,
         passed: false,
       });
     } finally {
       setRunning(false);
     }
+
   }
 
   const passed = evaluation?.passed === true;
@@ -153,6 +160,36 @@ export default function GgsSentinelSmokeRunnerPanel() {
               ))}
             </ul>
 
+            {evaluation.metricFreshness.length > 0 && (
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="text-sm font-medium">Freshness guidance</h3>
+                  <span className="text-xs text-muted-foreground">
+                    Freshness window: {formatGgsWindowLabel(SPIDER_FARMER_GGS_STALE_MS)}
+                  </span>
+                </div>
+                <ul className="divide-y rounded-md border text-sm">
+                  {evaluation.metricFreshness.map((f) => (
+                    <li key={f.metric} className="grid grid-cols-1 gap-1 px-3 py-2 md:grid-cols-[1fr_auto] md:items-center">
+                      <div>
+                        <div className="font-medium">
+                          {GGS_METRIC_FRIENDLY_NAME[f.metric]}{" "}
+                          <span className="text-xs text-muted-foreground">({f.metric})</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {f.capturedAt ? `Captured ${f.ageLabel} · ${f.capturedAt}` : "No recent row"}
+                        </div>
+                        <div className="text-xs">{f.nextActionLabel}</div>
+                      </div>
+                      <FreshnessBadge freshness={f} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+
+
             {evaluation.safeMetrics.length > 0 && (
               <div>
                 <h3 className="mb-2 text-sm font-medium">Latest safe metric summary</h3>
@@ -202,3 +239,12 @@ function CheckBadge({ status }: { status: "pass" | "fail" | "warn" | "skipped" }
   if (status === "warn") return <Badge variant="secondary">warn</Badge>;
   return <Badge variant="outline">skipped</Badge>;
 }
+
+function FreshnessBadge({ freshness }: { freshness: GgsSentinelMetricFreshness }) {
+  const s = freshness.freshnessStatus;
+  if (s === "fresh") return <Badge variant="default">fresh</Badge>;
+  if (s === "aging") return <Badge variant="secondary">fresh but aging</Badge>;
+  if (s === "stale") return <Badge variant="destructive">stale</Badge>;
+  return <Badge variant="outline">missing</Badge>;
+}
+

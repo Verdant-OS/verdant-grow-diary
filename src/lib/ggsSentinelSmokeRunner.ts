@@ -62,6 +62,22 @@ export interface GgsSentinelCheck {
   detail?: string;
 }
 
+export type GgsFreshnessStatus = "fresh" | "aging" | "stale" | "missing";
+
+export interface GgsSentinelMetricFreshness {
+  metric: GgsSentinelMetric;
+  capturedAt: string | null;
+  ageMs: number | null;
+  ageLabel: string;
+  freshnessWindowMs: number;
+  freshnessWindowLabel: string;
+  freshnessStatus: GgsFreshnessStatus;
+  fresh: boolean;
+  stale: boolean;
+  missing: boolean;
+  nextActionLabel: string;
+}
+
 export interface GgsSentinelSafeMetricSummary {
   metric: GgsSentinelMetric;
   value: number;
@@ -69,12 +85,14 @@ export interface GgsSentinelSafeMetricSummary {
   vendor: string | null;
   captured_at: string;
   age_seconds: number;
+  freshness: GgsSentinelMetricFreshness;
 }
 
 export interface GgsSentinelEvaluation {
   state: GgsSentinelState;
   checks: GgsSentinelCheck[];
   safeMetrics: GgsSentinelSafeMetricSummary[];
+  metricFreshness: GgsSentinelMetricFreshness[];
   snapshot: {
     captured_at: string | null;
     source: string | null;
@@ -93,6 +111,99 @@ export interface GgsSentinelEvaluateInput {
   now?: Date;
   /** Freshness threshold; defaults to GGS 15-minute stale window. */
   staleMs?: number;
+}
+
+export const GGS_METRIC_FRIENDLY_NAME: Record<GgsSentinelMetric, string> = {
+  soil_moisture_pct: "soil moisture",
+  ec: "EC",
+  soil_temp_c: "soil temperature",
+};
+
+export function formatGgsAgeLabel(ageMs: number): string {
+  if (!Number.isFinite(ageMs) || ageMs < 0) return "just now";
+  const totalSec = Math.round(ageMs / 1000);
+  if (totalSec < 60) return `${totalSec}s ago`;
+  const totalMin = Math.round(totalSec / 60);
+  if (totalMin < 60) return `${totalMin}m ago`;
+  const hours = Math.floor(totalMin / 60);
+  const mins = totalMin % 60;
+  return mins === 0 ? `${hours}h ago` : `${hours}h ${mins}m ago`;
+}
+
+export function formatGgsWindowLabel(ms: number): string {
+  const mins = Math.round(ms / 60000);
+  return `${mins} min`;
+}
+
+function buildFreshness(
+  metric: GgsSentinelMetric,
+  capturedAt: string | null,
+  now: Date,
+  windowMs: number,
+): GgsSentinelMetricFreshness {
+  const windowLabel = formatGgsWindowLabel(windowMs);
+  if (!capturedAt) {
+    return {
+      metric,
+      capturedAt: null,
+      ageMs: null,
+      ageLabel: "—",
+      freshnessWindowMs: windowMs,
+      freshnessWindowLabel: windowLabel,
+      freshnessStatus: "missing",
+      fresh: false,
+      stale: false,
+      missing: true,
+      nextActionLabel: `Missing — no recent GGS ${GGS_METRIC_FRIENDLY_NAME[metric]} row found.`,
+    };
+  }
+  const t = new Date(capturedAt).getTime();
+  const ageMs = Number.isFinite(t) ? Math.max(0, now.getTime() - t) : Number.POSITIVE_INFINITY;
+  const ageLabel = formatGgsAgeLabel(ageMs);
+  if (ageMs > windowMs) {
+    return {
+      metric,
+      capturedAt,
+      ageMs,
+      ageLabel,
+      freshnessWindowMs: windowMs,
+      freshnessWindowLabel: windowLabel,
+      freshnessStatus: "stale",
+      fresh: false,
+      stale: true,
+      missing: false,
+      nextActionLabel: `Stale — captured ${ageLabel}. Ingest a new real GGS reading to clear live Sentinel.`,
+    };
+  }
+  const aging = ageMs > windowMs * 0.75;
+  if (aging) {
+    return {
+      metric,
+      capturedAt,
+      ageMs,
+      ageLabel,
+      freshnessWindowMs: windowMs,
+      freshnessWindowLabel: windowLabel,
+      freshnessStatus: "aging",
+      fresh: true,
+      stale: false,
+      missing: false,
+      nextActionLabel: `Fresh but aging — captured ${ageLabel}. Recheck soon; stale at ${windowLabel}.`,
+    };
+  }
+  return {
+    metric,
+    capturedAt,
+    ageMs,
+    ageLabel,
+    freshnessWindowMs: windowMs,
+    freshnessWindowLabel: windowLabel,
+    freshnessStatus: "fresh",
+    fresh: true,
+    stale: false,
+    missing: false,
+    nextActionLabel: `Fresh — captured ${ageLabel}. Valid for live Sentinel.`,
+  };
 }
 
 function ageSeconds(capturedAt: string, now: Date): number {
@@ -160,10 +271,14 @@ export function evaluateGgsSentinelReadiness(
       state: "BLOCKED_NO_GGS_ROWS",
       checks,
       safeMetrics: [],
+      metricFreshness: GGS_SENTINEL_METRICS.map((m) =>
+        buildFreshness(m, null, now, staleMs),
+      ),
       snapshot: summarizeSnapshot(input.snapshot, now),
       passed: false,
     };
   }
+
 
   const hasSoilTemp = latestByMetric.has("soil_temp_c");
   checks.push(
@@ -205,6 +320,7 @@ export function evaluateGgsSentinelReadiness(
     if (age * 1000 > staleMs) {
       if (!staleMetric || age > staleMetric.age) staleMetric = { metric, age };
     }
+    const freshness = buildFreshness(metric, row.captured_at, now, staleMs);
     safeMetrics.push({
       metric,
       value: row.value as number,
@@ -212,8 +328,15 @@ export function evaluateGgsSentinelReadiness(
       vendor,
       captured_at: row.captured_at,
       age_seconds: age,
+      freshness,
     });
   }
+
+  const metricFreshness: GgsSentinelMetricFreshness[] = GGS_SENTINEL_METRICS.map((m) => {
+    const found = safeMetrics.find((s) => s.metric === m);
+    return found ? found.freshness : buildFreshness(m, null, now, staleMs);
+  });
+
 
   checks.push(
     check(
@@ -281,10 +404,12 @@ export function evaluateGgsSentinelReadiness(
     state,
     checks,
     safeMetrics,
+    metricFreshness,
     snapshot,
     passed: state === "PASS_LIVE_SENTINEL_READY",
   };
 }
+
 
 function summarizeSnapshot(
   snapshot: GgsSentinelSnapshot | null,

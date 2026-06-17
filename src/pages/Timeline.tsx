@@ -65,7 +65,9 @@ import TimelinePhotoLightbox from "@/components/TimelinePhotoLightbox";
 import TimelineEvidenceDetailDrawer from "@/components/TimelineEvidenceDetailDrawer";
 import { buildTimelineEvidenceDetailViewModel } from "@/lib/timelineEvidenceDetailViewModel";
 import TimelineSensorSourceBadge from "@/components/TimelineSensorSourceBadge";
-import { classifyTimelineSensorSource } from "@/lib/timelineSensorSourceBadgeRules";
+import { classifyTimelineSensorSource, type TimelineSensorSourceKind } from "@/lib/timelineSensorSourceBadgeRules";
+import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
+import { SENSOR_SOURCE_KINDS, SENSOR_SOURCE_SHORT_LABEL } from "@/constants/sensorSourceLabels";
 
 
 
@@ -166,6 +168,7 @@ export default function Timeline() {
   const [eventTypeFilter, setEventTypeFilter] = useState("");
   const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
   const [detailEntryId, setDetailEntryId] = useState<string | null>(null);
+  const [sensorSourceFilter, setSensorSourceFilter] = useState<TimelineSensorSourceKind[]>([]);
 
   async function load() {
     if (!user || !activeGrowId) {
@@ -257,6 +260,7 @@ export default function Timeline() {
     plantId: plantFilter,
     tentId: tentFilter,
     eventType: eventTypeFilter,
+    sensorSources: sensorSourceFilter,
   };
   const evidenceActive = isTimelineEvidenceFilterActive(evidenceFilterInput);
 
@@ -275,6 +279,7 @@ export default function Timeline() {
     plantFilter,
     tentFilter,
     eventTypeFilter,
+    sensorSourceFilter,
   ]);
 
   function clearEvidenceFilters() {
@@ -282,6 +287,13 @@ export default function Timeline() {
     setPlantFilter("");
     setTentFilter("");
     setEventTypeFilter("");
+    setSensorSourceFilter([]);
+  }
+
+  function toggleSensorSource(kind: TimelineSensorSourceKind) {
+    setSensorSourceFilter((cur) =>
+      cur.includes(kind) ? cur.filter((k) => k !== kind) : [...cur, kind],
+    );
   }
 
   // Lightbox navigation list derived from currently visible (filtered)

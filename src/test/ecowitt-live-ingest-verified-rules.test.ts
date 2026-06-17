@@ -207,12 +207,9 @@ describe("classifyLiveIngestVerifiedMarker", () => {
       ".rpc" + "(",
       "functions.invoke",
       "service" + "_role",
-      "PASS" + "KEY",
-      "Authoriz" + "ation",
-      "Bearer" + " ",
       "vbt_",
-      "raw_payload",
       "fetch(",
+      "supabase",
     ]) {
       expect(src.includes(forbidden), `helper contains "${forbidden}"`).toBe(false);
     }

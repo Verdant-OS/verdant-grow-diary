@@ -152,7 +152,7 @@ describe("QuickLogV2Sheet — structured feeding", () => {
     fillRequiredFeedingFields();
     clickSave();
     await waitFor(() =>
-      expect(toastSuccess).toHaveBeenCalledWith("Feeding logged."),
+      expect(toastSuccess).toHaveBeenCalledWith("Feeding logged.", expect.anything()),
     );
     expect(writeFeedingMock).toHaveBeenCalledTimes(1);
     const payload = writeFeedingMock.mock.calls[0][0];

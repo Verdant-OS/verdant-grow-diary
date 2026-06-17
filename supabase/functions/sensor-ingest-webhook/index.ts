@@ -179,20 +179,19 @@ async function handle(req: Request): Promise<Response> {
   const capturedAt = normalized.rows[0].captured_at as string;
   const source = normalized.rows[0].source as string;
 
-  // Stamp user_id from auth (never from the request body) and fold the
-  // Idempotency-Key header (if any) into raw_payload for traceability. The
-  // real dedupe guarantee is the partial unique index
+  // Stamp user_id from auth (never from the request body), remap the
+  // transport/vendor source label to a canonical stored source per the
+  // Verdant sensor-truth contract (e.g. "ecowitt" -> "live"), and fold
+  // the Idempotency-Key header (if any) into raw_payload for
+  // traceability. The real dedupe guarantee is the partial unique index
   // `sensor_readings_dedupe_uidx` enforced atomically by Postgres.
-  const toInsert = normalized.rows.map((r) => {
-    const raw = (r as { raw_payload?: Record<string, unknown> }).raw_payload ?? {};
-    return {
-      ...r,
-      user_id: auth.userId,
-      raw_payload: idempotencyKey
-        ? ({ ...raw, idempotency_key: idempotencyKey } as unknown as typeof r.raw_payload)
-        : (r.raw_payload as typeof r.raw_payload),
-    };
-  });
+  const toInsert = normalized.rows.map((r) =>
+    buildStoredRow({
+      row: r as unknown as Record<string, unknown>,
+      userId: auth.userId,
+      idempotencyKey,
+    }),
+  );
 
   // Atomic upsert: ON CONFLICT (user_id, tent_id, source, metric, captured_at)
   // DO NOTHING. Concurrent identical POSTs cannot create duplicates.
@@ -205,14 +204,20 @@ async function handle(req: Request): Promise<Response> {
     .select("id");
 
   if (insErr) {
-    // Never leak PG error text, constraint names, payload values, tokens,
-    // bridge ids, secrets, or internal table names. Log internally only.
+    // Classify into a stable, sanitized reason code. Never leak raw PG
+    // error text, constraint names, payload values, tokens, bridge ids,
+    // secrets, or internal table names.
+    const reason = classifyInsertError(
+      insErr as { code?: string | null; message?: string | null },
+    );
     safeLog("insert_failed", {
       auth_kind: auth.kind,
       tent_id_present: !!payloadTentId,
+      reason,
     });
-    return json(req, { error: "insert_failed" }, 400);
+    return json(req, { error: "insert_failed", reason }, 400);
   }
+
 
 
   const insertedCount = upserted?.length ?? 0;

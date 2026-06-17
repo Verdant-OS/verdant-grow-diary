@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, ShieldOff } from "lucide-react";
 import GgsRealPayloadIngestPanel from "@/components/GgsRealPayloadIngestPanel";
+import GgsSentinelSmokeRunnerPanel from "@/components/GgsSentinelSmokeRunnerPanel";
 import { useHasRole } from "@/hooks/useHasRole";
 
 export default function OperatorGgsRealPayloadIngest() {
@@ -71,7 +72,12 @@ export default function OperatorGgsRealPayloadIngest() {
         </Alert>
       )}
 
-      {role.status === "granted" && <GgsRealPayloadIngestPanel />}
+      {role.status === "granted" && (
+        <>
+          <GgsRealPayloadIngestPanel />
+          <GgsSentinelSmokeRunnerPanel />
+        </>
+      )}
     </div>
   );
 }

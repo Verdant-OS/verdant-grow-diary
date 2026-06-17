@@ -21,23 +21,58 @@ import {
 } from "./auth.ts";
 
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+// Centralized CORS handling. Allowed origins are explicit — no wildcard is
+// returned when an Authorization or bridge token may be present. Every
+// response path (success, auth failure, validation failure, method not
+// allowed, malformed JSON, unexpected error) MUST include these headers so
+// the browser surfaces real HTTP statuses instead of collapsing to status 0.
+const ALLOWED_ORIGINS = new Set<string>([
+  "https://verdantgrowdiary.com",
+  "https://www.verdantgrowdiary.com",
+  "https://verdantgrowdiary-com.lovable.app",
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://localhost:8080",
+]);
 
-function json(body: unknown, status: number) {
+function buildCorsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("origin") ?? "";
+  const allowOrigin = ALLOWED_ORIGINS.has(origin)
+    ? origin
+    : "https://verdantgrowdiary.com";
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers":
+      "authorization, content-type, apikey, x-client-info, x-verdant-bridge-token, x-verdant-tent-id, idempotency-key",
+    "Access-Control-Max-Age": "86400",
+    "Vary": "Origin",
+  };
+}
+
+function json(req: Request, body: unknown, status: number) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...buildCorsHeaders(req), "Content-Type": "application/json" },
   });
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+  // OPTIONS preflight: respond before auth, body parsing, or DB lookups.
+  // No bridge token required. No telemetry classification. No writes.
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: buildCorsHeaders(req) });
+  }
+  try {
+    return await handle(req);
+  } catch (_err) {
+    // Never leak error text, stack traces, tokens, or PG details.
+    return json(req, { error: "internal_error" }, 500);
+  }
+});
+
+async function handle(req: Request): Promise<Response> {
+  if (req.method !== "POST") return json(req, { error: "method_not_allowed" }, 405);
 
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) return json({ error: "unauthorized" }, 401);

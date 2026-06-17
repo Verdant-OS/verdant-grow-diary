@@ -62,10 +62,88 @@ import {
   PLANT_DETAIL_LOAD_TIMEOUT_MS,
   classifyPlantDetailLoadState,
 } from "@/lib/plantDetailLoadTimeoutRules";
+import {
+  derivePlantDetailBlockedStateView,
+  type PlantDetailBlockedStateAction,
+  type PlantDetailBlockedStateView,
+} from "@/lib/plantDetailBlockedStateViewModel";
+import { useSearchParams } from "react-router-dom";
+
+function BlockedStateBackLink({
+  action,
+}: {
+  action: PlantDetailBlockedStateAction;
+}) {
+  return (
+    <Button asChild variant="ghost" className="min-h-11">
+      <Link to={action.path} data-testid={action.testId}>
+        <ArrowLeft className="h-4 w-4" /> {action.label}
+      </Link>
+    </Button>
+  );
+}
+
+function BlockedStateView({
+  view,
+  onRetry,
+}: {
+  view: PlantDetailBlockedStateView;
+  onRetry?: () => void;
+}) {
+  const isMissingLike =
+    view.kind === "not-found" || view.kind === "archived";
+  return (
+    <div
+      data-testid={view.testId}
+      role={view.kind === "loading-slow" ? "alert" : undefined}
+    >
+      <EmptyState
+        icon={
+          isMissingLike ? (
+            view.kind === "archived" ? (
+              <Archive className="h-6 w-6" />
+            ) : (
+              <Sprout className="h-6 w-6" />
+            )
+          ) : (
+            <AlertTriangle className="h-6 w-6" />
+          )
+        }
+        title={view.title}
+        description={view.description}
+        action={
+          <div className="flex flex-wrap gap-2">
+            {view.showRetry && onRetry && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onRetry}
+                data-testid={
+                  view.kind === "loading-slow"
+                    ? "plant-detail-loading-slow-retry"
+                    : "plant-detail-error-retry"
+                }
+                className="min-h-11"
+              >
+                Retry
+              </Button>
+            )}
+            <BlockedStateBackLink action={view.primaryBack} />
+            {view.secondaryBack && (
+              <BlockedStateBackLink action={view.secondaryBack} />
+            )}
+          </div>
+        }
+      />
+    </div>
+  );
+}
 
 export default function PlantDetail() {
   const [quickLogOpen, setQuickLogOpen] = useState(false);
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const contextTentId = searchParams.get("tentId");
   const { data: plant, isLoading, isError, refetch } = useGrowPlant(id);
   const { data: tent } = useGrowTent(plant?.tentId);
   const plantMeta = getGrowDataMeta(["grow", "plant", id ?? null]);
@@ -97,6 +175,12 @@ export default function PlantDetail() {
     loadTimedOut,
   });
 
+  const blockedView = derivePlantDetailBlockedStateView({
+    loadState,
+    plant: plant ?? null,
+    contextTentId,
+  });
+
   if (loadState === "loading") {
     return (
       <div
@@ -108,69 +192,24 @@ export default function PlantDetail() {
       />
     );
   }
-  if (loadState === "loading-slow") {
+
+  if (blockedView && blockedView.kind === "loading-slow") {
     return (
-      <div data-testid="plant-detail-loading-slow" role="alert">
-        <EmptyState
-          icon={<AlertTriangle className="h-6 w-6" />}
-          title="Still loading this plant"
-          description="Loading is taking longer than expected. Check your connection and retry, or head back to your plants."
-          action={
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setLoadTimedOut(false);
-                  void refetch();
-                }}
-                data-testid="plant-detail-loading-slow-retry"
-                className="min-h-11"
-              >
-                Retry
-              </Button>
-              <Button asChild variant="ghost" className="min-h-11">
-                <Link to={plantsPath()}>
-                  <ArrowLeft className="h-4 w-4" /> Back to plants
-                </Link>
-              </Button>
-            </div>
-          }
-        />
-      </div>
+      <BlockedStateView
+        view={blockedView}
+        onRetry={() => {
+          setLoadTimedOut(false);
+          void refetch();
+        }}
+      />
     );
   }
 
-  if (isError) {
-    return (
-      <div data-testid="plant-detail-error">
-        <EmptyState
-          icon={<AlertTriangle className="h-6 w-6" />}
-          title="Couldn't load this plant"
-          description="Something went wrong while loading plant details. Check your connection and retry."
-          action={
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => refetch()}
-                data-testid="plant-detail-error-retry"
-                className="min-h-11"
-              >
-                Retry
-              </Button>
-              <Button asChild variant="ghost" className="min-h-11">
-                <Link to={plantsPath()}>
-                  <ArrowLeft className="h-4 w-4" /> Back to plants
-                </Link>
-              </Button>
-            </div>
-          }
-        />
-      </div>
-    );
+  if (blockedView && blockedView.kind === "error") {
+    return <BlockedStateView view={blockedView} onRetry={() => refetch()} />;
   }
-  if (!plant) {
+
+  if (blockedView && blockedView.kind === "not-found") {
     return (
       <div>
         <GrowDataSourceDisclosure
@@ -179,21 +218,24 @@ export default function PlantDetail() {
           metas={[plantMeta]}
           testId="plant-detail-data-source-disclosure"
         />
-        <EmptyState
-          icon={<Sprout className="h-6 w-6" />}
-          title="Plant not found"
-          description="This plant isn't in your tracked plants yet."
-          action={
-            <Button asChild variant="outline" className="min-h-11">
-              <Link to={plantsPath()}>
-                <ArrowLeft className="h-4 w-4" /> Back to plants
-              </Link>
-            </Button>
-          }
-        />
+        <BlockedStateView view={blockedView} />
       </div>
     );
   }
+
+  if (blockedView && blockedView.kind === "archived") {
+    return (
+      <div>
+        <PlantDetailDataSourceDisclosure
+          metas={[plantMeta, tentMeta]}
+          testId="plant-detail-data-source-disclosure"
+        />
+        <BlockedStateView view={blockedView} />
+      </div>
+    );
+  }
+
+
 
   const ageDays = Math.floor((Date.now() - new Date(plant.startedAt).getTime()) / 86400000);
   return (

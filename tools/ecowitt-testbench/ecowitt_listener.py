@@ -385,6 +385,9 @@ _WEBHOOK_ERROR_CLASSIFICATIONS = {
     "invalid_payload": "payload_shape_mismatch",
     "invalid_json": "payload_shape_mismatch",
     "unauthorized": "auth_failed",
+    "token_revoked": "token_revoked",
+    "token_expired": "token_expired",
+    "auth_lookup_failed": "auth_lookup_failed",
     "forbidden_tent": "tent_authorization_mismatch",
     "tent_lookup_failed": "tent_lookup_failed",
     "insert_failed": "storage_insert_failed",
@@ -1183,6 +1186,18 @@ _RECOMMENDED_NEXT_STEP: Dict[str, str] = {
     "auth_failed": (
         "Bridge token rejected. Re-check VERDANT_BRIDGE_TOKEN in .env "
         "(do not paste it anywhere) and restart the listener."
+    ),
+    "token_revoked": (
+        "Bridge token was revoked. Generate or paste a new active bridge token, "
+        "update .env, restart the listener, and retry one forward."
+    ),
+    "token_expired": (
+        "Bridge token has expired. Generate a new active bridge token, "
+        "update .env, restart the listener, and retry one forward."
+    ),
+    "auth_lookup_failed": (
+        "Webhook could not look up the bridge token. Retry shortly; "
+        "if it persists, share the sanitized report only."
     ),
     "tent_authorization_mismatch": (
         "The bridge token is not authorized for this tent. Verify "

@@ -348,10 +348,18 @@ class ForwardErrorSanitizationTests(unittest.TestCase):
             ("tent_lookup_failed", "tent_lookup_failed"),
             ("insert_failed", "storage_insert_failed"),
             ("unauthorized", "auth_failed"),
+            ("token_revoked", "token_revoked"),
+            ("token_expired", "token_expired"),
+            ("auth_lookup_failed", "auth_lookup_failed"),
         ]:
             r = summarize_forward_response(_FakeResp(400, {"error": err}))
             self.assertEqual(r["error"], err)
             self.assertEqual(r["classification"], cls)
+            self.assertNotEqual(
+                r["classification"],
+                "unknown_webhook_error",
+                f"{err} must not classify as unknown_webhook_error",
+            )
 
 
 class RetryBehaviorTests(unittest.TestCase):
@@ -497,6 +505,45 @@ class ForwardingErrorReportEndpointTests(unittest.TestCase):
         body = resp.get_json()
         self.assertFalse(body["forwarding_ready"])
         self.assertIn("VERDANT_TENT_ID", body["recommended_next_step"])
+
+    def test_report_token_revoked_recommendation(self):
+        env = _full_env(VERDANT_BRIDGE_TOKEN="vbt_" + ("Z" * 30))
+        with mock.patch.dict(os.environ, env, clear=False):
+            FORWARD_STATS["last_status"] = 401
+            FORWARD_STATS["last_error"] = "http_401"
+            FORWARD_STATS["last_forward_response_error"] = "token_revoked"
+            FORWARD_STATS["last_forward_response_classification"] = "token_revoked"
+            FORWARD_STATS["last_forward_response_message"] = None
+            resp = self.client.get(
+                "/debug/forwarding-error-report",
+                environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+            )
+        self.assertEqual(resp.status_code, 200)
+        body = resp.get_json()
+        self.assertEqual(body["last_forward_response_classification"], "token_revoked")
+        self.assertNotEqual(
+            body["last_forward_response_classification"], "unknown_webhook_error"
+        )
+        step = body["recommended_next_step"]
+        lower = step.lower()
+        self.assertIn("revoked", lower)
+        self.assertIn("new active bridge token", lower)
+        self.assertIn(".env", lower)
+        self.assertIn("restart the listener", lower)
+        self.assertNotIn("unrecognized webhook error", lower)
+        # never recommend editing DB rows directly
+        self.assertNotIn("database", lower)
+        self.assertNotIn("sql", lower)
+        self.assertNotIn("update bridge_tokens", lower)
+        # no token-like substring anywhere in the report body
+        text = resp.get_data(as_text=True)
+        import re as _re
+        self.assertIsNone(
+            _re.search(r"vbt_[A-Za-z0-9_\-]{6,}", text),
+            f"token-like substring leaked: {text[:200]}",
+        )
+        self.assertNotIn("Authorization", text)
+        self.assertNotIn("Bearer ", text)
 
 
 if __name__ == "__main__":

@@ -65,6 +65,10 @@ function pickArrayLen(obj: unknown, key: string): number {
 export const SANITIZED_WEBHOOK_ERROR_COPY: Record<string, string> = {
   unauthorized:
     "Bridge token or Authorization header was rejected. Recheck the token value in the local bridge .env; do not paste it into the browser.",
+  token_revoked:
+    "Bridge token was revoked. Generate or paste a new active bridge token, update .env, restart the listener, and retry one forward.",
+  token_expired:
+    "Bridge token has expired. Generate a new active bridge token, update .env, restart the listener, and retry one forward.",
   server_misconfigured:
     "The ingest function is missing required server-side configuration.",
   invalid_json: "The request body was not valid JSON.",
@@ -144,9 +148,11 @@ export function classifySensorIngestTestResult(
     return {
       category: "auth_problem",
       headline: "HTTP 401 — auth / token problem",
-      detail: reason
-        ? `Token rejected (${reason}). Mint a fresh tent-scoped bridge token and retry.`
-        : "Bridge token missing, revoked, or expired. Mint a new one and retry.",
+      detail: codeCopy
+        ? codeCopy
+        : reason
+          ? `Token rejected (${reason}). Mint a fresh tent-scoped bridge token and retry.`
+          : "Bridge token missing, revoked, or expired. Mint a new one and retry.",
       isSuccess: false,
       corsWorking: true,
     };

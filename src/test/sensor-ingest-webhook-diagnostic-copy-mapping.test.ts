@@ -14,6 +14,8 @@ import {
 
 const EXPECTED_CODES = [
   "unauthorized",
+  "token_revoked",
+  "token_expired",
   "server_misconfigured",
   "invalid_json",
   "invalid_payload",
@@ -22,6 +24,7 @@ const EXPECTED_CODES = [
   "insert_failed",
   "method_not_allowed",
   "internal_error",
+  "auth_lookup_failed",
 ];
 
 describe("SANITIZED_WEBHOOK_ERROR_COPY — every webhook code has copy", () => {
@@ -41,10 +44,10 @@ describe("SANITIZED_WEBHOOK_ERROR_COPY — every webhook code has copy", () => {
 });
 
 describe("classifySensorIngestTestResult — copy/category coverage", () => {
-  it("401 unauthorized is auth_problem with reason echoed (sanitized)", () => {
+  it("401 unauthorized is auth_problem with sanitized copy", () => {
     const r = classifySensorIngestTestResult({ status: 401, body: { error: "unauthorized" } });
     expect(r.category).toBe("auth_problem");
-    expect(r.detail).toContain("unauthorized");
+    expect(r.detail.toLowerCase()).toContain("bridge token");
     expect(r.corsWorking).toBe(true);
   });
 
@@ -61,6 +64,35 @@ describe("classifySensorIngestTestResult — copy/category coverage", () => {
     });
     expect(r.corsWorking).toBe(true);
     expect(r.detail).not.toMatch(/Bearer/i);
+  });
+
+  it("401 token_revoked maps to revoked-token copy (not unknown)", () => {
+    const r = classifySensorIngestTestResult({
+      status: 401,
+      body: { error: "token_revoked" },
+    });
+    expect(r.category).toBe("auth_problem");
+    expect(r.detail.toLowerCase()).toContain("revoked");
+    expect(r.detail.toLowerCase()).toContain("new active bridge token");
+    expect(r.detail.toLowerCase()).toContain(".env");
+    expect(r.detail.toLowerCase()).toContain("restart the listener");
+    expect(r.detail.toLowerCase()).not.toContain("unrecognized");
+    expect(r.detail.toLowerCase()).not.toContain("unknown_webhook_error");
+    // never echoes raw token shapes or Authorization headers
+    expect(r.detail).not.toMatch(/vbt_[A-Za-z0-9]/);
+    expect(r.detail).not.toMatch(/Bearer\s+\S+/i);
+    expect(r.detail.toLowerCase()).not.toContain("authorization:");
+    expect(r.detail.toLowerCase()).not.toContain("database");
+  });
+
+  it("401 token_expired maps to expired-token copy", () => {
+    const r = classifySensorIngestTestResult({
+      status: 401,
+      body: { error: "token_expired" },
+    });
+    expect(r.category).toBe("auth_problem");
+    expect(r.detail.toLowerCase()).toContain("expired");
+    expect(r.detail.toLowerCase()).toContain("new active bridge token");
   });
 });
 

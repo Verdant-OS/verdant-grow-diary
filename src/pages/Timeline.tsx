@@ -62,6 +62,8 @@ import {
   buildTimelinePhotoAltText,
 } from "@/lib/timelinePhotoLightboxRules";
 import TimelinePhotoLightbox from "@/components/TimelinePhotoLightbox";
+import TimelineEvidenceDetailDrawer from "@/components/TimelineEvidenceDetailDrawer";
+import { buildTimelineEvidenceDetailViewModel } from "@/lib/timelineEvidenceDetailViewModel";
 
 
 
@@ -161,6 +163,7 @@ export default function Timeline() {
   const [tentFilter, setTentFilter] = useState("");
   const [eventTypeFilter, setEventTypeFilter] = useState("");
   const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
+  const [detailEntryId, setDetailEntryId] = useState<string | null>(null);
 
   async function load() {
     if (!user || !activeGrowId) {
@@ -654,7 +657,20 @@ export default function Timeline() {
                           <ImageIcon className="h-8 w-8" />
                         </div>
                       )}
-                      <div className="p-4">
+                      <div
+                        className="p-4 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        role="button"
+                        tabIndex={0}
+                        data-testid="timeline-entry-body"
+                        aria-label="Open entry details"
+                        onClick={() => setDetailEntryId(e.id)}
+                        onKeyDown={(ev) => {
+                          if (ev.key === "Enter" || ev.key === " ") {
+                            ev.preventDefault();
+                            setDetailEntryId(e.id);
+                          }
+                        }}
+                      >
                         {(() => {
                           const et = getEventType((e.details?.event_type as string | undefined) ?? null);
                           const Icon = et.icon;
@@ -681,7 +697,7 @@ export default function Timeline() {
                                 <span title={format(new Date(e.entry_at), "PPpp")}>{formatDistanceToNow(new Date(e.entry_at), { addSuffix: true })}</span>
                                 <button
                                   type="button"
-                                  onClick={() => setEditingId(e.id)}
+                                  onClick={(ev) => { ev.stopPropagation(); setEditingId(e.id); }}
                                   aria-label="Edit entry"
                                   className="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition"
                                 >
@@ -787,6 +803,25 @@ export default function Timeline() {
           onNavigate={(i) => setLightboxPhotoId(lightboxItems[i]?.id ?? null)}
         />
       )}
+      <TimelineEvidenceDetailDrawer
+        open={!!detailEntryId}
+        viewModel={(() => {
+          const row = entries.find((r) => r.id === detailEntryId);
+          return row
+            ? buildTimelineEvidenceDetailViewModel({
+                id: row.id,
+                note: row.note,
+                photo_url: row.photo_url,
+                stage: row.stage,
+                entry_at: row.entry_at,
+                plant_id: row.plant_id,
+                tent_id: row.tent_id,
+                details: row.details,
+              })
+            : null;
+        })()}
+        onClose={() => setDetailEntryId(null)}
+      />
     </div>
   );
 }

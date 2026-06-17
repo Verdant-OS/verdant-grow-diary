@@ -148,6 +148,10 @@ export default function Timeline() {
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [plantFilter, setPlantFilter] = useState("");
+  const [tentFilter, setTentFilter] = useState("");
+  const [eventTypeFilter, setEventTypeFilter] = useState("");
 
   async function load() {
     if (!user || !activeGrowId) {

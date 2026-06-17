@@ -236,6 +236,7 @@ export function isTimelineEvidenceFilterActive(
   if (input.plantId && input.plantId.trim() !== "") return true;
   if (input.tentId && input.tentId.trim() !== "") return true;
   if (input.eventType && input.eventType.trim() !== "") return true;
+  if (Array.isArray(input.sensorSources) && input.sensorSources.length > 0) return true;
   return false;
 }
 

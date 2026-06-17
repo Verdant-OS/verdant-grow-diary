@@ -67,16 +67,18 @@ export function buildPlantSensorSourceReadings(
   for (const r of rows) {
     const snap = extractSnapshot(r.details);
     if (!snap) continue;
-    // Fall back to the diary entry's own captured time when the snapshot
-    // omits ts, so date-range filtering still works.
+    // Quick Log snapshots with no explicit source are intrinsically
+    // grower-entered → inject "manual" so unknown/unrecognised explicit
+    // source strings can still be surfaced as "invalid" downstream.
     out.push({
-      source: snap.source,
+      source: snap.source ?? "manual",
       captured_at: snap.captured_at ?? r.entry_at ?? null,
       ts: r.entry_at,
     });
   }
   return out;
 }
+
 
 export const PLANT_SENSOR_SOURCE_HISTORY_LIMIT = 200;
 

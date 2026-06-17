@@ -243,6 +243,46 @@ describe("Timeline filter + lightbox integration", () => {
   });
 });
 
+/**
+ * Shared static-safety helpers used by the Timeline guard tests.
+ *
+ * Browser URL/query-param mutation (URLSearchParams.delete()) is allowed —
+ * it is not a Verdant write path. Supabase/client destructive deletes such
+ * as `supabase.from("x").delete()` MUST remain blocked. Do not broaden
+ * `filterAppDeleteCalls` back into a raw `\.delete\(` scan.
+ */
+const URL_PARAM_DELETE_NAMES =
+  /^(next|prev|sp|params|searchParams|urlParams|query|qs)$/i;
+const SUPABASE_CHAIN_DELETE = /\.from\([^)]*\)[\s\S]{0,200}?\.delete\(/;
+function filterAppDeleteCalls(source: string): string[] {
+  return [...source.matchAll(/([A-Za-z_$][\w$]*)\.delete\(/g)]
+    .filter(([, name]) => !URL_PARAM_DELETE_NAMES.test(name))
+    .map((m) => m[0]);
+}
+
+describe("Timeline static-safety guard — URL param allowlist", () => {
+  it("allows URLSearchParams.delete() in browser URL sync code", () => {
+    const sample = `
+      const next = new URLSearchParams(searchParams);
+      next.delete("sensorSources");
+      searchParams.delete("from");
+    `;
+    expect(filterAppDeleteCalls(sample)).toEqual([]);
+    expect(sample).not.toMatch(SUPABASE_CHAIN_DELETE);
+  });
+
+  it("still flags Supabase .from(...).delete() destructive writes", () => {
+    const bad = `await supabase.from("sensor_readings").delete().eq("id", id);`;
+    expect(filterAppDeleteCalls(bad)).not.toEqual([]);
+    expect(bad).toMatch(SUPABASE_CHAIN_DELETE);
+  });
+
+  it("still flags arbitrary client/table .delete() calls", () => {
+    const bad = `client.delete({ id: 1 });`;
+    expect(filterAppDeleteCalls(bad)).toEqual(["client.delete("]);
+  });
+});
+
 describe("Timeline page source — anchor + label + leak guards", () => {
   const TIMELINE = readFileSync(join(process.cwd(), "src/pages/Timeline.tsx"), "utf8");
 

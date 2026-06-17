@@ -52,10 +52,14 @@ describe("TimelinePhotoLightbox", () => {
   });
 
   it("hides Previous at first and Next at last", () => {
-    const { rerender } = render(<Harness start={0} />);
+    const { rerender } = render(
+      <TimelinePhotoLightbox items={ITEMS} activeIndex={0} onClose={() => {}} onNavigate={() => {}} />,
+    );
     expect(screen.queryByTestId("timeline-photo-lightbox-prev")).toBeNull();
     expect(screen.getByTestId("timeline-photo-lightbox-next")).toBeTruthy();
-    rerender(<Harness start={ITEMS.length - 1} />);
+    rerender(
+      <TimelinePhotoLightbox items={ITEMS} activeIndex={ITEMS.length - 1} onClose={() => {}} onNavigate={() => {}} />,
+    );
     expect(screen.queryByTestId("timeline-photo-lightbox-next")).toBeNull();
     expect(screen.getByTestId("timeline-photo-lightbox-prev")).toBeTruthy();
   });

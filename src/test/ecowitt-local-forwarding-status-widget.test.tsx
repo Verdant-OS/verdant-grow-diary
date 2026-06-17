@@ -288,7 +288,7 @@ describe("EcowittLocalForwardingStatusWidget", () => {
     ).toHaveTextContent("insert_source_constraint_failed");
     expect(
       screen.getByTestId("ecowitt-local-forwarding-banner-next-step"),
-    ).toHaveTextContent(/stored canonical source remap/i);
+    ).toHaveTextContent(/remapped to stored source "live"/i);
     expect(
       screen.getByTestId("ecowitt-local-forwarding-banner-report-link"),
     ).toHaveAttribute("href", "http://localhost:8787/debug/forwarding-error-report");

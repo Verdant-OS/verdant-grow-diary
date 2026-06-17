@@ -547,6 +547,149 @@ class ForwardingErrorReportEndpointTests(unittest.TestCase):
         self.assertNotIn("Bearer ", text)
 
 
+class InsertFailedReasonCaptureTests(unittest.TestCase):
+    def setUp(self):
+        _reset_stats()
+        self.client = app.test_client()
+
+    def _post_insert_failed(self, reason, **extra_body):
+        body = {"error": "insert_failed"}
+        if reason is not None:
+            body["reason"] = reason
+        body.update(extra_body)
+        with mock.patch.dict(os.environ, _full_env(), clear=False):
+            with mock.patch("ecowitt_listener.requests") as fake_requests:
+                fake_requests.post.return_value = _FakeResp(400, body)
+                maybe_forward({"captured_at": "x", "metrics": {"temp_f": 70.0}})
+
+    def test_summarize_captures_known_reason(self):
+        r = summarize_forward_response(
+            _FakeResp(400, {"error": "insert_failed", "reason": "insert_check_failed"})
+        )
+        self.assertEqual(r["error"], "insert_failed")
+        self.assertEqual(r["classification"], "storage_insert_failed")
+        self.assertEqual(r["reason"], "insert_check_failed")
+
+    def test_summarize_collapses_unknown_reason(self):
+        r = summarize_forward_response(
+            _FakeResp(400, {"error": "insert_failed", "reason": "something_weird"})
+        )
+        self.assertEqual(r["reason"], "insert_unknown")
+
+    def test_summarize_handles_missing_reason(self):
+        r = summarize_forward_response(_FakeResp(400, {"error": "insert_failed"}))
+        self.assertIsNone(r["reason"])
+
+    def test_summarize_redacts_token_like_reason(self):
+        leaky = "Bearer vbt_" + ("Q" * 30)
+        r = summarize_forward_response(
+            _FakeResp(400, {"error": "insert_failed", "reason": leaky})
+        )
+        # Reason must collapse to insert_unknown and never echo the token
+        self.assertEqual(r["reason"], "insert_unknown")
+        import json as _json
+        dumped = _json.dumps(r, default=str)
+        self.assertNotIn("vbt_", dumped)
+        self.assertNotIn("Bearer", dumped)
+
+    def test_forward_status_exposes_reason(self):
+        self._post_insert_failed("insert_source_constraint_failed")
+        resp = self.client.get(
+            "/debug/forwarding-status",
+            environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+        )
+        body = resp.get_json()
+        self.assertEqual(
+            body["last_forward_response_reason"], "insert_source_constraint_failed"
+        )
+
+    def test_error_report_exposes_reason(self):
+        self._post_insert_failed("insert_check_failed")
+        resp = self.client.get(
+            "/debug/forwarding-error-report",
+            environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+        )
+        body = resp.get_json()
+        self.assertEqual(body["last_forward_response_reason"], "insert_check_failed")
+        self.assertIn("check constraint", body["recommended_next_step"].lower())
+
+    def test_reason_specific_recommendations(self):
+        cases = [
+            (
+                "insert_required_field_missing",
+                ["required db field is missing", "share the sanitized report"],
+            ),
+            (
+                "insert_source_constraint_failed",
+                ["canonical source constraint", "stored source 'live'"],
+            ),
+            (
+                "insert_check_failed",
+                ["check constraint rejected", "share the sanitized report"],
+            ),
+            (
+                "insert_column_mismatch",
+                ["column that does not exist", "schema"],
+            ),
+            (
+                "insert_duplicate",
+                ["duplicate/idempotent reading", "dedupe"],
+            ),
+            (
+                "insert_unknown",
+                ["unknown sanitized reason", "share the sanitized report"],
+            ),
+        ]
+        for reason, expected_fragments in cases:
+            _reset_stats()
+            self._post_insert_failed(reason)
+            resp = self.client.get(
+                "/debug/forwarding-error-report",
+                environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+            )
+            body = resp.get_json()
+            step = body["recommended_next_step"].lower()
+            for frag in expected_fragments:
+                self.assertIn(
+                    frag, step, f"reason={reason} missing '{frag}' in step: {step}"
+                )
+            # Never recommend raw DB edits or SQL
+            self.assertNotIn("update sensor_readings", step)
+            self.assertNotIn("alter table", step)
+
+    def test_reason_field_never_leaks_secrets(self):
+        env = _full_env(VERDANT_BRIDGE_TOKEN="vbt_" + ("Z" * 30))
+        leaky = "PASSKEY=ABC vbt_" + ("Y" * 30) + " Bearer eyJabcdefghij.eyJabcdefghij.signature"
+        with mock.patch.dict(os.environ, env, clear=False):
+            with mock.patch("ecowitt_listener.requests") as fake_requests:
+                fake_requests.post.return_value = _FakeResp(
+                    400, {"error": "insert_failed", "reason": leaky}
+                )
+                maybe_forward({"captured_at": "x", "metrics": {"temp_f": 70.0}})
+            resp = self.client.get(
+                "/debug/forwarding-error-report",
+                environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+            )
+        text = resp.get_data(as_text=True)
+        import re as _re
+        self.assertIsNone(_re.search(r"vbt_[A-Za-z0-9_\-]{6,}", text))
+        self.assertNotIn("PASSKEY=ABC", text)
+        self.assertNotIn("Bearer ", text)
+        self.assertNotIn("eyJabcdefghij", text)
+        body = resp.get_json()
+        self.assertEqual(body["last_forward_response_reason"], "insert_unknown")
+
+    def test_non_json_400_has_no_reason(self):
+        with mock.patch.dict(os.environ, _full_env(), clear=False):
+            with mock.patch("ecowitt_listener.requests") as fake_requests:
+                fake_requests.post.return_value = _FakeResp(
+                    400, json_body=None, text="<html>nginx 400</html>"
+                )
+                maybe_forward({"captured_at": "x", "metrics": {"temp_f": 70.0}})
+        self.assertIsNone(FORWARD_STATS["last_forward_response_reason"])
+
+
 if __name__ == "__main__":
     unittest.main()
+
 

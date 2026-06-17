@@ -260,8 +260,13 @@ export function parseGgsCsvRow(
     }
   }
 
-  // Soil temperature: parse + preserve only. NEVER emit a draft.
+  // Soil temperature: parse + bounds-check. Emit a draft only if the
+  // value is finite and within the same [-20, 80] °C bounds the DB
+  // trigger enforces. Out-of-bounds values are flagged + skipped, never
+  // clamped. The parsed °C value is preserved in raw_payload for audit
+  // regardless of whether a draft was emitted.
   let parsedSoilTempC: number | undefined;
+  let soilTempCEmit: number | null = null;
   const rawTempF = pick(raw, TEMP_F_ALIASES);
   const rawTempC = pick(raw, TEMP_C_ALIASES);
   if (rawTempF !== undefined) {
@@ -270,7 +275,6 @@ export function parseGgsCsvRow(
     else {
       parsedSoilTempC = ((n - 32) * 5) / 9;
       originalUnits.soil_temp_c = "fahrenheit";
-      skipped.add("soil_temp_c");
     }
   } else if (rawTempC !== undefined) {
     const n = toFiniteNumber(rawTempC);
@@ -278,7 +282,17 @@ export function parseGgsCsvRow(
     else {
       parsedSoilTempC = n;
       originalUnits.soil_temp_c = "celsius";
+    }
+  }
+  if (parsedSoilTempC !== undefined) {
+    if (
+      parsedSoilTempC < GGS_SOIL_TEMP_C_MIN ||
+      parsedSoilTempC > GGS_SOIL_TEMP_C_MAX
+    ) {
+      warnings.add("soil_temp_out_of_range");
       skipped.add("soil_temp_c");
+    } else {
+      soilTempCEmit = parsedSoilTempC;
     }
   }
 
@@ -316,6 +330,18 @@ export function parseGgsCsvRow(
       raw_payload,
     });
   }
+  if (canEmit && soilTempCEmit !== null) {
+    drafts.push({
+      metric: "soil_temp_c",
+      value: soilTempCEmit,
+      source: "csv",
+      captured_at: capturedAt,
+      tent_id,
+      device_id: sensorId,
+      raw_payload,
+    });
+  }
+
 
   const source: GgsCsvSource = drafts.length > 0 ? "csv" : "invalid";
 

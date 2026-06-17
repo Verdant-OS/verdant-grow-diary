@@ -175,7 +175,7 @@ jobs:
       # NOT replace the full suite above. See
       # src/test/support/scannerGuardrailHarness.ts.
       - name: Scanner guardrail timeout sentinel
-        run: bun run test:scanner-guardrails
+        run: bun run test:scanner-guardrails:ci
 
       - name: Upload scanner guardrail slow-test report
         if: always()

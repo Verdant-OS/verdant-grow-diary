@@ -54,10 +54,14 @@ import { format, formatDistanceToNow } from "date-fns";
 
 import PlantQuickLog from "@/components/PlantQuickLog";
 import PlantManualSensorFreshnessCard from "@/components/PlantManualSensorFreshnessCard";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Zap } from "lucide-react";
 
 import { logsPath, plantDetailPath, plantsPath, tentDetailPath } from "@/lib/routes";
+import {
+  PLANT_DETAIL_LOAD_TIMEOUT_MS,
+  classifyPlantDetailLoadState,
+} from "@/lib/plantDetailLoadTimeoutRules";
 
 export default function PlantDetail() {
   const [quickLogOpen, setQuickLogOpen] = useState(false);
@@ -67,7 +71,33 @@ export default function PlantDetail() {
   const plantMeta = getGrowDataMeta(["grow", "plant", id ?? null]);
   const tentMeta = getGrowDataMeta(["grow", "tent", plant?.tentId ?? null]);
 
-  if (isLoading) {
+  // Bounded-loading guard: if the plant query never settles (slow network,
+  // hung Supabase request, etc.) we must not leave the grower on a blank
+  // skeleton. After PLANT_DETAIL_LOAD_TIMEOUT_MS, promote the loading
+  // state to a retryable failure surface. Reset whenever the id changes
+  // or the query is no longer pending.
+  const [loadTimedOut, setLoadTimedOut] = useState(false);
+  useEffect(() => {
+    if (!isLoading) {
+      setLoadTimedOut(false);
+      return;
+    }
+    setLoadTimedOut(false);
+    const handle = setTimeout(
+      () => setLoadTimedOut(true),
+      PLANT_DETAIL_LOAD_TIMEOUT_MS,
+    );
+    return () => clearTimeout(handle);
+  }, [id, isLoading]);
+
+  const loadState = classifyPlantDetailLoadState({
+    isLoading,
+    isError,
+    hasPlant: !!plant,
+    loadTimedOut,
+  });
+
+  if (loadState === "loading") {
     return (
       <div
         role="status"
@@ -78,6 +108,39 @@ export default function PlantDetail() {
       />
     );
   }
+  if (loadState === "loading-slow") {
+    return (
+      <div data-testid="plant-detail-loading-slow" role="alert">
+        <EmptyState
+          icon={<AlertTriangle className="h-6 w-6" />}
+          title="Still loading this plant"
+          description="Loading is taking longer than expected. Check your connection and retry, or head back to your plants."
+          action={
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setLoadTimedOut(false);
+                  void refetch();
+                }}
+                data-testid="plant-detail-loading-slow-retry"
+                className="min-h-11"
+              >
+                Retry
+              </Button>
+              <Button asChild variant="ghost" className="min-h-11">
+                <Link to={plantsPath()}>
+                  <ArrowLeft className="h-4 w-4" /> Back to plants
+                </Link>
+              </Button>
+            </div>
+          }
+        />
+      </div>
+    );
+  }
+
   if (isError) {
     return (
       <div data-testid="plant-detail-error">

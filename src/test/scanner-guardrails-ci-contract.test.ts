@@ -7,11 +7,11 @@
  * Safety: test-tooling only. No production code under test.
  */
 import { describe, it, expect } from "vitest";
-// @ts-expect-error - .mjs without types; helpers are pure JS.
 import {
   validateScannerSlowRow,
   parseAndValidateScannerSlowReport,
   SCANNER_SLOW_THRESHOLD_MS,
+  // @ts-ignore - .mjs without types; helpers are pure JS.
 } from "../../scripts/run-scanner-guardrails-ci.mjs";
 
 const validRow = () => ({

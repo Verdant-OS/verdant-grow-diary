@@ -621,7 +621,27 @@ export default function Timeline() {
                   {group.items.map((e) => (
                     <li key={e.id} className="glass rounded-2xl overflow-hidden animate-fade-in">
                       {e.photo_url ? (
-                        <img src={e.photo_url} className="w-full aspect-[4/3] object-cover" alt="" loading="lazy" />
+                        (() => {
+                          const idx = findTimelinePhotoIndexById(lightboxItems, e.id);
+                          const item = idx >= 0 ? lightboxItems[idx] : null;
+                          const alt = buildTimelinePhotoAltText(item);
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => { if (idx >= 0) setLightboxIndex(idx); }}
+                              aria-label={`Open photo: ${alt}`}
+                              data-testid="timeline-photo-open"
+                              className="block w-full focus:outline-none focus:ring-2 focus:ring-primary/60"
+                            >
+                              <img
+                                src={e.photo_url}
+                                className="w-full aspect-[4/3] object-cover"
+                                alt={alt}
+                                loading="lazy"
+                              />
+                            </button>
+                          );
+                        })()
                       ) : (
                         <div className="w-full aspect-[4/3] bg-secondary/40 flex items-center justify-center text-muted-foreground">
                           <ImageIcon className="h-8 w-8" />

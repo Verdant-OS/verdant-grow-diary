@@ -965,3 +965,52 @@ describe("ecowitt windows testbench — preflight + wrapper + CI artifacts", () 
     expect(workflow).toMatch(/DIR=tools\/ecowitt-testbench/);
   });
 });
+
+describe("ecowitt windows testbench — preflight path-safety regression", () => {
+  const body = readFileSync(join(TESTBENCH_DIR, "preflight-windows.ps1"), "utf-8");
+
+  it("never calls Resolve-Path without -LiteralPath", () => {
+    // Reject `Resolve-Path $x` or `Resolve-Path "..."` style calls.
+    // Every Resolve-Path call must use -LiteralPath.
+    const calls = body.match(/Resolve-Path\b[^\r\n]*/g) || [];
+    for (const c of calls) {
+      expect(c, `Resolve-Path call must use -LiteralPath: ${c}`).toMatch(/-LiteralPath/);
+    }
+  });
+
+  it("uses Test-Path -LiteralPath for filesystem probes", () => {
+    expect(body).toMatch(/Test-Path -LiteralPath/);
+    // The fragile pattern from the bug — `Resolve-Path $c` — must not return.
+    expect(body).not.toMatch(/Resolve-Path\s+\$[A-Za-z_]/);
+  });
+
+  it("guards Resolve-Path with Test-Path via a safe helper", () => {
+    expect(body).toMatch(/function\s+Get-SafePath/);
+    expect(body).toMatch(/\$PSScriptRoot/);
+  });
+
+  it("still checks all expected kit + repo files", () => {
+    for (const f of [
+      ".env.example",
+      "ecowitt_listener.py",
+      "requirements.txt",
+      "send-demo-payload-windows.ps1",
+      "setup-windows.ps1",
+      "start-listener-windows.ps1",
+      "verify-testbench-windows.ps1",
+      "preflight-windows.ps1",
+    ]) {
+      expect(body, `preflight no longer checks ${f}`).toContain(f);
+    }
+    expect(body).toMatch(/docs\\ecowitt-windows-testbench\.md/);
+    expect(body).toMatch(/src\\test\\ecowitt-windows-testbench-static-safety\.test\.ts/);
+    expect(body).toMatch(/\.github\\workflows\\ecowitt-testbench-safety\.yml/);
+  });
+
+  it("preserves safety: no .env read, no forwarding, no token printing", () => {
+    expect(body).not.toMatch(/Get-Content\s+.*\.env/i);
+    expect(body).not.toMatch(/-ForwardToVerdant/);
+    expect(body).not.toMatch(/vbt_[A-Za-z0-9_-]{8,}/);
+    expect(body).not.toMatch(/Start-Process.*listener/i);
+  });
+});

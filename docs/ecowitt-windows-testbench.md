@@ -298,6 +298,70 @@ Notes:
 - Counters are **in-memory** and reset when the listener restarts.
 - `forwarding_enabled=false` is expected for local-only testing.
 - Do **not** paste bridge tokens, Authorization headers, or raw EcoWitt payloads into curl commands, support chats, or issue reports. **Never paste bridge token values or raw payloads** anywhere — the sanitized `last_forward_response_*` fields are the safe way to share failure context.
+- The listener now retries transient webhook failures (HTTP 408, 425, 429, 500, 502, 503, 504, plus connection/DNS/timeout errors) with bounded exponential backoff. `retry_count`, `last_retry_error`, `last_retry_at`, `last_retryable_status`, and `max_retry_attempts` are exposed in `/debug/forwarding-status`. Non-retryable errors (400, 401, 403, 404, 405, validation errors, missing tent/token/url) are **never** retried.
+
+### Copyable sanitized forwarding error report
+
+When forwarding fails, run:
+
+```
+curl "http://localhost:8787/debug/forwarding-error-report"
+curl.exe "http://localhost:8787/debug/forwarding-error-report"
+```
+
+This loopback-only, read-only endpoint returns a **sanitized JSON
+report** safe to share with a developer. It includes:
+
+- `generated_at`
+- `forwarding_enabled`, `forwarding_ready`
+- `ingest_url_configured`, `bridge_token_configured`
+- `tent_id_configured`, `tent_id_valid` (booleans only — never the raw UUID)
+- `last_forward_status`, `last_forward_error`
+- `last_forward_response_error`, `last_forward_response_classification`, `last_forward_response_message`
+- `retry_count`, `last_retry_error`, `max_retry_attempts`
+- `latest_metrics` (source, vendor, metrics, captured_at — no raw payload)
+- `malformed_line_count`
+- `recommended_next_step` — a one-line operator-facing instruction
+
+The endpoint **never** returns: the bridge token, the `Authorization`
+header, raw `PASSKEY`, raw EcoWitt payload, JWT-like strings,
+service-role values, or `.env` contents.
+
+### Troubleshooting checklist by classification
+
+For each `last_forward_response_classification` (or local block reason),
+follow the matching step. Never paste the bridge token, raw EcoWitt
+payload, or `Authorization` header into any chat/issue/email.
+
+| Classification / reason | Meaning | Most likely cause | Command | Retry? | Edit .env? | Escalate? |
+| --- | --- | --- | --- | --- | --- | --- |
+| `invalid_payload` (HTTP 400) | Payload shape rejected | `tent_id`, `source`, `captured_at`, or `metrics` mismatch | `curl http://localhost:8787/debug/forwarding-error-report` | No | If `tent_id_configured: false`, set `VERDANT_TENT_ID` | No |
+| `unauthorized` (HTTP 401) | Bridge token rejected | Wrong/expired `VERDANT_BRIDGE_TOKEN` | `curl http://localhost:8787/debug/forwarding-status` | No | Update `VERDANT_BRIDGE_TOKEN`, restart listener | Only if token is known good |
+| `forbidden_tent` (HTTP 403) | Token cannot write this tent | `VERDANT_TENT_ID` not authorized for this token | `curl http://localhost:8787/debug/forwarding-error-report` | No | Fix `VERDANT_TENT_ID` to a tent the token can write to | Developer if pairing should work |
+| `tent_lookup_failed` | Webhook could not verify tent | Tent UUID does not exist | check the tent in Verdant UI | No | Set `VERDANT_TENT_ID` to a real tent UUID | No |
+| `insert_failed` | Storage insert failed | Transient DB issue | `curl http://localhost:8787/debug/forwarding-error-report` | Listener already retried | No | Developer with sanitized report |
+| `server_misconfigured` | Webhook reported server misconfig | Edge function env missing | — | No | No | Developer with sanitized report |
+| `method_not_allowed` (HTTP 405) | Wrong URL/method | `VERDANT_INGEST_URL` typo | `curl http://localhost:8787/debug/forwarding-status` | No | Fix `VERDANT_INGEST_URL` to the `sensor-ingest-webhook` path | No |
+| `internal_error` | Webhook 500 | Edge function bug or transient | — | Listener already retried | No | Developer with sanitized report |
+| `non_json_response` | Edge/gateway error page | Gateway/proxy returned HTML | check connectivity | No | Verify `VERDANT_INGEST_URL` | If persistent |
+| `blocked_missing_tent_id` | Listener refused to send | `VERDANT_TENT_ID` not set | `curl http://localhost:8787/debug/forwarding-status` | n/a | Set `VERDANT_TENT_ID=<uuid>`, restart | No |
+| `blocked_invalid_tent_id` | Display name / placeholder rejected | Used a name (e.g. `Flower Tent`) or `tent-1` | `curl http://localhost:8787/debug/forwarding-status` | n/a | Use a real tent UUID | No |
+| `http_400` (no classification) | Generic 400 | Payload mismatch not enumerated | `curl http://localhost:8787/debug/forwarding-error-report` | No | Inspect `last_forward_response_message` | If unclear |
+| transient 5xx / 429 / 408 / 425 / 504 | Temporary upstream issue | Network/edge backpressure | — | Listener retries up to `max_retry_attempts` | No | Only if it persists |
+
+What **not** to paste anywhere:
+
+- the bridge token (`vbt_...`)
+- the full `Authorization: Bearer ...` header
+- raw `PASSKEY` values
+- raw EcoWitt payloads
+- JWT-shaped values
+- the full tent UUID (the sanitized report exposes booleans only)
+
+Always prefer sharing the sanitized output of
+`/debug/forwarding-error-report`.
+
+
 
 
 ### Parse diagnostics — categorize malformed JSONL safely

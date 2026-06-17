@@ -9,6 +9,9 @@
 import { useEffect, useRef } from "react";
 import { X, Camera, Gauge, FileText, Droplets, FlaskConical, Leaf, Sprout, Clock } from "lucide-react";
 import type { TimelineEvidenceDetailViewModel } from "@/lib/timelineEvidenceDetailViewModel";
+import TimelineSensorSourceBadge from "@/components/TimelineSensorSourceBadge";
+import { classifyTimelineSensorSource } from "@/lib/timelineSensorSourceBadgeRules";
+import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
 
 interface Props {
   viewModel: TimelineEvidenceDetailViewModel | null;
@@ -137,21 +140,42 @@ export default function TimelineEvidenceDetailDrawer({ viewModel, open, onClose 
           </section>
         )}
 
-        {vm.sensor && (
-          <section className="mb-4" data-testid="timeline-evidence-drawer-sensor">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Sensor snapshot</p>
-            <div className="flex flex-wrap gap-1.5">
-              {vm.sensor.tempC != null && <Chip>{vm.sensor.tempC}°C</Chip>}
-              {vm.sensor.rhPercent != null && <Chip>{vm.sensor.rhPercent}% RH</Chip>}
-              {vm.sensor.vpdKpa != null && <Chip>VPD {vm.sensor.vpdKpa}</Chip>}
-              {vm.sensor.co2Ppm != null && <Chip>CO₂ {vm.sensor.co2Ppm}</Chip>}
-              {vm.sensor.soilPercent != null && <Chip>Soil {vm.sensor.soilPercent}%</Chip>}
-            </div>
-            {vm.sensor.capturedAt && (
-              <p className="text-[11px] text-muted-foreground mt-1">Captured {vm.sensor.capturedAt}</p>
-            )}
-          </section>
-        )}
+        {vm.sensor && (() => {
+          // Canonical source badge. If the entry has sensor-derived
+          // evidence and no trusted source, this renders "invalid",
+          // not "live".
+          const sourceBadge = classifyTimelineSensorSource({
+            rawSource: vm.sensor.source === "unknown" ? null : vm.sensor.source,
+            capturedAt: vm.sensor.capturedAt,
+            // Detail view does not assume manual fallback — unknown
+            // sources must be flagged as invalid.
+            fallback: "invalid",
+          });
+          return (
+            <section className="mb-4" data-testid="timeline-evidence-drawer-sensor">
+              <div className="mb-1 flex items-center justify-between gap-2 flex-wrap">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Sensor snapshot</p>
+                <SensorSourceLegendTooltip testIdSuffix="drawer" />
+              </div>
+              <div className="mb-1.5">
+                <TimelineSensorSourceBadge
+                  badge={sourceBadge}
+                  className="mr-1"
+                />
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {vm.sensor.tempC != null && <Chip>{vm.sensor.tempC}°C</Chip>}
+                {vm.sensor.rhPercent != null && <Chip>{vm.sensor.rhPercent}% RH</Chip>}
+                {vm.sensor.vpdKpa != null && <Chip>VPD {vm.sensor.vpdKpa}</Chip>}
+                {vm.sensor.co2Ppm != null && <Chip>CO₂ {vm.sensor.co2Ppm}</Chip>}
+                {vm.sensor.soilPercent != null && <Chip>Soil {vm.sensor.soilPercent}%</Chip>}
+              </div>
+              {vm.sensor.capturedAt && (
+                <p className="text-[11px] text-muted-foreground mt-1">Captured {vm.sensor.capturedAt}</p>
+              )}
+            </section>
+          );
+        })()}
 
         {(vm.watering || vm.feeding) && (
           <section className="mb-2">

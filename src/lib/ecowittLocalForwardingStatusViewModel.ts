@@ -38,6 +38,8 @@ export interface ForwardingStatusViewModel {
   subheadline: string;
   rows: ForwardingStatusRow[];
   banner: ForwardingStatusBanner;
+  /** Operator-mode "Live Ingest Verified" marker. */
+  verifiedMarker: LiveIngestVerifiedMarker;
 }
 
 const HIDDEN_BANNER: ForwardingStatusBanner = {

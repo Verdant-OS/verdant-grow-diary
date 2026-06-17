@@ -84,7 +84,30 @@ export default function QuickLogV2Sheet({
   const plants = (plantsQ.data as Parameters<typeof buildQuickLogV2TargetOptions>[1]) ?? [];
   const tents = (tentsQ.data as Parameters<typeof buildQuickLogV2TargetOptions>[0]) ?? [];
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { save, saving } = useQuickLogV2Save();
+
+  function showTimelineConfirmation(
+    message: string,
+    scope: {
+      targetType: "plant" | "tent";
+      targetId: string;
+      tentId: string | null;
+      growEventId?: string | null;
+    },
+  ) {
+    const nav = buildQuickLogTimelineNavTarget({
+      targetType: scope.targetType,
+      targetId: scope.targetId,
+      growEventId: scope.growEventId ?? null,
+    });
+    toast.success(message, {
+      action: {
+        label: QUICK_LOG_TIMELINE_CTA_LABEL,
+        onClick: () => navigate(nav.href),
+      },
+    });
+  }
 
   const [form, setForm] = useState<QuickLogV2FormState>(EMPTY_QUICKLOG_V2_FORM);
   const [feedingForm, setFeedingForm] = useState<QuickLogFeedingFormState>(

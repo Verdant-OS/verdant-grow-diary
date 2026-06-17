@@ -697,7 +697,7 @@ export default function Timeline() {
                                 <span title={format(new Date(e.entry_at), "PPpp")}>{formatDistanceToNow(new Date(e.entry_at), { addSuffix: true })}</span>
                                 <button
                                   type="button"
-                                  onClick={() => setEditingId(e.id)}
+                                  onClick={(ev) => { ev.stopPropagation(); setEditingId(e.id); }}
                                   aria-label="Edit entry"
                                   className="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition"
                                 >

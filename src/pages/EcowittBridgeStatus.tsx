@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import EcowittSnapshotTrustExamples from "@/components/EcowittSnapshotTrustExamples";
+import EcowittLocalForwardingStatusWidget from "@/components/EcowittLocalForwardingStatusWidget";
 import IngestAttemptReportDrawer from "@/components/IngestAttemptReportDrawer";
 import {
   buildIngestAttemptReport,

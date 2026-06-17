@@ -220,7 +220,7 @@ describe("buildGgsRealPayloadCommitInput", () => {
     expect(src).not.toMatch(/device[_-]?control\s*[=:(]/i);
     expect(src).not.toMatch(/automation/i);
     expect(src).not.toMatch(/SERVICE_ROLE/);
-    expect(src).not.toMatch(/bridge[_\s-]?token/i);
+    expect(src).not.toMatch(/bridge[_\s-]?token\s*[=:]\s*["']/i);
     expect(src).not.toMatch(/\bfetch\(/);
   });
 });

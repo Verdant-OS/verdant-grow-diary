@@ -18,6 +18,7 @@ import {
   buildQuickLogTimelineNavTarget,
   QUICK_LOG_TIMELINE_CTA_LABEL,
 } from "@/lib/quickLogTimelineNavigationTarget";
+import { navigateToTimelineAnchor } from "@/lib/timelineAnchorNavigation";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";

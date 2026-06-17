@@ -128,7 +128,7 @@ describe("buildStoredRow — EcoWitt transport mapping", () => {
       row: {
         ...baseRow,
         source: "ecowitt",
-        raw_payload: { ...baseRow.raw_payload, vendor: "ecowitt_gw2000a" },
+        raw_payload: { ...(baseRow.raw_payload), vendor: "ecowitt_gw2000a" },
       },
       userId: USER,
       idempotencyKey: null,

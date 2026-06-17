@@ -348,10 +348,18 @@ class ForwardErrorSanitizationTests(unittest.TestCase):
             ("tent_lookup_failed", "tent_lookup_failed"),
             ("insert_failed", "storage_insert_failed"),
             ("unauthorized", "auth_failed"),
+            ("token_revoked", "token_revoked"),
+            ("token_expired", "token_expired"),
+            ("auth_lookup_failed", "auth_lookup_failed"),
         ]:
             r = summarize_forward_response(_FakeResp(400, {"error": err}))
             self.assertEqual(r["error"], err)
             self.assertEqual(r["classification"], cls)
+            self.assertNotEqual(
+                r["classification"],
+                "unknown_webhook_error",
+                f"{err} must not classify as unknown_webhook_error",
+            )
 
 
 class RetryBehaviorTests(unittest.TestCase):

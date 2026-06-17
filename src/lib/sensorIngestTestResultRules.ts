@@ -69,6 +69,7 @@ export function classifySensorIngestTestResult(
         "OPTIONS preflight likely failed before POST reached the function. " +
         "Check Edge Function OPTIONS headers, ad-block, browser extensions, or network reachability.",
       isSuccess: false,
+      corsWorking: false,
     };
   }
 
@@ -85,6 +86,7 @@ export function classifySensorIngestTestResult(
         headline: `HTTP ${status} — accepted with ${rejected} rejection${rejected === 1 ? "" : "s"}`,
         detail: `Inserted ${inserted}. Some metrics were rejected — see rejected[] below.`,
         isSuccess: true,
+        corsWorking: true,
       };
     }
     return {
@@ -92,6 +94,7 @@ export function classifySensorIngestTestResult(
       headline: `HTTP ${status} — accepted`,
       detail: `Inserted ${inserted} reading${inserted === 1 ? "" : "s"}. Auth: ${pickString(body, "auth") ?? "ok"}.`,
       isSuccess: true,
+      corsWorking: true,
     };
   }
 
@@ -103,6 +106,7 @@ export function classifySensorIngestTestResult(
         ? `Token rejected (${reason}). Mint a fresh tent-scoped bridge token and retry.`
         : "Bridge token missing, revoked, or expired. Mint a new one and retry.",
       isSuccess: false,
+      corsWorking: true,
     };
   }
 
@@ -113,6 +117,7 @@ export function classifySensorIngestTestResult(
       detail:
         "Token is valid but not scoped to this tent. Mint a token from this tent's panel.",
       isSuccess: false,
+      corsWorking: true,
     };
   }
 
@@ -124,6 +129,7 @@ export function classifySensorIngestTestResult(
         ? `Server rejected payload: ${reason}.`
         : "Server rejected payload. Check source, captured_at, and metric names.",
       isSuccess: false,
+      corsWorking: true,
     };
   }
 
@@ -134,6 +140,7 @@ export function classifySensorIngestTestResult(
       detail:
         "sensor-ingest-webhook is not deployed at this URL. Confirm the app's Supabase project matches the ingest endpoint.",
       isSuccess: false,
+      corsWorking: true,
     };
   }
 
@@ -143,6 +150,7 @@ export function classifySensorIngestTestResult(
       headline: "HTTP 429 — rate limited",
       detail: "Too many requests. Wait a moment and retry.",
       isSuccess: false,
+      corsWorking: true,
     };
   }
 
@@ -153,6 +161,7 @@ export function classifySensorIngestTestResult(
       detail:
         "Ingest function returned a server error. Check Edge Function logs.",
       isSuccess: false,
+      corsWorking: true,
     };
   }
 
@@ -161,6 +170,7 @@ export function classifySensorIngestTestResult(
     headline: status > 0 ? `HTTP ${status}` : "Unknown response",
     detail: reason ?? "Unrecognized response from the ingest endpoint.",
     isSuccess: false,
+    corsWorking: true,
   };
 }
 

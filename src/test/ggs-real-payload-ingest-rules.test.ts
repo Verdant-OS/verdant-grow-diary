@@ -41,8 +41,11 @@ function realLookingPayload(): Record<string, unknown> {
 
 /** Narrowing helper: asserts plan is a refusal and returns its reason. */
 function refusalReason(plan: GgsRealPayloadCommitInput): string {
-  if (plan.ok) throw new Error(`expected refusal, got success with ${plan.rows.length} rows`);
-  return plan.reason;
+  if (plan.ok === true) {
+    throw new Error(`expected refusal, got success with ${plan.rows.length} rows`);
+  }
+  const failed = plan as Extract<GgsRealPayloadCommitInput, { ok: false }>;
+  return failed.reason;
 }
 
 describe("buildGgsRealPayloadCommitInput", () => {

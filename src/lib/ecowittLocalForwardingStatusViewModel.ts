@@ -16,6 +16,15 @@ export interface ForwardingStatusRow {
   tone: "neutral" | "ok" | "warn" | "error";
 }
 
+export interface ForwardingStatusBanner {
+  show: boolean;
+  title: string;
+  status: string;
+  classification: string;
+  reason: string;
+  recommendedNextStep: string;
+}
+
 export interface ForwardingStatusViewModel {
   state: "loading" | "offline" | "ready";
   /** Short headline string for the widget. */
@@ -23,7 +32,17 @@ export interface ForwardingStatusViewModel {
   /** Sub-headline / explanation. Empty string when none. */
   subheadline: string;
   rows: ForwardingStatusRow[];
+  banner: ForwardingStatusBanner;
 }
+
+const HIDDEN_BANNER: ForwardingStatusBanner = {
+  show: false,
+  title: "",
+  status: "",
+  classification: "",
+  reason: "",
+  recommendedNextStep: "",
+};
 
 const OFFLINE_HEADLINE = "EcoWitt local bridge not reachable on localhost:8787.";
 const OFFLINE_SUB =

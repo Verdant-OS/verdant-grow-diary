@@ -137,7 +137,7 @@ describe("EcowittLocalForwardingStatusWidget", () => {
     render(<EcowittLocalForwardingStatusWidget autoFetch={false} />);
     fireEvent.click(screen.getByTestId("ecowitt-local-forwarding-copy-report"));
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
-    const written = writeText.mock.calls[0][0] as string;
+    const written = (writeText.mock.calls[0] as unknown as [string])[0];
     expect(written).toContain("recommended_next_step");
     expect(written).toContain("payload_shape_mismatch");
   });
@@ -163,7 +163,7 @@ describe("EcowittLocalForwardingStatusWidget", () => {
     render(<EcowittLocalForwardingStatusWidget autoFetch={false} />);
     fireEvent.click(screen.getByTestId("ecowitt-local-forwarding-copy-report"));
     await waitFor(() => expect(writeText).toHaveBeenCalled());
-    const written = writeText.mock.calls[0][0] as string;
+    const written = (writeText.mock.calls[0] as unknown as [string])[0];
     expect(written).not.toMatch(/vbt_[A-Za-z0-9_-]{6,}/);
     expect(written).not.toMatch(/Bearer\s+[A-Za-z0-9._-]{6,}/i);
     expect(written).not.toMatch(/eyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}/);
@@ -190,7 +190,7 @@ describe("EcowittLocalForwardingStatusWidget", () => {
     fireEvent.click(screen.getByTestId("ecowitt-local-forwarding-refresh"));
     await waitFor(() => expect(fn.mock.calls.length).toBeGreaterThanOrEqual(2));
     for (const call of fn.mock.calls) {
-      const [url, init] = call as [string, RequestInit | undefined];
+      const [url, init] = call as unknown as [string, RequestInit | undefined];
       expect(url.startsWith("http://localhost:8787/")).toBe(true);
       // No method override → defaults to GET
       expect(init?.method ?? "GET").toBe("GET");

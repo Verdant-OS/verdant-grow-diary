@@ -200,6 +200,35 @@ def append_raw_log(record: Dict[str, Any]) -> None:
 # Optional forwarding to the validated ingest webhook
 # ---------------------------------------------------------------------------
 
+# In-memory forwarding counters. Reset on restart. Never persisted.
+FORWARD_STATS: Dict[str, Any] = {
+    "attempt_count": 0,
+    "success_count": 0,
+    "failure_count": 0,
+    "last_status": None,
+    "last_at": None,
+    "last_error": None,
+}
+
+
+def _short_sanitized_error(exc: Any) -> str:
+    """Short, sanitized one-line error summary. Never echoes tokens/payloads."""
+    text = str(exc)
+    if len(text) > 200:
+        text = text[:200] + "..."
+    safe = sanitize_debug_payload_str_safe(text)
+    return safe
+
+
+def sanitize_debug_payload_str_safe(text: str) -> str:
+    # Forward declaration shim — real sanitizer is defined below. We
+    # avoid forward-reference issues by guarding here.
+    try:
+        return sanitize_debug_payload(text)  # type: ignore[name-defined]
+    except NameError:
+        return text
+
+
 def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
     url = os.environ.get("VERDANT_INGEST_URL")
     token = os.environ.get("VERDANT_BRIDGE_TOKEN")
@@ -224,8 +253,17 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
         "Idempotency-Key": str(uuid.uuid4()),
         "User-Agent": f"{VENDOR}/1.0",
     }
+    FORWARD_STATS["attempt_count"] += 1
+    FORWARD_STATS["last_at"] = datetime.now(timezone.utc).isoformat()
     try:
         resp = requests.post(url, json=reading, headers=headers, timeout=10)
+        FORWARD_STATS["last_status"] = resp.status_code
+        if 200 <= resp.status_code < 300:
+            FORWARD_STATS["success_count"] += 1
+            FORWARD_STATS["last_error"] = None
+        else:
+            FORWARD_STATS["failure_count"] += 1
+            FORWARD_STATS["last_error"] = f"http_{resp.status_code}"
         print(
             f"[verdant-testbench] forwarded reading -> {resp.status_code} "
             f"(token {mask_token(token)})"
@@ -236,7 +274,30 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
             "idempotency_key": headers["Idempotency-Key"],
         }
     except Exception as exc:
+        FORWARD_STATS["failure_count"] += 1
+        FORWARD_STATS["last_status"] = None
+        FORWARD_STATS["last_error"] = _short_sanitized_error(exc)
         return {"forwarded": False, "reason": f"request_error: {exc!s}"}
+
+
+def mask_ingest_url(url: Optional[str]) -> Optional[str]:
+    """Return a host/path summary that hides project identifiers."""
+    if not url:
+        return None
+    try:
+        from urllib.parse import urlparse
+
+        p = urlparse(url)
+        host = p.hostname or ""
+        parts = host.split(".")
+        if len(parts) >= 3:
+            parts[0] = "***"
+        masked_host = ".".join(parts) if parts else "***"
+        scheme = p.scheme or "https"
+        path = p.path or ""
+        return f"{scheme}://{masked_host}{path}"
+    except Exception:
+        return "***"
 
 
 # ---------------------------------------------------------------------------
@@ -425,10 +486,18 @@ def read_recent_log_lines(n: int) -> list[str]:
         return []
 
 
-def parse_jsonl_entries(lines: list[str]) -> tuple[list[Dict[str, Any]], int]:
-    """Parse JSONL lines. Returns (parsed_entries, malformed_line_count)."""
+def parse_jsonl_entries(
+    lines: list[str],
+) -> tuple[list[Dict[str, Any]], int, Optional[str]]:
+    """Parse JSONL lines.
+
+    Returns (parsed_entries, malformed_line_count, last_parse_error_summary).
+    The error summary is short and sanitized — never contains the raw
+    offending line, tokens, or payloads.
+    """
     parsed: list[Dict[str, Any]] = []
     malformed = 0
+    last_err: Optional[str] = None
     for raw in lines:
         text = raw.rstrip("\n")
         if not text.strip():
@@ -439,9 +508,15 @@ def parse_jsonl_entries(lines: list[str]) -> tuple[list[Dict[str, Any]], int]:
                 parsed.append(obj)
             else:
                 malformed += 1
-        except Exception:
+                last_err = "non_object_jsonl_line"
+        except Exception as exc:
             malformed += 1
-    return parsed, malformed
+            # Short sanitized class+message; never the raw line text.
+            msg = f"{type(exc).__name__}: {str(exc)[:120]}"
+            safe = sanitize_debug_payload(msg)
+            last_err = safe if isinstance(safe, str) else _REDACTED
+    return parsed, malformed, last_err
+
 
 
 @app.get("/debug/raw-log-tail")
@@ -520,7 +595,10 @@ def debug_status() -> Any:
                 "log_exists": False,
                 "log_path": log_path_str,
                 "entry_count": 0,
+                "parsed_line_count": 0,
+                "skipped_line_count": 0,
                 "malformed_line_count": 0,
+                "last_parse_error": None,
                 "latest_entry": None,
                 "latest_captured_at": None,
                 "latest_received_at": None,
@@ -538,7 +616,7 @@ def debug_status() -> Any:
             500,
         )
 
-    parsed, malformed = parse_jsonl_entries(all_lines)
+    parsed, malformed, last_parse_error = parse_jsonl_entries(all_lines)
     latest = parsed[-1] if parsed else None
     latest_safe = sanitize_debug_payload(latest) if latest else None
 
@@ -560,7 +638,10 @@ def debug_status() -> Any:
             "log_exists": True,
             "log_path": log_path_str,
             "entry_count": len(parsed),
+            "parsed_line_count": len(parsed),
+            "skipped_line_count": malformed,
             "malformed_line_count": malformed,
+            "last_parse_error": last_parse_error,
             "latest_entry": latest_safe,
             "latest_captured_at": latest_captured_at,
             "latest_received_at": latest_received_at,
@@ -568,6 +649,49 @@ def debug_status() -> Any:
             "message": "ok",
         }
     )
+
+
+def _mask_token_preview(token: Optional[str]) -> Optional[str]:
+    if not token:
+        return None
+    return mask_token(token)
+
+
+@app.get("/debug/forwarding-status")
+def debug_forwarding_status() -> Any:
+    # Local-only: never expose forwarding configuration over LAN.
+    if not _is_local_request():
+        return (
+            jsonify({"ok": False, "error": "forbidden_non_local"}),
+            403,
+        )
+
+    url = os.environ.get("VERDANT_INGEST_URL")
+    token = os.environ.get("VERDANT_BRIDGE_TOKEN")
+    forwarding_enabled = bool(url and token)
+
+    last_error = FORWARD_STATS.get("last_error")
+    if isinstance(last_error, str):
+        safe_err = sanitize_debug_payload(last_error)
+        last_error = safe_err if isinstance(safe_err, str) else _REDACTED
+
+    return jsonify(
+        {
+            "ok": True,
+            "forwarding_enabled": forwarding_enabled,
+            "ingest_url_configured": bool(url),
+            "bridge_token_configured": bool(token),
+            "masked_ingest_url": mask_ingest_url(url),
+            "masked_token_preview": _mask_token_preview(token),
+            "forward_attempt_count": int(FORWARD_STATS.get("attempt_count", 0)),
+            "forward_success_count": int(FORWARD_STATS.get("success_count", 0)),
+            "forward_failure_count": int(FORWARD_STATS.get("failure_count", 0)),
+            "last_forward_status": FORWARD_STATS.get("last_status"),
+            "last_forward_at": FORWARD_STATS.get("last_at"),
+            "last_forward_error": last_error,
+        }
+    )
+
 
 
 @app.get("/debug/last-events")
@@ -581,7 +705,7 @@ def debug_last_events() -> Any:
 
     n = parse_debug_line_count(request.args.get("lines"))
     lines = read_recent_log_lines(max(n * 4, n))  # over-read to tolerate malformed
-    parsed, malformed = parse_jsonl_entries(lines)
+    parsed, malformed, _last_err = parse_jsonl_entries(lines)
     parsed_tail = parsed[-n:]
 
     events: list[Dict[str, Any]] = []

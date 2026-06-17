@@ -37,11 +37,30 @@ import {
 } from "@/lib/manualSensorSnapshotQualityRules";
 import ManualSensorSnapshotQualityBadge from "@/components/ManualSensorSnapshotQualityBadge";
 
+export interface AiDoctorReadinessQuickActions {
+  onFastAddPhoto?: () => void;
+  onAddWatering?: () => void;
+  onAddFeeding?: () => void;
+  onAddSensorSnapshot?: () => void;
+}
+
 export interface AiDoctorContextReadinessPanelProps {
   context: AiDoctorContext;
   openAlertsCount?: number;
   className?: string;
+  quickActions?: AiDoctorReadinessQuickActions;
 }
+
+const QUICK_ACTION_COPY = {
+  photo: "A recent plant photo helps AI Doctor avoid guessing from logs alone.",
+  watering:
+    "Recent watering context helps separate environment stress from root-zone stress.",
+  feeding:
+    "Recent feeding context helps avoid overcorrecting nutrients from weak evidence.",
+  sensor:
+    "A fresh sensor snapshot grounds the diagnosis in current environment data.",
+  disabled: "Coming soon — no safe entry point yet.",
+} as const;
 
 const STATE_STYLES: Record<
   AiDoctorReadinessState,

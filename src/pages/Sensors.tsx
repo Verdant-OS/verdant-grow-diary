@@ -8,8 +8,6 @@ import SensorChart from "@/components/SensorChart";
 import GrowDataSourceBadge from "@/components/GrowDataSourceBadge";
 import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
 import SensorBridgeHealthCard from "@/components/SensorBridgeHealthCard";
-import TentCsvImportCard from "@/components/TentCsvImportCard";
-import EnvironmentCsvImportLauncher from "@/components/EnvironmentCsvImportLauncher";
 import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
 import SensorsTestbenchPanel from "@/components/SensorsTestbenchPanel";
 import { useGrowTents, useGrowSensorReadings } from "@/hooks/useGrowData";
@@ -175,20 +173,9 @@ export default function Sensors() {
           <ManualSensorReadingCard tents={manualTents} defaultTentId={defaultManualTentId} />
         )}
       </div>
-      {manualTents.length > 0 && selectedTent && (
-        <div id="import-sensor-data" className="mt-4 max-w-xl scroll-mt-24" data-testid="sensors-import-sensor-data-anchor">
-          <TentCsvImportCard
-            tentId={tentId}
-            growId={(selectedTent as unknown as { growId?: string | null }).growId ?? null}
-          />
-        </div>
-      )}
-      <div className="mt-4 max-w-xl">
-        <EnvironmentCsvImportLauncher
-          growId={(selectedTent as unknown as { growId?: string | null } | null)?.growId ?? null}
-          tentId={manualTents.find((t) => t.id === tentId)?.id ?? null}
-          testIdPrefix="sensors-csv-launcher"
-        />
+      <div className="mt-4 max-w-xl rounded-lg border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground">
+        Sensor readings come from live ingest, manual entry, CSV history where
+        explicitly labeled, or demo data in demo mode.
       </div>
       <div className="mt-4 max-w-xl">
         <SensorBridgeHealthCard />

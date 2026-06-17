@@ -92,7 +92,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/grows", access: "auth" },
   { path: "/grows/:growId", access: "auth" },
   { path: "/hardware-integrations", access: "public" },
-  { path: "/imports/representative-csv", access: "operator" },
+  
   { path: "/ingest-inspector", access: "operator" },
   { path: "/internal/ai-doctor-confidence-audit", access: "internal", description: "AI Doctor confidence internal static audit." },
   { path: "/internal/ai-doctor-phase1-preview", access: "internal", description: "Static Phase 1 view model preview." },
@@ -108,9 +108,9 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/operator/ecowitt-bridge-status", access: "operator", description: "EcoWitt bridge status." },
   { path: "/operator/ecowitt-live-bringup", access: "operator", description: "EcoWitt live bring-up operator checklist." },
   { path: "/operator/ecowitt-tent-preview", access: "operator", description: "EcoWitt multi-tent read-only normalizer preview." },
-  { path: "/operator/genetics-import", access: "operator", description: "Verdant genetics XLSX import preview (preview-only)." },
+  
   { path: "/operator/one-tent-proof-record", access: "operator", description: "One-tent proof record export." },
-  { path: "/partners/csv-preview", access: "public" },
+  
   { path: "/pi-ingest-status", access: "operator" },
   { path: "/plants", access: "auth" },
   { path: "/plants/:id", access: "auth" },
@@ -119,7 +119,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/reports", access: "auth" },
   { path: "/reset-password", access: "public", description: "Password reset landing page." },
   { path: "/sensors", access: "auth" },
-  { path: "/sensors/csv-preview", access: "operator" },
+  
   { path: "/sensors/ecowitt-audit", access: "operator" },
   { path: "/sensors/ingest-normalizer", access: "operator" },
   { path: "/settings", access: "auth" },

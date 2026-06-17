@@ -45,7 +45,7 @@ const REQUIRED_PROTECTED = [
   "/sensors",
   "/sensors/ecowitt-audit",
   "/sensors/ingest-normalizer",
-  "/imports/representative-csv",
+  
   "/actions",
   "/admin/leads",
   "/leads",
@@ -58,7 +58,7 @@ const REQUIRED_PUBLIC = [
   "/welcome",
   "/pricing",
   "/hardware-integrations",
-  "/partners/csv-preview",
+  
 ];
 
 describe("Operator routes require authenticated AppShell", () => {

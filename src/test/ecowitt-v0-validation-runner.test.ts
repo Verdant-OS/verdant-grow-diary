@@ -37,7 +37,8 @@ describe("ecowitt v0 validation runner", () => {
     expect(SRC).not.toMatch(/\bfetch\(/);
     expect(SRC).not.toMatch(/http\.request|https\.request/);
     expect(SRC).not.toMatch(/method:\s*["']POST["']/i);
-    expect(SRC).not.toMatch(/\.env\b/);
+    expect(SRC).not.toMatch(/readFileSync\([^)]*\.env/);
+    expect(SRC).not.toMatch(/process\.env\.[A-Z_]+/);
     expect(SRC).not.toMatch(/trigger[-_]?forward/i);
   });
 

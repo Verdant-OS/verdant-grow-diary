@@ -305,7 +305,27 @@ export default function PlantDetail() {
     );
   }
 
+  const archivedTimelineMode =
+    searchParams.get("mode") === "archived-timeline";
+
   if (blockedView && blockedView.kind === "archived") {
+    if (archivedTimelineMode && plant) {
+      return (
+        <ArchivedTimelineReadOnlyView
+          plant={{
+            id: plant.id,
+            name: plant.name,
+            strain: plant.strain,
+            stage: plant.stage,
+            startedAt: plant.startedAt,
+            tentId: plant.tentId ?? null,
+            growId: plant.growId ?? null,
+          }}
+          tentName={tent?.name ?? null}
+          backAction={blockedView.primaryBack}
+        />
+      );
+    }
     return (
       <div>
         <PlantDetailDataSourceDisclosure
@@ -316,6 +336,7 @@ export default function PlantDetail() {
       </div>
     );
   }
+
 
 
 

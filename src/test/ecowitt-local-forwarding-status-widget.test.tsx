@@ -124,22 +124,76 @@ describe("EcowittLocalForwardingStatusWidget", () => {
     );
   });
 
-  it("copy button fetches /debug/forwarding-error-report and writes sanitized JSON to clipboard", async () => {
+  it("copy button writes allow-listed sanitized report with top-level header + safety + bridge_status + latest_metrics", async () => {
     const writeText = vi.fn(async () => undefined);
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
       value: { writeText },
     });
     mockFetchOnce({
-      "http://localhost:8787/debug/forwarding-status": READY_STATUS,
+      "http://localhost:8787/debug/forwarding-status": FAILED_STATUS,
       "http://localhost:8787/debug/forwarding-error-report": ERROR_REPORT,
     });
     render(<EcowittLocalForwardingStatusWidget autoFetch={false} />);
     fireEvent.click(screen.getByTestId("ecowitt-local-forwarding-copy-report"));
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     const written = (writeText.mock.calls[0] as unknown as [string])[0];
-    expect(written).toContain("recommended_next_step");
-    expect(written).toContain("payload_shape_mismatch");
+    const parsed = JSON.parse(written);
+    expect(parsed.report_type).toBe("verdant_ecowitt_forwarding_debug_report");
+    expect(parsed.generated_by).toBe("verdant_operator_mode");
+    expect(typeof parsed.copied_at).toBe("string");
+    expect(parsed.safety).toEqual({
+      sanitized: true,
+      raw_payload_included: false,
+      secrets_included: false,
+      write_action: false,
+    });
+    // Allow-listed bridge_status fields only.
+    expect(Object.keys(parsed.bridge_status).sort()).toEqual(
+      [
+        "forwarding_enabled",
+        "forwarding_ready",
+        "generated_at",
+        "last_forward_error",
+        "last_forward_response_classification",
+        "last_forward_response_error",
+        "last_forward_response_reason",
+        "last_forward_status",
+        "last_retry_error",
+        "malformed_line_count",
+        "max_retry_attempts",
+        "recommended_next_step",
+        "retry_count",
+      ].sort(),
+    );
+    expect(parsed.bridge_status.last_forward_status).toBe(400);
+    expect(parsed.bridge_status.last_forward_response_classification).toBe(
+      "payload_shape_mismatch",
+    );
+    expect(parsed.latest_metrics).toBeDefined();
+    expect(Object.keys(parsed.latest_metrics).sort()).toEqual(
+      ["captured_at", "metrics", "source", "vendor"].sort(),
+    );
+    // No disallowed top-level fields.
+    expect(Object.keys(parsed).sort()).toEqual(
+      [
+        "bridge_status",
+        "copied_at",
+        "generated_by",
+        "latest_metrics",
+        "report_type",
+        "safety",
+      ].sort(),
+    );
+    // Disallowed leakage paths must not appear anywhere in the serialized output.
+    expect(written).not.toContain("ingest_url");
+    expect(written).not.toContain("bridge_token");
+    expect(written).not.toContain("authorization");
+    expect(written).not.toMatch(/PASSKEY/i);
+    expect(written).not.toContain("raw_payload");
+    expect(written).not.toMatch(/\.env/);
+    expect(written).not.toMatch(/service_role/i);
+    expect(written).not.toMatch(/eyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}/);
   });
 
   it("never copies token-like / Authorization / PASSKEY / raw_payload / .env content", async () => {

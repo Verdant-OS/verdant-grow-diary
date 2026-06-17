@@ -1169,6 +1169,13 @@ def debug_forwarding_status() -> Any:
     last_resp_msg = sanitize_forward_error_value(
         FORWARD_STATS.get("last_forward_response_message")
     )
+    raw_reason = FORWARD_STATS.get("last_forward_response_reason")
+    last_resp_reason: Optional[str] = None
+    if isinstance(raw_reason, str) and raw_reason in _KNOWN_INSERT_REASONS:
+        last_resp_reason = raw_reason
+    elif isinstance(raw_reason, str) and raw_reason:
+        # Defensive: re-collapse any unknown stored value at read time.
+        last_resp_reason = "insert_unknown"
 
     last_retry_err = FORWARD_STATS.get("last_retry_error")
     if isinstance(last_retry_err, str):

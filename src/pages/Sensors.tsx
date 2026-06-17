@@ -21,6 +21,8 @@ import {
 } from "@/lib/environmentStageTargetRules";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import SensorSourceSummaryWidget from "@/components/SensorSourceSummaryWidget";
+import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
 
 const METRICS = [
   { key: "temp", label: "Temperature" },
@@ -177,7 +179,10 @@ export default function Sensors() {
         className="mt-4 max-w-xl rounded-lg border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground"
         data-testid="sensors-source-explainer"
       >
-        <p className="font-semibold text-foreground mb-1">Sensor sources</p>
+        <div className="mb-1 flex items-center justify-between gap-2 flex-wrap">
+          <p className="font-semibold text-foreground">Sensor sources</p>
+          <SensorSourceLegendTooltip testIdSuffix="sensors" />
+        </div>
         <p>
           Verdant can show live ingest readings, grower-entered manual
           readings, explicitly labeled csv history, or demo data in demo
@@ -185,6 +190,15 @@ export default function Sensors() {
           treated as healthy current data.
         </p>
       </div>
+      <SensorSourceSummaryWidget
+        className="mt-4 max-w-xl"
+        readings={filtered.map((r) => ({
+          source: (r as unknown as { source?: string | null }).source ?? null,
+          captured_at: (r as unknown as { captured_at?: string | null }).captured_at ?? null,
+          ts: r.ts,
+        }))}
+        options={{ fallback: "demo" }}
+      />
       <div className="mt-4 max-w-xl">
         <SensorBridgeHealthCard />
       </div>

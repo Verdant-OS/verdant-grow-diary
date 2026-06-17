@@ -13,12 +13,18 @@
  *    detail blobs.
  *  - Case-insensitive, trimmed. Empty query returns all rows.
  */
+import {
+  classifyTimelineSensorSource,
+  type TimelineSensorSourceKind,
+} from "@/lib/timelineSensorSourceBadgeRules";
+
 export interface TimelineEvidenceRow {
   id: string;
   note: string | null | undefined;
   stage: string | null | undefined;
   plant_id: string | null | undefined;
   tent_id: string | null | undefined;
+  entry_at?: string | null;
   details?: Record<string, unknown> | null;
 }
 
@@ -28,6 +34,43 @@ export interface TimelineEvidenceFilterInput {
   tentId?: string | null;
   /** Diary `event_type` token, e.g. "watering", "feeding", "note". */
   eventType?: string | null;
+  /**
+   * When non-empty, only sensor-derived rows whose canonical source kind
+   * is in the set are kept. Non-sensor entries are hidden.
+   */
+  sensorSources?: ReadonlyArray<TimelineSensorSourceKind> | null;
+}
+
+const TIMELINE_FILTER_STALE_MS = 30 * 60 * 1000;
+
+/**
+ * Returns the canonical sensor-source kind for a row's sensor snapshot,
+ * or `null` if the row is not sensor-derived. Quick Log sensor snapshots
+ * with no explicit source fall back to "manual" (intrinsically
+ * grower-entered).
+ */
+export function deriveTimelineRowSensorSource(
+  row: TimelineEvidenceRow,
+  options: { now?: number; staleMs?: number } = {},
+): TimelineSensorSourceKind | null {
+  const details = (row?.details ?? {}) as Record<string, unknown>;
+  const raw = details.sensor_snapshot ?? details.sensor;
+  if (!raw || typeof raw !== "object") return null;
+  const snap = raw as { source?: unknown; ts?: unknown };
+  const rawSource = typeof snap.source === "string" ? snap.source : null;
+  const capturedAt =
+    typeof snap.ts === "string" && snap.ts
+      ? snap.ts
+      : typeof row.entry_at === "string"
+        ? row.entry_at
+        : null;
+  return classifyTimelineSensorSource({
+    rawSource,
+    capturedAt,
+    staleMs: options.staleMs ?? TIMELINE_FILTER_STALE_MS,
+    now: options.now,
+    fallback: "manual",
+  }).kind;
 }
 
 const SAFE_DETAIL_TEXT_KEYS = ["plant_name", "stage"] as const;
@@ -84,6 +127,12 @@ export function timelineEvidenceRowMatches(
     if (got !== want) return false;
   }
 
+  if (Array.isArray(input.sensorSources) && input.sensorSources.length > 0) {
+    const kind = deriveTimelineRowSensorSource(row);
+    if (kind === null) return false;
+    if (!input.sensorSources.includes(kind)) return false;
+  }
+
   return true;
 }
 
@@ -99,7 +148,8 @@ export function filterTimelineEvidenceRows<T extends TimelineEvidenceRow>(
   const noPlant = !input.plantId || input.plantId.trim() === "";
   const noTent = !input.tentId || input.tentId.trim() === "";
   const noType = !input.eventType || input.eventType.trim() === "";
-  if (noQuery && noPlant && noTent && noType) return [...rows];
+  const noSrc = !Array.isArray(input.sensorSources) || input.sensorSources.length === 0;
+  if (noQuery && noPlant && noTent && noType && noSrc) return [...rows];
   return rows.filter((r) => timelineEvidenceRowMatches(r, input));
 }
 
@@ -186,6 +236,7 @@ export function isTimelineEvidenceFilterActive(
   if (input.plantId && input.plantId.trim() !== "") return true;
   if (input.tentId && input.tentId.trim() !== "") return true;
   if (input.eventType && input.eventType.trim() !== "") return true;
+  if (Array.isArray(input.sensorSources) && input.sensorSources.length > 0) return true;
   return false;
 }
 

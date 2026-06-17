@@ -61,6 +61,7 @@ import SensorTruthAudit from "./pages/SensorTruthAudit";
 import AiDoctorConfidenceAudit from "./pages/AiDoctorConfidenceAudit";
 import EcowittLiveBringup from "./pages/EcowittLiveBringup";
 import EnvironmentSummaryReportPage from "./pages/EnvironmentSummaryReportPage";
+import OperatorOneTentLoopSmokeTest from "./pages/OperatorOneTentLoopSmokeTest";
 
 const queryClient = new QueryClient();
 
@@ -149,6 +150,10 @@ const App = () => (
                   element={<OperatorEcowittTentPreview />}
                 />
                 <Route path="/operator/genetics-import" element={<OperatorGeneticsImportPage />} />
+                <Route
+                  path="/operator/one-tent-loop-smoke-test"
+                  element={<OperatorOneTentLoopSmokeTest />}
+                />
                 <Route path="/pi-ingest-status" element={<PiIngestStatus />} />
                 <Route path="/ingest-inspector" element={<IngestInspector />} />
                 <Route path="/imports/representative-csv" element={<RepresentativeCsvPreview />} />

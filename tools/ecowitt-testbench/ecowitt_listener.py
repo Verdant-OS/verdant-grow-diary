@@ -200,6 +200,35 @@ def append_raw_log(record: Dict[str, Any]) -> None:
 # Optional forwarding to the validated ingest webhook
 # ---------------------------------------------------------------------------
 
+# In-memory forwarding counters. Reset on restart. Never persisted.
+FORWARD_STATS: Dict[str, Any] = {
+    "attempt_count": 0,
+    "success_count": 0,
+    "failure_count": 0,
+    "last_status": None,
+    "last_at": None,
+    "last_error": None,
+}
+
+
+def _short_sanitized_error(exc: Any) -> str:
+    """Short, sanitized one-line error summary. Never echoes tokens/payloads."""
+    text = str(exc)
+    if len(text) > 200:
+        text = text[:200] + "..."
+    safe = sanitize_debug_payload_str_safe(text)
+    return safe
+
+
+def sanitize_debug_payload_str_safe(text: str) -> str:
+    # Forward declaration shim — real sanitizer is defined below. We
+    # avoid forward-reference issues by guarding here.
+    try:
+        return sanitize_debug_payload(text)  # type: ignore[name-defined]
+    except NameError:
+        return text
+
+
 def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
     url = os.environ.get("VERDANT_INGEST_URL")
     token = os.environ.get("VERDANT_BRIDGE_TOKEN")
@@ -224,8 +253,17 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
         "Idempotency-Key": str(uuid.uuid4()),
         "User-Agent": f"{VENDOR}/1.0",
     }
+    FORWARD_STATS["attempt_count"] += 1
+    FORWARD_STATS["last_at"] = datetime.now(timezone.utc).isoformat()
     try:
         resp = requests.post(url, json=reading, headers=headers, timeout=10)
+        FORWARD_STATS["last_status"] = resp.status_code
+        if 200 <= resp.status_code < 300:
+            FORWARD_STATS["success_count"] += 1
+            FORWARD_STATS["last_error"] = None
+        else:
+            FORWARD_STATS["failure_count"] += 1
+            FORWARD_STATS["last_error"] = f"http_{resp.status_code}"
         print(
             f"[verdant-testbench] forwarded reading -> {resp.status_code} "
             f"(token {mask_token(token)})"
@@ -236,7 +274,30 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
             "idempotency_key": headers["Idempotency-Key"],
         }
     except Exception as exc:
+        FORWARD_STATS["failure_count"] += 1
+        FORWARD_STATS["last_status"] = None
+        FORWARD_STATS["last_error"] = _short_sanitized_error(exc)
         return {"forwarded": False, "reason": f"request_error: {exc!s}"}
+
+
+def mask_ingest_url(url: Optional[str]) -> Optional[str]:
+    """Return a host/path summary that hides project identifiers."""
+    if not url:
+        return None
+    try:
+        from urllib.parse import urlparse
+
+        p = urlparse(url)
+        host = p.hostname or ""
+        parts = host.split(".")
+        if len(parts) >= 3:
+            parts[0] = "***"
+        masked_host = ".".join(parts) if parts else "***"
+        scheme = p.scheme or "https"
+        path = p.path or ""
+        return f"{scheme}://{masked_host}{path}"
+    except Exception:
+        return "***"
 
 
 # ---------------------------------------------------------------------------

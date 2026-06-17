@@ -404,10 +404,12 @@ export function evaluateGgsSentinelReadiness(
     state,
     checks,
     safeMetrics,
+    metricFreshness,
     snapshot,
     passed: state === "PASS_LIVE_SENTINEL_READY",
   };
 }
+
 
 function summarizeSnapshot(
   snapshot: GgsSentinelSnapshot | null,

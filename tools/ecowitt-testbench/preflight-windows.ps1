@@ -8,7 +8,7 @@
 #   - Does NOT read or print .env.
 #   - Does NOT print bridge tokens.
 #   - Does NOT start the listener.
-#   - Does NOT forward anything. Does not call -ForwardToVerdant.
+#   - Does NOT forward anything. Does not call forwarding opt-in.
 #
 # Usage (from repo root OR from tools/ecowitt-testbench):
 #   .\preflight-windows.ps1

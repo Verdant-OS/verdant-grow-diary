@@ -7,7 +7,7 @@
 #   - Does NOT read or print .env.
 #   - Does NOT print bridge tokens.
 #   - Does NOT post payloads by default.
-#   - Does NOT call -ForwardToVerdant.
+#   - Does NOT call forwarding opt-in.
 #
 # Usage (from repo root OR from tools/ecowitt-testbench):
 #   .\tools\ecowitt-testbench\run-testbench-windows.ps1

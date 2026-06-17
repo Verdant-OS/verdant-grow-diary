@@ -52,7 +52,7 @@ describe("ecowitt-mqtt-runner — static safety", () => {
   it("redacts the bridge token in logs", () => {
     expect(SRC).toMatch(/redactBridgeToken\(/);
     const rawTokenLogs =
-      (CODE.match(/console\.log\([^)]*\benv\.token\b[^)]*\)/g) ?? []).filter(
+      ((CODE.match(/console\.log\([^)]*\benv\.token\b[^)]*\)/g) ?? []) as string[]).filter(
         (l) => !l.includes("redactBridgeToken"),
       );
     expect(rawTokenLogs).toEqual([]);

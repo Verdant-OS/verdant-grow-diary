@@ -160,14 +160,15 @@ describe("buildGgsRealPayloadCommitInput", () => {
       CTX,
     );
     // Either upstream normalizer drops it, or our bounds check fires.
-    if (plan.ok) {
+    if (plan.ok === true) {
       expect(plan.rows.find((r) => r.metric === "soil_temp_c")).toBeUndefined();
     } else {
+      const failed = plan as Extract<GgsRealPayloadCommitInput, { ok: false }>;
       expect([
         "soil_temp_out_of_range",
         "no_canonical_readings",
         "normalizer_refused",
-      ]).toContain(plan.reason);
+      ]).toContain(failed.reason);
     }
   });
 

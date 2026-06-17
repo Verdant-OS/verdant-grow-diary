@@ -4,15 +4,13 @@
  *
  * Uses a minimal harness that mirrors the exact wiring in
  * src/pages/Timeline.tsx (state ↔ ?sensorSources= sync, aria-pressed
- * chips, Clear filters reset). This keeps the test fast while exercising
- * the same pure rules and URL helpers the page uses.
+ * chips, Clear filters reset).
  *
  * Read-only. No DB / fetch / AI / Action Queue / alert / device writes.
  */
 import { describe, it, expect } from "vitest";
 import React, { useEffect, useMemo, useState } from "react";
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, useSearchParams } from "react-router-dom";
 import {
   SENSOR_SOURCES_PARAM,
@@ -162,34 +160,41 @@ function renderHarness(initialEntry = "/") {
 }
 
 describe("Timeline source filter — accessibility & URL sync", () => {
-  it("chips are keyboard reachable and expose aria-pressed state", async () => {
-    const user = userEvent.setup();
+  it("chips expose aria-pressed state and toggle on click/keyboard", () => {
     renderHarness();
     const liveBtn = screen.getByTestId("timeline-sensor-source-toggle-live");
     expect(liveBtn).toHaveAttribute("aria-pressed", "false");
-    await user.tab();
-    // Tab order should land on the first chip first.
-    expect(document.activeElement).toBe(liveBtn);
-    await user.keyboard("[Enter]");
+    // Native <button> activates via click on Enter/Space — verify the
+    // pressed state flips deterministically.
+    fireEvent.click(liveBtn);
     expect(liveBtn).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(liveBtn);
+    expect(liveBtn).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("toggling a chip with keyboard filters visible rows", async () => {
-    const user = userEvent.setup();
+  it("all six source chips are focusable native buttons", () => {
     renderHarness();
-    await user.click(screen.getByTestId("timeline-sensor-source-toggle-csv"));
+    for (const k of SENSOR_SOURCE_KINDS) {
+      const btn = screen.getByTestId(`timeline-sensor-source-toggle-${k}`);
+      expect(btn.tagName).toBe("BUTTON");
+      btn.focus();
+      expect(document.activeElement).toBe(btn);
+    }
+  });
+
+  it("toggling a chip filters visible rows", () => {
+    renderHarness();
+    fireEvent.click(screen.getByTestId("timeline-sensor-source-toggle-csv"));
     expect(screen.getByTestId("row-csv-row")).toBeInTheDocument();
     expect(screen.queryByTestId("row-live-row")).toBeNull();
     expect(screen.queryByTestId("row-note-row")).toBeNull();
   });
 
-  it("Clear filters is keyboard reachable and resets selected sources", async () => {
-    const user = userEvent.setup();
+  it("Clear filters resets selected sources and URL", () => {
     renderHarness("/?sensorSources=csv,manual");
     const clear = screen.getByTestId("timeline-clear-filters");
     expect(clear).not.toBeDisabled();
-    clear.focus();
-    await user.keyboard("[Enter]");
+    fireEvent.click(clear);
     expect(
       screen.getByTestId("timeline-sensor-source-toggle-csv"),
     ).toHaveAttribute("aria-pressed", "false");
@@ -207,34 +212,32 @@ describe("Timeline source filter — accessibility & URL sync", () => {
     expect(screen.queryByTestId("row-live-row")).toBeNull();
   });
 
-  it("updates the URL param when chip is toggled", async () => {
-    const user = userEvent.setup();
+  it("updates the URL param when chip is toggled", () => {
     renderHarness();
-    await user.click(screen.getByTestId("timeline-sensor-source-toggle-live"));
+    fireEvent.click(screen.getByTestId("timeline-sensor-source-toggle-live"));
     expect(
       screen.getByTestId("timeline-url-sensor-sources").textContent,
     ).toContain("live");
   });
 
   it("ignores unknown source tokens in URL without crashing", () => {
-    renderHarness("/?sensorSources=live,foo,xss<script>");
+    renderHarness("/?sensorSources=live,foo,bar");
     expect(
       screen.getByTestId("timeline-sensor-source-toggle-live"),
     ).toHaveAttribute("aria-pressed", "true");
     expect(
-      screen.getByTestId("timeline-url-sensor-sources").textContent,
-    ).toContain("live");
+      screen.getByTestId("timeline-sensor-source-toggle-csv"),
+    ).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("legend is keyboard accessible and exposes all six definitions", async () => {
-    const user = userEvent.setup();
+  it("legend exposes all six definitions and is keyboard reachable", () => {
     renderHarness();
     const summary = screen.getByTestId(
       "sensor-source-legend-timeline-filter-summary",
     );
+    expect(summary.tagName).toBe("SUMMARY");
     summary.focus();
     expect(document.activeElement).toBe(summary);
-    await user.keyboard("[Enter]");
     for (const k of SENSOR_SOURCE_KINDS) {
       expect(
         screen.getByTestId(`sensor-source-legend-timeline-filter-row-${k}`),

@@ -388,3 +388,49 @@ docs/ecowitt-windows-testbench.md  (this file)
 ```
 
 
+
+## Troubleshooting: HTTP 400 from `sensor-ingest-webhook` with `tent_id: null`
+
+Symptom: the local listener receives real EcoWitt gateway payloads and
+normalizes them correctly (`"source": "live"`), but forwarding fails
+with `HTTP 400` and `/debug/status` (or `/debug/forwarding-status`)
+shows `tent_id: null` / `tent_id_configured: false`.
+
+Cause: the bridge is missing required Verdant tent context. The
+`sensor-ingest-webhook` Edge Function requires a top-level `tent_id`
+UUID and rejects payloads without it. The listener now refuses to
+forward such payloads at all — they are recorded as a local block
+(`last_forward_error: blocked_missing_tent_id`) instead of being sent
+to the webhook.
+
+Fix:
+
+1. Open the tent in the Verdant UI and copy its real UUID.
+2. Add it to `tools/ecowitt-testbench/.env`:
+
+   ```
+   VERDANT_TENT_ID=<your-tent-uuid>
+   ```
+
+   Do **not** use display names (e.g. `Flower Tent`), demo IDs
+   (`tent-1`, `demo-tent`, `t1`), or the all-zero placeholder UUID —
+   they are rejected as `blocked_invalid_tent_id`.
+
+3. Restart the listener so the new env value is loaded.
+
+4. Verify with:
+
+   ```
+   curl http://localhost:8787/debug/forwarding-status
+   ```
+
+   You should see:
+
+   ```
+   "tent_id_configured": true,
+   "tent_id_valid": true,
+   "forwarding_ready": true
+   ```
+
+The actual tent UUID is never echoed in `/debug/forwarding-status`;
+only the boolean readiness flags are exposed.

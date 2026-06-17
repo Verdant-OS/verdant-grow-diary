@@ -148,9 +148,11 @@ export function classifySensorIngestTestResult(
     return {
       category: "auth_problem",
       headline: "HTTP 401 — auth / token problem",
-      detail: reason
-        ? `Token rejected (${reason}). Mint a fresh tent-scoped bridge token and retry.`
-        : "Bridge token missing, revoked, or expired. Mint a new one and retry.",
+      detail: codeCopy
+        ? codeCopy
+        : reason
+          ? `Token rejected (${reason}). Mint a fresh tent-scoped bridge token and retry.`
+          : "Bridge token missing, revoked, or expired. Mint a new one and retry.",
       isSuccess: false,
       corsWorking: true,
     };

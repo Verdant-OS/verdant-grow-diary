@@ -23,6 +23,12 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import SensorSourceSummaryWidget from "@/components/SensorSourceSummaryWidget";
 import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
+import SensorSourceInlineLegend from "@/components/SensorSourceInlineLegend";
+import { useSearchParams } from "react-router-dom";
+import {
+  SENSOR_SOURCES_PARAM,
+  parseSensorSourcesParam,
+} from "@/lib/sensorSourceUrlRules";
 
 const METRICS = [
   { key: "temp", label: "Temperature" },

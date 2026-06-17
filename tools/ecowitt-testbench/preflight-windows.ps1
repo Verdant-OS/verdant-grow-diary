@@ -15,29 +15,55 @@
 
 $ErrorActionPreference = "Stop"
 
+function Get-SafePath {
+    param([string]$Path)
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $null }
+    try {
+        if (-not (Test-Path -LiteralPath $Path)) { return $null }
+        return (Resolve-Path -LiteralPath $Path).Path
+    } catch {
+        return $null
+    }
+}
+
 function Find-RepoRoot {
-    $start = Split-Path -Parent $MyInvocation.MyCommand.Definition
-    $candidates = @($start, (Get-Location).Path)
-    foreach ($c in $candidates) {
-        $dir = (Resolve-Path $c).Path
-        for ($i = 0; $i -lt 6; $i++) {
-            $hasGit = Test-Path (Join-Path $dir ".git")
-            $hasPkg = Test-Path (Join-Path $dir "package.json")
-            $hasTools = Test-Path (Join-Path $dir "tools\ecowitt-testbench")
+    param([string[]]$StartPaths)
+    foreach ($start in $StartPaths) {
+        $dir = Get-SafePath $start
+        if (-not $dir) { continue }
+        for ($i = 0; $i -lt 8; $i++) {
+            $hasGit   = Test-Path -LiteralPath (Join-Path $dir ".git")
+            $hasPkg   = Test-Path -LiteralPath (Join-Path $dir "package.json")
+            $hasTools = Test-Path -LiteralPath (Join-Path $dir "tools\ecowitt-testbench")
             if (($hasGit -or $hasPkg) -and $hasTools) {
                 return $dir
             }
             $parent = Split-Path -Parent $dir
-            if (-not $parent -or $parent -eq $dir) { break }
+            if ([string]::IsNullOrEmpty($parent) -or $parent -eq $dir) { break }
             $dir = $parent
         }
     }
     return $null
 }
 
-$cwd = (Get-Location).Path
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$repoRoot = Find-RepoRoot
+# Prefer $PSScriptRoot (set when the script is dot-sourced or executed normally).
+$scriptDir = $PSScriptRoot
+if ([string]::IsNullOrWhiteSpace($scriptDir)) {
+    try {
+        $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+    } catch {
+        $scriptDir = $null
+    }
+}
+$scriptDir = Get-SafePath $scriptDir
+
+$cwd = Get-SafePath ((Get-Location).Path)
+
+$candidates = @()
+if ($scriptDir) { $candidates += $scriptDir }
+if ($cwd)       { $candidates += $cwd }
+
+$repoRoot = Find-RepoRoot -StartPaths $candidates
 
 Write-Host "[preflight] current directory: $cwd"
 Write-Host "[preflight] script directory:  $scriptDir"
@@ -47,9 +73,10 @@ if ($repoRoot) {
     Write-Host "[preflight] detected repo root: (none)" -ForegroundColor Yellow
 }
 
-# Detect old standalone folder pattern.
+# Detect old standalone folder pattern (safe regex on plain strings).
 $looksLikeOldStandalone = $false
 foreach ($p in @($cwd, $scriptDir)) {
+    if ([string]::IsNullOrWhiteSpace($p)) { continue }
     if ($p -match '(?i)\\verdant-testbench$' -and $p -notmatch '(?i)\\tools\\ecowitt-testbench$') {
         $looksLikeOldStandalone = $true
     }
@@ -69,7 +96,7 @@ if (-not $repoRoot) {
     $missing += "repo-root (no .git/package.json + tools\ecowitt-testbench found)"
 } else {
     $testbenchDir = Join-Path $repoRoot "tools\ecowitt-testbench"
-    if (-not (Test-Path $testbenchDir)) {
+    if (-not (Test-Path -LiteralPath $testbenchDir)) {
         $missing += "tools\ecowitt-testbench"
     }
 
@@ -85,7 +112,7 @@ if (-not $repoRoot) {
     )
     foreach ($f in $expectedKit) {
         $full = Join-Path $testbenchDir $f
-        if (-not (Test-Path $full)) { $missing += "tools\ecowitt-testbench\$f" }
+        if (-not (Test-Path -LiteralPath $full)) { $missing += "tools\ecowitt-testbench\$f" }
     }
 
     $expectedRepo = @(
@@ -95,7 +122,7 @@ if (-not $repoRoot) {
     )
     foreach ($f in $expectedRepo) {
         $full = Join-Path $repoRoot $f
-        if (-not (Test-Path $full)) { $missing += $f }
+        if (-not (Test-Path -LiteralPath $full)) { $missing += $f }
     }
 }
 

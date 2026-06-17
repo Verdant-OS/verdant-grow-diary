@@ -60,8 +60,9 @@ describe("deriveTimelineRowSensorSource", () => {
 });
 
 describe("filterTimelineEvidenceRows + sensorSources", () => {
+  const recent = new Date(Date.now() - 5_000).toISOString();
   const rows = [
-    row("live", { sensor_snapshot: { source: "live", ts: "2025-06-01T11:59:50Z" } }),
+    row("live", { sensor_snapshot: { source: "live", ts: recent } }),
     row("manual", { sensor_snapshot: { temp: 22 } }),
     row("csv", { sensor_snapshot: { source: "csv" } }),
     row("demo", { sensor_snapshot: { source: "demo" } }),

@@ -13,6 +13,11 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import { useInRouterContext, useNavigate } from "react-router-dom";
+import {
+  buildQuickLogTimelineNavTarget,
+  QUICK_LOG_TIMELINE_CTA_LABEL,
+} from "@/lib/quickLogTimelineNavigationTarget";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -79,7 +84,46 @@ export default function QuickLogV2Sheet({
   const plants = (plantsQ.data as Parameters<typeof buildQuickLogV2TargetOptions>[1]) ?? [];
   const tents = (tentsQ.data as Parameters<typeof buildQuickLogV2TargetOptions>[0]) ?? [];
   const queryClient = useQueryClient();
+  const inRouter = useInRouterContext();
+  // `useNavigate` throws when called outside a Router. The sheet is
+  // always mounted inside the app's Router in production, but some
+  // tests mount it bare — fall back to a no-op navigator in that case.
+  // Hook order is preserved because `inRouter` is stable across renders.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const navigate = inRouter ? useNavigate() : null;
   const { save, saving } = useQuickLogV2Save();
+
+  function navigateToTimeline(href: string) {
+    if (navigate) {
+      navigate(href);
+      return;
+    }
+    if (typeof window !== "undefined" && window.location) {
+      window.location.assign(href);
+    }
+  }
+
+  function showTimelineConfirmation(
+    message: string,
+    scope: {
+      targetType: "plant" | "tent";
+      targetId: string;
+      tentId: string | null;
+      growEventId?: string | null;
+    },
+  ) {
+    const nav = buildQuickLogTimelineNavTarget({
+      targetType: scope.targetType,
+      targetId: scope.targetId,
+      growEventId: scope.growEventId ?? null,
+    });
+    toast.success(message, {
+      action: {
+        label: QUICK_LOG_TIMELINE_CTA_LABEL,
+        onClick: () => navigateToTimeline(nav.href),
+      },
+    });
+  }
 
   const [form, setForm] = useState<QuickLogV2FormState>(EMPTY_QUICKLOG_V2_FORM);
   const [feedingForm, setFeedingForm] = useState<QuickLogFeedingFormState>(
@@ -300,7 +344,12 @@ export default function QuickLogV2Sheet({
         return;
       }
       setSaveStatus(FEEDING_SAVE_SUCCESS_MESSAGE);
-      toast.success(FEEDING_SAVE_SUCCESS_MESSAGE);
+      showTimelineConfirmation(FEEDING_SAVE_SUCCESS_MESSAGE, {
+        targetType: resolved.targetType as "plant" | "tent",
+        targetId: resolved.targetId as string,
+        tentId: resolved.tentId ?? null,
+        growEventId: null,
+      });
       applyQuickLogV2Refresh(queryClient, {
         targetType: resolved.targetType as "plant" | "tent",
         targetId: resolved.targetId as string,
@@ -372,7 +421,12 @@ export default function QuickLogV2Sheet({
 
     const successMessage = photoFile ? "Log and photo saved" : "Log saved";
     setSaveStatus(successMessage);
-    toast.success(successMessage);
+    showTimelineConfirmation(successMessage, {
+      targetType: resolved.targetType as "plant" | "tent",
+      targetId: resolved.targetId as string,
+      tentId: resolved.tentId ?? null,
+      growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
+    });
     applyQuickLogV2Refresh(queryClient, {
       targetType: resolved.targetType as "plant" | "tent",
       targetId: resolved.targetId as string,

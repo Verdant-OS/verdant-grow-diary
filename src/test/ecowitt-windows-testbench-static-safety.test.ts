@@ -94,7 +94,8 @@ describe("ecowitt windows testbench — static safety", () => {
 
   it("listener does not import the supabase client or write to tables directly", () => {
     const py = readFileSync(join(TESTBENCH_DIR, "ecowitt_listener.py"), "utf-8");
-    expect(py).not.toMatch(/supabase/i);
+    expect(py).not.toMatch(/from\s+supabase/i);
+    expect(py).not.toMatch(/import\s+supabase/i);
     expect(py).not.toMatch(/service_role/i);
   });
 

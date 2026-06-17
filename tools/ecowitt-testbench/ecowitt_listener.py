@@ -299,7 +299,148 @@ FORWARD_STATS: Dict[str, Any] = {
     "last_status": None,
     "last_at": None,
     "last_error": None,
+    # Sanitized fields captured from the most recent non-2xx response
+    # from sensor-ingest-webhook. Populated only after the body has been
+    # passed through the local sanitizer; never raw bodies, tokens, or
+    # raw EcoWitt payloads.
+    "last_forward_response_error": None,
+    "last_forward_response_classification": None,
+    "last_forward_response_message": None,
 }
+
+
+# Webhook contract: sensor-ingest-webhook only accepts canonical transport
+# `source` labels from WEBHOOK_ALLOWED_SOURCES (e.g. "ecowitt", "webhook").
+# The Verdant local source label ("live" / "demo" / ...) is preserved
+# under metadata.verdant_source for audit; never sent as `source`.
+WEBHOOK_TRANSPORT_SOURCE = "ecowitt"
+
+# Keys we always strip from raw EcoWitt payloads before forwarding —
+# they are device-auth secrets or noisy fields, never needed by Verdant.
+_FORWARD_PAYLOAD_REDACT_KEYS = {"passkey", "PASSKEY", "Passkey"}
+
+
+def _redact_raw_payload_for_forward(raw: Any) -> Any:
+    """Return a copy of raw EcoWitt payload with PASSKEY-class secrets removed."""
+    if not isinstance(raw, dict):
+        return raw
+    out: Dict[str, Any] = {}
+    for k, v in raw.items():
+        ks = str(k)
+        if ks in _FORWARD_PAYLOAD_REDACT_KEYS or ks.lower() == "passkey":
+            continue
+        out[ks] = v
+    return out
+
+
+# Known sanitized error codes the sensor-ingest-webhook may return.
+# Used to classify the body so operators see meaningful guidance rather
+# than just an HTTP status.
+_WEBHOOK_ERROR_CLASSIFICATIONS = {
+    "invalid_payload": "payload_shape_mismatch",
+    "invalid_json": "payload_shape_mismatch",
+    "unauthorized": "auth_failed",
+    "forbidden_tent": "tent_authorization_mismatch",
+    "tent_lookup_failed": "tent_lookup_failed",
+    "insert_failed": "storage_insert_failed",
+    "server_misconfigured": "server_misconfigured",
+    "method_not_allowed": "transport_error",
+    "internal_error": "internal_error",
+}
+
+
+import re as _re_inline
+
+# Substring patterns redacted inline even when embedded in a larger
+# string (so error messages like "bad token vbt_XYZ in payload" do not
+# leak the embedded credential).
+_INLINE_REDACT_PATTERNS = [
+    _re_inline.compile(r"vbt_[A-Za-z0-9_\-]{6,}"),
+    _re_inline.compile(r"eyJ[A-Za-z0-9_\-]{6,}\.[A-Za-z0-9_\-]{6,}\.[A-Za-z0-9_\-]{6,}"),
+    _re_inline.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]{6,}"),
+]
+
+
+
+def _scrub_inline_secrets(text: str) -> str:
+    out = text
+    for pat in _INLINE_REDACT_PATTERNS:
+        out = pat.sub(_REDACTED, out)
+    return out
+
+
+def sanitize_forward_error_value(value: Any) -> Any:
+    """Sanitize a value pulled from a webhook error response.
+
+    Always passes through the recursive sanitizer (which redacts vbt_,
+    JWT, Bearer, Authorization, x-verdant-bridge-token, PASSKEY, and
+    service-role markers) AND scrubs embedded token-like substrings.
+    Long strings are truncated to a short summary. Never returns raw
+    response bodies of unbounded length.
+    """
+    safe = sanitize_debug_payload(value)
+    if isinstance(safe, str):
+        s = _scrub_inline_secrets(safe).strip()
+        if len(s) > 240:
+            s = s[:240] + "..."
+        return s
+    if isinstance(safe, (dict, list)):
+        # Re-serialize/parse through inline scrub to catch embedded tokens.
+        try:
+            dumped = json.dumps(safe, default=str)
+            scrubbed = _scrub_inline_secrets(dumped)
+            return json.loads(scrubbed)
+        except Exception:
+            return safe
+    return safe
+
+
+
+def summarize_forward_response(resp: Any) -> Dict[str, Any]:
+    """Extract a sanitized summary from a requests.Response-like object.
+
+    Returns a dict with: error, classification, message. Never returns
+    full bodies, tokens, Authorization headers, or raw EcoWitt payloads.
+    Non-JSON bodies become a short summary describing the content type
+    and a clipped, sanitized snippet (<=240 chars).
+    """
+    out: Dict[str, Any] = {
+        "error": None,
+        "classification": None,
+        "message": None,
+    }
+    body_obj: Any = None
+    try:
+        body_obj = resp.json()
+    except Exception:
+        body_obj = None
+
+    if isinstance(body_obj, dict):
+        err = body_obj.get("error")
+        if isinstance(err, str) and err:
+            safe_err = sanitize_forward_error_value(err)
+            out["error"] = safe_err if isinstance(safe_err, str) else _REDACTED
+            cls = _WEBHOOK_ERROR_CLASSIFICATIONS.get(
+                safe_err if isinstance(safe_err, str) else "",
+                "unknown_webhook_error",
+            )
+            out["classification"] = cls
+        msg_candidates = body_obj.get("errors") or body_obj.get("message")
+        if msg_candidates is not None:
+            out["message"] = sanitize_forward_error_value(msg_candidates)
+        return out
+
+    # Non-JSON body — store a short sanitized summary only.
+    try:
+        text = getattr(resp, "text", None) or ""
+    except Exception:
+        text = ""
+    snippet = sanitize_forward_error_value(text) if text else None
+    out["error"] = "non_json_response"
+    out["classification"] = "non_json_response"
+    out["message"] = snippet
+    return out
+
 
 
 import re as _re
@@ -421,14 +562,41 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
         )
         return {"forwarded": False, "reason": "non_ascii_auth_header"}
 
-    # Attach tent context. Edge Function requires top-level tent_id;
-    # x-verdant-tent-id is a secondary signal already in the CORS allowlist.
-    outbound = dict(reading)
+    # Attach tent context AND align with the sensor-ingest-webhook
+    # contract (WEBHOOK_ALLOWED_SOURCES requires a canonical transport
+    # label such as "ecowitt"; the local Verdant source — "live" /
+    # "demo" / ... — is preserved under metadata.verdant_source for
+    # audit but never sent as `source`).
+    verdant_source = reading.get("source")
+    raw_payload_in = None
+    metadata_in = reading.get("metadata") if isinstance(reading.get("metadata"), dict) else {}
+    if isinstance(metadata_in, dict):
+        raw_payload_in = metadata_in.get("raw_payload")
+    safe_raw_payload = _redact_raw_payload_for_forward(raw_payload_in)
+
+    safe_metadata: Dict[str, Any] = {}
+    if isinstance(metadata_in, dict):
+        for k, v in metadata_in.items():
+            if k == "raw_payload":
+                continue
+            safe_metadata[str(k)] = v
+    safe_metadata["tent_id"] = tent_id
+    safe_metadata["verdant_source"] = verdant_source
+    if safe_raw_payload is not None:
+        safe_metadata["raw_payload"] = safe_raw_payload
+
+    outbound: Dict[str, Any] = {
+        "source": WEBHOOK_TRANSPORT_SOURCE,
+        "vendor": VENDOR,
+        "captured_at": reading.get("captured_at"),
+        "metrics": reading.get("metrics") or {},
+        "metadata": safe_metadata,
+    }
+    # Top-level tent_id is required by sensor-ingest-webhook. Set via
+    # explicit assignment (preserved for static safety scans that look
+    # for `outbound["tent_id"] = tent_id`).
     outbound["tent_id"] = tent_id
-    if isinstance(outbound.get("metadata"), dict):
-        md = dict(outbound["metadata"])
-        md["tent_id"] = tent_id
-        outbound["metadata"] = md
+
 
     headers = {
         "Authorization": auth,
@@ -439,6 +607,11 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
     }
     FORWARD_STATS["attempt_count"] += 1
     FORWARD_STATS["last_at"] = datetime.now(timezone.utc).isoformat()
+    # Reset prior sanitized response fields each attempt — they only
+    # describe the *last* response, never carried over silently.
+    FORWARD_STATS["last_forward_response_error"] = None
+    FORWARD_STATS["last_forward_response_classification"] = None
+    FORWARD_STATS["last_forward_response_message"] = None
     try:
         resp = requests.post(url, json=outbound, headers=headers, timeout=10)
         FORWARD_STATS["last_status"] = resp.status_code
@@ -448,6 +621,12 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
         else:
             FORWARD_STATS["failure_count"] += 1
             FORWARD_STATS["last_error"] = f"http_{resp.status_code}"
+            summary = summarize_forward_response(resp)
+            FORWARD_STATS["last_forward_response_error"] = summary["error"]
+            FORWARD_STATS["last_forward_response_classification"] = summary[
+                "classification"
+            ]
+            FORWARD_STATS["last_forward_response_message"] = summary["message"]
         print(
             f"[verdant-testbench] forwarded reading -> {resp.status_code} "
             f"(token {mask_token(token or '')})"
@@ -461,7 +640,8 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
         FORWARD_STATS["failure_count"] += 1
         FORWARD_STATS["last_status"] = None
         FORWARD_STATS["last_error"] = _short_sanitized_error(exc)
-        return {"forwarded": False, "reason": f"request_error: {exc!s}"}
+        return {"forwarded": False, "reason": f"request_error: {type(exc).__name__}"}
+
 
 
 def mask_ingest_url(url: Optional[str]) -> Optional[str]:
@@ -862,6 +1042,18 @@ def debug_forwarding_status() -> Any:
         safe_err = sanitize_debug_payload(last_error)
         last_error = safe_err if isinstance(safe_err, str) else _REDACTED
 
+    # Sanitized webhook response fields (always re-sanitized at read
+    # time as a belt-and-braces guard).
+    last_resp_error = sanitize_forward_error_value(
+        FORWARD_STATS.get("last_forward_response_error")
+    )
+    last_resp_cls = sanitize_forward_error_value(
+        FORWARD_STATS.get("last_forward_response_classification")
+    )
+    last_resp_msg = sanitize_forward_error_value(
+        FORWARD_STATS.get("last_forward_response_message")
+    )
+
     return jsonify(
         {
             "ok": True,
@@ -880,8 +1072,12 @@ def debug_forwarding_status() -> Any:
             "last_forward_status": FORWARD_STATS.get("last_status"),
             "last_forward_at": FORWARD_STATS.get("last_at"),
             "last_forward_error": last_error,
+            "last_forward_response_error": last_resp_error,
+            "last_forward_response_classification": last_resp_cls,
+            "last_forward_response_message": last_resp_msg,
         }
     )
+
 
 
 

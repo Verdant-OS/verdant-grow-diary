@@ -1227,3 +1227,80 @@ describe("ecowitt windows testbench — forwarding tent-context safety", () => {
     expect(doc).toMatch(/forwarding_ready/);
   });
 });
+
+describe("ecowitt windows testbench — forwarding response sanitization", () => {
+  const LISTENER_PATH = join(TESTBENCH_DIR, "ecowitt_listener.py");
+  const listener = readFileSync(LISTENER_PATH, "utf-8");
+  const doc = readFileSync(DOC_PATH, "utf-8");
+  const fwdBlock =
+    listener.split('@app.get("/debug/forwarding-status")')[1]?.split("@app.get(")[0] ??
+    "";
+
+  it("declares sanitize_forward_error_value and summarize_forward_response helpers", () => {
+    expect(listener).toMatch(/def\s+sanitize_forward_error_value\(/);
+    expect(listener).toMatch(/def\s+summarize_forward_response\(/);
+  });
+
+  it("captures sanitized webhook response fields in FORWARD_STATS", () => {
+    expect(listener).toMatch(/"last_forward_response_error"/);
+    expect(listener).toMatch(/"last_forward_response_classification"/);
+    expect(listener).toMatch(/"last_forward_response_message"/);
+  });
+
+  it("/debug/forwarding-status exposes sanitized response fields", () => {
+    expect(fwdBlock).toMatch(/last_forward_response_error/);
+    expect(fwdBlock).toMatch(/last_forward_response_classification/);
+    expect(fwdBlock).toMatch(/last_forward_response_message/);
+    expect(fwdBlock).toMatch(/sanitize_forward_error_value/);
+  });
+
+  it("/debug/forwarding-status still never echoes Authorization or raw payload", () => {
+    expect(fwdBlock).not.toMatch(/Authorization/);
+    expect(fwdBlock).not.toMatch(/raw_payload/);
+  });
+
+  it("forwarded payload uses webhook transport source, never raw verdant 'live'", () => {
+    expect(listener).toMatch(/WEBHOOK_TRANSPORT_SOURCE\s*=\s*"ecowitt"/);
+    const fn = listener.split("def maybe_forward")[1]?.split("\ndef ")[0] ?? "";
+    expect(fn).toMatch(/"source":\s*WEBHOOK_TRANSPORT_SOURCE/);
+    // Verdant source must be preserved as lineage in metadata, not as `source`.
+    expect(fn).toMatch(/verdant_source/);
+  });
+
+  it("PASSKEY is stripped from forwarded raw_payload", () => {
+    expect(listener).toMatch(/_redact_raw_payload_for_forward/);
+    expect(listener).toMatch(/_FORWARD_PAYLOAD_REDACT_KEYS/);
+    // The redactor must drop PASSKEY in any common case.
+    const redactor =
+      listener.split("def _redact_raw_payload_for_forward")[1]?.split("\ndef ")[0] ?? "";
+    expect(redactor).toMatch(/passkey/i);
+  });
+
+  it("summarize_forward_response never returns response.text without sanitization", () => {
+    const fn =
+      listener.split("def summarize_forward_response")[1]?.split("\ndef ")[0] ?? "";
+    expect(fn).toMatch(/sanitize_forward_error_value/);
+    // Must not assign raw resp.text directly into output keys.
+    expect(fn).not.toMatch(/"message"\s*:\s*text\b/);
+    expect(fn).not.toMatch(/"error"\s*:\s*text\b/);
+  });
+
+  it("inline redactor scrubs embedded vbt_ / JWT / Bearer substrings", () => {
+    expect(listener).toMatch(/_INLINE_REDACT_PATTERNS/);
+    expect(listener).toMatch(/vbt_\[A-Za-z0-9_\\-\]/);
+    expect(listener).toMatch(/eyJ\[A-Za-z0-9_\\-\]/);
+    expect(listener).toMatch(/bearer/i);
+  });
+
+  it("docs explain sanitized forwarding response diagnostics", () => {
+    expect(doc).toMatch(/last_forward_response_error/);
+    expect(doc).toMatch(/last_forward_response_classification/);
+    expect(doc).toMatch(/last_forward_response_message/);
+    expect(doc).toMatch(/invalid_payload/);
+    expect(doc).toMatch(/forbidden_tent/);
+    expect(doc).toMatch(/tent_lookup_failed/);
+    expect(doc).toMatch(/insert_failed/);
+    expect(doc).toMatch(/Never paste bridge token/i);
+  });
+});
+

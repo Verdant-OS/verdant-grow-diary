@@ -46,11 +46,26 @@ function isEcowittRow(row: EcowittSensorReadingRow): boolean {
   if (src === "ecowitt") return true;
   const raw = row.raw_payload;
   if (raw && typeof raw === "object") {
-    const vendor = (raw as { vendor?: unknown }).vendor;
-    if (typeof vendor === "string" && vendor.trim().toLowerCase() === "ecowitt") {
-      return true;
+    const r = raw as {
+      vendor?: unknown;
+      source?: unknown;
+      transport_source?: unknown;
+    };
+    const lineageFields: unknown[] = [r.vendor, r.source, r.transport_source];
+    for (const field of lineageFields) {
+      if (typeof field === "string") {
+        const f = field.trim().toLowerCase();
+        // Accept canonical "ecowitt" and any vendor lineage starting with
+        // "ecowitt" (e.g. "ecowitt_windows_testbench") so live-forwarded
+        // rows stored as source="live" still resolve as EcoWitt-derived.
+        if (f === "ecowitt" || f.startsWith("ecowitt")) return true;
+      }
     }
   }
+  // Canonical V0 "live" source rows are EcoWitt-derived only when their
+  // raw_payload carries EcoWitt vendor lineage (handled above). We do NOT
+  // accept bare source="live" without lineage to avoid bleeding unrelated
+  // live ingest paths into this card.
   return false;
 }
 

@@ -270,6 +270,57 @@ describe("SensorHistoryImportAuditLedger component", () => {
       expect(txt.toLowerCase()).not.toContain(forbidden);
     }
   });
+
+  it("renders inserted + skipped-duplicates counts when present and '—' when absent", () => {
+    const opts = makeOpts(Date.UTC(2026, 6, 1, 9));
+    // Event WITH duplicate-aware counts
+    recordSensorHistoryImportAuditEvent(
+      {
+        sourceAppId: "verdant_genetics_xlsx",
+        fileType: "xlsx",
+        acceptedRowCount: 2266,
+        rejectedRowCount: 0,
+        insertedRowCount: 120,
+        duplicateRowCount: 2146,
+        mappedTentLabels: ["Tent A"],
+      },
+      opts,
+    );
+    // Event WITHOUT duplicate-aware counts (legacy / older event)
+    recordSensorHistoryImportAuditEvent(
+      {
+        sourceAppId: "spider_farmer",
+        fileType: "csv",
+        acceptedRowCount: 30,
+        rejectedRowCount: 0,
+        mappedTentLabels: ["Tent B"],
+      },
+      opts,
+    );
+    render(<SensorHistoryImportAuditLedger options={opts} />);
+    const rows = screen.getAllByTestId(
+      "sensor-history-import-audit-ledger-row",
+    );
+    // newest first → spider_farmer (no counts), then xlsx (with counts)
+    const legacyRow = rows[0];
+    const newRow = rows[1];
+    expect(
+      within(newRow).getByTestId("ledger-inserted-count").textContent,
+    ).toMatch(/Inserted:\s*120/);
+    expect(
+      within(newRow).getByTestId("ledger-duplicate-count").textContent,
+    ).toMatch(/Skipped duplicates:\s*2146/);
+    expect(
+      within(legacyRow).getByTestId("ledger-inserted-count").textContent,
+    ).toMatch(/Inserted:\s*—/);
+    expect(
+      within(legacyRow).getByTestId("ledger-duplicate-count").textContent,
+    ).toMatch(/Skipped duplicates:\s*—/);
+    // No-live disclaimer always present.
+    expect(
+      screen.getByText(/not live telemetry/i),
+    ).toBeInTheDocument();
+  });
 });
 
 describe("sensorHistoryImportAuditLog + ledger — static safety guard", () => {

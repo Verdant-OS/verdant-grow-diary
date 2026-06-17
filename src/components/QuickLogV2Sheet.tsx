@@ -122,7 +122,7 @@ export default function QuickLogV2Sheet({
     toast.success(message, {
       action: {
         label: QUICK_LOG_TIMELINE_CTA_LABEL,
-        onClick: () => navigateToTimeline(nav.href),
+        onClick: () => navigateToTimeline(nav.href, nav.hash, nav.path),
       },
     });
   }

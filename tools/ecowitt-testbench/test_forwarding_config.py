@@ -13,8 +13,13 @@ from unittest import mock
 
 from ecowitt_listener import (
     FORWARD_STATS,
+    MAX_RETRY_ATTEMPTS,
+    RETRYABLE_STATUSES,
     WEBHOOK_TRANSPORT_SOURCE,
+    app,
+    compute_backoff_delay,
     evaluate_forwarding_readiness,
+    is_retryable_status,
     is_valid_tent_id,
     maybe_forward,
     sanitize_forward_error_value,
@@ -34,11 +39,18 @@ def _reset_stats() -> None:
         "success_count",
         "failure_count",
         "blocked_count",
+        "retry_count",
     ):
         FORWARD_STATS[k] = 0
     FORWARD_STATS["last_status"] = None
     FORWARD_STATS["last_at"] = None
     FORWARD_STATS["last_error"] = None
+    FORWARD_STATS["last_retry_error"] = None
+    FORWARD_STATS["last_retry_at"] = None
+    FORWARD_STATS["last_retryable_status"] = None
+    FORWARD_STATS["last_forward_response_error"] = None
+    FORWARD_STATS["last_forward_response_classification"] = None
+    FORWARD_STATS["last_forward_response_message"] = None
 
 
 class TentIdValidationTests(unittest.TestCase):
@@ -340,6 +352,151 @@ class ForwardErrorSanitizationTests(unittest.TestCase):
             r = summarize_forward_response(_FakeResp(400, {"error": err}))
             self.assertEqual(r["error"], err)
             self.assertEqual(r["classification"], cls)
+
+
+class RetryBehaviorTests(unittest.TestCase):
+    def setUp(self):
+        _reset_stats()
+
+    def _fake_responses(self, statuses):
+        responses = [_FakeResp(s, {"error": "internal_error"} if s >= 400 else {"ok": True}) for s in statuses]
+        return responses
+
+    def test_retries_on_500(self):
+        with mock.patch.dict(os.environ, _full_env(), clear=False):
+            with mock.patch("ecowitt_listener.requests") as fake_requests, \
+                 mock.patch("time.sleep"):
+                fake_requests.post.side_effect = self._fake_responses([500, 500, 200])
+                maybe_forward({"captured_at": "x", "metrics": {"temp_f": 70.0}})
+        self.assertEqual(FORWARD_STATS["retry_count"], 2)
+        self.assertEqual(FORWARD_STATS["last_status"], 200)
+        self.assertEqual(FORWARD_STATS["last_retryable_status"], 500)
+        self.assertIsNotNone(FORWARD_STATS["last_retry_at"])
+
+    def test_retries_on_503_then_fails(self):
+        with mock.patch.dict(os.environ, _full_env(), clear=False):
+            with mock.patch("ecowitt_listener.requests") as fake_requests, \
+                 mock.patch("time.sleep"):
+                fake_requests.post.side_effect = self._fake_responses([503, 503, 503])
+                maybe_forward({"captured_at": "x", "metrics": {"temp_f": 70.0}})
+        # max 2 retries → 3 total attempts → retry_count == 2
+        self.assertEqual(FORWARD_STATS["retry_count"], 2)
+        self.assertEqual(FORWARD_STATS["last_status"], 503)
+
+    def test_retries_on_429(self):
+        with mock.patch.dict(os.environ, _full_env(), clear=False):
+            with mock.patch("ecowitt_listener.requests") as fake_requests, \
+                 mock.patch("time.sleep"):
+                fake_requests.post.side_effect = self._fake_responses([429, 200])
+                maybe_forward({"captured_at": "x", "metrics": {"temp_f": 70.0}})
+        self.assertEqual(FORWARD_STATS["retry_count"], 1)
+        self.assertEqual(FORWARD_STATS["last_status"], 200)
+
+    def test_does_not_retry_400(self):
+        with mock.patch.dict(os.environ, _full_env(), clear=False):
+            with mock.patch("ecowitt_listener.requests") as fake_requests, \
+                 mock.patch("time.sleep") as fake_sleep:
+                fake_requests.post.return_value = _FakeResp(400, {"error": "invalid_payload"})
+                maybe_forward({"captured_at": "x", "metrics": {"temp_f": 70.0}})
+                self.assertEqual(fake_requests.post.call_count, 1)
+                fake_sleep.assert_not_called()
+        self.assertEqual(FORWARD_STATS["retry_count"], 0)
+
+    def test_does_not_retry_401_403(self):
+        for status, err in [(401, "unauthorized"), (403, "forbidden_tent")]:
+            _reset_stats()
+            with mock.patch.dict(os.environ, _full_env(), clear=False):
+                with mock.patch("ecowitt_listener.requests") as fake_requests, \
+                     mock.patch("time.sleep"):
+                    fake_requests.post.return_value = _FakeResp(status, {"error": err})
+                    maybe_forward({"captured_at": "x", "metrics": {"temp_f": 70.0}})
+                    self.assertEqual(fake_requests.post.call_count, 1, f"status={status}")
+            self.assertEqual(FORWARD_STATS["retry_count"], 0)
+
+    def test_retry_count_is_bounded(self):
+        # 10 consecutive 500s should not trigger 10 retries.
+        with mock.patch.dict(os.environ, _full_env(), clear=False):
+            with mock.patch("ecowitt_listener.requests") as fake_requests, \
+                 mock.patch("time.sleep"):
+                fake_requests.post.side_effect = [_FakeResp(500, {"error": "internal_error"})] * 10
+                maybe_forward({"captured_at": "x", "metrics": {"temp_f": 70.0}})
+                self.assertLessEqual(fake_requests.post.call_count, MAX_RETRY_ATTEMPTS + 1)
+        self.assertLessEqual(FORWARD_STATS["retry_count"], MAX_RETRY_ATTEMPTS)
+
+    def test_is_retryable_status_matrix(self):
+        for s in (408, 425, 429, 500, 502, 503, 504):
+            self.assertTrue(is_retryable_status(s), s)
+        for s in (200, 201, 204, 400, 401, 403, 404, 405, 409, 422):
+            self.assertFalse(is_retryable_status(s), s)
+
+    def test_compute_backoff_delay_bounded(self):
+        for attempt in range(5):
+            d = compute_backoff_delay(attempt)
+            self.assertGreaterEqual(d, 0.0)
+            self.assertLess(d, 2.0, f"attempt={attempt} delay={d}")
+
+
+class ForwardingErrorReportEndpointTests(unittest.TestCase):
+    def setUp(self):
+        _reset_stats()
+        self.client = app.test_client()
+
+    def test_loopback_only(self):
+        resp = self.client.get(
+            "/debug/forwarding-error-report",
+            environ_overrides={"REMOTE_ADDR": "10.0.0.5"},
+        )
+        self.assertEqual(resp.status_code, 403)
+
+    def test_report_contains_recommended_next_step(self):
+        with mock.patch.dict(os.environ, _full_env(), clear=False):
+            resp = self.client.get(
+                "/debug/forwarding-error-report",
+                environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+            )
+        self.assertEqual(resp.status_code, 200)
+        body = resp.get_json()
+        self.assertIn("recommended_next_step", body)
+        self.assertIn("generated_at", body)
+        self.assertIn("retry_count", body)
+        self.assertIn("max_retry_attempts", body)
+        self.assertIn("latest_metrics", body)
+
+    def test_report_never_includes_token_or_payload(self):
+        env = _full_env(VERDANT_BRIDGE_TOKEN="vbt_" + ("Z" * 30))
+        with mock.patch.dict(os.environ, env, clear=False):
+            # Simulate a recent failure with token-like leak in response.
+            FORWARD_STATS["last_forward_response_message"] = (
+                "bad token vbt_" + ("Q" * 30) + " inside"
+            )
+            FORWARD_STATS["last_error"] = "http_400"
+            FORWARD_STATS["last_retry_error"] = "Bearer vbt_" + ("R" * 30)
+            resp = self.client.get(
+                "/debug/forwarding-error-report",
+                environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+            )
+        text = resp.get_data(as_text=True)
+        # No token-like substrings of significant length
+        import re as _re
+        self.assertIsNone(
+            _re.search(r"vbt_[A-Za-z0-9_\-]{6,}", text),
+            f"token-like substring leaked: {text[:200]}",
+        )
+        self.assertNotIn("Authorization", text)
+        self.assertNotIn("PASSKEY", text)
+        # Tent UUID must not be echoed verbatim
+        self.assertNotIn(VALID_TENT_UUID, text)
+
+    def test_report_blocked_missing_tent_id_gives_actionable_step(self):
+        env = {k: v for k, v in _full_env().items() if k != "VERDANT_TENT_ID"}
+        with mock.patch.dict(os.environ, env, clear=True):
+            resp = self.client.get(
+                "/debug/forwarding-error-report",
+                environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+            )
+        body = resp.get_json()
+        self.assertFalse(body["forwarding_ready"])
+        self.assertIn("VERDANT_TENT_ID", body["recommended_next_step"])
 
 
 if __name__ == "__main__":

@@ -1304,3 +1304,122 @@ describe("ecowitt windows testbench — forwarding response sanitization", () =>
   });
 });
 
+describe("ecowitt windows testbench — retry/backoff + error report", () => {
+  const LISTENER_PATH = join(TESTBENCH_DIR, "ecowitt_listener.py");
+  const listener = readFileSync(LISTENER_PATH, "utf-8");
+  const doc = readFileSync(DOC_PATH, "utf-8");
+
+  it("declares bounded retry constants and helpers", () => {
+    expect(listener).toMatch(/MAX_RETRY_ATTEMPTS\s*=\s*\d/);
+    expect(listener).toMatch(/RETRYABLE_STATUSES\s*=\s*\{/);
+    expect(listener).toMatch(/def is_retryable_status\(/);
+    expect(listener).toMatch(/def compute_backoff_delay\(/);
+  });
+
+  it("retry set includes transient statuses and excludes terminal ones", () => {
+    const block =
+      listener.split("RETRYABLE_STATUSES = {")[1]?.split("}")[0] ?? "";
+    for (const s of ["408", "425", "429", "500", "502", "503", "504"]) {
+      expect(block).toContain(s);
+    }
+    for (const s of ["400", "401", "403", "404", "405", "409"]) {
+      expect(block).not.toContain(s);
+    }
+  });
+
+  it("retry loop is bounded (uses MAX_RETRY_ATTEMPTS, not while True)", () => {
+    const fn = listener.split("def maybe_forward")[1]?.split("\ndef ")[0] ?? "";
+    expect(fn).toMatch(/range\(MAX_RETRY_ATTEMPTS\s*\+\s*1\)/);
+    expect(fn).not.toMatch(/while\s+True/);
+    // No unbounded queue wording
+    expect(fn).not.toMatch(/queue\.put|deque\(/);
+  });
+
+  it("forwarding-status exposes retry tracking fields", () => {
+    const fwd =
+      listener.split('@app.get("/debug/forwarding-status")')[1]?.split("@app.get(")[0] ?? "";
+    expect(fwd).toMatch(/"retry_count"/);
+    expect(fwd).toMatch(/"last_retry_error"/);
+    expect(fwd).toMatch(/"last_retry_at"/);
+    expect(fwd).toMatch(/"last_retryable_status"/);
+    expect(fwd).toMatch(/"max_retry_attempts"/);
+  });
+
+  it("/debug/forwarding-error-report endpoint exists and is loopback-only + sanitized", () => {
+    expect(listener).toMatch(/@app\.get\("\/debug\/forwarding-error-report"\)/);
+    const fn =
+      listener.split('@app.get("/debug/forwarding-error-report")')[1]?.split("@app.get(")[0] ?? "";
+    expect(fn).toMatch(/_is_local_request\(\)/);
+    expect(fn).toMatch(/recommended_next_step/);
+    expect(fn).toMatch(/sanitize_debug_payload/);
+    // never echoes Authorization or raw payload
+    expect(fn).not.toMatch(/Authorization/);
+    expect(fn).not.toMatch(/raw_payload/);
+    // never reads .env file contents (allow os.environ access)
+    expect(fn).not.toMatch(/open\([^)]*\.env\b/);
+    expect(fn).not.toMatch(/\.env"|'\.env'/);
+  });
+
+  it("no endpoint reads or returns .env file contents", () => {
+    // Routes must not open or return the .env file body.
+    expect(listener).not.toMatch(/open\([^)]*\.env[^)]*\)/);
+  });
+
+  it("summarize_forward_response sanitizes resp.text before storing", () => {
+    const fn =
+      listener.split("def summarize_forward_response")[1]?.split("\ndef ")[0] ?? "";
+    // Must call sanitizer; must not pass raw text straight into message
+    expect(fn).toMatch(/sanitize_forward_error_value\(text\)/);
+  });
+
+  it("docs document /debug/forwarding-error-report and retry behavior", () => {
+    expect(doc).toMatch(/\/debug\/forwarding-error-report/);
+    expect(doc).toMatch(/recommended_next_step/);
+    expect(doc).toMatch(/retry_count/);
+    expect(doc).toMatch(/max_retry_attempts/);
+    expect(doc).toMatch(/exponential backoff/i);
+  });
+
+  it("docs include troubleshooting checklist with each classification", () => {
+    for (const cls of [
+      "invalid_payload",
+      "unauthorized",
+      "forbidden_tent",
+      "tent_lookup_failed",
+      "insert_failed",
+      "server_misconfigured",
+      "method_not_allowed",
+      "internal_error",
+      "non_json_response",
+      "blocked_missing_tent_id",
+      "blocked_invalid_tent_id",
+    ]) {
+      expect(doc, `docs missing checklist row for ${cls}`).toContain(cls);
+    }
+  });
+
+  it("golden contract fixture has no secrets", () => {
+    const fixture = readFileSync(
+      join(TESTBENCH_DIR, "fixtures", "golden_forwarded_payload.json"),
+      "utf-8",
+    );
+    expect(fixture).not.toMatch(/PASSKEY/i);
+    expect(fixture).not.toMatch(/vbt_[A-Za-z0-9_\-]{6,}/);
+    expect(fixture).not.toMatch(/Authorization/);
+    expect(fixture).not.toMatch(/Bearer\s+/);
+    expect(fixture).not.toMatch(/service_role/i);
+  });
+
+  it("golden contract test file exists and asserts contract fields", () => {
+    const test = readFileSync(
+      join(TESTBENCH_DIR, "test_forwarding_contract.py"),
+      "utf-8",
+    );
+    expect(test).toMatch(/source.*ecowitt/);
+    expect(test).toMatch(/tent_id/);
+    expect(test).toMatch(/verdant_source/);
+    expect(test).toMatch(/PASSKEY/);
+  });
+});
+
+

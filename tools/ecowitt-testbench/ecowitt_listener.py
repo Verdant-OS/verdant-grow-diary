@@ -290,6 +290,44 @@ def append_raw_log(record: Dict[str, Any]) -> None:
 # Optional forwarding to the validated ingest webhook
 # ---------------------------------------------------------------------------
 
+# Bounded retry/backoff configuration. Kept small so the local
+# operator testbench never blocks the listener for long. We never queue
+# unbounded readings — at most MAX_RETRY_ATTEMPTS retries happen inline
+# for a single forward call, then the failure is recorded and the
+# listener moves on.
+MAX_RETRY_ATTEMPTS = 2  # additional retries after the first attempt
+BACKOFF_BASE_SECONDS = 0.2
+BACKOFF_MAX_SECONDS = 1.0
+
+# HTTP statuses we treat as transient and worth retrying. 409 is
+# intentionally NOT retried — the webhook contract does not classify
+# duplicate idempotency-key conflicts as retryable.
+RETRYABLE_STATUSES = {408, 425, 429, 500, 502, 503, 504}
+
+
+def is_retryable_status(status: Optional[int]) -> bool:
+    """Pure predicate: should this HTTP status trigger a retry?"""
+    return isinstance(status, int) and status in RETRYABLE_STATUSES
+
+
+def compute_backoff_delay(
+    attempt: int,
+    base: float = BACKOFF_BASE_SECONDS,
+    cap: float = BACKOFF_MAX_SECONDS,
+) -> float:
+    """Exponential backoff with bounded jitter. Pure-ish (random jitter).
+
+    `attempt` is the retry index (0 for first retry). Total delay is
+    capped at `cap` seconds + small jitter so the listener cannot block
+    for long.
+    """
+    import random as _random
+
+    base_delay = min(cap, base * (2 ** max(0, attempt)))
+    jitter = _random.uniform(0.0, base_delay * 0.25)
+    return base_delay + jitter
+
+
 # In-memory forwarding counters. Reset on restart. Never persisted.
 FORWARD_STATS: Dict[str, Any] = {
     "attempt_count": 0,
@@ -306,6 +344,13 @@ FORWARD_STATS: Dict[str, Any] = {
     "last_forward_response_error": None,
     "last_forward_response_classification": None,
     "last_forward_response_message": None,
+    # Bounded retry tracking. retry_count is cumulative across listener
+    # uptime. last_retry_error/last_retry_at/last_retryable_status
+    # describe the most recent retry attempt only and are sanitized.
+    "retry_count": 0,
+    "last_retry_error": None,
+    "last_retry_at": None,
+    "last_retryable_status": None,
 }
 
 
@@ -612,35 +657,70 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
     FORWARD_STATS["last_forward_response_error"] = None
     FORWARD_STATS["last_forward_response_classification"] = None
     FORWARD_STATS["last_forward_response_message"] = None
-    try:
-        resp = requests.post(url, json=outbound, headers=headers, timeout=10)
-        FORWARD_STATS["last_status"] = resp.status_code
-        if 200 <= resp.status_code < 300:
-            FORWARD_STATS["success_count"] += 1
-            FORWARD_STATS["last_error"] = None
-        else:
-            FORWARD_STATS["failure_count"] += 1
-            FORWARD_STATS["last_error"] = f"http_{resp.status_code}"
-            summary = summarize_forward_response(resp)
-            FORWARD_STATS["last_forward_response_error"] = summary["error"]
-            FORWARD_STATS["last_forward_response_classification"] = summary[
-                "classification"
-            ]
-            FORWARD_STATS["last_forward_response_message"] = summary["message"]
-        print(
-            f"[verdant-testbench] forwarded reading -> {resp.status_code} "
-            f"(token {mask_token(token or '')})"
-        )
-        return {
-            "forwarded": True,
-            "status_code": resp.status_code,
-            "idempotency_key": headers["Idempotency-Key"],
-        }
-    except Exception as exc:
+
+    import time as _time
+
+    last_resp: Any = None
+    last_exc: Optional[BaseException] = None
+    final_status: Optional[int] = None
+
+    # Bounded retry loop: 1 + MAX_RETRY_ATTEMPTS total attempts. We
+    # never block indefinitely and never queue unbounded readings.
+    for attempt_index in range(MAX_RETRY_ATTEMPTS + 1):
+        try:
+            last_resp = requests.post(url, json=outbound, headers=headers, timeout=10)
+            last_exc = None
+            final_status = last_resp.status_code
+            if 200 <= final_status < 300:
+                break
+            if attempt_index < MAX_RETRY_ATTEMPTS and is_retryable_status(final_status):
+                FORWARD_STATS["retry_count"] = int(FORWARD_STATS.get("retry_count", 0)) + 1
+                FORWARD_STATS["last_retry_at"] = datetime.now(timezone.utc).isoformat()
+                FORWARD_STATS["last_retryable_status"] = final_status
+                FORWARD_STATS["last_retry_error"] = f"http_{final_status}"
+                _time.sleep(compute_backoff_delay(attempt_index))
+                continue
+            break
+        except Exception as exc:
+            last_exc = exc
+            last_resp = None
+            final_status = None
+            if attempt_index < MAX_RETRY_ATTEMPTS:
+                FORWARD_STATS["retry_count"] = int(FORWARD_STATS.get("retry_count", 0)) + 1
+                FORWARD_STATS["last_retry_at"] = datetime.now(timezone.utc).isoformat()
+                FORWARD_STATS["last_retryable_status"] = None
+                FORWARD_STATS["last_retry_error"] = _short_sanitized_error(exc)
+                _time.sleep(compute_backoff_delay(attempt_index))
+                continue
+            break
+
+    if last_exc is not None:
         FORWARD_STATS["failure_count"] += 1
         FORWARD_STATS["last_status"] = None
-        FORWARD_STATS["last_error"] = _short_sanitized_error(exc)
-        return {"forwarded": False, "reason": f"request_error: {type(exc).__name__}"}
+        FORWARD_STATS["last_error"] = _short_sanitized_error(last_exc)
+        return {"forwarded": False, "reason": f"request_error: {type(last_exc).__name__}"}
+
+    resp = last_resp
+    FORWARD_STATS["last_status"] = resp.status_code
+    if 200 <= resp.status_code < 300:
+        FORWARD_STATS["success_count"] += 1
+        FORWARD_STATS["last_error"] = None
+    else:
+        FORWARD_STATS["failure_count"] += 1
+        FORWARD_STATS["last_error"] = f"http_{resp.status_code}"
+        summary = summarize_forward_response(resp)
+        FORWARD_STATS["last_forward_response_error"] = summary["error"]
+        FORWARD_STATS["last_forward_response_classification"] = summary["classification"]
+        FORWARD_STATS["last_forward_response_message"] = summary["message"]
+    print(
+        f"[verdant-testbench] forwarded reading -> {resp.status_code} "
+        f"(token {mask_token(token or '')})"
+    )
+    return {
+        "forwarded": True,
+        "status_code": resp.status_code,
+        "idempotency_key": headers["Idempotency-Key"],
+    }
 
 
 
@@ -1054,6 +1134,11 @@ def debug_forwarding_status() -> Any:
         FORWARD_STATS.get("last_forward_response_message")
     )
 
+    last_retry_err = FORWARD_STATS.get("last_retry_error")
+    if isinstance(last_retry_err, str):
+        safe_retry_err = sanitize_debug_payload(last_retry_err)
+        last_retry_err = safe_retry_err if isinstance(safe_retry_err, str) else _REDACTED
+
     return jsonify(
         {
             "ok": True,
@@ -1075,8 +1160,213 @@ def debug_forwarding_status() -> Any:
             "last_forward_response_error": last_resp_error,
             "last_forward_response_classification": last_resp_cls,
             "last_forward_response_message": last_resp_msg,
+            "retry_count": int(FORWARD_STATS.get("retry_count", 0)),
+            "last_retry_error": last_retry_err,
+            "last_retry_at": FORWARD_STATS.get("last_retry_at"),
+            "last_retryable_status": FORWARD_STATS.get("last_retryable_status"),
+            "max_retry_attempts": MAX_RETRY_ATTEMPTS,
         }
     )
+
+
+# ---------------------------------------------------------------------------
+# /debug/forwarding-error-report — LOCAL-ONLY, sanitized, read-only
+# ---------------------------------------------------------------------------
+
+# Operator-friendly next-step guidance for each known classification.
+# Pure mapping; never references tokens, payloads, or env values.
+_RECOMMENDED_NEXT_STEP: Dict[str, str] = {
+    "payload_shape_mismatch": (
+        "Confirm the forwarded payload includes tent_id (UUID), source='ecowitt', "
+        "captured_at, and metrics. Restart the listener and retry."
+    ),
+    "auth_failed": (
+        "Bridge token rejected. Re-check VERDANT_BRIDGE_TOKEN in .env "
+        "(do not paste it anywhere) and restart the listener."
+    ),
+    "tent_authorization_mismatch": (
+        "The bridge token is not authorized for this tent. Verify "
+        "VERDANT_TENT_ID matches a tent the token can write to."
+    ),
+    "tent_lookup_failed": (
+        "Webhook could not verify tent context. Double-check VERDANT_TENT_ID "
+        "is a real Verdant tent UUID."
+    ),
+    "storage_insert_failed": (
+        "Webhook accepted the payload but the database insert failed. "
+        "Retry shortly; if it persists, contact a developer with the "
+        "sanitized report only."
+    ),
+    "server_misconfigured": (
+        "Webhook reported a server misconfiguration. Contact a developer with "
+        "the sanitized report only — do not paste the bridge token."
+    ),
+    "transport_error": (
+        "Method not allowed. Verify VERDANT_INGEST_URL points at the "
+        "sensor-ingest-webhook endpoint."
+    ),
+    "internal_error": (
+        "Webhook reported an internal error. Retry shortly. If it persists, "
+        "share the sanitized report only."
+    ),
+    "non_json_response": (
+        "Webhook returned a non-JSON body (often an edge/gateway error page). "
+        "Check connectivity and VERDANT_INGEST_URL."
+    ),
+    "unknown_webhook_error": (
+        "Unrecognized webhook error. Share the sanitized report only."
+    ),
+}
+
+_RECOMMENDED_BLOCKED: Dict[str, str] = {
+    "blocked_missing_tent_id": (
+        "Set VERDANT_TENT_ID=<your-tent-uuid> in .env and restart the listener."
+    ),
+    "blocked_invalid_tent_id": (
+        "VERDANT_TENT_ID must be a real tent UUID. Reject display names, "
+        "demo IDs (tent-1, demo-tent), and the all-zero placeholder."
+    ),
+    "no_forwarding_configured": (
+        "Forwarding is disabled (no VERDANT_INGEST_URL/VERDANT_BRIDGE_TOKEN). "
+        "Set both to enable forwarding."
+    ),
+}
+
+
+def _recommended_next_step_for(
+    readiness: Dict[str, Any],
+    classification: Optional[str],
+    last_error: Optional[str],
+    last_status: Optional[int],
+) -> str:
+    if not readiness.get("ready"):
+        reason = readiness.get("reason") or "no_forwarding_configured"
+        return _RECOMMENDED_BLOCKED.get(reason, "Resolve forwarding readiness before retrying.")
+    if isinstance(classification, str) and classification in _RECOMMENDED_NEXT_STEP:
+        return _RECOMMENDED_NEXT_STEP[classification]
+    if isinstance(last_status, int) and is_retryable_status(last_status):
+        return (
+            f"Transient HTTP {last_status}. The listener already retried up to "
+            f"{MAX_RETRY_ATTEMPTS} times. Retry the send and check connectivity."
+        )
+    if isinstance(last_error, str) and last_error.startswith("http_"):
+        return "Inspect last_forward_response_* fields for details."
+    if last_error:
+        return "Connectivity or DNS error. Verify VERDANT_INGEST_URL and network."
+    return "No recent errors. Nothing to do."
+
+
+def _latest_metrics_summary() -> Dict[str, Any]:
+    """Read the most recent normalized event and return a slim, sanitized summary."""
+    summary: Dict[str, Any] = {
+        "source": None,
+        "vendor": None,
+        "metrics": None,
+        "captured_at": None,
+        "malformed_line_count": 0,
+    }
+    if not LOG_PATH.exists():
+        return summary
+    try:
+        with LOG_PATH.open("r", encoding="utf-8", errors="replace") as fh:
+            tail = fh.readlines()[-20:]
+    except Exception:
+        return summary
+    parsed, malformed, _ = parse_jsonl_entries(tail)
+    summary["malformed_line_count"] = malformed
+    if parsed:
+        safe = sanitize_debug_payload(parsed[-1])
+        if isinstance(safe, dict):
+            summary["source"] = safe.get("source")
+            summary["vendor"] = safe.get("vendor")
+            summary["metrics"] = safe.get("metrics")
+            summary["captured_at"] = safe.get("captured_at")
+    return summary
+
+
+@app.get("/debug/forwarding-error-report")
+def debug_forwarding_error_report() -> Any:
+    """LOCAL-ONLY copyable sanitized forwarding error report.
+
+    Returns sanitized JSON only. Never includes the bridge token, the
+    auth header, raw PASSKEY, raw EcoWitt payload, JWT-like strings,
+    admin-role values, .env contents, or the raw tent UUID.
+    """
+    if not _is_local_request():
+        return (
+            jsonify({"ok": False, "error": "forbidden_non_local"}),
+            403,
+        )
+
+    url = os.environ.get("VERDANT_INGEST_URL")
+    token = os.environ.get("VERDANT_BRIDGE_TOKEN")
+    tent_id = os.environ.get("VERDANT_TENT_ID")
+    readiness = evaluate_forwarding_readiness(url, token, tent_id)
+    forwarding_enabled = bool(url and token)
+
+    last_error_raw = FORWARD_STATS.get("last_error")
+    last_error = sanitize_debug_payload(last_error_raw) if isinstance(last_error_raw, str) else last_error_raw
+
+    last_resp_error = sanitize_forward_error_value(
+        FORWARD_STATS.get("last_forward_response_error")
+    )
+    last_resp_cls = sanitize_forward_error_value(
+        FORWARD_STATS.get("last_forward_response_classification")
+    )
+    last_resp_msg = sanitize_forward_error_value(
+        FORWARD_STATS.get("last_forward_response_message")
+    )
+    last_retry_err_raw = FORWARD_STATS.get("last_retry_error")
+    last_retry_err = (
+        sanitize_debug_payload(last_retry_err_raw)
+        if isinstance(last_retry_err_raw, str)
+        else last_retry_err_raw
+    )
+
+    classification_str = last_resp_cls if isinstance(last_resp_cls, str) else None
+    next_step = _recommended_next_step_for(
+        readiness,
+        classification_str,
+        last_error if isinstance(last_error, str) else None,
+        FORWARD_STATS.get("last_status"),
+    )
+
+    latest = _latest_metrics_summary()
+
+    report = {
+        "ok": True,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "forwarding_enabled": forwarding_enabled,
+        "forwarding_ready": readiness["ready"],
+        "ingest_url_configured": readiness["ingest_url_configured"],
+        "bridge_token_configured": readiness["bridge_token_configured"],
+        "tent_id_configured": readiness["tent_id_configured"],
+        "tent_id_valid": readiness["tent_id_valid"],
+        "last_forward_status": FORWARD_STATS.get("last_status"),
+        "last_forward_error": last_error,
+        "last_forward_response_error": last_resp_error,
+        "last_forward_response_classification": last_resp_cls,
+        "last_forward_response_message": last_resp_msg,
+        "retry_count": int(FORWARD_STATS.get("retry_count", 0)),
+        "last_retry_error": last_retry_err,
+        "max_retry_attempts": MAX_RETRY_ATTEMPTS,
+        "latest_metrics": {
+            "source": latest["source"],
+            "vendor": latest["vendor"],
+            "metrics": latest["metrics"],
+            "captured_at": latest["captured_at"],
+        },
+        "malformed_line_count": latest["malformed_line_count"],
+        "recommended_next_step": next_step,
+    }
+    # Belt-and-braces: re-sanitize the entire response object before
+    # returning to ensure no token-like substring leaks through any
+    # intermediate field added later.
+    safe_report = sanitize_debug_payload(report)
+    return jsonify(safe_report)
+
+
+
 
 
 

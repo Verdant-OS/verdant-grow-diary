@@ -13,7 +13,7 @@
  * NEVER renders raw_payload. NEVER emits alerts / Action Queue / AI / device
  * control side effects.
  */
-import { Helmet } from "react-helmet-async";
+import { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, ShieldOff } from "lucide-react";
@@ -21,7 +21,8 @@ import GgsRealPayloadIngestPanel from "@/components/GgsRealPayloadIngestPanel";
 import { useHasRole } from "@/hooks/useHasRole";
 
 export default function OperatorGgsRealPayloadIngest() {
-  const role = useHasRole("admin");
+  const role = useHasRole("operator");
+  useEffect(() => { document.title = "Operator · GGS real-payload ingest"; }, []);
 
   return (
     <div className="container mx-auto max-w-3xl space-y-4 p-4">

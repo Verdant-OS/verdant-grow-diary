@@ -26,6 +26,13 @@ describe("GGS Sentinel freshness panel UI", () => {
     expect(text).toContain("result-state priority still comes from the smoke-check result above");
   });
 
+  it("uses a dedicated presenter so the compact rows can be tested without RPC or tent mocks", () => {
+    const text = panelSource();
+
+    expect(text).toContain("export function GgsSentinelFreshnessGuidanceList");
+    expect(text).toContain("<GgsSentinelFreshnessGuidanceList metricFreshness={evaluation.metricFreshness} />");
+  });
+
   it("uses a compact one-line metric row that preserves age, status, and next action", () => {
     const text = panelSource();
 

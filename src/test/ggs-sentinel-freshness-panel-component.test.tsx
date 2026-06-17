@@ -53,16 +53,6 @@ describe("GgsSentinelFreshnessGuidanceList", () => {
             ageLabel: "24m ago",
             nextActionLabel: "Stale — captured 24m ago. Ingest a new real GGS reading to clear live Sentinel.",
           }),
-          freshness({
-            metric: "soil_temp_c",
-            capturedAt: null,
-            ageMs: null,
-            freshnessStatus: "missing",
-            fresh: false,
-            missing: true,
-            ageLabel: "—",
-            nextActionLabel: "Missing — no recent GGS soil temperature row found.",
-          }),
         ]}
       />,
     );
@@ -78,15 +68,38 @@ describe("GgsSentinelFreshnessGuidanceList", () => {
     expect(screen.getByText("Fresh — captured 4m ago. Valid for live Sentinel.")).toBeInTheDocument();
     expect(screen.getByText(/Fresh but aging/)).toBeInTheDocument();
     expect(screen.getByText(/Ingest a new real GGS reading/)).toBeInTheDocument();
+  });
+
+  it("renders missing guidance distinctly", () => {
+    render(
+      <GgsSentinelFreshnessGuidanceList
+        metricFreshness={[
+          freshness({
+            metric: "soil_temp_c",
+            capturedAt: null,
+            ageMs: null,
+            freshnessStatus: "missing",
+            fresh: false,
+            missing: true,
+            ageLabel: "—",
+            nextActionLabel: "Missing — no recent GGS soil temperature row found.",
+          }),
+        ]}
+      />,
+    );
+
     expect(screen.getByText(/no recent GGS soil temperature row found/)).toBeInTheDocument();
+    expect(screen.getByLabelText("no row found")).toBeInTheDocument();
+    expect(screen.getByTestId("ggs-freshness-row-missing")).toHaveClass("border-dashed");
   });
 
   it("uses distinct accessible icon labels for stale and missing states", () => {
     render(
       <GgsSentinelFreshnessGuidanceList
         metricFreshness={[
-          freshness({ freshnessStatus: "stale", stale: true, fresh: false }),
+          freshness({ metric: "ec", freshnessStatus: "stale", stale: true, fresh: false }),
           freshness({
+            metric: "soil_temp_c",
             capturedAt: null,
             ageMs: null,
             ageLabel: "—",
@@ -108,10 +121,11 @@ describe("GgsSentinelFreshnessGuidanceList", () => {
     render(
       <GgsSentinelFreshnessGuidanceList
         metricFreshness={[
-          freshness({ freshnessStatus: "fresh" }),
-          freshness({ freshnessStatus: "aging" }),
-          freshness({ freshnessStatus: "stale", stale: true, fresh: false }),
+          freshness({ metric: "soil_moisture_pct", freshnessStatus: "fresh" }),
+          freshness({ metric: "ec", freshnessStatus: "aging" }),
+          freshness({ metric: "soil_temp_c", freshnessStatus: "stale", stale: true, fresh: false }),
           freshness({
+            metric: "soil_temp_c",
             capturedAt: null,
             ageMs: null,
             ageLabel: "—",

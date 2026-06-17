@@ -162,10 +162,13 @@ export function buildGgsRealPayloadIngestViewModel(
   };
 }
 
+export type GgsRealPayloadIngestRefusalReason =
+  | GgsRealPayloadRefusalReason
+  | "payload_unparseable"
+  | "payload_blank";
+
 /** Human-readable explanation for a refusal reason. UI-only. */
-export function describeRefusal(
-  reason: GgsRealPayloadIngestViewModel extends { status: "refused"; reason: infer R } ? R : never,
-): string {
+export function describeRefusal(reason: GgsRealPayloadIngestRefusalReason): string {
   switch (reason) {
     case "payload_blank":
       return "Paste the JSON payload from the physical Spider Farmer GGS device.";

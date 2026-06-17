@@ -76,13 +76,15 @@ export function sanitizeErrorMessage(value: unknown): string {
   let raw: string;
   if (value instanceof Error) raw = value.message ?? "error";
   else if (typeof value === "string") raw = value;
+  else if (value === null || value === undefined) raw = "error";
   else {
-    try { raw = JSON.stringify(value); } catch { raw = "error"; }
+    try { raw = JSON.stringify(value) ?? "error"; } catch { raw = "error"; }
   }
-  // Cap length, strip secrets, strip newlines.
+  if (typeof raw !== "string") raw = "error";
   raw = raw.replace(/[\r\n]+/g, " ").slice(0, 200);
   return sanitizeString(raw);
 }
+
 
 // Safe console logger. Only stable string event names + sanitized details.
 // Never accepts the raw req or raw body.

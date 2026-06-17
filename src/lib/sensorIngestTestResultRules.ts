@@ -56,12 +56,15 @@ export function classifySensorIngestTestResult(
   if (input.networkError) {
     return {
       category: "network_error",
-      headline: "Network / CORS error",
+      headline: "Network / CORS preflight error",
       detail:
-        "Browser could not reach the ingest endpoint. Check internet, ad-block, or browser extensions.",
+        "Browser status 0 — the request was blocked before a readable HTTP response was available. " +
+        "OPTIONS preflight likely failed before POST reached the function. " +
+        "Check Edge Function OPTIONS headers, ad-block, browser extensions, or network reachability.",
       isSuccess: false,
     };
   }
+
 
   const { status, body } = input;
   const reason = pickString(body, "error") ?? pickString(body, "reason");

@@ -299,7 +299,118 @@ FORWARD_STATS: Dict[str, Any] = {
     "last_status": None,
     "last_at": None,
     "last_error": None,
+    # Sanitized fields captured from the most recent non-2xx response
+    # from sensor-ingest-webhook. Populated only after the body has been
+    # passed through the local sanitizer; never raw bodies, tokens, or
+    # raw EcoWitt payloads.
+    "last_forward_response_error": None,
+    "last_forward_response_classification": None,
+    "last_forward_response_message": None,
 }
+
+
+# Webhook contract: sensor-ingest-webhook only accepts canonical transport
+# `source` labels from WEBHOOK_ALLOWED_SOURCES (e.g. "ecowitt", "webhook").
+# The Verdant local source label ("live" / "demo" / ...) is preserved
+# under metadata.verdant_source for audit; never sent as `source`.
+WEBHOOK_TRANSPORT_SOURCE = "ecowitt"
+
+# Keys we always strip from raw EcoWitt payloads before forwarding —
+# they are device-auth secrets or noisy fields, never needed by Verdant.
+_FORWARD_PAYLOAD_REDACT_KEYS = {"passkey", "PASSKEY", "Passkey"}
+
+
+def _redact_raw_payload_for_forward(raw: Any) -> Any:
+    """Return a copy of raw EcoWitt payload with PASSKEY-class secrets removed."""
+    if not isinstance(raw, dict):
+        return raw
+    out: Dict[str, Any] = {}
+    for k, v in raw.items():
+        ks = str(k)
+        if ks in _FORWARD_PAYLOAD_REDACT_KEYS or ks.lower() == "passkey":
+            continue
+        out[ks] = v
+    return out
+
+
+# Known sanitized error codes the sensor-ingest-webhook may return.
+# Used to classify the body so operators see meaningful guidance rather
+# than just an HTTP status.
+_WEBHOOK_ERROR_CLASSIFICATIONS = {
+    "invalid_payload": "payload_shape_mismatch",
+    "invalid_json": "payload_shape_mismatch",
+    "unauthorized": "auth_failed",
+    "forbidden_tent": "tent_authorization_mismatch",
+    "tent_lookup_failed": "tent_lookup_failed",
+    "insert_failed": "storage_insert_failed",
+    "server_misconfigured": "server_misconfigured",
+    "method_not_allowed": "transport_error",
+    "internal_error": "internal_error",
+}
+
+
+def sanitize_forward_error_value(value: Any) -> Any:
+    """Sanitize a value pulled from a webhook error response.
+
+    Always passes through the recursive sanitizer (which redacts vbt_,
+    JWT, Bearer, Authorization, x-verdant-bridge-token, PASSKEY, and
+    service-role markers). Long strings are truncated to a short summary.
+    Never returns raw response bodies of unbounded length.
+    """
+    safe = sanitize_debug_payload(value)
+    if isinstance(safe, str):
+        s = safe.strip()
+        if len(s) > 240:
+            s = s[:240] + "..."
+        return s
+    return safe
+
+
+def summarize_forward_response(resp: Any) -> Dict[str, Any]:
+    """Extract a sanitized summary from a requests.Response-like object.
+
+    Returns a dict with: error, classification, message. Never returns
+    full bodies, tokens, Authorization headers, or raw EcoWitt payloads.
+    Non-JSON bodies become a short summary describing the content type
+    and a clipped, sanitized snippet (<=240 chars).
+    """
+    out: Dict[str, Any] = {
+        "error": None,
+        "classification": None,
+        "message": None,
+    }
+    body_obj: Any = None
+    try:
+        body_obj = resp.json()
+    except Exception:
+        body_obj = None
+
+    if isinstance(body_obj, dict):
+        err = body_obj.get("error")
+        if isinstance(err, str) and err:
+            safe_err = sanitize_forward_error_value(err)
+            out["error"] = safe_err if isinstance(safe_err, str) else _REDACTED
+            cls = _WEBHOOK_ERROR_CLASSIFICATIONS.get(
+                safe_err if isinstance(safe_err, str) else "",
+                "unknown_webhook_error",
+            )
+            out["classification"] = cls
+        msg_candidates = body_obj.get("errors") or body_obj.get("message")
+        if msg_candidates is not None:
+            out["message"] = sanitize_forward_error_value(msg_candidates)
+        return out
+
+    # Non-JSON body — store a short sanitized summary only.
+    try:
+        text = getattr(resp, "text", None) or ""
+    except Exception:
+        text = ""
+    snippet = sanitize_forward_error_value(text) if text else None
+    out["error"] = "non_json_response"
+    out["classification"] = "non_json_response"
+    out["message"] = snippet
+    return out
+
 
 
 import re as _re

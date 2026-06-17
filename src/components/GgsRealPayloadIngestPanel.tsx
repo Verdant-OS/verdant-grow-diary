@@ -226,7 +226,7 @@ export default function GgsRealPayloadIngestPanel() {
               {result.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
               <AlertTitle>{result.ok ? "Commit complete" : "Commit failed"}</AlertTitle>
               <AlertDescription className="text-sm">
-                {result.ok ? (
+                {result.ok === true ? (
                   <>
                     Inserted: <strong>{result.inserted}</strong> · Duplicate / rejected:{" "}
                     <strong>{result.rejected}</strong>

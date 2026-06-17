@@ -39,10 +39,9 @@ function looksLikeSecret(s: string): boolean {
   if (/^sb_[A-Za-z0-9_-]{16,}$/.test(s)) return true;
   // SUPABASE_SERVICE_ROLE_KEY env name leaking.
   if (/SUPABASE_SERVICE_ROLE_KEY/.test(s)) return true;
-  // Long opaque high-entropy string.
-  if (s.length >= 32 && /^[A-Za-z0-9_\-\.]+$/.test(s) && !/\s/.test(s)) return true;
   return false;
 }
+
 
 function sanitizeString(s: string): string {
   if (looksLikeSecret(s)) return REDACTED;

@@ -116,6 +116,51 @@ export default function EcowittLocalForwardingStatusWidget({
           ) : null}
         </div>
 
+        {vm.banner.show ? (
+          <div
+            role="alert"
+            data-testid="ecowitt-local-forwarding-banner"
+            className="rounded-md border border-destructive/40 bg-destructive/5 p-3 space-y-1 text-xs"
+          >
+            <p
+              className="text-sm font-semibold text-destructive"
+              data-testid="ecowitt-local-forwarding-banner-title"
+            >
+              {vm.banner.title}
+            </p>
+            <p data-testid="ecowitt-local-forwarding-banner-status">
+              <span className="text-muted-foreground">Status: </span>
+              <span className="font-medium">{vm.banner.status}</span>
+            </p>
+            <p data-testid="ecowitt-local-forwarding-banner-classification">
+              <span className="text-muted-foreground">Classification: </span>
+              <span className="font-medium">{vm.banner.classification}</span>
+            </p>
+            <p data-testid="ecowitt-local-forwarding-banner-reason">
+              <span className="text-muted-foreground">Reason: </span>
+              <span className="font-medium">{vm.banner.reason}</span>
+            </p>
+            <p
+              data-testid="ecowitt-local-forwarding-banner-next-step"
+              className="pt-1"
+            >
+              <span className="text-muted-foreground">Next step: </span>
+              <span className="font-medium">
+                {vm.banner.recommendedNextStep}
+              </span>
+            </p>
+            <a
+              className="inline-block pt-1 underline text-[11px]"
+              href={LOCAL_FORWARDING_ERROR_REPORT_URL}
+              target="_blank"
+              rel="noreferrer"
+              data-testid="ecowitt-local-forwarding-banner-report-link"
+            >
+              View sanitized forwarding error report
+            </a>
+          </div>
+        ) : null}
+
         {vm.state === "ready" && vm.rows.length > 0 ? (
           <dl
             className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs"

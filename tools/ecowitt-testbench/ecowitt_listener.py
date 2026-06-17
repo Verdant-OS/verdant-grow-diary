@@ -31,6 +31,8 @@ Endpoints:
     GET  /ecowitt              (accepts query params, like EcoWitt customized upload)
     POST /ecowitt              (accepts form data, JSON, or raw body)
     GET  /debug/raw-log-tail   (LOCAL-ONLY operator debug; sanitized; read-only)
+    GET  /debug/status         (LOCAL-ONLY log status; sanitized; read-only)
+    GET  /debug/last-events    (LOCAL-ONLY normalized events; sanitized; read-only)
 """
 from __future__ import annotations
 

@@ -290,6 +290,44 @@ def append_raw_log(record: Dict[str, Any]) -> None:
 # Optional forwarding to the validated ingest webhook
 # ---------------------------------------------------------------------------
 
+# Bounded retry/backoff configuration. Kept small so the local
+# operator testbench never blocks the listener for long. We never queue
+# unbounded readings — at most MAX_RETRY_ATTEMPTS retries happen inline
+# for a single forward call, then the failure is recorded and the
+# listener moves on.
+MAX_RETRY_ATTEMPTS = 2  # additional retries after the first attempt
+BACKOFF_BASE_SECONDS = 0.2
+BACKOFF_MAX_SECONDS = 1.0
+
+# HTTP statuses we treat as transient and worth retrying. 409 is
+# intentionally NOT retried — the webhook contract does not classify
+# duplicate idempotency-key conflicts as retryable.
+RETRYABLE_STATUSES = {408, 425, 429, 500, 502, 503, 504}
+
+
+def is_retryable_status(status: Optional[int]) -> bool:
+    """Pure predicate: should this HTTP status trigger a retry?"""
+    return isinstance(status, int) and status in RETRYABLE_STATUSES
+
+
+def compute_backoff_delay(
+    attempt: int,
+    base: float = BACKOFF_BASE_SECONDS,
+    cap: float = BACKOFF_MAX_SECONDS,
+) -> float:
+    """Exponential backoff with bounded jitter. Pure-ish (random jitter).
+
+    `attempt` is the retry index (0 for first retry). Total delay is
+    capped at `cap` seconds + small jitter so the listener cannot block
+    for long.
+    """
+    import random as _random
+
+    base_delay = min(cap, base * (2 ** max(0, attempt)))
+    jitter = _random.uniform(0.0, base_delay * 0.25)
+    return base_delay + jitter
+
+
 # In-memory forwarding counters. Reset on restart. Never persisted.
 FORWARD_STATS: Dict[str, Any] = {
     "attempt_count": 0,
@@ -306,6 +344,13 @@ FORWARD_STATS: Dict[str, Any] = {
     "last_forward_response_error": None,
     "last_forward_response_classification": None,
     "last_forward_response_message": None,
+    # Bounded retry tracking. retry_count is cumulative across listener
+    # uptime. last_retry_error/last_retry_at/last_retryable_status
+    # describe the most recent retry attempt only and are sanitized.
+    "retry_count": 0,
+    "last_retry_error": None,
+    "last_retry_at": None,
+    "last_retryable_status": None,
 }
 
 

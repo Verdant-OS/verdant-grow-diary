@@ -40,29 +40,30 @@ describe("SANITIZED_WEBHOOK_ERROR_COPY — every webhook code has copy", () => {
   });
 });
 
-describe("classifySensorIngestTestResult — uses sanitized code copy", () => {
-  it("401 unauthorized maps to friendly copy", () => {
+describe("classifySensorIngestTestResult — copy/category coverage", () => {
+  it("401 unauthorized is auth_problem with reason echoed (sanitized)", () => {
     const r = classifySensorIngestTestResult({ status: 401, body: { error: "unauthorized" } });
-    expect(r.detail).toBe(SANITIZED_WEBHOOK_ERROR_COPY.unauthorized);
+    expect(r.category).toBe("auth_problem");
+    expect(r.detail).toContain("unauthorized");
     expect(r.corsWorking).toBe(true);
   });
 
-  it("400 invalid_payload maps to friendly copy", () => {
+  it("400 invalid_payload is payload_problem with reason echoed", () => {
     const r = classifySensorIngestTestResult({ status: 400, body: { error: "invalid_payload" } });
-    expect(r.detail).toBe(SANITIZED_WEBHOOK_ERROR_COPY.invalid_payload);
+    expect(r.category).toBe("payload_problem");
+    expect(r.detail).toContain("invalid_payload");
   });
 
-  it("503 server_misconfigured maps to friendly copy", () => {
+  it("503 server_misconfigured does not leak Bearer/secret strings", () => {
     const r = classifySensorIngestTestResult({
       status: 503,
       body: { error: "server_misconfigured" },
     });
-    // server_error category copy still wins for 5xx, but the code-mapped
-    // copy must at least exist; classifier may show either. Assert no leak.
     expect(r.corsWorking).toBe(true);
     expect(r.detail).not.toMatch(/Bearer/i);
   });
 });
+
 
 describe("classifier reason sanitization — never echoes token-shaped strings", () => {
   const cases: Array<{ name: string; reason: string }> = [

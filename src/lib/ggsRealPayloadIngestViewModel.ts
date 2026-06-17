@@ -102,7 +102,7 @@ export function buildGgsRealPayloadIngestViewModel(
   input: GgsRealPayloadIngestViewModelInput,
 ): GgsRealPayloadIngestViewModel {
   const parsed = parsePayload(input.payloadText);
-  if (!parsed.ok) {
+  if (parsed.ok === false) {
     return { status: "refused", reason: parsed.reason, details: parsed.details, canCommit: false };
   }
 
@@ -111,7 +111,7 @@ export function buildGgsRealPayloadIngestViewModel(
     now: input.now ?? input.context.now,
   });
 
-  if (!planned.ok) {
+  if (planned.ok === false) {
     return {
       status: "refused",
       reason: planned.reason,

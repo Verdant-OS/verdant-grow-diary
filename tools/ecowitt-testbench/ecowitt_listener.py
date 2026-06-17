@@ -595,7 +595,10 @@ def debug_status() -> Any:
                 "log_exists": False,
                 "log_path": log_path_str,
                 "entry_count": 0,
+                "parsed_line_count": 0,
+                "skipped_line_count": 0,
                 "malformed_line_count": 0,
+                "last_parse_error": None,
                 "latest_entry": None,
                 "latest_captured_at": None,
                 "latest_received_at": None,
@@ -613,7 +616,7 @@ def debug_status() -> Any:
             500,
         )
 
-    parsed, malformed = parse_jsonl_entries(all_lines)
+    parsed, malformed, last_parse_error = parse_jsonl_entries(all_lines)
     latest = parsed[-1] if parsed else None
     latest_safe = sanitize_debug_payload(latest) if latest else None
 
@@ -635,7 +638,10 @@ def debug_status() -> Any:
             "log_exists": True,
             "log_path": log_path_str,
             "entry_count": len(parsed),
+            "parsed_line_count": len(parsed),
+            "skipped_line_count": malformed,
             "malformed_line_count": malformed,
+            "last_parse_error": last_parse_error,
             "latest_entry": latest_safe,
             "latest_captured_at": latest_captured_at,
             "latest_received_at": latest_received_at,
@@ -643,6 +649,49 @@ def debug_status() -> Any:
             "message": "ok",
         }
     )
+
+
+def _mask_token_preview(token: Optional[str]) -> Optional[str]:
+    if not token:
+        return None
+    return mask_token(token)
+
+
+@app.get("/debug/forwarding-status")
+def debug_forwarding_status() -> Any:
+    # Local-only: never expose forwarding configuration over LAN.
+    if not _is_local_request():
+        return (
+            jsonify({"ok": False, "error": "forbidden_non_local"}),
+            403,
+        )
+
+    url = os.environ.get("VERDANT_INGEST_URL")
+    token = os.environ.get("VERDANT_BRIDGE_TOKEN")
+    forwarding_enabled = bool(url and token)
+
+    last_error = FORWARD_STATS.get("last_error")
+    if isinstance(last_error, str):
+        safe_err = sanitize_debug_payload(last_error)
+        last_error = safe_err if isinstance(safe_err, str) else _REDACTED
+
+    return jsonify(
+        {
+            "ok": True,
+            "forwarding_enabled": forwarding_enabled,
+            "ingest_url_configured": bool(url),
+            "bridge_token_configured": bool(token),
+            "masked_ingest_url": mask_ingest_url(url),
+            "masked_token_preview": _mask_token_preview(token),
+            "forward_attempt_count": int(FORWARD_STATS.get("attempt_count", 0)),
+            "forward_success_count": int(FORWARD_STATS.get("success_count", 0)),
+            "forward_failure_count": int(FORWARD_STATS.get("failure_count", 0)),
+            "last_forward_status": FORWARD_STATS.get("last_status"),
+            "last_forward_at": FORWARD_STATS.get("last_at"),
+            "last_forward_error": last_error,
+        }
+    )
+
 
 
 @app.get("/debug/last-events")

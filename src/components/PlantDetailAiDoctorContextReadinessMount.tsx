@@ -32,6 +32,19 @@ export interface PlantDetailAiDoctorContextReadinessMountProps {
   plantName?: string | null;
   strain?: string | null;
   stage?: string | null;
+  /**
+   * Optional pass-through for growing medium. The Plant Detail data
+   * source (`useGrowPlant` / `plants` table) does NOT yet expose this
+   * field — callers may thread it in when a future profile/metadata
+   * source provides it. Never inferred from notes / strain / freeform.
+   */
+  medium?: string | null;
+  /**
+   * Optional pass-through for container / pot size. Same provenance
+   * rules as `medium` — null when the underlying data source has no
+   * value to surface.
+   */
+  potSize?: string | null;
 }
 
 function FallbackShell({

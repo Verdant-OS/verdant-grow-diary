@@ -344,6 +344,12 @@ FORWARD_STATS: Dict[str, Any] = {
     "last_forward_response_error": None,
     "last_forward_response_classification": None,
     "last_forward_response_message": None,
+    # Sanitized `reason` sub-code captured from webhook response bodies.
+    # Used to refine `insert_failed` storage-insert classifications into
+    # actionable operator guidance (e.g. insert_source_constraint_failed,
+    # insert_check_failed, insert_duplicate). Always sanitized; never
+    # raw DB messages, SQL, or constraint names.
+    "last_forward_response_reason": None,
     # Bounded retry tracking. retry_count is cumulative across listener
     # uptime. last_retry_error/last_retry_at/last_retryable_status
     # describe the most recent retry attempt only and are sanitized.
@@ -394,6 +400,19 @@ _WEBHOOK_ERROR_CLASSIFICATIONS = {
     "server_misconfigured": "server_misconfigured",
     "method_not_allowed": "transport_error",
     "internal_error": "internal_error",
+}
+
+# Known sanitized `reason` sub-codes for storage_insert_failed responses.
+# Used both to whitelist values and to drive operator guidance copy.
+# Anything not in this set is collapsed to "insert_unknown" — we never
+# echo raw PG messages, SQLSTATEs, constraint names, or column lists.
+_KNOWN_INSERT_REASONS = {
+    "insert_required_field_missing",
+    "insert_source_constraint_failed",
+    "insert_check_failed",
+    "insert_column_mismatch",
+    "insert_duplicate",
+    "insert_unknown",
 }
 
 
@@ -456,6 +475,7 @@ def summarize_forward_response(resp: Any) -> Dict[str, Any]:
         "error": None,
         "classification": None,
         "message": None,
+        "reason": None,
     }
     body_obj: Any = None
     try:
@@ -476,6 +496,17 @@ def summarize_forward_response(resp: Any) -> Dict[str, Any]:
         msg_candidates = body_obj.get("errors") or body_obj.get("message")
         if msg_candidates is not None:
             out["message"] = sanitize_forward_error_value(msg_candidates)
+        raw_reason = body_obj.get("reason")
+        if isinstance(raw_reason, str) and raw_reason:
+            safe_reason_val = sanitize_forward_error_value(raw_reason)
+            safe_reason = safe_reason_val if isinstance(safe_reason_val, str) else None
+            # Whitelist: only echo known sanitized insert reason codes.
+            # Anything else (including any text that survived sanitizer)
+            # collapses to "insert_unknown" — never raw DB strings.
+            if safe_reason and safe_reason in _KNOWN_INSERT_REASONS:
+                out["reason"] = safe_reason
+            else:
+                out["reason"] = "insert_unknown"
         return out
 
     # Non-JSON body — store a short sanitized summary only.
@@ -660,6 +691,7 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
     FORWARD_STATS["last_forward_response_error"] = None
     FORWARD_STATS["last_forward_response_classification"] = None
     FORWARD_STATS["last_forward_response_message"] = None
+    FORWARD_STATS["last_forward_response_reason"] = None
 
     import time as _time
 
@@ -715,6 +747,7 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
         FORWARD_STATS["last_forward_response_error"] = summary["error"]
         FORWARD_STATS["last_forward_response_classification"] = summary["classification"]
         FORWARD_STATS["last_forward_response_message"] = summary["message"]
+        FORWARD_STATS["last_forward_response_reason"] = summary.get("reason")
     print(
         f"[verdant-testbench] forwarded reading -> {resp.status_code} "
         f"(token {mask_token(token or '')})"
@@ -1136,6 +1169,13 @@ def debug_forwarding_status() -> Any:
     last_resp_msg = sanitize_forward_error_value(
         FORWARD_STATS.get("last_forward_response_message")
     )
+    raw_reason = FORWARD_STATS.get("last_forward_response_reason")
+    last_resp_reason: Optional[str] = None
+    if isinstance(raw_reason, str) and raw_reason in _KNOWN_INSERT_REASONS:
+        last_resp_reason = raw_reason
+    elif isinstance(raw_reason, str) and raw_reason:
+        # Defensive: re-collapse any unknown stored value at read time.
+        last_resp_reason = "insert_unknown"
 
     last_retry_err = FORWARD_STATS.get("last_retry_error")
     if isinstance(last_retry_err, str):
@@ -1163,6 +1203,7 @@ def debug_forwarding_status() -> Any:
             "last_forward_response_error": last_resp_error,
             "last_forward_response_classification": last_resp_cls,
             "last_forward_response_message": last_resp_msg,
+            "last_forward_response_reason": last_resp_reason,
             "retry_count": int(FORWARD_STATS.get("retry_count", 0)),
             "last_retry_error": last_retry_err,
             "last_retry_at": FORWARD_STATS.get("last_retry_at"),
@@ -1248,15 +1289,55 @@ _RECOMMENDED_BLOCKED: Dict[str, str] = {
 }
 
 
+# Reason-specific next steps for storage_insert_failed sub-codes. These
+# override the generic storage_insert_failed copy when the webhook
+# returns a known sanitized `reason` value.
+_RECOMMENDED_NEXT_STEP_BY_REASON: Dict[str, str] = {
+    "insert_required_field_missing": (
+        "The webhook reached storage but a required DB field is missing. "
+        "Share the sanitized report with a developer."
+    ),
+    "insert_source_constraint_failed": (
+        "Stored source failed the canonical source constraint. Confirm "
+        "EcoWitt transport source is remapped to stored source 'live'."
+    ),
+    "insert_check_failed": (
+        "A database check constraint rejected the row. Share the "
+        "sanitized report with a developer."
+    ),
+    "insert_column_mismatch": (
+        "The insert payload references a column that does not exist or "
+        "no longer matches schema."
+    ),
+    "insert_duplicate": (
+        "This looks like a duplicate/idempotent reading. Usually safe; "
+        "verify dedupe behavior."
+    ),
+    "insert_unknown": (
+        "Storage insert failed for an unknown sanitized reason. Share "
+        "the sanitized report only."
+    ),
+}
+
+
 def _recommended_next_step_for(
     readiness: Dict[str, Any],
     classification: Optional[str],
     last_error: Optional[str],
     last_status: Optional[int],
+    reason: Optional[str] = None,
 ) -> str:
     if not readiness.get("ready"):
-        reason = readiness.get("reason") or "no_forwarding_configured"
-        return _RECOMMENDED_BLOCKED.get(reason, "Resolve forwarding readiness before retrying.")
+        block_reason = readiness.get("reason") or "no_forwarding_configured"
+        return _RECOMMENDED_BLOCKED.get(block_reason, "Resolve forwarding readiness before retrying.")
+    # When the webhook reports storage_insert_failed, prefer the
+    # reason-specific copy if we have a known sanitized reason.
+    if (
+        classification == "storage_insert_failed"
+        and isinstance(reason, str)
+        and reason in _RECOMMENDED_NEXT_STEP_BY_REASON
+    ):
+        return _RECOMMENDED_NEXT_STEP_BY_REASON[reason]
     if isinstance(classification, str) and classification in _RECOMMENDED_NEXT_STEP:
         return _RECOMMENDED_NEXT_STEP[classification]
     if isinstance(last_status, int) and is_retryable_status(last_status):
@@ -1331,6 +1412,13 @@ def debug_forwarding_error_report() -> Any:
     last_resp_msg = sanitize_forward_error_value(
         FORWARD_STATS.get("last_forward_response_message")
     )
+    raw_reason = FORWARD_STATS.get("last_forward_response_reason")
+    if isinstance(raw_reason, str) and raw_reason in _KNOWN_INSERT_REASONS:
+        last_resp_reason: Optional[str] = raw_reason
+    elif isinstance(raw_reason, str) and raw_reason:
+        last_resp_reason = "insert_unknown"
+    else:
+        last_resp_reason = None
     last_retry_err_raw = FORWARD_STATS.get("last_retry_error")
     last_retry_err = (
         sanitize_debug_payload(last_retry_err_raw)
@@ -1344,6 +1432,7 @@ def debug_forwarding_error_report() -> Any:
         classification_str,
         last_error if isinstance(last_error, str) else None,
         FORWARD_STATS.get("last_status"),
+        last_resp_reason,
     )
 
     latest = _latest_metrics_summary()
@@ -1362,6 +1451,7 @@ def debug_forwarding_error_report() -> Any:
         "last_forward_response_error": last_resp_error,
         "last_forward_response_classification": last_resp_cls,
         "last_forward_response_message": last_resp_msg,
+        "last_forward_response_reason": last_resp_reason,
         "retry_count": int(FORWARD_STATS.get("retry_count", 0)),
         "last_retry_error": last_retry_err,
         "max_retry_attempts": MAX_RETRY_ATTEMPTS,

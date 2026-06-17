@@ -1245,12 +1245,14 @@ describe("ecowitt windows testbench — forwarding response sanitization", () =>
     expect(listener).toMatch(/"last_forward_response_error"/);
     expect(listener).toMatch(/"last_forward_response_classification"/);
     expect(listener).toMatch(/"last_forward_response_message"/);
+    expect(listener).toMatch(/"last_forward_response_reason"/);
   });
 
   it("/debug/forwarding-status exposes sanitized response fields", () => {
     expect(fwdBlock).toMatch(/last_forward_response_error/);
     expect(fwdBlock).toMatch(/last_forward_response_classification/);
     expect(fwdBlock).toMatch(/last_forward_response_message/);
+    expect(fwdBlock).toMatch(/last_forward_response_reason/);
     expect(fwdBlock).toMatch(/sanitize_forward_error_value/);
   });
 
@@ -1296,10 +1298,14 @@ describe("ecowitt windows testbench — forwarding response sanitization", () =>
     expect(doc).toMatch(/last_forward_response_error/);
     expect(doc).toMatch(/last_forward_response_classification/);
     expect(doc).toMatch(/last_forward_response_message/);
+    expect(doc).toMatch(/last_forward_response_reason/);
     expect(doc).toMatch(/invalid_payload/);
     expect(doc).toMatch(/forbidden_tent/);
     expect(doc).toMatch(/tent_lookup_failed/);
     expect(doc).toMatch(/insert_failed/);
+    expect(doc).toMatch(/insert_source_constraint_failed/);
+    expect(doc).toMatch(/insert_check_failed/);
+    expect(doc).toMatch(/insert_duplicate/);
     expect(doc).toMatch(/Never paste bridge token/i);
   });
 });

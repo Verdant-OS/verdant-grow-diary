@@ -292,6 +292,13 @@ Fields:
   - `non_json_response` — webhook returned a non-JSON body (often an edge or gateway error page).
   - `unknown_webhook_error` — an unrecognized error string.
 - `last_forward_response_message` — sanitized short summary from the response body. Token-like substrings (`vbt_…`, JWT-shaped strings, `Bearer …`) are redacted inline. Never the full raw body.
+- `last_forward_response_reason` — sanitized `reason` sub-code parsed from `insert_failed` responses. Whitelisted to one of:
+  - `insert_required_field_missing` — a required DB field was missing from the insert payload.
+  - `insert_source_constraint_failed` — stored `source` failed the canonical source check (EcoWitt transport `source` must be remapped to stored `source = "live"`).
+  - `insert_check_failed` — a database check constraint rejected the row.
+  - `insert_column_mismatch` — the insert payload references a column that does not exist or no longer matches schema.
+  - `insert_duplicate` — duplicate/idempotent reading; usually safe.
+  - `insert_unknown` — fallback when the webhook returned a `reason` we do not recognize, or any value containing token-like text. Raw PG messages, SQL, and constraint names are **never** echoed.
 
 Notes:
 
@@ -317,7 +324,7 @@ report** safe to share with a developer. It includes:
 - `ingest_url_configured`, `bridge_token_configured`
 - `tent_id_configured`, `tent_id_valid` (booleans only — never the raw UUID)
 - `last_forward_status`, `last_forward_error`
-- `last_forward_response_error`, `last_forward_response_classification`, `last_forward_response_message`
+- `last_forward_response_error`, `last_forward_response_classification`, `last_forward_response_message`, `last_forward_response_reason`
 - `retry_count`, `last_retry_error`, `max_retry_attempts`
 - `latest_metrics` (source, vendor, metrics, captured_at — no raw payload)
 - `malformed_line_count`
@@ -348,6 +355,45 @@ payload, or `Authorization` header into any chat/issue/email.
 | `blocked_invalid_tent_id` | Display name / placeholder rejected | Used a name (e.g. `Flower Tent`) or `tent-1` | `curl http://localhost:8787/debug/forwarding-status` | n/a | Use a real tent UUID | No |
 | `http_400` (no classification) | Generic 400 | Payload mismatch not enumerated | `curl http://localhost:8787/debug/forwarding-error-report` | No | Inspect `last_forward_response_message` | If unclear |
 | transient 5xx / 429 / 408 / 425 / 504 | Temporary upstream issue | Network/edge backpressure | — | Listener retries up to `max_retry_attempts` | No | Only if it persists |
+
+#### `insert_failed` sub-reasons
+
+When `last_forward_response_classification = storage_insert_failed`, the
+listener also captures a sanitized `last_forward_response_reason` from
+the webhook body and tailors `recommended_next_step` accordingly:
+
+| `last_forward_response_reason` | Meaning | What to do |
+| --- | --- | --- |
+| `insert_required_field_missing` | A required DB field is missing | Share the sanitized report with a developer |
+| `insert_source_constraint_failed` | Stored `source` failed the canonical source constraint | Confirm EcoWitt transport `source` is remapped to stored `source = "live"` |
+| `insert_check_failed` | A database check constraint rejected the row | Share the sanitized report with a developer |
+| `insert_column_mismatch` | Insert references a column that does not exist / no longer matches schema | Developer must align payload mapping with schema |
+| `insert_duplicate` | Duplicate / idempotent reading | Usually safe; verify dedupe behavior |
+| `insert_unknown` | Sub-reason not recognized (or sanitizer collapsed an unsafe value) | Share the sanitized report only |
+
+> Never edit `sensor_readings` rows or constraints directly to "fix"
+> an `insert_failed`. Always share the sanitized
+> `/debug/forwarding-error-report` body with a developer.
+
+#### Deploy verification
+
+If live reports still show `insert_failed` with `last_forward_response_reason: null`,
+then either:
+
+1. The `sensor-ingest-webhook` Edge Function has not been redeployed with
+   the `reason` field support, **or**
+2. The local bridge listener is not capturing the `reason` (verify with
+   `python3 -m unittest test_forwarding_config`).
+
+To redeploy the webhook:
+
+```
+npx supabase functions deploy sensor-ingest-webhook --project-ref knkwiiywfkbqznbxwqfh
+```
+
+After redeploy, retry one forward and re-read
+`/debug/forwarding-error-report`. `last_forward_response_reason` should
+now be populated on `insert_failed` responses.
 
 What **not** to paste anywhere:
 

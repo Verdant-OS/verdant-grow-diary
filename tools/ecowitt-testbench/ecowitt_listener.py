@@ -344,6 +344,12 @@ FORWARD_STATS: Dict[str, Any] = {
     "last_forward_response_error": None,
     "last_forward_response_classification": None,
     "last_forward_response_message": None,
+    # Sanitized `reason` sub-code captured from webhook response bodies.
+    # Used to refine `insert_failed` storage-insert classifications into
+    # actionable operator guidance (e.g. insert_source_constraint_failed,
+    # insert_check_failed, insert_duplicate). Always sanitized; never
+    # raw DB messages, SQL, or constraint names.
+    "last_forward_response_reason": None,
     # Bounded retry tracking. retry_count is cumulative across listener
     # uptime. last_retry_error/last_retry_at/last_retryable_status
     # describe the most recent retry attempt only and are sanitized.

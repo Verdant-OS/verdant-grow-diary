@@ -28,6 +28,7 @@
     "sb:types:local": "supabase gen types typescript --local > src/integrations/supabase/types.ts",
     "sb:functions:serve": "supabase functions serve --env-file .env.local",
     "sb:functions:deploy": "supabase functions deploy",
+    "test:edge:sensor-ingest-webhook": "deno test --allow-env --allow-net=esm.sh,deno.land supabase/functions/sensor-ingest-webhook/cors_e2e_test.ts",
     "sb:verify": "tsx scripts/verify-seed.ts",
     "test:sensor-safety": "vitest run src/test/csv-sensor-import.test.ts src/test/manual-sensor-freshness-and-delta.test.ts src/test/manual-sensor-chronology-delta.test.ts src/test/plant-manual-sensor-freshness-card.test.tsx",
     "test:static-safety": "vitest run src/test/utils/stripSourceComments.test.ts src/test/action-queue-provenance.test.ts src/test/action-queue-alert-context-chip.test.tsx src/test/action-queue-safety.test.ts src/test/v0-operating-loop-ci-guardrails.test.ts",

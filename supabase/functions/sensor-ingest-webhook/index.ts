@@ -57,7 +57,10 @@ function json(req: Request, body: unknown, status: number) {
   });
 }
 
-Deno.serve(async (req) => {
+// Exported for Deno-based CORS + secret-leakage tests. Behavior is identical
+// to the live serve handler: OPTIONS short-circuits before auth/body/DB, and
+// any thrown error is caught so the browser still sees CORS-tagged JSON.
+export async function handleRequest(req: Request): Promise<Response> {
   // OPTIONS preflight: respond before auth, body parsing, or DB lookups.
   // No bridge token required. No telemetry classification. No writes.
   if (req.method === "OPTIONS") {
@@ -69,7 +72,10 @@ Deno.serve(async (req) => {
     // Never leak error text, stack traces, tokens, or PG details.
     return json(req, { error: "internal_error" }, 500);
   }
-});
+}
+
+Deno.serve(handleRequest);
+
 
 async function handle(req: Request): Promise<Response> {
   if (req.method !== "POST") return json(req, { error: "method_not_allowed" }, 405);

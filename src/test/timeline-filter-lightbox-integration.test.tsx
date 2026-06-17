@@ -50,7 +50,7 @@ const ROWS: Row[] = [
 function Harness() {
   const [query, setQuery] = useState("");
   const [plantId, setPlantId] = useState("");
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [photoId, setPhotoId] = useState<string | null>(null);
 
   const filtered = useMemo(
     () => filterTimelineEvidenceRows(ROWS, { query, plantId, tentId: "", eventType: "" }),
@@ -60,12 +60,13 @@ function Harness() {
     () => buildTimelinePhotoLightboxList(filtered),
     [filtered],
   );
+  const lightboxIndex = useMemo(
+    () => findTimelinePhotoIndexById(lightboxItems, photoId),
+    [lightboxItems, photoId],
+  );
   useEffect(() => {
-    if (lightboxIndex === null) return;
-    if (lightboxIndex < 0 || lightboxIndex >= lightboxItems.length) {
-      setLightboxIndex(null);
-    }
-  }, [lightboxItems, lightboxIndex]);
+    if (photoId !== null && lightboxIndex < 0) setPhotoId(null);
+  }, [photoId, lightboxIndex]);
 
   const active = isTimelineEvidenceFilterActive({ query, plantId, tentId: "", eventType: "" });
 

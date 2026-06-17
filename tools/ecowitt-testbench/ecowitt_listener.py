@@ -486,10 +486,18 @@ def read_recent_log_lines(n: int) -> list[str]:
         return []
 
 
-def parse_jsonl_entries(lines: list[str]) -> tuple[list[Dict[str, Any]], int]:
-    """Parse JSONL lines. Returns (parsed_entries, malformed_line_count)."""
+def parse_jsonl_entries(
+    lines: list[str],
+) -> tuple[list[Dict[str, Any]], int, Optional[str]]:
+    """Parse JSONL lines.
+
+    Returns (parsed_entries, malformed_line_count, last_parse_error_summary).
+    The error summary is short and sanitized — never contains the raw
+    offending line, tokens, or payloads.
+    """
     parsed: list[Dict[str, Any]] = []
     malformed = 0
+    last_err: Optional[str] = None
     for raw in lines:
         text = raw.rstrip("\n")
         if not text.strip():
@@ -500,9 +508,15 @@ def parse_jsonl_entries(lines: list[str]) -> tuple[list[Dict[str, Any]], int]:
                 parsed.append(obj)
             else:
                 malformed += 1
-        except Exception:
+                last_err = "non_object_jsonl_line"
+        except Exception as exc:
             malformed += 1
-    return parsed, malformed
+            # Short sanitized class+message; never the raw line text.
+            msg = f"{type(exc).__name__}: {str(exc)[:120]}"
+            safe = sanitize_debug_payload(msg)
+            last_err = safe if isinstance(safe, str) else _REDACTED
+    return parsed, malformed, last_err
+
 
 
 @app.get("/debug/raw-log-tail")

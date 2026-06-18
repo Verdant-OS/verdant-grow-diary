@@ -194,6 +194,17 @@ export default function EcowittIngestAudit() {
         </select>
       </section>
 
+      {selection.invalidRequested && selection.invalidCopy ? (
+        <p
+          data-testid="ecowitt-audit-invalid-tent"
+          role="status"
+          className="text-sm text-amber-600 dark:text-amber-400"
+        >
+          {selection.invalidCopy}
+        </p>
+      ) : null}
+
+
       <EcowittIngestValidationPanel
         input={{
           rows: query.data ?? [],

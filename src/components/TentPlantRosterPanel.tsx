@@ -52,6 +52,12 @@ export default function TentPlantRosterPanel({
         >
           {viewModel.sharedEnvironmentCopy}
         </p>
+        <p
+          className="text-[11px] text-muted-foreground mt-1"
+          data-testid="tent-plant-roster-header-counts"
+        >
+          {viewModel.headerCountsCopy}
+        </p>
         {viewModel.tentSensorContextLabel && (
           <p
             className="text-[11px] text-muted-foreground mt-1"
@@ -65,19 +71,33 @@ export default function TentPlantRosterPanel({
         )}
         {onToggleIncludeArchived && (
           <div className="mt-2">
-            <label className="inline-flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+            <label
+              htmlFor="tent-plant-roster-show-archived-toggle"
+              className="inline-flex items-center gap-2 text-xs text-muted-foreground cursor-pointer"
+            >
               <input
+                id="tent-plant-roster-show-archived-toggle"
                 type="checkbox"
                 checked={viewModel.includeArchived}
                 onChange={(e) => onToggleIncludeArchived(e.target.checked)}
                 data-testid="tent-plant-roster-show-archived-toggle"
-                aria-label={viewModel.archivedToggleLabel}
+                aria-label={viewModel.archivedToggleAccessibleLabel}
+                aria-describedby="tent-plant-roster-show-archived-help"
+                className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded"
               />
               <span>{viewModel.archivedToggleLabel}</span>
             </label>
+            <p
+              id="tent-plant-roster-show-archived-help"
+              className="text-[11px] text-muted-foreground mt-1"
+              data-testid="tent-plant-roster-show-archived-help"
+            >
+              {viewModel.archivedToggleHelpCopy}
+            </p>
           </div>
         )}
       </div>
+
 
       {viewModel.state === "unknown-relationship" && (
         <p
@@ -133,10 +153,13 @@ export default function TentPlantRosterPanel({
                       <span
                         className="text-[11px] rounded-md border px-1.5 py-0.5 text-muted-foreground"
                         data-testid={`tent-plant-roster-row-${row.id}-archived`}
+                        title={viewModel.archivedBadgeHelpCopy}
+                        aria-label={`${viewModel.archivedRowLabel}. ${viewModel.archivedBadgeHelpCopy}`}
                       >
-                        {viewModel.archivedRowLabel}
+                        <span aria-hidden="true">{viewModel.archivedRowLabel}</span>
                       </span>
                     )}
+
                     {row.stage && (
                       <span
                         className="text-[11px] rounded-md border px-1.5 py-0.5 text-muted-foreground"

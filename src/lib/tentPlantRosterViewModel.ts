@@ -100,13 +100,26 @@ export interface TentPlantRosterViewModel {
   includeArchived: boolean;
   /** Number of archived plants matching the tent that are currently hidden. */
   archivedHiddenCount: number;
+  /** All non-archived plants matching the tent (stable regardless of toggle). */
+  activePlantCount: number;
+  /** All archived plants matching the tent (stable regardless of toggle). */
+  archivedPlantCount: number;
+  /** Compact header counts copy: "Active plants: N · Archived plants: N". */
+  headerCountsCopy: string;
   /** Hint shown when active roster is empty but archived plants exist. */
   emptyArchivedHintCopy: string | null;
   /** Label for the archived toggle control. */
   archivedToggleLabel: string;
+  /** Accessible label for the archived toggle (longer, screen-reader). */
+  archivedToggleAccessibleLabel: string;
+  /** Help text describing what the toggle does. */
+  archivedToggleHelpCopy: string;
   /** Label for the archived row badge. */
   archivedRowLabel: string;
+  /** Help copy explaining what "Archived" means on a plant row. */
+  archivedBadgeHelpCopy: string;
 }
+
 
 export const TENT_PLANT_ROSTER_SHARED_ENVIRONMENT_COPY =
   "Tent environment is shared. Plant response is tracked per plant.";
@@ -126,10 +139,26 @@ export const TENT_PLANT_ROSTER_HARVEST_WATCH_FALLBACK_COPY =
 export const TENT_PLANT_ROSTER_ARCHIVED_TOGGLE_LABEL =
   "Show archived plants";
 
+export const TENT_PLANT_ROSTER_ARCHIVED_TOGGLE_ACCESSIBLE_LABEL =
+  "Show archived plants in this tent roster";
+
+export const TENT_PLANT_ROSTER_ARCHIVED_TOGGLE_HELP_COPY =
+  "Archived plants are hidden by default. Turn this on to include completed or inactive plants in this roster.";
+
 export const TENT_PLANT_ROSTER_ARCHIVED_ROW_LABEL = "Archived";
+
+export const TENT_PLANT_ROSTER_ARCHIVED_BADGE_HELP_COPY =
+  "Archived plants are completed or inactive plants kept for record review.";
 
 export const TENT_PLANT_ROSTER_EMPTY_ARCHIVED_HINT_COPY =
   "Archived plants can be shown using the toggle above.";
+
+export function formatTentPlantRosterHeaderCounts(
+  active: number,
+  archived: number,
+): string {
+  return `Active plants: ${active} · Archived plants: ${archived}`;
+}
 
 function normalizeString(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -157,11 +186,27 @@ function compareRows(a: TentPlantRosterRow, b: TentPlantRosterRow): number {
   const bn = b.name.toLocaleLowerCase();
   if (an < bn) return -1;
   if (an > bn) return 1;
-  // deterministic tiebreaker
   if (a.id < b.id) return -1;
   if (a.id > b.id) return 1;
   return 0;
 }
+
+interface CommonCopy {
+  archivedToggleLabel: string;
+  archivedToggleAccessibleLabel: string;
+  archivedToggleHelpCopy: string;
+  archivedRowLabel: string;
+  archivedBadgeHelpCopy: string;
+}
+
+const COMMON_COPY: CommonCopy = {
+  archivedToggleLabel: TENT_PLANT_ROSTER_ARCHIVED_TOGGLE_LABEL,
+  archivedToggleAccessibleLabel:
+    TENT_PLANT_ROSTER_ARCHIVED_TOGGLE_ACCESSIBLE_LABEL,
+  archivedToggleHelpCopy: TENT_PLANT_ROSTER_ARCHIVED_TOGGLE_HELP_COPY,
+  archivedRowLabel: TENT_PLANT_ROSTER_ARCHIVED_ROW_LABEL,
+  archivedBadgeHelpCopy: TENT_PLANT_ROSTER_ARCHIVED_BADGE_HELP_COPY,
+};
 
 export function buildTentPlantRosterViewModel(
   input: TentPlantRosterInput,
@@ -182,16 +227,20 @@ export function buildTentPlantRosterViewModel(
       unknownRelationshipCopy: TENT_PLANT_ROSTER_UNKNOWN_RELATIONSHIP_COPY,
       includeArchived,
       archivedHiddenCount: 0,
+      activePlantCount: 0,
+      archivedPlantCount: 0,
+      headerCountsCopy: formatTentPlantRosterHeaderCounts(0, 0),
       emptyArchivedHintCopy: null,
-      archivedToggleLabel: TENT_PLANT_ROSTER_ARCHIVED_TOGGLE_LABEL,
-      archivedRowLabel: TENT_PLANT_ROSTER_ARCHIVED_ROW_LABEL,
+      ...COMMON_COPY,
     };
   }
 
   const plants = Array.isArray(input.plants) ? input.plants : [];
 
   const rows: TentPlantRosterRow[] = [];
-  let archivedHiddenCount = 0;
+  let activePlantCount = 0;
+  let archivedPlantCount = 0;
+
   for (const raw of plants) {
     if (!raw || typeof raw !== "object") continue;
     const id = normalizeString(raw.id);
@@ -199,10 +248,12 @@ export function buildTentPlantRosterViewModel(
     const plantTentId = normalizeString(raw.tentId);
     if (!tentId || plantTentId !== tentId) continue;
     const isArchived = raw.isArchived === true;
-    if (!includeArchived && isArchived) {
-      archivedHiddenCount += 1;
-      continue;
+    if (isArchived) {
+      archivedPlantCount += 1;
+    } else {
+      activePlantCount += 1;
     }
+    if (!includeArchived && isArchived) continue;
 
     rows.push({
       id,
@@ -221,6 +272,11 @@ export function buildTentPlantRosterViewModel(
   rows.sort(compareRows);
 
   const sensorLabel = normalizeString(input.tentSensorContextLabel);
+  const archivedHiddenCount = includeArchived ? 0 : archivedPlantCount;
+  const headerCountsCopy = formatTentPlantRosterHeaderCounts(
+    activePlantCount,
+    archivedPlantCount,
+  );
 
   if (rows.length === 0) {
     return {
@@ -234,12 +290,14 @@ export function buildTentPlantRosterViewModel(
       unknownRelationshipCopy: null,
       includeArchived,
       archivedHiddenCount,
+      activePlantCount,
+      archivedPlantCount,
+      headerCountsCopy,
       emptyArchivedHintCopy:
         archivedHiddenCount > 0
           ? TENT_PLANT_ROSTER_EMPTY_ARCHIVED_HINT_COPY
           : null,
-      archivedToggleLabel: TENT_PLANT_ROSTER_ARCHIVED_TOGGLE_LABEL,
-      archivedRowLabel: TENT_PLANT_ROSTER_ARCHIVED_ROW_LABEL,
+      ...COMMON_COPY,
     };
   }
 
@@ -254,8 +312,11 @@ export function buildTentPlantRosterViewModel(
     unknownRelationshipCopy: null,
     includeArchived,
     archivedHiddenCount,
+    activePlantCount,
+    archivedPlantCount,
+    headerCountsCopy,
     emptyArchivedHintCopy: null,
-    archivedToggleLabel: TENT_PLANT_ROSTER_ARCHIVED_TOGGLE_LABEL,
-    archivedRowLabel: TENT_PLANT_ROSTER_ARCHIVED_ROW_LABEL,
+    ...COMMON_COPY,
   };
 }
+

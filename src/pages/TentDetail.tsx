@@ -4,7 +4,7 @@ import EnvironmentStabilityCard from "@/components/EnvironmentStabilityCard";
 import TentAiDoctorSessionsPanel from "@/components/TentAiDoctorSessionsPanel";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
 import { useParams, Link } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
@@ -65,13 +65,28 @@ import { buildPlantQuickLogPrefill } from "@/lib/plantQuickLogPrefillRules";
 import TentPlantRosterPanel from "@/components/TentPlantRosterPanel";
 import { buildTentPlantRosterViewModel } from "@/lib/tentPlantRosterViewModel";
 import { useTentPlantRosterActivity } from "@/hooks/useTentPlantRosterActivity";
+import {
+  readTentPlantRosterIncludeArchived,
+  writeTentPlantRosterIncludeArchived,
+} from "@/lib/tentPlantRosterPreferences";
+
 
 import { plantDetailPath, tentsPath } from "@/lib/routes";
 
 export default function TentDetail() {
   const { id } = useParams();
   const [showArchived, setShowArchived] = useState(false);
-  const [rosterIncludeArchived, setRosterIncludeArchived] = useState(false);
+  const [rosterIncludeArchived, setRosterIncludeArchived] = useState<boolean>(() =>
+    readTentPlantRosterIncludeArchived(id ?? null),
+  );
+  useEffect(() => {
+    setRosterIncludeArchived(readTentPlantRosterIncludeArchived(id ?? null));
+  }, [id]);
+  const handleToggleRosterIncludeArchived = (next: boolean) => {
+    setRosterIncludeArchived(next);
+    writeTentPlantRosterIncludeArchived(id ?? null, next);
+  };
+
   const [quickLogOpen, setQuickLogOpen] = useState(false);
   const { data: tent, isLoading, isError, refetch } = useGrowTent(id);
   const { data: activePlants = [] } = useGrowPlants(id);
@@ -381,7 +396,7 @@ export default function TentDetail() {
       })()}
 
       <TentPlantRosterPanel
-        onToggleIncludeArchived={setRosterIncludeArchived}
+        onToggleIncludeArchived={handleToggleRosterIncludeArchived}
         viewModel={buildTentPlantRosterViewModel({
           tentId: id ?? null,
           includeArchived: rosterIncludeArchived,

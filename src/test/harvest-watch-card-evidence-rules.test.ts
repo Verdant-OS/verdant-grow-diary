@@ -286,6 +286,8 @@ describe("pickNextInspection", () => {
       key: k,
       label: k,
       present: !missing.includes(k),
+      status: missing.includes(k) ? ("missing" as const) : ("present" as const),
+      reason: "",
     }));
   }
 

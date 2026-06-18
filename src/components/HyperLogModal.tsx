@@ -207,7 +207,7 @@ export function HyperLogModal({
 
   const handleCommit = () => {
     if (!selected) return;
-    onCommit?.(selected, form);
+    onCommit?.(selected, form, { photoCount: photos.length });
     onOpenChange(false);
     resetAll();
   };

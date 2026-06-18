@@ -24,6 +24,11 @@ const EMPTY: HyperLogDemoFormState = {
   defoliateIntensity: "",
   defoliateNote: "",
   freeformNote: "",
+  envTemp: "",
+  envHumidity: "",
+  envVpd: "",
+  envCo2: "",
+  envNote: "",
 };
 
 const CTX = {

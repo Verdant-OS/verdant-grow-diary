@@ -43,10 +43,21 @@ function offset(ms: number): string {
   return new Date(NOW.getTime() - ms).toISOString();
 }
 
+function allRowsAt(ageMs: number): GgsSentinelInputRow[] {
+  const ts = offset(ageMs);
+  return [
+    row("soil_moisture_pct", 40, ts),
+    row("ec", 1, ts),
+    row("soil_temp_c", 22, ts),
+  ];
+}
+
 describe("GGS Sentinel freshness guidance", () => {
-  it("formats age labels in seconds, minutes, and hours", () => {
+  it("formats age labels in seconds, minutes, precise boundary seconds, and hours", () => {
+    expect(formatGgsAgeLabel(0)).toBe("0m ago");
     expect(formatGgsAgeLabel(45_000)).toBe("45s ago");
     expect(formatGgsAgeLabel(4 * 60_000)).toBe("4m ago");
+    expect(formatGgsAgeLabel(15 * 60_000 + 1_000)).toBe("15m 1s ago");
     expect(formatGgsAgeLabel(90 * 60_000)).toBe("1h 30m ago");
     expect(formatGgsAgeLabel(2 * 3600_000)).toBe("2h ago");
   });
@@ -73,6 +84,54 @@ describe("GGS Sentinel freshness guidance", () => {
     expect(temp.freshnessWindowLabel).toBe("15 min");
     expect(temp.nextActionLabel).toContain("Fresh");
     expect(temp.nextActionLabel).toContain("Valid for live Sentinel");
+  });
+
+  it("exactly 0m old shows exact fresh guidance copy", () => {
+    const ev = evaluateGgsSentinelReadiness({
+      rows: allRowsAt(0),
+      snapshot: SNAP,
+      now: NOW,
+    });
+    const m = ev.metricFreshness.find((f) => f.metric === "soil_moisture_pct")!;
+    expect(m.freshnessStatus).toBe("fresh");
+    expect(m.ageLabel).toBe("0m ago");
+    expect(m.nextActionLabel).toBe(
+      "Fresh — captured 0m ago. Valid for live Sentinel.",
+    );
+  });
+
+  it("exactly 15m old remains aging and shows exact threshold guidance copy", () => {
+    const ev = evaluateGgsSentinelReadiness({
+      rows: allRowsAt(15 * 60_000),
+      snapshot: SNAP,
+      now: NOW,
+    });
+    const m = ev.metricFreshness.find((f) => f.metric === "ec")!;
+    expect(ev.state).toBe("PASS_LIVE_SENTINEL_READY");
+    expect(m.freshnessStatus).toBe("aging");
+    expect(m.fresh).toBe(true);
+    expect(m.stale).toBe(false);
+    expect(m.ageLabel).toBe("15m ago");
+    expect(m.nextActionLabel).toBe(
+      "Fresh but aging — captured 15m ago. Recheck soon; stale at 15 min.",
+    );
+  });
+
+  it("just over 15m old is stale and shows exact expired-row guidance copy", () => {
+    const ev = evaluateGgsSentinelReadiness({
+      rows: allRowsAt(15 * 60_000 + 1_000),
+      snapshot: SNAP,
+      now: NOW,
+    });
+    const m = ev.metricFreshness.find((f) => f.metric === "soil_temp_c")!;
+    expect(ev.state).toBe("BLOCKED_STALE_READING");
+    expect(m.freshnessStatus).toBe("stale");
+    expect(m.fresh).toBe(false);
+    expect(m.stale).toBe(true);
+    expect(m.ageLabel).toBe("15m 1s ago");
+    expect(m.nextActionLabel).toBe(
+      "Stale — captured 15m 1s ago. Ingest a new real GGS reading to clear live Sentinel.",
+    );
   });
 
   it("near-stale row (within final 25% of window) shows fresh but aging", () => {

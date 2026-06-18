@@ -171,6 +171,124 @@ describe("TentPlantRosterPanel", () => {
       screen.queryByTestId("tent-plant-roster-row-p1-recent-photo"),
     ).toBeNull();
   });
+
+  it("does not render archived toggle when no handler is provided", () => {
+    const vm = buildTentPlantRosterViewModel({
+      tentId: "t1",
+      plants: [{ id: "p1", name: "Alpha", tentId: "t1" }],
+    });
+    wrap(<TentPlantRosterPanel viewModel={vm} />);
+    expect(
+      screen.queryByTestId("tent-plant-roster-show-archived-toggle"),
+    ).toBeNull();
+  });
+
+  it("renders archived toggle when handler is provided and excludes archived by default", () => {
+    const vm = buildTentPlantRosterViewModel({
+      tentId: "t1",
+      plants: [
+        { id: "p1", name: "Alpha", tentId: "t1" },
+        { id: "p2", name: "Beta", tentId: "t1", isArchived: true },
+      ],
+    });
+    wrap(
+      <TentPlantRosterPanel
+        viewModel={vm}
+        onToggleIncludeArchived={() => {}}
+      />,
+    );
+    const toggle = screen.getByTestId(
+      "tent-plant-roster-show-archived-toggle",
+    ) as HTMLInputElement;
+    expect(toggle).toBeInTheDocument();
+    expect(toggle.checked).toBe(false);
+    expect(screen.getByTestId("tent-plant-roster-row-p1")).toBeInTheDocument();
+    expect(screen.queryByTestId("tent-plant-roster-row-p2")).toBeNull();
+  });
+
+  it("calls handler with true when archived toggle is clicked", () => {
+    const vm = buildTentPlantRosterViewModel({
+      tentId: "t1",
+      plants: [{ id: "p1", name: "Alpha", tentId: "t1" }],
+    });
+    const calls: boolean[] = [];
+    wrap(
+      <TentPlantRosterPanel
+        viewModel={vm}
+        onToggleIncludeArchived={(v) => calls.push(v)}
+      />,
+    );
+    const toggle = screen.getByTestId(
+      "tent-plant-roster-show-archived-toggle",
+    );
+    (toggle as HTMLInputElement).click();
+    expect(calls).toEqual([true]);
+  });
+
+  it("shows archived plants and Archived label when includeArchived is true", () => {
+    const vm = buildTentPlantRosterViewModel({
+      tentId: "t1",
+      includeArchived: true,
+      plants: [
+        { id: "p1", name: "Alpha", tentId: "t1" },
+        { id: "p2", name: "Beta", tentId: "t1", isArchived: true },
+      ],
+    });
+    wrap(
+      <TentPlantRosterPanel
+        viewModel={vm}
+        onToggleIncludeArchived={() => {}}
+      />,
+    );
+    expect(screen.getByTestId("tent-plant-roster-row-p2")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("tent-plant-roster-row-p2-archived"),
+    ).toHaveTextContent("Archived");
+    expect(
+      screen.queryByTestId("tent-plant-roster-row-p1-archived"),
+    ).toBeNull();
+    // Plant Detail link still present on archived row.
+    expect(
+      screen.getByTestId("tent-plant-roster-row-p2-link"),
+    ).toHaveAttribute("href");
+  });
+
+  it("renders empty archived hint when active is empty but archived exist", () => {
+    const vm = buildTentPlantRosterViewModel({
+      tentId: "t1",
+      plants: [
+        { id: "p1", name: "Alpha", tentId: "t1", isArchived: true },
+      ],
+    });
+    wrap(
+      <TentPlantRosterPanel
+        viewModel={vm}
+        onToggleIncludeArchived={() => {}}
+      />,
+    );
+    expect(screen.getByTestId("tent-plant-roster-empty")).toHaveTextContent(
+      "No plants assigned to this tent yet.",
+    );
+    expect(
+      screen.getByTestId("tent-plant-roster-empty-archived-hint"),
+    ).toHaveTextContent("Archived plants");
+  });
+
+  it("does not render empty archived hint when no archived plants exist", () => {
+    const vm = buildTentPlantRosterViewModel({
+      tentId: "t1",
+      plants: [],
+    });
+    wrap(
+      <TentPlantRosterPanel
+        viewModel={vm}
+        onToggleIncludeArchived={() => {}}
+      />,
+    );
+    expect(
+      screen.queryByTestId("tent-plant-roster-empty-archived-hint"),
+    ).toBeNull();
+  });
 });
 
 

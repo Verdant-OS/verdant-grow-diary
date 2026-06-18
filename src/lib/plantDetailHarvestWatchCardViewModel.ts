@@ -4,12 +4,32 @@
  *
  * Pure and deterministic. No React. No Supabase. No I/O. No AI calls. No
  * alerts. No Action Queue writes. No automation or device control.
+ *
+ * v0 enhancements layered on top of the existing v1.5 row (additive only,
+ * existing fields preserved):
+ *   • `v0ReadinessState` / `v0ReadinessStateLabel` / `v0ReadinessCaution`
+ *   • `evidenceChecklist` (trichome, pistil, bud maturity, window, photos)
+ *   • `groupedRecent` (photos / notes / snapshots, newest first, safe empty)
+ *   • `nextInspection` (cautious diary prefill for the "Next inspection" CTA)
  */
 import {
   buildHarvestWatchRowViewModel,
   type HarvestWatchRowViewModel,
 } from "@/lib/harvestWatchViewModel";
 import type { HarvestWatchInput } from "@/lib/harvestWatchRules";
+import type { PlantRecentActivityRow } from "@/lib/plantRecentActivityRules";
+import {
+  buildEvidenceChecklist,
+  groupHarvestRecentItems,
+  HARVEST_WATCH_V0_STATE_CAUTION,
+  HARVEST_WATCH_V0_STATE_LABEL,
+  mapToV0ReadinessState,
+  pickNextInspection,
+  type HarvestEvidenceChecklistItem,
+  type HarvestRecentGroup,
+  type HarvestWatchV0ReadinessState,
+  type NextInspectionPrefill,
+} from "@/lib/harvestWatchCardEvidenceRules";
 
 export interface PlantDetailHarvestWatchPlantLike {
   id: string;
@@ -33,6 +53,13 @@ export interface PlantDetailHarvestWatchCardViewModel {
   missingContext: string[];
   nextObservation: string;
   stageLabel: string;
+  // v0 additions
+  v0ReadinessState: HarvestWatchV0ReadinessState;
+  v0ReadinessStateLabel: string;
+  v0ReadinessCaution: string;
+  evidenceChecklist: HarvestEvidenceChecklistItem[];
+  groupedRecent: HarvestRecentGroup[];
+  nextInspection: NextInspectionPrefill;
 }
 
 function countActivityPhotos(rows: readonly PlantDetailHarvestWatchActivityLike[]): number {
@@ -96,6 +123,29 @@ export function buildPlantDetailHarvestWatchCardViewModel(params: {
 
   const evidenceLabel = `${row.readiness.score == null ? "Evidence building" : "Evidence ready for review"} · ${photos} photo evidence point${photos === 1 ? "" : "s"}`;
 
+  // v0 evidence checklist / grouping / state. Callers may pass either the
+  // lightweight PlantDetailHarvestWatchActivityLike shape or the full
+  // PlantRecentActivityRow — we narrow defensively for the v0 features.
+  const recentForChecklist = (rows as readonly PlantRecentActivityRow[]).filter(
+    (r) => typeof r === "object" && r !== null && "notePreview" in r,
+  );
+  const evidenceChecklist = buildEvidenceChecklist({
+    recentRows: recentForChecklist,
+    photoEvidenceCount: photos,
+    daysInFlower: input.daysInFlower,
+    expectedHarvestDay: input.expectedHarvestDay,
+  });
+  const groupedRecent = groupHarvestRecentItems(recentForChecklist, {
+    perGroupLimit: 5,
+  });
+  const v0ReadinessState = mapToV0ReadinessState({
+    row,
+    photoEvidenceCount: photos,
+    daysInFlower: input.daysInFlower,
+    expectedHarvestDay: input.expectedHarvestDay,
+  });
+  const nextInspection = pickNextInspection(evidenceChecklist);
+
   return {
     row,
     advisoryLabel: "Advisory only — grower decides",
@@ -106,5 +156,11 @@ export function buildPlantDetailHarvestWatchCardViewModel(params: {
         ? "Keep adding close-up bud photos and harvest notes as the window approaches."
         : "Add close-up bud photos and harvest notes before relying on this watch card.",
     stageLabel: stageLabel(plant.stage),
+    v0ReadinessState,
+    v0ReadinessStateLabel: HARVEST_WATCH_V0_STATE_LABEL[v0ReadinessState],
+    v0ReadinessCaution: HARVEST_WATCH_V0_STATE_CAUTION[v0ReadinessState],
+    evidenceChecklist,
+    groupedRecent,
+    nextInspection,
   };
 }

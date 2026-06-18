@@ -361,6 +361,9 @@ const DETAIL_SECTION_LABEL: Record<DiaryCalendarEventKind, string> = {
 const ENVIRONMENT_CHECK_NOT_LIVE_SUBTITLE =
   "Quick Log environment check — not live sensor telemetry.";
 
+export const ENVIRONMENT_CHECK_NO_VALUES_COPY =
+  "No environment values captured.";
+
 const DIARY_CALENDAR_EMPTY_DETAILS_FALLBACK =
   "No extra details saved for this entry.";
 
@@ -393,10 +396,12 @@ function buildEventDetails(
   let fields: DiaryCalendarEventDisplayField[] = [];
   let ecPreview: EcCompensationPreviewModel | null = null;
   let subtitle: string | null = null;
+  let fallback: string | null = null;
 
   if (kind === "environment") {
     fields = buildEnvironmentFields(rawEntry);
     subtitle = ENVIRONMENT_CHECK_NOT_LIVE_SUBTITLE;
+    if (fields.length === 0) fallback = ENVIRONMENT_CHECK_NO_VALUES_COPY;
   } else if (d) {
     if (kind === "watering") fields = buildWateringFields(d);
     else if (kind === "feeding") {
@@ -416,15 +421,20 @@ function buildEventDetails(
     } else if (kind === "diagnosis") fields = buildDiagnosisFields(d);
   }
 
-  const hasContent = fields.length > 0 || ecPreview !== null || !!noteSnippet;
+  if (kind !== "environment") {
+    const hasContent = fields.length > 0 || ecPreview !== null || !!noteSnippet;
+    fallback = hasContent ? null : DIARY_CALENDAR_EMPTY_DETAILS_FALLBACK;
+  }
+
   return {
     sectionLabel: DETAIL_SECTION_LABEL[kind],
     subtitle,
     fields,
     ecPreview,
-    fallback: hasContent ? null : DIARY_CALENDAR_EMPTY_DETAILS_FALLBACK,
+    fallback,
   };
 }
+
 
 
 

@@ -36,9 +36,14 @@ describe("CustomerGuideQrBlock", () => {
     const wrap = screen.getByTestId("customer-guide-qr-svg-wrap");
     const svg = wrap.querySelector("svg");
     expect(svg).not.toBeNull();
-    // qrcode.react renders many <path>/<rect> children — enough to be a real QR.
-    const children = svg?.querySelectorAll("path, rect") ?? [];
-    expect(children.length).toBeGreaterThan(2);
+    // qrcode.react encodes the value as a single SVG <path> with a long
+    // `d` attribute (real QR modules) — assert it is non-trivially long.
+    const paths = svg?.querySelectorAll("path") ?? [];
+    expect(paths.length).toBeGreaterThan(0);
+    const totalD = Array.from(paths)
+      .map((p) => p.getAttribute("d") ?? "")
+      .join("");
+    expect(totalD.length).toBeGreaterThan(50);
   });
 
   it("renders the unavailable fallback when shareId is missing", () => {

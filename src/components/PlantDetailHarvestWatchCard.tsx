@@ -201,6 +201,7 @@ export default function PlantDetailHarvestWatchCard({
               className={cn("text-[11px]", v0StateTone(vm.v0ReadinessState))}
               data-testid="plant-detail-harvest-watch-v0-state"
               data-state={vm.v0ReadinessState}
+              aria-label={`Harvest Watch readiness: ${vm.v0ReadinessStateLabel}. ${vm.v0ReadinessCaution}`}
             >
               {vm.v0ReadinessStateLabel}
             </Badge>

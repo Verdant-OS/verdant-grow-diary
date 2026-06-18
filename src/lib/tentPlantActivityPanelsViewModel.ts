@@ -293,6 +293,14 @@ export function buildTentPlantActivityPanelsViewModel(
         : null;
     const hasRecentPhoto = a.hasRecentPhoto === true;
     const isFirstQuickLog = latestLogAt === null;
+    const latestLogEntryId =
+      typeof a.latestLogEntryId === "string" && a.latestLogEntryId.length > 0
+        ? a.latestLogEntryId
+        : null;
+    const latestPhotoEntryId =
+      typeof a.latestPhotoEntryId === "string" && a.latestPhotoEntryId.length > 0
+        ? a.latestPhotoEntryId
+        : null;
 
     const plantDetailHref = plantDetailPath(p.id);
     const diaryHref = `${plantDetailHref}#${PLANT_RELATIVE_TIMELINE_ANCHOR_ID}`;
@@ -320,9 +328,11 @@ export function buildTentPlantActivityPanelsViewModel(
       latestLogAt,
       latestLogDateLabel,
       latestLogSummary,
+      latestLogEntryId,
       diaryEmptyCopy: latestLogAt ? null : TENT_PLANT_ACTIVITY_NO_DIARY_COPY,
 
       hasRecentPhoto,
+      latestPhotoEntryId,
       photoEmptyCopy: hasRecentPhoto
         ? null
         : TENT_PLANT_ACTIVITY_NO_PHOTOS_COPY,

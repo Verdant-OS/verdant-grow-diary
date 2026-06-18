@@ -4,32 +4,11 @@ on:
   push:
     branches: [main]
   pull_request:
-    paths:
-      - '.github/workflows/one-tent-loop-smoke-test.yml'
-      - 'src/lib/**quicklog**'
-      - 'src/lib/**QuickLog**'
-      - 'src/lib/**timeline**'
-      - 'src/lib/**Timeline**'
-      - 'src/lib/**actionQueue**'
-      - 'src/lib/**ActionQueue**'
-      - 'src/lib/**aiDoctor**'
-      - 'src/lib/**AiDoctor**'
-      - 'src/hooks/**QuickLog**'
-      - 'src/hooks/**ActionQueue**'
-      - 'src/components/**QuickLog**'
-      - 'src/components/**Timeline**'
-      - 'src/components/**ActionQueue**'
-      - 'src/components/**AiDoctor**'
-      - 'src/pages/**Timeline**'
-      - 'src/pages/**PlantDetail**'
-      - 'src/test/**one-tent**'
-      - 'src/test/**action-queue**'
-      - 'src/test/**quicklog**'
-      - 'src/test/**timeline**'
-      - 'src/test/**sensor-intelligence**'
-      - 'scripts/assert-ecowitt-only-sensor-direction.mjs'
-      - 'package.json'
-      - 'bun.lockb'
+    paths-ignore:
+      - 'src/lib/ggsSentinelSmokeRunner.ts'
+      - 'src/components/GgsSentinelSmokeRunnerPanel.tsx'
+      - 'src/test/ggs-sentinel-*.test.ts'
+      - 'src/test/ggs-sentinel-*.test.tsx'
   workflow_dispatch:
 
 jobs:
@@ -57,10 +36,6 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # Stop-ship: protects the core Verdant operating loop
-      # (Grow → Tent → Plant → Manual Reading → Snapshot → Alert →
-      # Action Queue → Completion → Follow-up Diary → Timeline).
-      # See docs/one-tent-loop-smoke-test-audit.md.
       - name: One-Tent Loop smoke audit
         run: bun run test:one-tent-loop-smoke
 

@@ -49,7 +49,28 @@ export default function TentPlantRosterPanel({
   testId = "tent-plant-roster-panel",
   className,
   onToggleIncludeArchived,
+  quickActionContext,
 }: TentPlantRosterPanelProps) {
+  const navigate = useNavigate();
+
+  function handleEntryActivate(
+    entry: TentPlantRosterQuickActionEntry,
+    e: React.MouseEvent<HTMLAnchorElement | HTMLButtonElement>,
+  ) {
+    if (entry.disabled) {
+      e.preventDefault();
+      return;
+    }
+    if (entry.event === "open-quicklog") {
+      e.preventDefault();
+      dispatchTentPlantRosterQuickLog(entry.eventPayload ?? null);
+      return;
+    }
+    if (entry.href) {
+      e.preventDefault();
+      navigate(entry.href);
+    }
+  }
   return (
     <section
       data-testid={testId}

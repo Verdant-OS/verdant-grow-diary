@@ -224,15 +224,22 @@ export default function GlobalFastAddButton({
         open={hyperLogOpen}
         onOpenChange={setHyperLogOpen}
         initialAction={hyperLogAction}
-        onCommit={(action: HyperLogAction, form: HyperLogDemoFormState) => {
+        onCommit={(
+          action: HyperLogAction,
+          form: HyperLogDemoFormState,
+          extras?: { photoCount: number },
+        ) => {
           // Handoff: map the HyperLog demo draft to the existing Quick
           // Log prefill payload and dispatch the already-wired window
           // event. The grower still confirms + saves inside Quick Log.
           // No writes happen here; demo sensor snapshot values are
-          // intentionally NOT carried over.
+          // intentionally NOT carried over. Photo files stay local in
+          // the HyperLog modal — only the count is forwarded so the
+          // Quick Log preview can show the "Photo preview only" copy.
           const prefill = buildHyperLogQuickLogPrefill({
             action,
             form,
+            photoCount: extras?.photoCount ?? 0,
             context: context
               ? {
                   plantId: context.plantId ?? null,

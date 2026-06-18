@@ -64,6 +64,7 @@ import FirstPlantMemoryCta from "@/components/FirstPlantMemoryCta";
 import { buildPlantQuickLogPrefill } from "@/lib/plantQuickLogPrefillRules";
 import TentPlantRosterPanel from "@/components/TentPlantRosterPanel";
 import { buildTentPlantRosterViewModel } from "@/lib/tentPlantRosterViewModel";
+import { useTentPlantRosterActivity } from "@/hooks/useTentPlantRosterActivity";
 
 import { plantDetailPath, tentsPath } from "@/lib/routes";
 
@@ -82,6 +83,9 @@ export default function TentDetail() {
   const activeCount = getActivePlantCount(activePlants);
   const hasArchived = shouldShowArchivedToggle(allPlants);
   const visiblePlants = filterVisiblePlants(allPlants, { showArchived });
+  const rosterActivity = useTentPlantRosterActivity(visiblePlants);
+
+
 
   if (isLoading) {
     return (
@@ -378,17 +382,25 @@ export default function TentDetail() {
       <TentPlantRosterPanel
         viewModel={buildTentPlantRosterViewModel({
           tentId: id ?? null,
-          plants: visiblePlants.map((p) => ({
-            id: p.id,
-            name: p.name,
-            strain: p.strain,
-            stage: p.stage,
-            tentId: p.tentId,
-            isArchived: p.isArchived,
-          })),
+          plants: visiblePlants.map((p) => {
+            const a = rosterActivity.byPlantId[p.id];
+            return {
+              id: p.id,
+              name: p.name,
+              strain: p.strain,
+              stage: p.stage,
+              tentId: p.tentId,
+              isArchived: p.isArchived,
+              latestLogAt: a?.latestLogAt ?? null,
+              hasRecentPhoto: a?.hasRecentPhoto ?? false,
+              harvestWatchPublicState: a?.harvestWatchPublicState ?? null,
+            };
+          }),
           tentSensorContextLabel: header.sourceLabel ?? null,
         })}
       />
+
+
 
       <div className="glass rounded-2xl p-4">
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">

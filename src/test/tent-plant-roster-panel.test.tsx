@@ -108,7 +108,71 @@ describe("TentPlantRosterPanel", () => {
       screen.getByTestId("tent-plant-roster-row-p1-link"),
     ).toHaveAttribute("href");
   });
+
+  it("renders provided Harvest Watch public state when safe", () => {
+    const vm = buildTentPlantRosterViewModel({
+      tentId: "t1",
+      plants: [
+        {
+          id: "p1",
+          name: "Alpha",
+          tentId: "t1",
+          harvestWatchPublicState: "watch_window",
+        },
+      ],
+    });
+    wrap(<TentPlantRosterPanel viewModel={vm} />);
+    const node = screen.getByTestId("tent-plant-roster-row-p1-harvest-watch");
+    expect(node).toHaveTextContent("watch_window");
+  });
+
+  it("never renders forbidden harvest-instruction copy", () => {
+    const states = [
+      "not_enough_evidence",
+      "too_early_to_call",
+      "watch_window",
+      "ready_for_manual_review",
+      "past_expected_window",
+      "unknown",
+    ];
+    const vm = buildTentPlantRosterViewModel({
+      tentId: "t1",
+      plants: states.map((s, i) => ({
+        id: `p${i}`,
+        name: `Plant ${i}`,
+        tentId: "t1",
+        harvestWatchPublicState: s,
+      })),
+    });
+    const { container } = wrap(<TentPlantRosterPanel viewModel={vm} />);
+    const text = container.textContent ?? "";
+    for (const forbidden of [
+      "harvest now",
+      "ready to harvest",
+      "optimal",
+      "guaranteed",
+      "chop",
+      "flush",
+      "dark period",
+      "fix immediately",
+      "plant is unhealthy",
+    ]) {
+      expect(text.toLowerCase()).not.toContain(forbidden);
+    }
+  });
+
+  it("does not show recent-photo badge when hasRecentPhoto is false", () => {
+    const vm = buildTentPlantRosterViewModel({
+      tentId: "t1",
+      plants: [{ id: "p1", name: "Alpha", tentId: "t1" }],
+    });
+    wrap(<TentPlantRosterPanel viewModel={vm} />);
+    expect(
+      screen.queryByTestId("tent-plant-roster-row-p1-recent-photo"),
+    ).toBeNull();
+  });
 });
+
 
 describe("TentPlantRosterPanel static safety", () => {
   const sources = [

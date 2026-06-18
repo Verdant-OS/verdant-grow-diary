@@ -1,11 +1,10 @@
 /**
- * CustomerGuideTimeline — presenter for the customer-facing timeline
- * shell. Renders the empty-state copy when no public events are present.
+ * CustomerGuideTimeline — presenter for the customer-facing timeline.
  *
  * Hard constraints:
  *  - Does not query private diary entries or sensor_readings.
- *  - Renders only the fields explicitly present on
- *    CustomerGuideTimelineEvent (no raw_payload, no plant/tent ids).
+ *  - Renders only the public-safe fields on CustomerGuideTimelineEvent
+ *    (no raw_payload, no plant/tent ids).
  */
 import type { CustomerGuideTimelineEvent } from "@/lib/customerModeGuideViewModel";
 
@@ -13,12 +12,14 @@ export interface CustomerGuideTimelineProps {
   label: "Customer-facing timeline";
   events: ReadonlyArray<CustomerGuideTimelineEvent>;
   emptyCopy: string;
+  publishedOnlyCopy: string;
 }
 
 export default function CustomerGuideTimeline({
   label,
   events,
   emptyCopy,
+  publishedOnlyCopy,
 }: CustomerGuideTimelineProps) {
   const isEmpty = events.length === 0;
   return (
@@ -34,6 +35,12 @@ export default function CustomerGuideTimeline({
       >
         {label}
       </h2>
+      <p
+        data-testid="customer-guide-timeline-published-only"
+        className="mt-1 text-xs text-muted-foreground"
+      >
+        {publishedOnlyCopy}
+      </p>
       {isEmpty ? (
         <p
           data-testid="customer-guide-timeline-empty"
@@ -47,16 +54,24 @@ export default function CustomerGuideTimeline({
             <li
               key={event.id}
               data-testid={`customer-guide-timeline-event-${event.id}`}
+              data-category={event.category}
               className="rounded-lg border border-border/40 p-3"
             >
               <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                {event.whenLabel}
+                {event.dateLabel}
               </p>
               <p className="mt-1 text-sm font-medium">{event.title}</p>
-              {event.description ? (
+              {event.summary ? (
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {event.description}
+                  {event.summary}
                 </p>
+              ) : null}
+              {event.publicImageUrl ? (
+                <img
+                  src={event.publicImageUrl}
+                  alt=""
+                  className="mt-2 rounded-md max-h-48 object-cover"
+                />
               ) : null}
             </li>
           ))}

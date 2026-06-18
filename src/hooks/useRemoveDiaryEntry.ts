@@ -3,7 +3,7 @@
  *
  * - Hard-deletes ONE diary_entries row by id via the authenticated client.
  * - RLS enforces owner-only deletion. No service role, no admin bypass.
- * - Does NOT touch sensor_readings, action_queue, alerts, AI, or devices.
+ * - Scope is strictly the diary entry. No other tables are touched.
  * - Does NOT delete storage objects (no tested helper exists for that today).
  * - Toast copy is fixed and never echoes raw DB errors.
  */

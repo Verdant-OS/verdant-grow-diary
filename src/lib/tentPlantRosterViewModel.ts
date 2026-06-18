@@ -100,13 +100,26 @@ export interface TentPlantRosterViewModel {
   includeArchived: boolean;
   /** Number of archived plants matching the tent that are currently hidden. */
   archivedHiddenCount: number;
+  /** All non-archived plants matching the tent (stable regardless of toggle). */
+  activePlantCount: number;
+  /** All archived plants matching the tent (stable regardless of toggle). */
+  archivedPlantCount: number;
+  /** Compact header counts copy: "Active plants: N · Archived plants: N". */
+  headerCountsCopy: string;
   /** Hint shown when active roster is empty but archived plants exist. */
   emptyArchivedHintCopy: string | null;
   /** Label for the archived toggle control. */
   archivedToggleLabel: string;
+  /** Accessible label for the archived toggle (longer, screen-reader). */
+  archivedToggleAccessibleLabel: string;
+  /** Help text describing what the toggle does. */
+  archivedToggleHelpCopy: string;
   /** Label for the archived row badge. */
   archivedRowLabel: string;
+  /** Help copy explaining what "Archived" means on a plant row. */
+  archivedBadgeHelpCopy: string;
 }
+
 
 export const TENT_PLANT_ROSTER_SHARED_ENVIRONMENT_COPY =
   "Tent environment is shared. Plant response is tracked per plant.";

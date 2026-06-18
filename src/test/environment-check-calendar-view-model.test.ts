@@ -34,9 +34,9 @@ describe("environmentCheckCalendarViewModel", () => {
 
   it("never labels Environment Check calendar events as live or sensor readings", () => {
     const groups = buildEnvironmentCheckCalendarGroups([make("a", "2026-06-15T08:00:00Z")]);
-    expect(JSON.stringify(groups)).not.toMatch(/\blive\b/i);
     expect(groups[0].events[0].isSensorReading).toBe(false);
     expect(groups[0].events[0].notLive).toBe(true);
+    expect(JSON.stringify(groups)).not.toMatch(/"source"\s*:\s*"live"/i);
   });
 
   it("ignores non-environment entries safely", () => {

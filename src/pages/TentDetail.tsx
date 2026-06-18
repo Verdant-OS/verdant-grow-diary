@@ -119,6 +119,22 @@ export default function TentDetail() {
   const visiblePlants = filterVisiblePlants(allPlants, { showArchived });
   const rosterActivity = useTentPlantRosterActivity(allPlants);
 
+  // Reconcile persisted selected tab against currently visible plants.
+  // If the restored plant id no longer exists, or is archived while archived
+  // plants are hidden, fall back to "All plants" and clear storage.
+  useEffect(() => {
+    if (selectedPlantTabId == null) return;
+    if (!Array.isArray(allPlants) || allPlants.length === 0) return;
+    const match = allPlants.find((p) => p.id === selectedPlantTabId);
+    const isVisible = match
+      ? rosterIncludeArchived || match.isArchived !== true
+      : false;
+    if (!isVisible) {
+      setSelectedPlantTabIdState(null);
+      writeTentPlantTabsSelectedPlantId(id ?? null, null);
+    }
+  }, [selectedPlantTabId, allPlants, rosterIncludeArchived, id]);
+
 
 
   if (isLoading) {

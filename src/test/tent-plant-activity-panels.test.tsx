@@ -150,4 +150,69 @@ describe("TentPlantActivityPanels", () => {
     const cta = screen.getByTestId("tent-plant-activity-panel-p1-add-quicklog") as HTMLButtonElement;
     expect(cta.disabled).toBe(true);
   });
+
+  it("renders Harvest Watch help text + caution near the public state", () => {
+    wrap(<TentPlantActivityPanels viewModel={vm()} />);
+    const help = screen.getByTestId(
+      "tent-plant-activity-panel-p1-harvest-watch-help",
+    );
+    expect(help).toHaveTextContent(/Start checking direct harvest evidence/i);
+    expect(help).toHaveTextContent(/Harvest Watch is evidence-only\./);
+  });
+
+  it("renders fallback Harvest Watch help text when state is missing", () => {
+    wrap(<TentPlantActivityPanels viewModel={vm()} />);
+    const help = screen.getByTestId(
+      "tent-plant-activity-panel-p2-harvest-watch-help",
+    );
+    expect(help).toHaveTextContent(
+      /Not enough context to determine a review state\./,
+    );
+    expect(help).toHaveTextContent(/Harvest Watch is evidence-only\./);
+  });
+
+  it("renders loading skeletons while activity data is hydrating", () => {
+    wrap(<TentPlantActivityPanels viewModel={vm()} isLoading />);
+    const region = screen.getByTestId("tent-plant-activity-panels-loading");
+    expect(region).toBeInTheDocument();
+    expect(region.getAttribute("aria-busy")).toBe("true");
+    expect(
+      screen.getByTestId("tent-plant-activity-panels-skeleton-list"),
+    ).toBeInTheDocument();
+    // No real panels render while loading
+    expect(screen.queryByTestId("tent-plant-activity-panel-p1")).toBeNull();
+    expect(screen.queryByTestId("tent-plant-activity-panel-p2")).toBeNull();
+  });
+
+  it("skeleton does not leak any plant name, strain, or sensor value", () => {
+    wrap(<TentPlantActivityPanels viewModel={vm()} isLoading />);
+    const region = screen.getByTestId("tent-plant-activity-panels-loading");
+    const text = region.textContent ?? "";
+    expect(text).not.toMatch(/Blue Dream/);
+    expect(text).not.toMatch(/Plant B/);
+    expect(text).not.toMatch(/Hybrid/);
+    expect(text).not.toMatch(/Watered/);
+    expect(text).not.toMatch(/observation window/i);
+    expect(text).not.toMatch(/°|kPa|ppm/);
+  });
+
+  it("skeletons are replaced by real panels once loading completes", () => {
+    const { rerender } = wrap(
+      <TentPlantActivityPanels viewModel={vm()} isLoading />,
+    );
+    expect(
+      screen.getByTestId("tent-plant-activity-panels-loading"),
+    ).toBeInTheDocument();
+    rerender(
+      <MemoryRouter>
+        <TentPlantActivityPanels viewModel={vm()} isLoading={false} />
+      </MemoryRouter>,
+    );
+    expect(
+      screen.queryByTestId("tent-plant-activity-panels-loading"),
+    ).toBeNull();
+    expect(
+      screen.getByTestId("tent-plant-activity-panel-p1"),
+    ).toBeInTheDocument();
+  });
 });

@@ -13,6 +13,12 @@ export interface TentPlantRosterPanelProps {
   viewModel: TentPlantRosterViewModel;
   testId?: string;
   className?: string;
+  /**
+   * When provided, the Panel renders a "Show archived plants" toggle wired
+   * to this callback. The current pressed state is read from
+   * `viewModel.includeArchived`. Read-only — no writes, no persistence.
+   */
+  onToggleIncludeArchived?: (next: boolean) => void;
 }
 
 function formatLatestLogAt(iso: string | null): string | null {

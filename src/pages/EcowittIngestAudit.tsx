@@ -246,7 +246,9 @@ export default function EcowittIngestAudit() {
           data-testid="ecowitt-audit-empty"
           className="text-sm text-muted-foreground"
         >
-          {vm.emptyStateMessage ?? ECOWITT_AUDIT_EMPTY_MESSAGE}
+          {effectiveTentId
+            ? ECOWITT_AUDIT_EMPTY_FOR_TENT_COPY
+            : (vm.emptyStateMessage ?? ECOWITT_AUDIT_EMPTY_MESSAGE)}
         </p>
       ) : null}
 

@@ -4,6 +4,20 @@ on:
   push:
     branches: [main]
   pull_request:
+    paths:
+      - '.github/workflows/one-tent-loop-smoke-test.yml'
+      - 'src/lib/**'
+      - 'src/hooks/**'
+      - 'src/components/**'
+      - 'src/pages/**'
+      - 'src/test/**one-tent**'
+      - 'src/test/**action-queue**'
+      - 'src/test/**quicklog**'
+      - 'src/test/**timeline**'
+      - 'src/test/**sensor-intelligence**'
+      - 'scripts/assert-ecowitt-only-sensor-direction.mjs'
+      - 'package.json'
+      - 'bun.lockb'
   workflow_dispatch:
 
 jobs:

@@ -381,9 +381,11 @@ export default function TentDetail() {
       })()}
 
       <TentPlantRosterPanel
+        onToggleIncludeArchived={setRosterIncludeArchived}
         viewModel={buildTentPlantRosterViewModel({
           tentId: id ?? null,
-          plants: visiblePlants.map((p) => {
+          includeArchived: rosterIncludeArchived,
+          plants: allPlants.map((p) => {
             const a = rosterActivity.byPlantId[p.id];
             return {
               id: p.id,

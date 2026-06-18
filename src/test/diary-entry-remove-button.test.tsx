@@ -2,7 +2,9 @@
  * DiaryEntryRemoveButton — visibility, confirmation, mutation, toast tests.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render as rtlRender, screen, waitFor } from "@testing-library/react";
+import React from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const { deleteEq, deleteFn, toastSuccess, toastError } = vi.hoisted(() => {
   const deleteEq = vi.fn(() => Promise.resolve({ error: null }));
@@ -24,6 +26,13 @@ vi.mock("sonner", () => ({
 import DiaryEntryRemoveButton from "@/components/DiaryEntryRemoveButton";
 
 const VIEWER = { currentUserId: "user-1" };
+
+function render(ui: React.ReactElement) {
+  const client = new QueryClient();
+  return rtlRender(
+    React.createElement(QueryClientProvider, { client }, ui),
+  );
+}
 
 beforeEach(() => {
   deleteEq.mockClear();

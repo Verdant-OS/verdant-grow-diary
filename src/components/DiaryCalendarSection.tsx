@@ -34,8 +34,15 @@ import {
   type DiaryCalendarEventDrawerViewModel,
 } from "@/lib/diaryCalendarEventDrawerViewModel";
 import DiaryCalendarEventDrawer from "@/components/DiaryCalendarEventDrawer";
+import {
+  readPersistedDiaryCalendarFilter,
+  writePersistedDiaryCalendarFilter,
+} from "@/lib/diaryCalendarFilterPersistence";
 
 import { cn } from "@/lib/utils";
+
+export const ENVIRONMENT_CHECK_SHOW_DETAILS_LABEL = "Show details";
+export const ENVIRONMENT_CHECK_HIDE_DETAILS_LABEL = "Hide details";
 
 const KIND_TONE: Record<DiaryCalendarEventKind, string> = {
   watering: "bg-sky-500/15 text-sky-300 border-sky-500/30",
@@ -89,9 +96,23 @@ export default function DiaryCalendarSection({
     () => buildDiaryCalendarViewModel(rawEntries ?? []),
     [rawEntries],
   );
-  const [filter, setFilterState] = useState<DiaryCalendarFilter>("all");
+  const [filter, setFilterState] = useState<DiaryCalendarFilter>(
+    () => readPersistedDiaryCalendarFilter() ?? "all",
+  );
+  const [expandedEnvIds, setExpandedEnvIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const toggleEnvExpanded = (id: string) => {
+    setExpandedEnvIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
   const [visibleMonth, setVisibleMonth] = useState<string | null>(() =>
-    defaultDiaryCalendarMonth(allGroups, "all"),
+    defaultDiaryCalendarMonth(allGroups, filter)
+      ?? defaultDiaryCalendarMonth(allGroups, "all"),
   );
 
   // If the parent dataset changes and the current month no longer exists,
@@ -153,6 +174,7 @@ export default function DiaryCalendarSection({
   const setFilter = (next: DiaryCalendarFilter) => {
     if (next === filter) return;
     setFilterState(next);
+    writePersistedDiaryCalendarFilter(next);
     const nextMonth = defaultDiaryCalendarMonth(allGroups, next) ?? visibleMonth;
     setVisibleMonth(nextMonth);
     const nextMonthGroups = filterDiaryCalendarGroups(
@@ -432,34 +454,98 @@ export default function DiaryCalendarSection({
                                   </p>
                                 )}
 
-                                {ev.details.fields.length > 0 && (
-                                  <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-[11px]">
-                                    {ev.details.fields.map((f) => (
-                                      <div key={f.label} className="contents">
-                                        <dt className="text-muted-foreground">{f.label}</dt>
-                                        <dd className="break-words">{f.value}</dd>
-                                      </div>
-                                    ))}
-                                  </dl>
-                                )}
-                                {ev.details.ecPreview && ev.details.ecPreview.visible && (
-                                  <p
-                                    className="mt-1 text-[11px] text-muted-foreground"
-                                    data-testid="diary-calendar-ec-preview"
-                                  >
-                                    <span className="font-medium text-foreground">
-                                      {ev.details.ecPreview.label}:
-                                    </span>{" "}
-                                    {ev.details.ecPreview.valueDisplay}
-                                    <span className="ml-1 italic">
-                                      ({ev.details.ecPreview.disclaimer})
-                                    </span>
-                                  </p>
-                                )}
-                                {ev.details.fallback && (
-                                  <p className="text-[11px] text-muted-foreground italic">
-                                    {ev.details.fallback}
-                                  </p>
+                                {ev.kind === "environment" ? (
+                                  (() => {
+                                    const expanded = expandedEnvIds.has(ev.id);
+                                    const fields = ev.details.fields;
+                                    const hasValues = fields.length > 0;
+                                    return (
+                                      <>
+                                        {hasValues && (
+                                          <p
+                                            className="text-[11px] text-foreground"
+                                            data-testid="diary-calendar-env-compact"
+                                          >
+                                            {fields.map((f) => f.value).join(" · ")}
+                                          </p>
+                                        )}
+                                        {expanded && hasValues && (
+                                          <dl
+                                            className="mt-1 grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-[11px]"
+                                            data-testid="diary-calendar-env-expanded"
+                                          >
+                                            {fields.map((f) => (
+                                              <div key={f.label} className="contents">
+                                                <dt className="text-muted-foreground">{f.label}</dt>
+                                                <dd className="break-words">{f.value}</dd>
+                                              </div>
+                                            ))}
+                                            {ev.noteSnippet && (
+                                              <div className="contents">
+                                                <dt className="text-muted-foreground">Note</dt>
+                                                <dd className="break-words">{ev.noteSnippet}</dd>
+                                              </div>
+                                            )}
+                                          </dl>
+                                        )}
+                                        {ev.details.fallback && (
+                                          <p className="text-[11px] text-muted-foreground italic">
+                                            {ev.details.fallback}
+                                          </p>
+                                        )}
+                                        {(hasValues || ev.noteSnippet) && (
+                                          <button
+                                            type="button"
+                                            onClick={() => toggleEnvExpanded(ev.id)}
+                                            aria-expanded={expanded}
+                                            aria-label={
+                                              expanded
+                                                ? ENVIRONMENT_CHECK_HIDE_DETAILS_LABEL
+                                                : ENVIRONMENT_CHECK_SHOW_DETAILS_LABEL
+                                            }
+                                            data-testid="diary-calendar-env-toggle"
+                                            className="mt-1 inline-flex items-center text-[11px] font-medium text-primary hover:underline"
+                                          >
+                                            {expanded
+                                              ? ENVIRONMENT_CHECK_HIDE_DETAILS_LABEL
+                                              : ENVIRONMENT_CHECK_SHOW_DETAILS_LABEL}
+                                          </button>
+                                        )}
+                                      </>
+                                    );
+                                  })()
+                                ) : (
+                                  <>
+                                    {ev.details.fields.length > 0 && (
+                                      <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-[11px]">
+                                        {ev.details.fields.map((f) => (
+                                          <div key={f.label} className="contents">
+                                            <dt className="text-muted-foreground">{f.label}</dt>
+                                            <dd className="break-words">{f.value}</dd>
+                                          </div>
+                                        ))}
+                                      </dl>
+                                    )}
+                                    {ev.details.ecPreview && ev.details.ecPreview.visible && (
+                                      <p
+                                        className="mt-1 text-[11px] text-muted-foreground"
+                                        data-testid="diary-calendar-ec-preview"
+                                      >
+                                        <span className="font-medium text-foreground">
+                                          {ev.details.ecPreview.label}:
+                                        </span>{" "}
+                                        {ev.details.ecPreview.valueDisplay}
+                                        <span className="ml-1 italic">
+                                          ({ev.details.ecPreview.disclaimer})
+                                        </span>
+                                      </p>
+                                    )}
+                                    {ev.details.fallback && (
+                                      <p className="text-[11px] text-muted-foreground italic">
+                                        {ev.details.fallback}
+                                      </p>
+                                    )}
+                                  </>
                                 )}
                               </div>
                               <div className="mt-2">
@@ -550,7 +636,7 @@ export const ENVIRONMENT_CHECK_EMPTY_CTA_FALLBACK = "Open Quick Log to add one."
 
 function EnvironmentCheckEmptyState() {
   // Dispatches the existing window event handled by Quick Log / Global Fast
-  // Add. No Supabase, no write helpers, no sensor_readings created here.
+  // Add. No Supabase, no write helpers, no telemetry rows created here.
   const canDispatch =
     typeof window !== "undefined" && typeof window.dispatchEvent === "function";
   const onClick = () => {

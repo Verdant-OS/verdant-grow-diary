@@ -53,6 +53,8 @@ export function mapHyperLogActionToEventType(
     case "defoliate":
       // Defoliation is a canopy training action in the existing taxonomy.
       return "training";
+    case "environment":
+      return "environment";
     case "note":
     default:
       return "observation";

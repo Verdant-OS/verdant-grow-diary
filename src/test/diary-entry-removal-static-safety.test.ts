@@ -13,11 +13,13 @@ const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 
 const RULES = read("src/lib/diaryEntryRemovalRules.ts");
 const INVALIDATION = read("src/lib/diaryEntryRemovalInvalidationRules.ts");
+const FOLLOWUP = read("src/lib/diaryEntryRemovalFollowUpRules.ts");
 const HOOK = read("src/hooks/useRemoveDiaryEntry.ts");
 const COMPONENT = read("src/components/DiaryEntryRemoveButton.tsx");
 const FILES = [
   { name: "rules", src: RULES },
   { name: "invalidation", src: INVALIDATION },
+  { name: "followup", src: FOLLOWUP },
   { name: "hook", src: HOOK },
   { name: "component", src: COMPONENT },
 ];

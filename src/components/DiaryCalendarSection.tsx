@@ -264,7 +264,13 @@ export default function DiaryCalendarSection({
         <div
           role="group"
           aria-label="Filter calendar by event type"
-          className="mb-3 flex flex-wrap gap-1.5"
+          className={cn(
+            // Mobile: single-row horizontal scroll with comfortable tap targets.
+            "mb-3 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1",
+            "[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
+            // Desktop: wrap chips into multiple rows; smaller gap.
+            "sm:mx-0 sm:px-0 sm:pb-0 sm:flex-wrap sm:gap-1.5 sm:overflow-visible",
+          )}
           data-testid="diary-calendar-filters"
         >
           {DIARY_CALENDAR_FILTERS.map((f) => {
@@ -279,7 +285,10 @@ export default function DiaryCalendarSection({
                 onClick={() => setFilter(f.value)}
                 data-testid={`diary-calendar-filter-${f.value}`}
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition",
+                  // Mobile: 44px-tall comfortable target, no wrapping, no shrink.
+                  "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-2 text-xs font-medium transition min-h-[40px]",
+                  // Desktop: tighter density to match prior look.
+                  "sm:px-2.5 sm:py-1 sm:text-[11px] sm:min-h-0",
                   active
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-secondary/50 text-foreground border-border/50 hover:bg-secondary",
@@ -288,7 +297,7 @@ export default function DiaryCalendarSection({
                 {f.label}
                 <span
                   className={cn(
-                    "inline-flex items-center justify-center min-w-[1rem] px-1 rounded-full text-[10px] font-semibold",
+                    "inline-flex items-center justify-center min-w-[1.25rem] px-1 rounded-full text-[10px] font-semibold",
                     active
                       ? "bg-primary-foreground/20 text-primary-foreground"
                       : "bg-muted text-muted-foreground",
@@ -304,15 +313,19 @@ export default function DiaryCalendarSection({
       )}
 
       {groups.length === 0 ? (
-        <div
-          className="py-8 text-center text-sm text-muted-foreground"
-          data-testid="diary-calendar-empty"
-        >
-          <p>{diaryCalendarMonthEmptyTitle(visibleMonth, filter)}</p>
-
-          <p className="text-xs mt-1">{DIARY_CALENDAR_EMPTY_HINT}</p>
-        </div>
+        filter === "environment" ? (
+          <EnvironmentCheckEmptyState />
+        ) : (
+          <div
+            className="py-8 text-center text-sm text-muted-foreground"
+            data-testid="diary-calendar-empty"
+          >
+            <p>{diaryCalendarMonthEmptyTitle(visibleMonth, filter)}</p>
+            <p className="text-xs mt-1">{DIARY_CALENDAR_EMPTY_HINT}</p>
+          </div>
+        )
       ) : (
+
         <>
           <div className="mb-3 flex flex-wrap gap-1.5 text-[11px]">
             <SummaryChip kind="watering" count={summary.counts.watering} />

@@ -180,25 +180,36 @@ export function buildTentPlantRosterViewModel(
       tentSensorContextNote: TENT_PLANT_ROSTER_TENT_SENSOR_CONTEXT_NOTE,
       emptyCopy: null,
       unknownRelationshipCopy: TENT_PLANT_ROSTER_UNKNOWN_RELATIONSHIP_COPY,
+      includeArchived,
+      archivedHiddenCount: 0,
+      emptyArchivedHintCopy: null,
+      archivedToggleLabel: TENT_PLANT_ROSTER_ARCHIVED_TOGGLE_LABEL,
+      archivedRowLabel: TENT_PLANT_ROSTER_ARCHIVED_ROW_LABEL,
     };
   }
 
   const plants = Array.isArray(input.plants) ? input.plants : [];
 
   const rows: TentPlantRosterRow[] = [];
+  let archivedHiddenCount = 0;
   for (const raw of plants) {
     if (!raw || typeof raw !== "object") continue;
     const id = normalizeString(raw.id);
     if (!id) continue;
     const plantTentId = normalizeString(raw.tentId);
     if (!tentId || plantTentId !== tentId) continue;
-    if (!includeArchived && raw.isArchived === true) continue;
+    const isArchived = raw.isArchived === true;
+    if (!includeArchived && isArchived) {
+      archivedHiddenCount += 1;
+      continue;
+    }
 
     rows.push({
       id,
       name: normalizeString(raw.name) ?? "Unnamed plant",
       strain: normalizeString(raw.strain),
       stage: normalizeStage(raw.stage),
+      isArchived,
       latestLogAt: normalizeString(raw.latestLogAt),
       hasRecentPhoto: raw.hasRecentPhoto === true,
       harvestWatchPublicState: normalizeString(raw.harvestWatchPublicState),
@@ -221,6 +232,14 @@ export function buildTentPlantRosterViewModel(
       tentSensorContextNote: TENT_PLANT_ROSTER_TENT_SENSOR_CONTEXT_NOTE,
       emptyCopy: TENT_PLANT_ROSTER_EMPTY_COPY,
       unknownRelationshipCopy: null,
+      includeArchived,
+      archivedHiddenCount,
+      emptyArchivedHintCopy:
+        archivedHiddenCount > 0
+          ? TENT_PLANT_ROSTER_EMPTY_ARCHIVED_HINT_COPY
+          : null,
+      archivedToggleLabel: TENT_PLANT_ROSTER_ARCHIVED_TOGGLE_LABEL,
+      archivedRowLabel: TENT_PLANT_ROSTER_ARCHIVED_ROW_LABEL,
     };
   }
 
@@ -233,5 +252,10 @@ export function buildTentPlantRosterViewModel(
     tentSensorContextNote: TENT_PLANT_ROSTER_TENT_SENSOR_CONTEXT_NOTE,
     emptyCopy: null,
     unknownRelationshipCopy: null,
+    includeArchived,
+    archivedHiddenCount,
+    emptyArchivedHintCopy: null,
+    archivedToggleLabel: TENT_PLANT_ROSTER_ARCHIVED_TOGGLE_LABEL,
+    archivedRowLabel: TENT_PLANT_ROSTER_ARCHIVED_ROW_LABEL,
   };
 }

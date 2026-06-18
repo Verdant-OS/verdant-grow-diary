@@ -34,7 +34,12 @@ import {
 import { cn } from "@/lib/utils";
 import { GeneticsBadge } from "@/components/GeneticsBadge";
 
-export type HyperLogAction = "water" | "feed" | "defoliate" | "note";
+export type HyperLogAction =
+  | "water"
+  | "feed"
+  | "defoliate"
+  | "note"
+  | "environment";
 
 export interface HyperLogDemoFormState {
   waterAmount: string;
@@ -46,13 +51,27 @@ export interface HyperLogDemoFormState {
   defoliateIntensity: string;
   defoliateNote: string;
   freeformNote: string;
+  // Environment Check — manual/demo draft values. Never live telemetry.
+  envTemp: string;
+  envHumidity: string;
+  envVpd: string;
+  envCo2: string;
+  envNote: string;
 }
 
 interface HyperLogModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Presenter callback. Receives the selected action + demo form snapshot. */
-  onCommit?: (action: HyperLogAction, demo: HyperLogDemoFormState) => void;
+  /**
+   * Presenter callback. Receives the selected action, demo form snapshot,
+   * and a small extras bag (e.g. local photo preview count). No file
+   * handles are exposed — photos stay local in this modal.
+   */
+  onCommit?: (
+    action: HyperLogAction,
+    demo: HyperLogDemoFormState,
+    extras?: { photoCount: number },
+  ) => void;
   /** Optional preselected action (e.g. when launched from Fast Add). */
   initialAction?: HyperLogAction | null;
   /**
@@ -72,6 +91,7 @@ const ACTION_TILES: Array<{
   { id: "feed", label: "Feed", icon: Leaf },
   { id: "defoliate", label: "Defoliate", icon: Scissors },
   { id: "note", label: "Note", icon: NotebookPen },
+  { id: "environment", label: "Env Check", icon: Gauge },
 ];
 
 // Hardcoded demo values — NOT live telemetry.
@@ -95,6 +115,11 @@ const EMPTY_FORM: HyperLogDemoFormState = {
   defoliateIntensity: "",
   defoliateNote: "",
   freeformNote: "",
+  envTemp: "",
+  envHumidity: "",
+  envVpd: "",
+  envCo2: "",
+  envNote: "",
 };
 
 export function HyperLogModal({

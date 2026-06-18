@@ -88,6 +88,6 @@ describe("dispatchCorrectedQuickLogHandoff", () => {
     expect(payload.tentId).toBe("t1");
     expect(payload.growId).toBe("g1");
     expect(payload.note).toBe("n");
-    expect((payload as Record<string, unknown>).plantId).toBeUndefined();
+    expect((payload as unknown as Record<string, unknown>).plantId).toBeUndefined();
   });
 });

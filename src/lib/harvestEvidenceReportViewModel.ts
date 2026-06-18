@@ -7,7 +7,7 @@
  * via the existing harvest evidence classifier in
  * `harvestWatchEvidenceHistoryViewModel`. No I/O. No Supabase. No AI.
  * No alerts. No Action Queue. No automation. No device control. No
- * sensor_readings reads. No raw_payload parsing.
+ * telemetry reads. No raw payload parsing.
  *
  * Hard rules:
  *   - Does not predict harvest timing, health, or readiness.

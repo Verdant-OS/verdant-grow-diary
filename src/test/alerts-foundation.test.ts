@@ -271,28 +271,38 @@ describe("status helpers only update status + timestamps", () => {
     vi.clearAllMocks();
   });
 
-  it("acknowledgeAlert sets only status + acknowledged_at", async () => {
+  it("acknowledgeAlert sets status + acknowledged_at and clears resolved_at", async () => {
     await mod.acknowledgeAlert("a1");
     expect(spies.update).toHaveBeenCalledTimes(1);
     const patch = spies.update.mock.calls[0][0] as Record<string, unknown>;
     expect(Object.keys(patch).sort()).toEqual(
-      ["acknowledged_at", "status"].sort(),
+      ["acknowledged_at", "resolved_at", "status"].sort(),
     );
     expect(patch.status).toBe("acknowledged");
+    expect(patch.resolved_at).toBeNull();
   });
 
-  it("resolveAlert sets only status + resolved_at", async () => {
+  it("resolveAlert sets status + resolved_at and clears acknowledged_at", async () => {
+    // Regression: an acknowledged alert had a non-null acknowledged_at, which
+    // violated alerts_acknowledged_at_status_check on resolve.
     await mod.resolveAlert("a1");
     const patch = spies.update.mock.calls[0][0] as Record<string, unknown>;
-    expect(Object.keys(patch).sort()).toEqual(["resolved_at", "status"].sort());
+    expect(Object.keys(patch).sort()).toEqual(
+      ["acknowledged_at", "resolved_at", "status"].sort(),
+    );
     expect(patch.status).toBe("resolved");
+    expect(patch.acknowledged_at).toBeNull();
   });
 
-  it("dismissAlert sets only status", async () => {
+  it("dismissAlert sets status and clears both timestamps", async () => {
     await mod.dismissAlert("a1");
     const patch = spies.update.mock.calls[0][0] as Record<string, unknown>;
-    expect(Object.keys(patch)).toEqual(["status"]);
+    expect(Object.keys(patch).sort()).toEqual(
+      ["acknowledged_at", "resolved_at", "status"].sort(),
+    );
     expect(patch.status).toBe("dismissed");
+    expect(patch.acknowledged_at).toBeNull();
+    expect(patch.resolved_at).toBeNull();
   });
 
   it("saveAlert insert payload never contains user_id", async () => {

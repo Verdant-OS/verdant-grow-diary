@@ -5,7 +5,7 @@
  *
  * Safety:
  *   - Pure, deterministic, no React, no I/O, no Supabase imports.
- *   - No fake live data. Returns null when context is missing.
+ *   - Never fabricates sensor data. Returns null when context is missing.
  *   - Operator-safe fallback copy when the requested tent is invalid.
  */
 

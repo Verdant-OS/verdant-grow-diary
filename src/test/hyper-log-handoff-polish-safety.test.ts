@@ -69,6 +69,8 @@ describe("hyperlog handoff polish — static safety", () => {
   it("quickLogDraftPreviewViewModel exports never-live copy constants", () => {
     expect(VM).toContain("QUICK_LOG_DRAFT_PHOTO_BLOCKED_COPY");
     expect(VM).toContain("QUICK_LOG_DRAFT_DEMO_SNAPSHOT_COPY");
-    expect(VM).not.toMatch(/\blive sensor data\b(?! ")/i);
+    // Must never positively assert HyperLog data IS live telemetry.
+    expect(VM).not.toMatch(/\bis live\b/i);
+    expect(VM).not.toMatch(/\blive telemetry\b/i);
   });
 });

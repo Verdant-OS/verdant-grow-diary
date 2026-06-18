@@ -7,7 +7,7 @@
  * eventType, and cautious note copy. The handoff is read-only — no
  * Supabase write, no AI, no alerts, no Action Queue, no device control.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 
 import PlantDetailHarvestWatchCard from "@/components/PlantDetailHarvestWatchCard";

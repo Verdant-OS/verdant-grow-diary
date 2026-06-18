@@ -215,4 +215,132 @@ describe("TentPlantActivityPanels", () => {
       screen.getByTestId("tent-plant-activity-panel-p1"),
     ).toBeInTheDocument();
   });
+
+  it("skeleton count matches visible plant count when no override is provided", () => {
+    wrap(<TentPlantActivityPanels viewModel={vm()} isLoading />);
+    const list = screen.getByTestId("tent-plant-activity-panels-skeleton-list");
+    expect(list.getAttribute("data-skeleton-count")).toBe("2");
+    expect(screen.getByTestId("tent-plant-activity-panels-skeleton-0")).toBeInTheDocument();
+    expect(screen.getByTestId("tent-plant-activity-panels-skeleton-1")).toBeInTheDocument();
+    expect(screen.queryByTestId("tent-plant-activity-panels-skeleton-2")).toBeNull();
+  });
+
+  it("skeleton count is 1 when a single plant tab is selected", () => {
+    wrap(
+      <TentPlantActivityPanels
+        viewModel={vm({ selectedPlantId: "p2" })}
+        isLoading
+      />,
+    );
+    const list = screen.getByTestId("tent-plant-activity-panels-skeleton-list");
+    expect(list.getAttribute("data-skeleton-count")).toBe("1");
+    expect(screen.queryByTestId("tent-plant-activity-panels-skeleton-1")).toBeNull();
+  });
+
+  it("archived hidden excludes archived plants from skeleton count", () => {
+    const plants = [
+      ...PLANTS,
+      { id: "p3", name: "Archived", isArchived: true },
+    ];
+    wrap(
+      <TentPlantActivityPanels
+        viewModel={vm({ plants, includeArchived: false })}
+        isLoading
+      />,
+    );
+    expect(
+      screen.getByTestId("tent-plant-activity-panels-skeleton-list").getAttribute("data-skeleton-count"),
+    ).toBe("2");
+  });
+
+  it("archived shown includes archived plants in skeleton count", () => {
+    const plants = [
+      ...PLANTS,
+      { id: "p3", name: "Archived", isArchived: true },
+    ];
+    wrap(
+      <TentPlantActivityPanels
+        viewModel={vm({ plants, includeArchived: true })}
+        isLoading
+      />,
+    );
+    expect(
+      screen.getByTestId("tent-plant-activity-panels-skeleton-list").getAttribute("data-skeleton-count"),
+    ).toBe("3");
+  });
+
+  it("no visible plants renders a single compact placeholder, never fake plant cards", () => {
+    wrap(
+      <TentPlantActivityPanels
+        viewModel={vm({ plants: [], activityByPlantId: {} })}
+        isLoading
+      />,
+    );
+    const list = screen.getByTestId("tent-plant-activity-panels-skeleton-list");
+    expect(list.getAttribute("data-skeleton-count")).toBe("1");
+    expect(list.getAttribute("data-has-visible-plants")).toBe("false");
+    expect(screen.getByTestId("tent-plant-activity-panels-skeleton-0")).toBeInTheDocument();
+    expect(screen.queryByTestId("tent-plant-activity-panels-skeleton-1")).toBeNull();
+    const text = list.textContent ?? "";
+    expect(text).not.toMatch(/Blue Dream|Plant B/);
+  });
+
+  it("skeleton cards mirror real panel layout landmarks (rounded card with border)", () => {
+    wrap(<TentPlantActivityPanels viewModel={vm()} isLoading />);
+    const skel = screen.getByTestId("tent-plant-activity-panels-skeleton-0");
+    expect(skel.className).toMatch(/rounded-xl/);
+    expect(skel.className).toMatch(/border/);
+    expect(skel.className).toMatch(/min-h-/);
+  });
+
+  it("empty diary state renders 'Add first Quick Log' CTA copy", () => {
+    wrap(<TentPlantActivityPanels viewModel={vm()} />);
+    const cta = screen.getByTestId("tent-plant-activity-panel-p2-add-quicklog");
+    expect(cta).toHaveTextContent("Add first Quick Log");
+    expect(cta.getAttribute("aria-label")).toBe("Add first Quick Log for Plant B");
+    expect(cta.getAttribute("data-is-first-quicklog")).toBe("true");
+  });
+
+  it("plants with existing diary keep the regular 'Add Quick Log' CTA copy", () => {
+    wrap(<TentPlantActivityPanels viewModel={vm()} />);
+    const cta = screen.getByTestId("tent-plant-activity-panel-p1-add-quicklog");
+    expect(cta).toHaveTextContent("Add Quick Log");
+    expect(cta).not.toHaveTextContent("first");
+    expect(cta.getAttribute("data-is-first-quicklog")).toBe("false");
+  });
+
+  it("empty-state CTA dispatches Quick Log handoff with full prefill", () => {
+    const received: Array<Record<string, unknown>> = [];
+    const listener = (ev: Event) =>
+      received.push((ev as CustomEvent).detail as Record<string, unknown>);
+    window.addEventListener("verdant:open-quicklog", listener as EventListener);
+    wrap(<TentPlantActivityPanels viewModel={vm()} />);
+    (
+      screen.getByTestId("tent-plant-activity-panel-p2-add-quicklog") as HTMLButtonElement
+    ).click();
+    window.removeEventListener("verdant:open-quicklog", listener as EventListener);
+    expect(received).toHaveLength(1);
+    expect(received[0]).toMatchObject({
+      plantId: "p2",
+      plantName: "Plant B",
+      tentId: "t1",
+      tentName: "Tent A",
+      growId: "g1",
+      eventType: "observation",
+      suggestSnapshot: true,
+    });
+  });
+
+  it("empty-state CTA disables when required context is missing", () => {
+    wrap(
+      <TentPlantActivityPanels
+        viewModel={vm({ tentId: null, growId: null })}
+      />,
+    );
+    const cta = screen.getByTestId(
+      "tent-plant-activity-panel-p2-add-quicklog",
+    ) as HTMLButtonElement;
+    expect(cta.disabled).toBe(true);
+    expect(cta.textContent).toMatch(/Add first Quick Log/);
+  });
 });

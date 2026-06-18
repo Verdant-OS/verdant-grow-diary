@@ -251,6 +251,12 @@ export default function PlantDetailHarvestWatchCard({
           <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Evidence checklist
           </div>
+          <p
+            className="mt-0.5 text-[11px] text-muted-foreground"
+            data-testid="plant-detail-harvest-watch-checklist-caution"
+          >
+            Evidence checklist — not a harvest instruction.
+          </p>
           <ul className="mt-2 grid gap-1.5 text-xs sm:grid-cols-2">
             {vm.evidenceChecklist.map((item) => (
               <li

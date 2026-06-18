@@ -135,6 +135,7 @@ const App = () => (
                 <Route path="/grow-lineage" element={<GrowLineageRepair />} />
                 <Route path="/grows" element={<Grows />} />
                 <Route path="/grows/:growId" element={<GrowDetail />} />
+                <Route path="/pheno-hunts/new" element={<PhenoHuntNew />} />
                 <Route path="/reports" element={<Reports />} />
                 <Route
                   path="/diary/environment-summary"

@@ -6,8 +6,15 @@
  * no alerts, no Action Queue, no device control.
  */
 
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import type { TentPlantRosterViewModel } from "@/lib/tentPlantRosterViewModel";
+import {
+  buildTentPlantRosterQuickActions,
+  dispatchTentPlantRosterQuickLog,
+  tentPlantRosterQuickActionsTriggerLabel,
+  type TentPlantRosterQuickActionContext,
+  type TentPlantRosterQuickActionEntry,
+} from "@/lib/tentPlantRosterQuickActions";
 
 export interface TentPlantRosterPanelProps {
   viewModel: TentPlantRosterViewModel;
@@ -19,6 +26,11 @@ export interface TentPlantRosterPanelProps {
    * `viewModel.includeArchived`. Read-only — no writes, no persistence.
    */
   onToggleIncludeArchived?: (next: boolean) => void;
+  /**
+   * When provided, each row renders a compact quick-action menu (View
+   * diary, Add Quick Log, View photos) wired to existing handoffs only.
+   */
+  quickActionContext?: TentPlantRosterQuickActionContext;
 }
 
 function formatLatestLogAt(iso: string | null): string | null {

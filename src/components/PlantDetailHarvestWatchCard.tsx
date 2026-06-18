@@ -93,29 +93,24 @@ function v0StateTone(state: HarvestWatchV0ReadinessState): string {
 }
 
 function dispatchNextInspection(
-  prefill: NextInspectionPrefill,
-  context: {
-    plantId: string;
-    plantName?: string | null;
-    growId?: string | null;
-    tentId?: string | null;
-  },
+  prefill: HarvestInspectionQuickLogPrefill,
 ) {
   if (typeof window === "undefined") return;
   window.dispatchEvent(
-    new CustomEvent("verdant:open-quicklog", {
+    new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, {
       bubbles: true,
       cancelable: true,
       detail: {
-        plantId: context.plantId,
-        plantName: context.plantName ?? null,
-        growId: context.growId ?? null,
-        tentId: context.tentId ?? null,
+        plantId: prefill.plantId,
+        plantName: prefill.plantName,
+        growId: prefill.growId,
+        tentId: prefill.tentId,
         eventType: prefill.eventType,
-        suggestedAction: prefill.suggestedAction,
-        suggestedInspection: prefill.kind,
-        notePrefill: prefill.notePrefill,
-        source: "harvest-watch-next-inspection",
+        suggestSnapshot: prefill.suggestSnapshot,
+        note: prefill.note,
+        source: prefill.source,
+        // Non-standard hint fields — downstream consumers may ignore safely.
+        preset: prefill.preset,
       },
     }),
   );

@@ -474,6 +474,7 @@ export default function TentDetail() {
               })}
             />
             <TentPlantActivityPanels
+              isLoading={rosterActivity.isLoading}
               viewModel={buildTentPlantActivityPanelsViewModel({
                 plants: allPlants.map((p) => ({
                   id: p.id,

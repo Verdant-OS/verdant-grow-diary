@@ -40,9 +40,12 @@ describe("environmentCheckTimelineViewModel", () => {
     expect(keys).toEqual(["co2", "humidity", "temp", "vpd"]);
   });
 
-  it("never labels environment check data as live", () => {
+  it("never labels environment check data as live (positive flags only)", () => {
     const vm = buildEnvironmentCheckTimelineViewModel(envEntry)!;
-    expect(JSON.stringify(vm)).not.toMatch(/\blive\b/i);
+    expect(vm.notLive).toBe(true);
+    expect(vm.isSensorReading).toBe(false);
+    expect(JSON.stringify(vm)).not.toMatch(/"source"\s*:\s*"live"/i);
+    expect(JSON.stringify(vm)).not.toMatch(/"status"\s*:\s*"live"/i);
   });
 
   it("returns null for non-environment entries", () => {

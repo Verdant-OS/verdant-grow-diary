@@ -1,9 +1,9 @@
 /**
- * /pheno-hunts/new — operator-only Pheno Hunt Start Page (v0).
+ * /pheno-hunts/new — operator-only Pheno Hunt Start Page (v1).
  *
  * Mounted inside AppShell so it inherits the authenticated/operator gate.
  * Loads the operator's plants (RLS-scoped) read-only for candidate linking.
- * No writes — persistence is intentionally blocked in v0.
+ * Persistence is handled by useCreatePhenoHunt inside the presenter.
  */
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -17,10 +17,14 @@ export default function PhenoHuntNew() {
   const tentId = params.get("tentId");
 
   const [plants, setPlants] = useState<CandidatePlant[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!cancelled) setUserId(auth.user?.id ?? null);
+
       const { data } = await supabase
         .from("plants")
         .select("id,name,strain,stage,grow_id,tent_id,is_archived");
@@ -45,6 +49,7 @@ export default function PhenoHuntNew() {
   return (
     <PhenoHuntStartPage
       allPlants={plants}
+      userId={userId}
       initialDraft={{ growId: growId ?? null, tentId: tentId ?? null }}
     />
   );

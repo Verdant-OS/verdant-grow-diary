@@ -114,6 +114,23 @@ export const TENT_PLANT_ACTIVITY_NO_PHOTOS_COPY =
   "No recent photos for this plant.";
 export const TENT_PLANT_ACTIVITY_HARVEST_WATCH_FALLBACK_COPY =
   "Harvest Watch available on Plant Detail.";
+export const TENT_PLANT_ACTIVITY_HARVEST_WATCH_CAUTION_COPY =
+  "Harvest Watch is evidence-only.";
+export const TENT_PLANT_ACTIVITY_HARVEST_WATCH_HELP_FALLBACK_COPY =
+  "Not enough context to determine a review state.";
+
+export const TENT_PLANT_ACTIVITY_HARVEST_WATCH_HELP_TEXT: Readonly<
+  Record<string, string>
+> = {
+  not_enough_evidence: "More direct inspection evidence is needed.",
+  too_early_to_call: "Timing or evidence suggests review is not near yet.",
+  watch_window: "Start checking direct harvest evidence more closely.",
+  ready_for_manual_review:
+    "Evidence supports manual review; the grower decides.",
+  past_expected_window:
+    "Expected window may have passed; re-check direct evidence.",
+  unknown: "Not enough context to determine a review state.",
+};
 export const TENT_PLANT_ACTIVITY_SHARED_ENV_COPY =
   "Tent environment is shared. Plant response is tracked per plant.";
 export const TENT_PLANT_ACTIVITY_EMPTY_NO_PLANTS_COPY =

@@ -164,4 +164,67 @@ describe("tentPlantRosterViewModel", () => {
     });
     expect(vm.state).toBe("empty");
   });
+
+  it("includes archived plants when includeArchived=true and marks isArchived", () => {
+    const vm = buildTentPlantRosterViewModel({
+      tentId: TENT,
+      includeArchived: true,
+      plants: [
+        { id: "p1", name: "Alpha", tentId: TENT },
+        { id: "p2", name: "Beta", tentId: TENT, isArchived: true },
+      ],
+    });
+    expect(vm.includeArchived).toBe(true);
+    expect(vm.rows.map((r) => r.id)).toEqual(["p1", "p2"]);
+    const beta = vm.rows.find((r) => r.id === "p2");
+    expect(beta?.isArchived).toBe(true);
+    const alpha = vm.rows.find((r) => r.id === "p1");
+    expect(alpha?.isArchived).toBe(false);
+  });
+
+  it("counts archived plants hidden by default", () => {
+    const vm = buildTentPlantRosterViewModel({
+      tentId: TENT,
+      plants: [
+        { id: "p1", name: "Alpha", tentId: TENT },
+        { id: "p2", name: "Beta", tentId: TENT, isArchived: true },
+        { id: "p3", name: "Gamma", tentId: TENT, isArchived: true },
+      ],
+    });
+    expect(vm.archivedHiddenCount).toBe(2);
+    expect(vm.includeArchived).toBe(false);
+  });
+
+  it("emits empty archived hint when active set is empty but archived exist", () => {
+    const vm = buildTentPlantRosterViewModel({
+      tentId: TENT,
+      plants: [
+        { id: "p2", name: "Beta", tentId: TENT, isArchived: true },
+      ],
+    });
+    expect(vm.state).toBe("empty");
+    expect(vm.archivedHiddenCount).toBe(1);
+    expect(vm.emptyArchivedHintCopy).toContain("Archived plants");
+  });
+
+  it("does not emit archived hint when no archived plants exist", () => {
+    const vm = buildTentPlantRosterViewModel({
+      tentId: TENT,
+      plants: [],
+    });
+    expect(vm.emptyArchivedHintCopy).toBeNull();
+  });
+
+  it("preserves deterministic sort when archived plants are included", () => {
+    const vm = buildTentPlantRosterViewModel({
+      tentId: TENT,
+      includeArchived: true,
+      plants: [
+        { id: "p2", name: "Charlie", tentId: TENT },
+        { id: "p1", name: "alpha", tentId: TENT, isArchived: true },
+        { id: "p3", name: "Bravo", tentId: TENT },
+      ],
+    });
+    expect(vm.rows.map((r) => r.name)).toEqual(["alpha", "Bravo", "Charlie"]);
+  });
 });

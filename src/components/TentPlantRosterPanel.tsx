@@ -13,6 +13,12 @@ export interface TentPlantRosterPanelProps {
   viewModel: TentPlantRosterViewModel;
   testId?: string;
   className?: string;
+  /**
+   * When provided, the Panel renders a "Show archived plants" toggle wired
+   * to this callback. The current pressed state is read from
+   * `viewModel.includeArchived`. Read-only — no writes, no persistence.
+   */
+  onToggleIncludeArchived?: (next: boolean) => void;
 }
 
 function formatLatestLogAt(iso: string | null): string | null {
@@ -30,6 +36,7 @@ export default function TentPlantRosterPanel({
   viewModel,
   testId = "tent-plant-roster-panel",
   className,
+  onToggleIncludeArchived,
 }: TentPlantRosterPanelProps) {
   return (
     <section
@@ -56,6 +63,20 @@ export default function TentPlantRosterPanel({
             {viewModel.tentSensorContextLabel}
           </p>
         )}
+        {onToggleIncludeArchived && (
+          <div className="mt-2">
+            <label className="inline-flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+              <input
+                type="checkbox"
+                checked={viewModel.includeArchived}
+                onChange={(e) => onToggleIncludeArchived(e.target.checked)}
+                data-testid="tent-plant-roster-show-archived-toggle"
+                aria-label={viewModel.archivedToggleLabel}
+              />
+              <span>{viewModel.archivedToggleLabel}</span>
+            </label>
+          </div>
+        )}
       </div>
 
       {viewModel.state === "unknown-relationship" && (
@@ -69,12 +90,22 @@ export default function TentPlantRosterPanel({
       )}
 
       {viewModel.state === "empty" && (
-        <p
-          className="text-sm text-muted-foreground py-3"
-          data-testid="tent-plant-roster-empty"
-        >
-          {viewModel.emptyCopy}
-        </p>
+        <div className="py-3">
+          <p
+            className="text-sm text-muted-foreground"
+            data-testid="tent-plant-roster-empty"
+          >
+            {viewModel.emptyCopy}
+          </p>
+          {viewModel.emptyArchivedHintCopy && (
+            <p
+              className="text-xs text-muted-foreground mt-1"
+              data-testid="tent-plant-roster-empty-archived-hint"
+            >
+              {viewModel.emptyArchivedHintCopy}
+            </p>
+          )}
+        </div>
       )}
 
       {viewModel.state === "loaded" && (
@@ -97,14 +128,24 @@ export default function TentPlantRosterPanel({
                   >
                     {row.name}
                   </span>
-                  {row.stage && (
-                    <span
-                      className="text-[11px] rounded-md border px-1.5 py-0.5 text-muted-foreground"
-                      data-testid={`tent-plant-roster-row-${row.id}-stage`}
-                    >
-                      {row.stage}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {row.isArchived && (
+                      <span
+                        className="text-[11px] rounded-md border px-1.5 py-0.5 text-muted-foreground"
+                        data-testid={`tent-plant-roster-row-${row.id}-archived`}
+                      >
+                        {viewModel.archivedRowLabel}
+                      </span>
+                    )}
+                    {row.stage && (
+                      <span
+                        className="text-[11px] rounded-md border px-1.5 py-0.5 text-muted-foreground"
+                        data-testid={`tent-plant-roster-row-${row.id}-stage`}
+                      >
+                        {row.stage}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {row.strain && (
                   <p

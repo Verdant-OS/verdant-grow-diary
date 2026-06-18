@@ -67,13 +67,12 @@ describe("<PhenoHuntStartPage />", () => {
     expect(within(summary).getByText(/BB-01/)).toBeInTheDocument();
   });
 
-  it("save CTA is disabled and shows blocked copy", () => {
+  it("save CTA is disabled until required setup is complete", () => {
     render(<PhenoHuntStartPage allPlants={[]} />);
     const cta = screen.getByTestId("ph-save-cta") as HTMLButtonElement;
     expect(cta.disabled).toBe(true);
-    expect(screen.getByTestId("ph-save-blocked-copy")).toHaveTextContent(
-      /persistence slice/i,
-    );
+    expect(cta).toHaveTextContent(/complete required setup/i);
+    expect(screen.getByTestId("ph-save-blocked-copy")).toBeInTheDocument();
   });
 
   it("archived plants only show when 'Show archived' is toggled, and are labeled", () => {

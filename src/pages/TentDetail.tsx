@@ -73,6 +73,10 @@ import {
   readTentPlantRosterIncludeArchived,
   writeTentPlantRosterIncludeArchived,
 } from "@/lib/tentPlantRosterPreferences";
+import {
+  readTentPlantTabsSelectedPlantId,
+  writeTentPlantTabsSelectedPlantId,
+} from "@/lib/tentPlantTabsPreferences";
 
 
 import { plantDetailPath, tentsPath } from "@/lib/routes";

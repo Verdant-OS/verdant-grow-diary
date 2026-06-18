@@ -45,12 +45,17 @@ export default function TentPlantActivityPanels({
   className,
   testId = "tent-plant-activity-panels",
   isLoading = false,
-  loadingSkeletonCount = 3,
+  loadingSkeletonCount,
 }: TentPlantActivityPanelsProps) {
-  const skeletonCount = Math.max(
-    1,
-    Math.min(6, Math.floor(loadingSkeletonCount)),
-  );
+  // Skeleton count matches the visible/scoped plant filter so the loading
+  // shell matches the panels that will render. Falls back to 1 compact
+  // placeholder when no plants are visible — never fakes plant cards.
+  const derivedCount =
+    typeof loadingSkeletonCount === "number" && Number.isFinite(loadingSkeletonCount)
+      ? Math.floor(loadingSkeletonCount)
+      : viewModel.scopedPanelCount;
+  const skeletonCount = Math.max(1, Math.min(12, derivedCount > 0 ? derivedCount : 1));
+  const hasVisiblePlants = viewModel.visiblePlantCount > 0;
   return (
     <section
       data-testid={testId}
@@ -75,23 +80,31 @@ export default function TentPlantActivityPanels({
           <ul
             className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3"
             data-testid="tent-plant-activity-panels-skeleton-list"
+            data-skeleton-count={skeletonCount}
+            data-has-visible-plants={hasVisiblePlants ? "true" : "false"}
             aria-hidden="true"
           >
             {Array.from({ length: skeletonCount }).map((_, i) => (
               <li
                 key={i}
                 data-testid={`tent-plant-activity-panels-skeleton-${i}`}
-                className="rounded-xl border border-border/50 p-3 bg-card animate-pulse"
+                className="rounded-xl border border-border/50 p-3 bg-card animate-pulse min-h-[10.5rem] flex flex-col"
               >
-                <div className="h-4 w-1/2 bg-muted rounded mb-2" />
-                <div className="h-3 w-1/3 bg-muted/70 rounded mb-3" />
-                <div className="space-y-1.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="h-4 w-1/2 bg-muted rounded mb-2" />
+                    <div className="h-3 w-1/3 bg-muted/70 rounded" />
+                  </div>
+                  <div className="h-5 w-12 bg-muted/50 rounded-md shrink-0" />
+                </div>
+                <div className="mt-2 space-y-1.5 flex-1">
                   <div className="h-3 w-3/4 bg-muted/60 rounded" />
                   <div className="h-3 w-2/3 bg-muted/60 rounded" />
                   <div className="h-3 w-1/2 bg-muted/60 rounded" />
                 </div>
-                <div className="mt-3 flex gap-2">
-                  <div className="h-6 w-24 bg-muted/70 rounded-full" />
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="h-6 w-28 bg-muted/70 rounded-full" />
+                  <div className="h-6 w-16 bg-muted/50 rounded" />
                   <div className="h-6 w-16 bg-muted/50 rounded" />
                 </div>
               </li>
@@ -100,6 +113,7 @@ export default function TentPlantActivityPanels({
         </div>
       ) : (
         <>
+
       {viewModel.emptyCopy && (
         <p
           className="text-sm text-muted-foreground"

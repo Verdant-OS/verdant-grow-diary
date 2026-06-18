@@ -65,6 +65,11 @@ import { buildPlantQuickLogPrefill } from "@/lib/plantQuickLogPrefillRules";
 import TentPlantRosterPanel from "@/components/TentPlantRosterPanel";
 import { buildTentPlantRosterViewModel } from "@/lib/tentPlantRosterViewModel";
 import { useTentPlantRosterActivity } from "@/hooks/useTentPlantRosterActivity";
+import {
+  readTentPlantRosterIncludeArchived,
+  writeTentPlantRosterIncludeArchived,
+} from "@/lib/tentPlantRosterPreferences";
+
 
 import { plantDetailPath, tentsPath } from "@/lib/routes";
 

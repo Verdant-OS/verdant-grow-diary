@@ -138,11 +138,20 @@ export function buildPlantDetailHarvestWatchCardViewModel(params: {
   const groupedRecent = groupHarvestRecentItems(recentForChecklist, {
     perGroupLimit: 5,
   });
+  const STRONG_KEYS = new Set([
+    "trichome_inspection",
+    "pistil_observation",
+    "bud_maturity_note",
+  ]);
+  const strongEvidenceCount = evidenceChecklist.filter(
+    (i) => STRONG_KEYS.has(i.key) && i.present,
+  ).length;
   const v0ReadinessState = mapToV0ReadinessState({
     row,
     photoEvidenceCount: photos,
     daysInFlower: input.daysInFlower,
     expectedHarvestDay: input.expectedHarvestDay,
+    strongEvidenceCount,
   });
   const nextInspection = pickNextInspection(evidenceChecklist);
 

@@ -72,51 +72,96 @@ function makeActivity(
 }
 
 describe("mapToV0ReadinessState", () => {
-  it("returns not_enough_evidence when readiness is gated and trend unknown", () => {
-    const row = makeRow();
+  const base = {
+    photoEvidenceCount: 0,
+    daysInFlower: null as number | null,
+    expectedHarvestDay: null as number | null,
+    strongEvidenceCount: 0,
+  };
+
+  it("returns unknown when trend unknown and no evidence of any kind", () => {
+    expect(mapToV0ReadinessState({ ...base, row: makeRow() })).toBe("unknown");
+  });
+
+  it("returns not_enough_evidence when trend unknown but some evidence exists", () => {
     expect(
-      mapToV0ReadinessState({
-        row,
-        photoEvidenceCount: 0,
-        daysInFlower: null,
-        expectedHarvestDay: null,
-      }),
+      mapToV0ReadinessState({ ...base, row: makeRow(), photoEvidenceCount: 1 }),
     ).toBe("not_enough_evidence");
   });
 
-  it("returns watch_window when trend is approaching with weak score", () => {
-    const row = makeRow({ trend: "approaching", readiness: { score: 0.6 } as HarvestWatchRowViewModel["readiness"] });
+  it("returns watch_window when trend is approaching", () => {
+    const row = makeRow({ trend: "approaching" });
     expect(
-      mapToV0ReadinessState({ row, photoEvidenceCount: 1, daysInFlower: null, expectedHarvestDay: null }),
+      mapToV0ReadinessState({ ...base, row, photoEvidenceCount: 1 }),
     ).toBe("watch_window");
   });
 
-  it("returns ready_for_manual_review only with strong score AND multiple photos", () => {
-    const row = makeRow({ trend: "approaching", readiness: { score: 0.85 } as HarvestWatchRowViewModel["readiness"] });
+  it("returns watch_window for trend holding when strongEvidenceCount < 2", () => {
+    const row = makeRow({ trend: "holding" });
     expect(
-      mapToV0ReadinessState({ row, photoEvidenceCount: 1, daysInFlower: null, expectedHarvestDay: null }),
+      mapToV0ReadinessState({ ...base, row, strongEvidenceCount: 1 }),
     ).toBe("watch_window");
+  });
+
+  it("returns ready_for_manual_review only with trend=holding AND >=2 strong signals", () => {
+    const row = makeRow({ trend: "holding" });
     expect(
-      mapToV0ReadinessState({ row, photoEvidenceCount: 3, daysInFlower: null, expectedHarvestDay: null }),
+      mapToV0ReadinessState({ ...base, row, strongEvidenceCount: 2 }),
     ).toBe("ready_for_manual_review");
+  });
+
+  it("a single recent photo alone does NOT produce ready_for_manual_review", () => {
+    for (const trend of ["holding", "approaching", "unknown", "early"] as const) {
+      const row = makeRow({ trend });
+      const state = mapToV0ReadinessState({
+        ...base,
+        row,
+        photoEvidenceCount: 1,
+        strongEvidenceCount: 0,
+      });
+      expect(state).not.toBe("ready_for_manual_review");
+    }
+  });
+
+  it("returns too_early_to_call for trend=early", () => {
+    expect(
+      mapToV0ReadinessState({ ...base, row: makeRow({ trend: "early" }) }),
+    ).toBe("too_early_to_call");
   });
 
   it("returns too_early_to_call when daysInFlower is well before window start", () => {
     const row = makeRow({ trend: "early" });
     expect(
-      mapToV0ReadinessState({ row, photoEvidenceCount: 0, daysInFlower: 20, expectedHarvestDay: 60 }),
+      mapToV0ReadinessState({ ...base, row, daysInFlower: 20, expectedHarvestDay: 60 }),
     ).toBe("too_early_to_call");
   });
 
   it("returns past_expected_window when daysInFlower is past window end + 7", () => {
     const row = makeRow({ trend: "holding" });
     expect(
-      mapToV0ReadinessState({ row, photoEvidenceCount: 1, daysInFlower: 85, expectedHarvestDay: 65 }),
+      mapToV0ReadinessState({
+        ...base,
+        row,
+        daysInFlower: 85,
+        expectedHarvestDay: 65,
+        strongEvidenceCount: 3,
+      }),
     ).toBe("past_expected_window");
   });
 
-  it("all v0 state labels and cautions never include harvest-instruction phrasing", () => {
-    const forbidden = [/harvest now/i, /ready to harvest/i, /guaranteed/i, /optimal/i, /\bchop\b/i, /\bflush\b/i, /dark period/i];
+  it("all v0 state labels and cautions never include forbidden harvest-instruction phrasing", () => {
+    const forbidden = [
+      /harvest now/i,
+      /ready to harvest/i,
+      /guaranteed/i,
+      /optimal/i,
+      /\bdone\b/i,
+      /\bchop\b/i,
+      /\bflush\b/i,
+      /dark period/i,
+      /fix immediately/i,
+      /plant is unhealthy/i,
+    ];
     for (const [, label] of Object.entries(HARVEST_WATCH_V0_STATE_LABEL)) {
       for (const f of forbidden) expect(label).not.toMatch(f);
     }
@@ -125,6 +170,8 @@ describe("mapToV0ReadinessState", () => {
     }
     // ready_for_manual_review must defer to grower
     expect(HARVEST_WATCH_V0_STATE_CAUTION.ready_for_manual_review).toMatch(/grower decides/i);
+    // unknown must be honest about insufficient info
+    expect(HARVEST_WATCH_V0_STATE_CAUTION.unknown).toMatch(/cannot determine/i);
   });
 });
 

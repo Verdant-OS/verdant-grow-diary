@@ -396,7 +396,7 @@ export default function TentDetail() {
       })()}
 
       <TentPlantRosterPanel
-        onToggleIncludeArchived={setRosterIncludeArchived}
+        onToggleIncludeArchived={handleToggleRosterIncludeArchived}
         viewModel={buildTentPlantRosterViewModel({
           tentId: id ?? null,
           includeArchived: rosterIncludeArchived,

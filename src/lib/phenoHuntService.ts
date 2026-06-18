@@ -122,3 +122,77 @@ export async function createPhenoHunt(
 
   return { huntId, taggedPlantIds: tagged };
 }
+
+export interface DeletePhenoHuntInput {
+  huntId: string;
+}
+
+export interface DeletePhenoHuntResult {
+  huntId: string;
+  untaggedPlantIds: string[];
+}
+
+/**
+ * Delete a Pheno Hunt safely:
+ *   1. Untag every plant linked to the hunt (pheno_hunt_id = null,
+ *      candidate_label = null).
+ *   2. Delete the pheno_hunts row.
+ *
+ * If step 1 fails the hunt row is left intact. Never deletes plants,
+ * diary entries, photos, sensor readings, alerts, or action queue rows.
+ * Relies on RLS — never uses service_role.
+ */
+export async function deletePhenoHunt(
+  input: DeletePhenoHuntInput,
+  client: SupabaseClient = defaultClient,
+): Promise<DeletePhenoHuntResult> {
+  const huntId = input.huntId;
+  if (!huntId) throw new PhenoHuntError("Hunt id is required.");
+
+  // Fetch linked plants up front so we can report what was untagged and
+  // avoid relying on a returning-clause on the bulk update.
+  const { data: linked, error: selErr } = await client
+    .from("plants")
+    .select("id")
+    .eq("pheno_hunt_id", huntId);
+
+  if (selErr) {
+    throw new PhenoHuntError(
+      `Could not read linked plants: ${selErr.message}`,
+      selErr,
+    );
+  }
+
+  const linkedIds = (linked ?? []).map((r) => (r as { id: string }).id);
+
+  if (linkedIds.length > 0) {
+    const { error: untagErr } = await client
+      .from("plants")
+      .update({
+        pheno_hunt_id: null,
+        candidate_label: null,
+      } as never)
+      .eq("pheno_hunt_id", huntId);
+
+    if (untagErr) {
+      throw new PhenoHuntError(
+        `Could not untag linked plants: ${untagErr.message}`,
+        untagErr,
+      );
+    }
+  }
+
+  const { error: delErr } = await client
+    .from("pheno_hunts")
+    .delete()
+    .eq("id", huntId);
+
+  if (delErr) {
+    throw new PhenoHuntError(
+      `Could not delete pheno hunt: ${delErr.message}`,
+      delErr,
+    );
+  }
+
+  return { huntId, untaggedPlantIds: linkedIds };
+}

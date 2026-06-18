@@ -142,7 +142,7 @@ export function buildTentPlantRosterQuickActions(
       kind: "view_photos",
       label: "View photos",
       href: photosHref,
-      testId: "tent-plant-roster-row-action-view-photos",
+      testId: `${testIdBase}-view-photos`,
       anchorBlocked: !PHOTOS_ANCHOR_AVAILABLE,
       disabled: !plantId,
       disabledReason: plantId ? undefined : "Plant context is not loaded yet.",

@@ -139,10 +139,8 @@ describe("buildHyperLogQuickLogPrefill", () => {
   });
 
   it("returns null on bogus input", () => {
-    // @ts-expect-error intentional bogus input
-    expect(buildHyperLogQuickLogPrefill(null)).toBeNull();
-    // @ts-expect-error intentional bogus input
-    expect(buildHyperLogQuickLogPrefill({})).toBeNull();
+    expect(buildHyperLogQuickLogPrefill(null as never)).toBeNull();
+    expect(buildHyperLogQuickLogPrefill({} as never)).toBeNull();
   });
 
   it("uses the existing window event name (no new write path)", () => {

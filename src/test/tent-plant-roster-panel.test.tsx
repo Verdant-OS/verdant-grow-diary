@@ -390,6 +390,105 @@ describe("TentPlantRosterPanel", () => {
   });
 });
 
+describe("TentPlantRosterPanel quick-action menu", () => {
+  const ctx = { tentId: "t1", tentName: "Tent A", growId: "g1" };
+
+  function buildVm() {
+    return buildTentPlantRosterViewModel({
+      tentId: "t1",
+      includeArchived: true,
+      plants: [
+        { id: "p1", name: "Alpha", tentId: "t1" },
+        { id: "p2", name: "Beta", tentId: "t1", isArchived: true },
+      ],
+    });
+  }
+
+  it("does not render the menu when quickActionContext is not provided", () => {
+    wrap(<TentPlantRosterPanel viewModel={buildVm()} />);
+    expect(
+      screen.queryByTestId("tent-plant-roster-row-p1-actions-trigger"),
+    ).toBeNull();
+  });
+
+  it("renders a trigger per row with accessible label including plant name", () => {
+    wrap(<TentPlantRosterPanel viewModel={buildVm()} quickActionContext={ctx} />);
+    const trigger = screen.getByTestId(
+      "tent-plant-roster-row-p1-actions-trigger",
+    );
+    expect(trigger.tagName.toLowerCase()).toBe("summary");
+    expect(trigger.getAttribute("aria-label")).toBe("Open actions for Alpha");
+  });
+
+  it("menu exposes View diary, Add Quick Log, View photos", () => {
+    wrap(<TentPlantRosterPanel viewModel={buildVm()} quickActionContext={ctx} />);
+    expect(
+      screen.getByTestId("tent-plant-roster-row-p1-action-view-diary"),
+    ).toHaveTextContent("View diary");
+    expect(
+      screen.getByTestId("tent-plant-roster-row-p1-action-add-quicklog"),
+    ).toHaveTextContent("Add Quick Log");
+    expect(
+      screen.getByTestId("tent-plant-roster-row-p1-action-view-photos"),
+    ).toHaveTextContent("View photos");
+  });
+
+  it("View diary anchor links to plant timeline section", () => {
+    wrap(<TentPlantRosterPanel viewModel={buildVm()} quickActionContext={ctx} />);
+    const link = screen.getByTestId(
+      "tent-plant-roster-row-p1-action-view-diary",
+    );
+    expect(link.getAttribute("href")).toBe("/plants/p1#plant-relative-timeline");
+    expect(link.getAttribute("data-anchor-blocked")).toBeNull();
+  });
+
+  it("View photos falls back to Plant Detail and marks anchor blocked", () => {
+    wrap(<TentPlantRosterPanel viewModel={buildVm()} quickActionContext={ctx} />);
+    const link = screen.getByTestId(
+      "tent-plant-roster-row-p1-action-view-photos",
+    );
+    expect(link.getAttribute("href")).toBe("/plants/p1");
+    expect(link.getAttribute("data-anchor-blocked")).toBe("true");
+  });
+
+  it("Add Quick Log dispatches verdant:open-quicklog with correct payload", () => {
+    const received: Array<{
+      plantId: string;
+      plantName: string | null;
+      growId: string;
+      tentId: string;
+      eventType: string;
+    }> = [];
+    const listener = (ev: Event) =>
+      received.push((ev as CustomEvent).detail);
+    window.addEventListener("verdant:open-quicklog", listener as EventListener);
+    wrap(<TentPlantRosterPanel viewModel={buildVm()} quickActionContext={ctx} />);
+    (
+      screen.getByTestId("tent-plant-roster-row-p1-action-add-quicklog") as HTMLButtonElement
+    ).click();
+    window.removeEventListener(
+      "verdant:open-quicklog",
+      listener as EventListener,
+    );
+    expect(received).toHaveLength(1);
+    expect(received[0].plantId).toBe("p1");
+    expect(received[0].plantName).toBe("Alpha");
+    expect(received[0].tentId).toBe("t1");
+    expect(received[0].growId).toBe("g1");
+    expect(received[0].eventType).toBe("observation");
+  });
+
+  it("archived row still exposes quick actions", () => {
+    wrap(<TentPlantRosterPanel viewModel={buildVm()} quickActionContext={ctx} />);
+    expect(
+      screen.getByTestId("tent-plant-roster-row-p2-actions-trigger"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("tent-plant-roster-row-p2-action-add-quicklog"),
+    ).toBeInTheDocument();
+  });
+});
+
 
 
 describe("TentPlantRosterPanel static safety", () => {

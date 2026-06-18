@@ -6,15 +6,18 @@
  * no alerts, no Action Queue, no device control.
  */
 
+import { useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { TentPlantRosterViewModel } from "@/lib/tentPlantRosterViewModel";
 import {
   buildTentPlantRosterQuickActions,
   dispatchTentPlantRosterQuickLog,
   tentPlantRosterQuickActionsTriggerLabel,
+  TENT_PLANT_ROSTER_PHOTOS_FALLBACK_HINT_COPY,
   type TentPlantRosterQuickActionContext,
   type TentPlantRosterQuickActionEntry,
 } from "@/lib/tentPlantRosterQuickActions";
+import { trackTentRosterAction } from "@/lib/tentPlantRosterActionTracking";
 
 export interface TentPlantRosterPanelProps {
   viewModel: TentPlantRosterViewModel;

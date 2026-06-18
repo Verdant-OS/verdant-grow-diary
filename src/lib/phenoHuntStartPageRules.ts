@@ -206,8 +206,10 @@ export function containsForbiddenPhenoHuntCopy(text: string): boolean {
   return FORBIDDEN_PATTERNS.some((re) => re.test(text));
 }
 
-/** v0 persistence is blocked — no pheno_hunts table exists yet. */
-export const PHENO_HUNT_PERSISTENCE_BLOCKED = true as const;
+/**
+ * v1: Pheno hunt persistence is live (see useCreatePhenoHunt).
+ * Save readiness is validated by phenoHuntPersistenceRules.
+ */
+export const PHENO_HUNT_PERSISTENCE_BLOCKED = false as const;
 
-export const PHENO_HUNT_PERSISTENCE_BLOCKED_COPY =
-  "Saving pheno hunts requires a dedicated persistence slice.";
+export const PHENO_HUNT_PERSISTENCE_BLOCKED_COPY = "";

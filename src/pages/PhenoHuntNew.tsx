@@ -171,10 +171,19 @@ export default function PhenoHuntNew() {
 
           {plants.length === 0 ? (
             <div
-              className="rounded-md border border-dashed p-4 text-sm text-muted-foreground text-center"
+              className="rounded-lg border border-dashed p-6 text-center space-y-3"
               data-testid="ph-empty"
             >
-              No plants in this grow yet. Add plants before starting a pheno hunt.
+              <h3 className="text-sm font-semibold">
+                No plants in this grow yet
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Add a plant before starting a Pheno Hunt. Candidates are
+                tagged plants, not separate records.
+              </p>
+              <Button asChild size="sm" data-testid="ph-empty-cta">
+                <Link to={`/grows/${growId}`}>Go to grow to add a plant</Link>
+              </Button>
             </div>
           ) : (
             <ul className="space-y-1.5" data-testid="ph-plant-list">

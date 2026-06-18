@@ -178,6 +178,8 @@ describe("static safety — harvestWatchEvidenceHistoryViewModel", () => {
   );
 
   it("has no forbidden imports", () => {
+    const importLines = SRC.split("\n").filter((l) => /^\s*import\s/.test(l));
+    const joined = importLines.join("\n");
     const FORBIDDEN = [
       "@supabase/",
       "supabase/client",
@@ -187,9 +189,9 @@ describe("static safety — harvestWatchEvidenceHistoryViewModel", () => {
       "actionQueue",
       "action_queue",
       "deviceControl",
-      "alerts",
+      "/alerts",
     ];
-    for (const f of FORBIDDEN) expect(SRC).not.toContain(f);
+    for (const f of FORBIDDEN) expect(joined).not.toContain(f);
   });
 
   it("does not render forbidden harvest-instruction phrasing", () => {

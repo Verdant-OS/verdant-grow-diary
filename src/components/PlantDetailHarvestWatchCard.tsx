@@ -35,8 +35,13 @@ import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
 import { buildPlantDetailHarvestWatchCardViewModel } from "@/lib/plantDetailHarvestWatchCardViewModel";
 import type {
   HarvestWatchV0ReadinessState,
-  NextInspectionPrefill,
 } from "@/lib/harvestWatchCardEvidenceRules";
+import {
+  buildHarvestInspectionQuickLogPrefill,
+  pickHarvestInspectionPreset,
+  type HarvestInspectionQuickLogPrefill,
+} from "@/lib/harvestInspectionQuickLogRules";
+import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { cn } from "@/lib/utils";
 
 interface PlantDetailHarvestWatchCardProps {
@@ -88,29 +93,24 @@ function v0StateTone(state: HarvestWatchV0ReadinessState): string {
 }
 
 function dispatchNextInspection(
-  prefill: NextInspectionPrefill,
-  context: {
-    plantId: string;
-    plantName?: string | null;
-    growId?: string | null;
-    tentId?: string | null;
-  },
+  prefill: HarvestInspectionQuickLogPrefill,
 ) {
   if (typeof window === "undefined") return;
   window.dispatchEvent(
-    new CustomEvent("verdant:open-quicklog", {
+    new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, {
       bubbles: true,
       cancelable: true,
       detail: {
-        plantId: context.plantId,
-        plantName: context.plantName ?? null,
-        growId: context.growId ?? null,
-        tentId: context.tentId ?? null,
+        plantId: prefill.plantId,
+        plantName: prefill.plantName,
+        growId: prefill.growId,
+        tentId: prefill.tentId,
         eventType: prefill.eventType,
-        suggestedAction: prefill.suggestedAction,
-        suggestedInspection: prefill.kind,
-        notePrefill: prefill.notePrefill,
-        source: "harvest-watch-next-inspection",
+        suggestSnapshot: prefill.suggestSnapshot,
+        note: prefill.note,
+        source: prefill.source,
+        // Non-standard hint fields — downstream consumers may ignore safely.
+        preset: prefill.preset,
       },
     }),
   );
@@ -139,12 +139,17 @@ export default function PlantDetailHarvestWatchCard({
 
   const onNextInspection = useCallback(() => {
     if (!vm || !plant) return;
-    dispatchNextInspection(vm.nextInspection, {
-      plantId: plant.id,
-      plantName: plant.name,
-      growId: (plant as { growId?: string | null }).growId ?? null,
-      tentId: (plant as { tentId?: string | null }).tentId ?? null,
+    const preset = pickHarvestInspectionPreset(vm.evidenceChecklist);
+    const prefill = buildHarvestInspectionQuickLogPrefill({
+      preset,
+      context: {
+        plantId: plant.id,
+        plantName: plant.name,
+        growId: (plant as { growId?: string | null }).growId ?? null,
+        tentId: (plant as { tentId?: string | null }).tentId ?? null,
+      },
     });
+    dispatchNextInspection(prefill);
   }, [vm, plant]);
 
   if (!plantId) return null;

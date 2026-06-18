@@ -65,6 +65,8 @@ import { buildPlantQuickLogPrefill } from "@/lib/plantQuickLogPrefillRules";
 import TentPlantRosterPanel from "@/components/TentPlantRosterPanel";
 import { buildTentPlantRosterViewModel } from "@/lib/tentPlantRosterViewModel";
 import { useTentPlantRosterActivity } from "@/hooks/useTentPlantRosterActivity";
+import TentPlantTabs from "@/components/TentPlantTabs";
+import { buildTentPlantTabsViewModel } from "@/lib/tentPlantTabsViewModel";
 import {
   readTentPlantRosterIncludeArchived,
   writeTentPlantRosterIncludeArchived,
@@ -86,6 +88,7 @@ export default function TentDetail() {
     setRosterIncludeArchived(next);
     writeTentPlantRosterIncludeArchived(id ?? null, next);
   };
+  const [selectedPlantTabId, setSelectedPlantTabId] = useState<string | null>(null);
 
   const [quickLogOpen, setQuickLogOpen] = useState(false);
   const { data: tent, isLoading, isError, refetch } = useGrowTent(id);

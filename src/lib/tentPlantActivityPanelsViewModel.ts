@@ -83,9 +83,13 @@ export interface TentPlantActivityPanelRow {
   latestLogAt: string | null;
   latestLogDateLabel: string | null;
   latestLogSummary: string | null;
+  /** Internal id used for entry-specific actions (e.g. Remove log). Never rendered. */
+  latestLogEntryId: string | null;
   diaryEmptyCopy: string | null;
 
   hasRecentPhoto: boolean;
+  /** Internal id used for entry-specific actions (e.g. Remove photo log). Never rendered. */
+  latestPhotoEntryId: string | null;
   photoEmptyCopy: string | null;
 
   harvestWatch: TentPlantActivityPanelHarvestWatch;

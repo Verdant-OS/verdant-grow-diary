@@ -9,6 +9,7 @@
 import { useMemo } from "react";
 
 import HarvestEvidenceReportPanel from "@/components/HarvestEvidenceReportPanel";
+import HarvestEvidenceReportExportButton from "@/components/HarvestEvidenceReportExportButton";
 import { useHarvestEvidenceReportData } from "@/hooks/useHarvestEvidenceReportData";
 import { buildHarvestEvidenceReport } from "@/lib/harvestEvidenceReportViewModel";
 
@@ -59,7 +60,16 @@ export default function PlantDetailHarvestEvidenceReportMount({
   }
 
   return (
-    <div data-testid="plant-detail-harvest-evidence-report-mount">
+    <div
+      data-testid="plant-detail-harvest-evidence-report-mount"
+      className="flex flex-col gap-2"
+    >
+      <div className="flex justify-end print-hidden">
+        <HarvestEvidenceReportExportButton
+          report={report}
+          isLoading={isLoading}
+        />
+      </div>
       <HarvestEvidenceReportPanel report={report} />
     </div>
   );

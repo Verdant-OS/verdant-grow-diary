@@ -398,33 +398,86 @@ export default function TentDetail() {
         return <FirstPlantMemoryCta prefill={prefill} testId="tent-detail-first-plant-memory-cta" />;
       })()}
 
-      <TentPlantRosterPanel
-        onToggleIncludeArchived={handleToggleRosterIncludeArchived}
-        quickActionContext={{
-          tentId: id ?? null,
-          tentName: tent.name ?? null,
-          growId: tent.growId ?? null,
-        }}
-        viewModel={buildTentPlantRosterViewModel({
-          tentId: id ?? null,
+      {(() => {
+        const tabsVm = buildTentPlantTabsViewModel({
+          plants: allPlants.map((p) => ({
+            id: p.id,
+            name: p.name,
+            isArchived: p.isArchived,
+          })),
           includeArchived: rosterIncludeArchived,
-          plants: allPlants.map((p) => {
-            const a = rosterActivity.byPlantId[p.id];
-            return {
-              id: p.id,
-              name: p.name,
-              strain: p.strain,
-              stage: p.stage,
-              tentId: p.tentId,
-              isArchived: p.isArchived,
-              latestLogAt: a?.latestLogAt ?? null,
-              hasRecentPhoto: a?.hasRecentPhoto ?? false,
-              harvestWatchPublicState: a?.harvestWatchPublicState ?? null,
-            };
-          }),
-          tentSensorContextLabel: header.sourceLabel ?? null,
-        })}
-      />
+          selectedPlantId: selectedPlantTabId,
+        });
+        const rosterPlantSource =
+          tabsVm.selectedPlantId == null
+            ? allPlants
+            : allPlants.filter((p) => p.id === tabsVm.selectedPlantId);
+        return (
+          <div className="space-y-3">
+            <TentPlantTabs
+              viewModel={tabsVm}
+              onSelect={setSelectedPlantTabId}
+            />
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="tent-plant-tabs-current-scope"
+            >
+              {tabsVm.selectedPlantCopy ?? tabsVm.allPlantsCopy}
+            </p>
+            <p
+              className="text-[11px] text-muted-foreground"
+              data-testid="tent-plant-tabs-shared-env-reminder"
+            >
+              {tabsVm.sharedEnvironmentReminderCopy}
+            </p>
+            <TentPlantRosterPanel
+              onToggleIncludeArchived={handleToggleRosterIncludeArchived}
+              quickActionContext={{
+                tentId: id ?? null,
+                tentName: tent.name ?? null,
+                growId: tent.growId ?? null,
+              }}
+              viewModel={buildTentPlantRosterViewModel({
+                tentId: id ?? null,
+                includeArchived: rosterIncludeArchived,
+                plants: rosterPlantSource.map((p) => {
+                  const a = rosterActivity.byPlantId[p.id];
+                  return {
+                    id: p.id,
+                    name: p.name,
+                    strain: p.strain,
+                    stage: p.stage,
+                    tentId: p.tentId,
+                    isArchived: p.isArchived,
+                    latestLogAt: a?.latestLogAt ?? null,
+                    hasRecentPhoto: a?.hasRecentPhoto ?? false,
+                    harvestWatchPublicState:
+                      a?.harvestWatchPublicState ?? null,
+                  };
+                }),
+                tentSensorContextLabel: header.sourceLabel ?? null,
+              })}
+            />
+            {tabsVm.selectedPlantId != null &&
+              rosterPlantSource.length > 0 &&
+              (() => {
+                const a =
+                  rosterActivity.byPlantId[rosterPlantSource[0].id];
+                const hasActivity =
+                  !!a && (a.latestLogAt || a.hasRecentPhoto);
+                if (hasActivity) return null;
+                return (
+                  <p
+                    className="text-xs text-muted-foreground"
+                    data-testid="tent-plant-tabs-empty-selected-plant"
+                  >
+                    {tabsVm.emptySelectedPlantActivityCopy}
+                  </p>
+                );
+              })()}
+          </div>
+        );
+      })()}
 
 
 

@@ -63,6 +63,20 @@ export default function TentPlantRosterPanel({
             {viewModel.tentSensorContextLabel}
           </p>
         )}
+        {onToggleIncludeArchived && (
+          <div className="mt-2">
+            <label className="inline-flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+              <input
+                type="checkbox"
+                checked={viewModel.includeArchived}
+                onChange={(e) => onToggleIncludeArchived(e.target.checked)}
+                data-testid="tent-plant-roster-show-archived-toggle"
+                aria-label={viewModel.archivedToggleLabel}
+              />
+              <span>{viewModel.archivedToggleLabel}</span>
+            </label>
+          </div>
+        )}
       </div>
 
       {viewModel.state === "unknown-relationship" && (
@@ -76,12 +90,22 @@ export default function TentPlantRosterPanel({
       )}
 
       {viewModel.state === "empty" && (
-        <p
-          className="text-sm text-muted-foreground py-3"
-          data-testid="tent-plant-roster-empty"
-        >
-          {viewModel.emptyCopy}
-        </p>
+        <div className="py-3">
+          <p
+            className="text-sm text-muted-foreground"
+            data-testid="tent-plant-roster-empty"
+          >
+            {viewModel.emptyCopy}
+          </p>
+          {viewModel.emptyArchivedHintCopy && (
+            <p
+              className="text-xs text-muted-foreground mt-1"
+              data-testid="tent-plant-roster-empty-archived-hint"
+            >
+              {viewModel.emptyArchivedHintCopy}
+            </p>
+          )}
+        </div>
       )}
 
       {viewModel.state === "loaded" && (

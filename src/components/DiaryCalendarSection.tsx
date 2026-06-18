@@ -287,6 +287,10 @@ export default function DiaryCalendarSection({
       )}
 
       {hasAnyEntries && (
+        <EnvironmentCheckInsightsPanel rawEntries={rawEntries} />
+      )}
+
+      {hasAnyEntries && (
         <div
           role="group"
           aria-label="Filter calendar by event type"

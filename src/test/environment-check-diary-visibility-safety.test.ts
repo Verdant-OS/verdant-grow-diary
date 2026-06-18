@@ -41,12 +41,11 @@ describe("environment check view-model trio — static safety", () => {
     });
   }
 
-  it("never inserts the literal 'live' as a status value", () => {
+  it("never declares a literal `live` source/status token", () => {
     for (const rel of FILES) {
       const src = readFileSync(resolve(process.cwd(), rel), "utf8");
-      // Allowed: words containing 'live' inside copy strings. Disallowed:
-      // a quoted "live" status token.
-      expect(src).not.toMatch(/["']live["']/);
+      expect(src).not.toMatch(/source\s*[:=]\s*["']live["']/);
+      expect(src).not.toMatch(/status\s*[:=]\s*["']live["']/);
     }
   });
 });

@@ -59,12 +59,12 @@ function captureEvent(): Array<{ name: string; detail: unknown }> {
 }
 
 function makeRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  // Shape consumed by buildPlantRecentActivity (raw DB-ish row).
+  // Shape consumed by normalizeDiaryEntries via buildPlantRecentActivity.
   return {
     id: overrides.id ?? "e1",
     event_type: overrides.event_type ?? "observation",
-    occurred_at: overrides.occurred_at ?? "2026-06-15T10:00:00.000Z",
-    notes: overrides.notes ?? "",
+    created_at: overrides.created_at ?? "2026-06-15T10:00:00.000Z",
+    note: overrides.note ?? "",
     plant_id: "p1",
     tent_id: "t1",
     photo_url: overrides.photo_url ?? null,

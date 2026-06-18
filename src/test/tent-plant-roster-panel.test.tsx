@@ -442,13 +442,16 @@ describe("TentPlantRosterPanel quick-action menu", () => {
     expect(link.getAttribute("data-anchor-blocked")).toBeNull();
   });
 
-  it("View photos falls back to Plant Detail and marks anchor blocked", () => {
+  it("View photos points to plant-photos anchor by default and clears the blocked flag", () => {
     wrap(<TentPlantRosterPanel viewModel={buildVm()} quickActionContext={ctx} />);
     const link = screen.getByTestId(
       "tent-plant-roster-row-p1-action-view-photos",
     );
-    expect(link.getAttribute("href")).toBe("/plants/p1");
-    expect(link.getAttribute("data-anchor-blocked")).toBe("true");
+    expect(link.getAttribute("href")).toBe("/plants/p1#plant-photos");
+    expect(link.getAttribute("data-anchor-blocked")).toBeNull();
+    expect(
+      screen.queryByTestId("tent-plant-roster-row-p1-photos-fallback-hint"),
+    ).toBeNull();
   });
 
   it("Add Quick Log dispatches verdant:open-quicklog with correct payload", () => {
@@ -486,6 +489,64 @@ describe("TentPlantRosterPanel quick-action menu", () => {
     expect(
       screen.getByTestId("tent-plant-roster-row-p2-action-add-quicklog"),
     ).toBeInTheDocument();
+  });
+
+  it("clicks dispatch verdant:tent-roster-action with safe detail (no ids)", () => {
+    const received: Array<Record<string, unknown>> = [];
+    const listener = (ev: Event) =>
+      received.push((ev as CustomEvent).detail as Record<string, unknown>);
+    window.addEventListener(
+      "verdant:tent-roster-action",
+      listener as EventListener,
+    );
+    wrap(<TentPlantRosterPanel viewModel={buildVm()} quickActionContext={ctx} />);
+    (
+      screen.getByTestId(
+        "tent-plant-roster-row-p1-action-view-diary",
+      ) as HTMLAnchorElement
+    ).click();
+    (
+      screen.getByTestId(
+        "tent-plant-roster-row-p1-action-add-quicklog",
+      ) as HTMLButtonElement
+    ).click();
+    (
+      screen.getByTestId(
+        "tent-plant-roster-row-p1-action-view-photos",
+      ) as HTMLAnchorElement
+    ).click();
+    window.removeEventListener(
+      "verdant:tent-roster-action",
+      listener as EventListener,
+    );
+    expect(received.map((d) => d.action)).toEqual([
+      "view_diary",
+      "add_quick_log",
+      "view_photos",
+    ]);
+    for (const detail of received) {
+      expect(detail).not.toHaveProperty("plantId");
+      expect(detail).not.toHaveProperty("tentId");
+      expect(detail).not.toHaveProperty("growId");
+      expect(detail.plantName).toBe("Alpha");
+      expect(detail.hasTentContext).toBe(true);
+    }
+    expect(received[2].anchorBlocked).toBe(false);
+  });
+
+  it("Escape on the menu closes the row actions", async () => {
+    wrap(<TentPlantRosterPanel viewModel={buildVm()} quickActionContext={ctx} />);
+    const details = screen.getByTestId(
+      "tent-plant-roster-row-p1-actions",
+    ) as HTMLDetailsElement;
+    details.open = true;
+    const menu = screen.getByTestId(
+      "tent-plant-roster-row-p1-actions-menu",
+    );
+    menu.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    );
+    expect(details.open).toBe(false);
   });
 });
 

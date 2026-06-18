@@ -35,12 +35,25 @@ describe("tentPlantRosterQuickActions helper", () => {
     expect(diary.disabled).toBeFalsy();
   });
 
-  it("view_photos navigates to Plant Detail and reports anchor blocked", () => {
+  it("view_photos navigates to Plant Detail with photos anchor (default)", () => {
     const entries = buildTentPlantRosterQuickActions({
       plantId: "p1",
       plantName: "Alpha",
       tentId: "t1",
       growId: "g1",
+    });
+    const photos = entries.find((e) => e.kind === "view_photos")!;
+    expect(photos.href).toBe("/plants/p1#plant-photos");
+    expect(photos.anchorBlocked).toBe(false);
+  });
+
+  it("view_photos reports anchorBlocked when photosAnchorAvailable override is false", () => {
+    const entries = buildTentPlantRosterQuickActions({
+      plantId: "p1",
+      plantName: "Alpha",
+      tentId: "t1",
+      growId: "g1",
+      photosAnchorAvailable: false,
     });
     const photos = entries.find((e) => e.kind === "view_photos")!;
     expect(photos.href).toBe("/plants/p1");

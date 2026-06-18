@@ -184,6 +184,13 @@ function formatDateLabel(iso: string | null | undefined): string | null {
   }
 }
 
+function helpTextFor(state: string | null): string {
+  if (state && TENT_PLANT_ACTIVITY_HARVEST_WATCH_HELP_TEXT[state]) {
+    return TENT_PLANT_ACTIVITY_HARVEST_WATCH_HELP_TEXT[state];
+  }
+  return TENT_PLANT_ACTIVITY_HARVEST_WATCH_HELP_FALLBACK_COPY;
+}
+
 function harvestWatchFor(
   state: string | null | undefined,
 ): TentPlantActivityPanelHarvestWatch {
@@ -193,6 +200,8 @@ function harvestWatchFor(
       return {
         state,
         copy: known.copy,
+        helpText: helpTextFor(state),
+        cautionText: TENT_PLANT_ACTIVITY_HARVEST_WATCH_CAUTION_COPY,
         tone: known.tone,
         isFallback: false,
       };
@@ -200,6 +209,8 @@ function harvestWatchFor(
     return {
       state,
       copy: TENT_PLANT_ACTIVITY_HARVEST_WATCH_FALLBACK_COPY,
+      helpText: helpTextFor(null),
+      cautionText: TENT_PLANT_ACTIVITY_HARVEST_WATCH_CAUTION_COPY,
       tone: "unknown",
       isFallback: true,
     };
@@ -207,6 +218,8 @@ function harvestWatchFor(
   return {
     state: null,
     copy: TENT_PLANT_ACTIVITY_HARVEST_WATCH_FALLBACK_COPY,
+    helpText: helpTextFor(null),
+    cautionText: TENT_PLANT_ACTIVITY_HARVEST_WATCH_CAUTION_COPY,
     tone: "unknown",
     isFallback: true,
   };

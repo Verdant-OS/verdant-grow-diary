@@ -58,9 +58,41 @@ export function useEcowittAuditRows(tentId: string | null | undefined) {
 
 export default function EcowittIngestAudit() {
   const { data: tents = [] } = useTents();
-  const [tentId, setTentId] = useState<string | null>(null);
-  const effectiveTentId =
-    tentId ?? (tents.length > 0 ? (tents[0] as { id: string }).id : null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [userSelectedTentId, setUserSelectedTentId] = useState<string | null>(
+    null,
+  );
+  const urlTentId = readEcowittAuditTentIdFromSearch(searchParams);
+  const selection = useMemo(
+    () =>
+      resolveEcowittAuditSelectedTent({
+        urlTentId,
+        availableTents: tents as Array<{ id: string }>,
+        userSelectedTentId,
+      }),
+    [urlTentId, tents, userSelectedTentId],
+  );
+  const effectiveTentId = selection.selectedTentId;
+
+  // Keep the URL in sync with the resolved selection so refresh + share links
+  // open the same tent. Never silently overwrite a different user request.
+  useEffect(() => {
+    if (!effectiveTentId) return;
+    if (urlTentId === effectiveTentId) return;
+    setSearchParams(
+      (current) =>
+        applyEcowittAuditTentIdToSearch(current, effectiveTentId),
+      { replace: true },
+    );
+  }, [effectiveTentId, urlTentId, setSearchParams]);
+
+  const handleTentChange = (next: string | null) => {
+    setUserSelectedTentId(next);
+    setSearchParams(
+      (current) => applyEcowittAuditTentIdToSearch(current, next),
+      { replace: true },
+    );
+  };
 
   const query = useEcowittAuditRows(effectiveTentId);
   const { save: saveQuickLog, saving: isLogging } = useQuickLogV2Save();

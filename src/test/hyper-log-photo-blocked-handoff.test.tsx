@@ -33,14 +33,10 @@ if (typeof (globalThis as { ResizeObserver?: unknown }).ResizeObserver === "unde
 }
 
 // Stub URL.createObjectURL so HyperLog can build local previews safely.
-if (typeof URL.createObjectURL !== "function") {
-  // @ts-expect-error jsdom polyfill
-  URL.createObjectURL = () => "blob:hyperlog-test";
-}
-if (typeof URL.revokeObjectURL !== "function") {
-  // @ts-expect-error jsdom polyfill
-  URL.revokeObjectURL = () => undefined;
-}
+(URL as unknown as { createObjectURL: (f: unknown) => string }).createObjectURL =
+  () => "blob:hyperlog-test";
+(URL as unknown as { revokeObjectURL: (u: string) => void }).revokeObjectURL =
+  () => undefined;
 
 // ---- Minimal QuickLog mocks (mirrors quick-log-environment-check.test.tsx)
 const saveMock = vi.fn().mockResolvedValue({ ok: true, eventId: "ev-1" });

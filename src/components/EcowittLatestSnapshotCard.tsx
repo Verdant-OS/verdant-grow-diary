@@ -244,7 +244,7 @@ export function EcowittLatestSnapshotCard(
 
       <div className="mt-2 text-xs">
         <Link
-          to="/sensors/ecowitt-audit"
+          to={buildEcowittAuditHref(input.tentId ?? null)}
           data-testid="ecowitt-audit-link"
           className="text-primary hover:underline"
         >

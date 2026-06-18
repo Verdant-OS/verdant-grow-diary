@@ -131,7 +131,7 @@ export default function TentPlantActivityPanels({
           {viewModel.panels.map((panel) => (
             <li
               key={panel.id}
-              className="rounded-xl border border-border/50 p-3 bg-card"
+              className="rounded-xl border border-border/50 p-3 bg-card min-h-[10.5rem] flex flex-col"
               data-testid={panel.testId}
             >
               <header className="flex items-start justify-between gap-2">

@@ -274,7 +274,7 @@ export function HyperLogModal({
               <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 mb-2.5">
                 Action
               </p>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                 {ACTION_TILES.map((tile) => {
                   const Icon = tile.icon;
                   const isActive = selected === tile.id;

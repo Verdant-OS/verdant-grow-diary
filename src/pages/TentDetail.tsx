@@ -71,6 +71,7 @@ import { plantDetailPath, tentsPath } from "@/lib/routes";
 export default function TentDetail() {
   const { id } = useParams();
   const [showArchived, setShowArchived] = useState(false);
+  const [rosterIncludeArchived, setRosterIncludeArchived] = useState(false);
   const [quickLogOpen, setQuickLogOpen] = useState(false);
   const { data: tent, isLoading, isError, refetch } = useGrowTent(id);
   const { data: activePlants = [] } = useGrowPlants(id);
@@ -83,7 +84,7 @@ export default function TentDetail() {
   const activeCount = getActivePlantCount(activePlants);
   const hasArchived = shouldShowArchivedToggle(allPlants);
   const visiblePlants = filterVisiblePlants(allPlants, { showArchived });
-  const rosterActivity = useTentPlantRosterActivity(visiblePlants);
+  const rosterActivity = useTentPlantRosterActivity(allPlants);
 
 
 

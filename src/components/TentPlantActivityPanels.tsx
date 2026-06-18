@@ -235,6 +235,8 @@ export default function TentPlantActivityPanels({
           ))}
         </ul>
       )}
+        </>
+      )}
     </section>
   );
 }

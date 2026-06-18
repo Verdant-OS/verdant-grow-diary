@@ -91,6 +91,12 @@ export interface QuickLogPrefill {
   tentId?: string | null;
   eventType?: string | null;
   suggestSnapshot?: boolean | null;
+  /**
+   * Optional starter note text. Seeded into the Quick Log note field when
+   * the user has not yet typed anything. The grower still reviews/edits
+   * and confirms the save manually.
+   */
+  note?: string | null;
 }
 
 interface Props {

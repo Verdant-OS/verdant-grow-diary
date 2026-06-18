@@ -8,10 +8,18 @@
  * Add Quick Log CTA reuses the existing `verdant:open-quicklog` event.
  */
 
+import { useId, useState } from "react";
 import { Link } from "react-router-dom";
 import type {
   TentPlantActivityPanelRow,
   TentPlantActivityPanelsViewModel,
+} from "@/lib/tentPlantActivityPanelsViewModel";
+import {
+  TENT_PLANT_ACTIVITY_EVIDENCE_NOTES_LABEL,
+  TENT_PLANT_ACTIVITY_EVIDENCE_NOTES_HELPER_COPY,
+  TENT_PLANT_ACTIVITY_EVIDENCE_NOTES_PLACEHOLDER,
+  TENT_PLANT_ACTIVITY_EVIDENCE_NOTES_CAUTION_COPY,
+  TENT_PLANT_ACTIVITY_EVIDENCE_NOTES_CTA_COPY,
 } from "@/lib/tentPlantActivityPanelsViewModel";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 

@@ -97,6 +97,8 @@ export interface TentPlantActivityPanelRow {
   quickLogPrefill: PlantQuickLogPrefill | null;
   quickLogDisabled: boolean;
   quickLogDisabledReason: string | null;
+  /** True when no diary activity exists yet — CTA copy switches to "first". */
+  isFirstQuickLog: boolean;
 
   testId: string;
 }
@@ -106,6 +108,10 @@ export interface TentPlantActivityPanelsViewModel {
   selectedPlantId: string | null;
   emptyCopy: string | null;
   sharedEnvironmentReminderCopy: string;
+  /** Visible plant count (after archived filter). Used for loading skeletons. */
+  visiblePlantCount: number;
+  /** Panels rendered after selection resolution. Used for loading skeletons. */
+  scopedPanelCount: number;
 }
 
 export const TENT_PLANT_ACTIVITY_NO_DIARY_COPY =

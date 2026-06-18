@@ -64,16 +64,35 @@ describe("CustomerModeGuide", () => {
     ).toBeInTheDocument();
   });
 
-  it("never echoes the :shareId param into the visible DOM", () => {
+  it("never echoes the :shareId into the visible DOM outside the QR URL block", () => {
     const shareId = "share-abc-12345-PRIVATE";
     renderAt(`/customer/${shareId}`);
     const page = screen.getByTestId("customer-mode-guide-page");
-    expect(page.textContent ?? "").not.toContain(shareId);
+    // Remove the QR block (which legitimately renders the public URL
+    // containing the shareId) before scanning the rest of the page.
+    const clone = page.cloneNode(true) as HTMLElement;
+    clone
+      .querySelectorAll('[data-testid="customer-guide-qr-block"]')
+      .forEach((el) => el.remove());
+    expect(clone.textContent ?? "").not.toContain(shareId);
   });
 
   it("does NOT render the Operator Mode Quick Log / Fast Add trigger", () => {
     renderAt("/customer/share-abc");
     expect(screen.queryByTestId("global-fast-add")).toBeNull();
     expect(screen.queryByTestId("global-fast-add-trigger")).toBeNull();
+  });
+
+  it("renders the QR block and trust/FAQ footer on the page", () => {
+    renderAt("/customer/share-abc");
+    expect(screen.getByTestId("customer-guide-qr-block")).toBeInTheDocument();
+    expect(screen.getByTestId("customer-guide-trust-footer")).toBeInTheDocument();
+  });
+
+  it("timeline shell renders the 'only events explicitly published' copy", () => {
+    renderAt("/customer/share-abc");
+    expect(
+      screen.getByTestId("customer-guide-timeline-published-only"),
+    ).toHaveTextContent(/only events explicitly published for customers appear here/i);
   });
 });

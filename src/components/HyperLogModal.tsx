@@ -34,7 +34,12 @@ import {
 import { cn } from "@/lib/utils";
 import { GeneticsBadge } from "@/components/GeneticsBadge";
 
-export type HyperLogAction = "water" | "feed" | "defoliate" | "note";
+export type HyperLogAction =
+  | "water"
+  | "feed"
+  | "defoliate"
+  | "note"
+  | "environment";
 
 export interface HyperLogDemoFormState {
   waterAmount: string;
@@ -46,13 +51,27 @@ export interface HyperLogDemoFormState {
   defoliateIntensity: string;
   defoliateNote: string;
   freeformNote: string;
+  // Environment Check — manual/demo draft values. Never live telemetry.
+  envTemp: string;
+  envHumidity: string;
+  envVpd: string;
+  envCo2: string;
+  envNote: string;
 }
 
 interface HyperLogModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Presenter callback. Receives the selected action + demo form snapshot. */
-  onCommit?: (action: HyperLogAction, demo: HyperLogDemoFormState) => void;
+  /**
+   * Presenter callback. Receives the selected action, demo form snapshot,
+   * and a small extras bag (e.g. local photo preview count). No file
+   * handles are exposed — photos stay local in this modal.
+   */
+  onCommit?: (
+    action: HyperLogAction,
+    demo: HyperLogDemoFormState,
+    extras?: { photoCount: number },
+  ) => void;
   /** Optional preselected action (e.g. when launched from Fast Add). */
   initialAction?: HyperLogAction | null;
   /**
@@ -72,6 +91,7 @@ const ACTION_TILES: Array<{
   { id: "feed", label: "Feed", icon: Leaf },
   { id: "defoliate", label: "Defoliate", icon: Scissors },
   { id: "note", label: "Note", icon: NotebookPen },
+  { id: "environment", label: "Env Check", icon: Gauge },
 ];
 
 // Hardcoded demo values — NOT live telemetry.
@@ -95,6 +115,11 @@ const EMPTY_FORM: HyperLogDemoFormState = {
   defoliateIntensity: "",
   defoliateNote: "",
   freeformNote: "",
+  envTemp: "",
+  envHumidity: "",
+  envVpd: "",
+  envCo2: "",
+  envNote: "",
 };
 
 export function HyperLogModal({
@@ -182,7 +207,7 @@ export function HyperLogModal({
 
   const handleCommit = () => {
     if (!selected) return;
-    onCommit?.(selected, form);
+    onCommit?.(selected, form, { photoCount: photos.length });
     onOpenChange(false);
     resetAll();
   };
@@ -249,7 +274,7 @@ export function HyperLogModal({
               <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 mb-2.5">
                 Action
               </p>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                 {ACTION_TILES.map((tile) => {
                   const Icon = tile.icon;
                   const isActive = selected === tile.id;
@@ -367,6 +392,50 @@ export function HyperLogModal({
                   onChange={(v) => updateField("freeformNote", v)}
                   minRows={3}
                 />
+              ) : null}
+
+              {selected === "environment" ? (
+                <div className="space-y-2.5" data-testid="hyperlog-env-fields">
+                  <FieldRow>
+                    <DemoInput
+                      placeholder="Temp (°C)"
+                      value={form.envTemp}
+                      onChange={(v) => updateField("envTemp", v)}
+                      aria-label="Environment temperature"
+                    />
+                    <DemoInput
+                      placeholder="RH (%)"
+                      value={form.envHumidity}
+                      onChange={(v) => updateField("envHumidity", v)}
+                      aria-label="Environment humidity"
+                    />
+                  </FieldRow>
+                  <FieldRow>
+                    <DemoInput
+                      placeholder="VPD (kPa)"
+                      value={form.envVpd}
+                      onChange={(v) => updateField("envVpd", v)}
+                      aria-label="Environment VPD"
+                    />
+                    <DemoInput
+                      placeholder="CO₂ (ppm, optional)"
+                      value={form.envCo2}
+                      onChange={(v) => updateField("envCo2", v)}
+                      aria-label="Environment CO2"
+                    />
+                  </FieldRow>
+                  <DemoTextarea
+                    placeholder="Optional note"
+                    value={form.envNote}
+                    onChange={(v) => updateField("envNote", v)}
+                  />
+                  <p
+                    data-testid="hyperlog-env-not-live-copy"
+                    className="text-[10px] italic text-amber-300/80"
+                  >
+                    Environment Check is a Quick Log note, not a live sensor reading.
+                  </p>
+                </div>
               ) : null}
             </div>
 
@@ -580,6 +649,16 @@ function buildTimelinePreview(
     const intensity = form.defoliateIntensity.trim() || "intensity not set";
     const summary = `Defoliated — ${intensity}${form.defoliateNote.trim() ? ` · ${form.defoliateNote.trim()}` : ""}`;
     return { headline: "Defoliation · demo", summary, meta: photoMeta };
+  }
+  if (action === "environment") {
+    const parts: string[] = [];
+    if (form.envTemp.trim()) parts.push(`Temp ${form.envTemp.trim()}°C`);
+    if (form.envHumidity.trim()) parts.push(`RH ${form.envHumidity.trim()}%`);
+    if (form.envVpd.trim()) parts.push(`VPD ${form.envVpd.trim()} kPa`);
+    if (form.envCo2.trim()) parts.push(`CO₂ ${form.envCo2.trim()} ppm`);
+    if (form.envNote.trim()) parts.push(form.envNote.trim());
+    const summary = parts.length > 0 ? parts.join(" · ") : "No readings entered";
+    return { headline: "Env check · demo", summary, meta: photoMeta };
   }
   const note = form.freeformNote.trim() || "Empty note";
   return { headline: "Note · demo", summary: note, meta: photoMeta };

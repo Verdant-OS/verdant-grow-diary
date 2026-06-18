@@ -53,6 +53,8 @@ export function mapHyperLogActionToEventType(
     case "defoliate":
       // Defoliation is a canopy training action in the existing taxonomy.
       return "training";
+    case "environment":
+      return "environment";
     case "note":
     default:
       return "observation";
@@ -94,6 +96,20 @@ export function composeHyperLogNote(
     parts.push(intensity ? `Defoliated — ${intensity}` : "Defoliated");
     const n = trim(form.defoliateNote);
     if (n) parts.push(n);
+  } else if (action === "environment") {
+    const sub: string[] = [];
+    const t = trim(form.envTemp);
+    const h = trim(form.envHumidity);
+    const v = trim(form.envVpd);
+    const c = trim(form.envCo2);
+    if (t) sub.push(`Temp ${t}°C`);
+    if (h) sub.push(`RH ${h}%`);
+    if (v) sub.push(`VPD ${v} kPa`);
+    if (c) sub.push(`CO2 ${c} ppm`);
+    if (sub.length > 0) parts.push(`Env check — ${sub.join(", ")}`);
+    else parts.push("Env check");
+    const n = trim(form.envNote);
+    if (n) parts.push(n);
   } else {
     const n = trim(form.freeformNote);
     if (n) parts.push(n);
@@ -119,7 +135,8 @@ export function buildHyperLogQuickLogPrefill(
     if (!input || !input.action || !input.form) return null;
     const ctx = input.context ?? null;
     const eventType = mapHyperLogActionToEventType(input.action);
-    const note = composeHyperLogNote(input.action, input.form, input.photoCount ?? 0);
+    const photoCount = Math.max(0, Math.floor(Number(input.photoCount ?? 0))) || 0;
+    const note = composeHyperLogNote(input.action, input.form, photoCount);
     const prefill: QuickLogPrefill = {
       plantId: ctx?.plantId ?? null,
       plantName: ctx?.plantName ?? null,
@@ -128,6 +145,8 @@ export function buildHyperLogQuickLogPrefill(
       eventType,
       suggestSnapshot: Boolean(ctx?.tentId),
       note: note || null,
+      source: "hyperlog",
+      photoCount,
     };
     return prefill;
   } catch {

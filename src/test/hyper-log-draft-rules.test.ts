@@ -24,6 +24,11 @@ const EMPTY: HyperLogDemoFormState = {
   defoliateIntensity: "",
   defoliateNote: "",
   freeformNote: "",
+  envTemp: "",
+  envHumidity: "",
+  envVpd: "",
+  envCo2: "",
+  envNote: "",
 };
 
 const CTX = {
@@ -98,6 +103,8 @@ describe("buildHyperLogQuickLogPrefill", () => {
       eventType: "watering",
       suggestSnapshot: true,
       note: "Watered 300 ml",
+      source: "hyperlog",
+      photoCount: 0,
     });
   });
 

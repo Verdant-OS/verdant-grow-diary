@@ -158,7 +158,7 @@ export default function GlobalFastAddButton({
               HyperLog · demo
             </p>
             <div className="grid grid-cols-2 gap-1">
-              {(["water", "feed", "defoliate", "note"] as HyperLogAction[]).map((a) => (
+              {(["water", "feed", "defoliate", "note", "environment"] as HyperLogAction[]).map((a) => (
                 <button
                   key={a}
                   type="button"
@@ -167,7 +167,7 @@ export default function GlobalFastAddButton({
                   onClick={() => openHyperLog(a)}
                   className="text-left px-2 min-h-10 flex items-center rounded-md text-xs hover:bg-secondary/60 active:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation capitalize"
                 >
-                  {a}
+                  {a === "environment" ? "Env Check" : a}
                 </button>
               ))}
             </div>
@@ -224,15 +224,22 @@ export default function GlobalFastAddButton({
         open={hyperLogOpen}
         onOpenChange={setHyperLogOpen}
         initialAction={hyperLogAction}
-        onCommit={(action: HyperLogAction, form: HyperLogDemoFormState) => {
+        onCommit={(
+          action: HyperLogAction,
+          form: HyperLogDemoFormState,
+          extras?: { photoCount: number },
+        ) => {
           // Handoff: map the HyperLog demo draft to the existing Quick
           // Log prefill payload and dispatch the already-wired window
           // event. The grower still confirms + saves inside Quick Log.
           // No writes happen here; demo sensor snapshot values are
-          // intentionally NOT carried over.
+          // intentionally NOT carried over. Photo files stay local in
+          // the HyperLog modal — only the count is forwarded so the
+          // Quick Log preview can show the "Photo preview only" copy.
           const prefill = buildHyperLogQuickLogPrefill({
             action,
             form,
+            photoCount: extras?.photoCount ?? 0,
             context: context
               ? {
                   plantId: context.plantId ?? null,

@@ -373,6 +373,21 @@ export default function TentDetail() {
         return <FirstPlantMemoryCta prefill={prefill} testId="tent-detail-first-plant-memory-cta" />;
       })()}
 
+      <TentPlantRosterPanel
+        viewModel={buildTentPlantRosterViewModel({
+          tentId: id ?? null,
+          plants: visiblePlants.map((p) => ({
+            id: p.id,
+            name: p.name,
+            strain: p.strain,
+            stage: p.stage,
+            tentId: p.tentId,
+            isArchived: p.isArchived,
+          })),
+          tentSensorContextLabel: header.sourceLabel ?? null,
+        })}
+      />
+
       <div className="glass rounded-2xl p-4">
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <h2 className="font-display font-semibold">

@@ -22,6 +22,8 @@ import {
   TENT_PLANT_ACTIVITY_EVIDENCE_NOTES_CTA_COPY,
 } from "@/lib/tentPlantActivityPanelsViewModel";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
+import DiaryEntryRemoveButton from "@/components/DiaryEntryRemoveButton";
+import type { DiaryEntryRemovalViewerContext } from "@/lib/diaryEntryRemovalRules";
 
 export interface TentPlantActivityPanelsProps {
   viewModel: TentPlantActivityPanelsViewModel;
@@ -34,6 +36,16 @@ export interface TentPlantActivityPanelsProps {
   isLoading?: boolean;
   /** Number of skeleton placeholder cards to render while loading. */
   loadingSkeletonCount?: number;
+  /**
+   * Viewer context used to gate per-entry destructive controls. Required for
+   * Remove log / Remove photo log controls to render. Customer/public/report
+   * views must pass viewer flags so these controls stay hidden.
+   */
+  viewer?: DiaryEntryRemovalViewerContext;
+  /** Tent id (forwarded for query invalidation only; never displayed). */
+  tentId?: string | null;
+  /** Grow id (forwarded for query invalidation only; never displayed). */
+  growId?: string | null;
 }
 
 export const TENT_PLANT_ACTIVITY_LOADING_COPY = "Loading plant activity…";
@@ -128,6 +140,9 @@ export default function TentPlantActivityPanels({
   testId = "tent-plant-activity-panels",
   isLoading = false,
   loadingSkeletonCount,
+  viewer,
+  tentId,
+  growId,
 }: TentPlantActivityPanelsProps) {
   // Skeleton count matches the visible/scoped plant filter so the loading
   // shell matches the panels that will render. Falls back to 1 compact
@@ -256,10 +271,27 @@ export default function TentPlantActivityPanels({
 
               <div className="mt-2 space-y-1 text-xs">
                 {panel.latestLogDateLabel ? (
-                  <p data-testid={`${panel.testId}-latest-log`}>
-                    Latest log: {panel.latestLogDateLabel}
-                    {panel.latestLogSummary ? ` — ${panel.latestLogSummary}` : ""}
-                  </p>
+                  <div className="flex items-center gap-2 flex-wrap" data-testid={`${panel.testId}-latest-log-row`}>
+                    <p data-testid={`${panel.testId}-latest-log`}>
+                      Latest log: {panel.latestLogDateLabel}
+                      {panel.latestLogSummary ? ` — ${panel.latestLogSummary}` : ""}
+                    </p>
+                    {viewer && panel.latestLogEntryId ? (
+                      <DiaryEntryRemoveButton
+                        entry={{
+                          id: panel.latestLogEntryId,
+                          kind: "diary",
+                          // Photo flag handled separately by Remove photo log.
+                          photoUrl: null,
+                        }}
+                        viewer={viewer}
+                        plantName={panel.name}
+                        plantId={panel.id}
+                        tentId={tentId ?? null}
+                        growId={growId ?? null}
+                      />
+                    ) : null}
+                  </div>
                 ) : (
                   <p
                     className="text-muted-foreground"
@@ -269,9 +301,26 @@ export default function TentPlantActivityPanels({
                   </p>
                 )}
                 {panel.hasRecentPhoto ? (
-                  <p data-testid={`${panel.testId}-recent-photo`}>
-                    Recent photo on file
-                  </p>
+                  <div className="flex items-center gap-2 flex-wrap" data-testid={`${panel.testId}-recent-photo-row`}>
+                    <p data-testid={`${panel.testId}-recent-photo`}>
+                      Recent photo on file
+                    </p>
+                    {viewer && panel.latestPhotoEntryId ? (
+                      <DiaryEntryRemoveButton
+                        entry={{
+                          id: panel.latestPhotoEntryId,
+                          kind: "diary",
+                          // Forces photo-log copy variant.
+                          photoUrl: "x",
+                        }}
+                        viewer={viewer}
+                        plantName={panel.name}
+                        plantId={panel.id}
+                        tentId={tentId ?? null}
+                        growId={growId ?? null}
+                      />
+                    ) : null}
+                  </div>
                 ) : (
                   <p
                     className="text-muted-foreground"

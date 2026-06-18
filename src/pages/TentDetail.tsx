@@ -5,6 +5,7 @@ import TentAiDoctorSessionsPanel from "@/components/TentAiDoctorSessionsPanel";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
+import { useAuth } from "@/store/auth";
 import { formatDistanceToNow } from "date-fns";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
@@ -87,6 +88,7 @@ import { plantDetailPath, tentsPath } from "@/lib/routes";
 
 export default function TentDetail() {
   const { id } = useParams();
+  const { user } = useAuth();
   const [showArchived, setShowArchived] = useState(false);
   const [rosterIncludeArchived, setRosterIncludeArchived] = useState<boolean>(() =>
     readTentPlantRosterIncludeArchived(id ?? null),
@@ -529,7 +531,11 @@ export default function TentDetail() {
                 tentName: tent.name ?? null,
                 growId: tent.growId ?? null,
               })}
+              viewer={{ currentUserId: user?.id ?? null }}
+              tentId={id ?? null}
+              growId={tent.growId ?? null}
             />
+
           </div>
         );
       })()}

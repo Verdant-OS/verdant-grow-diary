@@ -35,7 +35,13 @@ export interface TentPlantRosterActivityPlant {
 
 export interface TentPlantRosterActivityEntry {
   latestLogAt: string | null;
+  /** diary_entries.id of the most recent log, for entry-specific actions. */
+  latestLogEntryId: string | null;
   hasRecentPhoto: boolean;
+  /** diary_entries.id of the most recent log that has a photo_url. */
+  latestPhotoEntryId: string | null;
+  /** occurredAt for the most recent photo log, if available. */
+  latestPhotoAt: string | null;
   harvestWatchPublicState: string | null;
 }
 
@@ -47,7 +53,10 @@ export interface UseTentPlantRosterActivityResult {
 
 const EMPTY_ENTRY: TentPlantRosterActivityEntry = {
   latestLogAt: null,
+  latestLogEntryId: null,
   hasRecentPhoto: false,
+  latestPhotoEntryId: null,
+  latestPhotoAt: null,
   harvestWatchPublicState: null,
 };
 
@@ -102,9 +111,22 @@ export function useTentPlantRosterActivity(
       });
 
       // Per-plant only. Generic tent-level activity is never mixed in.
-      const latestLogAt =
-        rows.find((r) => typeof r.occurredAt === "string")?.occurredAt ?? null;
-      const hasRecentPhoto = rows.some((r) => r.hasPhoto === true);
+      const latestLogRow =
+        rows.find((r) => typeof r.occurredAt === "string") ?? null;
+      const latestLogAt = latestLogRow?.occurredAt ?? null;
+      const latestLogEntryId =
+        latestLogRow && typeof latestLogRow.id === "string" && latestLogRow.id
+          ? latestLogRow.id
+          : null;
+      const latestPhotoRow =
+        rows.find((r) => r.hasPhoto === true && typeof r.id === "string") ??
+        null;
+      const hasRecentPhoto = !!latestPhotoRow;
+      const latestPhotoEntryId = latestPhotoRow?.id ?? null;
+      const latestPhotoAt =
+        (latestPhotoRow && typeof latestPhotoRow.occurredAt === "string"
+          ? latestPhotoRow.occurredAt
+          : null) ?? null;
 
       let harvestWatchPublicState: string | null = null;
       try {
@@ -127,7 +149,10 @@ export function useTentPlantRosterActivity(
 
       out[id] = {
         latestLogAt,
+        latestLogEntryId,
         hasRecentPhoto,
+        latestPhotoEntryId,
+        latestPhotoAt,
         harvestWatchPublicState,
       };
     }

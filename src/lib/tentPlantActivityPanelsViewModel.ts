@@ -97,6 +97,8 @@ export interface TentPlantActivityPanelRow {
   quickLogPrefill: PlantQuickLogPrefill | null;
   quickLogDisabled: boolean;
   quickLogDisabledReason: string | null;
+  /** True when no diary activity exists yet — CTA copy switches to "first". */
+  isFirstQuickLog: boolean;
 
   testId: string;
 }
@@ -106,6 +108,10 @@ export interface TentPlantActivityPanelsViewModel {
   selectedPlantId: string | null;
   emptyCopy: string | null;
   sharedEnvironmentReminderCopy: string;
+  /** Visible plant count (after archived filter). Used for loading skeletons. */
+  visiblePlantCount: number;
+  /** Panels rendered after selection resolution. Used for loading skeletons. */
+  scopedPanelCount: number;
 }
 
 export const TENT_PLANT_ACTIVITY_NO_DIARY_COPY =
@@ -268,6 +274,7 @@ export function buildTentPlantActivityPanelsViewModel(
         ? a.latestLogSummary
         : null;
     const hasRecentPhoto = a.hasRecentPhoto === true;
+    const isFirstQuickLog = latestLogAt === null;
 
     const plantDetailHref = plantDetailPath(p.id);
     const diaryHref = `${plantDetailHref}#${PLANT_RELATIVE_TIMELINE_ANCHOR_ID}`;
@@ -311,13 +318,16 @@ export function buildTentPlantActivityPanelsViewModel(
       photosAccessibleLabel: `Open ${name} photos on Plant Detail`,
       photosAnchorBlocked: !photosAnchorAvailable,
 
-      quickLogCtaLabel: "Add Quick Log",
-      quickLogCtaAccessibleLabel: `Add Quick Log for ${name}`,
+      quickLogCtaLabel: isFirstQuickLog ? "Add first Quick Log" : "Add Quick Log",
+      quickLogCtaAccessibleLabel: isFirstQuickLog
+        ? `Add first Quick Log for ${name}`
+        : `Add Quick Log for ${name}`,
       quickLogPrefill: prefill,
       quickLogDisabled: !prefill,
       quickLogDisabledReason: prefill
         ? null
         : "Plant, tent, or grow context is not loaded yet.",
+      isFirstQuickLog,
 
       testId: `tent-plant-activity-panel-${p.id}`,
     };
@@ -335,5 +345,7 @@ export function buildTentPlantActivityPanelsViewModel(
     selectedPlantId: resolvedSelection,
     emptyCopy,
     sharedEnvironmentReminderCopy: TENT_PLANT_ACTIVITY_SHARED_ENV_COPY,
+    visiblePlantCount: visible.length,
+    scopedPanelCount: panels.length,
   };
 }

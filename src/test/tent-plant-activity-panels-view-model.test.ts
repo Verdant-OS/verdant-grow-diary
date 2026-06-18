@@ -215,8 +215,48 @@ describe("buildTentPlantActivityPanelsViewModel", () => {
       activityByPlantId: {},
     });
     expect(vm.panels[0].quickLogCtaAccessibleLabel).toBe(
-      "Add Quick Log for Unnamed plant",
+      "Add first Quick Log for Unnamed plant",
     );
+  });
+
+  it("visiblePlantCount tracks the archived filter", () => {
+    const hidden = buildTentPlantActivityPanelsViewModel(BASE);
+    expect(hidden.visiblePlantCount).toBe(2);
+    expect(hidden.scopedPanelCount).toBe(2);
+    const shown = buildTentPlantActivityPanelsViewModel({
+      ...BASE,
+      includeArchived: true,
+    });
+    expect(shown.visiblePlantCount).toBe(3);
+    expect(shown.scopedPanelCount).toBe(3);
+  });
+
+  it("scopedPanelCount is 1 when a single plant tab is selected", () => {
+    const vm = buildTentPlantActivityPanelsViewModel({
+      ...BASE,
+      selectedPlantId: "p2",
+    });
+    expect(vm.visiblePlantCount).toBe(2);
+    expect(vm.scopedPanelCount).toBe(1);
+  });
+
+  it("isFirstQuickLog flips CTA copy when there is no diary activity", () => {
+    const vm = buildTentPlantActivityPanelsViewModel(BASE);
+    const p1 = vm.panels.find((p) => p.id === "p1")!;
+    const p2 = vm.panels.find((p) => p.id === "p2")!;
+    expect(p1.isFirstQuickLog).toBe(false);
+    expect(p1.quickLogCtaLabel).toBe("Add Quick Log");
+    expect(p1.quickLogCtaAccessibleLabel).toBe("Add Quick Log for Blue Dream");
+    expect(p2.isFirstQuickLog).toBe(true);
+    expect(p2.quickLogCtaLabel).toBe("Add first Quick Log");
+    expect(p2.quickLogCtaAccessibleLabel).toBe("Add first Quick Log for Plant B");
+    expect(p2.quickLogPrefill).toMatchObject({
+      plantId: "p2",
+      tentId: "t1",
+      growId: "g1",
+      eventType: "observation",
+      suggestSnapshot: true,
+    });
   });
 });
 

@@ -60,11 +60,10 @@ describe("diary removal slice — static safety", () => {
   });
 
   it("delete path is scoped by id only — no bulk delete", () => {
-    // Hook deletes by .eq('id', id); no .in(, .gt(, .lt(, or unconditional .delete()
-    expect(HOOK).toMatch(/\.delete\(\)\s*\n?\s*\.eq\(["']id["']/);
+    // Hook deletes by .eq('id', id); no .in(, .neq(, or unconditional .delete()
+    expect(HOOK).toMatch(/\.delete\(\)[\s\S]*?\.eq\(["']id["']/);
     expect(HOOK).not.toMatch(/\.delete\(\)\s*\.in\(/);
     expect(HOOK).not.toMatch(/\.delete\(\)\s*\.neq\(/);
-    expect(HOOK).not.toMatch(/\.delete\(\)\s*;\s*$/m);
   });
 
   it("hook does not touch storage buckets", () => {

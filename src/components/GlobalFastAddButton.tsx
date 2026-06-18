@@ -25,7 +25,11 @@ import {
   type FastAddActionId,
   type FastAddSelectionContext,
 } from "@/lib/fastAddActionRules";
-import HyperLogModal, { type HyperLogAction } from "@/components/HyperLogModal";
+import HyperLogModal, { type HyperLogAction, type HyperLogDemoFormState } from "@/components/HyperLogModal";
+import {
+  buildHyperLogQuickLogPrefill,
+  HYPERLOG_QUICKLOG_EVENT_NAME,
+} from "@/lib/hyperLogDraftRules";
 
 
 
@@ -220,6 +224,34 @@ export default function GlobalFastAddButton({
         open={hyperLogOpen}
         onOpenChange={setHyperLogOpen}
         initialAction={hyperLogAction}
+        onCommit={(action: HyperLogAction, form: HyperLogDemoFormState) => {
+          // Handoff: map the HyperLog demo draft to the existing Quick
+          // Log prefill payload and dispatch the already-wired window
+          // event. The grower still confirms + saves inside Quick Log.
+          // No writes happen here; demo sensor snapshot values are
+          // intentionally NOT carried over.
+          const prefill = buildHyperLogQuickLogPrefill({
+            action,
+            form,
+            context: context
+              ? {
+                  plantId: context.plantId ?? null,
+                  plantName: context.plantName ?? null,
+                  growId: context.growId ?? null,
+                  tentId: context.tentId ?? null,
+                  tentName: context.tentName ?? null,
+                }
+              : null,
+          });
+          if (!prefill) return;
+          if (onDispatchEvent) {
+            onDispatchEvent(HYPERLOG_QUICKLOG_EVENT_NAME, prefill);
+          } else if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent(HYPERLOG_QUICKLOG_EVENT_NAME, { detail: prefill }),
+            );
+          }
+        }}
       />
     </div>
   );

@@ -289,6 +289,7 @@ export default function TentPlantActivityPanels({
                         plantId={panel.id}
                         tentId={tentId ?? null}
                         growId={growId ?? null}
+                        showFollowUp
                       />
                     ) : null}
                   </div>

@@ -77,6 +77,10 @@ import {
   readTentPlantTabsSelectedPlantId,
   writeTentPlantTabsSelectedPlantId,
 } from "@/lib/tentPlantTabsPreferences";
+import {
+  readTentPlantTabsUrlPlantId,
+  applyTentPlantTabsUrlPlantId,
+} from "@/lib/tentPlantTabsUrlState";
 
 
 import { plantDetailPath, tentsPath } from "@/lib/routes";

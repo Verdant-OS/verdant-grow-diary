@@ -2,13 +2,23 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const VM = readFileSync(
-  join(process.cwd(), "src/lib/environmentCheckInsightsViewModel.ts"),
-  "utf8",
+function stripComments(src: string): string {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+}
+
+const VM = stripComments(
+  readFileSync(
+    join(process.cwd(), "src/lib/environmentCheckInsightsViewModel.ts"),
+    "utf8",
+  ),
 );
-const PANEL = readFileSync(
-  join(process.cwd(), "src/components/EnvironmentCheckInsightsPanel.tsx"),
-  "utf8",
+const PANEL = stripComments(
+  readFileSync(
+    join(process.cwd(), "src/components/EnvironmentCheckInsightsPanel.tsx"),
+    "utf8",
+  ),
 );
 
 describe("Environment Check insights — static safety", () => {

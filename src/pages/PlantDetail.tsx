@@ -424,6 +424,10 @@ export default function PlantDetail() {
         plantId={plant.id}
         onAddQuickCheck={() => setQuickLogOpen(true)}
       />
+      <PlantDetailHarvestWatchCard
+        plantId={plant.id}
+        hasPlantPhoto={!!plant.photo}
+      />
       <PlantDetailAiDoctorReadiness
         plantId={plant.id}
         growId={plant.growId ?? null}

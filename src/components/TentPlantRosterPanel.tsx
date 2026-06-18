@@ -128,14 +128,24 @@ export default function TentPlantRosterPanel({
                   >
                     {row.name}
                   </span>
-                  {row.stage && (
-                    <span
-                      className="text-[11px] rounded-md border px-1.5 py-0.5 text-muted-foreground"
-                      data-testid={`tent-plant-roster-row-${row.id}-stage`}
-                    >
-                      {row.stage}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {row.isArchived && (
+                      <span
+                        className="text-[11px] rounded-md border px-1.5 py-0.5 text-muted-foreground"
+                        data-testid={`tent-plant-roster-row-${row.id}-archived`}
+                      >
+                        {viewModel.archivedRowLabel}
+                      </span>
+                    )}
+                    {row.stage && (
+                      <span
+                        className="text-[11px] rounded-md border px-1.5 py-0.5 text-muted-foreground"
+                        data-testid={`tent-plant-roster-row-${row.id}-stage`}
+                      >
+                        {row.stage}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {row.strain && (
                   <p

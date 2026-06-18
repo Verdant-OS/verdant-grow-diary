@@ -103,6 +103,8 @@ describe("buildHyperLogQuickLogPrefill", () => {
       eventType: "watering",
       suggestSnapshot: true,
       note: "Watered 300 ml",
+      source: "hyperlog",
+      photoCount: 0,
     });
   });
 

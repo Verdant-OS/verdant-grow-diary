@@ -97,6 +97,10 @@ const App = () => (
               <Route path="/hardware-integrations" element={<HardwareIntegrations />} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/billing/:plan" element={<BillingPlaceholder />} />
+              {/* Public Customer Mode shell. Mounted OUTSIDE AppShell so
+                  no operator chrome (header, Quick Log) renders. */}
+              <Route path="/customer/:shareId" element={<CustomerModeGuide />} />
+              
               
 
               <Route element={<AppShell />}>

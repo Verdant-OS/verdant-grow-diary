@@ -274,6 +274,7 @@ export function buildTentPlantActivityPanelsViewModel(
         ? a.latestLogSummary
         : null;
     const hasRecentPhoto = a.hasRecentPhoto === true;
+    const isFirstQuickLog = latestLogAt === null;
 
     const plantDetailHref = plantDetailPath(p.id);
     const diaryHref = `${plantDetailHref}#${PLANT_RELATIVE_TIMELINE_ANCHOR_ID}`;

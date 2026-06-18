@@ -24,6 +24,7 @@ import PlantQuickStatusStrip from "@/components/PlantQuickStatusStrip";
 import PlantDetailQuickActions from "@/components/PlantDetailQuickActions";
 import PlantDetailPhotoStrip from "@/components/PlantDetailPhotoStrip";
 import PlantDetailRecentActivityRecap from "@/components/PlantDetailRecentActivityRecap";
+import PlantDetailHarvestWatchCard from "@/components/PlantDetailHarvestWatchCard";
 import PlantDetailWhatsMissing from "@/components/PlantDetailWhatsMissing";
 import PlantDetailAiDoctorReadiness from "@/components/PlantDetailAiDoctorReadiness";
 import PlantDetailDoctorContextPreview from "@/components/PlantDetailDoctorContextPreview";
@@ -422,6 +423,10 @@ export default function PlantDetail() {
       <PlantDetailRecentActivityRecap
         plantId={plant.id}
         onAddQuickCheck={() => setQuickLogOpen(true)}
+      />
+      <PlantDetailHarvestWatchCard
+        plantId={plant.id}
+        hasPlantPhoto={!!plant.photo}
       />
       <PlantDetailAiDoctorReadiness
         plantId={plant.id}

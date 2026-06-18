@@ -3,6 +3,7 @@ import {
   createPhenoHunt,
   defaultCandidateLabel,
   defaultHuntName,
+  deletePhenoHunt,
   validatePhenoHuntDraft,
   PhenoHuntError,
 } from "@/lib/phenoHuntService";

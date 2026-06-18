@@ -102,7 +102,7 @@ describe("<EnvironmentCheckInsightsPanel />", () => {
     expect(html).not.toMatch(/fix immediately/i);
     expect(html).not.toMatch(/unhealthy/i);
     expect(html).not.toMatch(/health score/i);
-    expect(html).not.toMatch(/live sensor telemetry(?! )/i); // disclaimer says "not live sensor telemetry"
+    expect(html).not.toMatch(/\bis live\b/i);
   });
 
   it("toggle button exposes accessible aria-label + aria-controls", () => {

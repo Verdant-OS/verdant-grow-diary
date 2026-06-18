@@ -60,6 +60,7 @@ import EcowittLiveBringup from "./pages/EcowittLiveBringup";
 import EnvironmentSummaryReportPage from "./pages/EnvironmentSummaryReportPage";
 import OperatorOneTentLoopSmokeTest from "./pages/OperatorOneTentLoopSmokeTest";
 import OperatorGgsRealPayloadIngest from "./pages/OperatorGgsRealPayloadIngest";
+import CustomerModeGuide from "./pages/CustomerModeGuide";
 
 const queryClient = new QueryClient();
 

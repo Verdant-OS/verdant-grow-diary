@@ -32,6 +32,7 @@ import {
   ImageIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { GeneticsBadge } from "@/components/GeneticsBadge";
 
 export type HyperLogAction = "water" | "feed" | "defoliate" | "note";
 
@@ -54,6 +55,12 @@ interface HyperLogModalProps {
   onCommit?: (action: HyperLogAction, demo: HyperLogDemoFormState) => void;
   /** Optional preselected action (e.g. when launched from Fast Add). */
   initialAction?: HyperLogAction | null;
+  /**
+   * Optional strain / plant context (string or object). Used presenter-only
+   * to render an optional GeneticsBadge inside the Plant Memory Preview.
+   * No data fetching, no writes.
+   */
+  strain?: unknown;
 }
 
 const ACTION_TILES: Array<{
@@ -95,6 +102,7 @@ export function HyperLogModal({
   onOpenChange,
   onCommit,
   initialAction = null,
+  strain,
 }: HyperLogModalProps) {
   const [selected, setSelected] = useState<HyperLogAction | null>(initialAction);
   const [form, setForm] = useState<HyperLogDemoFormState>(EMPTY_FORM);
@@ -499,6 +507,12 @@ export function HyperLogModal({
                   </p>
                 ) : null}
               </div>
+
+              {strain !== undefined && strain !== null ? (
+                <div className="mt-3">
+                  <GeneticsBadge source={strain} compact={false} />
+                </div>
+              ) : null}
 
               <p className="mt-3 text-[10px] text-white/35 italic">
                 Demo/sample data — not live telemetry. Nothing is written.

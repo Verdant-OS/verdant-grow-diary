@@ -1081,105 +1081,30 @@ export type Database = {
         }
         Relationships: []
       }
-      pheno_hunt_candidates: {
-        Row: {
-          created_at: string
-          hunt_id: string
-          id: string
-          label: string
-          plant_id: string
-        }
-        Insert: {
-          created_at?: string
-          hunt_id: string
-          id?: string
-          label: string
-          plant_id: string
-        }
-        Update: {
-          created_at?: string
-          hunt_id?: string
-          id?: string
-          label?: string
-          plant_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pheno_hunt_candidates_hunt_id_fkey"
-            columns: ["hunt_id"]
-            isOneToOne: false
-            referencedRelation: "pheno_hunts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pheno_hunt_candidates_plant_id_fkey"
-            columns: ["plant_id"]
-            isOneToOne: false
-            referencedRelation: "plants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       pheno_hunts: {
         Row: {
-          breeder_seed_source: string | null
-          candidate_count: number
           created_at: string
-          cultivar: string
-          generation: string | null
-          germination_method: string | null
           grow_id: string
-          grow_style: string | null
-          hunt_name: string
           id: string
-          lineage: string | null
-          medium: string | null
-          notes: string | null
-          project_goal: string
-          propagation_type: string | null
-          start_date: string
+          name: string
           tent_id: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
-          breeder_seed_source?: string | null
-          candidate_count?: number
           created_at?: string
-          cultivar: string
-          generation?: string | null
-          germination_method?: string | null
           grow_id: string
-          grow_style?: string | null
-          hunt_name: string
           id?: string
-          lineage?: string | null
-          medium?: string | null
-          notes?: string | null
-          project_goal: string
-          propagation_type?: string | null
-          start_date: string
+          name: string
           tent_id?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
-          breeder_seed_source?: string | null
-          candidate_count?: number
           created_at?: string
-          cultivar?: string
-          generation?: string | null
-          germination_method?: string | null
           grow_id?: string
-          grow_style?: string | null
-          hunt_name?: string
           id?: string
-          lineage?: string | null
-          medium?: string | null
-          notes?: string | null
-          project_goal?: string
-          propagation_type?: string | null
-          start_date?: string
+          name?: string
           tent_id?: string | null
           updated_at?: string
           user_id?: string
@@ -1349,6 +1274,7 @@ export type Database = {
       }
       plants: {
         Row: {
+          candidate_label: string | null
           created_at: string
           grow_id: string | null
           health: string
@@ -1357,6 +1283,7 @@ export type Database = {
           last_note: string | null
           medium: string | null
           name: string
+          pheno_hunt_id: string | null
           photo_url: string | null
           pot_size: string | null
           schema_version: number
@@ -1368,6 +1295,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          candidate_label?: string | null
           created_at?: string
           grow_id?: string | null
           health?: string
@@ -1376,6 +1304,7 @@ export type Database = {
           last_note?: string | null
           medium?: string | null
           name: string
+          pheno_hunt_id?: string | null
           photo_url?: string | null
           pot_size?: string | null
           schema_version?: number
@@ -1387,6 +1316,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          candidate_label?: string | null
           created_at?: string
           grow_id?: string | null
           health?: string
@@ -1395,6 +1325,7 @@ export type Database = {
           last_note?: string | null
           medium?: string | null
           name?: string
+          pheno_hunt_id?: string | null
           photo_url?: string | null
           pot_size?: string | null
           schema_version?: number
@@ -1411,6 +1342,13 @@ export type Database = {
             columns: ["grow_id"]
             isOneToOne: false
             referencedRelation: "grows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plants_pheno_hunt_id_fkey"
+            columns: ["pheno_hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
             referencedColumns: ["id"]
           },
         ]

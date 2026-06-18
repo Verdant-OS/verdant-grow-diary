@@ -76,7 +76,17 @@ import { plantDetailPath, tentsPath } from "@/lib/routes";
 export default function TentDetail() {
   const { id } = useParams();
   const [showArchived, setShowArchived] = useState(false);
-  const [rosterIncludeArchived, setRosterIncludeArchived] = useState(false);
+  const [rosterIncludeArchived, setRosterIncludeArchived] = useState<boolean>(() =>
+    readTentPlantRosterIncludeArchived(id ?? null),
+  );
+  useEffect(() => {
+    setRosterIncludeArchived(readTentPlantRosterIncludeArchived(id ?? null));
+  }, [id]);
+  const handleToggleRosterIncludeArchived = (next: boolean) => {
+    setRosterIncludeArchived(next);
+    writeTentPlantRosterIncludeArchived(id ?? null, next);
+  };
+
   const [quickLogOpen, setQuickLogOpen] = useState(false);
   const { data: tent, isLoading, isError, refetch } = useGrowTent(id);
   const { data: activePlants = [] } = useGrowPlants(id);

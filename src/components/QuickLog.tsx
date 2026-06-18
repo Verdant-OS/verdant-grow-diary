@@ -249,6 +249,8 @@ export default function QuickLog({
   const [envWaterTempUnit, setEnvWaterTempUnit] =
     useState<EnvironmentCheckWaterTempUnit>("F");
   const [envEcMscm, setEnvEcMscm] = useState<string>("");
+  const [harvestPhotoAngle, setHarvestPhotoAngle] = useState<HarvestPhotoAngle | "">("");
+  const [harvestPhotoLighting, setHarvestPhotoLighting] = useState<HarvestPhotoLighting | "">("");
 
   const wateringInputRef = useRef<HTMLInputElement | null>(null);
   const plantSelectTriggerRef = useRef<HTMLButtonElement | null>(null);

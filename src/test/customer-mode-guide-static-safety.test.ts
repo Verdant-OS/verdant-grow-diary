@@ -11,8 +11,12 @@ import { resolve } from "node:path";
 
 const FILES = [
   "src/lib/customerModeGuideViewModel.ts",
+  "src/lib/customerShareLinkPreviewRules.ts",
   "src/components/customer/CustomerGuideSection.tsx",
   "src/components/customer/CustomerGuideTimeline.tsx",
+  "src/components/customer/CustomerGuideQrBlock.tsx",
+  "src/components/customer/CustomerGuideTrustFooter.tsx",
+  "src/components/customer/CustomerShareLinkPreview.tsx",
   "src/pages/CustomerModeGuide.tsx",
 ];
 

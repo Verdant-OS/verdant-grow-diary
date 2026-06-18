@@ -26,6 +26,7 @@ import Settings from "./pages/Settings";
 import Timeline from "./pages/Timeline";
 import Grows from "./pages/Grows";
 import GrowDetail from "./pages/GrowDetail";
+import PhenoHuntNew from "./pages/PhenoHuntNew";
 import Reports from "./pages/Reports";
 
 import Coach from "./pages/Coach";

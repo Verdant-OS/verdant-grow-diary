@@ -32,7 +32,12 @@ export interface TentPlantActivityPanelsPlantInput {
 export interface TentPlantActivityPanelsActivityEntry {
   latestLogAt?: string | null;
   latestLogSummary?: string | null;
+  /** diary_entries.id of the most recent log (internal action targeting only). */
+  latestLogEntryId?: string | null;
   hasRecentPhoto?: boolean | null;
+  /** diary_entries.id of the most recent photo log (internal action targeting only). */
+  latestPhotoEntryId?: string | null;
+  latestPhotoAt?: string | null;
   harvestWatchPublicState?: string | null;
 }
 

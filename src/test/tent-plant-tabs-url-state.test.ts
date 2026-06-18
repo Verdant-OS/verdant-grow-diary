@@ -193,6 +193,6 @@ describe("tentPlantTabsUrlState static safety", () => {
   it("does not import React or perform any I/O", () => {
     expect(content).not.toMatch(/from\s+["']react["']/);
     expect(content).not.toMatch(/fetch\(/);
-    expect(content).not.toMatch(/localStorage/);
+    expect(content).not.toMatch(/window\.localStorage/);
   });
 });

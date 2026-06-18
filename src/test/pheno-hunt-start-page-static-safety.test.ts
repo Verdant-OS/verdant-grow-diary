@@ -61,7 +61,10 @@ describe("pheno hunt start page — static safety", () => {
     expect(src).not.toMatch(/publicMode/);
   });
 
-  it.each(ALL_SLICE)("$name does not contain marketplace/sales copy", ({ src }) => {
+  // Skip the rules module itself — it intentionally encodes the forbidden
+  // patterns to detect them. Scan the user-visible / runtime files.
+  const COPY_FILES = ALL_SLICE.filter((f) => f.name !== "rules");
+  it.each(COPY_FILES)("$name does not contain marketplace/sales copy", ({ src }) => {
     expect(src).not.toMatch(/marketplace/i);
     expect(src).not.toMatch(/\bresale\b/i);
     expect(src).not.toMatch(/seed sale/i);

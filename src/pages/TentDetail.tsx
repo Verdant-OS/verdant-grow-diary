@@ -64,6 +64,7 @@ import FirstPlantMemoryCta from "@/components/FirstPlantMemoryCta";
 import { buildPlantQuickLogPrefill } from "@/lib/plantQuickLogPrefillRules";
 import TentPlantRosterPanel from "@/components/TentPlantRosterPanel";
 import { buildTentPlantRosterViewModel } from "@/lib/tentPlantRosterViewModel";
+import { useTentPlantRosterActivity } from "@/hooks/useTentPlantRosterActivity";
 
 import { plantDetailPath, tentsPath } from "@/lib/routes";
 

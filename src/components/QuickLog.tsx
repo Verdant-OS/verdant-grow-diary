@@ -91,6 +91,12 @@ export interface QuickLogPrefill {
   tentId?: string | null;
   eventType?: string | null;
   suggestSnapshot?: boolean | null;
+  /**
+   * Optional starter note text. Seeded into the Quick Log note field when
+   * the user has not yet typed anything. The grower still reviews/edits
+   * and confirms the save manually.
+   */
+  note?: string | null;
 }
 
 interface Props {
@@ -233,6 +239,11 @@ export default function QuickLog({
     }
     if (prefill.eventType) setEventType(prefill.eventType);
     if (prefill.suggestSnapshot && prefill.tentId) setSnapshot(true);
+    // Seed a starter note only when the grower has not yet typed anything,
+    // so we never overwrite in-progress text on re-open.
+    if (typeof prefill.note === "string" && prefill.note.length > 0) {
+      setNote((prev) => (prev.trim().length === 0 ? prefill.note ?? "" : prev));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     open,
@@ -240,6 +251,7 @@ export default function QuickLog({
     prefill?.tentId,
     prefill?.eventType,
     prefill?.suggestSnapshot,
+    prefill?.note,
   ]);
 
   const scopedPlants = useMemo(

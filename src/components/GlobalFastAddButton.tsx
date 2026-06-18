@@ -158,7 +158,7 @@ export default function GlobalFastAddButton({
               HyperLog · demo
             </p>
             <div className="grid grid-cols-2 gap-1">
-              {(["water", "feed", "defoliate", "note"] as HyperLogAction[]).map((a) => (
+              {(["water", "feed", "defoliate", "note", "environment"] as HyperLogAction[]).map((a) => (
                 <button
                   key={a}
                   type="button"
@@ -167,7 +167,7 @@ export default function GlobalFastAddButton({
                   onClick={() => openHyperLog(a)}
                   className="text-left px-2 min-h-10 flex items-center rounded-md text-xs hover:bg-secondary/60 active:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation capitalize"
                 >
-                  {a}
+                  {a === "environment" ? "Env Check" : a}
                 </button>
               ))}
             </div>

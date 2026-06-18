@@ -273,76 +273,14 @@ export default function TentPlantRosterPanel({
                   >
                     Open Plant Detail
                   </Link>
-                  {quickActionContext && (() => {
-                    const entries = buildTentPlantRosterQuickActions({
-                      plantId: row.id,
-                      plantName: row.name,
-                      tentId: quickActionContext.tentId,
-                      tentName: quickActionContext.tentName ?? null,
-                      growId: quickActionContext.growId ?? null,
-                    });
-                    const triggerLabel = tentPlantRosterQuickActionsTriggerLabel(row.name);
-                    return (
-                      <details
-                        className="relative text-xs"
-                        data-testid={`tent-plant-roster-row-${row.id}-actions`}
-                      >
-                        <summary
-                          className="cursor-pointer list-none rounded-md border px-2 py-1 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                          aria-label={triggerLabel}
-                          data-testid={`tent-plant-roster-row-${row.id}-actions-trigger`}
-                        >
-                          Plant actions
-                        </summary>
-                        <ul
-                          role="menu"
-                          className="absolute right-0 z-10 mt-1 min-w-[10rem] rounded-md border bg-popover p-1 shadow-md"
-                          data-testid={`tent-plant-roster-row-${row.id}-actions-menu`}
-                        >
-                          {entries.map((entry) => {
-                            const baseClass =
-                              "block w-full text-left rounded-sm px-2 py-1 text-xs hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
-                            const aria = entry.disabled && entry.disabledReason
-                              ? `${entry.label} (unavailable: ${entry.disabledReason})`
-                              : entry.label;
-                            if (entry.event === "open-quicklog") {
-                              return (
-                                <li key={entry.kind} role="none">
-                                  <button
-                                    type="button"
-                                    role="menuitem"
-                                    className={baseClass}
-                                    aria-label={aria}
-                                    aria-disabled={entry.disabled || undefined}
-                                    data-testid={entry.testId}
-                                    onClick={(e) => handleEntryActivate(entry, e)}
-                                  >
-                                    {entry.label}
-                                  </button>
-                                </li>
-                              );
-                            }
-                            return (
-                              <li key={entry.kind} role="none">
-                                <a
-                                  role="menuitem"
-                                  href={entry.href ?? "#"}
-                                  className={baseClass}
-                                  aria-label={aria}
-                                  aria-disabled={entry.disabled || undefined}
-                                  data-testid={entry.testId}
-                                  data-anchor-blocked={entry.anchorBlocked ? "true" : undefined}
-                                  onClick={(e) => handleEntryActivate(entry, e)}
-                                >
-                                  {entry.label}
-                                </a>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </details>
-                    );
-                  })()}
+                  {quickActionContext && (
+                    <TentPlantRosterRowActions
+                      rowId={row.id}
+                      rowName={row.name}
+                      quickActionContext={quickActionContext}
+                      onActivate={handleEntryActivate}
+                    />
+                  )}
                 </div>
               </li>
             );

@@ -777,10 +777,13 @@ export default function Timeline() {
                                   entry={{ id: e.id, photoUrl: e.photo_url, kind: "diary" }}
                                   viewer={{ currentUserId: user?.id ?? null }}
                                   plantName={plantName}
+                                  plantId={e.plant_id ?? null}
+                                  tentId={e.tent_id ?? null}
                                   onRemoved={(removedId) => {
                                     setEntries((rows) => rows.filter((r) => r.id !== removedId));
                                   }}
                                 />
+
                               </div>
                               <p className="text-sm whitespace-pre-wrap">{e.note}</p>
                               {remindAt && (

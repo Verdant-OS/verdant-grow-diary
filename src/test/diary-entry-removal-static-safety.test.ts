@@ -12,10 +12,12 @@ const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 
 const RULES = read("src/lib/diaryEntryRemovalRules.ts");
+const INVALIDATION = read("src/lib/diaryEntryRemovalInvalidationRules.ts");
 const HOOK = read("src/hooks/useRemoveDiaryEntry.ts");
 const COMPONENT = read("src/components/DiaryEntryRemoveButton.tsx");
 const FILES = [
   { name: "rules", src: RULES },
+  { name: "invalidation", src: INVALIDATION },
   { name: "hook", src: HOOK },
   { name: "component", src: COMPONENT },
 ];
@@ -25,6 +27,13 @@ describe("diary removal slice — static safety", () => {
     expect(RULES).not.toMatch(/from\s+["']react["']/);
     expect(RULES).not.toMatch(/@\/integrations\/supabase/);
     expect(RULES).not.toMatch(/sonner/);
+  });
+
+  it("invalidation module is pure (no React, no supabase, no toast, no react-query runtime)", () => {
+    expect(INVALIDATION).not.toMatch(/from\s+["']react["']/);
+    expect(INVALIDATION).not.toMatch(/@\/integrations\/supabase/);
+    expect(INVALIDATION).not.toMatch(/sonner/);
+    expect(INVALIDATION).not.toMatch(/@tanstack\/react-query/);
   });
 
   it("does not touch sensor_readings", () => {

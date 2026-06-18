@@ -9,8 +9,8 @@
  *   - May or may not have a photo_url.
  *
  * Out of scope (must never be removable through this path):
- *   - sensor_readings rows (raw telemetry / imported CSV).
- *   - tent-level sensor snapshots.
+ *   - Raw sensor reading rows (live or imported telemetry).
+ *   - Tent-level sensor snapshots.
  *   - Bulk delete of any kind.
  *   - Customer/public/read-only report views.
  */

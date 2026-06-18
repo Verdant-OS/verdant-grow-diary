@@ -139,12 +139,17 @@ export default function PlantDetailHarvestWatchCard({
 
   const onNextInspection = useCallback(() => {
     if (!vm || !plant) return;
-    dispatchNextInspection(vm.nextInspection, {
-      plantId: plant.id,
-      plantName: plant.name,
-      growId: (plant as { growId?: string | null }).growId ?? null,
-      tentId: (plant as { tentId?: string | null }).tentId ?? null,
+    const preset = pickHarvestInspectionPreset(vm.evidenceChecklist);
+    const prefill = buildHarvestInspectionQuickLogPrefill({
+      preset,
+      context: {
+        plantId: plant.id,
+        plantName: plant.name,
+        growId: (plant as { growId?: string | null }).growId ?? null,
+        tentId: (plant as { tentId?: string | null }).tentId ?? null,
+      },
     });
+    dispatchNextInspection(prefill);
   }, [vm, plant]);
 
   if (!plantId) return null;

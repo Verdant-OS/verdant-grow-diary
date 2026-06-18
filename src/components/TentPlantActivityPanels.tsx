@@ -294,6 +294,10 @@ export default function TentPlantActivityPanels({
                 </p>
               </div>
 
+              <EvidenceNotesSection panel={panel} />
+
+
+
               <div className="mt-auto pt-3 flex flex-wrap items-center gap-2">
                 <button
                   type="button"

@@ -339,14 +339,21 @@ export function EcowittIngestValidationPanel({
         >
           <CopyButton
             label="Copy accepted test command"
-            command={ECOWITT_VALIDATION_COPY_COMMANDS.accepted}
+            command={buildEcowittAuditDevSenderCommand(
+              ECOWITT_VALIDATION_COPY_COMMANDS.accepted,
+              input.tentId ?? null,
+            )}
             testId="copy-accepted-command-button"
           />
           <CopyButton
             label="Copy invalid test command"
-            command={ECOWITT_VALIDATION_COPY_COMMANDS.invalid}
+            command={buildEcowittAuditDevSenderCommand(
+              ECOWITT_VALIDATION_COPY_COMMANDS.invalid,
+              input.tentId ?? null,
+            )}
             testId="copy-invalid-command-button"
           />
+
           {onRefresh ? (
             <Button
               type="button"

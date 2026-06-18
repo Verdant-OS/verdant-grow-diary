@@ -18,14 +18,16 @@ beforeEach(() => {
 
 const NOW = new Date("2026-06-18T12:00:00Z");
 
-function envEntry(id: string, details: Record<string, unknown>) {
+function envEntry(id: string, env: Record<string, unknown>) {
   return {
     id,
-    type: "environment",
-    occurredAt: "2026-06-18T09:00:00Z",
-    plantName: "Plant A",
+    entry_at: "2026-06-18T09:00:00Z",
+    event_type: "environment",
     note: "Lights up 18/6, drying out fast.",
-    details,
+    details: {
+      event_type: "environment",
+      environment_check: env,
+    },
   };
 }
 
@@ -113,7 +115,7 @@ describe("Environment Check expanded layout polish", () => {
     render(
       <DiaryCalendarSection
         now={NOW}
-        rawEntries={[envEntry("env-5", { event_type: "environment", environment_check: {} })]}
+        rawEntries={[envEntry("env-5", {})]}
       />,
     );
     expect(

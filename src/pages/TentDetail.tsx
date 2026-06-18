@@ -85,6 +85,7 @@ import {
 
 
 import { plantDetailPath, tentsPath } from "@/lib/routes";
+import StartPhenoHuntButton from "@/components/StartPhenoHuntButton";
 
 export default function TentDetail() {
   const { id } = useParams();
@@ -271,7 +272,7 @@ export default function TentDetail() {
         testId="tent-detail-data-source-disclosure"
       />
 
-      <div className="mb-3">
+      <div className="mb-3 flex items-center gap-2 flex-wrap">
         <TentCardActionsMenu
           tent={{
             id: tent.id,
@@ -285,6 +286,9 @@ export default function TentDetail() {
           variant="row"
           hideView
         />
+        {tent.growId ? (
+          <StartPhenoHuntButton growId={tent.growId} tentId={tent.id} />
+        ) : null}
       </div>
 
       <div className="flex flex-wrap gap-2 mb-5" data-testid="tent-detail-metric-chips">

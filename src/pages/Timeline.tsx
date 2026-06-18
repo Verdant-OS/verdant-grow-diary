@@ -43,6 +43,7 @@ import {
   defaultEnvironmentSummaryRange,
 } from "@/lib/environmentSummaryNavigationRules";
 import TimelineCsvContextPanel from "@/components/TimelineCsvContextPanel";
+import PhenoHuntTimelineSection from "@/components/PhenoHuntTimelineSection";
 import { cn } from "@/lib/utils";
 import { getEventType } from "@/lib/diary";
 import { buildGrowDiaryTimeline } from "@/lib/growDiaryTimelineRules";
@@ -447,6 +448,10 @@ export default function Timeline() {
           </ol>
         </div>
       )}
+
+      {urlGrowId && <PhenoHuntTimelineSection growId={urlGrowId} />}
+
+
 
       {urlGrowId && (
         <ScopedGrowBanner

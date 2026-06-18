@@ -47,11 +47,9 @@ export const HARVEST_WATCH_V0_STATE_LABEL: Record<
 
 /**
  * Cautious copy per v0 state. NEVER instructs harvest action. Always defers
- * to grower judgement via direct plant inspection.
- *
- * Forbidden phrasing: "harvest now", "ready to harvest", "guaranteed",
- * "optimal", "done", "chop", "flush", "dark period", "fix immediately",
- * "plant is unhealthy" — enforced by harvest-watch-card-evidence-rules tests.
+ * to grower judgement via direct plant inspection. Forbidden harvest-
+ * instruction phrasing is enforced by the harvest-watch-card-evidence-rules
+ * and plant-detail-harvest-watch-accessibility tests.
  */
 export const HARVEST_WATCH_V0_STATE_CAUTION: Record<
   HarvestWatchV0ReadinessState,

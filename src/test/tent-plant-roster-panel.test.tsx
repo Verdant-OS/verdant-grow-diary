@@ -442,13 +442,16 @@ describe("TentPlantRosterPanel quick-action menu", () => {
     expect(link.getAttribute("data-anchor-blocked")).toBeNull();
   });
 
-  it("View photos falls back to Plant Detail and marks anchor blocked", () => {
+  it("View photos points to plant-photos anchor by default and clears the blocked flag", () => {
     wrap(<TentPlantRosterPanel viewModel={buildVm()} quickActionContext={ctx} />);
     const link = screen.getByTestId(
       "tent-plant-roster-row-p1-action-view-photos",
     );
-    expect(link.getAttribute("href")).toBe("/plants/p1");
-    expect(link.getAttribute("data-anchor-blocked")).toBe("true");
+    expect(link.getAttribute("href")).toBe("/plants/p1#plant-photos");
+    expect(link.getAttribute("data-anchor-blocked")).toBeNull();
+    expect(
+      screen.queryByTestId("tent-plant-roster-row-p1-photos-fallback-hint"),
+    ).toBeNull();
   });
 
   it("Add Quick Log dispatches verdant:open-quicklog with correct payload", () => {

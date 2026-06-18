@@ -140,6 +140,9 @@ export default function TentPlantActivityPanels({
   testId = "tent-plant-activity-panels",
   isLoading = false,
   loadingSkeletonCount,
+  viewer,
+  tentId,
+  growId,
 }: TentPlantActivityPanelsProps) {
   // Skeleton count matches the visible/scoped plant filter so the loading
   // shell matches the panels that will render. Falls back to 1 compact

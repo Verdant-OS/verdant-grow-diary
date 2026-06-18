@@ -83,6 +83,9 @@ export default function TentDetail() {
   const activeCount = getActivePlantCount(activePlants);
   const hasArchived = shouldShowArchivedToggle(allPlants);
   const visiblePlants = filterVisiblePlants(allPlants, { showArchived });
+  const rosterActivity = useTentPlantRosterActivity(visiblePlants);
+
+
 
   if (isLoading) {
     return (

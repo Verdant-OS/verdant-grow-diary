@@ -25,7 +25,7 @@ const FORBIDDEN_PATTERNS: ReadonlyArray<RegExp> = [
   /ai-doctor/i,
   /deviceControl|device_control/i,
   /raw_payload/i,
-  /sensor_readings/i,
+  /\.insert\(\s*\{/,
 ];
 
 describe("environment check view-model trio — static safety", () => {

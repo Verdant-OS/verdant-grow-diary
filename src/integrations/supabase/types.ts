@@ -1081,6 +1081,126 @@ export type Database = {
         }
         Relationships: []
       }
+      pheno_hunt_candidates: {
+        Row: {
+          created_at: string
+          hunt_id: string
+          id: string
+          label: string
+          plant_id: string
+        }
+        Insert: {
+          created_at?: string
+          hunt_id: string
+          id?: string
+          label: string
+          plant_id: string
+        }
+        Update: {
+          created_at?: string
+          hunt_id?: string
+          id?: string
+          label?: string
+          plant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_hunt_candidates_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_hunt_candidates_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pheno_hunts: {
+        Row: {
+          breeder_seed_source: string | null
+          candidate_count: number
+          created_at: string
+          cultivar: string
+          generation: string | null
+          germination_method: string | null
+          grow_id: string
+          grow_style: string | null
+          hunt_name: string
+          id: string
+          lineage: string | null
+          medium: string | null
+          notes: string | null
+          project_goal: string
+          propagation_type: string | null
+          start_date: string
+          tent_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          breeder_seed_source?: string | null
+          candidate_count?: number
+          created_at?: string
+          cultivar: string
+          generation?: string | null
+          germination_method?: string | null
+          grow_id: string
+          grow_style?: string | null
+          hunt_name: string
+          id?: string
+          lineage?: string | null
+          medium?: string | null
+          notes?: string | null
+          project_goal: string
+          propagation_type?: string | null
+          start_date: string
+          tent_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          breeder_seed_source?: string | null
+          candidate_count?: number
+          created_at?: string
+          cultivar?: string
+          generation?: string | null
+          germination_method?: string | null
+          grow_id?: string
+          grow_style?: string | null
+          hunt_name?: string
+          id?: string
+          lineage?: string | null
+          medium?: string | null
+          notes?: string | null
+          project_goal?: string
+          propagation_type?: string | null
+          start_date?: string
+          tent_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_hunts_grow_id_fkey"
+            columns: ["grow_id"]
+            isOneToOne: false
+            referencedRelation: "grows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_hunts_tent_id_fkey"
+            columns: ["tent_id"]
+            isOneToOne: false
+            referencedRelation: "tents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       photo_events: {
         Row: {
           caption: string | null

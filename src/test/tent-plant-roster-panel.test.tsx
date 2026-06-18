@@ -289,7 +289,107 @@ describe("TentPlantRosterPanel", () => {
       screen.queryByTestId("tent-plant-roster-empty-archived-hint"),
     ).toBeNull();
   });
+
+  it("renders header counts that exclude other tents and stay stable when archived hidden", () => {
+    const vm = buildTentPlantRosterViewModel({
+      tentId: "t1",
+      plants: [
+        { id: "p1", name: "Alpha", tentId: "t1" },
+        { id: "p2", name: "Beta", tentId: "t1", isArchived: true },
+        { id: "p3", name: "Gamma", tentId: "other" },
+        { id: "p4", name: "Delta", tentId: "other", isArchived: true },
+      ],
+    });
+    wrap(<TentPlantRosterPanel viewModel={vm} onToggleIncludeArchived={() => {}} />);
+    expect(screen.getByTestId("tent-plant-roster-header-counts")).toHaveTextContent(
+      "Active plants: 1 · Archived plants: 1",
+    );
+  });
+
+  it("header counts remain stable when archived plants are shown", () => {
+    const vm = buildTentPlantRosterViewModel({
+      tentId: "t1",
+      includeArchived: true,
+      plants: [
+        { id: "p1", name: "Alpha", tentId: "t1" },
+        { id: "p2", name: "Beta", tentId: "t1", isArchived: true },
+      ],
+    });
+    wrap(<TentPlantRosterPanel viewModel={vm} onToggleIncludeArchived={() => {}} />);
+    expect(screen.getByTestId("tent-plant-roster-header-counts")).toHaveTextContent(
+      "Active plants: 1 · Archived plants: 1",
+    );
+  });
+
+  it("toggle has accessible label, help text via aria-describedby, and focus-visible styling", () => {
+    const vm = buildTentPlantRosterViewModel({
+      tentId: "t1",
+      plants: [{ id: "p1", name: "Alpha", tentId: "t1" }],
+    });
+    wrap(<TentPlantRosterPanel viewModel={vm} onToggleIncludeArchived={() => {}} />);
+    const toggle = screen.getByTestId(
+      "tent-plant-roster-show-archived-toggle",
+    ) as HTMLInputElement;
+    expect(toggle.type).toBe("checkbox");
+    expect(toggle.getAttribute("aria-label")).toBe(
+      "Show archived plants in this tent roster",
+    );
+    expect(toggle.getAttribute("aria-describedby")).toBe(
+      "tent-plant-roster-show-archived-help",
+    );
+    expect(toggle.className).toMatch(/focus-visible:ring/);
+    const help = screen.getByTestId("tent-plant-roster-show-archived-help");
+    expect(help.id).toBe("tent-plant-roster-show-archived-help");
+    expect(help).toHaveTextContent(
+      "Archived plants are hidden by default.",
+    );
+  });
+
+  it("toggle reflects checked state from the view-model", () => {
+    const vmOff = buildTentPlantRosterViewModel({
+      tentId: "t1",
+      plants: [{ id: "p1", name: "Alpha", tentId: "t1" }],
+    });
+    const { rerender } = wrap(
+      <TentPlantRosterPanel viewModel={vmOff} onToggleIncludeArchived={() => {}} />,
+    );
+    expect(
+      (screen.getByTestId("tent-plant-roster-show-archived-toggle") as HTMLInputElement).checked,
+    ).toBe(false);
+    const vmOn = buildTentPlantRosterViewModel({
+      tentId: "t1",
+      includeArchived: true,
+      plants: [{ id: "p1", name: "Alpha", tentId: "t1" }],
+    });
+    rerender(
+      <MemoryRouter>
+        <TentPlantRosterPanel viewModel={vmOn} onToggleIncludeArchived={() => {}} />
+      </MemoryRouter>,
+    );
+    expect(
+      (screen.getByTestId("tent-plant-roster-show-archived-toggle") as HTMLInputElement).checked,
+    ).toBe(true);
+  });
+
+  it("archived badge exposes accessible help copy and is not focusable", () => {
+    const vm = buildTentPlantRosterViewModel({
+      tentId: "t1",
+      includeArchived: true,
+      plants: [{ id: "p1", name: "Alpha", tentId: "t1", isArchived: true }],
+    });
+    wrap(<TentPlantRosterPanel viewModel={vm} onToggleIncludeArchived={() => {}} />);
+    const badge = screen.getByTestId("tent-plant-roster-row-p1-archived");
+    expect(badge.getAttribute("aria-label")).toContain(
+      "Archived plants are completed or inactive plants",
+    );
+    expect(badge.getAttribute("title")).toContain(
+      "Archived plants are completed or inactive plants",
+    );
+    expect(badge.tagName.toLowerCase()).toBe("span");
+    expect(badge.hasAttribute("tabindex")).toBe(false);
+  });
 });
+
 
 
 describe("TentPlantRosterPanel static safety", () => {

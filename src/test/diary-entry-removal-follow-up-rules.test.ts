@@ -34,13 +34,12 @@ describe("buildCorrectedQuickLogHandoff", () => {
     const p = buildCorrectedQuickLogHandoff({
       tentId: "tent-1",
       growId: "grow-1",
-      // @ts-expect-error guard: callers must not pass plant identifiers
-      plantId: "plant-X",
-      // @ts-expect-error guard: callers must not pass plant identifiers
-      plantName: "Wrong plant",
+      // Extra keys are tolerated by the builder but must be stripped.
+      ...({ plantId: "plant-X", plantName: "Wrong plant" } as object),
     });
-    expect((p as Record<string, unknown>).plantId).toBeUndefined();
-    expect((p as Record<string, unknown>).plantName).toBeUndefined();
+    const bag = p as unknown as Record<string, unknown>;
+    expect(bag.plantId).toBeUndefined();
+    expect(bag.plantName).toBeUndefined();
   });
 
   it("omits whitespace-only / empty strings", () => {

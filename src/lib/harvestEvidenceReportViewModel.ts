@@ -11,7 +11,7 @@
  *
  * Hard rules:
  *   - Does not predict harvest timing, health, or readiness.
- *   - Never recommends harvest action (chop / flush / dark period / etc).
+ *   - Never recommends harvest action.
  *   - Generic photos NEVER count as trichome inspection (delegated to the
  *     shared classifier).
  *   - Deterministic and null-safe. Never throws on missing input.

@@ -220,6 +220,73 @@ describe("buildTentPlantActivityPanelsViewModel", () => {
   });
 });
 
+describe("buildTentPlantActivityPanelsViewModel — Harvest Watch help text", () => {
+  const STATES = [
+    "not_enough_evidence",
+    "too_early_to_call",
+    "watch_window",
+    "ready_for_manual_review",
+    "past_expected_window",
+    "unknown",
+  ] as const;
+
+  for (const state of STATES) {
+    it(`emits help text for "${state}"`, () => {
+      const vm = buildTentPlantActivityPanelsViewModel({
+        plants: [{ id: "p1", name: "P", isArchived: false }],
+        activityByPlantId: { p1: { harvestWatchPublicState: state } },
+        includeArchived: false,
+        selectedPlantId: null,
+        tentId: "t1",
+        tentName: "T",
+        growId: "g1",
+      });
+      const p1 = vm.panels[0];
+      expect(p1.harvestWatch.helpText).toBe(
+        TENT_PLANT_ACTIVITY_HARVEST_WATCH_HELP_TEXT[state],
+      );
+      expect(p1.harvestWatch.cautionText).toBe(
+        TENT_PLANT_ACTIVITY_HARVEST_WATCH_CAUTION_COPY,
+      );
+      expect(p1.harvestWatch.cautionText).toMatch(/evidence-only/i);
+    });
+  }
+
+  it("emits fallback help text for null/unknown states", () => {
+    const vm = buildTentPlantActivityPanelsViewModel({
+      plants: [{ id: "p1", name: "P", isArchived: false }],
+      activityByPlantId: { p1: { harvestWatchPublicState: null } },
+      includeArchived: false,
+      selectedPlantId: null,
+      tentId: "t1",
+      tentName: "T",
+      growId: "g1",
+    });
+    const p1 = vm.panels[0];
+    expect(p1.harvestWatch.helpText).toBe(
+      TENT_PLANT_ACTIVITY_HARVEST_WATCH_HELP_TEXT.unknown,
+    );
+    expect(p1.harvestWatch.copy).toBe(
+      TENT_PLANT_ACTIVITY_HARVEST_WATCH_FALLBACK_COPY,
+    );
+  });
+
+  it("help text avoids forbidden harvest instruction language", () => {
+    const FORBIDDEN = [
+      /harvest now/i,
+      /ready to harvest/i,
+      /\bchop\b/i,
+      /\bflush\b/i,
+      /dark period/i,
+      /fix immediately/i,
+    ];
+    for (const state of Object.keys(TENT_PLANT_ACTIVITY_HARVEST_WATCH_HELP_TEXT)) {
+      const text = TENT_PLANT_ACTIVITY_HARVEST_WATCH_HELP_TEXT[state];
+      for (const re of FORBIDDEN) expect(text).not.toMatch(re);
+    }
+  });
+});
+
 describe("tentPlantActivityPanelsViewModel forbidden copy + static safety", () => {
   const vmPath = resolve(__dirname, "../lib/tentPlantActivityPanelsViewModel.ts");
   const cmpPath = resolve(__dirname, "../components/TentPlantActivityPanels.tsx");

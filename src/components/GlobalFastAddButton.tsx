@@ -215,6 +215,13 @@ export default function GlobalFastAddButton({
       <span className="sr-only" data-testid="global-fast-add-needs-context-copy">
         {FAST_ADD_NO_CONTEXT_COPY}
       </span>
+
+      <HyperLogModal
+        open={hyperLogOpen}
+        onOpenChange={setHyperLogOpen}
+        initialAction={hyperLogAction}
+      />
     </div>
   );
 }
+

@@ -56,6 +56,7 @@ import {
 } from "@/lib/legacyQuickLogUnifiedSave";
 import { buildSensorSnapshotSavePayload } from "@/lib/latestSensorSnapshotRules";
 import { buildStaleSnapshotHelperCopy } from "@/lib/quickLogStaleSnapshotHelperCopy";
+import { buildQuickLogDraftPreview } from "@/lib/quickLogDraftPreviewViewModel";
 import { plantDetailPath } from "@/lib/routes";
 import {
   EARLY_STAGE_MILESTONES,
@@ -619,6 +620,55 @@ export default function QuickLog({
         </DialogHeader>
 
         <form onSubmit={submit} className="grid gap-4">
+          {(() => {
+            const draftPreview = buildQuickLogDraftPreview({ prefill });
+            if (!draftPreview.show) return null;
+            return (
+              <div
+                data-testid="quick-log-draft-preview"
+                data-source={prefill?.source ?? "unknown"}
+                className="rounded-lg border border-primary/30 bg-primary/[0.04] p-2.5 space-y-1"
+              >
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <p className="text-[11px] uppercase tracking-wide text-primary/80">
+                    {draftPreview.eventTypeLabel ?? "Draft"} prefilled
+                  </p>
+                  {draftPreview.sourceLabel ? (
+                    <span
+                      data-testid="quick-log-draft-preview-source"
+                      className="text-[10px] uppercase tracking-wide text-amber-200/80 rounded-sm border border-amber-200/30 px-1.5 py-0.5"
+                    >
+                      {draftPreview.sourceLabel}
+                    </span>
+                  ) : null}
+                </div>
+                {draftPreview.noteSummary ? (
+                  <p
+                    data-testid="quick-log-draft-preview-note"
+                    className="text-[12px] text-foreground/90 leading-snug"
+                  >
+                    {draftPreview.noteSummary}
+                  </p>
+                ) : null}
+                {draftPreview.snapshotLabel ? (
+                  <p
+                    data-testid="quick-log-draft-preview-snapshot"
+                    className="text-[11px] text-muted-foreground italic"
+                  >
+                    {draftPreview.snapshotLabel}
+                  </p>
+                ) : null}
+                {draftPreview.photoLabel ? (
+                  <p
+                    data-testid="quick-log-draft-preview-photo"
+                    className="text-[11px] text-muted-foreground italic"
+                  >
+                    {draftPreview.photoLabel}
+                  </p>
+                ) : null}
+              </div>
+            );
+          })()}
           {(showMismatch || showStaleHelper || showWateringErr) && (
             <div
               data-testid="quick-log-review-issues"

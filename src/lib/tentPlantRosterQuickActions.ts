@@ -113,12 +113,16 @@ export function buildTentPlantRosterQuickActions(
 
   const prefill = buildPrefill(input);
 
+  const testIdBase = plantId
+    ? `tent-plant-roster-row-${plantId}-action`
+    : "tent-plant-roster-row-action";
+
   return [
     {
       kind: "view_diary",
       label: "View diary",
       href: diaryHref,
-      testId: "tent-plant-roster-row-action-view-diary",
+      testId: `${testIdBase}-view-diary`,
       anchorBlocked: !DIARY_ANCHOR_AVAILABLE,
       disabled: !plantId,
       disabledReason: plantId ? undefined : "Plant context is not loaded yet.",
@@ -128,7 +132,7 @@ export function buildTentPlantRosterQuickActions(
       label: "Add Quick Log",
       event: "open-quicklog",
       eventPayload: prefill,
-      testId: "tent-plant-roster-row-action-add-quicklog",
+      testId: `${testIdBase}-add-quicklog`,
       disabled: !prefill,
       disabledReason: prefill
         ? undefined

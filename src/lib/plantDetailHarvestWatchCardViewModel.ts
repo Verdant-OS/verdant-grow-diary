@@ -159,6 +159,9 @@ export function buildPlantDetailHarvestWatchCardViewModel(params: {
     strongEvidenceCount,
   });
   const nextInspection = pickNextInspection(evidenceChecklist);
+  const evidenceHistory = buildHarvestEvidenceHistory(recentForChecklist, {
+    perGroupLimit: 10,
+  });
 
   return {
     row,
@@ -176,5 +179,6 @@ export function buildPlantDetailHarvestWatchCardViewModel(params: {
     evidenceChecklist,
     groupedRecent,
     nextInspection,
+    evidenceHistory,
   };
 }

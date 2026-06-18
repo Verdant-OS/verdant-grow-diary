@@ -34,8 +34,10 @@ describe("buildQuickLogDraftPreview", () => {
       prefill: { eventType: "environment", source: "hyperlog" },
     });
     expect(vm.snapshotLabel).toBe(QUICK_LOG_DRAFT_DEMO_SNAPSHOT_COPY);
-    expect(vm.snapshotLabel).not.toMatch(/\blive\b/i);
-    expect(vm.sourceLabel).not.toMatch(/\blive\b/i);
+    // Never asserts the data IS live (positive live claims).
+    expect(vm.snapshotLabel).not.toMatch(/\bis live\b/i);
+    expect(vm.sourceLabel).not.toMatch(/\bis live\b/i);
+    expect(vm.sourceLabel).not.toMatch(/\blive sensor\b/i);
   });
 
   it("surfaces the photo-blocked copy when photoCount > 0", () => {
@@ -45,7 +47,7 @@ describe("buildQuickLogDraftPreview", () => {
     expect(vm.photoLabel).toBe(QUICK_LOG_DRAFT_PHOTO_BLOCKED_COPY);
   });
 
-  it("never renders live for hyperlog-sourced prefill regardless of fields", () => {
+  it("never positively claims HyperLog data is live", () => {
     const vm = buildQuickLogDraftPreview({
       prefill: {
         eventType: "environment",
@@ -57,7 +59,10 @@ describe("buildQuickLogDraftPreview", () => {
       },
     });
     const serialized = JSON.stringify(vm);
-    expect(serialized).not.toMatch(/\blive\b/i);
+    // No positive "live" claim — only the negation "not ... live sensor data" is allowed.
+    expect(serialized).not.toMatch(/\bis live\b/i);
+    expect(serialized).not.toMatch(/\blive telemetry\b/i);
+    expect(serialized).not.toMatch(/\bLIVE SNAPSHOT\b/);
   });
 
   it("falls back to non-hyperlog snapshot copy for plant-detail handoff", () => {
@@ -70,7 +75,7 @@ describe("buildQuickLogDraftPreview", () => {
       },
     });
     expect(vm.snapshotLabel).toMatch(/Sensor snapshot suggested/);
-    expect(vm.snapshotLabel).not.toMatch(/\blive\b/i);
+    expect(vm.snapshotLabel).not.toMatch(/\bis live\b/i);
   });
 
   it("never throws on malformed input", () => {

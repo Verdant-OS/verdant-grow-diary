@@ -88,6 +88,7 @@ import { plantDetailPath, tentsPath } from "@/lib/routes";
 
 export default function TentDetail() {
   const { id } = useParams();
+  const { user } = useAuth();
   const [showArchived, setShowArchived] = useState(false);
   const [rosterIncludeArchived, setRosterIncludeArchived] = useState<boolean>(() =>
     readTentPlantRosterIncludeArchived(id ?? null),

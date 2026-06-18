@@ -465,19 +465,12 @@ export default function DiaryCalendarSection({
                                     const regionId = `diary-calendar-env-details-${ev.id}`;
                                     return (
                                       <>
-                                        {hasValues ? (
+                                        {hasValues && (
                                           <p
                                             className="text-[11px] text-foreground break-words"
                                             data-testid="diary-calendar-env-compact"
                                           >
                                             {fields.map((f) => f.value).join(" · ")}
-                                          </p>
-                                        ) : (
-                                          <p
-                                            className="text-[11px] text-muted-foreground italic"
-                                            data-testid="diary-calendar-env-no-values"
-                                          >
-                                            {ENVIRONMENT_CHECK_NO_VALUES_LABEL}
                                           </p>
                                         )}
                                         {expanded && hasValues && (

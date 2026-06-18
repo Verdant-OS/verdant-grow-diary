@@ -171,6 +171,6 @@ describe("DiaryCalendarSection — Environment Check expansion safety", () => {
     const html = document.body.innerHTML;
     expect(html).not.toContain("sensor_readings");
     expect(html).not.toMatch(/"source"\s*:\s*"live"/);
-    expect(html).not.toMatch(/\blive sensor telemetry\b(?!.*not live)/i);
+    expect(html).not.toMatch(/(?<!not )\blive sensor telemetry\b/i);
   });
 });

@@ -117,13 +117,20 @@ export function buildTentPlantRosterQuickActions(
       ? input.plantId
       : null;
 
+  const photosAnchorAvailable =
+    input.photosAnchorAvailable === false ? false : PHOTOS_ANCHOR_AVAILABLE_DEFAULT;
+
   const plantDetailHref = plantId ? plantDetailPath(plantId) : "#";
   const diaryHref = plantId
     ? DIARY_ANCHOR_AVAILABLE
       ? `${plantDetailHref}#${PLANT_RELATIVE_TIMELINE_ANCHOR_ID}`
       : plantDetailHref
     : "#";
-  const photosHref = plantDetailHref;
+  const photosHref = plantId
+    ? photosAnchorAvailable
+      ? `${plantDetailHref}#${PLANT_PHOTOS_ANCHOR_ID}`
+      : plantDetailHref
+    : "#";
 
   const prefill = buildPrefill(input);
 
@@ -157,7 +164,7 @@ export function buildTentPlantRosterQuickActions(
       label: "View photos",
       href: photosHref,
       testId: `${testIdBase}-view-photos`,
-      anchorBlocked: !PHOTOS_ANCHOR_AVAILABLE,
+      anchorBlocked: !photosAnchorAvailable,
       disabled: !plantId,
       disabledReason: plantId ? undefined : "Plant context is not loaded yet.",
     },

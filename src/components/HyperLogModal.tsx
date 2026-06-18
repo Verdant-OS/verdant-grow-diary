@@ -650,6 +650,16 @@ function buildTimelinePreview(
     const summary = `Defoliated — ${intensity}${form.defoliateNote.trim() ? ` · ${form.defoliateNote.trim()}` : ""}`;
     return { headline: "Defoliation · demo", summary, meta: photoMeta };
   }
+  if (action === "environment") {
+    const parts: string[] = [];
+    if (form.envTemp.trim()) parts.push(`Temp ${form.envTemp.trim()}°C`);
+    if (form.envHumidity.trim()) parts.push(`RH ${form.envHumidity.trim()}%`);
+    if (form.envVpd.trim()) parts.push(`VPD ${form.envVpd.trim()} kPa`);
+    if (form.envCo2.trim()) parts.push(`CO₂ ${form.envCo2.trim()} ppm`);
+    if (form.envNote.trim()) parts.push(form.envNote.trim());
+    const summary = parts.length > 0 ? parts.join(" · ") : "No readings entered";
+    return { headline: "Env check · demo", summary, meta: photoMeta };
+  }
   const note = form.freeformNote.trim() || "Empty note";
   return { headline: "Note · demo", summary: note, meta: photoMeta };
 }

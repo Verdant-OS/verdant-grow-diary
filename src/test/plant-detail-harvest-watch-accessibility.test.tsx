@@ -157,6 +157,12 @@ function baseVm(state: HarvestWatchV0ReadinessState) {
       suggestedAction: "note" as const,
       eventType: "observation" as const,
     },
+    evidenceHistory: {
+      groups: [],
+      caution:
+        "Harvest evidence history is diary evidence only — confirm with direct inspection.",
+      totalCount: 0,
+    },
   };
 }
 

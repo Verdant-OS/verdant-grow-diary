@@ -5,7 +5,7 @@
  * fails after the hunt insert succeeded, attempts a best-effort rollback
  * delete of the just-created hunt. Returns a structured result.
  *
- * No AI. No alerts. No Action Queue. No device control. No service_role.
+ * No AI. No alerts. No Action Queue. No device control. No elevated keys.
  */
 import { useCallback, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";

@@ -74,6 +74,7 @@ import TimelineSensorSourceBadge from "@/components/TimelineSensorSourceBadge";
 import { classifyTimelineSensorSource, type TimelineSensorSourceKind } from "@/lib/timelineSensorSourceBadgeRules";
 import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
 import { SENSOR_SOURCE_KINDS, SENSOR_SOURCE_SHORT_LABEL } from "@/constants/sensorSourceLabels";
+import DiaryEntryRemoveButton from "@/components/DiaryEntryRemoveButton";
 
 
 

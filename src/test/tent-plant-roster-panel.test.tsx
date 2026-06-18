@@ -489,6 +489,8 @@ describe("TentPlantRosterPanel quick-action menu", () => {
     expect(
       screen.getByTestId("tent-plant-roster-row-p2-action-add-quicklog"),
     ).toBeInTheDocument();
+  });
+
   it("clicks dispatch verdant:tent-roster-action with safe detail (no ids)", () => {
     const received: Array<Record<string, unknown>> = [];
     const listener = (ev: Event) =>

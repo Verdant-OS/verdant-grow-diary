@@ -271,10 +271,27 @@ export default function TentPlantActivityPanels({
 
               <div className="mt-2 space-y-1 text-xs">
                 {panel.latestLogDateLabel ? (
-                  <p data-testid={`${panel.testId}-latest-log`}>
-                    Latest log: {panel.latestLogDateLabel}
-                    {panel.latestLogSummary ? ` — ${panel.latestLogSummary}` : ""}
-                  </p>
+                  <div className="flex items-center gap-2 flex-wrap" data-testid={`${panel.testId}-latest-log-row`}>
+                    <p data-testid={`${panel.testId}-latest-log`}>
+                      Latest log: {panel.latestLogDateLabel}
+                      {panel.latestLogSummary ? ` — ${panel.latestLogSummary}` : ""}
+                    </p>
+                    {viewer && panel.latestLogEntryId ? (
+                      <DiaryEntryRemoveButton
+                        entry={{
+                          id: panel.latestLogEntryId,
+                          kind: "diary",
+                          // Photo flag handled separately by Remove photo log.
+                          photoUrl: null,
+                        }}
+                        viewer={viewer}
+                        plantName={panel.name}
+                        plantId={panel.id}
+                        tentId={tentId ?? null}
+                        growId={growId ?? null}
+                      />
+                    ) : null}
+                  </div>
                 ) : (
                   <p
                     className="text-muted-foreground"
@@ -284,9 +301,26 @@ export default function TentPlantActivityPanels({
                   </p>
                 )}
                 {panel.hasRecentPhoto ? (
-                  <p data-testid={`${panel.testId}-recent-photo`}>
-                    Recent photo on file
-                  </p>
+                  <div className="flex items-center gap-2 flex-wrap" data-testid={`${panel.testId}-recent-photo-row`}>
+                    <p data-testid={`${panel.testId}-recent-photo`}>
+                      Recent photo on file
+                    </p>
+                    {viewer && panel.latestPhotoEntryId ? (
+                      <DiaryEntryRemoveButton
+                        entry={{
+                          id: panel.latestPhotoEntryId,
+                          kind: "diary",
+                          // Forces photo-log copy variant.
+                          photoUrl: "x",
+                        }}
+                        viewer={viewer}
+                        plantName={panel.name}
+                        plantId={panel.id}
+                        tentId={tentId ?? null}
+                        growId={growId ?? null}
+                      />
+                    ) : null}
+                  </div>
                 ) : (
                   <p
                     className="text-muted-foreground"

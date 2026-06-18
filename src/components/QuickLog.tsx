@@ -84,6 +84,13 @@ import {
 import { buildEnvironmentCheckSensorContext } from "@/lib/environmentCheckSensorContextRules";
 import { buildSensorNormalizationPreviewViewModel } from "@/lib/sensors/sensorNormalizationPreviewViewModel";
 import { SensorNormalizationPreviewPanel } from "@/components/SensorNormalizationPreviewPanel";
+import {
+  buildHarvestInspectionPreviewViewModel,
+  HARVEST_PHOTO_COMPARISON_ANGLES,
+  HARVEST_PHOTO_COMPARISON_LIGHTINGS,
+  type HarvestPhotoAngle,
+  type HarvestPhotoLighting,
+} from "@/lib/harvestInspectionQuickLogPreviewRules";
 
 export interface QuickLogPrefill {
   plantId?: string | null;
@@ -99,16 +106,23 @@ export interface QuickLogPrefill {
    */
   note?: string | null;
   /**
-   * Optional handoff source label (e.g. "hyperlog"). Drives the draft
-   * preview header copy — never used as a write path discriminator.
+   * Optional handoff source label (e.g. "hyperlog", "harvest-watch-inspection").
+   * Drives the draft preview header copy — never used as a write path
+   * discriminator.
    */
-  source?: "hyperlog" | string | null;
+  source?: "hyperlog" | "harvest-watch-inspection" | string | null;
   /**
    * Optional count of locally previewed photos waiting in the upstream
    * caller (HyperLog modal). Drives the "Photo preview only" copy.
    * The legacy Quick Log editor never receives the files themselves.
    */
   photoCount?: number | null;
+  /**
+   * Optional Harvest Watch inspection preset key (e.g. "trichome_inspection",
+   * "close_flower_photo"). Drives the Harvest Watch preview panel only.
+   * Never used as a write path discriminator.
+   */
+  preset?: string | null;
 }
 
 interface Props {
@@ -235,6 +249,8 @@ export default function QuickLog({
   const [envWaterTempUnit, setEnvWaterTempUnit] =
     useState<EnvironmentCheckWaterTempUnit>("F");
   const [envEcMscm, setEnvEcMscm] = useState<string>("");
+  const [harvestPhotoAngle, setHarvestPhotoAngle] = useState<HarvestPhotoAngle | "">("");
+  const [harvestPhotoLighting, setHarvestPhotoLighting] = useState<HarvestPhotoLighting | "">("");
 
   const wateringInputRef = useRef<HTMLInputElement | null>(null);
   const plantSelectTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -388,6 +404,8 @@ export default function QuickLog({
     setEnvWaterTempValue("");
     setEnvWaterTempUnit("F");
     setEnvEcMscm("");
+    setHarvestPhotoAngle("");
+    setHarvestPhotoLighting("");
   }
 
   function resetForAnother() {
@@ -414,6 +432,8 @@ export default function QuickLog({
     setEnvWaterTempValue("");
     setEnvWaterTempUnit("F");
     setEnvEcMscm("");
+    setHarvestPhotoAngle("");
+    setHarvestPhotoLighting("");
     if (keepPlantId) setPlantId(keepPlantId);
     setTimeout(() => noteRef.current?.focus(), 0);
   }
@@ -665,6 +685,131 @@ export default function QuickLog({
                   >
                     {draftPreview.photoLabel}
                   </p>
+                ) : null}
+              </div>
+            );
+          })()}
+          {(() => {
+            const hv = buildHarvestInspectionPreviewViewModel(prefill ?? null);
+            if (!hv.show) return null;
+            return (
+              <div
+                data-testid="quick-log-harvest-inspection-preview"
+                data-preset={hv.preset ?? ""}
+                className="rounded-lg border border-amber-400/30 bg-amber-400/[0.04] p-2.5 space-y-1.5"
+              >
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <p
+                    className="text-[11px] uppercase tracking-wide text-amber-200/90"
+                    data-testid="quick-log-harvest-inspection-preview-label"
+                  >
+                    Harvest Watch · {hv.presetLabel}
+                  </p>
+                  <span
+                    className="text-[10px] uppercase tracking-wide text-muted-foreground rounded-sm border border-border/60 px-1.5 py-0.5"
+                    data-testid="quick-log-harvest-inspection-preview-event-type"
+                  >
+                    {hv.eventTypeLabel}
+                  </span>
+                </div>
+                <p
+                  className="text-[11px] text-amber-200/80"
+                  data-testid="quick-log-harvest-inspection-preview-caution"
+                >
+                  {hv.caution}
+                </p>
+                <p
+                  className="text-[11px] text-muted-foreground"
+                  data-testid="quick-log-harvest-inspection-preview-review"
+                >
+                  {hv.reviewCopy}
+                </p>
+                {hv.note ? (
+                  <pre
+                    data-testid="quick-log-harvest-inspection-preview-note"
+                    className="text-[12px] text-foreground/90 leading-snug whitespace-pre-wrap font-sans"
+                  >
+                    {hv.note}
+                  </pre>
+                ) : null}
+                <p
+                  className="text-[11px] text-muted-foreground italic"
+                  data-testid="quick-log-harvest-inspection-preview-grower"
+                >
+                  Grower reviews before saving.
+                </p>
+                {hv.showPhotoComparison ? (
+                  <div
+                    data-testid="quick-log-harvest-photo-comparison"
+                    className="grid gap-2 sm:grid-cols-2 pt-1"
+                  >
+                    <div className="grid gap-1">
+                      <Label
+                        htmlFor="ql-harvest-angle"
+                        className="text-[11px] text-muted-foreground"
+                      >
+                        Angle (optional)
+                      </Label>
+                      <Select
+                        value={harvestPhotoAngle}
+                        onValueChange={(v) =>
+                          setHarvestPhotoAngle(v as HarvestPhotoAngle)
+                        }
+                      >
+                        <SelectTrigger
+                          id="ql-harvest-angle"
+                          data-testid="quick-log-harvest-photo-angle"
+                          className="h-8 text-xs"
+                        >
+                          <SelectValue placeholder="Select angle" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {HARVEST_PHOTO_COMPARISON_ANGLES.map((opt) => (
+                            <SelectItem
+                              key={opt.value}
+                              value={opt.value}
+                              data-testid={`quick-log-harvest-photo-angle-${opt.value}`}
+                            >
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-1">
+                      <Label
+                        htmlFor="ql-harvest-lighting"
+                        className="text-[11px] text-muted-foreground"
+                      >
+                        Lighting (optional)
+                      </Label>
+                      <Select
+                        value={harvestPhotoLighting}
+                        onValueChange={(v) =>
+                          setHarvestPhotoLighting(v as HarvestPhotoLighting)
+                        }
+                      >
+                        <SelectTrigger
+                          id="ql-harvest-lighting"
+                          data-testid="quick-log-harvest-photo-lighting"
+                          className="h-8 text-xs"
+                        >
+                          <SelectValue placeholder="Select lighting" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {HARVEST_PHOTO_COMPARISON_LIGHTINGS.map((opt) => (
+                            <SelectItem
+                              key={opt.value}
+                              value={opt.value}
+                              data-testid={`quick-log-harvest-photo-lighting-${opt.value}`}
+                            >
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 ) : null}
               </div>
             );

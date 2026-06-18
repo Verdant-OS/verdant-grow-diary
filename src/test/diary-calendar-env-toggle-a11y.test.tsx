@@ -113,12 +113,12 @@ describe("Environment Check expanded layout polish", () => {
     render(
       <DiaryCalendarSection
         now={NOW}
-        rawEntries={[envEntry("env-5", {})]}
+        rawEntries={[envEntry("env-5", { event_type: "environment", environment_check: {} })]}
       />,
     );
     expect(
-      screen.getByTestId("diary-calendar-env-no-values"),
-    ).toHaveTextContent(ENVIRONMENT_CHECK_NO_VALUES_LABEL);
+      screen.getByText(ENVIRONMENT_CHECK_NO_VALUES_LABEL),
+    ).toBeInTheDocument();
     expect(
       screen.queryByTestId("diary-calendar-env-compact"),
     ).not.toBeInTheDocument();

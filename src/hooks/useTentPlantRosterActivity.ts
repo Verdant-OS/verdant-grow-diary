@@ -35,7 +35,13 @@ export interface TentPlantRosterActivityPlant {
 
 export interface TentPlantRosterActivityEntry {
   latestLogAt: string | null;
+  /** diary_entries.id of the most recent log, for entry-specific actions. */
+  latestLogEntryId: string | null;
   hasRecentPhoto: boolean;
+  /** diary_entries.id of the most recent log that has a photo_url. */
+  latestPhotoEntryId: string | null;
+  /** occurredAt for the most recent photo log, if available. */
+  latestPhotoAt: string | null;
   harvestWatchPublicState: string | null;
 }
 
@@ -47,7 +53,10 @@ export interface UseTentPlantRosterActivityResult {
 
 const EMPTY_ENTRY: TentPlantRosterActivityEntry = {
   latestLogAt: null,
+  latestLogEntryId: null,
   hasRecentPhoto: false,
+  latestPhotoEntryId: null,
+  latestPhotoAt: null,
   harvestWatchPublicState: null,
 };
 

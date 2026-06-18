@@ -78,7 +78,11 @@ describe("trackTentRosterAction", () => {
 
 describe("trackTentRosterAction static safety", () => {
   const path = resolve(__dirname, "../lib/tentPlantRosterActionTracking.ts");
-  const content = readFileSync(path, "utf8");
+  const raw = readFileSync(path, "utf8");
+  // Strip block + line comments so safety regexes do not match doc strings.
+  const content = raw
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 
   it("does not call fetch / XMLHttpRequest / Supabase", () => {
     expect(content).not.toMatch(/\bfetch\s*\(/);

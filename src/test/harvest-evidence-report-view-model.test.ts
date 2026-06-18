@@ -31,7 +31,8 @@ function row(o: Partial<{
     notePreview: null,
     hasPhoto: o.hasPhoto ?? false,
     eventType: o.eventType ?? "observation",
-    occurredAt: o.occurredAt ?? "2025-06-10T10:00:00.000Z",
+    occurredAt:
+      o.occurredAt === undefined ? "2025-06-10T10:00:00.000Z" : o.occurredAt,
     occurredAtLabel: "Jun 10",
   };
 }

@@ -56,7 +56,9 @@ describe("growReportEnvironmentCheckViewModel", () => {
 
   it("never labels Environment Check values as live", () => {
     const section = buildGrowReportEnvironmentCheckSection([make("a", "2026-06-15T00:00:00Z")]);
-    expect(JSON.stringify(section)).not.toMatch(/\blive\b/i);
+    expect(section.rows[0].notLive).toBe(true);
+    expect(section.rows[0].isSensorReading).toBe(false);
+    expect(JSON.stringify(section)).not.toMatch(/"source"\s*:\s*"live"/i);
   });
 
   it("returns empty section copy when no environment checks exist", () => {

@@ -19,7 +19,16 @@ export interface TentPlantActivityPanelsProps {
   viewModel: TentPlantActivityPanelsViewModel;
   className?: string;
   testId?: string;
+  /**
+   * When true, render a layout-stable skeleton placeholder set instead of
+   * panels. Skeletons never display fake plant or sensor values.
+   */
+  isLoading?: boolean;
+  /** Number of skeleton placeholder cards to render while loading. */
+  loadingSkeletonCount?: number;
 }
+
+export const TENT_PLANT_ACTIVITY_LOADING_COPY = "Loading plant activity…";
 
 function emitQuickLog(panel: TentPlantActivityPanelRow) {
   if (!panel.quickLogPrefill) return;
@@ -35,7 +44,13 @@ export default function TentPlantActivityPanels({
   viewModel,
   className,
   testId = "tent-plant-activity-panels",
+  isLoading = false,
+  loadingSkeletonCount = 3,
 }: TentPlantActivityPanelsProps) {
+  const skeletonCount = Math.max(
+    1,
+    Math.min(6, Math.floor(loadingSkeletonCount)),
+  );
   return (
     <section
       data-testid={testId}
@@ -48,6 +63,43 @@ export default function TentPlantActivityPanels({
       >
         {viewModel.sharedEnvironmentReminderCopy}
       </p>
+      {isLoading ? (
+        <div
+          role="status"
+          aria-busy="true"
+          aria-label={TENT_PLANT_ACTIVITY_LOADING_COPY}
+          data-testid="tent-plant-activity-panels-loading"
+          className="space-y-2"
+        >
+          <p className="sr-only">{TENT_PLANT_ACTIVITY_LOADING_COPY}</p>
+          <ul
+            className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3"
+            data-testid="tent-plant-activity-panels-skeleton-list"
+            aria-hidden="true"
+          >
+            {Array.from({ length: skeletonCount }).map((_, i) => (
+              <li
+                key={i}
+                data-testid={`tent-plant-activity-panels-skeleton-${i}`}
+                className="rounded-xl border border-border/50 p-3 bg-card animate-pulse"
+              >
+                <div className="h-4 w-1/2 bg-muted rounded mb-2" />
+                <div className="h-3 w-1/3 bg-muted/70 rounded mb-3" />
+                <div className="space-y-1.5">
+                  <div className="h-3 w-3/4 bg-muted/60 rounded" />
+                  <div className="h-3 w-2/3 bg-muted/60 rounded" />
+                  <div className="h-3 w-1/2 bg-muted/60 rounded" />
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <div className="h-6 w-24 bg-muted/70 rounded-full" />
+                  <div className="h-6 w-16 bg-muted/50 rounded" />
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <>
       {viewModel.emptyCopy && (
         <p
           className="text-sm text-muted-foreground"
@@ -138,6 +190,12 @@ export default function TentPlantActivityPanels({
                 >
                   {panel.harvestWatch.copy}
                 </p>
+                <p
+                  className="text-[11px] text-muted-foreground"
+                  data-testid={`${panel.testId}-harvest-watch-help`}
+                >
+                  {panel.harvestWatch.helpText} {panel.harvestWatch.cautionText}
+                </p>
               </div>
 
               <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -176,6 +234,8 @@ export default function TentPlantActivityPanels({
             </li>
           ))}
         </ul>
+      )}
+        </>
       )}
     </section>
   );

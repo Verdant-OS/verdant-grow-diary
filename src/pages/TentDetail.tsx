@@ -73,6 +73,10 @@ import {
   readTentPlantRosterIncludeArchived,
   writeTentPlantRosterIncludeArchived,
 } from "@/lib/tentPlantRosterPreferences";
+import {
+  readTentPlantTabsSelectedPlantId,
+  writeTentPlantTabsSelectedPlantId,
+} from "@/lib/tentPlantTabsPreferences";
 
 
 import { plantDetailPath, tentsPath } from "@/lib/routes";
@@ -90,7 +94,16 @@ export default function TentDetail() {
     setRosterIncludeArchived(next);
     writeTentPlantRosterIncludeArchived(id ?? null, next);
   };
-  const [selectedPlantTabId, setSelectedPlantTabId] = useState<string | null>(null);
+  const [selectedPlantTabId, setSelectedPlantTabIdState] = useState<string | null>(
+    () => readTentPlantTabsSelectedPlantId(id ?? null),
+  );
+  useEffect(() => {
+    setSelectedPlantTabIdState(readTentPlantTabsSelectedPlantId(id ?? null));
+  }, [id]);
+  const setSelectedPlantTabId = (next: string | null) => {
+    setSelectedPlantTabIdState(next);
+    writeTentPlantTabsSelectedPlantId(id ?? null, next);
+  };
 
   const [quickLogOpen, setQuickLogOpen] = useState(false);
   const { data: tent, isLoading, isError, refetch } = useGrowTent(id);
@@ -105,6 +118,22 @@ export default function TentDetail() {
   const hasArchived = shouldShowArchivedToggle(allPlants);
   const visiblePlants = filterVisiblePlants(allPlants, { showArchived });
   const rosterActivity = useTentPlantRosterActivity(allPlants);
+
+  // Reconcile persisted selected tab against currently visible plants.
+  // If the restored plant id no longer exists, or is archived while archived
+  // plants are hidden, fall back to "All plants" and clear storage.
+  useEffect(() => {
+    if (selectedPlantTabId == null) return;
+    if (!Array.isArray(allPlants) || allPlants.length === 0) return;
+    const match = allPlants.find((p) => p.id === selectedPlantTabId);
+    const isVisible = match
+      ? rosterIncludeArchived || match.isArchived !== true
+      : false;
+    if (!isVisible) {
+      setSelectedPlantTabIdState(null);
+      writeTentPlantTabsSelectedPlantId(id ?? null, null);
+    }
+  }, [selectedPlantTabId, allPlants, rosterIncludeArchived, id]);
 
 
 
@@ -461,6 +490,7 @@ export default function TentDetail() {
               })}
             />
             <TentPlantActivityPanels
+              isLoading={rosterActivity.isLoading}
               viewModel={buildTentPlantActivityPanelsViewModel({
                 plants: allPlants.map((p) => ({
                   id: p.id,

@@ -9,6 +9,7 @@
 import { useMemo } from "react";
 
 import HarvestEvidenceReportPanel from "@/components/HarvestEvidenceReportPanel";
+import HarvestEvidenceReportExportButton from "@/components/HarvestEvidenceReportExportButton";
 import { useHarvestEvidenceReportData } from "@/hooks/useHarvestEvidenceReportData";
 import { buildHarvestEvidenceReport } from "@/lib/harvestEvidenceReportViewModel";
 

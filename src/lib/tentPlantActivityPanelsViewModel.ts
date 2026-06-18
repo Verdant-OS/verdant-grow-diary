@@ -62,6 +62,8 @@ export type TentPlantActivityPanelsHarvestWatchTone =
 export interface TentPlantActivityPanelHarvestWatch {
   state: string | null;
   copy: string;
+  helpText: string;
+  cautionText: string;
   tone: TentPlantActivityPanelsHarvestWatchTone;
   isFallback: boolean;
 }

@@ -52,6 +52,16 @@ export default function GlobalFastAddButton({
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [hyperLogOpen, setHyperLogOpen] = useState(false);
+  const [hyperLogAction, setHyperLogAction] = useState<HyperLogAction | null>(null);
+
+  const openHyperLog = useCallback((action: HyperLogAction | null) => {
+    setHyperLogAction(action);
+    setHyperLogOpen(true);
+    setOpen(false);
+    setNotice(null);
+  }, []);
+
 
   const context = useMemo<FastAddSelectionContext | null>(() => {
     if (contextProp !== undefined) return contextProp;

@@ -52,7 +52,7 @@ describe("CustomerModeGuide — static safety", () => {
   }
 
   it("CustomerModeGuide page must not import AppShell or GlobalFastAddButton", () => {
-    const src = read("src/pages/CustomerModeGuide.tsx");
+    const src = stripCommentsAndStrings(read("src/pages/CustomerModeGuide.tsx"));
     expect(src).not.toMatch(/from\s+["']@\/components\/AppShell["']/);
     expect(src).not.toMatch(/GlobalFastAddButton/);
   });

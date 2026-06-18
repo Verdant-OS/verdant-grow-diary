@@ -227,4 +227,40 @@ describe("tentPlantRosterViewModel", () => {
     });
     expect(vm.rows.map((r) => r.name)).toEqual(["alpha", "Bravo", "Charlie"]);
   });
+
+  it("counts active/archived plants restricted to this tent, stable across toggle", () => {
+    const plants = [
+      { id: "p1", name: "Alpha", tentId: TENT },
+      { id: "p2", name: "Beta", tentId: TENT, isArchived: true },
+      { id: "p3", name: "Gamma", tentId: "other" },
+      { id: "p4", name: "Delta", tentId: "other", isArchived: true },
+    ];
+    const vmHidden = buildTentPlantRosterViewModel({ tentId: TENT, plants });
+    expect(vmHidden.activePlantCount).toBe(1);
+    expect(vmHidden.archivedPlantCount).toBe(1);
+    expect(vmHidden.headerCountsCopy).toBe(
+      "Active plants: 1 · Archived plants: 1",
+    );
+
+    const vmShown = buildTentPlantRosterViewModel({
+      tentId: TENT,
+      includeArchived: true,
+      plants,
+    });
+    expect(vmShown.activePlantCount).toBe(1);
+    expect(vmShown.archivedPlantCount).toBe(1);
+    expect(vmShown.headerCountsCopy).toBe(
+      "Active plants: 1 · Archived plants: 1",
+    );
+  });
+
+  it("exposes accessible toggle/help and archived badge help copy", () => {
+    const vm = buildTentPlantRosterViewModel({ tentId: TENT, plants: [] });
+    expect(vm.archivedToggleAccessibleLabel).toBe(
+      "Show archived plants in this tent roster",
+    );
+    expect(vm.archivedToggleHelpCopy).toMatch(/hidden by default/);
+    expect(vm.archivedBadgeHelpCopy).toMatch(/completed or inactive/);
+  });
 });
+

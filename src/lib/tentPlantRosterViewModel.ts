@@ -72,6 +72,7 @@ export interface TentPlantRosterRow {
   name: string;
   strain: string | null;
   stage: TentPlantRosterStage;
+  isArchived: boolean;
   latestLogAt: string | null;
   hasRecentPhoto: boolean;
   harvestWatchPublicState: string | null;
@@ -95,6 +96,16 @@ export interface TentPlantRosterViewModel {
   tentSensorContextNote: string;
   emptyCopy: string | null;
   unknownRelationshipCopy: string | null;
+  /** Effective archived inclusion state. */
+  includeArchived: boolean;
+  /** Number of archived plants matching the tent that are currently hidden. */
+  archivedHiddenCount: number;
+  /** Hint shown when active roster is empty but archived plants exist. */
+  emptyArchivedHintCopy: string | null;
+  /** Label for the archived toggle control. */
+  archivedToggleLabel: string;
+  /** Label for the archived row badge. */
+  archivedRowLabel: string;
 }
 
 export const TENT_PLANT_ROSTER_SHARED_ENVIRONMENT_COPY =
@@ -111,6 +122,14 @@ export const TENT_PLANT_ROSTER_UNKNOWN_RELATIONSHIP_COPY =
 
 export const TENT_PLANT_ROSTER_HARVEST_WATCH_FALLBACK_COPY =
   "Harvest Watch available on Plant Detail";
+
+export const TENT_PLANT_ROSTER_ARCHIVED_TOGGLE_LABEL =
+  "Show archived plants";
+
+export const TENT_PLANT_ROSTER_ARCHIVED_ROW_LABEL = "Archived";
+
+export const TENT_PLANT_ROSTER_EMPTY_ARCHIVED_HINT_COPY =
+  "Archived plants can be shown using the toggle above.";
 
 function normalizeString(value: unknown): string | null {
   if (typeof value !== "string") return null;

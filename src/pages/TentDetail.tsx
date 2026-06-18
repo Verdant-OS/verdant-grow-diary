@@ -529,7 +529,11 @@ export default function TentDetail() {
                 tentName: tent.name ?? null,
                 growId: tent.growId ?? null,
               })}
+              viewer={{ currentUserId: user?.id ?? null }}
+              tentId={id ?? null}
+              growId={tent.growId ?? null}
             />
+
           </div>
         );
       })()}

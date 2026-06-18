@@ -59,20 +59,48 @@ export default function TentPlantRosterPanel({
   function handleEntryActivate(
     entry: TentPlantRosterQuickActionEntry,
     e: React.MouseEvent<HTMLAnchorElement | HTMLButtonElement>,
+    plantName: string | null,
   ) {
     if (entry.disabled) {
       e.preventDefault();
       return;
     }
+    // Tracking first (swallowed) — must never block navigation/handoff.
+    const trackingAction =
+      entry.kind === "view_diary"
+        ? "view_diary"
+        : entry.kind === "add_quicklog"
+          ? "add_quick_log"
+          : "view_photos";
+    trackTentRosterAction({
+      action: trackingAction,
+      plantName,
+      hasTentContext: !!quickActionContext?.tentId,
+      anchorBlocked: entry.anchorBlocked === true,
+    });
     if (entry.event === "open-quicklog") {
       e.preventDefault();
       dispatchTentPlantRosterQuickLog(entry.eventPayload ?? null);
+      // Close any open row menu after handoff.
+      closeAllOpenRowMenus();
       return;
     }
     if (entry.href) {
       e.preventDefault();
       navigate(entry.href);
+      closeAllOpenRowMenus();
     }
+  }
+
+  function closeAllOpenRowMenus() {
+    if (typeof document === "undefined") return;
+    document
+      .querySelectorAll<HTMLDetailsElement>(
+        '[data-testid^="tent-plant-roster-row-"][data-testid$="-actions"]',
+      )
+      .forEach((el) => {
+        el.open = false;
+      });
   }
   return (
     <section

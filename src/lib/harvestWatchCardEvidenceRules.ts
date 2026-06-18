@@ -249,7 +249,7 @@ function sortNewestFirst(a: HarvestRecentItem, b: HarvestRecentItem): number {
 }
 
 const HARVEST_RELEVANT_RE =
-  /\b(trich|pistil|hair|bud|flower|swell|calyx|dense|harvest|amber|cloudy|clear|recession)\b/i;
+  /\b(trich\w*|pistil\w*|hair\w*|bud\w*|flower\w*|swell\w*|calyx\w*|dense\w*|harvest\w*|amber\w*|cloudy\w*|clear|recession)\b/i;
 
 /**
  * Groups recent activity rows into photos / notes / snapshots buckets for the

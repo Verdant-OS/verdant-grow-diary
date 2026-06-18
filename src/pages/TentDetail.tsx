@@ -397,6 +397,11 @@ export default function TentDetail() {
 
       <TentPlantRosterPanel
         onToggleIncludeArchived={handleToggleRosterIncludeArchived}
+        quickActionContext={{
+          tentId: id ?? null,
+          tentName: tent.name ?? null,
+          growId: tent.growId ?? null,
+        }}
         viewModel={buildTentPlantRosterViewModel({
           tentId: id ?? null,
           includeArchived: rosterIncludeArchived,

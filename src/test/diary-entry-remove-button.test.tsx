@@ -4,14 +4,19 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
-const deleteEq = vi.fn(() => Promise.resolve({ error: null }));
-const deleteFn = vi.fn(() => ({ eq: deleteEq }));
+const { deleteEq, deleteFn, toastSuccess, toastError } = vi.hoisted(() => {
+  const deleteEq = vi.fn(() => Promise.resolve({ error: null }));
+  const deleteFn = vi.fn(() => ({ eq: deleteEq }));
+  return {
+    deleteEq,
+    deleteFn,
+    toastSuccess: vi.fn(),
+    toastError: vi.fn(),
+  };
+});
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { from: vi.fn(() => ({ delete: deleteFn })) },
 }));
-
-const toastSuccess = vi.fn();
-const toastError = vi.fn();
 vi.mock("sonner", () => ({
   toast: { success: toastSuccess, error: toastError },
 }));

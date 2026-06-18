@@ -143,6 +143,15 @@ export const TENT_PLANT_ACTIVITY_EMPTY_NO_PLANTS_COPY =
   "No plants assigned to this tent yet.";
 export const TENT_PLANT_ACTIVITY_EMPTY_SELECTED_PLANT_COPY =
   "No plant-specific activity found for this plant yet.";
+export const TENT_PLANT_ACTIVITY_EVIDENCE_NOTES_LABEL = "Evidence notes";
+export const TENT_PLANT_ACTIVITY_EVIDENCE_NOTES_HELPER_COPY =
+  "Draft manual inspection notes here. Nothing is saved until you add it to Quick Log.";
+export const TENT_PLANT_ACTIVITY_EVIDENCE_NOTES_PLACEHOLDER =
+  "Example: Checked trichomes under loupe, noted mostly cloudy with some clear…";
+export const TENT_PLANT_ACTIVITY_EVIDENCE_NOTES_CAUTION_COPY =
+  "Harvest Watch is evidence-only. The grower decides.";
+export const TENT_PLANT_ACTIVITY_EVIDENCE_NOTES_CTA_COPY =
+  "Add note to Quick Log";
 
 const HARVEST_WATCH_LABELS: Record<
   string,

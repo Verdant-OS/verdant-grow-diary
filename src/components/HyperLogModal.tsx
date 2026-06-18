@@ -393,6 +393,50 @@ export function HyperLogModal({
                   minRows={3}
                 />
               ) : null}
+
+              {selected === "environment" ? (
+                <div className="space-y-2.5" data-testid="hyperlog-env-fields">
+                  <FieldRow>
+                    <DemoInput
+                      placeholder="Temp (°C)"
+                      value={form.envTemp}
+                      onChange={(v) => updateField("envTemp", v)}
+                      aria-label="Environment temperature"
+                    />
+                    <DemoInput
+                      placeholder="RH (%)"
+                      value={form.envHumidity}
+                      onChange={(v) => updateField("envHumidity", v)}
+                      aria-label="Environment humidity"
+                    />
+                  </FieldRow>
+                  <FieldRow>
+                    <DemoInput
+                      placeholder="VPD (kPa)"
+                      value={form.envVpd}
+                      onChange={(v) => updateField("envVpd", v)}
+                      aria-label="Environment VPD"
+                    />
+                    <DemoInput
+                      placeholder="CO₂ (ppm, optional)"
+                      value={form.envCo2}
+                      onChange={(v) => updateField("envCo2", v)}
+                      aria-label="Environment CO2"
+                    />
+                  </FieldRow>
+                  <DemoTextarea
+                    placeholder="Optional note"
+                    value={form.envNote}
+                    onChange={(v) => updateField("envNote", v)}
+                  />
+                  <p
+                    data-testid="hyperlog-env-not-live-copy"
+                    className="text-[10px] italic text-amber-300/80"
+                  >
+                    Environment Check is a Quick Log note, not a live sensor reading.
+                  </p>
+                </div>
+              ) : null}
             </div>
 
             {/* Sensor Snapshot */}

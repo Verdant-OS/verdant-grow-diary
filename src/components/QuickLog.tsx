@@ -99,16 +99,23 @@ export interface QuickLogPrefill {
    */
   note?: string | null;
   /**
-   * Optional handoff source label (e.g. "hyperlog"). Drives the draft
-   * preview header copy — never used as a write path discriminator.
+   * Optional handoff source label (e.g. "hyperlog", "harvest-watch-inspection").
+   * Drives the draft preview header copy — never used as a write path
+   * discriminator.
    */
-  source?: "hyperlog" | string | null;
+  source?: "hyperlog" | "harvest-watch-inspection" | string | null;
   /**
    * Optional count of locally previewed photos waiting in the upstream
    * caller (HyperLog modal). Drives the "Photo preview only" copy.
    * The legacy Quick Log editor never receives the files themselves.
    */
   photoCount?: number | null;
+  /**
+   * Optional Harvest Watch inspection preset key (e.g. "trichome_inspection",
+   * "close_flower_photo"). Drives the Harvest Watch preview panel only.
+   * Never used as a write path discriminator.
+   */
+  preset?: string | null;
 }
 
 interface Props {

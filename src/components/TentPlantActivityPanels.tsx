@@ -190,6 +190,12 @@ export default function TentPlantActivityPanels({
                 >
                   {panel.harvestWatch.copy}
                 </p>
+                <p
+                  className="text-[11px] text-muted-foreground"
+                  data-testid={`${panel.testId}-harvest-watch-help`}
+                >
+                  {panel.harvestWatch.helpText} {panel.harvestWatch.cautionText}
+                </p>
               </div>
 
               <div className="mt-3 flex flex-wrap items-center gap-2">

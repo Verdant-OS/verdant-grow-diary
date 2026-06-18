@@ -1,15 +1,59 @@
-import { useState } from "react";
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+/**
+ * HyperLogModal — presenter-only Quick Log / Plant Memory modal.
+ *
+ * Hard constraints (presenter-only, demo-safe):
+ *  - No Supabase writes, no AI calls, no alerts, no Action Queue, no device control.
+ *  - No file upload or storage. Photo "previews" are local object URLs only,
+ *    revoked on remove + unmount.
+ *  - Sensor snapshot values are hardcoded demo data. Snapshot badge is
+ *    "DEMO SNAPSHOT" and a "Demo/sample data — not live telemetry." note is
+ *    shown. Nothing in this modal may be labeled LIVE.
+ *  - All form inputs and selected action live in local React state only.
+ *  - Commit is a callback-only handoff; this component performs no I/O.
+ */
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Droplets, Leaf, Scissors, NotebookPen, Camera, Thermometer, Droplet, Gauge, X } from "lucide-react";
+import {
+  Droplets,
+  Leaf,
+  Scissors,
+  NotebookPen,
+  Camera,
+  Thermometer,
+  Droplet,
+  Gauge,
+  X,
+  ImageIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type HyperLogAction = "water" | "feed" | "defoliate" | "note";
 
+export interface HyperLogDemoFormState {
+  waterAmount: string;
+  waterUnit: string;
+  waterNote: string;
+  feedAmount: string;
+  feedNutrient: string;
+  feedNote: string;
+  defoliateIntensity: string;
+  defoliateNote: string;
+  freeformNote: string;
+}
+
 interface HyperLogModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCommit?: (action: HyperLogAction) => void;
+  /** Presenter callback. Receives the selected action + demo form snapshot. */
+  onCommit?: (action: HyperLogAction, demo: HyperLogDemoFormState) => void;
+  /** Optional preselected action (e.g. when launched from Fast Add). */
+  initialAction?: HyperLogAction | null;
 }
 
 const ACTION_TILES: Array<{
@@ -30,37 +74,141 @@ const DEMO_SNAPSHOT = {
   vpd: "1.12 kPa",
 };
 
+const WATER_UNITS = ["ml", "L", "cups"] as const;
+
 const VERDANT_GREEN = "#00C853";
 
-export function HyperLogModal({ open, onOpenChange, onCommit }: HyperLogModalProps) {
-  const [selected, setSelected] = useState<HyperLogAction | null>(null);
+const EMPTY_FORM: HyperLogDemoFormState = {
+  waterAmount: "",
+  waterUnit: "ml",
+  waterNote: "",
+  feedAmount: "",
+  feedNutrient: "",
+  feedNote: "",
+  defoliateIntensity: "",
+  defoliateNote: "",
+  freeformNote: "",
+};
+
+export function HyperLogModal({
+  open,
+  onOpenChange,
+  onCommit,
+  initialAction = null,
+}: HyperLogModalProps) {
+  const [selected, setSelected] = useState<HyperLogAction | null>(initialAction);
+  const [form, setForm] = useState<HyperLogDemoFormState>(EMPTY_FORM);
+  const [photos, setPhotos] = useState<Array<{ id: string; url: string; name: string }>>([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Sync initialAction when modal re-opens with a preselect.
+  useEffect(() => {
+    if (open) setSelected(initialAction ?? null);
+  }, [open, initialAction]);
+
+  // Revoke any local object URLs on unmount.
+  useEffect(() => {
+    return () => {
+      photos.forEach((p) => {
+        try {
+          URL.revokeObjectURL(p.url);
+        } catch {
+          /* noop — presenter-only */
+        }
+      });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const updateField = useCallback(
+    <K extends keyof HyperLogDemoFormState>(key: K, value: HyperLogDemoFormState[K]) => {
+      setForm((prev) => ({ ...prev, [key]: value }));
+    },
+    [],
+  );
+
+  const handleFiles = useCallback((files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const next: Array<{ id: string; url: string; name: string }> = [];
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith("image/")) continue;
+      const url = URL.createObjectURL(file);
+      next.push({
+        id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
+        url,
+        name: file.name,
+      });
+    }
+    if (next.length === 0) return;
+    setPhotos((prev) => [...prev, ...next]);
+  }, []);
+
+  const removePhoto = useCallback((id: string) => {
+    setPhotos((prev) => {
+      const target = prev.find((p) => p.id === id);
+      if (target) {
+        try {
+          URL.revokeObjectURL(target.url);
+        } catch {
+          /* noop */
+        }
+      }
+      return prev.filter((p) => p.id !== id);
+    });
+  }, []);
+
+  const resetAll = useCallback(() => {
+    setPhotos((prev) => {
+      prev.forEach((p) => {
+        try {
+          URL.revokeObjectURL(p.url);
+        } catch {
+          /* noop */
+        }
+      });
+      return [];
+    });
+    setForm(EMPTY_FORM);
+    setSelected(null);
+  }, []);
 
   const handleCommit = () => {
     if (!selected) return;
-    onCommit?.(selected);
+    onCommit?.(selected, form);
     onOpenChange(false);
-    setSelected(null);
+    resetAll();
   };
 
+  const handleClose = (next: boolean) => {
+    if (!next) resetAll();
+    onOpenChange(next);
+  };
+
+  const timelinePreview = useMemo(
+    () => buildTimelinePreview(selected, form, photos.length),
+    [selected, form, photos.length],
+  );
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent
         className={cn(
-          // Mobile: bottom sheet. Desktop: centered modal.
           "p-0 gap-0 border-0 bg-transparent shadow-none",
           "max-w-none w-full sm:max-w-lg",
           "fixed left-0 right-0 bottom-0 top-auto translate-x-0 translate-y-0 rounded-t-2xl",
           "sm:left-1/2 sm:top-1/2 sm:bottom-auto sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl",
+          "max-h-[92vh] overflow-hidden flex flex-col",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
-          "sm:data-[state=closed]:slide-out-to-bottom-0 sm:data-[state=open]:slide-in-from-bottom-0",
           "sm:data-[state=open]:zoom-in-95 sm:data-[state=closed]:zoom-out-95",
         )}
       >
         <div
-          className="bg-[#0a0a0a] border border-white/[0.06] rounded-t-2xl sm:rounded-2xl overflow-hidden"
+          data-testid="hyperlog-modal"
+          className="bg-[#0a0a0a] border border-white/[0.06] rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col max-h-[92vh] font-mono"
           style={{
-            boxShadow: "0 24px 60px -20px rgba(0,0,0,0.8), 0 0 0 1px rgba(0,200,83,0.06)",
+            boxShadow:
+              "0 24px 60px -20px rgba(0,0,0,0.8), 0 0 0 1px rgba(0,200,83,0.06)",
           }}
         >
           {/* Header */}
@@ -71,11 +219,11 @@ export function HyperLogModal({ open, onOpenChange, onCommit }: HyperLogModalPro
                 style={{ background: VERDANT_GREEN, boxShadow: `0 0 8px ${VERDANT_GREEN}` }}
               />
               <DialogTitle className="text-sm font-semibold tracking-wide text-white uppercase">
-                Quick Log
+                HyperLog — Plant Memory
               </DialogTitle>
             </div>
             <button
-              onClick={() => onOpenChange(false)}
+              onClick={() => handleClose(false)}
               className="text-white/40 hover:text-white/80 transition-colors"
               aria-label="Close"
             >
@@ -84,10 +232,10 @@ export function HyperLogModal({ open, onOpenChange, onCommit }: HyperLogModalPro
           </div>
 
           <DialogDescription className="sr-only">
-            Quick Log a grow action with optional sensor snapshot and photo evidence.
+            Demo-only Quick Log presenter. No live data is written.
           </DialogDescription>
 
-          <div className="px-5 py-5 space-y-5">
+          <div className="px-5 py-5 space-y-5 overflow-y-auto">
             {/* Action Tiles */}
             <div>
               <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 mb-2.5">
@@ -101,6 +249,7 @@ export function HyperLogModal({ open, onOpenChange, onCommit }: HyperLogModalPro
                     <button
                       key={tile.id}
                       type="button"
+                      data-testid={`hyperlog-action-${tile.id}`}
                       onClick={() => setSelected(tile.id)}
                       className={cn(
                         "flex flex-col items-center justify-center gap-1.5 rounded-xl px-2 py-3.5",
@@ -128,6 +277,91 @@ export function HyperLogModal({ open, onOpenChange, onCommit }: HyperLogModalPro
               </div>
             </div>
 
+            {/* Action-specific form fields */}
+            <div data-testid="hyperlog-action-fields">
+              {selected === null ? (
+                <p
+                  className="text-[11px] text-white/40 italic px-3 py-3 rounded-lg border border-dashed border-white/[0.08] bg-[#0d0d0d]"
+                  data-testid="hyperlog-no-action-helper"
+                >
+                  Select an action to preview the plant memory entry.
+                </p>
+              ) : null}
+
+              {selected === "water" ? (
+                <div className="space-y-2.5">
+                  <FieldRow>
+                    <DemoInput
+                      placeholder="Amount (e.g. 500)"
+                      value={form.waterAmount}
+                      onChange={(v) => updateField("waterAmount", v)}
+                      aria-label="Water amount"
+                    />
+                    <DemoSelect
+                      value={form.waterUnit}
+                      onChange={(v) => updateField("waterUnit", v)}
+                      options={WATER_UNITS as readonly string[]}
+                      aria-label="Water unit"
+                    />
+                  </FieldRow>
+                  <DemoTextarea
+                    placeholder="Optional note (runoff, pH, etc.)"
+                    value={form.waterNote}
+                    onChange={(v) => updateField("waterNote", v)}
+                  />
+                </div>
+              ) : null}
+
+              {selected === "feed" ? (
+                <div className="space-y-2.5">
+                  <FieldRow>
+                    <DemoInput
+                      placeholder="Amount (e.g. 500 ml)"
+                      value={form.feedAmount}
+                      onChange={(v) => updateField("feedAmount", v)}
+                      aria-label="Feed amount"
+                    />
+                    <DemoInput
+                      placeholder="Nutrient / EC (e.g. 1.4)"
+                      value={form.feedNutrient}
+                      onChange={(v) => updateField("feedNutrient", v)}
+                      aria-label="Nutrient or EC"
+                    />
+                  </FieldRow>
+                  <DemoTextarea
+                    placeholder="Optional note (recipe, runoff, pH)"
+                    value={form.feedNote}
+                    onChange={(v) => updateField("feedNote", v)}
+                  />
+                </div>
+              ) : null}
+
+              {selected === "defoliate" ? (
+                <div className="space-y-2.5">
+                  <DemoInput
+                    placeholder="Intensity / area (e.g. light — lower canopy)"
+                    value={form.defoliateIntensity}
+                    onChange={(v) => updateField("defoliateIntensity", v)}
+                    aria-label="Defoliation intensity"
+                  />
+                  <DemoTextarea
+                    placeholder="Optional note (target leaves, reason)"
+                    value={form.defoliateNote}
+                    onChange={(v) => updateField("defoliateNote", v)}
+                  />
+                </div>
+              ) : null}
+
+              {selected === "note" ? (
+                <DemoTextarea
+                  placeholder="Write a freeform observation…"
+                  value={form.freeformNote}
+                  onChange={(v) => updateField("freeformNote", v)}
+                  minRows={3}
+                />
+              ) : null}
+            </div>
+
             {/* Sensor Snapshot */}
             <div className="rounded-xl bg-[#0f0f0f] border border-white/[0.06] p-4">
               <div className="flex items-center justify-between mb-3">
@@ -135,6 +369,7 @@ export function HyperLogModal({ open, onOpenChange, onCommit }: HyperLogModalPro
                   Sensor Snapshot
                 </p>
                 <span
+                  data-testid="hyperlog-demo-snapshot-badge"
                   className="text-[9px] font-semibold uppercase tracking-[0.15em] px-1.5 py-0.5 rounded-sm"
                   style={{
                     color: "#FFB020",
@@ -142,7 +377,7 @@ export function HyperLogModal({ open, onOpenChange, onCommit }: HyperLogModalPro
                     border: "1px solid rgba(255,176,32,0.30)",
                   }}
                 >
-                  Demo Snapshot
+                  DEMO SNAPSHOT
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-3">
@@ -157,33 +392,129 @@ export function HyperLogModal({ open, onOpenChange, onCommit }: HyperLogModalPro
 
             {/* Photo evidence */}
             <div>
-              <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 mb-2.5">
-                Photo Evidence
-              </p>
+              <div className="flex items-center justify-between mb-2.5">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-white/40">
+                  Photo Evidence
+                </p>
+                <span className="text-[9px] uppercase tracking-[0.15em] text-white/30">
+                  Local preview only
+                </span>
+              </div>
+
+              {photos.length > 0 ? (
+                <div
+                  data-testid="hyperlog-photo-thumbnails"
+                  className="grid grid-cols-4 gap-2 mb-2"
+                >
+                  {photos.map((p) => (
+                    <div
+                      key={p.id}
+                      className="relative aspect-square rounded-lg overflow-hidden border border-white/[0.08] bg-[#0d0d0d]"
+                    >
+                      <img
+                        src={p.url}
+                        alt={p.name}
+                        className="h-full w-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        data-testid={`hyperlog-photo-remove-${p.id}`}
+                        aria-label={`Remove ${p.name}`}
+                        onClick={() => removePhoto(p.id)}
+                        className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-black"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
               <button
                 type="button"
+                onClick={() => fileInputRef.current?.click()}
                 className={cn(
                   "w-full rounded-xl border border-dashed border-white/[0.10] bg-[#0d0d0d]",
-                  "px-4 py-6 flex flex-col items-center justify-center gap-1.5",
+                  "px-4 py-5 flex flex-col items-center justify-center gap-1.5",
                   "text-white/50 hover:text-white/80 hover:border-white/20 transition-colors",
                 )}
               >
                 <Camera className="h-5 w-5" />
-                <span className="text-xs font-medium">Attach Photo</span>
-                <span className="text-[10px] text-white/30">Optional — drag, paste, or browse</span>
+                <span className="text-xs font-medium">
+                  {photos.length > 0 ? "Add another photo" : "Attach Photo"}
+                </span>
+                <span className="text-[10px] text-white/30">
+                  Optional — previews stay in your browser
+                </span>
               </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  handleFiles(e.target.files);
+                  if (fileInputRef.current) fileInputRef.current.value = "";
+                }}
+                data-testid="hyperlog-photo-input"
+              />
+            </div>
+
+            {/* Diary timeline preview */}
+            <div
+              data-testid="hyperlog-timeline-preview"
+              className="rounded-xl bg-[#0f0f0f] border border-white/[0.06] p-4"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-white/40">
+                  Plant Memory Preview
+                </p>
+                <span
+                  className="text-[9px] font-semibold uppercase tracking-[0.15em] px-1.5 py-0.5 rounded-sm"
+                  style={{
+                    color: "#FFB020",
+                    background: "rgba(255,176,32,0.10)",
+                    border: "1px solid rgba(255,176,32,0.30)",
+                  }}
+                >
+                  DEMO ONLY
+                </span>
+              </div>
+
+              <div className="relative pl-4">
+                <span
+                  className="absolute left-1 top-1.5 h-2 w-2 rounded-full"
+                  style={{ background: selected ? VERDANT_GREEN : "rgba(255,255,255,0.2)" }}
+                />
+                <p className="text-[11px] uppercase tracking-wider text-white/40">
+                  {timelinePreview.headline}
+                </p>
+                <p className="mt-1 text-sm text-white/85 leading-snug">
+                  {timelinePreview.summary}
+                </p>
+                {timelinePreview.meta ? (
+                  <p className="mt-1.5 text-[10px] text-white/40">
+                    {timelinePreview.meta}
+                  </p>
+                ) : null}
+              </div>
+
+              <p className="mt-3 text-[10px] text-white/35 italic">
+                Demo/sample data — not live telemetry. Nothing is written.
+              </p>
             </div>
           </div>
 
           {/* Footer / CTA */}
-          <div className="px-5 pb-5 pt-1">
+          <div className="px-5 pb-5 pt-3 border-t border-white/[0.05] bg-[#0a0a0a]">
             <Button
               type="button"
+              data-testid="hyperlog-commit"
               onClick={handleCommit}
               disabled={!selected}
               className={cn(
                 "w-full h-11 rounded-xl font-semibold tracking-wide text-sm",
-                "text-black",
                 "disabled:opacity-40 disabled:cursor-not-allowed",
                 "transition-all duration-150",
               )}
@@ -196,13 +527,48 @@ export function HyperLogModal({ open, onOpenChange, onCommit }: HyperLogModalPro
               Commit to Plant Memory
             </Button>
             <p className="mt-2 text-center text-[10px] text-white/30">
-              {selected ? "Ready to commit." : "Select an action to continue."}
+              {selected
+                ? "Demo preview — no data will be written."
+                : "Select an action to preview the plant memory entry."}
             </p>
           </div>
         </div>
       </DialogContent>
     </Dialog>
   );
+}
+
+function buildTimelinePreview(
+  action: HyperLogAction | null,
+  form: HyperLogDemoFormState,
+  photoCount: number,
+): { headline: string; summary: string; meta: string | null } {
+  const photoMeta = photoCount > 0 ? `${photoCount} photo${photoCount === 1 ? "" : "s"} attached` : null;
+  if (!action) {
+    return {
+      headline: "No entry yet",
+      summary: "Choose Water, Feed, Defoliate, or Note to see how this entry will appear in the plant memory timeline.",
+      meta: null,
+    };
+  }
+  if (action === "water") {
+    const amt = form.waterAmount.trim() || "—";
+    const summary = `Watered with ${amt} ${form.waterUnit}${form.waterNote.trim() ? ` · ${form.waterNote.trim()}` : ""}`;
+    return { headline: "Watering · demo", summary, meta: photoMeta };
+  }
+  if (action === "feed") {
+    const amt = form.feedAmount.trim() || "—";
+    const nute = form.feedNutrient.trim() ? ` (${form.feedNutrient.trim()})` : "";
+    const summary = `Fed ${amt}${nute}${form.feedNote.trim() ? ` · ${form.feedNote.trim()}` : ""}`;
+    return { headline: "Feeding · demo", summary, meta: photoMeta };
+  }
+  if (action === "defoliate") {
+    const intensity = form.defoliateIntensity.trim() || "intensity not set";
+    const summary = `Defoliated — ${intensity}${form.defoliateNote.trim() ? ` · ${form.defoliateNote.trim()}` : ""}`;
+    return { headline: "Defoliation · demo", summary, meta: photoMeta };
+  }
+  const note = form.freeformNote.trim() || "Empty note";
+  return { headline: "Note · demo", summary: note, meta: photoMeta };
 }
 
 function SnapshotCell({
@@ -224,5 +590,83 @@ function SnapshotCell({
     </div>
   );
 }
+
+function FieldRow({ children }: { children: React.ReactNode }) {
+  return <div className="grid grid-cols-2 gap-2">{children}</div>;
+}
+
+function DemoInput({
+  value,
+  onChange,
+  placeholder,
+  ...rest
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange">) {
+  return (
+    <input
+      {...rest}
+      value={value}
+      placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full rounded-lg bg-[#0d0d0d] border border-white/[0.08] px-3 py-2 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-[#00C853]/60 font-mono"
+    />
+  );
+}
+
+function DemoSelect({
+  value,
+  onChange,
+  options,
+  ...rest
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: readonly string[];
+} & Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "value" | "onChange">) {
+  return (
+    <select
+      {...rest}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full rounded-lg bg-[#0d0d0d] border border-white/[0.08] px-3 py-2 text-xs text-white focus:outline-none focus:border-[#00C853]/60 font-mono"
+    >
+      {options.map((o) => (
+        <option key={o} value={o} className="bg-[#0d0d0d]">
+          {o}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function DemoTextarea({
+  value,
+  onChange,
+  placeholder,
+  minRows = 2,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  minRows?: number;
+}) {
+  return (
+    <textarea
+      value={value}
+      placeholder={placeholder}
+      rows={minRows}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full resize-none rounded-lg bg-[#0d0d0d] border border-white/[0.08] px-3 py-2 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-[#00C853]/60 font-mono"
+    />
+  );
+}
+
+// Unused but exported for downstream presenters that may want to render a
+// non-modal preview card. Keeps the module's public surface explicit.
+export const HYPERLOG_DEMO_SNAPSHOT = DEMO_SNAPSHOT;
+export const HYPERLOG_PHOTO_ICON = ImageIcon;
 
 export default HyperLogModal;

@@ -19,7 +19,16 @@ export interface TentPlantActivityPanelsProps {
   viewModel: TentPlantActivityPanelsViewModel;
   className?: string;
   testId?: string;
+  /**
+   * When true, render a layout-stable skeleton placeholder set instead of
+   * panels. Skeletons never display fake plant or sensor values.
+   */
+  isLoading?: boolean;
+  /** Number of skeleton placeholder cards to render while loading. */
+  loadingSkeletonCount?: number;
 }
+
+export const TENT_PLANT_ACTIVITY_LOADING_COPY = "Loading plant activity…";
 
 function emitQuickLog(panel: TentPlantActivityPanelRow) {
   if (!panel.quickLogPrefill) return;

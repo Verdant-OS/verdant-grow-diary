@@ -2,7 +2,7 @@
  * CustomerModeGuide — public, read-only Customer Mode shell page.
  *
  * Mounted at /customer/:shareId OUTSIDE the AppShell so:
- *   - AppShell chrome (header, GlobalFastAddButton/Quick Log) is NOT rendered.
+ *   - AppShell chrome (header, Quick Log / Fast Add) is NOT rendered.
  *   - No auth-gated providers run.
  *
  * Hard constraints (presenter-only shell):
@@ -17,13 +17,16 @@ import { useMemo } from "react";
 import { useParams } from "react-router-dom";
 import CustomerGuideSectionView from "@/components/customer/CustomerGuideSection";
 import CustomerGuideTimeline from "@/components/customer/CustomerGuideTimeline";
+import CustomerGuideQrBlock from "@/components/customer/CustomerGuideQrBlock";
+import CustomerGuideTrustFooter from "@/components/customer/CustomerGuideTrustFooter";
 import { buildCustomerModeGuideViewModel } from "@/lib/customerModeGuideViewModel";
 
 export default function CustomerModeGuide() {
   const params = useParams<{ shareId?: string }>();
+  const shareId = params.shareId ?? null;
   const vm = useMemo(
-    () => buildCustomerModeGuideViewModel(params.shareId ?? null),
-    [params.shareId],
+    () => buildCustomerModeGuideViewModel({ shareId }),
+    [shareId],
   );
 
   return (
@@ -54,11 +57,16 @@ export default function CustomerModeGuide() {
           <CustomerGuideSectionView key={section.id} section={section} />
         ))}
 
+        <CustomerGuideQrBlock shareId={shareId} />
+
         <CustomerGuideTimeline
           label={vm.timeline.label}
           events={vm.timeline.events}
           emptyCopy={vm.timeline.emptyCopy}
+          publishedOnlyCopy={vm.timeline.publishedOnlyCopy}
         />
+
+        <CustomerGuideTrustFooter />
 
         <footer
           data-testid="customer-mode-guide-footer"

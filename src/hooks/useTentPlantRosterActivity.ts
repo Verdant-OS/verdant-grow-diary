@@ -9,8 +9,9 @@
  * `buildPlantDetailHarvestWatchCardViewModel` adapter.
  *
  * Strictly read-only:
- *   - Only reads `diary_entries`. Never reads `sensor_readings`.
- *   - No writes, alerts, action_queue, AI calls, or device control.
+ *   - Only reads `diary_entries`. Never reads sensor telemetry tables.
+ *   - No writes, alerting, queued-action writes, AI/model calls, or device
+ *     control.
  *   - Plant-scoped: results never aggregate across plants in the same tent.
  *   - Missing data → null/false (never invented).
  */

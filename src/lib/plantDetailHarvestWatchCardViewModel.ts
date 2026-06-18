@@ -30,6 +30,10 @@ import {
   type HarvestWatchV0ReadinessState,
   type NextInspectionPrefill,
 } from "@/lib/harvestWatchCardEvidenceRules";
+import {
+  buildHarvestEvidenceHistory,
+  type HarvestEvidenceHistory,
+} from "@/lib/harvestWatchEvidenceHistoryViewModel";
 
 export interface PlantDetailHarvestWatchPlantLike {
   id: string;
@@ -60,6 +64,7 @@ export interface PlantDetailHarvestWatchCardViewModel {
   evidenceChecklist: HarvestEvidenceChecklistItem[];
   groupedRecent: HarvestRecentGroup[];
   nextInspection: NextInspectionPrefill;
+  evidenceHistory: HarvestEvidenceHistory;
 }
 
 function countActivityPhotos(rows: readonly PlantDetailHarvestWatchActivityLike[]): number {
@@ -154,6 +159,9 @@ export function buildPlantDetailHarvestWatchCardViewModel(params: {
     strongEvidenceCount,
   });
   const nextInspection = pickNextInspection(evidenceChecklist);
+  const evidenceHistory = buildHarvestEvidenceHistory(recentForChecklist, {
+    perGroupLimit: 10,
+  });
 
   return {
     row,
@@ -171,5 +179,6 @@ export function buildPlantDetailHarvestWatchCardViewModel(params: {
     evidenceChecklist,
     groupedRecent,
     nextInspection,
+    evidenceHistory,
   };
 }

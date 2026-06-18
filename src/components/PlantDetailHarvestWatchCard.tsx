@@ -362,6 +362,60 @@ export default function PlantDetailHarvestWatchCard({
           </div>
         </div>
 
+        <div
+          className="rounded-lg border border-border/50 bg-background/40 p-3"
+          data-testid="plant-detail-harvest-watch-evidence-history"
+        >
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Harvest evidence history
+          </div>
+          <p
+            className="mt-0.5 text-[11px] text-muted-foreground"
+            data-testid="plant-detail-harvest-watch-evidence-history-caution"
+          >
+            {vm.evidenceHistory.caution}
+          </p>
+          <div className="mt-2 space-y-3">
+            {vm.evidenceHistory.groups.map((group) => (
+              <div
+                key={group.key}
+                data-testid={`harvest-evidence-history-group-${group.key}`}
+              >
+                <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  {group.label}
+                </div>
+                {group.items.length === 0 ? (
+                  <p
+                    className="mt-1 text-xs text-muted-foreground"
+                    data-testid={`harvest-evidence-history-empty-${group.key}`}
+                  >
+                    {group.emptyCopy}
+                  </p>
+                ) : (
+                  <ul className="mt-1 space-y-1 text-xs">
+                    {group.items.map((item) => (
+                      <li
+                        key={item.id}
+                        className="flex items-start gap-2 text-muted-foreground"
+                        data-testid={`harvest-evidence-history-item-${group.key}-${item.id}`}
+                        data-event-type={item.eventType}
+                      >
+                        <span className="shrink-0 text-[11px] tabular-nums">
+                          {item.occurredAtLabel || "—"}
+                        </span>
+                        <span className="flex-1 text-foreground">
+                          {item.summary || (item.hasPhoto ? "Photo logged" : "Note logged")}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+
         <div className="rounded-lg border border-dashed border-border/60 bg-secondary/20 p-3">
           <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Missing context

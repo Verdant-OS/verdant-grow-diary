@@ -258,31 +258,56 @@ export default function PlantDetailHarvestWatchCard({
           >
             Evidence checklist — not a harvest instruction.
           </p>
-          <ul className="mt-2 grid gap-1.5 text-xs sm:grid-cols-2">
-            {vm.evidenceChecklist.map((item) => (
-              <li
-                key={item.key}
-                className="flex items-center gap-2"
-                data-testid={`harvest-watch-checklist-${item.key}`}
-                data-present={item.present ? "true" : "false"}
-              >
-                {item.present ? (
-                  <Check className="h-3.5 w-3.5 text-emerald-400" aria-hidden="true" />
-                ) : (
-                  <X className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
-                )}
-                <span
-                  className={cn(
-                    item.present ? "text-foreground" : "text-muted-foreground",
-                  )}
+          <ul
+            className="mt-2 grid gap-2 text-xs sm:grid-cols-2"
+            aria-label="Harvest evidence checklist"
+          >
+            {vm.evidenceChecklist.map((item) => {
+              const statusLabel =
+                item.status === "present"
+                  ? "Present"
+                  : item.status === "limited"
+                    ? "Limited"
+                    : "Missing";
+              return (
+                <li
+                  key={item.key}
+                  className="flex items-start gap-2"
+                  data-testid={`harvest-watch-checklist-${item.key}`}
+                  data-present={item.present ? "true" : "false"}
+                  data-status={item.status}
                 >
-                  {item.label}
-                </span>
-                <span className="sr-only">
-                  {item.present ? "present" : "missing"}
-                </span>
-              </li>
-            ))}
+                  {item.status === "present" ? (
+                    <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" aria-hidden="true" />
+                  ) : (
+                    <X className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  )}
+                  <div className="flex-1">
+                    <div
+                      className={cn(
+                        "font-medium",
+                        item.status === "present" ? "text-foreground" : "text-muted-foreground",
+                      )}
+                    >
+                      <span>{item.label}</span>
+                      <span className="sr-only">{`: ${statusLabel}. ${item.reason}`}</span>
+                      <span
+                        aria-hidden="true"
+                        className="ml-1 text-[10px] uppercase tracking-wide text-muted-foreground"
+                      >
+                        · {statusLabel}
+                      </span>
+                    </div>
+                    <p
+                      className="mt-0.5 text-[11px] text-muted-foreground"
+                      data-testid={`harvest-watch-checklist-${item.key}-reason`}
+                    >
+                      {item.reason}
+                    </p>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </div>
 

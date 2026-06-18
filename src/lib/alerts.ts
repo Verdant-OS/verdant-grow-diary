@@ -8,6 +8,12 @@
  *   - Save/acknowledge/resolve/dismiss are user-initiated only.
  */
 import { supabase } from "@/integrations/supabase/client";
+import {
+  buildAcknowledgeAlertPatch,
+  buildResolveAlertPatch,
+  buildDismissAlertPatch,
+  buildReopenAlertPatch,
+} from "@/lib/alertStatusTransitionRules";
 
 export type AlertSeverityRow = "info" | "watch" | "warning" | "critical";
 export type AlertStatusRow = "open" | "acknowledged" | "resolved" | "dismissed";
@@ -65,13 +71,16 @@ export async function saveAlert(input: SaveAlertInput): Promise<AlertRow> {
   return data as unknown as AlertRow;
 }
 
-/** Mark an alert as acknowledged. Only flips status/acknowledged_at. */
+/**
+ * Mark an alert as acknowledged.
+ *
+ * Sets status = 'acknowledged' and stamps acknowledged_at. Also clears
+ * resolved_at so the row never violates `alerts_resolved_at_status_check`
+ * if a previously resolved/dismissed alert was reopened-then-acknowledged.
+ */
 export async function acknowledgeAlert(id: string): Promise<AlertRow> {
   const { data, error } = await alertsTable()
-    .update({
-      status: "acknowledged",
-      acknowledged_at: new Date().toISOString(),
-    })
+    .update(buildAcknowledgeAlertPatch())
     .eq("id", id)
     .select("*")
     .single();
@@ -79,13 +88,16 @@ export async function acknowledgeAlert(id: string): Promise<AlertRow> {
   return data as unknown as AlertRow;
 }
 
-/** Mark an alert as resolved. Only flips status/resolved_at. */
+/**
+ * Mark an alert as resolved.
+ *
+ * Clears acknowledged_at so the row satisfies
+ * `alerts_acknowledged_at_status_check` (acknowledged_at must be NULL
+ * unless status = 'acknowledged'). Stamps resolved_at.
+ */
 export async function resolveAlert(id: string): Promise<AlertRow> {
   const { data, error } = await alertsTable()
-    .update({
-      status: "resolved",
-      resolved_at: new Date().toISOString(),
-    })
+    .update(buildResolveAlertPatch())
     .eq("id", id)
     .select("*")
     .single();
@@ -93,10 +105,15 @@ export async function resolveAlert(id: string): Promise<AlertRow> {
   return data as unknown as AlertRow;
 }
 
-/** Dismiss an alert. Only flips status. */
+/**
+ * Dismiss an alert.
+ *
+ * Clears both acknowledged_at and resolved_at — the dismissed state matches
+ * neither of the timestamp CHECK constraints.
+ */
 export async function dismissAlert(id: string): Promise<AlertRow> {
   const { data, error } = await alertsTable()
-    .update({ status: "dismissed" })
+    .update(buildDismissAlertPatch())
     .eq("id", id)
     .select("*")
     .single();
@@ -111,11 +128,7 @@ export async function dismissAlert(id: string): Promise<AlertRow> {
  */
 export async function reopenAlert(id: string): Promise<AlertRow> {
   const { data, error } = await alertsTable()
-    .update({
-      status: "open",
-      acknowledged_at: null,
-      resolved_at: null,
-    })
+    .update(buildReopenAlertPatch())
     .eq("id", id)
     .select("*")
     .single();

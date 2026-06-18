@@ -20,6 +20,7 @@ import {
 } from "@/hooks/useEcowittLatestSnapshot";
 import { ECOWITT_DERIVED_VPD_LABEL } from "@/lib/ecowittReadingViewModel";
 import SensorSourceProvenanceBadge from "@/components/SensorSourceProvenanceBadge";
+import { buildEcowittAuditHref } from "@/lib/ecowittAuditTentSelectionRules";
 import { Link } from "react-router-dom";
 
 export interface EcowittLatestSnapshotCardProps
@@ -243,7 +244,7 @@ export function EcowittLatestSnapshotCard(
 
       <div className="mt-2 text-xs">
         <Link
-          to="/sensors/ecowitt-audit"
+          to={buildEcowittAuditHref(input.tentId ?? null)}
           data-testid="ecowitt-audit-link"
           className="text-primary hover:underline"
         >

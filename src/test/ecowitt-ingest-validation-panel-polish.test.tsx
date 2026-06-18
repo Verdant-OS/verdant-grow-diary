@@ -52,7 +52,7 @@ describe("EcowittIngestValidationPanel — operator polish", () => {
     expect(hints).toContain("bun run dev:send-ecowitt:invalid");
   });
 
-  it("copies the accepted command to clipboard", async () => {
+  it("copies the accepted command to clipboard (tent-scoped)", async () => {
     render(
       <EcowittIngestValidationPanel
         input={{ rows: [], tentId: TENT, now: NOW }}
@@ -60,7 +60,9 @@ describe("EcowittIngestValidationPanel — operator polish", () => {
     );
     fireEvent.click(screen.getByTestId("copy-accepted-command-button"));
     await waitFor(() => {
-      expect(writeText).toHaveBeenCalledWith("bun run dev:send-ecowitt");
+      expect(writeText).toHaveBeenCalledWith(
+        `VERDANT_TENT_ID=${TENT} bun run dev:send-ecowitt`,
+      );
     });
     await waitFor(() => {
       expect(
@@ -69,7 +71,7 @@ describe("EcowittIngestValidationPanel — operator polish", () => {
     });
   });
 
-  it("copies the invalid command to clipboard", async () => {
+  it("copies the invalid command to clipboard (tent-scoped)", async () => {
     render(
       <EcowittIngestValidationPanel
         input={{ rows: [], tentId: TENT, now: NOW }}
@@ -78,7 +80,7 @@ describe("EcowittIngestValidationPanel — operator polish", () => {
     fireEvent.click(screen.getByTestId("copy-invalid-command-button"));
     await waitFor(() => {
       expect(writeText).toHaveBeenCalledWith(
-        "bun run dev:send-ecowitt:invalid",
+        `VERDANT_TENT_ID=${TENT} bun run dev:send-ecowitt:invalid`,
       );
     });
   });

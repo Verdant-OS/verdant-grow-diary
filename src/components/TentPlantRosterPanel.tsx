@@ -153,10 +153,13 @@ export default function TentPlantRosterPanel({
                       <span
                         className="text-[11px] rounded-md border px-1.5 py-0.5 text-muted-foreground"
                         data-testid={`tent-plant-roster-row-${row.id}-archived`}
+                        title={viewModel.archivedBadgeHelpCopy}
+                        aria-label={`${viewModel.archivedRowLabel}. ${viewModel.archivedBadgeHelpCopy}`}
                       >
-                        {viewModel.archivedRowLabel}
+                        <span aria-hidden="true">{viewModel.archivedRowLabel}</span>
                       </span>
                     )}
+
                     {row.stage && (
                       <span
                         className="text-[11px] rounded-md border px-1.5 py-0.5 text-muted-foreground"

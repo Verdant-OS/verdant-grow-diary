@@ -212,10 +212,11 @@ export default function TentPlantActivityPanels({
                 </p>
               </div>
 
-              <div className="mt-3 flex flex-wrap items-center gap-2">
+              <div className="mt-auto pt-3 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   data-testid={`${panel.testId}-add-quicklog`}
+                  data-is-first-quicklog={panel.isFirstQuickLog ? "true" : "false"}
                   aria-label={panel.quickLogCtaAccessibleLabel}
                   aria-disabled={panel.quickLogDisabled || undefined}
                   disabled={panel.quickLogDisabled}

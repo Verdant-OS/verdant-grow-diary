@@ -184,9 +184,12 @@ describe("buildHarvestEvidenceReport — grouping & counts", () => {
   it("does not crash on null / malformed entries", () => {
     expect(() =>
       buildHarvestEvidenceReport([
-        // @ts-expect-error intentionally malformed
-        null,
-        { plantId: "p1", plantName: "Alpha", rows: [null as any, undefined as any] },
+        null as unknown as HarvestEvidenceReportPlantInput,
+        {
+          plantId: "p1",
+          plantName: "Alpha",
+          rows: [null as unknown as never, undefined as unknown as never],
+        },
       ]),
     ).not.toThrow();
   });

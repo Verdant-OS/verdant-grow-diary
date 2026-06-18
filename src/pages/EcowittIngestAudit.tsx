@@ -9,8 +9,9 @@
  *  - Sensitive fields are redacted via `redactRawPayload` before render.
  *  - Empty / loading / error states are explicit.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useTents } from "@/hooks/use-tents";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
@@ -18,6 +19,12 @@ import {
   buildEcowittAuditPageViewModel,
   ECOWITT_AUDIT_EMPTY_MESSAGE,
 } from "@/lib/ecowittRawPayloadAuditViewModel";
+import {
+  applyEcowittAuditTentIdToSearch,
+  readEcowittAuditTentIdFromSearch,
+  resolveEcowittAuditSelectedTent,
+  ECOWITT_AUDIT_EMPTY_FOR_TENT_COPY,
+} from "@/lib/ecowittAuditTentSelectionRules";
 import type { EcowittSensorReadingRow } from "@/lib/ecowittLatestSnapshotFilter";
 import { EcowittIngestValidationPanel } from "@/components/EcowittIngestValidationPanel";
 import type { DiaryEnvironmentCheckDraft } from "@/lib/ecowittDiaryEnvironmentCheckRules";

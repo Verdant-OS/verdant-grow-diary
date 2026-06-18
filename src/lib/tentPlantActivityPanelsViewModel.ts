@@ -317,13 +317,16 @@ export function buildTentPlantActivityPanelsViewModel(
       photosAccessibleLabel: `Open ${name} photos on Plant Detail`,
       photosAnchorBlocked: !photosAnchorAvailable,
 
-      quickLogCtaLabel: "Add Quick Log",
-      quickLogCtaAccessibleLabel: `Add Quick Log for ${name}`,
+      quickLogCtaLabel: isFirstQuickLog ? "Add first Quick Log" : "Add Quick Log",
+      quickLogCtaAccessibleLabel: isFirstQuickLog
+        ? `Add first Quick Log for ${name}`
+        : `Add Quick Log for ${name}`,
       quickLogPrefill: prefill,
       quickLogDisabled: !prefill,
       quickLogDisabledReason: prefill
         ? null
         : "Plant, tent, or grow context is not loaded yet.",
+      isFirstQuickLog,
 
       testId: `tent-plant-activity-panel-${p.id}`,
     };
@@ -341,5 +344,7 @@ export function buildTentPlantActivityPanelsViewModel(
     selectedPlantId: resolvedSelection,
     emptyCopy,
     sharedEnvironmentReminderCopy: TENT_PLANT_ACTIVITY_SHARED_ENV_COPY,
+    visiblePlantCount: visible.length,
+    scopedPanelCount: panels.length,
   };
 }

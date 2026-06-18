@@ -181,7 +181,7 @@ export default function EcowittIngestAudit() {
           data-testid="ecowitt-audit-tent-select"
           className="rounded-md border border-border bg-background px-2 py-1 text-sm"
           value={effectiveTentId ?? ""}
-          onChange={(e) => setTentId(e.target.value || null)}
+          onChange={(e) => handleTentChange(e.target.value || null)}
         >
           {tents.length === 0 ? (
             <option value="">No tents</option>

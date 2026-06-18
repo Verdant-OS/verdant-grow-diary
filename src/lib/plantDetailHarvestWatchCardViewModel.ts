@@ -144,7 +144,7 @@ export function buildPlantDetailHarvestWatchCardViewModel(params: {
     "bud_maturity_note",
   ]);
   const strongEvidenceCount = evidenceChecklist.filter(
-    (i) => STRONG_KEYS.has(i.key) && i.present,
+    (i) => STRONG_KEYS.has(i.key) && i.status === "present",
   ).length;
   const v0ReadinessState = mapToV0ReadinessState({
     row,

@@ -47,11 +47,9 @@ export const HARVEST_WATCH_V0_STATE_LABEL: Record<
 
 /**
  * Cautious copy per v0 state. NEVER instructs harvest action. Always defers
- * to grower judgement via direct plant inspection.
- *
- * Forbidden phrasing: "harvest now", "ready to harvest", "guaranteed",
- * "optimal", "done", "chop", "flush", "dark period", "fix immediately",
- * "plant is unhealthy" — enforced by harvest-watch-card-evidence-rules tests.
+ * to grower judgement via direct plant inspection. Forbidden harvest-
+ * instruction phrasing is enforced by the harvest-watch-card-evidence-rules
+ * and plant-detail-harvest-watch-accessibility tests.
  */
 export const HARVEST_WATCH_V0_STATE_CAUTION: Record<
   HarvestWatchV0ReadinessState,
@@ -191,10 +189,16 @@ export type HarvestEvidenceKey =
   | "window_evidence"
   | "recent_photos";
 
+export type HarvestEvidenceStatus = "present" | "limited" | "missing";
+
 export interface HarvestEvidenceChecklistItem {
   key: HarvestEvidenceKey;
   label: string;
+  /** Backward-compatible boolean: true when status !== "missing". */
   present: boolean;
+  status: HarvestEvidenceStatus;
+  /** Screen-reader friendly reason / next-evidence-needed hint. */
+  reason: string;
 }
 
 const EVIDENCE_LABELS: Record<HarvestEvidenceKey, string> = {
@@ -205,6 +209,23 @@ const EVIDENCE_LABELS: Record<HarvestEvidenceKey, string> = {
   recent_photos: "Recent close-up photos",
 };
 
+const STRONG_PRESENT_REASON: Record<HarvestEvidenceKey, string> = {
+  trichome_inspection: "Present — trichome inspection note logged.",
+  pistil_observation: "Present — pistil / recession observation logged.",
+  bud_maturity_note: "Present — bud maturity observation logged.",
+  window_evidence: "Present — harvest window context available.",
+  recent_photos: "Present — recent close-up photos logged.",
+};
+
+const STRONG_MISSING_REASON: Record<HarvestEvidenceKey, string> = {
+  trichome_inspection: "Missing — add a trichome inspection note.",
+  pistil_observation: "Missing — add pistil color or recession notes.",
+  bud_maturity_note: "Missing — add bud maturity observations.",
+  window_evidence:
+    "Missing — flower start date or expected harvest day not yet logged.",
+  recent_photos: "Missing — add close-up flower photos.",
+};
+
 const TRICHOME_RE = /\btrich(ome|omes|y)\b/i;
 const PISTIL_RE = /\bpistil(s)?\b|\brecession\b|\bhairs?\b/i;
 const BUD_RE = /\bbud(s)?\b|\bflower(s)?\b|\bswell(ing)?\b|\bcalyx(es)?\b|\bdense\b/i;
@@ -212,8 +233,9 @@ const BUD_RE = /\bbud(s)?\b|\bflower(s)?\b|\bswell(ing)?\b|\bcalyx(es)?\b|\bdens
 /**
  * Builds the v0 evidence checklist from existing recent activity rows and
  * row context. NEVER infers trichome / pistil evidence from a generic photo
- * — only explicit note text counts. If a note signal is absent, the item is
- * reported as missing.
+ * — only explicit note text counts. Photos can be Present / Limited / Missing
+ * but never substitute for direct inspection notes. Window evidence can be
+ * Present / Limited / Missing but never replaces direct inspection evidence.
  */
 export function buildEvidenceChecklist(input: {
   recentRows: readonly PlantRecentActivityRow[];
@@ -229,21 +251,65 @@ export function buildEvidenceChecklist(input: {
   const hasPistil = notes.some((n) => PISTIL_RE.test(n));
   const hasBud = notes.some((n) => BUD_RE.test(n));
 
-  const hasWindow =
-    (typeof input.daysInFlower === "number" &&
-      Number.isFinite(input.daysInFlower)) ||
-    (typeof input.expectedHarvestDay === "number" &&
-      Number.isFinite(input.expectedHarvestDay) &&
-      input.expectedHarvestDay > 0);
+  const hasDays =
+    typeof input.daysInFlower === "number" &&
+    Number.isFinite(input.daysInFlower);
+  const hasExpected =
+    typeof input.expectedHarvestDay === "number" &&
+    Number.isFinite(input.expectedHarvestDay) &&
+    input.expectedHarvestDay > 0;
 
-  const hasRecentPhotos = input.photoEvidenceCount > 0;
+  let windowStatus: HarvestEvidenceStatus;
+  if (hasDays && hasExpected) windowStatus = "present";
+  else if (hasDays || hasExpected) windowStatus = "limited";
+  else windowStatus = "missing";
+
+  let photosStatus: HarvestEvidenceStatus;
+  if (input.photoEvidenceCount >= 2) photosStatus = "present";
+  else if (input.photoEvidenceCount === 1) photosStatus = "limited";
+  else photosStatus = "missing";
+
+  const strong = (
+    key: HarvestEvidenceKey,
+    isPresent: boolean,
+  ): HarvestEvidenceChecklistItem => ({
+    key,
+    label: EVIDENCE_LABELS[key],
+    present: isPresent,
+    status: isPresent ? "present" : "missing",
+    reason: isPresent ? STRONG_PRESENT_REASON[key] : STRONG_MISSING_REASON[key],
+  });
+
+  const reasonFor = (
+    key: HarvestEvidenceKey,
+    status: HarvestEvidenceStatus,
+  ): string => {
+    if (status === "present") return STRONG_PRESENT_REASON[key];
+    if (status === "missing") return STRONG_MISSING_REASON[key];
+    if (key === "recent_photos") {
+      return "Limited — add more close-up flower photos. Photos do not replace direct inspection.";
+    }
+    return "Limited — partial harvest window context available. Direct inspection still required.";
+  };
 
   const items: HarvestEvidenceChecklistItem[] = [
-    { key: "trichome_inspection", label: EVIDENCE_LABELS.trichome_inspection, present: hasTrichome },
-    { key: "pistil_observation", label: EVIDENCE_LABELS.pistil_observation, present: hasPistil },
-    { key: "bud_maturity_note", label: EVIDENCE_LABELS.bud_maturity_note, present: hasBud },
-    { key: "window_evidence", label: EVIDENCE_LABELS.window_evidence, present: hasWindow },
-    { key: "recent_photos", label: EVIDENCE_LABELS.recent_photos, present: hasRecentPhotos },
+    strong("trichome_inspection", hasTrichome),
+    strong("pistil_observation", hasPistil),
+    strong("bud_maturity_note", hasBud),
+    {
+      key: "window_evidence",
+      label: EVIDENCE_LABELS.window_evidence,
+      present: windowStatus !== "missing",
+      status: windowStatus,
+      reason: reasonFor("window_evidence", windowStatus),
+    },
+    {
+      key: "recent_photos",
+      label: EVIDENCE_LABELS.recent_photos,
+      present: photosStatus !== "missing",
+      status: photosStatus,
+      reason: reasonFor("recent_photos", photosStatus),
+    },
   ];
   return items;
 }
@@ -410,7 +476,7 @@ const PREFILL: Record<NextInspectionKind, { label: string; notePrefill: string }
 /**
  * Picks the most useful next inspection based on which evidence is missing.
  * Order: trichome → pistil → bud → photo → general. Never recommends
- * destructive actions (no chop / flush / dark period / heavy defoliation).
+ * destructive actions — see test forbidden-phrase list for enforcement.
  */
 export function pickNextInspection(
   checklist: readonly HarvestEvidenceChecklistItem[],

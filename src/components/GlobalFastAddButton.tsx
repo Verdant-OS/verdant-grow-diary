@@ -144,6 +144,33 @@ export default function GlobalFastAddButton({
             ))}
           </ul>
 
+          {/* Operator Mode HyperLog quick-create — presenter-only, demo. */}
+          <div
+            data-testid="global-fast-add-hyperlog-section"
+            className="mt-1 border-t border-border/40 pt-2 px-1"
+          >
+            <p className="px-2 pb-1 text-[10px] uppercase tracking-[0.15em] text-muted-foreground/80 flex items-center gap-1.5">
+              <Zap className="h-3 w-3" aria-hidden="true" />
+              HyperLog · demo
+            </p>
+            <div className="grid grid-cols-2 gap-1">
+              {(["water", "feed", "defoliate", "note"] as HyperLogAction[]).map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  role="menuitem"
+                  data-testid={`global-fast-add-hyperlog-${a}`}
+                  onClick={() => openHyperLog(a)}
+                  className="text-left px-2 min-h-10 flex items-center rounded-md text-xs hover:bg-secondary/60 active:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation capitalize"
+                >
+                  {a}
+                </button>
+              ))}
+            </div>
+          </div>
+
+
+
           {notice ? (
             <div
               data-testid="global-fast-add-needs-context-wrap"

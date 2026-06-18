@@ -84,6 +84,13 @@ import {
 import { buildEnvironmentCheckSensorContext } from "@/lib/environmentCheckSensorContextRules";
 import { buildSensorNormalizationPreviewViewModel } from "@/lib/sensors/sensorNormalizationPreviewViewModel";
 import { SensorNormalizationPreviewPanel } from "@/components/SensorNormalizationPreviewPanel";
+import {
+  buildHarvestInspectionPreviewViewModel,
+  HARVEST_PHOTO_COMPARISON_ANGLES,
+  HARVEST_PHOTO_COMPARISON_LIGHTINGS,
+  type HarvestPhotoAngle,
+  type HarvestPhotoLighting,
+} from "@/lib/harvestInspectionQuickLogPreviewRules";
 
 export interface QuickLogPrefill {
   plantId?: string | null;

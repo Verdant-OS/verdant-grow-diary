@@ -8,6 +8,12 @@
  *   - Save/acknowledge/resolve/dismiss are user-initiated only.
  */
 import { supabase } from "@/integrations/supabase/client";
+import {
+  buildAcknowledgeAlertPatch,
+  buildResolveAlertPatch,
+  buildDismissAlertPatch,
+  buildReopenAlertPatch,
+} from "@/lib/alertStatusTransitionRules";
 
 export type AlertSeverityRow = "info" | "watch" | "warning" | "critical";
 export type AlertStatusRow = "open" | "acknowledged" | "resolved" | "dismissed";

@@ -3,8 +3,8 @@ import EcowittLatestSnapshotCard from "@/components/EcowittLatestSnapshotCard";
 import EnvironmentStabilityCard from "@/components/EnvironmentStabilityCard";
 import TentAiDoctorSessionsPanel from "@/components/TentAiDoctorSessionsPanel";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
-import { useParams, Link } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useParams, Link, useSearchParams } from "react-router-dom";
+import { useEffect, useState, useRef } from "react";
 import { formatDistanceToNow } from "date-fns";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
@@ -77,6 +77,10 @@ import {
   readTentPlantTabsSelectedPlantId,
   writeTentPlantTabsSelectedPlantId,
 } from "@/lib/tentPlantTabsPreferences";
+import {
+  readTentPlantTabsUrlPlantId,
+  applyTentPlantTabsUrlPlantId,
+} from "@/lib/tentPlantTabsUrlState";
 
 
 import { plantDetailPath, tentsPath } from "@/lib/routes";
@@ -94,15 +98,30 @@ export default function TentDetail() {
     setRosterIncludeArchived(next);
     writeTentPlantRosterIncludeArchived(id ?? null, next);
   };
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedPlantTabId, setSelectedPlantTabIdState] = useState<string | null>(
-    () => readTentPlantTabsSelectedPlantId(id ?? null),
+    () =>
+      readTentPlantTabsUrlPlantId(searchParams) ??
+      readTentPlantTabsSelectedPlantId(id ?? null),
   );
+  // Track which tent we've initialized for so re-renders don't clobber state
+  // with the URL value mid-session.
+  const initializedTentIdRef = useRef<string | null>(id ?? null);
   useEffect(() => {
-    setSelectedPlantTabIdState(readTentPlantTabsSelectedPlantId(id ?? null));
-  }, [id]);
+    if (initializedTentIdRef.current === (id ?? null)) return;
+    initializedTentIdRef.current = id ?? null;
+    setSelectedPlantTabIdState(
+      readTentPlantTabsUrlPlantId(searchParams) ??
+        readTentPlantTabsSelectedPlantId(id ?? null),
+    );
+  }, [id, searchParams]);
   const setSelectedPlantTabId = (next: string | null) => {
     setSelectedPlantTabIdState(next);
     writeTentPlantTabsSelectedPlantId(id ?? null, next);
+    setSearchParams(
+      (current) => applyTentPlantTabsUrlPlantId(current, next),
+      { replace: true },
+    );
   };
 
   const [quickLogOpen, setQuickLogOpen] = useState(false);
@@ -119,9 +138,9 @@ export default function TentDetail() {
   const visiblePlants = filterVisiblePlants(allPlants, { showArchived });
   const rosterActivity = useTentPlantRosterActivity(allPlants);
 
-  // Reconcile persisted selected tab against currently visible plants.
+  // Reconcile persisted/URL selected tab against currently visible plants.
   // If the restored plant id no longer exists, or is archived while archived
-  // plants are hidden, fall back to "All plants" and clear storage.
+  // plants are hidden, fall back to "All plants" and clear storage + URL.
   useEffect(() => {
     if (selectedPlantTabId == null) return;
     if (!Array.isArray(allPlants) || allPlants.length === 0) return;
@@ -132,8 +151,12 @@ export default function TentDetail() {
     if (!isVisible) {
       setSelectedPlantTabIdState(null);
       writeTentPlantTabsSelectedPlantId(id ?? null, null);
+      setSearchParams(
+        (current) => applyTentPlantTabsUrlPlantId(current, null),
+        { replace: true },
+      );
     }
-  }, [selectedPlantTabId, allPlants, rosterIncludeArchived, id]);
+  }, [selectedPlantTabId, allPlants, rosterIncludeArchived, id, setSearchParams]);
 
 
 

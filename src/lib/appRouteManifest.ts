@@ -79,6 +79,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/alerts/:alertId", access: "auth" },
   { path: "/auth", access: "public" },
   { path: "/billing/:plan", access: "public", description: "Billing placeholder." },
+  { path: "/customer/:shareId", access: "public", description: "Customer Mode QR guide shell (read-only, no private grow data)." },
   { path: "/daily-check", access: "auth" },
   { path: "/demo", access: "redirect", description: "→ /welcome" },
   { path: "/diagnostics", access: "operator" },

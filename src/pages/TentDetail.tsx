@@ -62,6 +62,8 @@ import {
 import { cn } from "@/lib/utils";
 import FirstPlantMemoryCta from "@/components/FirstPlantMemoryCta";
 import { buildPlantQuickLogPrefill } from "@/lib/plantQuickLogPrefillRules";
+import TentPlantRosterPanel from "@/components/TentPlantRosterPanel";
+import { buildTentPlantRosterViewModel } from "@/lib/tentPlantRosterViewModel";
 
 import { plantDetailPath, tentsPath } from "@/lib/routes";
 

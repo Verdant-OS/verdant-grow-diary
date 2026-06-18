@@ -290,3 +290,175 @@ export default function TentPlantRosterPanel({
     </section>
   );
 }
+
+interface TentPlantRosterRowActionsProps {
+  rowId: string;
+  rowName: string | null;
+  quickActionContext: TentPlantRosterQuickActionContext;
+  onActivate: (
+    entry: TentPlantRosterQuickActionEntry,
+    e: React.MouseEvent<HTMLAnchorElement | HTMLButtonElement>,
+    plantName: string | null,
+  ) => void;
+}
+
+function TentPlantRosterRowActions({
+  rowId,
+  rowName,
+  quickActionContext,
+  onActivate,
+}: TentPlantRosterRowActionsProps) {
+  const detailsRef = useRef<HTMLDetailsElement | null>(null);
+  const summaryRef = useRef<HTMLElement | null>(null);
+  const menuRef = useRef<HTMLUListElement | null>(null);
+
+  const entries = buildTentPlantRosterQuickActions({
+    plantId: rowId,
+    plantName: rowName,
+    tentId: quickActionContext.tentId,
+    tentName: quickActionContext.tentName ?? null,
+    growId: quickActionContext.growId ?? null,
+  });
+  const triggerLabel = tentPlantRosterQuickActionsTriggerLabel(rowName);
+  const photosEntry = entries.find((e) => e.kind === "view_photos");
+  const showPhotosFallbackHint = photosEntry?.anchorBlocked === true;
+
+  // Click-outside closes the menu.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    function handleDocClick(ev: MouseEvent) {
+      const el = detailsRef.current;
+      if (!el || !el.open) return;
+      const target = ev.target as Node | null;
+      if (target && el.contains(target)) return;
+      el.open = false;
+    }
+    document.addEventListener("mousedown", handleDocClick);
+    return () => document.removeEventListener("mousedown", handleDocClick);
+  }, []);
+
+  function focusMenuItem(index: number) {
+    const items = menuRef.current?.querySelectorAll<HTMLElement>(
+      '[role="menuitem"]',
+    );
+    if (!items || items.length === 0) return;
+    const safeIndex = ((index % items.length) + items.length) % items.length;
+    items[safeIndex]?.focus();
+  }
+
+  function currentItemIndex(): number {
+    const items = menuRef.current?.querySelectorAll<HTMLElement>(
+      '[role="menuitem"]',
+    );
+    if (!items) return -1;
+    const active = document.activeElement as HTMLElement | null;
+    if (!active) return -1;
+    return Array.from(items).indexOf(active);
+  }
+
+  function handleMenuKeyDown(e: React.KeyboardEvent<HTMLUListElement>) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      if (detailsRef.current) detailsRef.current.open = false;
+      summaryRef.current?.focus();
+      return;
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const idx = currentItemIndex();
+      focusMenuItem(idx + 1);
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const idx = currentItemIndex();
+      focusMenuItem(idx <= 0 ? -1 : idx - 1);
+    }
+  }
+
+  function handleSummaryKeyDown(e: React.KeyboardEvent<HTMLElement>) {
+    if (e.key === "Escape" && detailsRef.current?.open) {
+      e.preventDefault();
+      detailsRef.current.open = false;
+      summaryRef.current?.focus();
+    }
+  }
+
+  return (
+    <details
+      ref={detailsRef}
+      className="relative text-xs"
+      data-testid={`tent-plant-roster-row-${rowId}-actions`}
+    >
+      <summary
+        ref={(el) => {
+          summaryRef.current = el;
+        }}
+        className="cursor-pointer list-none rounded-md border px-2 py-1 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        aria-label={triggerLabel}
+        data-testid={`tent-plant-roster-row-${rowId}-actions-trigger`}
+        onKeyDown={handleSummaryKeyDown}
+      >
+        Plant actions
+      </summary>
+      <ul
+        ref={menuRef}
+        role="menu"
+        className="absolute right-0 z-10 mt-1 min-w-[10rem] rounded-md border bg-popover p-1 shadow-md"
+        data-testid={`tent-plant-roster-row-${rowId}-actions-menu`}
+        onKeyDown={handleMenuKeyDown}
+      >
+        {entries.map((entry) => {
+          const baseClass =
+            "block w-full text-left rounded-sm px-2 py-1 text-xs hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+          const aria = entry.disabled && entry.disabledReason
+            ? `${entry.label} (unavailable: ${entry.disabledReason})`
+            : entry.label;
+          if (entry.event === "open-quicklog") {
+            return (
+              <li key={entry.kind} role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={baseClass}
+                  aria-label={aria}
+                  aria-disabled={entry.disabled || undefined}
+                  data-testid={entry.testId}
+                  onClick={(e) => onActivate(entry, e, rowName)}
+                >
+                  {entry.label}
+                </button>
+              </li>
+            );
+          }
+          return (
+            <li key={entry.kind} role="none">
+              <a
+                role="menuitem"
+                href={entry.href ?? "#"}
+                className={baseClass}
+                aria-label={aria}
+                aria-disabled={entry.disabled || undefined}
+                data-testid={entry.testId}
+                data-anchor-blocked={entry.anchorBlocked ? "true" : undefined}
+                onClick={(e) => onActivate(entry, e, rowName)}
+              >
+                {entry.label}
+              </a>
+            </li>
+          );
+        })}
+        {showPhotosFallbackHint && (
+          <li role="none" className="mt-1 px-2 py-1">
+            <p
+              className="text-[11px] text-muted-foreground"
+              data-testid={`tent-plant-roster-row-${rowId}-photos-fallback-hint`}
+            >
+              {TENT_PLANT_ROSTER_PHOTOS_FALLBACK_HINT_COPY}
+            </p>
+          </li>
+        )}
+      </ul>
+    </details>
+  );
+}

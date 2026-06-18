@@ -38,13 +38,87 @@ export interface TentPlantActivityPanelsProps {
 
 export const TENT_PLANT_ACTIVITY_LOADING_COPY = "Loading plant activity…";
 
-function emitQuickLog(panel: TentPlantActivityPanelRow) {
+function emitQuickLog(panel: TentPlantActivityPanelRow, note?: string) {
   if (!panel.quickLogPrefill) return;
   if (typeof window === "undefined") return;
+  const trimmed = typeof note === "string" ? note.trim() : "";
+  const detail =
+    trimmed.length > 0
+      ? { ...panel.quickLogPrefill, note: trimmed }
+      : panel.quickLogPrefill;
   window.dispatchEvent(
-    new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, {
-      detail: panel.quickLogPrefill,
-    }),
+    new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail }),
+  );
+}
+
+function EvidenceNotesSection({ panel }: { panel: TentPlantActivityPanelRow }) {
+  const [draft, setDraft] = useState("");
+  const labelId = useId();
+  const textareaId = useId();
+  const helperId = useId();
+  const cautionId = useId();
+  const trimmed = draft.trim();
+  const disabled = trimmed.length === 0 || panel.quickLogDisabled;
+  const handleSend = () => {
+    if (disabled) return;
+    emitQuickLog(panel, trimmed);
+  };
+  return (
+    <div
+      className="mt-2 space-y-1 border-t border-border/40 pt-2"
+      data-testid={`${panel.testId}-evidence-notes`}
+    >
+      <label
+        id={labelId}
+        htmlFor={textareaId}
+        className="text-[11px] font-medium text-muted-foreground"
+        data-testid={`${panel.testId}-evidence-notes-label`}
+      >
+        {TENT_PLANT_ACTIVITY_EVIDENCE_NOTES_LABEL}
+      </label>
+      <p
+        id={helperId}
+        className="text-[11px] text-muted-foreground"
+        data-testid={`${panel.testId}-evidence-notes-helper`}
+      >
+        {TENT_PLANT_ACTIVITY_EVIDENCE_NOTES_HELPER_COPY}
+      </p>
+      <textarea
+        id={textareaId}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder={TENT_PLANT_ACTIVITY_EVIDENCE_NOTES_PLACEHOLDER}
+        aria-labelledby={labelId}
+        aria-describedby={`${helperId} ${cautionId}`}
+        rows={3}
+        data-testid={`${panel.testId}-evidence-notes-textarea`}
+        className="w-full text-xs rounded-md border border-border bg-background p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      />
+      <p
+        id={cautionId}
+        className="text-[11px] text-muted-foreground"
+        data-testid={`${panel.testId}-evidence-notes-caution`}
+      >
+        {TENT_PLANT_ACTIVITY_EVIDENCE_NOTES_CAUTION_COPY}
+      </p>
+      <div className="pt-1">
+        <button
+          type="button"
+          onClick={handleSend}
+          disabled={disabled}
+          aria-disabled={disabled || undefined}
+          aria-label={`Add evidence note to Quick Log for ${panel.name}`}
+          data-testid={`${panel.testId}-evidence-notes-send`}
+          title={
+            panel.quickLogDisabledReason ??
+            (trimmed.length === 0 ? "Draft a note to enable." : undefined)
+          }
+          className="text-xs px-2.5 py-1 rounded-full border bg-secondary text-secondary-foreground border-border disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          {TENT_PLANT_ACTIVITY_EVIDENCE_NOTES_CTA_COPY}
+        </button>
+      </div>
+    </div>
   );
 }
 

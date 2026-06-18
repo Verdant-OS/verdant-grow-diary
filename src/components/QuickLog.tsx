@@ -404,6 +404,8 @@ export default function QuickLog({
     setEnvWaterTempValue("");
     setEnvWaterTempUnit("F");
     setEnvEcMscm("");
+    setHarvestPhotoAngle("");
+    setHarvestPhotoLighting("");
   }
 
   function resetForAnother() {
@@ -430,6 +432,8 @@ export default function QuickLog({
     setEnvWaterTempValue("");
     setEnvWaterTempUnit("F");
     setEnvEcMscm("");
+    setHarvestPhotoAngle("");
+    setHarvestPhotoLighting("");
     if (keepPlantId) setPlantId(keepPlantId);
     setTimeout(() => noteRef.current?.focus(), 0);
   }

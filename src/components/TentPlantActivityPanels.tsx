@@ -22,6 +22,8 @@ import {
   TENT_PLANT_ACTIVITY_EVIDENCE_NOTES_CTA_COPY,
 } from "@/lib/tentPlantActivityPanelsViewModel";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
+import DiaryEntryRemoveButton from "@/components/DiaryEntryRemoveButton";
+import type { DiaryEntryRemovalViewerContext } from "@/lib/diaryEntryRemovalRules";
 
 export interface TentPlantActivityPanelsProps {
   viewModel: TentPlantActivityPanelsViewModel;
@@ -34,6 +36,16 @@ export interface TentPlantActivityPanelsProps {
   isLoading?: boolean;
   /** Number of skeleton placeholder cards to render while loading. */
   loadingSkeletonCount?: number;
+  /**
+   * Viewer context used to gate per-entry destructive controls. Required for
+   * Remove log / Remove photo log controls to render. Customer/public/report
+   * views must pass viewer flags so these controls stay hidden.
+   */
+  viewer?: DiaryEntryRemovalViewerContext;
+  /** Tent id (forwarded for query invalidation only; never displayed). */
+  tentId?: string | null;
+  /** Grow id (forwarded for query invalidation only; never displayed). */
+  growId?: string | null;
 }
 
 export const TENT_PLANT_ACTIVITY_LOADING_COPY = "Loading plant activity…";

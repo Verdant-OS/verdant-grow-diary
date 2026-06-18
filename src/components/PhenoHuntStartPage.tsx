@@ -2,7 +2,8 @@
  * Pheno Hunt Start Page — presenter component.
  *
  * Pure presenter: derives view state via the pheno hunt view model and
- * renders the v0 intake / setup UI. No persistence (blocked in v0).
+ * renders the v1 intake / setup UI. Persistence is performed via the
+ * injected createHunt helper (default: useCreatePhenoHunt → Supabase).
  * No AI, no alerts, no Action Queue, no device control.
  */
 import { useMemo, useState } from "react";
@@ -19,12 +20,23 @@ import {
   buildPhenoHuntStartPageView,
   type PhenoHuntEmptyState,
 } from "@/lib/phenoHuntStartPageViewModel";
+import { isPhenoHuntDraftSavable } from "@/lib/phenoHuntPersistenceRules";
+import {
+  useCreatePhenoHunt,
+  type CreatePhenoHuntInput,
+  type CreatePhenoHuntResult,
+  type CreatePhenoHuntStatus,
+} from "@/hooks/useCreatePhenoHunt";
 
 export interface PhenoHuntStartPageProps {
   /** Plants the operator can choose from. Filtering applied internally. */
   allPlants: readonly CandidatePlant[];
   /** Optional initial draft (e.g. tent-scoped entry from Tent Detail). */
   initialDraft?: Partial<PhenoHuntDraft>;
+  /** Authenticated user id; required to enable Save. */
+  userId?: string | null;
+  /** Test seam — override the persistence helper. */
+  createHuntOverride?: (input: CreatePhenoHuntInput) => Promise<CreatePhenoHuntResult>;
 }
 
 const EMPTY_STATE_COPY: Record<PhenoHuntEmptyState["kind"], string> = {
@@ -37,6 +49,8 @@ const EMPTY_STATE_COPY: Record<PhenoHuntEmptyState["kind"], string> = {
 export default function PhenoHuntStartPage({
   allPlants,
   initialDraft,
+  userId,
+  createHuntOverride,
 }: PhenoHuntStartPageProps) {
   const [draft, setDraft] = useState<PhenoHuntDraft>(() => ({
     ...emptyPhenoHuntDraft(),
@@ -45,9 +59,23 @@ export default function PhenoHuntStartPage({
   const [selections, setSelections] = useState<CandidateSelection[]>([]);
   const [includeArchived, setIncludeArchived] = useState(false);
 
+  const hook = useCreatePhenoHunt();
+  const create = createHuntOverride ?? hook.create;
+  const [overrideStatus, setOverrideStatus] = useState<CreatePhenoHuntStatus>("idle");
+  const [overrideResult, setOverrideResult] = useState<CreatePhenoHuntResult | null>(null);
+  const status: CreatePhenoHuntStatus = createHuntOverride ? overrideStatus : hook.status;
+  const lastResult: CreatePhenoHuntResult | null = createHuntOverride
+    ? overrideResult
+    : hook.lastResult;
+
   const view = useMemo(
     () => buildPhenoHuntStartPageView({ draft, allPlants, selections, includeArchived }),
     [draft, allPlants, selections, includeArchived],
+  );
+
+  const savable = useMemo(
+    () => isPhenoHuntDraftSavable({ draft, selections, plants: allPlants }),
+    [draft, selections, allPlants],
   );
 
   function patch<K extends keyof PhenoHuntDraft>(key: K, value: PhenoHuntDraft[K]) {

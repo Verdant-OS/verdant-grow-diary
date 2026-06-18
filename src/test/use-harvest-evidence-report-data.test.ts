@@ -93,7 +93,7 @@ describe("useHarvestEvidenceReportData", () => {
     const { result } = renderHook(() => useHarvestEvidenceReportData("p1"));
     const report = buildHarvestEvidenceReport(result.current.plantInputs);
     expect(report.totals.trichomeInspections).toBe(1);
-    expect(report.totals.recentFlowerPhotos ?? report.totals.closeFlowerPhotos).toBe(0);
+    expect(report.totals.closeFlowerPhotos).toBe(0);
   });
 
   it("maps photo rows into report input as close flower photos", () => {

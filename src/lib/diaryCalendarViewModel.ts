@@ -16,14 +16,25 @@ import {
   type EcCompensationPreviewModel,
 } from "@/lib/ecCompensationPreviewViewModel";
 import type { EcUnit } from "@/constants/units";
+import {
+  buildEnvironmentCheckTimelineViewModel,
+  ENVIRONMENT_CHECK_TIMELINE_SOURCE_LABEL,
+  type EnvironmentCheckTimelineRawEntry,
+} from "@/lib/environmentCheckTimelineViewModel";
 
-export type DiaryCalendarEventKind = "watering" | "feeding" | "diagnosis";
+export type DiaryCalendarEventKind =
+  | "watering"
+  | "feeding"
+  | "diagnosis"
+  | "environment";
 
 const ALLOWED_KINDS: ReadonlySet<string> = new Set([
   "watering",
   "feeding",
   "diagnosis",
   "ai_doctor_review",
+  "environment",
+  "environment_check",
 ]);
 
 function normalizeKind(raw: unknown): DiaryCalendarEventKind | null {
@@ -31,6 +42,7 @@ function normalizeKind(raw: unknown): DiaryCalendarEventKind | null {
   const k = raw.toLowerCase();
   if (!ALLOWED_KINDS.has(k)) return null;
   if (k === "ai_doctor_review") return "diagnosis";
+  if (k === "environment_check") return "environment";
   return k as DiaryCalendarEventKind;
 }
 
@@ -38,6 +50,7 @@ export const DIARY_CALENDAR_KIND_LABEL: Record<DiaryCalendarEventKind, string> =
   watering: "Watering",
   feeding: "Feeding",
   diagnosis: "Diagnosis",
+  environment: "Environment Check",
 };
 
 export const DIARY_CALENDAR_EMPTY_TITLE =
@@ -61,7 +74,9 @@ export const DIARY_CALENDAR_FILTERS: ReadonlyArray<{
   { value: "watering", label: "Watering" },
   { value: "feeding", label: "Feeding" },
   { value: "diagnosis", label: "Diagnosis" },
+  { value: "environment", label: "Environment Check" },
 ];
+
 
 /**
  * Compute per-filter event counts from the full unfiltered dataset.
@@ -76,19 +91,23 @@ export function computeDiaryCalendarFilterCounts(
     watering: 0,
     feeding: 0,
     diagnosis: 0,
+    environment: 0,
   };
   for (const g of groups) {
     counts.watering += g.counts.watering;
     counts.feeding += g.counts.feeding;
     counts.diagnosis += g.counts.diagnosis;
+    counts.environment += g.counts.environment;
   }
   return {
-    all: counts.watering + counts.feeding + counts.diagnosis,
+    all: counts.watering + counts.feeding + counts.diagnosis + counts.environment,
     watering: counts.watering,
     feeding: counts.feeding,
     diagnosis: counts.diagnosis,
+    environment: counts.environment,
   };
 }
+
 
 
 /**
@@ -109,6 +128,7 @@ export function filterDiaryCalendarGroups(
       watering: 0,
       feeding: 0,
       diagnosis: 0,
+      environment: 0,
     };
     events.forEach((e) => {
       counts[e.kind] += 1;
@@ -122,7 +142,9 @@ const FILTER_EMPTY_COPY: Record<DiaryCalendarEventKind, string> = {
   watering: "No watering events logged for this period.",
   feeding: "No feeding events logged for this period.",
   diagnosis: "No diagnosis events logged for this period.",
+  environment: "No environment checks logged for this period.",
 };
+
 
 /** Filter-aware empty title. "all" preserves the original copy. */
 export function diaryCalendarEmptyTitleFor(filter: DiaryCalendarFilter): string {
@@ -164,6 +186,8 @@ export interface DiaryCalendarEventDisplayField {
 export interface DiaryCalendarEventDetails {
   /** Human-readable section heading, e.g. "Watering details". */
   sectionLabel: string;
+  /** Optional short disclaimer beneath the section heading (e.g. env-check "not live" copy). */
+  subtitle: string | null;
   /** Allowlisted, vetted display fields. Never the raw details object. */
   fields: DiaryCalendarEventDisplayField[];
   /** Read-only EC @25°C preview for feeding only; never marked as stored. */
@@ -171,6 +195,7 @@ export interface DiaryCalendarEventDetails {
   /** Calm fallback when there are no fields, no preview, and no note. */
   fallback: string | null;
 }
+
 
 export interface DiaryCalendarDayGroup {
   /** YYYY-MM-DD */
@@ -330,23 +355,49 @@ const DETAIL_SECTION_LABEL: Record<DiaryCalendarEventKind, string> = {
   watering: "Watering details",
   feeding: "Feeding details",
   diagnosis: "Diagnosis details",
+  environment: "Environment Check details",
 };
+
+const ENVIRONMENT_CHECK_NOT_LIVE_SUBTITLE =
+  "Quick Log environment check — not live sensor telemetry.";
 
 const DIARY_CALENDAR_EMPTY_DETAILS_FALLBACK =
   "No extra details saved for this entry.";
 
 export const DIARY_CALENDAR_DETAILS_EMPTY = DIARY_CALENDAR_EMPTY_DETAILS_FALLBACK;
 
+function buildEnvironmentFields(
+  rawEntry: DiaryCalendarRawEntry,
+): DiaryCalendarEventDisplayField[] {
+  // Delegate parsing to the existing environment-check timeline VM so we
+  // never duplicate envelope parsing logic inside the calendar layer.
+  const envEntry: EnvironmentCheckTimelineRawEntry = {
+    id: rawEntry.id,
+    entry_at: rawEntry.entry_at ?? rawEntry.occurred_at ?? null,
+    occurred_at: rawEntry.occurred_at ?? null,
+    event_type: rawEntry.event_type ?? "environment",
+    note: rawEntry.note ?? null,
+    details: rawEntry.details,
+  };
+  const vm = buildEnvironmentCheckTimelineViewModel(envEntry);
+  if (!vm) return [];
+  return vm.fields.map((f) => ({ label: f.label, value: f.value }));
+}
+
 function buildEventDetails(
   kind: DiaryCalendarEventKind,
-  rawDetails: unknown,
+  rawEntry: DiaryCalendarRawEntry,
   noteSnippet: string | null,
 ): DiaryCalendarEventDetails {
-  const d = pickRecord(rawDetails);
+  const d = pickRecord(rawEntry.details);
   let fields: DiaryCalendarEventDisplayField[] = [];
   let ecPreview: EcCompensationPreviewModel | null = null;
+  let subtitle: string | null = null;
 
-  if (d) {
+  if (kind === "environment") {
+    fields = buildEnvironmentFields(rawEntry);
+    subtitle = ENVIRONMENT_CHECK_NOT_LIVE_SUBTITLE;
+  } else if (d) {
     if (kind === "watering") fields = buildWateringFields(d);
     else if (kind === "feeding") {
       fields = buildFeedingFields(d);
@@ -368,11 +419,14 @@ function buildEventDetails(
   const hasContent = fields.length > 0 || ecPreview !== null || !!noteSnippet;
   return {
     sectionLabel: DETAIL_SECTION_LABEL[kind],
+    subtitle,
     fields,
     ecPreview,
     fallback: hasContent ? null : DIARY_CALENDAR_EMPTY_DETAILS_FALLBACK,
   };
 }
+
+
 
 
 function extractKind(entry: DiaryCalendarRawEntry): DiaryCalendarEventKind | null {
@@ -426,7 +480,7 @@ export function buildDiaryCalendarViewModel(
       dateKey: dateKeyUtc(iso),
       plantName: safePlantName(raw.details),
       noteSnippet,
-      details: buildEventDetails(kind, raw.details, noteSnippet),
+      details: buildEventDetails(kind, raw, noteSnippet),
     });
   }
 
@@ -448,7 +502,9 @@ export function buildDiaryCalendarViewModel(
       watering: 0,
       feeding: 0,
       diagnosis: 0,
+      environment: 0,
     };
+
     items.forEach((it) => {
       counts[it.kind] += 1;
     });
@@ -472,6 +528,7 @@ export function summarizeDiaryCalendar(
     watering: 0,
     feeding: 0,
     diagnosis: 0,
+    environment: 0,
   };
   let total = 0;
   for (const g of groups) {
@@ -479,9 +536,11 @@ export function summarizeDiaryCalendar(
     counts.watering += g.counts.watering;
     counts.feeding += g.counts.feeding;
     counts.diagnosis += g.counts.diagnosis;
+    counts.environment += g.counts.environment;
   }
   return { totalEvents: total, totalDays: groups.length, counts };
 }
+
 
 // ---------------------------------------------------------------------------
 // Month navigation helpers (pure & deterministic).

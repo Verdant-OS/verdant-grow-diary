@@ -3,6 +3,7 @@ import {
   Droplets,
   Utensils,
   Stethoscope,
+  Thermometer,
   CalendarDays,
   ChevronDown,
   ChevronRight,
@@ -40,13 +41,23 @@ const KIND_TONE: Record<DiaryCalendarEventKind, string> = {
   watering: "bg-sky-500/15 text-sky-300 border-sky-500/30",
   feeding: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
   diagnosis: "bg-rose-500/15 text-rose-300 border-rose-500/30",
+  environment: "bg-amber-500/15 text-amber-300 border-amber-500/30",
 };
 
 const KIND_ICON: Record<DiaryCalendarEventKind, typeof Droplets> = {
   watering: Droplets,
   feeding: Utensils,
   diagnosis: Stethoscope,
+  environment: Thermometer,
 };
+
+const KIND_ORDER: readonly DiaryCalendarEventKind[] = [
+  "watering",
+  "feeding",
+  "diagnosis",
+  "environment",
+];
+
 
 function formatDateHeader(dateKey: string): string {
   const [y, m, d] = dateKey.split("-").map((n) => Number(n));
@@ -199,8 +210,9 @@ export default function DiaryCalendarSection({
           Calendar
         </h2>
         <span className="text-[11px] text-muted-foreground">
-          Watering · Feeding · Diagnosis · read-only
+          Watering · Feeding · Diagnosis · Environment · read-only
         </span>
+
       </header>
 
       {hasAnyEntries && visibleMonth && (
@@ -306,10 +318,12 @@ export default function DiaryCalendarSection({
             <SummaryChip kind="watering" count={summary.counts.watering} />
             <SummaryChip kind="feeding" count={summary.counts.feeding} />
             <SummaryChip kind="diagnosis" count={summary.counts.diagnosis} />
+            <SummaryChip kind="environment" count={summary.counts.environment} />
             <span className="ml-auto text-muted-foreground">
               {summary.totalDays} {summary.totalDays === 1 ? "day" : "days"}
             </span>
           </div>
+
 
 
           <ul className="space-y-2" role="list">
@@ -340,12 +354,12 @@ export default function DiaryCalendarSection({
                       {formatDateHeader(group.dateKey)}
                     </h3>
                     <div className="ml-auto flex flex-wrap gap-1">
-                      {(["watering", "feeding", "diagnosis"] as DiaryCalendarEventKind[]).map(
-                        (k) =>
-                          group.counts[k] > 0 ? (
-                            <KindChip key={k} kind={k} count={group.counts[k]} compact />
-                          ) : null,
+                      {KIND_ORDER.map((k) =>
+                        group.counts[k] > 0 ? (
+                          <KindChip key={k} kind={k} count={group.counts[k]} compact />
+                        ) : null,
                       )}
+
                     </div>
                   </button>
 
@@ -396,6 +410,15 @@ export default function DiaryCalendarSection({
                                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
                                   {ev.details.sectionLabel}
                                 </p>
+                                {ev.details.subtitle && (
+                                  <p
+                                    className="text-[11px] text-muted-foreground italic mb-1"
+                                    data-testid="diary-calendar-event-subtitle"
+                                  >
+                                    {ev.details.subtitle}
+                                  </p>
+                                )}
+
                                 {ev.details.fields.length > 0 && (
                                   <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-[11px]">
                                     {ev.details.fields.map((f) => (

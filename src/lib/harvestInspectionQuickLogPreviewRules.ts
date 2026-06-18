@@ -9,9 +9,7 @@
  *   - Read-only over the prefill the caller already received.
  *   - Caution & review copy are mandated literals enforced by tests.
  *   - Never recommends harvest action. Never contains forbidden harvest
- *     instruction phrasing ("harvest now", "ready to harvest", "optimal",
- *     "guaranteed", "chop", "flush", "dark period", "fix immediately",
- *     "plant is unhealthy").
+ *     instruction phrasing (see harvest-watch evidence rules test scan).
  */
 import {
   HARVEST_INSPECTION_PRESET_LABEL,

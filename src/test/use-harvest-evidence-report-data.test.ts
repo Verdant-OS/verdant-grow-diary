@@ -118,10 +118,10 @@ describe("useHarvestEvidenceReportData", () => {
   });
 
   it("does not call sensor_readings APIs", async () => {
-    // Static guarantee: hook source must not import sensor read paths.
     const fs = await import("node:fs");
+    const path = await import("node:path");
     const src = fs.readFileSync(
-      new URL("../hooks/useHarvestEvidenceReportData.ts", import.meta.url),
+      path.resolve(process.cwd(), "src/hooks/useHarvestEvidenceReportData.ts"),
       "utf8",
     );
     expect(src).not.toMatch(/sensor_readings/i);
@@ -143,8 +143,9 @@ describe("useHarvestEvidenceReportData", () => {
 
   it("does not import AI, alerts, action queue, or device control", async () => {
     const fs = await import("node:fs");
+    const path = await import("node:path");
     const src = fs.readFileSync(
-      new URL("../hooks/useHarvestEvidenceReportData.ts", import.meta.url),
+      path.resolve(process.cwd(), "src/hooks/useHarvestEvidenceReportData.ts"),
       "utf8",
     );
     expect(src).not.toMatch(/ai-doctor|aiDoctor|ai_doctor/i);

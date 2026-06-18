@@ -4,6 +4,13 @@ on:
   push:
     branches: [main]
   pull_request:
+    paths:
+      - '.github/workflows/ecowitt-only-safety-scan.yml'
+      - 'scripts/assert-ecowitt-only-sensor-direction.mjs'
+      - 'docs/ecowitt-only-sensor-direction.md'
+      - 'src/test/ecowitt-only-sensor-direction.test.ts'
+      - 'package.json'
+      - 'bun.lockb'
   workflow_dispatch:
 
 jobs:

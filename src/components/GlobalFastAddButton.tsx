@@ -16,7 +16,7 @@
  */
 import { useCallback, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { Plus, Zap } from "lucide-react";
 import {
   FAST_ADD_ACTIONS,
   FAST_ADD_NO_CONTEXT_COPY,
@@ -25,6 +25,9 @@ import {
   type FastAddActionId,
   type FastAddSelectionContext,
 } from "@/lib/fastAddActionRules";
+import HyperLogModal, { type HyperLogAction } from "@/components/HyperLogModal";
+
+
 
 export interface GlobalFastAddButtonProps {
   /**

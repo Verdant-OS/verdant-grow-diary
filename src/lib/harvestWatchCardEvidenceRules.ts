@@ -30,7 +30,8 @@ export type HarvestWatchV0ReadinessState =
   | "too_early_to_call"
   | "watch_window"
   | "ready_for_manual_review"
-  | "past_expected_window";
+  | "past_expected_window"
+  | "unknown";
 
 export const HARVEST_WATCH_V0_STATE_LABEL: Record<
   HarvestWatchV0ReadinessState,
@@ -41,11 +42,16 @@ export const HARVEST_WATCH_V0_STATE_LABEL: Record<
   watch_window: "Approaching watch window",
   ready_for_manual_review: "Ready for manual review",
   past_expected_window: "Past expected window",
+  unknown: "Unknown",
 };
 
 /**
  * Cautious copy per v0 state. NEVER instructs harvest action. Always defers
  * to grower judgement via direct plant inspection.
+ *
+ * Forbidden phrasing: "harvest now", "ready to harvest", "guaranteed",
+ * "optimal", "done", "chop", "flush", "dark period", "fix immediately",
+ * "plant is unhealthy" — enforced by harvest-watch-card-evidence-rules tests.
  */
 export const HARVEST_WATCH_V0_STATE_CAUTION: Record<
   HarvestWatchV0ReadinessState,
@@ -54,14 +60,24 @@ export const HARVEST_WATCH_V0_STATE_CAUTION: Record<
   not_enough_evidence:
     "Not enough harvest evidence yet. Add a trichome or flower inspection note.",
   too_early_to_call:
-    "Too early to call. Keep logging routine observations and photos.",
+    "Too early to call. Keep logging plant response and flower development.",
   watch_window:
     "Approaching manual review window. Inspect trichomes, pistils, and recent plant response.",
   ready_for_manual_review:
     "Evidence supports a manual harvest review. The grower decides.",
   past_expected_window:
-    "Past the expected window per logged context. Inspect the plant directly before deciding next steps.",
+    "Past expected window based on available dates. Re-check trichomes, pistils, and plant condition before deciding.",
+  unknown:
+    "Harvest Watch cannot determine a review state from the available information.",
 };
+
+/** Universal evidence-only caution surfaced under the card title. */
+export const HARVEST_WATCH_V0_UNIVERSAL_CAUTION =
+  "Harvest Watch is evidence-only. Confirm with direct plant inspection before making harvest decisions.";
+
+/** Surfaced next to the evidence checklist when one is rendered. */
+export const HARVEST_WATCH_V0_CHECKLIST_CAUTION =
+  "Evidence checklist — not a harvest instruction.";
 
 export interface MapV0ReadinessInput {
   row: HarvestWatchRowViewModel;
@@ -71,68 +87,96 @@ export interface MapV0ReadinessInput {
   daysInFlower: number | null;
   /** Expected harvest day if known. */
   expectedHarvestDay: number | null;
+  /**
+   * Count of present STRONG inspection signals (trichome / pistil / bud
+   * notes). Required for `ready_for_manual_review`. A single recent photo
+   * MUST NOT contribute to this count.
+   */
+  strongEvidenceCount: number;
 }
 
 /**
  * Maps the existing v1.5 row + ancillary context to a single v0 state.
  *
- * Rules (deterministic, cautious):
- *  • If readiness is gated (no score) AND evidence is sparse → not_enough_evidence.
- *  • If we have a date anchor but it's before the predicted window start
- *    by more than 14 days → too_early_to_call.
- *  • If days in flower > endDay + 7 → past_expected_window.
- *  • If trend === "approaching" AND readiness >= 0.75 AND at least 2 photos
- *    → ready_for_manual_review.
- *  • If trend === "approaching" OR trend === "holding" → watch_window.
- *  • Otherwise → not_enough_evidence.
+ * Cautious & deterministic. Mapping (in priority order):
+ *   1. past_expected_window — date anchor exists AND daysInFlower > end + 7.
+ *   2. too_early_to_call    — date anchor exists AND daysInFlower < start - 14.
+ *   3. too_early_to_call    — internal v1.5 trend === "early".
+ *   4. ready_for_manual_review — trend === "holding" AND
+ *                                 strongEvidenceCount >= 2.
+ *   5. watch_window          — trend === "approaching" or "holding".
+ *   6. unknown               — trend === "unknown" AND no evidence of any
+ *                              kind (no dates, no photos, no strong notes).
+ *   7. not_enough_evidence   — anything else.
+ *
+ * A single recent photo on its own can NEVER produce ready_for_manual_review
+ * — strong inspection notes are the only path.
  */
 export function mapToV0ReadinessState(
   input: MapV0ReadinessInput,
 ): HarvestWatchV0ReadinessState {
-  const { row, photoEvidenceCount, daysInFlower, expectedHarvestDay } = input;
-  const score = row.readiness.score;
+  const {
+    row,
+    photoEvidenceCount,
+    daysInFlower,
+    expectedHarvestDay,
+    strongEvidenceCount,
+  } = input;
   const trend = row.trend;
   const windowStart = row.harvestWindow?.startDay ?? null;
   const windowEnd = row.harvestWindow?.endDay ?? null;
+  const hasDateAnchor =
+    typeof daysInFlower === "number" && Number.isFinite(daysInFlower);
+  const hasExpectedDay =
+    typeof expectedHarvestDay === "number" &&
+    Number.isFinite(expectedHarvestDay) &&
+    expectedHarvestDay > 0;
 
-  // Past window: only when we have a real date anchor + window end.
+  // 1. Past window.
   if (
-    typeof daysInFlower === "number" &&
-    Number.isFinite(daysInFlower) &&
+    hasDateAnchor &&
     typeof windowEnd === "number" &&
     Number.isFinite(windowEnd) &&
-    daysInFlower > windowEnd + 7
+    (daysInFlower as number) > windowEnd + 7
   ) {
     return "past_expected_window";
   }
 
-  // Too early: meaningful date anchor that's well before window start.
+  // 2. Too early by date.
   if (
-    typeof daysInFlower === "number" &&
-    Number.isFinite(daysInFlower) &&
+    hasDateAnchor &&
     typeof windowStart === "number" &&
     Number.isFinite(windowStart) &&
-    daysInFlower < windowStart - 14
+    (daysInFlower as number) < windowStart - 14
   ) {
     return "too_early_to_call";
   }
 
-  // Ready for manual review — requires multiple signals AND non-trivial evidence.
-  if (
-    trend === "approaching" &&
-    typeof score === "number" &&
-    score >= 0.75 &&
-    photoEvidenceCount >= 2
-  ) {
+  // 3. Too early by internal trend label.
+  if (trend === "early") return "too_early_to_call";
+
+  // 4. Ready for manual review — needs multiple STRONG inspection signals.
+  if (trend === "holding" && strongEvidenceCount >= 2) {
     return "ready_for_manual_review";
   }
 
+  // 5. Watch window.
   if (trend === "approaching" || trend === "holding") {
     return "watch_window";
   }
 
-  // expectedHarvestDay unused below but accepted to permit future tightening.
-  void expectedHarvestDay;
+  // 6. Truly unknown — no evidence of any kind.
+  if (
+    trend === "unknown" &&
+    !hasDateAnchor &&
+    !hasExpectedDay &&
+    photoEvidenceCount === 0 &&
+    strongEvidenceCount === 0
+  ) {
+    return "unknown";
+  }
+
+  // 7. Default cautious fallback.
   return "not_enough_evidence";
 }
 

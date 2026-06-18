@@ -41,6 +41,10 @@ export interface DiaryEntryRemoveButtonProps {
   entry: DiaryEntryRemovalCandidate;
   viewer: DiaryEntryRemovalViewerContext;
   plantName?: string | null;
+  /** Optional metadata passed through for query invalidation. Not shown to users. */
+  plantId?: string | null;
+  tentId?: string | null;
+  growId?: string | null;
   onRemoved?: (id: string) => void;
   className?: string;
 }
@@ -49,6 +53,9 @@ export default function DiaryEntryRemoveButton({
   entry,
   viewer,
   plantName,
+  plantId,
+  tentId,
+  growId,
   onRemoved,
   className,
 }: DiaryEntryRemoveButtonProps) {
@@ -63,7 +70,13 @@ export default function DiaryEntryRemoveButton({
 
   const handleConfirm = async () => {
     if (!entry.id) return;
-    const ok = await remove({ id: entry.id, isPhotoLog: isPhoto });
+    const ok = await remove({
+      id: entry.id,
+      isPhotoLog: isPhoto,
+      plantId,
+      tentId,
+      growId,
+    });
     if (ok) setOpen(false);
   };
 

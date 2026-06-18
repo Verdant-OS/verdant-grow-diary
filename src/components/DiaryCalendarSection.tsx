@@ -34,6 +34,7 @@ import {
   type DiaryCalendarEventDrawerViewModel,
 } from "@/lib/diaryCalendarEventDrawerViewModel";
 import DiaryCalendarEventDrawer from "@/components/DiaryCalendarEventDrawer";
+import EnvironmentCheckInsightsPanel from "@/components/EnvironmentCheckInsightsPanel";
 import {
   readPersistedDiaryCalendarFilter,
   writePersistedDiaryCalendarFilter,
@@ -283,6 +284,10 @@ export default function DiaryCalendarSection({
           </div>
 
         </div>
+      )}
+
+      {hasAnyEntries && (
+        <EnvironmentCheckInsightsPanel rawEntries={rawEntries} />
       )}
 
       {hasAnyEntries && (

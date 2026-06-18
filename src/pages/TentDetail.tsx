@@ -94,7 +94,16 @@ export default function TentDetail() {
     setRosterIncludeArchived(next);
     writeTentPlantRosterIncludeArchived(id ?? null, next);
   };
-  const [selectedPlantTabId, setSelectedPlantTabId] = useState<string | null>(null);
+  const [selectedPlantTabId, setSelectedPlantTabIdState] = useState<string | null>(
+    () => readTentPlantTabsSelectedPlantId(id ?? null),
+  );
+  useEffect(() => {
+    setSelectedPlantTabIdState(readTentPlantTabsSelectedPlantId(id ?? null));
+  }, [id]);
+  const setSelectedPlantTabId = (next: string | null) => {
+    setSelectedPlantTabIdState(next);
+    writeTentPlantTabsSelectedPlantId(id ?? null, next);
+  };
 
   const [quickLogOpen, setQuickLogOpen] = useState(false);
   const { data: tent, isLoading, isError, refetch } = useGrowTent(id);

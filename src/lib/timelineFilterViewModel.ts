@@ -40,6 +40,7 @@ export function countTimelineFilterBuckets(
     photos: 0,
     manual_sensor_snapshot: 0,
     warnings: 0,
+    harvest_evidence: 0,
   };
   for (const item of items) {
     const buckets = classifyTimelineMemoryItem(item);

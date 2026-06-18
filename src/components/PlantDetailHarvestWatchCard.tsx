@@ -172,6 +172,12 @@ export default function PlantDetailHarvestWatchCard({
         >
           Next observation: {vm.nextObservation}
         </p>
+        <p
+          className="text-[11px] text-muted-foreground"
+          data-testid="plant-detail-harvest-watch-evidence-only-caution"
+        >
+          Harvest Watch is evidence-only. Confirm with direct plant inspection before making harvest decisions.
+        </p>
       </CardContent>
     </Card>
   );

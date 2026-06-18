@@ -26,6 +26,7 @@ import Settings from "./pages/Settings";
 import Timeline from "./pages/Timeline";
 import Grows from "./pages/Grows";
 import GrowDetail from "./pages/GrowDetail";
+import PhenoHuntNew from "./pages/PhenoHuntNew";
 import Reports from "./pages/Reports";
 
 import Coach from "./pages/Coach";
@@ -135,6 +136,7 @@ const App = () => (
                 <Route path="/grow-lineage" element={<GrowLineageRepair />} />
                 <Route path="/grows" element={<Grows />} />
                 <Route path="/grows/:growId" element={<GrowDetail />} />
+                <Route path="/pheno-hunts/new" element={<PhenoHuntNew />} />
                 <Route path="/reports" element={<Reports />} />
                 <Route
                   path="/diary/environment-summary"

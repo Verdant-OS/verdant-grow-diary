@@ -15,7 +15,10 @@
  * tent/plant data, does NOT add Harvest Watch recommendations.
  */
 import { plantDetailPath } from "@/lib/routes";
-import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
+import {
+  PLANT_RELATIVE_TIMELINE_ANCHOR_ID,
+  PLANT_PHOTOS_ANCHOR_ID,
+} from "@/lib/plantDetailQuickActions";
 import {
   PLANT_QUICKLOG_PREFILL_EVENT,
   type PlantQuickLogPrefill,
@@ -41,7 +44,18 @@ export interface TentPlantRosterQuickActionPlantInput {
 
 export interface TentPlantRosterQuickActionsInput
   extends TentPlantRosterQuickActionPlantInput,
-    TentPlantRosterQuickActionContext {}
+    TentPlantRosterQuickActionContext {
+  /**
+   * Override for the photos anchor availability. Defaults to true now that
+   * Plant Detail renders a dedicated `plant-photos` anchor. Tests/storybook
+   * can pass `false` to force the fallback (no-anchor) behavior.
+   */
+  photosAnchorAvailable?: boolean;
+}
+
+/** UI copy surfaced under the View Photos entry when the anchor is unavailable. */
+export const TENT_PLANT_ROSTER_PHOTOS_FALLBACK_HINT_COPY =
+  "Photos open on Plant Detail. Dedicated photo jump is not available yet.";
 
 export interface TentPlantRosterQuickActionEntry {
   kind: TentPlantRosterQuickActionKind;
@@ -66,7 +80,7 @@ export interface TentPlantRosterQuickActionEntry {
 }
 
 const DIARY_ANCHOR_AVAILABLE = true;
-const PHOTOS_ANCHOR_AVAILABLE = false;
+const PHOTOS_ANCHOR_AVAILABLE_DEFAULT = true;
 
 function buildPrefill(
   input: TentPlantRosterQuickActionsInput,

@@ -29,6 +29,13 @@ describe("diary removal slice — static safety", () => {
     expect(RULES).not.toMatch(/sonner/);
   });
 
+  it("invalidation module is pure (no React, no supabase, no toast, no react-query runtime)", () => {
+    expect(INVALIDATION).not.toMatch(/from\s+["']react["']/);
+    expect(INVALIDATION).not.toMatch(/@\/integrations\/supabase/);
+    expect(INVALIDATION).not.toMatch(/sonner/);
+    expect(INVALIDATION).not.toMatch(/@tanstack\/react-query/);
+  });
+
   it("does not touch sensor_readings", () => {
     for (const f of FILES) {
       expect(f.src, f.name).not.toMatch(/sensor_readings/);

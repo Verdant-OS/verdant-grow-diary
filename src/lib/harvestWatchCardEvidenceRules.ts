@@ -476,7 +476,7 @@ const PREFILL: Record<NextInspectionKind, { label: string; notePrefill: string }
 /**
  * Picks the most useful next inspection based on which evidence is missing.
  * Order: trichome → pistil → bud → photo → general. Never recommends
- * destructive actions (no chop / flush / dark period / heavy defoliation).
+ * destructive actions — see test forbidden-phrase list for enforcement.
  */
 export function pickNextInspection(
   checklist: readonly HarvestEvidenceChecklistItem[],

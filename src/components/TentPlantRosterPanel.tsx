@@ -36,6 +36,7 @@ export default function TentPlantRosterPanel({
   viewModel,
   testId = "tent-plant-roster-panel",
   className,
+  onToggleIncludeArchived,
 }: TentPlantRosterPanelProps) {
   return (
     <section

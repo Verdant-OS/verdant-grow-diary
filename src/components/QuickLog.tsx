@@ -97,6 +97,17 @@ export interface QuickLogPrefill {
    * and confirms the save manually.
    */
   note?: string | null;
+  /**
+   * Optional handoff source label (e.g. "hyperlog"). Drives the draft
+   * preview header copy — never used as a write path discriminator.
+   */
+  source?: "hyperlog" | string | null;
+  /**
+   * Optional count of locally previewed photos waiting in the upstream
+   * caller (HyperLog modal). Drives the "Photo preview only" copy.
+   * The legacy Quick Log editor never receives the files themselves.
+   */
+  photoCount?: number | null;
 }
 
 interface Props {

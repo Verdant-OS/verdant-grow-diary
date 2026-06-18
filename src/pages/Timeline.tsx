@@ -779,10 +779,12 @@ export default function Timeline() {
                                   plantName={plantName}
                                   plantId={e.plant_id ?? null}
                                   tentId={e.tent_id ?? null}
+                                  showFollowUp
                                   onRemoved={(removedId) => {
                                     setEntries((rows) => rows.filter((r) => r.id !== removedId));
                                   }}
                                 />
+
 
                               </div>
                               <p className="text-sm whitespace-pre-wrap">{e.note}</p>

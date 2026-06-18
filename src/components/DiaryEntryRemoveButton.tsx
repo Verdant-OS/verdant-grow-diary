@@ -36,6 +36,13 @@ import {
   type DiaryEntryRemovalCandidate,
   type DiaryEntryRemovalViewerContext,
 } from "@/lib/diaryEntryRemovalRules";
+import {
+  FOLLOW_UP_ACCESSIBLE_LABEL,
+  FOLLOW_UP_BUTTON_LABEL,
+  FOLLOW_UP_HELPER_COPY,
+  FOLLOW_UP_NOTE_PREFILL,
+  dispatchCorrectedQuickLogHandoff,
+} from "@/lib/diaryEntryRemovalFollowUpRules";
 
 export interface DiaryEntryRemoveButtonProps {
   entry: DiaryEntryRemovalCandidate;
@@ -47,6 +54,17 @@ export interface DiaryEntryRemoveButtonProps {
   growId?: string | null;
   onRemoved?: (id: string) => void;
   className?: string;
+  /**
+   * When true, after a successful removal show an inline "Add to correct
+   * plant" follow-up that dispatches the existing Quick Log handoff with
+   * tent/grow context but no plant id (operator must choose).
+   */
+  showFollowUp?: boolean;
+  /**
+   * Optional draft note prefilled into the corrected Quick Log handoff.
+   * Defaults to FOLLOW_UP_NOTE_PREFILL when undefined; pass null to omit.
+   */
+  followUpNote?: string | null;
 }
 
 export default function DiaryEntryRemoveButton({
@@ -58,9 +76,15 @@ export default function DiaryEntryRemoveButton({
   growId,
   onRemoved,
   className,
+  showFollowUp = false,
+  followUpNote,
 }: DiaryEntryRemoveButtonProps) {
   const [open, setOpen] = useState(false);
-  const { remove, isRemoving } = useRemoveDiaryEntry(onRemoved);
+  const [justRemoved, setJustRemoved] = useState(false);
+  const { remove, isRemoving } = useRemoveDiaryEntry((id) => {
+    setJustRemoved(true);
+    onRemoved?.(id);
+  });
 
   if (!canRemoveDiaryEntry(entry, viewer)) return null;
 
@@ -78,6 +102,22 @@ export default function DiaryEntryRemoveButton({
       growId,
     });
     if (ok) setOpen(false);
+  };
+
+  const handleFollowUp = () => {
+    const note =
+      followUpNote === null
+        ? undefined
+        : typeof followUpNote === "string"
+        ? followUpNote
+        : FOLLOW_UP_NOTE_PREFILL;
+    dispatchCorrectedQuickLogHandoff({
+      tentId,
+      // tentName is not passed by callers today; safe to omit.
+      growId,
+      note,
+    });
+    setJustRemoved(false);
   };
 
   return (
@@ -98,6 +138,33 @@ export default function DiaryEntryRemoveButton({
         <Trash2 className="h-3 w-3" />
         {label}
       </button>
+      {showFollowUp && justRemoved ? (
+        <span
+          className="inline-flex items-center gap-1.5"
+          data-testid="diary-entry-remove-followup"
+          role="status"
+        >
+          <button
+            type="button"
+            onClick={(ev) => {
+              ev.stopPropagation();
+              handleFollowUp();
+            }}
+            aria-label={FOLLOW_UP_ACCESSIBLE_LABEL}
+            title={FOLLOW_UP_HELPER_COPY}
+            data-testid="diary-entry-remove-followup-button"
+            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] border border-primary/40 text-primary hover:bg-primary/10 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
+            {FOLLOW_UP_BUTTON_LABEL}
+          </button>
+          <span
+            className="text-[11px] text-muted-foreground"
+            data-testid="diary-entry-remove-followup-helper"
+          >
+            {FOLLOW_UP_HELPER_COPY}
+          </span>
+        </span>
+      ) : null}
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent data-testid="diary-entry-remove-dialog">
           <AlertDialogHeader>
@@ -130,3 +197,4 @@ export default function DiaryEntryRemoveButton({
     </>
   );
 }
+

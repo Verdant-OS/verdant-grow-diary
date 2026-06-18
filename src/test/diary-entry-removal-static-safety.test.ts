@@ -13,11 +13,13 @@ const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 
 const RULES = read("src/lib/diaryEntryRemovalRules.ts");
 const INVALIDATION = read("src/lib/diaryEntryRemovalInvalidationRules.ts");
+const FOLLOWUP = read("src/lib/diaryEntryRemovalFollowUpRules.ts");
 const HOOK = read("src/hooks/useRemoveDiaryEntry.ts");
 const COMPONENT = read("src/components/DiaryEntryRemoveButton.tsx");
 const FILES = [
   { name: "rules", src: RULES },
   { name: "invalidation", src: INVALIDATION },
+  { name: "followup", src: FOLLOWUP },
   { name: "hook", src: HOOK },
   { name: "component", src: COMPONENT },
 ];
@@ -34,6 +36,18 @@ describe("diary removal slice — static safety", () => {
     expect(INVALIDATION).not.toMatch(/@\/integrations\/supabase/);
     expect(INVALIDATION).not.toMatch(/sonner/);
     expect(INVALIDATION).not.toMatch(/@tanstack\/react-query/);
+  });
+
+  it("follow-up module is pure (no React, no supabase, no toast, no react-query)", () => {
+    expect(FOLLOWUP).not.toMatch(/from\s+["']react["']/);
+    expect(FOLLOWUP).not.toMatch(/@\/integrations\/supabase/);
+    expect(FOLLOWUP).not.toMatch(/sonner/);
+    expect(FOLLOWUP).not.toMatch(/@tanstack\/react-query/);
+  });
+
+  it("follow-up module does not perform Supabase writes or hit storage", () => {
+    expect(FOLLOWUP).not.toMatch(/supabase\./);
+    expect(FOLLOWUP).not.toMatch(/storage/i);
   });
 
   it("does not touch sensor_readings", () => {

@@ -264,7 +264,13 @@ export default function DiaryCalendarSection({
         <div
           role="group"
           aria-label="Filter calendar by event type"
-          className="mb-3 flex flex-wrap gap-1.5"
+          className={cn(
+            // Mobile: single-row horizontal scroll with comfortable tap targets.
+            "mb-3 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1",
+            "[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
+            // Desktop: wrap chips into multiple rows; smaller gap.
+            "sm:mx-0 sm:px-0 sm:pb-0 sm:flex-wrap sm:gap-1.5 sm:overflow-visible",
+          )}
           data-testid="diary-calendar-filters"
         >
           {DIARY_CALENDAR_FILTERS.map((f) => {
@@ -279,7 +285,10 @@ export default function DiaryCalendarSection({
                 onClick={() => setFilter(f.value)}
                 data-testid={`diary-calendar-filter-${f.value}`}
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition",
+                  // Mobile: 44px-tall comfortable target, no wrapping, no shrink.
+                  "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-2 text-xs font-medium transition min-h-[40px]",
+                  // Desktop: tighter density to match prior look.
+                  "sm:px-2.5 sm:py-1 sm:text-[11px] sm:min-h-0",
                   active
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-secondary/50 text-foreground border-border/50 hover:bg-secondary",
@@ -288,7 +297,7 @@ export default function DiaryCalendarSection({
                 {f.label}
                 <span
                   className={cn(
-                    "inline-flex items-center justify-center min-w-[1rem] px-1 rounded-full text-[10px] font-semibold",
+                    "inline-flex items-center justify-center min-w-[1.25rem] px-1 rounded-full text-[10px] font-semibold",
                     active
                       ? "bg-primary-foreground/20 text-primary-foreground"
                       : "bg-muted text-muted-foreground",
@@ -304,15 +313,19 @@ export default function DiaryCalendarSection({
       )}
 
       {groups.length === 0 ? (
-        <div
-          className="py-8 text-center text-sm text-muted-foreground"
-          data-testid="diary-calendar-empty"
-        >
-          <p>{diaryCalendarMonthEmptyTitle(visibleMonth, filter)}</p>
-
-          <p className="text-xs mt-1">{DIARY_CALENDAR_EMPTY_HINT}</p>
-        </div>
+        filter === "environment" ? (
+          <EnvironmentCheckEmptyState />
+        ) : (
+          <div
+            className="py-8 text-center text-sm text-muted-foreground"
+            data-testid="diary-calendar-empty"
+          >
+            <p>{diaryCalendarMonthEmptyTitle(visibleMonth, filter)}</p>
+            <p className="text-xs mt-1">{DIARY_CALENDAR_EMPTY_HINT}</p>
+          </div>
+        )
       ) : (
+
         <>
           <div className="mb-3 flex flex-wrap gap-1.5 text-[11px]">
             <SummaryChip kind="watering" count={summary.counts.watering} />
@@ -528,3 +541,64 @@ function KindChip({
     </span>
   );
 }
+
+export const ENVIRONMENT_CHECK_EMPTY_TITLE = "No Environment Checks yet";
+export const ENVIRONMENT_CHECK_EMPTY_BODY =
+  "Log an Environment Check to capture grower-entered temp, humidity, VPD, CO₂, and notes for this day. These entries are diary evidence, not live sensor telemetry.";
+export const ENVIRONMENT_CHECK_EMPTY_CTA = "Add Environment Check";
+export const ENVIRONMENT_CHECK_EMPTY_CTA_FALLBACK = "Open Quick Log to add one.";
+
+function EnvironmentCheckEmptyState() {
+  // Dispatches the existing window event handled by Quick Log / Global Fast
+  // Add. No Supabase, no write helpers, no sensor_readings created here.
+  const canDispatch =
+    typeof window !== "undefined" && typeof window.dispatchEvent === "function";
+  const onClick = () => {
+    if (!canDispatch) return;
+    window.dispatchEvent(
+      new CustomEvent("verdant:open-quicklog", {
+        detail: { eventType: "environment", source: "diary-calendar-empty" },
+      }),
+    );
+  };
+  return (
+    <div
+      className="py-8 px-4 text-center"
+      data-testid="diary-calendar-empty"
+      role="status"
+    >
+      <p className="text-sm font-medium text-foreground">
+        {ENVIRONMENT_CHECK_EMPTY_TITLE}
+      </p>
+      <p
+        className="mt-2 text-xs text-muted-foreground max-w-md mx-auto"
+        data-testid="diary-calendar-environment-empty-body"
+      >
+        {ENVIRONMENT_CHECK_EMPTY_BODY}
+      </p>
+      <button
+        type="button"
+        onClick={canDispatch ? onClick : undefined}
+        disabled={!canDispatch}
+        data-testid="diary-calendar-environment-empty-cta"
+        aria-label={
+          canDispatch
+            ? ENVIRONMENT_CHECK_EMPTY_CTA
+            : ENVIRONMENT_CHECK_EMPTY_CTA_FALLBACK
+        }
+        className={cn(
+          "mt-4 inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium min-h-[40px] transition",
+          canDispatch
+            ? "bg-primary text-primary-foreground hover:bg-primary/90"
+            : "bg-secondary text-muted-foreground cursor-not-allowed",
+        )}
+      >
+        <Thermometer className="h-3.5 w-3.5" aria-hidden />
+        {canDispatch
+          ? ENVIRONMENT_CHECK_EMPTY_CTA
+          : ENVIRONMENT_CHECK_EMPTY_CTA_FALLBACK}
+      </button>
+    </div>
+  );
+}
+

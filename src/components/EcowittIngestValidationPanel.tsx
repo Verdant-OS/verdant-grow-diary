@@ -18,6 +18,7 @@ import {
   type EcowittValidationMetricStatus,
   type EcowittValidationStatus,
 } from "@/lib/ecowittIngestValidationViewModel";
+import { buildEcowittAuditDevSenderCommand } from "@/lib/ecowittAuditTentSelectionRules";
 import {
   buildLatestEvidenceSnapshot,
   serializeEvidenceForClipboard,

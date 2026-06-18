@@ -772,6 +772,14 @@ export default function Timeline() {
                                 >
                                   <Pencil className="h-3 w-3" />Edit
                                 </button>
+                                <DiaryEntryRemoveButton
+                                  entry={{ id: e.id, photoUrl: e.photo_url, kind: "diary" }}
+                                  viewer={{ currentUserId: user?.id ?? null }}
+                                  plantName={plantName}
+                                  onRemoved={(removedId) => {
+                                    setEntries((rows) => rows.filter((r) => r.id !== removedId));
+                                  }}
+                                />
                               </div>
                               <p className="text-sm whitespace-pre-wrap">{e.note}</p>
                               {remindAt && (

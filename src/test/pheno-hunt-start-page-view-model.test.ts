@@ -28,14 +28,21 @@ const baseDraft = (): PhenoHuntDraft => ({
 });
 
 describe("buildPhenoHuntStartPageView", () => {
-  it("reports save blocked in v0", () => {
-    const v = buildPhenoHuntStartPageView({
+  it("canSave is false without candidates, true when ready with selections", () => {
+    const noCandidates = buildPhenoHuntStartPageView({
       draft: baseDraft(),
       allPlants: [],
       selections: [],
     });
-    expect(v.canSave).toBe(false);
-    expect(v.saveBlockedReason).toMatch(/persistence/i);
+    expect(noCandidates.canSave).toBe(false);
+    expect(noCandidates.saveBlockedReason).toBeNull();
+
+    const ready = buildPhenoHuntStartPageView({
+      draft: baseDraft(),
+      allPlants: [plant({})],
+      selections: [{ plantId: "p1", label: "BB-01" }],
+    });
+    expect(ready.canSave).toBe(true);
   });
 
   it("returns no-grow empty state when grow missing", () => {

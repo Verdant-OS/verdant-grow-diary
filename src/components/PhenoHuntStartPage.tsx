@@ -2,7 +2,8 @@
  * Pheno Hunt Start Page — presenter component.
  *
  * Pure presenter: derives view state via the pheno hunt view model and
- * renders the v0 intake / setup UI. No persistence (blocked in v0).
+ * renders the v1 intake / setup UI. Persistence is performed via the
+ * injected createHunt helper (default: useCreatePhenoHunt → Supabase).
  * No AI, no alerts, no Action Queue, no device control.
  */
 import { useMemo, useState } from "react";
@@ -19,12 +20,23 @@ import {
   buildPhenoHuntStartPageView,
   type PhenoHuntEmptyState,
 } from "@/lib/phenoHuntStartPageViewModel";
+import { isPhenoHuntDraftSavable } from "@/lib/phenoHuntPersistenceRules";
+import {
+  useCreatePhenoHunt,
+  type CreatePhenoHuntInput,
+  type CreatePhenoHuntResult,
+  type CreatePhenoHuntStatus,
+} from "@/hooks/useCreatePhenoHunt";
 
 export interface PhenoHuntStartPageProps {
   /** Plants the operator can choose from. Filtering applied internally. */
   allPlants: readonly CandidatePlant[];
   /** Optional initial draft (e.g. tent-scoped entry from Tent Detail). */
   initialDraft?: Partial<PhenoHuntDraft>;
+  /** Authenticated user id; required to enable Save. */
+  userId?: string | null;
+  /** Test seam — override the persistence helper. */
+  createHuntOverride?: (input: CreatePhenoHuntInput) => Promise<CreatePhenoHuntResult>;
 }
 
 const EMPTY_STATE_COPY: Record<PhenoHuntEmptyState["kind"], string> = {
@@ -37,6 +49,8 @@ const EMPTY_STATE_COPY: Record<PhenoHuntEmptyState["kind"], string> = {
 export default function PhenoHuntStartPage({
   allPlants,
   initialDraft,
+  userId,
+  createHuntOverride,
 }: PhenoHuntStartPageProps) {
   const [draft, setDraft] = useState<PhenoHuntDraft>(() => ({
     ...emptyPhenoHuntDraft(),
@@ -45,9 +59,23 @@ export default function PhenoHuntStartPage({
   const [selections, setSelections] = useState<CandidateSelection[]>([]);
   const [includeArchived, setIncludeArchived] = useState(false);
 
+  const hook = useCreatePhenoHunt();
+  const create = createHuntOverride ?? hook.create;
+  const [overrideStatus, setOverrideStatus] = useState<CreatePhenoHuntStatus>("idle");
+  const [overrideResult, setOverrideResult] = useState<CreatePhenoHuntResult | null>(null);
+  const status: CreatePhenoHuntStatus = createHuntOverride ? overrideStatus : hook.status;
+  const lastResult: CreatePhenoHuntResult | null = createHuntOverride
+    ? overrideResult
+    : hook.lastResult;
+
   const view = useMemo(
     () => buildPhenoHuntStartPageView({ draft, allPlants, selections, includeArchived }),
     [draft, allPlants, selections, includeArchived],
+  );
+
+  const savable = useMemo(
+    () => isPhenoHuntDraftSavable({ draft, selections, plants: allPlants }),
+    [draft, selections, allPlants],
   );
 
   function patch<K extends keyof PhenoHuntDraft>(key: K, value: PhenoHuntDraft[K]) {
@@ -293,22 +321,58 @@ export default function PhenoHuntStartPage({
           </p>
         ) : null}
 
-        <div className="pt-2">
+        <div className="pt-2 space-y-2">
           <button
             type="button"
-            disabled
-            className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground opacity-50 cursor-not-allowed"
+            disabled={!savable || !userId || status === "saving" || status === "saved"}
+            onClick={async () => {
+              if (!userId) return;
+              if (createHuntOverride) {
+                setOverrideStatus("saving");
+                const res = await create({ userId, draft, selections });
+                setOverrideResult(res);
+                setOverrideStatus(res.ok ? "saved" : "error");
+              } else {
+                await create({ userId, draft, selections });
+              }
+            }}
+            className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="ph-save-cta"
-            aria-disabled="true"
+            aria-disabled={!savable || !userId || status === "saving" || status === "saved"}
           >
-            Create hunt
+            {status === "saving"
+              ? "Creating Pheno Hunt…"
+              : status === "saved"
+                ? "Pheno Hunt Created"
+                : savable && userId
+                  ? "Create Pheno Hunt"
+                  : "Complete required setup"}
           </button>
-          {view.saveBlockedReason ? (
+
+          {!savable || !userId ? (
             <p
-              className="mt-2 text-xs text-muted-foreground"
+              className="text-xs text-muted-foreground"
               data-testid="ph-save-blocked-copy"
             >
-              {view.saveBlockedReason}
+              {userId
+                ? "Complete required setup to create this pheno hunt."
+                : "Sign in to create a pheno hunt."}
+            </p>
+          ) : null}
+
+          {status === "error" && lastResult?.errorMessage ? (
+            <p
+              className="text-xs text-destructive"
+              data-testid="ph-save-error"
+              role="alert"
+            >
+              Could not create pheno hunt: {lastResult.errorMessage}
+            </p>
+          ) : null}
+
+          {status === "saved" && lastResult?.huntId ? (
+            <p className="text-xs text-emerald-700 dark:text-emerald-400" data-testid="ph-save-success">
+              Pheno hunt saved. You can keep refining details from the hunt page.
             </p>
           ) : null}
         </div>

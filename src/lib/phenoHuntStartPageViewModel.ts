@@ -40,7 +40,7 @@ export interface PhenoHuntStartPageView {
   selectedCandidates: CandidateRow[];
   missingRequired: RequiredField[];
   ready: boolean;
-  canSave: false; // v0: persistence blocked
+  canSave: boolean;
   saveBlockedReason: string | null;
   summary: PhenoHuntStartPageSummary;
   emptyState: PhenoHuntEmptyState | null;
@@ -105,10 +105,8 @@ export function buildPhenoHuntStartPageView(
     selectedCandidates,
     missingRequired,
     ready,
-    canSave: false,
-    saveBlockedReason: PHENO_HUNT_PERSISTENCE_BLOCKED
-      ? "Saving pheno hunts requires a dedicated persistence slice."
-      : null,
+    canSave: ready && selectedCandidates.length > 0 && !PHENO_HUNT_PERSISTENCE_BLOCKED,
+    saveBlockedReason: null,
     summary,
     emptyState,
   };

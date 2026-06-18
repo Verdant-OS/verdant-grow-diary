@@ -6,8 +6,15 @@
  * no alerts, no Action Queue, no device control.
  */
 
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import type { TentPlantRosterViewModel } from "@/lib/tentPlantRosterViewModel";
+import {
+  buildTentPlantRosterQuickActions,
+  dispatchTentPlantRosterQuickLog,
+  tentPlantRosterQuickActionsTriggerLabel,
+  type TentPlantRosterQuickActionContext,
+  type TentPlantRosterQuickActionEntry,
+} from "@/lib/tentPlantRosterQuickActions";
 
 export interface TentPlantRosterPanelProps {
   viewModel: TentPlantRosterViewModel;
@@ -19,6 +26,11 @@ export interface TentPlantRosterPanelProps {
    * `viewModel.includeArchived`. Read-only — no writes, no persistence.
    */
   onToggleIncludeArchived?: (next: boolean) => void;
+  /**
+   * When provided, each row renders a compact quick-action menu (View
+   * diary, Add Quick Log, View photos) wired to existing handoffs only.
+   */
+  quickActionContext?: TentPlantRosterQuickActionContext;
 }
 
 function formatLatestLogAt(iso: string | null): string | null {
@@ -37,7 +49,28 @@ export default function TentPlantRosterPanel({
   testId = "tent-plant-roster-panel",
   className,
   onToggleIncludeArchived,
+  quickActionContext,
 }: TentPlantRosterPanelProps) {
+  const navigate = useNavigate();
+
+  function handleEntryActivate(
+    entry: TentPlantRosterQuickActionEntry,
+    e: React.MouseEvent<HTMLAnchorElement | HTMLButtonElement>,
+  ) {
+    if (entry.disabled) {
+      e.preventDefault();
+      return;
+    }
+    if (entry.event === "open-quicklog") {
+      e.preventDefault();
+      dispatchTentPlantRosterQuickLog(entry.eventPayload ?? null);
+      return;
+    }
+    if (entry.href) {
+      e.preventDefault();
+      navigate(entry.href);
+    }
+  }
   return (
     <section
       data-testid={testId}
@@ -201,7 +234,7 @@ export default function TentPlantRosterPanel({
                 >
                   {row.harvestWatchPublicState ?? row.harvestWatchFallbackCopy}
                 </p>
-                <div className="mt-3">
+                <div className="mt-3 flex items-center justify-between gap-2">
                   <Link
                     to={row.plantDetailHref}
                     className="text-xs underline underline-offset-2"
@@ -209,6 +242,76 @@ export default function TentPlantRosterPanel({
                   >
                     Open Plant Detail
                   </Link>
+                  {quickActionContext && (() => {
+                    const entries = buildTentPlantRosterQuickActions({
+                      plantId: row.id,
+                      plantName: row.name,
+                      tentId: quickActionContext.tentId,
+                      tentName: quickActionContext.tentName ?? null,
+                      growId: quickActionContext.growId ?? null,
+                    });
+                    const triggerLabel = tentPlantRosterQuickActionsTriggerLabel(row.name);
+                    return (
+                      <details
+                        className="relative text-xs"
+                        data-testid={`tent-plant-roster-row-${row.id}-actions`}
+                      >
+                        <summary
+                          className="cursor-pointer list-none rounded-md border px-2 py-1 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                          aria-label={triggerLabel}
+                          data-testid={`tent-plant-roster-row-${row.id}-actions-trigger`}
+                        >
+                          Plant actions
+                        </summary>
+                        <ul
+                          role="menu"
+                          className="absolute right-0 z-10 mt-1 min-w-[10rem] rounded-md border bg-popover p-1 shadow-md"
+                          data-testid={`tent-plant-roster-row-${row.id}-actions-menu`}
+                        >
+                          {entries.map((entry) => {
+                            const baseClass =
+                              "block w-full text-left rounded-sm px-2 py-1 text-xs hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+                            const aria = entry.disabled && entry.disabledReason
+                              ? `${entry.label} (unavailable: ${entry.disabledReason})`
+                              : entry.label;
+                            if (entry.event === "open-quicklog") {
+                              return (
+                                <li key={entry.kind} role="none">
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    className={baseClass}
+                                    aria-label={aria}
+                                    aria-disabled={entry.disabled || undefined}
+                                    data-testid={entry.testId}
+                                    onClick={(e) => handleEntryActivate(entry, e)}
+                                  >
+                                    {entry.label}
+                                  </button>
+                                </li>
+                              );
+                            }
+                            return (
+                              <li key={entry.kind} role="none">
+                                <a
+                                  role="menuitem"
+                                  href={entry.href ?? "#"}
+                                  className={baseClass}
+                                  aria-label={aria}
+                                  aria-disabled={entry.disabled || undefined}
+                                  data-testid={entry.testId}
+                                  data-anchor-blocked={entry.anchorBlocked ? "true" : undefined}
+                                  onClick={(e) => handleEntryActivate(entry, e)}
+                                >
+                                  {entry.label}
+                                </a>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </details>
+                    );
+                  })()}
                 </div>
               </li>
             );

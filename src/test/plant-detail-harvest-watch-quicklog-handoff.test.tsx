@@ -107,7 +107,7 @@ describe("Harvest Watch — Quick Log handoff", () => {
       data: [
         makeRow({
           id: "n1",
-          notes: "Checked trichomes — about 30% cloudy across upper colas.",
+          note: "Checked trichomes — about 30% cloudy across upper colas.",
         }),
       ],
       isLoading: false,
@@ -126,8 +126,8 @@ describe("Harvest Watch — Quick Log handoff", () => {
   it("trichome + pistil present, bud missing → dispatches bud_maturity preset", () => {
     mocks.usePlantRecentActivity.mockReturnValue({
       data: [
-        makeRow({ id: "n1", notes: "Trichomes mostly cloudy." }),
-        makeRow({ id: "n2", notes: "Pistils 50% receded." }),
+        makeRow({ id: "n1", note: "Trichomes mostly cloudy." }),
+        makeRow({ id: "n2", note: "Pistils 50% receded." }),
       ],
       isLoading: false,
     });
@@ -144,9 +144,9 @@ describe("Harvest Watch — Quick Log handoff", () => {
   it("only photo missing → dispatches close_flower_photo preset (eventType=photo)", () => {
     mocks.usePlantRecentActivity.mockReturnValue({
       data: [
-        makeRow({ id: "n1", notes: "Trichomes mostly cloudy." }),
-        makeRow({ id: "n2", notes: "Pistils 50% receded." }),
-        makeRow({ id: "n3", notes: "Buds swelling, calyxes dense." }),
+        makeRow({ id: "n1", note: "Trichomes mostly cloudy." }),
+        makeRow({ id: "n2", note: "Pistils 50% receded." }),
+        makeRow({ id: "n3", note: "Buds swelling, calyxes dense." }),
       ],
       isLoading: false,
     });

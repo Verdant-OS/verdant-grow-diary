@@ -35,8 +35,13 @@ import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
 import { buildPlantDetailHarvestWatchCardViewModel } from "@/lib/plantDetailHarvestWatchCardViewModel";
 import type {
   HarvestWatchV0ReadinessState,
-  NextInspectionPrefill,
 } from "@/lib/harvestWatchCardEvidenceRules";
+import {
+  buildHarvestInspectionQuickLogPrefill,
+  pickHarvestInspectionPreset,
+  type HarvestInspectionQuickLogPrefill,
+} from "@/lib/harvestInspectionQuickLogRules";
+import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { cn } from "@/lib/utils";
 
 interface PlantDetailHarvestWatchCardProps {

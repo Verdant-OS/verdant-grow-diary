@@ -74,17 +74,20 @@ export default function EcowittIngestAudit() {
   );
   const effectiveTentId = selection.selectedTentId;
 
-  // Keep the URL in sync with the resolved selection so refresh + share links
-  // open the same tent. Never silently overwrite a different user request.
+  // Keep the URL in sync with the resolved selection on initial load so
+  // refresh + share links open the same tent. Do NOT rewrite the URL when
+  // the operator explicitly requested an invalid tent — keep the warning
+  // visible until they pick another tent from the dropdown.
   useEffect(() => {
     if (!effectiveTentId) return;
+    if (selection.invalidRequested) return;
     if (urlTentId === effectiveTentId) return;
     setSearchParams(
       (current) =>
         applyEcowittAuditTentIdToSearch(current, effectiveTentId),
       { replace: true },
     );
-  }, [effectiveTentId, urlTentId, setSearchParams]);
+  }, [effectiveTentId, urlTentId, selection.invalidRequested, setSearchParams]);
 
   const handleTentChange = (next: string | null) => {
     setUserSelectedTentId(next);

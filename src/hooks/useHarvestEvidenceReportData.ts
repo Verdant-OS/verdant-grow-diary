@@ -5,9 +5,9 @@
  * Reuses the existing diary read-path (`usePlantRecentActivity`) and the
  * normalized PlantRecentActivityRow shape (via `buildPlantRecentActivity`),
  * which is already an acceptable `HarvestEvidenceClassifiableRow`. The
- * hook only loads diary entries — it does NOT read sensor_readings, does
- * NOT call AI, does NOT write, does NOT touch alerts or the Action Queue,
- * and does NOT touch device control.
+ * hook only loads diary entries — it does NOT read sensor telemetry,
+ * does NOT call AI, does NOT write, does NOT touch alerts or the action
+ * queue, and does NOT touch device control.
  *
  * Returned shape feeds `buildHarvestEvidenceReport` directly.
  */

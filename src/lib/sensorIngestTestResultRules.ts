@@ -87,8 +87,6 @@ export const SANITIZED_WEBHOOK_ERROR_COPY: Record<string, string> = {
     "The function could not verify the bridge token. Retry shortly.",
 };
 
-const SERVER_ROLE_ENV_NAME = ["SUPABASE", "SERVICE", "ROLE", "KEY"].join("_");
-
 // Strip strings that look like Bearer headers, JWTs, vbt_* tokens, or
 // server-only keys before rendering. Defense-in-depth: the server already
 // sanitizes its responses, but the diagnostic UI must not become a leak

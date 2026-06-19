@@ -1,20 +1,3 @@
-/**
- * aiDoctorPhase1TimelineEvidenceViewModel — pure read-only view-model.
- *
- * Detects and shapes a saved AI Doctor Phase 1 evidence entry for display
- * on a plant's timeline. This is a READ-ONLY presenter helper; it never
- * mutates data, writes Action Queue items, raises notifications, calls AI
- * models, or controls equipment.
- *
- * Hard constraints:
- *  - Pure, deterministic, null-safe.
- *  - Malformed `details` degrade gracefully to a minimal safe shape.
- *  - Does NOT surface raw_payload, secrets, tokens, env vars, or model
- *    prompts.
- *  - Does NOT include approve / send / execute / action-queue copy.
- *  - Link target is a deep link into the read-only Operator AI Doctor
- *    Phase 1 review page only.
- */
 import {
   AI_DOCTOR_PHASE1_EVIDENCE_DISCLAIMER,
   AI_DOCTOR_PHASE1_EVIDENCE_LABEL,
@@ -30,11 +13,6 @@ export const AI_DOCTOR_PHASE1_TIMELINE_SOURCE_LABEL =
 export const AI_DOCTOR_PHASE1_TIMELINE_REVIEW_BASE_PATH =
   "/operator/ai-doctor-phase1" as const;
 
-/**
- * Minimal saved-event shape this view-model consumes. The fetch layer
- * must surface `details` (e.g. by joining `diary_entries.details`) for
- * the discriminator to be visible.
- */
 export interface AiDoctorPhase1TimelineEvidenceEventInput {
   id?: string | null;
   occurred_at?: string | null;
@@ -71,6 +49,8 @@ export interface AiDoctorPhase1TimelineEvidenceViewModel {
   missingInformation: readonly string[];
   missingInformationCount: number;
   occurredAt: string | null;
+  savedAtLabel: string | null;
+  metadataLine: string | null;
   link: AiDoctorPhase1TimelineEvidenceLink;
 }
 
@@ -95,11 +75,29 @@ function asStringArray(value: unknown): string[] {
   return out;
 }
 
-/**
- * Returns true only when the event's `details.kind` matches the saved
- * AI Doctor Phase 1 evidence discriminator. Defensive against missing,
- * malformed, or non-object details.
- */
+export function formatAiDoctorPhase1TimelineSavedAt(
+  iso: string | null | undefined,
+): string | null {
+  if (typeof iso !== "string" || iso.length === 0) return null;
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return null;
+  try {
+    return (
+      new Intl.DateTimeFormat("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZone: "UTC",
+      }).format(new Date(ms)) + " UTC"
+    );
+  } catch {
+    return iso;
+  }
+}
+
 export function isAiDoctorPhase1EvidenceEvent(
   event: AiDoctorPhase1TimelineEvidenceEventInput | null | undefined,
 ): boolean {
@@ -109,11 +107,14 @@ export function isAiDoctorPhase1EvidenceEvent(
   return details.kind === AI_DOCTOR_PHASE1_TIMELINE_KIND;
 }
 
-function buildLink(
-  plantId: string | null,
-  growId: string | null,
-  tentId: string | null,
-): AiDoctorPhase1TimelineEvidenceLink {
+export function buildAiDoctorPhase1TimelineReviewHref(input: {
+  plantId?: string | null;
+  growId?: string | null;
+  tentId?: string | null;
+}): AiDoctorPhase1TimelineEvidenceLink {
+  const plantId = asString(input.plantId) ?? null;
+  const growId = asString(input.growId) ?? null;
+  const tentId = asString(input.tentId) ?? null;
   const params = new URLSearchParams();
   if (plantId) params.set("plantId", plantId);
   if (growId) params.set("growId", growId);
@@ -130,11 +131,6 @@ function buildLink(
   };
 }
 
-/**
- * Builds a deterministic, redacted view-model from a saved AI Doctor
- * Phase 1 evidence event. Returns null if the event is not a valid
- * AI Doctor Phase 1 evidence entry.
- */
 export function buildAiDoctorPhase1TimelineEvidenceViewModel(
   event: AiDoctorPhase1TimelineEvidenceEventInput | null | undefined,
 ): AiDoctorPhase1TimelineEvidenceViewModel | null {
@@ -152,6 +148,7 @@ export function buildAiDoctorPhase1TimelineEvidenceViewModel(
   const tentId = asString(event!.tent_id);
   const occurredAt =
     asString(event!.occurred_at) ?? asString(event!.entry_at) ?? null;
+  const savedAtLabel = formatAiDoctorPhase1TimelineSavedAt(occurredAt);
 
   return {
     id: asString(event!.id),
@@ -171,6 +168,8 @@ export function buildAiDoctorPhase1TimelineEvidenceViewModel(
     missingInformation: asStringArray(result.missing_information),
     missingInformationCount: asStringArray(result.missing_information).length,
     occurredAt,
-    link: buildLink(plantId, growId, tentId),
+    savedAtLabel,
+    metadataLine: savedAtLabel ? `Saved ${savedAtLabel}` : null,
+    link: buildAiDoctorPhase1TimelineReviewHref({ plantId, growId, tentId }),
   };
 }

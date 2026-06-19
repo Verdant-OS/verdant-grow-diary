@@ -1,16 +1,3 @@
-/**
- * AiDoctorPhase1TimelineEvidenceCard — read-only timeline card.
- *
- * Presenter only. Renders a saved AI Doctor Phase 1 evidence entry on
- * the plant timeline with a deep link back to the read-only Operator
- * Phase 1 review page.
- *
- * Hard constraints:
- *  - No save / approve / send / execute controls.
- *  - No Action Queue, alert, or device-control buttons.
- *  - No fetches, no AI model calls, no mutations.
- *  - Link only.
- */
 import { Link } from "react-router-dom";
 import type { AiDoctorPhase1TimelineEvidenceViewModel } from "@/lib/aiDoctorPhase1TimelineEvidenceViewModel";
 import { AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES } from "@/lib/aiDoctorPhase1A11yClassNames";
@@ -32,6 +19,8 @@ export function AiDoctorPhase1TimelineEvidenceCard({
     evidenceCount,
     missingInformationCount,
     occurredAt,
+    savedAtLabel,
+    metadataLine,
     disclaimer,
     link,
   } = viewModel;
@@ -53,6 +42,19 @@ export function AiDoctorPhase1TimelineEvidenceCard({
           </span>
         ))}
       </header>
+
+      {metadataLine && occurredAt && savedAtLabel && (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="ai-doctor-phase1-timeline-evidence-card-metadata"
+        >
+          <span className="font-medium text-foreground">Read-only evidence</span>
+          {" · "}
+          <span>
+            Saved date: <time dateTime={occurredAt}>{savedAtLabel}</time>
+          </span>
+        </p>
+      )}
 
       <p className="text-sm text-foreground">{summary}</p>
 
@@ -98,11 +100,11 @@ export function AiDoctorPhase1TimelineEvidenceCard({
       <div className="pt-1">
         <Link
           to={link.href}
-          aria-label="Review AI Doctor context for this saved evidence"
+          aria-label="Review AI Doctor Phase 1 results for this saved evidence"
           data-testid="ai-doctor-phase1-timeline-evidence-card-review-link"
           className={`inline-flex min-h-10 items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted ${AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES}`}
         >
-          Review AI Doctor context
+          Review AI Doctor Phase 1 results
         </Link>
       </div>
     </article>

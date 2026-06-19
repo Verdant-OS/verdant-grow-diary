@@ -282,27 +282,23 @@ describe("status helpers only update status + timestamps", () => {
     expect(patch.resolved_at).toBeNull();
   });
 
-  it("resolveAlert sets status + resolved_at and clears acknowledged_at", async () => {
-    // Regression: an acknowledged alert had a non-null acknowledged_at, which
-    // violated alerts_acknowledged_at_status_check on resolve.
+  it("resolveAlert sets status + resolved_at and preserves acknowledged_at history", async () => {
+    // Post-fix: acknowledged_at is intentionally OMITTED from the patch so
+    // a historical acknowledged_at value is preserved by the database.
     await mod.resolveAlert("a1");
     const patch = spies.update.mock.calls[0][0] as Record<string, unknown>;
-    expect(Object.keys(patch).sort()).toEqual(
-      ["acknowledged_at", "resolved_at", "status"].sort(),
-    );
+    expect(Object.keys(patch).sort()).toEqual(["resolved_at", "status"].sort());
     expect(patch.status).toBe("resolved");
-    expect(patch.acknowledged_at).toBeNull();
+    expect(patch).not.toHaveProperty("acknowledged_at");
   });
 
-  it("dismissAlert sets status and clears both timestamps", async () => {
+  it("dismissAlert sets status, clears resolved_at, preserves acknowledged_at history", async () => {
     await mod.dismissAlert("a1");
     const patch = spies.update.mock.calls[0][0] as Record<string, unknown>;
-    expect(Object.keys(patch).sort()).toEqual(
-      ["acknowledged_at", "resolved_at", "status"].sort(),
-    );
+    expect(Object.keys(patch).sort()).toEqual(["resolved_at", "status"].sort());
     expect(patch.status).toBe("dismissed");
-    expect(patch.acknowledged_at).toBeNull();
     expect(patch.resolved_at).toBeNull();
+    expect(patch).not.toHaveProperty("acknowledged_at");
   });
 
   it("saveAlert insert payload never contains user_id", async () => {

@@ -91,9 +91,10 @@ export async function acknowledgeAlert(id: string): Promise<AlertRow> {
 /**
  * Mark an alert as resolved.
  *
- * Clears acknowledged_at so the row satisfies
- * `alerts_acknowledged_at_status_check` (acknowledged_at must be NULL
- * unless status = 'acknowledged'). Stamps resolved_at.
+ * Stamps resolved_at and intentionally OMITS `acknowledged_at` from the
+ * patch so any historical acknowledgement timestamp is preserved by the
+ * database. The relaxed `alerts_acknowledged_at_status_check` allows
+ * resolved rows to carry a non-null `acknowledged_at`.
  */
 export async function resolveAlert(id: string): Promise<AlertRow> {
   const { data, error } = await alertsTable()
@@ -108,8 +109,10 @@ export async function resolveAlert(id: string): Promise<AlertRow> {
 /**
  * Dismiss an alert.
  *
- * Clears both acknowledged_at and resolved_at — the dismissed state matches
- * neither of the timestamp CHECK constraints.
+ * Clears `resolved_at` (the unchanged `alerts_resolved_at_status_check`
+ * still requires it to be NULL outside `status='resolved'`). Intentionally
+ * OMITS `acknowledged_at` from the patch so historical acknowledgement
+ * timestamps are preserved.
  */
 export async function dismissAlert(id: string): Promise<AlertRow> {
   const { data, error } = await alertsTable()

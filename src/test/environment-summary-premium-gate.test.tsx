@@ -45,15 +45,48 @@ vi.mock("@/hooks/use-diary-entries", () => ({
 }));
 
 vi.mock("@/integrations/supabase/client", () => {
-  const proxy: any = new Proxy(
-    {},
+  // Minimal supabase mock — only `functions.invoke` is allowed (the server-
+  // authoritative gate). Any other property access throws to keep the test
+  // honest about what surfaces are touched.
+  const supabase: any = new Proxy(
     {
-      get() {
-        throw new Error("Supabase access not allowed in premium gate test");
+      functions: {
+        invoke: async () => {
+          if (entitlementMock.current === "pro") {
+            return {
+              data: {
+                ok: true,
+                feature: "environment_summary_report",
+                display_plan_id: "pro_monthly",
+                effective_plan_id: "pro_monthly",
+                capabilities: { advancedExports: true },
+              },
+              error: null,
+            };
+          }
+          return {
+            data: {
+              ok: false,
+              reason: "upgrade_required",
+              feature: "environment_summary_report",
+              display_plan_id: "free",
+              effective_plan_id: "free",
+            },
+            error: { context: { status: 403 } } as any,
+          };
+        },
+      },
+    },
+    {
+      get(target: any, prop) {
+        if (prop in target) return target[prop];
+        throw new Error(
+          `Supabase access not allowed in premium gate test: ${String(prop)}`,
+        );
       },
     },
   );
-  return { supabase: proxy };
+  return { supabase };
 });
 
 import EnvironmentSummaryReportPage from "@/pages/EnvironmentSummaryReportPage";

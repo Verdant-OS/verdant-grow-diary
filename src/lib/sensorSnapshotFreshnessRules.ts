@@ -463,25 +463,25 @@ function deriveWarningCopy(
     case "fresh":
       return null;
     case "demo":
-      return "Demo data — never treated as live.";
+      return "Demo data — never treated as live. Enter a manual reading before making decisions.";
     case "stale":
       return m.ageLabel
-        ? `Sensor data is stale (${m.ageLabel}). Save will be marked accordingly.`
-        : "Sensor data is stale. Save will be marked accordingly.";
+        ? `Sensor data is stale (${m.ageLabel}). Refresh evidence before using this for decisions. Save will be marked accordingly.`
+        : "Sensor data is stale. Refresh evidence before using this for decisions. Save will be marked accordingly.";
     case "invalid":
       if (m.reasonCodes.includes("future_captured_at")) {
-        return "Sensor timestamp is in the future. Treated as invalid.";
+        return "Sensor timestamp is in the future. Treated as invalid. Check latest sensor ingestion.";
       }
       if (m.reasonCodes.includes("missing_captured_at")) {
-        return "Sensor data is missing a capture time. Treated as invalid.";
+        return "Sensor data is missing a capture time. Treated as invalid. Enter a manual reading or check latest sensor ingestion.";
       }
       if (m.reasonCodes.includes("unknown_source")) {
-        return "Sensor source is unknown. Treated as invalid.";
+        return "Sensor source is unknown. Treated as invalid. Confirm the source label.";
       }
-      return "Sensor data is invalid.";
+      return "Sensor data is invalid. Refresh evidence before using this for decisions.";
     case "unknown":
     default:
-      return "Sensor context is unavailable.";
+      return "Sensor context is unavailable. Enter a manual reading or check latest sensor ingestion.";
   }
 }
 

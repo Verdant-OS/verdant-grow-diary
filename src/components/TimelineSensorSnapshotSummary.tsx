@@ -31,6 +31,7 @@ import {
 import { MISSING_SNAPSHOT_NOTE_LABEL } from "@/lib/manualSensorSnapshotViewModel";
 import type { SnapshotStatus } from "@/lib/sensorSnapshotStatusContract";
 import type { ManualSnapshotQuality } from "@/lib/manualSensorSnapshotQualityRules";
+import { formatAgeLabel } from "@/lib/sensorSnapshotFreshnessRules";
 
 /** Local, presentation-only mapping. Keeps demo/csv/etc. non-healthy. */
 function qualityToStatus(q: ManualSnapshotQuality): SnapshotStatus {

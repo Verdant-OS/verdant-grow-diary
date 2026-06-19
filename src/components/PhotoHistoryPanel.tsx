@@ -9,6 +9,10 @@ import {
   buildPhotoHistory,
   type PhotoHistoryRow,
 } from "@/lib/photoHistoryRules";
+import {
+  PHOTO_NON_DIAGNOSTIC_LABEL,
+  PHOTO_NON_DIAGNOSTIC_TESTID,
+} from "@/lib/photoEventNonDiagnosticLabelRules";
 
 interface PhotoHistoryPanelProps {
   /**
@@ -72,6 +76,14 @@ function Card({ row }: { row: PhotoHistoryRow }) {
         {row.stage && (
           <div className="text-[11px] text-muted-foreground/80">
             Stage: <span className="text-foreground/80">{row.stage}</span>
+          </div>
+        )}
+        {row.showPhotoNonDiagnosticLabel && (
+          <div
+            data-testid={PHOTO_NON_DIAGNOSTIC_TESTID}
+            className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground/80"
+          >
+            {PHOTO_NON_DIAGNOSTIC_LABEL}
           </div>
         )}
         {row.caption && (

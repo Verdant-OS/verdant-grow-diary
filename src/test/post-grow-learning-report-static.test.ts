@@ -53,7 +53,7 @@ describe("Post-Grow Learning Report safety", () => {
   it("does not add schema, RLS, Edge, RPC, AI, or device-control surfaces", () => {
     const all = [APP, PAGE, CARDS, HOOK, RULES, GROW_DETAIL].join("\n");
     expect(all).not.toMatch(/create table|alter table|policy|service_role|functions\.invoke|ai_doctor|openai/i);
-    expect(all).not.toMatch(/target_device:\s*[^n]/);
+    expect(all).not.toMatch(/target_device:\s*(?!null\b)/);
     expect(all).not.toMatch(/relay\.|actuator|dispatchCommand|device_control/i);
   });
 

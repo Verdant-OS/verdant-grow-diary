@@ -83,8 +83,11 @@ async function fetchAiDoctorPhase1DiaryRows(
 ): Promise<RawDiaryEntryRow[]> {
   let q = supabase
     .from("diary_entries")
+    // PostgREST JSON arrow operator — equivalent to filter("details->>kind", "eq", …)
+    // but uses `.eq` so it composes with the existing query-mock surface.
     .select(DIARY_SELECT)
-    .filter("details->>kind", "eq", AI_DOCTOR_PHASE1_TIMELINE_KIND);
+    .eq("details->>kind" as never, AI_DOCTOR_PHASE1_TIMELINE_KIND as never);
+
 
   if (scope.kind === "plant") {
     q = q.eq("plant_id", scope.plantId);

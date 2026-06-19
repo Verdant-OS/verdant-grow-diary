@@ -319,7 +319,7 @@ export default function SensorIngestAuditReport({
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               );
             })}
           </tbody>

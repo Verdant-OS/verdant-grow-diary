@@ -101,11 +101,14 @@ describe("Sensors page wiring (source contract)", () => {
     expect(SENSORS).toMatch(/<GrowDataSourceBadge/);
   });
 
-  it("renders an empty state instead of an empty chart when there are no readings", () => {
+  it("renders calm per-metric empty state via classifySensorMetricState (not red Unavailable)", () => {
     // AUD-003: previously gated on classification.label === "Unavailable";
-    // now gated on hasReadings so valid-but-stale readings still chart.
+    // now per-metric state from sensorMetricStateRules drives the empty copy.
     expect(SENSORS).toMatch(/hasReadings/);
-    expect(SENSORS).toMatch(/No reading available/i);
+    expect(SENSORS).toMatch(/classifySensorMetricState/);
+    expect(SENSORS).toMatch(/sensors-empty-/);
+    // No FUD-style "Unavailable" rendered for optional metrics.
+    expect(SENSORS).not.toMatch(/>\s*Unavailable\s*</);
   });
 
   it("does not introduce writes, service_role, or external-control surface", () => {

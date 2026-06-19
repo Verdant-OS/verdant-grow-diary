@@ -77,8 +77,8 @@ const piRoute: IngestRoute = {
       source: "pi_bridge",
       captured_at: TS,
       readings: [
-        { metric: "temperature_c", value: VALID_TEMP_C, unit: "C" },
-        { metric: "humidity_pct", value: VALID_RH, unit: "%" },
+        { metric: "temperature_c", value: VALID_TEMP_C, unit: "temperature_c" },
+        { metric: "humidity_pct", value: VALID_RH, unit: "percent" },
       ],
     });
     const vpd = r.rows.find((row) => row.metric === "vpd_kpa");
@@ -90,8 +90,8 @@ const piRoute: IngestRoute = {
       source: "pi_bridge",
       captured_at: TS,
       readings: [
-        { metric: "temperature_c", value: VALID_TEMP_C, unit: "C" },
-        { metric: "humidity_pct", value: 0, unit: "%" },
+        { metric: "temperature_c", value: VALID_TEMP_C, unit: "temperature_c" },
+        { metric: "humidity_pct", value: 150, unit: "percent" },
       ],
     });
     return r.rows.find((row) => row.metric === "vpd_kpa")?.value ?? null;
@@ -102,7 +102,7 @@ const piRoute: IngestRoute = {
       source: "pi_bridge",
       captured_at: TS,
       readings: [
-        { metric: "temperature_c", value: VALID_TEMP_C, unit: "C" },
+        { metric: "temperature_c", value: VALID_TEMP_C, unit: "temperature_c" },
       ],
     });
     return r.rows.find((row) => row.metric === "vpd_kpa")?.value ?? null;
@@ -113,8 +113,8 @@ const piRoute: IngestRoute = {
       source: "pi_bridge",
       captured_at: TS,
       readings: [
-        { metric: "temperature_c", value: 9999, unit: "C" },
-        { metric: "humidity_pct", value: VALID_RH, unit: "%" },
+        { metric: "temperature_c", value: 9999, unit: "temperature_c" },
+        { metric: "humidity_pct", value: VALID_RH, unit: "percent" },
       ],
     });
     return r.rows.find((row) => row.metric === "vpd_kpa")?.value ?? null;
@@ -136,7 +136,7 @@ function runEcoWitt(payload: Record<string, unknown>): number | null {
 const ecowittRoute: IngestRoute = {
   name: "EcoWitt buildEcoWittRoutedRows",
   validVpd: () => runEcoWitt({ temp1f: VALID_TEMP_F, humidity1: VALID_RH }),
-  invalidRhVpd: () => runEcoWitt({ temp1f: VALID_TEMP_F, humidity1: 0 }),
+  invalidRhVpd: () => runEcoWitt({ temp1f: VALID_TEMP_F, humidity1: 150 }),
   missingHumidityVpd: () => runEcoWitt({ temp1f: VALID_TEMP_F }),
   invalidTempVpd: () => runEcoWitt({ temp1f: 9999, humidity1: VALID_RH }),
 };
@@ -154,7 +154,7 @@ function runBridge(payload: Record<string, unknown>): number | null {
 const bridgeRoute: IngestRoute = {
   name: "EcoWitt normalizeEcowittLiveSoilPayload",
   validVpd: () => runBridge({ tempf: VALID_TEMP_F, humidity: VALID_RH }),
-  invalidRhVpd: () => runBridge({ tempf: VALID_TEMP_F, humidity: 0 }),
+  invalidRhVpd: () => runBridge({ tempf: VALID_TEMP_F, humidity: 150 }),
   missingHumidityVpd: () => runBridge({ tempf: VALID_TEMP_F }),
   invalidTempVpd: () => runBridge({ tempf: 9999, humidity: VALID_RH }),
 };

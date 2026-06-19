@@ -509,29 +509,35 @@ export default function AiDoctorDiagnosisPanel({
           <button
             type="button"
             onClick={handleDownloadReport}
+            disabled={pendingExport !== null}
+            aria-busy={pendingExport === "report"}
             data-testid={tid("ai-doctor-diagnosis-download-report")}
-            className="inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+            className="inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 disabled:opacity-60 disabled:cursor-not-allowed"
             aria-label="Download AI Doctor Report as PDF"
           >
-            Download AI Doctor Report
+            {pendingExport === "report" ? "Checking…" : "Download AI Doctor Report"}
           </button>
           <button
             type="button"
             onClick={handleDownloadCsv}
+            disabled={pendingExport !== null}
+            aria-busy={pendingExport === "csv"}
             data-testid={tid("ai-doctor-diagnosis-download-csv")}
-            className="inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+            className="inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 disabled:opacity-60 disabled:cursor-not-allowed"
             aria-label="Download AI Doctor Evidence CSV"
           >
-            Download Evidence CSV
+            {pendingExport === "csv" ? "Checking…" : "Download Evidence CSV"}
           </button>
           <button
             type="button"
             onClick={handleDownloadPackage}
+            disabled={pendingExport !== null}
+            aria-busy={pendingExport === "package"}
             data-testid={tid("ai-doctor-diagnosis-download-package")}
-            className="inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+            className="inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 disabled:opacity-60 disabled:cursor-not-allowed"
             aria-label="Download AI Doctor PDF and Evidence CSV package"
           >
-            Download package
+            {pendingExport === "package" ? "Checking…" : "Download package"}
           </button>
           {packageMessage ? (
             <span

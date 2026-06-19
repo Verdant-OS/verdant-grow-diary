@@ -35,12 +35,29 @@ describe("ecowitt-live-soil dry-run fixture", () => {
     expect(out.posted).toBe(false);
     expect(out.accepted).toBeGreaterThan(0);
     expect(out.payloads.length).toBeGreaterThan(0);
+    // Internal bridge payload — `source` is the vendor lineage label
+    // accepted by the existing sensor-ingest-webhook for back-compat.
     const air = out.payloads.find((p) => p.metrics.temp_f !== undefined);
     expect(air).toBeDefined();
-    expect(air!.source).toBe("ecowitt");
     expect(air!.vendor).toBe("ecowitt");
     expect(air!.metadata.transport).toBe("mqtt");
     expect(air!.tent_id).toBe(TENT);
+    // Canonical Verdant view — what operators / CSVs / charts see.
+    const canonAir = out.canonicalPreviews.find(
+      (p) => p.metrics.temp_f !== undefined,
+    );
+    expect(canonAir).toBeDefined();
+    expect(canonAir!.source).toBe("live");
+    expect(canonAir!.provider).toBe("ecowitt");
+    expect(canonAir!.transport).toBe("mqtt");
+    // Canonical Verdant source MUST be one of the allow-listed labels —
+    // never "ecowitt" / "mqtt" / vendor lineage strings.
+    for (const p of out.canonicalPreviews) {
+      expect(["live", "manual", "csv", "demo", "stale", "invalid"]).toContain(
+        p.source,
+      );
+      expect(p.source).not.toBe("ecowitt");
+    }
   });
 
   it("derives vpd_kpa from valid temp + humidity", () => {
@@ -186,5 +203,26 @@ describe("ecowitt-live-soil dry-run script safety", () => {
     expect(script).not.toMatch(/device[_-]?control/i);
     expect(script).not.toMatch(/action[_-]?queue/i);
     expect(script).not.toMatch(/\bfetch\s*\(/);
+  });
+});
+
+describe("ecowitt-live-soil dry-run CLI canonical source labeling", () => {
+  it("CLI JSON output shows canonical source='live' for accepted readings (never 'ecowitt')", () => {
+    const { execSync } = require("node:child_process") as typeof import("node:child_process");
+    const TENT_UUID = "11111111-1111-1111-1111-111111111111";
+    const stdout = execSync(
+      `bun run scripts/ecowitt-live-soil-dry-run.ts --fixture fixtures/ecowitt-live-soil-sample.json --dry-run`,
+      { env: { ...process.env, VERDANT_TENT_ID: TENT_UUID }, encoding: "utf8" },
+    );
+    const parsed = JSON.parse(stdout) as {
+      payloads: { source: string; provider: string; transport: string }[];
+    };
+    expect(parsed.payloads.length).toBeGreaterThan(0);
+    for (const p of parsed.payloads) {
+      expect(p.source).toBe("live");
+      expect(p.source).not.toBe("ecowitt");
+      expect(p.provider).toBe("ecowitt");
+      expect(p.transport).toBe("mqtt");
+    }
   });
 });

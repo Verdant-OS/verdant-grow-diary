@@ -324,6 +324,10 @@ async function main(): Promise<void> {
     }
   }
 
+  // CLI output prints the canonical Verdant view (source:"live",
+  // provider:"ecowitt", transport:"mqtt"). The bridge's internal webhook
+  // payload (vendor lineage `source:"ecowitt"`) is intentionally NOT
+  // surfaced here — operators only need to verify the canonical shape.
   // eslint-disable-next-line no-console
   console.log(
     JSON.stringify(
@@ -333,8 +337,7 @@ async function main(): Promise<void> {
         accepted: out.accepted,
         rejected: out.rejected,
         reasons: out.reasons,
-        canonicalPreviews: out.canonicalPreviews,
-        payloads: out.payloads,
+        payloads: out.canonicalPreviews,
         redactedRawPreview: out.redactedRawPreview,
         csvOut: args.csvOut ?? null,
       },

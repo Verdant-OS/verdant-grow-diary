@@ -6,6 +6,7 @@
  * module's output and MUST NOT reach into raw `details` JSON.
  */
 import type { NormalizedDiaryEntry } from "./diaryEntryRules";
+import { shouldShowPhotoNonDiagnosticLabel } from "./photoEventNonDiagnosticLabelRules";
 
 export interface PhotoHistoryRow {
   id: string;

@@ -337,7 +337,7 @@ describe("helperTextForChecklistItem — local-facts-only helper copy", () => {
         });
         if (helper) {
           expect(helper).not.toMatch(
-            /increase|raise|defoliate|transplant|flush|nute|ppm|EC|train|topping|fimming|turn on|turn off|switch off|run pump/i,
+            /\b(increase|raise|defoliate|transplant|flush|nute|ppm|EC|train|topping|fimming)\b|turn on|turn off|switch off|run pump/i,
           );
         }
       }

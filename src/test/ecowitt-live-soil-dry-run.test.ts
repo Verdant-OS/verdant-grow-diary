@@ -35,12 +35,29 @@ describe("ecowitt-live-soil dry-run fixture", () => {
     expect(out.posted).toBe(false);
     expect(out.accepted).toBeGreaterThan(0);
     expect(out.payloads.length).toBeGreaterThan(0);
+    // Internal bridge payload — `source` is the vendor lineage label
+    // accepted by the existing sensor-ingest-webhook for back-compat.
     const air = out.payloads.find((p) => p.metrics.temp_f !== undefined);
     expect(air).toBeDefined();
-    expect(air!.source).toBe("ecowitt");
     expect(air!.vendor).toBe("ecowitt");
     expect(air!.metadata.transport).toBe("mqtt");
     expect(air!.tent_id).toBe(TENT);
+    // Canonical Verdant view — what operators / CSVs / charts see.
+    const canonAir = out.canonicalPreviews.find(
+      (p) => p.metrics.temp_f !== undefined,
+    );
+    expect(canonAir).toBeDefined();
+    expect(canonAir!.source).toBe("live");
+    expect(canonAir!.provider).toBe("ecowitt");
+    expect(canonAir!.transport).toBe("mqtt");
+    // Canonical Verdant source MUST be one of the allow-listed labels —
+    // never "ecowitt" / "mqtt" / vendor lineage strings.
+    for (const p of out.canonicalPreviews) {
+      expect(["live", "manual", "csv", "demo", "stale", "invalid"]).toContain(
+        p.source,
+      );
+      expect(p.source).not.toBe("ecowitt");
+    }
   });
 
   it("derives vpd_kpa from valid temp + humidity", () => {

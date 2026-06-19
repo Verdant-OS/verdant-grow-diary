@@ -122,6 +122,17 @@ export default function OperatorAiDoctorPhase1(
   const resultBundle =
     selectedPlant ? getResultForPlant(selectedPlant.id) : null;
 
+  const recentActivity: ReadonlyArray<AiDoctorPhase1RecentActivityRow> =
+    selectedPlant && props.getRecentActivityForPlant
+      ? props.getRecentActivityForPlant(selectedPlant.id) ?? []
+      : [];
+
+  const isDerivingResult = !!(
+    selectedPlant &&
+    !resultBundle &&
+    props.isDerivingResult
+  );
+
   const ctaContext = {
     plantId: selectedPlant?.id ?? null,
     growId: selectedPlant?.grow_id ?? null,

@@ -84,7 +84,6 @@ function row(partial: Partial<PhotoHistoryRow>): PhotoHistoryRow {
     photoUrl: "https://example.com/img.jpg",
     caption: "",
     warnings: [],
-    showPhotoNonDiagnosticLabel: true,
     ...partial,
   };
 }

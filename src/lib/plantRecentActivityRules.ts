@@ -13,6 +13,7 @@ import {
 } from "@/lib/diaryEntryRules";
 import { isStale } from "@/lib/sensorSnapshot";
 import { splitHardwareReadingsFromNote } from "@/lib/quickLogHardwareReadingsDisplayRules";
+import { shouldShowPhotoNonDiagnosticLabel } from "@/lib/photoEventNonDiagnosticLabelRules";
 
 export interface PlantRecentActivityRow {
   id: string;

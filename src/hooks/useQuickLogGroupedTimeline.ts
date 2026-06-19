@@ -23,6 +23,12 @@ import {
   partitionQuickLogRows,
   type RawGrowEventRow,
 } from "@/lib/quickLogGroupedTimelineRowAdapter";
+import {
+  attachAiDoctorPhase1EvidenceToActionEvents,
+  buildAiDoctorPhase1EvidenceIndex,
+  type RawDiaryEntryRow,
+} from "@/lib/quickLogTimelineDiaryDetailsMerge";
+import { AI_DOCTOR_PHASE1_TIMELINE_KIND } from "@/lib/aiDoctorPhase1TimelineDraft";
 
 export const QUICK_LOG_GROUPED_TIMELINE_DEFAULT_LIMIT = 200;
 
@@ -32,6 +38,8 @@ export type QuickLogGroupedTimelineScope =
 
 const SELECT =
   "id, plant_id, tent_id, occurred_at, event_type, source, note, is_deleted, watering_events ( volume_ml ), environment_events ( temperature_c, humidity_pct, vpd_kpa )";
+
+const DIARY_SELECT = "id, plant_id, tent_id, grow_id, entry_at, details";
 
 async function fetchRows(
   scope: QuickLogGroupedTimelineScope,
@@ -63,6 +71,40 @@ async function fetchRows(
   if (error) throw error;
   return (data ?? []) as unknown as RawGrowEventRow[];
 }
+
+/**
+ * Read-only fetch of saved AI Doctor Phase 1 evidence rows from
+ * `diary_entries`. RLS enforces user ownership. Filtered by
+ * `details->>kind` so we never widen the query to unrelated note kinds.
+ */
+async function fetchAiDoctorPhase1DiaryRows(
+  scope: QuickLogGroupedTimelineScope,
+  limit: number,
+): Promise<RawDiaryEntryRow[]> {
+  let q = supabase
+    .from("diary_entries")
+    // PostgREST JSON arrow operator — equivalent to filter("details->>kind", "eq", …)
+    // but uses `.eq` so it composes with the existing query-mock surface.
+    .select(DIARY_SELECT)
+    .eq("details->>kind" as never, AI_DOCTOR_PHASE1_TIMELINE_KIND as never);
+
+
+  if (scope.kind === "plant") {
+    q = q.eq("plant_id", scope.plantId);
+  } else {
+    q = q.eq("tent_id", scope.tentId);
+  }
+
+  const { data, error } = await q
+    .order("entry_at", { ascending: false })
+    .limit(limit);
+  if (error) {
+    // Enrichment failure must never break the timeline. Return empty.
+    return [];
+  }
+  return (data ?? []) as unknown as RawDiaryEntryRow[];
+}
+
 
 export interface UseQuickLogGroupedTimelineResult {
   entries: QuickLogTimelineEntry[];
@@ -105,12 +147,47 @@ export function useQuickLogGroupedTimeline(
       });
     },
   });
+
+  // Read-only AI Doctor Phase 1 evidence enrichment runs as a separate
+  // query so that:
+  //  - the primary timeline still renders if diary enrichment fails;
+  //  - existing tests that mock only the `grow_events` fetch path keep
+  //    working without modification.
+  const diaryQuery = useQuery<RawDiaryEntryRow[]>({
+    queryKey: [
+      "quick_log_grouped_timeline__ai_doctor_phase1_evidence",
+      scope?.kind ?? "none",
+      scope?.kind === "plant" ? scope.plantId : null,
+      scope?.kind === "tent" ? scope.tentId : null,
+      limit,
+    ],
+    enabled: scope !== null,
+    queryFn: async () => (scope ? fetchAiDoctorPhase1DiaryRows(scope, limit) : []),
+  });
+
+  const baseEntries = query.data ?? [];
+  const diaryRows = diaryQuery.data ?? [];
+  const evidenceIndex = buildAiDoctorPhase1EvidenceIndex(diaryRows);
+  const entries =
+    evidenceIndex.size === 0
+      ? baseEntries
+      : baseEntries.map((entry) => {
+          if (entry.kind === "environment") return entry;
+          const enriched = attachAiDoctorPhase1EvidenceToActionEvents(
+            [entry.action],
+            evidenceIndex,
+          )[0];
+          if (enriched === entry.action) return entry;
+          return { ...entry, action: enriched };
+        });
+
   return {
-    entries: query.data ?? [],
+    entries,
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     isError: query.isError,
     error: query.error,
   };
 }
+
 

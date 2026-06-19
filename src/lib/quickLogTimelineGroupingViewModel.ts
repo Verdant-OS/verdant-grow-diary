@@ -50,7 +50,24 @@ export interface QuickLogActionEvent {
   /** Optional display details — never invented, may be null/undefined. */
   noteText?: string | null;
   volumeMl?: number | null;
+  /**
+   * Optional saved AI Doctor Phase 1 evidence payload attached by the
+   * read-only diary_entries enrichment step. Presenter-only; never used
+   * for grouping, ordering, or pairing decisions.
+   */
+  aiDoctorPhase1Evidence?: {
+    /** diary_entries.id of the matching row. */
+    diaryEntryId: string;
+    /** diary_entries.entry_at (ISO-8601) of the matching row. */
+    entryAt: string;
+    plantId: string | null;
+    tentId: string | null;
+    growId: string | null;
+    /** Raw `details` from diary_entries — passed only through the safe view-model. */
+    details: unknown;
+  } | null;
 }
+
 
 export type QuickLogTimelineEntry =
   | {

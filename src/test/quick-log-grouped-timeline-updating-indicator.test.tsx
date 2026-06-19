@@ -43,9 +43,14 @@ beforeEach(() => {
 
 describe("QuickLogGroupedTimelineSection — updating indicator", () => {
   it("shows the calm updating label while a post-save refetch is in flight", async () => {
-    // First fetch resolves immediately with empty data.
+    // Mount order:
+    //   1) grow_events (main)         → resolve immediately
+    //   2) diary_entries (AI Doctor)  → resolve immediately
+    //   3) grow_events refetch        → held pending so we can assert the
+    //      "Updating QuickLog timeline…" indicator
     let pendingResolve: ((v: unknown[]) => void) | null = null;
     fromMock
+      .mockImplementationOnce(() => buildQueryStub(() => Promise.resolve([])))
       .mockImplementationOnce(() => buildQueryStub(() => Promise.resolve([])))
       .mockImplementationOnce(() =>
         buildQueryStub(
@@ -55,6 +60,12 @@ describe("QuickLogGroupedTimelineSection — updating indicator", () => {
             }),
         ),
       );
+    // Any further `from()` calls resolve to empty (defensive).
+    fromMock.mockImplementation(() =>
+      buildQueryStub(() => Promise.resolve([])),
+    );
+
+
 
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: 0 } },

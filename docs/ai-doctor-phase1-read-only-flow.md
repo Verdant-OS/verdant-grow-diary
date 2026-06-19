@@ -165,3 +165,21 @@ Added in the save-evidence slice.
   saved entry as a generic Quick Log note. Promoting it to the styled
   evidence card requires a follow-up fetch slice that joins
   `diary_entries.details` (no schema change required).
+
+## Timeline enrichment (read-only `diary_entries.details` merge)
+
+- `useQuickLogGroupedTimeline` now performs a second read-only SELECT
+  on `diary_entries` filtered by `details->>kind = "ai_doctor_phase1_evidence"`
+  for the same plant/tent scope as the main `grow_events` query.
+- The pure helper `quickLogTimelineDiaryDetailsMerge` builds a
+  deterministic index keyed by `(plant_id, tent_id, normalized ISO
+  entry_at)` and attaches matching `details` to the existing note
+  `QuickLogActionEvent` as `aiDoctorPhase1Evidence`. No row is added,
+  duplicated, or re-ordered.
+- `QuickLogGroupedTimelineSection` renders
+  `AiDoctorPhase1TimelineEvidenceCard` whenever the attached evidence
+  produces a valid view-model; the generic note UI is preserved for all
+  other entries and as a graceful fallback when `details` is malformed.
+- Enrichment is read-only: no writes, no Action Queue, no alerts, no
+  Edge Functions, no AI model calls, no device control. A failed diary
+  fetch returns an empty index — the timeline still renders normally.

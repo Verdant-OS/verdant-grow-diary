@@ -30,6 +30,9 @@ import type {
   QuickLogActionEvent,
   QuickLogTimelineEntry,
 } from "@/lib/quickLogTimelineGroupingViewModel";
+import { AiDoctorPhase1TimelineEvidenceCard } from "@/components/AiDoctorPhase1TimelineEvidenceCard";
+import { buildAiDoctorPhase1TimelineEvidenceViewModel } from "@/lib/aiDoctorPhase1TimelineEvidenceViewModel";
+
 import {
   QUICK_LOG_GROUPED_TIMELINE_FILTERS,
   QUICK_LOG_GROUPED_TIMELINE_FILTER_LABELS,
@@ -181,9 +184,46 @@ function EntryItem({ entry, demoVariant }: EntryItemProps) {
       ? buildQuickLogReviewActionSection(entry)
       : null;
 
+  // AI Doctor Phase 1 evidence card override (presenter-only). Builds a
+  // safe, redacted view-model from the attached diary_entries.details and
+  // renders the read-only evidence card in place of the generic note.
+  const evidence =
+    entry.kind === "action" || entry.kind === "grouped"
+      ? entry.action.aiDoctorPhase1Evidence ?? null
+      : null;
+  const evidenceViewModel = evidence
+    ? buildAiDoctorPhase1TimelineEvidenceViewModel({
+        id: evidence.diaryEntryId,
+        plant_id: evidence.plantId,
+        tent_id: evidence.tentId,
+        grow_id: evidence.growId,
+        entry_at: evidence.entryAt,
+        occurred_at: evidence.entryAt,
+        details: evidence.details,
+      })
+    : null;
+
+  if (evidenceViewModel && (entry.kind === "action" || entry.kind === "grouped")) {
+    return (
+      <Card
+        {...commonDataAttrs}
+        data-entry-kind="ai-doctor-phase1-evidence"
+        data-action-id={entry.action.id}
+      >
+        <CardContent className="p-3 space-y-3">
+          <AiDoctorPhase1TimelineEvidenceCard viewModel={evidenceViewModel} />
+          {entry.kind === "grouped" && (
+            <ManualSnapshotTimelineCard card={entry.environmentCard} />
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (entry.kind === "grouped") {
     return (
       <Card
+
         {...commonDataAttrs}
         data-entry-kind="grouped"
         data-action-id={entry.action.id}

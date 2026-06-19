@@ -146,6 +146,11 @@ All three originally identified paid-launch blockers are now resolved:
 2. Premium CSV / report exporters — SERVER-GATED PREFLIGHT (hardened).
 3. Live-sensor surfaces — DOCUMENTED / NO ACTIVE PREMIUM SURFACE; server
    gate scaffold ready and required for any future premium live surface.
+   Future premium live-sensor widgets MUST wrap their UI in
+   `src/components/PremiumLiveSensorGate.tsx`, which renders children
+   only after the server gate returns `allowed`. Currently shipped live
+   sensor surfaces remain free; client-side entitlement state is not
+   authoritative.
 
 No outstanding paid-launch blockers from this audit. Future premium
 surfaces must follow the existing server-gate pattern.

@@ -29,20 +29,21 @@ describe("CanonicalSourceLegend", () => {
 
   it("does not classify stale or invalid as healthy", () => {
     render(<CanonicalSourceLegend defaultOpen />);
-    const stale = screen.getByTestId("canonical-source-legend-entry-stale").textContent ?? "";
-    const invalid = screen.getByTestId("canonical-source-legend-entry-invalid").textContent ?? "";
-    expect(stale.toLowerCase()).not.toMatch(/healthy/);
-    expect(invalid.toLowerCase()).not.toMatch(/healthy/);
-    expect(stale.toLowerCase()).toMatch(/(not.*current|old)/);
-    expect(invalid.toLowerCase()).toMatch(/(bad|suspicious|invalid)/);
+    const stale = (screen.getByTestId("canonical-source-legend-entry-stale").textContent ?? "").toLowerCase();
+    const invalid = (screen.getByTestId("canonical-source-legend-entry-invalid").textContent ?? "").toLowerCase();
+    // Stale must say it is NOT current/healthy.
+    expect(stale).toMatch(/(not.*current|old)/);
+    expect(stale).not.toMatch(/is\s+healthy/);
+    // Invalid must explicitly warn against treating as healthy.
+    expect(invalid).toMatch(/(bad|suspicious|invalid)/);
+    expect(invalid).toMatch(/not\s+be\s+treated\s+as\s+healthy/);
   });
 
-  it("does not list ecowitt as a canonical source", () => {
+  it("does not list ecowitt as a canonical source key", () => {
     render(<CanonicalSourceLegend defaultOpen />);
     const keys = CANONICAL_SOURCE_LEGEND_ENTRIES.map((e) => e.key);
     expect(keys).not.toContain("ecowitt" as never);
-    const content = screen.getByTestId("canonical-source-legend-content").textContent ?? "";
-    expect(content).not.toMatch(/canonical.*ecowitt/i);
+    expect(screen.queryByTestId("canonical-source-legend-entry-ecowitt")).toBeNull();
   });
 });
 

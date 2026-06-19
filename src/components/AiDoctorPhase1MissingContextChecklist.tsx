@@ -53,6 +53,8 @@ export interface AiDoctorPhase1MissingContextChecklistProps {
   /** Derived diagnosis result's missing_information, if any. */
   missing_information?: readonly string[];
   ctaContext: AiDoctorPhase1ChecklistCtaContext;
+  /** Optional plant name used to enrich aria-label copy. */
+  plantName?: string | null;
 }
 
 function ctaQuery(ctx: AiDoctorPhase1ChecklistCtaContext): string {

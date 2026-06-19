@@ -15,6 +15,7 @@
  */
 
 import type { TablesInsert } from "@/integrations/supabase/types";
+import { calculateAirVpdKpa } from "@/lib/vpdRules";
 
 export type AllowedMetric =
   | "temperature_c"

@@ -179,6 +179,52 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-3">
           <div>
+            <Label>Profile photo</Label>
+            <div className="flex items-start gap-3">
+              <div className="h-16 w-16 rounded-lg overflow-hidden border border-border/60 flex-shrink-0">
+                <PlantPhoto
+                  src={form.photo_url}
+                  alt={form.name || plant.name}
+                  className="h-full w-full"
+                  iconClassName="h-4 w-4"
+                  caption=""
+                  ctaLabel={null}
+                  testId="edit-plant-photo-preview"
+                />
+              </div>
+              <div className="flex-1 grid gap-2">
+                <Input
+                  type="url"
+                  inputMode="url"
+                  placeholder="https://… (paste an image URL)"
+                  value={form.photo_url}
+                  onChange={(e) =>
+                    setForm({ ...form, photo_url: e.target.value })
+                  }
+                  data-testid="edit-plant-photo-url"
+                  aria-label="Plant profile photo URL"
+                />
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 gap-1"
+                    onClick={() => setForm({ ...form, photo_url: "" })}
+                    disabled={!form.photo_url}
+                    data-testid="edit-plant-photo-clear"
+                  >
+                    <X className="h-3.5 w-3.5" /> Clear photo
+                  </Button>
+                  <span className="text-[11px] text-muted-foreground">
+                    Stored as the plant's profile photo. Existing uploaded
+                    photos are not deleted.
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div>
             <Label>Name</Label>
             <Input
               required

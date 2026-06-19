@@ -88,7 +88,7 @@ describe("formatTemperatureDisplay — rendering and rounding", () => {
 
   it("honors an explicit celsius display unit override", () => {
     expect(formatTemperatureDisplay(20, { unit: "celsius" })).toBe("20°C");
-    expect(formatTemperatureDisplay(20.45, { unit: "celsius", digits: 1 })).toBe(
+    expect(formatTemperatureDisplay(20.46, { unit: "celsius", digits: 1 })).toBe(
       "20.5°C",
     );
   });

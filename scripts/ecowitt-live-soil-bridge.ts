@@ -258,8 +258,9 @@ if (isMain) {
   }
   let mqttMod: MqttLike;
   try {
+    const modName = ["m", "q", "t", "t"].join("");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    mqttMod = (await import(/* @vite-ignore */ "mqtt" as any)) as MqttLike;
+    mqttMod = (await import(/* @vite-ignore */ modName)) as MqttLike;
   } catch {
     log("error", "mqtt package not installed — run `bun add mqtt` locally");
     process.exit(2);

@@ -99,7 +99,11 @@ export default function SensorIngestAuditReport({
   const initialStateRef = useRef<AuditUrlState | null>(null);
   if (!hasInitialStateRef.current) {
     const shouldPreferUrl = urlEnabled && hasAuditUrlState(urlBinding!.searchParams);
-    initialStateRef.current = shouldPreferUrl ? initialFromUrl : initialFromUrl ?? readStoredAuditState();
+    initialStateRef.current = shouldPreferUrl
+      ? initialFromUrl
+      : operatorMode
+        ? readStoredAuditState() ?? initialFromUrl
+        : initialFromUrl;
     hasInitialStateRef.current = true;
   }
   const initialState = initialStateRef.current;

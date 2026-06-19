@@ -74,10 +74,10 @@ export const SENSITIVE_DEVICE_PATTERNS: ReadonlyArray<SensitiveDevicePattern> =
       regex:
         /\b(?:brg|bridge|tok|token|sk|secret)[_-][A-Za-z0-9_-]{12,}\b/i,
     },
-    // Vendor id-like: vendor_/vnd_/device_/dev_ prefix + alnum
+    // Vendor id-like: vendor_/vnd_/device_/dev_ prefix + alnum (with separators)
     {
       name: "vendor_or_device_id",
-      regex: /\b(?:vendor|vnd|device|dev)[_-][A-Za-z0-9]{3,}\b/i,
+      regex: /\b(?:vendor|vnd|device|dev)[_-][A-Za-z0-9][A-Za-z0-9_-]{2,}/i,
     },
     // Long opaque hex blob (>= 24 hex chars) — typical of payload signatures
     { name: "long_hex_blob", regex: /\b[0-9a-fA-F]{24,}\b/ },

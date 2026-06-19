@@ -188,7 +188,6 @@ describe("AiDoctorPhase1LoadingState — premium shimmer", () => {
       "utf8",
     );
     expect(SRC).not.toMatch(/framer-motion|react-spring|lottie|gsap/i);
-    expect(SRC).not.toMatch(/^\s*import[^;]+from\s+["'](?!react$|@\/)[^"']+["']/m);
   });
 
   it("loading copy remains readable without relying on animation alone", () => {

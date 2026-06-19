@@ -156,7 +156,8 @@ describe("QuickLogSensorSnapshotStrip — view-model adoption advisory", () => {
     const advisory = screen.getByTestId("quicklog-sensor-snapshot-advisory");
     expect(advisory).toHaveAttribute("data-advisory-kind", "demo");
     expect(advisory.textContent ?? "").toMatch(/demo/i);
-    expect(advisory.textContent ?? "").not.toMatch(/\blive\b/i);
+    // Demo copy must explicitly disclaim live treatment, not assert it.
+    expect(advisory.textContent ?? "").toMatch(/never treated as live/i);
   });
 
   it("missing snapshot (no tent) — renders 'No sensor snapshot available.'", () => {

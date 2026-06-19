@@ -95,8 +95,32 @@ status for any other surface.
 - Client-side entitlement state is not authoritative.
 
 ### Live sensor surfaces (`capabilities.liveSensors`)
-- **Status:** PAID-LAUNCH BLOCKED — CLIENT-GATED ONLY.
-- No edge function currently gates live-sensor visibility on plan tier.
+- **Status:** DOCUMENTED / NO ACTIVE PREMIUM LIVE-SENSOR SURFACE; server
+  gate scaffold ready for future surfaces.
+- **Audit (as of this slice):** an exhaustive grep of `src/` confirms that
+  `capabilities.liveSensors` is defined in the entitlements catalog /
+  defaults / types and referenced only by 1 test mock. **No app code uses
+  it as an access gate.** Live sensor displays today (Plants page "Live
+  sensor data" panel, `useLatestSensorSnapshot`, etc.) render for any
+  authenticated user with ingested readings — they are not premium-gated.
+- **Server scaffold:** `supabase/functions/live-sensor-entitlement` now
+  exists and mirrors the hardened `premium-export-entitlement` shape
+  (JWT verification via `auth.getUser`, RLS-scoped read of
+  `public.billing_subscriptions`, server-side `resolveEntitlements()`,
+  strict body validation with `surface` allow-list + UUID validation for
+  `grow_id` / `tent_id` / `plant_id`, RLS-scoped ownership probe). It
+  returns 200 only when `capabilities.liveSensors === true`. No
+  service_role. No reads of sensor_readings / raw_payload / device IDs.
+- **Client scaffold:** `src/hooks/useLiveSensorServerGate.ts` exposes
+  typed `state` ∈ `{loading, allowed, denied, invalid_request,
+  network_error}` and a `requireLiveSensorAccess(...)` helper.
+- **Mandatory future rule:** any new premium live-sensor surface MUST
+  call `requireLiveSensorAccess(...)` and treat the server response as
+  authoritative. `useMyEntitlements`/`capabilities.liveSensors` remain
+  presentation-only and MUST NOT be used as an access gate. A static
+  guard test enforces this (`src/test/live-sensor-server-gate.test.ts`).
+- **Residual risk:** none today — there is nothing to bypass.
+- Client-side entitlement state is not authoritative.
 
 ### Pricing / upgrade copy (`src/pages/Pricing.tsx`)
 - **Status:** N/A. Public copy; no gating required.
@@ -114,14 +138,15 @@ status for any other surface.
 
 ---
 
-## What this slice fixed
-- Removed `as never` cast on `billing_subscriptions` client read.
-- Authored this per-surface blocker doc.
-- Added regression tests asserting the client-gated surfaces are
-  documented as paid-launch blockers (so a future "looks done" PR cannot
-  silently mark them shipped).
+## Paid-launch blocker status
 
-## What this slice did NOT fix
-- Live sensor surfaces still have no server-side plan check.
+All three originally identified paid-launch blockers are now resolved:
 
-These remain individually paid-launch-blocked.
+1. Environment Summary Report — SERVER-VALIDATED.
+2. Premium CSV / report exporters — SERVER-GATED PREFLIGHT (hardened).
+3. Live-sensor surfaces — DOCUMENTED / NO ACTIVE PREMIUM SURFACE; server
+   gate scaffold ready and required for any future premium live surface.
+
+No outstanding paid-launch blockers from this audit. Future premium
+surfaces must follow the existing server-gate pattern.
+

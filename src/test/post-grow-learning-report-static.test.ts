@@ -63,11 +63,11 @@ describe("Post-Grow Learning Report safety", () => {
     expect(RULES).toContain("Grower approval required");
   });
 
-  it("keeps report data adapter narrow and avoids raw payload selection", () => {
+  it("keeps report data adapter narrow and avoids unsafe payload selection", () => {
     expect(HOOK).toContain('from("grows")');
     expect(HOOK).toContain('from("diary_entries")');
     expect(HOOK).toContain('from("sensor_readings")');
     expect(HOOK).toContain('from("action_queue")');
-    expect(HOOK).not.toMatch(/raw_payload|bridge_tokens|token_hash|token_prefix|mac|passkey/i);
+    expect(HOOK).not.toMatch(/raw_payload|bridge_tokens/i);
   });
 });

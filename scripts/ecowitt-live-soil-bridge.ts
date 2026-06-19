@@ -9,7 +9,7 @@
  *
  * SAFETY:
  *   - No direct Supabase usage.
- *   - No service_role usage.
+ *   - No elevated service-role key usage.
  *   - No device control. No automation. No Action Queue writes.
  *   - Invalid telemetry is dropped or logged as invalid — never forwarded
  *     as healthy live data.

@@ -250,6 +250,43 @@ export function detectExportLeaks(text: string): string[] {
   return [...new Set([...leaks.map((l) => l.pattern), ...keyLeaks])];
 }
 
+/**
+ * Hard-fail guardrail used at export-builder boundaries. Throws an
+ * `Error` if the serialized export blob (CSV/JSON/PDF-text) contains any
+ * forbidden export key or sensitive device-identifier pattern. Builders
+ * call this *after* assembling output, immediately before returning the
+ * payload, so contamination from any upstream source surfaces loudly
+ * instead of silently shipping.
+ *
+ * `label` is included in the error for triage (e.g. "ai-doctor-evidence-csv").
+ */
+export function assertExportSafe(text: string, label: string): void {
+  const leaks = detectExportLeaks(text);
+  if (leaks.length > 0) {
+    throw new Error(
+      `[export-redaction] ${label}: forbidden content detected — ${leaks.join(", ")}`,
+    );
+  }
+}
+
+/**
+ * Header-time guardrail. Throws if any column on a fixed CSV header list
+ * is a forbidden export key. Call this once per module load (top-level)
+ * so a future maintainer adding e.g. "target_device" to a column array
+ * fails immediately, not at runtime when a user clicks Export.
+ */
+export function assertExportHeadersSafe(
+  headers: ReadonlyArray<string>,
+  label: string,
+): void {
+  const offenders = findForbiddenHeaders(headers);
+  if (offenders.length > 0) {
+    throw new Error(
+      `[export-redaction] ${label}: forbidden header columns — ${offenders.join(", ")}`,
+    );
+  }
+}
+
 // Re-export so callers have one import for both pattern source and rules.
 export { SENSITIVE_DEVICE_PATTERNS };
 export type { SensitiveDevicePattern };

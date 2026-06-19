@@ -20,6 +20,10 @@ import {
   redactReportLine,
   buildPerMetricStatusTable,
 } from "./aiDoctorReportRules";
+import {
+  assertExportHeadersSafe,
+  assertExportSafe,
+} from "./exportRedactionRules";
 
 export type CsvCell = string | number | null | undefined;
 
@@ -246,9 +250,19 @@ export function buildAiDoctorEvidenceCsv(
     );
   }
 
+  // Module-load and runtime guardrails: headers + serialized output are
+  // both routed through the centralized export-redaction helper so a
+  // future change that adds a forbidden column or upstream contamination
+  // fails loudly instead of shipping silently.
+  assertExportHeadersSafe(
+    AI_DOCTOR_EVIDENCE_CSV_COLUMNS,
+    "ai-doctor-evidence-csv",
+  );
+  const contents = lines.join("\n") + "\n";
+  assertExportSafe(contents, "ai-doctor-evidence-csv");
   return {
     filename: "ai-doctor-evidence.csv",
-    contents: lines.join("\n") + "\n",
+    contents,
   };
 }
 

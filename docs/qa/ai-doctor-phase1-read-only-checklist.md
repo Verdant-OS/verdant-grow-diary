@@ -88,3 +88,17 @@ no live AI/model calls, no Action Queue writes, no device control.
 - [ ] Card has no Approve, Send, Execute, Save, or Action Queue buttons.
 - [ ] Card never creates Action Queue items, alert rows, or device commands.
 - [ ] Card performs no AI/model requests and no additional Supabase writes.
+
+## J. Saved evidence wiring on plant timeline
+
+- [ ] Saving an AI Doctor Phase 1 result causes the plant timeline to
+      render the styled evidence card (not the generic note text).
+- [ ] Only one timeline row appears per saved evidence (no duplicate
+      from the `diary_entries` enrichment).
+- [ ] Normal Water / Note logs continue to render with the existing UI.
+- [ ] Mixed timelines preserve chronological ordering.
+- [ ] Evidence card never shows Approve / Send / Execute / Save / Action
+      Queue / device controls.
+- [ ] Network: enrichment performs a `SELECT` from `diary_entries`
+      filtered by `details->>kind`. No RPC, no Edge Function, no AI
+      model endpoint, no insert/update/delete.

@@ -21,6 +21,8 @@ import {
   type QuickLogSnapshotStripStatus,
 } from "@/lib/quickLogSnapshotStripAdapter";
 import SnapshotTrustBadge from "@/components/SnapshotTrustBadge";
+import { buildQuickLogSensorSnapshotViewModel } from "@/lib/quickLogSensorSnapshotViewModel";
+import { adaptQuickLogSensorContextInput } from "@/lib/quickLogSensorSnapshotViewModelAdapter";
 
 
 interface Props {

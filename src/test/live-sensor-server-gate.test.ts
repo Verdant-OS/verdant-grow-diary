@@ -237,6 +237,7 @@ describe("static guard — capabilities.liveSensors is never used as an authorit
     resolve(ROOT, "src/hooks/useLiveSensorServerGate.ts"),
     resolve(ROOT, "src/components/PremiumLiveSensorGate.tsx"),
     resolve(ROOT, "src/test/premium-live-sensor-gate.test.tsx"),
+    resolve(ROOT, "src/test/premium-live-sensor-gate-hardening.test.tsx"),
   ]);
 
   it("only the entitlements catalog + this gate file reference capabilities.liveSensors as a gate", () => {

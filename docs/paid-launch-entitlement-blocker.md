@@ -155,3 +155,41 @@ All three originally identified paid-launch blockers are now resolved:
 No outstanding paid-launch blockers from this audit. Future premium
 surfaces must follow the existing server-gate pattern.
 
+
+---
+
+## How to wrap future premium live-sensor widgets
+
+Future premium live-sensor widgets must use `PremiumLiveSensorGate`
+(`src/components/PremiumLiveSensorGate.tsx`). Children must never render
+until the server gate returns `allowed`. `capabilities.liveSensors` and
+`useMyEntitlements` are presentation-only / catalog state, not
+authoritative access gates.
+
+```tsx
+import { PremiumLiveSensorGate } from "@/components/PremiumLiveSensorGate";
+
+export function MyPremiumLiveSensorWidget(props: { tentId: string }) {
+  return (
+    <PremiumLiveSensorGate
+      surface="live_sensor_stream"
+      scope={{ tentId: props.tentId }}
+    >
+      {/* Rendered ONLY after the server-side live-sensor-entitlement
+          edge function returns ok:true. Fail-closed by default:
+          loading → skeleton, denied → Pro paywall, invalid_request /
+          network_error → safe error copy, never children. */}
+      <LivePremiumSensorStream tentId={props.tentId} />
+    </PremiumLiveSensorGate>
+  );
+}
+```
+
+Rules:
+
+- Never render premium live-sensor children before the server gate
+  returns `allowed`.
+- Never trust `useMyEntitlements` or `capabilities.liveSensors` to gate
+  the widget — they are presentation-only.
+- `PremiumLiveSensorGate` is fail-closed: any non-allowed state
+  (loading, denied, invalid_request, network_error) hides children.

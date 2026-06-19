@@ -170,9 +170,7 @@ export default function Settings() {
 
         {user?.id ? <StartScreenTile userId={user.id} /> : null}
 
-        <Tile name="Units" state="coming_soon">
-          <p className="text-sm text-muted-foreground">Temperature: °F · Nutrients: EC</p>
-        </Tile>
+        <TemperatureUnitTile />
 
         <Tile name="Notifications" state="coming_soon">
           <p className="text-sm text-muted-foreground">

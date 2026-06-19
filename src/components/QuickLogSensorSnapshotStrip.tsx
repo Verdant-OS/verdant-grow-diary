@@ -131,6 +131,17 @@ export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, a
 
       <p className="text-[12px] text-muted-foreground leading-snug">{view.description}</p>
 
+      {advisory && (
+        <p
+          data-testid="quicklog-sensor-snapshot-advisory"
+          data-advisory-kind={advisoryKind ?? "missing"}
+          role="note"
+          className="text-[11px] leading-snug text-muted-foreground"
+        >
+          {advisory}
+        </p>
+      )}
+
       {(view.ageLabel || view.metrics.length > 0) && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
           {view.ageLabel && (

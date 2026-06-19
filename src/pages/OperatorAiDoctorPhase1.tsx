@@ -325,23 +325,31 @@ export default function OperatorAiDoctorPhase1(
         />
       )}
 
-      {selectedPlant && !resultBundle && (
-        <section
-          data-testid="ai-doctor-phase1-no-result-state"
-          className="rounded-md border border-border bg-muted p-4 text-sm"
-        >
-          <h2 className="text-base font-semibold text-foreground">
-            No AI Doctor result available
-          </h2>
-          <p className="text-muted-foreground">Next steps:</p>
-          <ul className="ml-4 list-disc text-muted-foreground">
-            <li>Add a Quick Log</li>
-            <li>Add or attach a plant photo</li>
-            <li>Add a manual or live sensor snapshot</li>
-            <li>Then run AI Doctor when the context is ready</li>
-          </ul>
-          <AiDoctorPhase1EmptyStateActions kind="no-result" context={ctaContext} />
-        </section>
+      {isDerivingResult && <AiDoctorPhase1LoadingState />}
+
+      {selectedPlant && !resultBundle && !isDerivingResult && (
+        <>
+          <section
+            data-testid="ai-doctor-phase1-no-result-state"
+            className="rounded-md border border-border bg-muted p-4 text-sm"
+          >
+            <h2 className="text-base font-semibold text-foreground">
+              No AI Doctor result available
+            </h2>
+            <p className="text-muted-foreground">Next steps:</p>
+            <ul className="ml-4 list-disc text-muted-foreground">
+              <li>Add a Quick Log</li>
+              <li>Add or attach a plant photo</li>
+              <li>Add a manual or live sensor snapshot</li>
+              <li>Then run AI Doctor when the context is ready</li>
+            </ul>
+            <AiDoctorPhase1EmptyStateActions kind="no-result" context={ctaContext} />
+          </section>
+          <AiDoctorPhase1MissingContextChecklist
+            context={null}
+            ctaContext={ctaContext}
+          />
+        </>
       )}
 
       {selectedPlant && resultBundle && (
@@ -376,6 +384,12 @@ export default function OperatorAiDoctorPhase1(
             </section>
           )}
 
+          <AiDoctorPhase1MissingContextChecklist
+            context={resultBundle.context}
+            missing_information={resultBundle.result.missing_information}
+            ctaContext={ctaContext}
+          />
+
           <section
             data-testid="ai-doctor-phase1-evidence-shortcuts"
             aria-label="Evidence shortcuts"
@@ -399,6 +413,11 @@ export default function OperatorAiDoctorPhase1(
               Open sensor summary
             </a>
           </section>
+
+          <AiDoctorPhase1EvidenceShortcuts
+            items={recentActivity}
+            context={ctaContext}
+          />
 
           <div id={AI_DOCTOR_PHASE1_SENSOR_ANCHOR_ID}>
             <AiDoctorPhase1ResultPanel

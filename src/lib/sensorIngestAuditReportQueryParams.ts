@@ -21,8 +21,18 @@ export const AUDIT_URL_PARAM_FROM = "audit_from";
 export const AUDIT_URL_PARAM_TO = "audit_to";
 export const AUDIT_URL_PARAM_DEVICE = "audit_q";
 export const AUDIT_URL_PARAM_PAGE_SIZE = "audit_n";
+export const AUDIT_URL_OPERATOR_PARAM = "operator";
+export const AUDIT_URL_OPERATOR_VALUE = "1";
 
 export const AUDIT_DEVICE_QUERY_MAX = 64;
+
+export const AUDIT_URL_PARAMS = [
+  AUDIT_URL_PARAM_PROVIDER,
+  AUDIT_URL_PARAM_FROM,
+  AUDIT_URL_PARAM_TO,
+  AUDIT_URL_PARAM_DEVICE,
+  AUDIT_URL_PARAM_PAGE_SIZE,
+] as const;
 
 // Same unsafe-shape heuristics used for raw payload/device display id.
 const UNSAFE_DEVICE_QUERY_PATTERNS: RegExp[] = [
@@ -66,6 +76,10 @@ export function isSafeDeviceQuery(raw: string): boolean {
     if (re.test(raw)) return false;
   }
   return true;
+}
+
+export function hasAuditUrlState(params: URLSearchParams): boolean {
+  return AUDIT_URL_PARAMS.some((key) => params.has(key));
 }
 
 export function parseAuditUrlState(
@@ -133,13 +147,7 @@ export function applyAuditUrlState(
   const next = new URLSearchParams(current);
   const desired = serializeAuditUrlState(state);
 
-  for (const k of [
-    AUDIT_URL_PARAM_PROVIDER,
-    AUDIT_URL_PARAM_FROM,
-    AUDIT_URL_PARAM_TO,
-    AUDIT_URL_PARAM_DEVICE,
-    AUDIT_URL_PARAM_PAGE_SIZE,
-  ]) {
+  for (const k of AUDIT_URL_PARAMS) {
     next.delete(k);
   }
   for (const [k, v] of Object.entries(desired)) {
@@ -148,4 +156,27 @@ export function applyAuditUrlState(
   // Operator mode flag is preserved (we copied `current`). If it was
   // already present we leave it; we never inject it on its own here.
   return next;
+}
+
+export function buildOperatorAuditSearchParams(
+  current: URLSearchParams,
+  state: AuditUrlState,
+): URLSearchParams {
+  const next = applyAuditUrlState(current, {
+    ...state,
+    deviceQuery: isSafeDeviceQuery(state.deviceQuery) ? state.deviceQuery : "",
+  });
+  next.set(AUDIT_URL_OPERATOR_PARAM, AUDIT_URL_OPERATOR_VALUE);
+  return next;
+}
+
+export function buildOperatorAuditLink(input: {
+  origin: string;
+  pathname: string;
+  currentSearchParams: URLSearchParams;
+  state: AuditUrlState;
+}): string {
+  const next = buildOperatorAuditSearchParams(input.currentSearchParams, input.state);
+  const query = next.toString();
+  return `${input.origin}${input.pathname}${query ? `?${query}` : ""}`;
 }

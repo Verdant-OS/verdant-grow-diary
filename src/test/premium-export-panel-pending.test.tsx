@@ -36,13 +36,13 @@ vi.mock("@/lib/aiDoctorEvidenceCsvExportRules", async () => {
   };
 });
 
-let invokeImpl: (...args: unknown[]) => unknown = async () => ({
+let invokeImpl: (...args: any[]) => unknown = async () => ({
   data: { ok: true },
   error: null,
 });
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    functions: { invoke: (...a: unknown[]) => invokeImpl(...a) },
+    functions: { invoke: (...a: any[]) => invokeImpl.apply(null, a as []) },
   },
 }));
 

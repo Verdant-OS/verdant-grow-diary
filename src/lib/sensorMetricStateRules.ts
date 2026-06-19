@@ -60,10 +60,75 @@ export interface ClassifyMetricInput {
   hasAnyReading: boolean;
   /** Stale: any real reading whose age exceeded the freshness window. */
   isStale?: boolean;
-  /** Invalid: detected impossible/stuck telemetry. */
+  /** Invalid: detected impossible/stuck telemetry. Caller-forced. */
   isInvalid?: boolean;
   /** True if the metric was derived (e.g. VPD from temp + RH). */
   isDerived?: boolean;
+  /**
+   * Optional recent values for stuck-at-bound detection. Used for
+   * soil moisture: 3+ consecutive 0 or 100 readings classify as stuck.
+   */
+  recentValues?: readonly (number | null | undefined)[];
+}
+
+/** Optional metric invalid bounds. Outside → caution, calm otherwise. */
+export interface OptionalMetricBounds {
+  min: number;
+  max: number;
+}
+
+export const CO2_VALID_BOUNDS: OptionalMetricBounds = { min: 250, max: 5000 };
+export const PPFD_VALID_BOUNDS: OptionalMetricBounds = { min: 0, max: 2500 };
+export const SOIL_VALID_BOUNDS: OptionalMetricBounds = { min: 0, max: 100 };
+
+const INVALID_COPY: Partial<Record<SensorMetricKey, string>> = {
+  co2: "CO₂ reading looks invalid. Check source or units.",
+  ppfd: "PPFD reading looks invalid. Check source or units.",
+  soil: "Soil moisture reading looks invalid. Check source or units.",
+};
+
+const STUCK_COPY: Partial<Record<SensorMetricKey, string>> = {
+  soil: "Soil moisture appears stuck. Check probe or calibration.",
+};
+
+/**
+ * Detect impossible/non-finite optional metric values. Missing → false
+ * (caller decides calm state); finite-but-out-of-bounds → true.
+ */
+export function isOptionalMetricInvalid(
+  metric: SensorMetricKey,
+  value: number | null | undefined,
+): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value !== "number" || !Number.isFinite(value)) return true;
+  if (metric === "co2") {
+    return value < CO2_VALID_BOUNDS.min || value > CO2_VALID_BOUNDS.max;
+  }
+  if (metric === "ppfd") {
+    return value < PPFD_VALID_BOUNDS.min || value > PPFD_VALID_BOUNDS.max;
+  }
+  if (metric === "soil") {
+    return value < SOIL_VALID_BOUNDS.min || value > SOIL_VALID_BOUNDS.max;
+  }
+  return false;
+}
+
+/**
+ * Soil-moisture "stuck at bound" detector. Only classifies as stuck when
+ * 3+ recent values are all exactly 0 or all exactly 100. Anything less
+ * conservative would risk false positives on a single zero reading.
+ */
+export function isSoilMoistureStuck(
+  recentValues: readonly (number | null | undefined)[] | undefined,
+): boolean {
+  if (!recentValues || recentValues.length < 3) return false;
+  const finite = recentValues.filter(
+    (v): v is number => typeof v === "number" && Number.isFinite(v),
+  );
+  if (finite.length < 3) return false;
+  const allZero = finite.every((v) => v === 0);
+  const allMax = finite.every((v) => v === 100);
+  return allZero || allMax;
 }
 
 /** Core metrics that are always expected from a working tent. */
@@ -146,6 +211,10 @@ export function isCoreMetric(metric: SensorMetricKey): boolean {
 
 /**
  * Classify a metric's presentation state. Pure & deterministic.
+ *
+ * Cautionary tone is reserved for `stale` and `invalid` only. Optional
+ * metrics that are simply not connected use a calm tone. Soil moisture
+ * uses an optional `recentValues` history to detect stuck-at-bound.
  */
 export function classifySensorMetricState(
   input: ClassifyMetricInput,
@@ -153,9 +222,26 @@ export function classifySensorMetricState(
   const { metric, value, hasAnyReading } = input;
   const hasValue = typeof value === "number" && Number.isFinite(value);
 
+  // Auto-detect invalid for optional metrics from value bounds.
+  const autoInvalid =
+    isOptionalMetric(metric) && isOptionalMetricInvalid(metric, value);
+  // Soil moisture stuck-at-bound only triggers on enough history.
+  const autoStuck =
+    metric === "soil" && isSoilMoistureStuck(input.recentValues);
+
   // Cautionary takes priority over "we have a value".
-  if (input.isInvalid) {
-    return makeState("invalid", metric, "Invalid telemetry detected.", false);
+  if (input.isInvalid || autoInvalid) {
+    const copy =
+      INVALID_COPY[metric] ?? "Invalid telemetry detected.";
+    return makeState("invalid", metric, copy, false);
+  }
+  if (autoStuck) {
+    return makeState(
+      "invalid",
+      metric,
+      STUCK_COPY.soil ?? "Soil moisture appears stuck.",
+      true,
+    );
   }
   if (hasValue && input.isStale) {
     return makeState(
@@ -182,7 +268,6 @@ export function classifySensorMetricState(
   if (isOptionalMetric(metric)) {
     return makeState("not_connected", metric, CALM_EMPTY_COPY[metric], false);
   }
-  // Core metric (temp/rh/vpd) with no reading.
   if (metric === "vpd") {
     return makeState("no_reading_yet", metric, CALM_EMPTY_COPY.vpd, false);
   }

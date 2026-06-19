@@ -5,6 +5,9 @@ import {
   classifySensorMetricState,
   isOptionalMetric,
   isCoreMetric,
+  isOptionalMetricInvalid,
+  isSoilMoistureStuck,
+  type SensorMetricKey,
 } from "@/lib/sensorMetricStateRules";
 
 describe("sensorMetricStateRules", () => {
@@ -174,3 +177,191 @@ describe("sensorMetricStateRules static safety", () => {
     }
   });
 });
+
+describe("optional metric invalid detection", () => {
+  it.each([
+    ["co2", null, false],
+    ["co2", undefined, false],
+    ["co2", Number.NaN, true],
+    ["co2", Number.POSITIVE_INFINITY, true],
+    ["co2", -10, true],
+    ["co2", 100, true],
+    ["co2", 6000, true],
+    ["co2", 420, false],
+    ["co2", 800, false],
+    ["co2", 1200, false],
+    ["ppfd", null, false],
+    ["ppfd", undefined, false],
+    ["ppfd", Number.NaN, true],
+    ["ppfd", Number.POSITIVE_INFINITY, true],
+    ["ppfd", -1, true],
+    ["ppfd", 3000, true],
+    ["ppfd", 0, false],
+    ["ppfd", 100, false],
+    ["ppfd", 600, false],
+    ["ppfd", 1200, false],
+    ["soil", null, false],
+    ["soil", undefined, false],
+    ["soil", Number.NaN, true],
+    ["soil", -1, true],
+    ["soil", 101, true],
+    ["soil", 0, false],
+    ["soil", 15, false],
+    ["soil", 45, false],
+    ["soil", 80, false],
+  ] as const)(
+    "isOptionalMetricInvalid(%s, %s) -> %s",
+    (metric, value, expected) => {
+      expect(isOptionalMetricInvalid(metric as SensorMetricKey, value)).toBe(
+        expected,
+      );
+    },
+  );
+
+  it("classifies CO2 6000 as caution with units copy", () => {
+    const s = classifySensorMetricState({
+      metric: "co2",
+      value: 6000,
+      hasAnyReading: true,
+    });
+    expect(s.kind).toBe("invalid");
+    expect(s.tone).toBe("caution");
+    expect(s.message).toMatch(/CO₂ reading looks invalid/);
+  });
+
+  it("classifies PPFD 3000 as caution with units copy", () => {
+    const s = classifySensorMetricState({
+      metric: "ppfd",
+      value: 3000,
+      hasAnyReading: true,
+    });
+    expect(s.kind).toBe("invalid");
+    expect(s.message).toMatch(/PPFD reading looks invalid/);
+  });
+
+  it("missing optional metric stays calm (not invalid) for CO2/PPFD/soil", () => {
+    for (const m of ["co2", "ppfd", "soil"] as const) {
+      const s = classifySensorMetricState({
+        metric: m,
+        value: null,
+        hasAnyReading: false,
+      });
+      expect(s.tone).toBe("calm");
+      expect(s.kind).toBe("not_connected");
+    }
+  });
+});
+
+describe("soil moisture stuck detection", () => {
+  it("single 0 reading is not stuck", () => {
+    expect(isSoilMoistureStuck([0])).toBe(false);
+    const s = classifySensorMetricState({
+      metric: "soil",
+      value: 0,
+      hasAnyReading: true,
+      recentValues: [0],
+    });
+    expect(s.kind).not.toBe("invalid");
+  });
+
+  it("[0,0,0] classifies as caution/stuck", () => {
+    expect(isSoilMoistureStuck([0, 0, 0])).toBe(true);
+    const s = classifySensorMetricState({
+      metric: "soil",
+      value: 0,
+      hasAnyReading: true,
+      recentValues: [0, 0, 0],
+    });
+    expect(s.kind).toBe("invalid");
+    expect(s.tone).toBe("caution");
+    expect(s.message).toMatch(/stuck/i);
+  });
+
+  it("[100,100,100] classifies as caution/stuck", () => {
+    expect(isSoilMoistureStuck([100, 100, 100])).toBe(true);
+  });
+
+  it("[0,1,0] does NOT classify as stuck", () => {
+    expect(isSoilMoistureStuck([0, 1, 0])).toBe(false);
+  });
+
+  it("undefined recentValues never stuck", () => {
+    expect(isSoilMoistureStuck(undefined)).toBe(false);
+  });
+});
+
+describe("stale vs invalid caution-tone coverage", () => {
+  const CALM_KINDS = [
+    "live",
+    "manual",
+    "csv",
+    "demo",
+    "derived",
+    "not_connected",
+    "no_reading_yet",
+  ] as const;
+
+  it.each(CALM_KINDS)("%s renders calm tone, not caution", (kind) => {
+    let s;
+    if (kind === "derived") {
+      s = classifySensorMetricState({
+        metric: "vpd",
+        value: 1.2,
+        hasAnyReading: true,
+        isDerived: true,
+      });
+    } else if (kind === "not_connected") {
+      s = classifySensorMetricState({
+        metric: "co2",
+        value: null,
+        hasAnyReading: false,
+      });
+    } else if (kind === "no_reading_yet") {
+      s = classifySensorMetricState({
+        metric: "vpd",
+        value: null,
+        hasAnyReading: true,
+      });
+    } else {
+      s = classifySensorMetricState({
+        metric: "temp",
+        value: 24,
+        source: kind,
+        hasAnyReading: true,
+      });
+    }
+    expect(s.kind).toBe(kind);
+    expect(s.tone).toBe("calm");
+  });
+
+  it("stale and invalid are the only caution tones", () => {
+    const stale = classifySensorMetricState({
+      metric: "temp",
+      value: 24,
+      source: "live",
+      hasAnyReading: true,
+      isStale: true,
+    });
+    const invalid = classifySensorMetricState({
+      metric: "co2",
+      value: 99,
+      hasAnyReading: true,
+    });
+    expect(stale.tone).toBe("caution");
+    expect(invalid.tone).toBe("caution");
+  });
+
+  it.each(["vpd", "co2", "ppfd", "soil"] as const)(
+    "optional metric %s classifies all four bound cases without throwing",
+    (metric) => {
+      expect(() =>
+        classifySensorMetricState({
+          metric,
+          value: null,
+          hasAnyReading: false,
+        }),
+      ).not.toThrow();
+    },
+  );
+});
+

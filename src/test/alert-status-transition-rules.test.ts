@@ -9,37 +9,102 @@ import {
   safeAlertTransitionErrorCopy,
 } from "@/lib/alertStatusTransitionRules";
 
-const ACK_CHECK = (patch: { acknowledged_at: string | null; status: string }) =>
-  patch.acknowledged_at === null || patch.status === "acknowledged";
-const RES_CHECK = (patch: { resolved_at: string | null; status: string }) =>
-  patch.resolved_at === null || patch.status === "resolved";
+/**
+ * Simulate the post-migration CHECK constraints in pure JS so we can
+ * assert validity of a hypothetical post-update row.
+ */
+type RowState = {
+  status: "open" | "acknowledged" | "resolved" | "dismissed";
+  acknowledged_at: string | null;
+  resolved_at: string | null;
+};
+
+const ACK_CHECK_NEW = (r: RowState) =>
+  (r.status === "open" && r.acknowledged_at === null) ||
+  (r.status === "acknowledged" && r.acknowledged_at !== null) ||
+  r.status === "resolved" ||
+  r.status === "dismissed";
+
+const RES_CHECK = (r: RowState) =>
+  r.resolved_at === null || r.status === "resolved";
+
+function applyPatch<T extends Partial<RowState> & { status: RowState["status"] }>(
+  before: RowState,
+  patch: T,
+): RowState {
+  return { ...before, ...patch };
+}
 
 describe("alertStatusTransitionRules — patch builders", () => {
-  it("buildResolveAlertPatch satisfies alerts_acknowledged_at_status_check", () => {
+  it("buildResolveAlertPatch omits acknowledged_at so history is preserved", () => {
     const p = buildResolveAlertPatch("2026-06-18T00:00:00Z");
     expect(p.status).toBe("resolved");
     expect(p.resolved_at).toBe("2026-06-18T00:00:00Z");
-    expect(p.acknowledged_at).toBeNull();
-    expect(ACK_CHECK(p)).toBe(true);
-    expect(RES_CHECK(p)).toBe(true);
+    expect("acknowledged_at" in p).toBe(false);
   });
 
-  it("buildAcknowledgeAlertPatch clears resolved_at and satisfies both CHECKs", () => {
-    const p = buildAcknowledgeAlertPatch("2026-06-18T00:00:00Z");
-    expect(p.status).toBe("acknowledged");
-    expect(p.acknowledged_at).toBe("2026-06-18T00:00:00Z");
-    expect(p.resolved_at).toBeNull();
-    expect(ACK_CHECK(p)).toBe(true);
-    expect(RES_CHECK(p)).toBe(true);
+  it("acknowledged → resolved: preserves historical acknowledged_at and is constraint-valid", () => {
+    const before: RowState = {
+      status: "acknowledged",
+      acknowledged_at: "2026-06-17T10:00:00Z",
+      resolved_at: null,
+    };
+    const after = applyPatch(before, buildResolveAlertPatch("2026-06-18T00:00:00Z"));
+    expect(after.acknowledged_at).toBe("2026-06-17T10:00:00Z");
+    expect(after.status).toBe("resolved");
+    expect(after.resolved_at).toBe("2026-06-18T00:00:00Z");
+    expect(ACK_CHECK_NEW(after)).toBe(true);
+    expect(RES_CHECK(after)).toBe(true);
   });
 
-  it("buildDismissAlertPatch clears both timestamps", () => {
+  it("acknowledged → dismissed: preserves historical acknowledged_at and is constraint-valid", () => {
+    const before: RowState = {
+      status: "acknowledged",
+      acknowledged_at: "2026-06-17T10:00:00Z",
+      resolved_at: null,
+    };
+    const after = applyPatch(before, buildDismissAlertPatch());
+    expect(after.acknowledged_at).toBe("2026-06-17T10:00:00Z");
+    expect(after.status).toBe("dismissed");
+    expect(after.resolved_at).toBeNull();
+    expect(ACK_CHECK_NEW(after)).toBe(true);
+    expect(RES_CHECK(after)).toBe(true);
+  });
+
+  it("open → resolved (no prior acknowledgement) stays constraint-valid", () => {
+    const before: RowState = {
+      status: "open",
+      acknowledged_at: null,
+      resolved_at: null,
+    };
+    const after = applyPatch(before, buildResolveAlertPatch("2026-06-18T00:00:00Z"));
+    expect(after.acknowledged_at).toBeNull();
+    expect(ACK_CHECK_NEW(after)).toBe(true);
+    expect(RES_CHECK(after)).toBe(true);
+  });
+
+  it("buildAcknowledgeAlertPatch stamps acknowledged_at and clears resolved_at", () => {
+    const before: RowState = {
+      status: "resolved",
+      acknowledged_at: null,
+      resolved_at: "2026-06-17T10:00:00Z",
+    };
+    const after = applyPatch(
+      before,
+      buildAcknowledgeAlertPatch("2026-06-18T00:00:00Z"),
+    );
+    expect(after.status).toBe("acknowledged");
+    expect(after.acknowledged_at).toBe("2026-06-18T00:00:00Z");
+    expect(after.resolved_at).toBeNull();
+    expect(ACK_CHECK_NEW(after)).toBe(true);
+    expect(RES_CHECK(after)).toBe(true);
+  });
+
+  it("buildDismissAlertPatch clears resolved_at and omits acknowledged_at", () => {
     const p = buildDismissAlertPatch();
     expect(p.status).toBe("dismissed");
-    expect(p.acknowledged_at).toBeNull();
     expect(p.resolved_at).toBeNull();
-    expect(ACK_CHECK(p)).toBe(true);
-    expect(RES_CHECK(p)).toBe(true);
+    expect("acknowledged_at" in p).toBe(false);
   });
 
   it("buildReopenAlertPatch returns the row to a pristine open state", () => {
@@ -47,8 +112,16 @@ describe("alertStatusTransitionRules — patch builders", () => {
     expect(p.status).toBe("open");
     expect(p.acknowledged_at).toBeNull();
     expect(p.resolved_at).toBeNull();
-    expect(ACK_CHECK(p)).toBe(true);
-    expect(RES_CHECK(p)).toBe(true);
+    const after = applyPatch(
+      {
+        status: "acknowledged",
+        acknowledged_at: "2026-06-17T10:00:00Z",
+        resolved_at: null,
+      },
+      p,
+    );
+    expect(ACK_CHECK_NEW(after)).toBe(true);
+    expect(RES_CHECK(after)).toBe(true);
   });
 
   it("resolve patch is deterministic when `now` is provided", () => {
@@ -60,6 +133,24 @@ describe("alertStatusTransitionRules — patch builders", () => {
   it("resolve patch accepts a Date instance", () => {
     const p = buildResolveAlertPatch(new Date("2026-02-02T03:04:05Z"));
     expect(p.resolved_at).toBe("2026-02-02T03:04:05.000Z");
+  });
+
+  it("simulated CHECK still blocks an open row with acknowledged_at set", () => {
+    const invalid: RowState = {
+      status: "open",
+      acknowledged_at: "2026-06-18T00:00:00Z",
+      resolved_at: null,
+    };
+    expect(ACK_CHECK_NEW(invalid)).toBe(false);
+  });
+
+  it("simulated CHECK still blocks an acknowledged row missing acknowledged_at", () => {
+    const invalid: RowState = {
+      status: "acknowledged",
+      acknowledged_at: null,
+      resolved_at: null,
+    };
+    expect(ACK_CHECK_NEW(invalid)).toBe(false);
   });
 });
 

@@ -6,6 +6,7 @@
  */
 
 import type { EnvironmentSummaryExportAuditEvent } from "./environmentSummaryExportAuditRules";
+import { assertExportSafe } from "./exportRedactionRules";
 
 export interface ExportReceiptViewModel {
   eventId: string;
@@ -80,5 +81,7 @@ export function formatReceiptPlainText(vm: ExportReceiptViewModel): string {
   lines.push(`Source:         ${vm.sourceLabel}`);
   lines.push(`------------------------------------------`);
   lines.push(`This receipt is stored locally in your browser only.`);
-  return lines.join("\n");
+  const text = lines.join("\n");
+  assertExportSafe(text, "environment-summary-export-receipt");
+  return text;
 }

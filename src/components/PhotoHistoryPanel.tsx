@@ -9,6 +9,10 @@ import {
   buildPhotoHistory,
   type PhotoHistoryRow,
 } from "@/lib/photoHistoryRules";
+import {
+  PHOTO_NON_DIAGNOSTIC_LABEL,
+  PHOTO_NON_DIAGNOSTIC_TESTID,
+} from "@/lib/photoEventNonDiagnosticLabelRules";
 
 interface PhotoHistoryPanelProps {
   /**

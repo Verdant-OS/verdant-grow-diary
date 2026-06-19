@@ -220,3 +220,22 @@ describe("AiDoctorPhase1EvidenceShortcuts — accessibility polish", () => {
     expect(aria).not.toMatch(/Approve|Send|Execute|Run equipment|Control device/i);
   });
 });
+
+describe("AiDoctorPhase1EvidenceShortcuts — shared a11y utility", () => {
+  it("diary shortcut className contains the shared focus-visible recipe", async () => {
+    const { AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES } = await import(
+      "@/lib/aiDoctorPhase1A11yClassNames"
+    );
+    renderWithRouter(
+      <AiDoctorPhase1EvidenceShortcuts
+        items={[row("x", "2026-06-10T00:00:00Z")]}
+        context={CTX}
+      />,
+    );
+    const cls =
+      screen.getByTestId("ai-doctor-phase1-diary-shortcut-x").getAttribute("class") ?? "";
+    for (const token of AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES.split(/\s+/)) {
+      expect(cls).toContain(token);
+    }
+  });
+});

@@ -113,18 +113,18 @@ export default function Sensors() {
       />
       <div className="grid lg:grid-cols-2 gap-4">
         {METRICS.map((m) => {
-          const metricKey = m.key as SensorMetricKey;
+          const m.key = m.key as SensorMetricKey;
           // Resolve raw value for this metric from the latest reading.
           const rawValue: number | null | undefined = latest
             ? (latest as unknown as Record<string, number | null | undefined>)[
-                metricKey
+                m.key
               ]
             : null;
           // Derive VPD from temp + RH when no VPD value is present.
           let value: number | null | undefined = rawValue;
           let isDerived = false;
           if (
-            metricKey === "vpd" &&
+            m.key === "vpd" &&
             (value == null || !Number.isFinite(value as number)) &&
             latest
           ) {
@@ -139,7 +139,7 @@ export default function Sensors() {
             }
           }
           const state = classifySensorMetricState({
-            metric: metricKey,
+            metric: m.key,
             value: value ?? null,
             source: latestSource,
             hasAnyReading: hasReadings,
@@ -151,13 +151,13 @@ export default function Sensors() {
           // stage never reads as ok. Pure presenter; no writes.
           let envStatus: "ok" | "warn" | "bad" | null = null;
           let envLabel: string | null = null;
-          if (metricKey === "temp" && latest) {
+          if (m.key === "temp" && latest) {
             const r = classifyTempAgainstStage(latest.temp ?? null, {
               stage: selectedTentStage,
             });
             envStatus = environmentMetricChipStatus(r);
             envLabel = r.label;
-          } else if (metricKey === "rh" && latest) {
+          } else if (m.key === "rh" && latest) {
             const r = classifyRhAgainstStage(latest.rh ?? null, {
               stage: selectedTentStage,
             });
@@ -177,13 +177,13 @@ export default function Sensors() {
               : "border-border/60 text-muted-foreground";
 
           return (
-            <div key={metricKey} className="glass rounded-2xl p-4">
+            <div key={m.key} className="glass rounded-2xl p-4">
               <div className="flex items-center justify-between mb-2 gap-2">
                 <div className="flex items-center gap-2">
                   <h3 className="font-display font-semibold">{m.label}</h3>
                   {envStatus && envLabel && (
                     <span
-                      data-testid={`sensors-stage-status-${metricKey}`}
+                      data-testid={`sensors-stage-status-${m.key}`}
                       className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] ${envToneClass}`}
                       title={envLabel}
                     >
@@ -191,7 +191,7 @@ export default function Sensors() {
                     </span>
                   )}
                   <span
-                    data-testid={`sensors-metric-state-${metricKey}`}
+                    data-testid={`sensors-metric-state-${m.key}`}
                     data-kind={state.kind}
                     data-tone={state.tone}
                     className={cn(
@@ -208,16 +208,16 @@ export default function Sensors() {
                 )}
               </div>
               {state.showChart ? (
-                <SensorChart data={filtered} metric={metricKey} height={200} />
+                <SensorChart data={filtered} metric={m.key} height={200} />
               ) : (
                 <p
                   className="text-xs text-muted-foreground py-6 text-center"
-                  data-testid={`sensors-empty-${metricKey}`}
+                  data-testid={`sensors-empty-${m.key}`}
                 >
                   {state.message}
                 </p>
               )}
-              {metricKey === "vpd" && isDerived && (
+              {m.key === "vpd" && isDerived && (
                 <p
                   className="text-[11px] text-muted-foreground mt-2"
                   data-testid="sensors-vpd-derived-note"
@@ -225,7 +225,7 @@ export default function Sensors() {
                   {VPD_DERIVED_NOTE}
                 </p>
               )}
-              {metricKey === "vpd" && (
+              {m.key === "vpd" && (
                 <p
                   className="text-[11px] text-muted-foreground mt-2"
                   data-testid="sensors-vpd-stage-hint"
@@ -233,7 +233,7 @@ export default function Sensors() {
                   {VPD_STAGE_HELPER_TEXT}
                 </p>
               )}
-              {metricKey === "vpd" && vpdStageMissing && (
+              {m.key === "vpd" && vpdStageMissing && (
                 <VpdStageMissingBadge
                   testId="sensors-vpd-stage-missing-badge"
                   className="mt-2"
